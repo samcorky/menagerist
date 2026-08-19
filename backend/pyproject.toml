@@ -10,6 +10,7 @@ license-files = [
 
 [dependency-groups]
 dev = [
+    "hatchling>=1.32.0",
     "mypy>=2.3.1",
     "ruff>=0.16.3",
 ]
@@ -28,6 +29,9 @@ source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/app"]
+
+[tool.hatch.build.hooks.custom]
+path = "scripts/hatch_build_info.py"
 
 [tool.hatch.version.raw-options]
 search_parent_directories = true
