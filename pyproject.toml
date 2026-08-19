@@ -25,9 +25,36 @@ verbosity = -1
 cmd = "prek install -f"
 help = "Install or update local git hooks"
 
-[tool.poe.tasks.check]
-cmd = "prek run --all-files"
+[tool.poe.tasks.format-backend]
+cmd = "ruff format ."
+cwd = "backend"
+help = "Format backend Python files with Ruff"
+
+[tool.poe.tasks.lint-backend]
+cmd = "ruff check ."
+cwd = "backend"
+help = "Lint backend Python files with Ruff"
+
+[tool.poe.tasks.lint-backend-fix]
+cmd = "ruff check . --fix"
+cwd = "backend"
+help = "Lint backend Python files with Ruff and apply safe fixes"
+
+[tool.poe.tasks.format]
+sequence = ["format-backend"]
+help = "Format all project code"
+
+[tool.poe.tasks.lint]
+sequence = ["lint-backend"]
+help = "Lint all project code"
+
+[tool.poe.tasks._check-hooks]
+shell = "prek run --all-files || prek run --all-files"
 help = "Run all configured pre-commit checks against the full repository"
+
+[tool.poe.tasks.check]
+sequence = ["lint", "_check-hooks"]
+help = "Run all configured checks against the full repository"
 
 [tool.poe.tasks.init]
 sequence = ["_install-hooks"]
