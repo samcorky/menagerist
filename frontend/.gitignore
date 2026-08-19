@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Vite
+dist/
+.vite/
+
+# Testing / coverage
+coverage/
+
+# TypeScript
+*.tsbuildinfo

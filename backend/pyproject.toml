@@ -1,0 +1,29 @@
+[project]
+name = "menagerist"
+dynamic = ["version"]
+description = "A lightweight, self-hostable and flexible platform for organising the things you care about."
+requires-python = ">=3.14"
+dependencies = []
+license-files = [
+    "../LICENSE"
+]
+
+[build-system]
+requires = [
+    "hatchling==1.29.0",
+    "hatch-vcs==0.5.0",
+    "calver-scm==1.4.1"
+]
+
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/app"]
+
+[tool.hatch.version.raw-options]
+search_parent_directories = true
+version_scheme = "calver-scm"
+local_scheme = "no-local-version"
