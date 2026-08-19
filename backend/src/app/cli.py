@@ -1,4 +1,5 @@
 import sys
+from pprint import pformat
 
 import structlog
 
@@ -27,6 +28,12 @@ app = App(
 async def hello() -> None:
     """Print a hello-world log message."""
     logger.info("Hello World")
+
+
+@app.command
+async def info() -> None:
+    """Print the app info."""
+    logger.info(pformat(app_info.model_dump()))
 
 
 if __name__ == "__main__":
