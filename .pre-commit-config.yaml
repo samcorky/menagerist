@@ -13,9 +13,6 @@ repos:
       - id: no-commit-to-branch
         args:
           - --branch=main
-      - id: name-tests-test
-        args:
-          - --pytest-test-first
       - id: pretty-format-json
         args:
           - --autofix
