@@ -1,15 +1,10 @@
-from __future__ import annotations
-
+from datetime import datetime  # noqa: TC003
 from functools import lru_cache
 from importlib.metadata import distribution
-from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
 from app.platform import _DISTRIBUTION_NAME
-
-if TYPE_CHECKING:
-    from datetime import datetime
 
 
 class BuildInfo(BaseModel):
