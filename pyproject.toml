@@ -4,7 +4,10 @@ version = "0.0.0"
 description = "A lightweight, self-hostable and flexible platform for organising the things you care about."
 requires-python = ">=3.14"
 
-dependencies = ["menagerist"]
+dependencies = [
+    "cyclopts==4.23.1",
+    "menagerist",
+]
 
 [tool.uv]
 package = false

@@ -9,9 +9,12 @@ dependencies = [
     "pydantic>=2.13.4",
     "pydantic-settings>=2.15.0",
     "structlog>=26.1.0",
-    "cyclopts>=4.23.0",
+    "cyclopts>=4.23.1",
     "fastapi>=0.141.1",
     "granian>=2.8.1",
+    "sqlalchemy>=2.0.52",
+    "psycopg>=3.3.4",
+    "alembic>=1.19.1",
 ]
 
 [dependency-groups]

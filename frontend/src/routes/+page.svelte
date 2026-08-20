@@ -86,7 +86,7 @@
 			</div>
 		</section>
 
-		{#if error}
+		{#if error || healthy === false}
 			<Alert variant="destructive">
 				<TriangleAlert class="size-4" />
 				<AlertTitle>API unavailable</AlertTitle>
