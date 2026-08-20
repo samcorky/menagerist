@@ -17,6 +17,7 @@
 	let checkedAt = $state<Date | null>(null);
 
 	const apiBaseUrl = 'http://localhost:8000/api';
+	const refreshIntervalMs = 5_000;
 
 	async function loadStatus() {
 		loading = true;
@@ -43,6 +44,14 @@
 
 	$effect(() => {
 		void loadStatus();
+
+		const interval = window.setInterval(() => {
+			void loadStatus();
+		}, refreshIntervalMs);
+
+		return () => {
+			window.clearInterval(interval);
+		};
 	});
 </script>
 
@@ -122,9 +131,9 @@
 				<Card.Header>
 					<Card.Description>Application version</Card.Description>
 
-					<Card.Title>
-						{#if loading}
-							<Skeleton class="h-8 w-32" />
+					<Card.Title class="flex h-8 items-center">
+						{#if loading && !version}
+							<Skeleton class="h-7 w-36" />
 						{:else if version}
 							{version}
 						{:else}
