@@ -4,6 +4,8 @@ version = "0.0.0"
 description = "A lightweight, self-hostable and flexible platform for organising the things you care about."
 requires-python = ">=3.14"
 
+dependencies = ["menagerist"]
+
 [tool.uv]
 package = false
 
@@ -11,6 +13,9 @@ package = false
 members = [
     "backend"
 ]
+
+[tool.uv.sources]
+menagerist = {workspace = true}
 
 [dependency-groups]
 dev = [
@@ -64,6 +69,14 @@ help = "Run all configured pre-commit checks against the full repository"
 [tool.poe.tasks.check]
 sequence = ["_check-hooks"]
 help = "Run all configured checks against the full repository"
+
+[tool.poe.tasks.build-backend]
+cmd = "uv build --package menagerist"
+help = "Build sdist+wheel for the menagerist package"
+
+[tool.poe.tasks.build]
+sequence = ["build-backend"]
+help = "Build backend and frontend"
 
 [tool.poe.tasks.init]
 sequence = ["_install-hooks"]

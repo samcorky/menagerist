@@ -8,6 +8,7 @@ license = "Apache-2.0"
 dependencies = [
     "pydantic>=2.13.4",
     "structlog>=26.1.0",
+    "cyclopts>=4.23.0",
 ]
 
 [dependency-groups]
@@ -15,10 +16,6 @@ dev = [
     "hatchling==1.32.0",
     "mypy>=2.3.1",
     "ruff>=0.16.3",
-]
-
-cli = [
-    "cyclopts>=4.23.0",
 ]
 
 [project.scripts]
