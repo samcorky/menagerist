@@ -26,62 +26,81 @@ dev = [
 [tool.poe]
 verbosity = -1
 
-[tool.poe.tasks._install-hooks]
+[tool.poe.groups.setup]
+heading = "Setup"
+
+[tool.poe.groups.setup.tasks._install-hooks]
 cmd = "prek install -f"
 help = "Install or update local git hooks"
 
-[tool.poe.tasks.sync]
+[tool.poe.groups.setup.tasks.sync]
 cmd = "uv sync --all-packages --all-groups"
 help = "Sync the environment with all workspace members and their dependency groups"
 
-[tool.poe.tasks.format-backend]
+[tool.poe.groups.setup.tasks.init]
+sequence = ["sync", "_install-hooks"]
+help = "Initialize the local development environment"
+
+[tool.poe.groups.quality]
+heading = "Quality"
+
+[tool.poe.groups.quality.tasks.format-backend]
 cmd = "ruff format ."
 cwd = "backend"
 help = "Format backend Python files with Ruff"
 
-[tool.poe.tasks.lint-backend]
+[tool.poe.groups.quality.tasks.lint-backend]
 cmd = "ruff check ."
 cwd = "backend"
 help = "Lint backend Python files with Ruff"
 
-[tool.poe.tasks.lint-backend-fix]
+[tool.poe.groups.quality.tasks.lint-backend-fix]
 cmd = "ruff check . --fix"
 cwd = "backend"
 help = "Lint backend Python files with Ruff and apply safe fixes"
 
-[tool.poe.tasks.typecheck-backend]
+[tool.poe.groups.quality.tasks.typecheck-backend]
 cmd = "mypy"
 cwd = "backend"
 help = "Type-check backend Python files with mypy"
 
-[tool.poe.tasks.format]
+[tool.poe.groups.quality.tasks.format]
 sequence = ["format-backend"]
 help = "Format all project code"
 
-[tool.poe.tasks.lint]
+[tool.poe.groups.quality.tasks.lint]
 sequence = ["lint-backend"]
 help = "Lint all project code"
 
-[tool.poe.tasks.typecheck]
+[tool.poe.groups.quality.tasks.typecheck]
 sequence = ["typecheck-backend"]
 help = "Type-check all project code"
 
-[tool.poe.tasks._check-hooks]
+[tool.poe.groups.quality.tasks._check-hooks]
 shell = "prek run --all-files || prek run --all-files"
 help = "Run all configured pre-commit checks against the full repository"
 
-[tool.poe.tasks.check]
+[tool.poe.groups.quality.tasks.check]
 sequence = ["_check-hooks"]
 help = "Run all configured checks against the full repository"
 
-[tool.poe.tasks.build-backend]
+[tool.poe.groups.run]
+heading = "Build & Run"
+
+[tool.poe.groups.run.tasks.build-backend]
 cmd = "uv build --package menagerist"
 help = "Build sdist+wheel for the menagerist package"
 
-[tool.poe.tasks.build]
+[tool.poe.groups.run.tasks.build]
 sequence = ["build-backend"]
 help = "Build backend and frontend"
 
-[tool.poe.tasks.init]
-sequence = ["sync", "_install-hooks"]
-help = "Initialize the local development environment"
+[tool.poe.groups.run.tasks.serve-backend]
+cmd = "menagerist serve --reload"
+help = "Run the backend API server with auto-reload for development"
+
+[tool.poe.groups.run.tasks.serve]
+parallel = ["serve-backend"]
+help = "Run the app for local development"
+# Ctrl+C exits the server non-zero; without this poe reports it as a failed task.
+ignore_fail = true

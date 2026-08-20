@@ -9,7 +9,7 @@ from . import _DISTRIBUTION_NAME
 class ProjectInfo(BaseModel):
     """Static project metadata read from the installed package metadata."""
 
-    name: str = _DISTRIBUTION_NAME
+    name: str
     description: str | None = None
     version: str | None = None
     license: str | None = None

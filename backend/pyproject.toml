@@ -24,7 +24,7 @@ dev = [
 ]
 
 [project.scripts]
-menagerist = "app.cli:app"
+menagerist = "app.entrypoints.cli:app"
 
 [build-system]
 requires = [
