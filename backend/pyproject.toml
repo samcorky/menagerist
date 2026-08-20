@@ -9,10 +9,14 @@ dependencies = [
     "pydantic>=2.13.4",
     "structlog>=26.1.0",
     "cyclopts>=4.23.0",
+    "fastapi>=0.141.1",
+    "granian>=2.8.1",
 ]
 
 [dependency-groups]
 dev = [
+    "granian[reload]>=2.8.1",
+    "hatch>=1.18.0",
     "hatchling==1.32.0",
     "mypy>=2.3.1",
     "ruff>=0.16.3",
@@ -51,6 +55,9 @@ path = "scripts/hatch_build_info.py"
 search_parent_directories = true
 version_scheme = "calver-scm"
 local_scheme = "no-local-version"
+
+[tool.calver-scm]
+stable = false
 
 [tool.ruff]
 fix = true
