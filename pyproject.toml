@@ -33,9 +33,19 @@ heading = "Setup"
 cmd = "prek install -f"
 help = "Install or update local git hooks"
 
-[tool.poe.groups.setup.tasks.sync]
+[tool.poe.groups.setup.tasks.sync-backend]
 cmd = "uv sync --all-packages --all-groups"
-help = "Sync the environment with all workspace members and their dependency groups"
+help = "Sync the backend environment with all workspace members and their dependency groups"
+
+[tool.poe.groups.setup.tasks.sync-frontend]
+shell = "npm install"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Install frontend npm dependencies"
+
+[tool.poe.groups.setup.tasks.sync]
+sequence = ["sync-backend", "sync-frontend"]
+help = "Sync all project dependencies"
 
 [tool.poe.groups.setup.tasks.init]
 sequence = ["sync", "_install-hooks"]
@@ -64,16 +74,40 @@ cmd = "mypy"
 cwd = "backend"
 help = "Type-check backend Python files with mypy"
 
+[tool.poe.groups.quality.tasks.format-frontend]
+shell = "npm run format"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Format frontend files with Prettier"
+
+[tool.poe.groups.quality.tasks.lint-frontend]
+shell = "npm run lint"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Lint frontend files with Prettier and ESLint"
+
+[tool.poe.groups.quality.tasks.lint-frontend-fix]
+shell = "npm run lint:fix"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Lint frontend files with ESLint and apply safe fixes"
+
+[tool.poe.groups.quality.tasks.typecheck-frontend]
+shell = "npm run check"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Type-check frontend files with svelte-check"
+
 [tool.poe.groups.quality.tasks.format]
-sequence = ["format-backend"]
+sequence = ["format-backend", "format-frontend"]
 help = "Format all project code"
 
 [tool.poe.groups.quality.tasks.lint]
-sequence = ["lint-backend"]
+sequence = ["lint-backend", "lint-frontend"]
 help = "Lint all project code"
 
 [tool.poe.groups.quality.tasks.typecheck]
-sequence = ["typecheck-backend"]
+sequence = ["typecheck-backend", "typecheck-frontend"]
 help = "Type-check all project code"
 
 [tool.poe.groups.quality.tasks._check-hooks]
@@ -91,16 +125,28 @@ heading = "Build & Run"
 cmd = "uv build --package menagerist"
 help = "Build sdist+wheel for the menagerist package"
 
+[tool.poe.groups.run.tasks.build-frontend]
+shell = "npm run build"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Build the frontend for production"
+
 [tool.poe.groups.run.tasks.build]
-sequence = ["build-backend"]
+sequence = ["build-backend", "build-frontend"]
 help = "Build backend and frontend"
 
 [tool.poe.groups.run.tasks.serve-backend]
 cmd = "menagerist serve --reload"
 help = "Run the backend API server with auto-reload for development"
 
+[tool.poe.groups.run.tasks.serve-frontend]
+shell = "npm run dev"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Run the frontend dev server with hot reload"
+
 [tool.poe.groups.run.tasks.serve]
-parallel = ["serve-backend"]
+parallel = ["serve-backend", "serve-frontend"]
 help = "Run the app for local development"
 # Ctrl+C exits the server non-zero; without this poe reports it as a failed task.
 ignore_fail = true

@@ -17,6 +17,7 @@ repos:
         args:
           - --autofix
           - --no-sort-keys
+        exclude: ^frontend/
       - id: check-added-large-files
       - id: check-executables-have-shebangs
 
