@@ -11,12 +11,13 @@
 		current_version: string;
 	};
 
+	let healthy = $state<boolean | null>(null);
 	let version = $state<string | null>(null);
 	let error = $state<string | null>(null);
 	let loading = $state(false);
 	let checkedAt = $state<Date | null>(null);
 
-	const apiBaseUrl = 'http://localhost:8000/api';
+	const apiBaseUrl = `http://${window.location.hostname}:8000/api`;
 	const refreshIntervalMs = 5_000;
 
 	async function loadStatus() {
@@ -24,16 +25,25 @@
 		error = null;
 
 		try {
-			const response = await fetch(`${apiBaseUrl}/version`);
+			const [healthResponse, versionResponse] = await Promise.all([
+				fetch(`${apiBaseUrl}/health`),
+				fetch(`${apiBaseUrl}/version`)
+			]);
 
-			if (!response.ok) {
-				throw new Error(`API returned ${response.status}`);
+			if (!healthResponse.ok) {
+				throw new Error(`Health API returned ${healthResponse.status}`);
 			}
 
-			const data = (await response.json()) as VersionResponse;
+			if (!versionResponse.ok) {
+				throw new Error(`Version API returned ${versionResponse.status}`);
+			}
+
+			const data = (await versionResponse.json()) as VersionResponse;
+			healthy = true;
 			version = data.current_version;
 			checkedAt = new Date();
 		} catch (cause) {
+			healthy = false;
 			version = null;
 			error = cause instanceof Error ? cause.message : 'Unable to reach the API';
 			checkedAt = new Date();
@@ -93,9 +103,9 @@
 						<Card.Description>API status</Card.Description>
 
 						<Card.Title class={error ? 'text-destructive' : undefined}>
-							{#if loading}
+							{#if loading && healthy === null}
 								Checking…
-							{:else if error}
+							{:else if error || healthy === false}
 								Unavailable
 							{:else}
 								Operational
@@ -106,12 +116,12 @@
 					<div
 						class={[
 							'rounded-full border p-3',
-							error
+							error || healthy === false
 								? 'border-destructive/30 bg-destructive/10 text-destructive'
 								: 'border-green-500/30 bg-green-500/10 text-green-600'
 						]}
 					>
-						{#if error}
+						{#if error || healthy === false}
 							<TriangleAlert class="size-5" />
 						{:else}
 							<BadgeCheck class="size-5" />
@@ -121,8 +131,11 @@
 
 				<Card.Content>
 					<div class="rounded-lg bg-muted p-4">
-						<p class="text-sm text-muted-foreground">Endpoint</p>
-						<p class="mt-1 font-mono text-sm">GET /api/version</p>
+						<p class="text-sm text-muted-foreground">Endpoints</p>
+						<div class="mt-1 space-y-1 font-mono text-sm">
+							<p>GET /api/health</p>
+							<p>GET /api/version</p>
+						</div>
 					</div>
 				</Card.Content>
 			</Card.Root>

@@ -136,11 +136,11 @@ sequence = ["build-backend", "build-frontend"]
 help = "Build backend and frontend"
 
 [tool.poe.groups.run.tasks.serve-backend]
-cmd = "menagerist serve --reload"
+cmd = "menagerist serve --host 0.0.0.0 --reload"
 help = "Run the backend API server with auto-reload for development"
 
 [tool.poe.groups.run.tasks.serve-frontend]
-shell = "npm run dev"
+shell = "npm run dev -- --host 0.0.0.0"
 interpreter = ["powershell", "posix"]
 cwd = "frontend"
 help = "Run the frontend dev server with hot reload"
