@@ -35,7 +35,9 @@ cache-keys = [
     { file = "pyproject.toml" },
     { git = { commit = true, tags = true } },
     { file = "src/**" },
+    { file = "scripts/hatch_build_info.py" },
 ]
+
 [tool.hatch.version]
 source = "vcs"
 
