@@ -1,5 +1,6 @@
 from fastapi import APIRouter, FastAPI
 from granian.utils.proxies import wrap_asgi_with_proxy_headers
+from starlette.middleware.cors import CORSMiddleware
 
 from app.entrypoints.api.system.router import router as system_router
 from app.platform.app_info import load_app_info
@@ -23,6 +24,20 @@ def create_app() -> FastAPI:
     fastapi_app.version = app_info.version
     if app_info.project.description:
         fastapi_app.description = app_info.project.description
+
+    origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+
+    # noinspection PyTypeChecker
+    fastapi_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     fastapi_app.include_router(api_router)
 
