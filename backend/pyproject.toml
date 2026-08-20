@@ -30,6 +30,12 @@ requires = [
 
 build-backend = "hatchling.build"
 
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { git = { commit = true, tags = true } },
+    { file = "src/**" },
+]
 [tool.hatch.version]
 source = "vcs"
 
