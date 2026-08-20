@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import structlog
 from cyclopts import App
 from granian import Granian
@@ -11,6 +13,8 @@ configure_logging()
 app_info = load_app_info()
 
 logger = structlog.get_logger(__name__)
+
+BACKEND_SRC_PATH = Path(__file__).resolve().parents[3]
 
 app = App(
     name=app_info.name,
@@ -45,11 +49,13 @@ def serve(
         interface=Interfaces.ASGI,
         workers=workers,
         reload=reload,
+        reload_paths=[BACKEND_SRC_PATH],
         loop=Loops.auto,
         log_level=log_level,
         log_dictconfig=GRANIAN_LOG_DICTCONFIG,
         log_access=access_log,
     )
+    logger.info(BACKEND_SRC_PATH)
     server.serve()
 
 

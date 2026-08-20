@@ -12,7 +12,7 @@ api_router.include_router(system_router)
 
 
 def create_app() -> FastAPI:
-    """Create an instance of the API app."""
+    """Create an instance of the API cli_app."""
     app_info = load_app_info()
     fastapi_app = FastAPI(
         title=app_info.name,
