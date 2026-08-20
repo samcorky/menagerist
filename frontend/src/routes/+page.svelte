@@ -1,5 +1,11 @@
 <script lang="ts">
-	import { RefreshCw, Server, BadgeCheck, TriangleAlert } from '@lucide/svelte';
+	import { BadgeCheck, RefreshCw, Server, TriangleAlert } from '@lucide/svelte';
+	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert/index.js';
+	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import * as Card from '$lib/components/ui/card/index.js';
+	import { Separator } from '$lib/components/ui/separator/index.js';
+	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 
 	type VersionResponse = {
 		current_version: string;
@@ -48,12 +54,10 @@
 <main class="min-h-screen bg-background px-6 py-10 text-foreground">
 	<div class="mx-auto flex max-w-4xl flex-col gap-8">
 		<section class="flex flex-col gap-3">
-			<div
-				class="inline-flex w-fit items-center gap-2 rounded-full border bg-card px-3 py-1 text-sm text-muted-foreground"
-			>
+			<Badge variant="outline" class="w-fit gap-2 px-3 py-1">
 				<Server class="size-4" />
 				System status
-			</div>
+			</Badge>
 
 			<div class="space-y-2">
 				<h1 class="text-4xl font-semibold tracking-tight">Service health</h1>
@@ -63,19 +67,31 @@
 			</div>
 		</section>
 
-		<section class="grid gap-4 md:grid-cols-2">
-			<div class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
-				<div class="flex items-start justify-between gap-4">
-					<div class="space-y-1">
-						<p class="text-sm font-medium text-muted-foreground">API status</p>
+		{#if error}
+			<Alert variant="destructive">
+				<TriangleAlert class="size-4" />
+				<AlertTitle>API unavailable</AlertTitle>
+				<AlertDescription>
+					{error}
+				</AlertDescription>
+			</Alert>
+		{/if}
 
-						{#if loading}
-							<h2 class="text-2xl font-semibold">Checking…</h2>
-						{:else if error}
-							<h2 class="text-2xl font-semibold text-destructive">Unavailable</h2>
-						{:else}
-							<h2 class="text-2xl font-semibold">Operational</h2>
-						{/if}
+		<section class="grid gap-4 md:grid-cols-2">
+			<Card.Root>
+				<Card.Header class="flex flex-row items-start justify-between gap-4 space-y-0">
+					<div class="space-y-1">
+						<Card.Description>API status</Card.Description>
+
+						<Card.Title class={error ? 'text-destructive' : undefined}>
+							{#if loading}
+								Checking…
+							{:else if error}
+								Unavailable
+							{:else}
+								Operational
+							{/if}
+						</Card.Title>
 					</div>
 
 					<div
@@ -92,52 +108,55 @@
 							<BadgeCheck class="size-5" />
 						{/if}
 					</div>
-				</div>
+				</Card.Header>
 
-				<div class="mt-6 rounded-lg bg-muted p-4">
-					<p class="text-sm text-muted-foreground">Endpoint</p>
-					<p class="mt-1 font-mono text-sm">GET /version</p>
-				</div>
-			</div>
+				<Card.Content>
+					<div class="rounded-lg bg-muted p-4">
+						<p class="text-sm text-muted-foreground">Endpoint</p>
+						<p class="mt-1 font-mono text-sm">GET /api/version</p>
+					</div>
+				</Card.Content>
+			</Card.Root>
 
-			<div class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
-				<div class="space-y-1">
-					<p class="text-sm font-medium text-muted-foreground">Application version</p>
+			<Card.Root>
+				<Card.Header>
+					<Card.Description>Application version</Card.Description>
 
-					{#if loading}
-						<div class="mt-3 h-8 w-32 animate-pulse rounded-md bg-muted"></div>
-					{:else if version}
-						<h2 class="text-2xl font-semibold">{version}</h2>
-					{:else}
-						<h2 class="text-2xl font-semibold text-muted-foreground">Unknown</h2>
-					{/if}
-				</div>
+					<Card.Title>
+						{#if loading}
+							<Skeleton class="h-8 w-32" />
+						{:else if version}
+							{version}
+						{:else}
+							<span class="text-muted-foreground">Unknown</span>
+						{/if}
+					</Card.Title>
+				</Card.Header>
 
-				<div class="mt-6 space-y-2 text-sm text-muted-foreground">
-					<p>
-						Last checked:
-						<span class="text-foreground">
-							{checkedAt ? checkedAt.toLocaleString() : 'Not checked yet'}
-						</span>
-					</p>
+				<Card.Content class="space-y-4">
+					<Separator />
 
-					{#if error}
-						<p class="text-destructive">Error: {error}</p>
-					{/if}
-				</div>
-			</div>
+					<div class="space-y-2 text-sm text-muted-foreground">
+						<p>
+							Last checked:
+							<span class="text-foreground">
+								{checkedAt ? checkedAt.toLocaleString() : 'Not checked yet'}
+							</span>
+						</p>
+
+						{#if error}
+							<p class="text-destructive">Error: {error}</p>
+						{/if}
+					</div>
+				</Card.Content>
+			</Card.Root>
 		</section>
 
 		<div class="flex justify-end">
-			<button
-				type="button"
-				class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-				disabled={loading}
-				onclick={loadStatus}
-			>
+			<Button type="button" disabled={loading} onclick={loadStatus}>
 				<RefreshCw class={['size-4', loading && 'animate-spin']} />
 				Refresh
-			</button>
+			</Button>
 		</div>
 	</div>
 </main>
