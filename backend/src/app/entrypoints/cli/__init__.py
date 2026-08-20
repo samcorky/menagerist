@@ -46,6 +46,7 @@ def serve(
         loop=Loops.auto,
         log_level=log_level,
         log_dictconfig=GRANIAN_LOG_DICTCONFIG,
+        log_access=True,
     )
     server.serve()
 

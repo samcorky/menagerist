@@ -18,7 +18,7 @@ class AppInfo(BaseModel):
         return self.project.name
 
     @property
-    def version(self) -> str | None:
+    def version(self) -> str:
         """Return the application package version."""
         return self.project.version
 

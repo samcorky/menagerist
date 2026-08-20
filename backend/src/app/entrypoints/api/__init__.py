@@ -2,6 +2,7 @@ import structlog
 from fastapi import APIRouter, FastAPI
 from granian.utils.proxies import wrap_asgi_with_proxy_headers
 
+from app.entrypoints.api.system.router import router as system_router
 from app.platform.app_info import load_app_info
 from app.platform.logging_config import configure_logging
 
@@ -9,6 +10,7 @@ configure_logging()
 logger = structlog.get_logger(__name__)
 
 api_router = APIRouter(prefix="/api")
+api_router.include_router(system_router)
 
 
 def create_app() -> FastAPI:
@@ -20,8 +22,7 @@ def create_app() -> FastAPI:
         redoc_url="/api/redoc",
         openapi_url="/api/openapi.json",
     )
-    if app_info.version:
-        fastapi_app.version = app_info.version
+    fastapi_app.version = app_info.version
     if app_info.project.description:
         fastapi_app.description = app_info.project.description
 

@@ -5,10 +5,43 @@ import sys
 import structlog
 
 
+def _expand_access_log_fields(
+    logger: logging.Logger | None,
+    method_name: str,
+    event_dict: structlog.types.EventDict,
+) -> structlog.types.EventDict:
+    """Promote Granian's per-request access log fields to top-level keys.
+
+    Granian builds a dict of request fields (addr, method, path, status,
+    dt_ms, ...) and passes it as the log record's args - see
+    granian.log.log_request_builder. With `pass_foreign_args=True` on the
+    formatter below, that dict survives as `positional_args`. Merge it into
+    the event dict so each field renders separately instead of being baked
+    into one opaque message string via the access-log format template.
+    """
+    record: logging.LogRecord | None = event_dict.get("_record")
+    args = event_dict.pop("positional_args", None)
+    if (
+        record is not None
+        and record.name == "granian.access"
+        and isinstance(args, dict)
+    ):
+        event_dict.update(args)
+        # ASGI query strings are raw bytes; decode for a readable log field.
+        query_string = event_dict.get("query_string")
+        if isinstance(query_string, bytes):
+            event_dict["query_string"] = query_string.decode("utf-8", "replace")
+        event_dict["event"] = f"{args['method']} {args['path']}"
+        # Redundant with the `timestamp` key TimeStamper adds to every record.
+        event_dict.pop("time", None)
+    return event_dict
+
+
 def configure_logging(*, level: int | str = logging.INFO) -> None:
     """Sets up logging with structlog."""
     shared_processors: list[structlog.types.Processor] = [
         structlog.contextvars.merge_contextvars,
+        _expand_access_log_fields,
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
@@ -36,7 +69,9 @@ def configure_logging(*, level: int | str = logging.INFO) -> None:
         sort_keys=False,
     )
     formatter = structlog.stdlib.ProcessorFormatter(
-        processor=renderer, foreign_pre_chain=shared_processors
+        processor=renderer,
+        foreign_pre_chain=shared_processors,
+        pass_foreign_args=True,
     )
 
     handler = logging.StreamHandler(sys.stdout)
