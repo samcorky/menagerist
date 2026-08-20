@@ -25,6 +25,7 @@ def serve(
     port: int = 8000,
     workers: int = 1,
     reload: bool = False,
+    access_log: bool = True,
     log_level: LogLevels = LogLevels.info,
 ) -> None:
     """Run the API server.
@@ -34,6 +35,7 @@ def serve(
         port: Port to bind the server to.
         workers: Number of worker processes.
         reload: Restart workers when application code changes.
+        access_log: Whether to log access events.
         log_level: Minimum level for Granian's own server logs.
     """
     server = Granian(
@@ -46,7 +48,7 @@ def serve(
         loop=Loops.auto,
         log_level=log_level,
         log_dictconfig=GRANIAN_LOG_DICTCONFIG,
-        log_access=True,
+        log_access=access_log,
     )
     server.serve()
 
