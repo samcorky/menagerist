@@ -4,7 +4,6 @@
     "config:recommended",
     "group:allNonMajor",
     ":dependencyDashboard",
-    ":pinDevDependencies",
     "schedule:weekly",
     "security:openssf-scorecard",
     "security:minimumReleaseAgeNpm",
