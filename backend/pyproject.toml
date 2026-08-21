@@ -26,6 +26,7 @@ dev = [
     "httpx2>=2.12.0",
     "mypy>=2.3.1",
     "pytest>=9.1.1",
+    "pytest-alembic>=0.12.1",
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.3",
@@ -122,6 +123,30 @@ ignore = [
 ]
 fixable = ["ALL"]
 
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"__future__.annotations".msg = "`from __future__ import annotations` is banned; this project targets Python 3.14, where it is deprecated, and runtime frameworks need annotations to be resolvable."
+
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = [
+    "pydantic.BaseModel",
+    "pydantic_settings.BaseSettings",
+    "sqlalchemy.orm.DeclarativeBase",
+]
+runtime-evaluated-decorators = [
+    "dataclasses.dataclass",
+    "pydantic.dataclasses.dataclass",
+    "sqlalchemy.orm.mapped_as_dataclass",
+    "sqlalchemy.orm.registry.mapped_as_dataclass",
+    "fastapi.APIRouter.get",
+    "fastapi.APIRouter.post",
+    "fastapi.APIRouter.put",
+    "fastapi.APIRouter.patch",
+    "fastapi.APIRouter.delete",
+    "fastapi.APIRouter.options",
+    "fastapi.APIRouter.head",
+    "fastapi.APIRouter.api_route",
+]
+
 [tool.ruff.lint.flake8-implicit-str-concat]
 allow-multiline = false
 
@@ -143,6 +168,7 @@ indent-style = "space"
 line-ending = "lf"
 
 [tool.mypy]
+plugins = ["pydantic.mypy"]
 strict = true
 files = ["src/app"]
 mypy_path = "src"
