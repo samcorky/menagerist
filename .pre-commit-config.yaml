@@ -31,3 +31,10 @@ repos:
     hooks:
       - id: validate-pyproject
         name: validate pyproject.toml files
+
+  - repo: https://github.com/renovatebot/pre-commit-hooks
+    rev: 44.9.0
+    hooks:
+      - id: renovate-config-validator
+        args: [--strict]
+        files: ^\.github/renovate\.json$

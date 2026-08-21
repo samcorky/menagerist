@@ -37,7 +37,7 @@ cmd = "prek install -f"
 help = "Install or update local git hooks"
 
 [tool.poe.groups.setup.tasks.sync-backend]
-cmd = "uv sync --all-packages --all-groups"
+cmd = "uv sync --all-packages --group dev"
 help = "Sync the backend environment with all workspace members and their dependency groups"
 
 [tool.poe.groups.setup.tasks.sync-frontend]

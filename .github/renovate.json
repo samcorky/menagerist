@@ -1,0 +1,159 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "group:allNonMajor",
+    ":dependencyDashboard",
+    ":pinDevDependencies",
+    "schedule:weekly",
+    "security:openssf-scorecard",
+    "security:minimumReleaseAgeNpm",
+    "security:minimumReleaseAgePypi"
+  ],
+  "timezone": "UTC",
+  "semanticCommits": "disabled",
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "labels": [
+      "security"
+    ],
+    "schedule": [
+      "at any time"
+    ],
+    "automerge": true,
+    "platformAutomerge": true,
+    "minimumReleaseAge": null
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 6am on monday"
+    ],
+    "automerge": true,
+    "platformAutomerge": true
+  },
+  "pre-commit": {
+    "enabled": true
+  },
+  "pyenv": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "description": "Group all Python interpreter version bumps (.python-version, and any future Dockerfile python pins) into one PR, and treat as a major/manual-review change",
+      "matchManagers": [
+        "pyenv",
+        "dockerfile"
+      ],
+      "matchPackageNames": [
+        "python"
+      ],
+      "groupName": "python interpreter version",
+      "automerge": false,
+      "labels": [
+        "python-version"
+      ]
+    },
+    {
+      "description": "Group Python runtime dependencies (project.dependencies)",
+      "matchManagers": [
+        "pep621",
+        "pip_requirements"
+      ],
+      "matchDepTypes": [
+        "dependencies"
+      ],
+      "groupName": "python runtime dependencies"
+    },
+    {
+      "description": "Group Python dev/tooling dependencies (dependency-groups.dev)",
+      "matchManagers": [
+        "pep621",
+        "pip_requirements"
+      ],
+      "matchDepTypes": [
+        "dev"
+      ],
+      "groupName": "python dev dependencies"
+    },
+    {
+      "description": "Group Python build-system requirements (build-system.requires)",
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchDepTypes": [
+        "build-system.requires"
+      ],
+      "groupName": "python build system"
+    },
+    {
+      "description": "Group Python distroless-variant extras separately from main runtime deps",
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchDepTypes": [
+        "distroless"
+      ],
+      "groupName": "python distroless dependencies"
+    },
+    {
+      "description": "Group all frontend (npm) updates together",
+      "matchManagers": [
+        "npm"
+      ],
+      "groupName": "frontend dependencies"
+    },
+    {
+      "description": "Group SvelteKit/Vite ecosystem updates",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "/^svelte/",
+        "/^@sveltejs//",
+        "/^vite/",
+        "/^@sveltejs\\/vite-plugin-svelte/"
+      ],
+      "groupName": "svelte & vite"
+    },
+    {
+      "description": "Group pre-commit hook updates together",
+      "matchManagers": [
+        "pre-commit"
+      ],
+      "groupName": "pre-commit hooks"
+    },
+    {
+      "description": "Automerge non-major devDependency and lint/format tooling updates",
+      "matchDepTypes": [
+        "devDependencies",
+        "dev"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "automerge": true,
+      "platformAutomerge": true
+    },
+    {
+      "description": "Require manual review for all major updates",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "labels": [
+        "major-update"
+      ]
+    },
+    {
+      "description": "Require manual review for runtime/production dependencies",
+      "matchDepTypes": [
+        "dependencies"
+      ],
+      "automerge": false
+    }
+  ]
+}
