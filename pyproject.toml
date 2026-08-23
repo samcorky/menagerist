@@ -77,6 +77,16 @@ cmd = "mypy"
 cwd = "backend"
 help = "Type-check backend Python files with mypy"
 
+[tool.poe.groups.quality.tasks.test-backend]
+cmd = "pytest -m 'not integration'"
+cwd = "backend"
+help = "Run backend unit tests"
+
+[tool.poe.groups.quality.tasks.test-backend-integration]
+cmd = "pytest -m integration"
+cwd = "backend"
+help = "Run backend integration tests against real adapters"
+
 [tool.poe.groups.quality.tasks.format-frontend]
 shell = "npm run format"
 interpreter = ["powershell", "posix"]

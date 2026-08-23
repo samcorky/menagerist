@@ -11,22 +11,30 @@ repos:
     hooks:
       - id: ruff-check
         name: ruff check
-        entry: uv run ruff check --fix
+        entry: uv run poe lint-backend-fix
         language: system
         types_or:
           - python
           - pyi
+        pass_filenames: false
 
       - id: ruff-format
         name: ruff format
-        entry: uv run ruff format
+        entry: uv run poe format-backend
         language: system
         types_or:
           - python
           - pyi
+        pass_filenames: false
 
       - id: mypy
         name: mypy
-        entry: uv run mypy
+        entry: uv run poe typecheck-backend
+        language: system
+        pass_filenames: false
+
+      - id: pytest
+        name: pytest
+        entry: uv run poe test-backend
         language: system
         pass_filenames: false

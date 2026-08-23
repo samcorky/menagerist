@@ -96,6 +96,7 @@ select = [
     "TID",
     "RUF",
     "ISC",
+    "UP"
 ]
 ignore = [
     # Conflicts with Ruff formatter:
@@ -147,6 +148,13 @@ runtime-evaluated-decorators = [
     "fastapi.APIRouter.api_route",
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# FastAPI dependency-provider functions (get_x, referenced only via Depends(get_x)
+# elsewhere) need their annotations resolvable at runtime, same as a route handler -
+# but they aren't decorated, so `runtime-evaluated-decorators` above can't detect
+# them and flake8-type-checking flags the imports as type-only.
+"**/dependencies.py" = ["TC001", "TC002", "TC003"]
+
 [tool.ruff.lint.flake8-implicit-str-concat]
 allow-multiline = false
 
@@ -176,3 +184,10 @@ explicit_package_bases = true
 warn_unused_configs = true
 show_error_codes = true
 pretty = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: exercises a real adapter (database, network) instead of an in-memory fake",
+]

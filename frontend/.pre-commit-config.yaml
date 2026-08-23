@@ -3,7 +3,7 @@ repos:
     hooks:
       - id: prettier
         name: prettier format
-        entry: npm run format
+        entry: uv run poe format-frontend
         language: system
         types_or:
           - javascript
@@ -12,10 +12,11 @@ repos:
           - svelte
           - css
           - markdown
+        pass_filenames: false
 
       - id: eslint
         name: eslint check
-        entry: npm run lint
+        entry: uv run poe lint-frontend
         language: system
         types_or:
           - javascript
