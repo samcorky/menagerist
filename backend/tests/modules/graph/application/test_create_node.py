@@ -1,3 +1,6 @@
+from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
+    InMemoryEdgeRepository,
+)
 from app.modules.graph.adapters.persistence.in_memory_node_repository import (
     InMemoryNodeRepository,
 )
@@ -11,7 +14,7 @@ from app.shared_kernel.actor import SYSTEM_ACTOR
 
 async def test_create_node_persists_and_commits() -> None:
     """CreateNode adds the node to the repository and commits the unit of work."""
-    repos = GraphRepos(nodes=InMemoryNodeRepository())
+    repos = GraphRepos(nodes=InMemoryNodeRepository(), edges=InMemoryEdgeRepository())
     uow = create_in_memory_graph_uow(repos)
     use_case = CreateNode(uow)
 

@@ -47,3 +47,45 @@ async def test_list_respects_after_and_limit() -> None:
     page = await repository.list(after=nodes[0].id, limit=2)
 
     assert page == nodes[1:3]
+
+
+async def test_save_persists_changes_to_an_existing_node() -> None:
+    """save() overwrites the stored node with the given instance."""
+    repository = InMemoryNodeRepository()
+    node = Node.create(name="Alien", type="film")
+    await repository.add(node)
+
+    node.name = "Alien (1979)"
+    await repository.save(node)
+
+    result = await repository.get(node.id)
+    assert result is not None
+    assert result.name == "Alien (1979)"
+
+
+async def test_get_returns_none_for_a_soft_deleted_node() -> None:
+    """get() treats a soft-deleted node as if it doesn't exist."""
+    repository = InMemoryNodeRepository()
+    node = Node.create(name="Alien", type="film")
+    await repository.add(node)
+
+    node.soft_delete()
+    await repository.save(node)
+
+    assert await repository.get(node.id) is None
+
+
+async def test_list_excludes_soft_deleted_nodes() -> None:
+    """list() omits soft-deleted nodes."""
+    repository = InMemoryNodeRepository()
+    kept = Node.create(name="Alien", type="film")
+    deleted = Node.create(name="Predator", type="film")
+    await repository.add(kept)
+    await repository.add(deleted)
+
+    deleted.soft_delete()
+    await repository.save(deleted)
+
+    result = await repository.list(after=None, limit=10)
+
+    assert result == [kept]

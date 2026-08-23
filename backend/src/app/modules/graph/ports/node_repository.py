@@ -13,10 +13,14 @@ class NodeRepository(Protocol):
         """Add a new node."""
         ...
 
+    async def save(self, node: Node) -> None:
+        """Persist changes to an existing node."""
+        ...
+
     async def get(self, node_id: uuid.UUID) -> Node | None:
-        """Return the node with `node_id`, or `None` if it doesn't exist."""
+        """Return the node with `node_id`, or `None` if missing or deleted."""
         ...
 
     async def list(self, *, after: uuid.UUID | None, limit: int) -> list[Node]:
-        """List nodes ordered by id, starting after `after` if given."""
+        """List non-deleted nodes ordered by id, starting after `after` if given."""
         ...

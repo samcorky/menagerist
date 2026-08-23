@@ -75,3 +75,35 @@ def test_create_rejects_type_that_slugifies_to_empty_string() -> None:
     """Node.create raises ValidationError for a type that slugs to an empty string."""
     with pytest.raises(ValidationError, match="type must be provided"):
         Node.create(name="dummy", type="   ")
+
+
+def test_update_applies_provided_fields_and_touches_updated_at() -> None:
+    """update() overwrites only the fields it's given and bumps updated_at."""
+    node = Node.create(name="Alien", type="film", description="Original")
+    original_updated_at = node.updated_at
+
+    node.update(name="Alien (1979)", description="New", attributes={"year": 1979})
+
+    assert node.name == "Alien (1979)"
+    assert node.description == "New"
+    assert node.attributes == {"year": 1979}
+    assert node.updated_at >= original_updated_at
+
+
+def test_update_leaves_unspecified_fields_unchanged() -> None:
+    """update() with no arguments leaves name/description/attributes untouched."""
+    node = Node.create(name="Alien", type="film", description="Original")
+
+    node.update()
+
+    assert node.name == "Alien"
+    assert node.description == "Original"
+
+
+@pytest.mark.parametrize("name", ["", "   "])
+def test_update_rejects_empty_or_blank_name(name: str) -> None:
+    """update() raises ValidationError for an empty or whitespace-only name."""
+    node = Node.create(name="Alien", type="film")
+
+    with pytest.raises(ValidationError, match="name must be provided"):
+        node.update(name=name)

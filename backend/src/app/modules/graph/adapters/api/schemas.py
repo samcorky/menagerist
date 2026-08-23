@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.graph.application.create_node import CreateNodeCommand
+from app.modules.graph.application.update_node import UpdateNodeCommand
 
 if TYPE_CHECKING:
     from app.modules.graph.domain.node import Node
@@ -49,6 +50,35 @@ class CreateNodeRequest(BaseModel):
         return CreateNodeCommand(
             name=self.name,
             type=self.type,
+            description=self.description,
+            attributes=self.attributes,
+        )
+
+
+class UpdateNodeRequest(BaseModel):
+    """Request body for updating a node. Omitted fields are left unchanged."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "name": "Alien (1979)",
+                    "description": "Now with a corrected release year.",
+                    "attributes": {"year": 1979},
+                }
+            ]
+        }
+    )
+
+    name: str | None = Field(default=None)
+    description: str | None = Field(default=None)
+    attributes: dict[str, Any] | None = Field(default=None)
+
+    def to_command(self, node_id: uuid.UUID) -> UpdateNodeCommand:
+        """Convert this request into an `UpdateNodeCommand` for `node_id`."""
+        return UpdateNodeCommand(
+            node_id=node_id,
+            name=self.name,
             description=self.description,
             attributes=self.attributes,
         )

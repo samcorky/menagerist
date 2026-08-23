@@ -40,6 +40,10 @@ help = "Install or update local git hooks"
 cmd = "uv sync --all-packages --group dev"
 help = "Sync the backend environment with all workspace members and their dependency groups"
 
+[tool.poe.groups.setup.tasks.repair-backend]
+cmd = "uv sync --all-packages --group dev --reinstall"
+help = "Force-reinstall all backend packages to repair a corrupted venv (e.g. after an interrupted sync)"
+
 [tool.poe.groups.setup.tasks.sync-frontend]
 shell = "npm install"
 interpreter = ["powershell", "posix"]
@@ -147,7 +151,7 @@ sequence = ["validate-renovate", "_renovate-local"]
 help = "Validate Renovate config, then run Renovate locally in dry-run mode"
 
 [tool.poe.groups.quality.tasks.check]
-sequence = ["_check-hooks"]
+sequence = ["sync", "_check-hooks"]
 help = "Run all configured checks against the full repository"
 
 [tool.poe.groups.run]
