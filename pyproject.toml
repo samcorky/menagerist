@@ -72,6 +72,11 @@ cmd = "ruff check . --fix"
 cwd = "backend"
 help = "Lint backend Python files with Ruff and apply safe fixes"
 
+[tool.poe.groups.quality.tasks.lint-backend-fix-unsafe]
+cmd = "ruff check . --fix --unsafe-fixes"
+cwd = "backend"
+help = "Lint backend Python files with Ruff and apply safe and unsafe fixes"
+
 [tool.poe.groups.quality.tasks.typecheck-backend]
 cmd = "mypy"
 cwd = "backend"

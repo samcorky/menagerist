@@ -9,7 +9,7 @@ from app.modules.graph.domain.node import Node
 async def test_add_and_get_round_trips() -> None:
     """A node added to the repository can be retrieved by id."""
     repository = InMemoryNodeRepository()
-    node = Node.create(type="film")
+    node = Node.create(name="Alien", type="film")
 
     await repository.add(node)
 
@@ -26,7 +26,7 @@ async def test_get_returns_none_for_missing_node() -> None:
 async def test_list_orders_by_id_ascending() -> None:
     """list() returns nodes ordered by id ascending, regardless of insert order."""
     repository = InMemoryNodeRepository()
-    nodes = [Node.create(type="film") for _ in range(3)]
+    nodes = [Node.create(name="Alien", type="film") for _ in range(3)]
     for node in reversed(nodes):
         await repository.add(node)
 
@@ -38,7 +38,9 @@ async def test_list_orders_by_id_ascending() -> None:
 async def test_list_respects_after_and_limit() -> None:
     """list() paginates using after/limit."""
     repository = InMemoryNodeRepository()
-    nodes = sorted((Node.create(type="film") for _ in range(4)), key=lambda n: n.id)
+    nodes = sorted(
+        (Node.create(name="Alien", type="film") for _ in range(4)), key=lambda n: n.id
+    )
     for node in nodes:
         await repository.add(node)
 

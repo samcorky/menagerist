@@ -14,7 +14,7 @@ from app.shared_kernel.actor import SYSTEM_ACTOR
 async def test_get_node_returns_existing_node() -> None:
     """GetNode returns the node when it exists."""
     repository = InMemoryNodeRepository()
-    node = Node.create(type="film")
+    node = Node.create(name="Alien", type="film")
     await repository.add(node)
     use_case = GetNode(repository)
 

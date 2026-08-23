@@ -16,7 +16,8 @@ async def test_create_node_persists_and_commits() -> None:
     use_case = CreateNode(uow)
 
     node = await use_case.handle(
-        CreateNodeCommand(type="film", attributes={"title": "Alien"}), SYSTEM_ACTOR
+        CreateNodeCommand(name="Alien", type="film", attributes={"title": "Alien"}),
+        SYSTEM_ACTOR,
     )
 
     assert await repos.nodes.get(node.id) is node

@@ -10,7 +10,8 @@ def test_create_get_list_and_404_round_trip() -> None:
     client = TestClient(create_app())
 
     create_response = client.post(
-        "/api/nodes", json={"type": "film", "attributes": {"title": "Alien"}}
+        "/api/nodes",
+        json={"name": "Alien", "type": "film", "attributes": {"title": "Alien"}},
     )
     assert create_response.status_code == 201
     node = create_response.json()

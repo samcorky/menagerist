@@ -9,7 +9,7 @@ from app.shared_kernel.actor import SYSTEM_ACTOR
 async def test_list_nodes_orders_by_id_and_paginates() -> None:
     """ListNodes returns nodes ordered by id, respecting after/limit."""
     repository = InMemoryNodeRepository()
-    nodes = [Node.create(type="film") for _ in range(3)]
+    nodes = [Node.create(name="Alien", type="film") for _ in range(3)]
     for node in nodes:
         await repository.add(node)
     expected_order = sorted(nodes, key=lambda node: node.id)

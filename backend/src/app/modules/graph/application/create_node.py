@@ -12,7 +12,9 @@ if TYPE_CHECKING:
 class CreateNodeCommand:
     """Request to create a new node."""
 
+    name: str
     type: str
+    description: str | None = field(default=None)
     attributes: dict[str, Any] = field(default_factory=dict)
 
 
@@ -24,7 +26,12 @@ class CreateNode:
 
     async def handle(self, command: CreateNodeCommand, actor: Actor) -> Node:
         """Create a node from `command` and commit it."""
-        node = Node.create(type=command.type, attributes=command.attributes)
+        node = Node.create(
+            name=command.name,
+            type=command.type,
+            description=command.description,
+            attributes=command.attributes,
+        )
         async with self._uow as repos:
             await repos.nodes.add(node)
             await self._uow.commit()
