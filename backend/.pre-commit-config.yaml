@@ -3,14 +3,16 @@ repos:
     rev: v6.0.0
     hooks:
       - id: check-ast
+        name: check python files syntax
       - id: name-tests-test
+        name: Name tests with test prefix
         args:
           - --pytest-test-first
 
   - repo: local
     hooks:
       - id: ruff-check
-        name: ruff check
+        name: check and fix liniting errors (ruff check)
         entry: uv run poe lint-backend-fix
         language: system
         types_or:
@@ -19,7 +21,7 @@ repos:
         pass_filenames: false
 
       - id: ruff-format
-        name: ruff format
+        name: check and fix formatting errors (ruff format)
         entry: uv run poe format-backend
         language: system
         types_or:
@@ -28,13 +30,13 @@ repos:
         pass_filenames: false
 
       - id: mypy
-        name: mypy
+        name: check types (mypy)
         entry: uv run poe typecheck-backend
         language: system
         pass_filenames: false
 
       - id: pytest
-        name: pytest
+        name: run non-integration tests (pytest)
         entry: uv run poe test-backend
         language: system
         pass_filenames: false
