@@ -44,6 +44,10 @@ help = "Sync the backend environment with all workspace members and their depend
 cmd = "uv sync --all-packages --group dev --reinstall"
 help = "Force-reinstall all backend packages to repair a corrupted venv (e.g. after an interrupted sync)"
 
+[tool.poe.groups.setup.tasks.repair]
+sequence = ["repair-backend"]
+help = "Repair local backend"
+
 [tool.poe.groups.setup.tasks.sync-frontend]
 shell = "npm install"
 interpreter = ["powershell", "posix"]
