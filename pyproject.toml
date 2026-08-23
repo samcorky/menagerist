@@ -127,6 +127,20 @@ help = "Type-check all project code"
 shell = "prek run --all-files || prek run --all-files"
 help = "Run all configured pre-commit checks against the full repository"
 
+[tool.poe.groups.quality.tasks.validate-renovate]
+cmd = "prek run renovate-config-validator --all-files"
+help = "Validate Renovate config with prek"
+
+[tool.poe.groups.quality.tasks._renovate-local]
+shell = 'docker run --rm -e LOG_LEVEL=debug -v "${PWD}:/tmp/repo" -w /tmp/repo renovate/renovate --platform=local --dry-run=full'
+cwd = "."
+interpreter = ["powershell", "posix"]
+help = "Run Renovate locally in dry-run mode"
+
+[tool.poe.groups.quality.tasks.renovate-local]
+sequence = ["validate-renovate", "_renovate-local"]
+help = "Validate Renovate config, then run Renovate locally in dry-run mode"
+
 [tool.poe.groups.quality.tasks.check]
 sequence = ["_check-hooks"]
 help = "Run all configured checks against the full repository"

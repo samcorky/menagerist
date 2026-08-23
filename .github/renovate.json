@@ -1,12 +1,10 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended",
+    "config:best-practices",
     "group:allNonMajor",
-    ":dependencyDashboard",
     "schedule:weekly",
     "security:openssf-scorecard",
-    "security:minimumReleaseAgeNpm",
     "security:minimumReleaseAgePypi"
   ],
   "timezone": "UTC",
@@ -32,10 +30,8 @@
     "platformAutomerge": true
   },
   "pre-commit": {
-    "enabled": true
-  },
-  "pyenv": {
-    "enabled": true
+    "enabled": true,
+    "pinDigests": true
   },
   "packageRules": [
     {
@@ -116,11 +112,48 @@
       "groupName": "svelte & vite"
     },
     {
-      "description": "Group pre-commit hook updates together",
+      "description": "Group GitHub Actions updates together and pin SHA digests",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "github actions",
+      "pinDigests": true
+    },
+    {
+      "description": "Automerge GitHub Actions updates",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "automerge": true,
+      "platformAutomerge": true
+    },
+    {
+      "description": "Group pre-commit hook updates together and pin SHA digests",
       "matchManagers": [
         "pre-commit"
       ],
-      "groupName": "pre-commit hooks"
+      "groupName": "pre-commit hooks",
+      "pinDigests": true
+    },
+    {
+      "description": "Automerge pre-commit hook updates",
+      "matchManagers": [
+        "pre-commit"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "automerge": true,
+      "platformAutomerge": true
     },
     {
       "description": "Automerge non-major devDependency and lint/format tooling updates",
