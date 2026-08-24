@@ -1,16 +1,8 @@
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
 
-from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
-    InMemoryEdgeRepository,
-)
-from app.modules.graph.adapters.persistence.in_memory_node_repository import (
-    InMemoryNodeRepository,
-)
-from app.modules.graph.adapters.persistence.unit_of_work import (
-    create_in_memory_graph_uow,
-)
+from app.modules.graph.adapters.persistence.unit_of_work import create_graph_uow
 from app.modules.graph.application.create_edge import CreateEdge
 from app.modules.graph.application.create_node import CreateNode
 from app.modules.graph.application.delete_edge import DeleteEdge
@@ -23,43 +15,46 @@ from app.modules.graph.application.update_edge import UpdateEdge
 from app.modules.graph.application.update_node import UpdateNode
 from app.modules.graph.ports.edge_repository import EdgeRepository
 from app.modules.graph.ports.node_repository import NodeRepository
-from app.modules.graph.ports.unit_of_work import GraphRepos, GraphUnitOfWork
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.platform.database import get_session_factory
 
-_graph_repos = GraphRepos(
-    nodes=InMemoryNodeRepository(), edges=InMemoryEdgeRepository()
-)
-"""Process-wide graph repositories.
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
-A module-level singleton for now, since the in-memory store must survive
-across requests - the SQLAlchemy adapter replaces this with a per-request
-session instead, once that adapter exists.
-"""
-
-
-def get_graph_repos() -> GraphRepos:
-    """Return the process-wide graph repository bundle."""
-    return _graph_repos
-
-
-def get_node_repository(
-    repos: Annotated[GraphRepos, Depends(get_graph_repos)],
-) -> NodeRepository:
-    """Return the node repository directly, for read-only queries."""
-    return repos.nodes
-
-
-def get_edge_repository(
-    repos: Annotated[GraphRepos, Depends(get_graph_repos)],
-) -> EdgeRepository:
-    """Return the edge repository directly, for read-only queries."""
-    return repos.edges
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 
 def get_graph_uow(
-    repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    session_factory: Annotated[
+        async_sessionmaker[AsyncSession], Depends(get_session_factory)
+    ],
 ) -> GraphUnitOfWork:
-    """Return a unit of work over the shared graph repositories, for commands."""
-    return create_in_memory_graph_uow(repos)
+    """Return a unit of work over the graph tables, for commands and queries alike."""
+    return create_graph_uow(session_factory)
+
+
+async def get_node_repository(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+) -> AsyncIterator[NodeRepository]:
+    """Return the node repository directly, for read-only queries.
+
+    Reuses the unit of work's session lifecycle rather than opening a second,
+    separate per-request session - a read simply never calls `.commit()`.
+    """
+    async with uow as repos:
+        yield repos.nodes
+
+
+async def get_edge_repository(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+) -> AsyncIterator[EdgeRepository]:
+    """Return the edge repository directly, for read-only queries.
+
+    Reuses the unit of work's session lifecycle rather than opening a second,
+    separate per-request session - a read simply never calls `.commit()`.
+    """
+    async with uow as repos:
+        yield repos.edges
 
 
 def get_create_node_use_case(

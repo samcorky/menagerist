@@ -13,7 +13,7 @@ dependencies = [
     "fastapi>=0.141.1",
     "granian>=2.8.1",
     "sqlalchemy>=2.0.52",
-    "psycopg>=3.3.4",
+    "asyncpg>=0.31.0",
     "alembic>=1.19.1",
 ]
 
@@ -25,14 +25,13 @@ dev = [
     "hatchling==1.32.0",
     "httpx2>=2.12.0",
     "mypy>=2.3.1",
+    "psycopg[binary]>=3.3.4",
     "pytest>=9.1.1",
     "pytest-alembic>=0.12.1",
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.3",
-]
-distroless = [
-    "psycopg[binary]>=3.3.4",
+    "testcontainers[postgres]>=4.15.0",
 ]
 
 [project.scripts]
@@ -154,6 +153,15 @@ runtime-evaluated-decorators = [
 # but they aren't decorated, so `runtime-evaluated-decorators` above can't detect
 # them and flake8-type-checking flags the imports as type-only.
 "**/dependencies.py" = ["TC001", "TC002", "TC003"]
+# SQLAlchemy's declarative mapper evaluates `Mapped[...]` annotations at class-
+# definition time - `runtime-evaluated-base-classes` above doesn't catch this
+# through our custom `Base` + mixins, so flake8-type-checking still flags these
+# as type-only. Moving them into `TYPE_CHECKING` breaks the mapper (verified).
+"**/adapters/persistence/models.py" = ["TC003"]
+"**/platform/orm_mixins.py" = ["TC003"]
+# Alembic-generated migration scripts - mechanically produced, reviewed for
+# correctness rather than style.
+"alembic/versions/*.py" = ["D103", "D415", "W291", "TC003"]
 
 [tool.ruff.lint.flake8-implicit-str-concat]
 allow-multiline = false

@@ -59,3 +59,24 @@ jobs:
       - name: Verify all checks pass
         if: steps.prek.outcome != 'success'
         run: uv run prek run --all-files
+
+  integration:
+    name: Backend Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --all-packages --group dev
+
+      - name: Run backend integration tests
+        run: uv run poe test-backend-integration

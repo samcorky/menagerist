@@ -158,6 +158,24 @@ help = "Validate Renovate config, then run Renovate locally in dry-run mode"
 sequence = ["sync", "_check-hooks"]
 help = "Run all configured checks against the full repository"
 
+[tool.poe.groups.database]
+heading = "Database"
+
+[tool.poe.groups.database.tasks.db-up]
+shell = "docker compose up -d postgres"
+interpreter = ["powershell", "posix"]
+help = "Start the local Postgres container"
+
+[tool.poe.groups.database.tasks.db-down]
+shell = "docker compose down"
+interpreter = ["powershell", "posix"]
+help = "Stop and remove the local Postgres container"
+
+[tool.poe.groups.database.tasks.migrate]
+cmd = "menagerist migrate upgrade"
+cwd = "backend"
+help = "Apply database migrations up to the latest revision"
+
 [tool.poe.groups.run]
 heading = "Build & Run"
 

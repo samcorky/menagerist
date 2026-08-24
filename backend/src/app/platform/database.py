@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import PostgresDsn
 from pydantic_settings import BaseSettings
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -15,9 +16,19 @@ class Base(DeclarativeBase):
 
 
 class DatabaseSettings(BaseSettings):
-    """Database connection configuration, read from the environment."""
+    """Database connection configuration, read from the environment.
 
-    database_url: str
+    Defaults match `compose.yaml`'s `postgres` service, so local
+    development works with no `.env` beyond `docker compose up -d`. Uses the
+    `asyncpg` driver rather than psycopg's async mode - asyncpg has no
+    dependency on `loop.add_reader`/`add_writer`, so it runs under any
+    event loop implementation (including Windows' default `ProactorEventLoop`,
+    which psycopg's async mode cannot use) with no platform-specific setup.
+    """
+
+    database_url: PostgresDsn = PostgresDsn(
+        "postgresql+asyncpg://menagerist:menagerist@localhost:5432/menagerist"
+    )
 
 
 @lru_cache(maxsize=1)
@@ -29,7 +40,7 @@ def load_database_settings() -> DatabaseSettings:
 @lru_cache(maxsize=1)
 def get_engine() -> AsyncEngine:
     """Return the process-wide async database engine."""
-    return create_async_engine(load_database_settings().database_url)
+    return create_async_engine(str(load_database_settings().database_url))
 
 
 @lru_cache(maxsize=1)

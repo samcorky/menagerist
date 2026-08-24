@@ -6,6 +6,7 @@ from granian import Granian
 from granian.constants import Interfaces, Loops
 from granian.log import LogLevels
 
+from app.platform import alembic_runner
 from app.platform.app_info import load_app_info
 from app.platform.logging_config import GRANIAN_LOG_DICTCONFIG, configure_logging
 
@@ -20,6 +21,9 @@ app = App(
     name=app_info.name,
     version=app_info.version,
 )
+
+migrate_app = App(name="migrate", help="Manage database migrations.")
+app.command(migrate_app)
 
 
 @app.command
@@ -57,6 +61,37 @@ def serve(
     )
     logger.info(BACKEND_SRC_PATH)
     server.serve()
+
+
+@migrate_app.command
+def upgrade(revision: str = "head") -> None:
+    """Upgrade the database to `revision`.
+
+    Args:
+        revision: Target revision, or "head" for the latest.
+    """
+    alembic_runner.upgrade(revision)
+
+
+@migrate_app.command
+def downgrade(revision: str) -> None:
+    """Downgrade the database to `revision`.
+
+    Args:
+        revision: Target revision.
+    """
+    alembic_runner.downgrade(revision)
+
+
+@migrate_app.command
+def revision(message: str, *, autogenerate: bool = True) -> None:
+    """Create a new migration script.
+
+    Args:
+        message: Short description of the migration.
+        autogenerate: Diff current models against the database schema.
+    """
+    alembic_runner.make_revision(message, autogenerate=autogenerate)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,31 @@
+import uuid
+from typing import Any
+
+from sqlalchemy import ForeignKey
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.platform.database import Base
+from app.platform.orm_mixins import IdentifiableMixin, SoftDeletableMixin
+
+
+class NodeModel(IdentifiableMixin, SoftDeletableMixin, Base):
+    """ORM row for a node - the storage shape, kept separate from `domain.Node`."""
+
+    __tablename__ = "nodes"
+
+    name: Mapped[str]
+    type: Mapped[str] = mapped_column(index=True)
+    description: Mapped[str | None]
+    attributes: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+
+
+class EdgeModel(IdentifiableMixin, SoftDeletableMixin, Base):
+    """ORM row for an edge - the storage shape, kept separate from `domain.Edge`."""
+
+    __tablename__ = "edges"
+
+    source_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("nodes.id"), index=True)
+    target_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("nodes.id"), index=True)
+    type: Mapped[str] = mapped_column(index=True)
+    attributes: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
