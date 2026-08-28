@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { BadgeCheck, RefreshCw, Server, TriangleAlert } from '@lucide/svelte';
+	import { getHealth, getVersion } from '$lib/api/client';
 	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -7,49 +8,30 @@
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 
-	type VersionResponse = {
-		current_version: string;
-	};
-
 	let healthy = $state<boolean | null>(null);
 	let version = $state<string | null>(null);
 	let error = $state<string | null>(null);
 	let loading = $state(false);
 	let checkedAt = $state<Date | null>(null);
 
-	const apiBaseUrl = `http://${window.location.hostname}:8000/api`;
 	const refreshIntervalMs = 5_000;
 
 	async function loadStatus() {
 		loading = true;
 		error = null;
 
-		try {
-			const [healthResponse, versionResponse] = await Promise.all([
-				fetch(`${apiBaseUrl}/health`),
-				fetch(`${apiBaseUrl}/version`)
-			]);
+		const [healthResult, versionResult] = await Promise.all([getHealth(), getVersion()]);
 
-			if (!healthResponse.ok) {
-				throw new Error(`Health API returned ${healthResponse.status}`);
-			}
-
-			if (!versionResponse.ok) {
-				throw new Error(`Version API returned ${versionResponse.status}`);
-			}
-
-			const data = (await versionResponse.json()) as VersionResponse;
-			healthy = true;
-			version = data.current_version;
-			checkedAt = new Date();
-		} catch (cause) {
+		if (healthResult.error || versionResult.error || !versionResult.data) {
 			healthy = false;
 			version = null;
-			error = cause instanceof Error ? cause.message : 'Unable to reach the API';
-			checkedAt = new Date();
-		} finally {
-			loading = false;
+			error = 'Unable to reach the API';
+		} else {
+			healthy = true;
+			version = versionResult.data.current_version;
 		}
+		checkedAt = new Date();
+		loading = false;
 	}
 
 	$effect(() => {

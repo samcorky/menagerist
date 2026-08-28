@@ -47,7 +47,7 @@ async def test_get_returns_none_for_missing_node(db_session: AsyncSession) -> No
 
 
 async def test_list_orders_by_id_ascending(db_session: AsyncSession) -> None:
-    """list() returns nodes ordered by id ascending, regardless of insert order."""
+    """list() returns node ordered by id ascending, regardless of insert order."""
     repository = SqlAlchemyNodeRepository(db_session)
     nodes = [Node.create(name="Alien", type="film") for _ in range(3)]
     for node in reversed(nodes):
@@ -103,7 +103,7 @@ async def test_get_returns_none_for_a_soft_deleted_node(
 
 
 async def test_list_excludes_soft_deleted_nodes(db_session: AsyncSession) -> None:
-    """list() omits soft-deleted nodes."""
+    """list() omits soft-deleted node."""
     repository = SqlAlchemyNodeRepository(db_session)
     kept = Node.create(name="Alien", type="film")
     deleted = Node.create(name="Predator", type="film")

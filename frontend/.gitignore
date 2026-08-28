@@ -21,3 +21,7 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Generated API client (run `poe generate-frontend-client` to regenerate)
+/openapi.json
+/src/lib/api/generated

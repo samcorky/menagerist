@@ -24,7 +24,7 @@ async def test_get_returns_none_for_missing_node() -> None:
 
 
 async def test_list_orders_by_id_ascending() -> None:
-    """list() returns nodes ordered by id ascending, regardless of insert order."""
+    """list() returns node ordered by id ascending, regardless of insert order."""
     repository = InMemoryNodeRepository()
     nodes = [Node.create(name="Alien", type="film") for _ in range(3)]
     for node in reversed(nodes):
@@ -76,7 +76,7 @@ async def test_get_returns_none_for_a_soft_deleted_node() -> None:
 
 
 async def test_list_excludes_soft_deleted_nodes() -> None:
-    """list() omits soft-deleted nodes."""
+    """list() omits soft-deleted node."""
     repository = InMemoryNodeRepository()
     kept = Node.create(name="Alien", type="film")
     deleted = Node.create(name="Predator", type="film")

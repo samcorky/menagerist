@@ -54,8 +54,22 @@ interpreter = ["powershell", "posix"]
 cwd = "frontend"
 help = "Install frontend npm dependencies"
 
+[tool.poe.groups.setup.tasks.dump-schema]
+cmd = "menagerist schema dump --output ../frontend/openapi.json"
+cwd = "backend"
+help = "Dump the backend's OpenAPI schema for frontend client generation"
+
+[tool.poe.groups.setup.tasks._run-frontend-generate]
+shell = "npm run generate"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+
+[tool.poe.groups.setup.tasks.generate-frontend-client]
+sequence = ["dump-schema", "_run-frontend-generate"]
+help = "Generate the frontend's typed API client from the OpenAPI schema"
+
 [tool.poe.groups.setup.tasks.sync]
-sequence = ["sync-backend", "sync-frontend"]
+sequence = ["sync-backend", "sync-frontend", "generate-frontend-client"]
 help = "Sync all project dependencies"
 
 [tool.poe.groups.setup.tasks.init]

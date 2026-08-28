@@ -112,7 +112,7 @@ class NodeResponse(BaseModel):
 
 
 class ListNodesResponse(BaseModel):
-    """A page of nodes."""
+    """A page of node."""
 
     model_config = ConfigDict(
         json_schema_extra={"examples": [{"items": [_NODE_EXAMPLE]}]}

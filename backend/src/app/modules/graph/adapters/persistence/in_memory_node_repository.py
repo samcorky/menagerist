@@ -28,7 +28,7 @@ class InMemoryNodeRepository:
         return node
 
     async def list(self, *, after: uuid.UUID | None, limit: int) -> list[Node]:
-        """List non-deleted nodes ordered by id, starting after `after` if given."""
+        """List non-deleted node ordered by id, starting after `after` if given."""
         ordered = sorted(
             (node for node in self._nodes.values() if not node.is_deleted),
             key=lambda node: node.id,

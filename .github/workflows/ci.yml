@@ -43,6 +43,9 @@ jobs:
           uv sync --all-packages --group dev
           npm --prefix frontend ci
 
+      - name: Generate frontend API client
+        run: uv run poe generate-frontend-client
+
       - name: Run prek
         id: prek
         continue-on-error: true

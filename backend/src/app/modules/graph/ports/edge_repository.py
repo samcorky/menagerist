@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 
 
 class EdgeRepository(Protocol):
-    """Access to edges, independent of storage backend."""
+    """Access to edge, independent of storage backend."""
 
     async def add(self, edge: Edge) -> None:
         """Add a new edge."""
@@ -24,9 +24,9 @@ class EdgeRepository(Protocol):
     async def list_for_node(
         self, node_id: uuid.UUID, *, after: uuid.UUID | None, limit: int
     ) -> list[Edge]:
-        """List non-deleted edges where `node_id` is the source or target."""
+        """List non-deleted edge where `node_id` is the source or target."""
         ...
 
     async def list(self, *, after: uuid.UUID | None, limit: int) -> list[Edge]:
-        """List non-deleted edges ordered by id, starting after `after` if given."""
+        """List non-deleted edge ordered by id, starting after `after` if given."""
         ...

@@ -56,7 +56,7 @@ async def test_save_persists_changes_to_an_existing_edge() -> None:
 
 
 async def test_list_orders_by_id_ascending() -> None:
-    """list() returns edges ordered by id ascending, regardless of insert order."""
+    """list() returns edge ordered by id ascending, regardless of insert order."""
     repository = InMemoryEdgeRepository()
     edges = [_make_edge() for _ in range(3)]
     for edge in reversed(edges):
@@ -68,7 +68,7 @@ async def test_list_orders_by_id_ascending() -> None:
 
 
 async def test_list_excludes_soft_deleted_edges() -> None:
-    """list() omits soft-deleted edges."""
+    """list() omits soft-deleted edge."""
     repository = InMemoryEdgeRepository()
     kept = _make_edge()
     deleted = _make_edge()
@@ -84,7 +84,7 @@ async def test_list_excludes_soft_deleted_edges() -> None:
 
 
 async def test_list_for_node_returns_edges_touching_the_node_either_direction() -> None:
-    """list_for_node() returns edges where the node is either source or target."""
+    """list_for_node() returns edge where the node is either source or target."""
     repository = InMemoryEdgeRepository()
     node_id = uuid.uuid4()
     outgoing = Edge.create(source_id=node_id, target_id=uuid.uuid4(), type="owns")

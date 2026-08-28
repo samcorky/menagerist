@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 
 
 class NodeRepository(Protocol):
-    """Access to nodes, independent of storage backend."""
+    """Access to node, independent of storage backend."""
 
     async def add(self, node: Node) -> None:
         """Add a new node."""
@@ -22,5 +22,5 @@ class NodeRepository(Protocol):
         ...
 
     async def list(self, *, after: uuid.UUID | None, limit: int) -> list[Node]:
-        """List non-deleted nodes ordered by id, starting after `after` if given."""
+        """List non-deleted node ordered by id, starting after `after` if given."""
         ...

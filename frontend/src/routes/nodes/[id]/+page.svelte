@@ -1,0 +1,291 @@
+<script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
+	import { Trash2 } from '@lucide/svelte';
+	import {
+		createEdge,
+		deleteEdge,
+		deleteNode,
+		getNode,
+		listEdges,
+		listNodes,
+		updateNode,
+		type EdgeResponse,
+		type NodeResponse
+	} from '$lib/api/client';
+	import { errorMessage } from '$lib/api/errors';
+	import AttributesEditor, {
+		attributesToRows,
+		rowsToAttributes,
+		type AttributeRow
+	} from '$lib/components/attributes-editor.svelte';
+	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import * as Card from '$lib/components/ui/card/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
+	import { Separator } from '$lib/components/ui/separator/index.js';
+	import { Textarea } from '$lib/components/ui/textarea/index.js';
+
+	let nodeId = $derived(page.params.id!);
+
+	let node = $state<NodeResponse | null>(null);
+	let edges = $state<EdgeResponse[]>([]);
+	let otherNodes = $state<NodeResponse[]>([]);
+	let nodesById = $derived(new Map(otherNodes.map((candidate) => [candidate.id, candidate])));
+	let loading = $state(true);
+	let loadError = $state<string | null>(null);
+
+	let name = $state('');
+	let description = $state('');
+	let attributeRows = $state<AttributeRow[]>([]);
+	let saving = $state(false);
+	let saveError = $state<string | null>(null);
+	let deletingNode = $state(false);
+
+	let newEdgeType = $state('');
+	let newEdgeTargetId = $state('');
+	let creatingEdge = $state(false);
+	let edgeError = $state<string | null>(null);
+
+	async function load() {
+		loading = true;
+		loadError = null;
+
+		const [nodeResult, edgesResult, nodesResult] = await Promise.all([
+			getNode({ path: { node_id: nodeId } }),
+			listEdges({ query: { node_id: nodeId, limit: 100 } }),
+			listNodes({ query: { limit: 100 } })
+		]);
+
+		if (nodeResult.error || !nodeResult.data) {
+			loadError = errorMessage(nodeResult.error);
+			loading = false;
+			return;
+		}
+
+		node = nodeResult.data;
+		name = node.name;
+		description = node.description ?? '';
+		attributeRows = attributesToRows(node.attributes);
+		edges = edgesResult.data?.items ?? [];
+		otherNodes = (nodesResult.data?.items ?? []).filter((candidate) => candidate.id !== nodeId);
+		loading = false;
+	}
+
+	$effect(() => {
+		void load();
+	});
+
+	function otherNodeId(edge: EdgeResponse): string {
+		return edge.source_id === nodeId ? edge.target_id : edge.source_id;
+	}
+
+	async function handleSave(event: SubmitEvent) {
+		event.preventDefault();
+		saving = true;
+		saveError = null;
+
+		const result = await updateNode({
+			path: { node_id: nodeId },
+			body: {
+				name,
+				description: description || null,
+				attributes: rowsToAttributes(attributeRows)
+			}
+		});
+
+		if (result.error || !result.data) {
+			saveError = errorMessage(result.error);
+		} else {
+			node = result.data;
+		}
+		saving = false;
+	}
+
+	async function handleDeleteNode() {
+		if (!window.confirm(`Delete "${node?.name}"? This cannot be undone.`)) {
+			return;
+		}
+		deletingNode = true;
+		const result = await deleteNode({ path: { node_id: nodeId } });
+		if (result.error) {
+			saveError = errorMessage(result.error);
+			deletingNode = false;
+			return;
+		}
+		await goto(resolve('/nodes'));
+	}
+
+	async function handleCreateEdge(event: SubmitEvent) {
+		event.preventDefault();
+		creatingEdge = true;
+		edgeError = null;
+
+		const result = await createEdge({
+			body: { source_id: nodeId, target_id: newEdgeTargetId, type: newEdgeType, attributes: {} }
+		});
+
+		if (result.error || !result.data) {
+			edgeError = errorMessage(result.error);
+		} else {
+			edges = [...edges, result.data];
+			newEdgeType = '';
+			newEdgeTargetId = '';
+		}
+		creatingEdge = false;
+	}
+
+	async function handleDeleteEdge(edge: EdgeResponse) {
+		if (!window.confirm('Remove this connection?')) {
+			return;
+		}
+		const result = await deleteEdge({ path: { edge_id: edge.id } });
+		if (!result.error) {
+			edges = edges.filter((existing) => existing.id !== edge.id);
+		}
+	}
+</script>
+
+<svelte:head>
+	<title>{node?.name ?? 'Node'}</title>
+</svelte:head>
+
+<main class="min-h-screen bg-background px-6 py-10 text-foreground">
+	<div class="mx-auto flex max-w-2xl flex-col gap-6">
+		<Button variant="ghost" href={resolve('/nodes')} class="w-fit">← Back to Nodes</Button>
+
+		{#if loading}
+			<p class="text-muted-foreground">Loading…</p>
+		{:else if loadError}
+			<Alert variant="destructive">
+				<AlertTitle>Couldn't load node</AlertTitle>
+				<AlertDescription>{loadError}</AlertDescription>
+			</Alert>
+		{:else if node}
+			<Card.Root>
+				<Card.Header>
+					<Card.Title>{node.name}</Card.Title>
+					<Card.Description>Type: {node.type} (not editable)</Card.Description>
+				</Card.Header>
+				<Card.Content>
+					<form class="space-y-4" onsubmit={handleSave}>
+						{#if saveError}
+							<Alert variant="destructive">
+								<AlertTitle>Couldn't save changes</AlertTitle>
+								<AlertDescription>{saveError}</AlertDescription>
+							</Alert>
+						{/if}
+
+						<div class="space-y-2">
+							<Label for="name">Name</Label>
+							<Input id="name" bind:value={name} required />
+						</div>
+
+						<div class="space-y-2">
+							<Label for="description">Description</Label>
+							<Textarea id="description" bind:value={description} />
+						</div>
+
+						<AttributesEditor bind:rows={attributeRows} />
+
+						<div class="flex justify-between gap-2">
+							<Button
+								type="button"
+								variant="destructive"
+								disabled={deletingNode}
+								onclick={handleDeleteNode}
+							>
+								<Trash2 class="size-4" />
+								Delete Node
+							</Button>
+							<Button type="submit" disabled={saving}>
+								{saving ? 'Saving…' : 'Save changes'}
+							</Button>
+						</div>
+					</form>
+				</Card.Content>
+			</Card.Root>
+
+			<Card.Root>
+				<Card.Header>
+					<Card.Title>Connections</Card.Title>
+					<Card.Description>Edges touching this node, in either direction.</Card.Description>
+				</Card.Header>
+				<Card.Content class="space-y-4">
+					{#if edges.length === 0}
+						<p class="text-sm text-muted-foreground">No connections yet.</p>
+					{:else}
+						<ul class="space-y-2">
+							{#each edges as edge (edge.id)}
+								<li class="flex items-center justify-between gap-2 rounded-lg border p-3">
+									<div class="text-sm">
+										<span class="font-medium">{edge.type}</span>
+										<a
+											href={resolve('/nodes/[id]', { id: otherNodeId(edge) })}
+											class="ml-2 text-muted-foreground underline"
+										>
+											{nodesById.get(otherNodeId(edge))?.name ?? 'View connected node'}
+										</a>
+									</div>
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon"
+										onclick={() => handleDeleteEdge(edge)}
+										aria-label="Remove connection"
+									>
+										<Trash2 class="size-4" />
+									</Button>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+
+					<Separator />
+
+					<form class="space-y-3" onsubmit={handleCreateEdge}>
+						{#if edgeError}
+							<Alert variant="destructive">
+								<AlertTitle>Couldn't create connection</AlertTitle>
+								<AlertDescription>{edgeError}</AlertDescription>
+							</Alert>
+						{/if}
+
+						<div class="space-y-2">
+							<Label for="edge-type">Connection type</Label>
+							<Input
+								id="edge-type"
+								bind:value={newEdgeType}
+								required
+								placeholder="e.g. directed-by"
+							/>
+						</div>
+
+						<div class="space-y-2">
+							<Label for="edge-target">Connect to</Label>
+							<select
+								id="edge-target"
+								bind:value={newEdgeTargetId}
+								required
+								class="h-9 w-full rounded-md border border-input bg-transparent px-2.5 text-sm"
+							>
+								<option value="" disabled selected>Select a node…</option>
+								{#each otherNodes as candidate (candidate.id)}
+									<option value={candidate.id}>{candidate.name} ({candidate.type})</option>
+								{/each}
+							</select>
+						</div>
+
+						<div class="flex justify-end">
+							<Button type="submit" disabled={creatingEdge}>
+								{creatingEdge ? 'Adding…' : 'Add connection'}
+							</Button>
+						</div>
+					</form>
+				</Card.Content>
+			</Card.Root>
+		{/if}
+	</div>
+</main>

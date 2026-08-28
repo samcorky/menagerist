@@ -26,13 +26,13 @@ class VersionResponse(BaseModel):
     ]
 
 
-@router.get("/health", summary="Liveness check")
+@router.get("/health", summary="Liveness check", operation_id="get_health")
 def get_health() -> HealthResponse:
     """Report that the process is up and able to accept requests."""
     return HealthResponse()
 
 
-@router.get("/version", summary="Application version")
+@router.get("/version", summary="Application version", operation_id="get_version")
 def get_version(
     app_info: Annotated[AppInfo, Depends(load_app_info)],
 ) -> VersionResponse:

@@ -10,7 +10,7 @@ from app.shared_kernel.slug import slugify
 
 @dataclass(kw_only=True, eq=False)
 class Edge(Identifiable, SoftDeletable):
-    """A typed relationship connecting two nodes in the collection graph."""
+    """A typed relationship connecting two node in the collection graph."""
 
     source_id: uuid.UUID
     target_id: uuid.UUID

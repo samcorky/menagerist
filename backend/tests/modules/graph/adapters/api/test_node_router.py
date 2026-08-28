@@ -38,7 +38,7 @@ def test_create_get_list_and_404_round_trip() -> None:
     client = TestClient(_app_with_in_memory_graph())
 
     create_response = client.post(
-        "/api/nodes",
+        "/api/node",
         json={"name": "Alien", "type": "film", "attributes": {"title": "Alien"}},
     )
     assert create_response.status_code == 201
@@ -46,15 +46,15 @@ def test_create_get_list_and_404_round_trip() -> None:
     assert node["type"] == "film"
     assert node["attributes"] == {"title": "Alien"}
 
-    get_response = client.get(f"/api/nodes/{node['id']}")
+    get_response = client.get(f"/api/node/{node['id']}")
     assert get_response.status_code == 200
     assert get_response.json() == node
 
-    list_response = client.get("/api/nodes")
+    list_response = client.get("/api/node")
     assert list_response.status_code == 200
     assert node in list_response.json()["items"]
 
-    missing_response = client.get(f"/api/nodes/{uuid.uuid4()}")
+    missing_response = client.get(f"/api/node/{uuid.uuid4()}")
     assert missing_response.status_code == 404
     assert missing_response.json()["title"] == "NodeNotFoundError"
 
@@ -62,10 +62,10 @@ def test_create_get_list_and_404_round_trip() -> None:
 def test_update_node_applies_changes() -> None:
     """PATCH updates the given fields and leaves the rest unchanged."""
     client = TestClient(_app_with_in_memory_graph())
-    node = client.post("/api/nodes", json={"name": "Alien", "type": "film"}).json()
+    node = client.post("/api/node", json={"name": "Alien", "type": "film"}).json()
 
     update_response = client.patch(
-        f"/api/nodes/{node['id']}", json={"name": "Alien (1979)"}
+        f"/api/node/{node['id']}", json={"name": "Alien (1979)"}
     )
 
     assert update_response.status_code == 200
@@ -78,7 +78,7 @@ def test_update_node_returns_404_when_missing() -> None:
     """PATCH on a nonexistent node returns 404."""
     client = TestClient(_app_with_in_memory_graph())
 
-    response = client.patch(f"/api/nodes/{uuid.uuid4()}", json={"name": "Alien"})
+    response = client.patch(f"/api/node/{uuid.uuid4()}", json={"name": "Alien"})
 
     assert response.status_code == 404
 
@@ -86,19 +86,19 @@ def test_update_node_returns_404_when_missing() -> None:
 def test_delete_node_then_get_and_list_no_longer_find_it() -> None:
     """DELETE soft-deletes the node, so subsequent GET/LIST treat it as gone."""
     client = TestClient(_app_with_in_memory_graph())
-    node = client.post("/api/nodes", json={"name": "Alien", "type": "film"}).json()
+    node = client.post("/api/node", json={"name": "Alien", "type": "film"}).json()
 
-    delete_response = client.delete(f"/api/nodes/{node['id']}")
+    delete_response = client.delete(f"/api/node/{node['id']}")
     assert delete_response.status_code == 204
 
-    assert client.get(f"/api/nodes/{node['id']}").status_code == 404
-    assert node not in client.get("/api/nodes").json()["items"]
+    assert client.get(f"/api/node/{node['id']}").status_code == 404
+    assert node not in client.get("/api/node").json()["items"]
 
 
 def test_delete_node_returns_404_when_missing() -> None:
     """DELETE on a nonexistent node returns 404."""
     client = TestClient(_app_with_in_memory_graph())
 
-    response = client.delete(f"/api/nodes/{uuid.uuid4()}")
+    response = client.delete(f"/api/node/{uuid.uuid4()}")
 
     assert response.status_code == 404

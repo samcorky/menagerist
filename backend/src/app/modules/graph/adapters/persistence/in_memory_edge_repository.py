@@ -30,7 +30,7 @@ class InMemoryEdgeRepository:
     async def list_for_node(
         self, node_id: uuid.UUID, *, after: uuid.UUID | None, limit: int
     ) -> list[Edge]:
-        """List non-deleted edges where `node_id` is the source or target."""
+        """List non-deleted edge where `node_id` is the source or target."""
         ordered = sorted(
             (
                 edge
@@ -45,7 +45,7 @@ class InMemoryEdgeRepository:
         return ordered[:limit]
 
     async def list(self, *, after: uuid.UUID | None, limit: int) -> list[Edge]:
-        """List non-deleted edges ordered by id, starting after `after` if given."""
+        """List non-deleted edge ordered by id, starting after `after` if given."""
         ordered = sorted(
             (edge for edge in self._edges.values() if not edge.is_deleted),
             key=lambda edge: edge.id,

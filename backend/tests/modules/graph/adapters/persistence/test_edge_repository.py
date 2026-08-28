@@ -83,7 +83,7 @@ async def test_save_persists_changes_to_an_existing_edge(
 
 
 async def test_list_orders_by_id_ascending(db_session: AsyncSession) -> None:
-    """list() returns edges ordered by id ascending, regardless of insert order."""
+    """list() returns edge ordered by id ascending, regardless of insert order."""
     repository = SqlAlchemyEdgeRepository(db_session)
     edges = [await _make_edge(db_session) for _ in range(3)]
 
@@ -93,7 +93,7 @@ async def test_list_orders_by_id_ascending(db_session: AsyncSession) -> None:
 
 
 async def test_list_excludes_soft_deleted_edges(db_session: AsyncSession) -> None:
-    """list() omits soft-deleted edges."""
+    """list() omits soft-deleted edge."""
     repository = SqlAlchemyEdgeRepository(db_session)
     kept = await _make_edge(db_session)
     deleted = await _make_edge(db_session)
@@ -109,7 +109,7 @@ async def test_list_excludes_soft_deleted_edges(db_session: AsyncSession) -> Non
 async def test_list_for_node_returns_edges_touching_the_node_either_direction(
     db_session: AsyncSession,
 ) -> None:
-    """list_for_node() returns edges where the node is either source or target."""
+    """list_for_node() returns edge where the node is either source or target."""
     repository = SqlAlchemyEdgeRepository(db_session)
     node = await _make_node(db_session)
     other_a = await _make_node(db_session)

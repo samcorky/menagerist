@@ -22,7 +22,7 @@ _EDGE_EXAMPLE: dict[str, Any] = {
 
 
 class CreateEdgeRequest(BaseModel):
-    """Request body for creating an edge between two nodes."""
+    """Request body for creating an edge between two node."""
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -94,7 +94,7 @@ class EdgeResponse(BaseModel):
 
 
 class ListEdgesResponse(BaseModel):
-    """A page of edges."""
+    """A page of edge."""
 
     model_config = ConfigDict(
         json_schema_extra={"examples": [{"items": [_EDGE_EXAMPLE]}]}

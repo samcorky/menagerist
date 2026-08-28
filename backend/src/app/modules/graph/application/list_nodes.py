@@ -10,18 +10,18 @@ if TYPE_CHECKING:
 
 @dataclass(kw_only=True)
 class ListNodesQuery:
-    """Request for a page of nodes, ordered by id."""
+    """Request for a page of node, ordered by id."""
 
     after: uuid.UUID | None = None
     limit: int = 50
 
 
 class ListNodes:
-    """List nodes with keyset pagination."""
+    """List node with keyset pagination."""
 
     def __init__(self, nodes: NodeRepository) -> None:
         self._nodes = nodes
 
     async def handle(self, query: ListNodesQuery, actor: Actor) -> list[Node]:
-        """Return a page of nodes after `query.after`, up to `query.limit`."""
+        """Return a page of node after `query.after`, up to `query.limit`."""
         return await self._nodes.list(after=query.after, limit=query.limit)

@@ -69,7 +69,7 @@ class SqlAlchemyEdgeRepository:
     async def list_for_node(
         self, node_id: uuid.UUID, *, after: uuid.UUID | None, limit: int
     ) -> list[Edge]:
-        """List non-deleted edges where `node_id` is the source or target."""
+        """List non-deleted edge where `node_id` is the source or target."""
         stmt = (
             select(EdgeModel)
             .where(
@@ -85,7 +85,7 @@ class SqlAlchemyEdgeRepository:
         return [_to_domain(model) for model in result.scalars()]
 
     async def list(self, *, after: uuid.UUID | None, limit: int) -> list[Edge]:
-        """List non-deleted edges ordered by id, starting after `after` if given."""
+        """List non-deleted edge ordered by id, starting after `after` if given."""
         stmt = (
             select(EdgeModel)
             .where(EdgeModel.deleted_at.is_(None))

@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import structlog
@@ -24,6 +25,9 @@ app = App(
 
 migrate_app = App(name="migrate", help="Manage database migrations.")
 app.command(migrate_app)
+
+schema_app = App(name="schema", help="Inspect the API schema.")
+app.command(schema_app)
 
 
 @app.command
@@ -92,6 +96,22 @@ def revision(message: str, *, autogenerate: bool = True) -> None:
         autogenerate: Diff current models against the database schema.
     """
     alembic_runner.make_revision(message, autogenerate=autogenerate)
+
+
+@schema_app.command
+def dump(*, output: Path = Path("openapi.json")) -> None:
+    """Write the API's OpenAPI schema to a file.
+
+    No live server is needed - this builds the same FastAPI app `serve` does
+    and reads its schema directly, so the frontend can generate a typed
+    client without a running backend.
+
+    Args:
+        output: Path to write the schema JSON to.
+    """
+    from app.entrypoints.api import create_app
+
+    output.write_text(json.dumps(create_app().openapi(), indent=2))
 
 
 if __name__ == "__main__":

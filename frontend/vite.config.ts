@@ -1,22 +1,30 @@
 import tailwindcss from '@tailwindcss/vite';
-import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
 	plugins: [
 		tailwindcss(),
-		sveltekit({
-			compilerOptions: {
-				// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
-				runes: ({ filename }) =>
-					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
-			},
-
-			// adapter-auto only supports some environments, see https://svelte.dev/docs/kit/adapter-auto for a list.
-			// If your environment is not supported, or you settled on a specific environment, switch out the adapter.
-			// See https://svelte.dev/docs/kit/adapters for more information about adapters.
-			adapter: adapter()
-		})
-	]
+		// Passing any options here (compilerOptions, adapter, ...) makes this
+		// call ignore svelte.config.js entirely rather than merging with it -
+		// so all of that (including compilerOptions.runes and the adapter)
+		// lives in svelte.config.js instead, and this call takes none.
+		sveltekit()
+	],
+	server: {
+		// Mirrors how nginx proxies `/api/*` to the backend in production, so
+		// the frontend always calls a same-origin relative `/api/...` and never
+		// needs to know the backend's host/port.
+		proxy: {
+			'/api': 'http://localhost:8000'
+		}
+	},
+	optimizeDeps: {
+		// @lucide/svelte has thousands of icon exports - if left to be
+		// discovered lazily (different routes each importing a few icons),
+		// Vite's dep optimizer can re-trigger mid-navigation and cascade into
+		// a "504 Outdated Optimize Dep" loop. Pre-bundling it upfront avoids
+		// that entirely.
+		include: ['@lucide/svelte']
+	}
 });

@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 @dataclass(kw_only=True)
 class CreateEdgeCommand:
-    """Request to create a new edge between two nodes."""
+    """Request to create a new edge between two node."""
 
     source_id: uuid.UUID
     target_id: uuid.UUID
@@ -21,7 +21,7 @@ class CreateEdgeCommand:
 
 
 class CreateEdge:
-    """Create and persist a new edge, validating that both nodes exist."""
+    """Create and persist a new edge, validating that both node exist."""
 
     def __init__(self, uow: GraphUnitOfWork) -> None:
         self._uow = uow

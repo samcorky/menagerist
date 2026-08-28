@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 @dataclass(kw_only=True)
 class GraphRepos:
-    """The graph module's repository bundle - nodes and edges."""
+    """The graph module's repository bundle - node and edge."""
 
     nodes: "NodeRepository"
     edges: "EdgeRepository"
