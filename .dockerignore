@@ -1,11 +1,37 @@
-   .venv/
-   .git/
-   .idea/
-   __pycache__/
-   *.py[cod]
-   .pytest_cache/
-   .ruff_cache/
-   .mypy_cache/
-   dist/
-   build/
-   *.egg-info/
+# Git must remain available as a BuildKit mount.
+# .git
+
+# Python
+__pycache__
+*.py[cod]
+*.pyo
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# Environments
+.venv
+venv
+.env
+.env.*
+
+# IDEs
+.vscode
+.idea
+
+# Frontend/build artefacts
+frontend/node_modules
+frontend/.svelte-kit
+frontend/dist
+frontend/build
+node_modules
+dist
+build
+
+# Documentation / repo stuff not required by backend build
+docs
+README.md
+LICENSE
+.github

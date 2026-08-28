@@ -63,7 +63,6 @@ def serve(
         log_dictconfig=GRANIAN_LOG_DICTCONFIG,
         log_access=access_log,
     )
-    logger.info(BACKEND_SRC_PATH)
     server.serve()
 
 
