@@ -4,6 +4,8 @@ import sys
 
 import structlog
 
+from app.platform.config import get_logging_settings
+
 
 def _expand_access_log_fields(
     logger: logging.Logger | None,
@@ -37,8 +39,10 @@ def _expand_access_log_fields(
     return event_dict
 
 
-def configure_logging(*, level: int | str = logging.INFO) -> None:
+def configure_logging(*, level: int | str | None = None) -> None:
     """Sets up logging with structlog."""
+    settings = get_logging_settings()
+    effective_level = level if level is not None else settings.log_level
     shared_processors: list[structlog.types.Processor] = [
         structlog.contextvars.merge_contextvars,
         _expand_access_log_fields,
@@ -57,17 +61,20 @@ def configure_logging(*, level: int | str = logging.INFO) -> None:
         cache_logger_on_first_use=True,
     )
 
-    # https://no-color.org/
-    colors_enabled = os.environ.get("NO_COLOR", "0")[0] == "0"
-    renderer = structlog.dev.ConsoleRenderer(
-        colors=colors_enabled,
-        # On Windows, colorama strips ANSI codes whenever stdout isn't a real
-        # console handle - which is always the case when poe pipes a task's
-        # output (eg. `parallel`) to prefix each line. force_colors keeps the
-        # codes intact in that case too.
-        force_colors=colors_enabled,
-        sort_keys=False,
-    )
+    if settings.log_json:
+        renderer: structlog.types.Processor = structlog.processors.JSONRenderer()
+    else:
+        # https://no-color.org/
+        colors_enabled = os.environ.get("NO_COLOR", "0")[0] == "0"
+        renderer = structlog.dev.ConsoleRenderer(
+            colors=colors_enabled,
+            # On Windows, colorama strips ANSI codes whenever stdout isn't a real
+            # console handle - which is always the case when poe pipes a task's
+            # output (eg. `parallel`) to prefix each line. force_colors keeps the
+            # codes intact in that case too.
+            force_colors=colors_enabled,
+            sort_keys=False,
+        )
     formatter = structlog.stdlib.ProcessorFormatter(
         processor=renderer,
         foreign_pre_chain=shared_processors,
@@ -79,7 +86,7 @@ def configure_logging(*, level: int | str = logging.INFO) -> None:
     root_logger = logging.getLogger()
     root_logger.handlers.clear()  # avoid duplicate lines if this ever runs twice
     root_logger.addHandler(handler)
-    root_logger.setLevel(level)
+    root_logger.setLevel(effective_level)
 
     # Route warnings.warn() (deprecation warnings from dependencies, etc.)
     # through logging -> the same handler above, instead of straight to stderr.

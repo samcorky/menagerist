@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from testcontainers.community.postgres import PostgresContainer
 
 from app.platform import alembic_runner
-from app.platform.database import load_database_settings
+from app.platform.config import get_database_settings
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator
@@ -33,8 +33,8 @@ def postgres_url(
 ) -> str:
     """The async (asyncpg) connection url, migrated to head once per session."""
     url = postgres_container.get_connection_url(driver="asyncpg")
-    monkeypatch_session.setenv("DATABASE_URL", url)
-    load_database_settings.cache_clear()
+    monkeypatch_session.setenv("MENAGERIST_DATABASE_URL", url)
+    get_database_settings.cache_clear()
     alembic_runner.upgrade()
     return url
 

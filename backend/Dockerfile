@@ -106,10 +106,6 @@ COPY --from=builder \
     /usr/share/terminfo \
     /usr/share/terminfo
 
-COPY --from=builder \
-    /app/backend/scripts/healthcheck.py \
-    /app/backend/scripts/healthcheck.py
-
 
 WORKDIR /app
 
@@ -122,6 +118,7 @@ COPY --from=builder /opt/python /opt/python
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/backend/alembic /app/backend/alembic
 COPY --from=builder /app/backend/alembic.ini /app/backend/alembic.ini
+COPY --from=builder /app/backend/scripts/healthcheck.py /app/healthcheck.py
 
 EXPOSE 8000
 
@@ -132,6 +129,7 @@ HEALTHCHECK \
     --timeout=5s \
     --start-period=10s \
     --retries=3 \
-    CMD ["/app/.venv/bin/python", "/app/backend/scripts/healthcheck.py"]
+    CMD ["/app/.venv/bin/python", "/app/healthcheck.py"]
+
 ENTRYPOINT ["menagerist"]
-CMD ["serve"]
+CMD ["serve", "--host", "0.0.0.0"]

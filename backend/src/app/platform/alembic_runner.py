@@ -3,7 +3,7 @@ from pathlib import Path
 from alembic.config import Config
 
 from alembic import command
-from app.platform.database import load_database_settings
+from app.platform.config import get_database_settings
 
 _MIGRATIONS_PATH = Path(__file__).resolve().parents[3] / "alembic"
 """Where `alembic/` lives relative to this installed module.
@@ -23,7 +23,7 @@ def build_config() -> Config:
     """
     config = Config()
     config.set_main_option("script_location", str(_MIGRATIONS_PATH))
-    config.set_main_option("sqlalchemy.url", str(load_database_settings().database_url))
+    config.set_main_option("sqlalchemy.url", str(get_database_settings().database_url))
     return config
 
 

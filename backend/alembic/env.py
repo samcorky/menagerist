@@ -10,7 +10,8 @@ from alembic import context
 if TYPE_CHECKING:
     from sqlalchemy.engine import Connection
 from app.modules.graph.adapters.persistence import models as graph_models  # noqa: F401
-from app.platform.database import Base, load_database_settings
+from app.platform.config import get_database_settings
+from app.platform.database import Base
 
 # this is the Alembic Config object, which provides access to values within
 # the .ini file in use.
@@ -19,7 +20,7 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", str(load_database_settings().database_url))
+config.set_main_option("sqlalchemy.url", str(get_database_settings().database_url))
 
 # `graph_models` above registers Node/Edge tables on `Base.metadata` before
 # autogenerate runs - every future module's persistence models get the same

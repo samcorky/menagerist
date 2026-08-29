@@ -7,6 +7,7 @@ from app.entrypoints.api.system.router import router as system_router
 from app.modules.graph.adapters.api.edge.router import router as edge_router
 from app.modules.graph.adapters.api.node.router import router as graph_router
 from app.platform.app_info import load_app_info
+from app.platform.config import get_api_settings
 from app.platform.logging_config import configure_logging
 
 configure_logging()
@@ -33,7 +34,7 @@ def create_app() -> FastAPI:
     # noinspection PyTypeChecker
     fastapi_app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=get_api_settings().cors_origins,
         allow_methods=["*"],
         allow_headers=["*"],
     )
