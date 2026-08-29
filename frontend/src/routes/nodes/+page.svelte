@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { Plus } from '@lucide/svelte';
+	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import { listNodes, type NodeResponse } from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
 	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert/index.js';
@@ -9,6 +10,7 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 
 	const PAGE_SIZE = 50;
+	const loadingSkeletons = [1, 2, 3, 4, 5];
 
 	let nodes = $state<NodeResponse[]>([]);
 	let loading = $state(false);
@@ -66,26 +68,44 @@
 			</Alert>
 		{/if}
 
-		<div class="grid gap-3">
-			{#each nodes as node (node.id)}
-				<a href={resolve('/nodes/[id]', { id: node.id })}>
-					<Card.Root class="transition-colors hover:bg-muted/50">
-						<Card.Header class="flex flex-row items-center justify-between gap-4 space-y-0">
-							<div>
-								<Card.Title>{node.name}</Card.Title>
-								{#if node.description}
-									<Card.Description>{node.description}</Card.Description>
-								{/if}
+		{#if loading && nodes.length === 0}
+			<Shimmer loading={true}>
+				<div class="grid gap-3">
+					{#each loadingSkeletons as skeleton (skeleton)}
+						<div class="rounded-lg border p-4" aria-label={`Loading node ${skeleton}`}>
+							<div class="flex items-center justify-between gap-4">
+								<div class="space-y-1">
+									<div class="h-5 w-48 rounded bg-muted"></div>
+									<div class="h-4 w-72 rounded bg-muted"></div>
+								</div>
+								<div class="h-6 w-16 rounded-full bg-muted"></div>
 							</div>
-							<Badge variant="secondary">{node.type}</Badge>
-						</Card.Header>
-					</Card.Root>
-				</a>
-			{/each}
-		</div>
+						</div>
+					{/each}
+				</div>
+			</Shimmer>
+		{:else}
+			<div class="grid gap-3">
+				{#each nodes as node (node.id)}
+					<a href={resolve('/nodes/[id]', { id: node.id })}>
+						<Card.Root class="transition-colors hover:bg-muted/50">
+							<Card.Header class="flex flex-row items-center justify-between gap-4 space-y-0">
+								<div>
+									<Card.Title>{node.name}</Card.Title>
+									{#if node.description}
+										<Card.Description>{node.description}</Card.Description>
+									{/if}
+								</div>
+								<Badge variant="secondary">{node.type}</Badge>
+							</Card.Header>
+						</Card.Root>
+					</a>
+				{/each}
+			</div>
 
-		{#if nodes.length === 0 && !loading}
-			<p class="text-muted-foreground">No nodes yet.</p>
+			{#if nodes.length === 0 && !loading}
+				<p class="text-muted-foreground">No nodes yet.</p>
+			{/if}
 		{/if}
 
 		{#if hasMore}
