@@ -24,8 +24,8 @@
 		if (result.error || !result.data) {
 			error = errorMessage(result.error);
 		} else {
-			nodes = after ? [...nodes, ...result.data.items] : result.data.items;
-			hasMore = result.data.items.length === PAGE_SIZE;
+			nodes = after ? [...nodes, ...result.data] : result.data;
+			hasMore = result.data.length === PAGE_SIZE;
 		}
 		loading = false;
 	}

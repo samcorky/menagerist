@@ -15,7 +15,6 @@ from app.modules.graph.adapters.api.dependencies import (
 from app.modules.graph.adapters.api.edge.schemas import (
     CreateEdgeRequest,
     EdgeResponse,
-    ListEdgesResponse,
     UpdateEdgeRequest,
 )
 from app.modules.graph.application.create_edge import CreateEdge
@@ -72,19 +71,19 @@ async def get_edge(
     return EdgeResponse.from_domain(edge)
 
 
-@router.get("", response_model=ListEdgesResponse, operation_id="list_edges")
+@router.get("", response_model=list[EdgeResponse], operation_id="list_edges")
 async def list_edges(
     use_case: Annotated[ListEdges, Depends(get_list_edges_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
     after: uuid.UUID | None = None,
     limit: int = 50,
     node_id: uuid.UUID | None = None,
-) -> ListEdgesResponse:
+) -> list[EdgeResponse]:
     """List edge, paginated by id and optionally filtered to one node."""
     edges = await use_case.handle(
         ListEdgesQuery(after=after, limit=limit, node_id=node_id), actor
     )
-    return ListEdgesResponse(items=[EdgeResponse.from_domain(edge) for edge in edges])
+    return [EdgeResponse.from_domain(edge) for edge in edges]
 
 
 @router.patch(

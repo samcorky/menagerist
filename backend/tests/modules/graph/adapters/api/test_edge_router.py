@@ -80,11 +80,11 @@ def test_create_get_list_and_404_round_trip() -> None:
 
     list_response = client.get("/api/edge")
     assert list_response.status_code == 200
-    assert edge in list_response.json()["items"]
+    assert edge in list_response.json()
 
     filtered_response = client.get(f"/api/edge?node_id={target['id']}")
     assert filtered_response.status_code == 200
-    assert edge in filtered_response.json()["items"]
+    assert edge in filtered_response.json()
 
     missing_response = client.get(f"/api/edge/{uuid.uuid4()}")
     assert missing_response.status_code == 404
@@ -144,7 +144,7 @@ def test_delete_edge_then_get_and_list_no_longer_find_it() -> None:
     assert delete_response.status_code == 204
 
     assert client.get(f"/api/edge/{edge['id']}").status_code == 404
-    assert edge not in client.get("/api/edge").json()["items"]
+    assert edge not in client.get("/api/edge").json()
 
 
 def test_delete_edge_returns_404_when_missing() -> None:

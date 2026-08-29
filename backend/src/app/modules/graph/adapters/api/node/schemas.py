@@ -109,13 +109,3 @@ class NodeResponse(BaseModel):
             created_at=node.created_at,
             updated_at=node.updated_at,
         )
-
-
-class ListNodesResponse(BaseModel):
-    """A page of node."""
-
-    model_config = ConfigDict(
-        json_schema_extra={"examples": [{"items": [_NODE_EXAMPLE]}]}
-    )
-
-    items: list[NodeResponse]

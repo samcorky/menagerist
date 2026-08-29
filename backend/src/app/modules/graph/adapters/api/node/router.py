@@ -14,7 +14,6 @@ from app.modules.graph.adapters.api.dependencies import (
 )
 from app.modules.graph.adapters.api.node.schemas import (
     CreateNodeRequest,
-    ListNodesResponse,
     NodeResponse,
     UpdateNodeRequest,
 )
@@ -66,16 +65,16 @@ async def get_node(
     return NodeResponse.from_domain(node)
 
 
-@router.get("", response_model=ListNodesResponse, operation_id="list_nodes")
+@router.get("", response_model=list[NodeResponse], operation_id="list_nodes")
 async def list_nodes(
     use_case: Annotated[ListNodes, Depends(get_list_nodes_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
     after: uuid.UUID | None = None,
     limit: int = 50,
-) -> ListNodesResponse:
+) -> list[NodeResponse]:
     """List node, paginated by id."""
     nodes = await use_case.handle(ListNodesQuery(after=after, limit=limit), actor)
-    return ListNodesResponse(items=[NodeResponse.from_domain(node) for node in nodes])
+    return [NodeResponse.from_domain(node) for node in nodes]
 
 
 @router.patch(

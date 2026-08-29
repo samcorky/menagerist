@@ -52,7 +52,7 @@ def test_create_get_list_and_404_round_trip() -> None:
 
     list_response = client.get("/api/node")
     assert list_response.status_code == 200
-    assert node in list_response.json()["items"]
+    assert node in list_response.json()
 
     missing_response = client.get(f"/api/node/{uuid.uuid4()}")
     assert missing_response.status_code == 404
@@ -92,7 +92,7 @@ def test_delete_node_then_get_and_list_no_longer_find_it() -> None:
     assert delete_response.status_code == 204
 
     assert client.get(f"/api/node/{node['id']}").status_code == 404
-    assert node not in client.get("/api/node").json()["items"]
+    assert node not in client.get("/api/node").json()
 
 
 def test_delete_node_returns_404_when_missing() -> None:

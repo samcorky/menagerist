@@ -91,13 +91,3 @@ class EdgeResponse(BaseModel):
             created_at=edge.created_at,
             updated_at=edge.updated_at,
         )
-
-
-class ListEdgesResponse(BaseModel):
-    """A page of edge."""
-
-    model_config = ConfigDict(
-        json_schema_extra={"examples": [{"items": [_EDGE_EXAMPLE]}]}
-    )
-
-    items: list[EdgeResponse]

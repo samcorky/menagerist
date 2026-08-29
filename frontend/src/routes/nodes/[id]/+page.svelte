@@ -69,8 +69,8 @@
 		name = node.name;
 		description = node.description ?? '';
 		attributeRows = attributesToRows(node.attributes);
-		edges = edgesResult.data?.items ?? [];
-		otherNodes = (nodesResult.data?.items ?? []).filter((candidate) => candidate.id !== nodeId);
+		edges = edgesResult.data ?? [];
+		otherNodes = (nodesResult.data ?? []).filter((candidate) => candidate.id !== nodeId);
 		loading = false;
 	}
 
