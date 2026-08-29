@@ -19,6 +19,8 @@ RUN npm run generate && npm run build
 FROM cgr.dev/chainguard/nginx AS runtime
 
 COPY --from=builder /app/build /usr/share/nginx/html
+COPY frontend/nginx.main.conf /etc/nginx/nginx.conf
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY frontend/nginx.default.conf /etc/nginx/conf.d/nginx.default.conf
 
 EXPOSE 8080

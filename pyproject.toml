@@ -222,3 +222,47 @@ parallel = ["serve-backend", "serve-frontend"]
 help = "Run the app for local development"
 # Ctrl+C exits the server non-zero; without this poe reports it as a failed task.
 ignore_fail = true
+
+[tool.poe.groups.run.tasks.docker-build-backend]
+cmd = "docker compose -f compose.dev.yaml build backend"
+help = "Build the backend Docker image"
+
+[tool.poe.groups.run.tasks.docker-build-frontend]
+cmd = "docker compose -f compose.dev.yaml build frontend"
+help = "Build the frontend Docker image"
+deps = ["dump-schema"]
+
+[tool.poe.groups.run.tasks.docker-build]
+sequence = ["docker-build-backend", "docker-build-frontend"]
+help = "Build backend and frontend Docker images"
+
+[tool.poe.groups.run.tasks.docker-run-backend]
+cmd = "docker compose -f compose.dev.yaml up backend"
+help = "Run the backend stack (postgres + backend) via Docker Compose"
+ignore_fail = true
+
+[tool.poe.groups.run.tasks.docker-run-frontend]
+cmd = "docker compose -f compose.dev.yaml up frontend"
+help = "Run the full stack including frontend via Docker Compose"
+ignore_fail = true
+deps = ["dump-schema"]
+
+[tool.poe.groups.run.tasks.docker-run]
+cmd = "docker compose -f compose.dev.yaml up"
+help = "Run the full app via Docker Compose"
+ignore_fail = true
+deps = ["dump-schema"]
+
+[tool.poe.groups.run.tasks.docker-up-backend]
+cmd = "docker compose -f compose.dev.yaml up -d --build --force-recreate backend"
+help = "Build and (re)start the backend container detached"
+
+[tool.poe.groups.run.tasks.docker-up-frontend]
+cmd = "docker compose -f compose.dev.yaml up -d --build --force-recreate frontend"
+help = "Build and (re)start the frontend container detached"
+deps = ["dump-schema"]
+
+[tool.poe.groups.run.tasks.docker-up]
+cmd = "docker compose -f compose.dev.yaml up -d --build --force-recreate"
+help = "Build and (re)start all containers detached"
+deps = ["dump-schema"]

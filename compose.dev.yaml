@@ -18,6 +18,7 @@ services:
       retries: 5
 
   migrate:
+    container_name: menagerist-migrate
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -29,7 +30,7 @@ services:
         condition: service_healthy
 
   backend:
-    container_name: menagerist-backend
+    container_name: menagerist
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -45,7 +46,7 @@ services:
         condition: service_completed_successfully
 
   frontend:
-    container_name: menagerist-frontend
+    container_name: menagerist-web
     build:
       context: .
       dockerfile: frontend/Dockerfile
