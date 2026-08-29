@@ -23,7 +23,7 @@ services:
       dockerfile: backend/Dockerfile
     command: ["migrate", "upgrade"]
     environment:
-      MENAGERIST_DATABASE_URL: postgresql+asyncpg://menagerist:menagerist@menagerist-db:5432/menagerist
+      MENAGERIST_DATABASE_URL: postgresql+asyncpg://menagerist:menagerist@postgres:5432/menagerist
     depends_on:
       postgres:
         condition: service_healthy

@@ -5,14 +5,8 @@ from alembic.config import Config
 from alembic import command
 from app.platform.config import get_database_settings
 
-_MIGRATIONS_PATH = Path(__file__).resolve().parents[3] / "alembic"
-"""Where `alembic/` lives relative to this installed module.
-
-Mirrors the `BACKEND_SRC_PATH` convention in `entrypoints/cli/__init__.py`.
-Assumes `alembic/` sits alongside the package's source tree, true for
-`uv run`/editable installs (dev + CI) - revisit once a packaged production
-container needs to run migrations too.
-"""
+_MIGRATIONS_PATH = Path(__file__).resolve().parent.parent / "alembic"
+# app/platform/ → app/ → app/alembic/ — works for both editable and installed wheels.
 
 
 def build_config() -> Config:

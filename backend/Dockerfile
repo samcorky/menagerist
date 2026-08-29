@@ -116,8 +116,6 @@ ENV \
 
 COPY --from=builder /opt/python /opt/python
 COPY --from=builder /app/.venv /app/.venv
-COPY --from=builder /app/backend/alembic /app/backend/alembic
-COPY --from=builder /app/backend/alembic.ini /app/backend/alembic.ini
 COPY --from=builder /app/backend/scripts/healthcheck.py /app/healthcheck.py
 
 EXPOSE 8000

@@ -161,7 +161,7 @@ runtime-evaluated-decorators = [
 "**/platform/orm_mixins.py" = ["TC003"]
 # Alembic-generated migration scripts - mechanically produced, reviewed for
 # correctness rather than style.
-"alembic/versions/*.py" = ["D103", "D415", "W291", "TC003"]
+"**/alembic/versions/*.py" = ["D103", "D415", "W291", "TC003"]
 
 [tool.ruff.lint.flake8-implicit-str-concat]
 allow-multiline = false
