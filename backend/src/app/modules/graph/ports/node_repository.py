@@ -21,6 +21,8 @@ class NodeRepository(Protocol):
         """Return the node with `node_id`, or `None` if missing or deleted."""
         ...
 
-    async def list(self, *, after: uuid.UUID | None, limit: int) -> list[Node]:
+    async def list(
+        self, *, after: uuid.UUID | None, limit: int, type: str | None = None
+    ) -> list[Node]:
         """List non-deleted node ordered by id, starting after `after` if given."""
         ...

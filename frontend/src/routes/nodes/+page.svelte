@@ -16,18 +16,25 @@
 	let loading = $state(false);
 	let error = $state<string | null>(null);
 	let hasMore = $state(true);
+	let selectedType = $state<string | null>(null);
+	let knownTypes = $state<string[]>([]);
 
 	async function fetchPage(after?: string) {
 		loading = true;
 		error = null;
 
-		const result = await listNodes({ query: { after, limit: PAGE_SIZE } });
+		const result = await listNodes({
+			query: { after, limit: PAGE_SIZE, type: selectedType ?? undefined }
+		});
 
 		if (result.error || !result.data) {
 			error = errorMessage(result.error);
 		} else {
 			nodes = after ? [...nodes, ...result.data] : result.data;
 			hasMore = result.data.length === PAGE_SIZE;
+			if (selectedType === null) {
+				knownTypes = [...new Set([...knownTypes, ...result.data.map((n) => n.type)])].sort();
+			}
 		}
 		loading = false;
 	}
@@ -36,12 +43,16 @@
 		void fetchPage(nodes.at(-1)?.id);
 	}
 
-	// Reads no reactive state synchronously before its first await, so this
-	// effect has no tracked dependencies and only runs once, on mount -
-	// `loadMore` (which does read `node`) only ever runs from the button
-	// click below, never from here. See fetchPage(after) split above: an
-	// effect calling a function that both reads and later reassigns the same
-	// state creates a self-retriggering loop.
+	function selectType(type: string | null) {
+		if (selectedType === type) return;
+		nodes = [];
+		hasMore = true;
+		selectedType = type;
+	}
+
+	// fetchPage reads selectedType synchronously, so this effect re-runs
+	// whenever selectedType changes. selectType must NOT call fetchPage
+	// directly to avoid a double request.
 	$effect(() => {
 		void fetchPage();
 	});
@@ -51,7 +62,7 @@
 	<title>Nodes</title>
 </svelte:head>
 
-<main class="min-h-screen bg-background px-6 py-10 text-foreground">
+<main class="flex-1 bg-background px-6 py-10 text-foreground">
 	<div class="mx-auto flex max-w-4xl flex-col gap-6">
 		<div class="flex items-center justify-between gap-4">
 			<h1 class="text-3xl font-semibold tracking-tight">Nodes</h1>
@@ -66,6 +77,27 @@
 				<AlertTitle>Couldn't load nodes</AlertTitle>
 				<AlertDescription>{error}</AlertDescription>
 			</Alert>
+		{/if}
+
+		{#if knownTypes.length > 1}
+			<div class="flex flex-wrap gap-2">
+				<Badge
+					variant={selectedType === null ? 'default' : 'outline'}
+					class="cursor-pointer"
+					onclick={() => selectType(null)}
+				>
+					All
+				</Badge>
+				{#each knownTypes as type (type)}
+					<Badge
+						variant={selectedType === type ? 'default' : 'outline'}
+						class="cursor-pointer"
+						onclick={() => selectType(type)}
+					>
+						{type}
+					</Badge>
+				{/each}
+			</div>
 		{/if}
 
 		{#if loading && nodes.length === 0}
@@ -104,11 +136,13 @@
 			</div>
 
 			{#if nodes.length === 0 && !loading}
-				<p class="text-muted-foreground">No nodes yet.</p>
+				<p class="text-muted-foreground">
+					{selectedType ? `No "${selectedType}" nodes.` : 'No nodes yet.'}
+				</p>
 			{/if}
 		{/if}
 
-		{#if hasMore}
+		{#if hasMore && nodes.length > 0}
 			<div class="flex justify-center">
 				<Button variant="outline" disabled={loading} onclick={loadMore}>
 					{loading ? 'Loading…' : 'Load more'}

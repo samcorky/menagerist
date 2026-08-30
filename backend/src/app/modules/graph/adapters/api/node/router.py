@@ -71,9 +71,12 @@ async def list_nodes(
     actor: Annotated[Actor, Depends(get_current_actor)],
     after: uuid.UUID | None = None,
     limit: int = 50,
+    type: str | None = None,
 ) -> list[NodeResponse]:
     """List node, paginated by id."""
-    nodes = await use_case.handle(ListNodesQuery(after=after, limit=limit), actor)
+    nodes = await use_case.handle(
+        ListNodesQuery(after=after, limit=limit, type=type), actor
+    )
     return [NodeResponse.from_domain(node) for node in nodes]
 
 

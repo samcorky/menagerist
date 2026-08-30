@@ -50,7 +50,7 @@
 	<title>New Node</title>
 </svelte:head>
 
-<main class="min-h-screen bg-background px-6 py-10 text-foreground">
+<main class="flex-1 bg-background px-6 py-10 text-foreground">
 	<div class="mx-auto max-w-2xl">
 		<Card.Root>
 			<Card.Header>

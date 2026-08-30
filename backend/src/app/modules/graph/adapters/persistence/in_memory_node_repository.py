@@ -27,12 +27,16 @@ class InMemoryNodeRepository:
             return None
         return node
 
-    async def list(self, *, after: uuid.UUID | None, limit: int) -> list[Node]:
+    async def list(
+        self, *, after: uuid.UUID | None, limit: int, type: str | None = None
+    ) -> list[Node]:
         """List non-deleted node ordered by id, starting after `after` if given."""
         ordered = sorted(
             (node for node in self._nodes.values() if not node.is_deleted),
             key=lambda node: node.id,
         )
+        if type is not None:
+            ordered = [node for node in ordered if node.type == type]
         if after is not None:
             ordered = [node for node in ordered if node.id > after]
         return ordered[:limit]

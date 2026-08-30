@@ -6,6 +6,21 @@ from app.modules.graph.domain.node import Node
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
+async def test_list_nodes_filters_by_type() -> None:
+    """ListNodes returns only nodes matching the requested type."""
+    repository = InMemoryNodeRepository()
+    film = Node.create(name="Alien", type="film")
+    person = Node.create(name="Ridley Scott", type="person")
+    await repository.add(film)
+    await repository.add(person)
+    use_case = ListNodes(repository)
+
+    result = await use_case.handle(ListNodesQuery(type="film"), SYSTEM_ACTOR)
+
+    assert result == [film]
+    assert person not in result
+
+
 async def test_list_nodes_orders_by_id_and_paginates() -> None:
     """ListNodes returns node ordered by id, respecting after/limit."""
     repository = InMemoryNodeRepository()

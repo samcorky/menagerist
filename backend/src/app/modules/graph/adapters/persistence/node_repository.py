@@ -67,7 +67,9 @@ class SqlAlchemyNodeRepository:
             return None
         return _to_domain(model)
 
-    async def list(self, *, after: uuid.UUID | None, limit: int) -> list[Node]:
+    async def list(
+        self, *, after: uuid.UUID | None, limit: int, type: str | None = None
+    ) -> list[Node]:
         """List non-deleted node ordered by id, starting after `after` if given."""
         stmt = (
             select(NodeModel)
@@ -75,6 +77,8 @@ class SqlAlchemyNodeRepository:
             .order_by(NodeModel.id)
             .limit(limit)
         )
+        if type is not None:
+            stmt = stmt.where(NodeModel.type == type)
         if after is not None:
             stmt = stmt.where(NodeModel.id > after)
         result = await self._session.execute(stmt)

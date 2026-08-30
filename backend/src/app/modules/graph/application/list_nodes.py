@@ -14,6 +14,7 @@ class ListNodesQuery:
 
     after: uuid.UUID | None = None
     limit: int = 50
+    type: str | None = None
 
 
 class ListNodes:
@@ -24,4 +25,6 @@ class ListNodes:
 
     async def handle(self, query: ListNodesQuery, actor: Actor) -> list[Node]:
         """Return a page of node after `query.after`, up to `query.limit`."""
-        return await self._nodes.list(after=query.after, limit=query.limit)
+        return await self._nodes.list(
+            after=query.after, limit=query.limit, type=query.type
+        )

@@ -102,3 +102,17 @@ def test_delete_node_returns_404_when_missing() -> None:
     response = client.delete(f"/api/node/{uuid.uuid4()}")
 
     assert response.status_code == 404
+
+
+def test_list_nodes_filters_by_type() -> None:
+    """GET /api/node?type=film returns only film nodes."""
+    client = TestClient(_app_with_in_memory_graph())
+    film = client.post("/api/node", json={"name": "Alien", "type": "film"}).json()
+    client.post("/api/node", json={"name": "Ridley Scott", "type": "person"})
+
+    response = client.get("/api/node?type=film")
+
+    assert response.status_code == 200
+    results = response.json()
+    assert len(results) == 1
+    assert results[0]["id"] == film["id"]

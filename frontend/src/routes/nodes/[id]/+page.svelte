@@ -154,7 +154,7 @@
 	<title>{node?.name ?? 'Node'}</title>
 </svelte:head>
 
-<main class="min-h-screen bg-background px-6 py-10 text-foreground">
+<main class="flex-1 bg-background px-6 py-10 text-foreground">
 	<div class="mx-auto flex max-w-2xl flex-col gap-6">
 		<Button variant="ghost" href={resolve('/nodes')} class="w-fit">← Back to Nodes</Button>
 
