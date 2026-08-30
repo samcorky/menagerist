@@ -2,8 +2,17 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from starlette.requests import Request
+from starlette.responses import Response
 
+from app.entrypoints.api.shared.conditional_request import ConditionalRequestDep
 from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.entrypoints.api.shared.http_headers import (
+    conditional_get_responses,
+    conditional_patch_responses,
+    link_header_responses,
+    link_next_header,
+)
 from app.entrypoints.api.shared.problem_response import error_response
 from app.modules.graph.adapters.api.dependencies import (
     get_create_node_use_case,
@@ -50,34 +59,50 @@ async def create_node(
     "/{node_id}",
     response_model=NodeResponse,
     operation_id="get_node",
-    responses=error_response(
-        NodeNotFoundError,
-        detail="Node 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10 not found",
-    ),
+    responses={
+        **conditional_get_responses(),
+        **error_response(
+            NodeNotFoundError,
+            detail="Node 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10 not found",
+        ),
+    },
 )
 async def get_node(
     node_id: uuid.UUID,
     use_case: Annotated[GetNode, Depends(get_get_node_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
-) -> NodeResponse:
+    cond: ConditionalRequestDep,
+) -> NodeResponse | Response:
     """Fetch a single node by id."""
     node = await use_case.handle(GetNodeQuery(node_id=node_id), actor)
+    if earlier := cond.check_get(node):
+        return earlier
     return NodeResponse.from_domain(node)
 
 
-@router.get("", response_model=list[NodeResponse], operation_id="list_nodes")
+@router.get(
+    "",
+    response_model=list[NodeResponse],
+    operation_id="list_nodes",
+    responses={**link_header_responses()},
+)
 async def list_nodes(
     use_case: Annotated[ListNodes, Depends(get_list_nodes_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
+    request: Request,
+    response: Response,
     after: uuid.UUID | None = None,
     limit: int = 50,
     type: str | None = None,
 ) -> list[NodeResponse]:
     """List node, paginated by id."""
     nodes = await use_case.handle(
-        ListNodesQuery(after=after, limit=limit, type=type), actor
+        ListNodesQuery(after=after, limit=limit + 1, type=type), actor
     )
-    return [NodeResponse.from_domain(node) for node in nodes]
+    if len(nodes) > limit:
+        response.headers["Link"] = link_next_header(request, str(nodes[limit - 1].id))
+
+    return [NodeResponse.from_domain(node) for node in nodes[:limit]]
 
 
 @router.patch(
@@ -85,6 +110,7 @@ async def list_nodes(
     response_model=NodeResponse,
     operation_id="update_node",
     responses={
+        **conditional_patch_responses(),
         **error_response(
             NodeNotFoundError,
             detail="Node 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10 not found",
@@ -95,11 +121,17 @@ async def list_nodes(
 async def update_node(
     node_id: uuid.UUID,
     payload: UpdateNodeRequest,
-    use_case: Annotated[UpdateNode, Depends(get_update_node_use_case)],
+    get_usecase: Annotated[GetNode, Depends(get_get_node_use_case)],
+    update_usecase: Annotated[UpdateNode, Depends(get_update_node_use_case)],
+    cond: ConditionalRequestDep,
     actor: Annotated[Actor, Depends(get_current_actor)],
-) -> NodeResponse:
+) -> NodeResponse | Response:
     """Update a node's editable fields."""
-    node = await use_case.handle(payload.to_command(node_id), actor)
+    current = await get_usecase.handle(GetNodeQuery(node_id=node_id), actor)
+    if earlier := cond.check_patch(current):
+        return earlier
+    node = await update_usecase.handle(payload.to_command(node_id), actor)
+    cond.set_response_etag(node)
     return NodeResponse.from_domain(node)
 
 

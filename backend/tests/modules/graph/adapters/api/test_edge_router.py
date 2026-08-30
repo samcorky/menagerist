@@ -154,3 +154,150 @@ def test_delete_edge_returns_404_when_missing() -> None:
     response = client.delete(f"/api/edge/{uuid.uuid4()}")
 
     assert response.status_code == 404
+
+
+def test_get_edge_response_includes_etag_and_last_modified_headers() -> None:
+    """GET /api/edge/{id} returns ETag and Last-Modified headers."""
+    client = TestClient(_app_with_in_memory_graph())
+    node_1 = _create_node(client, name="Node 1", type_="type1")
+    node_2 = _create_node(client, name="Node 2", type_="type2")
+
+    edge = client.post(
+        "/api/edge",
+        json={"source_id": node_1["id"], "target_id": node_2["id"], "type": "test"},
+    ).json()
+
+    response = client.get(f"/api/edge/{edge['id']}")
+
+    assert response.status_code == 200
+    assert "ETag" in response.headers
+    assert "Last-Modified" in response.headers
+
+
+def test_get_edge_returns_304_when_etag_matches() -> None:
+    """GET /api/edge/{id} returns 304 Not Modified when ETag matches."""
+    client = TestClient(_app_with_in_memory_graph())
+    node_1 = _create_node(client, name="Node 1", type_="type1")
+    node_2 = _create_node(client, name="Node 2", type_="type2")
+    edge = client.post(
+        "/api/edge",
+        json={"source_id": node_1["id"], "target_id": node_2["id"], "type": "test"},
+    ).json()
+
+    initial_response = client.get(f"/api/edge/{edge['id']}")
+    etag = initial_response.headers["ETag"]
+
+    response = client.get(f"/api/edge/{edge['id']}", headers={"If-None-Match": etag})
+
+    assert response.status_code == 304
+    assert response.headers["ETag"] == etag
+
+
+def test_get_edge_returns_304_when_not_modified_since() -> None:
+    """GET /api/edge/{id} returns 304 Not Modified when If-Modified-Since matches."""
+    client = TestClient(_app_with_in_memory_graph())
+    node_1 = _create_node(client, name="Node 1", type_="type1")
+    node_2 = _create_node(client, name="Node 2", type_="type2")
+    edge = client.post(
+        "/api/edge",
+        json={"source_id": node_1["id"], "target_id": node_2["id"], "type": "test"},
+    ).json()
+
+    initial_response = client.get(f"/api/edge/{edge['id']}")
+    last_modified = initial_response.headers["Last-Modified"]
+
+    response = client.get(
+        f"/api/edge/{edge['id']}", headers={"If-Modified-Since": last_modified}
+    )
+
+    assert response.status_code == 304
+    assert response.headers["Last-Modified"] == last_modified
+
+
+def test_update_edge_returns_412_when_if_match_stale() -> None:
+    """PATCH /api/edge/{id} returns 412 Precondition Failed when If-Match is stale."""
+    client = TestClient(_app_with_in_memory_graph())
+    node_1 = _create_node(client, name="Node 1", type_="type1")
+    node_2 = _create_node(client, name="Node 2", type_="type2")
+    edge = client.post(
+        "/api/edge",
+        json={"source_id": node_1["id"], "target_id": node_2["id"], "type": "test"},
+    ).json()
+
+    initial_response = client.get(f"/api/edge/{edge['id']}")
+    etag = initial_response.headers["ETag"]
+
+    # Update the edge to change its ETag
+    client.patch(f"/api/edge/{edge['id']}", json={"type": "updated_test"})
+
+    response = client.patch(
+        f"/api/edge/{edge['id']}",
+        json={"type": "another_test"},
+        headers={"If-Match": etag},
+    )
+
+    assert response.status_code == 412
+    assert response.headers["ETag"] != etag
+
+
+def test_update_edge_proceeds_when_if_match_current() -> None:
+    """PATCH /api/edge/{id} succeeds when If-Match matches current ETag."""
+    client = TestClient(_app_with_in_memory_graph())
+    node_1 = _create_node(client, name="Node 1", type_="type1")
+    node_2 = _create_node(client, name="Node 2", type_="type2")
+    edge = client.post(
+        "/api/edge",
+        json={"source_id": node_1["id"], "target_id": node_2["id"], "type": "test"},
+    ).json()
+
+    initial_response = client.get(f"/api/edge/{edge['id']}")
+    etag = initial_response.headers["ETag"]
+
+    response = client.patch(
+        f"/api/edge/{edge['id']}",
+        json={"attributes": {"patched": True}},
+        headers={"If-Match": etag},
+    )
+
+    assert response.status_code == 200
+    updated_edge = response.json()
+    assert updated_edge["attributes"] == {"patched": True}
+    # type is immutable through PATCH
+    assert updated_edge["type"] == "test"
+
+
+def test_list_edges_link_header_present_when_more_pages_exist() -> None:
+    """GET /api/edge returns Link header when more pages exist."""
+    client = TestClient(_app_with_in_memory_graph())
+    # Create enough edges to require pagination
+    for i in range(15):
+        src = _create_node(client, name=f"Source {i}", type_="type")
+        tgt = _create_node(client, name=f"Target {i}", type_="type")
+        client.post(
+            "/api/edge",
+            json={"source_id": src["id"], "target_id": tgt["id"], "type": "test"},
+        )
+
+    response = client.get("/api/edge?limit=10")
+
+    assert response.status_code == 200
+    assert "Link" in response.headers
+    assert 'rel="next"' in response.headers["Link"]
+
+
+def test_list_edges_no_link_header_on_last_page() -> None:
+    """GET /api/edge does not return Link header on last page."""
+    client = TestClient(_app_with_in_memory_graph())
+    # Create fewer edges than the page size
+    for i in range(5):
+        src = _create_node(client, name=f"Source {i}", type_="type")
+        tgt = _create_node(client, name=f"Target {i}", type_="type")
+        client.post(
+            "/api/edge",
+            json={"source_id": src["id"], "target_id": tgt["id"], "type": "test"},
+        )
+
+    response = client.get("/api/edge")
+
+    assert response.status_code == 200
+    assert "Link" not in response.headers
