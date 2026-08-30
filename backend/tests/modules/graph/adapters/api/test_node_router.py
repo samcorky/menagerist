@@ -45,7 +45,7 @@ def test_create_get_list_and_404_round_trip() -> None:
     client = TestClient(_app_with_in_memory_graph())
 
     create_response = client.post(
-        "/api/node",
+        "/api/v1/node",
         json={"name": "Alien", "type": "film", "attributes": {"title": "Alien"}},
     )
     assert create_response.status_code == 201
@@ -53,15 +53,15 @@ def test_create_get_list_and_404_round_trip() -> None:
     assert node["type"] == "film"
     assert node["attributes"] == {"title": "Alien"}
 
-    get_response = client.get(f"/api/node/{node['id']}")
+    get_response = client.get(f"/api/v1/node/{node['id']}")
     assert get_response.status_code == 200
     assert get_response.json() == node
 
-    list_response = client.get("/api/node")
+    list_response = client.get("/api/v1/node")
     assert list_response.status_code == 200
     assert node in list_response.json()
 
-    missing_response = client.get(f"/api/node/{uuid.uuid4()}")
+    missing_response = client.get(f"/api/v1/node/{uuid.uuid4()}")
     assert missing_response.status_code == 404
     assert missing_response.json()["title"] == "NodeNotFoundError"
 
@@ -69,10 +69,10 @@ def test_create_get_list_and_404_round_trip() -> None:
 def test_update_node_applies_changes() -> None:
     """PATCH updates the given fields and leaves the rest unchanged."""
     client = TestClient(_app_with_in_memory_graph())
-    node = client.post("/api/node", json={"name": "Alien", "type": "film"}).json()
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
 
     update_response = client.patch(
-        f"/api/node/{node['id']}", json={"name": "Alien (1979)"}
+        f"/api/v1/node/{node['id']}", json={"name": "Alien (1979)"}
     )
 
     assert update_response.status_code == 200
@@ -85,7 +85,7 @@ def test_update_node_returns_404_when_missing() -> None:
     """PATCH on a nonexistent node returns 404."""
     client = TestClient(_app_with_in_memory_graph())
 
-    response = client.patch(f"/api/node/{uuid.uuid4()}", json={"name": "Alien"})
+    response = client.patch(f"/api/v1/node/{uuid.uuid4()}", json={"name": "Alien"})
 
     assert response.status_code == 404
 
@@ -93,31 +93,31 @@ def test_update_node_returns_404_when_missing() -> None:
 def test_delete_node_then_get_and_list_no_longer_find_it() -> None:
     """DELETE soft-deletes the node, so subsequent GET/LIST treat it as gone."""
     client = TestClient(_app_with_in_memory_graph())
-    node = client.post("/api/node", json={"name": "Alien", "type": "film"}).json()
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
 
-    delete_response = client.delete(f"/api/node/{node['id']}")
+    delete_response = client.delete(f"/api/v1/node/{node['id']}")
     assert delete_response.status_code == 204
 
-    assert client.get(f"/api/node/{node['id']}").status_code == 404
-    assert node not in client.get("/api/node").json()
+    assert client.get(f"/api/v1/node/{node['id']}").status_code == 404
+    assert node not in client.get("/api/v1/node").json()
 
 
 def test_delete_node_returns_404_when_missing() -> None:
     """DELETE on a nonexistent node returns 404."""
     client = TestClient(_app_with_in_memory_graph())
 
-    response = client.delete(f"/api/node/{uuid.uuid4()}")
+    response = client.delete(f"/api/v1/node/{uuid.uuid4()}")
 
     assert response.status_code == 404
 
 
 def test_list_nodes_filters_by_type() -> None:
-    """GET /api/node?type=film returns only film nodes."""
+    """GET /api/v1/node?type=film returns only film nodes."""
     client = TestClient(_app_with_in_memory_graph())
-    film = client.post("/api/node", json={"name": "Alien", "type": "film"}).json()
-    client.post("/api/node", json={"name": "Ridley Scott", "type": "person"})
+    film = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
+    client.post("/api/v1/node", json={"name": "Ridley Scott", "type": "person"})
 
-    response = client.get("/api/node?type=film")
+    response = client.get("/api/v1/node?type=film")
 
     assert response.status_code == 200
     results = response.json()
@@ -126,12 +126,12 @@ def test_list_nodes_filters_by_type() -> None:
 
 
 def test_list_nodes_search_by_name() -> None:
-    """GET /api/node?q=alien returns only nodes whose name contains the query."""
+    """GET /api/v1/node?q=alien returns only nodes whose name contains the query."""
     client = TestClient(_app_with_in_memory_graph())
-    client.post("/api/node", json={"name": "Alien", "type": "film"})
-    client.post("/api/node", json={"name": "Predator", "type": "film"})
+    client.post("/api/v1/node", json={"name": "Alien", "type": "film"})
+    client.post("/api/v1/node", json={"name": "Predator", "type": "film"})
 
-    response = client.get("/api/node?q=alien")
+    response = client.get("/api/v1/node?q=alien")
 
     assert response.status_code == 200
     results = response.json()
@@ -140,12 +140,12 @@ def test_list_nodes_search_by_name() -> None:
 
 
 def test_list_nodes_search_and_type_filter_combine() -> None:
-    """GET /api/node?q=alien&type=film applies both filters."""
+    """GET /api/v1/node?q=alien&type=film applies both filters."""
     client = TestClient(_app_with_in_memory_graph())
-    client.post("/api/node", json={"name": "Alien", "type": "film"})
-    client.post("/api/node", json={"name": "Alien character", "type": "person"})
+    client.post("/api/v1/node", json={"name": "Alien", "type": "film"})
+    client.post("/api/v1/node", json={"name": "Alien character", "type": "person"})
 
-    response = client.get("/api/node?q=alien&type=film")
+    response = client.get("/api/v1/node?q=alien&type=film")
 
     assert response.status_code == 200
     results = response.json()
@@ -154,11 +154,11 @@ def test_list_nodes_search_and_type_filter_combine() -> None:
 
 
 def test_get_node_response_includes_etag_and_last_modified_headers() -> None:
-    """GET /api/node/{id} returns ETag and Last-Modified headers."""
+    """GET /api/v1/node/{id} returns ETag and Last-Modified headers."""
     client = TestClient(_app_with_in_memory_graph())
-    node = client.post("/api/node", json={"name": "Alien", "type": "film"}).json()
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
 
-    response = client.get(f"/api/node/{node['id']}")
+    response = client.get(f"/api/v1/node/{node['id']}")
 
     assert response.status_code == 200
     assert "ETag" in response.headers
@@ -166,29 +166,29 @@ def test_get_node_response_includes_etag_and_last_modified_headers() -> None:
 
 
 def test_get_node_returns_304_when_etag_matches() -> None:
-    """GET /api/node/{id} returns 304 Not Modified when ETag matches."""
+    """GET /api/v1/node/{id} returns 304 Not Modified when ETag matches."""
     client = TestClient(_app_with_in_memory_graph())
-    node = client.post("/api/node", json={"name": "Alien", "type": "film"}).json()
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
 
-    initial_response = client.get(f"/api/node/{node['id']}")
+    initial_response = client.get(f"/api/v1/node/{node['id']}")
     etag = initial_response.headers["ETag"]
 
-    response = client.get(f"/api/node/{node['id']}", headers={"If-None-Match": etag})
+    response = client.get(f"/api/v1/node/{node['id']}", headers={"If-None-Match": etag})
 
     assert response.status_code == 304
     assert response.headers["ETag"] == etag
 
 
 def test_get_node_returns_304_when_not_modified_since() -> None:
-    """GET /api/node/{id} returns 304 Not Modified when If-Modified-Since matches."""
+    """GET /api/v1/node/{id} returns 304 Not Modified when If-Modified-Since matches."""
     client = TestClient(_app_with_in_memory_graph())
-    node = client.post("/api/node", json={"name": "Alien", "type": "film"}).json()
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
 
-    initial_response = client.get(f"/api/node/{node['id']}")
+    initial_response = client.get(f"/api/v1/node/{node['id']}")
     last_modified = initial_response.headers["Last-Modified"]
 
     response = client.get(
-        f"/api/node/{node['id']}", headers={"If-Modified-Since": last_modified}
+        f"/api/v1/node/{node['id']}", headers={"If-Modified-Since": last_modified}
     )
 
     assert response.status_code == 304
@@ -196,18 +196,21 @@ def test_get_node_returns_304_when_not_modified_since() -> None:
 
 
 def test_update_node_returns_412_when_if_match_stale() -> None:
-    """PATCH /api/node/{id} returns 412 Precondition Failed when If-Match is stale."""
-    client = TestClient(_app_with_in_memory_graph())
-    node = client.post("/api/node", json={"name": "Alien", "type": "film"}).json()
+    """PATCH /api/v1/node/{id} returns 412 Precondition Failed.
 
-    initial_response = client.get(f"/api/node/{node['id']}")
+    When If-Match is stale.
+    """
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
+
+    initial_response = client.get(f"/api/v1/node/{node['id']}")
     etag = initial_response.headers["ETag"]
 
     # Update the node to change its ETag
-    client.patch(f"/api/node/{node['id']}", json={"name": "Alien (1979)"})
+    client.patch(f"/api/v1/node/{node['id']}", json={"name": "Alien (1979)"})
 
     response = client.patch(
-        f"/api/node/{node['id']}",
+        f"/api/v1/node/{node['id']}",
         json={"name": "Alien (1980)"},
         headers={"If-Match": etag},
     )
@@ -217,15 +220,15 @@ def test_update_node_returns_412_when_if_match_stale() -> None:
 
 
 def test_update_node_proceeds_when_if_match_current() -> None:
-    """PATCH /api/node/{id} succeeds when If-Match matches current ETag."""
+    """PATCH /api/v1/node/{id} succeeds when If-Match matches current ETag."""
     client = TestClient(_app_with_in_memory_graph())
-    node = client.post("/api/node", json={"name": "Alien", "type": "film"}).json()
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
 
-    initial_response = client.get(f"/api/node/{node['id']}")
+    initial_response = client.get(f"/api/v1/node/{node['id']}")
     etag = initial_response.headers["ETag"]
 
     response = client.patch(
-        f"/api/node/{node['id']}",
+        f"/api/v1/node/{node['id']}",
         json={"name": "Alien (1979)"},
         headers={"If-Match": etag},
     )
@@ -236,13 +239,13 @@ def test_update_node_proceeds_when_if_match_current() -> None:
 
 
 def test_list_nodes_link_header_present_when_more_pages_exist() -> None:
-    """GET /api/node returns Link header when more pages exist."""
+    """GET /api/v1/node returns Link header when more pages exist."""
     client = TestClient(_app_with_in_memory_graph())
     # Create enough nodes to require pagination
     for i in range(15):
-        client.post("/api/node", json={"name": f"Node {i}", "type": "test"})
+        client.post("/api/v1/node", json={"name": f"Node {i}", "type": "test"})
 
-    response = client.get("/api/node?limit=10")
+    response = client.get("/api/v1/node?limit=10")
 
     assert response.status_code == 200
     assert "Link" in response.headers
@@ -250,13 +253,13 @@ def test_list_nodes_link_header_present_when_more_pages_exist() -> None:
 
 
 def test_list_nodes_no_link_header_on_last_page() -> None:
-    """GET /api/node does not return Link header on last page."""
+    """GET /api/v1/node does not return Link header on last page."""
     client = TestClient(_app_with_in_memory_graph())
     # Create fewer nodes than the page size (assuming default page size is 10)
     for i in range(5):
-        client.post("/api/node", json={"name": f"Node {i}", "type": "test"})
+        client.post("/api/v1/node", json={"name": f"Node {i}", "type": "test"})
 
-    response = client.get("/api/node")
+    response = client.get("/api/v1/node")
 
     assert response.status_code == 200
     assert "Link" not in response.headers

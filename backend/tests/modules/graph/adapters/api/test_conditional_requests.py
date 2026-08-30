@@ -46,7 +46,7 @@ def _app_with_in_memory_graph() -> FastAPI:
 
 def _create_node(client: TestClient, *, name: str, type_: str) -> dict:
     """Create a node via the API and return the JSON response."""
-    response = client.post("/api/node", json={"name": name, "type": type_})
+    response = client.post("/api/v1/node", json={"name": name, "type": type_})
     return response.json()
 
 
@@ -56,9 +56,9 @@ def test_last_modified_is_rfc1123_no_subsecond() -> None:
     (RFC 1123, no sub-second precision).
     """
     client = TestClient(_app_with_in_memory_graph())
-    node = client.post("/api/node", json={"name": "Alien", "type": "film"}).json()
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
 
-    resp = client.get(f"/api/node/{node['id']}")
+    resp = client.get(f"/api/v1/node/{node['id']}")
     assert resp.status_code == 200
     assert "Last-Modified" in resp.headers
 
@@ -72,7 +72,7 @@ def test_cache_control_present_on_get() -> None:
     client = TestClient(_app_with_in_memory_graph())
     node = _create_node(client, name="Alien", type_="film")
 
-    resp = client.get(f"/api/node/{node['id']}")
+    resp = client.get(f"/api/v1/node/{node['id']}")
     assert resp.status_code == 200
     assert "Cache-Control" in resp.headers
     assert resp.headers["Cache-Control"] == "private, no-cache"
@@ -83,16 +83,18 @@ def test_304_preserves_etag_and_last_modified() -> None:
     client = TestClient(_app_with_in_memory_graph())
     node = _create_node(client, name="Alien", type_="film")
 
-    initial = client.get(f"/api/node/{node['id']}")
+    initial = client.get(f"/api/v1/node/{node['id']}")
     etag = initial.headers["ETag"]
     last_mod = initial.headers["Last-Modified"]
 
-    r1 = client.get(f"/api/node/{node['id']}", headers={"If-None-Match": etag})
+    r1 = client.get(f"/api/v1/node/{node['id']}", headers={"If-None-Match": etag})
     assert r1.status_code == 304
     assert r1.headers["ETag"] == etag
     assert r1.headers["Last-Modified"] == last_mod
 
-    r2 = client.get(f"/api/node/{node['id']}", headers={"If-Modified-Since": last_mod})
+    r2 = client.get(
+        f"/api/v1/node/{node['id']}", headers={"If-Modified-Since": last_mod}
+    )
     assert r2.status_code == 304
     assert r2.headers["ETag"] == etag
     assert r2.headers["Last-Modified"] == last_mod
@@ -103,11 +105,11 @@ def test_patch_with_if_unmodified_since_returns_412_when_stale() -> None:
     client = TestClient(_app_with_in_memory_graph())
     node = _create_node(client, name="Alien", type_="film")
 
-    initial = client.get(f"/api/node/{node['id']}")
+    initial = client.get(f"/api/v1/node/{node['id']}")
     last_mod = initial.headers["Last-Modified"]
 
     # Mutate the resource
-    client.patch(f"/api/node/{node['id']}", json={"name": "Alien (1980)"})
+    client.patch(f"/api/v1/node/{node['id']}", json={"name": "Alien (1980)"})
 
     # Use a timestamp older than the original Last-Modified to ensure the
     # precondition is considered stale regardless of sub-second timing.
@@ -116,7 +118,7 @@ def test_patch_with_if_unmodified_since_returns_412_when_stale() -> None:
     stale_header = formatdate(stale_dt.timestamp(), usegmt=True)
 
     response = client.patch(
-        f"/api/node/{node['id']}",
+        f"/api/v1/node/{node['id']}",
         json={"name": "Alien (1979)"},
         headers={"If-Unmodified-Since": stale_header},
     )
@@ -130,20 +132,20 @@ def test_etag_changes_on_mutation_and_stale_if_match_returns_412() -> None:
     client = TestClient(_app_with_in_memory_graph())
     node = _create_node(client, name="Alien", type_="film")
 
-    initial = client.get(f"/api/node/{node['id']}")
+    initial = client.get(f"/api/v1/node/{node['id']}")
     etag1 = initial.headers["ETag"]
 
     # change the resource
-    client.patch(f"/api/node/{node['id']}", json={"name": "Alien (1980)"})
+    client.patch(f"/api/v1/node/{node['id']}", json={"name": "Alien (1980)"})
 
     # ETag should have changed
-    after = client.get(f"/api/node/{node['id']}")
+    after = client.get(f"/api/v1/node/{node['id']}")
     etag2 = after.headers["ETag"]
     assert etag1 != etag2
 
     # An attempt to PATCH with the old ETag must yield 412
     response = client.patch(
-        f"/api/node/{node['id']}",
+        f"/api/v1/node/{node['id']}",
         json={"name": "Alien (1979)"},
         headers={"If-Match": etag1},
     )

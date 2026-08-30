@@ -1,14 +1,51 @@
+x-hardened: &hardened
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  cap_add:
+    - NET_BIND_SERVICE
+  tmpfs:
+    - /tmp
+    - /var/run
+  user: "1000:1000"
+  networks:
+    - menagerist
+
+x-logging: &logging
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
   postgres:
     image: postgres:18-alpine
     container_name: menagerist-db
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - CHOWN
+      - DAC_OVERRIDE
+    read_only: false
+    tmpfs:
+      - /tmp
+      - /var/run
+      - /run/postgresql
     environment:
       POSTGRES_USER: menagerist
       POSTGRES_PASSWORD: menagerist
       POSTGRES_DB: menagerist
+      POSTGRES_INITDB_ARGS: -c log_connections=on -c log_disconnections=on
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql
     healthcheck:
@@ -16,8 +53,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - menagerist
 
   migrate:
+    <<: [*hardened, *logging]
     container_name: menagerist-migrate
     build:
       context: .
@@ -28,33 +68,45 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    restart: no
 
   backend:
-    container_name: menagerist
+    <<: [*hardened, *logging]
+    container_name: menagerist-backend
     build:
       context: .
       dockerfile: backend/Dockerfile
     restart: unless-stopped
     environment:
-      MENAGERIST_DATABASE_URL: postgresql+asyncpg://menagerist:menagerist@menagerist-db:5432/menagerist
-    ports:
-      - "8000:8000"
+      MENAGERIST_DATABASE_URL: postgresql+asyncpg://menagerist:menagerist@postgres:5432/menagerist
     depends_on:
       postgres:
         condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
 
   frontend:
-    container_name: menagerist-web
+    <<: [*hardened, *logging]
+    container_name: menagerist-frontend
     build:
       context: .
       dockerfile: frontend/Dockerfile
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run
+      - /var/lib/nginx/tmp
+      - /var/cache/nginx
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     depends_on:
       - backend
 
 volumes:
   postgres-data:
+    driver: local
+
+networks:
+  menagerist:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: menagerist
