@@ -8,6 +8,9 @@ from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
 from app.modules.graph.adapters.persistence.in_memory_node_repository import (
     InMemoryNodeRepository,
 )
+from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
+    InMemoryNodeTypeRepository,
+)
 from app.modules.graph.adapters.persistence.unit_of_work import (
     create_in_memory_graph_uow,
 )
@@ -23,7 +26,11 @@ async def test_delete_node_soft_deletes_and_commits() -> None:
     repository = InMemoryNodeRepository()
     node = Node.create(name="Alien", type="film")
     await repository.add(node)
-    repos = GraphRepos(nodes=repository, edges=InMemoryEdgeRepository())
+    repos = GraphRepos(
+        nodes=repository,
+        edges=InMemoryEdgeRepository(),
+        node_types=InMemoryNodeTypeRepository(),
+    )
     uow = create_in_memory_graph_uow(repos)
     use_case = DeleteNode(uow)
 
@@ -34,7 +41,11 @@ async def test_delete_node_soft_deletes_and_commits() -> None:
 
 async def test_delete_node_raises_when_missing() -> None:
     """DeleteNode raises NodeNotFoundError when the node doesn't exist."""
-    repos = GraphRepos(nodes=InMemoryNodeRepository(), edges=InMemoryEdgeRepository())
+    repos = GraphRepos(
+        nodes=InMemoryNodeRepository(),
+        edges=InMemoryEdgeRepository(),
+        node_types=InMemoryNodeTypeRepository(),
+    )
     uow = create_in_memory_graph_uow(repos)
     use_case = DeleteNode(uow)
 

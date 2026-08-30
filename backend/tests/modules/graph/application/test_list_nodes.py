@@ -21,6 +21,21 @@ async def test_list_nodes_filters_by_type() -> None:
     assert person not in result
 
 
+async def test_list_nodes_filters_by_search_query() -> None:
+    """ListNodes passes q to the repository and returns only matching nodes."""
+    repository = InMemoryNodeRepository()
+    alien = Node.create(name="Alien", type="film")
+    predator = Node.create(name="Predator", type="film")
+    await repository.add(alien)
+    await repository.add(predator)
+    use_case = ListNodes(repository)
+
+    result = await use_case.handle(ListNodesQuery(q="alien"), SYSTEM_ACTOR)
+
+    assert result == [alien]
+    assert predator not in result
+
+
 async def test_list_nodes_orders_by_id_and_paginates() -> None:
     """ListNodes returns node ordered by id, respecting after/limit."""
     repository = InMemoryNodeRepository()

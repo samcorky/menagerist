@@ -6,6 +6,9 @@ from app.modules.graph.adapters.persistence.edge_repository import (
 from app.modules.graph.adapters.persistence.node_repository import (
     SqlAlchemyNodeRepository,
 )
+from app.modules.graph.adapters.persistence.node_type_repository import (
+    SqlAlchemyNodeTypeRepository,
+)
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.platform.unit_of_work import SqlAlchemySessionUnitOfWork
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
@@ -20,6 +23,7 @@ def _build_repos(session: AsyncSession) -> GraphRepos:
     return GraphRepos(
         nodes=SqlAlchemyNodeRepository(session),
         edges=SqlAlchemyEdgeRepository(session),
+        node_types=SqlAlchemyNodeTypeRepository(session),
     )
 
 

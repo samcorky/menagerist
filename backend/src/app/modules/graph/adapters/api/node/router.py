@@ -94,10 +94,11 @@ async def list_nodes(
     after: uuid.UUID | None = None,
     limit: int = 50,
     type: str | None = None,
+    q: str | None = None,
 ) -> list[NodeResponse]:
     """List node, paginated by id."""
     nodes = await use_case.handle(
-        ListNodesQuery(after=after, limit=limit + 1, type=type), actor
+        ListNodesQuery(after=after, limit=limit + 1, type=type, q=q), actor
     )
     if len(nodes) > limit:
         response.headers["Link"] = link_next_header(request, str(nodes[limit - 1].id))

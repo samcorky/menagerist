@@ -8,6 +8,9 @@ from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
 from app.modules.graph.adapters.persistence.in_memory_node_repository import (
     InMemoryNodeRepository,
 )
+from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
+    InMemoryNodeTypeRepository,
+)
 from app.modules.graph.adapters.persistence.unit_of_work import (
     create_in_memory_graph_uow,
 )
@@ -23,7 +26,11 @@ async def test_delete_edge_soft_deletes_and_commits() -> None:
     repository = InMemoryEdgeRepository()
     edge = Edge.create(source_id=uuid.uuid4(), target_id=uuid.uuid4(), type="owns")
     await repository.add(edge)
-    repos = GraphRepos(nodes=InMemoryNodeRepository(), edges=repository)
+    repos = GraphRepos(
+        nodes=InMemoryNodeRepository(),
+        edges=repository,
+        node_types=InMemoryNodeTypeRepository(),
+    )
     uow = create_in_memory_graph_uow(repos)
     use_case = DeleteEdge(uow)
 
@@ -34,7 +41,11 @@ async def test_delete_edge_soft_deletes_and_commits() -> None:
 
 async def test_delete_edge_raises_when_missing() -> None:
     """DeleteEdge raises EdgeNotFoundError when the edge doesn't exist."""
-    repos = GraphRepos(nodes=InMemoryNodeRepository(), edges=InMemoryEdgeRepository())
+    repos = GraphRepos(
+        nodes=InMemoryNodeRepository(),
+        edges=InMemoryEdgeRepository(),
+        node_types=InMemoryNodeTypeRepository(),
+    )
     uow = create_in_memory_graph_uow(repos)
     use_case = DeleteEdge(uow)
 

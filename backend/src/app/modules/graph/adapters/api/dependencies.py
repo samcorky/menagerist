@@ -5,16 +5,22 @@ from fastapi import Depends
 from app.modules.graph.adapters.persistence.unit_of_work import create_graph_uow
 from app.modules.graph.application.create_edge import CreateEdge
 from app.modules.graph.application.create_node import CreateNode
+from app.modules.graph.application.create_node_type import CreateNodeType
 from app.modules.graph.application.delete_edge import DeleteEdge
 from app.modules.graph.application.delete_node import DeleteNode
+from app.modules.graph.application.delete_node_type import DeleteNodeType
 from app.modules.graph.application.get_edge import GetEdge
 from app.modules.graph.application.get_node import GetNode
+from app.modules.graph.application.get_node_type import GetNodeType
 from app.modules.graph.application.list_edges import ListEdges
+from app.modules.graph.application.list_node_types import ListNodeTypes
 from app.modules.graph.application.list_nodes import ListNodes
 from app.modules.graph.application.update_edge import UpdateEdge
 from app.modules.graph.application.update_node import UpdateNode
+from app.modules.graph.application.update_node_type import UpdateNodeType
 from app.modules.graph.ports.edge_repository import EdgeRepository
 from app.modules.graph.ports.node_repository import NodeRepository
+from app.modules.graph.ports.node_type_repository import NodeTypeRepository
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.platform.database import get_session_factory
 
@@ -55,6 +61,14 @@ async def get_edge_repository(
     """
     async with uow as repos:
         yield repos.edges
+
+
+async def get_node_type_repository(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+) -> AsyncIterator[NodeTypeRepository]:
+    """Return the node type repository directly, for read-only queries."""
+    async with uow as repos:
+        yield repos.node_types
 
 
 def get_create_node_use_case(
@@ -125,3 +139,38 @@ def get_delete_edge_use_case(
 ) -> DeleteEdge:
     """Return the `DeleteEdge` use case."""
     return DeleteEdge(uow)
+
+
+def get_create_node_type_use_case(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+) -> CreateNodeType:
+    """Return the `CreateNodeType` use case."""
+    return CreateNodeType(uow)
+
+
+def get_get_node_type_use_case(
+    node_types: Annotated[NodeTypeRepository, Depends(get_node_type_repository)],
+) -> GetNodeType:
+    """Return the `GetNodeType` use case."""
+    return GetNodeType(node_types)
+
+
+def get_list_node_types_use_case(
+    node_types: Annotated[NodeTypeRepository, Depends(get_node_type_repository)],
+) -> ListNodeTypes:
+    """Return the `ListNodeTypes` use case."""
+    return ListNodeTypes(node_types)
+
+
+def get_update_node_type_use_case(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+) -> UpdateNodeType:
+    """Return the `UpdateNodeType` use case."""
+    return UpdateNodeType(uow)
+
+
+def get_delete_node_type_use_case(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+) -> DeleteNodeType:
+    """Return the `DeleteNodeType` use case."""
+    return DeleteNodeType(uow)

@@ -89,3 +89,58 @@ async def test_list_excludes_soft_deleted_nodes() -> None:
     result = await repository.list(after=None, limit=10)
 
     assert result == [kept]
+
+
+async def test_list_filters_by_name_search() -> None:
+    """list(q=...) returns nodes whose name contains the query (case-insensitive)."""
+    repository = InMemoryNodeRepository()
+    alien = Node.create(name="Alien", type="film")
+    aliens = Node.create(name="Aliens", type="film")
+    predator = Node.create(name="Predator", type="film")
+    for node in (alien, aliens, predator):
+        await repository.add(node)
+
+    result = await repository.list(after=None, limit=10, q="alien")
+
+    assert alien in result
+    assert aliens in result
+    assert predator not in result
+
+
+async def test_list_filters_by_description_search() -> None:
+    """list(q=...) matches against description as well as name."""
+    repository = InMemoryNodeRepository()
+    match = Node.create(name="Untitled", type="film", description="A Ridley Scott film")
+    no_match = Node.create(
+        name="Untitled 2", type="film", description="A James Cameron film"
+    )
+    for node in (match, no_match):
+        await repository.add(node)
+
+    result = await repository.list(after=None, limit=10, q="ridley")
+
+    assert result == [match]
+
+
+async def test_list_search_is_case_insensitive() -> None:
+    """list(q=...) matches regardless of case in query or stored value."""
+    repository = InMemoryNodeRepository()
+    node = Node.create(name="ALIEN", type="film")
+    await repository.add(node)
+
+    result = await repository.list(after=None, limit=10, q="alien")
+
+    assert result == [node]
+
+
+async def test_list_search_combines_with_type_filter() -> None:
+    """list(q=..., type=...) applies both filters independently."""
+    repository = InMemoryNodeRepository()
+    film = Node.create(name="Alien", type="film")
+    person = Node.create(name="Alien character", type="person")
+    for node in (film, person):
+        await repository.add(node)
+
+    result = await repository.list(after=None, limit=10, q="alien", type="film")
+
+    assert result == [film]

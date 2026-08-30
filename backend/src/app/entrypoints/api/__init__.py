@@ -6,6 +6,7 @@ from app.entrypoints.api.shared.problem_response import register_exception_handl
 from app.entrypoints.api.system.router import router as system_router
 from app.modules.graph.adapters.api.edge.router import router as edge_router
 from app.modules.graph.adapters.api.node.router import router as graph_router
+from app.modules.graph.adapters.api.node_type.router import router as node_type_router
 from app.platform.app_info import load_app_info
 from app.platform.config import get_api_settings
 from app.platform.logging_config import configure_logging
@@ -16,6 +17,7 @@ api_router = APIRouter(prefix="/api")
 api_router.include_router(system_router)
 api_router.include_router(graph_router)
 api_router.include_router(edge_router)
+api_router.include_router(node_type_router)
 
 
 def create_app() -> FastAPI:

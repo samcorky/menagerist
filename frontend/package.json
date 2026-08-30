@@ -49,6 +49,7 @@
 		"vitest": "^1.0.0"
 	},
 	"dependencies": {
-		"@shimmer-from-structure/svelte": "^2.4.6"
+		"@shimmer-from-structure/svelte": "^2.4.6",
+		"svelte-sonner": "^1.2.1"
 	}
 }

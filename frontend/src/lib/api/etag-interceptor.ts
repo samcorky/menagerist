@@ -1,7 +1,10 @@
 import { client } from './generated/client.gen';
 import { getEtag, setEtag, clearEtag } from './etagStore';
 
-const cacheKey = (url: string): string => new URL(url, 'http://x').pathname;
+const cacheKey = (url: string): string => {
+	const parsed = new URL(url, 'http://x');
+	return parsed.pathname + parsed.search;
+};
 
 client.interceptors.request.use((request) => {
 	const key = cacheKey(request.url);

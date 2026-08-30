@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { createNode } from '$lib/api/client';
+	import { createNode, listNodeTypes } from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
 	import AttributesEditor, {
 		attributesToRows,
 		rowsToAttributes,
 		type AttributeRow
 	} from '$lib/components/attributes-editor.svelte';
-	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert/index.js';
+	import { toast } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -20,12 +20,19 @@
 	let description = $state('');
 	let attributeRows = $state<AttributeRow[]>(attributesToRows({}));
 	let submitting = $state(false);
-	let error = $state<string | null>(null);
+	let knownTypeSlugs = $state<string[]>([]);
+
+	$effect(() => {
+		listNodeTypes({ query: { limit: 200 } }).then((result) => {
+			if (result.data) {
+				knownTypeSlugs = result.data.map((t) => t.slug);
+			}
+		});
+	});
 
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
 		submitting = true;
-		error = null;
 
 		const result = await createNode({
 			body: {
@@ -37,7 +44,7 @@
 		});
 
 		if (result.error || !result.data) {
-			error = errorMessage(result.error);
+			toast.error("Couldn't create node", { description: errorMessage(result.error) });
 			submitting = false;
 			return;
 		}
@@ -59,13 +66,6 @@
 			</Card.Header>
 			<Card.Content>
 				<form class="space-y-4" onsubmit={handleSubmit}>
-					{#if error}
-						<Alert variant="destructive">
-							<AlertTitle>Couldn't create node</AlertTitle>
-							<AlertDescription>{error}</AlertDescription>
-						</Alert>
-					{/if}
-
 					<div class="space-y-2">
 						<Label for="name">Name</Label>
 						<Input id="name" bind:value={name} required />
@@ -73,7 +73,18 @@
 
 					<div class="space-y-2">
 						<Label for="type">Type</Label>
-						<Input id="type" bind:value={type} required placeholder="e.g. film, person, place" />
+						<Input
+							id="type"
+							bind:value={type}
+							required
+							placeholder="e.g. film, person, place"
+							list="type-suggestions"
+						/>
+						<datalist id="type-suggestions">
+							{#each knownTypeSlugs as slug (slug)}
+								<option value={slug}></option>
+							{/each}
+						</datalist>
 					</div>
 
 					<div class="space-y-2">

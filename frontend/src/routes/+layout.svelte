@@ -2,12 +2,15 @@
 	import './layout.css';
 	import { resolve } from '$app/paths';
 	import { Plus } from '@lucide/svelte';
+	import { Toaster } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button/index.js';
 
 	let { children } = $props();
 </script>
 
 <svelte:head><link rel="icon" href="/logo.svg" /></svelte:head>
+
+<Toaster richColors position="top-right" />
 
 <div class="flex min-h-screen flex-col">
 	<header class="sticky top-0 z-50 border-b bg-background">
@@ -16,10 +19,15 @@
 				<img src="/logo.svg" alt="" aria-hidden="true" class="size-8" />
 				Menagerist
 			</a>
-			<Button size="sm" href={resolve('/nodes/new')}>
-				<Plus class="size-4" />
-				New node
-			</Button>
+			<nav class="flex items-center gap-3">
+				<a href={resolve('/node-types')} class="text-sm text-muted-foreground hover:text-foreground"
+					>Types</a
+				>
+				<Button size="sm" href={resolve('/nodes/new')}>
+					<Plus class="size-4" />
+					New node
+				</Button>
+			</nav>
 		</div>
 	</header>
 

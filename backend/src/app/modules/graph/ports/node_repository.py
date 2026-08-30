@@ -22,7 +22,12 @@ class NodeRepository(Protocol):
         ...
 
     async def list(
-        self, *, after: uuid.UUID | None, limit: int, type: str | None = None
+        self,
+        *,
+        after: uuid.UUID | None,
+        limit: int,
+        type: str | None = None,
+        q: str | None = None,
     ) -> list[Node]:
         """List non-deleted node ordered by id, starting after `after` if given."""
         ...

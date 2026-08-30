@@ -56,4 +56,65 @@ describe('etag-interceptor (integration-style)', () => {
 		});
 		expect(res2).toEqual({ id: '123', name: 'node1' });
 	});
+
+	it('keys cache by path + query, so different query strings on the same path do not collide', async () => {
+		const etag = '"v1"';
+
+		vi.stubGlobal('fetch', async (request: Request) => {
+			// Neither request should be treated as a repeat of the other.
+			expect(request.headers.get('If-None-Match')).toBeNull();
+
+			const url = new URL(request.url);
+			return new Response(JSON.stringify({ type: url.searchParams.get('type') }), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json', ETag: etag }
+			});
+		});
+
+		const cats = await client.get({
+			url: '/api/nodes?type=cat',
+			responseStyle: 'data',
+			throwOnError: true
+		});
+		expect(cats).toEqual({ type: 'cat' });
+
+		const dogs = await client.get({
+			url: '/api/nodes?type=dog',
+			responseStyle: 'data',
+			throwOnError: true
+		});
+		expect(dogs).toEqual({ type: 'dog' });
+	});
+
+	it('reuses the cache when the same path and query string is requested again', async () => {
+		const etag = '"v1"';
+		let call = 0;
+
+		vi.stubGlobal('fetch', async (request: Request) => {
+			call++;
+			if (call === 1) {
+				return new Response(JSON.stringify({ type: 'cat' }), {
+					status: 200,
+					headers: { 'Content-Type': 'application/json', ETag: etag }
+				});
+			}
+
+			expect(request.headers.get('If-None-Match')).toBe(etag);
+			return new Response(null, { status: 304, headers: { ETag: etag } });
+		});
+
+		const first = await client.get({
+			url: '/api/nodes?type=cat',
+			responseStyle: 'data',
+			throwOnError: true
+		});
+		expect(first).toEqual({ type: 'cat' });
+
+		const second = await client.get({
+			url: '/api/nodes?type=cat',
+			responseStyle: 'data',
+			throwOnError: true
+		});
+		expect(second).toEqual({ type: 'cat' });
+	});
 });

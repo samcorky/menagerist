@@ -2,11 +2,12 @@
 	import { resolve } from '$app/paths';
 	import { Plus } from '@lucide/svelte';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
+	import { toast } from 'svelte-sonner';
 	import { listNodes, type NodeResponse } from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
-	import { Alert, AlertDescription, AlertTitle } from '$lib/components/ui/alert/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 
 	const PAGE_SIZE = 50;
@@ -14,25 +15,39 @@
 
 	let nodes = $state<NodeResponse[]>([]);
 	let loading = $state(false);
-	let error = $state<string | null>(null);
 	let hasMore = $state(true);
 	let selectedType = $state<string | null>(null);
 	let knownTypes = $state<string[]>([]);
+	let searchInput = $state('');
+	let q = $state('');
+
+	// Debounce: when searchInput changes, wait 300ms then reset list and commit q.
+	// Guard against no-op updates (e.g. on mount where value === q === '') so the
+	// fetch effect isn't skipped while nodes stay cleared.
+	$effect(() => {
+		const value = searchInput;
+		const timer = setTimeout(() => {
+			if (value === q) return;
+			nodes = [];
+			hasMore = true;
+			q = value;
+		}, 300);
+		return () => clearTimeout(timer);
+	});
 
 	async function fetchPage(after?: string) {
 		loading = true;
-		error = null;
 
 		const result = await listNodes({
-			query: { after, limit: PAGE_SIZE, type: selectedType ?? undefined }
+			query: { after, limit: PAGE_SIZE, type: selectedType ?? undefined, q: q || undefined }
 		});
 
 		if (result.error || !result.data) {
-			error = errorMessage(result.error);
+			toast.error("Couldn't load nodes", { description: errorMessage(result.error) });
 		} else {
 			nodes = after ? [...nodes, ...result.data] : result.data;
-			hasMore = result.data.length === PAGE_SIZE;
-			if (selectedType === null) {
+			hasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
+			if (selectedType === null && !q) {
 				knownTypes = [...new Set([...knownTypes, ...result.data.map((n) => n.type)])].sort();
 			}
 		}
@@ -50,9 +65,9 @@
 		selectedType = type;
 	}
 
-	// fetchPage reads selectedType synchronously, so this effect re-runs
-	// whenever selectedType changes. selectType must NOT call fetchPage
-	// directly to avoid a double request.
+	// fetchPage reads selectedType and q synchronously, so this effect re-runs
+	// whenever either changes. selectType and the debounce effect handle resets
+	// before the state changes that trigger this re-run.
 	$effect(() => {
 		void fetchPage();
 	});
@@ -72,12 +87,7 @@
 			</Button>
 		</div>
 
-		{#if error}
-			<Alert variant="destructive">
-				<AlertTitle>Couldn't load nodes</AlertTitle>
-				<AlertDescription>{error}</AlertDescription>
-			</Alert>
-		{/if}
+		<Input bind:value={searchInput} type="search" placeholder="Search nodes…" class="max-w-sm" />
 
 		{#if knownTypes.length > 1}
 			<div class="flex flex-wrap gap-2">
@@ -137,7 +147,13 @@
 
 			{#if nodes.length === 0 && !loading}
 				<p class="text-muted-foreground">
-					{selectedType ? `No "${selectedType}" nodes.` : 'No nodes yet.'}
+					{#if q}
+						No results for "{q}".
+					{:else if selectedType}
+						No "{selectedType}" nodes.
+					{:else}
+						No nodes yet.
+					{/if}
 				</p>
 			{/if}
 		{/if}

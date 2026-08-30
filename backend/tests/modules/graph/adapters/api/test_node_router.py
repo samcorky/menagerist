@@ -11,6 +11,9 @@ from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
 from app.modules.graph.adapters.persistence.in_memory_node_repository import (
     InMemoryNodeRepository,
 )
+from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
+    InMemoryNodeTypeRepository,
+)
 from app.modules.graph.adapters.persistence.unit_of_work import (
     create_in_memory_graph_uow,
 )
@@ -28,7 +31,11 @@ def _app_with_in_memory_graph() -> FastAPI:
     this test tier.
     """
     app = create_app()
-    repos = GraphRepos(nodes=InMemoryNodeRepository(), edges=InMemoryEdgeRepository())
+    repos = GraphRepos(
+        nodes=InMemoryNodeRepository(),
+        edges=InMemoryEdgeRepository(),
+        node_types=InMemoryNodeTypeRepository(),
+    )
     app.dependency_overrides[get_graph_uow] = lambda: create_in_memory_graph_uow(repos)
     return app
 
@@ -116,6 +123,34 @@ def test_list_nodes_filters_by_type() -> None:
     results = response.json()
     assert len(results) == 1
     assert results[0]["id"] == film["id"]
+
+
+def test_list_nodes_search_by_name() -> None:
+    """GET /api/node?q=alien returns only nodes whose name contains the query."""
+    client = TestClient(_app_with_in_memory_graph())
+    client.post("/api/node", json={"name": "Alien", "type": "film"})
+    client.post("/api/node", json={"name": "Predator", "type": "film"})
+
+    response = client.get("/api/node?q=alien")
+
+    assert response.status_code == 200
+    results = response.json()
+    assert len(results) == 1
+    assert results[0]["name"] == "Alien"
+
+
+def test_list_nodes_search_and_type_filter_combine() -> None:
+    """GET /api/node?q=alien&type=film applies both filters."""
+    client = TestClient(_app_with_in_memory_graph())
+    client.post("/api/node", json={"name": "Alien", "type": "film"})
+    client.post("/api/node", json={"name": "Alien character", "type": "person"})
+
+    response = client.get("/api/node?q=alien&type=film")
+
+    assert response.status_code == 200
+    results = response.json()
+    assert len(results) == 1
+    assert results[0]["type"] == "film"
 
 
 def test_get_node_response_includes_etag_and_last_modified_headers() -> None:

@@ -8,6 +8,9 @@ from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
 from app.modules.graph.adapters.persistence.in_memory_node_repository import (
     InMemoryNodeRepository,
 )
+from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
+    InMemoryNodeTypeRepository,
+)
 from app.modules.graph.adapters.persistence.unit_of_work import (
     create_in_memory_graph_uow,
 )
@@ -24,7 +27,15 @@ async def _repos_with_two_nodes() -> tuple[GraphRepos, Node, Node]:
     target = Node.create(name="Ridley Scott", type="person")
     await node_repo.add(source)
     await node_repo.add(target)
-    return GraphRepos(nodes=node_repo, edges=InMemoryEdgeRepository()), source, target
+    return (
+        GraphRepos(
+            nodes=node_repo,
+            edges=InMemoryEdgeRepository(),
+            node_types=InMemoryNodeTypeRepository(),
+        ),
+        source,
+        target,
+    )
 
 
 async def test_create_edge_persists_and_commits() -> None:

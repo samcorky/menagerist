@@ -9,6 +9,22 @@ from app.platform.database import Base
 from app.platform.orm_mixins import IdentifiableMixin, SoftDeletableMixin
 
 
+class NodeTypeModel(IdentifiableMixin, SoftDeletableMixin, Base):
+    """ORM row for a node type.
+
+    Storage shape kept separate from `domain.NodeType`.
+    """
+
+    __tablename__ = "node_types"
+
+    slug: Mapped[str] = mapped_column(unique=True, index=True)
+    label: Mapped[str]
+    description: Mapped[str | None]
+    attributes_schema: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, nullable=True
+    )
+
+
 class NodeModel(IdentifiableMixin, SoftDeletableMixin, Base):
     """ORM row for a node - the storage shape, kept separate from `domain.Node`."""
 

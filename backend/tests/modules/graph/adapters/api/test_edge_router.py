@@ -11,6 +11,9 @@ from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
 from app.modules.graph.adapters.persistence.in_memory_node_repository import (
     InMemoryNodeRepository,
 )
+from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
+    InMemoryNodeTypeRepository,
+)
 from app.modules.graph.adapters.persistence.unit_of_work import (
     create_in_memory_graph_uow,
 )
@@ -28,7 +31,11 @@ def _app_with_in_memory_graph() -> FastAPI:
     this test tier.
     """
     app = create_app()
-    repos = GraphRepos(nodes=InMemoryNodeRepository(), edges=InMemoryEdgeRepository())
+    repos = GraphRepos(
+        nodes=InMemoryNodeRepository(),
+        edges=InMemoryEdgeRepository(),
+        node_types=InMemoryNodeTypeRepository(),
+    )
     app.dependency_overrides[get_graph_uow] = lambda: create_in_memory_graph_uow(repos)
     return app
 
