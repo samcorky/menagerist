@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { Plus } from '@lucide/svelte';
+	import { page } from '$app/state';
+	import { LayoutGrid, Plus, SearchX } from '@lucide/svelte';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import { toast } from 'svelte-sonner';
 	import { listNodes, type NodeResponse } from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 
 	const PAGE_SIZE = 50;
@@ -20,6 +20,7 @@
 	let knownTypes = $state<string[]>([]);
 	let searchInput = $state('');
 	let q = $state('');
+	let searchEl = $state<HTMLInputElement | null>(null);
 
 	// Debounce: when searchInput changes, wait 300ms then reset list and commit q.
 	// Guard against no-op updates (e.g. on mount where value === q === '') so the
@@ -65,11 +66,63 @@
 		selectedType = type;
 	}
 
+	function sentinel(node: HTMLElement) {
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0].isIntersecting && hasMore && !loading) loadMore();
+			},
+			{ rootMargin: '200px' }
+		);
+		observer.observe(node);
+		return {
+			destroy() {
+				observer.disconnect();
+			}
+		};
+	}
+
+	function focusRef(node: HTMLInputElement) {
+		searchEl = node;
+		return {
+			destroy() {
+				searchEl = null;
+			}
+		};
+	}
+
 	// fetchPage reads selectedType and q synchronously, so this effect re-runs
 	// whenever either changes. selectType and the debounce effect handle resets
 	// before the state changes that trigger this re-run.
 	$effect(() => {
 		void fetchPage();
+	});
+
+	$effect(() => {
+		function handleKey(e: KeyboardEvent) {
+			if (
+				e.key === '/' &&
+				document.activeElement?.tagName !== 'INPUT' &&
+				document.activeElement?.tagName !== 'TEXTAREA'
+			) {
+				e.preventDefault();
+				searchEl?.focus();
+			}
+			if (e.key === 'Escape' && document.activeElement === searchEl) {
+				searchInput = '';
+				searchEl?.blur();
+			}
+		}
+		window.addEventListener('keydown', handleKey);
+		return () => window.removeEventListener('keydown', handleKey);
+	});
+
+	$effect(() => {
+		if (page.url.searchParams.get('search') === '1') {
+			setTimeout(() => searchEl?.focus(), 50);
+			const url = new URL(window.location.href);
+			url.searchParams.delete('search');
+			history.replaceState({}, '', url);
+		}
 	});
 </script>
 
@@ -87,7 +140,13 @@
 			</Button>
 		</div>
 
-		<Input bind:value={searchInput} type="search" placeholder="Search nodes…" class="max-w-sm" />
+		<input
+			use:focusRef
+			bind:value={searchInput}
+			type="search"
+			placeholder="Search nodes…"
+			class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:max-w-sm"
+		/>
 
 		{#if knownTypes.length > 1}
 			<div class="flex flex-wrap gap-2">
@@ -146,23 +205,48 @@
 			</div>
 
 			{#if nodes.length === 0 && !loading}
-				<p class="text-muted-foreground">
+				<div class="flex flex-col items-center gap-3 py-12 text-center">
 					{#if q}
-						No results for "{q}".
+						<SearchX class="size-10 text-muted-foreground/50" />
+						<div>
+							<p class="font-medium">No results for "{q}"</p>
+							<p class="text-sm text-muted-foreground">Try a different search term</p>
+						</div>
+						<Button variant="ghost" size="sm" onclick={() => (searchInput = '')}
+							>Clear search</Button
+						>
 					{:else if selectedType}
-						No "{selectedType}" nodes.
+						<LayoutGrid class="size-10 text-muted-foreground/50" />
+						<div>
+							<p class="font-medium">No "{selectedType}" nodes</p>
+							<p class="text-sm text-muted-foreground">Add one to get started</p>
+						</div>
+						<Button size="sm" href={resolve('/nodes/new')}>
+							<Plus class="size-4" />
+							New node
+						</Button>
 					{:else}
-						No nodes yet.
+						<LayoutGrid class="size-10 text-muted-foreground/50" />
+						<div>
+							<p class="font-medium">No nodes yet</p>
+							<p class="text-sm text-muted-foreground">Add your first node to get started</p>
+						</div>
+						<Button href={resolve('/nodes/new')}>
+							<Plus class="size-4" />
+							New node
+						</Button>
 					{/if}
-				</p>
+				</div>
 			{/if}
 		{/if}
 
-		{#if hasMore && nodes.length > 0}
-			<div class="flex justify-center">
-				<Button variant="outline" disabled={loading} onclick={loadMore}>
-					{loading ? 'Loading…' : 'Load more'}
-				</Button>
+		{#if hasMore}
+			<div use:sentinel class="flex justify-center py-4" aria-hidden="true">
+				{#if loading}
+					<div
+						class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
+					></div>
+				{/if}
 			</div>
 		{/if}
 	</div>

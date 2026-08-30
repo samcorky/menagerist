@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { onNavigate } from '$app/navigation';
-	import { CirclePlus, LayoutGrid, Shapes } from '@lucide/svelte';
+	import { CirclePlus, LayoutGrid, Search, Shapes } from '@lucide/svelte';
 	import { Toaster } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import ThemeToggle from '$lib/components/theme-toggle.svelte';
@@ -81,7 +81,10 @@
 				<ThemeToggle />
 			</nav>
 
-			<div class="flex items-center md:hidden">
+			<div class="flex items-center gap-1 md:hidden">
+				<Button variant="ghost" size="icon" href="{resolve('/nodes')}?search=1" aria-label="Search">
+					<Search class="size-4" />
+				</Button>
 				<ThemeToggle />
 			</div>
 		</div>

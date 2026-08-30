@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Shapes } from '@lucide/svelte';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import { toast } from 'svelte-sonner';
 	import { listNodeTypes, createNodeType, type NodeTypeResponse } from '$lib/api/client';
@@ -37,6 +38,21 @@
 
 	function loadMore() {
 		void fetchPage(nodeTypes.at(-1)?.id);
+	}
+
+	function sentinel(node: HTMLElement) {
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0].isIntersecting && hasMore && !loading) loadMore();
+			},
+			{ rootMargin: '200px' }
+		);
+		observer.observe(node);
+		return {
+			destroy() {
+				observer.disconnect();
+			}
+		};
 	}
 
 	$effect(() => {
@@ -152,15 +168,25 @@
 			</div>
 
 			{#if nodeTypes.length === 0 && !loading}
-				<p class="text-muted-foreground">No node types yet.</p>
+				<div class="flex flex-col items-center gap-3 py-12 text-center">
+					<Shapes class="size-10 text-muted-foreground/50" />
+					<div>
+						<p class="font-medium">No node types yet</p>
+						<p class="text-sm text-muted-foreground">
+							Create a type above to start organising your nodes
+						</p>
+					</div>
+				</div>
 			{/if}
 		{/if}
 
-		{#if hasMore && nodeTypes.length > 0}
-			<div class="flex justify-center">
-				<Button variant="outline" disabled={loading} onclick={loadMore}>
-					{loading ? 'Loading…' : 'Load more'}
-				</Button>
+		{#if hasMore}
+			<div use:sentinel class="flex justify-center py-4" aria-hidden="true">
+				{#if loading}
+					<div
+						class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
+					></div>
+				{/if}
 			</div>
 		{/if}
 	</div>

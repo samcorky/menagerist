@@ -22,6 +22,7 @@
 		rowsToAttributes,
 		type AttributeRow
 	} from '$lib/components/attributes-editor.svelte';
+	import BackButton from '$lib/components/back-button.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -49,6 +50,14 @@
 	let newEdgeType = $state('');
 	let newEdgeTargetId = $state('');
 	let creatingEdge = $state(false);
+	let edgeTargetSearch = $state('');
+	let edgeTargetOpen = $state(false);
+	let filteredNodes = $derived(
+		otherNodes.filter((n) =>
+			`${n.name} ${n.type}`.toLowerCase().includes(edgeTargetSearch.toLowerCase())
+		)
+	);
+	let selectedNodeLabel = $derived(otherNodes.find((n) => n.id === newEdgeTargetId)?.name ?? '');
 
 	async function load() {
 		loading = true;
@@ -127,6 +136,10 @@
 
 	async function handleCreateEdge(event: SubmitEvent) {
 		event.preventDefault();
+		if (!newEdgeTargetId) {
+			toast.error('Please select a node to connect to');
+			return;
+		}
 		creatingEdge = true;
 
 		const result = await createEdge({
@@ -140,6 +153,7 @@
 			edges = [...edges, result.data];
 			newEdgeType = '';
 			newEdgeTargetId = '';
+			edgeTargetSearch = '';
 		}
 		creatingEdge = false;
 	}
@@ -166,7 +180,7 @@
 
 <main class="flex-1 px-4 py-6 sm:px-6">
 	<div class="mx-auto flex max-w-2xl flex-col gap-6">
-		<Button variant="ghost" href={resolve('/nodes')} class="w-fit">← Back to Nodes</Button>
+		<BackButton fallback={resolve('/nodes')} />
 
 		<Shimmer {loading}>
 			<Card.Root>
@@ -311,17 +325,47 @@
 							<ShimmerSlot {loading} class="h-4 w-24">
 								<Label for="edge-target">Connect to</Label>
 							</ShimmerSlot>
-							<select
-								id="edge-target"
-								bind:value={newEdgeTargetId}
-								required
-								class="h-9 w-full rounded-md border border-input bg-transparent px-2.5 text-sm"
-							>
-								<option value="" disabled selected>Select a node…</option>
-								{#each otherNodes as candidate (candidate.id)}
-									<option value={candidate.id}>{candidate.name} ({candidate.type})</option>
-								{/each}
-							</select>
+							<div class="relative">
+								<Input
+									id="edge-target"
+									value={edgeTargetOpen ? edgeTargetSearch : selectedNodeLabel}
+									placeholder="Search nodes…"
+									autocomplete="off"
+									oninput={(e) => {
+										edgeTargetSearch = (e.target as HTMLInputElement).value;
+										edgeTargetOpen = true;
+										newEdgeTargetId = '';
+									}}
+									onfocus={() => {
+										edgeTargetOpen = true;
+										edgeTargetSearch = '';
+									}}
+									onblur={() => setTimeout(() => (edgeTargetOpen = false), 150)}
+								/>
+								{#if edgeTargetOpen && filteredNodes.length > 0}
+									<ul
+										class="absolute z-10 mt-1 max-h-52 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md"
+									>
+										{#each filteredNodes as candidate (candidate.id)}
+											<li>
+												<button
+													type="button"
+													class="flex w-full items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent"
+													onmousedown={() => {
+														newEdgeTargetId = candidate.id;
+														edgeTargetSearch = candidate.name;
+														edgeTargetOpen = false;
+													}}
+												>
+													<span>{candidate.name}</span>
+													<span class="text-xs text-muted-foreground">{candidate.type}</span>
+												</button>
+											</li>
+										{/each}
+									</ul>
+								{/if}
+								<input type="hidden" name="edge-target" value={newEdgeTargetId} />
+							</div>
 						</div>
 
 						<div class="flex justify-end">
