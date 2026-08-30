@@ -57,7 +57,7 @@
 	<title>New Node</title>
 </svelte:head>
 
-<main class="flex-1 bg-background px-6 py-10 text-foreground">
+<main class="flex-1 px-4 py-6 sm:px-6">
 	<div class="mx-auto max-w-2xl">
 		<Card.Root>
 			<Card.Header>

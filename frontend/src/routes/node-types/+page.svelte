@@ -72,7 +72,7 @@
 	<title>Node Types</title>
 </svelte:head>
 
-<main class="flex-1 bg-background px-6 py-10 text-foreground">
+<main class="flex-1 px-4 py-6 sm:px-6">
 	<div class="mx-auto flex max-w-4xl flex-col gap-6">
 		<h1 class="text-3xl font-semibold tracking-tight">Node Types</h1>
 

@@ -43,6 +43,8 @@
 	let attributeRows = $state<AttributeRow[]>([]);
 	let saving = $state(false);
 	let deletingNode = $state(false);
+	let confirmingDeleteNode = $state(false);
+	let confirmingEdgeId = $state<string | null>(null);
 
 	let newEdgeType = $state('');
 	let newEdgeTargetId = $state('');
@@ -107,9 +109,11 @@
 	}
 
 	async function handleDeleteNode() {
-		if (!window.confirm(`Delete "${node?.name}"? This cannot be undone.`)) {
+		if (!confirmingDeleteNode) {
+			confirmingDeleteNode = true;
 			return;
 		}
+		confirmingDeleteNode = false;
 		deletingNode = true;
 		const result = await deleteNode({ path: { node_id: nodeId } });
 		if (result.error) {
@@ -141,12 +145,17 @@
 	}
 
 	async function handleDeleteEdge(edge: EdgeResponse) {
-		if (!window.confirm('Remove this connection?')) {
+		if (confirmingEdgeId !== edge.id) {
+			confirmingEdgeId = edge.id;
 			return;
 		}
+		confirmingEdgeId = null;
 		const result = await deleteEdge({ path: { edge_id: edge.id } });
 		if (!result.error) {
 			edges = edges.filter((existing) => existing.id !== edge.id);
+			toast.success('Connection removed');
+		} else {
+			toast.error("Couldn't remove connection", { description: errorMessage(result.error) });
 		}
 	}
 </script>
@@ -155,7 +164,7 @@
 	<title>{node?.name ?? 'Node'}</title>
 </svelte:head>
 
-<main class="flex-1 bg-background px-6 py-10 text-foreground">
+<main class="flex-1 px-4 py-6 sm:px-6">
 	<div class="mx-auto flex max-w-2xl flex-col gap-6">
 		<Button variant="ghost" href={resolve('/nodes')} class="w-fit">← Back to Nodes</Button>
 
@@ -187,19 +196,39 @@
 
 						<AttributesEditor bind:rows={attributeRows} />
 
-						<div class="flex justify-between gap-2">
+						<div class="flex flex-wrap items-center justify-between gap-2">
 							{#if !loading}
-								<Button
-									type="button"
-									variant="destructive"
-									disabled={deletingNode}
-									onclick={handleDeleteNode}
-								>
-									<Trash2 class="size-4" />
-									Delete Node
-								</Button>
+								{#if confirmingDeleteNode}
+									<div class="flex gap-2">
+										<Button
+											type="button"
+											variant="outline"
+											onclick={() => (confirmingDeleteNode = false)}
+										>
+											Cancel
+										</Button>
+										<Button
+											type="button"
+											variant="destructive"
+											disabled={deletingNode}
+											onclick={handleDeleteNode}
+										>
+											Confirm delete
+										</Button>
+									</div>
+								{:else}
+									<Button
+										type="button"
+										variant="destructive"
+										disabled={deletingNode}
+										onclick={handleDeleteNode}
+									>
+										<Trash2 class="size-4" />
+										Delete
+									</Button>
+								{/if}
 							{/if}
-							<Button type="submit" disabled={saving || loading}>
+							<Button type="submit" disabled={saving || loading} class="ml-auto">
 								{saving ? 'Saving…' : 'Save changes'}
 							</Button>
 						</div>
@@ -228,15 +257,36 @@
 											{nodesById.get(otherNodeId(edge))?.name ?? 'View connected node'}
 										</a>
 									</div>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										onclick={() => handleDeleteEdge(edge)}
-										aria-label="Remove connection"
-									>
-										<Trash2 class="size-4" />
-									</Button>
+									{#if confirmingEdgeId === edge.id}
+										<div class="flex gap-1">
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												onclick={() => (confirmingEdgeId = null)}
+											>
+												Cancel
+											</Button>
+											<Button
+												type="button"
+												variant="destructive"
+												size="sm"
+												onclick={() => handleDeleteEdge(edge)}
+											>
+												Remove
+											</Button>
+										</div>
+									{:else}
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon"
+											onclick={() => handleDeleteEdge(edge)}
+											aria-label="Remove connection"
+										>
+											<Trash2 class="size-4" />
+										</Button>
+									{/if}
 								</li>
 							{/each}
 						</ul>
