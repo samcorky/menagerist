@@ -2,6 +2,7 @@
 	import './layout.css';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { onNavigate } from '$app/navigation';
 	import { CirclePlus, LayoutGrid, Shapes } from '@lucide/svelte';
 	import { Toaster } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -12,6 +13,27 @@
 
 	$effect(() => {
 		themeController.init();
+	});
+
+	$effect(() => {
+		function suppressViewTransitionAbort(e: PromiseRejectionEvent) {
+			if (e.reason instanceof DOMException && e.reason.name === 'InvalidStateError') {
+				e.preventDefault();
+			}
+		}
+		window.addEventListener('unhandledrejection', suppressViewTransitionAbort);
+		return () => window.removeEventListener('unhandledrejection', suppressViewTransitionAbort);
+	});
+
+	onNavigate((navigation) => {
+		if (!document.startViewTransition) return;
+		return new Promise((done) => {
+			const transition = document.startViewTransition(async () => {
+				done();
+				await navigation.complete.catch(() => {});
+			});
+			transition.finished.catch(() => {});
+		});
 	});
 
 	const pathname = $derived(page.url.pathname);
@@ -29,7 +51,10 @@
 <Toaster richColors position="top-right" />
 
 <div class="flex min-h-screen flex-col">
-	<header class="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
+	<header
+		style="view-transition-name: site-header"
+		class="sticky top-0 z-50 border-b bg-background/95 backdrop-blur"
+	>
 		<div class="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
 			<a href={resolve('/')} class="flex items-center gap-2 text-base font-semibold tracking-tight">
 				<img src="/logo.svg" alt="" aria-hidden="true" class="size-7" />
@@ -67,8 +92,8 @@
 	</div>
 
 	<nav
+		style="view-transition-name: site-nav; padding-bottom: env(safe-area-inset-bottom)"
 		class="fixed right-0 bottom-0 left-0 z-50 border-t bg-background/95 backdrop-blur md:hidden"
-		style="padding-bottom: env(safe-area-inset-bottom)"
 	>
 		<div class="flex items-center justify-around px-2 py-1">
 			<a

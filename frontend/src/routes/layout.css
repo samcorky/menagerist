@@ -116,6 +116,40 @@
 	--radius-4xl: calc(var(--radius) * 2.6);
 }
 
+@keyframes page-fade-in {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+}
+@keyframes page-fade-out {
+	to {
+		opacity: 0;
+		transform: translateY(-6px);
+	}
+}
+
+::view-transition-old(root) {
+	animation: 120ms ease page-fade-out;
+}
+::view-transition-new(root) {
+	animation: 180ms ease page-fade-in;
+}
+
+::view-transition-old(site-header),
+::view-transition-new(site-header),
+::view-transition-old(site-nav),
+::view-transition-new(site-nav) {
+	animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	::view-transition-old(root),
+	::view-transition-new(root) {
+		animation: none;
+	}
+}
+
 @layer base {
 	* {
 		@apply border-border outline-ring/50;

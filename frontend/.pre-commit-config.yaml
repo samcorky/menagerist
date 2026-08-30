@@ -23,3 +23,12 @@ repos:
           - ts
           - svelte
         pass_filenames: false
+
+      - id: svelte-check
+        name: svelte-check (types + svelte rules)
+        entry: uv run poe typecheck-frontend
+        language: system
+        types_or:
+          - ts
+          - svelte
+        pass_filenames: false
