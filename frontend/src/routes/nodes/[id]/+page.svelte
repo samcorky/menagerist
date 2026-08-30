@@ -98,7 +98,9 @@
 			}
 		});
 
-		if (result.error || !result.data) {
+		if (result.response?.status === 412) {
+			saveError = 'This node was edited elsewhere — refresh to see the latest version.';
+		} else if (result.error || !result.data) {
 			saveError = errorMessage(result.error);
 		} else {
 			node = result.data;

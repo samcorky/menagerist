@@ -138,6 +138,12 @@ interpreter = ["powershell", "posix"]
 cwd = "frontend"
 help = "Type-check frontend files with svelte-check"
 
+[tool.poe.groups.quality.tasks.test-frontend]
+shell = "npx vitest run"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Run frontend unit tests (vitest)"
+
 [tool.poe.groups.quality.tasks.format]
 sequence = ["format-backend", "format-frontend"]
 help = "Format all project code"
@@ -171,6 +177,10 @@ help = "Validate Renovate config, then run Renovate locally in dry-run mode"
 [tool.poe.groups.quality.tasks.check]
 sequence = ["sync", "_check-hooks"]
 help = "Run all configured checks against the full repository"
+
+[tool.poe.groups.quality.tasks.test]
+sequence = ["test-backend", "test-frontend"]
+help = "Run all unit tests"
 
 [tool.poe.groups.database]
 heading = "Database"
