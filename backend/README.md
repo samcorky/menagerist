@@ -40,7 +40,7 @@ modules/<context>/
 
 `ports/` is a standalone package, not colocated inside `application/`, so it's importable by `application/`, `adapters/`, and tests without pulling in SQLAlchemy or FastAPI. In `adapters/persistence/`, a port's real and in-memory implementations are plain sibling files named to match the port they satisfy - no `impl/` subfolder.
 
-A module is created the day its first entity or use case is written, not scaffolded ahead of time. `graph`, modeling nodes and edges, is first in line.
+A module is created the day its first entity or use case is written, not scaffolded ahead of time. `graph`, modeling nodes, edges, node types, and edge types, is the first module in the codebase.
 
 Infra with no domain and nothing swappable behind it lives in `platform/` instead of a module - package metadata, logging config, the database engine. The test: is more than one implementation plausible? If yes (a second repository backend, a second notification channel), it's a port inside a module. If there's exactly one reasonable way to do it, it's a `platform/` primitive.
 
@@ -127,7 +127,7 @@ Backend tests, migrations, and quality checks run as `poe` tasks from the worksp
 - `platform/unit_of_work.py::SqlAlchemySessionUnitOfWork[TRepos]` - opens a session from an `async_sessionmaker`, owns begin/rollback-on-exception/always-close/commit. Lives in `platform/` for the same reason `platform/database.py` does: exactly one plausible implementation.
 - `shared_kernel/unit_of_work.py::InMemoryUnitOfWork[TRepos]` - wraps an already-built repo bundle directly. `__aenter__` just returns what it was given, so there's no session to open or spoof. `.committed`/`.rolled_back` flags let a test assert a use case reached (or correctly avoided) its commit point.
 
-A module contributes a repo-bundle dataclass (`modules/graph/ports/unit_of_work.py::GraphRepos(nodes, edges)`) and a `GraphUnitOfWork = UnitOfWork[GraphRepos]` alias next to it, plus two one-line factories in `adapters/persistence/unit_of_work.py` - `create_graph_uow(session_factory)` and `create_in_memory_graph_uow(repos)` - each constructing one of the two shared implementations around a `GraphRepos`. No module writes `__aenter__`/`__aexit__`/`commit` itself.
+A module contributes a repo-bundle dataclass (`modules/graph/ports/unit_of_work.py::GraphRepos(nodes, edges, node_types, edge_types)`) and a `GraphUnitOfWork = UnitOfWork[GraphRepos]` alias next to it, plus two one-line factories in `adapters/persistence/unit_of_work.py` - `create_graph_uow(session_factory)` and `create_in_memory_graph_uow(repos)` - each constructing one of the two shared implementations around a `GraphRepos`. No module writes `__aenter__`/`__aexit__`/`commit` itself.
 
 A single central unit of work listing every module's repositories was rejected: it couples every module's use cases to every other module's repositories, and implies transactions spanning bounded contexts, which DDD treats as the wrong boundary. Cross-context consistency is handled by referencing IDs and accepting eventual consistency. A second module gets its own `Repos` dataclass and factories on the same two shared implementations, not a slot added to `GraphRepos`.
 

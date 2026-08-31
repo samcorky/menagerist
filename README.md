@@ -2,70 +2,69 @@
 
 *(meh-NAH-juh-rist)*
 
-A lightweight, self-hostable and flexible platform for organising the things you care about.
+A lightweight, self-hostable platform for organising the things you care about.
 
 > [!IMPORTANT]
-> **Early-stage alpha:** Menagerist is at the very beginning of development. The project structure, features, API, data model, and documentation are all expected to change frequently.
-
-Menagerist is a new self-hostable project designed to give you a **flexible, user-friendly way to organise and connect information**.
-
-Instead of forcing everything into predefined categories, Menagerist lets you build your own structure around the things that matter to you. Create records for items, people, events, places, photos, notes, or anything else, then connect them together however makes sense for your collection.
-
-The goal is to make building and maintaining a collection feel natural, without requiring you to fit your data into someone else's idea of how it should be organised.
+> **Early alpha:** The API, data model, and features are still evolving. Expect breaking changes.
 
 ---
 
-## Project Status
+## What is it?
 
-Menagerist is currently in its **initial project setup phase**.
+Menagerist is a flexible collection manager built on a graph model. Records can represent anything — items, people, events, places — and can be connected to each other in whatever way makes sense for your collection.
 
-The current focus is establishing the core concepts, shaping the underlying data model, and building the first usable foundation. Expect rough edges, missing features, and breaking changes while the project takes shape.
+The graph model is deliberately hidden from the user. You interact with familiar concepts like items and relationships; Menagerist handles the structure underneath.
 
 ---
 
-## Current features
+## Current state
 
-The project is still in its early stages, but the foundation is taking shape:
+The core is working end-to-end:
 
-- [x] Initial project scaffolding and repo layout
-- [x] Clear direction for a self-hostable, flexible collection platform
-- [x] Docker-based local development setup
-- [x] Early backend/frontend structure for future development
-- [x] Core project documentation and alpha status
-- [x] Flexible records as a foundational concept
-- [x] Relationship-based connections between records
-- [x] Custom types and metadata as a core design principle
+- **Nodes** — create, view, edit, soft-delete records of any type
+- **Node types** — define types with labels, descriptions, and custom attribute schemas
+- **Relationships** — connect records with typed, directional or symmetric edges
+- **Relationship types** — named edge types with forward/reverse labels and attribute schemas
+- **Attributes** — freeform and schema-driven key/value metadata on any record
+- **Search** — filter nodes by name or description
+- **Type filtering** — browse records by type
+- **Infinite scroll** — lists load more as you scroll
+- **Quick capture** — global `Cmd/Ctrl+K` sheet to add records without leaving the current page
+- **Dark mode** — system-aware theme with manual toggle
+- **Self-hosted** — single `docker compose up` to run the full stack
 
-## In progress
+---
 
-These are active areas of development and are expected to evolve as the app grows:
+## Stack
 
-- [ ] **Media**: Upload and associate photos and other media with your records
-- [ ] **Search & browsing**: Quickly find information and explore connected records
-- [ ] **Simple interface**: A clean, approachable web interface designed to make managing your data easy
-- [ ] **API**: A simple API for integrating Menagerist with other tools and services
-- [ ] **Privacy & ownership**: Keep your data under your control and avoid lock-in
-- [ ] **Easy self-hosting**: Continue making the app straightforward to run and maintain yourself
+| Layer | Technology |
+|---|---|
+| Backend | Python / FastAPI / SQLAlchemy / Alembic / PostgreSQL |
+| Frontend | SvelteKit / TypeScript / Tailwind CSS |
+| Container | Docker / Chainguard distroless images |
 
-## Planned feature roadmap
+---
 
-The following are longer-term ideas we want to explore next:
+## Running locally
 
-- [ ] **Data imports**: Potential support for importing existing collections from formats such as CSV and Excel
-- [ ] **Metadata enrichment**: Optional integrations with services such as TMDB, MusicBrainz, and others
+```bash
+docker compose -f compose.dev.yaml up
+```
+
+The app is available at [http://localhost:8080](http://localhost:8080).
+
+---
+
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for the full planned feature set.
 
 ---
 
 ## Why Menagerist?
 
-**Menagerist** is inspired by the idea of a *menagerie*, a carefully curated collection of things.
-
-Rather than being built around one particular type of collection, Menagerist is intended to be **general-purpose and adaptable**. Whether you're cataloguing memorabilia, tracking people and events, documenting a hobby, or building something entirely your own, you should be able to structure the information in a way that makes sense to you.
-
-The underlying idea is simple:
+Inspired by the idea of a *menagerie* — a curated collection of things. Rather than forcing everything into predefined categories, Menagerist is designed to be general-purpose and adaptable.
 
 > **Your collection, your structure.**
 
-Menagerist aims to make that flexibility approachable, while keeping the experience simple enough that you don't need to be a database expert to use it.
-
-> A subtle nod to *Star Trek: The Original Series: The Menagerie*.
+A subtle nod to *Star Trek: The Original Series — The Menagerie*.
