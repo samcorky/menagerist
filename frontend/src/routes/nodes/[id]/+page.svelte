@@ -11,11 +11,13 @@
 		getNode,
 		listEdges,
 		listEdgeTypes,
+		listNodeTypes,
 		listNodes,
 		updateNode,
 		type EdgeResponse,
 		type EdgeTypeResponse,
-		type NodeResponse
+		type NodeResponse,
+		type NodeTypeResponse
 	} from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
 	import { toast } from 'svelte-sonner';
@@ -24,6 +26,7 @@
 		rowsToAttributes,
 		type AttributeRow
 	} from '$lib/components/attributes-editor.svelte';
+	import type { Schema } from '$lib/components/schema-editor.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -39,8 +42,13 @@
 	let edges = $state<EdgeResponse[]>([]);
 	let otherNodes = $state<NodeResponse[]>([]);
 	let edgeTypes = $state<EdgeTypeResponse[]>([]);
+	let nodeTypes = $state<NodeTypeResponse[]>([]);
+	let settingType = $state(false);
 	let nodesById = $derived(new Map(otherNodes.map((candidate) => [candidate.id, candidate])));
 	let edgeTypesById = $derived(new Map(edgeTypes.map((et) => [et.slug, et])));
+	let nodeSchema = $derived(
+		(nodeTypes.find((nt) => nt.slug === node?.type)?.attributes_schema as Schema | null) ?? null
+	);
 	let loading = $state(true);
 
 	let name = $state('');
@@ -58,7 +66,7 @@
 	let edgeTargetOpen = $state(false);
 	let filteredNodes = $derived(
 		otherNodes.filter((n) =>
-			`${n.name} ${n.type}`.toLowerCase().includes(edgeTargetSearch.toLowerCase())
+			`${n.name} ${n.type ?? ''}`.toLowerCase().includes(edgeTargetSearch.toLowerCase())
 		)
 	);
 	let selectedNodeLabel = $derived(otherNodes.find((n) => n.id === newEdgeTargetId)?.name ?? '');
@@ -66,12 +74,14 @@
 	async function load() {
 		loading = true;
 
-		const [nodeResult, edgesResult, nodesResult, edgeTypesResult] = await Promise.all([
-			getNode({ path: { node_id: nodeId } }),
-			listEdges({ query: { node_id: nodeId, limit: 100 } }),
-			listNodes({ query: { limit: 100 } }),
-			listEdgeTypes({ query: { limit: 100 } })
-		]);
+		const [nodeResult, edgesResult, nodesResult, edgeTypesResult, nodeTypesResult] =
+			await Promise.all([
+				getNode({ path: { node_id: nodeId } }),
+				listEdges({ query: { node_id: nodeId, limit: 100 } }),
+				listNodes({ query: { limit: 100 } }),
+				listEdgeTypes({ query: { limit: 100 } }),
+				listNodeTypes({ query: { limit: 200 } })
+			]);
 
 		if (nodeResult.error || !nodeResult.data) {
 			toast.error("Couldn't load node", { description: errorMessage(nodeResult.error) });
@@ -86,6 +96,7 @@
 		edges = edgesResult.data ?? [];
 		otherNodes = (nodesResult.data ?? []).filter((candidate) => candidate.id !== nodeId);
 		edgeTypes = edgeTypesResult.data ?? [];
+		nodeTypes = nodeTypesResult.data ?? [];
 		loading = false;
 	}
 
@@ -95,6 +106,18 @@
 
 	function otherNodeId(edge: EdgeResponse): string {
 		return edge.source_id === nodeId ? edge.target_id : edge.source_id;
+	}
+
+	async function handleSetType(slug: string) {
+		settingType = true;
+		const result = await updateNode({ path: { node_id: nodeId }, body: { type: slug } });
+		if (result.error || !result.data) {
+			toast.error("Couldn't set type", { description: errorMessage(result.error) });
+		} else {
+			node = result.data;
+			toast.success('Type set');
+		}
+		settingType = false;
 	}
 
 	async function handleSave(event: SubmitEvent) {
@@ -195,7 +218,27 @@
 						<Card.Title>{node?.name ?? ''}</Card.Title>
 					</ShimmerSlot>
 					<ShimmerSlot {loading} class="mt-1 h-4 w-56">
-						<Card.Description>Type: {node?.type ?? ''} (not editable)</Card.Description>
+						{#if node?.type}
+							<Card.Description
+								>Type: <span class="font-mono text-xs">{node.type}</span></Card.Description
+							>
+						{:else if !loading && nodeTypes.length > 0}
+							<div class="mt-2 space-y-1.5">
+								<p class="text-xs text-muted-foreground">No type — pick one:</p>
+								<div class="flex flex-wrap gap-1.5">
+									{#each nodeTypes as nt (nt.slug)}
+										<button
+											type="button"
+											onclick={() => handleSetType(nt.slug)}
+											disabled={settingType}
+											class="rounded-full border border-border bg-background px-2.5 py-0.5 text-xs transition-colors hover:border-primary/50 hover:bg-muted disabled:opacity-50"
+										>
+											{nt.label}
+										</button>
+									{/each}
+								</div>
+							</div>
+						{/if}
 					</ShimmerSlot>
 				</Card.Header>
 				<Card.Content>
@@ -214,7 +257,7 @@
 							<Textarea id="description" bind:value={description} />
 						</div>
 
-						<AttributesEditor bind:rows={attributeRows} />
+						<AttributesEditor bind:rows={attributeRows} schema={nodeSchema} />
 
 						<div class="flex flex-wrap items-center justify-between gap-2">
 							{#if !loading}
@@ -371,7 +414,7 @@
 													}}
 												>
 													<span>{candidate.name}</span>
-													<span class="text-xs text-muted-foreground">{candidate.type}</span>
+													<span class="text-xs text-muted-foreground">{candidate.type ?? ''}</span>
 												</button>
 											</li>
 										{/each}

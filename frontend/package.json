@@ -49,6 +49,7 @@
 		"vitest": "^1.0.0"
 	},
 	"dependencies": {
+		"@fontsource-variable/manrope": "^5.3.0",
 		"@shimmer-from-structure/svelte": "^2.4.6",
 		"svelte-sonner": "^1.2.1"
 	}

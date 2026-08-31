@@ -2,7 +2,7 @@
 	export type SchemaField = {
 		key: string;
 		label: string;
-		type: 'text' | 'number' | 'boolean' | 'date' | 'select';
+		type: 'text' | 'number' | 'boolean' | 'date' | 'select' | 'richtext';
 		required: boolean;
 		options?: string[];
 	};
@@ -52,6 +52,7 @@
 				<option value="boolean">boolean</option>
 				<option value="date">date</option>
 				<option value="select">select</option>
+				<option value="richtext">richtext</option>
 			</select>
 			<label class="flex items-center gap-1 text-sm">
 				<input

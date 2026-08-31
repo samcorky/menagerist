@@ -48,7 +48,9 @@ def test_create_rejects_empty_or_blank_name(name: str) -> None:
 @pytest.mark.parametrize("type_", ["", "   "])
 def test_create_rejects_empty_or_blank_type(type_: str) -> None:
     """Node.create raises ValidationError for an empty or whitespace-only type."""
-    with pytest.raises(ValidationError, match="type must be provided"):
+    with pytest.raises(
+        ValidationError, match="type must be a non-empty string when provided"
+    ):
         Node.create(name="dummy", type=type_)
 
 
@@ -71,10 +73,19 @@ def test_create_slugifies_type(input_type: str, expected_type: str) -> None:
     assert node.type == expected_type
 
 
+def test_create_allows_null_type() -> None:
+    """Node.create with no type produces a node with type=None."""
+    node = Node.create(name="Quick capture")
+
+    assert node.type is None
+
+
 def test_create_rejects_type_that_slugifies_to_empty_string() -> None:
     """Node.create raises ValidationError for a type that slugs to an empty string."""
-    with pytest.raises(ValidationError, match="type must be provided"):
-        Node.create(name="dummy", type="   ")
+    with pytest.raises(
+        ValidationError, match="type must be a non-empty string when provided"
+    ):
+        Node.create(name="dummy", type="!!!")
 
 
 def test_update_applies_provided_fields_and_touches_updated_at() -> None:
@@ -107,3 +118,40 @@ def test_update_rejects_empty_or_blank_name(name: str) -> None:
 
     with pytest.raises(ValidationError, match="name must be provided"):
         node.update(name=name)
+
+
+def test_update_sets_type_when_currently_none() -> None:
+    """update() assigns type when the node was created without one."""
+    node = Node.create(name="Alien")
+
+    node.update(type="film")
+
+    assert node.type == "film"
+
+
+def test_update_slugifies_type_on_assignment() -> None:
+    """update() slugifies the type the same way create() does."""
+    node = Node.create(name="Alien")
+
+    node.update(type="Science Fiction Film")
+
+    assert node.type == "science-fiction-film"
+
+
+def test_update_rejects_type_change_once_set() -> None:
+    """update() raises ValidationError when trying to change an existing type."""
+    node = Node.create(name="Alien", type="film")
+
+    with pytest.raises(ValidationError, match="type cannot be changed after it is set"):
+        node.update(type="book")
+
+
+@pytest.mark.parametrize("type_", ["", "   ", "!!!"])
+def test_update_rejects_type_that_slugifies_to_empty(type_: str) -> None:
+    """update() raises when the provided type slugifies to an empty string."""
+    node = Node.create(name="Alien")
+
+    with pytest.raises(
+        ValidationError, match="type must be a non-empty string when provided"
+    ):
+        node.update(type=type_)

@@ -31,7 +31,7 @@ class NodeModel(IdentifiableMixin, SoftDeletableMixin, Base):
     __tablename__ = "nodes"
 
     name: Mapped[str]
-    type: Mapped[str] = mapped_column(index=True)
+    type: Mapped[str | None] = mapped_column(index=True, nullable=True)
     description: Mapped[str | None]
     attributes: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
 

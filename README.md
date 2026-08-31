@@ -23,21 +23,36 @@ The current focus is establishing the core concepts, shaping the underlying data
 
 ---
 
-## Planned Scope
+## Current features
 
-Menagerist aims to provide a flexible foundation for organising and exploring your own data:
+The project is still in its early stages, but the foundation is taking shape:
 
-* **Flexible records**: Create records for items, people, events, places, media, notes, or anything else you need
-* **Connections**: Link records together with meaningful relationships
-* **Custom types and metadata**: Shape Menagerist around your collection rather than adapting your collection to Menagerist
-* **Media**: Upload and associate photos and other media with your records
-* **Search & browsing**: Quickly find information and explore connected records
-* **Simple interface**: A clean, approachable web interface designed to make managing your data easy
-* **API**: A simple API for integrating Menagerist with other tools and services
-* **Data imports**: Potential support for importing existing collections from formats such as CSV and Excel
-* **Metadata enrichment**: Optional integrations with services such as TMDB, MusicBrainz, and others
-* **Privacy & ownership**: Your data stays under your control
-* **Easy self-hosting**: Designed to be straightforward to run and maintain yourself
+- [x] Initial project scaffolding and repo layout
+- [x] Clear direction for a self-hostable, flexible collection platform
+- [x] Docker-based local development setup
+- [x] Early backend/frontend structure for future development
+- [x] Core project documentation and alpha status
+- [x] Flexible records as a foundational concept
+- [x] Relationship-based connections between records
+- [x] Custom types and metadata as a core design principle
+
+## In progress
+
+These are active areas of development and are expected to evolve as the app grows:
+
+- [ ] **Media**: Upload and associate photos and other media with your records
+- [ ] **Search & browsing**: Quickly find information and explore connected records
+- [ ] **Simple interface**: A clean, approachable web interface designed to make managing your data easy
+- [ ] **API**: A simple API for integrating Menagerist with other tools and services
+- [ ] **Privacy & ownership**: Keep your data under your control and avoid lock-in
+- [ ] **Easy self-hosting**: Continue making the app straightforward to run and maintain yourself
+
+## Planned feature roadmap
+
+The following are longer-term ideas we want to explore next:
+
+- [ ] **Data imports**: Potential support for importing existing collections from formats such as CSV and Excel
+- [ ] **Metadata enrichment**: Optional integrations with services such as TMDB, MusicBrainz, and others
 
 ---
 

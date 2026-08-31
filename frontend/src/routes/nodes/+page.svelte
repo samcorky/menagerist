@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { LayoutGrid, Plus, SearchX } from '@lucide/svelte';
+	import { captureController } from '$lib/capture.svelte.js';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import { toast } from 'svelte-sonner';
 	import { listNodes, type NodeResponse } from '$lib/api/client';
@@ -49,7 +50,12 @@
 			nodes = after ? [...nodes, ...result.data] : result.data;
 			hasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
 			if (selectedType === null && !q) {
-				knownTypes = [...new Set([...knownTypes, ...result.data.map((n) => n.type)])].sort();
+				knownTypes = [
+					...new Set([
+						...knownTypes,
+						...result.data.map((n) => n.type).filter((t): t is string => t !== null)
+					])
+				].sort();
 			}
 		}
 		loading = false;
@@ -89,6 +95,14 @@
 			}
 		};
 	}
+
+	// Reload the list whenever a new node is created via the capture sheet.
+	$effect(() => {
+		if (captureController.nodeCreationCount === 0) return;
+		nodes = [];
+		hasMore = true;
+		void fetchPage();
+	});
 
 	// fetchPage reads selectedType and q synchronously, so this effect re-runs
 	// whenever either changes. selectType and the debounce effect handle resets
@@ -134,7 +148,7 @@
 	<div class="mx-auto flex max-w-4xl flex-col gap-6">
 		<div class="flex items-center justify-between gap-4">
 			<h1 class="text-3xl font-semibold tracking-tight">Nodes</h1>
-			<Button href={resolve('/nodes/new')}>
+			<Button onclick={() => captureController.show()}>
 				<Plus class="size-4" />
 				New Node
 			</Button>
@@ -197,7 +211,7 @@
 										<Card.Description>{node.description}</Card.Description>
 									{/if}
 								</div>
-								<Badge variant="secondary">{node.type}</Badge>
+								{#if node.type}<Badge variant="secondary">{node.type}</Badge>{/if}
 							</Card.Header>
 						</Card.Root>
 					</a>
@@ -221,7 +235,7 @@
 							<p class="font-medium">No "{selectedType}" nodes</p>
 							<p class="text-sm text-muted-foreground">Add one to get started</p>
 						</div>
-						<Button size="sm" href={resolve('/nodes/new')}>
+						<Button size="sm" onclick={() => captureController.show()}>
 							<Plus class="size-4" />
 							New node
 						</Button>
@@ -231,7 +245,7 @@
 							<p class="font-medium">No nodes yet</p>
 							<p class="text-sm text-muted-foreground">Add your first node to get started</p>
 						</div>
-						<Button href={resolve('/nodes/new')}>
+						<Button onclick={() => captureController.show()}>
 							<Plus class="size-4" />
 							New node
 						</Button>

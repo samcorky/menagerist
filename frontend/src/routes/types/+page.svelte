@@ -22,6 +22,7 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { page } from '$app/state';
+	import SchemaEditor, { type Schema } from '$lib/components/schema-editor.svelte';
 
 	const PAGE_SIZE = 50;
 	const loadingSkeletons = [1, 2, 3];
@@ -47,10 +48,13 @@
 	let nodeDescription = $state('');
 	let nodeSubmitting = $state(false);
 
+	let createNodeSchema = $state<Schema | null>(null);
+
 	// edit / delete state
 	let editingNodeTypeId = $state<string | null>(null);
 	let editNodeLabel = $state('');
 	let editNodeDescription = $state('');
+	let editNodeSchema = $state<Schema | null>(null);
 	let savingNodeTypeId = $state<string | null>(null);
 	let confirmingDeleteNodeTypeId = $state<string | null>(null);
 	let deletingNodeTypeId = $state<string | null>(null);
@@ -90,7 +94,12 @@
 		event.preventDefault();
 		nodeSubmitting = true;
 		const result = await createNodeType({
-			body: { slug: nodeSlug, label: nodeLabel, description: nodeDescription || undefined }
+			body: {
+				slug: nodeSlug,
+				label: nodeLabel,
+				description: nodeDescription || undefined,
+				attributes_schema: createNodeSchema
+			}
 		});
 		if (result.error || !result.data) {
 			toast.error("Couldn't create type", { description: errorMessage(result.error) });
@@ -99,6 +108,7 @@
 			nodeSlug = '';
 			nodeLabel = '';
 			nodeDescription = '';
+			createNodeSchema = null;
 			toast.success('Type created');
 		}
 		nodeSubmitting = false;
@@ -108,11 +118,13 @@
 		editingNodeTypeId = nt.id;
 		editNodeLabel = nt.label;
 		editNodeDescription = nt.description ?? '';
+		editNodeSchema = (nt.attributes_schema as Schema | null) ?? null;
 		confirmingDeleteNodeTypeId = null;
 	}
 
 	function cancelEditNodeType() {
 		editingNodeTypeId = null;
+		editNodeSchema = null;
 	}
 
 	async function handleNodeTypeUpdate(event: SubmitEvent, id: string) {
@@ -120,7 +132,11 @@
 		savingNodeTypeId = id;
 		const result = await updateNodeType({
 			path: { node_type_id: id },
-			body: { label: editNodeLabel, description: editNodeDescription || null }
+			body: {
+				label: editNodeLabel,
+				description: editNodeDescription || null,
+				attributes_schema: editNodeSchema
+			}
 		});
 		if (result.error || !result.data) {
 			toast.error("Couldn't save changes", { description: errorMessage(result.error) });
@@ -161,12 +177,15 @@
 	let edgeDirectional = $state(true);
 	let edgeSubmitting = $state(false);
 
+	let createEdgeSchema = $state<Schema | null>(null);
+
 	// edit / delete state
 	let editingEdgeTypeId = $state<string | null>(null);
 	let editEdgeLabel = $state('');
 	let editEdgeReverseLabel = $state('');
 	let editEdgeDescription = $state('');
 	let editEdgeDirectional = $state(true);
+	let editEdgeSchema = $state<Schema | null>(null);
 	let savingEdgeTypeId = $state<string | null>(null);
 	let confirmingDeleteEdgeTypeId = $state<string | null>(null);
 	let deletingEdgeTypeId = $state<string | null>(null);
@@ -211,7 +230,8 @@
 				label: edgeLabel,
 				reverse_label: edgeReverseLabel || undefined,
 				description: edgeDescription || undefined,
-				directional: edgeDirectional
+				directional: edgeDirectional,
+				attributes_schema: createEdgeSchema
 			}
 		});
 		if (result.error || !result.data) {
@@ -223,6 +243,7 @@
 			edgeReverseLabel = '';
 			edgeDescription = '';
 			edgeDirectional = true;
+			createEdgeSchema = null;
 			toast.success('Edge type created');
 		}
 		edgeSubmitting = false;
@@ -234,11 +255,13 @@
 		editEdgeReverseLabel = et.reverse_label ?? '';
 		editEdgeDescription = et.description ?? '';
 		editEdgeDirectional = et.directional;
+		editEdgeSchema = (et.attributes_schema as Schema | null) ?? null;
 		confirmingDeleteEdgeTypeId = null;
 	}
 
 	function cancelEditEdgeType() {
 		editingEdgeTypeId = null;
+		editEdgeSchema = null;
 	}
 
 	async function handleEdgeTypeUpdate(event: SubmitEvent, id: string) {
@@ -250,7 +273,8 @@
 				label: editEdgeLabel,
 				reverse_label: editEdgeReverseLabel || null,
 				description: editEdgeDescription || null,
-				directional: editEdgeDirectional
+				directional: editEdgeDirectional,
+				attributes_schema: editEdgeSchema
 			}
 		});
 		if (result.error || !result.data) {
@@ -349,6 +373,7 @@
 								placeholder="Optional description"
 							/>
 						</div>
+						<SchemaEditor bind:schema={createNodeSchema} />
 						<div class="flex justify-end">
 							<Button type="submit" disabled={nodeSubmitting}>
 								{nodeSubmitting ? 'Adding…' : 'Add Type'}
@@ -447,6 +472,7 @@
 												placeholder="Optional description"
 											/>
 										</div>
+										<SchemaEditor bind:schema={editNodeSchema} />
 										<div class="flex justify-end gap-2">
 											<Button type="button" variant="ghost" size="sm" onclick={cancelEditNodeType}>
 												<X class="size-4" />
@@ -544,6 +570,7 @@
 								</p>
 							</div>
 						</div>
+						<SchemaEditor bind:schema={createEdgeSchema} />
 						<div class="flex justify-end">
 							<Button type="submit" disabled={edgeSubmitting}>
 								{edgeSubmitting ? 'Adding…' : 'Add Edge Type'}
@@ -665,6 +692,7 @@
 											/>
 											<Label for="edit-edge-directional-{edgeType.id}">Directional</Label>
 										</div>
+										<SchemaEditor bind:schema={editEdgeSchema} />
 										<div class="flex justify-end gap-2">
 											<Button type="button" variant="ghost" size="sm" onclick={cancelEditEdgeType}>
 												<X class="size-4" />

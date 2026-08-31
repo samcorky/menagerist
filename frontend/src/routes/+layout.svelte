@@ -8,6 +8,8 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import ThemeToggle from '$lib/components/theme-toggle.svelte';
 	import { themeController } from '$lib/theme.svelte.js';
+	import { captureController } from '$lib/capture.svelte.js';
+	import CaptureSheet from '$lib/components/capture-sheet.svelte';
 
 	let { children } = $props();
 
@@ -40,8 +42,22 @@
 	const nodesActive = $derived(
 		pathname.startsWith(resolve('/nodes')) && !pathname.startsWith(resolve('/nodes/new'))
 	);
-	const newActive = $derived(pathname.startsWith(resolve('/nodes/new')));
+	const newActive = $derived(captureController.open);
 	const typesActive = $derived(pathname.startsWith(resolve('/types')));
+
+	$effect(() => {
+		function handleKeydown(e: KeyboardEvent) {
+			const tag = (e.target as HTMLElement).tagName;
+			if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable)
+				return;
+			if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+				e.preventDefault();
+				captureController.show();
+			}
+		}
+		window.addEventListener('keydown', handleKeydown);
+		return () => window.removeEventListener('keydown', handleKeydown);
+	});
 </script>
 
 <svelte:head>
@@ -49,6 +65,7 @@
 </svelte:head>
 
 <Toaster richColors position="top-right" />
+<CaptureSheet />
 
 <div class="flex min-h-screen flex-col">
 	<header
@@ -70,7 +87,7 @@
 					<Shapes class="size-4" />
 					Types
 				</Button>
-				<Button size="sm" href={resolve('/nodes/new')}>
+				<Button size="sm" onclick={() => captureController.show()}>
 					<CirclePlus class="size-4" />
 					New node
 				</Button>
@@ -106,16 +123,15 @@
 				<span class="text-[10px] font-medium">Nodes</span>
 			</a>
 
-			<a
-				href={resolve('/nodes/new')}
+			<button
+				onclick={() => captureController.show()}
 				class="flex flex-col items-center gap-0.5 rounded-xl px-5 py-2 transition-colors {newActive
 					? 'text-primary'
 					: 'text-muted-foreground hover:text-foreground'}"
-				aria-current={newActive ? 'page' : undefined}
 			>
 				<CirclePlus class="size-6" />
 				<span class="text-[10px] font-medium">New</span>
-			</a>
+			</button>
 
 			<a
 				href={resolve('/types')}

@@ -15,7 +15,7 @@ class CreateNodeCommand:
     """Request to create a new node."""
 
     name: str
-    type: str
+    type: str | None = field(default=None)
     description: str | None = field(default=None)
     attributes: dict[str, Any] = field(default_factory=dict)
 
@@ -39,11 +39,12 @@ class CreateNode:
             attributes=command.attributes,
         )
         async with self._uow as repos:
-            slug = slugify(command.type)
-            if await repos.node_types.get_by_slug(slug) is None:
-                await repos.node_types.add(
-                    NodeType.create(slug=slug, label=command.type)
-                )
+            if command.type is not None:
+                slug = slugify(command.type)
+                if await repos.node_types.get_by_slug(slug) is None:
+                    await repos.node_types.add(
+                        NodeType.create(slug=slug, label=command.type)
+                    )
             await repos.nodes.add(node)
             await self._uow.commit()
         return node

@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from app.modules.graph.domain.errors import NodeNotFoundError
+from app.modules.graph.domain.node_type import NodeType
+from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
     from app.modules.graph.domain.node import Node
@@ -14,12 +16,13 @@ if TYPE_CHECKING:
 class UpdateNodeCommand:
     """Request to update a node's editable fields.
 
-    A field left as `None` is unchanged - there's no way to explicitly clear
-    `description` back to `None` yet.
+    A field left as `None` is unchanged. `type` is one-time-settable — it can
+    be assigned when currently `None` but cannot be changed once set.
     """
 
     node_id: uuid.UUID
     name: str | None = field(default=None)
+    type: str | None = field(default=None)
     description: str | None = field(default=None)
     attributes: dict[str, Any] | None = field(default=None)
 
@@ -39,9 +42,17 @@ class UpdateNode:
 
             node.update(
                 name=command.name,
+                type=command.type,
                 description=command.description,
                 attributes=command.attributes,
             )
+
+            if command.type is not None:
+                slug = slugify(command.type)
+                if await repos.node_types.get_by_slug(slug) is None:
+                    await repos.node_types.add(
+                        NodeType.create(slug=slug, label=command.type)
+                    )
 
             await repos.nodes.save(node)
             await self._uow.commit()
