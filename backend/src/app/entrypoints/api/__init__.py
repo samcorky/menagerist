@@ -5,6 +5,7 @@ from starlette.middleware.cors import CORSMiddleware
 from app.entrypoints.api.shared.problem_response import register_exception_handlers
 from app.entrypoints.api.system.router import router as system_router
 from app.modules.graph.adapters.api.edge.router import router as edge_router
+from app.modules.graph.adapters.api.edge_type.router import router as edge_type_router
 from app.modules.graph.adapters.api.node.router import router as graph_router
 from app.modules.graph.adapters.api.node_type.router import router as node_type_router
 from app.platform.app_info import load_app_info
@@ -20,6 +21,7 @@ api_v1_router = APIRouter(prefix="/v1", tags=["v1"])
 api_v1_router.include_router(graph_router)
 api_v1_router.include_router(edge_router)
 api_v1_router.include_router(node_type_router)
+api_v1_router.include_router(edge_type_router)
 
 api_router.include_router(api_v1_router)
 
@@ -60,6 +62,10 @@ def create_app() -> FastAPI:
         {
             "name": "Node Types",
             "description": "Endpoints for managing node types in the graph.",
+        },
+        {
+            "name": "Edge Types",
+            "description": "Endpoints for managing edge types in the graph.",
         },
         {
             "name": "System",

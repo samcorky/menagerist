@@ -10,9 +10,11 @@
 		deleteNode,
 		getNode,
 		listEdges,
+		listEdgeTypes,
 		listNodes,
 		updateNode,
 		type EdgeResponse,
+		type EdgeTypeResponse,
 		type NodeResponse
 	} from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
@@ -36,7 +38,9 @@
 	let node = $state<NodeResponse | null>(null);
 	let edges = $state<EdgeResponse[]>([]);
 	let otherNodes = $state<NodeResponse[]>([]);
+	let edgeTypes = $state<EdgeTypeResponse[]>([]);
 	let nodesById = $derived(new Map(otherNodes.map((candidate) => [candidate.id, candidate])));
+	let edgeTypesById = $derived(new Map(edgeTypes.map((et) => [et.slug, et])));
 	let loading = $state(true);
 
 	let name = $state('');
@@ -62,10 +66,11 @@
 	async function load() {
 		loading = true;
 
-		const [nodeResult, edgesResult, nodesResult] = await Promise.all([
+		const [nodeResult, edgesResult, nodesResult, edgeTypesResult] = await Promise.all([
 			getNode({ path: { node_id: nodeId } }),
 			listEdges({ query: { node_id: nodeId, limit: 100 } }),
-			listNodes({ query: { limit: 100 } })
+			listNodes({ query: { limit: 100 } }),
+			listEdgeTypes({ query: { limit: 100 } })
 		]);
 
 		if (nodeResult.error || !nodeResult.data) {
@@ -80,6 +85,7 @@
 		attributeRows = attributesToRows(node.attributes);
 		edges = edgesResult.data ?? [];
 		otherNodes = (nodesResult.data ?? []).filter((candidate) => candidate.id !== nodeId);
+		edgeTypes = edgeTypesResult.data ?? [];
 		loading = false;
 	}
 
@@ -261,9 +267,16 @@
 					{:else}
 						<ul class="space-y-2">
 							{#each edges as edge (edge.id)}
+								{@const et = edgeTypesById.get(edge.type)}
+								{@const isOutgoing = edge.source_id === nodeId}
+								{@const relationLabel = et
+									? isOutgoing
+										? et.label
+										: (et.reverse_label ?? et.label)
+									: edge.type}
 								<li class="flex items-center justify-between gap-2 rounded-lg border p-3">
 									<div class="text-sm">
-										<span class="font-medium">{edge.type}</span>
+										<span class="font-medium">{relationLabel}</span>
 										<a
 											href={resolve('/nodes/[id]', { id: otherNodeId(edge) })}
 											class="ml-2 text-muted-foreground underline"

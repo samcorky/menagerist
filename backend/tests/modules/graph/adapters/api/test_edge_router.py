@@ -8,6 +8,9 @@ from app.modules.graph.adapters.api.dependencies import get_graph_uow
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
+from app.modules.graph.adapters.persistence.in_memory_edge_type_repository import (
+    InMemoryEdgeTypeRepository,
+)
 from app.modules.graph.adapters.persistence.in_memory_node_repository import (
     InMemoryNodeRepository,
 )
@@ -35,6 +38,7 @@ def _app_with_in_memory_graph() -> FastAPI:
         nodes=InMemoryNodeRepository(),
         edges=InMemoryEdgeRepository(),
         node_types=InMemoryNodeTypeRepository(),
+        edge_types=InMemoryEdgeTypeRepository(),
     )
     app.dependency_overrides[get_graph_uow] = lambda: create_in_memory_graph_uow(repos)
     return app

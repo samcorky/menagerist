@@ -3,6 +3,9 @@ from typing import TYPE_CHECKING
 from app.modules.graph.adapters.persistence.edge_repository import (
     SqlAlchemyEdgeRepository,
 )
+from app.modules.graph.adapters.persistence.edge_type_repository import (
+    SqlAlchemyEdgeTypeRepository,
+)
 from app.modules.graph.adapters.persistence.node_repository import (
     SqlAlchemyNodeRepository,
 )
@@ -24,16 +27,17 @@ def _build_repos(session: AsyncSession) -> GraphRepos:
         nodes=SqlAlchemyNodeRepository(session),
         edges=SqlAlchemyEdgeRepository(session),
         node_types=SqlAlchemyNodeTypeRepository(session),
+        edge_types=SqlAlchemyEdgeTypeRepository(session),
     )
 
 
 def create_graph_uow(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> GraphUnitOfWork:
-    """Wrap a session factory in a `SqlAlchemySessionUnitOfWork` - the real adapter."""
+    """Wrap a session factory in a SqlAlchemySessionUnitOfWork."""
     return SqlAlchemySessionUnitOfWork(session_factory, _build_repos)
 
 
 def create_in_memory_graph_uow(repos: GraphRepos) -> GraphUnitOfWork:
-    """Wrap `repos` in an `InMemoryUnitOfWork` - the fast-test/in-memory adapter."""
+    """Wrap repos in an InMemoryUnitOfWork."""
     return InMemoryUnitOfWork(repos)

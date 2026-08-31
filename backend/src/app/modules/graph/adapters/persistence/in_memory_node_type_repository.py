@@ -33,7 +33,7 @@ class InMemoryNodeTypeRepository:
             (
                 nt
                 for nt in self._node_types.values()
-                if nt.slug == slug and not nt.is_deleted
+                if str(nt.slug) == slug and not nt.is_deleted
             ),
             None,
         )

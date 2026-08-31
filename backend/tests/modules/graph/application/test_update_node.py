@@ -5,6 +5,9 @@ import pytest
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
+from app.modules.graph.adapters.persistence.in_memory_edge_type_repository import (
+    InMemoryEdgeTypeRepository,
+)
 from app.modules.graph.adapters.persistence.in_memory_node_repository import (
     InMemoryNodeRepository,
 )
@@ -30,6 +33,7 @@ async def test_update_node_persists_and_commits() -> None:
         nodes=repository,
         edges=InMemoryEdgeRepository(),
         node_types=InMemoryNodeTypeRepository(),
+        edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = create_in_memory_graph_uow(repos)
     use_case = UpdateNode(uow)
@@ -52,6 +56,7 @@ async def test_update_node_raises_when_missing() -> None:
         nodes=InMemoryNodeRepository(),
         edges=InMemoryEdgeRepository(),
         node_types=InMemoryNodeTypeRepository(),
+        edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = create_in_memory_graph_uow(repos)
     use_case = UpdateNode(uow)

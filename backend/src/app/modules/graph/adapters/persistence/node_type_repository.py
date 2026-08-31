@@ -4,6 +4,7 @@ from sqlalchemy import select
 
 from app.modules.graph.adapters.persistence.models import NodeTypeModel
 from app.modules.graph.domain.node_type import NodeType
+from app.shared_kernel.slug import Slug
 
 if TYPE_CHECKING:
     import uuid
@@ -15,7 +16,7 @@ def _to_domain(model: NodeTypeModel) -> NodeType:
     """Convert an ORM row into the domain entity."""
     return NodeType(
         id=model.id,
-        slug=model.slug,
+        slug=Slug(model.slug),
         label=model.label,
         description=model.description,
         attributes_schema=model.attributes_schema,
@@ -29,7 +30,7 @@ def _to_model(node_type: NodeType) -> NodeTypeModel:
     """Convert a domain entity into its ORM row."""
     return NodeTypeModel(
         id=node_type.id,
-        slug=node_type.slug,
+        slug=str(node_type.slug),
         label=node_type.label,
         description=node_type.description,
         attributes_schema=node_type.attributes_schema,

@@ -100,7 +100,7 @@ class NodeTypeResponse(BaseModel):
         """Build a response from a domain `NodeType`."""
         return cls(
             id=node_type.id,
-            slug=node_type.slug,
+            slug=str(node_type.slug),
             label=node_type.label,
             description=node_type.description,
             attributes_schema=node_type.attributes_schema,

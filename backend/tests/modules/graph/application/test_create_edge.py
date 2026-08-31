@@ -5,6 +5,9 @@ import pytest
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
+from app.modules.graph.adapters.persistence.in_memory_edge_type_repository import (
+    InMemoryEdgeTypeRepository,
+)
 from app.modules.graph.adapters.persistence.in_memory_node_repository import (
     InMemoryNodeRepository,
 )
@@ -32,6 +35,7 @@ async def _repos_with_two_nodes() -> tuple[GraphRepos, Node, Node]:
             nodes=node_repo,
             edges=InMemoryEdgeRepository(),
             node_types=InMemoryNodeTypeRepository(),
+            edge_types=InMemoryEdgeTypeRepository(),
         ),
         source,
         target,

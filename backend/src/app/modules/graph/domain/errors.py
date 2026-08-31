@@ -15,3 +15,11 @@ class NodeTypeNotFoundError(NotFoundError):
 
 class NodeTypeSlugConflictError(ConflictError):
     """Raised when a node type with the given slug already exists."""
+
+
+class EdgeTypeNotFoundError(NotFoundError):
+    """Raised when a requested edge type does not exist."""
+
+
+class EdgeTypeSlugConflictError(ConflictError):
+    """Raised when an edge type with the given slug already exists."""

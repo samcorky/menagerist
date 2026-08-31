@@ -45,3 +45,18 @@ class EdgeModel(IdentifiableMixin, SoftDeletableMixin, Base):
     target_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("nodes.id"), index=True)
     type: Mapped[str] = mapped_column(index=True)
     attributes: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+
+
+class EdgeTypeModel(IdentifiableMixin, SoftDeletableMixin, Base):
+    """ORM row for an edge type."""
+
+    __tablename__ = "edge_types"
+
+    slug: Mapped[str] = mapped_column(unique=True, index=True)
+    label: Mapped[str]
+    reverse_label: Mapped[str | None]
+    description: Mapped[str | None]
+    directional: Mapped[bool] = mapped_column(default=True)
+    attributes_schema: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, nullable=True
+    )

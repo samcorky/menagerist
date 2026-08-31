@@ -5,6 +5,9 @@ import pytest
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
+from app.modules.graph.adapters.persistence.in_memory_edge_type_repository import (
+    InMemoryEdgeTypeRepository,
+)
 from app.modules.graph.adapters.persistence.in_memory_node_repository import (
     InMemoryNodeRepository,
 )
@@ -30,6 +33,7 @@ async def test_delete_edge_soft_deletes_and_commits() -> None:
         nodes=InMemoryNodeRepository(),
         edges=repository,
         node_types=InMemoryNodeTypeRepository(),
+        edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = create_in_memory_graph_uow(repos)
     use_case = DeleteEdge(uow)
@@ -45,6 +49,7 @@ async def test_delete_edge_raises_when_missing() -> None:
         nodes=InMemoryNodeRepository(),
         edges=InMemoryEdgeRepository(),
         node_types=InMemoryNodeTypeRepository(),
+        edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = create_in_memory_graph_uow(repos)
     use_case = DeleteEdge(uow)

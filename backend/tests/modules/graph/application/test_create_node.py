@@ -1,6 +1,9 @@
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
+from app.modules.graph.adapters.persistence.in_memory_edge_type_repository import (
+    InMemoryEdgeTypeRepository,
+)
 from app.modules.graph.adapters.persistence.in_memory_node_repository import (
     InMemoryNodeRepository,
 )
@@ -21,6 +24,7 @@ async def test_create_node_persists_and_commits() -> None:
         nodes=InMemoryNodeRepository(),
         edges=InMemoryEdgeRepository(),
         node_types=InMemoryNodeTypeRepository(),
+        edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = create_in_memory_graph_uow(repos)
     use_case = CreateNode(uow)

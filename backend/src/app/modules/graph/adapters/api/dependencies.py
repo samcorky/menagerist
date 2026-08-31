@@ -4,21 +4,27 @@ from fastapi import Depends
 
 from app.modules.graph.adapters.persistence.unit_of_work import create_graph_uow
 from app.modules.graph.application.create_edge import CreateEdge
+from app.modules.graph.application.create_edge_type import CreateEdgeType
 from app.modules.graph.application.create_node import CreateNode
 from app.modules.graph.application.create_node_type import CreateNodeType
 from app.modules.graph.application.delete_edge import DeleteEdge
+from app.modules.graph.application.delete_edge_type import DeleteEdgeType
 from app.modules.graph.application.delete_node import DeleteNode
 from app.modules.graph.application.delete_node_type import DeleteNodeType
 from app.modules.graph.application.get_edge import GetEdge
+from app.modules.graph.application.get_edge_type import GetEdgeType
 from app.modules.graph.application.get_node import GetNode
 from app.modules.graph.application.get_node_type import GetNodeType
+from app.modules.graph.application.list_edge_types import ListEdgeTypes
 from app.modules.graph.application.list_edges import ListEdges
 from app.modules.graph.application.list_node_types import ListNodeTypes
 from app.modules.graph.application.list_nodes import ListNodes
 from app.modules.graph.application.update_edge import UpdateEdge
+from app.modules.graph.application.update_edge_type import UpdateEdgeType
 from app.modules.graph.application.update_node import UpdateNode
 from app.modules.graph.application.update_node_type import UpdateNodeType
 from app.modules.graph.ports.edge_repository import EdgeRepository
+from app.modules.graph.ports.edge_type_repository import EdgeTypeRepository
 from app.modules.graph.ports.node_repository import NodeRepository
 from app.modules.graph.ports.node_type_repository import NodeTypeRepository
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
@@ -69,6 +75,14 @@ async def get_node_type_repository(
     """Return the node type repository directly, for read-only queries."""
     async with uow as repos:
         yield repos.node_types
+
+
+async def get_edge_type_repository(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+) -> AsyncIterator[EdgeTypeRepository]:
+    """Return the edge type repository directly, for read-only queries."""
+    async with uow as repos:
+        yield repos.edge_types
 
 
 def get_create_node_use_case(
@@ -174,3 +188,38 @@ def get_delete_node_type_use_case(
 ) -> DeleteNodeType:
     """Return the `DeleteNodeType` use case."""
     return DeleteNodeType(uow)
+
+
+def get_create_edge_type_use_case(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+) -> CreateEdgeType:
+    """Return the `CreateEdgeType` use case."""
+    return CreateEdgeType(uow)
+
+
+def get_get_edge_type_use_case(
+    edge_types: Annotated[EdgeTypeRepository, Depends(get_edge_type_repository)],
+) -> GetEdgeType:
+    """Return the `GetEdgeType` use case."""
+    return GetEdgeType(edge_types)
+
+
+def get_list_edge_types_use_case(
+    edge_types: Annotated[EdgeTypeRepository, Depends(get_edge_type_repository)],
+) -> ListEdgeTypes:
+    """Return the `ListEdgeTypes` use case."""
+    return ListEdgeTypes(edge_types)
+
+
+def get_update_edge_type_use_case(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+) -> UpdateEdgeType:
+    """Return the `UpdateEdgeType` use case."""
+    return UpdateEdgeType(uow)
+
+
+def get_delete_edge_type_use_case(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+) -> DeleteEdgeType:
+    """Return the `DeleteEdgeType` use case."""
+    return DeleteEdgeType(uow)

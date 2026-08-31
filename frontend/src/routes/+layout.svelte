@@ -41,7 +41,7 @@
 		pathname.startsWith(resolve('/nodes')) && !pathname.startsWith(resolve('/nodes/new'))
 	);
 	const newActive = $derived(pathname.startsWith(resolve('/nodes/new')));
-	const typesActive = $derived(pathname.startsWith(resolve('/node-types')));
+	const typesActive = $derived(pathname.startsWith(resolve('/types')));
 </script>
 
 <svelte:head>
@@ -66,11 +66,7 @@
 					<LayoutGrid class="size-4" />
 					Nodes
 				</Button>
-				<Button
-					variant={typesActive ? 'secondary' : 'ghost'}
-					size="sm"
-					href={resolve('/node-types')}
-				>
+				<Button variant={typesActive ? 'secondary' : 'ghost'} size="sm" href={resolve('/types')}>
 					<Shapes class="size-4" />
 					Types
 				</Button>
@@ -122,7 +118,7 @@
 			</a>
 
 			<a
-				href={resolve('/node-types')}
+				href={resolve('/types')}
 				class="flex flex-col items-center gap-0.5 rounded-xl px-5 py-2 transition-colors {typesActive
 					? 'text-foreground'
 					: 'text-muted-foreground hover:text-foreground'}"
