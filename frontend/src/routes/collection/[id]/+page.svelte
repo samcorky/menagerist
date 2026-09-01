@@ -73,18 +73,17 @@
 
 	async function load() {
 		loading = true;
-
 		const [nodeResult, edgesResult, nodesResult, edgeTypesResult, nodeTypesResult] =
 			await Promise.all([
 				getNode({ path: { node_id: nodeId } }),
 				listEdges({ query: { node_id: nodeId, limit: 100 } }),
-				listNodes({ query: { limit: 100 } }),
+				listNodes({ query: { limit: 500 } }),
 				listEdgeTypes({ query: { limit: 100 } }),
 				listNodeTypes({ query: { limit: 200 } })
 			]);
 
 		if (nodeResult.error || !nodeResult.data) {
-			toast.error("Couldn't load node", { description: errorMessage(nodeResult.error) });
+			toast.error("Couldn't load item", { description: errorMessage(nodeResult.error) });
 			loading = false;
 			return;
 		}
@@ -111,11 +110,15 @@
 	async function handleSetType(slug: string) {
 		settingType = true;
 		const result = await updateNode({ path: { node_id: nodeId }, body: { type: slug } });
-		if (result.error || !result.data) {
-			toast.error("Couldn't set type", { description: errorMessage(result.error) });
+		if (result.response?.status === 412) {
+			toast.error('Edit conflict', {
+				description: 'This item was updated elsewhere — refresh to see the latest version.'
+			});
+		} else if (result.error || !result.data) {
+			toast.error("Couldn't set category", { description: errorMessage(result.error) });
 		} else {
 			node = result.data;
-			toast.success('Type set');
+			toast.success('Category set');
 		}
 		settingType = false;
 	}
@@ -123,7 +126,6 @@
 	async function handleSave(event: SubmitEvent) {
 		event.preventDefault();
 		saving = true;
-
 		const result = await updateNode({
 			path: { node_id: nodeId },
 			body: {
@@ -132,10 +134,9 @@
 				attributes: rowsToAttributes(attributeRows)
 			}
 		});
-
 		if (result.response?.status === 412) {
 			toast.error('Edit conflict', {
-				description: 'This node was edited elsewhere — refresh to see the latest version.'
+				description: 'This item was edited elsewhere — refresh to see the latest version.'
 			});
 		} else if (result.error || !result.data) {
 			toast.error("Couldn't save changes", { description: errorMessage(result.error) });
@@ -155,28 +156,35 @@
 		deletingNode = true;
 		const result = await deleteNode({ path: { node_id: nodeId } });
 		if (result.error) {
-			toast.error("Couldn't delete node", { description: errorMessage(result.error) });
+			toast.error("Couldn't delete item", { description: errorMessage(result.error) });
 			deletingNode = false;
 			return;
 		}
-		toast.success('Node deleted');
-		await goto(resolve('/nodes'));
+		toast.success('Item deleted');
+		await goto(resolve('/collection'));
 	}
 
 	async function handleCreateEdge(event: SubmitEvent) {
 		event.preventDefault();
 		if (!newEdgeTargetId) {
-			toast.error('Please select a node to connect to');
+			toast.error('Please select an item to connect to');
 			return;
 		}
 		creatingEdge = true;
-
 		const result = await createEdge({
-			body: { source_id: nodeId, target_id: newEdgeTargetId, type: newEdgeType, attributes: {} }
+			body: {
+				source_id: nodeId,
+				target_id: newEdgeTargetId,
+				type: newEdgeType.trim(),
+				attributes: {}
+			}
 		});
-
 		if (result.error || !result.data) {
 			toast.error("Couldn't add connection", { description: errorMessage(result.error) });
+			if (result.response?.status === 404) {
+				newEdgeTargetId = '';
+				edgeTargetSearch = '';
+			}
 		} else {
 			toast.success('Connection added');
 			edges = [...edges, result.data];
@@ -204,27 +212,36 @@
 </script>
 
 <svelte:head>
-	<title>{node?.name ?? 'Node'}</title>
+	<title>{node?.name ?? 'Item'} — Menagerist</title>
 </svelte:head>
 
 <main class="flex-1 px-4 py-6 sm:px-6">
 	<div class="mx-auto flex max-w-2xl flex-col gap-6">
-		<BackButton fallback={resolve('/nodes')} />
+		<BackButton fallback={resolve('/collection')} />
 
 		<Shimmer {loading}>
 			<Card.Root>
 				<Card.Header>
 					<ShimmerSlot {loading} class="h-6 w-40">
-						<Card.Title>{node?.name ?? ''}</Card.Title>
+						<Card.Title class="font-heading text-xl">{node?.name ?? ''}</Card.Title>
 					</ShimmerSlot>
 					<ShimmerSlot {loading} class="mt-1 h-4 w-56">
 						{#if node?.type}
-							<Card.Description
-								>Type: <span class="font-mono text-xs">{node.type}</span></Card.Description
-							>
+							{@const typeLabel = nodeTypes.find((nt) => nt.slug === node!.type)?.label}
+							<Card.Description>
+								Category:
+								{#if typeLabel}
+									{typeLabel}
+								{:else}
+									<span
+										class="font-mono text-xs text-muted-foreground/60 italic"
+										title="This category no longer exists">{node.type}</span
+									>
+								{/if}
+							</Card.Description>
 						{:else if !loading && nodeTypes.length > 0}
 							<div class="mt-2 space-y-1.5">
-								<p class="text-xs text-muted-foreground">No type — pick one:</p>
+								<p class="text-xs text-muted-foreground">No category — pick one:</p>
 								<div class="flex flex-wrap gap-1.5">
 									{#each nodeTypes as nt (nt.slug)}
 										<button
@@ -301,8 +318,7 @@
 
 			<Card.Root>
 				<Card.Header>
-					<Card.Title>Connections</Card.Title>
-					<Card.Description>Edges touching this node, in either direction.</Card.Description>
+					<Card.Title class="font-heading">Connected to</Card.Title>
 				</Card.Header>
 				<Card.Content class="space-y-4">
 					{#if edges.length === 0}
@@ -321,10 +337,10 @@
 									<div class="text-sm">
 										<span class="font-medium">{relationLabel}</span>
 										<a
-											href={resolve('/nodes/[id]', { id: otherNodeId(edge) })}
+											href={resolve('/collection/[id]', { id: otherNodeId(edge) })}
 											class="ml-2 text-muted-foreground underline"
 										>
-											{nodesById.get(otherNodeId(edge))?.name ?? 'View connected node'}
+											{nodesById.get(otherNodeId(edge))?.name ?? 'View item'}
 										</a>
 									</div>
 									{#if confirmingEdgeId === edge.id}
@@ -367,7 +383,7 @@
 					<form class="space-y-3" onsubmit={handleCreateEdge}>
 						<div class="space-y-2">
 							<ShimmerSlot {loading} class="h-4 w-32">
-								<Label for="edge-type">Connection type</Label>
+								<Label for="edge-type">Relationship</Label>
 							</ShimmerSlot>
 							<Input
 								id="edge-type"
@@ -379,13 +395,13 @@
 
 						<div class="space-y-2">
 							<ShimmerSlot {loading} class="h-4 w-24">
-								<Label for="edge-target">Connect to</Label>
+								<Label for="edge-target">Item</Label>
 							</ShimmerSlot>
 							<div class="relative">
 								<Input
 									id="edge-target"
 									value={edgeTargetOpen ? edgeTargetSearch : selectedNodeLabel}
-									placeholder="Search nodes…"
+									placeholder="Search items…"
 									autocomplete="off"
 									oninput={(e) => {
 										edgeTargetSearch = (e.target as HTMLInputElement).value;
@@ -426,7 +442,7 @@
 
 						<div class="flex justify-end">
 							<Button type="submit" disabled={creatingEdge}>
-								{creatingEdge ? 'Adding…' : 'Add connection'}
+								{creatingEdge ? 'Connecting…' : 'Connect item'}
 							</Button>
 						</div>
 					</form>

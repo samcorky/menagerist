@@ -141,11 +141,15 @@
 	async function openFullPage() {
 		if (!savedNodeId) return;
 		captureController.hide();
-		await goto(resolve('/nodes/[id]', { id: savedNodeId }));
+		await goto(resolve('/collection/[id]', { id: savedNodeId }));
 		resetState();
 	}
 
-	function close() {
+	async function close() {
+		if (savedNodeId) {
+			clearTimeout(saveTimer);
+			await autoSave(description, attrRows);
+		}
 		captureController.hide();
 		resetState();
 	}
@@ -244,7 +248,7 @@
 								onclick={() => (showNewTypeForm = true)}
 								class="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
 							>
-								+ New type
+								+ New category
 							</button>
 						{:else}
 							<form
@@ -256,7 +260,7 @@
 							>
 								<Input
 									bind:value={newTypeLabel}
-									placeholder="Type label…"
+									placeholder="Category label…"
 									class="h-7 flex-1 text-xs"
 									autofocus
 								/>

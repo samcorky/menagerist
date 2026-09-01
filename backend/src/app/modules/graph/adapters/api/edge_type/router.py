@@ -38,6 +38,7 @@ from app.modules.graph.application.list_edge_types import (
 )
 from app.modules.graph.application.update_edge_type import UpdateEdgeType
 from app.modules.graph.domain.errors import (
+    EdgeTypeInUseError,
     EdgeTypeNotFoundError,
     EdgeTypeSlugConflictError,
 )
@@ -154,10 +155,16 @@ async def update_edge_type(
     "/{edge_type_id}",
     status_code=204,
     operation_id="delete_edge_type",
-    responses=error_response(
-        EdgeTypeNotFoundError,
-        detail="EdgeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
-    ),
+    responses={
+        **error_response(
+            EdgeTypeNotFoundError,
+            detail="EdgeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+        ),
+        **error_response(
+            EdgeTypeInUseError,
+            detail="Edge type 'directed-by' is still used by one or more connections",
+        ),
+    },
 )
 async def delete_edge_type(
     edge_type_id: uuid.UUID,

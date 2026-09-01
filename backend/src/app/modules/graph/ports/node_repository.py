@@ -31,3 +31,11 @@ class NodeRepository(Protocol):
     ) -> list[Node]:
         """List non-deleted node ordered by id, starting after `after` if given."""
         ...
+
+    async def count(self, *, type: str | None = None, q: str | None = None) -> int:
+        """Return the total number of non-deleted nodes matching the given filters."""
+        ...
+
+    async def clear_type(self, type_slug: str) -> None:
+        """Null out `type` on all non-deleted nodes that reference `type_slug`."""
+        ...

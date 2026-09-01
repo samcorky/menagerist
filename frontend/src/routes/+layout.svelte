@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { onNavigate } from '$app/navigation';
-	import { CirclePlus, LayoutGrid, Search, Shapes } from '@lucide/svelte';
+	import { CirclePlus, LayoutGrid, House, Settings } from '@lucide/svelte';
 	import { Toaster } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import ThemeToggle from '$lib/components/theme-toggle.svelte';
@@ -39,11 +39,10 @@
 	});
 
 	const pathname = $derived(page.url.pathname);
-	const nodesActive = $derived(
-		pathname.startsWith(resolve('/nodes')) && !pathname.startsWith(resolve('/nodes/new'))
-	);
+	const homeActive = $derived(pathname === resolve('/'));
+	const collectionActive = $derived(pathname.startsWith(resolve('/collection')));
 	const newActive = $derived(captureController.open);
-	const typesActive = $derived(pathname.startsWith(resolve('/types')));
+	const settingsActive = $derived(pathname.startsWith(resolve('/settings')));
 
 	$effect(() => {
 		function handleKeydown(e: KeyboardEvent) {
@@ -67,7 +66,7 @@
 <Toaster richColors position="top-right" />
 <CaptureSheet />
 
-<div class="flex min-h-screen flex-col">
+<div class="flex h-dvh flex-col">
 	<header
 		style="view-transition-name: site-header"
 		class="sticky top-0 z-50 border-b bg-background/95 backdrop-blur"
@@ -79,53 +78,73 @@
 			</a>
 
 			<nav class="hidden items-center gap-1 md:flex">
-				<Button variant={nodesActive ? 'secondary' : 'ghost'} size="sm" href={resolve('/nodes')}>
-					<LayoutGrid class="size-4" />
-					Nodes
+				<Button variant={homeActive ? 'secondary' : 'ghost'} size="sm" href={resolve('/')}>
+					<House class="size-4" />
+					Home
 				</Button>
-				<Button variant={typesActive ? 'secondary' : 'ghost'} size="sm" href={resolve('/types')}>
-					<Shapes class="size-4" />
-					Types
+				<Button
+					variant={collectionActive ? 'secondary' : 'ghost'}
+					size="sm"
+					href={resolve('/collection')}
+				>
+					<LayoutGrid class="size-4" />
+					Collection
 				</Button>
 				<Button size="sm" onclick={() => captureController.show()}>
 					<CirclePlus class="size-4" />
-					New node
+					New item
+				</Button>
+				<Button
+					variant={settingsActive ? 'secondary' : 'ghost'}
+					size="icon"
+					href={resolve('/settings')}
+					aria-label="Settings"
+				>
+					<Settings class="size-4" />
 				</Button>
 				<ThemeToggle />
 			</nav>
 
 			<div class="flex items-center gap-1 md:hidden">
-				<Button variant="ghost" size="icon" href="{resolve('/nodes')}?search=1" aria-label="Search">
-					<Search class="size-4" />
-				</Button>
 				<ThemeToggle />
 			</div>
 		</div>
 	</header>
 
-	<div class="flex-1 pb-16 md:pb-0">
+	<div class="flex-1 overflow-y-auto">
 		{@render children()}
 	</div>
 
 	<nav
 		style="view-transition-name: site-nav; padding-bottom: env(safe-area-inset-bottom)"
-		class="fixed right-0 bottom-0 left-0 z-50 border-t bg-background/95 backdrop-blur md:hidden"
+		class="shrink-0 border-t bg-background/95 backdrop-blur md:hidden"
 	>
 		<div class="flex items-center justify-around px-2 py-1">
 			<a
-				href={resolve('/nodes')}
-				class="flex flex-col items-center gap-0.5 rounded-xl px-5 py-2 transition-colors {nodesActive
+				href={resolve('/')}
+				class="flex flex-col items-center gap-0.5 rounded-xl px-4 py-2 transition-colors {homeActive
 					? 'text-foreground'
 					: 'text-muted-foreground hover:text-foreground'}"
-				aria-current={nodesActive ? 'page' : undefined}
+				aria-current={homeActive ? 'page' : undefined}
+			>
+				<House class="size-5" />
+				<span class="text-[10px] font-medium">Home</span>
+			</a>
+
+			<a
+				href={resolve('/collection')}
+				class="flex flex-col items-center gap-0.5 rounded-xl px-4 py-2 transition-colors {collectionActive
+					? 'text-foreground'
+					: 'text-muted-foreground hover:text-foreground'}"
+				aria-current={collectionActive ? 'page' : undefined}
 			>
 				<LayoutGrid class="size-5" />
-				<span class="text-[10px] font-medium">Nodes</span>
+				<span class="text-[10px] font-medium">Collection</span>
 			</a>
 
 			<button
 				onclick={() => captureController.show()}
-				class="flex flex-col items-center gap-0.5 rounded-xl px-5 py-2 transition-colors {newActive
+				class="flex flex-col items-center gap-0.5 rounded-xl px-4 py-2 transition-colors {newActive
 					? 'text-primary'
 					: 'text-muted-foreground hover:text-foreground'}"
 			>
@@ -134,14 +153,14 @@
 			</button>
 
 			<a
-				href={resolve('/types')}
-				class="flex flex-col items-center gap-0.5 rounded-xl px-5 py-2 transition-colors {typesActive
+				href={resolve('/settings')}
+				class="flex flex-col items-center gap-0.5 rounded-xl px-4 py-2 transition-colors {settingsActive
 					? 'text-foreground'
 					: 'text-muted-foreground hover:text-foreground'}"
-				aria-current={typesActive ? 'page' : undefined}
+				aria-current={settingsActive ? 'page' : undefined}
 			>
-				<Shapes class="size-5" />
-				<span class="text-[10px] font-medium">Types</span>
+				<Settings class="size-5" />
+				<span class="text-[10px] font-medium">Settings</span>
 			</a>
 		</div>
 	</nav>

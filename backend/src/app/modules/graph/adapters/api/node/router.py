@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from typing import Annotated
 
@@ -19,6 +20,7 @@ from app.modules.graph.adapters.api.dependencies import (
     get_delete_node_use_case,
     get_get_node_use_case,
     get_list_nodes_use_case,
+    get_node_repository,
     get_update_node_use_case,
 )
 from app.modules.graph.adapters.api.node.schemas import (
@@ -32,6 +34,7 @@ from app.modules.graph.application.get_node import GetNode, GetNodeQuery
 from app.modules.graph.application.list_nodes import ListNodes, ListNodesQuery
 from app.modules.graph.application.update_node import UpdateNode
 from app.modules.graph.domain.errors import NodeNotFoundError
+from app.modules.graph.ports.node_repository import NodeRepository
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ValidationError
 
@@ -88,6 +91,7 @@ async def get_node(
 )
 async def list_nodes(
     use_case: Annotated[ListNodes, Depends(get_list_nodes_use_case)],
+    nodes_repo: Annotated[NodeRepository, Depends(get_node_repository)],
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
@@ -97,11 +101,15 @@ async def list_nodes(
     q: str | None = None,
 ) -> list[NodeResponse]:
     """List node, paginated by id."""
-    nodes = await use_case.handle(
-        ListNodesQuery(after=after, limit=limit + 1, type=type, q=q), actor
+    nodes, total = await asyncio.gather(
+        use_case.handle(
+            ListNodesQuery(after=after, limit=limit + 1, type=type, q=q), actor
+        ),
+        nodes_repo.count(type=type, q=q),
     )
     if len(nodes) > limit:
         response.headers["Link"] = link_next_header(request, str(nodes[limit - 1].id))
+    response.headers["X-Total-Count"] = str(total)
 
     return [NodeResponse.from_domain(node) for node in nodes[:limit]]
 

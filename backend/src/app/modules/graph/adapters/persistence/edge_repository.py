@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import or_, select
+from sqlalchemy import exists, or_, select
 
 from app.modules.graph.adapters.persistence.models import EdgeModel
 from app.modules.graph.domain.edge import Edge
@@ -96,3 +96,11 @@ class SqlAlchemyEdgeRepository:
             stmt = stmt.where(EdgeModel.id > after)
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
+
+    async def has_edges_of_type(self, type_slug: str) -> bool:
+        """Return True if any non-deleted edges reference `type_slug`."""
+        stmt = select(
+            exists().where(EdgeModel.deleted_at.is_(None), EdgeModel.type == type_slug)
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one()

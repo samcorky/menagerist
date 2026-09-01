@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 
 from app.modules.graph.adapters.persistence.models import NodeModel
 from app.modules.graph.domain.node import Node
@@ -93,3 +93,30 @@ class SqlAlchemyNodeRepository:
             )
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
+
+    async def count(self, *, type: str | None = None, q: str | None = None) -> int:
+        """Return the total number of non-deleted nodes matching the given filters."""
+        stmt = (
+            select(func.count())
+            .select_from(NodeModel)
+            .where(NodeModel.deleted_at.is_(None))
+        )
+        if type is not None:
+            stmt = stmt.where(NodeModel.type == type)
+        if q is not None:
+            pattern = f"%{q}%"
+            stmt = stmt.where(
+                NodeModel.name.ilike(pattern) | NodeModel.description.ilike(pattern)
+            )
+        result = await self._session.execute(stmt)
+        return result.scalar_one()
+
+    async def clear_type(self, type_slug: str) -> None:
+        """Set `type` to NULL on all non-deleted nodes if type matches `type_slug`."""
+        stmt = (
+            update(NodeModel)
+            .where(NodeModel.deleted_at.is_(None), NodeModel.type == type_slug)
+            .values(type=None)
+        )
+        await self._session.execute(stmt)
+        await self._session.flush()

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from app.modules.graph.domain.errors import EdgeTypeNotFoundError
+from app.modules.graph.domain.errors import EdgeTypeInUseError, EdgeTypeNotFoundError
 
 if TYPE_CHECKING:
     import uuid
@@ -31,6 +31,12 @@ class DeleteEdgeType:
                 raise EdgeTypeNotFoundError(
                     f"Edge type {command.edge_type_id} not found"
                 )
+            if await repos.edges.has_edges_of_type(str(edge_type.slug)):
+                raise EdgeTypeInUseError(
+                    f"Edge type '{edge_type.slug}' "
+                    + "is still used by one or more connections"
+                )
+
             edge_type.soft_delete()
             await repos.edge_types.save(edge_type)
             await self._uow.commit()

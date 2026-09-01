@@ -30,3 +30,7 @@ class EdgeRepository(Protocol):
     async def list(self, *, after: uuid.UUID | None, limit: int) -> list[Edge]:
         """List non-deleted edge ordered by id, starting after `after` if given."""
         ...
+
+    async def has_edges_of_type(self, type_slug: str) -> bool:
+        """Return True if any non-deleted edges reference `type_slug`."""
+        ...

@@ -34,4 +34,5 @@ class DeleteNodeType:
             node_type.soft_delete()
 
             await repos.node_types.save(node_type)
+            await repos.nodes.clear_type(str(node_type.slug))
             await self._uow.commit()

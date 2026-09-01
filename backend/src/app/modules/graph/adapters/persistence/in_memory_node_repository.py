@@ -53,3 +53,24 @@ class InMemoryNodeRepository:
                 or needle in (node.description or "").casefold()
             ]
         return ordered[:limit]
+
+    async def count(self, *, type: str | None = None, q: str | None = None) -> int:
+        """Return the total number of non-deleted nodes matching the given filters."""
+        nodes = [n for n in self._nodes.values() if not n.is_deleted]
+        if type is not None:
+            nodes = [n for n in nodes if n.type == type]
+        if q is not None:
+            needle = q.casefold()
+            nodes = [
+                n
+                for n in nodes
+                if needle in n.name.casefold()
+                or needle in (n.description or "").casefold()
+            ]
+        return len(nodes)
+
+    async def clear_type(self, type_slug: str) -> None:
+        """Set `type` to None on all non-deleted nodes if type matches `type_slug`."""
+        for node in self._nodes.values():
+            if not node.is_deleted and node.type == type_slug:
+                node.type = None

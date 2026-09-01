@@ -53,3 +53,10 @@ class InMemoryEdgeRepository:
         if after is not None:
             ordered = [edge for edge in ordered if edge.id > after]
         return ordered[:limit]
+
+    async def has_edges_of_type(self, type_slug: str) -> bool:
+        """Return True if any non-deleted edges reference `type_slug`."""
+        return any(
+            not edge.is_deleted and edge.type == type_slug
+            for edge in self._edges.values()
+        )
