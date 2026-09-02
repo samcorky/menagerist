@@ -131,6 +131,16 @@
 		return rows;
 	});
 
+	const healthSummary = $derived.by(() => {
+		if (!ready?.checks) return { total: 0, pass: 0, fail: 0 };
+		const checks = Object.values(ready.checks);
+		return {
+			total: checks.length,
+			pass: checks.filter((check) => check.status === 'pass').length,
+			fail: checks.filter((check) => check.status === 'fail').length
+		};
+	});
+
 	async function load(refresh = false): Promise<void> {
 		if (refresh) {
 			refreshing = true;
@@ -182,8 +192,10 @@
 </svelte:head>
 
 <main class="flex-1 px-4 py-8 sm:px-6">
-	<div class="mx-auto flex max-w-3xl flex-col gap-6">
-		<div class="flex items-start justify-between gap-4">
+	<div class="mx-auto flex max-w-5xl flex-col gap-6">
+		<div
+			class="flex items-start justify-between gap-4 rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur-sm"
+		>
 			<div>
 				<p class="mb-2 text-xs font-medium tracking-[0.18em] text-muted-foreground uppercase">
 					Operations
@@ -201,21 +213,31 @@
 			<div class="flex items-center gap-2">
 				<Button
 					variant="outline"
-					size="sm"
+					size="icon"
 					onclick={() => load(true)}
 					disabled={refreshing || loading}
-					class="gap-2"
+					aria-label="Refresh status"
+					title="Refresh status"
 				>
 					<RefreshCw class="size-4 {refreshing ? 'animate-spin' : ''}" />
-					Refresh
 				</Button>
 				<Button
 					variant={autoRefreshEnabled ? 'default' : 'outline'}
 					size="sm"
 					onclick={() => (autoRefreshEnabled = !autoRefreshEnabled)}
-					class="min-w-[7rem]"
+					aria-label={autoRefreshEnabled ? 'Pause auto refresh' : 'Resume auto refresh'}
+					title={autoRefreshEnabled ? 'Pause auto refresh' : 'Resume auto refresh'}
+					class="gap-2 rounded-full"
 				>
-					{autoRefreshEnabled ? 'Pause auto' : 'Resume auto'}
+					<Activity class="size-4" />
+					<span class="inline-flex items-center gap-1.5">
+						<span
+							class={autoRefreshEnabled
+								? 'size-2 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,0.2)]'
+								: 'size-2 rounded-full bg-muted-foreground'}
+						></span>
+						{autoRefreshEnabled ? 'Live' : 'Paused'}
+					</span>
 				</Button>
 			</div>
 		</div>
@@ -268,6 +290,32 @@
 					</Badge>
 				</Card.Content>
 			</Card.Root>
+
+			<div class="grid gap-3 sm:grid-cols-3">
+				<div class="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+					<p class="text-xs tracking-[0.18em] text-muted-foreground uppercase">Checks</p>
+					<div class="mt-2 flex items-baseline gap-2">
+						<span class="font-heading text-2xl font-semibold">{healthSummary.total}</span>
+						<span class="text-sm text-muted-foreground">total</span>
+					</div>
+				</div>
+				<div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 shadow-sm">
+					<p class="text-xs tracking-[0.18em] text-emerald-700 uppercase dark:text-emerald-400">
+						Healthy
+					</p>
+					<div class="mt-2 flex items-baseline gap-2 text-emerald-600 dark:text-emerald-400">
+						<span class="font-heading text-2xl font-semibold">{healthSummary.pass}</span>
+						<span class="text-sm">operational</span>
+					</div>
+				</div>
+				<div class="rounded-2xl border border-destructive/20 bg-destructive/5 p-4 shadow-sm">
+					<p class="text-xs tracking-[0.18em] text-destructive uppercase">Alerts</p>
+					<div class="mt-2 flex items-baseline gap-2 text-destructive">
+						<span class="font-heading text-2xl font-semibold">{healthSummary.fail}</span>
+						<span class="text-sm">failing</span>
+					</div>
+				</div>
+			</div>
 
 			{#each groups as [groupKey, checks] (groupKey)}
 				{@const GroupIcon = groupIcon(groupKey)}
