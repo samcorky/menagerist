@@ -138,6 +138,48 @@ def test_delete_edge_type_returns_404_when_missing() -> None:
     assert response.status_code == 404
 
 
+def test_delete_edge_type_returns_409_when_edges_still_use_it() -> None:
+    """DELETE returns 409 when active edges reference the edge type."""
+    client = TestClient(_app_with_in_memory_graph())
+    et = client.post(
+        "/api/v1/edge-type", json={"slug": "directed-by", "label": "Directed By"}
+    ).json()
+    source = client.post("/api/v1/node", json={"name": "Ridley Scott"}).json()
+    target = client.post("/api/v1/node", json={"name": "Alien"}).json()
+    client.post(
+        "/api/v1/edge",
+        json={
+            "source_id": source["id"],
+            "target_id": target["id"],
+            "type": "directed-by",
+        },
+    )
+
+    response = client.delete(f"/api/v1/edge-type/{et['id']}")
+
+    assert response.status_code == 409
+    assert response.json()["title"] == "EdgeTypeInUseError"
+
+
+def test_delete_edge_type_succeeds_when_no_active_edges_use_it() -> None:
+    """DELETE succeeds when no active edges reference the edge type."""
+    client = TestClient(_app_with_in_memory_graph())
+    et = client.post(
+        "/api/v1/edge-type", json={"slug": "directed-by", "label": "Directed By"}
+    ).json()
+    # A different edge type's edges should not block this deletion
+    source = client.post("/api/v1/node", json={"name": "Ridley Scott"}).json()
+    target = client.post("/api/v1/node", json={"name": "Alien"}).json()
+    client.post(
+        "/api/v1/edge",
+        json={"source_id": source["id"], "target_id": target["id"], "type": "produced"},
+    )
+
+    response = client.delete(f"/api/v1/edge-type/{et['id']}")
+
+    assert response.status_code == 204
+
+
 def test_attributes_schema_round_trips_through_create_and_update() -> None:
     """attributes_schema is stored on create and can be updated via PATCH."""
     client = TestClient(_app_with_in_memory_graph())

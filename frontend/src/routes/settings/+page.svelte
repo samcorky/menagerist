@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { Tag, ArrowLeftRight, ChevronRight } from '@lucide/svelte';
+	import { Tag, ArrowLeftRight, ChevronRight, Activity } from '@lucide/svelte';
 </script>
 
 <svelte:head>
@@ -52,6 +52,29 @@
 							<p class="font-heading font-semibold">Relationship types</p>
 							<p class="mt-0.5 text-sm text-muted-foreground">
 								Define how items connect — "Directed by", "Signed by", "Part of".
+							</p>
+						</div>
+					</div>
+					<ChevronRight
+						class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+					/>
+				</div>
+			</a>
+
+			<a href={resolve('/status')} class="group block">
+				<div
+					class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
+				>
+					<div class="flex items-start gap-4">
+						<div
+							class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
+						>
+							<Activity class="size-5" />
+						</div>
+						<div>
+							<p class="font-heading font-semibold">System status</p>
+							<p class="mt-0.5 text-sm text-muted-foreground">
+								Health checks, database connectivity, and build info.
 							</p>
 						</div>
 					</div>

@@ -22,6 +22,7 @@ from app.modules.graph.application.delete_node_type import (
     DeleteNodeTypeCommand,
 )
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
+from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos, GraphUnitOfWork
 from app.shared_kernel.actor import SYSTEM_ACTOR
@@ -59,3 +60,22 @@ async def test_delete_node_type_raises_when_missing() -> None:
         await use_case.handle(
             DeleteNodeTypeCommand(node_type_id=uuid.uuid4()), SYSTEM_ACTOR
         )
+
+
+async def test_delete_node_type_clears_type_on_referencing_nodes() -> None:
+    """Deleting a node type nulls out that type on all nodes that referenced it."""
+    uow, repos = _make_uow()
+    nt = NodeType.create(slug="film", label="Film")
+    await repos.node_types.add(nt)
+    node_a = Node.create(name="Alien", type="film")
+    node_b = Node.create(name="Aliens", type="film")
+    node_other = Node.create(name="Ridley Scott", type="person")
+    for node in (node_a, node_b, node_other):
+        await repos.nodes.add(node)
+    use_case = DeleteNodeType(uow)
+
+    await use_case.handle(DeleteNodeTypeCommand(node_type_id=nt.id), SYSTEM_ACTOR)
+
+    assert node_a.type is None
+    assert node_b.type is None
+    assert node_other.type == "person"

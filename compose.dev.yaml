@@ -7,8 +7,11 @@ x-hardened: &hardened
   cap_add:
     - NET_BIND_SERVICE
   tmpfs:
-    - /tmp
-    - /var/run
+    # noexec/nosuid/nodev block these tmpfses from being used to smuggle in
+    # or run anything; sizes are caps, not reservations. uid/gid pin
+    # ownership to the anchor's own user: "1000:1000".
+    - /tmp:mode=1700,size=512M,noexec,nosuid,nodev,uid=1000,gid=1000
+    - /var/run:mode=1700,size=16M,noexec,nosuid,nodev,uid=1000,gid=1000
   user: "1000:1000"
   networks:
     - menagerist
@@ -36,9 +39,13 @@ services:
       - DAC_OVERRIDE
     read_only: false
     tmpfs:
-      - /tmp
-      - /var/run
-      - /run/postgresql
+      # noexec/nosuid/nodev as elsewhere. No uid/gid pin: the entrypoint
+      # runs as root initially and chowns these to its own postgres uid
+      # before dropping privileges (that's what SETUID/SETGID/CHOWN/
+      # DAC_OVERRIDE below are for) — pinning ownership here would fight it.
+      - /tmp:mode=1777,size=256M,noexec,nosuid,nodev
+      - /var/run:mode=1777,size=16M,noexec,nosuid,nodev
+      - /run/postgresql:mode=1777,size=16M,noexec,nosuid,nodev
     environment:
       POSTGRES_USER: menagerist
       POSTGRES_PASSWORD: menagerist
@@ -91,11 +98,14 @@ services:
       dockerfile: frontend/Dockerfile
     restart: unless-stopped
     read_only: true
+    # ammnt/nginx chowns /etc/nginx to 10001:10001 at 550/440 — overrides
+    # the hardened anchor's 1000:1000, which can't traverse those dirs.
+    user: "10001:10001"
     tmpfs:
-      - /tmp
-      - /var/run
-      - /var/lib/nginx/tmp
-      - /var/cache/nginx
+      # noexec/nosuid/nodev block this tmpfs from being used to smuggle in
+      # or run anything; size is a cap, not a reservation, so 1G costs
+      # nothing at rest. uid/gid pin ownership regardless of process user.
+      - /tmp:mode=1700,size=1G,noexec,nosuid,nodev,uid=10001,gid=10001
     ports:
       - "8080:8080"
     depends_on:

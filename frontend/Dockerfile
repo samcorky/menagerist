@@ -14,13 +14,18 @@ COPY frontend/ .
 RUN npm run generate && npm run build
 
 # ---------------------------------------------------------------------------
-# Runtime: distroless nginx (Chainguard), non-root, port 8080
+# Runtime: distroless nginx (ammnt/nginx), non-root uid/gid 10001, port 8080
+#
+# Built FROM scratch with /etc/nginx chowned 10001:10001 and locked to 550
+# (dirs) / 440 (files) — only uid or gid 10001 can traverse it, so the
+# container MUST run as 10001:10001 (see compose.dev.yaml). Files added here
+# are chowned to match; the base image ships no html directory of its own,
+# and its default.conf/nginx.conf are placeholders we fully replace.
 # ---------------------------------------------------------------------------
-FROM cgr.dev/chainguard/nginx AS runtime
+FROM ghcr.io/ammnt/nginx:1.31.4 AS runtime
 
-COPY --from=builder /app/build /usr/share/nginx/html
-COPY frontend/nginx.main.conf /etc/nginx/nginx.conf
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
-COPY frontend/nginx.default.conf /etc/nginx/conf.d/nginx.default.conf
+COPY --from=builder --chown=10001:10001 /app/build /usr/share/nginx/html
+COPY --chown=10001:10001 frontend/nginx.main.conf /etc/nginx/nginx.conf
+COPY --chown=10001:10001 frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 8080

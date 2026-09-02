@@ -267,3 +267,41 @@ def test_list_nodes_no_link_header_on_last_page() -> None:
 
     assert response.status_code == 200
     assert "Link" not in response.headers
+
+
+def test_list_nodes_returns_x_total_count_header() -> None:
+    """GET /api/v1/node returns X-Total-Count with the total number of nodes."""
+    client = TestClient(_app_with_in_memory_graph())
+    for i in range(5):
+        client.post("/api/v1/node", json={"name": f"Node {i}", "type": "test"})
+
+    response = client.get("/api/v1/node")
+
+    assert response.status_code == 200
+    assert response.headers["X-Total-Count"] == "5"
+
+
+def test_list_nodes_x_total_count_reflects_filters() -> None:
+    """X-Total-Count matches the filtered total, not the overall total."""
+    client = TestClient(_app_with_in_memory_graph())
+    client.post("/api/v1/node", json={"name": "Alien", "type": "film"})
+    client.post("/api/v1/node", json={"name": "Aliens", "type": "film"})
+    client.post("/api/v1/node", json={"name": "Ridley Scott", "type": "person"})
+
+    response = client.get("/api/v1/node?type=film")
+
+    assert response.status_code == 200
+    assert response.headers["X-Total-Count"] == "2"
+
+
+def test_list_nodes_x_total_count_matches_full_count_across_pages() -> None:
+    """X-Total-Count equals the full total even when pagination limits the page."""
+    client = TestClient(_app_with_in_memory_graph())
+    for i in range(15):
+        client.post("/api/v1/node", json={"name": f"Node {i}", "type": "test"})
+
+    response = client.get("/api/v1/node?limit=10")
+
+    assert response.status_code == 200
+    assert len(response.json()) == 10
+    assert response.headers["X-Total-Count"] == "15"

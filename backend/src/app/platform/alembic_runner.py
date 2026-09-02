@@ -1,9 +1,16 @@
+from functools import lru_cache
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from alembic.config import Config
+from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
 
 from alembic import command
 from app.platform.config import get_database_settings
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 _MIGRATIONS_PATH = Path(__file__).resolve().parent.parent / "alembic"
 # app/platform/ → app/ → app/alembic/ — works for both editable and installed wheels.
@@ -34,3 +41,30 @@ def downgrade(revision: str) -> None:
 def make_revision(message: str, *, autogenerate: bool = True) -> None:
     """Create a new migration script."""
     command.revision(build_config(), message=message, autogenerate=autogenerate)
+
+
+@lru_cache(maxsize=1)
+def code_head_revisions() -> tuple[str, ...]:
+    """Return the head revision(s) declared in the migration scripts.
+
+    Cached per-process since the scripts are static for the lifetime of a build.
+    """
+    return tuple(ScriptDirectory.from_config(build_config()).get_heads())
+
+
+async def db_current_revisions(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> tuple[str, ...]:
+    """Return the revision(s) currently applied in the database.
+
+    Opens an isolated session so this read is independent of any caller's unit
+    of work — Alembic's MigrationContext reads alembic_version directly, not
+    through the ORM, and must not participate in an outer transaction.
+    """
+    async with session_factory() as session:
+        connection = await session.connection()
+        return tuple(
+            await connection.run_sync(
+                lambda c: MigrationContext.configure(c).get_current_heads()
+            )
+        )

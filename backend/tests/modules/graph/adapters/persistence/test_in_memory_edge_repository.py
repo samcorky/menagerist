@@ -115,3 +115,36 @@ async def test_list_for_node_respects_after_and_limit() -> None:
     page = await repository.list_for_node(node_id, after=edges[0].id, limit=2)
 
     assert page == edges[1:3]
+
+
+async def test_has_edges_of_type_returns_true_when_matching_edge_exists() -> None:
+    """has_edges_of_type() returns True when a non-deleted edge uses that type."""
+    repository = InMemoryEdgeRepository()
+    edge = Edge.create(
+        source_id=uuid.uuid4(), target_id=uuid.uuid4(), type="directed-by"
+    )
+    await repository.add(edge)
+
+    assert await repository.has_edges_of_type("directed-by") is True
+
+
+async def test_has_edges_of_type_returns_false_when_no_match() -> None:
+    """has_edges_of_type() returns False when no edges use that type."""
+    repository = InMemoryEdgeRepository()
+    edge = Edge.create(source_id=uuid.uuid4(), target_id=uuid.uuid4(), type="owns")
+    await repository.add(edge)
+
+    assert await repository.has_edges_of_type("directed-by") is False
+
+
+async def test_has_edges_of_type_ignores_soft_deleted_edges() -> None:
+    """has_edges_of_type() does not count soft-deleted edges."""
+    repository = InMemoryEdgeRepository()
+    edge = Edge.create(
+        source_id=uuid.uuid4(), target_id=uuid.uuid4(), type="directed-by"
+    )
+    await repository.add(edge)
+    edge.soft_delete()
+    await repository.save(edge)
+
+    assert await repository.has_edges_of_type("directed-by") is False

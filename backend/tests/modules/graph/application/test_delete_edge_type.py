@@ -21,8 +21,9 @@ from app.modules.graph.application.delete_edge_type import (
     DeleteEdgeType,
     DeleteEdgeTypeCommand,
 )
+from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.edge_type import EdgeType
-from app.modules.graph.domain.errors import EdgeTypeNotFoundError
+from app.modules.graph.domain.errors import EdgeTypeInUseError, EdgeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphRepos, GraphUnitOfWork
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
@@ -59,3 +60,37 @@ async def test_delete_edge_type_raises_when_missing() -> None:
         await use_case.handle(
             DeleteEdgeTypeCommand(edge_type_id=uuid.uuid4()), SYSTEM_ACTOR
         )
+
+
+async def test_delete_edge_type_raises_when_edges_still_reference_it() -> None:
+    """DeleteEdgeType raises EdgeTypeInUseError when edges use the type."""
+    uow, repos = _make_uow()
+    et = EdgeType.create(slug="directed-by", label="Directed By")
+    await repos.edge_types.add(et)
+    edge = Edge.create(
+        source_id=uuid.uuid4(), target_id=uuid.uuid4(), type="directed-by"
+    )
+    await repos.edges.add(edge)
+    use_case = DeleteEdgeType(uow)
+
+    with pytest.raises(EdgeTypeInUseError):
+        await use_case.handle(DeleteEdgeTypeCommand(edge_type_id=et.id), SYSTEM_ACTOR)
+
+    assert et.is_deleted is False
+
+
+async def test_delete_edge_type_succeeds_when_no_edges_reference_it() -> None:
+    """DeleteEdgeType soft-deletes when no active edges use the type."""
+    uow, repos = _make_uow()
+    et = EdgeType.create(slug="directed-by", label="Directed By")
+    await repos.edge_types.add(et)
+    # Edge with a different type — should not block deletion
+    other_edge = Edge.create(
+        source_id=uuid.uuid4(), target_id=uuid.uuid4(), type="produced-by"
+    )
+    await repos.edges.add(other_edge)
+    use_case = DeleteEdgeType(uow)
+
+    await use_case.handle(DeleteEdgeTypeCommand(edge_type_id=et.id), SYSTEM_ACTOR)
+
+    assert et.is_deleted is True
