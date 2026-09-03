@@ -42,7 +42,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=.git,target=/app/.git,ro \
     --mount=type=bind,source=.,target=/src,ro \
     GIT_DIR=/app/.git GIT_WORK_TREE=/src \
-    uv sync --locked --no-editable
+    uv sync --locked --no-editable --reinstall-package menagerist
 
 # ---------------------------------------------------------------------------
 # Strip things that aren't required at runtime.
