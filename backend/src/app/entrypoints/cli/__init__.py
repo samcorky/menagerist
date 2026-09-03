@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 
 import structlog
@@ -66,6 +67,10 @@ def serve(
     server.serve()
 
 
+def _enable_migration_logs() -> None:
+    logging.getLogger("alembic.runtime.migration").setLevel(logging.INFO)
+
+
 @migrate_app.command
 def upgrade(revision: str = "head") -> None:
     """Upgrade the database to `revision`.
@@ -73,6 +78,7 @@ def upgrade(revision: str = "head") -> None:
     Args:
         revision: Target revision, or "head" for the latest.
     """
+    _enable_migration_logs()
     alembic_runner.upgrade(revision)
 
 
@@ -83,6 +89,7 @@ def downgrade(revision: str) -> None:
     Args:
         revision: Target revision.
     """
+    _enable_migration_logs()
     alembic_runner.downgrade(revision)
 
 

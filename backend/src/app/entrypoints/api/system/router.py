@@ -316,7 +316,7 @@ async def get_health_ready(
     pool_obj = cast(QueuePool, get_engine().pool)
     checkedout = pool_obj.checkedout()
     pool_size = pool_obj.size()
-    pool_saturated = pool_size > 0 and checkedout >= pool_size
+    pool_saturated = 0 < pool_size <= checkedout
     utilization = round(checkedout / pool_size * 100, 2) if pool_size > 0 else 0.0
     pool_output: str | None = (
         f"{checkedout}/{pool_size} connections checked out, 0 available"

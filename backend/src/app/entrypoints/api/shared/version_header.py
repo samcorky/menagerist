@@ -11,6 +11,8 @@ if TYPE_CHECKING:
     from starlette.responses import Response
     from starlette.types import ASGIApp
 
+_APP_VERSION_HEADER = "App-Version"
+
 
 class VersionHeaderMiddleware(BaseHTTPMiddleware):
     """Stamp every response with an App-Version header."""
@@ -26,5 +28,5 @@ class VersionHeaderMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         """Add App-Version to every response."""
         response = await call_next(request)
-        response.headers["App-Version"] = self._version
+        response.headers[_APP_VERSION_HEADER] = self._version
         return response

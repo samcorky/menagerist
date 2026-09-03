@@ -92,6 +92,10 @@ def configure_logging(*, level: int | str | None = None) -> None:
     # through logging -> the same handler above, instead of straight to stderr.
     logging.captureWarnings(True)
 
+    # Suppress Alembic's per-request "Context impl" / "Will assume transactional
+    # DDL" chatter at INFO. The migrate commands re-enable this before running.
+    logging.getLogger("alembic.runtime.migration").setLevel(logging.WARNING)
+
 
 # Handed to Granian's `log_dictconfig` param. Granian's own `_granian` and
 # `granian.access` loggers default to `propagate: False` with their own
