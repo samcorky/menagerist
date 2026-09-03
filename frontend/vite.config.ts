@@ -1,6 +1,18 @@
 import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+function getBackendVersion(): string {
+	try {
+		const path = fileURLToPath(new URL('./openapi.json', import.meta.url));
+		const schema = JSON.parse(readFileSync(path, 'utf-8')) as { info?: { version?: string } };
+		return schema.info?.version ?? '';
+	} catch {
+		return '';
+	}
+}
 
 export default defineConfig({
 	plugins: [
@@ -18,6 +30,9 @@ export default defineConfig({
 		proxy: {
 			'/api': 'http://localhost:8000'
 		}
+	},
+	define: {
+		__EXPECTED_BACKEND_VERSION__: JSON.stringify(getBackendVersion())
 	},
 	optimizeDeps: {
 		// @lucide/svelte has thousands of icon exports - if left to be

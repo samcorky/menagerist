@@ -10,6 +10,7 @@
 	import { themeController } from '$lib/theme.svelte.js';
 	import { captureController } from '$lib/capture.svelte.js';
 	import CaptureSheet from '$lib/components/capture-sheet.svelte';
+	import VersionMismatchBanner from '$lib/components/version-mismatch-banner.svelte';
 
 	let { children } = $props();
 
@@ -110,6 +111,8 @@
 			</div>
 		</div>
 	</header>
+
+	<VersionMismatchBanner />
 
 	<div class="flex-1 overflow-y-auto">
 		{@render children()}

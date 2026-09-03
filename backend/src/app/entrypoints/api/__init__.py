@@ -3,6 +3,7 @@ from granian.utils.proxies import wrap_asgi_with_proxy_headers
 from starlette.middleware.cors import CORSMiddleware
 
 from app.entrypoints.api.shared.problem_response import register_exception_handlers
+from app.entrypoints.api.shared.version_header import VersionHeaderMiddleware
 from app.entrypoints.api.system.router import router as system_router
 from app.modules.graph.adapters.api.edge.router import router as edge_router
 from app.modules.graph.adapters.api.edge_type.router import router as edge_type_router
@@ -40,11 +41,14 @@ def create_app() -> FastAPI:
         fastapi_app.description = app_info.project.description
 
     # noinspection PyTypeChecker
+    fastapi_app.add_middleware(VersionHeaderMiddleware)
+    # noinspection PyTypeChecker
     fastapi_app.add_middleware(
         CORSMiddleware,
         allow_origins=get_api_settings().cors_origins,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["App-Version"],
     )
 
     fastapi_app.include_router(api_router)
