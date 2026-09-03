@@ -30,8 +30,9 @@ node_modules
 dist
 build
 
-# Documentation / repo stuff not required by backend build
-docs
-README.md
-LICENSE
-.github
+# NOTE: docs/, README.md, LICENSE, .github/ used to be excluded here.
+# They're git-tracked, and backend/Dockerfile bind-mounts this whole
+# context read-only at /src as git's work tree, purely to compute build
+# metadata (see backend/scripts/hatch_build_info.py) — excluding tracked
+# paths made every build look dirty. Never reaches an image layer, so
+# there's no runtime cost to including them.
