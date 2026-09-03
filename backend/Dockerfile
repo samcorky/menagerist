@@ -43,13 +43,17 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # in PATH. We therefore explicitly locate the Python installation under
 # /opt/python.
 #
-# Keep terminfo because readline/curses-based CLI functionality requires it.
+# Keep terminfo because readline/curses-based CLI functionality requires it
+# — but curate it down to the terminal types actually plausible in a
+# container (real TTYs via `docker exec`, tmux/screen multiplexers, CI),
+# rather than shipping ncurses-term's full database of hundreds of entries.
 # ---------------------------------------------------------------------------
 RUN PYTHON_DIR="$(find /opt/python -mindepth 1 -maxdepth 1 -type d -name 'cpython-*' -print -quit)" \
     && echo "Python runtime: ${PYTHON_DIR}" \
     \
     && echo "=== Before cleanup ===" \
     && du -sh "${PYTHON_DIR}" \
+    && du -sh /usr/share/terminfo \
     \
     && rm -rf \
         "${PYTHON_DIR}/include" \
@@ -63,6 +67,7 @@ RUN PYTHON_DIR="$(find /opt/python -mindepth 1 -maxdepth 1 -type d -name 'cpytho
         "${PYTHON_DIR}/lib/python3.14/ensurepip" \
         "${PYTHON_DIR}/lib/python3.14/site-packages/pip" \
         "${PYTHON_DIR}/lib/python3.14/site-packages/setuptools" \
+        "${PYTHON_DIR}"/lib/python3.14/config-3.14* \
     \
     && find /opt/python /app/.venv \
         \( \
@@ -77,15 +82,31 @@ RUN PYTHON_DIR="$(find /opt/python -mindepth 1 -maxdepth 1 -type d -name 'cpytho
             -name '*.pyc' \
             -o -name '*.pyo' \
             -o -name '*.a' \
+            -o -name '_test*.so' \
+            -o -name '_ctypes_test*.so' \
+            -o -name 'xxlimited*.so' \
+            -o -name 'xxsubtype*.so' \
         \) \
         -delete \
+    \
+    && mkdir -p /opt/terminfo-min \
+    && for term in xterm xterm-256color screen screen-256color \
+                   tmux tmux-256color linux vt100 ansi dumb; do \
+         first_char="$(printf '%s' "${term}" | cut -c1)"; \
+         if [ -f "/usr/share/terminfo/${first_char}/${term}" ]; then \
+             mkdir -p "/opt/terminfo-min/${first_char}"; \
+             cp "/usr/share/terminfo/${first_char}/${term}" \
+                "/opt/terminfo-min/${first_char}/${term}"; \
+         fi; \
+       done \
     \
     && echo "=== greenlet dependencies ===" \
     && ldd /app/.venv/lib/python3.14/site-packages/greenlet/_greenlet*.so \
     \
     && echo "=== After cleanup ===" \
     && du -sh "${PYTHON_DIR}" \
-    && du -sh /app/.venv
+    && du -sh /app/.venv \
+    && du -sh /opt/terminfo-min
 
 # ---------------------------------------------------------------------------
 # Runtime
@@ -101,9 +122,10 @@ COPY --from=builder \
     /usr/lib/x86_64-linux-gnu/libstdc++.so.6 \
     /usr/lib/x86_64-linux-gnu/libstdc++.so.6
 
-# Required by readline/curses-based CLI functionality.
+# Required by readline/curses-based CLI functionality — curated subset,
+# see the cleanup RUN step in the builder stage for which terminals.
 COPY --from=builder \
-    /usr/share/terminfo \
+    /opt/terminfo-min \
     /usr/share/terminfo
 
 
