@@ -66,6 +66,7 @@ services:
   migrate:
     <<: [*hardened, *logging]
     container_name: menagerist-migrate
+    image: menagerist-backend:local
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -80,6 +81,7 @@ services:
   backend:
     <<: [*hardened, *logging]
     container_name: menagerist-backend
+    image: menagerist-backend:local
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -89,10 +91,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   frontend:
     <<: [*hardened, *logging]
     container_name: menagerist-frontend
+    image: menagerist-frontend:local
     build:
       context: .
       dockerfile: frontend/Dockerfile
@@ -107,7 +112,7 @@ services:
       # nothing at rest. uid/gid pin ownership regardless of process user.
       - /tmp:mode=1700,size=1G,noexec,nosuid,nodev,uid=10001,gid=10001
     ports:
-      - "8081:8080"
+      - "8080:8080"
     depends_on:
       backend:
         condition: service_healthy

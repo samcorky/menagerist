@@ -31,34 +31,33 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 COPY backend/ backend/
 
-# hatch_build_info.py shells out to plain `git` commands (status, rev-parse,
-# branch, config) with no explicit --git-dir/--work-tree. Left alone, git
-# discovers .git at /app/.git and defaults the work tree to its parent,
-# /app — which only contains backend/, so `git status --porcelain` always
-# reports dirty. Bind-mount the full repo read-only and point GIT_WORK_TREE
-# at it instead: every git call the hook makes picks this up automatically,
-# no hook changes or build args required.
+ARG SETUPTOOLS_SCM_PRETEND_VERSION=""
+ARG MENAGERIST_BUILD_COMMIT_SHA=""
+ARG MENAGERIST_BUILD_BRANCH=""
+ARG MENAGERIST_BUILD_REPOSITORY_URL=""
+ARG MENAGERIST_BUILD_TIMESTAMP=""
+ARG MENAGERIST_BUILD_DIRTY=""
+
+# Keep metadata tied to the repo root during build.
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=.git,target=/app/.git,ro \
     --mount=type=bind,source=.,target=/src,ro \
     GIT_DIR=/app/.git GIT_WORK_TREE=/src \
+    SETUPTOOLS_SCM_PRETEND_VERSION=${SETUPTOOLS_SCM_PRETEND_VERSION} \
+    MENAGERIST_BUILD_COMMIT_SHA=${MENAGERIST_BUILD_COMMIT_SHA} \
+    MENAGERIST_BUILD_BRANCH=${MENAGERIST_BUILD_BRANCH} \
+    MENAGERIST_BUILD_REPOSITORY_URL=${MENAGERIST_BUILD_REPOSITORY_URL} \
+    MENAGERIST_BUILD_TIMESTAMP=${MENAGERIST_BUILD_TIMESTAMP} \
+    MENAGERIST_BUILD_DIRTY=${MENAGERIST_BUILD_DIRTY} \
     uv sync --locked --no-editable --reinstall-package menagerist
 
-# ---------------------------------------------------------------------------
-# Strip things that aren't required at runtime.
-#
-# IMPORTANT:
-# `uv python find` returns /app/.venv/bin/python3 because the venv is first
-# in PATH. We therefore explicitly locate the Python installation under
-# /opt/python.
-#
-# Keep terminfo because readline/curses-based CLI functionality requires it.
-# ---------------------------------------------------------------------------
+# Keep the minimal terminal database needed for readline/curses CLI usage.
 RUN PYTHON_DIR="$(find /opt/python -mindepth 1 -maxdepth 1 -type d -name 'cpython-*' -print -quit)" \
     && echo "Python runtime: ${PYTHON_DIR}" \
     \
     && echo "=== Before cleanup ===" \
     && du -sh "${PYTHON_DIR}" \
+    && du -sh /usr/share/terminfo \
     \
     && rm -rf \
         "${PYTHON_DIR}/include" \
@@ -72,6 +71,7 @@ RUN PYTHON_DIR="$(find /opt/python -mindepth 1 -maxdepth 1 -type d -name 'cpytho
         "${PYTHON_DIR}/lib/python3.14/ensurepip" \
         "${PYTHON_DIR}/lib/python3.14/site-packages/pip" \
         "${PYTHON_DIR}/lib/python3.14/site-packages/setuptools" \
+        "${PYTHON_DIR}"/lib/python3.14/config-3.14* \
     \
     && find /opt/python /app/.venv \
         \( \
@@ -86,22 +86,34 @@ RUN PYTHON_DIR="$(find /opt/python -mindepth 1 -maxdepth 1 -type d -name 'cpytho
             -name '*.pyc' \
             -o -name '*.pyo' \
             -o -name '*.a' \
+            -o -name '_test*.so' \
+            -o -name '_ctypes_test*.so' \
+            -o -name 'xxlimited*.so' \
+            -o -name 'xxsubtype*.so' \
         \) \
         -delete \
+    \
+    && mkdir -p /opt/terminfo-min \
+    && for term in xterm xterm-256color screen screen-256color \
+                   tmux tmux-256color linux vt100 ansi dumb; do \
+         first_char="$(printf '%s' "${term}" | cut -c1)"; \
+         if [ -f "/usr/share/terminfo/${first_char}/${term}" ]; then \
+             mkdir -p "/opt/terminfo-min/${first_char}"; \
+             cp "/usr/share/terminfo/${first_char}/${term}" \
+                "/opt/terminfo-min/${first_char}/${term}"; \
+         fi; \
+       done \
     \
     && echo "=== greenlet dependencies ===" \
     && ldd /app/.venv/lib/python3.14/site-packages/greenlet/_greenlet*.so \
     \
     && echo "=== After cleanup ===" \
     && du -sh "${PYTHON_DIR}" \
-    && du -sh /app/.venv
+    && du -sh /app/.venv \
+    && du -sh /opt/terminfo-min
 
-# ---------------------------------------------------------------------------
-# Runtime
-# ---------------------------------------------------------------------------
 FROM gcr.io/distroless/base-debian13:nonroot AS runtime
 
-# Required by greenlet.
 COPY --from=builder \
     /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 \
     /usr/lib/x86_64-linux-gnu/libgcc_s.so.1
@@ -110,9 +122,8 @@ COPY --from=builder \
     /usr/lib/x86_64-linux-gnu/libstdc++.so.6 \
     /usr/lib/x86_64-linux-gnu/libstdc++.so.6
 
-# Required by readline/curses-based CLI functionality.
 COPY --from=builder \
-    /usr/share/terminfo \
+    /opt/terminfo-min \
     /usr/share/terminfo
 
 

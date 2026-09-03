@@ -234,11 +234,11 @@ help = "Run the app for local development"
 ignore_fail = true
 
 [tool.poe.groups.run.tasks.docker-build-backend]
-cmd = "docker compose -f compose.dev.yaml build backend"
+cmd = "docker buildx bake -f docker-bake.hcl backend-local"
 help = "Build the backend Docker image"
 
 [tool.poe.groups.run.tasks.docker-build-frontend]
-cmd = "docker compose -f compose.dev.yaml build frontend"
+cmd = "docker buildx bake -f docker-bake.hcl frontend-local"
 help = "Build the frontend Docker image"
 deps = ["dump-schema"]
 
@@ -255,24 +255,23 @@ ignore_fail = true
 cmd = "docker compose -f compose.dev.yaml up frontend"
 help = "Run the full stack including frontend via Docker Compose"
 ignore_fail = true
-deps = ["dump-schema"]
 
 [tool.poe.groups.run.tasks.docker-run]
 cmd = "docker compose -f compose.dev.yaml up"
 help = "Run the full app via Docker Compose"
 ignore_fail = true
-deps = ["dump-schema"]
 
 [tool.poe.groups.run.tasks.docker-up-backend]
-cmd = "docker compose -f compose.dev.yaml up -d --build --force-recreate backend"
+cmd = "docker compose -f compose.dev.yaml up -d --force-recreate backend"
 help = "Build and (re)start the backend container detached"
+deps = ["docker-build-backend"]
 
 [tool.poe.groups.run.tasks.docker-up-frontend]
-cmd = "docker compose -f compose.dev.yaml up -d --build --force-recreate frontend"
+cmd = "docker compose -f compose.dev.yaml up -d --force-recreate frontend"
 help = "Build and (re)start the frontend container detached"
-deps = ["dump-schema"]
+deps = ["docker-build-frontend"]
 
 [tool.poe.groups.run.tasks.docker-up]
-cmd = "docker compose -f compose.dev.yaml up -d --build --force-recreate"
+cmd = "docker compose -f compose.dev.yaml up -d --force-recreate"
 help = "Build and (re)start all containers detached"
-deps = ["dump-schema"]
+deps = ["docker-build"]
