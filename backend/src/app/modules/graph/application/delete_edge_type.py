@@ -1,12 +1,12 @@
+import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from app.modules.graph.domain.errors import EdgeTypeInUseError, EdgeTypeNotFoundError
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
-    import uuid
-
-    from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
     from app.shared_kernel.actor import Actor
 
 
@@ -14,14 +14,11 @@ if TYPE_CHECKING:
 class DeleteEdgeTypeCommand:
     """Request to soft-delete an edge type."""
 
-    edge_type_id: "uuid.UUID"
+    edge_type_id: uuid.UUID
 
 
-class DeleteEdgeType:
+class DeleteEdgeType(CommandHandler[GraphUnitOfWork, DeleteEdgeTypeCommand, None]):
     """Soft-delete an edge type."""
-
-    def __init__(self, uow: GraphUnitOfWork) -> None:
-        self._uow = uow
 
     async def handle(self, command: DeleteEdgeTypeCommand, actor: Actor) -> None:
         """Soft-delete the edge type or raise EdgeTypeNotFoundError."""

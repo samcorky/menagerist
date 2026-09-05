@@ -2,11 +2,12 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.errors import EdgeNotFoundError
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
-    from app.modules.graph.domain.edge import Edge
-    from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
     from app.shared_kernel.actor import Actor
 
 
@@ -22,11 +23,8 @@ class UpdateEdgeCommand:
     attributes: dict[str, Any] | None = field(default=None)
 
 
-class UpdateEdge:
+class UpdateEdge(CommandHandler[GraphUnitOfWork, UpdateEdgeCommand, Edge]):
     """Update an existing edge's editable fields."""
-
-    def __init__(self, uow: GraphUnitOfWork) -> None:
-        self._uow = uow
 
     async def handle(self, command: UpdateEdgeCommand, actor: Actor) -> Edge:
         """Apply `command`'s changes to the edge and commit."""

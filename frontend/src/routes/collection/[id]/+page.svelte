@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { Trash2 } from '@lucide/svelte';
+	import { Star, Trash2 } from '@lucide/svelte';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import {
 		createEdge,
@@ -19,7 +19,7 @@
 		type NodeResponse,
 		type NodeTypeResponse
 	} from '$lib/api/client';
-	import { errorMessage } from '$lib/api/errors';
+	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { toast } from 'svelte-sonner';
 	import AttributesEditor, {
 		attributesToRows,
@@ -29,6 +29,7 @@
 	import type { Schema } from '$lib/components/schema-editor.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { Toggle } from '$lib/components/ui/toggle/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -56,8 +57,6 @@
 	let attributeRows = $state<AttributeRow[]>([]);
 	let saving = $state(false);
 	let deletingNode = $state(false);
-	let confirmingDeleteNode = $state(false);
-	let confirmingEdgeId = $state<string | null>(null);
 
 	let newEdgeType = $state('');
 	let newEdgeTargetId = $state('');
@@ -71,6 +70,17 @@
 	);
 	let selectedNodeLabel = $derived(otherNodes.find((n) => n.id === newEdgeTargetId)?.name ?? '');
 
+	// Autocomplete for relationship types
+	let edgeTypeSearch = $state('');
+	let edgeTypeOpen = $state(false);
+	let filteredEdgeTypes = $derived(
+		edgeTypes.filter(
+			(et) =>
+				et.label.toLowerCase().includes(edgeTypeSearch.toLowerCase()) ||
+				et.slug.includes(edgeTypeSearch.toLowerCase())
+		)
+	);
+
 	async function load() {
 		loading = true;
 		const [nodeResult, edgesResult, nodesResult, edgeTypesResult, nodeTypesResult] =
@@ -83,7 +93,8 @@
 			]);
 
 		if (nodeResult.error || !nodeResult.data) {
-			toast.error("Couldn't load item", { description: errorMessage(nodeResult.error) });
+			const { title, description: desc } = networkAwareError(nodeResult);
+			toast.error(title, { description: desc });
 			loading = false;
 			return;
 		}
@@ -139,7 +150,8 @@
 				description: 'This item was edited elsewhere — refresh to see the latest version.'
 			});
 		} else if (result.error || !result.data) {
-			toast.error("Couldn't save changes", { description: errorMessage(result.error) });
+			const { title, description: desc } = networkAwareError(result);
+			toast.error(title, { description: desc });
 		} else {
 			toast.success('Saved');
 			node = result.data;
@@ -147,21 +159,48 @@
 		saving = false;
 	}
 
-	async function handleDeleteNode() {
-		if (!confirmingDeleteNode) {
-			confirmingDeleteNode = true;
-			return;
-		}
-		confirmingDeleteNode = false;
+	function handleDeleteNode() {
+		const id = nodeId;
 		deletingNode = true;
-		const result = await deleteNode({ path: { node_id: nodeId } });
-		if (result.error) {
-			toast.error("Couldn't delete item", { description: errorMessage(result.error) });
-			deletingNode = false;
-			return;
+
+		let undone = false;
+		const timerId = setTimeout(async () => {
+			if (undone) return;
+			const result = await deleteNode({ path: { node_id: id } });
+			if (result.error) {
+				deletingNode = false;
+				const { title, description: desc } = networkAwareError(result);
+				toast.error(title, { description: desc });
+				return;
+			}
+			await goto(resolve('/collection'));
+		}, 5000);
+
+		toast('Item deleted', {
+			action: {
+				label: 'Undo',
+				onClick: () => {
+					undone = true;
+					clearTimeout(timerId);
+					deletingNode = false;
+				}
+			},
+			duration: 5000
+		});
+	}
+
+	async function handleToggleFavourite() {
+		if (!node) return;
+		const newValue = !node.favourite;
+		node = { ...node, favourite: newValue };
+		const result = await updateNode({ path: { node_id: nodeId }, body: { favourite: newValue } });
+		if (result.error || !result.data) {
+			node = { ...node, favourite: !newValue };
+			const { title, description: desc } = networkAwareError(result);
+			toast.error(title, { description: desc });
+		} else {
+			node = result.data;
 		}
-		toast.success('Item deleted');
-		await goto(resolve('/collection'));
 	}
 
 	async function handleCreateEdge(event: SubmitEvent) {
@@ -180,7 +219,8 @@
 			}
 		});
 		if (result.error || !result.data) {
-			toast.error("Couldn't add connection", { description: errorMessage(result.error) });
+			const { title, description: desc } = networkAwareError(result);
+			toast.error(title, { description: desc });
 			if (result.response?.status === 404) {
 				newEdgeTargetId = '';
 				edgeTargetSearch = '';
@@ -191,23 +231,37 @@
 			newEdgeType = '';
 			newEdgeTargetId = '';
 			edgeTargetSearch = '';
+			edgeTypeSearch = '';
 		}
 		creatingEdge = false;
 	}
 
-	async function handleDeleteEdge(edge: EdgeResponse) {
-		if (confirmingEdgeId !== edge.id) {
-			confirmingEdgeId = edge.id;
-			return;
-		}
-		confirmingEdgeId = null;
-		const result = await deleteEdge({ path: { edge_id: edge.id } });
-		if (!result.error) {
-			edges = edges.filter((existing) => existing.id !== edge.id);
-			toast.success('Connection removed');
-		} else {
-			toast.error("Couldn't remove connection", { description: errorMessage(result.error) });
-		}
+	function handleDeleteEdge(edge: EdgeResponse) {
+		// Optimistically remove
+		edges = edges.filter((e) => e.id !== edge.id);
+
+		let undone = false;
+		const timerId = setTimeout(async () => {
+			if (undone) return;
+			const result = await deleteEdge({ path: { edge_id: edge.id } });
+			if (result.error) {
+				edges = [...edges, edge];
+				const { title, description: desc } = networkAwareError(result);
+				toast.error(title, { description: desc });
+			}
+		}, 5000);
+
+		toast('Connection removed', {
+			action: {
+				label: 'Undo',
+				onClick: () => {
+					undone = true;
+					clearTimeout(timerId);
+					edges = [...edges, edge];
+				}
+			},
+			duration: 5000
+		});
 	}
 </script>
 
@@ -221,42 +275,53 @@
 
 		<Shimmer {loading}>
 			<Card.Root>
-				<Card.Header>
-					<ShimmerSlot {loading} class="h-6 w-40">
-						<Card.Title class="font-heading text-xl">{node?.name ?? ''}</Card.Title>
-					</ShimmerSlot>
-					<ShimmerSlot {loading} class="mt-1 h-4 w-56">
-						{#if node?.type}
-							{@const typeLabel = nodeTypes.find((nt) => nt.slug === node!.type)?.label}
-							<Card.Description>
-								Category:
-								{#if typeLabel}
-									{typeLabel}
-								{:else}
-									<span
-										class="font-mono text-xs text-muted-foreground/60 italic"
-										title="This category no longer exists">{node.type}</span
-									>
-								{/if}
-							</Card.Description>
-						{:else if !loading && nodeTypes.length > 0}
-							<div class="mt-2 space-y-1.5">
-								<p class="text-xs text-muted-foreground">No category — pick one:</p>
-								<div class="flex flex-wrap gap-1.5">
-									{#each nodeTypes as nt (nt.slug)}
-										<button
-											type="button"
-											onclick={() => handleSetType(nt.slug)}
-											disabled={settingType}
-											class="rounded-full border border-border bg-background px-2.5 py-0.5 text-xs transition-colors hover:border-primary/50 hover:bg-muted disabled:opacity-50"
+				<Card.Header class="flex flex-row items-start justify-between gap-4 space-y-0">
+					<div class="min-w-0 flex-1">
+						<ShimmerSlot {loading} class="h-6 w-40">
+							<Card.Title class="font-heading text-xl">{node?.name ?? ''}</Card.Title>
+						</ShimmerSlot>
+						<ShimmerSlot {loading} class="mt-1 h-4 w-56">
+							{#if node?.type}
+								{@const typeLabel = nodeTypes.find((nt) => nt.slug === node!.type)?.label}
+								<Card.Description>
+									{#if typeLabel}
+										{typeLabel}
+									{:else}
+										<span
+											class="font-mono text-xs text-muted-foreground/60 italic"
+											title="This category no longer exists">{node.type}</span
 										>
-											{nt.label}
-										</button>
-									{/each}
+									{/if}
+								</Card.Description>
+							{:else if !loading && nodeTypes.length > 0}
+								<div class="mt-2 space-y-1.5">
+									<p class="text-xs text-muted-foreground">No category — pick one:</p>
+									<div class="flex flex-wrap gap-1.5">
+										{#each nodeTypes as nt (nt.slug)}
+											<button
+												type="button"
+												onclick={() => handleSetType(nt.slug)}
+												disabled={settingType}
+												class="rounded-full border border-border bg-background px-2.5 py-0.5 text-xs transition-colors hover:border-primary/50 hover:bg-muted disabled:opacity-50"
+											>
+												{nt.label}
+											</button>
+										{/each}
+									</div>
 								</div>
-							</div>
-						{/if}
-					</ShimmerSlot>
+							{/if}
+						</ShimmerSlot>
+					</div>
+					{#if !loading}
+						<Toggle
+							pressed={node?.favourite ?? false}
+							onPressedChange={handleToggleFavourite}
+							aria-label={node?.favourite ? 'Remove from favourites' : 'Add to favourites'}
+							class="shrink-0"
+						>
+							<Star class="size-4 {node?.favourite ? 'fill-current' : ''}" />
+						</Toggle>
+					{/if}
 				</Card.Header>
 				<Card.Content>
 					<form class="space-y-4" onsubmit={handleSave}>
@@ -278,35 +343,15 @@
 
 						<div class="flex flex-wrap items-center justify-between gap-2">
 							{#if !loading}
-								{#if confirmingDeleteNode}
-									<div class="flex gap-2">
-										<Button
-											type="button"
-											variant="outline"
-											onclick={() => (confirmingDeleteNode = false)}
-										>
-											Cancel
-										</Button>
-										<Button
-											type="button"
-											variant="destructive"
-											disabled={deletingNode}
-											onclick={handleDeleteNode}
-										>
-											Confirm delete
-										</Button>
-									</div>
-								{:else}
-									<Button
-										type="button"
-										variant="destructive"
-										disabled={deletingNode}
-										onclick={handleDeleteNode}
-									>
-										<Trash2 class="size-4" />
-										Delete
-									</Button>
-								{/if}
+								<Button
+									type="button"
+									variant="destructive"
+									disabled={deletingNode}
+									onclick={handleDeleteNode}
+								>
+									<Trash2 class="size-4" />
+									{deletingNode ? 'Deleting…' : 'Delete'}
+								</Button>
 							{/if}
 							<Button type="submit" disabled={saving || loading} class="ml-auto">
 								{saving ? 'Saving…' : 'Save changes'}
@@ -343,36 +388,15 @@
 											{nodesById.get(otherNodeId(edge))?.name ?? 'View item'}
 										</a>
 									</div>
-									{#if confirmingEdgeId === edge.id}
-										<div class="flex gap-1">
-											<Button
-												type="button"
-												variant="ghost"
-												size="sm"
-												onclick={() => (confirmingEdgeId = null)}
-											>
-												Cancel
-											</Button>
-											<Button
-												type="button"
-												variant="destructive"
-												size="sm"
-												onclick={() => handleDeleteEdge(edge)}
-											>
-												Remove
-											</Button>
-										</div>
-									{:else}
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon"
-											onclick={() => handleDeleteEdge(edge)}
-											aria-label="Remove connection"
-										>
-											<Trash2 class="size-4" />
-										</Button>
-									{/if}
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon"
+										onclick={() => handleDeleteEdge(edge)}
+										aria-label="Remove connection"
+									>
+										<Trash2 class="size-4" />
+									</Button>
 								</li>
 							{/each}
 						</ul>
@@ -385,12 +409,48 @@
 							<ShimmerSlot {loading} class="h-4 w-32">
 								<Label for="edge-type">Relationship</Label>
 							</ShimmerSlot>
-							<Input
-								id="edge-type"
-								bind:value={newEdgeType}
-								required
-								placeholder="e.g. directed-by"
-							/>
+							<div class="relative">
+								<Input
+									id="edge-type"
+									value={edgeTypeOpen ? edgeTypeSearch : newEdgeType}
+									placeholder="e.g. Directed by"
+									autocomplete="off"
+									oninput={(e) => {
+										edgeTypeSearch = (e.target as HTMLInputElement).value;
+										newEdgeType = edgeTypeSearch;
+										edgeTypeOpen = true;
+									}}
+									onfocus={() => {
+										edgeTypeOpen = true;
+										edgeTypeSearch = newEdgeType;
+									}}
+									onblur={() => setTimeout(() => (edgeTypeOpen = false), 150)}
+								/>
+								{#if edgeTypeOpen && filteredEdgeTypes.length > 0}
+									<ul
+										class="absolute z-10 mt-1 max-h-40 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md"
+									>
+										{#each filteredEdgeTypes as et (et.slug)}
+											<li>
+												<button
+													type="button"
+													class="flex w-full items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent"
+													onmousedown={() => {
+														newEdgeType = et.slug;
+														edgeTypeSearch = et.label;
+														edgeTypeOpen = false;
+													}}
+												>
+													<span>{et.label}</span>
+													{#if et.reverse_label}
+														<span class="text-xs text-muted-foreground">↔ {et.reverse_label}</span>
+													{/if}
+												</button>
+											</li>
+										{/each}
+									</ul>
+								{/if}
+							</div>
 						</div>
 
 						<div class="space-y-2">

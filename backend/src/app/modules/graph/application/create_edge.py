@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING, Any
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import NodeNotFoundError
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
-    from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
     from app.shared_kernel.actor import Actor
 
 
@@ -22,11 +23,8 @@ class CreateEdgeCommand:
     attributes: dict[str, Any] = field(default_factory=dict)
 
 
-class CreateEdge:
+class CreateEdge(CommandHandler[GraphUnitOfWork, CreateEdgeCommand, Edge]):
     """Create and persist a new edge, auto-creating its EdgeType if not yet known."""
-
-    def __init__(self, uow: GraphUnitOfWork) -> None:
-        self._uow = uow
 
     async def handle(self, command: CreateEdgeCommand, actor: Actor) -> Edge:
         """Create an edge from `command` and commit it.

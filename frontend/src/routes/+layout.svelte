@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { onNavigate } from '$app/navigation';
-	import { CirclePlus, LayoutGrid, House, Settings } from '@lucide/svelte';
+	import { CirclePlus, LayoutGrid, House, Settings, Telescope } from '@lucide/svelte';
 	import { Toaster } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import ThemeToggle from '$lib/components/theme-toggle.svelte';
@@ -42,6 +42,7 @@
 	const pathname = $derived(page.url.pathname);
 	const homeActive = $derived(pathname === resolve('/'));
 	const collectionActive = $derived(pathname.startsWith(resolve('/collection')));
+	const exploreActive = $derived(pathname.startsWith(resolve('/explore')));
 	const newActive = $derived(captureController.open);
 	const settingsActive = $derived(pathname.startsWith(resolve('/settings')));
 
@@ -91,6 +92,14 @@
 					<LayoutGrid class="size-4" />
 					Collection
 				</Button>
+				<Button
+					variant={exploreActive ? 'secondary' : 'ghost'}
+					size="sm"
+					href={resolve('/explore')}
+				>
+					<Telescope class="size-4" />
+					Explore
+				</Button>
 				<Button size="sm" onclick={() => captureController.show()}>
 					<CirclePlus class="size-4" />
 					New item
@@ -114,7 +123,7 @@
 
 	<VersionMismatchBanner />
 
-	<div class="flex-1 overflow-y-auto">
+	<div id="main-scroll" class="flex-1 overflow-y-auto">
 		{@render children()}
 	</div>
 
@@ -136,13 +145,24 @@
 
 			<a
 				href={resolve('/collection')}
-				class="flex flex-col items-center gap-0.5 rounded-xl px-4 py-2 transition-colors {collectionActive
+				class="flex flex-col items-center gap-0.5 rounded-xl px-3 py-2 transition-colors {collectionActive
 					? 'text-foreground'
 					: 'text-muted-foreground hover:text-foreground'}"
 				aria-current={collectionActive ? 'page' : undefined}
 			>
 				<LayoutGrid class="size-5" />
 				<span class="text-[10px] font-medium">Collection</span>
+			</a>
+
+			<a
+				href={resolve('/explore')}
+				class="flex flex-col items-center gap-0.5 rounded-xl px-3 py-2 transition-colors {exploreActive
+					? 'text-foreground'
+					: 'text-muted-foreground hover:text-foreground'}"
+				aria-current={exploreActive ? 'page' : undefined}
+			>
+				<Telescope class="size-5" />
+				<span class="text-[10px] font-medium">Explore</span>
 			</a>
 
 			<button

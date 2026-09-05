@@ -1,11 +1,12 @@
+import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    import uuid
+from app.modules.graph.domain.edge_type import EdgeType
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.cqrs import QueryHandler
 
-    from app.modules.graph.domain.edge_type import EdgeType
-    from app.modules.graph.ports.edge_type_repository import EdgeTypeRepository
+if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
 
 
@@ -13,16 +14,14 @@ if TYPE_CHECKING:
 class ListEdgeTypesQuery:
     """Request to list edge types with keyset pagination."""
 
-    after: "uuid.UUID | None" = None
+    after: uuid.UUID | None = None
     limit: int = 50
 
 
-class ListEdgeTypes:
+class ListEdgeTypes(QueryHandler[GraphUnitOfWork, ListEdgeTypesQuery, list[EdgeType]]):
     """List edge types with keyset pagination."""
-
-    def __init__(self, edge_types: EdgeTypeRepository) -> None:
-        self._edge_types = edge_types
 
     async def handle(self, query: ListEdgeTypesQuery, actor: Actor) -> list[EdgeType]:
         """Return a page of non-deleted edge types ordered by id."""
-        return await self._edge_types.list(after=query.after, limit=query.limit)
+        async with self._uow as repos:
+            return await repos.edge_types.list(after=query.after, limit=query.limit)

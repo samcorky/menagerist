@@ -3,10 +3,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from app.modules.graph.domain.errors import NodeNotFoundError
+from app.modules.graph.domain.node import Node
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
-    from app.modules.graph.domain.node import Node
-    from app.modules.graph.ports.node_repository import NodeRepository
     from app.shared_kernel.actor import Actor
 
 
@@ -17,15 +18,13 @@ class GetNodeQuery:
     node_id: uuid.UUID
 
 
-class GetNode:
+class GetNode(QueryHandler[GraphUnitOfWork, GetNodeQuery, Node]):
     """Fetch a single node by id."""
-
-    def __init__(self, nodes: NodeRepository) -> None:
-        self._nodes = nodes
 
     async def handle(self, query: GetNodeQuery, actor: Actor) -> Node:
         """Return the requested node, raising `NodeNotFoundError` if it's missing."""
-        node = await self._nodes.get(query.node_id)
+        async with self._uow as repos:
+            node = await repos.nodes.get(query.node_id)
         if node is None:
             raise NodeNotFoundError(f"Node {query.node_id} not found")
         return node

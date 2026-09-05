@@ -34,6 +34,7 @@ class InMemoryNodeRepository:
         limit: int,
         type: str | None = None,
         q: str | None = None,
+        favourite: bool | None = None,
     ) -> list[Node]:
         """List non-deleted node ordered by id, starting after `after` if given."""
         ordered = sorted(
@@ -52,9 +53,17 @@ class InMemoryNodeRepository:
                 if needle in node.name.casefold()
                 or needle in (node.description or "").casefold()
             ]
+        if favourite is not None:
+            ordered = [node for node in ordered if node.favourite == favourite]
         return ordered[:limit]
 
-    async def count(self, *, type: str | None = None, q: str | None = None) -> int:
+    async def count(
+        self,
+        *,
+        type: str | None = None,
+        q: str | None = None,
+        favourite: bool | None = None,
+    ) -> int:
         """Return the total number of non-deleted nodes matching the given filters."""
         nodes = [n for n in self._nodes.values() if not n.is_deleted]
         if type is not None:
@@ -67,6 +76,8 @@ class InMemoryNodeRepository:
                 if needle in n.name.casefold()
                 or needle in (n.description or "").casefold()
             ]
+        if favourite is not None:
+            nodes = [n for n in nodes if n.favourite == favourite]
         return len(nodes)
 
     async def clear_type(self, type_slug: str) -> None:

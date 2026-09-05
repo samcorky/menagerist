@@ -16,6 +16,7 @@ class Node(Identifiable, SoftDeletable):
     type: str | None = None
     description: str | None = None
     attributes: dict[str, Any] = field(default_factory=dict)
+    favourite: bool = False
 
     def __post_init__(self) -> None:
         """Validate invariants and normalise fields after construction."""
@@ -37,6 +38,7 @@ class Node(Identifiable, SoftDeletable):
         type: str | None = None,
         description: str | None = None,
         attributes: dict[str, Any] | None = None,
+        favourite: bool = False,
     ) -> Node:
         """Create a new node, generating its id and timestamps."""
         now = datetime.now(UTC)
@@ -46,9 +48,24 @@ class Node(Identifiable, SoftDeletable):
             type=type,
             description=description,
             attributes=attributes or {},
+            favourite=favourite,
             created_at=now,
             updated_at=now,
         )
+
+    def _set_if_given(self, **kwargs: object) -> None:
+        """Set each attribute that is not None. For simple fields with no validation."""
+        for attr, val in kwargs.items():
+            if val is not None:
+                setattr(self, attr, val)
+
+    def _apply_type(self, type: str) -> None:
+        if self.type is not None:
+            raise ValidationError("type cannot be changed after it is set")
+        normalised = slugify(type)
+        if normalised == "":
+            raise ValidationError("type must be a non-empty string when provided")
+        self.type = normalised
 
     def update(
         self,
@@ -57,10 +74,13 @@ class Node(Identifiable, SoftDeletable):
         type: str | None = None,
         description: str | None = None,
         attributes: dict[str, Any] | None = None,
+        favourite: bool | None = None,
     ) -> None:
         """Apply partial changes to editable fields, validating invariants.
 
         `type` can only be set once — it cannot be changed after it has a value.
+        Simple fields (description, attributes, favourite, …) use `_set_if_given`
+        so adding more never increases this method's cyclomatic complexity.
         """
         if name is not None:
             if name.strip() == "":
@@ -68,17 +88,9 @@ class Node(Identifiable, SoftDeletable):
             self.name = name
 
         if type is not None:
-            if self.type is not None:
-                raise ValidationError("type cannot be changed after it is set")
-            normalised = slugify(type)
-            if normalised == "":
-                raise ValidationError("type must be a non-empty string when provided")
-            self.type = normalised
+            self._apply_type(type)
 
-        if description is not None:
-            self.description = description
-
-        if attributes is not None:
-            self.attributes = attributes
-
+        self._set_if_given(
+            description=description, attributes=attributes, favourite=favourite
+        )
         self.touch()

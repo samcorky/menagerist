@@ -3,9 +3,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from app.modules.graph.domain.errors import EdgeNotFoundError
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
-    from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
     from app.shared_kernel.actor import Actor
 
 
@@ -16,11 +17,8 @@ class DeleteEdgeCommand:
     edge_id: uuid.UUID
 
 
-class DeleteEdge:
+class DeleteEdge(CommandHandler[GraphUnitOfWork, DeleteEdgeCommand, None]):
     """Soft-delete an existing edge."""
-
-    def __init__(self, uow: GraphUnitOfWork) -> None:
-        self._uow = uow
 
     async def handle(self, command: DeleteEdgeCommand, actor: Actor) -> None:
         """Soft-delete the edge identified by `command` and commit."""

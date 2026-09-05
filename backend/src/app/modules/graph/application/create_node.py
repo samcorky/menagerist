@@ -3,10 +3,11 @@ from typing import TYPE_CHECKING, Any
 
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
-    from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
     from app.shared_kernel.actor import Actor
 
 
@@ -18,13 +19,11 @@ class CreateNodeCommand:
     type: str | None = field(default=None)
     description: str | None = field(default=None)
     attributes: dict[str, Any] = field(default_factory=dict)
+    favourite: bool = field(default=False)
 
 
-class CreateNode:
+class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
     """Create and persist a new node, auto-creating its NodeType if not yet known."""
-
-    def __init__(self, uow: GraphUnitOfWork) -> None:
-        self._uow = uow
 
     async def handle(self, command: CreateNodeCommand, actor: Actor) -> Node:
         """Create a node from `command` and commit it.
@@ -37,6 +36,7 @@ class CreateNode:
             type=command.type,
             description=command.description,
             attributes=command.attributes,
+            favourite=command.favourite,
         )
         async with self._uow as repos:
             if command.type is not None:

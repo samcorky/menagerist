@@ -19,6 +19,7 @@ def _to_domain(model: NodeModel) -> Node:
         type=model.type,
         description=model.description,
         attributes=model.attributes,
+        favourite=model.favourite,
         created_at=model.created_at,
         updated_at=model.updated_at,
         deleted_at=model.deleted_at,
@@ -33,6 +34,7 @@ def _to_model(node: Node) -> NodeModel:
         type=node.type,
         description=node.description,
         attributes=node.attributes,
+        favourite=node.favourite,
         created_at=node.created_at,
         updated_at=node.updated_at,
         deleted_at=node.deleted_at,
@@ -74,6 +76,7 @@ class SqlAlchemyNodeRepository:
         limit: int,
         type: str | None = None,
         q: str | None = None,
+        favourite: bool | None = None,
     ) -> list[Node]:
         """List non-deleted node ordered by id, starting after `after` if given."""
         stmt = (
@@ -91,10 +94,18 @@ class SqlAlchemyNodeRepository:
             stmt = stmt.where(
                 NodeModel.name.ilike(pattern) | NodeModel.description.ilike(pattern)
             )
+        if favourite is not None:
+            stmt = stmt.where(NodeModel.favourite == favourite)
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
 
-    async def count(self, *, type: str | None = None, q: str | None = None) -> int:
+    async def count(
+        self,
+        *,
+        type: str | None = None,
+        q: str | None = None,
+        favourite: bool | None = None,
+    ) -> int:
         """Return the total number of non-deleted nodes matching the given filters."""
         stmt = (
             select(func.count())
@@ -108,6 +119,8 @@ class SqlAlchemyNodeRepository:
             stmt = stmt.where(
                 NodeModel.name.ilike(pattern) | NodeModel.description.ilike(pattern)
             )
+        if favourite is not None:
+            stmt = stmt.where(NodeModel.favourite == favourite)
         result = await self._session.execute(stmt)
         return result.scalar_one()
 

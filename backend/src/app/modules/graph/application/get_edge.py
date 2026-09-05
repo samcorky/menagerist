@@ -2,11 +2,12 @@ import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.errors import EdgeNotFoundError
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
-    from app.modules.graph.domain.edge import Edge
-    from app.modules.graph.ports.edge_repository import EdgeRepository
     from app.shared_kernel.actor import Actor
 
 
@@ -17,15 +18,13 @@ class GetEdgeQuery:
     edge_id: uuid.UUID
 
 
-class GetEdge:
+class GetEdge(QueryHandler[GraphUnitOfWork, GetEdgeQuery, Edge]):
     """Fetch a single edge by id."""
-
-    def __init__(self, edges: EdgeRepository) -> None:
-        self._edges = edges
 
     async def handle(self, query: GetEdgeQuery, actor: Actor) -> Edge:
         """Return the requested edge, raising `EdgeNotFoundError` if it's missing."""
-        edge = await self._edges.get(query.edge_id)
+        async with self._uow as repos:
+            edge = await repos.edges.get(query.edge_id)
         if edge is None:
             raise EdgeNotFoundError(f"Edge {query.edge_id} not found")
         return edge

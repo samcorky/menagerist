@@ -1,13 +1,13 @@
+import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import EdgeTypeNotFoundError
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
-    import uuid
-
-    from app.modules.graph.domain.edge_type import EdgeType
-    from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
     from app.shared_kernel.actor import Actor
 
 
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 class UpdateEdgeTypeCommand:
     """Request to update an existing edge type."""
 
-    edge_type_id: "uuid.UUID"
+    edge_type_id: uuid.UUID
     label: str | None = field(default=None)
     reverse_label: str | None = field(default=None)
     description: str | None = field(default=None)
@@ -23,11 +23,8 @@ class UpdateEdgeTypeCommand:
     attributes_schema: dict[str, Any] | None = field(default=None)
 
 
-class UpdateEdgeType:
+class UpdateEdgeType(CommandHandler[GraphUnitOfWork, UpdateEdgeTypeCommand, EdgeType]):
     """Apply partial updates to an existing edge type."""
-
-    def __init__(self, uow: GraphUnitOfWork) -> None:
-        self._uow = uow
 
     async def handle(self, command: UpdateEdgeTypeCommand, actor: Actor) -> EdgeType:
         """Apply the update and commit."""

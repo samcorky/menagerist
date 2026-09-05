@@ -11,6 +11,7 @@
 		type EdgeTypeResponse
 	} from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
+	import { slugify } from '$lib/utils.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -27,7 +28,6 @@
 	let loading = $state(false);
 	let hasMore = $state(true);
 
-	let slug = $state('');
 	let label = $state('');
 	let reverseLabel = $state('');
 	let description = $state('');
@@ -42,8 +42,6 @@
 	let editDirectional = $state(true);
 	let editSchema = $state<Schema | null>(null);
 	let savingId = $state<string | null>(null);
-	let confirmingDeleteId = $state<string | null>(null);
-	let deletingId = $state<string | null>(null);
 
 	async function fetchPage(after?: string) {
 		loading = true;
@@ -77,7 +75,7 @@
 		submitting = true;
 		const result = await createEdgeType({
 			body: {
-				slug,
+				slug: slugify(label),
 				label,
 				reverse_label: reverseLabel || undefined,
 				description: description || undefined,
@@ -89,7 +87,6 @@
 			toast.error("Couldn't create relationship type", { description: errorMessage(result.error) });
 		} else {
 			relTypes = [result.data, ...relTypes];
-			slug = '';
 			label = '';
 			reverseLabel = '';
 			description = '';
@@ -107,7 +104,6 @@
 		editDescription = et.description ?? '';
 		editDirectional = et.directional;
 		editSchema = (et.attributes_schema as Schema | null) ?? null;
-		confirmingDeleteId = null;
 	}
 
 	function cancelEdit() {
@@ -138,26 +134,39 @@
 		savingId = null;
 	}
 
-	async function handleDelete(et: EdgeTypeResponse) {
-		if (confirmingDeleteId !== et.id) {
-			confirmingDeleteId = et.id;
-			editingId = null;
-			return;
-		}
-		confirmingDeleteId = null;
-		deletingId = et.id;
-		const result = await deleteEdgeType({ path: { edge_type_id: et.id } });
-		if (result.response?.status === 409) {
-			toast.error("Can't delete — connections still use this type", {
-				description: 'Remove those connections first, or keep this relationship type.'
-			});
-		} else if (result.error) {
-			toast.error("Couldn't delete relationship type", { description: errorMessage(result.error) });
-		} else {
-			relTypes = relTypes.filter((r) => r.id !== et.id);
-			toast.success('Relationship type deleted');
-		}
-		deletingId = null;
+	function handleDelete(et: EdgeTypeResponse) {
+		// Optimistically remove with undo window; restore if the server rejects (e.g. 409 in use)
+		relTypes = relTypes.filter((r) => r.id !== et.id);
+		editingId = null;
+
+		let undone = false;
+		const timerId = setTimeout(async () => {
+			if (undone) return;
+			const result = await deleteEdgeType({ path: { edge_type_id: et.id } });
+			if (result.response?.status === 409) {
+				relTypes = [et, ...relTypes];
+				toast.error("Can't delete — connections still use this type", {
+					description: 'Remove those connections first, or keep this relationship type.'
+				});
+			} else if (result.error) {
+				relTypes = [et, ...relTypes];
+				toast.error("Couldn't delete relationship type", {
+					description: errorMessage(result.error)
+				});
+			}
+		}, 5000);
+
+		toast('Relationship type deleted', {
+			action: {
+				label: 'Undo',
+				onClick: () => {
+					undone = true;
+					clearTimeout(timerId);
+					relTypes = [et, ...relTypes];
+				}
+			},
+			duration: 5000
+		});
 	}
 
 	$effect(() => {
@@ -186,16 +195,6 @@
 			</Card.Header>
 			<Card.Content>
 				<form class="space-y-4" onsubmit={handleSubmit}>
-					<div class="space-y-1.5">
-						<Label for="rel-slug">Identifier</Label>
-						<Input
-							id="rel-slug"
-							bind:value={slug}
-							type="text"
-							placeholder="e.g. directed-by, related-to"
-							required
-						/>
-					</div>
 					<div class="space-y-1.5">
 						<Label for="rel-label">Label</Label>
 						<Input
@@ -279,45 +278,24 @@
 								<Badge variant="outline">
 									{et.directional ? 'Directional →' : 'Symmetric ↔'}
 								</Badge>
-								{#if confirmingDeleteId === et.id}
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										onclick={() => (confirmingDeleteId = null)}
-									>
-										Cancel
-									</Button>
-									<Button
-										type="button"
-										variant="destructive"
-										size="sm"
-										disabled={deletingId === et.id}
-										onclick={() => handleDelete(et)}
-									>
-										Confirm delete
-									</Button>
-								{:else}
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										onclick={() => startEdit(et)}
-										aria-label="Edit relationship type"
-									>
-										<Pencil class="size-4" />
-									</Button>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										disabled={deletingId === et.id}
-										onclick={() => handleDelete(et)}
-										aria-label="Delete relationship type"
-									>
-										<Trash2 class="size-4" />
-									</Button>
-								{/if}
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									onclick={() => startEdit(et)}
+									aria-label="Edit relationship type"
+								>
+									<Pencil class="size-4" />
+								</Button>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									onclick={() => handleDelete(et)}
+									aria-label="Delete relationship type"
+								>
+									<Trash2 class="size-4" />
+								</Button>
 							</div>
 						</Card.Header>
 

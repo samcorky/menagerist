@@ -152,7 +152,7 @@ runtime-evaluated-decorators = [
 # elsewhere) need their annotations resolvable at runtime, same as a route handler -
 # but they aren't decorated, so `runtime-evaluated-decorators` above can't detect
 # them and flake8-type-checking flags the imports as type-only.
-"**/dependencies.py" = ["TC001", "TC002", "TC003"]
+"**/dependencies.py" = ["TC001", "TC002", "TC003", "D103"]
 # SQLAlchemy's declarative mapper evaluates `Mapped[...]` annotations at class-
 # definition time - `runtime-evaluated-base-classes` above doesn't catch this
 # through our custom `Base` + mixins, so flake8-type-checking still flags these

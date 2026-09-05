@@ -28,11 +28,18 @@ class NodeRepository(Protocol):
         limit: int,
         type: str | None = None,
         q: str | None = None,
+        favourite: bool | None = None,
     ) -> list[Node]:
         """List non-deleted node ordered by id, starting after `after` if given."""
         ...
 
-    async def count(self, *, type: str | None = None, q: str | None = None) -> int:
+    async def count(
+        self,
+        *,
+        type: str | None = None,
+        q: str | None = None,
+        favourite: bool | None = None,
+    ) -> int:
         """Return the total number of non-deleted nodes matching the given filters."""
         ...
 

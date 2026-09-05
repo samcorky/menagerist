@@ -3,10 +3,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
+from app.modules.graph.domain.node_type import NodeType
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
-    from app.modules.graph.domain.node_type import NodeType
-    from app.modules.graph.ports.node_type_repository import NodeTypeRepository
     from app.shared_kernel.actor import Actor
 
 
@@ -17,15 +18,13 @@ class GetNodeTypeQuery:
     node_type_id: uuid.UUID
 
 
-class GetNodeType:
+class GetNodeType(QueryHandler[GraphUnitOfWork, GetNodeTypeQuery, NodeType]):
     """Fetch a single node type by id."""
-
-    def __init__(self, node_types: NodeTypeRepository) -> None:
-        self._node_types = node_types
 
     async def handle(self, query: GetNodeTypeQuery, actor: Actor) -> NodeType:
         """Return the node type, or raise `NodeTypeNotFoundError` if missing."""
-        node_type = await self._node_types.get(query.node_type_id)
+        async with self._uow as repos:
+            node_type = await repos.node_types.get(query.node_type_id)
         if node_type is None:
             raise NodeTypeNotFoundError(f"NodeType {query.node_type_id} not found")
         return node_type

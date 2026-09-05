@@ -3,12 +3,13 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from app.modules.graph.domain.errors import NodeNotFoundError
+from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
-    from app.modules.graph.domain.node import Node
-    from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
     from app.shared_kernel.actor import Actor
 
 
@@ -25,13 +26,11 @@ class UpdateNodeCommand:
     type: str | None = field(default=None)
     description: str | None = field(default=None)
     attributes: dict[str, Any] | None = field(default=None)
+    favourite: bool | None = field(default=None)
 
 
-class UpdateNode:
+class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
     """Update an existing node's editable fields."""
-
-    def __init__(self, uow: GraphUnitOfWork) -> None:
-        self._uow = uow
 
     async def handle(self, command: UpdateNodeCommand, actor: Actor) -> Node:
         """Apply `command`'s changes to the node and commit."""
@@ -45,6 +44,7 @@ class UpdateNode:
                 type=command.type,
                 description=command.description,
                 attributes=command.attributes,
+                favourite=command.favourite,
             )
 
             if command.type is not None:

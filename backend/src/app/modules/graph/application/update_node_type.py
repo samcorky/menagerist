@@ -3,10 +3,11 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
+from app.modules.graph.domain.node_type import NodeType
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
-    from app.modules.graph.domain.node_type import NodeType
-    from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
     from app.shared_kernel.actor import Actor
 
 
@@ -20,11 +21,8 @@ class UpdateNodeTypeCommand:
     attributes_schema: dict[str, Any] | None = field(default=None)
 
 
-class UpdateNodeType:
+class UpdateNodeType(CommandHandler[GraphUnitOfWork, UpdateNodeTypeCommand, NodeType]):
     """Update an existing node type's editable fields."""
-
-    def __init__(self, uow: GraphUnitOfWork) -> None:
-        self._uow = uow
 
     async def handle(self, command: UpdateNodeTypeCommand, actor: Actor) -> NodeType:
         """Apply `command`'s changes to the node type and commit."""

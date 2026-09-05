@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { Package, Plus, ChevronRight } from '@lucide/svelte';
+	import { Package, Plus, ChevronRight, AlertCircle, Star } from '@lucide/svelte';
 	import { captureController } from '$lib/capture.svelte.js';
 	import {
 		listNodes,
@@ -12,12 +12,33 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 
-	let items = $state<NodeResponse[]>([]);
+	// 30-day window per §18a
+	const RECENT_DAYS = 30;
+	const RECENT_LIMIT = 12;
+
+	let allItems = $state<NodeResponse[]>([]);
 	let categories = $state<NodeTypeResponse[]>([]);
 	let loading = $state(true);
 	let totalItems = $state(0);
 
-	let recentItems = $derived(items);
+	let categoryBySlug = $derived(new Map(categories.map((c) => [c.slug, c])));
+
+	// "Recently added" — items with a created_at within the last 30 days
+	let recentItems = $derived(
+		allItems.filter((item) => {
+			if (!item.created_at) return true; // no timestamp → include by default
+			const age = Date.now() - new Date(item.created_at).getTime();
+			return age <= RECENT_DAYS * 24 * 60 * 60 * 1000;
+		})
+	);
+
+	// "Missing details" — no description and no attributes
+	let missingDetails = $derived(
+		allItems.filter(
+			(item) => !item.description?.trim() && Object.keys(item.attributes ?? {}).length === 0
+		)
+	);
+
 	let showNudge = $derived(!loading && totalItems >= 5 && categories.length === 0);
 
 	$effect(() => {
@@ -25,16 +46,20 @@
 		void loadData();
 	});
 
+	let favouriteItems = $state<NodeResponse[]>([]);
+
 	async function loadData() {
 		loading = true;
-		const [itemsResult, categoriesResult] = await Promise.all([
-			listNodes({ query: { limit: 6 } }),
-			listNodeTypes({ query: { limit: 50 } })
+		const [itemsResult, categoriesResult, favouritesResult] = await Promise.all([
+			listNodes({ query: { limit: RECENT_LIMIT } }),
+			listNodeTypes({ query: { limit: 50 } }),
+			listNodes({ query: { limit: 100, favourite: true } })
 		]);
-		items = itemsResult.data ?? [];
-		const rawTotal = itemsResult.response?.headers.get('x-total-count');
-		totalItems = rawTotal ? parseInt(rawTotal, 10) : items.length;
+		allItems = itemsResult.data ?? [];
+		const rawTotal = itemsResult.response?.headers.get('Total-Count');
+		totalItems = rawTotal ? parseInt(rawTotal, 10) : allItems.length;
 		categories = categoriesResult.data ?? [];
+		favouriteItems = favouritesResult.data ?? [];
 		loading = false;
 	}
 
@@ -97,38 +122,114 @@
 				</Button>
 			</div>
 
-			<section class="space-y-3">
-				<div class="flex items-center justify-between">
-					<h2 class="font-heading text-lg font-semibold">Recently added</h2>
-					<a
-						href={resolve('/collection')}
-						class="flex items-center gap-0.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-					>
-						Browse all
-						<ChevronRight class="size-3.5" />
-					</a>
-				</div>
-				<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-					{#each recentItems as item (item.id)}
-						<a href={resolve('/collection/[id]', { id: item.id })} class="group block">
-							<Card.Root class="h-full transition-colors group-hover:bg-muted/50">
-								<Card.Header class="p-4">
-									<Card.Title class="line-clamp-2 text-sm leading-snug">{item.name}</Card.Title>
-									{#if item.type}
-										<Badge variant="secondary" class="mt-1 w-fit text-xs">{item.type}</Badge>
-									{/if}
-									{#if item.description}
-										<Card.Description class="mt-1 line-clamp-2 text-xs"
-											>{item.description}</Card.Description
-										>
-									{/if}
-								</Card.Header>
-							</Card.Root>
+			<!-- Recently added (30-day window) -->
+			{#if recentItems.length > 0}
+				<section class="space-y-3">
+					<div class="flex items-center justify-between">
+						<div>
+							<h2 class="font-heading text-lg font-semibold">Recently added</h2>
+							<p class="text-xs text-muted-foreground">Added in the last {RECENT_DAYS} days</p>
+						</div>
+						<a
+							href={resolve('/collection')}
+							class="flex items-center gap-0.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+						>
+							Browse all
+							<ChevronRight class="size-3.5" />
 						</a>
-					{/each}
-				</div>
-			</section>
+					</div>
+					<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+						{#each recentItems.slice(0, 6) as item (item.id)}
+							{@const catLabel = categoryBySlug.get(item.type ?? '')?.label}
+							<a href={resolve('/collection/[id]', { id: item.id })} class="group block">
+								<Card.Root class="h-full transition-colors group-hover:bg-muted/50">
+									<Card.Header class="p-4">
+										<Card.Title class="line-clamp-2 text-sm leading-snug">{item.name}</Card.Title>
+										{#if catLabel}
+											<Badge variant="secondary" class="mt-1 w-fit text-xs">{catLabel}</Badge>
+										{/if}
+										{#if item.description}
+											<Card.Description class="mt-1 line-clamp-2 text-xs"
+												>{item.description}</Card.Description
+											>
+										{/if}
+									</Card.Header>
+								</Card.Root>
+							</a>
+						{/each}
+					</div>
+				</section>
+			{/if}
 
+			<!-- Favourites -->
+			{#if favouriteItems.length > 0}
+				<section class="space-y-3">
+					<div class="flex items-center justify-between">
+						<div>
+							<h2 class="font-heading text-lg font-semibold">Favourites</h2>
+							<p class="text-xs text-muted-foreground">
+								{favouriteItems.length} starred {favouriteItems.length === 1 ? 'item' : 'items'}
+							</p>
+						</div>
+					</div>
+					<div class="grid gap-2">
+						{#each favouriteItems as item (item.id)}
+							{@const catLabel = categoryBySlug.get(item.type ?? '')?.label}
+							<a href={resolve('/collection/[id]', { id: item.id })}>
+								<div
+									class="flex items-center justify-between gap-3 rounded-lg border px-4 py-3 transition-colors hover:bg-muted/40"
+								>
+									<div class="min-w-0">
+										<p class="truncate text-sm font-medium">{item.name}</p>
+										{#if catLabel}
+											<p class="text-xs text-muted-foreground">{catLabel}</p>
+										{/if}
+									</div>
+									<Star class="size-3.5 shrink-0 fill-current text-muted-foreground" />
+								</div>
+							</a>
+						{/each}
+					</div>
+				</section>
+			{/if}
+
+			<!-- Missing details smart group -->
+			{#if missingDetails.length > 0 && totalItems >= 3}
+				<section class="space-y-3">
+					<div class="flex items-center justify-between">
+						<div>
+							<h2 class="font-heading text-lg font-semibold">Missing details</h2>
+							<p class="text-xs text-muted-foreground">
+								{missingDetails.length}
+								{missingDetails.length === 1 ? 'item has' : 'items have'} no description or extra information
+							</p>
+						</div>
+					</div>
+					<div class="grid gap-2">
+						{#each missingDetails.slice(0, 5) as item (item.id)}
+							{@const catLabel = categoryBySlug.get(item.type ?? '')?.label}
+							<a href={resolve('/collection/[id]', { id: item.id })}>
+								<div
+									class="flex items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3 transition-colors hover:bg-muted/40"
+								>
+									<div class="min-w-0">
+										<p class="truncate text-sm font-medium">{item.name}</p>
+										{#if catLabel}
+											<p class="text-xs text-muted-foreground">{catLabel}</p>
+										{/if}
+									</div>
+									<div class="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+										<AlertCircle class="size-3.5" />
+										Add information
+									</div>
+								</div>
+							</a>
+						{/each}
+					</div>
+				</section>
+			{/if}
+
+			<!-- By category -->
 			{#if categories.length > 0}
 				<section class="space-y-3">
 					<h2 class="font-heading text-lg font-semibold">By category</h2>

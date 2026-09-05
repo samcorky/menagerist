@@ -12,6 +12,7 @@
 		type NodeTypeResponse
 	} from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
+	import { slugify } from '$lib/utils.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -28,7 +29,6 @@
 	let loading = $state(false);
 	let hasMore = $state(true);
 
-	let slug = $state('');
 	let label = $state('');
 	let description = $state('');
 	let submitting = $state(false);
@@ -40,7 +40,6 @@
 	let editSchema = $state<Schema | null>(null);
 	let savingId = $state<string | null>(null);
 	let confirmingDeleteId = $state<string | null>(null);
-	let confirmingDeleteInUse = $state(false);
 	let deletingId = $state<string | null>(null);
 
 	async function fetchPage(after?: string) {
@@ -75,7 +74,7 @@
 		submitting = true;
 		const result = await createNodeType({
 			body: {
-				slug,
+				slug: slugify(label),
 				label,
 				description: description || undefined,
 				attributes_schema: createSchema
@@ -85,7 +84,6 @@
 			toast.error("Couldn't create category", { description: errorMessage(result.error) });
 		} else {
 			categories = [result.data, ...categories];
-			slug = '';
 			label = '';
 			description = '';
 			createSchema = null;
@@ -129,24 +127,55 @@
 	}
 
 	async function handleDelete(cat: NodeTypeResponse) {
-		if (confirmingDeleteId !== cat.id) {
-			const inUse = await listNodes({ query: { type: cat.slug, limit: 1 } });
-			confirmingDeleteInUse = (inUse.data?.length ?? 0) > 0;
-			confirmingDeleteId = cat.id;
-			editingId = null;
+		const inUse = await listNodes({ query: { type: cat.slug, limit: 1 } });
+		const hasItems = (inUse.data?.length ?? 0) > 0;
+
+		if (hasItems) {
+			// Destructive — items will lose their category. Require explicit confirmation.
+			if (confirmingDeleteId !== cat.id) {
+				confirmingDeleteId = cat.id;
+				editingId = null;
+				return;
+			}
+			confirmingDeleteId = null;
+			deletingId = cat.id;
+			const result = await deleteNodeType({ path: { node_type_id: cat.id } });
+			if (result.error) {
+				toast.error("Couldn't delete category", { description: errorMessage(result.error) });
+			} else {
+				categories = categories.filter((c) => c.id !== cat.id);
+				toast.success('Category deleted');
+			}
+			deletingId = null;
 			return;
 		}
+
+		// No items — optimistic removal with undo window
+		editingId = null;
 		confirmingDeleteId = null;
-		confirmingDeleteInUse = false;
-		deletingId = cat.id;
-		const result = await deleteNodeType({ path: { node_type_id: cat.id } });
-		if (result.error) {
-			toast.error("Couldn't delete category", { description: errorMessage(result.error) });
-		} else {
-			categories = categories.filter((c) => c.id !== cat.id);
-			toast.success('Category deleted');
-		}
-		deletingId = null;
+		categories = categories.filter((c) => c.id !== cat.id);
+
+		let undone = false;
+		const timerId = setTimeout(async () => {
+			if (undone) return;
+			const result = await deleteNodeType({ path: { node_type_id: cat.id } });
+			if (result.error) {
+				categories = [cat, ...categories];
+				toast.error("Couldn't delete category", { description: errorMessage(result.error) });
+			}
+		}, 5000);
+
+		toast('Category deleted', {
+			action: {
+				label: 'Undo',
+				onClick: () => {
+					undone = true;
+					clearTimeout(timerId);
+					categories = [cat, ...categories];
+				}
+			},
+			duration: 5000
+		});
 	}
 
 	$effect(() => {
@@ -176,17 +205,7 @@
 			<Card.Content>
 				<form class="space-y-4" onsubmit={handleSubmit}>
 					<div class="space-y-1.5">
-						<Label for="cat-slug">Identifier</Label>
-						<Input
-							id="cat-slug"
-							bind:value={slug}
-							type="text"
-							placeholder="e.g. film, person, place"
-							required
-						/>
-					</div>
-					<div class="space-y-1.5">
-						<Label for="cat-label">Label</Label>
+						<Label for="cat-label">Name</Label>
 						<Input
 							id="cat-label"
 							bind:value={label}
@@ -242,17 +261,12 @@
 							<div class="flex shrink-0 items-center gap-1">
 								<Badge variant="secondary">{cat.slug}</Badge>
 								{#if confirmingDeleteId === cat.id}
-									{#if confirmingDeleteInUse}
-										<span class="text-xs text-destructive">Items still use this category</span>
-									{/if}
+									<span class="text-xs text-destructive">Items will lose this category</span>
 									<Button
 										type="button"
 										variant="ghost"
 										size="sm"
-										onclick={() => {
-											confirmingDeleteId = null;
-											confirmingDeleteInUse = false;
-										}}
+										onclick={() => (confirmingDeleteId = null)}
 									>
 										Cancel
 									</Button>
@@ -263,7 +277,7 @@
 										disabled={deletingId === cat.id}
 										onclick={() => handleDelete(cat)}
 									>
-										{confirmingDeleteInUse ? 'Delete anyway' : 'Confirm delete'}
+										Delete anyway
 									</Button>
 								{:else}
 									<Button

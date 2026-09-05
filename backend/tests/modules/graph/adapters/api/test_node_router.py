@@ -270,7 +270,7 @@ def test_list_nodes_no_link_header_on_last_page() -> None:
 
 
 def test_list_nodes_returns_x_total_count_header() -> None:
-    """GET /api/v1/node returns X-Total-Count with the total number of nodes."""
+    """GET /api/v1/node returns Total-Count with the total number of nodes."""
     client = TestClient(_app_with_in_memory_graph())
     for i in range(5):
         client.post("/api/v1/node", json={"name": f"Node {i}", "type": "test"})
@@ -278,11 +278,11 @@ def test_list_nodes_returns_x_total_count_header() -> None:
     response = client.get("/api/v1/node")
 
     assert response.status_code == 200
-    assert response.headers["X-Total-Count"] == "5"
+    assert response.headers["Total-Count"] == "5"
 
 
 def test_list_nodes_x_total_count_reflects_filters() -> None:
-    """X-Total-Count matches the filtered total, not the overall total."""
+    """Total-Count matches the filtered total, not the overall total."""
     client = TestClient(_app_with_in_memory_graph())
     client.post("/api/v1/node", json={"name": "Alien", "type": "film"})
     client.post("/api/v1/node", json={"name": "Aliens", "type": "film"})
@@ -291,11 +291,83 @@ def test_list_nodes_x_total_count_reflects_filters() -> None:
     response = client.get("/api/v1/node?type=film")
 
     assert response.status_code == 200
-    assert response.headers["X-Total-Count"] == "2"
+    assert response.headers["Total-Count"] == "2"
+
+
+def test_create_node_favourite_defaults_to_false() -> None:
+    """POST /api/v1/node without favourite returns favourite=false in the response."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    response = client.post("/api/v1/node", json={"name": "Alien"})
+
+    assert response.status_code == 201
+    assert response.json()["favourite"] is False
+
+
+def test_create_node_with_favourite_true() -> None:
+    """POST /api/v1/node with favourite=true stores and returns it."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    response = client.post("/api/v1/node", json={"name": "Alien", "favourite": True})
+
+    assert response.status_code == 201
+    assert response.json()["favourite"] is True
+
+
+def test_update_node_sets_favourite() -> None:
+    """PATCH /api/v1/node/{id} with favourite=true stores and returns it."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien"}).json()
+
+    response = client.patch(f"/api/v1/node/{node['id']}", json={"favourite": True})
+
+    assert response.status_code == 200
+    assert response.json()["favourite"] is True
+
+
+def test_update_node_clears_favourite() -> None:
+    """PATCH /api/v1/node/{id} with favourite=false unfavourites a starred node."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien", "favourite": True}).json()
+
+    response = client.patch(f"/api/v1/node/{node['id']}", json={"favourite": False})
+
+    assert response.status_code == 200
+    assert response.json()["favourite"] is False
+
+
+def test_list_nodes_filters_by_favourite() -> None:
+    """GET /api/v1/node?favourite=true returns only favourited nodes."""
+    client = TestClient(_app_with_in_memory_graph())
+    starred = client.post(
+        "/api/v1/node", json={"name": "Alien", "favourite": True}
+    ).json()
+    client.post("/api/v1/node", json={"name": "Predator"})
+
+    response = client.get("/api/v1/node?favourite=true")
+
+    assert response.status_code == 200
+    results = response.json()
+    assert len(results) == 1
+    assert results[0]["id"] == starred["id"]
+
+
+def test_list_nodes_x_total_count_reflects_favourite_filter() -> None:
+    """Total-Count respects the favourite filter."""
+    client = TestClient(_app_with_in_memory_graph())
+    for _ in range(3):
+        client.post("/api/v1/node", json={"name": "Alien", "favourite": True})
+    for _ in range(2):
+        client.post("/api/v1/node", json={"name": "Predator"})
+
+    response = client.get("/api/v1/node?favourite=true")
+
+    assert response.status_code == 200
+    assert response.headers["Total-Count"] == "3"
 
 
 def test_list_nodes_x_total_count_matches_full_count_across_pages() -> None:
-    """X-Total-Count equals the full total even when pagination limits the page."""
+    """Total-Count equals the full total even when pagination limits the page."""
     client = TestClient(_app_with_in_memory_graph())
     for i in range(15):
         client.post("/api/v1/node", json={"name": f"Node {i}", "type": "test"})
@@ -304,4 +376,4 @@ def test_list_nodes_x_total_count_matches_full_count_across_pages() -> None:
 
     assert response.status_code == 200
     assert len(response.json()) == 10
-    assert response.headers["X-Total-Count"] == "15"
+    assert response.headers["Total-Count"] == "15"

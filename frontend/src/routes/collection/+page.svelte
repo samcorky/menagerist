@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { LayoutGrid, Plus, SearchX } from '@lucide/svelte';
+	import { beforeNavigate, afterNavigate } from '$app/navigation';
+	import { browser } from '$app/environment';
+	import { LayoutGrid, List, Plus, SearchX } from '@lucide/svelte';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import { toast } from 'svelte-sonner';
@@ -11,13 +13,16 @@
 		type NodeResponse,
 		type NodeTypeResponse
 	} from '$lib/api/client';
-	import { errorMessage } from '$lib/api/errors';
+	import { networkAwareError } from '$lib/api/errors';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 
 	const PAGE_SIZE = 50;
 	const loadingSkeletons = [1, 2, 3, 4, 5];
+
+	// Persisted outside component so scroll position survives navigation
+	let savedScrollTop = 0;
 
 	let items = $state<NodeResponse[]>([]);
 	let allCategories = $state<NodeTypeResponse[]>([]);
@@ -28,6 +33,23 @@
 	let searchInput = $state('');
 	let q = $state('');
 	let searchEl = $state<HTMLInputElement | null>(null);
+	let viewMode = $state<'list' | 'grid'>('list');
+
+	let selectedTypeLabel = $derived(
+		allCategories.find((c) => c.slug === selectedType)?.label ?? selectedType
+	);
+
+	// Initialise view mode from localStorage
+	$effect(() => {
+		if (browser) {
+			const stored = localStorage.getItem('collection-view');
+			if (stored === 'grid' || stored === 'list') viewMode = stored;
+		}
+	});
+
+	$effect(() => {
+		if (browser) localStorage.setItem('collection-view', viewMode);
+	});
 
 	// Pick up ?type= from URL (from dashboard category chips)
 	$effect(() => {
@@ -56,7 +78,8 @@
 		});
 		if (seq !== fetchSeq) return;
 		if (result.error || !result.data) {
-			toast.error("Couldn't load items", { description: errorMessage(result.error) });
+			const { title, description } = networkAwareError(result);
+			toast.error(title, { description });
 			hasMore = false;
 		} else {
 			items = after ? [...items, ...result.data] : result.data;
@@ -143,6 +166,20 @@
 			history.replaceState({}, '', url);
 		}
 	});
+
+	// Scroll preservation: save before navigating into an item, restore on return
+	beforeNavigate(({ to }) => {
+		if (to?.url.pathname.startsWith(resolve('/collection/'))) {
+			savedScrollTop = document.getElementById('main-scroll')?.scrollTop ?? 0;
+		}
+	});
+
+	afterNavigate(({ from }) => {
+		if (from?.url.pathname.startsWith(resolve('/collection/'))) {
+			const el = document.getElementById('main-scroll');
+			if (el) el.scrollTop = savedScrollTop;
+		}
+	});
 </script>
 
 <svelte:head>
@@ -159,13 +196,37 @@
 			</Button>
 		</div>
 
-		<input
-			use:focusRef
-			bind:value={searchInput}
-			type="search"
-			placeholder="Search your collection…"
-			class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:max-w-sm"
-		/>
+		<div class="flex items-center gap-2">
+			<input
+				use:focusRef
+				bind:value={searchInput}
+				type="search"
+				placeholder="Search your collection…"
+				class="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:max-w-sm"
+			/>
+			<div class="ml-auto flex items-center gap-1">
+				<button
+					onclick={() => (viewMode = 'list')}
+					class="rounded-md p-1.5 transition-colors {viewMode === 'list'
+						? 'bg-muted text-foreground'
+						: 'text-muted-foreground hover:text-foreground'}"
+					aria-label="List view"
+					aria-pressed={viewMode === 'list'}
+				>
+					<List class="size-4" />
+				</button>
+				<button
+					onclick={() => (viewMode = 'grid')}
+					class="rounded-md p-1.5 transition-colors {viewMode === 'grid'
+						? 'bg-muted text-foreground'
+						: 'text-muted-foreground hover:text-foreground'}"
+					aria-label="Grid view"
+					aria-pressed={viewMode === 'grid'}
+				>
+					<LayoutGrid class="size-4" />
+				</button>
+			</div>
+		</div>
 
 		{#if allCategories.length > 1}
 			<div class="flex flex-wrap gap-2">
@@ -190,20 +251,50 @@
 
 		{#if loading && items.length === 0}
 			<Shimmer loading={true}>
-				<div class="grid gap-3">
-					{#each loadingSkeletons as skeleton (skeleton)}
-						<div class="rounded-lg border p-4">
-							<div class="flex items-center justify-between gap-4">
-								<div class="space-y-1">
-									<div class="h-5 w-48 rounded bg-muted"></div>
-									<div class="h-4 w-72 rounded bg-muted"></div>
+				{#if viewMode === 'grid'}
+					<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+						{#each loadingSkeletons as skeleton (skeleton)}
+							<div class="aspect-[3/4] animate-pulse rounded-xl bg-muted"></div>
+						{/each}
+					</div>
+				{:else}
+					<div class="grid gap-3">
+						{#each loadingSkeletons as skeleton (skeleton)}
+							<div class="rounded-lg border p-4">
+								<div class="flex items-center justify-between gap-4">
+									<div class="space-y-1">
+										<div class="h-5 w-48 rounded bg-muted"></div>
+										<div class="h-4 w-72 rounded bg-muted"></div>
+									</div>
+									<div class="h-6 w-16 rounded-full bg-muted"></div>
 								</div>
-								<div class="h-6 w-16 rounded-full bg-muted"></div>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</Shimmer>
+		{:else if viewMode === 'grid'}
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+				{#each items as item (item.id)}
+					{@const catLabel = allCategories.find((c) => c.slug === item.type)?.label}
+					<a href={resolve('/collection/[id]', { id: item.id })} class="group block">
+						<div
+							class="flex aspect-[3/4] flex-col overflow-hidden rounded-xl border bg-muted/30 transition-colors group-hover:bg-muted/60"
+						>
+							<!-- Image placeholder -->
+							<div class="flex flex-1 items-center justify-center text-muted-foreground/30">
+								<LayoutGrid class="size-10" />
+							</div>
+							<div class="border-t bg-background/80 px-2.5 py-2">
+								<p class="truncate text-sm leading-tight font-medium">{item.name}</p>
+								{#if catLabel}
+									<p class="mt-0.5 truncate text-xs text-muted-foreground">{catLabel}</p>
+								{/if}
 							</div>
 						</div>
-					{/each}
-				</div>
-			</Shimmer>
+					</a>
+				{/each}
+			</div>
 		{:else}
 			<div class="grid gap-3">
 				{#each items as item (item.id)}
@@ -213,15 +304,12 @@
 								<div>
 									<Card.Title>{item.name}</Card.Title>
 									{#if item.description}
-										<Card.Description>{item.description}</Card.Description>
+										<Card.Description class="line-clamp-1">{item.description}</Card.Description>
 									{/if}
 								</div>
 								{#if item.type}
 									{@const catLabel = allCategories.find((c) => c.slug === item.type)?.label}
-									<Badge
-										variant={catLabel ? 'secondary' : 'outline'}
-										class={catLabel ? '' : 'text-muted-foreground/60 italic'}
-									>
+									<Badge variant="secondary" class="shrink-0">
 										{catLabel ?? item.type}
 									</Badge>
 								{/if}
@@ -230,41 +318,44 @@
 					</a>
 				{/each}
 			</div>
+		{/if}
 
-			{#if items.length === 0 && !loading}
-				<div class="flex flex-col items-center gap-3 py-12 text-center">
-					{#if q}
-						<SearchX class="size-10 text-muted-foreground/50" />
-						<div>
-							<p class="font-medium">Nothing matched "{q}"</p>
-							<p class="text-sm text-muted-foreground">Try a different search term</p>
-						</div>
-						<Button variant="ghost" size="sm" onclick={() => (searchInput = '')}
-							>Clear search</Button
-						>
-					{:else if selectedType}
-						<LayoutGrid class="size-10 text-muted-foreground/50" />
-						<div>
-							<p class="font-medium">No "{selectedType}" items yet</p>
-							<p class="text-sm text-muted-foreground">Add one to get started</p>
-						</div>
-						<Button size="sm" onclick={() => captureController.show()}>
-							<Plus class="size-4" />
-							New item
-						</Button>
-					{:else}
-						<LayoutGrid class="size-10 text-muted-foreground/50" />
-						<div>
-							<p class="font-medium">Nothing here yet</p>
-							<p class="text-sm text-muted-foreground">Add your first item to get started</p>
-						</div>
-						<Button onclick={() => captureController.show()}>
-							<Plus class="size-4" />
-							Add your first item
-						</Button>
-					{/if}
-				</div>
-			{/if}
+		{#if items.length === 0 && !loading}
+			<div class="flex flex-col items-center gap-3 py-12 text-center">
+				{#if q}
+					<SearchX class="size-10 text-muted-foreground/50" />
+					<div>
+						<p class="font-medium">Nothing matched "{q}"</p>
+						<p class="text-sm text-muted-foreground">Try a different search term</p>
+					</div>
+					<Button variant="ghost" size="sm" onclick={() => (searchInput = '')}>Clear search</Button>
+				{:else if selectedType}
+					<LayoutGrid class="size-10 text-muted-foreground/50" />
+					<div>
+						<p class="font-medium">No {selectedTypeLabel} items yet</p>
+						<p class="text-sm text-muted-foreground">
+							Add one, or <button
+								class="underline underline-offset-2 hover:text-foreground"
+								onclick={() => selectType(null)}>clear this filter</button
+							> to see everything.
+						</p>
+					</div>
+					<Button size="sm" onclick={() => captureController.show()}>
+						<Plus class="size-4" />
+						New item
+					</Button>
+				{:else}
+					<LayoutGrid class="size-10 text-muted-foreground/50" />
+					<div>
+						<p class="font-medium">Nothing here yet</p>
+						<p class="text-sm text-muted-foreground">Add your first item to get started</p>
+					</div>
+					<Button onclick={() => captureController.show()}>
+						<Plus class="size-4" />
+						Add your first item
+					</Button>
+				{/if}
+			</div>
 		{/if}
 
 		{#if hasMore}

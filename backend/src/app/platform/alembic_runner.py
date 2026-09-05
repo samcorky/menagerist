@@ -2,11 +2,11 @@ from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from alembic import command
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 
-from alembic import command
 from app.platform.config import get_database_settings
 
 if TYPE_CHECKING:

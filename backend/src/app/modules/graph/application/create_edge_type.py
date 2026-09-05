@@ -3,10 +3,11 @@ from typing import TYPE_CHECKING, Any
 
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import EdgeTypeSlugConflictError
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
-    from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
     from app.shared_kernel.actor import Actor
 
 
@@ -22,11 +23,8 @@ class CreateEdgeTypeCommand:
     attributes_schema: dict[str, Any] | None = field(default=None)
 
 
-class CreateEdgeType:
+class CreateEdgeType(CommandHandler[GraphUnitOfWork, CreateEdgeTypeCommand, EdgeType]):
     """Create and persist a new edge type."""
-
-    def __init__(self, uow: GraphUnitOfWork) -> None:
-        self._uow = uow
 
     async def handle(self, command: CreateEdgeTypeCommand, actor: Actor) -> EdgeType:
         """Create an edge type from `command` and commit it."""

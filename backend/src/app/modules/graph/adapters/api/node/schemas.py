@@ -16,6 +16,7 @@ _NODE_EXAMPLE: dict[str, Any] = {
     "type": "film",
     "description": "A 1979 science fiction horror film directed by Ridley Scott.",
     "attributes": {"year": 1979},
+    "favourite": False,
     "created_at": "2026-08-23T10:14:44.465954Z",
     "updated_at": "2026-08-23T10:14:44.465954Z",
 }
@@ -26,6 +27,7 @@ _NODE_MINIMAL_EXAMPLE: dict[str, Any] = {
     "type": None,
     "description": None,
     "attributes": {},
+    "favourite": False,
     "created_at": "2026-08-23T10:14:44.465954Z",
     "updated_at": "2026-08-23T10:14:44.465954Z",
 }
@@ -55,6 +57,7 @@ class CreateNodeRequest(BaseModel):
     type: str | None = Field(default=None)
     description: str | None = Field(default=None)
     attributes: dict[str, Any] = Field(default_factory=dict)
+    favourite: bool = Field(default=False)
 
     @field_validator("type", mode="before")
     @classmethod
@@ -71,6 +74,7 @@ class CreateNodeRequest(BaseModel):
             type=self.type,
             description=self.description,
             attributes=self.attributes,
+            favourite=self.favourite,
         )
 
 
@@ -96,6 +100,7 @@ class UpdateNodeRequest(BaseModel):
     type: str | None = Field(default=None)
     description: str | None = Field(default=None)
     attributes: dict[str, Any] | None = Field(default=None)
+    favourite: bool | None = Field(default=None)
 
     @field_validator("type", mode="before")
     @classmethod
@@ -113,6 +118,7 @@ class UpdateNodeRequest(BaseModel):
             type=self.type,
             description=self.description,
             attributes=self.attributes,
+            favourite=self.favourite,
         )
 
 
@@ -128,6 +134,7 @@ class NodeResponse(BaseModel):
     type: str | None = Field(default=None)
     description: str | None = Field(default=None)
     attributes: dict[str, Any]
+    favourite: bool
     created_at: datetime
     updated_at: datetime
 
@@ -140,6 +147,7 @@ class NodeResponse(BaseModel):
             type=node.type,
             description=node.description,
             attributes=node.attributes,
+            favourite=node.favourite,
             created_at=node.created_at,
             updated_at=node.updated_at,
         )

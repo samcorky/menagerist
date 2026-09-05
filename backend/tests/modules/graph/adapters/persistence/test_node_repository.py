@@ -21,6 +21,7 @@ def _fields(node: Node) -> tuple[object, ...]:
         node.type,
         node.description,
         node.attributes,
+        node.favourite,
         node.created_at,
         node.updated_at,
         node.deleted_at,
@@ -100,6 +101,58 @@ async def test_get_returns_none_for_a_soft_deleted_node(
     await repository.save(node)
 
     assert await repository.get(node.id) is None
+
+
+async def test_favourite_field_round_trips(db_session: AsyncSession) -> None:
+    """A node created with favourite=True stores and retrieves the value correctly."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    node = Node.create(name="Alien", favourite=True)
+
+    await repository.add(node)
+    result = await repository.get(node.id)
+
+    assert result is not None
+    assert result.favourite is True
+    assert _fields(result) == _fields(node)
+
+
+async def test_save_persists_favourite_change(db_session: AsyncSession) -> None:
+    """save() persists a change to the favourite field."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    node = Node.create(name="Alien")
+    await repository.add(node)
+
+    node.update(favourite=True)
+    await repository.save(node)
+
+    result = await repository.get(node.id)
+    assert result is not None
+    assert result.favourite is True
+
+
+async def test_list_filters_by_favourite(db_session: AsyncSession) -> None:
+    """list(favourite=True) returns only favourited nodes."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    starred = Node.create(name="Alien", favourite=True)
+    plain = Node.create(name="Predator")
+    await repository.add(starred)
+    await repository.add(plain)
+
+    result = await repository.list(after=None, limit=10, favourite=True)
+
+    assert [n.id for n in result] == [starred.id]
+
+
+async def test_count_filters_by_favourite(db_session: AsyncSession) -> None:
+    """count(favourite=True) counts only favourited nodes."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    for _ in range(3):
+        await repository.add(Node.create(name="Alien", favourite=True))
+    for _ in range(2):
+        await repository.add(Node.create(name="Predator"))
+
+    assert await repository.count(favourite=True) == 3
+    assert await repository.count(favourite=False) == 2
 
 
 async def test_list_excludes_soft_deleted_nodes(db_session: AsyncSession) -> None:

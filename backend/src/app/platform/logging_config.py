@@ -33,6 +33,12 @@ def _expand_access_log_fields(
         query_string = event_dict.get("query_string")
         if isinstance(query_string, bytes):
             event_dict["query_string"] = query_string.decode("utf-8", "replace")
+        # Granian names header atoms positionally (_h0, _h1, …). _h0 is
+        # the Request-Id header — the only header atom in GRANIAN_ACCESS_LOG_FORMAT.
+        # Granian emits "-" for a missing header (same convention as nginx).
+        request_id = event_dict.pop("_h0", None)
+        if request_id and request_id != "-":
+            event_dict["request_id"] = request_id
         event_dict["event"] = f"{args['method']} {args['path']}"
         # Redundant with the `timestamp` key TimeStamper adds to every record.
         event_dict.pop("time", None)
@@ -104,6 +110,16 @@ def configure_logging(*, level: int | str | None = None) -> None:
 # so server startup/lifecycle and access logs render identically to
 # everything else.
 type LoggerConfig = dict[str, str | bool | list[str]]
+
+# Extends Granian's default access log format with the Request-Id header.
+# nginx injects this on every proxied request (generating one if the client
+# didn't supply it), so it is always present and correlates backend logs with
+# nginx access logs. _expand_access_log_fields renames the raw atom key to
+# `request_id` so it renders cleanly in structured output.
+GRANIAN_ACCESS_LOG_FORMAT = (
+    '[%(time)s] %(addr)s - "%(method)s %(path)s %(protocol)s"'
+    + " %(status)d %(dt_ms).3f %(header{request-id})s"
+)
 
 GRANIAN_LOG_DICTCONFIG: dict[str, dict[str, LoggerConfig]] = {
     "loggers": {

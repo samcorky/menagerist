@@ -21,3 +21,26 @@ export function errorMessage(error: unknown): string {
 	}
 	return 'Something went wrong.';
 }
+
+/**
+ * Returns a user-facing title + optional description appropriate for the
+ * failure mode: offline, server error, or a domain/validation error.
+ */
+export function networkAwareError(result: { error?: unknown; response?: Response | null }): {
+	title: string;
+	description?: string;
+} {
+	if (!result.response) {
+		return {
+			title: 'You appear to be offline',
+			description: 'Check your connection and try again.'
+		};
+	}
+	if (result.response.status >= 500) {
+		return {
+			title: 'Something went wrong',
+			description: 'Try again, or reload the page if the problem persists.'
+		};
+	}
+	return { title: "Couldn't complete this action", description: errorMessage(result.error) };
+}

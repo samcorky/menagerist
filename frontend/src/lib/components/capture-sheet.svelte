@@ -13,6 +13,7 @@
 		type NodeTypeResponse
 	} from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
+	import { slugify } from '$lib/utils.js';
 	import AttributesEditor, {
 		rowsToAttributes,
 		type AttributeRow
@@ -22,13 +23,6 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 
-	function slugify(s: string): string {
-		return s
-			.toLowerCase()
-			.replace(/[^a-z0-9]+/g, '-')
-			.replace(/^-|-$/g, '');
-	}
-
 	// ── State ────────────────────────────────────────────────────────────────────
 	let name = $state('');
 	let selectedType = $state<string | null>(null);
@@ -37,6 +31,7 @@
 
 	// Layer 1 – type suggestions
 	let allNodeTypes = $state<NodeTypeResponse[]>([]);
+	let nodeTypesFetched = $state(false);
 	let showNewTypeForm = $state(false);
 	let newTypeLabel = $state('');
 	let creatingType = $state(false);
@@ -60,7 +55,8 @@
 
 	// ── Effects ──────────────────────────────────────────────────────────────────
 	$effect(() => {
-		if (captureController.open && allNodeTypes.length === 0) {
+		if (captureController.open && !nodeTypesFetched) {
+			nodeTypesFetched = true;
 			listNodeTypes({ query: { limit: 200 } }).then((r) => {
 				if (r.data) allNodeTypes = r.data;
 			});

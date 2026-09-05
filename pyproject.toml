@@ -157,7 +157,7 @@ sequence = ["typecheck-backend", "typecheck-frontend"]
 help = "Type-check all project code"
 
 [tool.poe.groups.quality.tasks._check-hooks]
-shell = "prek run --all-files || prek run --all-files"
+shell = "prek run --all-files"
 help = "Run all configured pre-commit checks against the full repository"
 
 [tool.poe.groups.quality.tasks.validate-renovate]
@@ -175,8 +175,9 @@ sequence = ["validate-renovate", "_renovate-local"]
 help = "Validate Renovate config, then run Renovate locally in dry-run mode"
 
 [tool.poe.groups.quality.tasks.check]
-sequence = ["sync", "_check-hooks"]
+sequence = ["_check-hooks"]
 help = "Run all configured checks against the full repository"
+deps = ["sync"]
 
 [tool.poe.groups.quality.tasks.test]
 sequence = ["test-backend", "test-frontend"]
@@ -262,8 +263,8 @@ help = "Run the full app via Docker Compose"
 ignore_fail = true
 
 [tool.poe.groups.run.tasks.docker-up-backend]
-cmd = "docker compose -f compose.dev.yaml up -d --force-recreate backend"
-help = "Build and (re)start the backend container detached"
+cmd = "docker compose -f compose.dev.yaml up -d --force-recreate migrate backend"
+help = "Build and (re)start the backend container detached (runs migrations first)"
 deps = ["docker-build-backend"]
 
 [tool.poe.groups.run.tasks.docker-up-frontend]

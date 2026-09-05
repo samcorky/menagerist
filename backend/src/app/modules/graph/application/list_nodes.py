@@ -2,9 +2,11 @@ import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from app.modules.graph.domain.node import Node
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.cqrs import QueryHandler
+
 if TYPE_CHECKING:
-    from app.modules.graph.domain.node import Node
-    from app.modules.graph.ports.node_repository import NodeRepository
     from app.shared_kernel.actor import Actor
 
 
@@ -16,16 +18,33 @@ class ListNodesQuery:
     limit: int = 50
     type: str | None = None
     q: str | None = None
+    favourite: bool | None = None
 
 
-class ListNodes:
+@dataclass(frozen=True)
+class ListNodesResult:
+    """Paginated node list with the total number of matching nodes."""
+
+    items: list[Node]
+    total: int
+
+
+class ListNodes(QueryHandler[GraphUnitOfWork, ListNodesQuery, ListNodesResult]):
     """List node with keyset pagination."""
 
-    def __init__(self, nodes: NodeRepository) -> None:
-        self._nodes = nodes
-
-    async def handle(self, query: ListNodesQuery, actor: Actor) -> list[Node]:
-        """Return a page of node after `query.after`, up to `query.limit`."""
-        return await self._nodes.list(
-            after=query.after, limit=query.limit, type=query.type, q=query.q
-        )
+    async def handle(self, query: ListNodesQuery, actor: Actor) -> ListNodesResult:
+        """Return a page of nodes and total count matching the query."""
+        async with self._uow as repos:
+            items = await repos.nodes.list(
+                after=query.after,
+                limit=query.limit,
+                type=query.type,
+                q=query.q,
+                favourite=query.favourite,
+            )
+            total = await repos.nodes.count(
+                type=query.type,
+                q=query.q,
+                favourite=query.favourite,
+            )
+        return ListNodesResult(items=items, total=total)

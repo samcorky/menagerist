@@ -10,7 +10,11 @@ from granian.log import LogLevels
 
 from app.platform import alembic_runner
 from app.platform.app_info import load_app_info
-from app.platform.logging_config import GRANIAN_LOG_DICTCONFIG, configure_logging
+from app.platform.logging_config import (
+    GRANIAN_ACCESS_LOG_FORMAT,
+    GRANIAN_LOG_DICTCONFIG,
+    configure_logging,
+)
 
 configure_logging()
 app_info = load_app_info()
@@ -63,6 +67,7 @@ def serve(
         log_level=log_level,
         log_dictconfig=GRANIAN_LOG_DICTCONFIG,
         log_access=access_log,
+        log_access_format=GRANIAN_ACCESS_LOG_FORMAT,
     )
     server.serve()
 
