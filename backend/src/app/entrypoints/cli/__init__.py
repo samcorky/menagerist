@@ -1,5 +1,7 @@
+import asyncio
 import json
 import logging
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import structlog
@@ -30,6 +32,9 @@ app = App(
 
 migrate_app = App(name="migrate", help="Manage database migrations.")
 app.command(migrate_app)
+
+media_app = App(name="media", help="Manage media assets.")
+app.command(media_app)
 
 schema_app = App(name="schema", help="Inspect the API schema.")
 app.command(schema_app)
@@ -123,6 +128,40 @@ def dump(*, output: Path = Path("openapi.json")) -> None:
     from app.entrypoints.api import create_app
 
     output.write_text(json.dumps(create_app().openapi(), indent=2))
+
+
+@media_app.command
+def cleanup() -> None:
+    """Hard-delete staged and orphaned media assets that have passed their TTL."""
+    from app.modules.media.adapters.persistence.unit_of_work import create_media_uow
+    from app.modules.media.adapters.storage.local_filesystem import (
+        LocalFilesystemMediaStorage,
+    )
+    from app.modules.media.application.cleanup_expired_media import (
+        CleanupExpiredMedia,
+        CleanupExpiredMediaCommand,
+    )
+    from app.platform.config.media import get_media_settings
+    from app.platform.database import get_session_factory
+    from app.shared_kernel.actor import SYSTEM_ACTOR
+
+    settings = get_media_settings()
+    now = datetime.now(UTC)
+
+    async def _run() -> int:
+        uow = create_media_uow(get_session_factory())
+        storage = LocalFilesystemMediaStorage(settings.media_storage_path)
+        use_case = CleanupExpiredMedia(uow, storage)
+        return await use_case.handle(
+            CleanupExpiredMediaCommand(
+                staged_before=now - timedelta(hours=settings.staged_ttl_hours),
+                orphaned_before=now - timedelta(hours=settings.orphaned_ttl_hours),
+            ),
+            SYSTEM_ACTOR,
+        )
+
+    count = asyncio.run(_run())
+    logger.info("media cleanup complete", deleted=count)
 
 
 if __name__ == "__main__":

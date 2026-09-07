@@ -12,6 +12,7 @@ from app.modules.graph.adapters.api.edge.router import router as edge_router
 from app.modules.graph.adapters.api.edge_type.router import router as edge_type_router
 from app.modules.graph.adapters.api.node.router import router as graph_router
 from app.modules.graph.adapters.api.node_type.router import router as node_type_router
+from app.modules.media.adapters.api.media.router import router as media_router
 from app.platform.app_info import load_app_info
 from app.platform.config import get_api_settings
 from app.platform.logging_config import configure_logging
@@ -26,6 +27,7 @@ api_v1_router.include_router(graph_router)
 api_v1_router.include_router(edge_router)
 api_v1_router.include_router(node_type_router)
 api_v1_router.include_router(edge_type_router)
+api_v1_router.include_router(media_router)
 
 api_router.include_router(api_v1_router)
 
@@ -80,6 +82,10 @@ def create_app() -> FastAPI:
         {
             "name": "System",
             "description": "System-level endpoints for health checks and diagnostics.",
+        },
+        {
+            "name": "Media",
+            "description": "Endpoints for managing media assets.",
         },
         {
             "name": "v1",

@@ -1,0 +1,162 @@
+import uuid
+
+from starlette.testclient import TestClient
+
+from app.entrypoints.api import create_app
+from app.modules.media.adapters.api.dependencies import get_media_storage, get_media_uow
+from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
+    InMemoryMediaAssetRepository,
+)
+from app.modules.media.adapters.persistence.unit_of_work import (
+    create_in_memory_media_uow,
+)
+from app.modules.media.adapters.storage.in_memory_media_storage import (
+    InMemoryMediaStorage,
+)
+from app.modules.media.ports.unit_of_work import MediaRepos
+
+
+def _app_with_in_memory_media() -> tuple[
+    object, InMemoryMediaAssetRepository, InMemoryMediaStorage
+]:
+    app = create_app()
+    repo = InMemoryMediaAssetRepository()
+    storage = InMemoryMediaStorage()
+    uow = create_in_memory_media_uow(MediaRepos(assets=repo))
+    app.dependency_overrides[get_media_uow] = lambda: uow
+    app.dependency_overrides[get_media_storage] = lambda: storage
+    return app, repo, storage
+
+
+def test_stage_and_get_round_trip() -> None:
+    """POST /media stages an asset; GET /media/{id} returns its metadata."""
+    app, _, _ = _app_with_in_memory_media()
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/v1/media",
+        files={"file": ("cover.jpg", b"binary content", "image/jpeg")},
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["status"] == "staged"
+    assert body["filename"] == "cover.jpg"
+    assert body["content_type"] == "image/jpeg"
+    assert body["size"] == len(b"binary content")
+
+    get_response = client.get(f"/api/v1/media/{body['id']}")
+    assert get_response.status_code == 200
+    assert get_response.json() == body
+
+
+def test_get_media_returns_404_for_missing_id() -> None:
+    """GET /media/{id} returns 404 for an unknown id."""
+    app, _, _ = _app_with_in_memory_media()
+    client = TestClient(app)
+
+    response = client.get(f"/api/v1/media/{uuid.uuid4()}")
+
+    assert response.status_code == 404
+    assert response.json()["title"] == "MediaAssetNotFoundError"
+
+
+def test_promote_transitions_to_attached() -> None:
+    """POST /media/{id}/promote changes status to attached."""
+    app, _, _ = _app_with_in_memory_media()
+    client = TestClient(app)
+
+    stage = client.post(
+        "/api/v1/media",
+        files={"file": ("f.jpg", b"data", "image/jpeg")},
+    ).json()
+
+    response = client.post(f"/api/v1/media/{stage['id']}/promote")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "attached"
+
+
+def test_promote_returns_404_for_missing_asset() -> None:
+    """POST /media/{id}/promote returns 404 for an unknown id."""
+    app, _, _ = _app_with_in_memory_media()
+    client = TestClient(app)
+
+    response = client.post(f"/api/v1/media/{uuid.uuid4()}/promote")
+
+    assert response.status_code == 404
+
+
+def test_orphan_transitions_to_orphaned() -> None:
+    """POST /media/{id}/orphan changes status from attached to orphaned."""
+    app, _, _ = _app_with_in_memory_media()
+    client = TestClient(app)
+
+    stage = client.post(
+        "/api/v1/media",
+        files={"file": ("f.jpg", b"data", "image/jpeg")},
+    ).json()
+    client.post(f"/api/v1/media/{stage['id']}/promote")
+
+    response = client.post(f"/api/v1/media/{stage['id']}/orphan")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "orphaned"
+
+
+def test_orphan_returns_400_if_not_attached() -> None:
+    """POST /media/{id}/orphan returns 400 when asset is staged."""
+    app, _, _ = _app_with_in_memory_media()
+    client = TestClient(app)
+
+    stage = client.post(
+        "/api/v1/media",
+        files={"file": ("f.jpg", b"data", "image/jpeg")},
+    ).json()
+
+    response = client.post(f"/api/v1/media/{stage['id']}/orphan")
+
+    assert response.status_code == 400
+
+
+def test_delete_removes_asset() -> None:
+    """DELETE /media/{id} returns 204 and the asset is no longer retrievable."""
+    app, _, _ = _app_with_in_memory_media()
+    client = TestClient(app)
+
+    stage = client.post(
+        "/api/v1/media",
+        files={"file": ("f.jpg", b"data", "image/jpeg")},
+    ).json()
+
+    delete_response = client.delete(f"/api/v1/media/{stage['id']}")
+    assert delete_response.status_code == 204
+
+    assert client.get(f"/api/v1/media/{stage['id']}").status_code == 404
+
+
+def test_delete_returns_404_for_missing_asset() -> None:
+    """DELETE /media/{id} returns 404 for an unknown id."""
+    app, _, _ = _app_with_in_memory_media()
+    client = TestClient(app)
+
+    response = client.delete(f"/api/v1/media/{uuid.uuid4()}")
+
+    assert response.status_code == 404
+
+
+def test_stream_content_returns_bytes() -> None:
+    """GET /media/{id}/content streams the file bytes."""
+    app, _, _ = _app_with_in_memory_media()
+    client = TestClient(app)
+
+    stage = client.post(
+        "/api/v1/media",
+        files={"file": ("f.jpg", b"image bytes", "image/jpeg")},
+    ).json()
+
+    response = client.get(f"/api/v1/media/{stage['id']}/content")
+
+    assert response.status_code == 200
+    assert response.content == b"image bytes"
+    assert response.headers["content-type"] == "image/jpeg"

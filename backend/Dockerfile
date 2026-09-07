@@ -112,6 +112,8 @@ RUN PYTHON_DIR="$(find /opt/python -mindepth 1 -maxdepth 1 -type d -name 'cpytho
     && du -sh /app/.venv \
     && du -sh /opt/terminfo-min
 
+RUN mkdir -p /data/media && chown 1000:1000 /data/media
+
 FROM gcr.io/distroless/base-debian13:nonroot AS runtime
 
 COPY --from=builder \
@@ -137,6 +139,7 @@ ENV \
 COPY --from=builder /opt/python /opt/python
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/backend/scripts/healthcheck.py /app/healthcheck.py
+COPY --from=builder --chown=1000:1000 /data/media /data/media
 
 EXPOSE 8000
 

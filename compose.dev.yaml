@@ -88,6 +88,8 @@ services:
     restart: unless-stopped
     environment:
       MENAGERIST_DATABASE_URL: postgresql+asyncpg://menagerist:menagerist@postgres:5432/menagerist
+    volumes:
+      - media-data:/data/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -119,6 +121,8 @@ services:
 
 volumes:
   postgres-data:
+    driver: local
+  media-data:
     driver: local
 
 networks:
