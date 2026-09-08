@@ -1,7 +1,13 @@
 from typing import TYPE_CHECKING
 
+from app.modules.media.adapters.persistence.in_memory_media_attachment_repository import (  # noqa: E501
+    InMemoryMediaAttachmentRepository,
+)
 from app.modules.media.adapters.persistence.media_asset_repository import (
     SqlAlchemyMediaAssetRepository,
+)
+from app.modules.media.adapters.persistence.media_attachment_repository import (
+    SqlAlchemyMediaAttachmentRepository,
 )
 from app.modules.media.ports.unit_of_work import MediaRepos
 from app.platform.unit_of_work import SqlAlchemySessionUnitOfWork
@@ -14,7 +20,10 @@ if TYPE_CHECKING:
 
 
 def _build_repos(session: AsyncSession) -> MediaRepos:
-    return MediaRepos(assets=SqlAlchemyMediaAssetRepository(session))
+    return MediaRepos(
+        assets=SqlAlchemyMediaAssetRepository(session),
+        attachments=SqlAlchemyMediaAttachmentRepository(session),
+    )
 
 
 def create_media_uow(
@@ -27,3 +36,19 @@ def create_media_uow(
 def create_in_memory_media_uow(repos: MediaRepos) -> MediaUnitOfWork:
     """Wrap repos in an `InMemoryUnitOfWork` for tests."""
     return InMemoryUnitOfWork(repos)
+
+
+def make_in_memory_repos(
+    *,
+    assets: InMemoryMediaAttachmentRepository | None = None,
+    attachments: InMemoryMediaAttachmentRepository | None = None,
+) -> MediaRepos:
+    """Build a `MediaRepos` with in-memory implementations for tests."""
+    from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (  # noqa: E501
+        InMemoryMediaAssetRepository,
+    )
+
+    return MediaRepos(
+        assets=assets or InMemoryMediaAssetRepository(),  # type: ignore[arg-type]
+        attachments=attachments or InMemoryMediaAttachmentRepository(),
+    )

@@ -7,3 +7,11 @@ class MediaAssetNotFoundError(NotFoundError):
 
 class MediaFileTooLargeError(ValidationError):
     """Raised when an upload exceeds the configured maximum file size."""
+
+
+class MediaAttachmentNotFoundError(NotFoundError):
+    """Raised when a requested media attachment record does not exist."""
+
+
+class UnsupportedMediaTypeError(ValidationError):
+    """Raised when a file's content-type is not permitted for the attachment target."""

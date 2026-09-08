@@ -5,6 +5,7 @@ from app.modules.media.adapters.persistence.in_memory_media_asset_repository imp
 )
 from app.modules.media.adapters.persistence.unit_of_work import (
     create_in_memory_media_uow,
+    make_in_memory_repos,
 )
 from app.modules.media.adapters.storage.in_memory_media_storage import (
     InMemoryMediaStorage,
@@ -14,7 +15,6 @@ from app.modules.media.application.cleanup_expired_media import (
     CleanupExpiredMediaCommand,
 )
 from app.modules.media.domain.media_asset import MediaAsset
-from app.modules.media.ports.unit_of_work import MediaRepos
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
@@ -23,7 +23,7 @@ def _make_use_case() -> tuple[
 ]:
     repo = InMemoryMediaAssetRepository()
     storage = InMemoryMediaStorage()
-    uow = create_in_memory_media_uow(MediaRepos(assets=repo))
+    uow = create_in_memory_media_uow(make_in_memory_repos(assets=repo))
     return CleanupExpiredMedia(uow, storage), repo, storage
 
 

@@ -4,15 +4,23 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.media.adapters.persistence.unit_of_work import create_media_uow
+from app.modules.media.adapters.policy.content_type_attachment_policy import (
+    ContentTypeAttachmentPolicy,
+)
 from app.modules.media.adapters.storage.local_filesystem import (
     LocalFilesystemMediaStorage,
 )
+from app.modules.media.application.attach_media import AttachMedia
 from app.modules.media.application.cleanup_expired_media import CleanupExpiredMedia
 from app.modules.media.application.delete_media import DeleteMedia
+from app.modules.media.application.detach_media import DetachMedia
 from app.modules.media.application.get_media import GetMedia
+from app.modules.media.application.list_node_media import ListNodeMedia
 from app.modules.media.application.orphan_media import OrphanMedia
 from app.modules.media.application.promote_media import PromoteMedia
 from app.modules.media.application.stage_media import StageMedia
+from app.modules.media.application.upload_and_attach_media import UploadAndAttachMedia
+from app.modules.media.ports.attachment_policy import AttachmentPolicyPort
 from app.modules.media.ports.media_storage import MediaStoragePort
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.platform.config.media import MediaSettings, get_media_settings
@@ -31,6 +39,10 @@ def get_media_storage(
     settings: Annotated[MediaSettings, Depends(get_media_settings)],
 ) -> MediaStoragePort:
     return LocalFilesystemMediaStorage(settings.media_storage_path)
+
+
+def get_attachment_policy() -> AttachmentPolicyPort:
+    return ContentTypeAttachmentPolicy()
 
 
 def get_stage_media_use_case(
@@ -72,3 +84,32 @@ def get_cleanup_expired_media_use_case(
     storage: Annotated[MediaStoragePort, Depends(get_media_storage)],
 ) -> CleanupExpiredMedia:
     return CleanupExpiredMedia(uow, storage)
+
+
+def get_attach_media_use_case(
+    uow: Annotated[MediaUnitOfWork, Depends(get_media_uow)],
+    storage: Annotated[MediaStoragePort, Depends(get_media_storage)],
+    policy: Annotated[AttachmentPolicyPort, Depends(get_attachment_policy)],
+) -> AttachMedia:
+    return AttachMedia(uow, storage, policy)
+
+
+def get_detach_media_use_case(
+    uow: Annotated[MediaUnitOfWork, Depends(get_media_uow)],
+    storage: Annotated[MediaStoragePort, Depends(get_media_storage)],
+) -> DetachMedia:
+    return DetachMedia(uow, storage)
+
+
+def get_upload_and_attach_use_case(
+    uow: Annotated[MediaUnitOfWork, Depends(get_media_uow)],
+    storage: Annotated[MediaStoragePort, Depends(get_media_storage)],
+    policy: Annotated[AttachmentPolicyPort, Depends(get_attachment_policy)],
+) -> UploadAndAttachMedia:
+    return UploadAndAttachMedia(uow, storage, policy)
+
+
+def get_list_node_media_use_case(
+    uow: Annotated[MediaUnitOfWork, Depends(get_media_uow)],
+) -> ListNodeMedia:
+    return ListNodeMedia(uow)

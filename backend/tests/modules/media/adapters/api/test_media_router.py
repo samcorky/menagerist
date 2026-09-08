@@ -9,11 +9,11 @@ from app.modules.media.adapters.persistence.in_memory_media_asset_repository imp
 )
 from app.modules.media.adapters.persistence.unit_of_work import (
     create_in_memory_media_uow,
+    make_in_memory_repos,
 )
 from app.modules.media.adapters.storage.in_memory_media_storage import (
     InMemoryMediaStorage,
 )
-from app.modules.media.ports.unit_of_work import MediaRepos
 
 
 def _app_with_in_memory_media() -> tuple[
@@ -22,7 +22,7 @@ def _app_with_in_memory_media() -> tuple[
     app = create_app()
     repo = InMemoryMediaAssetRepository()
     storage = InMemoryMediaStorage()
-    uow = create_in_memory_media_uow(MediaRepos(assets=repo))
+    uow = create_in_memory_media_uow(make_in_memory_repos(assets=repo))
     app.dependency_overrides[get_media_uow] = lambda: uow
     app.dependency_overrides[get_media_storage] = lambda: storage
     return app, repo, storage

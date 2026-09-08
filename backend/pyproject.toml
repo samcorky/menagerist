@@ -98,7 +98,7 @@ select = [
     "TID",
     "RUF",
     "ISC",
-    "UP"
+    "UP037"
 ]
 ignore = [
     # Conflicts with Ruff formatter:
