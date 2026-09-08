@@ -199,6 +199,17 @@ pretty = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+addopts = "--cov=app --cov-branch --cov-report=xml --cov-report=term-missing"
 markers = [
     "integration: exercises a real adapter (database, network) instead of an in-memory fake",
+]
+
+[tool.coverage.run]
+source = ["src/app"]
+branch = true
+
+[tool.coverage.report]
+skip_empty = true
+exclude_also = [
+    "if TYPE_CHECKING:",
 ]

@@ -105,14 +105,72 @@ cwd = "backend"
 help = "Type-check backend Python files with mypy"
 
 [tool.poe.groups.quality.tasks.test-backend]
-cmd = "pytest -m 'not integration'"
+shell = "coverage erase ; pytest -m 'not integration' --cov=app --cov-branch --cov-report="
+interpreter = ["powershell", "posix"]
 cwd = "backend"
-help = "Run backend unit tests"
+help = "Run backend unit tests from a clean coverage dataset"
 
 [tool.poe.groups.quality.tasks.test-backend-integration]
-cmd = "pytest -m integration"
+cmd = "pytest -m integration --cov=app --cov-append --cov-branch --cov-report="
 cwd = "backend"
-help = "Run backend integration tests against real adapters"
+help = "Run backend integration tests, appending to unit test coverage"
+
+[tool.poe.groups.quality.tasks.test-backend-all]
+sequence = ["test-backend", "test-backend-integration"]
+help = "Run unit + integration backend tests with combined coverage data"
+
+[tool.poe.groups.quality.tasks.coverage-domain]
+cmd = 'coverage report --include="src/app/modules/*/domain/*" --fail-under=100'
+cwd = "backend"
+help = "Enforce 100% coverage on domain layers"
+
+[tool.poe.groups.quality.tasks.coverage-ports]
+cmd = 'coverage report --include="src/app/modules/*/ports/*" --fail-under=100'
+cwd = "backend"
+help = "Enforce 100% coverage on port interfaces"
+
+[tool.poe.groups.quality.tasks.coverage-application]
+cmd = 'coverage report --include="src/app/modules/*/application/*" --fail-under=100'
+cwd = "backend"
+help = "Enforce 100% coverage on application use cases"
+
+[tool.poe.groups.quality.tasks.coverage-shared-kernel]
+cmd = 'coverage report --include="src/app/shared_kernel/*" --fail-under=100'
+cwd = "backend"
+help = "Enforce 100% coverage on the shared kernel"
+
+[tool.poe.groups.quality.tasks.coverage-adapters]
+cmd = 'coverage report --include="src/app/modules/*/adapters/*" --fail-under=80'
+cwd = "backend"
+help = "Enforce coverage threshold on adapters"
+
+[tool.poe.groups.quality.tasks.coverage-platform]
+cmd = 'coverage report --include="src/app/platform/*" --fail-under=70'
+cwd = "backend"
+help = "Enforce coverage threshold on platform/infrastructure wiring"
+
+[tool.poe.groups.quality.tasks.coverage-status]
+cmd = "uv run --script scripts/check_component_coverage.py"
+cwd = "backend"
+help = "Show per-component coverage percentages without failing locally"
+
+[tool.poe.groups.quality.tasks.coverage-check]
+cmd = "uv run --script scripts/check_component_coverage.py --strict"
+cwd = "backend"
+help = "Fail CI when any component is below its Codecov threshold"
+
+[tool.poe.groups.quality.tasks.test-and-status]
+sequence = ["test-backend-all", "coverage-status"]
+help = "Run all backend tests and print per-component coverage status without failing"
+
+[tool.poe.groups.quality.tasks.coverage-report]
+cmd = "coverage xml"
+cwd = "backend"
+help = "Write the combined coverage.xml for Codecov upload"
+
+[tool.poe.groups.quality.tasks.coverage]
+sequence = ["test-backend-all", "coverage-check", "coverage-report"]
+help = "Run full backend test suite and enforce per-layer coverage thresholds"
 
 [tool.poe.groups.quality.tasks.format-frontend]
 shell = "npm run format"
@@ -175,8 +233,8 @@ sequence = ["validate-renovate", "_renovate-local"]
 help = "Validate Renovate config, then run Renovate locally in dry-run mode"
 
 [tool.poe.groups.quality.tasks.check]
-sequence = ["_check-hooks"]
-help = "Run all configured checks against the full repository"
+sequence = ["_check-hooks", "coverage-check"]
+help = "Run the repository checks and enforce the backend coverage gate"
 deps = ["sync"]
 
 [tool.poe.groups.quality.tasks.test]
