@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="frontend/static/favicon.svg" width="64" height="64" alt="Menagerist logo">
+</p>
+
 # Menagerist
 
 *(meh-NAH-juh-rist)*

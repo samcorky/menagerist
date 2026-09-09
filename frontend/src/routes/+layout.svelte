@@ -62,7 +62,7 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href="/logo.svg" />
+	<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </svelte:head>
 
 <Toaster richColors position="top-right" />
@@ -75,7 +75,11 @@
 	>
 		<div class="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
 			<a href={resolve('/')} class="flex items-center gap-2 text-base font-semibold tracking-tight">
-				<img src="/logo.svg" alt="" aria-hidden="true" class="size-7" />
+				<span
+					aria-hidden="true"
+					class="size-7 shrink-0 bg-foreground"
+					style="mask-image: url(/logo.svg); mask-size: contain; mask-repeat: no-repeat; mask-position: center; -webkit-mask-image: url(/logo.svg); -webkit-mask-size: contain; -webkit-mask-repeat: no-repeat; -webkit-mask-position: center;"
+				></span>
 				Menagerist
 			</a>
 
