@@ -4,7 +4,11 @@ from typing import TYPE_CHECKING
 
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaStatus
-from app.modules.media.domain.media_attachment import AttachmentTarget, MediaAttachment
+from app.modules.media.domain.media_attachment import (
+    AttachmentKey,
+    AttachmentTarget,
+    MediaAttachment,
+)
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.shared_kernel.cqrs import CommandHandler
 
@@ -21,14 +25,14 @@ class AttachMediaCommand:
     asset_id: uuid.UUID
     target_type: AttachmentTarget
     target_id: uuid.UUID
-    attribute_key: str | None = field(default=None)
+    attribute_key: AttachmentKey | None = field(default=None)
 
 
 class AttachMedia(CommandHandler[MediaUnitOfWork, AttachMediaCommand, MediaAttachment]):
     """Link a media asset to a graph entity, promoting it from staged if needed.
 
-    DB commit comes before the storage move so the DB is always authoritative
-    about asset state (same ordering as PromoteMedia).
+    The DB commit lands before the storage move via ``on_commit``, so the DB
+    is always authoritative about asset state even if the storage move fails.
     """
 
     def __init__(
@@ -45,8 +49,6 @@ class AttachMedia(CommandHandler[MediaUnitOfWork, AttachMediaCommand, MediaAttac
         self, command: AttachMediaCommand, actor: Actor
     ) -> MediaAttachment:
         """Link the asset to the target entity, promoting it from staged if needed."""
-        was_staged = False
-
         async with self._uow as repos:
             asset = await repos.assets.get(command.asset_id)
             if asset is None:
@@ -59,7 +61,11 @@ class AttachMedia(CommandHandler[MediaUnitOfWork, AttachMediaCommand, MediaAttac
             if asset.status is MediaStatus.STAGED:
                 asset.promote()
                 await repos.assets.save(asset)
-                was_staged = True
+                self._uow.on_commit(
+                    lambda: self._storage.move(
+                        asset.id, MediaStatus.STAGED, MediaStatus.ATTACHED
+                    )
+                )
 
             attachment = MediaAttachment.for_target(
                 asset_id=asset.id,
@@ -69,8 +75,5 @@ class AttachMedia(CommandHandler[MediaUnitOfWork, AttachMediaCommand, MediaAttac
             )
             await repos.attachments.add(attachment)
             await self._uow.commit()
-
-        if was_staged:
-            await self._storage.move(asset.id, MediaStatus.STAGED, MediaStatus.ATTACHED)
 
         return attachment

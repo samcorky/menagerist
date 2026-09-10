@@ -29,10 +29,14 @@ class LocalFilesystemMediaStorage:
     def __init__(self, base_path: Path) -> None:
         self._base = base_path
 
+    @staticmethod
+    def _shard(asset_id: uuid.UUID) -> str:
+        """Return a stable, evenly distributed filesystem shard for `asset_id`."""
+        return hashlib.sha256(asset_id.bytes).hexdigest()[:2]
+
     def _path(self, asset_id: uuid.UUID, status: MediaStatus) -> Path:
         """Return the sharded path for `asset_id` in bucket `status`."""
-        hex_id = asset_id.hex
-        return self._base / status.value / hex_id[:2] / str(asset_id)
+        return self._base / status.value / self._shard(asset_id) / str(asset_id)
 
     async def store(
         self,

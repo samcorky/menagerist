@@ -5,8 +5,10 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict
 
 from app.modules.media.domain.media_asset import MediaStatus
+from app.modules.media.domain.media_attachment import AttachmentKey
 
 if TYPE_CHECKING:
+    from app.modules.media.application.list_node_media import NodeMediaItem
     from app.modules.media.domain.media_asset import MediaAsset
     from app.modules.media.domain.media_attachment import MediaAttachment
 
@@ -54,6 +56,27 @@ class MediaAssetResponse(BaseModel):
         )
 
 
+class NodeMediaItemResponse(BaseModel):
+    """A media asset with its attachment slot label, as returned by list_node_media."""
+
+    id: uuid.UUID
+    filename: str
+    content_type: str
+    size: int
+    sha256: str
+    status: MediaStatus
+    content_url: str
+    created_at: datetime
+    updated_at: datetime
+    attribute_key: AttachmentKey | None
+
+    @classmethod
+    def from_domain(cls, item: NodeMediaItem) -> NodeMediaItemResponse:
+        """Build a response from a `NodeMediaItem`."""
+        base = MediaAssetResponse.from_domain(item.asset)
+        return cls(**base.model_dump(), attribute_key=item.attribute_key)
+
+
 class MediaAttachmentResponse(BaseModel):
     """A media attachment record as returned by the API."""
 
@@ -61,7 +84,7 @@ class MediaAttachmentResponse(BaseModel):
     asset_id: uuid.UUID
     target_type: str
     target_id: uuid.UUID
-    attribute_key: str | None
+    attribute_key: AttachmentKey | None
     created_at: datetime
 
     @classmethod

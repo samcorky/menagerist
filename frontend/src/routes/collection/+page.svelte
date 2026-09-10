@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { beforeNavigate, afterNavigate } from '$app/navigation';
 	import { browser } from '$app/environment';
-	import { LayoutGrid, List, Plus, SearchX } from '@lucide/svelte';
+	import { List, Plus, SearchX, LayoutGrid } from '@lucide/svelte';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import { toast } from 'svelte-sonner';
@@ -17,6 +17,7 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
+	import NodeCover from '$lib/components/node-cover.svelte';
 
 	const PAGE_SIZE = 50;
 	const loadingSkeletons = [1, 2, 3, 4, 5];
@@ -34,6 +35,21 @@
 	let q = $state('');
 	let searchEl = $state<HTMLInputElement | null>(null);
 	let viewMode = $state<'list' | 'grid'>('list');
+
+	const CARD_PALETTES = [
+		'from-violet-500/20 to-indigo-500/20',
+		'from-sky-500/20 to-cyan-500/20',
+		'from-emerald-500/20 to-teal-500/20',
+		'from-amber-500/20 to-orange-500/20',
+		'from-rose-500/20 to-pink-500/20',
+		'from-fuchsia-500/20 to-purple-500/20'
+	];
+
+	function itemGradient(name: string) {
+		let h = 0;
+		for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+		return CARD_PALETTES[h % CARD_PALETTES.length];
+	}
 
 	let selectedTypeLabel = $derived(
 		allCategories.find((c) => c.slug === selectedType)?.label ?? selectedType
@@ -281,10 +297,10 @@
 						<div
 							class="flex aspect-[3/4] flex-col overflow-hidden rounded-xl border bg-muted/30 transition-colors group-hover:bg-muted/60"
 						>
-							<!-- Image placeholder -->
-							<div class="flex flex-1 items-center justify-center text-muted-foreground/30">
-								<LayoutGrid class="size-10" />
-							</div>
+							<!-- Cover image or colour swatch fallback -->
+							<NodeCover nodeId={item.id} class="flex-1">
+								<div class="flex-1 bg-gradient-to-br {itemGradient(item.name)}"></div>
+							</NodeCover>
 							<div class="border-t bg-background/80 px-2.5 py-2">
 								<p class="truncate text-sm leading-tight font-medium">{item.name}</p>
 								{#if catLabel}

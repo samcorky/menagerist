@@ -212,4 +212,5 @@ branch = true
 skip_empty = true
 exclude_also = [
     "if TYPE_CHECKING:",
+    "\\.\\.\\.\\s*$",
 ]

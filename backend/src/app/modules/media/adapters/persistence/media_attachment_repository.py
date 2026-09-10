@@ -3,7 +3,11 @@ from typing import TYPE_CHECKING
 from sqlalchemy import delete, select
 
 from app.modules.media.adapters.persistence.models import MediaAttachmentModel
-from app.modules.media.domain.media_attachment import AttachmentTarget, MediaAttachment
+from app.modules.media.domain.media_attachment import (
+    AttachmentKey,
+    AttachmentTarget,
+    MediaAttachment,
+)
 
 if TYPE_CHECKING:
     import uuid
@@ -23,7 +27,9 @@ class SqlAlchemyMediaAttachmentRepository:
             asset_id=row.asset_id,
             target_type=AttachmentTarget(row.target_type),
             target_id=row.target_id,
-            attribute_key=row.attribute_key,
+            attribute_key=AttachmentKey(row.attribute_key)
+            if row.attribute_key
+            else None,
             created_at=row.created_at,
             updated_at=row.updated_at,
         )

@@ -21,6 +21,7 @@ from app.modules.media.adapters.api.dependencies import (
 from app.modules.media.adapters.api.media.schemas import (
     MediaAssetResponse,
     MediaAttachmentResponse,
+    NodeMediaItemResponse,
 )
 from app.modules.media.application.attach_media import AttachMedia, AttachMediaCommand
 from app.modules.media.application.delete_media import DeleteMedia, DeleteMediaCommand
@@ -46,7 +47,7 @@ from app.modules.media.domain.errors import (
     MediaFileTooLargeError,
     UnsupportedMediaTypeError,
 )
-from app.modules.media.domain.media_attachment import AttachmentTarget
+from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
 from app.modules.media.ports.media_storage import MediaStoragePort
 from app.platform.config.media import MediaSettings, get_media_settings
 from app.shared_kernel.actor import Actor
@@ -114,7 +115,7 @@ async def upload_and_attach_media(
     settings: Annotated[MediaSettings, Depends(get_media_settings)],
     target_type: Annotated[AttachmentTarget, Form()],
     target_id: Annotated[uuid.UUID, Form()],
-    attribute_key: Annotated[str | None, Form()] = None,
+    attribute_key: Annotated[AttachmentKey | None, Form()] = None,
 ) -> MediaAttachmentResponse:
     """Stream a file to storage and attach it to a graph entity in one request."""
     attachment = await use_case.handle(
@@ -137,17 +138,17 @@ async def upload_and_attach_media(
 
 @router.get(
     "/for-node/{node_id}",
-    response_model=list[MediaAssetResponse],
+    response_model=list[NodeMediaItemResponse],
     operation_id="list_node_media",
 )
 async def list_node_media(
     node_id: uuid.UUID,
     use_case: Annotated[ListNodeMedia, Depends(get_list_node_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
-) -> list[MediaAssetResponse]:
-    """List all media assets currently attached to a node."""
-    assets = await use_case.handle(ListNodeMediaQuery(node_id=node_id), actor)
-    return [MediaAssetResponse.from_domain(a) for a in assets]
+) -> list[NodeMediaItemResponse]:
+    """List all media assets currently attached to a node, with their slot labels."""
+    items = await use_case.handle(ListNodeMediaQuery(node_id=node_id), actor)
+    return [NodeMediaItemResponse.from_domain(i) for i in items]
 
 
 # ── Per-asset metadata + content ───────────────────────────────────────────────
@@ -231,7 +232,7 @@ async def attach_media(
     actor: Annotated[Actor, Depends(get_current_actor)],
     target_type: Annotated[AttachmentTarget, Form()],
     target_id: Annotated[uuid.UUID, Form()],
-    attribute_key: Annotated[str | None, Form()] = None,
+    attribute_key: Annotated[AttachmentKey | None, Form()] = None,
 ) -> MediaAttachmentResponse:
     """Attach an already-staged asset to a graph entity."""
     attachment = await use_case.handle(
@@ -263,7 +264,7 @@ async def detach_media(
     actor: Annotated[Actor, Depends(get_current_actor)],
     target_type: Annotated[AttachmentTarget, Form()],
     target_id: Annotated[uuid.UUID, Form()],
-    attribute_key: Annotated[str | None, Form()] = None,
+    attribute_key: Annotated[AttachmentKey | None, Form()] = None,
 ) -> None:
     """Remove the attachment record; orphan the asset if no other attachments remain."""
     await use_case.handle(

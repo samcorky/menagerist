@@ -36,6 +36,8 @@
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import ShimmerSlot from '$lib/components/shimmer-slot.svelte';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import MediaGallery from '$lib/components/media-gallery.svelte';
+	import NodeCover from '$lib/components/node-cover.svelte';
 
 	let nodeId = $derived(page.params.id!);
 
@@ -274,7 +276,10 @@
 		<BackButton fallback={resolve('/collection')} />
 
 		<Shimmer {loading}>
-			<Card.Root>
+			<Card.Root class="overflow-hidden">
+				{#if node}
+					<NodeCover nodeId={node.id} class="h-48 w-full rounded-none object-cover" />
+				{/if}
 				<Card.Header class="flex flex-row items-start justify-between gap-4 space-y-0">
 					<div class="min-w-0 flex-1">
 						<ShimmerSlot {loading} class="h-6 w-40">
@@ -508,6 +513,17 @@
 					</form>
 				</Card.Content>
 			</Card.Root>
+
+			{#if !loading}
+				<Card.Root>
+					<Card.Header>
+						<Card.Title class="font-heading">Files</Card.Title>
+					</Card.Header>
+					<Card.Content>
+						<MediaGallery {nodeId} />
+					</Card.Content>
+				</Card.Root>
+			{/if}
 		</Shimmer>
 	</div>
 </main>

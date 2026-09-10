@@ -18,6 +18,7 @@
 		rowsToAttributes,
 		type AttributeRow
 	} from '$lib/components/attributes-editor.svelte';
+	import MediaGallery from '$lib/components/media-gallery.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -297,6 +298,10 @@
 								/>
 							</div>
 							<AttributesEditor bind:rows={attrRows} />
+							<div class="space-y-1.5">
+								<Label>Files</Label>
+								<MediaGallery nodeId={savedNodeId} />
+							</div>
 							{#if autoSaving}
 								<p class="text-xs text-muted-foreground">Saving…</p>
 							{/if}

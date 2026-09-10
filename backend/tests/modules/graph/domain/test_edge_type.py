@@ -98,6 +98,15 @@ def test_update_changes_attributes_schema() -> None:
     assert et.attributes_schema == schema
 
 
+def test_update_changes_description() -> None:
+    """update() with a description overwrites it."""
+    et = EdgeType.create(slug="directed-by", label="Directed By")
+
+    et.update(description="Links a film to its director.")
+
+    assert et.description == "Links a film to its director."
+
+
 def test_update_leaves_unspecified_fields_unchanged() -> None:
     """update() with no arguments leaves all fields untouched."""
     et = EdgeType.create(
