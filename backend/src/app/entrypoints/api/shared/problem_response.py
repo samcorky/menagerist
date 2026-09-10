@@ -14,7 +14,7 @@ from app.shared_kernel.errors import (
 if TYPE_CHECKING:
     from fastapi import FastAPI, Request
 
-_STATUS_BY_ERROR: dict[type[DomainError], int] = {
+_STATUS_BY_DOMAIN_ERROR: dict[type[DomainError], int] = {
     NotFoundError: 404,
     ConflictError: 409,
     ValidationError: 400,
@@ -35,7 +35,7 @@ class ProblemDetail(BaseModel):
 def _status_for(error_type: type[DomainError]) -> int:
     return next(
         status
-        for base, status in _STATUS_BY_ERROR.items()
+        for base, status in _STATUS_BY_DOMAIN_ERROR.items()
         if issubclass(error_type, base)
     )
 
@@ -77,7 +77,7 @@ def _problem_response(request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, DomainError)
     status_code = next(
         status
-        for error_type, status in _STATUS_BY_ERROR.items()
+        for error_type, status in _STATUS_BY_DOMAIN_ERROR.items()
         if isinstance(exc, error_type)
     )
     return JSONResponse(
@@ -100,5 +100,8 @@ def register_exception_handlers(app: FastAPI) -> None:
     try/except - a module-specific error like `NodeNotFoundError(NotFoundError)`
     gets the correct HTTP status for free, purely from subclassing.
     """
-    for error_type in _STATUS_BY_ERROR:
+    for error_type in _STATUS_BY_DOMAIN_ERROR:
         app.add_exception_handler(error_type, _problem_response)
+
+    # Catch-all for any unhandled exception, returning a 500 problem response.
+    app.add_exception_handler(Exception, _problem_response)
