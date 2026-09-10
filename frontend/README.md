@@ -10,6 +10,8 @@ Static SPA served by nginx. API calls proxy through `/api/*` to the backend.
 - Typed API client auto-generated from the backend's OpenAPI schema via [`@hey-api/openapi-ts`](https://heyapi.dev)
 - Chainguard distroless nginx, non-root, port 8080
 
+For UX and UI rules, see [DESIGN_GUIDELINES.md](DESIGN_GUIDELINES.md).
+
 ## Key patterns
 
 **Reactivity** — Svelte 5 runes throughout (`$state`, `$derived`, `$effect`). No global stores except singleton controllers (`src/lib/theme.svelte.ts`, `src/lib/capture.svelte.ts`).

@@ -65,6 +65,20 @@ See [ROADMAP.md](ROADMAP.md) for the full planned feature set.
 
 ---
 
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [ROADMAP.md](ROADMAP.md) | Product direction and feature priorities |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, commands, and testing |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System topology and data model |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | Significant technical decisions and rationale |
+| [backend/README.md](backend/README.md) | Backend architecture and conventions |
+| [frontend/README.md](frontend/README.md) | Frontend stack and dev workflow |
+| [frontend/DESIGN_GUIDELINES.md](frontend/DESIGN_GUIDELINES.md) | Frontend UX/UI rules |
+
+---
+
 ## Why Menagerist?
 
 Inspired by the idea of a *menagerie* — a curated collection of things. Rather than forcing everything into predefined categories, Menagerist is designed to be general-purpose and adaptable.
