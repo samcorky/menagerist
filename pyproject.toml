@@ -305,32 +305,52 @@ deps = ["dump-schema"]
 sequence = ["docker-build-backend", "docker-build-frontend"]
 help = "Build backend and frontend Docker images"
 
+[tool.poe.groups.run.tasks._compose-override]
+expr = """
+(lambda p: f'-f {p}' if p else '')(
+    next((f for f in ('compose.override.yml', 'compose.override.yaml')
+          if __import__('pathlib').Path(f).exists()), None)
+)
+"""
+help = "Internal: resolves to -f <override file> if compose.override.yml or .yaml exists, else empty"
+
+[tool.poe.groups.run.tasks.docker-config]
+cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} config"
+uses = { COMPOSE_OVERRIDE = "_compose-override" }
+help = "Print the fully merged Docker Compose config (base + override applied)"
+
 [tool.poe.groups.run.tasks.docker-run-backend]
-cmd = "docker compose -f compose.dev.yaml up backend"
+cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} up backend"
+uses = { COMPOSE_OVERRIDE = "_compose-override" }
 help = "Run the backend stack (postgres + backend) via Docker Compose"
 ignore_fail = true
 
 [tool.poe.groups.run.tasks.docker-run-frontend]
-cmd = "docker compose -f compose.dev.yaml up frontend"
+cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} up frontend"
+uses = { COMPOSE_OVERRIDE = "_compose-override" }
 help = "Run the full stack including frontend via Docker Compose"
 ignore_fail = true
 
 [tool.poe.groups.run.tasks.docker-run]
-cmd = "docker compose -f compose.dev.yaml up"
+cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} up"
+uses = { COMPOSE_OVERRIDE = "_compose-override" }
 help = "Run the full app via Docker Compose"
 ignore_fail = true
 
 [tool.poe.groups.run.tasks.docker-up-backend]
-cmd = "docker compose -f compose.dev.yaml up -d --force-recreate migrate backend"
+cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} up -d --force-recreate migrate backend"
+uses = { COMPOSE_OVERRIDE = "_compose-override" }
 help = "Build and (re)start the backend container detached (runs migrations first)"
 deps = ["docker-build-backend"]
 
 [tool.poe.groups.run.tasks.docker-up-frontend]
-cmd = "docker compose -f compose.dev.yaml up -d --force-recreate frontend"
+cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} up -d --force-recreate frontend"
+uses = { COMPOSE_OVERRIDE = "_compose-override" }
 help = "Build and (re)start the frontend container detached"
 deps = ["docker-build-frontend"]
 
 [tool.poe.groups.run.tasks.docker-up]
-cmd = "docker compose -f compose.dev.yaml up -d --force-recreate"
+cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} up -d --force-recreate"
+uses = { COMPOSE_OVERRIDE = "_compose-override" }
 help = "Build and (re)start all containers detached"
 deps = ["docker-build"]

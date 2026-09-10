@@ -36,3 +36,5 @@ build
 # metadata (see backend/scripts/hatch_build_info.py) — excluding tracked
 # paths made every build look dirty. Never reaches an image layer, so
 # there's no runtime cost to including them.
+compose.override.yml
+compose.override.yaml

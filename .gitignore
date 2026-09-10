@@ -17,3 +17,7 @@ Thumbs.db
 # AI Stuff*
 .claude/
 .agents/
+
+# Docker Compose Overrides
+compose.override.yml
+compose.override.yaml
