@@ -30,6 +30,7 @@ The core is working end-to-end:
 - **Relationships** — connect records with typed, directional or symmetric edges
 - **Relationship types** — named edge types with forward/reverse labels and attribute schemas
 - **Attributes** — freeform and schema-driven key/value metadata on any record
+- **Media & attachments** — attach photos, scans, and documents to any record
 - **Search** — filter nodes by name or description
 - **Type filtering** — browse records by type
 - **Infinite scroll** — lists load more as you scroll
