@@ -16,7 +16,7 @@ router = APIRouter()
 
 _STATIC_DIR = Path(__file__).parent / "static"
 _FAVICON_PATH = _STATIC_DIR / "favicon.svg"
-_LOGO_PATH = _STATIC_DIR / "logo.svg"
+_LOGO_PATH = _STATIC_DIR / "favicon.svg"
 
 _STATIC_CACHE = "public, max-age=86400"
 
