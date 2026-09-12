@@ -127,6 +127,6 @@ Read [frontend/README.md](frontend/README.md) and [frontend/DESIGN_GUIDELINES.md
 
 ## Dependencies
 
-- Only add or update dependencies when they are strictly necessary or clearly recommended for the task. Prefer the smallest, most targeted dependency that solves the problem, and avoid adding libraries that duplicate existing functionality or increase the runtime surface area without a clear benefit.
+- Only add or update dependencies when they are strictly necessary or clearly recommended for the task. Prefer the smallest, most targeted dependency that solves the problem and avoid adding libraries that duplicate existing functionality or increase the runtime surface area without a clear benefit.
 - Before adding or updating dependencies, review `.github/renovate.json` and keep the change aligned with the repository's Renovate rules and update policy (grouping, schedule, automerge, and manual review for majors/runtime dependencies).
 - When evaluating a dependency, estimate the impact on the final Docker image size and runtime footprint, and favour lighter or more maintainable options when trade-offs are similar.
