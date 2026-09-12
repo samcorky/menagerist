@@ -18,7 +18,7 @@ _DOCS_CSP = "; ".join(
             "style-src 'self' 'unsafe-inline' "
             + "https://cdn.jsdelivr.net https://fonts.googleapis.com"
         ),
-        "img-src 'self' data: https://fastapi.tiangolo.com",
+        "img-src 'self' data:",
         "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net",
         "connect-src 'self' https://cdn.jsdelivr.net",
         "worker-src 'self' blob:",

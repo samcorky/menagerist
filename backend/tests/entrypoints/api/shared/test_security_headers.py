@@ -56,7 +56,6 @@ def test_security_headers_middleware_allows_docs_csp(path: str) -> None:
     csp = resp.headers["Content-Security-Policy"]
     assert "https://cdn.jsdelivr.net" in csp
     assert "'unsafe-inline'" in csp
-    assert "https://fastapi.tiangolo.com" in csp
     assert "https://fonts.googleapis.com" in csp
     assert "https://fonts.gstatic.com" in csp
     assert "connect-src 'self' https://cdn.jsdelivr.net" in csp
