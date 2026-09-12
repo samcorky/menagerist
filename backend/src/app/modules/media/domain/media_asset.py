@@ -17,16 +17,14 @@ class MediaStatus(StrEnum):
 
 @dataclass(kw_only=True, eq=False)
 class MediaAsset(Identifiable, Timestamped):
-    """A binary file (image, document, etc.) attached to a graph node.
-
-    Lifecycle: staged → attached → orphaned → (hard deleted by cleanup).
-    """
+    """Binary media asset attached to a target entity."""
 
     filename: str
     content_type: str
     size: int
     sha256: str
     status: MediaStatus
+    has_thumbnail: bool = False
 
     def __post_init__(self) -> None:
         """Validate invariants after construction."""
@@ -43,11 +41,7 @@ class MediaAsset(Identifiable, Timestamped):
         size: int,
         sha256: str,
     ) -> MediaAsset:
-        """Create a new staged media asset.
-
-        `asset_id` lets the caller pre-generate the id (needed when the id must
-        be known before the file is written to storage).
-        """
+        """Create a new staged media asset."""
         now = datetime.now(UTC)
         return cls(
             id=asset_id if asset_id is not None else uuid.uuid7(),
@@ -61,10 +55,7 @@ class MediaAsset(Identifiable, Timestamped):
         )
 
     def promote(self) -> None:
-        """Transition from staged to attached.
-
-        Raises `ValidationError` if the asset is not currently staged.
-        """
+        """Transition from staged to attached."""
         if self.status is not MediaStatus.STAGED:
             raise ValidationError(
                 f"cannot promote a {self.status.value!r} asset; must be staged"
@@ -72,11 +63,12 @@ class MediaAsset(Identifiable, Timestamped):
         self.status = MediaStatus.ATTACHED
         self.touch()
 
-    def orphan(self) -> None:
-        """Transition from attached to orphaned.
+    def mark_thumbnail_generated(self) -> None:
+        """Record that a thumbnail has been generated for this asset."""
+        self.has_thumbnail = True
 
-        Raises `ValidationError` if the asset is not currently attached.
-        """
+    def orphan(self) -> None:
+        """Transition from attached to orphaned."""
         if self.status is not MediaStatus.ATTACHED:
             raise ValidationError(
                 f"cannot orphan a {self.status.value!r} asset; must be attached"

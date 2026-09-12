@@ -19,24 +19,23 @@ _CHUNK_SIZE = 64 * 1024
 
 
 class LocalFilesystemMediaStorage:
-    """Filesystem-backed media storage with sharded paths and atomic moves.
-
-    All lifecycle buckets (staged/attached/orphaned) share one base directory
-    so that `os.replace` can move files between them without crossing device
-    boundaries — a cross-device rename would break atomicity.
-    """
+    """Filesystem-backed media storage with sharded paths and atomic moves."""
 
     def __init__(self, base_path: Path) -> None:
         self._base = base_path
 
     @staticmethod
     def _shard(asset_id: uuid.UUID) -> str:
-        """Return a stable, evenly distributed filesystem shard for `asset_id`."""
+        """Return filesystem shard for asset_id."""
         return hashlib.sha256(asset_id.bytes).hexdigest()[:2]
 
     def _path(self, asset_id: uuid.UUID, status: MediaStatus) -> Path:
-        """Return the sharded path for `asset_id` in bucket `status`."""
+        """Return sharded path for asset_id in bucket status."""
         return self._base / status.value / self._shard(asset_id) / str(asset_id)
+
+    def _thumb_path(self, asset_id: uuid.UUID, status: MediaStatus) -> Path:
+        """Return thumbnail sibling path for asset_id."""
+        return self._path(asset_id, status).with_suffix(".thumb")
 
     async def store(
         self,
@@ -46,11 +45,7 @@ class LocalFilesystemMediaStorage:
         *,
         max_size: int | None = None,
     ) -> tuple[int, str]:
-        """Stream `stream` to disk, computing sha256 and byte count as it flows.
-
-        Writes to a `.tmp` sibling first, then atomically renames to the final
-        path — a partial upload never appears at the canonical location.
-        """
+        """Stream data to disk, computing sha256 and byte count."""
         path = self._path(asset_id, status)
         await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
         tmp = path.with_suffix(".tmp")
@@ -76,16 +71,8 @@ class LocalFilesystemMediaStorage:
     def retrieve(
         self, asset_id: uuid.UUID, status: MediaStatus
     ) -> AsyncGenerator[bytes]:
-        """Return an async generator that streams the stored file in chunks."""
-        return self._stream_file(asset_id, status)
-
-    async def _stream_file(
-        self, asset_id: uuid.UUID, status: MediaStatus
-    ) -> AsyncGenerator[bytes]:
-        path = self._path(asset_id, status)
-        async with aiofiles.open(path, "rb") as f:
-            while chunk := await f.read(_CHUNK_SIZE):
-                yield chunk
+        """Return async generator streaming the stored file."""
+        return self._stream_file_at(self._path(asset_id, status))
 
     async def move(
         self,
@@ -93,14 +80,51 @@ class LocalFilesystemMediaStorage:
         from_status: MediaStatus,
         to_status: MediaStatus,
     ) -> None:
-        """Atomically rename the file from one lifecycle bucket to another."""
+        """Atomically rename file and optional thumbnail between buckets."""
         src = self._path(asset_id, from_status)
         dst = self._path(asset_id, to_status)
         await asyncio.to_thread(dst.parent.mkdir, parents=True, exist_ok=True)
         await asyncio.to_thread(os.replace, str(src), str(dst))
+        src_thumb = self._thumb_path(asset_id, from_status)
+        dst_thumb = self._thumb_path(asset_id, to_status)
+        with suppress(FileNotFoundError):
+            await asyncio.to_thread(os.replace, str(src_thumb), str(dst_thumb))
 
     async def delete(self, asset_id: uuid.UUID, status: MediaStatus) -> None:
-        """Remove the stored file (no-op if already absent)."""
+        """Remove stored file and its thumbnail sibling."""
         path = self._path(asset_id, status)
         with suppress(FileNotFoundError):
             await asyncio.to_thread(path.unlink)
+        thumb = self._thumb_path(asset_id, status)
+        with suppress(FileNotFoundError):
+            await asyncio.to_thread(thumb.unlink)
+
+    async def store_thumbnail(
+        self,
+        asset_id: uuid.UUID,
+        status: MediaStatus,
+        data: bytes,
+    ) -> None:
+        """Write thumbnail bytes atomically alongside the original file."""
+        path = self._thumb_path(asset_id, status)
+        await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
+        tmp = path.parent / (path.name + ".tmp")
+        try:
+            async with aiofiles.open(tmp, "wb") as f:
+                await f.write(data)
+            await asyncio.to_thread(os.replace, str(tmp), str(path))
+        except Exception:
+            with suppress(FileNotFoundError):
+                await asyncio.to_thread(tmp.unlink)
+            raise
+
+    def retrieve_thumbnail(
+        self, asset_id: uuid.UUID, status: MediaStatus
+    ) -> AsyncGenerator[bytes]:
+        """Return an async generator that streams the thumbnail bytes."""
+        return self._stream_file_at(self._thumb_path(asset_id, status))
+
+    async def _stream_file_at(self, path: Path) -> AsyncGenerator[bytes]:
+        async with aiofiles.open(path, "rb") as f:
+            while chunk := await f.read(_CHUNK_SIZE):
+                yield chunk

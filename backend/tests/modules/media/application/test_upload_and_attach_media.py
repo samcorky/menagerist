@@ -12,6 +12,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from app.modules.media.adapters.imaging.in_memory_image_processor import (
+    InMemoryImageProcessor,
+)
 from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
     InMemoryMediaAssetRepository,
 )
@@ -76,7 +79,12 @@ async def test_upload_and_attach_stores_file_and_persists_records() -> None:
     """Happy path: file lands in attached storage, asset+attachment rows created."""
     node_id = uuid.uuid4()
     uow, assets, _, storage = _make_uow_and_repos()
-    use_case = UploadAndAttachMedia(uow, storage, _AllowAllPolicy())  # type: ignore[arg-type]
+    use_case = UploadAndAttachMedia(
+        uow,
+        storage,
+        _AllowAllPolicy(),
+        InMemoryImageProcessor(),  # type: ignore[arg-type]
+    )
 
     attachment = await use_case.handle(
         UploadAndAttachMediaCommand(
@@ -117,7 +125,12 @@ async def test_upload_and_attach_single_transaction() -> None:
 
     uow.commit = _tracking_commit  # type: ignore[method-assign]
 
-    use_case = UploadAndAttachMedia(uow, storage, _AllowAllPolicy())  # type: ignore[arg-type]
+    use_case = UploadAndAttachMedia(
+        uow,
+        storage,
+        _AllowAllPolicy(),
+        InMemoryImageProcessor(),  # type: ignore[arg-type]
+    )
     await use_case.handle(
         UploadAndAttachMediaCommand(
             filename="doc.pdf",
@@ -156,7 +169,12 @@ async def test_storage_move_fires_after_commit_not_before() -> None:
 
     storage.move = _tracking_move  # type: ignore[method-assign]
 
-    use_case = UploadAndAttachMedia(uow, storage, _AllowAllPolicy())  # type: ignore[arg-type]
+    use_case = UploadAndAttachMedia(
+        uow,
+        storage,
+        _AllowAllPolicy(),
+        InMemoryImageProcessor(),  # type: ignore[arg-type]
+    )
     await use_case.handle(
         UploadAndAttachMediaCommand(
             filename="img.png",
@@ -183,7 +201,12 @@ async def test_policy_violation_propagates_and_no_storage_move() -> None:
     """
     node_id = uuid.uuid4()
     uow, _, _, storage = _make_uow_and_repos()
-    use_case = UploadAndAttachMedia(uow, storage, _RejectAllPolicy())  # type: ignore[arg-type]
+    use_case = UploadAndAttachMedia(
+        uow,
+        storage,
+        _RejectAllPolicy(),
+        InMemoryImageProcessor(),  # type: ignore[arg-type]
+    )
 
     with pytest.raises(UnsupportedMediaTypeError):
         await use_case.handle(
@@ -209,7 +232,12 @@ async def test_attribute_key_forwarded_to_attachment() -> None:
     """attribute_key is passed through to the resulting attachment."""
     node_id = uuid.uuid4()
     uow, _, _, storage = _make_uow_and_repos()
-    use_case = UploadAndAttachMedia(uow, storage, _AllowAllPolicy())  # type: ignore[arg-type]
+    use_case = UploadAndAttachMedia(
+        uow,
+        storage,
+        _AllowAllPolicy(),
+        InMemoryImageProcessor(),  # type: ignore[arg-type]
+    )
 
     attachment = await use_case.handle(
         UploadAndAttachMediaCommand(
@@ -224,3 +252,33 @@ async def test_attribute_key_forwarded_to_attachment() -> None:
     )
 
     assert attachment.attribute_key == "thumbnail"
+
+
+async def test_upload_and_attach_moves_thumbnail_to_attached() -> None:
+    """When a thumbnail is generated, it moves with the asset to attached storage."""
+    node_id = uuid.uuid4()
+    uow, assets, _, storage = _make_uow_and_repos()
+    use_case = UploadAndAttachMedia(
+        uow,
+        storage,
+        _AllowAllPolicy(),
+        InMemoryImageProcessor(),  # type: ignore[arg-type]
+    )
+
+    attachment = await use_case.handle(
+        UploadAndAttachMediaCommand(
+            filename="photo.jpg",
+            content_type="image/jpeg",
+            sniffed_content_type="image/jpeg",
+            stream=_stream(b"real-image-bytes"),
+            target_type=AttachmentTarget.NODE,
+            target_id=node_id,
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    asset = await assets.get(attachment.asset_id)
+    assert asset is not None
+    assert asset.has_thumbnail is True
+    assert (asset.id, "attached") in storage._thumbnails
+    assert (asset.id, "staged") not in storage._thumbnails

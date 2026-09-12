@@ -43,15 +43,7 @@ def _status_for(error_type: type[DomainError]) -> int:
 def error_response(
     error_type: type[DomainError], *, detail: str
 ) -> dict[int | str, dict[str, Any]]:
-    """Build an OpenAPI `responses` entry documenting `error_type` for a route.
-
-    Lets a router declare, e.g., `responses=error_response(NodeNotFoundError,
-    detail="Node <id> not found")` so Swagger shows the exact problem+json
-    shape and status code `register_exception_handlers` actually returns for
-    that error, without every router re-describing the RFC 9457 schema by hand.
-    Merge multiple calls with `{**error_response(...), **error_response(...)}`
-    for a route that can raise more than one kind of domain error.
-    """
+    """Build an OpenAPI responses entry documenting error_type for a route."""
     status_code = _status_for(error_type)
     return {
         status_code: {
@@ -94,12 +86,7 @@ def _problem_response(request: Request, exc: Exception) -> JSONResponse:
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    """Map every `shared_kernel.errors` domain error to a problem response.
-
-    Registered once at the composition root so routers never carry a
-    try/except - a module-specific error like `NodeNotFoundError(NotFoundError)`
-    gets the correct HTTP status for free, purely from subclassing.
-    """
+    """Map domain errors to RFC 9457 problem responses."""
     for error_type in _STATUS_BY_DOMAIN_ERROR:
         app.add_exception_handler(error_type, _problem_response)
 

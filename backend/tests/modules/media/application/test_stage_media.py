@@ -1,5 +1,8 @@
 from typing import TYPE_CHECKING
 
+from app.modules.media.adapters.imaging.in_memory_image_processor import (
+    InMemoryImageProcessor,
+)
 from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
     InMemoryMediaAssetRepository,
 )
@@ -24,13 +27,14 @@ async def _stream(*chunks: bytes) -> AsyncIterator[bytes]:
         yield chunk
 
 
-def _make_use_case() -> tuple[
-    StageMedia, InMemoryMediaAssetRepository, InMemoryMediaStorage
-]:
+def _make_use_case(
+    image_processor: InMemoryImageProcessor | None = None,
+) -> tuple[StageMedia, InMemoryMediaAssetRepository, InMemoryMediaStorage]:
     repo = InMemoryMediaAssetRepository()
     storage = InMemoryMediaStorage()
     uow = create_in_memory_media_uow(make_in_memory_repos(assets=repo))
-    return StageMedia(uow, storage), repo, storage
+    proc = image_processor or InMemoryImageProcessor()
+    return StageMedia(uow, storage, proc), repo, storage
 
 
 async def test_stage_persists_asset_and_commits() -> None:
@@ -70,6 +74,61 @@ async def test_stage_computes_sha256() -> None:
     )
 
     assert asset.sha256 == hashlib.sha256(data).hexdigest()
+
+
+async def test_stage_generates_thumbnail_for_image() -> None:
+    """StageMedia generates and stores a thumbnail when content is thumbnailable."""
+    use_case, _repo, storage = _make_use_case()
+
+    asset = await use_case.handle(
+        StageMediaCommand(
+            filename="photo.jpg",
+            content_type="image/jpeg",
+            sniffed_content_type="image/jpeg",
+            stream=_stream(b"real-image-bytes"),
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    assert asset.has_thumbnail is True
+    assert (asset.id, "staged") in storage._thumbnails
+
+
+async def test_stage_skips_thumbnail_when_processor_returns_none() -> None:
+    """StageMedia skips thumbnailing gracefully when processor returns None."""
+    proc = InMemoryImageProcessor(generate_result=False)
+    use_case, _repo, storage = _make_use_case(image_processor=proc)
+
+    asset = await use_case.handle(
+        StageMediaCommand(
+            filename="photo.jpg",
+            content_type="image/jpeg",
+            sniffed_content_type="image/jpeg",
+            stream=_stream(b"invalid-image-bytes"),
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    assert asset.has_thumbnail is False
+    assert (asset.id, "staged") not in storage._thumbnails
+
+
+async def test_stage_warns_on_filename_extension_mismatch_and_downgrades() -> None:
+    """StageMedia warns on extension mismatch and downgrades unconfirmed type."""
+    use_case, _repo, _storage = _make_use_case()
+
+    asset = await use_case.handle(
+        StageMediaCommand(
+            filename="report.pdf",
+            content_type="image/jpeg",
+            sniffed_content_type=None,
+            stream=_stream(b"not-jpeg-bytes"),
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    assert asset.content_type == "application/octet-stream"
+    assert asset.has_thumbnail is False
 
 
 async def test_stage_raises_when_file_too_large() -> None:

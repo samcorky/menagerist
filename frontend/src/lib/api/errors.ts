@@ -1,10 +1,4 @@
-/**
- * Extract a human-readable message from a failed API call's `error` field.
- *
- * Covers both shapes the backend can return: an RFC 9457 problem detail
- * (`{ detail: string }`, from a domain error) and FastAPI's own request
- * validation error (`{ detail: Array<{ msg: string }> }`).
- */
+/** Extract a human-readable message from a failed API call's error field. */
 export function errorMessage(error: unknown): string {
 	if (error && typeof error === 'object' && 'detail' in error) {
 		const detail = (error as { detail: unknown }).detail;

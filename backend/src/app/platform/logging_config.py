@@ -12,15 +12,7 @@ def _expand_access_log_fields(
     method_name: str,
     event_dict: structlog.types.EventDict,
 ) -> structlog.types.EventDict:
-    """Promote Granian's per-request access log fields to top-level keys.
-
-    Granian builds a dict of request fields (addr, method, path, status,
-    dt_ms, ...) and passes it as the log record's args - see
-    granian.log.log_request_builder. With `pass_foreign_args=True` on the
-    formatter below, that dict survives as `positional_args`. Merge it into
-    the event dict so each field renders separately instead of being baked
-    into one opaque message string via the access-log format template.
-    """
+    """Promote Granian's per-request access log fields to top-level keys."""
     record: logging.LogRecord | None = event_dict.get("_record")
     args = event_dict.pop("positional_args", None)
     if (
@@ -74,10 +66,6 @@ def configure_logging(*, level: int | str | None = None) -> None:
         colors_enabled = os.environ.get("NO_COLOR", "0")[0] == "0"
         renderer = structlog.dev.ConsoleRenderer(
             colors=colors_enabled,
-            # On Windows, colorama strips ANSI codes whenever stdout isn't a real
-            # console handle - which is always the case when poe pipes a task's
-            # output (eg. `parallel`) to prefix each line. force_colors keeps the
-            # codes intact in that case too.
             force_colors=colors_enabled,
             sort_keys=False,
         )
@@ -94,28 +82,17 @@ def configure_logging(*, level: int | str | None = None) -> None:
     root_logger.addHandler(handler)
     root_logger.setLevel(effective_level)
 
-    # Route warnings.warn() (deprecation warnings from dependencies, etc.)
-    # through logging -> the same handler above, instead of straight to stderr.
+    # Route warnings through logging handler.
     logging.captureWarnings(True)
 
-    # Suppress Alembic's per-request "Context impl" / "Will assume transactional
-    # DDL" chatter at INFO. The migrate commands re-enable this before running.
+    # Suppress verbose Alembic migration logs.
     logging.getLogger("alembic.runtime.migration").setLevel(logging.WARNING)
 
 
-# Handed to Granian's `log_dictconfig` param. Granian's own `_granian` and
-# `granian.access` loggers default to `propagate: False` with their own
-# plain-text handlers, which bypasses the structlog renderer entirely.
-# This strips their handlers and lets records propagate to root instead,
-# so server startup/lifecycle and access logs render identically to
-# everything else.
+# Propagate Granian loggers to root so they render via structlog.
 type LoggerConfig = dict[str, str | bool | list[str]]
 
-# Extends Granian's default access log format with the Request-Id header.
-# nginx injects this on every proxied request (generating one if the client
-# didn't supply it), so it is always present and correlates backend logs with
-# nginx access logs. _expand_access_log_fields renames the raw atom key to
-# `request_id` so it renders cleanly in structured output.
+# Granian access log format including Request-Id header.
 GRANIAN_ACCESS_LOG_FORMAT = (
     '[%(time)s] %(addr)s - "%(method)s %(path)s %(protocol)s"'
     + " %(status)d %(dt_ms).3f %(header{request-id})s"

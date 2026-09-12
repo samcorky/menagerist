@@ -15,3 +15,7 @@ class MediaAttachmentNotFoundError(NotFoundError):
 
 class UnsupportedMediaTypeError(ValidationError):
     """Raised when a file's content-type is not permitted for the attachment target."""
+
+
+class ThumbnailNotAvailableError(NotFoundError):
+    """Raised when a thumbnail is requested for an asset that has none."""

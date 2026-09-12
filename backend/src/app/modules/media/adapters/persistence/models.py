@@ -17,16 +17,11 @@ class MediaAssetModel(IdentifiableMixin, TimestampedMixin, Base):
     size: Mapped[int]
     sha256: Mapped[str]
     status: Mapped[str] = mapped_column(index=True)
+    has_thumbnail: Mapped[bool] = mapped_column(default=False)
 
 
 class MediaAttachmentModel(IdentifiableMixin, TimestampedMixin, Base):
-    """Polymorphic junction table linking a media asset to any graph entity.
-
-    ``target_type`` is the ``AttachmentTarget`` string value (``"node"``,
-    ``"edge"``, …); ``target_id`` is the PK of the referenced row.  No FK
-    constraint on ``target_id`` — referential integrity is enforced by the
-    application layer, which also handles cascade deletion.
-    """
+    """Polymorphic junction table linking a media asset to a target entity."""
 
     __tablename__ = "media_attachments"
     __table_args__ = (

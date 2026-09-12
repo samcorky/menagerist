@@ -21,3 +21,6 @@ Thumbs.db
 # Docker Compose Overrides
 compose.override.yml
 compose.override.yaml
+
+# Pytest artifacts
+.coverage

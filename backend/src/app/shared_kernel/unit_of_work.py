@@ -6,13 +6,7 @@ if TYPE_CHECKING:
 
 
 class UnitOfWork[TRepos](Protocol):
-    """Transaction boundary that yields a module's repository bundle.
-
-    A structural contract, not a base class - a module's concrete unit of
-    work (real or in-memory) satisfies this by shape alone. See
-    `InMemoryUnitOfWork` for the fast-test implementation and
-    `app.platform.unit_of_work.SqlAlchemySessionUnitOfWork` for the real one.
-    """
+    """Transaction boundary that yields a module's repository bundle."""
 
     async def __aenter__(self) -> TRepos:
         """Enter the transactional scope, returning the module's repositories."""
@@ -32,23 +26,12 @@ class UnitOfWork[TRepos](Protocol):
         ...
 
     def on_commit(self, callback: Callable[[], Awaitable[None]]) -> None:
-        """Register a side effect to run only after this transaction truly commits.
-
-        A `JoinedUnitOfWork` forwards these to the owner, so a callback
-        registered by a composed sub-handler still runs exactly once, after
-        the outer transaction actually commits.
-        """
+        """Register a side effect to run after this transaction commits."""
         ...
 
 
 class JoinedUnitOfWork[TRepos]:
-    """Runs a sub-handler against an already-open transaction.
-
-    ``__aenter__``, ``__aexit__``, and ``commit()`` are all no-ops — the owner
-    controls the real session lifecycle and commit — but ``on_commit`` callbacks
-    are forwarded to ``owner``, so a sub-handler's deferred side effect still
-    runs exactly once, only after the owner's commit genuinely succeeds.
-    """
+    """Runs a sub-handler against an already-open transaction."""
 
     def __init__(self, repos: TRepos, owner: UnitOfWork[TRepos]) -> None:
         self._repos = repos
@@ -64,10 +47,10 @@ class JoinedUnitOfWork[TRepos]:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        """No-op: the owner's ``__aexit__`` handles rollback and cleanup."""
+        """No-op: the owner handles rollback and cleanup."""
 
     async def commit(self) -> None:
-        """No-op: call the owner's ``commit()`` to actually commit the transaction."""
+        """No-op: the owner controls the commit."""
 
     def on_commit(self, callback: Callable[[], Awaitable[None]]) -> None:
         """Forward the callback to the owning unit of work."""
@@ -75,15 +58,7 @@ class JoinedUnitOfWork[TRepos]:
 
 
 class InMemoryUnitOfWork[TRepos]:
-    """No-op transaction boundary wrapping an already-built repository bundle.
-
-    Exists so tests can construct a module's in-memory repositories directly
-    and hand them to a use case without spoofing a session factory - there is
-    no session, so there is nothing to begin, roll back, or close. ``committed``
-    and ``rolled_back`` let a test assert a use case reached (or correctly
-    avoided) its commit point.  ``on_commit`` callbacks fire in registration
-    order immediately after ``commit()`` succeeds, mirroring real-DB timing.
-    """
+    """In-memory transaction boundary wrapping a repository bundle for tests."""
 
     def __init__(self, repos: TRepos) -> None:
         self._repos = repos

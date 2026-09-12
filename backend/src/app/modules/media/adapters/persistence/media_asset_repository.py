@@ -21,6 +21,7 @@ def _to_domain(model: MediaAssetModel) -> MediaAsset:
         size=model.size,
         sha256=model.sha256,
         status=MediaStatus(model.status),
+        has_thumbnail=model.has_thumbnail,
         created_at=model.created_at,
         updated_at=model.updated_at,
     )
@@ -35,6 +36,7 @@ def _to_model(asset: MediaAsset) -> MediaAssetModel:
         size=asset.size,
         sha256=asset.sha256,
         status=asset.status.value,
+        has_thumbnail=asset.has_thumbnail,
         created_at=asset.created_at,
         updated_at=asset.updated_at,
     )

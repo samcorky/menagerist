@@ -29,11 +29,7 @@ class AttachMediaCommand:
 
 
 class AttachMedia(CommandHandler[MediaUnitOfWork, AttachMediaCommand, MediaAttachment]):
-    """Link a media asset to a graph entity, promoting it from staged if needed.
-
-    The DB commit lands before the storage move via ``on_commit``, so the DB
-    is always authoritative about asset state even if the storage move fails.
-    """
+    """Link a media asset to a target entity, promoting from staged if needed."""
 
     def __init__(
         self,

@@ -10,7 +10,8 @@
 
 	const mediaPromise = $derived(
 		listNodeMedia({ path: { node_id: nodeId } }).then(({ data }) => {
-			return data?.find((item) => item.attribute_key === 'cover')?.content_url ?? null;
+			const cover = data?.find((item) => item.attribute_key === 'cover');
+			return cover?.thumbnail_url ?? cover?.content_url ?? null;
 		})
 	);
 </script>

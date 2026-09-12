@@ -20,6 +20,7 @@ _EXAMPLE: dict[str, Any] = {
     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "status": "attached",
     "content_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/content",
+    "thumbnail_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/thumbnail",
     "created_at": "2026-09-07T10:00:00Z",
     "updated_at": "2026-09-07T10:00:00Z",
 }
@@ -37,6 +38,7 @@ class MediaAssetResponse(BaseModel):
     sha256: str
     status: MediaStatus
     content_url: str
+    thumbnail_url: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -51,6 +53,9 @@ class MediaAssetResponse(BaseModel):
             sha256=asset.sha256,
             status=asset.status,
             content_url=f"/api/v1/media/{asset.id}/content",
+            thumbnail_url=(
+                f"/api/v1/media/{asset.id}/thumbnail" if asset.has_thumbnail else None
+            ),
             created_at=asset.created_at,
             updated_at=asset.updated_at,
         )
@@ -66,6 +71,7 @@ class NodeMediaItemResponse(BaseModel):
     sha256: str
     status: MediaStatus
     content_url: str
+    thumbnail_url: str | None
     created_at: datetime
     updated_at: datetime
     attribute_key: AttachmentKey | None

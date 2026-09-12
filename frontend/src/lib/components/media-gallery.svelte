@@ -230,7 +230,7 @@
 				<div class="group relative aspect-square overflow-hidden rounded-lg border bg-muted/30">
 					{#if isImage(asset)}
 						<img
-							src={asset.content_url}
+							src={asset.thumbnail_url ?? asset.content_url}
 							alt={asset.filename}
 							class="h-full w-full object-cover"
 							loading="lazy"

@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.modules.media.adapters.imaging.pillow_processor import PillowImageProcessor
 from app.modules.media.adapters.persistence.unit_of_work import create_media_uow
 from app.modules.media.adapters.policy.content_type_attachment_policy import (
     ContentTypeAttachmentPolicy,
@@ -21,6 +22,7 @@ from app.modules.media.application.promote_media import PromoteMedia
 from app.modules.media.application.stage_media import StageMedia
 from app.modules.media.application.upload_and_attach_media import UploadAndAttachMedia
 from app.modules.media.ports.attachment_policy import AttachmentPolicyPort
+from app.modules.media.ports.image_processor import ImageProcessorPort
 from app.modules.media.ports.media_storage import MediaStoragePort
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.platform.config.media import MediaSettings, get_media_settings
@@ -45,11 +47,16 @@ def get_attachment_policy() -> AttachmentPolicyPort:
     return ContentTypeAttachmentPolicy()
 
 
+def get_image_processor() -> ImageProcessorPort:
+    return PillowImageProcessor()
+
+
 def get_stage_media_use_case(
     uow: Annotated[MediaUnitOfWork, Depends(get_media_uow)],
     storage: Annotated[MediaStoragePort, Depends(get_media_storage)],
+    image_processor: Annotated[ImageProcessorPort, Depends(get_image_processor)],
 ) -> StageMedia:
-    return StageMedia(uow, storage)
+    return StageMedia(uow, storage, image_processor)
 
 
 def get_get_media_use_case(
@@ -105,8 +112,9 @@ def get_upload_and_attach_use_case(
     uow: Annotated[MediaUnitOfWork, Depends(get_media_uow)],
     storage: Annotated[MediaStoragePort, Depends(get_media_storage)],
     policy: Annotated[AttachmentPolicyPort, Depends(get_attachment_policy)],
+    image_processor: Annotated[ImageProcessorPort, Depends(get_image_processor)],
 ) -> UploadAndAttachMedia:
-    return UploadAndAttachMedia(uow, storage, policy)
+    return UploadAndAttachMedia(uow, storage, policy, image_processor)
 
 
 def get_list_node_media_use_case(

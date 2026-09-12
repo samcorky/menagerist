@@ -29,9 +29,9 @@ def test_dependency_direction_and_layering() -> None:
         .layer("entrypoints")
         .defined_by_folder("*entrypoints/cli")
         .layer("entrypoints")
-        .defined_by_folder("*entrypoints/api/v1/system*")
+        .defined_by_folder("*entrypoints/api/system*")
         .layer("api_shared")
-        .defined_by_folder("*entrypoints/api/v1/shared*")
+        .defined_by_folder("*entrypoints/api/shared*")
         .where_layer("domain")
         .may_only_depend_on_layers("domain", "shared_kernel")
         .where_layer("ports")
@@ -57,55 +57,80 @@ def test_dependency_direction_and_layering() -> None:
 
 
 def test_domain_layer_has_no_framework_dependencies() -> None:
-    """Domain layer must not depend on frameworks (FastAPI, SQLAlchemy, Pydantic)."""
+    """Domain layer may only depend on pure data modeling and typing primitives."""
     rule = (
         project_files(SRC_PATH)
         .in_folder("*domain*")
-        .should_not()
+        .should()
         .depend_on_external_modules()
-        .matching("fastapi*")
-        .matching("sqlalchemy*")
-        .matching("pydantic*")
+        .matching("dataclasses*")
+        .matching("typing*")
+        .matching("types*")
+        .matching("uuid*")
+        .matching("datetime*")
+        .matching("enum*")
+        .matching("abc*")
+        .matching("collections*")
+        .matching("mimetypes*")
+        .matching("re*")
     )
     assert_passes(rule)
 
 
 def test_shared_kernel_has_no_framework_dependencies() -> None:
-    """Shared kernel must not depend on frameworks (FastAPI, SQLAlchemy, Pydantic)."""
+    """Shared kernel may only depend on pure data modeling and typing primitives."""
     rule = (
         project_files(SRC_PATH)
         .in_folder("*shared_kernel*")
-        .should_not()
+        .should()
         .depend_on_external_modules()
-        .matching("fastapi*")
-        .matching("sqlalchemy*")
-        .matching("pydantic*")
+        .matching("dataclasses*")
+        .matching("typing*")
+        .matching("types*")
+        .matching("uuid*")
+        .matching("datetime*")
+        .matching("enum*")
+        .matching("abc*")
+        .matching("collections*")
+        .matching("hashlib*")
+        .matching("re*")
+        .matching("unicodedata*")
     )
     assert_passes(rule)
 
 
 def test_ports_layer_has_no_framework_dependencies() -> None:
-    """Ports layer must not depend on frameworks (FastAPI, SQLAlchemy)."""
+    """Ports layer must not depend on web/storage frameworks or heavy I/O libraries."""
     rule = (
         project_files(SRC_PATH)
         .in_folder("*ports*")
         .should_not()
         .depend_on_external_modules()
         .matching("fastapi*")
+        .matching("starlette*")
         .matching("sqlalchemy*")
+        .matching("PIL*")
+        .matching("pillow*")
+        .matching("filetype*")
+        .matching("aiofiles*")
     )
     assert_passes(rule)
 
 
 def test_application_layer_has_no_framework_dependencies() -> None:
-    """Application layer must not depend on frameworks (FastAPI, SQLAlchemy)."""
+    """Application layer must not depend on web/storage frameworks."""
     rule = (
         project_files(SRC_PATH)
         .in_folder("*application*")
         .should_not()
         .depend_on_external_modules()
         .matching("fastapi*")
+        .matching("starlette*")
         .matching("sqlalchemy*")
+        .matching("PIL*")
+        .matching("pillow*")
+        .matching("filetype*")
+        .matching("aiofiles*")
     )
     assert_passes(rule)
 

@@ -15,6 +15,7 @@ class InMemoryMediaStorage:
 
     def __init__(self) -> None:
         self._files: dict[tuple[uuid.UUID, str], bytes] = {}
+        self._thumbnails: dict[tuple[uuid.UUID, str], bytes] = {}
 
     async def store(
         self,
@@ -55,7 +56,32 @@ class InMemoryMediaStorage:
         """Move the bytes to the new lifecycle bucket."""
         data = self._files.pop((asset_id, from_status.value))
         self._files[(asset_id, to_status.value)] = data
+        if (asset_id, from_status.value) in self._thumbnails:
+            self._thumbnails[(asset_id, to_status.value)] = self._thumbnails.pop(
+                (asset_id, from_status.value)
+            )
 
     async def delete(self, asset_id: uuid.UUID, status: MediaStatus) -> None:
         """Remove the stored bytes (no-op if absent)."""
         self._files.pop((asset_id, status.value), None)
+        self._thumbnails.pop((asset_id, status.value), None)
+
+    async def store_thumbnail(
+        self,
+        asset_id: uuid.UUID,
+        status: MediaStatus,
+        data: bytes,
+    ) -> None:
+        """Store pre-generated thumbnail bytes in memory."""
+        self._thumbnails[(asset_id, status.value)] = data
+
+    def retrieve_thumbnail(
+        self, asset_id: uuid.UUID, status: MediaStatus
+    ) -> AsyncGenerator[bytes]:
+        """Return an async generator that yields the thumbnail bytes."""
+        return self._stream_thumbnail(asset_id, status)
+
+    async def _stream_thumbnail(
+        self, asset_id: uuid.UUID, status: MediaStatus
+    ) -> AsyncGenerator[bytes]:
+        yield self._thumbnails.get((asset_id, status.value), b"")

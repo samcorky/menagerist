@@ -118,10 +118,6 @@ def revision(message: str, *, autogenerate: bool = True) -> None:
 def dump(*, output: Path = Path("openapi.json")) -> None:
     """Write the API's OpenAPI schema to a file.
 
-    No live server is needed - this builds the same FastAPI app `serve` does
-    and reads its schema directly, so the frontend can generate a typed
-    client without a running backend.
-
     Args:
         output: Path to write the schema JSON to.
     """

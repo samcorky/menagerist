@@ -8,14 +8,7 @@ if TYPE_CHECKING:
 
 
 class SqlAlchemySessionUnitOfWork[TRepos]:
-    """Real, SQLAlchemy-backed `UnitOfWork[TRepos]` shared by every module.
-
-    A module never subclasses this - it supplies a `build_repos` callable
-    that wraps a freshly-opened session in its own repository bundle, and
-    gets session lifecycle (begin, rollback-on-exception, always-close,
-    commit) for free.  ``on_commit`` callbacks are run in registration order
-    immediately after the SQLAlchemy commit succeeds.
-    """
+    """SQLAlchemy-backed UnitOfWork shared across modules."""
 
     def __init__(
         self,

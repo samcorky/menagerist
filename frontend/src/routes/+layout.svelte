@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { onNavigate } from '$app/navigation';
-	import { CirclePlus, LayoutGrid, House, Settings, Telescope } from '@lucide/svelte';
+	import { CirclePlus, LayoutGrid, House, Settings, Telescope, BookOpen } from '@lucide/svelte';
 	import { Toaster } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import ThemeToggle from '$lib/components/theme-toggle.svelte';
@@ -62,6 +62,7 @@
 </script>
 
 <svelte:head>
+	<link rel="icon" href="/favicon.ico" sizes="any" />
 	<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </svelte:head>
 
@@ -107,6 +108,9 @@
 				<Button size="sm" onclick={() => captureController.show()}>
 					<CirclePlus class="size-4" />
 					New item
+				</Button>
+				<Button variant="ghost" size="icon" href="/api/docs" target="_blank" aria-label="API docs">
+					<BookOpen class="size-4" />
 				</Button>
 				<Button
 					variant={settingsActive ? 'secondary' : 'ghost'}

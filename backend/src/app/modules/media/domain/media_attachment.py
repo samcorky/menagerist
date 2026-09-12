@@ -21,15 +21,7 @@ class AttachmentKey(StrEnum):
 
 @dataclass(kw_only=True, eq=False)
 class MediaAttachment(Identifiable, Timestamped):
-    """A link between a media asset and exactly one graph entity.
-
-    ``target_type`` identifies the entity table; ``target_id`` is the PK of
-    the target row.  Adding a new attachment point only requires a new
-    ``AttachmentTarget`` value — no schema changes.
-
-    ``attribute_key`` is an optional slot label (e.g. ``"cover"``, ``"scan_1"``)
-    that lets a single target hold multiple named attachments.
-    """
+    """Link between a media asset and a target entity."""
 
     asset_id: uuid.UUID
     target_type: AttachmentTarget

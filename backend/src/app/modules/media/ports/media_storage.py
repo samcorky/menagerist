@@ -49,3 +49,20 @@ class MediaStoragePort(Protocol):
     ) -> None:
         """Hard-delete the stored file."""
         ...
+
+    async def store_thumbnail(
+        self,
+        asset_id: uuid.UUID,
+        status: MediaStatus,
+        data: bytes,
+    ) -> None:
+        """Write pre-generated thumbnail bytes alongside the original file."""
+        ...
+
+    def retrieve_thumbnail(
+        self,
+        asset_id: uuid.UUID,
+        status: MediaStatus,
+    ) -> AsyncGenerator[bytes]:
+        """Return an async generator that streams the thumbnail bytes."""
+        ...
