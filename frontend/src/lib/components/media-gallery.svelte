@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Upload, X, File as FileIcon, Star, StarOff } from '@lucide/svelte';
+	import { onDestroy } from 'svelte';
+	import { X, File as FileIcon, Star, StarOff } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { SvelteSet } from 'svelte/reactivity';
 	import {
@@ -11,16 +12,20 @@
 		type NodeMediaItemResponse
 	} from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
+	import FileDrop from './file-drop.svelte';
 
 	let { nodeId }: { nodeId: string } = $props();
 
-	type UploadingEntry = { id: string; name: string; progress: 'uploading' | 'error' };
+	type UploadingEntry = {
+		id: string;
+		name: string;
+		progress: 'uploading' | 'error';
+		previewUrl?: string;
+	};
 
 	let assets = $state<NodeMediaItemResponse[]>([]);
 	let uploading = $state<UploadingEntry[]>([]);
 	let loading = $state(true);
-	let dragOver = $state(false);
-	let fileInputEl = $state<HTMLInputElement | null>(null);
 	let dropZoneEl = $state<HTMLDivElement | null>(null);
 
 	const displayAssets = $derived.by(() => {
@@ -57,7 +62,8 @@
 		const entries: UploadingEntry[] = list.map((f) => ({
 			id: crypto.randomUUID(),
 			name: f.name,
-			progress: 'uploading'
+			progress: 'uploading',
+			...(f.type.startsWith('image/') ? { previewUrl: URL.createObjectURL(f) } : {})
 		}));
 		uploading = [...uploading, ...entries];
 
@@ -83,23 +89,18 @@
 					toast.error(`Failed to upload ${file.name}`, { description: errorMessage(result.error) });
 				} else {
 					uploading = uploading.filter((u) => u.id !== entry.id);
+					if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl);
 					await loadMedia();
 				}
 			})
 		);
 	}
 
-	function handleDrop(e: DragEvent) {
-		e.preventDefault();
-		dragOver = false;
-		if (e.dataTransfer?.files) void uploadFiles(e.dataTransfer.files);
-	}
-
-	function handleFileInput(e: Event) {
-		const input = e.target as HTMLInputElement;
-		if (input.files) void uploadFiles(input.files);
-		input.value = '';
-	}
+	onDestroy(() => {
+		for (const u of uploading) {
+			if (u.previewUrl) URL.revokeObjectURL(u.previewUrl);
+		}
+	});
 
 	function handleDelete(asset: NodeMediaItemResponse, triggerEl: HTMLElement) {
 		const tile = triggerEl.closest<HTMLElement>('.group');
@@ -170,35 +171,7 @@
 </script>
 
 <div class="space-y-3">
-	<!-- Drop zone -->
-	<div
-		bind:this={dropZoneEl}
-		role="button"
-		tabindex="0"
-		class="relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-6 text-sm transition-colors {dragOver
-			? 'border-primary bg-primary/5'
-			: 'border-border hover:border-primary/50 hover:bg-muted/40'}"
-		ondragover={(e) => {
-			e.preventDefault();
-			dragOver = true;
-		}}
-		ondragleave={() => (dragOver = false)}
-		ondrop={handleDrop}
-		onclick={() => fileInputEl?.click()}
-		onkeydown={(e) => e.key === 'Enter' && fileInputEl?.click()}
-	>
-		<Upload class="size-5 text-muted-foreground" />
-		<span class="text-muted-foreground">
-			Drop files here or <span class="text-foreground underline underline-offset-2">browse</span>
-		</span>
-		<input
-			bind:this={fileInputEl}
-			type="file"
-			multiple
-			class="sr-only"
-			onchange={handleFileInput}
-		/>
-	</div>
+	<FileDrop onFiles={uploadFiles} bind:ref={dropZoneEl} />
 
 	<!-- Loading skeleton -->
 	{#if loading}
@@ -211,23 +184,45 @@
 		<div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
 			<!-- In-flight uploads -->
 			{#each uploading as u (u.id)}
-				<div
-					class="relative flex aspect-square flex-col items-center justify-center gap-1.5 rounded-lg border bg-muted/50 p-2 text-center {u.progress ===
-					'error'
-						? 'border-destructive/50'
-						: ''}"
-				>
+				{#if u.previewUrl}
 					<div
-						class="size-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground {u.progress ===
+						class="relative aspect-square overflow-hidden rounded-lg border bg-muted/50 {u.progress ===
 						'error'
-							? 'hidden'
+							? 'border-destructive/50'
 							: ''}"
-					></div>
-					{#if u.progress === 'error'}
-						<X class="size-4 text-destructive" />
-					{/if}
-					<span class="line-clamp-2 text-xs text-muted-foreground">{u.name}</span>
-				</div>
+					>
+						<img src={u.previewUrl} alt={u.name} class="h-full w-full object-cover opacity-60" />
+						<div class="absolute inset-0 flex items-center justify-center">
+							<div
+								class="size-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground {u.progress ===
+								'error'
+									? 'hidden'
+									: ''}"
+							></div>
+							{#if u.progress === 'error'}
+								<X class="size-4 text-destructive" />
+							{/if}
+						</div>
+					</div>
+				{:else}
+					<div
+						class="relative flex aspect-square flex-col items-center justify-center gap-1.5 rounded-lg border bg-muted/50 p-2 text-center {u.progress ===
+						'error'
+							? 'border-destructive/50'
+							: ''}"
+					>
+						<div
+							class="size-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground {u.progress ===
+							'error'
+								? 'hidden'
+								: ''}"
+						></div>
+						{#if u.progress === 'error'}
+							<X class="size-4 text-destructive" />
+						{/if}
+						<span class="line-clamp-2 text-xs text-muted-foreground">{u.name}</span>
+					</div>
+				{/if}
 			{/each}
 
 			<!-- Uploaded assets -->
