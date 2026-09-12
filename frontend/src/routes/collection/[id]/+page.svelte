@@ -63,6 +63,7 @@
 	let newEdgeType = $state('');
 	let newEdgeTargetId = $state('');
 	let creatingEdge = $state(false);
+	let connectButtonEl = $state<HTMLElement | null>(null);
 	let edgeTargetSearch = $state('');
 	let edgeTargetOpen = $state(false);
 	let filteredNodes = $derived(
@@ -238,9 +239,16 @@
 		creatingEdge = false;
 	}
 
-	function handleDeleteEdge(edge: EdgeResponse) {
+	function handleDeleteEdge(edge: EdgeResponse, triggerEl: HTMLElement) {
+		const row = triggerEl.closest('li');
+		const focusTarget =
+			row?.nextElementSibling?.querySelector<HTMLElement>('button') ??
+			row?.previousElementSibling?.querySelector<HTMLElement>('button') ??
+			connectButtonEl;
+
 		// Optimistically remove
 		edges = edges.filter((e) => e.id !== edge.id);
+		focusTarget?.focus();
 
 		let undone = false;
 		const timerId = setTimeout(async () => {
@@ -397,7 +405,7 @@
 										type="button"
 										variant="ghost"
 										size="icon"
-										onclick={() => handleDeleteEdge(edge)}
+										onclick={(e) => handleDeleteEdge(edge, e.currentTarget)}
 										aria-label="Remove connection"
 									>
 										<Trash2 class="size-4" />
@@ -506,7 +514,7 @@
 						</div>
 
 						<div class="flex justify-end">
-							<Button type="submit" disabled={creatingEdge}>
+							<Button type="submit" disabled={creatingEdge} bind:ref={connectButtonEl}>
 								{creatingEdge ? 'Connecting…' : 'Connect item'}
 							</Button>
 						</div>

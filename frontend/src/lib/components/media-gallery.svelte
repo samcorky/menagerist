@@ -21,6 +21,7 @@
 	let loading = $state(true);
 	let dragOver = $state(false);
 	let fileInputEl = $state<HTMLInputElement | null>(null);
+	let dropZoneEl = $state<HTMLDivElement | null>(null);
 
 	const displayAssets = $derived.by(() => {
 		const seen = new SvelteSet<string>();
@@ -100,9 +101,16 @@
 		input.value = '';
 	}
 
-	function handleDelete(asset: NodeMediaItemResponse) {
+	function handleDelete(asset: NodeMediaItemResponse, triggerEl: HTMLElement) {
+		const tile = triggerEl.closest<HTMLElement>('.group');
+		const focusTarget =
+			tile?.nextElementSibling?.querySelector<HTMLElement>('button[aria-label^="Delete"]') ??
+			tile?.previousElementSibling?.querySelector<HTMLElement>('button[aria-label^="Delete"]') ??
+			dropZoneEl;
+
 		const removed = assets.filter((a) => a.id === asset.id);
 		assets = assets.filter((a) => a.id !== asset.id);
+		focusTarget?.focus();
 
 		let undone = false;
 		const timerId = setTimeout(async () => {
@@ -164,6 +172,7 @@
 <div class="space-y-3">
 	<!-- Drop zone -->
 	<div
+		bind:this={dropZoneEl}
 		role="button"
 		tabindex="0"
 		class="relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-6 text-sm transition-colors {dragOver
@@ -272,7 +281,7 @@
 						{/if}
 						<button
 							type="button"
-							onclick={() => handleDelete(asset)}
+							onclick={(e) => handleDelete(asset, e.currentTarget)}
 							class="rounded-full bg-black/70 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/90"
 							aria-label="Delete {asset.filename}"
 						>

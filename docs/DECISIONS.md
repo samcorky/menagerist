@@ -90,6 +90,6 @@ Significant architectural choices and their rationale. Entries are added when a 
 
 ## CalVer with a `0.` pre-stable prefix
 
-**Decision:** Version scheme is `0.YYYY.MM` until the data model and API stabilise, then `YYYY.MM`.
+**Decision:** Version scheme is `0.YYYY.MM.PATCH` until the data model and API stabilise, then `YYYY.MM.PATCH`.
 
 **Rationale:** CalVer communicates the release date naturally for a personal app without semantic versioning overhead. The `0.` prefix signals pre-stable — breaking migrations and API changes are expected — without requiring a formal major-version bump. Dropping the `0.` is the public signal that the schema and API are stable.

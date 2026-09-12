@@ -96,11 +96,13 @@ Read [backend/README.md](backend/README.md) in full before writing backend code.
 | Component | Threshold |
 |---|---|
 | domain | 100% |
-| ports | 100% |
+| ports | tracked, no fixed floor |
 | application | 100% |
 | shared_kernel | 100% |
 | adapters | 80% |
 | platform | 70% |
+
+`ports/` holds `Protocol` interfaces — the stub method bodies (`...`) never execute, so a hard 100% floor wouldn't test anything real. Codecov tracks it for visibility (`target: auto` in `codecov.yml`) without gating on it.
 
 ## Frontend conventions
 

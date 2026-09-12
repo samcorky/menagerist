@@ -18,7 +18,7 @@ nginx (port 8080, Chainguard distroless)
 
 The nginx container serves the pre-built frontend as a static SPA and proxies all `/api/*` traffic to the backend. No server-side rendering, no API gateway, no service mesh.
 
-Docker Compose orchestrates the full stack. A development override (`compose.dev.yaml`) mounts source and enables hot reload. A machine-specific override (`compose.override.yaml`) handles per-machine configuration. Container images use Chainguard distroless bases — non-root, minimal attack surface.
+Docker Compose orchestrates the full stack. A development override (`compose.dev.yaml`) mounts source and enables hot reload. A machine-specific override (`compose.override.yml`) handles per-machine configuration. Container images use Chainguard distroless bases — non-root, minimal attack surface.
 
 ## Backend
 

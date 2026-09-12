@@ -108,7 +108,9 @@ The `SchedulerPort` will need the same shape later (Postgres/APScheduler/Cron ad
 
 ## Testing mirrors the architecture
 
-Coverage floors: domain 100%, application 90%, infrastructure/API 80% - matching how much of each layer's correctness is structural versus incidental. Domain code has no framework dependencies and is exhaustively unit-testable; adapters carry real sessions/HTTP/external services where 100% is impractical or low-signal. `@pytest.mark.integration` separates the fast domain-heavy loop from the slower suite touching real adapters.
+Coverage floors (defined in the root `codecov.yml`, enforced by `poe coverage` and Codecov): domain 100%, application 100%, shared_kernel 100%, adapters 80%, platform 70% - matching how much of each layer's correctness is structural versus incidental. Domain code has no framework dependencies and is exhaustively unit-testable; adapters carry real sessions/HTTP/external services where 100% is impractical or low-signal. `@pytest.mark.integration` separates the fast domain-heavy loop from the slower suite touching real adapters.
+
+`ports/` is tracked but has no fixed floor (`target: auto` in `codecov.yml`) rather than the 100% used for domain/application/shared_kernel - its files are `Protocol` interfaces whose stub method bodies (`...`) never execute, so forcing 100% there wouldn't test anything real.
 
 `backend/tests/` mirrors `src/app/modules/<context>/{domain,application,adapters}` directory-for-directory, plus `tests/architecture/`: an `archunitpython` suite encoding the dependency-direction rule itself (domain may not depend on application/adapters/entrypoints, application may not depend on adapters/entrypoints, adapters may not depend on entrypoints). No I/O, always runs, catches a boundary violation before it becomes a design problem.
 

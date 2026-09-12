@@ -33,9 +33,9 @@ poe sync          # installs backend + frontend deps and generates the API clien
 Then start the dev server (proxies `/api/*` to `localhost:8000`):
 
 ```sh
-poe dev           # from repo root
+poe serve-frontend   # from repo root
 # or
-npm run dev       # from this directory
+npm run dev          # from this directory
 ```
 
 The backend must be running separately for API calls to work:

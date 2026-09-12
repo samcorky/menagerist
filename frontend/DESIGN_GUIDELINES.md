@@ -512,7 +512,7 @@ Schemas are defined once, per category or relationship type, from **Settings →
 **Defining a schema field (in Settings):**
 
 1. **Label** — free text (e.g. "Rating," "Pressing," "Signed by"). This is the only name the user provides; don't also ask for a separate internal "key" — derive it the same way category slugs are already derived elsewhere in the app (auto-slugify the label, don't surface the slug as a thing to fill in).
-2. **Kind** — a plain-language picker of how the value should be entered/displayed (table below). Present these as ordinary words ("Number," "Yes/No," "Rating"), not as raw type strings or abbreviations — the current implementation's dropdown (`text` / `number` / `boolean` / `date` / `select` / `richtext`) and "Req" checkbox label need updating to match this.
+2. **Kind** — a plain-language picker of how the value should be entered/displayed (table below). Present these as ordinary words ("Number," "Yes/No," "Rating"), not as raw type strings or abbreviations — already reflected in the schema editor's dropdown ("Text" / "Number" / "Yes/No" / "Date" / "Choice" / "Long text") and its "Required" checkbox label.
 3. **Required** _(optional toggle)_ — marks the field as expected for that category. See the required-fields rule below before treating this as a hard constraint.
 
 **Field kinds:**
