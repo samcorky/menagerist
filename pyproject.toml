@@ -245,13 +245,13 @@ help = "Run all unit tests"
 heading = "Database"
 
 [tool.poe.groups.database.tasks.db-up]
-shell = "docker compose up -d postgres"
-interpreter = ["powershell", "posix"]
+cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} up -d postgres"
+uses = { COMPOSE_OVERRIDE = "_compose-override" }
 help = "Start the local Postgres container"
 
 [tool.poe.groups.database.tasks.db-down]
-shell = "docker compose down"
-interpreter = ["powershell", "posix"]
+cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} down"
+uses = { COMPOSE_OVERRIDE = "_compose-override" }
 help = "Stop and remove the local Postgres container"
 
 [tool.poe.groups.database.tasks.migrate]

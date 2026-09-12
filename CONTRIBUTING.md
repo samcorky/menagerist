@@ -2,20 +2,56 @@
 
 ## Setup
 
-Requires [uv](https://docs.astral.sh/uv/) and Node 20+.
+Requires [uv](https://docs.astral.sh/uv/) and Node 20+. If you don't have uv installed:
+
+```sh
+curl -LsSf https://astral.sh/uv/install.sh | sh   # macOS/Linux
+```
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"   # Windows
+```
 
 ```sh
 git clone <repo>
 cd menagerist
-poe init   # sync all deps and install git hooks
+uv run poe init   # sync all deps and install git hooks
 ```
+
+`poe` and the `menagerist` CLI live in the project's `.venv`, not your global PATH. Every `poe` command elsewhere in this doc is written bare (`poe test`, `poe lint`, ...) and assumes that venv is active:
+
+```sh
+source .venv/bin/activate       # Linux/macOS
+```
+
+```powershell
+.venv\Scripts\Activate.ps1      # Windows PowerShell
+```
+
+Skipping activation is fine too — just prefix each command with `uv run` instead, e.g. `uv run poe test`.
 
 Start the full stack (Docker required):
 
 ```sh
-poe serve                              # backend at :8000 + frontend at :5173
+poe db-up && poe migrate && poe serve  # Postgres in Docker + backend at :8000 + frontend at :5173
 # or
-docker compose -f compose.dev.yaml up  # full stack including Postgres
+docker compose -f compose.dev.yaml up  # full stack including Postgres, all containerized
+```
+
+### Manually, without `poe`
+
+```sh
+uv sync --all-packages --group dev
+cd frontend && npm install && cd ..
+
+docker compose -f compose.dev.yaml up -d postgres
+
+uv run menagerist migrate upgrade
+uv run menagerist serve --host 0.0.0.0 --reload   # backend at :8000
+```
+
+```sh
+cd frontend && npm run dev -- --host 0.0.0.0       # frontend at :5173, in a second shell
 ```
 
 ## Common tasks

@@ -51,11 +51,47 @@ The core is working end-to-end:
 
 ## Running locally
 
+All of these run the full stack (Postgres + backend + frontend) via Docker. There are no pre-built images yet — `menagerist-backend`/`menagerist-frontend` (or their `ghcr.io/samcorky/menagerist-*` equivalents) don't exist on a registry until the first tagged release, so every option below builds the images locally rather than pulling them. The frontend image build also needs `frontend/openapi.json` (the backend's API schema) to already exist — it's generated, not committed, so a fresh clone doesn't have one yet.
+
+### Easiest
+
+Install [uv](https://docs.astral.sh/uv/):
+
 ```bash
-docker compose -f compose.dev.yaml up
+curl -LsSf https://astral.sh/uv/install.sh | sh   # macOS/Linux
+```
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"   # Windows
+```
+
+Then, from the repo root:
+
+```sh
+uv run poe init
+uv run poe docker-up
 ```
 
 The app is available at [http://localhost:8080](http://localhost:8080).
+
+### The same thing, one `poe` task at a time
+
+```sh
+uv run poe init            # sync deps + install git hooks
+uv run poe dump-schema     # write frontend/openapi.json from the backend
+uv run poe docker-build    # build the backend + frontend images
+uv run poe docker-up       # start Postgres + backend + frontend, detached
+```
+
+### What `poe` is actually running (no `poe`)
+
+```sh
+cd backend && uv run menagerist schema dump --output ../frontend/openapi.json && cd ..
+docker buildx bake -f docker-bake.hcl local
+docker compose -f compose.dev.yaml up -d --force-recreate
+```
+
+`uv run` syncs and resolves the backend package on its own — no separate install step. If you've activated the project's venv instead (see [CONTRIBUTING.md](CONTRIBUTING.md)), drop the `uv run` prefix and call `menagerist` directly.
 
 ---
 
