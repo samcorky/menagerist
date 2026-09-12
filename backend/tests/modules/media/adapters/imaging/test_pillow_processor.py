@@ -45,6 +45,25 @@ def test_pillow_image_processor_rgb_image() -> None:
     assert out_img.format == "WEBP"
 
 
+def test_pillow_image_processor_corrects_exif_orientation() -> None:
+    """Thumbnail orientation matches visual content, not raw pixel layout."""
+    processor = PillowImageProcessor()
+
+    # Create a 200x100 landscape image then embed orientation=6 (rotate 90° CW),
+    # which simulates a portrait shot stored sideways — raw pixels are 200x100
+    # but the EXIF tag says "display as 100x200".
+    img = Image.new("RGB", (200, 100), color=(0, 0, 255))
+    buffer = io.BytesIO()
+    exif = img.getexif()
+    exif[0x0112] = 6  # Orientation tag: 90° CW
+    img.save(buffer, format="JPEG", exif=exif.tobytes())
+
+    result = processor.generate_thumbnail(buffer.getvalue(), max_dimension=320)
+    assert result is not None
+    # After transpose, the image should be portrait (100 wide x 200 tall)
+    assert result.width < result.height
+
+
 def test_pillow_image_processor_returns_none_for_corrupt_data() -> None:
     """Pillow processor returns None gracefully when decoding corrupt image bytes."""
     processor = PillowImageProcessor()

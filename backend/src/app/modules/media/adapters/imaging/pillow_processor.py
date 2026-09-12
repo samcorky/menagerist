@@ -1,6 +1,6 @@
 import io
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from app.modules.media.ports.image_processor import ThumbnailResult
 
@@ -14,12 +14,14 @@ class PillowImageProcessor:
     this in the first place.
     """
 
+    @staticmethod
     def generate_thumbnail(
-        self, data: bytes, *, max_dimension: int = 320
+        data: bytes, *, max_dimension: int = 320
     ) -> ThumbnailResult | None:
         """Return downscaled WEBP thumbnail or None if data is undecodable."""
         try:
-            image = Image.open(io.BytesIO(data))
+            loaded = Image.open(io.BytesIO(data))
+            image: Image.Image = ImageOps.exif_transpose(loaded)
             image.thumbnail((max_dimension, max_dimension))
             buffer = io.BytesIO()
             if image.mode in ("RGBA", "LA") or (
@@ -28,7 +30,7 @@ class PillowImageProcessor:
                 save_image = image.convert("RGBA")
             else:
                 save_image = image.convert("RGB")
-            save_image.save(buffer, format="WEBP", quality=80)
+            save_image.save(buffer, format="WEBP", quality=85, method=6)
         except UnidentifiedImageError, OSError, ValueError:
             return None
         return ThumbnailResult(
