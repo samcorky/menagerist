@@ -2,6 +2,8 @@ import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
@@ -9,6 +11,8 @@ from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -27,4 +31,5 @@ class GetMedia(QueryHandler[MediaUnitOfWork, GetMediaQuery, MediaAsset]):
             asset = await repos.assets.get(query.asset_id)
         if asset is None:
             raise MediaAssetNotFoundError(f"Media asset {query.asset_id} not found")
+        logger.debug("media asset fetched", asset_id=query.asset_id)
         return asset

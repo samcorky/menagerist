@@ -2,6 +2,8 @@ import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
@@ -9,6 +11,8 @@ from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -46,4 +50,5 @@ class ListNodeMedia(
                     results.append(
                         NodeMediaItem(asset=asset, attribute_key=att.attribute_key)
                     )
+        logger.debug("node media listed", node_id=query.node_id, count=len(results))
         return results

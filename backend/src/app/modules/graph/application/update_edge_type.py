@@ -2,6 +2,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+import structlog
+
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import EdgeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
@@ -9,6 +11,8 @@ from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -43,4 +47,5 @@ class UpdateEdgeType(CommandHandler[GraphUnitOfWork, UpdateEdgeTypeCommand, Edge
             )
             await repos.edge_types.save(edge_type)
             await self._uow.commit()
+        logger.info("edge type updated", edge_type_id=command.edge_type_id)
         return edge_type

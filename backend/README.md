@@ -160,6 +160,41 @@ This also decouples the transaction from the HTTP request/response cycle - the s
 
 There's no bus or mediator between a router/CLI command and the use case it calls - the router calls the use case directly, as shown above. A bus with pipeline behaviors would give a single seam for cross-cutting concerns (logging, authorization) applied uniformly, but nothing here needs that uniformity enforced yet. The typed-handler convention, plus every handler already taking an `actor`, is a prerequisite for a bus regardless, so this doesn't foreclose adding one later.
 
+## Logging
+
+The backend uses **structlog** (configured in `platform/logging_config.py`) with two output modes: colourised console in development, JSON in production (`MENAGERIST_LOG_JSON=true`). The effective log level is controlled by `MENAGERIST_LOG_LEVEL` (default: `INFO`).
+
+**Where loggers live** — application-layer use cases and adapter modules only. The domain layer has zero framework imports, so it carries no logger. In-memory adapters are test infrastructure and are also logger-free.
+
+**Level semantics:**
+
+| Level | When to use |
+|---|---|
+| `INFO` | One log per mutating action (create, update, delete, promote, attach, detach, stage, orphan, cleanup). Logged after `commit()` so only committed work is recorded. |
+| `DEBUG` | Trace-level detail: repository method calls, SQL queries (via SQLAlchemy's stdlib logger), file operations, thumbnail generation steps. Only emitted when `MENAGERIST_LOG_LEVEL=DEBUG`. |
+| `WARNING` | Recoverable anomalies that need attention (content-type mismatch, degraded trust level). |
+| `ERROR` | Unhandled exceptions, caught by the global exception handler. |
+
+**SQL query logging** is automatic at `DEBUG` level — SQLAlchemy emits every compiled statement through Python's `logging.getLogger("sqlalchemy.engine")`, which structlog's stdlib bridge picks up. No parameters are logged. Enable with `MENAGERIST_LOG_LEVEL=DEBUG`.
+
+**Call-site pattern:**
+
+```python
+import structlog
+
+logger = structlog.get_logger()
+
+# In a mutating use case, after commit:
+logger.info("node created", node_id=node.id, node_type=node.type)
+
+# In a query use case or adapter:
+logger.debug("fetching node", node_id=node_id)
+```
+
+Pass values directly — `uuid.UUID` objects are serialised to strings automatically by the `_serialise_uuids` processor in the shared pipeline. Never use f-strings or string formatting for structured fields.
+
+**Future:** when an event bus / pipeline behavior is introduced, cross-cutting logging will migrate to a central pipeline stage. The per-use-case logger calls will be removed at that point.
+
 ## Cross-cutting concerns
 
 **Permissions - wired, not enforced.** `shared_kernel/actor.py::Actor` (an id plus opaque `roles`) and `shared_kernel/authorization.py::AuthorizationPort` (`check(actor, action) -> None`, raising `ForbiddenError`) live in `shared_kernel/` since no bounded context owns authorization yet. The v1 concrete adapter, `entrypoints/api/shared/authorization.py::AllowAllAuthorizationAdapter`, always permits, and is wired at the composition root (`entrypoints/api/shared/dependencies.py`) rather than in `shared_kernel/` or a module, since it's a real adapter with no bounded-context owner yet. Routes depend on `get_current_actor` (v1: a fixed single-owner `Actor`); use cases take `actor` in `handle()` regardless of whether anything is actually checked. When the `identity` module lands (the OIDC roadmap step), only `get_current_actor` and the `AuthorizationPort` adapter get swapped - no route or use case signature changes, since they were only ever written against the port.

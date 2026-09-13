@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+import structlog
 from sqlalchemy import select
 
 from app.modules.graph.adapters.persistence.models import NodeTypeModel
@@ -10,6 +11,8 @@ if TYPE_CHECKING:
     import uuid
 
     from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = structlog.get_logger()
 
 
 def _to_domain(model: NodeTypeModel) -> NodeType:
@@ -48,16 +51,19 @@ class SqlAlchemyNodeTypeRepository:
 
     async def add(self, node_type: NodeType) -> None:
         """Add a new node type."""
+        logger.debug("adding node type", node_type_id=node_type.id)
         self._session.add(_to_model(node_type))
         await self._session.flush()
 
     async def save(self, node_type: NodeType) -> None:
         """Persist changes to an existing node type."""
+        logger.debug("saving node type", node_type_id=node_type.id)
         await self._session.merge(_to_model(node_type))
         await self._session.flush()
 
     async def get(self, node_type_id: uuid.UUID) -> NodeType | None:
         """Return the node type with `node_type_id`, or `None` if missing or deleted."""
+        logger.debug("fetching node type", node_type_id=node_type_id)
         model = await self._session.get(NodeTypeModel, node_type_id)
         if model is None or model.deleted_at is not None:
             return None
@@ -65,6 +71,7 @@ class SqlAlchemyNodeTypeRepository:
 
     async def get_by_slug(self, slug: str) -> NodeType | None:
         """Return the node type with `slug`, or `None` if missing or deleted."""
+        logger.debug("fetching node type by slug", slug=slug)
         stmt = (
             select(NodeTypeModel)
             .where(NodeTypeModel.slug == slug)
@@ -76,6 +83,7 @@ class SqlAlchemyNodeTypeRepository:
 
     async def list(self, *, after: uuid.UUID | None, limit: int) -> list[NodeType]:
         """List non-deleted node types ordered by id, starting after `after`."""
+        logger.debug("listing node types", after=after, limit=limit)
         stmt = (
             select(NodeTypeModel)
             .where(NodeTypeModel.deleted_at.is_(None))

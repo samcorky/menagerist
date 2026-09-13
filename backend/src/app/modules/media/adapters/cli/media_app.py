@@ -24,6 +24,7 @@ def cleanup() -> None:
     from app.platform.database import get_session_factory
     from app.shared_kernel.actor import SYSTEM_ACTOR
 
+    logger.debug("starting media cleanup")
     settings = get_media_settings()
     now = datetime.now(UTC)
 
@@ -63,6 +64,7 @@ def regenerate_thumbnails(*, max_dimension: int = 320) -> None:
     from app.platform.database import get_session_factory
     from app.shared_kernel.actor import SYSTEM_ACTOR
 
+    logger.debug("starting thumbnail regeneration", max_dimension=max_dimension)
     settings = get_media_settings()
 
     async def _run() -> int:

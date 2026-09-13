@@ -5,6 +5,7 @@ from contextlib import suppress
 from typing import TYPE_CHECKING
 
 import aiofiles
+import structlog
 
 from app.modules.media.domain.errors import MediaFileTooLargeError
 
@@ -14,6 +15,8 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from app.modules.media.domain.media_asset import MediaStatus
+
+logger = structlog.get_logger()
 
 _CHUNK_SIZE = 64 * 1024
 
@@ -46,6 +49,7 @@ class LocalFilesystemMediaStorage:
         max_size: int | None = None,
     ) -> tuple[int, str]:
         """Stream data to disk, computing sha256 and byte count."""
+        logger.debug("storing media file", asset_id=asset_id, status=status.value)
         path = self._path(asset_id, status)
         await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
         tmp = path.with_suffix(".tmp")
@@ -72,6 +76,7 @@ class LocalFilesystemMediaStorage:
         self, asset_id: uuid.UUID, status: MediaStatus
     ) -> AsyncGenerator[bytes]:
         """Return async generator streaming the stored file."""
+        logger.debug("retrieving media file", asset_id=asset_id, status=status.value)
         return self._stream_file_at(self._path(asset_id, status))
 
     async def move(
@@ -81,6 +86,12 @@ class LocalFilesystemMediaStorage:
         to_status: MediaStatus,
     ) -> None:
         """Atomically rename file and optional thumbnail between buckets."""
+        logger.debug(
+            "moving media file",
+            asset_id=asset_id,
+            from_status=from_status.value,
+            to_status=to_status.value,
+        )
         src = self._path(asset_id, from_status)
         dst = self._path(asset_id, to_status)
         await asyncio.to_thread(dst.parent.mkdir, parents=True, exist_ok=True)
@@ -92,6 +103,7 @@ class LocalFilesystemMediaStorage:
 
     async def delete(self, asset_id: uuid.UUID, status: MediaStatus) -> None:
         """Remove stored file and its thumbnail sibling."""
+        logger.debug("deleting media file", asset_id=asset_id, status=status.value)
         path = self._path(asset_id, status)
         with suppress(FileNotFoundError):
             await asyncio.to_thread(path.unlink)
@@ -106,6 +118,12 @@ class LocalFilesystemMediaStorage:
         data: bytes,
     ) -> None:
         """Write thumbnail bytes atomically alongside the original file."""
+        logger.debug(
+            "storing thumbnail",
+            asset_id=asset_id,
+            status=status.value,
+            size_bytes=len(data),
+        )
         path = self._thumb_path(asset_id, status)
         await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
         tmp = path.parent / (path.name + ".tmp")
@@ -122,6 +140,7 @@ class LocalFilesystemMediaStorage:
         self, asset_id: uuid.UUID, status: MediaStatus
     ) -> AsyncGenerator[bytes]:
         """Return an async generator that streams the thumbnail bytes."""
+        logger.debug("retrieving thumbnail", asset_id=asset_id, status=status.value)
         return self._stream_file_at(self._thumb_path(asset_id, status))
 
     async def _stream_file_at(self, path: Path) -> AsyncGenerator[bytes]:

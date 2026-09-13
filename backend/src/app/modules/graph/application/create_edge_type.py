@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+import structlog
+
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import EdgeTypeSlugConflictError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
@@ -9,6 +11,8 @@ from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -44,4 +48,7 @@ class CreateEdgeType(CommandHandler[GraphUnitOfWork, CreateEdgeTypeCommand, Edge
             )
             await repos.edge_types.add(edge_type)
             await self._uow.commit()
+        logger.info(
+            "edge type created", edge_type_id=edge_type.id, slug=str(edge_type.slug)
+        )
         return edge_type

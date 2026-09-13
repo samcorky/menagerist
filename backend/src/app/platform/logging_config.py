@@ -1,10 +1,23 @@
 import logging
 import os
 import sys
+import uuid
 
 import structlog
 
 from app.platform.config import get_logging_settings
+
+
+def _serialise_uuids(
+    logger: logging.Logger | None,
+    method_name: str,
+    event_dict: structlog.types.EventDict,
+) -> structlog.types.EventDict:
+    """Coerce any uuid.UUID values in the event dict to strings."""
+    return {
+        key: str(value) if isinstance(value, uuid.UUID) else value
+        for key, value in event_dict.items()
+    }
 
 
 def _expand_access_log_fields(
@@ -43,6 +56,7 @@ def configure_logging(*, level: int | str | None = None) -> None:
     effective_level = level if level is not None else settings.log_level
     shared_processors: list[structlog.types.Processor] = [
         structlog.contextvars.merge_contextvars,
+        _serialise_uuids,
         _expand_access_log_fields,
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
@@ -102,5 +116,6 @@ GRANIAN_LOG_DICTCONFIG: dict[str, dict[str, LoggerConfig]] = {
     "loggers": {
         "_granian": {"level": "INFO", "handlers": [], "propagate": True},
         "granian.access": {"level": "INFO", "handlers": [], "propagate": True},
+        "sqlalchemy.engine": {"level": "DEBUG", "handlers": [], "propagate": True},
     },
 }

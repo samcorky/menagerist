@@ -2,6 +2,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.modules.media.application.attach_media import AttachMedia, AttachMediaCommand
 from app.modules.media.application.stage_media import StageMedia, StageMediaCommand
 from app.modules.media.domain.media_attachment import (
@@ -20,6 +22,8 @@ if TYPE_CHECKING:
     from app.modules.media.ports.image_processor import ImageProcessorPort
     from app.modules.media.ports.media_storage import MediaStoragePort
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -85,4 +89,10 @@ class UploadAndAttachMedia(
 
             await self._uow.commit()
 
+        logger.info(
+            "media uploaded and attached",
+            asset_id=attachment.asset_id,
+            target_type=command.target_type.value,
+            target_id=command.target_id,
+        )
         return attachment

@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+import structlog
 from sqlalchemy import delete, select
 
 from app.modules.media.adapters.persistence.models import MediaAssetModel
@@ -10,6 +11,8 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = structlog.get_logger()
 
 
 def _to_domain(model: MediaAssetModel) -> MediaAsset:
@@ -50,16 +53,19 @@ class SqlAlchemyMediaAssetRepository:
 
     async def add(self, asset: MediaAsset) -> None:
         """Persist a new media asset."""
+        logger.debug("adding media asset", asset_id=asset.id)
         self._session.add(_to_model(asset))
         await self._session.flush()
 
     async def save(self, asset: MediaAsset) -> None:
         """Persist changes to an existing media asset."""
+        logger.debug("saving media asset", asset_id=asset.id)
         await self._session.merge(_to_model(asset))
         await self._session.flush()
 
     async def get(self, asset_id: uuid.UUID) -> MediaAsset | None:
         """Return the asset with `asset_id`, or `None` if it does not exist."""
+        logger.debug("fetching media asset", asset_id=asset_id)
         model = await self._session.get(MediaAssetModel, asset_id)
         if model is None:
             return None
@@ -72,6 +78,7 @@ class SqlAlchemyMediaAssetRepository:
         before: datetime,
     ) -> list[MediaAsset]:
         """Return assets in `status` whose `updated_at` is before `before`."""
+        logger.debug("listing expired media assets", status=status.value)
         stmt = select(MediaAssetModel).where(
             MediaAssetModel.status == status.value,
             MediaAssetModel.updated_at < before,
@@ -81,12 +88,14 @@ class SqlAlchemyMediaAssetRepository:
 
     async def list_by_status(self, *, status: MediaStatus) -> list[MediaAsset]:
         """Return all assets in `status`."""
+        logger.debug("listing media assets by status", status=status.value)
         stmt = select(MediaAssetModel).where(MediaAssetModel.status == status.value)
         result = await self._session.execute(stmt)
         return [_to_domain(m) for m in result.scalars()]
 
     async def delete(self, asset_id: uuid.UUID) -> None:
         """Hard-delete the asset record."""
+        logger.debug("deleting media asset", asset_id=asset_id)
         await self._session.execute(
             delete(MediaAssetModel).where(MediaAssetModel.id == asset_id)
         )

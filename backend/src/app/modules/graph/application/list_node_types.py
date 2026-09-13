@@ -2,12 +2,16 @@ import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -24,4 +28,6 @@ class ListNodeTypes(QueryHandler[GraphUnitOfWork, ListNodeTypesQuery, list[NodeT
     async def handle(self, query: ListNodeTypesQuery, actor: Actor) -> list[NodeType]:
         """Return a page of node types after `query.after`, up to `query.limit`."""
         async with self._uow as repos:
-            return await repos.node_types.list(after=query.after, limit=query.limit)
+            result = await repos.node_types.list(after=query.after, limit=query.limit)
+        logger.debug("node types listed", count=len(result))
+        return result

@@ -1,8 +1,11 @@
 import io
 
+import structlog
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from app.modules.media.ports.image_processor import ThumbnailResult
+
+logger = structlog.get_logger()
 
 
 class PillowImageProcessor:
@@ -19,6 +22,9 @@ class PillowImageProcessor:
         data: bytes, *, max_dimension: int = 320
     ) -> ThumbnailResult | None:
         """Return downscaled WEBP thumbnail or None if data is undecodable."""
+        logger.debug(
+            "generating thumbnail", max_dimension=max_dimension, input_bytes=len(data)
+        )
         try:
             loaded = Image.open(io.BytesIO(data))
             image: Image.Image = ImageOps.exif_transpose(loaded)
@@ -33,6 +39,13 @@ class PillowImageProcessor:
             save_image.save(buffer, format="WEBP", quality=85, method=6)
         except UnidentifiedImageError, OSError, ValueError:
             return None
-        return ThumbnailResult(
+        result = ThumbnailResult(
             data=buffer.getvalue(), width=save_image.width, height=save_image.height
         )
+        logger.debug(
+            "thumbnail generated",
+            width=result.width,
+            height=result.height,
+            size_bytes=len(result.data),
+        )
+        return result

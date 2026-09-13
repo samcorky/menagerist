@@ -2,6 +2,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.domain.media_attachment import (
@@ -16,6 +18,8 @@ if TYPE_CHECKING:
     from app.modules.media.ports.attachment_policy import AttachmentPolicyPort
     from app.modules.media.ports.media_storage import MediaStoragePort
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -72,4 +76,10 @@ class AttachMedia(CommandHandler[MediaUnitOfWork, AttachMediaCommand, MediaAttac
             await repos.attachments.add(attachment)
             await self._uow.commit()
 
+        logger.info(
+            "media attached",
+            asset_id=command.asset_id,
+            target_type=command.target_type.value,
+            target_id=command.target_id,
+        )
         return attachment

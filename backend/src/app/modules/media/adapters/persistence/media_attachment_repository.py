@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+import structlog
 from sqlalchemy import delete, select
 
 from app.modules.media.adapters.persistence.models import MediaAttachmentModel
@@ -13,6 +14,8 @@ if TYPE_CHECKING:
     import uuid
 
     from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = structlog.get_logger()
 
 
 class SqlAlchemyMediaAttachmentRepository:
@@ -47,11 +50,17 @@ class SqlAlchemyMediaAttachmentRepository:
 
     async def add(self, attachment: MediaAttachment) -> None:
         """Persist a new attachment row."""
+        logger.debug(
+            "adding media attachment",
+            attachment_id=attachment.id,
+            asset_id=attachment.asset_id,
+        )
         self._session.add(self._to_model(attachment))
         await self._session.flush()
 
     async def get(self, attachment_id: uuid.UUID) -> MediaAttachment | None:
         """Return an attachment by id, or ``None``."""
+        logger.debug("fetching media attachment", attachment_id=attachment_id)
         row = await self._session.get(MediaAttachmentModel, attachment_id)
         return self._to_domain(row) if row is not None else None
 
@@ -61,6 +70,11 @@ class SqlAlchemyMediaAttachmentRepository:
         target_id: uuid.UUID,
     ) -> list[MediaAttachment]:
         """Return all attachments for the given target entity."""
+        logger.debug(
+            "listing attachments for target",
+            target_type=target_type.value,
+            target_id=target_id,
+        )
         stmt = select(MediaAttachmentModel).where(
             MediaAttachmentModel.target_type == target_type.value,
             MediaAttachmentModel.target_id == target_id,
@@ -70,6 +84,7 @@ class SqlAlchemyMediaAttachmentRepository:
 
     async def list_for_asset(self, asset_id: uuid.UUID) -> list[MediaAttachment]:
         """Return all attachments for the given asset."""
+        logger.debug("listing attachments for asset", asset_id=asset_id)
         stmt = select(MediaAttachmentModel).where(
             MediaAttachmentModel.asset_id == asset_id
         )
@@ -78,6 +93,7 @@ class SqlAlchemyMediaAttachmentRepository:
 
     async def delete(self, attachment_id: uuid.UUID) -> None:
         """Remove an attachment row by id."""
+        logger.debug("deleting media attachment", attachment_id=attachment_id)
         await self._session.execute(
             delete(MediaAttachmentModel).where(MediaAttachmentModel.id == attachment_id)
         )

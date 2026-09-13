@@ -2,6 +2,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.modules.media.domain.errors import MediaAttachmentNotFoundError
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
@@ -11,6 +13,8 @@ from app.shared_kernel.cqrs import CommandHandler
 if TYPE_CHECKING:
     from app.modules.media.ports.media_storage import MediaStoragePort
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -73,3 +77,9 @@ class DetachMedia(CommandHandler[MediaUnitOfWork, DetachMediaCommand, None]):
                     )
 
             await self._uow.commit()
+        logger.info(
+            "media detached",
+            asset_id=command.asset_id,
+            target_type=command.target_type.value,
+            target_id=command.target_id,
+        )

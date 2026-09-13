@@ -2,6 +2,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+import structlog
+
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import NodeNotFoundError
@@ -11,6 +13,8 @@ from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -55,4 +59,11 @@ class CreateEdge(CommandHandler[GraphUnitOfWork, CreateEdgeCommand, Edge]):
             )
             await repos.edges.add(edge)
             await self._uow.commit()
+        logger.info(
+            "edge created",
+            edge_id=edge.id,
+            source_id=edge.source_id,
+            target_id=edge.target_id,
+            edge_type=edge.type,
+        )
         return edge

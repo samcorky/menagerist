@@ -113,4 +113,5 @@ class StageMedia(CommandHandler[MediaUnitOfWork, StageMediaCommand, MediaAsset])
         async with self._uow as repos:
             await repos.assets.add(asset)
             await self._uow.commit()
+        logger.info("media staged", asset_id=asset.id, filename=command.filename)
         return asset

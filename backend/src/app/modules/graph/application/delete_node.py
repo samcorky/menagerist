@@ -2,12 +2,16 @@ import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.modules.graph.domain.errors import NodeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -31,3 +35,4 @@ class DeleteNode(CommandHandler[GraphUnitOfWork, DeleteNodeCommand, None]):
 
             await repos.nodes.save(node)
             await self._uow.commit()
+        logger.info("node deleted", node_id=command.node_id)

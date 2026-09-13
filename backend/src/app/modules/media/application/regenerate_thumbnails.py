@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.domain.thumbnail_eligibility import is_thumbnailable_image
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
@@ -10,6 +12,8 @@ if TYPE_CHECKING:
     from app.modules.media.ports.image_processor import ImageProcessorPort
     from app.modules.media.ports.media_storage import MediaStoragePort
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 _MAX_THUMBNAILABLE_SIZE = 25 * 1024 * 1024
 
@@ -71,4 +75,5 @@ class RegenerateThumbnails(
                 await repos.assets.save(asset)
                 await self._uow.commit()
             count += 1
+        logger.info("thumbnails regenerated", count=count)
         return count

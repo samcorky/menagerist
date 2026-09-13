@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+import structlog
 from sqlalchemy import select
 
 from app.modules.graph.adapters.persistence.models import EdgeTypeModel
@@ -10,6 +11,8 @@ if TYPE_CHECKING:
     import uuid
 
     from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = structlog.get_logger()
 
 
 def _to_domain(model: EdgeTypeModel) -> EdgeType:
@@ -52,16 +55,19 @@ class SqlAlchemyEdgeTypeRepository:
 
     async def add(self, edge_type: EdgeType) -> None:
         """Add a new edge type."""
+        logger.debug("adding edge type", edge_type_id=edge_type.id)
         self._session.add(_to_model(edge_type))
         await self._session.flush()
 
     async def save(self, edge_type: EdgeType) -> None:
         """Persist changes to an existing edge type."""
+        logger.debug("saving edge type", edge_type_id=edge_type.id)
         await self._session.merge(_to_model(edge_type))
         await self._session.flush()
 
     async def get(self, edge_type_id: uuid.UUID) -> EdgeType | None:
         """Return the edge type with `edge_type_id`, or None if missing or deleted."""
+        logger.debug("fetching edge type", edge_type_id=edge_type_id)
         model = await self._session.get(EdgeTypeModel, edge_type_id)
         if model is None or model.deleted_at is not None:
             return None
@@ -69,6 +75,7 @@ class SqlAlchemyEdgeTypeRepository:
 
     async def get_by_slug(self, slug: str) -> EdgeType | None:
         """Return the edge type with `slug`, or None if missing or deleted."""
+        logger.debug("fetching edge type by slug", slug=slug)
         stmt = (
             select(EdgeTypeModel)
             .where(EdgeTypeModel.slug == slug)
@@ -80,6 +87,7 @@ class SqlAlchemyEdgeTypeRepository:
 
     async def list(self, *, after: uuid.UUID | None, limit: int) -> list[EdgeType]:
         """List non-deleted edge types ordered by id, starting after `after`."""
+        logger.debug("listing edge types", after=after, limit=limit)
         stmt = (
             select(EdgeTypeModel)
             .where(EdgeTypeModel.deleted_at.is_(None))
