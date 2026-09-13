@@ -2,12 +2,18 @@ FROM node:22-slim AS builder
 
 WORKDIR /app
 
-COPY frontend/package.json frontend/package-lock.json ./
+COPY frontend/package*.json ./
 RUN npm ci
 
 COPY frontend/openapi.json ./
-
-COPY frontend/ .
+COPY frontend/*.json ./
+COPY frontend/*.js ./
+COPY frontend/*.mjs ./
+COPY frontend/*.ts ./
+COPY frontend/*.cjs ./
+COPY frontend/*.config.* ./
+COPY frontend/src ./src
+COPY frontend/static ./static
 
 RUN npm run generate && npm run build
 
