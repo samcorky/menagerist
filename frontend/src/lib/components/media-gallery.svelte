@@ -26,10 +26,17 @@
 	let assets = $state<NodeMediaItemResponse[]>([]);
 	let uploading = $state<UploadingEntry[]>([]);
 	let loading = $state(true);
-	let dropZoneEl = $state<HTMLDivElement | null>(null);
+	let confirmDeleteAssetId = $state<string | null>(null);
 
 	let lightboxAsset = $state<NodeMediaItemResponse | null>(null);
 	let lightboxFullLoaded = $state(false);
+
+	function makeUploadId() {
+		if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+			return crypto.randomUUID();
+		}
+		return `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
+	}
 
 	$effect(() => {
 		if (lightboxAsset) lightboxFullLoaded = false;
@@ -67,7 +74,7 @@
 		if (list.length === 0) return;
 
 		const entries: UploadingEntry[] = list.map((f) => ({
-			id: crypto.randomUUID(),
+			id: makeUploadId(),
 			name: f.name,
 			progress: 'uploading',
 			...(f.type.startsWith('image/') ? { previewUrl: URL.createObjectURL(f) } : {})
@@ -109,38 +116,15 @@
 		}
 	});
 
-	function handleDelete(asset: NodeMediaItemResponse, triggerEl: HTMLElement) {
-		const tile = triggerEl.closest<HTMLElement>('.group');
-		const focusTarget =
-			tile?.nextElementSibling?.querySelector<HTMLElement>('button[aria-label^="Delete"]') ??
-			tile?.previousElementSibling?.querySelector<HTMLElement>('button[aria-label^="Delete"]') ??
-			dropZoneEl;
-
+	async function handleDelete(asset: NodeMediaItemResponse) {
+		confirmDeleteAssetId = null;
 		const removed = assets.filter((a) => a.id === asset.id);
 		assets = assets.filter((a) => a.id !== asset.id);
-		focusTarget?.focus();
-
-		let undone = false;
-		const timerId = setTimeout(async () => {
-			if (undone) return;
-			const result = await deleteMedia({ path: { asset_id: asset.id } });
-			if (result.error) {
-				assets = [...assets, ...removed];
-				toast.error('Delete failed', { description: errorMessage(result.error) });
-			}
-		}, 5000);
-
-		toast('File deleted', {
-			action: {
-				label: 'Undo',
-				onClick: () => {
-					undone = true;
-					clearTimeout(timerId);
-					assets = [...assets, ...removed];
-				}
-			},
-			duration: 5000
-		});
+		const result = await deleteMedia({ path: { asset_id: asset.id } });
+		if (result.error) {
+			assets = [...assets, ...removed];
+			toast.error('Delete failed', { description: errorMessage(result.error) });
+		}
 	}
 
 	async function setCover(asset: NodeMediaItemResponse) {
@@ -178,7 +162,7 @@
 </script>
 
 <div class="space-y-3">
-	<FileDrop onFiles={uploadFiles} bind:ref={dropZoneEl} />
+	<FileDrop onFiles={uploadFiles} />
 
 	<!-- Loading skeleton -->
 	{#if loading}
@@ -289,14 +273,34 @@
 								</button>
 							{/if}
 						{/if}
-						<button
-							type="button"
-							onclick={(e) => handleDelete(asset, e.currentTarget)}
-							class="pointer-events-auto rounded-full bg-black/70 p-1 text-white transition-opacity hover:bg-black/90 sm:opacity-0 sm:group-hover:opacity-100"
-							aria-label="Delete {asset.filename}"
-						>
-							<X class="size-3" />
-						</button>
+						{#if confirmDeleteAssetId === asset.id}
+							<div class="pointer-events-auto flex flex-col items-end gap-1">
+								<span class="rounded bg-black/70 px-1.5 py-0.5 text-xs text-white">Delete?</span>
+								<button
+									type="button"
+									onclick={() => (confirmDeleteAssetId = null)}
+									class="rounded-full bg-black/70 px-2 py-0.5 text-xs text-white hover:bg-black/90"
+								>
+									Cancel
+								</button>
+								<button
+									type="button"
+									onclick={() => handleDelete(asset)}
+									class="rounded-full bg-destructive/90 px-2 py-0.5 text-xs text-white hover:bg-destructive"
+								>
+									Delete
+								</button>
+							</div>
+						{:else}
+							<button
+								type="button"
+								onclick={() => (confirmDeleteAssetId = asset.id)}
+								class="pointer-events-auto rounded-full bg-black/70 p-1 text-white transition-opacity hover:bg-black/90 sm:opacity-0 sm:group-hover:opacity-100"
+								aria-label="Delete {asset.filename}"
+							>
+								<X class="size-3" />
+							</button>
+						{/if}
 					</div>
 				</div>
 			{/each}

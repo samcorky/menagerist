@@ -61,11 +61,12 @@
 	let attributeRows = $state<AttributeRow[]>([]);
 	let saving = $state(false);
 	let deletingNode = $state(false);
+	let confirmDeleteNode = $state(false);
+	let confirmDeleteEdgeId = $state<string | null>(null);
 
 	let newEdgeType = $state('');
 	let newEdgeTargetId = $state('');
 	let creatingEdge = $state(false);
-	let connectButtonEl = $state<HTMLElement | null>(null);
 	let edgeTargetSearch = $state('');
 	let edgeTargetOpen = $state(false);
 	let filteredNodes = $derived(
@@ -171,34 +172,17 @@
 		saving = false;
 	}
 
-	function handleDeleteNode() {
-		const id = nodeId;
+	async function handleDeleteNode() {
 		deletingNode = true;
-
-		let undone = false;
-		const timerId = setTimeout(async () => {
-			if (undone) return;
-			const result = await deleteNode({ path: { node_id: id } });
-			if (result.error) {
-				deletingNode = false;
-				const { title, description: desc } = networkAwareError(result);
-				toast.error(title, { description: desc });
-				return;
-			}
-			await goto(resolve('/collection'));
-		}, 5000);
-
-		toast('Item deleted', {
-			action: {
-				label: 'Undo',
-				onClick: () => {
-					undone = true;
-					clearTimeout(timerId);
-					deletingNode = false;
-				}
-			},
-			duration: 5000
-		});
+		const result = await deleteNode({ path: { node_id: nodeId } });
+		if (result.error) {
+			deletingNode = false;
+			confirmDeleteNode = false;
+			const { title, description: desc } = networkAwareError(result);
+			toast.error(title, { description: desc });
+			return;
+		}
+		await goto(resolve('/collection'));
 	}
 
 	async function handleToggleFavourite() {
@@ -248,39 +232,15 @@
 		creatingEdge = false;
 	}
 
-	function handleDeleteEdge(edge: EdgeResponse, triggerEl: HTMLElement) {
-		const row = triggerEl.closest('li');
-		const focusTarget =
-			row?.nextElementSibling?.querySelector<HTMLElement>('button') ??
-			row?.previousElementSibling?.querySelector<HTMLElement>('button') ??
-			connectButtonEl;
-
-		// Optimistically remove
+	async function handleDeleteEdge(edge: EdgeResponse) {
+		confirmDeleteEdgeId = null;
 		edges = edges.filter((e) => e.id !== edge.id);
-		focusTarget?.focus();
-
-		let undone = false;
-		const timerId = setTimeout(async () => {
-			if (undone) return;
-			const result = await deleteEdge({ path: { edge_id: edge.id } });
-			if (result.error) {
-				edges = [...edges, edge];
-				const { title, description: desc } = networkAwareError(result);
-				toast.error(title, { description: desc });
-			}
-		}, 5000);
-
-		toast('Connection removed', {
-			action: {
-				label: 'Undo',
-				onClick: () => {
-					undone = true;
-					clearTimeout(timerId);
-					edges = [...edges, edge];
-				}
-			},
-			duration: 5000
-		});
+		const result = await deleteEdge({ path: { edge_id: edge.id } });
+		if (result.error) {
+			edges = [...edges, edge];
+			const { title, description: desc } = networkAwareError(result);
+			toast.error(title, { description: desc });
+		}
 	}
 </script>
 
@@ -368,15 +328,38 @@
 
 							<div class="flex flex-wrap items-center justify-between gap-2">
 								{#if !loading}
-									<Button
-										type="button"
-										variant="destructive"
-										disabled={deletingNode}
-										onclick={handleDeleteNode}
-									>
-										<Trash2 class="size-4" />
-										{deletingNode ? 'Deleting…' : 'Delete'}
-									</Button>
+									{#if confirmDeleteNode}
+										<div class="flex items-center gap-2">
+											<span class="text-sm text-muted-foreground">Delete this item?</span>
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												onclick={() => (confirmDeleteNode = false)}
+											>
+												Cancel
+											</Button>
+											<Button
+												type="button"
+												variant="destructive"
+												size="sm"
+												disabled={deletingNode}
+												onclick={handleDeleteNode}
+											>
+												{deletingNode ? 'Deleting…' : 'Delete'}
+											</Button>
+										</div>
+									{:else}
+										<Button
+											type="button"
+											variant="destructive"
+											disabled={deletingNode}
+											onclick={() => (confirmDeleteNode = true)}
+										>
+											<Trash2 class="size-4" />
+											Delete
+										</Button>
+									{/if}
 								{/if}
 								<Button type="submit" disabled={saving || loading} class="ml-auto">
 									{saving ? 'Saving…' : 'Save changes'}
@@ -413,15 +396,37 @@
 												{nodesById.get(otherNodeId(edge))?.name ?? 'View item'}
 											</a>
 										</div>
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon"
-											onclick={(e) => handleDeleteEdge(edge, e.currentTarget)}
-											aria-label="Remove connection"
-										>
-											<Trash2 class="size-4" />
-										</Button>
+										{#if confirmDeleteEdgeId === edge.id}
+											<div class="flex shrink-0 items-center gap-1.5">
+												<span class="text-xs text-muted-foreground">Remove?</span>
+												<Button
+													type="button"
+													variant="outline"
+													size="sm"
+													onclick={() => (confirmDeleteEdgeId = null)}
+												>
+													Cancel
+												</Button>
+												<Button
+													type="button"
+													variant="destructive"
+													size="sm"
+													onclick={() => handleDeleteEdge(edge)}
+												>
+													Remove
+												</Button>
+											</div>
+										{:else}
+											<Button
+												type="button"
+												variant="ghost"
+												size="icon"
+												onclick={() => (confirmDeleteEdgeId = edge.id)}
+												aria-label="Remove connection"
+											>
+												<Trash2 class="size-4" />
+											</Button>
+										{/if}
 									</li>
 								{/each}
 							</ul>
@@ -528,7 +533,7 @@
 							</div>
 
 							<div class="flex justify-end">
-								<Button type="submit" disabled={creatingEdge} bind:ref={connectButtonEl}>
+								<Button type="submit" disabled={creatingEdge}>
 									{creatingEdge ? 'Connecting…' : 'Connect item'}
 								</Button>
 							</div>

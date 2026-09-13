@@ -38,12 +38,18 @@
 	}}
 	ondragleave={() => (dragOver = false)}
 	ondrop={handleDrop}
-	onclick={() => fileInputEl?.click()}
 	onkeydown={(e) => e.key === 'Enter' && fileInputEl?.click()}
 >
 	<Upload class="size-5 text-muted-foreground" />
 	<span class="text-muted-foreground">
 		Drop files here or <span class="text-foreground underline underline-offset-2">browse</span>
 	</span>
-	<input bind:this={fileInputEl} type="file" multiple class="sr-only" onchange={handleFileInput} />
+	<input
+		bind:this={fileInputEl}
+		type="file"
+		multiple
+		tabindex="-1"
+		class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+		onchange={handleFileInput}
+	/>
 </div>
