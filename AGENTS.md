@@ -121,7 +121,8 @@ Read [frontend/README.md](frontend/README.md) and [frontend/DESIGN_GUIDELINES.md
 - Use British English for project copy, comments, and user-facing docs unless a library, API, or existing convention explicitly requires a different spelling. This applies across both backend and frontend work.
 - Do not add error handling, validation, or abstractions beyond what the task requires.
 - Do not create documentation files unless asked.
-- Do not commit unless asked.
+- Never create, amend, squash, stage, or push any git commit or anything that would commit code on the user's behalf. Do not run `git commit`, `git add`, or any auto-commit workflow.
+- If a commit is needed, ask the user explicitly whether they want to commit, and let them handle the actual commit command themselves.
 - Backend: Python 3.14+. `poe typecheck-backend` (`mypy --strict`) must pass on any backend change.
 - Frontend: TypeScript strict mode. `poe typecheck-frontend` must pass on any frontend change.
 - For project-wide coding standards, including comments, docstrings, dependency policy, and backend typing rules, see [backend/README.md](backend/README.md) and [frontend/README.md](frontend/README.md).
