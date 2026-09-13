@@ -31,6 +31,10 @@ class MediaAssetRepository(Protocol):
         """Return assets in `status` whose `updated_at` is before `before`."""
         ...
 
+    async def list_by_status(self, *, status: MediaStatus) -> list[MediaAsset]:
+        """Return all assets in `status`."""
+        ...
+
     async def delete(self, asset_id: uuid.UUID) -> None:
         """Hard-delete the asset record."""
         ...

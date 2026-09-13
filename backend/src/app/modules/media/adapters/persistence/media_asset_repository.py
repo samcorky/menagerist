@@ -79,6 +79,12 @@ class SqlAlchemyMediaAssetRepository:
         result = await self._session.execute(stmt)
         return [_to_domain(m) for m in result.scalars()]
 
+    async def list_by_status(self, *, status: MediaStatus) -> list[MediaAsset]:
+        """Return all assets in `status`."""
+        stmt = select(MediaAssetModel).where(MediaAssetModel.status == status.value)
+        result = await self._session.execute(stmt)
+        return [_to_domain(m) for m in result.scalars()]
+
     async def delete(self, asset_id: uuid.UUID) -> None:
         """Hard-delete the asset record."""
         await self._session.execute(

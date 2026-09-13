@@ -38,6 +38,10 @@ class InMemoryMediaAssetRepository:
             if a.status is status and a.updated_at < before
         ]
 
+    async def list_by_status(self, *, status: MediaStatus) -> list[MediaAsset]:
+        """Return all assets in `status`."""
+        return [a for a in self._assets.values() if a.status is status]
+
     async def delete(self, asset_id: uuid.UUID) -> None:
         """Hard-delete the asset record."""
         self._assets.pop(asset_id, None)
