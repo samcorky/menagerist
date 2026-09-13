@@ -298,7 +298,7 @@
 			<Shimmer {loading}>
 				<Card.Root class="overflow-hidden">
 					{#if node}
-						<NodeCover nodeId={node.id} class="h-48 w-full rounded-none object-cover" />
+						<NodeCover nodeId={node.id} class="w-full rounded-none" hiRes />
 					{/if}
 					<Card.Header class="flex flex-row items-start justify-between gap-4 space-y-0">
 						<div class="min-w-0 flex-1">

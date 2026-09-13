@@ -70,6 +70,7 @@ poe typecheck   # mypy --strict + svelte-check + tsc
 poe lint        # ruff check + prettier + eslint
 poe format      # ruff format + prettier (writes in place)
 poe check       # full pre-commit hooks + coverage gate (re-syncs deps first — this is what CI runs)
+poe check-changed # run pre-commit checks on changed files only
 ```
 
 ## Testing

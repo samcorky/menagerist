@@ -28,6 +28,13 @@
 	let loading = $state(true);
 	let dropZoneEl = $state<HTMLDivElement | null>(null);
 
+	let lightboxAsset = $state<NodeMediaItemResponse | null>(null);
+	let lightboxFullLoaded = $state(false);
+
+	$effect(() => {
+		if (lightboxAsset) lightboxFullLoaded = false;
+	});
+
 	const displayAssets = $derived.by(() => {
 		const seen = new SvelteSet<string>();
 		const result: NodeMediaItemResponse[] = [];
@@ -229,15 +236,23 @@
 			{#each displayAssets as asset (asset.id)}
 				<div class="group relative aspect-square overflow-hidden rounded-lg border bg-muted/30">
 					{#if isImage(asset)}
-						<img
-							src={asset.thumbnail_url ?? asset.content_url}
-							alt={asset.filename}
-							class="h-full w-full object-cover"
-							loading="lazy"
-						/>
-						<!-- Cover badge -->
+						<!-- Clickable image (full tile) -->
+						<button
+							type="button"
+							class="h-full w-full"
+							onclick={() => (lightboxAsset = asset)}
+							aria-label="View {asset.filename}"
+						>
+							<img
+								src={asset.thumbnail_url ?? asset.content_url}
+								alt={asset.filename}
+								class="h-full w-full object-cover"
+								loading="lazy"
+							/>
+						</button>
+						<!-- Cover badge (top-left, absolute, non-interactive) -->
 						{#if coverIds.has(asset.id)}
-							<div class="absolute top-1 left-1 rounded-full bg-black/60 p-0.5">
+							<div class="pointer-events-none absolute top-1 left-1 rounded-full bg-black/60 p-0.5">
 								<Star class="size-3 fill-yellow-400 text-yellow-400" />
 							</div>
 						{/if}
@@ -249,16 +264,16 @@
 						</div>
 					{/if}
 
-					<!-- Hover overlay -->
+					<!-- Hover overlay (action buttons) -->
 					<div
-						class="absolute inset-0 flex flex-col items-end justify-start gap-1 bg-black/0 p-1 transition-colors group-hover:bg-black/40"
+						class="pointer-events-none absolute inset-0 flex flex-col items-end justify-start gap-1 bg-black/20 p-1 transition-colors sm:bg-black/0 sm:group-hover:bg-black/40"
 					>
 						{#if isImage(asset)}
 							{#if coverIds.has(asset.id)}
 								<button
 									type="button"
 									onclick={() => removeCover(asset)}
-									class="rounded-full bg-black/70 p-1 text-yellow-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/90"
+									class="pointer-events-auto rounded-full bg-black/70 p-1 text-yellow-400 transition-opacity hover:bg-black/90 sm:opacity-0 sm:group-hover:opacity-100"
 									aria-label="Remove cover for {asset.filename}"
 								>
 									<StarOff class="size-3" />
@@ -267,7 +282,7 @@
 								<button
 									type="button"
 									onclick={() => setCover(asset)}
-									class="rounded-full bg-black/70 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/90"
+									class="pointer-events-auto rounded-full bg-black/70 p-1 text-white transition-opacity hover:bg-black/90 sm:opacity-0 sm:group-hover:opacity-100"
 									aria-label="Set as cover {asset.filename}"
 								>
 									<Star class="size-3" />
@@ -277,7 +292,7 @@
 						<button
 							type="button"
 							onclick={(e) => handleDelete(asset, e.currentTarget)}
-							class="rounded-full bg-black/70 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/90"
+							class="pointer-events-auto rounded-full bg-black/70 p-1 text-white transition-opacity hover:bg-black/90 sm:opacity-0 sm:group-hover:opacity-100"
 							aria-label="Delete {asset.filename}"
 						>
 							<X class="size-3" />
@@ -290,3 +305,57 @@
 		<p class="text-center text-xs text-muted-foreground">No files attached yet.</p>
 	{/if}
 </div>
+
+<!-- Lightbox -->
+{#if lightboxAsset}
+	{@const asset = lightboxAsset}
+	<div
+		class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 p-4"
+		role="dialog"
+		aria-modal="true"
+		aria-label="Image viewer"
+		onclick={() => (lightboxAsset = null)}
+		onkeydown={(e) => e.key === 'Escape' && (lightboxAsset = null)}
+		tabindex="-1"
+	>
+		<button
+			type="button"
+			class="absolute top-4 right-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+			onclick={() => (lightboxAsset = null)}
+			aria-label="Close"
+		>
+			<X class="size-5" />
+		</button>
+		<div
+			class="flex max-w-[90vw] flex-col items-center gap-2"
+			onclick={(e) => e.stopPropagation()}
+			role="presentation"
+		>
+			{#if asset.thumbnail_url && asset.content_url !== asset.thumbnail_url}
+				<div class="grid w-full">
+					<img
+						src={asset.thumbnail_url}
+						alt={asset.filename}
+						class="col-start-1 row-start-1 max-h-[85dvh] w-full object-contain"
+						aria-hidden="true"
+					/>
+					<img
+						src={asset.content_url}
+						alt={asset.filename}
+						class="col-start-1 row-start-1 max-h-[85dvh] w-full object-contain transition-opacity duration-500 {lightboxFullLoaded
+							? 'opacity-100'
+							: 'opacity-0'}"
+						onload={() => (lightboxFullLoaded = true)}
+					/>
+				</div>
+			{:else}
+				<img
+					src={asset.content_url}
+					alt={asset.filename}
+					class="max-h-[85dvh] w-full object-contain"
+				/>
+			{/if}
+			<p class="text-center text-sm text-white/60">{asset.filename}</p>
+		</div>
+	</div>
+{/if}

@@ -67,6 +67,7 @@ poe lint-backend
 poe lint-frontend
 poe format                    # ruff format + prettier (auto-fix formatting)
 poe check                     # full pre-commit hooks + coverage gate (re-syncs deps first)
+poe check-changed             # run pre-commit checks on changed files only
 
 poe db-up                     # start local Postgres container
 poe db-down                   # stop Postgres container

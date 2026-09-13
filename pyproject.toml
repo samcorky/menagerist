@@ -237,6 +237,10 @@ sequence = ["_check-hooks", "coverage-check"]
 help = "Run the repository checks and enforce the backend coverage gate"
 deps = ["sync"]
 
+[tool.poe.groups.quality.tasks.check-changed]
+cmd = "prek run"
+help = "Run pre-commit checks on changed files only"
+
 [tool.poe.groups.quality.tasks.test]
 sequence = ["test-backend", "test-frontend"]
 help = "Run all unit tests"

@@ -290,11 +290,13 @@
 							class="flex aspect-[3/4] flex-col overflow-hidden rounded-xl border bg-muted/30 transition-colors group-hover:bg-muted/60"
 						>
 							<!-- Cover image or generic placeholder (§7b: muted background + category icon) -->
-							<NodeCover nodeId={item.id} class="flex-1">
-								<div class="flex flex-1 items-center justify-center bg-muted">
-									<Package class="size-8 text-muted-foreground/40" />
-								</div>
-							</NodeCover>
+							<div class="min-h-0 flex-1 overflow-hidden">
+								<NodeCover nodeId={item.id} class="h-full w-full">
+									<div class="flex h-full w-full items-center justify-center bg-muted">
+										<Package class="size-8 text-muted-foreground/40" />
+									</div>
+								</NodeCover>
+							</div>
 							<div class="border-t bg-background/80 px-2.5 py-2">
 								<p class="truncate text-sm leading-tight font-medium">{item.name}</p>
 								{#if catLabel}
