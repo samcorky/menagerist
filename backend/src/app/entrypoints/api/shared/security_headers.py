@@ -8,7 +8,14 @@ if TYPE_CHECKING:
     from starlette.requests import Request
     from starlette.responses import Response
 
-_DEFAULT_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+_DEFAULT_CSP = "; ".join(
+    [
+        "default-src 'none'",
+        "img-src 'self'",
+        "frame-ancestors 'none'",
+        "base-uri 'none'",
+    ]
+)
 
 _DOCS_CSP = "; ".join(
     [
@@ -31,8 +38,6 @@ _DOCS_PATHS: frozenset[str] = frozenset(
     {
         "/api/docs",
         "/api/redoc",
-        "/docs",
-        "/redoc",
     }
 )
 
