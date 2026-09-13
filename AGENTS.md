@@ -58,7 +58,7 @@ poe test-backend-integration  # integration tests — requires live Postgres
 poe test-backend-all          # unit + integration with combined coverage
 poe test-frontend             # Vitest unit tests
 
-poe coverage                  # full test suite + enforce all coverage thresholds
+poe coverage                  # full backend test suite + enforce all coverage thresholds
 poe typecheck                 # mypy + svelte-check + tsc
 poe typecheck-backend
 poe typecheck-frontend
@@ -102,6 +102,8 @@ Read [backend/README.md](backend/README.md) in full before writing backend code.
 | shared_kernel | 100% |
 | adapters | 80% |
 | platform | 70% |
+
+`poe coverage` is a full verification step, not a quick iteration command: it runs the full backend test suite and fails if any layer drops below the thresholds above. Use targeted backend tests while developing, then run `poe coverage` before considering backend work complete. It is intentionally heavier than `poe test-backend` and is the source of truth for the repository's coverage gate.
 
 `ports/` holds `Protocol` interfaces — the stub method bodies (`...`) never execute, so a hard 100% floor wouldn't test anything real. Codecov tracks it for visibility (`target: auto` in `codecov.yml`) without gating on it.
 

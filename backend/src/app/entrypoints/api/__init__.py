@@ -43,6 +43,7 @@ def create_app() -> FastAPI:
     if app_info.project.license:
         license_info["name"] = app_info.project.license
     if app_info.license_url:
+        # noinspection bad-index
         license_info["url"] = app_info.license_url
 
     fastapi_app = FastAPI(
