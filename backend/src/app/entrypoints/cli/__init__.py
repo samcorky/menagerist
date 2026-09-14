@@ -2,8 +2,9 @@ import json
 import logging
 from enum import StrEnum
 from pathlib import Path
+from typing import Annotated
 
-from cyclopts import App
+from cyclopts import App, Parameter
 
 from app.modules.media.adapters.cli.media_app import media_app
 from app.platform.app_info import load_app_info
@@ -18,6 +19,23 @@ app = App(
     name=app_info.name,
     version=app_info.version,
 )
+
+
+@app.meta.default
+def main(
+    *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+    verbose: Annotated[bool, Parameter(name=["--verbose", "-v"])] = False,
+) -> None:
+    """Menagerist CLI.
+
+    Args:
+        tokens: Remaining command-line tokens, forwarded to the command apps.
+        verbose: Log at DEBUG level, overriding `LOG_LEVEL`.
+    """
+    if verbose:
+        configure_logging(level=logging.DEBUG)
+    app(tokens)
+
 
 migrate_app = App(name="migrate", help="Manage database migrations.")
 app.command(migrate_app)
@@ -160,4 +178,4 @@ def dump(*, output: Path = Path("openapi.json")) -> None:
 
 
 if __name__ == "__main__":
-    app()
+    app.meta()

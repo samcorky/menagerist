@@ -40,7 +40,7 @@ dev = [
 ]
 
 [project.scripts]
-menagerist = "app.entrypoints.cli:app"
+menagerist = "app.entrypoints.cli:app.meta"
 
 [build-system]
 requires = [
@@ -215,4 +215,5 @@ skip_empty = true
 exclude_also = [
     "if TYPE_CHECKING:",
     "\\.\\.\\.\\s*$",
+    "if __name__ == .__main__.:",
 ]
