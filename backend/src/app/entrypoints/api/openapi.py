@@ -50,7 +50,7 @@ def _rewrite_refs(node: object, renamed_refs: dict[str, str]) -> None:
             _rewrite_refs(item, renamed_refs)
 
 
-def _rename_multipart_body_schemas(openapi_schema: dict[str, Any]) -> None:
+def _normalise_openapi_schemas(openapi_schema: dict[str, Any]) -> None:
     """Rename FastAPI's auto-generated `Body_<operation_id>` schemas.
 
     FastAPI synthesises a request-body model named ``Body_<operation_id>`` for
@@ -77,6 +77,8 @@ def _rename_multipart_body_schemas(openapi_schema: dict[str, Any]) -> None:
     }
     _rewrite_refs(openapi_schema, renamed_refs)
 
+    openapi_schema["components"]["schemas"] = dict(sorted(components.items()))
+
 
 def configure_openapi(app: FastAPI) -> None:
     """Attach customised OpenAPI schema generation and tag metadata."""
@@ -102,7 +104,7 @@ def configure_openapi(app: FastAPI) -> None:
             "url": "/api/docs/logo.svg",
             "altText": f"{app.title} logo",
         }
-        _rename_multipart_body_schemas(openapi_schema)
+        _normalise_openapi_schemas(openapi_schema)
         app.openapi_schema = openapi_schema
         return openapi_schema
 
