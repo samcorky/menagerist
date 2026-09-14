@@ -25,7 +25,9 @@ from app.modules.media.adapters.api.dependencies import (
 )
 from app.modules.media.adapters.api.media.content_caching import (
     check_content_not_modified,
+    check_thumbnail_not_modified,
     content_cache_headers,
+    thumbnail_cache_headers,
 )
 from app.modules.media.adapters.api.media.schemas import (
     AttachMediaRequest,
@@ -270,14 +272,14 @@ async def stream_media_thumbnail(
     asset = await get_use_case.handle(GetMediaQuery(asset_id=asset_id), actor)
     if not asset.has_thumbnail:
         raise ThumbnailNotAvailableError(f"No thumbnail available for asset {asset_id}")
-    if not_modified := check_content_not_modified(request, asset):
+    if not_modified := check_thumbnail_not_modified(request, asset):
         return not_modified
     return StreamingResponse(
         storage.retrieve_thumbnail(asset.id, asset.status),
         media_type="image/webp",
         headers={
             "Content-Disposition": f'inline; filename="{asset.filename}.webp"',
-            **content_cache_headers(asset),
+            **thumbnail_cache_headers(asset),
         },
     )
 

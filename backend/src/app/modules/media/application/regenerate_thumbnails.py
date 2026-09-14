@@ -1,3 +1,4 @@
+import hashlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -70,7 +71,9 @@ class RegenerateThumbnails(
                 continue
 
             await self._storage.store_thumbnail(asset.id, asset.status, result.data)
-            asset.mark_thumbnail_generated()
+            asset.mark_thumbnail_generated(
+                sha256=hashlib.sha256(result.data).hexdigest()
+            )
             async with self._uow as repos:
                 await repos.assets.save(asset)
                 await self._uow.commit()

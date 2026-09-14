@@ -18,6 +18,7 @@ class MediaAssetModel(IdentifiableMixin, TimestampedMixin, Base):
     sha256: Mapped[str]
     status: Mapped[str] = mapped_column(index=True)
     has_thumbnail: Mapped[bool] = mapped_column(default=False)
+    thumbnail_sha256: Mapped[str | None] = mapped_column(default=None)
 
 
 class MediaAttachmentModel(IdentifiableMixin, TimestampedMixin, Base):

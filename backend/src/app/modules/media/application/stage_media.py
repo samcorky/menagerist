@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -108,7 +109,9 @@ class StageMedia(CommandHandler[MediaUnitOfWork, StageMediaCommand, MediaAsset])
                 await self._storage.store_thumbnail(
                     asset_id, MediaStatus.STAGED, result.data
                 )
-                asset.mark_thumbnail_generated()
+                asset.mark_thumbnail_generated(
+                    sha256=hashlib.sha256(result.data).hexdigest()
+                )
 
         async with self._uow as repos:
             await repos.assets.add(asset)

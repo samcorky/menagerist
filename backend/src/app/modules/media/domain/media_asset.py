@@ -25,6 +25,7 @@ class MediaAsset(Identifiable, Timestamped):
     sha256: str
     status: MediaStatus
     has_thumbnail: bool = False
+    thumbnail_sha256: str | None = None
 
     def __post_init__(self) -> None:
         """Validate invariants after construction."""
@@ -63,9 +64,16 @@ class MediaAsset(Identifiable, Timestamped):
         self.status = MediaStatus.ATTACHED
         self.touch()
 
-    def mark_thumbnail_generated(self) -> None:
-        """Record that a thumbnail has been generated for this asset."""
+    def mark_thumbnail_generated(self, *, sha256: str) -> None:
+        """Record that a thumbnail has been generated for this asset.
+
+        `sha256` is the hash of the thumbnail's own bytes, not the
+        original's — thumbnails are cached under it independently so
+        that regenerating one (e.g. a thumbnailing bug fix) changes its
+        cache key even though the original file's `sha256` never does.
+        """
         self.has_thumbnail = True
+        self.thumbnail_sha256 = sha256
 
     def orphan(self) -> None:
         """Transition from attached to orphaned."""

@@ -1,4 +1,4 @@
-from datetime import UTC
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from starlette.responses import Response
@@ -11,6 +11,35 @@ if TYPE_CHECKING:
     from app.modules.media.domain.media_asset import MediaAsset
 
 
+def _cache_headers(*, etag_hash: str, last_modified: datetime) -> dict[str, str]:
+    return {
+        "ETag": f'"{etag_hash}"',
+        "Last-Modified": http_date(last_modified),
+        "Cache-Control": "private, max-age=31536000, immutable",
+    }
+
+
+def _check_not_modified(
+    request: Request, *, etag_hash: str, last_modified: datetime
+) -> Response | None:
+    headers = _cache_headers(etag_hash=etag_hash, last_modified=last_modified)
+    etag = headers["ETag"]
+
+    if_none_match = request.headers.get("If-None-Match")
+    if if_none_match and (if_none_match == etag or if_none_match == "*"):
+        return Response(status_code=304, headers=headers)
+
+    if_modified_since = request.headers.get("If-Modified-Since")
+    if if_modified_since:
+        since = parse_http_date(if_modified_since)
+        utc_modified = last_modified.astimezone(UTC)
+        # Compare at second resolution. RFC 1123 omits sub-second precision.
+        if since and utc_modified.replace(microsecond=0) <= since.astimezone(UTC):
+            return Response(status_code=304, headers=headers)
+
+    return None
+
+
 def content_cache_headers(asset: MediaAsset) -> dict[str, str]:
     """Immutable cache headers for content addressed by ``sha256``.
 
@@ -20,19 +49,16 @@ def content_cache_headers(asset: MediaAsset) -> dict[str, str]:
     and bumps ``updated_at`` even though the underlying bytes never change,
     which would false-invalidate the cache on every move. The hash is stable
     across the entire lifecycle, so this is safe to cache as ``immutable``
-    regardless of the asset's current status. Applies equally to the
-    original content and to a generated thumbnail, since both are served
-    under the same asset row and hash.
+    regardless of the asset's current status.
+
+    Covers only the original file's bytes — see ``thumbnail_cache_headers``
+    for the derived thumbnail, which is keyed on its own hash.
     """
-    return {
-        "ETag": f'"{asset.sha256}"',
-        "Last-Modified": http_date(asset.created_at),
-        "Cache-Control": "private, max-age=31536000, immutable",
-    }
+    return _cache_headers(etag_hash=asset.sha256, last_modified=asset.created_at)
 
 
 def check_content_not_modified(request: Request, asset: MediaAsset) -> Response | None:
-    """Return a bare 304 if the client's cached copy is still current, else None.
+    """Return a bare 304 if the client's cached copy of the original is still current.
 
     Deliberately does not use the ConditionalRequest/ETaggable machinery in
     shared/conditional_request.py: that writes headers onto the request-scoped
@@ -44,19 +70,44 @@ def check_content_not_modified(request: Request, asset: MediaAsset) -> Response 
     call site, and this function only ever returns a bare Response for the
     304 branch.
     """
-    headers = content_cache_headers(asset)
-    etag = headers["ETag"]
+    return _check_not_modified(
+        request, etag_hash=asset.sha256, last_modified=asset.created_at
+    )
 
-    if_none_match = request.headers.get("If-None-Match")
-    if if_none_match and (if_none_match == etag or if_none_match == "*"):
-        return Response(status_code=304, headers=headers)
 
-    if_modified_since = request.headers.get("If-Modified-Since")
-    if if_modified_since:
-        since = parse_http_date(if_modified_since)
-        utc_created = asset.created_at.astimezone(UTC)
-        # Compare at second resolution. RFC 1123 omits sub-second precision.
-        if since and utc_created.replace(microsecond=0) <= since.astimezone(UTC):
-            return Response(status_code=304, headers=headers)
+def thumbnail_cache_headers(asset: MediaAsset) -> dict[str, str]:
+    """Immutable cache headers for a generated thumbnail, keyed on its own hash.
 
-    return None
+    A thumbnail's bytes can change independently of the original file it was
+    derived from — ``RegenerateThumbnails`` re-encodes attached assets after
+    a thumbnailing fix (EXIF orientation, encoder quality) without touching
+    the original. Keying the thumbnail's ETag on the *original's* `sha256`
+    (as content_cache_headers does) made a freshly regenerated thumbnail
+    indistinguishable from the stale one it replaced, so under
+    ``Cache-Control: immutable`` neither the browser cache nor a conditional
+    304 would ever pick up the new bytes. `thumbnail_sha256` is the hash of
+    the thumbnail's own bytes, so regenerating it changes the cache key.
+
+    Falls back to `asset.sha256` for thumbnails generated before
+    `thumbnail_sha256` existed (nullable, unbackfilled); they get their own
+    key the next time they're regenerated.
+    """
+    return _cache_headers(
+        etag_hash=asset.thumbnail_sha256 or asset.sha256,
+        last_modified=asset.created_at,
+    )
+
+
+def check_thumbnail_not_modified(
+    request: Request, asset: MediaAsset
+) -> Response | None:
+    """Return a bare 304 if the client's cached thumbnail is still current.
+
+    See `thumbnail_cache_headers` for why this validates against
+    `thumbnail_sha256` rather than the original's `sha256`.
+    """
+    return _check_not_modified(
+        request,
+        etag_hash=asset.thumbnail_sha256 or asset.sha256,
+        last_modified=asset.created_at,
+    )

@@ -121,6 +121,19 @@ def test_orphan_raises_if_staged() -> None:
         asset.orphan()
 
 
+def test_mark_thumbnail_generated_sets_flag_and_hash() -> None:
+    """mark_thumbnail_generated sets has_thumbnail and stores the thumbnail's hash."""
+    asset = MediaAsset.create(
+        filename="f.jpg", content_type="image/jpeg", size=1, sha256="original-hash"
+    )
+
+    asset.mark_thumbnail_generated(sha256="thumbnail-hash")
+
+    assert asset.has_thumbnail is True
+    assert asset.thumbnail_sha256 == "thumbnail-hash"
+    assert asset.thumbnail_sha256 != asset.sha256
+
+
 def test_orphan_raises_if_already_orphaned() -> None:
     """orphan() raises ValidationError if the asset is already orphaned."""
     asset = MediaAsset.create(
