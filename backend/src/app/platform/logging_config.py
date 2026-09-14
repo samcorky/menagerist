@@ -118,6 +118,11 @@ def configure_logging(*, level: int | str | None = None) -> None:
     logging.getLogger("alembic.runtime.migration").setLevel(logging.WARNING)
     logging.getLogger("alembic.runtime.plugins").setLevel(logging.WARNING)
 
+    # SQLAlchemy engine logs (SQL statements, result rows) are only useful when
+    # actively debugging; suppress them unless the app itself is running at DEBUG.
+    if root_logger.level > logging.DEBUG:
+        logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+
 
 # Propagate Granian loggers to root so they render via structlog.
 type LoggerConfig = dict[str, str | bool | list[str]]
@@ -128,10 +133,28 @@ GRANIAN_ACCESS_LOG_FORMAT = (
     + " %(status)d %(dt_ms).3f %(header{request-id})s"
 )
 
-GRANIAN_LOG_DICTCONFIG: dict[str, dict[str, LoggerConfig]] = {
-    "loggers": {
-        "_granian": {"level": "INFO", "handlers": [], "propagate": True},
-        "granian.access": {"level": "INFO", "handlers": [], "propagate": True},
-        "sqlalchemy.engine": {"level": "DEBUG", "handlers": [], "propagate": True},
-    },
-}
+
+def granian_log_dictconfig() -> dict[str, dict[str, LoggerConfig]]:
+    """Return the logging dictConfig fragment passed to Granian at server start.
+
+    SQLAlchemy engine logs are only enabled when the configured log level is DEBUG,
+    matching the suppression applied by configure_logging() for the non-Granian path.
+    """
+    settings = get_logging_settings()
+    numeric_level = logging.getLevelName(settings.log_level.upper())
+    sqlalchemy_level = (
+        "DEBUG"
+        if isinstance(numeric_level, int) and numeric_level <= logging.DEBUG
+        else "WARNING"
+    )
+    return {
+        "loggers": {
+            "_granian": {"level": "INFO", "handlers": [], "propagate": True},
+            "granian.access": {"level": "INFO", "handlers": [], "propagate": True},
+            "sqlalchemy.engine": {
+                "level": sqlalchemy_level,
+                "handlers": [],
+                "propagate": True,
+            },
+        },
+    }

@@ -104,7 +104,7 @@ def serve(
 
     from app.platform.logging_config import (
         GRANIAN_ACCESS_LOG_FORMAT,
-        GRANIAN_LOG_DICTCONFIG,
+        granian_log_dictconfig,
     )
 
     server = Granian(
@@ -117,7 +117,7 @@ def serve(
         reload_paths=[BACKEND_SRC_PATH],
         loop=Loops.auto,
         log_level=LogLevels(log_level.value),
-        log_dictconfig=GRANIAN_LOG_DICTCONFIG,
+        log_dictconfig=granian_log_dictconfig(),
         log_access=access_log,
         log_access_format=GRANIAN_ACCESS_LOG_FORMAT,
     )
