@@ -15,6 +15,8 @@ x-hardened: &hardened
   user: "1000:1000"
   networks:
     - menagerist
+  env_file:
+    - .env
 
 x-logging: &logging
   logging:
