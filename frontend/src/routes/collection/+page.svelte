@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { beforeNavigate, afterNavigate } from '$app/navigation';
+	import { beforeNavigate, afterNavigate, goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { List, Plus, SearchX, LayoutGrid, Package } from '@lucide/svelte';
 	import { captureController } from '$lib/capture.svelte.js';
@@ -198,7 +198,7 @@
 	<div class="mx-auto flex max-w-4xl flex-col gap-6">
 		<div class="flex items-center justify-between gap-4">
 			<h1 class="font-heading text-3xl font-semibold tracking-tight">My Collection</h1>
-			<Button onclick={() => captureController.show()}>
+			<Button onclick={() => goto(resolve('/collection/new'))}>
 				<Plus class="size-4" />
 				New item
 			</Button>
@@ -352,7 +352,7 @@
 							> to see everything.
 						</p>
 					</div>
-					<Button size="sm" onclick={() => captureController.show()}>
+					<Button size="sm" onclick={() => goto(resolve('/collection/new'))}>
 						<Plus class="size-4" />
 						New item
 					</Button>
@@ -362,7 +362,7 @@
 						<p class="font-medium">Nothing here yet</p>
 						<p class="text-sm text-muted-foreground">Add your first item to get started</p>
 					</div>
-					<Button onclick={() => captureController.show()}>
+					<Button onclick={() => goto(resolve('/collection/new'))}>
 						<Plus class="size-4" />
 						Add your first item
 					</Button>

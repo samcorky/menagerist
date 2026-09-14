@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { goto } from '$app/navigation';
 	import { Package, Plus, ChevronRight, AlertCircle, Star } from '@lucide/svelte';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
@@ -105,7 +106,7 @@
 						collect.
 					</p>
 				</div>
-				<Button onclick={() => captureController.show()} size="lg">
+				<Button onclick={() => goto(resolve('/collection/new'))} size="lg">
 					<Plus class="size-4" />
 					Add your first item
 				</Button>
@@ -123,7 +124,7 @@
 						{/if}
 					</p>
 				</div>
-				<Button onclick={() => captureController.show()}>
+				<Button onclick={() => goto(resolve('/collection/new'))}>
 					<Plus class="size-4" />
 					New item
 				</Button>

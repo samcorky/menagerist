@@ -2,7 +2,7 @@
 	import './layout.css';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { onNavigate } from '$app/navigation';
+	import { onNavigate, goto } from '$app/navigation';
 	import { CirclePlus, LayoutGrid, House, Settings, Telescope, BookOpen } from '@lucide/svelte';
 	import { Toaster } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -104,7 +104,7 @@
 					<Telescope class="size-4" />
 					Explore
 				</Button>
-				<Button size="sm" onclick={() => captureController.show()}>
+				<Button size="sm" onclick={() => goto(resolve('/collection/new'))}>
 					<CirclePlus class="size-4" />
 					New item
 				</Button>
