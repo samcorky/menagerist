@@ -28,13 +28,15 @@ from app.modules.media.adapters.api.media.content_caching import (
     content_cache_headers,
 )
 from app.modules.media.adapters.api.media.schemas import (
+    AttachMediaRequest,
+    DetachMediaRequest,
     MediaAssetResponse,
     MediaAttachmentResponse,
     NodeMediaItemResponse,
 )
-from app.modules.media.application.attach_media import AttachMedia, AttachMediaCommand
+from app.modules.media.application.attach_media import AttachMedia
 from app.modules.media.application.delete_media import DeleteMedia, DeleteMediaCommand
-from app.modules.media.application.detach_media import DetachMedia, DetachMediaCommand
+from app.modules.media.application.detach_media import DetachMedia
 from app.modules.media.application.get_media import GetMedia, GetMediaQuery
 from app.modules.media.application.list_node_media import (
     ListNodeMedia,
@@ -300,22 +302,12 @@ async def stream_media_thumbnail(
 )
 async def attach_media(
     asset_id: uuid.UUID,
+    payload: AttachMediaRequest,
     use_case: Annotated[AttachMedia, Depends(get_attach_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    target_type: Annotated[AttachmentTarget, Form()],
-    target_id: Annotated[uuid.UUID, Form()],
-    attribute_key: Annotated[AttachmentKey | None, Form()] = None,
 ) -> MediaAttachmentResponse:
     """Attach an already-staged asset to a graph entity."""
-    attachment = await use_case.handle(
-        AttachMediaCommand(
-            asset_id=asset_id,
-            target_type=target_type,
-            target_id=target_id,
-            attribute_key=attribute_key,
-        ),
-        actor,
-    )
+    attachment = await use_case.handle(payload.to_command(asset_id), actor)
     return MediaAttachmentResponse.from_domain(attachment)
 
 
@@ -332,22 +324,12 @@ async def attach_media(
 )
 async def detach_media(
     asset_id: uuid.UUID,
+    payload: DetachMediaRequest,
     use_case: Annotated[DetachMedia, Depends(get_detach_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    target_type: Annotated[AttachmentTarget, Form()],
-    target_id: Annotated[uuid.UUID, Form()],
-    attribute_key: Annotated[AttachmentKey | None, Form()] = None,
 ) -> None:
     """Remove the attachment record; orphan the asset if no other attachments remain."""
-    await use_case.handle(
-        DetachMediaCommand(
-            asset_id=asset_id,
-            target_type=target_type,
-            target_id=target_id,
-            attribute_key=attribute_key,
-        ),
-        actor,
-    )
+    await use_case.handle(payload.to_command(asset_id), actor)
 
 
 # ── Admin / repair tools (kept for operational use) ────────────────────────────

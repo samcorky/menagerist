@@ -76,6 +76,12 @@ async def create_node(
 
 The router depends on the use case, not on the repository the use case happens to use - that dependency is resolved once, at the composition root, and injected down. CLI commands follow the identical shape: a Cyclopts command is a driving adapter calling the same use case a router would, just triggered from a terminal. A use case never needs a second implementation to be reachable from a second entrypoint.
 
+## Request bodies: named Pydantic models, not `Form()` fields
+
+A request body is a Pydantic `BaseModel` (`XxxRequest`, with a `to_command()` method converting it to the use case's command), not a collection of individual `Form()`/`Body()` parameters - even when the payload happens to be small, e.g. `AttachMediaRequest` for `POST /media/{asset_id}/attachments`. FastAPI treats a single Pydantic model parameter as a JSON body automatically, and `@hey-api/openapi-ts` turns it into a properly named type for the frontend client (`AttachMediaRequest`) instead of an untyped bag of form fields.
+
+The one case that can't use a plain model is an endpoint that also accepts an `UploadFile` - multipart file uploads can't be embedded inside a Pydantic model, so those fields stay as `Form()` parameters alongside the `UploadFile`. FastAPI then synthesises its own request-body wrapper schema for the multipart body, always named `Body_<operation_id>` (see `fastapi.routing.APIRoute._get_body_field` - there is no per-route parameter to override this name). Left alone, that produces awkward generated-client types like `Body_upload_and_attach_media`. `configure_openapi()` in `entrypoints/api/openapi.py` renames every `Body_*` component schema after generation (`Body_upload_and_attach_media` -> `UploadAndAttachMediaBody`) so the frontend client gets a sane name without changing the route's `operation_id`.
+
 ## Ports carry data, not machinery
 
 A port exposes only what the caller needs, never the internals that produce it. A scheduler port takes a `job_key` string, not a reference to the task registry that resolves it - resolution happens on the inbound side that already owns the registry. If a port signature includes a callable, a registry, or an ORM model, the interface is leaking an adapter's implementation detail into a contract that's supposed to be adapter-agnostic.

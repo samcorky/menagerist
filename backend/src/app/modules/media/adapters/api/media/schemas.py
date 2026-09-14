@@ -4,13 +4,60 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict
 
+from app.modules.media.application.attach_media import AttachMediaCommand
+from app.modules.media.application.detach_media import DetachMediaCommand
 from app.modules.media.domain.media_asset import MediaStatus
-from app.modules.media.domain.media_attachment import AttachmentKey
+from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
 
 if TYPE_CHECKING:
     from app.modules.media.application.list_node_media import NodeMediaItem
     from app.modules.media.domain.media_asset import MediaAsset
     from app.modules.media.domain.media_attachment import MediaAttachment
+
+_ATTACHMENT_EXAMPLE: dict[str, Any] = {
+    "target_type": "node",
+    "target_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+    "attribute_key": "cover",
+}
+
+
+class AttachMediaRequest(BaseModel):
+    """Request body for attaching an already-staged asset to a graph entity."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [_ATTACHMENT_EXAMPLE]})
+
+    target_type: AttachmentTarget
+    target_id: uuid.UUID
+    attribute_key: AttachmentKey | None = None
+
+    def to_command(self, asset_id: uuid.UUID) -> AttachMediaCommand:
+        """Convert this request into an `AttachMediaCommand` for `asset_id`."""
+        return AttachMediaCommand(
+            asset_id=asset_id,
+            target_type=self.target_type,
+            target_id=self.target_id,
+            attribute_key=self.attribute_key,
+        )
+
+
+class DetachMediaRequest(BaseModel):
+    """Request body identifying the attachment to remove for a given asset."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [_ATTACHMENT_EXAMPLE]})
+
+    target_type: AttachmentTarget
+    target_id: uuid.UUID
+    attribute_key: AttachmentKey | None = None
+
+    def to_command(self, asset_id: uuid.UUID) -> DetachMediaCommand:
+        """Convert this request into a `DetachMediaCommand` for `asset_id`."""
+        return DetachMediaCommand(
+            asset_id=asset_id,
+            target_type=self.target_type,
+            target_id=self.target_id,
+            attribute_key=self.attribute_key,
+        )
+
 
 _EXAMPLE: dict[str, Any] = {
     "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
