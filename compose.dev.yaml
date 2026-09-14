@@ -16,7 +16,8 @@ x-hardened: &hardened
   networks:
     - menagerist
   env_file:
-    - .env
+    - path: .env
+      required: false
 
 x-logging: &logging
   logging:
