@@ -68,7 +68,9 @@ def _rename_multipart_body_schemas(openapi_schema: dict[str, Any]) -> None:
     if not renames:
         return
     for old_name, new_name in renames.items():
-        components[new_name] = components.pop(old_name)
+        schema = components.pop(old_name)
+        schema["title"] = new_name
+        components[new_name] = schema
     renamed_refs = {
         f"#/components/schemas/{old_name}": f"#/components/schemas/{new_name}"
         for old_name, new_name in renames.items()

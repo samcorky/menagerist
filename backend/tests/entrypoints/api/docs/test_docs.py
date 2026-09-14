@@ -69,3 +69,19 @@ def test_openapi_schema_contains_x_logo() -> None:
     assert "x-logo" in schema["info"]
     assert schema["info"]["x-logo"]["url"] == "/api/docs/logo.svg"
     assert "logo" in schema["info"]["x-logo"]["altText"]
+
+
+def test_openapi_schema_renames_multipart_body_schemas() -> None:
+    """Auto-generated Body_<operation_id> schemas are renamed, title included.
+
+    The `title` must be rewritten alongside the `components.schemas` key,
+    since Swagger UI and generated clients display the schema's `title`
+    rather than its key.
+    """
+    app = create_app()
+    schema = app.openapi()
+    schemas = schema["components"]["schemas"]
+
+    assert not any(name.startswith("Body_") for name in schemas)
+    assert schemas["StageMediaBody"]["title"] == "StageMediaBody"
+    assert schemas["UploadAndAttachMediaBody"]["title"] == "UploadAndAttachMediaBody"
