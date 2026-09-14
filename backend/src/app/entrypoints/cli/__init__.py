@@ -4,6 +4,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
+import structlog
 from cyclopts import App, Parameter
 
 from app.modules.media.adapters.cli.media_app import media_app
@@ -12,6 +13,7 @@ from app.platform.logging_config import configure_logging
 
 configure_logging()
 app_info = load_app_info()
+logger = structlog.get_logger(__name__)
 
 BACKEND_SRC_PATH = Path(__file__).resolve().parents[3]
 
@@ -136,7 +138,9 @@ def upgrade(revision: str = "head") -> None:
     from app.platform import alembic_runner
 
     _enable_migration_logs()
+    logger.debug("starting database upgrade", revision=revision)
     alembic_runner.upgrade(revision)
+    logger.info("database upgrade complete", revision=revision)
 
 
 @migrate_app.command
@@ -149,7 +153,9 @@ def downgrade(revision: str) -> None:
     from app.platform import alembic_runner
 
     _enable_migration_logs()
+    logger.debug("starting database downgrade", revision=revision)
     alembic_runner.downgrade(revision)
+    logger.info("database downgrade complete", revision=revision)
 
 
 @migrate_app.command
@@ -162,7 +168,11 @@ def revision(message: str, *, autogenerate: bool = True) -> None:
     """
     from app.platform import alembic_runner
 
+    logger.debug(
+        "starting migration revision", message=message, autogenerate=autogenerate
+    )
     alembic_runner.make_revision(message, autogenerate=autogenerate)
+    logger.info("migration revision complete", message=message)
 
 
 @schema_app.command
@@ -174,7 +184,9 @@ def dump(*, output: Path = Path("openapi.json")) -> None:
     """
     from app.entrypoints.api import create_app
 
+    logger.debug("dumping API schema", output=str(output))
     output.write_text(json.dumps(create_app().openapi(), indent=2))
+    logger.info("schema dump complete", output=str(output))
 
 
 if __name__ == "__main__":

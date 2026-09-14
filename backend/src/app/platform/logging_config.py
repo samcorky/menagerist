@@ -99,8 +99,9 @@ def configure_logging(*, level: int | str | None = None) -> None:
     # Route warnings through logging handler.
     logging.captureWarnings(True)
 
-    # Suppress verbose Alembic migration logs.
+    # Suppress verbose Alembic migration and plugin-registration logs.
     logging.getLogger("alembic.runtime.migration").setLevel(logging.WARNING)
+    logging.getLogger("alembic.runtime.plugins").setLevel(logging.WARNING)
 
 
 # Propagate Granian loggers to root so they render via structlog.
