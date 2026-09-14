@@ -1,20 +1,13 @@
 import json
 import logging
+from enum import StrEnum
 from pathlib import Path
 
 from cyclopts import App
-from granian import Granian
-from granian.constants import Interfaces, Loops
-from granian.log import LogLevels
 
 from app.modules.media.adapters.cli.media_app import media_app
-from app.platform import alembic_runner
 from app.platform.app_info import load_app_info
-from app.platform.logging_config import (
-    GRANIAN_ACCESS_LOG_FORMAT,
-    GRANIAN_LOG_DICTCONFIG,
-    configure_logging,
-)
+from app.platform.logging_config import configure_logging
 
 configure_logging()
 app_info = load_app_info()
@@ -47,6 +40,24 @@ def help() -> None:
     app.help_print()
 
 
+class ServeLogLevel(StrEnum):
+    """Mirrors `granian.log.LogLevels` without requiring granian to be imported.
+
+    Granian is a heavy import (pulls in its Rust extension and server modules),
+    so it is only imported inside `serve()`, when actually needed. This enum lets
+    cyclopts validate and display `--log-level` choices without paying that cost
+    for every other CLI command.
+    """
+
+    critical = "critical"
+    error = "error"
+    warning = "warning"
+    warn = "warn"
+    info = "info"
+    debug = "debug"
+    notset = "notset"
+
+
 @app.command
 def serve(
     *,
@@ -55,7 +66,7 @@ def serve(
     workers: int = 1,
     reload: bool = False,
     access_log: bool = True,
-    log_level: LogLevels = LogLevels.info,
+    log_level: ServeLogLevel = ServeLogLevel.info,
 ) -> None:
     """Run the API server.
 
@@ -67,6 +78,15 @@ def serve(
         access_log: Whether to log access events.
         log_level: Minimum level for Granian's own server logs.
     """
+    from granian import Granian
+    from granian.constants import Interfaces, Loops
+    from granian.log import LogLevels
+
+    from app.platform.logging_config import (
+        GRANIAN_ACCESS_LOG_FORMAT,
+        GRANIAN_LOG_DICTCONFIG,
+    )
+
     server = Granian(
         target="app.entrypoints.api:app",
         address=host,
@@ -76,7 +96,7 @@ def serve(
         reload=reload,
         reload_paths=[BACKEND_SRC_PATH],
         loop=Loops.auto,
-        log_level=log_level,
+        log_level=LogLevels(log_level.value),
         log_dictconfig=GRANIAN_LOG_DICTCONFIG,
         log_access=access_log,
         log_access_format=GRANIAN_ACCESS_LOG_FORMAT,
@@ -95,6 +115,8 @@ def upgrade(revision: str = "head") -> None:
     Args:
         revision: Target revision, or "head" for the latest.
     """
+    from app.platform import alembic_runner
+
     _enable_migration_logs()
     alembic_runner.upgrade(revision)
 
@@ -106,6 +128,8 @@ def downgrade(revision: str) -> None:
     Args:
         revision: Target revision.
     """
+    from app.platform import alembic_runner
+
     _enable_migration_logs()
     alembic_runner.downgrade(revision)
 
@@ -118,6 +142,8 @@ def revision(message: str, *, autogenerate: bool = True) -> None:
         message: Short description of the migration.
         autogenerate: Diff current models against the database schema.
     """
+    from app.platform import alembic_runner
+
     alembic_runner.make_revision(message, autogenerate=autogenerate)
 
 
