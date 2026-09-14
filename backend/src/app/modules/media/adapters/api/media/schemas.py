@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.modules.media.application.attach_media import AttachMediaCommand
 from app.modules.media.application.detach_media import DetachMediaCommand
+from app.modules.media.application.update_media import UpdateMediaCommand
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
 
@@ -57,6 +58,20 @@ class DetachMediaRequest(BaseModel):
             target_id=self.target_id,
             attribute_key=self.attribute_key,
         )
+
+
+class UpdateMediaRequest(BaseModel):
+    """Request body for updating a media asset."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"filename": "front page"}]}
+    )
+
+    filename: str
+
+    def to_command(self, asset_id: uuid.UUID) -> UpdateMediaCommand:
+        """Convert this request into an `UpdateMediaCommand` for `asset_id`."""
+        return UpdateMediaCommand(asset_id=asset_id, filename=self.filename)
 
 
 _EXAMPLE: dict[str, Any] = {

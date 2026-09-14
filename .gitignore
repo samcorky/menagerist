@@ -14,7 +14,7 @@
 .DS_Store
 Thumbs.db
 
-# AI Stuff*
+# AI Stuff
 .claude/
 .agents/
 
@@ -24,6 +24,7 @@ compose.override.yaml
 
 # Pytest artifacts
 .coverage
+coverage.xml
 
 # Other
 openapi.json

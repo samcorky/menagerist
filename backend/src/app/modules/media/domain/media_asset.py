@@ -55,6 +55,35 @@ class MediaAsset(Identifiable, Timestamped):
             updated_at=now,
         )
 
+    @staticmethod
+    def _extension(name: str) -> str:
+        dot = name.rfind(".")
+        return name[dot:].lower() if dot != -1 else ""
+
+    def rename(self, filename: str) -> None:
+        """Rename the media asset while preserving its original extension."""
+        normalised = filename.strip()
+        if not normalised:
+            raise ValidationError("filename must be provided")
+
+        original_extension = self._extension(self.filename)
+        requested_extension = self._extension(normalised)
+
+        if (
+            original_extension
+            and requested_extension
+            and requested_extension != original_extension
+        ):
+            raise ValidationError("filename extension cannot be changed")
+
+        if requested_extension:
+            final_filename = normalised
+        else:
+            final_filename = f"{normalised}{original_extension}"
+
+        self.filename = final_filename
+        self.touch()
+
     def promote(self) -> None:
         """Transition from staged to attached."""
         if self.status is not MediaStatus.STAGED:

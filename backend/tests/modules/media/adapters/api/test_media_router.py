@@ -101,6 +101,49 @@ def test_promote_returns_404_for_missing_asset() -> None:
     assert response.status_code == 404
 
 
+def test_update_media_renames_filename_without_changing_extension() -> None:
+    """PATCH /media/{id} updates the stored filename while keeping the extension."""
+    app, _, _ = _app_with_in_memory_media()
+    client = TestClient(app)
+
+    stage = client.post(
+        "/api/v1/media",
+        files={"file": ("cover.jpg", b"data", "image/jpeg")},
+    ).json()
+
+    response = client.patch(
+        f"/api/v1/media/{stage['id']}",
+        json={"filename": "front page"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["filename"] == "front page.jpg"
+
+    get_response = client.get(f"/api/v1/media/{stage['id']}")
+    assert get_response.status_code == 200
+    assert get_response.json()["filename"] == "front page.jpg"
+
+
+def test_update_media_rejects_extension_change() -> None:
+    """PATCH /media/{id} rejects attempts to replace the file extension."""
+    app, _, _ = _app_with_in_memory_media()
+    client = TestClient(app)
+
+    stage = client.post(
+        "/api/v1/media",
+        files={"file": ("cover.jpg", b"data", "image/jpeg")},
+    ).json()
+
+    response = client.patch(
+        f"/api/v1/media/{stage['id']}",
+        json={"filename": "front.png"},
+    )
+
+    assert response.status_code == 400
+    assert "filename extension cannot be changed" in response.text
+
+
 def test_orphan_transitions_to_orphaned() -> None:
     """POST /media/{id}/orphan changes status from attached to orphaned."""
     app, _, _ = _app_with_in_memory_media()

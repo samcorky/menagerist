@@ -9,7 +9,10 @@ from starlette.responses import Response
 from app.entrypoints.api.shared.conditional_request import ConditionalRequestDep
 from app.entrypoints.api.shared.content_sniffing import sniff_and_rechain
 from app.entrypoints.api.shared.dependencies import get_current_actor
-from app.entrypoints.api.shared.http_headers import conditional_get_responses
+from app.entrypoints.api.shared.http_headers import (
+    conditional_get_responses,
+    conditional_patch_responses,
+)
 from app.entrypoints.api.shared.problem_response import error_response
 from app.modules.media.adapters.api.dependencies import (
     get_attach_media_use_case,
@@ -21,6 +24,7 @@ from app.modules.media.adapters.api.dependencies import (
     get_orphan_media_use_case,
     get_promote_media_use_case,
     get_stage_media_use_case,
+    get_update_media_use_case,
     get_upload_and_attach_use_case,
 )
 from app.modules.media.adapters.api.media.content_caching import (
@@ -35,6 +39,7 @@ from app.modules.media.adapters.api.media.schemas import (
     MediaAssetResponse,
     MediaAttachmentResponse,
     NodeMediaItemResponse,
+    UpdateMediaRequest,
 )
 from app.modules.media.application.attach_media import AttachMedia
 from app.modules.media.application.delete_media import DeleteMedia, DeleteMediaCommand
@@ -50,6 +55,7 @@ from app.modules.media.application.promote_media import (
     PromoteMediaCommand,
 )
 from app.modules.media.application.stage_media import StageMedia, StageMediaCommand
+from app.modules.media.application.update_media import UpdateMedia
 from app.modules.media.application.upload_and_attach_media import (
     UploadAndAttachMedia,
     UploadAndAttachMediaCommand,
@@ -196,6 +202,38 @@ async def get_media(
     asset = await use_case.handle(GetMediaQuery(asset_id=asset_id), actor)
     if earlier := cond.check_get(asset):
         return earlier
+    return MediaAssetResponse.from_domain(asset)
+
+
+@router.patch(
+    "/{asset_id}",
+    response_model=MediaAssetResponse,
+    operation_id="update_media",
+    responses={
+        **conditional_patch_responses(),
+        **error_response(
+            MediaAssetNotFoundError,
+            detail="Media asset 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+        ),
+        **error_response(
+            ValidationError, detail="filename extension cannot be changed"
+        ),
+    },
+)
+async def update_media(
+    asset_id: uuid.UUID,
+    payload: UpdateMediaRequest,
+    get_use_case: Annotated[GetMedia, Depends(get_get_media_use_case)],
+    update_use_case: Annotated[UpdateMedia, Depends(get_update_media_use_case)],
+    cond: ConditionalRequestDep,
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> MediaAssetResponse | Response:
+    """Update the media asset's editable filename."""
+    current = await get_use_case.handle(GetMediaQuery(asset_id=asset_id), actor)
+    if earlier := cond.check_patch(current):
+        return earlier
+    asset = await update_use_case.handle(payload.to_command(asset_id), actor)
+    cond.set_response_etag(asset)
     return MediaAssetResponse.from_domain(asset)
 
 

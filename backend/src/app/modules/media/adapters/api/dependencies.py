@@ -20,6 +20,7 @@ from app.modules.media.application.list_node_media import ListNodeMedia
 from app.modules.media.application.orphan_media import OrphanMedia
 from app.modules.media.application.promote_media import PromoteMedia
 from app.modules.media.application.stage_media import StageMedia
+from app.modules.media.application.update_media import UpdateMedia
 from app.modules.media.application.upload_and_attach_media import UploadAndAttachMedia
 from app.modules.media.ports.attachment_policy import AttachmentPolicyPort
 from app.modules.media.ports.image_processor import ImageProcessorPort
@@ -70,6 +71,12 @@ def get_promote_media_use_case(
     storage: Annotated[MediaStoragePort, Depends(get_media_storage)],
 ) -> PromoteMedia:
     return PromoteMedia(uow, storage)
+
+
+def get_update_media_use_case(
+    uow: Annotated[MediaUnitOfWork, Depends(get_media_uow)],
+) -> UpdateMedia:
+    return UpdateMedia(uow)
 
 
 def get_orphan_media_use_case(
