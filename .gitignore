@@ -24,3 +24,6 @@ compose.override.yaml
 
 # Pytest artifacts
 .coverage
+
+# Other
+openapi.json

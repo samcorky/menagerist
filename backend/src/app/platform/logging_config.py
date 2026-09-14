@@ -50,8 +50,23 @@ def _expand_access_log_fields(
     return event_dict
 
 
+_configured = False
+
+
 def configure_logging(*, level: int | str | None = None) -> None:
-    """Sets up logging with structlog."""
+    """Sets up logging with structlog.
+
+    A no-op on repeat calls unless `level` is given explicitly. Both entrypoint
+    modules (`api`, `cli`) call this unconditionally at import time, and a CLI
+    command can lazily import `api` after the CLI has already configured
+    logging (e.g. via `--verbose`); without this guard, that later import-time
+    call would silently reset the level back to `LOG_LEVEL`.
+    """
+    global _configured
+    if _configured and level is None:
+        return
+    _configured = True
+
     settings = get_logging_settings()
     effective_level = level if level is not None else settings.log_level
     shared_processors: list[structlog.types.Processor] = [
