@@ -35,6 +35,18 @@ schema_app = App(name="schema", help="Inspect the API schema.")
 app.command(schema_app)
 
 
+@app.default
+def shell() -> None:
+    """Start the interactive shell."""
+    app.interactive_shell(prompt=f"{app_info.name}> ")
+
+
+@app.command
+def help() -> None:
+    """Display the help screen."""
+    app.help_print()
+
+
 @app.command
 def serve(
     *,
