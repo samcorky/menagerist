@@ -77,16 +77,14 @@ RUN PYTHON_DIR="$(find /opt/python -mindepth 1 -maxdepth 1 -type d -name 'cpytho
     \
     && find /opt/python /app/.venv \
         \( \
-            -type d -name '__pycache__' \
-            -o -type d -name 'tests' \
+            -type d -name 'tests' \
             -o -type d -name 'test' \
         \) \
         -prune -exec rm -rf '{}' + \
     \
     && find /opt/python /app/.venv \
         \( \
-            -name '*.pyc' \
-            -o -name '*.pyo' \
+            -name '*.pyo' \
             -o -name '*.a' \
             -o -name '_test*.so' \
             -o -name '_ctypes_test*.so' \
