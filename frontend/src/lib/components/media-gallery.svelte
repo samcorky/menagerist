@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { X, File as FileIcon, Star, StarOff } from '@lucide/svelte';
+	import { X, File as FileIcon, Star, StarOff, Pencil, Check } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { SvelteSet } from 'svelte/reactivity';
 	import {
@@ -9,9 +9,11 @@
 		deleteMedia,
 		attachMedia,
 		detachMedia,
+		updateMedia,
 		type NodeMediaItemResponse
 	} from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
+	import { Input } from '$lib/components/ui/input/index.js';
 	import FileDrop from './file-drop.svelte';
 
 	let { nodeId }: { nodeId: string } = $props();
@@ -27,6 +29,8 @@
 	let uploading = $state<UploadingEntry[]>([]);
 	let loading = $state(true);
 	let confirmDeleteAssetId = $state<string | null>(null);
+	let renamingAssetId = $state<string | null>(null);
+	let renameValue = $state('');
 
 	let lightboxAsset = $state<NodeMediaItemResponse | null>(null);
 	let lightboxFullLoaded = $state(false);
@@ -150,6 +154,41 @@
 		await loadMedia();
 	}
 
+	function startRename(asset: NodeMediaItemResponse) {
+		renamingAssetId = asset.id;
+		renameValue = asset.filename;
+	}
+
+	function cancelRename() {
+		renamingAssetId = null;
+	}
+
+	async function saveRename(asset: NodeMediaItemResponse) {
+		const trimmed = renameValue.trim();
+		if (!trimmed || trimmed === asset.filename) {
+			cancelRename();
+			return;
+		}
+
+		const result = await updateMedia({
+			path: { asset_id: asset.id },
+			body: { filename: trimmed }
+		});
+
+		if (result.response?.status === 412) {
+			toast.error('Edit conflict', {
+				description: 'This file was updated elsewhere — refresh to see the latest version.'
+			});
+		} else if (result.error || !result.data) {
+			toast.error('Rename failed', { description: errorMessage(result.error) });
+		} else {
+			const updated = result.data;
+			assets = assets.map((a) => (a.id === asset.id ? { ...a, ...updated } : a));
+		}
+
+		cancelRename();
+	}
+
 	function isImage(asset: NodeMediaItemResponse) {
 		return asset.content_type.startsWith('image/');
 	}
@@ -252,54 +291,95 @@
 					<div
 						class="pointer-events-none absolute inset-0 flex flex-col items-end justify-start gap-1 bg-black/20 p-1 transition-colors sm:bg-black/0 sm:group-hover:bg-black/40"
 					>
-						{#if isImage(asset)}
-							{#if coverIds.has(asset.id)}
-								<button
-									type="button"
-									onclick={() => removeCover(asset)}
-									class="pointer-events-auto rounded-full bg-black/70 p-1 text-yellow-400 transition-opacity hover:bg-black/90 sm:opacity-0 sm:group-hover:opacity-100"
-									aria-label="Remove cover for {asset.filename}"
-								>
-									<StarOff class="size-3" />
-								</button>
+						{#if renamingAssetId === asset.id}
+							<div class="pointer-events-auto flex w-full flex-col items-end gap-1">
+								<Input
+									bind:value={renameValue}
+									autofocus
+									class="h-6 w-full rounded bg-black/70 px-1.5 py-0.5 text-xs text-white outline-none"
+									aria-label="Rename {asset.filename}"
+									onkeydown={(e) => {
+										if (e.key === 'Enter') saveRename(asset);
+										if (e.key === 'Escape') cancelRename();
+									}}
+								/>
+								<div class="flex gap-1">
+									<button
+										type="button"
+										onclick={cancelRename}
+										class="rounded-full bg-black/70 p-1 text-white hover:bg-black/90"
+										aria-label="Cancel rename"
+									>
+										<X class="size-3" />
+									</button>
+									<button
+										type="button"
+										onclick={() => saveRename(asset)}
+										class="rounded-full bg-black/70 p-1 text-white hover:bg-black/90"
+										aria-label="Save rename"
+									>
+										<Check class="size-3" />
+									</button>
+								</div>
+							</div>
+						{:else}
+							{#if isImage(asset)}
+								{#if coverIds.has(asset.id)}
+									<button
+										type="button"
+										onclick={() => removeCover(asset)}
+										class="pointer-events-auto rounded-full bg-black/70 p-1 text-yellow-400 transition-opacity hover:bg-black/90 sm:opacity-0 sm:group-hover:opacity-100"
+										aria-label="Remove cover for {asset.filename}"
+									>
+										<StarOff class="size-3" />
+									</button>
+								{:else}
+									<button
+										type="button"
+										onclick={() => setCover(asset)}
+										class="pointer-events-auto rounded-full bg-black/70 p-1 text-white transition-opacity hover:bg-black/90 sm:opacity-0 sm:group-hover:opacity-100"
+										aria-label="Set as cover {asset.filename}"
+									>
+										<Star class="size-3" />
+									</button>
+								{/if}
+							{/if}
+							<button
+								type="button"
+								onclick={() => startRename(asset)}
+								class="pointer-events-auto rounded-full bg-black/70 p-1 text-white transition-opacity hover:bg-black/90 sm:opacity-0 sm:group-hover:opacity-100"
+								aria-label="Rename {asset.filename}"
+							>
+								<Pencil class="size-3" />
+							</button>
+							{#if confirmDeleteAssetId === asset.id}
+								<div class="pointer-events-auto flex flex-col items-end gap-1">
+									<span class="rounded bg-black/70 px-1.5 py-0.5 text-xs text-white">Delete?</span>
+									<button
+										type="button"
+										onclick={() => (confirmDeleteAssetId = null)}
+										class="rounded-full bg-black/70 px-2 py-0.5 text-xs text-white hover:bg-black/90"
+									>
+										Cancel
+									</button>
+									<button
+										type="button"
+										onclick={() => handleDelete(asset)}
+										class="rounded-full bg-destructive/90 px-2 py-0.5 text-xs text-white hover:bg-destructive"
+									>
+										Delete
+									</button>
+								</div>
 							{:else}
 								<button
 									type="button"
-									onclick={() => setCover(asset)}
+									onclick={() => (confirmDeleteAssetId = asset.id)}
 									class="pointer-events-auto rounded-full bg-black/70 p-1 text-white transition-opacity hover:bg-black/90 sm:opacity-0 sm:group-hover:opacity-100"
-									aria-label="Set as cover {asset.filename}"
+									aria-label="Delete {asset.filename}"
 								>
-									<Star class="size-3" />
+									<X class="size-3" />
 								</button>
 							{/if}
-						{/if}
-						{#if confirmDeleteAssetId === asset.id}
-							<div class="pointer-events-auto flex flex-col items-end gap-1">
-								<span class="rounded bg-black/70 px-1.5 py-0.5 text-xs text-white">Delete?</span>
-								<button
-									type="button"
-									onclick={() => (confirmDeleteAssetId = null)}
-									class="rounded-full bg-black/70 px-2 py-0.5 text-xs text-white hover:bg-black/90"
-								>
-									Cancel
-								</button>
-								<button
-									type="button"
-									onclick={() => handleDelete(asset)}
-									class="rounded-full bg-destructive/90 px-2 py-0.5 text-xs text-white hover:bg-destructive"
-								>
-									Delete
-								</button>
-							</div>
-						{:else}
-							<button
-								type="button"
-								onclick={() => (confirmDeleteAssetId = asset.id)}
-								class="pointer-events-auto rounded-full bg-black/70 p-1 text-white transition-opacity hover:bg-black/90 sm:opacity-0 sm:group-hover:opacity-100"
-								aria-label="Delete {asset.filename}"
-							>
-								<X class="size-3" />
-							</button>
 						{/if}
 					</div>
 				</div>
