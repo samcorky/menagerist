@@ -5,7 +5,9 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict
 
 from app.modules.media.application.attach_media import AttachMediaCommand
+from app.modules.media.application.clear_media_cover import ClearMediaCoverCommand
 from app.modules.media.application.detach_media import DetachMediaCommand
+from app.modules.media.application.set_media_cover import SetMediaCoverCommand
 from app.modules.media.application.update_media import UpdateMediaCommand
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
@@ -57,6 +59,40 @@ class DetachMediaRequest(BaseModel):
             target_type=self.target_type,
             target_id=self.target_id,
             attribute_key=self.attribute_key,
+        )
+
+
+class CoverRequest(BaseModel):
+    """Request body identifying the target whose cover to set or clear."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "target_type": "node",
+                    "target_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                }
+            ]
+        }
+    )
+
+    target_type: AttachmentTarget
+    target_id: uuid.UUID
+
+    def to_set_command(self, asset_id: uuid.UUID) -> SetMediaCoverCommand:
+        """Convert this request into a `SetMediaCoverCommand` for `asset_id`."""
+        return SetMediaCoverCommand(
+            asset_id=asset_id,
+            target_type=self.target_type,
+            target_id=self.target_id,
+        )
+
+    def to_clear_command(self, asset_id: uuid.UUID) -> ClearMediaCoverCommand:
+        """Convert this request into a `ClearMediaCoverCommand` for `asset_id`."""
+        return ClearMediaCoverCommand(
+            asset_id=asset_id,
+            target_type=self.target_type,
+            target_id=self.target_id,
         )
 
 

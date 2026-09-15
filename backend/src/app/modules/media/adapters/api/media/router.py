@@ -16,6 +16,7 @@ from app.entrypoints.api.shared.http_headers import (
 from app.entrypoints.api.shared.problem_response import error_response
 from app.modules.media.adapters.api.dependencies import (
     get_attach_media_use_case,
+    get_clear_media_cover_use_case,
     get_delete_media_use_case,
     get_detach_media_use_case,
     get_get_media_use_case,
@@ -23,6 +24,7 @@ from app.modules.media.adapters.api.dependencies import (
     get_media_storage,
     get_orphan_media_use_case,
     get_promote_media_use_case,
+    get_set_media_cover_use_case,
     get_stage_media_use_case,
     get_update_media_use_case,
     get_upload_and_attach_use_case,
@@ -35,6 +37,7 @@ from app.modules.media.adapters.api.media.content_caching import (
 )
 from app.modules.media.adapters.api.media.schemas import (
     AttachMediaRequest,
+    CoverRequest,
     DetachMediaRequest,
     MediaAssetResponse,
     MediaAttachmentResponse,
@@ -42,6 +45,7 @@ from app.modules.media.adapters.api.media.schemas import (
     UpdateMediaRequest,
 )
 from app.modules.media.application.attach_media import AttachMedia
+from app.modules.media.application.clear_media_cover import ClearMediaCover
 from app.modules.media.application.delete_media import DeleteMedia, DeleteMediaCommand
 from app.modules.media.application.detach_media import DetachMedia
 from app.modules.media.application.get_media import GetMedia, GetMediaQuery
@@ -54,6 +58,7 @@ from app.modules.media.application.promote_media import (
     PromoteMedia,
     PromoteMediaCommand,
 )
+from app.modules.media.application.set_media_cover import SetMediaCover
 from app.modules.media.application.stage_media import StageMedia, StageMediaCommand
 from app.modules.media.application.update_media import UpdateMedia
 from app.modules.media.application.upload_and_attach_media import (
@@ -370,6 +375,57 @@ async def detach_media(
 ) -> None:
     """Remove the attachment record; orphan the asset if no other attachments remain."""
     await use_case.handle(payload.to_command(asset_id), actor)
+
+
+@router.post(
+    "/{asset_id}/attachments/cover",
+    response_model=MediaAttachmentResponse,
+    operation_id="set_media_cover",
+    responses={
+        **error_response(
+            MediaAssetNotFoundError,
+            detail="Media asset 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+        ),
+        **error_response(
+            UnsupportedMediaTypeError,
+            detail="'application/pdf' cannot be used as a cover",
+        ),
+        **error_response(
+            MediaAttachmentNotFoundError,
+            detail="No attachment found for the given asset + target",
+        ),
+    },
+)
+async def set_media_cover(
+    asset_id: uuid.UUID,
+    payload: CoverRequest,
+    use_case: Annotated[SetMediaCover, Depends(get_set_media_cover_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> MediaAttachmentResponse:
+    """Mark the asset's attachment as cover, atomically clearing any previous cover."""
+    attachment = await use_case.handle(payload.to_set_command(asset_id), actor)
+    return MediaAttachmentResponse.from_domain(attachment)
+
+
+@router.delete(
+    "/{asset_id}/attachments/cover",
+    status_code=204,
+    operation_id="clear_media_cover",
+    responses={
+        **error_response(
+            MediaAttachmentNotFoundError,
+            detail="No attachment found for the given asset + target",
+        ),
+    },
+)
+async def clear_media_cover(
+    asset_id: uuid.UUID,
+    payload: CoverRequest,
+    use_case: Annotated[ClearMediaCover, Depends(get_clear_media_cover_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> None:
+    """Clear the asset's cover flag; the asset stays attached to the target."""
+    await use_case.handle(payload.to_clear_command(asset_id), actor)
 
 
 # ── Admin / repair tools (kept for operational use) ────────────────────────────

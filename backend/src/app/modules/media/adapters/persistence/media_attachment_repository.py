@@ -91,6 +91,16 @@ class SqlAlchemyMediaAttachmentRepository:
         result = await self._session.execute(stmt)
         return [self._to_domain(r) for r in result.scalars()]
 
+    async def update(self, attachment: MediaAttachment) -> None:
+        """Persist changes to an existing attachment row."""
+        logger.debug("updating media attachment", attachment_id=attachment.id)
+        row = await self._session.get(MediaAttachmentModel, attachment.id)
+        if row is None:
+            return
+        row.attribute_key = attachment.attribute_key
+        row.updated_at = attachment.updated_at
+        await self._session.flush()
+
     async def delete(self, attachment_id: uuid.UUID) -> None:
         """Remove an attachment row by id."""
         logger.debug("deleting media attachment", attachment_id=attachment_id)

@@ -32,6 +32,10 @@ class MediaAttachmentRepository(Protocol):
         """Return all attachments for the given asset."""
         ...
 
+    async def update(self, attachment: MediaAttachment) -> None:
+        """Persist changes to an existing attachment."""
+        ...
+
     async def delete(self, attachment_id: uuid.UUID) -> None:
         """Remove an attachment by id."""
         ...

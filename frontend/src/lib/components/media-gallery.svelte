@@ -7,8 +7,8 @@
 		listNodeMedia,
 		uploadAndAttachMedia,
 		deleteMedia,
-		attachMedia,
-		detachMedia,
+		setMediaCover,
+		clearMediaCover,
 		updateMedia,
 		type NodeMediaItemResponse
 	} from '$lib/api/client';
@@ -73,6 +73,23 @@
 		void loadMedia();
 	});
 
+	async function runWithConcurrency<T>(
+		items: T[],
+		limit: number,
+		worker: (item: T, index: number) => Promise<void>
+	): Promise<void> {
+		let nextIndex = 0;
+		async function runNext(): Promise<void> {
+			while (nextIndex < items.length) {
+				const index = nextIndex;
+				nextIndex += 1;
+				await worker(items[index], index);
+			}
+		}
+		const poolSize = Math.min(limit, items.length);
+		await Promise.all(Array.from({ length: poolSize }, () => runNext()));
+	}
+
 	async function uploadFiles(files: FileList | File[]) {
 		const list = Array.from(files);
 		if (list.length === 0) return;
@@ -85,33 +102,36 @@
 		}));
 		uploading = [...uploading, ...entries];
 
-		await Promise.all(
-			list.map(async (file, i) => {
-				const entry = entries[i];
-
-				const fileIsImage = file.type.startsWith('image/');
-				const hasCover = coverIds.size > 0;
-				const attributeKey: 'cover' | undefined = fileIsImage && !hasCover ? 'cover' : undefined;
-
-				const result = await uploadAndAttachMedia({
-					body: {
-						file,
-						target_type: 'node',
-						target_id: nodeId,
-						...(attributeKey ? { attribute_key: attributeKey } : {})
-					}
-				});
-
-				if (result.error || !result.data) {
-					uploading = uploading.map((u) => (u.id === entry.id ? { ...u, progress: 'error' } : u));
-					toast.error(`Failed to upload ${file.name}`, { description: errorMessage(result.error) });
-				} else {
-					uploading = uploading.filter((u) => u.id !== entry.id);
-					if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl);
-					await loadMedia();
-				}
-			})
+		const hasExistingCover = coverIds.size > 0;
+		const firstImageIndex = hasExistingCover
+			? -1
+			: list.findIndex((f) => f.type.startsWith('image/'));
+		const attributeKeys: ('cover' | undefined)[] = list.map((_, i) =>
+			i === firstImageIndex ? 'cover' : undefined
 		);
+
+		await runWithConcurrency(list, 3, async (file, i) => {
+			const entry = entries[i];
+			const attributeKey = attributeKeys[i];
+
+			const result = await uploadAndAttachMedia({
+				body: {
+					file,
+					target_type: 'node',
+					target_id: nodeId,
+					...(attributeKey ? { attribute_key: attributeKey } : {})
+				}
+			});
+
+			if (result.error || !result.data) {
+				uploading = uploading.map((u) => (u.id === entry.id ? { ...u, progress: 'error' } : u));
+				toast.error(`Failed to upload ${file.name}`, { description: errorMessage(result.error) });
+			} else {
+				uploading = uploading.filter((u) => u.id !== entry.id);
+				if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl);
+				await loadMedia();
+			}
+		});
 	}
 
 	onDestroy(() => {
@@ -132,25 +152,26 @@
 	}
 
 	async function setCover(asset: NodeMediaItemResponse) {
-		const currentCoverId = [...coverIds].find((id) => id !== asset.id);
-		if (currentCoverId) {
-			await detachMedia({
-				path: { asset_id: currentCoverId },
-				body: { target_type: 'node', target_id: nodeId, attribute_key: 'cover' }
-			});
-		}
-		await attachMedia({
+		const result = await setMediaCover({
 			path: { asset_id: asset.id },
-			body: { target_type: 'node', target_id: nodeId, attribute_key: 'cover' }
+			body: { target_type: 'node', target_id: nodeId }
 		});
+		if (result.error) {
+			toast.error('Failed to set cover', { description: errorMessage(result.error) });
+			return;
+		}
 		await loadMedia();
 	}
 
 	async function removeCover(asset: NodeMediaItemResponse) {
-		await detachMedia({
+		const result = await clearMediaCover({
 			path: { asset_id: asset.id },
-			body: { target_type: 'node', target_id: nodeId, attribute_key: 'cover' }
+			body: { target_type: 'node', target_id: nodeId }
 		});
+		if (result.error) {
+			toast.error('Failed to remove cover', { description: errorMessage(result.error) });
+			return;
+		}
 		await loadMedia();
 	}
 

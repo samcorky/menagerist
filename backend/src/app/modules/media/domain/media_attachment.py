@@ -28,6 +28,16 @@ class MediaAttachment(Identifiable, Timestamped):
     target_id: uuid.UUID
     attribute_key: AttachmentKey | None = field(default=None)
 
+    def mark_as_cover(self) -> None:
+        """Flag this attachment as the target's cover."""
+        self.attribute_key = AttachmentKey.COVER
+        self.touch()
+
+    def clear_attribute_key(self) -> None:
+        """Clear this attachment's slot label without detaching it."""
+        self.attribute_key = None
+        self.touch()
+
     @classmethod
     def for_target(
         cls,
