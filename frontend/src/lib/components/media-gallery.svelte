@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { X, File as FileIcon, Star, StarOff, Pencil, Check } from '@lucide/svelte';
+	import { X, File as FileIcon, Star, StarOff, Pencil, Check, Download } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { SvelteSet } from 'svelte/reactivity';
 	import {
@@ -373,6 +373,16 @@
 							>
 								<Pencil class="size-3" />
 							</button>
+							<!-- eslint-disable svelte/no-navigation-without-resolve -->
+							<a
+								href={asset.content_url}
+								download={asset.filename}
+								class="pointer-events-auto rounded-full bg-black/70 p-1 text-white transition-opacity hover:bg-black/90 sm:opacity-0 sm:group-hover:opacity-100"
+								aria-label="Download {asset.filename}"
+							>
+								<Download class="size-3" />
+							</a>
+							<!-- eslint-enable svelte/no-navigation-without-resolve -->
 							{#if confirmDeleteAssetId === asset.id}
 								<div class="pointer-events-auto flex flex-col items-end gap-1">
 									<span class="rounded bg-black/70 px-1.5 py-0.5 text-xs text-white">Delete?</span>
@@ -423,6 +433,16 @@
 		onkeydown={(e) => e.key === 'Escape' && (lightboxAsset = null)}
 		tabindex="-1"
 	>
+		<!-- eslint-disable svelte/no-navigation-without-resolve -->
+		<a
+			href={asset.content_url}
+			download={asset.filename}
+			class="absolute top-4 right-16 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+			aria-label="Download {asset.filename}"
+		>
+			<Download class="size-5" />
+		</a>
+		<!-- eslint-enable svelte/no-navigation-without-resolve -->
 		<button
 			type="button"
 			class="absolute top-4 right-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
