@@ -1,15 +1,18 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { ImagePlus, X } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import {
+		attachMedia,
 		createNode,
 		listNodeTypes,
 		uploadAndAttachMedia,
 		type NodeTypeResponse
 	} from '$lib/api/client';
 	import { networkAwareError } from '$lib/api/errors';
+	import { captureController, type StagedPhoto } from '$lib/capture.svelte.js';
 	import AttributesEditor, {
 		rowsToAttributes,
 		type AttributeRow
@@ -30,6 +33,7 @@
 	let saving = $state(false);
 	let photo = $state<File | null>(null);
 	let photoPreview = $state<string | null>(null);
+	let stagedAsset = $state<StagedPhoto | null>(null);
 	let nodeTypes = $state<NodeTypeResponse[]>([]);
 
 	let nodeSchema = $derived(
@@ -45,9 +49,22 @@
 		};
 	});
 
+	onMount(() => {
+		const pending = captureController.consumePendingHandoff();
+		if (pending) {
+			name = pending.name;
+			selectedType = pending.selectedType;
+			if (pending.stagedPhoto) {
+				stagedAsset = pending.stagedPhoto;
+				photoPreview = pending.stagedPhoto.previewUrl;
+			}
+		}
+	});
+
 	function handlePhotoChange(e: Event) {
 		const file = (e.target as HTMLInputElement).files?.[0] ?? null;
 		if (photoPreview) URL.revokeObjectURL(photoPreview);
+		stagedAsset = null;
 		photo = file;
 		photoPreview = file ? URL.createObjectURL(file) : null;
 	}
@@ -56,6 +73,7 @@
 		if (photoPreview) URL.revokeObjectURL(photoPreview);
 		photo = null;
 		photoPreview = null;
+		stagedAsset = null;
 	}
 
 	async function handleSubmit(e: SubmitEvent) {
@@ -76,7 +94,12 @@
 			saving = false;
 			return;
 		}
-		if (photo) {
+		if (stagedAsset) {
+			await attachMedia({
+				path: { asset_id: stagedAsset.id },
+				body: { target_type: 'node', target_id: result.data.id, attribute_key: 'cover' }
+			});
+		} else if (photo) {
 			await uploadAndAttachMedia({
 				body: {
 					file: photo,

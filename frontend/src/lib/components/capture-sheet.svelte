@@ -4,8 +4,8 @@
 	import { resolve } from '$app/paths';
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
-	import { captureController } from '$lib/capture.svelte.js';
-	import { createNode, uploadAndAttachMedia } from '$lib/api/client';
+	import { captureController, type StagedPhoto } from '$lib/capture.svelte.js';
+	import { createNode, stageMedia, attachMedia } from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
 	import CategorySelect from '$lib/components/category-select.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -15,20 +15,28 @@
 	let name = $state('');
 	let selectedType = $state<string | null>(null);
 	let saving = $state(false);
-	let photo = $state<File | null>(null);
-	let photoPreview = $state<string | null>(null);
+	let stagedAsset = $state<StagedPhoto | null>(null);
+	let staging = $state(false);
 
-	function handlePhotoChange(e: Event) {
+	async function handlePhotoChange(e: Event) {
 		const file = (e.target as HTMLInputElement).files?.[0] ?? null;
-		if (photoPreview) URL.revokeObjectURL(photoPreview);
-		photo = file;
-		photoPreview = file ? URL.createObjectURL(file) : null;
+		if (!file) return;
+		staging = true;
+		const previewUrl = URL.createObjectURL(file);
+		const result = await stageMedia({ body: { file } });
+		if (result.error || !result.data) {
+			URL.revokeObjectURL(previewUrl);
+			toast.error("Couldn't add photo", { description: errorMessage(result.error) });
+			staging = false;
+			return;
+		}
+		stagedAsset = { id: result.data.id, filename: result.data.filename, previewUrl };
+		staging = false;
 	}
 
 	function clearPhoto() {
-		if (photoPreview) URL.revokeObjectURL(photoPreview);
-		photo = null;
-		photoPreview = null;
+		if (stagedAsset) URL.revokeObjectURL(stagedAsset.previewUrl);
+		stagedAsset = null;
 	}
 
 	async function save() {
@@ -40,14 +48,10 @@
 			saving = false;
 			return;
 		}
-		if (photo) {
-			await uploadAndAttachMedia({
-				body: {
-					file: photo,
-					target_type: 'node',
-					target_id: result.data.id,
-					attribute_key: 'cover'
-				}
+		if (stagedAsset) {
+			await attachMedia({
+				path: { asset_id: stagedAsset.id },
+				body: { target_type: 'node', target_id: result.data.id, attribute_key: 'cover' }
 			});
 		}
 		captureController.notifyNodeCreated();
@@ -56,8 +60,11 @@
 	}
 
 	function openFullForm() {
+		captureController.setPendingHandoff({ name, selectedType, stagedPhoto: stagedAsset });
 		captureController.hide();
-		resetState();
+		name = '';
+		selectedType = null;
+		stagedAsset = null;
 		void goto(resolve('/collection/new'));
 	}
 
@@ -69,9 +76,8 @@
 	function resetState() {
 		name = '';
 		selectedType = null;
-		if (photoPreview) URL.revokeObjectURL(photoPreview);
-		photo = null;
-		photoPreview = null;
+		if (stagedAsset) URL.revokeObjectURL(stagedAsset.previewUrl);
+		stagedAsset = null;
 	}
 </script>
 
@@ -102,10 +108,10 @@
 
 			<div class="mt-4 space-y-4">
 				<!-- Photo -->
-				{#if photoPreview}
+				{#if stagedAsset}
 					<div class="relative">
 						<img
-							src={photoPreview}
+							src={stagedAsset.previewUrl}
 							alt="Photo preview"
 							class="max-h-48 w-full rounded-lg object-cover"
 						/>
@@ -120,16 +126,19 @@
 					</div>
 				{:else}
 					<label
-						class="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border px-4 py-4 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+						class="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border px-4 py-4 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground {staging
+							? 'pointer-events-none opacity-60'
+							: ''}"
 					>
 						<Camera class="size-4" />
-						Add photo
+						{staging ? 'Adding…' : 'Add photo'}
 						<!-- @ts-expect-error capture is a valid mobile HTML attribute -->
 						<input
 							type="file"
 							accept="image/*"
 							capture="environment"
 							class="sr-only"
+							disabled={staging}
 							onchange={handlePhotoChange}
 						/>
 					</label>
