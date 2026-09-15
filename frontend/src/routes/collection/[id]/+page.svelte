@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { Star, Trash2 } from '@lucide/svelte';
+	import { Pencil, Star, Trash2 } from '@lucide/svelte';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import {
 		createEdge,
@@ -53,8 +53,12 @@
 	let nodeSchema = $derived(
 		(nodeTypes.find((nt) => nt.slug === node?.type)?.attributes_schema as Schema | null) ?? null
 	);
+	let attributeLabelsByKey = $derived(
+		new Map((nodeSchema?.fields ?? []).map((field) => [field.key, field.label || field.key]))
+	);
 	let loading = $state(true);
 	let notFound = $state(false);
+	let mode = $state<'read' | 'edit'>('read');
 
 	let name = $state('');
 	let description = $state('');
@@ -170,6 +174,15 @@
 			node = result.data;
 		}
 		saving = false;
+	}
+
+	function handleCancelEdit() {
+		if (node) {
+			name = node.name;
+			description = node.description ?? '';
+			attributeRows = attributesToRows(node.attributes);
+		}
+		mode = 'read';
 	}
 
 	async function handleDeleteNode() {
@@ -298,74 +311,116 @@
 							</ShimmerSlot>
 						</div>
 						{#if !loading}
-							<Toggle
-								pressed={node?.favourite ?? false}
-								onPressedChange={handleToggleFavourite}
-								aria-label={node?.favourite ? 'Remove from favourites' : 'Add to favourites'}
-								class="shrink-0"
-							>
-								<Star class="size-4 {node?.favourite ? 'fill-current' : ''}" />
-							</Toggle>
+							<div class="flex shrink-0 items-center gap-1">
+								<Toggle
+									pressed={node?.favourite ?? false}
+									onPressedChange={handleToggleFavourite}
+									aria-label={node?.favourite ? 'Remove from favourites' : 'Add to favourites'}
+								>
+									<Star class="size-4 {node?.favourite ? 'fill-current' : ''}" />
+								</Toggle>
+								{#if mode === 'read'}
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon"
+										onclick={() => (mode = 'edit')}
+										aria-label="Edit"
+									>
+										<Pencil class="size-4" />
+									</Button>
+								{/if}
+							</div>
 						{/if}
 					</Card.Header>
 					<Card.Content>
-						<form class="space-y-4" onsubmit={handleSave}>
-							<div class="space-y-2">
-								<ShimmerSlot {loading} class="h-4 w-12">
-									<Label for="name">Name</Label>
-								</ShimmerSlot>
-								<Input id="name" bind:value={name} required />
-							</div>
+						{#if mode === 'edit'}
+							<form class="space-y-4" onsubmit={handleSave}>
+								<div class="space-y-2">
+									<ShimmerSlot {loading} class="h-4 w-12">
+										<Label for="name">Name</Label>
+									</ShimmerSlot>
+									<Input id="name" bind:value={name} required />
+								</div>
 
-							<div class="space-y-2">
-								<ShimmerSlot {loading} class="h-4 w-24">
-									<Label for="description">Description</Label>
-								</ShimmerSlot>
-								<Textarea id="description" bind:value={description} />
-							</div>
+								<div class="space-y-2">
+									<ShimmerSlot {loading} class="h-4 w-24">
+										<Label for="description">Description</Label>
+									</ShimmerSlot>
+									<Textarea id="description" bind:value={description} />
+								</div>
 
-							<AttributesEditor bind:rows={attributeRows} schema={nodeSchema} />
+								<AttributesEditor bind:rows={attributeRows} schema={nodeSchema} />
 
-							<div class="flex flex-wrap items-center justify-between gap-2">
-								{#if !loading}
-									{#if confirmDeleteNode}
-										<div class="flex items-center gap-2">
-											<span class="text-sm text-muted-foreground">Delete this item?</span>
-											<Button
-												type="button"
-												variant="outline"
-												size="sm"
-												onclick={() => (confirmDeleteNode = false)}
-											>
-												Cancel
-											</Button>
+								<div class="flex flex-wrap items-center justify-between gap-2">
+									{#if !loading}
+										{#if confirmDeleteNode}
+											<div class="flex items-center gap-2">
+												<span class="text-sm text-muted-foreground">Delete this item?</span>
+												<Button
+													type="button"
+													variant="outline"
+													size="sm"
+													onclick={() => (confirmDeleteNode = false)}
+												>
+													Cancel
+												</Button>
+												<Button
+													type="button"
+													variant="destructive"
+													size="sm"
+													disabled={deletingNode}
+													onclick={handleDeleteNode}
+												>
+													{deletingNode ? 'Deleting…' : 'Delete'}
+												</Button>
+											</div>
+										{:else}
 											<Button
 												type="button"
 												variant="destructive"
-												size="sm"
 												disabled={deletingNode}
-												onclick={handleDeleteNode}
+												onclick={() => (confirmDeleteNode = true)}
 											>
-												{deletingNode ? 'Deleting…' : 'Delete'}
+												<Trash2 class="size-4" />
+												Delete
 											</Button>
-										</div>
-									{:else}
-										<Button
-											type="button"
-											variant="destructive"
-											disabled={deletingNode}
-											onclick={() => (confirmDeleteNode = true)}
-										>
-											<Trash2 class="size-4" />
-											Delete
-										</Button>
+										{/if}
 									{/if}
+									<div class="ml-auto flex items-center gap-2">
+										<Button type="button" variant="outline" onclick={handleCancelEdit}>
+											Cancel
+										</Button>
+										<Button type="submit" disabled={saving || loading}>
+											{saving ? 'Saving…' : 'Save changes'}
+										</Button>
+									</div>
+								</div>
+							</form>
+						{:else}
+							<div class="space-y-4">
+								<ShimmerSlot {loading} class="h-4 w-full">
+									{#if node?.description}
+										<p class="text-sm whitespace-pre-wrap">{node.description}</p>
+									{:else}
+										<p class="text-sm text-muted-foreground italic">No description.</p>
+									{/if}
+								</ShimmerSlot>
+
+								{#if !loading && attributeRows.length > 0}
+									<div class="space-y-1.5">
+										{#each attributeRows as row (row.key)}
+											<div class="flex items-center gap-2">
+												<span class="w-32 shrink-0 text-sm text-muted-foreground">
+													{attributeLabelsByKey.get(row.key) ?? row.key}
+												</span>
+												<span class="text-sm">{row.value}</span>
+											</div>
+										{/each}
+									</div>
 								{/if}
-								<Button type="submit" disabled={saving || loading} class="ml-auto">
-									{saving ? 'Saving…' : 'Save changes'}
-								</Button>
 							</div>
-						</form>
+						{/if}
 					</Card.Content>
 				</Card.Root>
 
