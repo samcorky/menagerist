@@ -6,12 +6,7 @@ if TYPE_CHECKING:
 
 
 class CommandHandler[TUoW, TCommand, TResult](ABC):
-    """Base for state-mutating use cases.
-
-    Enforces that every command use case receives a unit of work in its
-    constructor and stores it as `self._uow`; subclasses only need to
-    implement `handle()`.
-    """
+    """Base for state-mutating use cases."""
 
     def __init__(self, uow: TUoW) -> None:
         self._uow = uow
@@ -23,13 +18,7 @@ class CommandHandler[TUoW, TCommand, TResult](ABC):
 
 
 class QueryHandler[TUoW, TQuery, TResult](ABC):
-    """Base for read-only use cases.
-
-    Mirrors `CommandHandler`: receives a unit of work so that the session
-    lifecycle is fully controlled inside `handle()` — opens on entry,
-    closes on exit — with no dependency on FastAPI's async generator
-    cleanup machinery.
-    """
+    """Base for read-only use cases."""
 
     def __init__(self, uow: TUoW) -> None:
         self._uow = uow

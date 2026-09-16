@@ -30,6 +30,7 @@ The core is working end-to-end:
 - **Relationships** — connect records with typed, directional or symmetric edges
 - **Relationship types** — named edge types with forward/reverse labels and attribute schemas
 - **Attributes** — freeform and schema-driven key/value metadata on any record
+- **Media & attachments** — attach photos, scans, and documents to any record
 - **Search** — filter nodes by name or description
 - **Type filtering** — browse records by type
 - **Infinite scroll** — lists load more as you scroll
@@ -51,17 +52,67 @@ The core is working end-to-end:
 
 ## Running locally
 
+All of these run the full stack (Postgres + backend + frontend) via Docker. There are no pre-built images yet — `menagerist-backend`/`menagerist-frontend` (or their `ghcr.io/samcorky/menagerist-*` equivalents) don't exist on a registry until the first tagged release, so every option below builds the images locally rather than pulling them. The frontend image build also needs `frontend/openapi.json` (the backend's API schema) to already exist — it's generated, not committed, so a fresh clone doesn't have one yet.
+
+### Easiest
+
+Install [uv](https://docs.astral.sh/uv/):
+
 ```bash
-docker compose -f compose.dev.yaml up
+curl -LsSf https://astral.sh/uv/install.sh | sh   # macOS/Linux
+```
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"   # Windows
+```
+
+Then, from the repo root:
+
+```sh
+uv run poe init
+uv run poe docker-up
 ```
 
 The app is available at [http://localhost:8080](http://localhost:8080).
+
+### The same thing, one `poe` task at a time
+
+```sh
+uv run poe init            # sync deps + install git hooks
+uv run poe dump-schema     # write frontend/openapi.json from the backend
+uv run poe docker-build    # build the backend + frontend images
+uv run poe docker-up       # start Postgres + backend + frontend, detached
+```
+
+### What `poe` is actually running (no `poe`)
+
+```sh
+cd backend && uv run menagerist schema dump --output ../frontend/openapi.json && cd ..
+docker buildx bake -f docker-bake.hcl local
+docker compose -f compose.dev.yaml up -d --force-recreate
+```
+
+`uv run` syncs and resolves the backend package on its own — no separate install step. If you've activated the project's venv instead (see [CONTRIBUTING.md](CONTRIBUTING.md)), drop the `uv run` prefix and call `menagerist` directly.
 
 ---
 
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md) for the full planned feature set.
+
+---
+
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [ROADMAP.md](ROADMAP.md) | Product direction and feature priorities |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, commands, and testing |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System topology and data model |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | Significant technical decisions and rationale |
+| [backend/README.md](backend/README.md) | Backend architecture and conventions |
+| [frontend/README.md](frontend/README.md) | Frontend stack and dev workflow |
+| [frontend/DESIGN_GUIDELINES.md](frontend/DESIGN_GUIDELINES.md) | Frontend UX/UI rules |
 
 ---
 

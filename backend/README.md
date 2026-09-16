@@ -2,6 +2,21 @@
 
 Hexagonal (ports-and-adapters) architecture with DDD, organised as vertical slices by bounded context. This describes the pattern itself - how modules, ports, adapters, and routers relate - not a snapshot of what's currently built.
 
+## Coding conventions
+
+These conventions apply to both backend and frontend work unless a framework or library explicitly requires a different style.
+
+- Use British English for project copy, comments, and user-facing docs unless a library, API, or existing convention explicitly requires a different spelling.
+- Keep code comments short, factual, and concise. Only add a comment when the intent would otherwise be unclear.
+- Prefer Google-style docstrings for Python functions, methods, classes, and modules that are public or non-trivial. Keep the summary brief and use `Args:`, `Returns:`, and `Raises:` sections only when they add real value.
+- This project targets Python 3.14. The backend type-checking config in `backend/pyproject.toml` is strict: `mypy` runs with `strict = true`, `plugins = ["pydantic.mypy"]`, `warn_unused_configs = true`, and `show_error_codes = true`.
+- Use native Python 3.14 typing syntax and avoid quoted type annotations entirely. Prefer `str | None`, `list[str]`, and explicit concrete parameter/return types over stringified annotations or `Optional[...]`/`Union[...]` where the modern form is clearer.
+- Do not add `from __future__ import annotations`; the repo explicitly bans it because runtime frameworks need annotations to be resolvable at runtime.
+- Keep annotations explicit, precise, and readable; avoid `Any` unless it is truly necessary and document the reason when you do use it.
+- Only add or update dependencies when they are strictly necessary or clearly recommended for the task. Prefer the smallest, most targeted dependency that solves the problem and avoid adding libraries that duplicate existing functionality or increase the runtime surface area without a clear benefit.
+- Before adding or updating dependencies, review `.github/renovate.json` and keep the change aligned with the repository's Renovate rules and review policy (grouping, schedule, automerge, and manual review for majors/runtime dependencies).
+- When evaluating a dependency, estimate the impact on the final Docker image size and runtime footprint, and favour lighter or more maintainable options when trade-offs are similar.
+
 ## Hexagonal architecture
 
 Domain sits at the center and depends on nothing: entities, value objects, and business rules, with zero FastAPI/SQLAlchemy/Pydantic imports. Application wraps domain with use cases and defines **ports** - Python `Protocol`s describing what a use case needs from the outside world (a repository, a clock, an event publisher) without knowing how it's implemented. Adapters come in two directions:
@@ -61,6 +76,12 @@ async def create_node(
 
 The router depends on the use case, not on the repository the use case happens to use - that dependency is resolved once, at the composition root, and injected down. CLI commands follow the identical shape: a Cyclopts command is a driving adapter calling the same use case a router would, just triggered from a terminal. A use case never needs a second implementation to be reachable from a second entrypoint.
 
+## Request bodies: named Pydantic models, not `Form()` fields
+
+A request body is a Pydantic `BaseModel` (`XxxRequest`, with a `to_command()` method converting it to the use case's command), not a collection of individual `Form()`/`Body()` parameters - even when the payload happens to be small, e.g. `AttachMediaRequest` for `POST /media/{asset_id}/attachments`. FastAPI treats a single Pydantic model parameter as a JSON body automatically, and `@hey-api/openapi-ts` turns it into a properly named type for the frontend client (`AttachMediaRequest`) instead of an untyped bag of form fields.
+
+The one case that can't use a plain model is an endpoint that also accepts an `UploadFile` - multipart file uploads can't be embedded inside a Pydantic model, so those fields stay as `Form()` parameters alongside the `UploadFile`. FastAPI then synthesises its own request-body wrapper schema for the multipart body, always named `Body_<operation_id>` (see `fastapi.routing.APIRoute._get_body_field` - there is no per-route parameter to override this name). Left alone, that produces awkward generated-client types like `Body_upload_and_attach_media`. `configure_openapi()` in `entrypoints/api/openapi.py` renames every `Body_*` component schema after generation (`Body_upload_and_attach_media` -> `UploadAndAttachMediaBody`) so the frontend client gets a sane name without changing the route's `operation_id`.
+
 ## Ports carry data, not machinery
 
 A port exposes only what the caller needs, never the internals that produce it. A scheduler port takes a `job_key` string, not a reference to the task registry that resolves it - resolution happens on the inbound side that already owns the registry. If a port signature includes a callable, a registry, or an ORM model, the interface is leaking an adapter's implementation detail into a contract that's supposed to be adapter-agnostic.
@@ -108,7 +129,9 @@ The `SchedulerPort` will need the same shape later (Postgres/APScheduler/Cron ad
 
 ## Testing mirrors the architecture
 
-Coverage floors: domain 100%, application 90%, infrastructure/API 80% - matching how much of each layer's correctness is structural versus incidental. Domain code has no framework dependencies and is exhaustively unit-testable; adapters carry real sessions/HTTP/external services where 100% is impractical or low-signal. `@pytest.mark.integration` separates the fast domain-heavy loop from the slower suite touching real adapters.
+Coverage floors (defined in the root `codecov.yml`, enforced by `poe coverage` and Codecov): domain 100%, application 100%, shared_kernel 100%, adapters 80%, platform 70% - matching how much of each layer's correctness is structural versus incidental. Domain code has no framework dependencies and is exhaustively unit-testable; adapters carry real sessions/HTTP/external services where 100% is impractical or low-signal. `@pytest.mark.integration` separates the fast domain-heavy loop from the slower suite touching real adapters.
+
+`ports/` is tracked but has no fixed floor (`target: auto` in `codecov.yml`) rather than the 100% used for domain/application/shared_kernel - its files are `Protocol` interfaces whose stub method bodies (`...`) never execute, so forcing 100% there wouldn't test anything real.
 
 `backend/tests/` mirrors `src/app/modules/<context>/{domain,application,adapters}` directory-for-directory, plus `tests/architecture/`: an `archunitpython` suite encoding the dependency-direction rule itself (domain may not depend on application/adapters/entrypoints, application may not depend on adapters/entrypoints, adapters may not depend on entrypoints). No I/O, always runs, catches a boundary violation before it becomes a design problem.
 
@@ -142,6 +165,41 @@ This also decouples the transaction from the HTTP request/response cycle - the s
 `actor` is a `handle()` parameter, not a field on the command/query - it travels alongside the unit of work/repository rather than being baked into the "what to do" data.
 
 There's no bus or mediator between a router/CLI command and the use case it calls - the router calls the use case directly, as shown above. A bus with pipeline behaviors would give a single seam for cross-cutting concerns (logging, authorization) applied uniformly, but nothing here needs that uniformity enforced yet. The typed-handler convention, plus every handler already taking an `actor`, is a prerequisite for a bus regardless, so this doesn't foreclose adding one later.
+
+## Logging
+
+The backend uses **structlog** (configured in `platform/logging_config.py`) with two output modes: colourised console in development, JSON in production (`MENAGERIST_LOG_JSON=true`). The effective log level is controlled by `MENAGERIST_LOG_LEVEL` (default: `INFO`).
+
+**Where loggers live** — application-layer use cases and adapter modules only. The domain layer has zero framework imports, so it carries no logger. In-memory adapters are test infrastructure and are also logger-free.
+
+**Level semantics:**
+
+| Level | When to use |
+|---|---|
+| `INFO` | One log per mutating action (create, update, delete, promote, attach, detach, stage, orphan, cleanup). Logged after `commit()` so only committed work is recorded. |
+| `DEBUG` | Trace-level detail: repository method calls, SQL queries (via SQLAlchemy's stdlib logger), file operations, thumbnail generation steps. Only emitted when `MENAGERIST_LOG_LEVEL=DEBUG`. |
+| `WARNING` | Recoverable anomalies that need attention (content-type mismatch, degraded trust level). |
+| `ERROR` | Unhandled exceptions, caught by the global exception handler. |
+
+**SQL query logging** is automatic at `DEBUG` level — SQLAlchemy emits every compiled statement through Python's `logging.getLogger("sqlalchemy.engine")`, which structlog's stdlib bridge picks up. No parameters are logged. Enable with `MENAGERIST_LOG_LEVEL=DEBUG`.
+
+**Call-site pattern:**
+
+```python
+import structlog
+
+logger = structlog.get_logger()
+
+# In a mutating use case, after commit:
+logger.info("node created", node_id=node.id, node_type=node.type)
+
+# In a query use case or adapter:
+logger.debug("fetching node", node_id=node_id)
+```
+
+Pass values directly — `uuid.UUID` objects are serialised to strings automatically by the `_serialise_uuids` processor in the shared pipeline. Never use f-strings or string formatting for structured fields.
+
+**Future:** when an event bus / pipeline behavior is introduced, cross-cutting logging will migrate to a central pipeline stage. The per-use-case logger calls will be removed at that point.
 
 ## Cross-cutting concerns
 

@@ -12,7 +12,7 @@ repos:
   - repo: local
     hooks:
       - id: ruff-check
-        name: check and fix liniting errors (ruff check)
+        name: check and fix linting errors (ruff check)
         entry: uv run poe lint-backend-fix
         language: system
         types_or:
@@ -33,10 +33,16 @@ repos:
         name: check types (mypy)
         entry: uv run poe typecheck-backend
         language: system
+        types_or:
+          - python
+          - pyi
         pass_filenames: false
 
       - id: pytest
         name: run non-integration tests (pytest)
         entry: uv run poe test-backend
         language: system
+        types_or:
+          - python
+          - pyi
         pass_filenames: false

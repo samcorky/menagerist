@@ -32,3 +32,13 @@ repos:
           - ts
           - svelte
         pass_filenames: false
+
+      - id: vitest
+        name: run frontend unit tests (vitest)
+        entry: uv run poe test-frontend
+        language: system
+        types_or:
+          - javascript
+          - ts
+          - svelte
+        pass_filenames: false

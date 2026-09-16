@@ -39,6 +39,11 @@ class InMemoryMediaAttachmentRepository:
         """Return all attachments for the given asset."""
         return [a for a in self._store.values() if a.asset_id == asset_id]
 
+    async def update(self, attachment: MediaAttachment) -> None:
+        """Persist changes to an existing attachment (no-op if absent)."""
+        if attachment.id in self._store:
+            self._store[attachment.id] = attachment
+
     async def delete(self, attachment_id: uuid.UUID) -> None:
         """Remove an attachment by id (no-op if absent)."""
         self._store.pop(attachment_id, None)

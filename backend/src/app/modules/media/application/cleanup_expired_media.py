@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.shared_kernel.cqrs import CommandHandler
@@ -10,6 +12,8 @@ if TYPE_CHECKING:
 
     from app.modules.media.ports.media_storage import MediaStoragePort
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -49,4 +53,5 @@ class CleanupExpiredMedia(
                 await repos.assets.delete(asset.id)
                 await self._uow.commit()
             count += 1
+        logger.info("expired media cleaned up", deleted=count)
         return count

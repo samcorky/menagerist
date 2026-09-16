@@ -76,12 +76,7 @@ class Node(Identifiable, SoftDeletable):
         attributes: dict[str, Any] | None = None,
         favourite: bool | None = None,
     ) -> None:
-        """Apply partial changes to editable fields, validating invariants.
-
-        `type` can only be set once — it cannot be changed after it has a value.
-        Simple fields (description, attributes, favourite, …) use `_set_if_given`
-        so adding more never increases this method's cyclomatic complexity.
-        """
+        """Apply partial changes to editable fields, validating invariants."""
         if name is not None:
             if name.strip() == "":
                 raise ValidationError("name must be provided")

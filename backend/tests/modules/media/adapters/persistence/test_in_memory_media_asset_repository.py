@@ -84,6 +84,22 @@ async def test_list_expired_returns_assets_with_matching_status_before_cutoff() 
     assert fresh_asset not in result
 
 
+async def test_list_by_status_returns_only_matching_assets() -> None:
+    """list_by_status() returns assets whose status matches, and no others."""
+    repo = InMemoryMediaAssetRepository()
+    staged = _make_asset()
+    await repo.add(staged)
+
+    attached = _make_asset()
+    attached.promote()
+    await repo.add(attached)
+
+    result = await repo.list_by_status(status=MediaStatus.ATTACHED)
+
+    assert attached in result
+    assert staged not in result
+
+
 async def test_list_expired_filters_by_status() -> None:
     """list_expired() only returns assets whose status matches."""
     repo = InMemoryMediaAssetRepository()

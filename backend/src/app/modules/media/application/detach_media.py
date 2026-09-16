@@ -2,15 +2,19 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.modules.media.domain.errors import MediaAttachmentNotFoundError
 from app.modules.media.domain.media_asset import MediaStatus
-from app.modules.media.domain.media_attachment import AttachmentTarget
+from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.modules.media.ports.media_storage import MediaStoragePort
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -20,15 +24,15 @@ class DetachMediaCommand:
     asset_id: uuid.UUID
     target_type: AttachmentTarget
     target_id: uuid.UUID
-    attribute_key: str | None = field(default=None)
+    attribute_key: AttachmentKey | None = field(default=None)
 
 
 class DetachMedia(CommandHandler[MediaUnitOfWork, DetachMediaCommand, None]):
     """Remove a media-entity attachment; orphan the asset if now unreferenced.
 
     After the attachment row is deleted we check whether the asset is still
-    linked anywhere.  If not, it is orphaned (DB commit, then storage move)
-    so the cleanup job can reap it.
+    linked anywhere.  If not, it is orphaned (DB commit, then storage move via
+    ``on_commit``) so the cleanup job can reap it.
     """
 
     def __init__(self, uow: MediaUnitOfWork, storage: MediaStoragePort) -> None:
@@ -37,8 +41,6 @@ class DetachMedia(CommandHandler[MediaUnitOfWork, DetachMediaCommand, None]):
 
     async def handle(self, command: DetachMediaCommand, actor: Actor) -> None:
         """Delete the attachment; orphan the asset if it becomes unreferenced."""
-        should_orphan = False
-
         async with self._uow as repos:
             candidates = await repos.attachments.list_for_target(
                 command.target_type, command.target_id
@@ -67,11 +69,17 @@ class DetachMedia(CommandHandler[MediaUnitOfWork, DetachMediaCommand, None]):
                 if asset is not None and asset.status is MediaStatus.ATTACHED:
                     asset.orphan()
                     await repos.assets.save(asset)
-                    should_orphan = True
+                    asset_id = command.asset_id
+                    self._uow.on_commit(
+                        lambda: self._storage.move(
+                            asset_id, MediaStatus.ATTACHED, MediaStatus.ORPHANED
+                        )
+                    )
 
             await self._uow.commit()
-
-        if should_orphan:
-            await self._storage.move(
-                command.asset_id, MediaStatus.ATTACHED, MediaStatus.ORPHANED
-            )
+        logger.info(
+            "media detached",
+            asset_id=command.asset_id,
+            target_type=command.target_type.value,
+            target_id=command.target_id,
+        )

@@ -2,6 +2,16 @@
 
 Static SPA served by nginx. API calls proxy through `/api/*` to the backend.
 
+## Coding conventions
+
+These conventions apply across the project, including frontend work.
+
+- Use British English for project copy, comments, and user-facing docs unless a library, API, or existing convention explicitly requires a different spelling.
+- Keep code comments short, factual, and concise. Only add a comment when the intent would otherwise be unclear.
+- Only add or update dependencies when they are strictly necessary or clearly recommended for the task. Prefer the smallest, most targeted dependency that solves the problem and avoid adding libraries that duplicate existing functionality or increase the runtime surface area without a clear benefit.
+- Before adding or updating dependencies, review `.github/renovate.json` and keep the change aligned with the repository's Renovate rules and review policy (grouping, schedule, automerge, and manual review for majors/runtime dependencies).
+- When evaluating a dependency, estimate the impact on the final Docker image size and runtime footprint, and favour lighter or more maintainable options when trade-offs are similar.
+
 ## Stack
 
 - [SvelteKit](https://svelte.dev/docs/kit) (static adapter) + Svelte 5
@@ -9,6 +19,8 @@ Static SPA served by nginx. API calls proxy through `/api/*` to the backend.
 - TypeScript
 - Typed API client auto-generated from the backend's OpenAPI schema via [`@hey-api/openapi-ts`](https://heyapi.dev)
 - Chainguard distroless nginx, non-root, port 8080
+
+For UX and UI rules, see [DESIGN_GUIDELINES.md](DESIGN_GUIDELINES.md).
 
 ## Key patterns
 
@@ -31,9 +43,9 @@ poe sync          # installs backend + frontend deps and generates the API clien
 Then start the dev server (proxies `/api/*` to `localhost:8000`):
 
 ```sh
-poe dev           # from repo root
+poe serve-frontend   # from repo root
 # or
-npm run dev       # from this directory
+npm run dev          # from this directory
 ```
 
 The backend must be running separately for API calls to work:

@@ -1,10 +1,23 @@
 import logging
 import os
 import sys
+import uuid
 
 import structlog
 
 from app.platform.config import get_logging_settings
+
+
+def _serialise_uuids(
+    logger: logging.Logger | None,
+    method_name: str,
+    event_dict: structlog.types.EventDict,
+) -> structlog.types.EventDict:
+    """Coerce any uuid.UUID values in the event dict to strings."""
+    return {
+        key: str(value) if isinstance(value, uuid.UUID) else value
+        for key, value in event_dict.items()
+    }
 
 
 def _expand_access_log_fields(
@@ -12,15 +25,7 @@ def _expand_access_log_fields(
     method_name: str,
     event_dict: structlog.types.EventDict,
 ) -> structlog.types.EventDict:
-    """Promote Granian's per-request access log fields to top-level keys.
-
-    Granian builds a dict of request fields (addr, method, path, status,
-    dt_ms, ...) and passes it as the log record's args - see
-    granian.log.log_request_builder. With `pass_foreign_args=True` on the
-    formatter below, that dict survives as `positional_args`. Merge it into
-    the event dict so each field renders separately instead of being baked
-    into one opaque message string via the access-log format template.
-    """
+    """Promote Granian's per-request access log fields to top-level keys."""
     record: logging.LogRecord | None = event_dict.get("_record")
     args = event_dict.pop("positional_args", None)
     if (
@@ -45,12 +50,28 @@ def _expand_access_log_fields(
     return event_dict
 
 
+_configured = False
+
+
 def configure_logging(*, level: int | str | None = None) -> None:
-    """Sets up logging with structlog."""
+    """Sets up logging with structlog.
+
+    A no-op on repeat calls unless `level` is given explicitly. Both entrypoint
+    modules (`api`, `cli`) call this unconditionally at import time, and a CLI
+    command can lazily import `api` after the CLI has already configured
+    logging (e.g. via `--verbose`); without this guard, that later import-time
+    call would silently reset the level back to `LOG_LEVEL`.
+    """
+    global _configured
+    if _configured and level is None:
+        return
+    _configured = True
+
     settings = get_logging_settings()
     effective_level = level if level is not None else settings.log_level
     shared_processors: list[structlog.types.Processor] = [
         structlog.contextvars.merge_contextvars,
+        _serialise_uuids,
         _expand_access_log_fields,
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
@@ -74,10 +95,6 @@ def configure_logging(*, level: int | str | None = None) -> None:
         colors_enabled = os.environ.get("NO_COLOR", "0")[0] == "0"
         renderer = structlog.dev.ConsoleRenderer(
             colors=colors_enabled,
-            # On Windows, colorama strips ANSI codes whenever stdout isn't a real
-            # console handle - which is always the case when poe pipes a task's
-            # output (eg. `parallel`) to prefix each line. force_colors keeps the
-            # codes intact in that case too.
             force_colors=colors_enabled,
             sort_keys=False,
         )
@@ -94,36 +111,50 @@ def configure_logging(*, level: int | str | None = None) -> None:
     root_logger.addHandler(handler)
     root_logger.setLevel(effective_level)
 
-    # Route warnings.warn() (deprecation warnings from dependencies, etc.)
-    # through logging -> the same handler above, instead of straight to stderr.
+    # Route warnings through logging handler.
     logging.captureWarnings(True)
 
-    # Suppress Alembic's per-request "Context impl" / "Will assume transactional
-    # DDL" chatter at INFO. The migrate commands re-enable this before running.
+    # Suppress verbose Alembic migration and plugin-registration logs.
     logging.getLogger("alembic.runtime.migration").setLevel(logging.WARNING)
+    logging.getLogger("alembic.runtime.plugins").setLevel(logging.WARNING)
+
+    # SQLAlchemy engine logs (SQL statements, result rows) are only useful when
+    # actively debugging; suppress them unless the app itself is running at DEBUG.
+    if root_logger.level > logging.DEBUG:
+        logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
 
-# Handed to Granian's `log_dictconfig` param. Granian's own `_granian` and
-# `granian.access` loggers default to `propagate: False` with their own
-# plain-text handlers, which bypasses the structlog renderer entirely.
-# This strips their handlers and lets records propagate to root instead,
-# so server startup/lifecycle and access logs render identically to
-# everything else.
+# Propagate Granian loggers to root so they render via structlog.
 type LoggerConfig = dict[str, str | bool | list[str]]
 
-# Extends Granian's default access log format with the Request-Id header.
-# nginx injects this on every proxied request (generating one if the client
-# didn't supply it), so it is always present and correlates backend logs with
-# nginx access logs. _expand_access_log_fields renames the raw atom key to
-# `request_id` so it renders cleanly in structured output.
+# Granian access log format including Request-Id header.
 GRANIAN_ACCESS_LOG_FORMAT = (
     '[%(time)s] %(addr)s - "%(method)s %(path)s %(protocol)s"'
     + " %(status)d %(dt_ms).3f %(header{request-id})s"
 )
 
-GRANIAN_LOG_DICTCONFIG: dict[str, dict[str, LoggerConfig]] = {
-    "loggers": {
-        "_granian": {"level": "INFO", "handlers": [], "propagate": True},
-        "granian.access": {"level": "INFO", "handlers": [], "propagate": True},
-    },
-}
+
+def granian_log_dictconfig() -> dict[str, dict[str, LoggerConfig]]:
+    """Return the logging dictConfig fragment passed to Granian at server start.
+
+    SQLAlchemy engine logs are only enabled when the configured log level is DEBUG,
+    matching the suppression applied by configure_logging() for the non-Granian path.
+    """
+    settings = get_logging_settings()
+    numeric_level = logging.getLevelName(settings.log_level.upper())
+    sqlalchemy_level = (
+        "DEBUG"
+        if isinstance(numeric_level, int) and numeric_level <= logging.DEBUG
+        else "WARNING"
+    )
+    return {
+        "loggers": {
+            "_granian": {"level": "INFO", "handlers": [], "propagate": True},
+            "granian.access": {"level": "INFO", "handlers": [], "propagate": True},
+            "sqlalchemy.engine": {
+                "level": sqlalchemy_level,
+                "handlers": [],
+                "propagate": True,
+            },
+        },
+    }

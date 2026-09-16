@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { goto } from '$app/navigation';
 	import { Package, Plus, ChevronRight, AlertCircle, Star } from '@lucide/svelte';
 	import { captureController } from '$lib/capture.svelte.js';
+	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import {
 		listNodes,
 		listNodeTypes,
@@ -20,6 +22,12 @@
 	let categories = $state<NodeTypeResponse[]>([]);
 	let loading = $state(true);
 	let totalItems = $state(0);
+
+	// §13a: don't flash a skeleton for loads under 300ms
+	const loadingDisplay = delayedLoading();
+	$effect(() => {
+		loadingDisplay.set(loading);
+	});
 
 	let categoryBySlug = $derived(new Map(categories.map((c) => [c.slug, c])));
 
@@ -74,7 +82,7 @@
 
 <main class="flex-1 px-4 py-8 sm:px-6">
 	<div class="mx-auto flex max-w-3xl flex-col gap-10">
-		{#if loading}
+		{#if loadingDisplay.show}
 			<div class="space-y-3">
 				<div class="h-8 w-48 animate-pulse rounded-lg bg-muted"></div>
 				<div class="h-4 w-32 animate-pulse rounded bg-muted"></div>
@@ -84,7 +92,7 @@
 					<div class="h-24 animate-pulse rounded-xl bg-muted"></div>
 				{/each}
 			</div>
-		{:else if totalItems === 0}
+		{:else if !loading && totalItems === 0}
 			<div class="flex flex-col items-center gap-5 py-20 text-center">
 				<div class="flex size-16 items-center justify-center rounded-2xl bg-muted">
 					<Package class="size-8 text-muted-foreground" />
@@ -98,12 +106,12 @@
 						collect.
 					</p>
 				</div>
-				<Button onclick={() => captureController.show()} size="lg">
+				<Button onclick={() => goto(resolve('/collection/new'))} size="lg">
 					<Plus class="size-4" />
 					Add your first item
 				</Button>
 			</div>
-		{:else}
+		{:else if !loading}
 			<div class="flex items-start justify-between gap-4">
 				<div>
 					<h1 class="font-heading text-3xl font-semibold tracking-tight">My Collection</h1>
@@ -116,7 +124,7 @@
 						{/if}
 					</p>
 				</div>
-				<Button onclick={() => captureController.show()}>
+				<Button onclick={() => goto(resolve('/collection/new'))}>
 					<Plus class="size-4" />
 					New item
 				</Button>

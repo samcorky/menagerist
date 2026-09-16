@@ -4,11 +4,111 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict
 
+from app.modules.media.application.attach_media import AttachMediaCommand
+from app.modules.media.application.clear_media_cover import ClearMediaCoverCommand
+from app.modules.media.application.detach_media import DetachMediaCommand
+from app.modules.media.application.set_media_cover import SetMediaCoverCommand
+from app.modules.media.application.update_media import UpdateMediaCommand
 from app.modules.media.domain.media_asset import MediaStatus
+from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
 
 if TYPE_CHECKING:
+    from app.modules.media.application.list_node_media import NodeMediaItem
     from app.modules.media.domain.media_asset import MediaAsset
     from app.modules.media.domain.media_attachment import MediaAttachment
+
+_ATTACHMENT_EXAMPLE: dict[str, Any] = {
+    "target_type": "node",
+    "target_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+    "attribute_key": "cover",
+}
+
+
+class AttachMediaRequest(BaseModel):
+    """Request body for attaching an already-staged asset to a graph entity."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [_ATTACHMENT_EXAMPLE]})
+
+    target_type: AttachmentTarget
+    target_id: uuid.UUID
+    attribute_key: AttachmentKey | None = None
+
+    def to_command(self, asset_id: uuid.UUID) -> AttachMediaCommand:
+        """Convert this request into an `AttachMediaCommand` for `asset_id`."""
+        return AttachMediaCommand(
+            asset_id=asset_id,
+            target_type=self.target_type,
+            target_id=self.target_id,
+            attribute_key=self.attribute_key,
+        )
+
+
+class DetachMediaRequest(BaseModel):
+    """Request body identifying the attachment to remove for a given asset."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [_ATTACHMENT_EXAMPLE]})
+
+    target_type: AttachmentTarget
+    target_id: uuid.UUID
+    attribute_key: AttachmentKey | None = None
+
+    def to_command(self, asset_id: uuid.UUID) -> DetachMediaCommand:
+        """Convert this request into a `DetachMediaCommand` for `asset_id`."""
+        return DetachMediaCommand(
+            asset_id=asset_id,
+            target_type=self.target_type,
+            target_id=self.target_id,
+            attribute_key=self.attribute_key,
+        )
+
+
+class CoverRequest(BaseModel):
+    """Request body identifying the target whose cover to set or clear."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "target_type": "node",
+                    "target_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                }
+            ]
+        }
+    )
+
+    target_type: AttachmentTarget
+    target_id: uuid.UUID
+
+    def to_set_command(self, asset_id: uuid.UUID) -> SetMediaCoverCommand:
+        """Convert this request into a `SetMediaCoverCommand` for `asset_id`."""
+        return SetMediaCoverCommand(
+            asset_id=asset_id,
+            target_type=self.target_type,
+            target_id=self.target_id,
+        )
+
+    def to_clear_command(self, asset_id: uuid.UUID) -> ClearMediaCoverCommand:
+        """Convert this request into a `ClearMediaCoverCommand` for `asset_id`."""
+        return ClearMediaCoverCommand(
+            asset_id=asset_id,
+            target_type=self.target_type,
+            target_id=self.target_id,
+        )
+
+
+class UpdateMediaRequest(BaseModel):
+    """Request body for updating a media asset."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"filename": "front page"}]}
+    )
+
+    filename: str
+
+    def to_command(self, asset_id: uuid.UUID) -> UpdateMediaCommand:
+        """Convert this request into an `UpdateMediaCommand` for `asset_id`."""
+        return UpdateMediaCommand(asset_id=asset_id, filename=self.filename)
+
 
 _EXAMPLE: dict[str, Any] = {
     "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
@@ -18,6 +118,7 @@ _EXAMPLE: dict[str, Any] = {
     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "status": "attached",
     "content_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/content",
+    "thumbnail_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/thumbnail",
     "created_at": "2026-09-07T10:00:00Z",
     "updated_at": "2026-09-07T10:00:00Z",
 }
@@ -35,6 +136,7 @@ class MediaAssetResponse(BaseModel):
     sha256: str
     status: MediaStatus
     content_url: str
+    thumbnail_url: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -49,9 +151,34 @@ class MediaAssetResponse(BaseModel):
             sha256=asset.sha256,
             status=asset.status,
             content_url=f"/api/v1/media/{asset.id}/content",
+            thumbnail_url=(
+                f"/api/v1/media/{asset.id}/thumbnail" if asset.has_thumbnail else None
+            ),
             created_at=asset.created_at,
             updated_at=asset.updated_at,
         )
+
+
+class NodeMediaItemResponse(BaseModel):
+    """A media asset with its attachment slot label, as returned by list_node_media."""
+
+    id: uuid.UUID
+    filename: str
+    content_type: str
+    size: int
+    sha256: str
+    status: MediaStatus
+    content_url: str
+    thumbnail_url: str | None
+    created_at: datetime
+    updated_at: datetime
+    attribute_key: AttachmentKey | None
+
+    @classmethod
+    def from_domain(cls, item: NodeMediaItem) -> NodeMediaItemResponse:
+        """Build a response from a `NodeMediaItem`."""
+        base = MediaAssetResponse.from_domain(item.asset)
+        return cls(**base.model_dump(), attribute_key=item.attribute_key)
 
 
 class MediaAttachmentResponse(BaseModel):
@@ -61,7 +188,7 @@ class MediaAttachmentResponse(BaseModel):
     asset_id: uuid.UUID
     target_type: str
     target_id: uuid.UUID
-    attribute_key: str | None
+    attribute_key: AttachmentKey | None
     created_at: datetime
 
     @classmethod

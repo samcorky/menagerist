@@ -2,6 +2,8 @@ import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
@@ -9,6 +11,8 @@ from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -27,4 +31,5 @@ class GetNodeType(QueryHandler[GraphUnitOfWork, GetNodeTypeQuery, NodeType]):
             node_type = await repos.node_types.get(query.node_type_id)
         if node_type is None:
             raise NodeTypeNotFoundError(f"NodeType {query.node_type_id} not found")
+        logger.debug("node type fetched", node_type_id=query.node_type_id)
         return node_type

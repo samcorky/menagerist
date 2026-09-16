@@ -42,14 +42,15 @@ async def test_store_writes_file_and_returns_size_and_sha256(tmp_path: Path) -> 
 
 
 async def test_store_file_is_readable_at_sharded_path(tmp_path: Path) -> None:
-    """store() places the file under {status}/{hex[:2]}/{asset_id}."""
+    """store() places the file under {status}/{shard}/{asset_id}."""
     storage = _storage(tmp_path)
     asset = _asset()
     data = b"test content"
 
     await storage.store(asset.id, MediaStatus.STAGED, _stream(data))
 
-    expected = tmp_path / "staged" / asset.id.hex[:2] / str(asset.id)
+    shard = hashlib.sha256(asset.id.bytes).hexdigest()[:2]
+    expected = tmp_path / "staged" / shard / str(asset.id)
     assert expected.exists()
     assert expected.read_bytes() == data
 
@@ -61,7 +62,7 @@ async def test_store_no_tmp_file_left_on_success(tmp_path: Path) -> None:
 
     await storage.store(asset.id, MediaStatus.STAGED, _stream(b"x"))
 
-    shard = tmp_path / "staged" / asset.id.hex[:2]
+    shard = tmp_path / "staged" / hashlib.sha256(asset.id.bytes).hexdigest()[:2]
     tmp_files = list(shard.glob("*.tmp"))
     assert tmp_files == []
 
@@ -76,7 +77,7 @@ async def test_store_raises_and_cleans_up_when_too_large(tmp_path: Path) -> None
             asset.id, MediaStatus.STAGED, _stream(b"x" * 20), max_size=10
         )
 
-    shard = tmp_path / "staged" / asset.id.hex[:2]
+    shard = tmp_path / "staged" / hashlib.sha256(asset.id.bytes).hexdigest()[:2]
     # Neither the final file nor the tmp file should remain.
     assert not (shard / str(asset.id)).exists()
     tmp_files = list(shard.glob("*.tmp")) if shard.exists() else []
@@ -122,8 +123,9 @@ async def test_move_relocates_file_between_buckets(tmp_path: Path) -> None:
     await storage.store(asset.id, MediaStatus.STAGED, _stream(data))
     await storage.move(asset.id, MediaStatus.STAGED, MediaStatus.ATTACHED)
 
-    src = tmp_path / "staged" / asset.id.hex[:2] / str(asset.id)
-    dst = tmp_path / "attached" / asset.id.hex[:2] / str(asset.id)
+    shard = hashlib.sha256(asset.id.bytes).hexdigest()[:2]
+    src = tmp_path / "staged" / shard / str(asset.id)
+    dst = tmp_path / "attached" / shard / str(asset.id)
     assert not src.exists()
     assert dst.exists()
     assert dst.read_bytes() == data
@@ -151,7 +153,8 @@ async def test_delete_removes_stored_file(tmp_path: Path) -> None:
     asset = _asset()
 
     await storage.store(asset.id, MediaStatus.STAGED, _stream(b"gone"))
-    path = tmp_path / "staged" / asset.id.hex[:2] / str(asset.id)
+    shard = hashlib.sha256(asset.id.bytes).hexdigest()[:2]
+    path = tmp_path / "staged" / shard / str(asset.id)
     assert path.exists()
 
     await storage.delete(asset.id, MediaStatus.STAGED)
@@ -178,5 +181,6 @@ async def test_store_multipart_stream_concatenates_chunks(tmp_path: Path) -> Non
 
     assert size == len(data)
     assert sha256 == hashlib.sha256(data).hexdigest()
-    path = tmp_path / "staged" / asset.id.hex[:2] / str(asset.id)
+    shard = hashlib.sha256(asset.id.bytes).hexdigest()[:2]
+    path = tmp_path / "staged" / shard / str(asset.id)
     assert path.read_bytes() == data

@@ -2,6 +2,8 @@ import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import EdgeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
@@ -9,6 +11,8 @@ from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -27,4 +31,5 @@ class GetEdgeType(QueryHandler[GraphUnitOfWork, GetEdgeTypeQuery, EdgeType]):
             edge_type = await repos.edge_types.get(query.edge_type_id)
         if edge_type is None:
             raise EdgeTypeNotFoundError(f"Edge type {query.edge_type_id} not found")
+        logger.debug("edge type fetched", edge_type_id=query.edge_type_id)
         return edge_type

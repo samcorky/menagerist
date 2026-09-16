@@ -42,6 +42,12 @@ def test_create_rejects_empty_or_blank_type(type_: str) -> None:
         Edge.create(source_id=uuid.uuid4(), target_id=uuid.uuid4(), type=type_)
 
 
+def test_create_rejects_type_that_slugifies_to_empty() -> None:
+    """Edge.create raises ValidationError when the type slugifies to an empty string."""
+    with pytest.raises(ValidationError, match="type must be provided"):
+        Edge.create(source_id=uuid.uuid4(), target_id=uuid.uuid4(), type="!!!!")
+
+
 @pytest.mark.parametrize(
     ("input_type", "expected_type"),
     [

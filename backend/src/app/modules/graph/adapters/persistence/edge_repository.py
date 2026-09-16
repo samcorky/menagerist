@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+import structlog
 from sqlalchemy import exists, or_, select
 
 from app.modules.graph.adapters.persistence.models import EdgeModel
@@ -9,6 +10,8 @@ if TYPE_CHECKING:
     import uuid
 
     from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = structlog.get_logger()
 
 
 def _to_domain(model: EdgeModel) -> Edge:
@@ -51,16 +54,19 @@ class SqlAlchemyEdgeRepository:
         Flushes immediately for the same reason `SqlAlchemyNodeRepository.add`
         does - keeps later reads/writes in the same unit of work consistent.
         """
+        logger.debug("adding edge", edge_id=edge.id)
         self._session.add(_to_model(edge))
         await self._session.flush()
 
     async def save(self, edge: Edge) -> None:
         """Persist changes to an existing edge."""
+        logger.debug("saving edge", edge_id=edge.id)
         await self._session.merge(_to_model(edge))
         await self._session.flush()
 
     async def get(self, edge_id: uuid.UUID) -> Edge | None:
         """Return the edge with `edge_id`, or `None` if missing or deleted."""
+        logger.debug("fetching edge", edge_id=edge_id)
         model = await self._session.get(EdgeModel, edge_id)
         if model is None or model.deleted_at is not None:
             return None
@@ -70,6 +76,7 @@ class SqlAlchemyEdgeRepository:
         self, node_id: uuid.UUID, *, after: uuid.UUID | None, limit: int
     ) -> list[Edge]:
         """List non-deleted edge where `node_id` is the source or target."""
+        logger.debug("listing edges for node", node_id=node_id)
         stmt = (
             select(EdgeModel)
             .where(
@@ -86,6 +93,7 @@ class SqlAlchemyEdgeRepository:
 
     async def list(self, *, after: uuid.UUID | None, limit: int) -> list[Edge]:
         """List non-deleted edge ordered by id, starting after `after` if given."""
+        logger.debug("listing edges", after=after, limit=limit)
         stmt = (
             select(EdgeModel)
             .where(EdgeModel.deleted_at.is_(None))
@@ -99,6 +107,7 @@ class SqlAlchemyEdgeRepository:
 
     async def has_edges_of_type(self, type_slug: str) -> bool:
         """Return True if any non-deleted edges reference `type_slug`."""
+        logger.debug("checking edges of type", type_slug=type_slug)
         stmt = select(
             exists().where(EdgeModel.deleted_at.is_(None), EdgeModel.type == type_slug)
         )

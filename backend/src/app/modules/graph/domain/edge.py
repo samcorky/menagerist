@@ -10,7 +10,7 @@ from app.shared_kernel.slug import slugify
 
 @dataclass(kw_only=True, eq=False)
 class Edge(Identifiable, SoftDeletable):
-    """A typed relationship connecting two node in the collection graph."""
+    """Typed relationship connecting two nodes in the collection graph."""
 
     source_id: uuid.UUID
     target_id: uuid.UUID
@@ -53,12 +53,7 @@ class Edge(Identifiable, SoftDeletable):
         )
 
     def update(self, *, attributes: dict[str, Any] | None = None) -> None:
-        """Apply partial changes to editable fields, then touch `updated_at`.
-
-        `source_id`, `target_id`, and `type` aren't editable here - changing
-        what an edge connects or what it represents is a delete-and-recreate,
-        not an edit.
-        """
+        """Apply partial changes to editable fields and touch updated_at."""
         if attributes is not None:
             self.attributes = attributes
 

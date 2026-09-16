@@ -65,3 +65,56 @@ async def test_update_node_raises_when_missing() -> None:
         await use_case.handle(
             UpdateNodeCommand(node_id=uuid.uuid4(), name="Alien"), SYSTEM_ACTOR
         )
+
+
+async def test_update_node_skips_node_type_creation_when_type_exists() -> None:
+    """UpdateNode does not duplicate NodeType when the slug already exists."""
+    from app.modules.graph.domain.node_type import NodeType
+
+    node_types = InMemoryNodeTypeRepository()
+    existing = NodeType.create(slug="film", label="Film")
+    await node_types.add(existing)
+
+    repository = InMemoryNodeRepository()
+    node = Node.create(name="Alien")
+    await repository.add(node)
+    repos = GraphRepos(
+        nodes=repository,
+        edges=InMemoryEdgeRepository(),
+        node_types=node_types,
+        edge_types=InMemoryEdgeTypeRepository(),
+    )
+    uow = create_in_memory_graph_uow(repos)
+    use_case = UpdateNode(uow)
+
+    await use_case.handle(
+        UpdateNodeCommand(node_id=node.id, type="Film"),
+        SYSTEM_ACTOR,
+    )
+
+    assert len(node_types._node_types) == 1
+
+
+async def test_update_node_creates_node_type_when_type_is_new() -> None:
+    """UpdateNode auto-creates a NodeType when the type slug doesn't exist yet."""
+    node_types = InMemoryNodeTypeRepository()
+    repository = InMemoryNodeRepository()
+    node = Node.create(name="Alien")
+    await repository.add(node)
+    repos = GraphRepos(
+        nodes=repository,
+        edges=InMemoryEdgeRepository(),
+        node_types=node_types,
+        edge_types=InMemoryEdgeTypeRepository(),
+    )
+    uow = create_in_memory_graph_uow(repos)
+    use_case = UpdateNode(uow)
+
+    await use_case.handle(
+        UpdateNodeCommand(node_id=node.id, type="Film"),
+        SYSTEM_ACTOR,
+    )
+
+    film_type = await node_types.get_by_slug("film")
+    assert film_type is not None
+    assert film_type.label == "Film"

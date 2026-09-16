@@ -2,12 +2,16 @@ import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -26,7 +30,10 @@ class ListEdges(QueryHandler[GraphUnitOfWork, ListEdgesQuery, list[Edge]]):
         """Return a page of edge after `query.after`, up to `query.limit`."""
         async with self._uow as repos:
             if query.node_id is not None:
-                return await repos.edges.list_for_node(
+                edges = await repos.edges.list_for_node(
                     query.node_id, after=query.after, limit=query.limit
                 )
-            return await repos.edges.list(after=query.after, limit=query.limit)
+            else:
+                edges = await repos.edges.list(after=query.after, limit=query.limit)
+        logger.debug("edges listed", count=len(edges))
+        return edges

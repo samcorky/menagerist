@@ -2,6 +2,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+import structlog
+
 from app.modules.graph.domain.errors import NodeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
@@ -11,6 +13,8 @@ from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -56,4 +60,5 @@ class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
 
             await repos.nodes.save(node)
             await self._uow.commit()
+        logger.info("node updated", node_id=command.node_id)
         return node

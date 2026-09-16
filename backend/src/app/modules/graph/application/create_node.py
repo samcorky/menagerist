@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+import structlog
+
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
@@ -9,6 +11,8 @@ from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -47,4 +51,5 @@ class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
                     )
             await repos.nodes.add(node)
             await self._uow.commit()
+        logger.info("node created", node_id=node.id, node_type=node.type)
         return node

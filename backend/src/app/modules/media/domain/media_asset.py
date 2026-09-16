@@ -17,16 +17,15 @@ class MediaStatus(StrEnum):
 
 @dataclass(kw_only=True, eq=False)
 class MediaAsset(Identifiable, Timestamped):
-    """A binary file (image, document, etc.) attached to a graph node.
-
-    Lifecycle: staged → attached → orphaned → (hard deleted by cleanup).
-    """
+    """Binary media asset attached to a target entity."""
 
     filename: str
     content_type: str
     size: int
     sha256: str
     status: MediaStatus
+    has_thumbnail: bool = False
+    thumbnail_sha256: str | None = None
 
     def __post_init__(self) -> None:
         """Validate invariants after construction."""
@@ -43,11 +42,7 @@ class MediaAsset(Identifiable, Timestamped):
         size: int,
         sha256: str,
     ) -> MediaAsset:
-        """Create a new staged media asset.
-
-        `asset_id` lets the caller pre-generate the id (needed when the id must
-        be known before the file is written to storage).
-        """
+        """Create a new staged media asset."""
         now = datetime.now(UTC)
         return cls(
             id=asset_id if asset_id is not None else uuid.uuid7(),
@@ -60,11 +55,37 @@ class MediaAsset(Identifiable, Timestamped):
             updated_at=now,
         )
 
-    def promote(self) -> None:
-        """Transition from staged to attached.
+    @staticmethod
+    def _extension(name: str) -> str:
+        dot = name.rfind(".")
+        return name[dot:].lower() if dot != -1 else ""
 
-        Raises `ValidationError` if the asset is not currently staged.
-        """
+    def rename(self, filename: str) -> None:
+        """Rename the media asset while preserving its original extension."""
+        normalised = filename.strip()
+        if not normalised:
+            raise ValidationError("filename must be provided")
+
+        original_extension = self._extension(self.filename)
+        requested_extension = self._extension(normalised)
+
+        if (
+            original_extension
+            and requested_extension
+            and requested_extension != original_extension
+        ):
+            raise ValidationError("filename extension cannot be changed")
+
+        if requested_extension:
+            final_filename = normalised
+        else:
+            final_filename = f"{normalised}{original_extension}"
+
+        self.filename = final_filename
+        self.touch()
+
+    def promote(self) -> None:
+        """Transition from staged to attached."""
         if self.status is not MediaStatus.STAGED:
             raise ValidationError(
                 f"cannot promote a {self.status.value!r} asset; must be staged"
@@ -72,11 +93,19 @@ class MediaAsset(Identifiable, Timestamped):
         self.status = MediaStatus.ATTACHED
         self.touch()
 
-    def orphan(self) -> None:
-        """Transition from attached to orphaned.
+    def mark_thumbnail_generated(self, *, sha256: str) -> None:
+        """Record that a thumbnail has been generated for this asset.
 
-        Raises `ValidationError` if the asset is not currently attached.
+        `sha256` is the hash of the thumbnail's own bytes, not the
+        original's — thumbnails are cached under it independently so
+        that regenerating one (e.g. a thumbnailing bug fix) changes its
+        cache key even though the original file's `sha256` never does.
         """
+        self.has_thumbnail = True
+        self.thumbnail_sha256 = sha256
+
+    def orphan(self) -> None:
+        """Transition from attached to orphaned."""
         if self.status is not MediaStatus.ATTACHED:
             raise ValidationError(
                 f"cannot orphan a {self.status.value!r} asset; must be attached"

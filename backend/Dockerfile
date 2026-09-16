@@ -2,6 +2,7 @@ FROM debian:trixie-slim AS builder
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        ca-certificates \
         git \
         ncurses-term \
     && rm -rf /var/lib/apt/lists/*
@@ -19,7 +20,8 @@ ENV \
 
 COPY .python-version ./
 
-RUN uv python install
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv python install
 
 COPY pyproject.toml uv.lock ./
 COPY backend/pyproject.toml backend/pyproject.toml
@@ -75,16 +77,14 @@ RUN PYTHON_DIR="$(find /opt/python -mindepth 1 -maxdepth 1 -type d -name 'cpytho
     \
     && find /opt/python /app/.venv \
         \( \
-            -type d -name '__pycache__' \
-            -o -type d -name 'tests' \
+            -type d -name 'tests' \
             -o -type d -name 'test' \
         \) \
         -prune -exec rm -rf '{}' + \
     \
     && find /opt/python /app/.venv \
         \( \
-            -name '*.pyc' \
-            -o -name '*.pyo' \
+            -name '*.pyo' \
             -o -name '*.a' \
             -o -name '_test*.so' \
             -o -name '_ctypes_test*.so' \
@@ -115,6 +115,22 @@ RUN PYTHON_DIR="$(find /opt/python -mindepth 1 -maxdepth 1 -type d -name 'cpytho
 RUN mkdir -p /data/media && chown 1000:1000 /data/media
 
 FROM gcr.io/distroless/base-debian13:nonroot AS runtime
+
+ARG VERSION=""
+ARG MENAGERIST_BUILD_COMMIT_SHA=""
+ARG MENAGERIST_BUILD_BRANCH=""
+ARG MENAGERIST_BUILD_REPOSITORY_URL=""
+ARG MENAGERIST_BUILD_TIMESTAMP=""
+ARG MENAGERIST_BUILD_DIRTY=""
+
+LABEL org.opencontainers.image.title="Menagerist backend" \
+      org.opencontainers.image.description="FastAPI backend for Menagerist, a self-hostable personal collection manager." \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.source="https://github.com/samcorky/menagerist" \
+      org.opencontainers.image.url="https://github.com/samcorky/menagerist" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${MENAGERIST_BUILD_COMMIT_SHA}" \
+      org.opencontainers.image.created="${MENAGERIST_BUILD_TIMESTAMP}"
 
 COPY --from=builder \
     /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 \

@@ -1,26 +1,18 @@
-import asyncio
 import json
 import logging
-from datetime import UTC, datetime, timedelta
+from enum import StrEnum
 from pathlib import Path
+from typing import Annotated
 
 import structlog
-from cyclopts import App
-from granian import Granian
-from granian.constants import Interfaces, Loops
-from granian.log import LogLevels
+from cyclopts import App, Parameter
 
-from app.platform import alembic_runner
+from app.modules.media.adapters.cli.media_app import media_app
 from app.platform.app_info import load_app_info
-from app.platform.logging_config import (
-    GRANIAN_ACCESS_LOG_FORMAT,
-    GRANIAN_LOG_DICTCONFIG,
-    configure_logging,
-)
+from app.platform.logging_config import configure_logging
 
 configure_logging()
 app_info = load_app_info()
-
 logger = structlog.get_logger(__name__)
 
 BACKEND_SRC_PATH = Path(__file__).resolve().parents[3]
@@ -30,14 +22,60 @@ app = App(
     version=app_info.version,
 )
 
+
+@app.meta.default
+def main(
+    *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+    verbose: Annotated[bool, Parameter(name=["--verbose", "-v"])] = False,
+) -> None:
+    """Menagerist CLI.
+
+    Args:
+        tokens: Remaining command-line tokens, forwarded to the command apps.
+        verbose: Log at DEBUG level, overriding `LOG_LEVEL`.
+    """
+    if verbose:
+        configure_logging(level=logging.DEBUG)
+    app(tokens)
+
+
 migrate_app = App(name="migrate", help="Manage database migrations.")
 app.command(migrate_app)
 
-media_app = App(name="media", help="Manage media assets.")
 app.command(media_app)
 
 schema_app = App(name="schema", help="Inspect the API schema.")
 app.command(schema_app)
+
+
+@app.default
+def shell() -> None:
+    """Start the interactive shell."""
+    app.interactive_shell(prompt=f"{app_info.name}> ")
+
+
+@app.command
+def help() -> None:
+    """Display the help screen."""
+    app.help_print()
+
+
+class ServeLogLevel(StrEnum):
+    """Mirrors `granian.log.LogLevels` without requiring granian to be imported.
+
+    Granian is a heavy import (pulls in its Rust extension and server modules),
+    so it is only imported inside `serve()`, when actually needed. This enum lets
+    cyclopts validate and display `--log-level` choices without paying that cost
+    for every other CLI command.
+    """
+
+    critical = "critical"
+    error = "error"
+    warning = "warning"
+    warn = "warn"
+    info = "info"
+    debug = "debug"
+    notset = "notset"
 
 
 @app.command
@@ -48,7 +86,7 @@ def serve(
     workers: int = 1,
     reload: bool = False,
     access_log: bool = True,
-    log_level: LogLevels = LogLevels.info,
+    log_level: ServeLogLevel = ServeLogLevel.info,
 ) -> None:
     """Run the API server.
 
@@ -60,6 +98,15 @@ def serve(
         access_log: Whether to log access events.
         log_level: Minimum level for Granian's own server logs.
     """
+    from granian import Granian
+    from granian.constants import Interfaces, Loops
+    from granian.log import LogLevels
+
+    from app.platform.logging_config import (
+        GRANIAN_ACCESS_LOG_FORMAT,
+        granian_log_dictconfig,
+    )
+
     server = Granian(
         target="app.entrypoints.api:app",
         address=host,
@@ -69,8 +116,8 @@ def serve(
         reload=reload,
         reload_paths=[BACKEND_SRC_PATH],
         loop=Loops.auto,
-        log_level=log_level,
-        log_dictconfig=GRANIAN_LOG_DICTCONFIG,
+        log_level=LogLevels(log_level.value),
+        log_dictconfig=granian_log_dictconfig(),
         log_access=access_log,
         log_access_format=GRANIAN_ACCESS_LOG_FORMAT,
     )
@@ -88,8 +135,12 @@ def upgrade(revision: str = "head") -> None:
     Args:
         revision: Target revision, or "head" for the latest.
     """
+    from app.platform import alembic_runner
+
     _enable_migration_logs()
+    logger.debug("starting database upgrade", revision=revision)
     alembic_runner.upgrade(revision)
+    logger.info("database upgrade complete", revision=revision)
 
 
 @migrate_app.command
@@ -99,8 +150,12 @@ def downgrade(revision: str) -> None:
     Args:
         revision: Target revision.
     """
+    from app.platform import alembic_runner
+
     _enable_migration_logs()
+    logger.debug("starting database downgrade", revision=revision)
     alembic_runner.downgrade(revision)
+    logger.info("database downgrade complete", revision=revision)
 
 
 @migrate_app.command
@@ -111,58 +166,28 @@ def revision(message: str, *, autogenerate: bool = True) -> None:
         message: Short description of the migration.
         autogenerate: Diff current models against the database schema.
     """
+    from app.platform import alembic_runner
+
+    logger.debug(
+        "starting migration revision", message=message, autogenerate=autogenerate
+    )
     alembic_runner.make_revision(message, autogenerate=autogenerate)
+    logger.info("migration revision complete", message=message)
 
 
 @schema_app.command
 def dump(*, output: Path = Path("openapi.json")) -> None:
     """Write the API's OpenAPI schema to a file.
 
-    No live server is needed - this builds the same FastAPI app `serve` does
-    and reads its schema directly, so the frontend can generate a typed
-    client without a running backend.
-
     Args:
         output: Path to write the schema JSON to.
     """
     from app.entrypoints.api import create_app
 
+    logger.debug("dumping API schema", output=str(output))
     output.write_text(json.dumps(create_app().openapi(), indent=2))
-
-
-@media_app.command
-def cleanup() -> None:
-    """Hard-delete staged and orphaned media assets that have passed their TTL."""
-    from app.modules.media.adapters.persistence.unit_of_work import create_media_uow
-    from app.modules.media.adapters.storage.local_filesystem import (
-        LocalFilesystemMediaStorage,
-    )
-    from app.modules.media.application.cleanup_expired_media import (
-        CleanupExpiredMedia,
-        CleanupExpiredMediaCommand,
-    )
-    from app.platform.config.media import get_media_settings
-    from app.platform.database import get_session_factory
-    from app.shared_kernel.actor import SYSTEM_ACTOR
-
-    settings = get_media_settings()
-    now = datetime.now(UTC)
-
-    async def _run() -> int:
-        uow = create_media_uow(get_session_factory())
-        storage = LocalFilesystemMediaStorage(settings.media_storage_path)
-        use_case = CleanupExpiredMedia(uow, storage)
-        return await use_case.handle(
-            CleanupExpiredMediaCommand(
-                staged_before=now - timedelta(hours=settings.staged_ttl_hours),
-                orphaned_before=now - timedelta(hours=settings.orphaned_ttl_hours),
-            ),
-            SYSTEM_ACTOR,
-        )
-
-    count = asyncio.run(_run())
-    logger.info("media cleanup complete", deleted=count)
+    logger.info("schema dump complete", output=str(output))
 
 
 if __name__ == "__main__":
-    app()
+    app.meta()

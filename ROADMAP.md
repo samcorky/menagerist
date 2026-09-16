@@ -26,7 +26,7 @@ without ever being forced to think in terms of graph theory.
 
 ## Release milestones
 
-Versioning follows CalVer. The project is currently on a `0.`-prefixed scheme (`0.YYYY.MM`) to signal pre-stable — but the bar for the first merge to `main` is lower than it might seem.
+Versioning follows CalVer. The project is currently on a `0.`-prefixed scheme (`0.YYYY.MM.PATCH`) to signal pre-stable — but the bar for the first merge to `main` is lower than it might seem.
 
 **Merge to `main` (`0.x`)** — target once the following are done:
 - UI polish pass: tighten spacing, typography, empty states, loading states, and interaction feedback across all existing screens
@@ -36,7 +36,7 @@ The `0.` prefix signals that the API, data model, and features are still evolvin
 
 **Public images on GHCR** — publish `ghcr.io/…/menagerist-backend` and `ghcr.io/…/menagerist-frontend` on every merge to `main` via CI. Tagged as `0.YYYY.MM.DD` and `latest`. Makes self-hosting a one-liner without needing to build from source.
 
-**Stable release (`YYYY.MM`)** — drop the `0.` prefix once the P0 and P1 features are complete and the data model is unlikely to have breaking migrations. At that point CalVer without the leading zero becomes the normal scheme and `latest` tracks it.
+**Stable release (`YYYY.MM.PATCH`)** — drop the `0.` prefix once the P0 and P1 features are complete and the data model is unlikely to have breaking migrations. At that point CalVer without the leading zero becomes the normal scheme and `latest` tracks it.
 
 ---
 
@@ -53,6 +53,7 @@ The `0.` prefix signals that the API, data model, and features are still evolvin
 - [x] Quick capture (`Cmd/Ctrl+K`)
 - [x] Custom attributes (freeform key/value)
 - [x] Schema-driven attribute fields (text, number, boolean, date, select, richtext)
+- [x] Media & attachments (photos, scans, and documents on records)
 - [x] Dark mode
 
 ---
@@ -63,7 +64,6 @@ These unblock everything else. Without them the app doesn't feel like a collecti
 
 - [ ] **Collection-first UX** — replace graph terminology (nodes, edges) with user-facing concepts: Items, People, Events, Places. Navigation and empty states should speak the user's language, not the data model's.
 - [ ] **Improved detail pages** — unified view of a record's fields, media, relationships, and history on a single page; currently split and sparse
-- [ ] **Media & attachments** — photos, scans, and documents attached to records; essential for physical collection items
 - [ ] **Global full-text search** — search across names, descriptions, and indexed text fields across all record types
 
 ---

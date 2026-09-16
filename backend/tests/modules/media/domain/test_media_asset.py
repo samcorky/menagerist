@@ -97,6 +97,29 @@ def test_promote_raises_if_orphaned() -> None:
         asset.promote()
 
 
+def test_rename_keeps_existing_extension_and_updates_timestamp() -> None:
+    """rename() preserves the extension and touches updated_at."""
+    asset = MediaAsset.create(
+        filename="cover.jpg", content_type="image/jpeg", size=1, sha256="x"
+    )
+    original_updated_at = asset.updated_at
+
+    asset.rename("front page")
+
+    assert asset.filename == "front page.jpg"
+    assert asset.updated_at >= original_updated_at
+
+
+def test_rename_rejects_extension_change() -> None:
+    """rename() rejects a different extension even when it looks valid."""
+    asset = MediaAsset.create(
+        filename="cover.jpg", content_type="image/jpeg", size=1, sha256="x"
+    )
+
+    with pytest.raises(ValidationError, match="filename extension cannot be changed"):
+        asset.rename("front page.png")
+
+
 def test_orphan_transitions_attached_to_orphaned() -> None:
     """orphan() changes status from ATTACHED to ORPHANED and updates updated_at."""
     asset = MediaAsset.create(
@@ -119,6 +142,19 @@ def test_orphan_raises_if_staged() -> None:
 
     with pytest.raises(ValidationError, match="cannot orphan"):
         asset.orphan()
+
+
+def test_mark_thumbnail_generated_sets_flag_and_hash() -> None:
+    """mark_thumbnail_generated sets has_thumbnail and stores the thumbnail's hash."""
+    asset = MediaAsset.create(
+        filename="f.jpg", content_type="image/jpeg", size=1, sha256="original-hash"
+    )
+
+    asset.mark_thumbnail_generated(sha256="thumbnail-hash")
+
+    assert asset.has_thumbnail is True
+    assert asset.thumbnail_sha256 == "thumbnail-hash"
+    assert asset.thumbnail_sha256 != asset.sha256
 
 
 def test_orphan_raises_if_already_orphaned() -> None:

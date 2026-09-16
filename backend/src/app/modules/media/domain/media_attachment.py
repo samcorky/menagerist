@@ -13,22 +13,30 @@ class AttachmentTarget(StrEnum):
     EDGE = "edge"
 
 
+class AttachmentKey(StrEnum):
+    """Well-known slot labels for a media attachment."""
+
+    COVER = "cover"
+
+
 @dataclass(kw_only=True, eq=False)
 class MediaAttachment(Identifiable, Timestamped):
-    """A link between a media asset and exactly one graph entity.
-
-    ``target_type`` identifies the entity table; ``target_id`` is the PK of
-    the target row.  Adding a new attachment point only requires a new
-    ``AttachmentTarget`` value — no schema changes.
-
-    ``attribute_key`` is an optional slot label (e.g. ``"cover"``, ``"scan_1"``)
-    that lets a single target hold multiple named attachments.
-    """
+    """Link between a media asset and a target entity."""
 
     asset_id: uuid.UUID
     target_type: AttachmentTarget
     target_id: uuid.UUID
-    attribute_key: str | None = field(default=None)
+    attribute_key: AttachmentKey | None = field(default=None)
+
+    def mark_as_cover(self) -> None:
+        """Flag this attachment as the target's cover."""
+        self.attribute_key = AttachmentKey.COVER
+        self.touch()
+
+    def clear_attribute_key(self) -> None:
+        """Clear this attachment's slot label without detaching it."""
+        self.attribute_key = None
+        self.touch()
 
     @classmethod
     def for_target(
@@ -37,7 +45,7 @@ class MediaAttachment(Identifiable, Timestamped):
         asset_id: uuid.UUID,
         target_type: AttachmentTarget,
         target_id: uuid.UUID,
-        attribute_key: str | None = None,
+        attribute_key: AttachmentKey | None = None,
     ) -> MediaAttachment:
         """Create an attachment for any target type."""
         now = datetime.now(UTC)
@@ -57,7 +65,7 @@ class MediaAttachment(Identifiable, Timestamped):
         *,
         asset_id: uuid.UUID,
         node_id: uuid.UUID,
-        attribute_key: str | None = None,
+        attribute_key: AttachmentKey | None = None,
     ) -> MediaAttachment:
         """Create an attachment targeting a node."""
         return cls.for_target(
@@ -73,7 +81,7 @@ class MediaAttachment(Identifiable, Timestamped):
         *,
         asset_id: uuid.UUID,
         edge_id: uuid.UUID,
-        attribute_key: str | None = None,
+        attribute_key: AttachmentKey | None = None,
     ) -> MediaAttachment:
         """Create an attachment targeting an edge."""
         return cls.for_target(

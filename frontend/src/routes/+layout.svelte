@@ -2,8 +2,8 @@
 	import './layout.css';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { onNavigate } from '$app/navigation';
-	import { CirclePlus, LayoutGrid, House, Settings, Telescope } from '@lucide/svelte';
+	import { onNavigate, goto } from '$app/navigation';
+	import { CirclePlus, LayoutGrid, House, Settings, Telescope, BookOpen } from '@lucide/svelte';
 	import { Toaster } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import ThemeToggle from '$lib/components/theme-toggle.svelte';
@@ -104,9 +104,12 @@
 					<Telescope class="size-4" />
 					Explore
 				</Button>
-				<Button size="sm" onclick={() => captureController.show()}>
+				<Button size="sm" onclick={() => goto(resolve('/collection/new'))}>
 					<CirclePlus class="size-4" />
 					New item
+				</Button>
+				<Button variant="ghost" size="icon" href="/api/docs" target="_blank" aria-label="API docs">
+					<BookOpen class="size-4" />
 				</Button>
 				<Button
 					variant={settingsActive ? 'secondary' : 'ghost'}

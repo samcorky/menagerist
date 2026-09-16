@@ -1,14 +1,21 @@
 from typing import TYPE_CHECKING
 
+import structlog
 from sqlalchemy import delete, select
 
 from app.modules.media.adapters.persistence.models import MediaAttachmentModel
-from app.modules.media.domain.media_attachment import AttachmentTarget, MediaAttachment
+from app.modules.media.domain.media_attachment import (
+    AttachmentKey,
+    AttachmentTarget,
+    MediaAttachment,
+)
 
 if TYPE_CHECKING:
     import uuid
 
     from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = structlog.get_logger()
 
 
 class SqlAlchemyMediaAttachmentRepository:
@@ -23,7 +30,9 @@ class SqlAlchemyMediaAttachmentRepository:
             asset_id=row.asset_id,
             target_type=AttachmentTarget(row.target_type),
             target_id=row.target_id,
-            attribute_key=row.attribute_key,
+            attribute_key=AttachmentKey(row.attribute_key)
+            if row.attribute_key
+            else None,
             created_at=row.created_at,
             updated_at=row.updated_at,
         )
@@ -41,11 +50,17 @@ class SqlAlchemyMediaAttachmentRepository:
 
     async def add(self, attachment: MediaAttachment) -> None:
         """Persist a new attachment row."""
+        logger.debug(
+            "adding media attachment",
+            attachment_id=attachment.id,
+            asset_id=attachment.asset_id,
+        )
         self._session.add(self._to_model(attachment))
         await self._session.flush()
 
     async def get(self, attachment_id: uuid.UUID) -> MediaAttachment | None:
         """Return an attachment by id, or ``None``."""
+        logger.debug("fetching media attachment", attachment_id=attachment_id)
         row = await self._session.get(MediaAttachmentModel, attachment_id)
         return self._to_domain(row) if row is not None else None
 
@@ -55,6 +70,11 @@ class SqlAlchemyMediaAttachmentRepository:
         target_id: uuid.UUID,
     ) -> list[MediaAttachment]:
         """Return all attachments for the given target entity."""
+        logger.debug(
+            "listing attachments for target",
+            target_type=target_type.value,
+            target_id=target_id,
+        )
         stmt = select(MediaAttachmentModel).where(
             MediaAttachmentModel.target_type == target_type.value,
             MediaAttachmentModel.target_id == target_id,
@@ -64,14 +84,26 @@ class SqlAlchemyMediaAttachmentRepository:
 
     async def list_for_asset(self, asset_id: uuid.UUID) -> list[MediaAttachment]:
         """Return all attachments for the given asset."""
+        logger.debug("listing attachments for asset", asset_id=asset_id)
         stmt = select(MediaAttachmentModel).where(
             MediaAttachmentModel.asset_id == asset_id
         )
         result = await self._session.execute(stmt)
         return [self._to_domain(r) for r in result.scalars()]
 
+    async def update(self, attachment: MediaAttachment) -> None:
+        """Persist changes to an existing attachment row."""
+        logger.debug("updating media attachment", attachment_id=attachment.id)
+        row = await self._session.get(MediaAttachmentModel, attachment.id)
+        if row is None:
+            return
+        row.attribute_key = attachment.attribute_key
+        row.updated_at = attachment.updated_at
+        await self._session.flush()
+
     async def delete(self, attachment_id: uuid.UUID) -> None:
         """Remove an attachment row by id."""
+        logger.debug("deleting media attachment", attachment_id=attachment_id)
         await self._session.execute(
             delete(MediaAttachmentModel).where(MediaAttachmentModel.id == attachment_id)
         )

@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { Star, Trash2 } from '@lucide/svelte';
+	import { Pencil, Star, Trash2 } from '@lucide/svelte';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import {
 		createEdge,
@@ -28,6 +28,7 @@
 	} from '$lib/components/attributes-editor.svelte';
 	import type { Schema } from '$lib/components/schema-editor.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
+	import NotFound from '$lib/components/not-found.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Toggle } from '$lib/components/ui/toggle/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -36,6 +37,8 @@
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import ShimmerSlot from '$lib/components/shimmer-slot.svelte';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import MediaGallery from '$lib/components/media-gallery.svelte';
+	import NodeCover from '$lib/components/node-cover.svelte';
 
 	let nodeId = $derived(page.params.id!);
 
@@ -50,13 +53,20 @@
 	let nodeSchema = $derived(
 		(nodeTypes.find((nt) => nt.slug === node?.type)?.attributes_schema as Schema | null) ?? null
 	);
+	let attributeLabelsByKey = $derived(
+		new Map((nodeSchema?.fields ?? []).map((field) => [field.key, field.label || field.key]))
+	);
 	let loading = $state(true);
+	let notFound = $state(false);
+	let mode = $state<'read' | 'edit'>('read');
 
 	let name = $state('');
 	let description = $state('');
 	let attributeRows = $state<AttributeRow[]>([]);
 	let saving = $state(false);
 	let deletingNode = $state(false);
+	let confirmDeleteNode = $state(false);
+	let confirmDeleteEdgeId = $state<string | null>(null);
 
 	let newEdgeType = $state('');
 	let newEdgeTargetId = $state('');
@@ -83,6 +93,7 @@
 
 	async function load() {
 		loading = true;
+		notFound = false;
 		const [nodeResult, edgesResult, nodesResult, edgeTypesResult, nodeTypesResult] =
 			await Promise.all([
 				getNode({ path: { node_id: nodeId } }),
@@ -91,6 +102,12 @@
 				listEdgeTypes({ query: { limit: 100 } }),
 				listNodeTypes({ query: { limit: 200 } })
 			]);
+
+		if (nodeResult.response?.status === 404 || nodeResult.response?.status === 422) {
+			notFound = true;
+			loading = false;
+			return;
+		}
 
 		if (nodeResult.error || !nodeResult.data) {
 			const { title, description: desc } = networkAwareError(nodeResult);
@@ -159,34 +176,26 @@
 		saving = false;
 	}
 
-	function handleDeleteNode() {
-		const id = nodeId;
+	function handleCancelEdit() {
+		if (node) {
+			name = node.name;
+			description = node.description ?? '';
+			attributeRows = attributesToRows(node.attributes);
+		}
+		mode = 'read';
+	}
+
+	async function handleDeleteNode() {
 		deletingNode = true;
-
-		let undone = false;
-		const timerId = setTimeout(async () => {
-			if (undone) return;
-			const result = await deleteNode({ path: { node_id: id } });
-			if (result.error) {
-				deletingNode = false;
-				const { title, description: desc } = networkAwareError(result);
-				toast.error(title, { description: desc });
-				return;
-			}
-			await goto(resolve('/collection'));
-		}, 5000);
-
-		toast('Item deleted', {
-			action: {
-				label: 'Undo',
-				onClick: () => {
-					undone = true;
-					clearTimeout(timerId);
-					deletingNode = false;
-				}
-			},
-			duration: 5000
-		});
+		const result = await deleteNode({ path: { node_id: nodeId } });
+		if (result.error) {
+			deletingNode = false;
+			confirmDeleteNode = false;
+			const { title, description: desc } = networkAwareError(result);
+			toast.error(title, { description: desc });
+			return;
+		}
+		await goto(resolve('/collection'));
 	}
 
 	async function handleToggleFavourite() {
@@ -236,32 +245,15 @@
 		creatingEdge = false;
 	}
 
-	function handleDeleteEdge(edge: EdgeResponse) {
-		// Optimistically remove
+	async function handleDeleteEdge(edge: EdgeResponse) {
+		confirmDeleteEdgeId = null;
 		edges = edges.filter((e) => e.id !== edge.id);
-
-		let undone = false;
-		const timerId = setTimeout(async () => {
-			if (undone) return;
-			const result = await deleteEdge({ path: { edge_id: edge.id } });
-			if (result.error) {
-				edges = [...edges, edge];
-				const { title, description: desc } = networkAwareError(result);
-				toast.error(title, { description: desc });
-			}
-		}, 5000);
-
-		toast('Connection removed', {
-			action: {
-				label: 'Undo',
-				onClick: () => {
-					undone = true;
-					clearTimeout(timerId);
-					edges = [...edges, edge];
-				}
-			},
-			duration: 5000
-		});
+		const result = await deleteEdge({ path: { edge_id: edge.id } });
+		if (result.error) {
+			edges = [...edges, edge];
+			const { title, description: desc } = networkAwareError(result);
+			toast.error(title, { description: desc });
+		}
 	}
 </script>
 
@@ -273,241 +265,348 @@
 	<div class="mx-auto flex max-w-2xl flex-col gap-6">
 		<BackButton fallback={resolve('/collection')} />
 
-		<Shimmer {loading}>
-			<Card.Root>
-				<Card.Header class="flex flex-row items-start justify-between gap-4 space-y-0">
-					<div class="min-w-0 flex-1">
-						<ShimmerSlot {loading} class="h-6 w-40">
-							<Card.Title class="font-heading text-xl">{node?.name ?? ''}</Card.Title>
-						</ShimmerSlot>
-						<ShimmerSlot {loading} class="mt-1 h-4 w-56">
-							{#if node?.type}
-								{@const typeLabel = nodeTypes.find((nt) => nt.slug === node!.type)?.label}
-								<Card.Description>
-									{#if typeLabel}
-										{typeLabel}
-									{:else}
-										<span
-											class="font-mono text-xs text-muted-foreground/60 italic"
-											title="This category no longer exists">{node.type}</span
-										>
-									{/if}
-								</Card.Description>
-							{:else if !loading && nodeTypes.length > 0}
-								<div class="mt-2 space-y-1.5">
-									<p class="text-xs text-muted-foreground">No category — pick one:</p>
-									<div class="flex flex-wrap gap-1.5">
-										{#each nodeTypes as nt (nt.slug)}
-											<button
-												type="button"
-												onclick={() => handleSetType(nt.slug)}
-												disabled={settingType}
-												class="rounded-full border border-border bg-background px-2.5 py-0.5 text-xs transition-colors hover:border-primary/50 hover:bg-muted disabled:opacity-50"
-											>
-												{nt.label}
-											</button>
-										{/each}
-									</div>
-								</div>
-							{/if}
-						</ShimmerSlot>
-					</div>
-					{#if !loading}
-						<Toggle
-							pressed={node?.favourite ?? false}
-							onPressedChange={handleToggleFavourite}
-							aria-label={node?.favourite ? 'Remove from favourites' : 'Add to favourites'}
-							class="shrink-0"
-						>
-							<Star class="size-4 {node?.favourite ? 'fill-current' : ''}" />
-						</Toggle>
+		{#if notFound}
+			<NotFound backHref={resolve('/collection')} />
+		{:else}
+			<Shimmer {loading}>
+				<Card.Root class="overflow-hidden">
+					{#if node}
+						<NodeCover nodeId={node.id} class="w-full rounded-none" hiRes />
 					{/if}
-				</Card.Header>
-				<Card.Content>
-					<form class="space-y-4" onsubmit={handleSave}>
-						<div class="space-y-2">
-							<ShimmerSlot {loading} class="h-4 w-12">
-								<Label for="name">Name</Label>
+					<Card.Header class="flex flex-row items-start justify-between gap-4 space-y-0">
+						<div class="min-w-0 flex-1">
+							<ShimmerSlot {loading} class="h-6 w-40">
+								<Card.Title class="font-heading text-xl">{node?.name ?? ''}</Card.Title>
 							</ShimmerSlot>
-							<Input id="name" bind:value={name} required />
-						</div>
-
-						<div class="space-y-2">
-							<ShimmerSlot {loading} class="h-4 w-24">
-								<Label for="description">Description</Label>
-							</ShimmerSlot>
-							<Textarea id="description" bind:value={description} />
-						</div>
-
-						<AttributesEditor bind:rows={attributeRows} schema={nodeSchema} />
-
-						<div class="flex flex-wrap items-center justify-between gap-2">
-							{#if !loading}
-								<Button
-									type="button"
-									variant="destructive"
-									disabled={deletingNode}
-									onclick={handleDeleteNode}
-								>
-									<Trash2 class="size-4" />
-									{deletingNode ? 'Deleting…' : 'Delete'}
-								</Button>
-							{/if}
-							<Button type="submit" disabled={saving || loading} class="ml-auto">
-								{saving ? 'Saving…' : 'Save changes'}
-							</Button>
-						</div>
-					</form>
-				</Card.Content>
-			</Card.Root>
-
-			<Card.Root>
-				<Card.Header>
-					<Card.Title class="font-heading">Connected to</Card.Title>
-				</Card.Header>
-				<Card.Content class="space-y-4">
-					{#if edges.length === 0}
-						<p class="text-sm text-muted-foreground">No connections yet.</p>
-					{:else}
-						<ul class="space-y-2">
-							{#each edges as edge (edge.id)}
-								{@const et = edgeTypesById.get(edge.type)}
-								{@const isOutgoing = edge.source_id === nodeId}
-								{@const relationLabel = et
-									? isOutgoing
-										? et.label
-										: (et.reverse_label ?? et.label)
-									: edge.type}
-								<li class="flex items-center justify-between gap-2 rounded-lg border p-3">
-									<div class="text-sm">
-										<span class="font-medium">{relationLabel}</span>
-										<a
-											href={resolve('/collection/[id]', { id: otherNodeId(edge) })}
-											class="ml-2 text-muted-foreground underline"
-										>
-											{nodesById.get(otherNodeId(edge))?.name ?? 'View item'}
-										</a>
+							<ShimmerSlot {loading} class="mt-1 h-4 w-56">
+								{#if node?.type}
+									{@const typeLabel = nodeTypes.find((nt) => nt.slug === node!.type)?.label}
+									<Card.Description>
+										{#if typeLabel}
+											{typeLabel}
+										{:else}
+											<span
+												class="font-mono text-xs text-muted-foreground/60 italic"
+												title="This category no longer exists">{node.type}</span
+											>
+										{/if}
+									</Card.Description>
+								{:else if !loading && nodeTypes.length > 0}
+									<div class="mt-2 space-y-1.5">
+										<p class="text-xs text-muted-foreground">No category — pick one:</p>
+										<div class="flex flex-wrap gap-1.5">
+											{#each nodeTypes as nt (nt.slug)}
+												<button
+													type="button"
+													onclick={() => handleSetType(nt.slug)}
+													disabled={settingType}
+													class="rounded-full border border-border bg-background px-2.5 py-0.5 text-xs transition-colors hover:border-primary/50 hover:bg-muted disabled:opacity-50"
+												>
+													{nt.label}
+												</button>
+											{/each}
+										</div>
 									</div>
+								{/if}
+							</ShimmerSlot>
+						</div>
+						{#if !loading}
+							<div class="flex shrink-0 items-center gap-1">
+								<Toggle
+									pressed={node?.favourite ?? false}
+									onPressedChange={handleToggleFavourite}
+									aria-label={node?.favourite ? 'Remove from favourites' : 'Add to favourites'}
+								>
+									<Star class="size-4 {node?.favourite ? 'fill-current' : ''}" />
+								</Toggle>
+								{#if mode === 'read'}
 									<Button
 										type="button"
 										variant="ghost"
 										size="icon"
-										onclick={() => handleDeleteEdge(edge)}
-										aria-label="Remove connection"
+										onclick={() => (mode = 'edit')}
+										aria-label="Edit"
 									>
-										<Trash2 class="size-4" />
+										<Pencil class="size-4" />
 									</Button>
-								</li>
-							{/each}
-						</ul>
-					{/if}
-
-					<Separator />
-
-					<form class="space-y-3" onsubmit={handleCreateEdge}>
-						<div class="space-y-2">
-							<ShimmerSlot {loading} class="h-4 w-32">
-								<Label for="edge-type">Relationship</Label>
-							</ShimmerSlot>
-							<div class="relative">
-								<Input
-									id="edge-type"
-									value={edgeTypeOpen ? edgeTypeSearch : newEdgeType}
-									placeholder="e.g. Directed by"
-									autocomplete="off"
-									oninput={(e) => {
-										edgeTypeSearch = (e.target as HTMLInputElement).value;
-										newEdgeType = edgeTypeSearch;
-										edgeTypeOpen = true;
-									}}
-									onfocus={() => {
-										edgeTypeOpen = true;
-										edgeTypeSearch = newEdgeType;
-									}}
-									onblur={() => setTimeout(() => (edgeTypeOpen = false), 150)}
-								/>
-								{#if edgeTypeOpen && filteredEdgeTypes.length > 0}
-									<ul
-										class="absolute z-10 mt-1 max-h-40 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md"
-									>
-										{#each filteredEdgeTypes as et (et.slug)}
-											<li>
-												<button
-													type="button"
-													class="flex w-full items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent"
-													onmousedown={() => {
-														newEdgeType = et.slug;
-														edgeTypeSearch = et.label;
-														edgeTypeOpen = false;
-													}}
-												>
-													<span>{et.label}</span>
-													{#if et.reverse_label}
-														<span class="text-xs text-muted-foreground">↔ {et.reverse_label}</span>
-													{/if}
-												</button>
-											</li>
-										{/each}
-									</ul>
 								{/if}
 							</div>
-						</div>
+						{/if}
+					</Card.Header>
+					<Card.Content>
+						{#if mode === 'edit'}
+							<form class="space-y-4" onsubmit={handleSave}>
+								<div class="space-y-2">
+									<ShimmerSlot {loading} class="h-4 w-12">
+										<Label for="name">Name</Label>
+									</ShimmerSlot>
+									<Input id="name" bind:value={name} required />
+								</div>
 
-						<div class="space-y-2">
-							<ShimmerSlot {loading} class="h-4 w-24">
-								<Label for="edge-target">Item</Label>
-							</ShimmerSlot>
-							<div class="relative">
-								<Input
-									id="edge-target"
-									value={edgeTargetOpen ? edgeTargetSearch : selectedNodeLabel}
-									placeholder="Search items…"
-									autocomplete="off"
-									oninput={(e) => {
-										edgeTargetSearch = (e.target as HTMLInputElement).value;
-										edgeTargetOpen = true;
-										newEdgeTargetId = '';
-									}}
-									onfocus={() => {
-										edgeTargetOpen = true;
-										edgeTargetSearch = '';
-									}}
-									onblur={() => setTimeout(() => (edgeTargetOpen = false), 150)}
-								/>
-								{#if edgeTargetOpen && filteredNodes.length > 0}
-									<ul
-										class="absolute z-10 mt-1 max-h-52 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md"
-									>
-										{#each filteredNodes as candidate (candidate.id)}
-											<li>
-												<button
+								<div class="space-y-2">
+									<ShimmerSlot {loading} class="h-4 w-24">
+										<Label for="description">Description</Label>
+									</ShimmerSlot>
+									<Textarea id="description" bind:value={description} />
+								</div>
+
+								<AttributesEditor bind:rows={attributeRows} schema={nodeSchema} />
+
+								<div class="flex flex-wrap items-center justify-between gap-2">
+									{#if !loading}
+										{#if confirmDeleteNode}
+											<div class="flex items-center gap-2">
+												<span class="text-sm text-muted-foreground">Delete this item?</span>
+												<Button
 													type="button"
-													class="flex w-full items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent"
-													onmousedown={() => {
-														newEdgeTargetId = candidate.id;
-														edgeTargetSearch = candidate.name;
-														edgeTargetOpen = false;
-													}}
+													variant="outline"
+													size="sm"
+													onclick={() => (confirmDeleteNode = false)}
 												>
-													<span>{candidate.name}</span>
-													<span class="text-xs text-muted-foreground">{candidate.type ?? ''}</span>
-												</button>
-											</li>
-										{/each}
-									</ul>
-								{/if}
-								<input type="hidden" name="edge-target" value={newEdgeTargetId} />
-							</div>
-						</div>
+													Cancel
+												</Button>
+												<Button
+													type="button"
+													variant="destructive"
+													size="sm"
+													disabled={deletingNode}
+													onclick={handleDeleteNode}
+												>
+													{deletingNode ? 'Deleting…' : 'Delete'}
+												</Button>
+											</div>
+										{:else}
+											<Button
+												type="button"
+												variant="destructive"
+												disabled={deletingNode}
+												onclick={() => (confirmDeleteNode = true)}
+											>
+												<Trash2 class="size-4" />
+												Delete
+											</Button>
+										{/if}
+									{/if}
+									<div class="ml-auto flex items-center gap-2">
+										<Button type="button" variant="outline" onclick={handleCancelEdit}>
+											Cancel
+										</Button>
+										<Button type="submit" disabled={saving || loading}>
+											{saving ? 'Saving…' : 'Save changes'}
+										</Button>
+									</div>
+								</div>
+							</form>
+						{:else}
+							<div class="space-y-4">
+								<ShimmerSlot {loading} class="h-4 w-full">
+									{#if node?.description}
+										<p class="text-sm whitespace-pre-wrap">{node.description}</p>
+									{:else}
+										<p class="text-sm text-muted-foreground italic">No description.</p>
+									{/if}
+								</ShimmerSlot>
 
-						<div class="flex justify-end">
-							<Button type="submit" disabled={creatingEdge}>
-								{creatingEdge ? 'Connecting…' : 'Connect item'}
-							</Button>
-						</div>
-					</form>
-				</Card.Content>
-			</Card.Root>
-		</Shimmer>
+								{#if !loading && attributeRows.length > 0}
+									<div class="space-y-1.5">
+										{#each attributeRows as row (row.key)}
+											<div class="flex items-center gap-2">
+												<span class="w-32 shrink-0 text-sm text-muted-foreground">
+													{attributeLabelsByKey.get(row.key) ?? row.key}
+												</span>
+												<span class="text-sm">{row.value}</span>
+											</div>
+										{/each}
+									</div>
+								{/if}
+							</div>
+						{/if}
+					</Card.Content>
+				</Card.Root>
+
+				<Card.Root>
+					<Card.Header>
+						<Card.Title class="font-heading">Connected to</Card.Title>
+					</Card.Header>
+					<Card.Content class="space-y-4">
+						{#if edges.length === 0}
+							<p class="text-sm text-muted-foreground">No connections yet.</p>
+						{:else}
+							<ul class="space-y-2">
+								{#each edges as edge (edge.id)}
+									{@const et = edgeTypesById.get(edge.type)}
+									{@const isOutgoing = edge.source_id === nodeId}
+									{@const relationLabel = et
+										? isOutgoing
+											? et.label
+											: (et.reverse_label ?? et.label)
+										: edge.type}
+									<li class="flex items-center justify-between gap-2 rounded-lg border p-3">
+										<div class="text-sm">
+											<span class="font-medium">{relationLabel}</span>
+											<a
+												href={resolve('/collection/[id]', { id: otherNodeId(edge) })}
+												class="ml-2 text-muted-foreground underline"
+											>
+												{nodesById.get(otherNodeId(edge))?.name ?? 'View item'}
+											</a>
+										</div>
+										{#if confirmDeleteEdgeId === edge.id}
+											<div class="flex shrink-0 items-center gap-1.5">
+												<span class="text-xs text-muted-foreground">Remove?</span>
+												<Button
+													type="button"
+													variant="outline"
+													size="sm"
+													onclick={() => (confirmDeleteEdgeId = null)}
+												>
+													Cancel
+												</Button>
+												<Button
+													type="button"
+													variant="destructive"
+													size="sm"
+													onclick={() => handleDeleteEdge(edge)}
+												>
+													Remove
+												</Button>
+											</div>
+										{:else}
+											<Button
+												type="button"
+												variant="ghost"
+												size="icon"
+												onclick={() => (confirmDeleteEdgeId = edge.id)}
+												aria-label="Remove connection"
+											>
+												<Trash2 class="size-4" />
+											</Button>
+										{/if}
+									</li>
+								{/each}
+							</ul>
+						{/if}
+
+						<Separator />
+
+						<form class="space-y-3" onsubmit={handleCreateEdge}>
+							<div class="space-y-2">
+								<ShimmerSlot {loading} class="h-4 w-32">
+									<Label for="edge-type">Relationship</Label>
+								</ShimmerSlot>
+								<div class="relative">
+									<Input
+										id="edge-type"
+										value={edgeTypeOpen ? edgeTypeSearch : newEdgeType}
+										placeholder="e.g. Directed by"
+										autocomplete="off"
+										oninput={(e) => {
+											edgeTypeSearch = (e.target as HTMLInputElement).value;
+											newEdgeType = edgeTypeSearch;
+											edgeTypeOpen = true;
+										}}
+										onfocus={() => {
+											edgeTypeOpen = true;
+											edgeTypeSearch = newEdgeType;
+										}}
+										onblur={() => setTimeout(() => (edgeTypeOpen = false), 150)}
+									/>
+									{#if edgeTypeOpen && filteredEdgeTypes.length > 0}
+										<ul
+											class="absolute z-10 mt-1 max-h-40 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md"
+										>
+											{#each filteredEdgeTypes as et (et.slug)}
+												<li>
+													<button
+														type="button"
+														class="flex w-full items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent"
+														onmousedown={() => {
+															newEdgeType = et.slug;
+															edgeTypeSearch = et.label;
+															edgeTypeOpen = false;
+														}}
+													>
+														<span>{et.label}</span>
+														{#if et.reverse_label}
+															<span class="text-xs text-muted-foreground">↔ {et.reverse_label}</span
+															>
+														{/if}
+													</button>
+												</li>
+											{/each}
+										</ul>
+									{/if}
+								</div>
+							</div>
+
+							<div class="space-y-2">
+								<ShimmerSlot {loading} class="h-4 w-24">
+									<Label for="edge-target">Item</Label>
+								</ShimmerSlot>
+								<div class="relative">
+									<Input
+										id="edge-target"
+										value={edgeTargetOpen ? edgeTargetSearch : selectedNodeLabel}
+										placeholder="Search items…"
+										autocomplete="off"
+										oninput={(e) => {
+											edgeTargetSearch = (e.target as HTMLInputElement).value;
+											edgeTargetOpen = true;
+											newEdgeTargetId = '';
+										}}
+										onfocus={() => {
+											edgeTargetOpen = true;
+											edgeTargetSearch = '';
+										}}
+										onblur={() => setTimeout(() => (edgeTargetOpen = false), 150)}
+									/>
+									{#if edgeTargetOpen && filteredNodes.length > 0}
+										<ul
+											class="absolute z-10 mt-1 max-h-52 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md"
+										>
+											{#each filteredNodes as candidate (candidate.id)}
+												<li>
+													<button
+														type="button"
+														class="flex w-full items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent"
+														onmousedown={() => {
+															newEdgeTargetId = candidate.id;
+															edgeTargetSearch = candidate.name;
+															edgeTargetOpen = false;
+														}}
+													>
+														<span>{candidate.name}</span>
+														<span class="text-xs text-muted-foreground">{candidate.type ?? ''}</span
+														>
+													</button>
+												</li>
+											{/each}
+										</ul>
+									{/if}
+									<input type="hidden" name="edge-target" value={newEdgeTargetId} />
+								</div>
+							</div>
+
+							<div class="flex justify-end">
+								<Button type="submit" disabled={creatingEdge}>
+									{creatingEdge ? 'Connecting…' : 'Connect item'}
+								</Button>
+							</div>
+						</form>
+					</Card.Content>
+				</Card.Root>
+
+				{#if !loading}
+					<Card.Root>
+						<Card.Header>
+							<Card.Title class="font-heading">Files</Card.Title>
+						</Card.Header>
+						<Card.Content>
+							<MediaGallery {nodeId} />
+						</Card.Content>
+					</Card.Root>
+				{/if}
+			</Shimmer>
+		{/if}
 	</div>
 </main>

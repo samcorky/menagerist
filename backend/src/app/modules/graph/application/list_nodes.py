@@ -2,12 +2,16 @@ import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -47,4 +51,6 @@ class ListNodes(QueryHandler[GraphUnitOfWork, ListNodesQuery, ListNodesResult]):
                 q=query.q,
                 favourite=query.favourite,
             )
-        return ListNodesResult(items=items, total=total)
+        result = ListNodesResult(items=items, total=total)
+        logger.debug("nodes listed", count=len(result.items), total=result.total)
+        return result

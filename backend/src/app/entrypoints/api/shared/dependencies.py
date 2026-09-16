@@ -12,13 +12,7 @@ _authorization_port = AllowAllAuthorizationAdapter()
 
 
 def get_current_actor() -> Actor:
-    """Resolve the actor driving the current request.
-
-    v1 is single-owner with no authentication, so this always returns a
-    fixed owner actor. Once OIDC lands, this decodes the actor from the
-    request's token/session instead - every route that already depends on
-    `Actor` needs no change.
-    """
+    """Resolve the actor driving the current request."""
     return _V1_OWNER_ACTOR
 
 

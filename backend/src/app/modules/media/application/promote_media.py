@@ -2,6 +2,8 @@ import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
@@ -10,6 +12,8 @@ from app.shared_kernel.cqrs import CommandHandler
 if TYPE_CHECKING:
     from app.modules.media.ports.media_storage import MediaStoragePort
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -43,4 +47,5 @@ class PromoteMedia(CommandHandler[MediaUnitOfWork, PromoteMediaCommand, MediaAss
             await repos.assets.save(asset)
             await self._uow.commit()
         await self._storage.move(asset.id, MediaStatus.STAGED, MediaStatus.ATTACHED)
+        logger.info("media promoted", asset_id=asset.id)
         return asset

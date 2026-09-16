@@ -1,15 +1,28 @@
-FROM node:22-slim AS builder
+FROM node:22-slim AS deps
 
 WORKDIR /app
 
+# Only the lockfile determines install output, so this layer is cached
+# across builds until dependencies actually change - unaffected by every
+# other change below (generated client, source, config).
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 
-COPY frontend/openapi.json ./
+FROM deps AS generate
 
-COPY frontend/ .
+# openapi.json changes far less often than application source. Isolating
+# codegen in its own layer means source-only edits (the common case) skip
+# regenerating the API client entirely and reuse this layer from cache.
+COPY frontend/openapi.json frontend/openapi-ts.config.ts ./
+RUN npm run generate
 
-RUN npm run generate && npm run build
+FROM generate AS build
+
+COPY frontend/*.json frontend/*.js frontend/*.mjs frontend/*.ts frontend/*.cjs frontend/*.config.* ./
+COPY frontend/src ./src
+COPY frontend/static ./static
+
+RUN npm run build
 
 FROM ghcr.io/ammnt/nginx:1.31.4 AS runtime
 
@@ -26,7 +39,7 @@ LABEL org.opencontainers.image.title="Menagerist frontend" \
       org.opencontainers.image.revision="${MENAGERIST_BUILD_COMMIT_SHA}" \
       org.opencontainers.image.created="${MENAGERIST_BUILD_TIMESTAMP}"
 
-COPY --from=builder --chown=10001:10001 /app/build /usr/share/nginx/html
+COPY --from=build --chown=10001:10001 /app/build /usr/share/nginx/html
 COPY --chown=10001:10001 frontend/nginx.main.conf /etc/nginx/nginx.conf
 COPY --chown=10001:10001 frontend/nginx.conf /etc/nginx/conf.d/default.conf
 

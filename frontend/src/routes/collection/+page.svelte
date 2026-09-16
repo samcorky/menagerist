@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { beforeNavigate, afterNavigate } from '$app/navigation';
+	import { beforeNavigate, afterNavigate, goto } from '$app/navigation';
 	import { browser } from '$app/environment';
-	import { LayoutGrid, List, Plus, SearchX } from '@lucide/svelte';
+	import { List, Plus, SearchX, LayoutGrid, Package } from '@lucide/svelte';
 	import { captureController } from '$lib/capture.svelte.js';
+	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import { toast } from 'svelte-sonner';
 	import {
@@ -17,6 +18,7 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
+	import NodeCover from '$lib/components/node-cover.svelte';
 
 	const PAGE_SIZE = 50;
 	const loadingSkeletons = [1, 2, 3, 4, 5];
@@ -34,6 +36,12 @@
 	let q = $state('');
 	let searchEl = $state<HTMLInputElement | null>(null);
 	let viewMode = $state<'list' | 'grid'>('list');
+
+	// §13a: don't flash a skeleton for loads under 300ms
+	const loadingDisplay = delayedLoading();
+	$effect(() => {
+		loadingDisplay.set(loading);
+	});
 
 	let selectedTypeLabel = $derived(
 		allCategories.find((c) => c.slug === selectedType)?.label ?? selectedType
@@ -190,7 +198,7 @@
 	<div class="mx-auto flex max-w-4xl flex-col gap-6">
 		<div class="flex items-center justify-between gap-4">
 			<h1 class="font-heading text-3xl font-semibold tracking-tight">My Collection</h1>
-			<Button onclick={() => captureController.show()}>
+			<Button onclick={() => goto(resolve('/collection/new'))}>
 				<Plus class="size-4" />
 				New item
 			</Button>
@@ -249,7 +257,7 @@
 			</div>
 		{/if}
 
-		{#if loading && items.length === 0}
+		{#if loadingDisplay.show && items.length === 0}
 			<Shimmer loading={true}>
 				{#if viewMode === 'grid'}
 					<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
@@ -281,9 +289,13 @@
 						<div
 							class="flex aspect-[3/4] flex-col overflow-hidden rounded-xl border bg-muted/30 transition-colors group-hover:bg-muted/60"
 						>
-							<!-- Image placeholder -->
-							<div class="flex flex-1 items-center justify-center text-muted-foreground/30">
-								<LayoutGrid class="size-10" />
+							<!-- Cover image or generic placeholder (§7b: muted background + category icon) -->
+							<div class="min-h-0 flex-1 overflow-hidden">
+								<NodeCover nodeId={item.id} class="h-full w-full">
+									<div class="flex h-full w-full items-center justify-center bg-muted">
+										<Package class="size-8 text-muted-foreground/40" />
+									</div>
+								</NodeCover>
 							</div>
 							<div class="border-t bg-background/80 px-2.5 py-2">
 								<p class="truncate text-sm leading-tight font-medium">{item.name}</p>
@@ -340,7 +352,7 @@
 							> to see everything.
 						</p>
 					</div>
-					<Button size="sm" onclick={() => captureController.show()}>
+					<Button size="sm" onclick={() => goto(resolve('/collection/new'))}>
 						<Plus class="size-4" />
 						New item
 					</Button>
@@ -350,7 +362,7 @@
 						<p class="font-medium">Nothing here yet</p>
 						<p class="text-sm text-muted-foreground">Add your first item to get started</p>
 					</div>
-					<Button onclick={() => captureController.show()}>
+					<Button onclick={() => goto(resolve('/collection/new'))}>
 						<Plus class="size-4" />
 						Add your first item
 					</Button>
