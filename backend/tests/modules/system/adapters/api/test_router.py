@@ -14,7 +14,9 @@ if TYPE_CHECKING:
 
     from fastapi import FastAPI
 
-_PATCH_GET_ENGINE = "app.entrypoints.api.system.router.get_engine"
+_PATCH_GET_ENGINE = (
+    "app.modules.system.adapters.platform.health_check_adapter.get_engine"
+)
 
 
 class _FakeAsyncCM:

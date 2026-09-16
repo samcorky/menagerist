@@ -1,6 +1,10 @@
+from typing import TypeVar
+
 import pytest
 
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork, JoinedUnitOfWork
+
+_T = TypeVar("_T")
 
 
 async def test_in_memory_unit_of_work_yields_the_wrapped_repos() -> None:
@@ -192,6 +196,6 @@ async def test_joined_uow_on_commit_not_fired_if_owner_rolls_back() -> None:
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 
-async def _append(lst: list, value: object) -> None:
+async def _append[T](lst: list[_T], value: _T) -> None:
     """Async helper that appends a value — usable as an on_commit callback."""
     lst.append(value)

@@ -4,6 +4,7 @@
 # dependencies = [
 #     "coverage>=7.10",
 #     "pyyaml>=6.0.2",
+#     "types-pyyaml>=6.0.2",
 # ]
 # ///
 """Enforce per-component coverage thresholds defined in codecov.yml.
@@ -36,7 +37,9 @@ def load_components() -> list[dict[str, Any]]:
     if not isinstance(config, dict):
         raise SystemExit(f"Expected {CODECOV_YML} to contain a YAML mapping.")
 
-    components = config.get("component_management", {}).get("individual_components", [])
+    components: list[dict[str, Any]] = config.get("component_management", {}).get(
+        "individual_components", []
+    )
     if not components:
         raise SystemExit(
             f"No component_management.individual_components found in {CODECOV_YML}"

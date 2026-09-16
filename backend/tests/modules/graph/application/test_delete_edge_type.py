@@ -14,9 +14,6 @@ from app.modules.graph.adapters.persistence.in_memory_node_repository import (
 from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
     InMemoryNodeTypeRepository,
 )
-from app.modules.graph.adapters.persistence.unit_of_work import (
-    create_in_memory_graph_uow,
-)
 from app.modules.graph.application.delete_edge_type import (
     DeleteEdgeType,
     DeleteEdgeTypeCommand,
@@ -24,18 +21,19 @@ from app.modules.graph.application.delete_edge_type import (
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import EdgeTypeInUseError, EdgeTypeNotFoundError
-from app.modules.graph.ports.unit_of_work import GraphRepos, GraphUnitOfWork
+from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 
-def _make_uow() -> tuple[GraphUnitOfWork, GraphRepos]:
+def _make_uow() -> tuple[InMemoryUnitOfWork[GraphRepos], GraphRepos]:
     repos = GraphRepos(
         nodes=InMemoryNodeRepository(),
         edges=InMemoryEdgeRepository(),
         node_types=InMemoryNodeTypeRepository(),
         edge_types=InMemoryEdgeTypeRepository(),
     )
-    return create_in_memory_graph_uow(repos), repos
+    return InMemoryUnitOfWork(repos), repos
 
 
 async def test_delete_edge_type_soft_deletes_and_commits() -> None:

@@ -16,6 +16,9 @@ from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+    from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (  # noqa: E501
+        InMemoryMediaAssetRepository,
+    )
     from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 
 
@@ -41,7 +44,7 @@ def create_in_memory_media_uow(repos: MediaRepos) -> MediaUnitOfWork:
 
 def make_in_memory_repos(
     *,
-    assets: InMemoryMediaAttachmentRepository | None = None,
+    assets: InMemoryMediaAssetRepository | None = None,
     attachments: InMemoryMediaAttachmentRepository | None = None,
 ) -> MediaRepos:
     """Build a `MediaRepos` with in-memory implementations for tests."""
@@ -50,6 +53,6 @@ def make_in_memory_repos(
     )
 
     return MediaRepos(
-        assets=assets or InMemoryMediaAssetRepository(),  # type: ignore[arg-type]
+        assets=assets or InMemoryMediaAssetRepository(),
         attachments=attachments or InMemoryMediaAttachmentRepository(),
     )

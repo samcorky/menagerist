@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, UniqueConstraint
+from sqlalchemy import ForeignKey, Index, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.platform.database import Base
@@ -32,6 +32,13 @@ class MediaAttachmentModel(IdentifiableMixin, TimestampedMixin, Base):
             "target_id",
             "attribute_key",
             name="uq_media_attachment",
+        ),
+        Index(
+            "uq_media_attachment_cover",
+            "target_type",
+            "target_id",
+            unique=True,
+            postgresql_where=text("attribute_key = 'cover'"),
         ),
     )
 

@@ -4,29 +4,30 @@ from starlette.middleware.cors import CORSMiddleware
 
 from app.entrypoints.api.docs.router import router as docs_router
 from app.entrypoints.api.openapi import configure_openapi
+from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.entrypoints.api.shared.problem_response import register_exception_handlers
 from app.entrypoints.api.shared.request_context_middleware import (
     RequestContextMiddleware,
 )
 from app.entrypoints.api.shared.security_headers import SecurityHeadersMiddleware
 from app.entrypoints.api.shared.version_header import VersionHeaderMiddleware
-from app.entrypoints.api.system.router import router as system_router
 from app.modules.graph.adapters.api.edge.router import router as edge_router
 from app.modules.graph.adapters.api.edge_type.router import router as edge_type_router
 from app.modules.graph.adapters.api.node.router import router as graph_router
 from app.modules.graph.adapters.api.node_type.router import router as node_type_router
 from app.modules.media.adapters.api.media.router import router as media_router
+from app.modules.system.adapters.api.router import router as system_router
 from app.platform.app_info import load_app_info
 from app.platform.config import get_api_settings
 from app.platform.logging_config import configure_logging
 
 configure_logging()
 
-api_router = APIRouter(prefix="/api")
+api_router = APIRouter(prefix="/api", route_class=PermissionAwareRoute)
 api_router.include_router(system_router)
 api_router.include_router(docs_router)
 
-api_v1_router = APIRouter(prefix="/v1", tags=["v1"])
+api_v1_router = APIRouter(prefix="/v1", route_class=PermissionAwareRoute, tags=["v1"])
 api_v1_router.include_router(graph_router)
 api_v1_router.include_router(edge_router)
 api_v1_router.include_router(node_type_router)

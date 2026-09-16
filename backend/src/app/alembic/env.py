@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 if TYPE_CHECKING:
     from sqlalchemy.engine import Connection
 from app.modules.graph.adapters.persistence import models as graph_models  # noqa: F401
+from app.modules.media.adapters.persistence import models as media_models  # noqa: F401
 from app.platform.config import get_database_settings
 from app.platform.database import Base
 
@@ -21,9 +22,9 @@ if config.config_file_name is not None:
 
 config.set_main_option("sqlalchemy.url", str(get_database_settings().database_url))
 
-# `graph_models` above registers Node/Edge tables on `Base.metadata` before
-# autogenerate runs - every future module's persistence models get the same
-# import added here, per `backend/README.md`'s single-environment convention.
+# `graph_models`/`media_models` above register their tables on `Base.metadata`
+# before autogenerate runs - every future module's persistence models get the
+# same import added here, per `backend/README.md`'s single-environment convention.
 target_metadata = Base.metadata
 
 

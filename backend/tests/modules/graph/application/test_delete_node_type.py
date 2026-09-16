@@ -14,9 +14,6 @@ from app.modules.graph.adapters.persistence.in_memory_node_repository import (
 from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
     InMemoryNodeTypeRepository,
 )
-from app.modules.graph.adapters.persistence.unit_of_work import (
-    create_in_memory_graph_uow,
-)
 from app.modules.graph.application.delete_node_type import (
     DeleteNodeType,
     DeleteNodeTypeCommand,
@@ -24,18 +21,19 @@ from app.modules.graph.application.delete_node_type import (
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
-from app.modules.graph.ports.unit_of_work import GraphRepos, GraphUnitOfWork
+from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 
-def _make_uow() -> tuple[GraphUnitOfWork, GraphRepos]:
+def _make_uow() -> tuple[InMemoryUnitOfWork[GraphRepos], GraphRepos]:
     repos = GraphRepos(
         nodes=InMemoryNodeRepository(),
         edges=InMemoryEdgeRepository(),
         node_types=InMemoryNodeTypeRepository(),
         edge_types=InMemoryEdgeTypeRepository(),
     )
-    return create_in_memory_graph_uow(repos), repos
+    return InMemoryUnitOfWork(repos), repos
 
 
 async def test_delete_node_type_soft_deletes_and_commits() -> None:

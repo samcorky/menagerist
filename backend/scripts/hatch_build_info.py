@@ -5,8 +5,10 @@ import subprocess
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse, urlunparse
 
+from hatchling.builders.config import BuilderConfig
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
 _SCP_LIKE_GIT_URL_PATTERN = re.compile(
@@ -14,14 +16,14 @@ _SCP_LIKE_GIT_URL_PATTERN = re.compile(
 )
 
 
-class BuildInfoHook(BuildHookInterface):
+class BuildInfoHook(BuildHookInterface[BuilderConfig]):
     """Add build information to wheel metadata."""
 
     PLUGIN_NAME = "build-info"
 
     _build_info_path: Path | None = None
 
-    def initialize(self, version: str, build_data: dict) -> None:
+    def initialize(self, version: str, build_data: dict[str, Any]) -> None:
         """Write build_info.json to a temp file and register it as extra metadata."""
         if self.target_name != "wheel":
             return  # sdists have no dist-info
@@ -45,7 +47,9 @@ class BuildInfoHook(BuildHookInterface):
 
         build_data.setdefault("extra_metadata", {})[str(path)] = "build_info.json"
 
-    def finalize(self, version: str, build_data: dict, artifact_path: str) -> None:
+    def finalize(
+        self, version: str, build_data: dict[str, Any], artifact_path: str
+    ) -> None:
         """Delete the temporary build_info.json file after the build completes."""
         if self._build_info_path and self._build_info_path.exists():
             self._build_info_path.unlink()

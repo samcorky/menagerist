@@ -1,18 +1,28 @@
-import time
-from datetime import UTC, datetime
-from typing import Annotated, Literal, cast
+from datetime import datetime
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from sqlalchemy.pool import QueuePool
 
-from app.platform.alembic_runner import code_head_revisions, db_current_revisions
-from app.platform.app_info import AppInfo, load_app_info
-from app.platform.database import get_engine, get_session_factory
+from app.modules.system.adapters.api.dependencies import (
+    get_get_health_ready_use_case,
+    get_get_health_use_case,
+    get_get_version_use_case,
+)
+from app.modules.system.application.get_health import GetHealth, GetHealthQuery
+from app.modules.system.application.get_health_ready import (
+    GetHealthReady,
+    GetHealthReadyQuery,
+)
+from app.modules.system.application.get_version import GetVersion, GetVersionQuery
+from app.modules.system.domain.readiness import (
+    CheckObservation as DomainCheckObservation,
+    CheckStatus,
+    ReadinessReport,
+)
+from app.shared_kernel.actor import SYSTEM_ACTOR
 
 router = APIRouter(tags=["System"])
 
@@ -83,6 +93,18 @@ class CheckObservation(BaseModel):
         ),
     ] = None
 
+    @classmethod
+    def from_domain(cls, observation: DomainCheckObservation) -> CheckObservation:
+        """Build the API schema from the domain observation."""
+        return cls(
+            component_type=observation.component_type,
+            observed_value=observation.observed_value,
+            observed_unit=observation.observed_unit,
+            status=observation.status.value,
+            time=observation.time.isoformat(),
+            output=observation.output,
+        )
+
 
 class ReadyResponse(BaseModel):
     """Readiness status (IETF draft-inadarei-api-health-check-06)."""
@@ -98,6 +120,17 @@ class ReadyResponse(BaseModel):
         dict[str, CheckObservation],
         Field(description="Named check observations keyed by component:metric."),
     ]
+
+    @classmethod
+    def from_domain(cls, report: ReadinessReport) -> ReadyResponse:
+        """Build the API schema from the domain readiness report."""
+        return cls(
+            status=report.status.value,
+            checks={
+                key: CheckObservation.from_domain(observation)
+                for key, observation in report.checks.items()
+            },
+        )
 
 
 class VersionResponse(BaseModel):
@@ -221,36 +254,17 @@ _RESPONSE_503: dict[str, object] = {
 }
 
 
-def _observation(
-    observed_value: float | str,
-    observed_unit: str,
-    *,
-    now: str,
-    status: Literal["pass", "fail"] = "pass",
-    output: str | None = None,
-) -> CheckObservation:
-    return CheckObservation(
-        component_type="datastore",
-        observed_value=observed_value,
-        observed_unit=observed_unit,
-        status=status,
-        time=now,
-        output=output,
-    )
-
-
-def _failed(unit: str, *, now: str, exc: Exception) -> CheckObservation:
-    return _observation("unknown", unit, now=now, status="fail", output=str(exc))
-
-
 @router.get(
     "/health",
     summary="Liveness check",
     operation_id="get_health",
     response_class=HealthJSONResponse,
 )
-def get_health() -> HealthResponse:
+async def get_health(
+    use_case: Annotated[GetHealth, Depends(get_get_health_use_case)],
+) -> HealthResponse:
     """Report that the process is up and able to accept requests."""
+    await use_case.handle(GetHealthQuery(), SYSTEM_ACTOR)
     return HealthResponse()
 
 
@@ -265,79 +279,13 @@ def get_health() -> HealthResponse:
 )
 async def get_health_ready(
     response: Response,
-    session_factory: Annotated[
-        async_sessionmaker[AsyncSession], Depends(get_session_factory)
-    ],
+    use_case: Annotated[GetHealthReady, Depends(get_get_health_ready_use_case)],
 ) -> ReadyResponse:
     """Report readiness by verifying all required dependencies are reachable."""
-    now = datetime.now(UTC).isoformat()
-    checks: dict[str, CheckObservation] = {}
-
-    # database:responseTime + database:version share a single session/connection.
-    # Broad Exception here: asyncpg pool-connect failures (e.g. ConnectionRefusedError)
-    # propagate as raw OSError — SQLAlchemy only wraps errors at statement-execution
-    # time, not at pool-connect time. Catching only SQLAlchemyError would let those
-    # surface as unhandled 500s instead of a graceful 503.
-    try:
-        async with session_factory() as session:
-            t0 = time.perf_counter()
-            await session.execute(text("SELECT 1"))
-            elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
-
-            row = await session.execute(text("SHOW server_version"))
-            db_version: str = row.scalar_one()
-
-        checks["database:responseTime"] = _observation(elapsed_ms, "ms", now=now)
-        checks["database:version"] = _observation(db_version, "version", now=now)
-    except Exception as exc:
-        checks["database:responseTime"] = _failed("ms", now=now, exc=exc)
-        checks["database:version"] = _failed("version", now=now, exc=exc)
-
-    # database:migrationRevision — isolated try/except, same broad-catch rationale.
-    code_revisions = code_head_revisions()
-    code_rev_str = ", ".join(sorted(code_revisions)) if code_revisions else "none"
-    try:
-        db_revisions = await db_current_revisions(session_factory)
-        db_rev_str = ", ".join(sorted(db_revisions)) if db_revisions else "none"
-        migration_ok = set(db_revisions) == set(code_revisions)
-        mismatch = f"database at {db_rev_str}, code expects {code_rev_str}"
-        checks["database:migrationRevision"] = _observation(
-            db_rev_str,
-            "revision",
-            now=now,
-            status="pass" if migration_ok else "fail",
-            output=None if migration_ok else mismatch,
-        )
-    except Exception as exc:
-        checks["database:migrationRevision"] = _failed("revision", now=now, exc=exc)
-
-    # database:poolUtilization — pure in-process introspection, no query.
-    # Checked after the above sessions close so checkedout() reflects idle state.
-    pool_obj = cast(QueuePool, get_engine().pool)
-    checkedout = pool_obj.checkedout()
-    pool_size = pool_obj.size()
-    pool_saturated = 0 < pool_size <= checkedout
-    utilization = round(checkedout / pool_size * 100, 2) if pool_size > 0 else 0.0
-    pool_output: str | None = (
-        f"{checkedout}/{pool_size} connections checked out, 0 available"
-        if pool_saturated
-        else None
-    )
-    checks["database:poolUtilization"] = _observation(
-        utilization,
-        "percent",
-        now=now,
-        status="fail" if pool_saturated else "pass",
-        output=pool_output,
-    )
-
-    overall: Literal["pass", "fail"] = (
-        "fail" if any(c.status == "fail" for c in checks.values()) else "pass"
-    )
-    if overall == "fail":
+    report = await use_case.handle(GetHealthReadyQuery(), SYSTEM_ACTOR)
+    if report.status is CheckStatus.FAIL:
         response.status_code = 503
-
-    return ReadyResponse(status=overall, checks=checks)
+    return ReadyResponse.from_domain(report)
 
 
 @router.get(
@@ -346,18 +294,18 @@ async def get_health_ready(
     operation_id="get_version",
     response_model_exclude_none=True,
 )
-def get_version(
-    app_info: Annotated[AppInfo, Depends(load_app_info)],
+async def get_version(
+    use_case: Annotated[GetVersion, Depends(get_get_version_use_case)],
 ) -> VersionResponse:
     """Report the project version and build provenance of the running instance."""
-    build = app_info.build
+    app_info = await use_case.handle(GetVersionQuery(), SYSTEM_ACTOR)
     return VersionResponse(
         name=app_info.name,
         current_version=app_info.version,
-        commit_sha=build.commit_sha,
-        short_sha=build.short_sha,
-        branch=build.branch,
-        dirty=build.dirty,
-        build_timestamp=build.build_timestamp,
-        migration_head=list(code_head_revisions()),
+        commit_sha=app_info.commit_sha,
+        short_sha=app_info.short_sha,
+        branch=app_info.branch,
+        dirty=app_info.dirty,
+        build_timestamp=app_info.build_timestamp,
+        migration_head=list(app_info.migration_head),
     )

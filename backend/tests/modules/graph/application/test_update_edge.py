@@ -14,14 +14,12 @@ from app.modules.graph.adapters.persistence.in_memory_node_repository import (
 from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
     InMemoryNodeTypeRepository,
 )
-from app.modules.graph.adapters.persistence.unit_of_work import (
-    create_in_memory_graph_uow,
-)
 from app.modules.graph.application.update_edge import UpdateEdge, UpdateEdgeCommand
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.errors import EdgeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 
 async def test_update_edge_persists_and_commits() -> None:
@@ -35,7 +33,7 @@ async def test_update_edge_persists_and_commits() -> None:
         node_types=InMemoryNodeTypeRepository(),
         edge_types=InMemoryEdgeTypeRepository(),
     )
-    uow = create_in_memory_graph_uow(repos)
+    uow = InMemoryUnitOfWork(repos)
     use_case = UpdateEdge(uow)
 
     result = await use_case.handle(
@@ -58,7 +56,7 @@ async def test_update_edge_raises_when_missing() -> None:
         node_types=InMemoryNodeTypeRepository(),
         edge_types=InMemoryEdgeTypeRepository(),
     )
-    uow = create_in_memory_graph_uow(repos)
+    uow = InMemoryUnitOfWork(repos)
     use_case = UpdateEdge(uow)
 
     with pytest.raises(EdgeNotFoundError):

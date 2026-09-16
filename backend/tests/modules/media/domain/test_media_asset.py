@@ -120,6 +120,28 @@ def test_rename_rejects_extension_change() -> None:
         asset.rename("front page.png")
 
 
+@pytest.mark.parametrize("filename", ["", "   "])
+def test_rename_rejects_empty_filename(filename: str) -> None:
+    """rename() raises ValidationError for an empty or blank filename."""
+    asset = MediaAsset.create(
+        filename="cover.jpg", content_type="image/jpeg", size=1, sha256="x"
+    )
+
+    with pytest.raises(ValidationError, match="filename must be provided"):
+        asset.rename(filename)
+
+
+def test_rename_uses_requested_extension_when_original_has_none() -> None:
+    """rename() keeps the requested extension when the original filename lacks one."""
+    asset = MediaAsset.create(
+        filename="cover", content_type="image/jpeg", size=1, sha256="x"
+    )
+
+    asset.rename("front page.jpg")
+
+    assert asset.filename == "front page.jpg"
+
+
 def test_orphan_transitions_attached_to_orphaned() -> None:
     """orphan() changes status from ATTACHED to ORPHANED and updates updated_at."""
     asset = MediaAsset.create(

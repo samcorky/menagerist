@@ -200,7 +200,7 @@ def test_attributes_schema_round_trips_through_create_and_update() -> None:
     ).json()
     assert et["attributes_schema"] == schema
 
-    new_schema: dict = {"fields": []}
+    new_schema: dict[str, object] = {"fields": []}
     updated = client.patch(
         f"/api/v1/edge-type/{et['id']}",
         json={"attributes_schema": new_schema},

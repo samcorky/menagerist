@@ -28,8 +28,6 @@ def test_dependency_direction_and_layering() -> None:
         .defined_by_folder("*entrypoints/api")
         .layer("entrypoints")
         .defined_by_folder("*entrypoints/cli")
-        .layer("entrypoints")
-        .defined_by_folder("*entrypoints/api/system*")
         .layer("api_shared")
         .defined_by_folder("*entrypoints/api/shared*")
         .where_layer("domain")
