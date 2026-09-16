@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from app.modules.graph.domain.node import Node
-from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
@@ -33,24 +33,23 @@ class ListNodesResult:
     total: int
 
 
-class ListNodes(QueryHandler[GraphUnitOfWork, ListNodesQuery, ListNodesResult]):
+class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
     """List node with keyset pagination."""
 
     async def handle(self, query: ListNodesQuery, actor: Actor) -> ListNodesResult:
         """Return a page of nodes and total count matching the query."""
-        async with self._uow as repos:
-            items = await repos.nodes.list(
-                after=query.after,
-                limit=query.limit,
-                type=query.type,
-                q=query.q,
-                favourite=query.favourite,
-            )
-            total = await repos.nodes.count(
-                type=query.type,
-                q=query.q,
-                favourite=query.favourite,
-            )
+        items = await self._repos.nodes.list(
+            after=query.after,
+            limit=query.limit,
+            type=query.type,
+            q=query.q,
+            favourite=query.favourite,
+        )
+        total = await self._repos.nodes.count(
+            type=query.type,
+            q=query.q,
+            favourite=query.favourite,
+        )
         result = ListNodesResult(items=items, total=total)
         logger.debug("nodes listed", count=len(result.items), total=result.total)
         return result

@@ -8,10 +8,7 @@ from app.modules.media.adapters.persistence.in_memory_media_asset_repository imp
 from app.modules.media.adapters.persistence.in_memory_media_attachment_repository import (  # noqa: E501
     InMemoryMediaAttachmentRepository,
 )
-from app.modules.media.adapters.persistence.unit_of_work import (
-    create_in_memory_media_uow,
-    make_in_memory_repos,
-)
+from app.modules.media.adapters.persistence.unit_of_work import make_in_memory_repos
 from app.modules.media.application.list_node_media import (
     ListNodeMedia,
     ListNodeMediaQuery,
@@ -33,8 +30,7 @@ def _make_use_case() -> tuple[
     assets = InMemoryMediaAssetRepository()
     attachments = InMemoryMediaAttachmentRepository()
     repos = make_in_memory_repos(assets=assets, attachments=attachments)
-    uow = create_in_memory_media_uow(repos)
-    return ListNodeMedia(uow), assets, attachments
+    return ListNodeMedia(repos), assets, attachments
 
 
 async def test_list_node_media_returns_attached_assets() -> None:

@@ -6,7 +6,7 @@ import structlog
 
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset
-from app.modules.media.ports.unit_of_work import MediaUnitOfWork
+from app.modules.media.ports.unit_of_work import MediaRepos
 from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
@@ -22,13 +22,12 @@ class GetMediaQuery:
     asset_id: uuid.UUID
 
 
-class GetMedia(QueryHandler[MediaUnitOfWork, GetMediaQuery, MediaAsset]):
+class GetMedia(QueryHandler[MediaRepos, GetMediaQuery, MediaAsset]):
     """Fetch a single media asset by id."""
 
     async def handle(self, query: GetMediaQuery, actor: Actor) -> MediaAsset:
         """Return the requested asset, raising `MediaAssetNotFoundError` if missing."""
-        async with self._uow as repos:
-            asset = await repos.assets.get(query.asset_id)
+        asset = await self._repos.assets.get(query.asset_id)
         if asset is None:
             raise MediaAssetNotFoundError(f"Media asset {query.asset_id} not found")
         logger.debug("media asset fetched", asset_id=query.asset_id)

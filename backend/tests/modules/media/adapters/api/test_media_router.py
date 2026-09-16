@@ -5,6 +5,7 @@ from starlette.testclient import TestClient
 from app.entrypoints.api import create_app
 from app.modules.media.adapters.api.dependencies import (
     get_image_processor,
+    get_media_repos,
     get_media_storage,
     get_media_uow,
 )
@@ -34,8 +35,10 @@ def _app_with_in_memory_media() -> tuple[
     repo = InMemoryMediaAssetRepository()
     storage = InMemoryMediaStorage()
     image_processor = InMemoryImageProcessor()
-    uow = create_in_memory_media_uow(make_in_memory_repos(assets=repo))
+    repos = make_in_memory_repos(assets=repo)
+    uow = create_in_memory_media_uow(repos)
     app.dependency_overrides[get_media_uow] = lambda: uow
+    app.dependency_overrides[get_media_repos] = lambda: repos
     app.dependency_overrides[get_media_storage] = lambda: storage
     app.dependency_overrides[get_image_processor] = lambda: image_processor
     return app, repo, storage

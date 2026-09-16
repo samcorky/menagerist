@@ -1,10 +1,14 @@
+from collections.abc import AsyncIterator
 from typing import Annotated
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.media.adapters.imaging.pillow_processor import PillowImageProcessor
-from app.modules.media.adapters.persistence.unit_of_work import create_media_uow
+from app.modules.media.adapters.persistence.unit_of_work import (
+    build_media_repos,
+    create_media_uow,
+)
 from app.modules.media.adapters.policy.content_type_attachment_policy import (
     ContentTypeAttachmentPolicy,
 )
@@ -27,7 +31,7 @@ from app.modules.media.application.upload_and_attach_media import UploadAndAttac
 from app.modules.media.ports.attachment_policy import AttachmentPolicyPort
 from app.modules.media.ports.image_processor import ImageProcessorPort
 from app.modules.media.ports.media_storage import MediaStoragePort
-from app.modules.media.ports.unit_of_work import MediaUnitOfWork
+from app.modules.media.ports.unit_of_work import MediaRepos, MediaUnitOfWork
 from app.platform.config.media import MediaSettings, get_media_settings
 from app.platform.database import get_session_factory
 
@@ -38,6 +42,16 @@ def get_media_uow(
     ],
 ) -> MediaUnitOfWork:
     return create_media_uow(session_factory)
+
+
+async def get_media_repos(
+    session_factory: Annotated[
+        async_sessionmaker[AsyncSession], Depends(get_session_factory)
+    ],
+) -> AsyncIterator[MediaRepos]:
+    """Return a read-only repository bundle over the media tables, for queries."""
+    async with session_factory() as session:
+        yield build_media_repos(session)
 
 
 def get_media_storage(
@@ -63,9 +77,9 @@ def get_stage_media_use_case(
 
 
 def get_get_media_use_case(
-    uow: Annotated[MediaUnitOfWork, Depends(get_media_uow)],
+    repos: Annotated[MediaRepos, Depends(get_media_repos)],
 ) -> GetMedia:
-    return GetMedia(uow)
+    return GetMedia(repos)
 
 
 def get_promote_media_use_case(
@@ -139,6 +153,6 @@ def get_upload_and_attach_use_case(
 
 
 def get_list_node_media_use_case(
-    uow: Annotated[MediaUnitOfWork, Depends(get_media_uow)],
+    repos: Annotated[MediaRepos, Depends(get_media_repos)],
 ) -> ListNodeMedia:
-    return ListNodeMedia(uow)
+    return ListNodeMedia(repos)

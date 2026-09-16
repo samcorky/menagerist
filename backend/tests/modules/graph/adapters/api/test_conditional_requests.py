@@ -42,9 +42,13 @@ def _app_with_in_memory_graph() -> FastAPI:
         "app.modules.graph.adapters.persistence.unit_of_work.get_graph_uow"
     ] = lambda: create_in_memory_graph_uow(repos)  # type: ignore
     # Many router tests override get_graph_uow differently; replicate the same wiring
-    from app.modules.graph.adapters.api.dependencies import get_graph_uow
+    from app.modules.graph.adapters.api.dependencies import (
+        get_graph_repos,
+        get_graph_uow,
+    )
 
     app.dependency_overrides[get_graph_uow] = lambda: create_in_memory_graph_uow(repos)
+    app.dependency_overrides[get_graph_repos] = lambda: repos
     return app
 
 

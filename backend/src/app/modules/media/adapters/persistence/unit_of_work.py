@@ -19,7 +19,8 @@ if TYPE_CHECKING:
     from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 
 
-def _build_repos(session: AsyncSession) -> MediaRepos:
+def build_media_repos(session: AsyncSession) -> MediaRepos:
+    """Build a `MediaRepos` bundle of SQLAlchemy repositories over `session`."""
     return MediaRepos(
         assets=SqlAlchemyMediaAssetRepository(session),
         attachments=SqlAlchemyMediaAttachmentRepository(session),
@@ -30,7 +31,7 @@ def create_media_uow(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> MediaUnitOfWork:
     """Wrap a session factory in a `SqlAlchemySessionUnitOfWork` for media."""
-    return SqlAlchemySessionUnitOfWork(session_factory, _build_repos)
+    return SqlAlchemySessionUnitOfWork(session_factory, build_media_repos)
 
 
 def create_in_memory_media_uow(repos: MediaRepos) -> MediaUnitOfWork:

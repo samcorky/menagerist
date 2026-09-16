@@ -22,7 +22,8 @@ if TYPE_CHECKING:
     from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 
 
-def _build_repos(session: AsyncSession) -> GraphRepos:
+def build_graph_repos(session: AsyncSession) -> GraphRepos:
+    """Build a `GraphRepos` bundle of SQLAlchemy repositories over `session`."""
     return GraphRepos(
         nodes=SqlAlchemyNodeRepository(session),
         edges=SqlAlchemyEdgeRepository(session),
@@ -35,7 +36,7 @@ def create_graph_uow(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> GraphUnitOfWork:
     """Wrap a session factory in a SqlAlchemySessionUnitOfWork."""
-    return SqlAlchemySessionUnitOfWork(session_factory, _build_repos)
+    return SqlAlchemySessionUnitOfWork(session_factory, build_graph_repos)
 
 
 def create_in_memory_graph_uow(repos: GraphRepos) -> GraphUnitOfWork:

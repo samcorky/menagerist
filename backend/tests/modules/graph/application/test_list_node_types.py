@@ -10,26 +10,21 @@ from app.modules.graph.adapters.persistence.in_memory_node_repository import (
 from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
     InMemoryNodeTypeRepository,
 )
-from app.modules.graph.adapters.persistence.unit_of_work import (
-    create_in_memory_graph_uow,
-)
 from app.modules.graph.application.list_node_types import (
     ListNodeTypes,
     ListNodeTypesQuery,
 )
 from app.modules.graph.domain.node_type import NodeType
-from app.modules.graph.ports.unit_of_work import GraphRepos, GraphUnitOfWork
+from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
-def _make_uow(node_types: InMemoryNodeTypeRepository) -> GraphUnitOfWork:
-    return create_in_memory_graph_uow(
-        GraphRepos(
-            nodes=InMemoryNodeRepository(),
-            edges=InMemoryEdgeRepository(),
-            node_types=node_types,
-            edge_types=InMemoryEdgeTypeRepository(),
-        )
+def _make_repos(node_types: InMemoryNodeTypeRepository) -> GraphRepos:
+    return GraphRepos(
+        nodes=InMemoryNodeRepository(),
+        edges=InMemoryEdgeRepository(),
+        node_types=node_types,
+        edge_types=InMemoryEdgeTypeRepository(),
     )
 
 
@@ -40,7 +35,7 @@ async def test_list_node_types_returns_all() -> None:
     book = NodeType.create(slug="book", label="Book")
     await node_types.add(film)
     await node_types.add(book)
-    use_case = ListNodeTypes(_make_uow(node_types))
+    use_case = ListNodeTypes(_make_repos(node_types))
 
     results = await use_case.handle(ListNodeTypesQuery(), SYSTEM_ACTOR)
 
@@ -53,7 +48,7 @@ async def test_list_node_types_respects_limit() -> None:
     node_types = InMemoryNodeTypeRepository()
     for i in range(5):
         await node_types.add(NodeType.create(slug=f"type-{i}", label=f"Type {i}"))
-    use_case = ListNodeTypes(_make_uow(node_types))
+    use_case = ListNodeTypes(_make_repos(node_types))
 
     results = await use_case.handle(ListNodeTypesQuery(limit=3), SYSTEM_ACTOR)
 
@@ -66,7 +61,7 @@ async def test_list_node_types_excludes_deleted() -> None:
     nt = NodeType.create(slug="film", label="Film")
     nt.soft_delete()
     await node_types.add(nt)
-    use_case = ListNodeTypes(_make_uow(node_types))
+    use_case = ListNodeTypes(_make_repos(node_types))
 
     results = await use_case.handle(ListNodeTypesQuery(), SYSTEM_ACTOR)
 

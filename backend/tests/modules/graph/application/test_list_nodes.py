@@ -10,23 +10,18 @@ from app.modules.graph.adapters.persistence.in_memory_node_repository import (
 from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
     InMemoryNodeTypeRepository,
 )
-from app.modules.graph.adapters.persistence.unit_of_work import (
-    create_in_memory_graph_uow,
-)
 from app.modules.graph.application.list_nodes import ListNodes, ListNodesQuery
 from app.modules.graph.domain.node import Node
-from app.modules.graph.ports.unit_of_work import GraphRepos, GraphUnitOfWork
+from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
-def _make_uow(nodes: InMemoryNodeRepository) -> GraphUnitOfWork:
-    return create_in_memory_graph_uow(
-        GraphRepos(
-            nodes=nodes,
-            edges=InMemoryEdgeRepository(),
-            node_types=InMemoryNodeTypeRepository(),
-            edge_types=InMemoryEdgeTypeRepository(),
-        )
+def _make_repos(nodes: InMemoryNodeRepository) -> GraphRepos:
+    return GraphRepos(
+        nodes=nodes,
+        edges=InMemoryEdgeRepository(),
+        node_types=InMemoryNodeTypeRepository(),
+        edge_types=InMemoryEdgeTypeRepository(),
     )
 
 
@@ -37,7 +32,7 @@ async def test_list_nodes_filters_by_type() -> None:
     person = Node.create(name="Ridley Scott", type="person")
     await nodes.add(film)
     await nodes.add(person)
-    use_case = ListNodes(_make_uow(nodes))
+    use_case = ListNodes(_make_repos(nodes))
 
     result = await use_case.handle(ListNodesQuery(type="film"), SYSTEM_ACTOR)
 
@@ -52,7 +47,7 @@ async def test_list_nodes_filters_by_search_query() -> None:
     predator = Node.create(name="Predator", type="film")
     await nodes.add(alien)
     await nodes.add(predator)
-    use_case = ListNodes(_make_uow(nodes))
+    use_case = ListNodes(_make_repos(nodes))
 
     result = await use_case.handle(ListNodesQuery(q="alien"), SYSTEM_ACTOR)
 
@@ -67,8 +62,8 @@ async def test_list_nodes_orders_by_id_and_paginates() -> None:
     for node in node_list:
         await nodes.add(node)
     expected_order = sorted(node_list, key=lambda n: n.id)
-    uow = _make_uow(nodes)
-    use_case = ListNodes(uow)
+    repos = _make_repos(nodes)
+    use_case = ListNodes(repos)
 
     first_page = await use_case.handle(
         ListNodesQuery(after=None, limit=2), SYSTEM_ACTOR
@@ -88,7 +83,7 @@ async def test_list_nodes_total_reflects_all_matching_nodes() -> None:
     nodes = InMemoryNodeRepository()
     for _ in range(5):
         await nodes.add(Node.create(name="Alien", type="film"))
-    use_case = ListNodes(_make_uow(nodes))
+    use_case = ListNodes(_make_repos(nodes))
 
     result = await use_case.handle(ListNodesQuery(limit=2), SYSTEM_ACTOR)
 
