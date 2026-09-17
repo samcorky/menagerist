@@ -10,9 +10,10 @@ from fastapi.openapi.docs import (
 )
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 
+from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.platform.app_info import AppInfo, load_app_info
 
-router = APIRouter()
+router = APIRouter(route_class=PermissionAwareRoute)
 
 _STATIC_DIR = Path(__file__).parent / "static"
 _FAVICON_PATH = _STATIC_DIR / "favicon.svg"

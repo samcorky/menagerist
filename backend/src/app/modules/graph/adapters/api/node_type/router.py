@@ -13,6 +13,7 @@ from app.entrypoints.api.shared.http_headers import (
     link_header_responses,
     link_next_header,
 )
+from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.entrypoints.api.shared.problem_response import error_response
 from app.modules.graph.adapters.api.dependencies import (
     get_create_node_type_use_case,
@@ -43,7 +44,9 @@ from app.modules.graph.domain.errors import (
 )
 from app.shared_kernel.actor import Actor
 
-router = APIRouter(prefix="/node-type", tags=["Node Types"])
+router = APIRouter(
+    prefix="/node-type", tags=["Node Types"], route_class=PermissionAwareRoute
+)
 
 
 @router.post(

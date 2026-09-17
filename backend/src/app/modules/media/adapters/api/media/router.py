@@ -13,6 +13,7 @@ from app.entrypoints.api.shared.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
 )
+from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.entrypoints.api.shared.problem_response import error_response
 from app.modules.media.adapters.api.dependencies import (
     get_attach_media_use_case,
@@ -82,7 +83,7 @@ from app.shared_kernel.errors import ValidationError
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-router = APIRouter(prefix="/media", tags=["Media"])
+router = APIRouter(prefix="/media", tags=["Media"], route_class=PermissionAwareRoute)
 
 
 async def _chunks(upload: UploadFile) -> AsyncGenerator[bytes]:

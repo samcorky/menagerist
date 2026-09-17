@@ -4,7 +4,6 @@ from starlette.middleware.cors import CORSMiddleware
 
 from app.entrypoints.api.docs.router import router as docs_router
 from app.entrypoints.api.openapi import configure_openapi
-from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.entrypoints.api.shared.problem_response import register_exception_handlers
 from app.entrypoints.api.shared.request_context_middleware import (
     RequestContextMiddleware,
@@ -23,11 +22,14 @@ from app.platform.logging_config import configure_logging
 
 configure_logging()
 
-api_router = APIRouter(prefix="/api", route_class=PermissionAwareRoute)
+# Each included router builds its own APIRoute instances at decoration time, so
+# route_class here would never apply to them - every leaf router must be built
+# with permission_aware_router() instead (see permission_aware_route.py).
+api_router = APIRouter(prefix="/api")
 api_router.include_router(system_router)
 api_router.include_router(docs_router)
 
-api_v1_router = APIRouter(prefix="/v1", route_class=PermissionAwareRoute, tags=["v1"])
+api_v1_router = APIRouter(prefix="/v1", tags=["v1"])
 api_v1_router.include_router(graph_router)
 api_v1_router.include_router(edge_router)
 api_v1_router.include_router(node_type_router)

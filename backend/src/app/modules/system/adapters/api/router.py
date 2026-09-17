@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
+from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.system.adapters.api.dependencies import (
     get_get_health_ready_use_case,
     get_get_health_use_case,
@@ -24,7 +25,7 @@ from app.modules.system.domain.readiness import (
 )
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
-router = APIRouter(tags=["System"])
+router = APIRouter(tags=["System"], route_class=PermissionAwareRoute)
 
 _EXAMPLE_ISO = "2026-01-01T00:00:00.000000+00:00"
 

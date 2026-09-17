@@ -13,6 +13,7 @@ from app.entrypoints.api.shared.http_headers import (
     link_header_responses,
     link_next_header,
 )
+from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.entrypoints.api.shared.problem_response import error_response
 from app.modules.graph.adapters.api.dependencies import (
     get_create_edge_use_case,
@@ -35,7 +36,7 @@ from app.modules.graph.domain.errors import EdgeNotFoundError, NodeNotFoundError
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ValidationError
 
-router = APIRouter(prefix="/edge", tags=["Edges"])
+router = APIRouter(prefix="/edge", tags=["Edges"], route_class=PermissionAwareRoute)
 
 
 @router.post(
