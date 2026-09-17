@@ -83,7 +83,7 @@ def test_serve_configures_granian_from_the_given_options(
     """`serve` wires host/port/workers/etc. into Granian and starts serving."""
     from granian.log import LogLevels
 
-    granian_calls = []
+    granian_calls: list[dict[str, object] | str] = []
 
     class FakeGranian:
         def __init__(self, **kwargs: object) -> None:
@@ -105,6 +105,7 @@ def test_serve_configures_granian_from_the_given_options(
 
     assert len(granian_calls) == 2
     kwargs = granian_calls[0]
+    assert isinstance(kwargs, dict)
     assert kwargs["address"] == "0.0.0.0"
     assert kwargs["port"] == 9000
     assert kwargs["workers"] == 2
@@ -172,7 +173,10 @@ def test_schema_dump_writes_the_openapi_schema(
     """`schema dump` writes the app's OpenAPI schema as indented JSON."""
     from app.entrypoints import api
 
-    schema = {"openapi": "3.1.0", "info": {"title": "Menagerist"}}
+    schema: dict[str, object] = {
+        "openapi": "3.1.0",
+        "info": {"title": "Menagerist"},
+    }
 
     class FakeApp:
         def openapi(self) -> dict[str, object]:

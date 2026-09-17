@@ -192,7 +192,7 @@ line-ending = "lf"
 [tool.mypy]
 plugins = ["pydantic.mypy"]
 strict = true
-files = ["src/app"]
+files = ["src/app", "tests", "scripts"]
 mypy_path = "src"
 explicit_package_bases = true
 warn_unused_configs = true

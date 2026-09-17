@@ -26,7 +26,7 @@ async def test_command_handler_stores_uow() -> None:
         pass
 
     class MyUseCase(CommandHandler[object, MyCommand, None]):
-        async def handle(self, command: MyCommand, actor: object) -> None:  # type: ignore[override]
+        async def handle(self, command: MyCommand, actor: object) -> None:
             pass
 
     use_case = MyUseCase(sentinel)
@@ -36,7 +36,7 @@ async def test_command_handler_stores_uow() -> None:
 async def test_command_handler_cannot_be_instantiated_without_handle() -> None:
     """A CommandHandler subclass that omits handle() cannot be instantiated."""
 
-    class IncompleteCommand(CommandHandler[object, object, None]):  # type: ignore[type-abstract]
+    class IncompleteCommand(CommandHandler[object, object, None]):
         pass
 
     with pytest.raises(TypeError):
@@ -52,7 +52,7 @@ async def test_command_handler_uow_is_available_during_handle() -> None:
         pass
 
     class MyUseCase(CommandHandler[InMemoryUnitOfWork[object], MyCommand, None]):
-        async def handle(self, command: MyCommand, actor: object) -> None:  # type: ignore[override]
+        async def handle(self, command: MyCommand, actor: object) -> None:
             received.append(self._uow)
 
     await MyUseCase(uow).handle(MyCommand(), object())
@@ -67,11 +67,11 @@ async def test_command_handler_uow_is_available_during_handle() -> None:
 async def test_query_handler_cannot_be_instantiated_without_handle() -> None:
     """A QueryHandler subclass that omits handle() cannot be instantiated."""
 
-    class IncompleteQuery(QueryHandler[object, object, None]):  # type: ignore[type-abstract]
+    class IncompleteQuery(QueryHandler[object, object, None]):
         pass
 
     with pytest.raises(TypeError):
-        IncompleteQuery()  # type: ignore[abstract]
+        IncompleteQuery(object())  # type: ignore[abstract]
 
 
 async def test_query_handler_concrete_subclass_is_instantiable() -> None:
@@ -85,7 +85,7 @@ async def test_query_handler_concrete_subclass_is_instantiable() -> None:
         def __init__(self, repo: object) -> None:
             self._repo = repo
 
-        async def handle(self, query: MyQuery, actor: object) -> str:  # type: ignore[override]
+        async def handle(self, query: MyQuery, actor: object) -> str:
             return "ok"
 
     result = await MyUseCase(repo).handle(MyQuery(), object())
@@ -122,7 +122,7 @@ async def test_authorised_use_case_checks_permission_then_handles() -> None:
         async def _handle(self, request: MyRequest, actor: object) -> str:
             return "ok"
 
-    use_case = MyUseCase(authorization)  # type: ignore[arg-type]
+    use_case = MyUseCase(authorization)
     actor = object()
     result = await use_case.handle(MyRequest(), actor)  # type: ignore[arg-type]
 
@@ -146,7 +146,7 @@ async def test_authorised_command_handler_checks_permission_then_handles() -> No
         async def _handle(self, command: MyCommand, actor: object) -> str:
             return self._uow  # type: ignore[return-value]
 
-    use_case = MyUseCase(uow, authorization)  # type: ignore[arg-type]
+    use_case = MyUseCase(uow, authorization)
     actor = object()
     result = await use_case.handle(MyCommand(), actor)  # type: ignore[arg-type]
 
@@ -170,7 +170,7 @@ async def test_authorised_query_handler_checks_permission_then_handles() -> None
         async def _handle(self, query: MyQuery, actor: object) -> str:
             return self._repos  # type: ignore[return-value]
 
-    use_case = MyUseCase(repos, authorization)  # type: ignore[arg-type]
+    use_case = MyUseCase(repos, authorization)
     actor = object()
     result = await use_case.handle(MyQuery(), actor)  # type: ignore[arg-type]
 

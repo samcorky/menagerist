@@ -34,13 +34,15 @@ from app.modules.media.application.upload_and_attach_media import (
 )
 from app.modules.media.domain.errors import UnsupportedMediaTypeError
 from app.modules.media.domain.media_asset import MediaStatus
-from app.modules.media.domain.media_attachment import AttachmentTarget
+from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from app.modules.media.domain.media_asset import MediaAsset
+    from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 
 
 async def _stream(*chunks: bytes) -> AsyncIterator[bytes]:
@@ -59,7 +61,7 @@ class _RejectAllPolicy:
 
 
 def _make_uow_and_repos() -> tuple[
-    object,
+    MediaUnitOfWork,
     InMemoryMediaAssetRepository,
     InMemoryMediaAttachmentRepository,
     InMemoryMediaStorage,
@@ -83,7 +85,7 @@ async def test_upload_and_attach_stores_file_and_persists_records() -> None:
         uow,
         storage,
         _AllowAllPolicy(),
-        InMemoryImageProcessor(),  # type: ignore[arg-type]
+        InMemoryImageProcessor(),
     )
 
     attachment = await use_case.handle(
@@ -129,7 +131,7 @@ async def test_upload_and_attach_single_transaction() -> None:
         uow,
         storage,
         _AllowAllPolicy(),
-        InMemoryImageProcessor(),  # type: ignore[arg-type]
+        InMemoryImageProcessor(),
     )
     await use_case.handle(
         UploadAndAttachMediaCommand(
@@ -173,7 +175,7 @@ async def test_storage_move_fires_after_commit_not_before() -> None:
         uow,
         storage,
         _AllowAllPolicy(),
-        InMemoryImageProcessor(),  # type: ignore[arg-type]
+        InMemoryImageProcessor(),
     )
     await use_case.handle(
         UploadAndAttachMediaCommand(
@@ -205,7 +207,7 @@ async def test_policy_violation_propagates_and_no_storage_move() -> None:
         uow,
         storage,
         _RejectAllPolicy(),
-        InMemoryImageProcessor(),  # type: ignore[arg-type]
+        InMemoryImageProcessor(),
     )
 
     with pytest.raises(UnsupportedMediaTypeError):
@@ -225,7 +227,8 @@ async def test_policy_violation_propagates_and_no_storage_move() -> None:
     assert attached == []
 
     # InMemoryUnitOfWork records rollback even though it can't undo in-memory writes.
-    assert uow.rolled_back is True  # type: ignore[union-attr]
+    assert isinstance(uow, InMemoryUnitOfWork)
+    assert uow.rolled_back is True
 
 
 async def test_attribute_key_forwarded_to_attachment() -> None:
@@ -236,7 +239,7 @@ async def test_attribute_key_forwarded_to_attachment() -> None:
         uow,
         storage,
         _AllowAllPolicy(),
-        InMemoryImageProcessor(),  # type: ignore[arg-type]
+        InMemoryImageProcessor(),
     )
 
     attachment = await use_case.handle(
@@ -246,12 +249,12 @@ async def test_attribute_key_forwarded_to_attachment() -> None:
             stream=_stream(b"t"),
             target_type=AttachmentTarget.NODE,
             target_id=node_id,
-            attribute_key="thumbnail",
+            attribute_key=AttachmentKey.COVER,
         ),
         SYSTEM_ACTOR,
     )
 
-    assert attachment.attribute_key == "thumbnail"
+    assert attachment.attribute_key == AttachmentKey.COVER
 
 
 async def test_upload_and_attach_moves_thumbnail_to_attached() -> None:
@@ -262,7 +265,7 @@ async def test_upload_and_attach_moves_thumbnail_to_attached() -> None:
         uow,
         storage,
         _AllowAllPolicy(),
-        InMemoryImageProcessor(),  # type: ignore[arg-type]
+        InMemoryImageProcessor(),
     )
 
     attachment = await use_case.handle(

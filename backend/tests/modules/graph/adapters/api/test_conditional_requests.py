@@ -48,10 +48,11 @@ def _app_with_in_memory_graph() -> FastAPI:
     return app
 
 
-def _create_node(client: TestClient, *, name: str, type_: str) -> dict:
+def _create_node(client: TestClient, *, name: str, type_: str) -> dict[str, object]:
     """Create a node via the API and return the JSON response."""
     response = client.post("/api/v1/node", json={"name": name, "type": type_})
-    return response.json()
+    result: dict[str, object] = response.json()
+    return result
 
 
 def test_last_modified_is_rfc1123_no_subsecond() -> None:
