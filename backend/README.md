@@ -4,18 +4,13 @@ Hexagonal (ports-and-adapters) architecture with DDD, organised as vertical slic
 
 ## Coding conventions
 
-These conventions apply to both backend and frontend work unless a framework or library explicitly requires a different style.
+Shared project-wide conventions (British English, comment style, dependency policy) are in [AGENTS.md](../AGENTS.md#general-rules). Backend-specific rules:
 
-- Use British English for project copy, comments, and user-facing docs unless a library, API, or existing convention explicitly requires a different spelling.
-- Keep code comments short, factual, and concise. Only add a comment when the intent would otherwise be unclear.
 - Prefer Google-style docstrings for Python functions, methods, classes, and modules that are public or non-trivial. Keep the summary brief and use `Args:`, `Returns:`, and `Raises:` sections only when they add real value.
 - This project targets Python 3.14. The backend type-checking config in `backend/pyproject.toml` is strict: `mypy` runs with `strict = true`, `plugins = ["pydantic.mypy"]`, `warn_unused_configs = true`, and `show_error_codes = true`.
 - Use native Python 3.14 typing syntax and avoid quoted type annotations entirely. Prefer `str | None`, `list[str]`, and explicit concrete parameter/return types over stringified annotations or `Optional[...]`/`Union[...]` where the modern form is clearer.
 - Do not add `from __future__ import annotations`; the repo explicitly bans it because runtime frameworks need annotations to be resolvable at runtime.
 - Keep annotations explicit, precise, and readable; avoid `Any` unless it is truly necessary and document the reason when you do use it.
-- Only add or update dependencies when they are strictly necessary or clearly recommended for the task. Prefer the smallest, most targeted dependency that solves the problem and avoid adding libraries that duplicate existing functionality or increase the runtime surface area without a clear benefit.
-- Before adding or updating dependencies, review `.github/renovate.json` and keep the change aligned with the repository's Renovate rules and review policy (grouping, schedule, automerge, and manual review for majors/runtime dependencies).
-- When evaluating a dependency, estimate the impact on the final Docker image size and runtime footprint, and favour lighter or more maintainable options when trade-offs are similar.
 
 ## Hexagonal architecture
 

@@ -2,15 +2,7 @@
 
 Static SPA served by nginx. API calls proxy through `/api/*` to the backend.
 
-## Coding conventions
-
-These conventions apply across the project, including frontend work.
-
-- Use British English for project copy, comments, and user-facing docs unless a library, API, or existing convention explicitly requires a different spelling.
-- Keep code comments short, factual, and concise. Only add a comment when the intent would otherwise be unclear.
-- Only add or update dependencies when they are strictly necessary or clearly recommended for the task. Prefer the smallest, most targeted dependency that solves the problem and avoid adding libraries that duplicate existing functionality or increase the runtime surface area without a clear benefit.
-- Before adding or updating dependencies, review `.github/renovate.json` and keep the change aligned with the repository's Renovate rules and review policy (grouping, schedule, automerge, and manual review for majors/runtime dependencies).
-- When evaluating a dependency, estimate the impact on the final Docker image size and runtime footprint, and favour lighter or more maintainable options when trade-offs are similar.
+Coding conventions (British English, comment style, dependency policy) are in [AGENTS.md](../AGENTS.md#general-rules) — nothing frontend-specific to add here.
 
 ## Stack
 
