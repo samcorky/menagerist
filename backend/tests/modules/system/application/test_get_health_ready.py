@@ -1,5 +1,8 @@
 from datetime import UTC, datetime
 
+from app.modules.system.adapters.platform.in_memory_health_check_adapter import (
+    InMemoryHealthCheckAdapter,
+)
 from app.modules.system.application.get_health_ready import (
     GetHealthReady,
     GetHealthReadyQuery,
@@ -10,14 +13,6 @@ from app.modules.system.domain.readiness import (
     ReadinessReport,
 )
 from app.shared_kernel.actor import SYSTEM_ACTOR
-
-
-class _StubHealthCheck:
-    def __init__(self, report: ReadinessReport) -> None:
-        self._report = report
-
-    async def check(self) -> ReadinessReport:
-        return self._report
 
 
 async def test_get_health_ready_delegates_to_health_check_port() -> None:
@@ -34,7 +29,7 @@ async def test_get_health_ready_delegates_to_health_check_port() -> None:
             )
         },
     )
-    use_case = GetHealthReady(_StubHealthCheck(report))
+    use_case = GetHealthReady(InMemoryHealthCheckAdapter(report))
 
     result = await use_case.handle(GetHealthReadyQuery(), SYSTEM_ACTOR)
 

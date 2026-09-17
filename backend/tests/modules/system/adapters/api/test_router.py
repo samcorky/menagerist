@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
@@ -6,6 +7,16 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
+from app.modules.system.adapters.api.dependencies import get_get_health_ready_use_case
+from app.modules.system.adapters.platform.in_memory_health_check_adapter import (
+    InMemoryHealthCheckAdapter,
+)
+from app.modules.system.application.get_health_ready import GetHealthReady
+from app.modules.system.domain.readiness import (
+    CheckObservation,
+    CheckStatus,
+    ReadinessReport,
+)
 from app.platform.database import get_session_factory
 
 if TYPE_CHECKING:
@@ -136,6 +147,35 @@ def test_pool_healthy_omits_output() -> None:
     pool_check = data["checks"]["database:poolUtilization"]
     assert pool_check["status"] == "pass"
     assert "output" not in pool_check
+
+
+def test_readiness_reports_warn_status_without_503() -> None:
+    """A warn-status check is reflected in the payload but does not trigger 503."""
+    report = ReadinessReport(
+        status=CheckStatus.WARN,
+        checks={
+            "database:poolUtilization": CheckObservation(
+                component_type="datastore",
+                observed_value=80.0,
+                observed_unit="percent",
+                status=CheckStatus.WARN,
+                time=datetime.now(UTC),
+                output="4/5 connections checked out, 1 available",
+            )
+        },
+    )
+    app = create_app()
+    app.dependency_overrides[get_get_health_ready_use_case] = lambda: GetHealthReady(
+        InMemoryHealthCheckAdapter(report)
+    )
+    client = TestClient(app)
+
+    response = client.get("/api/health/ready")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "warn"
+    assert data["checks"]["database:poolUtilization"]["status"] == "warn"
 
 
 # ---------------------------------------------------------------------------

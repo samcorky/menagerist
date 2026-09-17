@@ -9,13 +9,14 @@ from app.entrypoints.api.shared.permission_aware_route import (
     _find_use_case_type,
 )
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
-from app.shared_kernel.cqrs import UseCase
+from app.shared_kernel.cqrs import CommandHandler, QueryHandler, UseCase
 
 
 class Permission(StrEnum):
     """Dummy permission enum for testing."""
 
     GRAPH_READ = "graph:read"
+    GRAPH_WRITE = "graph:write"
 
 
 class DocumentedUseCase(UseCase[object, str]):
@@ -36,6 +37,26 @@ class PlainUseCase(UseCase[object, str]):
         return "ok"
 
 
+class ReadUseCase(QueryHandler[object, object, str]):
+    """Query use case with a documented read permission."""
+
+    required_permission = Permission.GRAPH_READ
+
+    async def handle(self, request: object, actor: Actor) -> str:
+        """Handle the read use case."""
+        return "ok"
+
+
+class WriteUseCase(CommandHandler[object, object, str]):
+    """Command use case with a documented write permission."""
+
+    required_permission = Permission.GRAPH_WRITE
+
+    async def handle(self, request: object, actor: Actor) -> str:
+        """Handle the write use case."""
+        return "ok"
+
+
 def get_documented_use_case() -> DocumentedUseCase:
     """Return an instance of the documented use case."""
     return DocumentedUseCase()
@@ -44,6 +65,16 @@ def get_documented_use_case() -> DocumentedUseCase:
 def get_plain_use_case() -> PlainUseCase:
     """Return an instance of the plain use case."""
     return PlainUseCase()
+
+
+def get_read_use_case() -> ReadUseCase:
+    """Return an instance of the read use case."""
+    return ReadUseCase(object())
+
+
+def get_write_use_case() -> WriteUseCase:
+    """Return an instance of the write use case."""
+    return WriteUseCase(object())
 
 
 async def documented_endpoint(
@@ -60,9 +91,31 @@ async def plain_endpoint(
     return {"result": await use_case.handle(object(), SYSTEM_ACTOR)}
 
 
+async def read_before_write_endpoint(
+    get_use_case: Annotated[ReadUseCase, Depends(get_read_use_case)],
+    write_use_case: Annotated[WriteUseCase, Depends(get_write_use_case)],
+) -> dict[str, str]:
+    """Endpoint declaring its read use case before its write use case."""
+    return {"result": await write_use_case.handle(object(), SYSTEM_ACTOR)}
+
+
+async def write_before_read_endpoint(
+    write_use_case: Annotated[WriteUseCase, Depends(get_write_use_case)],
+    get_use_case: Annotated[ReadUseCase, Depends(get_read_use_case)],
+) -> dict[str, str]:
+    """Endpoint declaring its write use case before its read use case."""
+    return {"result": await write_use_case.handle(object(), SYSTEM_ACTOR)}
+
+
 def test_find_use_case_type_returns_annotated_use_case_type() -> None:
     """Use-case type discovery reads Annotated route dependencies."""
     assert _find_use_case_type(documented_endpoint) is DocumentedUseCase
+
+
+def test_find_use_case_type_prefers_command_handler_regardless_of_order() -> None:
+    """The mutating use case is picked over a read use case, either order."""
+    assert _find_use_case_type(read_before_write_endpoint) is WriteUseCase
+    assert _find_use_case_type(write_before_read_endpoint) is WriteUseCase
 
 
 def test_openapi_documents_required_permission() -> None:

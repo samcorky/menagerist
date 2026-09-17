@@ -6,7 +6,7 @@ from fastapi import Security
 from fastapi.routing import APIRoute
 from fastapi.security import APIKeyCookie
 
-from app.shared_kernel.cqrs import UseCase
+from app.shared_kernel.cqrs import CommandHandler, UseCase
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -18,15 +18,26 @@ cookie_scheme = APIKeyCookie(name="session_id", auto_error=False)
 
 
 def _find_use_case_type(endpoint: Callable[..., Any]) -> type[UseCase[Any, Any]] | None:
-    """Return the route parameter type annotated as a UseCase subclass, if any."""
+    """Return the route parameter type annotated as a UseCase subclass, if any.
+
+    An endpoint may depend on more than one use case, e.g. a PATCH handler
+    that reads current state via a query before applying a command. The
+    state-mutating one is preferred, since it is the one that actually
+    authorises the request - independent of parameter declaration order.
+    """
     hints = get_type_hints(endpoint, include_extras=True)
+    use_case_types: list[type[UseCase[Any, Any]]] = []
     for hint in hints.values():
         if get_origin(hint) is not Annotated:
             continue
         actual_type, *_ = get_args(hint)
         if isinstance(actual_type, type) and issubclass(actual_type, UseCase):
-            return actual_type
-    return None
+            use_case_types.append(actual_type)
+
+    for use_case_type in use_case_types:
+        if issubclass(use_case_type, CommandHandler):
+            return use_case_type
+    return use_case_types[0] if use_case_types else None
 
 
 def _permission_value(permission: object) -> str | None:

@@ -71,9 +71,9 @@ class CheckObservation(BaseModel):
         ),
     ]
     status: Annotated[
-        Literal["pass", "fail"],
+        Literal["pass", "warn", "fail"],
         Field(
-            description="Pass/fail result of this individual check.",
+            description="Pass/warn/fail result of this individual check.",
             examples=["pass"],
         ),
     ]
@@ -110,9 +110,9 @@ class ReadyResponse(BaseModel):
     """Readiness status (IETF draft-inadarei-api-health-check-06)."""
 
     status: Annotated[
-        Literal["pass", "fail"],
+        Literal["pass", "warn", "fail"],
         Field(
-            description="Overall readiness — fail if any single check fails.",
+            description="Overall readiness — fail beats warn beats pass.",
             examples=["pass"],
         ),
     ]

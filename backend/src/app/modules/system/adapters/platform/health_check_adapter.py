@@ -111,9 +111,10 @@ class DatabaseHealthCheckAdapter:
             output=pool_output,
         )
 
-        overall = (
-            CheckStatus.FAIL
-            if any(c.status is CheckStatus.FAIL for c in checks.values())
-            else CheckStatus.PASS
-        )
+        if any(c.status is CheckStatus.FAIL for c in checks.values()):
+            overall = CheckStatus.FAIL
+        elif any(c.status is CheckStatus.WARN for c in checks.values()):
+            overall = CheckStatus.WARN
+        else:
+            overall = CheckStatus.PASS
         return ReadinessReport(status=overall, checks=checks)

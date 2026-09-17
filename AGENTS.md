@@ -59,7 +59,8 @@ poe test-backend-all          # unit + integration with combined coverage
 poe test-frontend             # Vitest unit tests
 
 poe coverage                  # full backend test suite + enforce all coverage thresholds
-poe typecheck                 # mypy + svelte-check + tsc
+poe test-and-status           # full backend test suite + per-component coverage %, non-failing
+poe typecheck                 # mypy + svelte-check (TS checking included)
 poe typecheck-backend
 poe typecheck-frontend
 poe lint                      # ruff + prettier + eslint
