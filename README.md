@@ -98,7 +98,7 @@ docker compose -f compose.dev.yaml up -d --force-recreate
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for the full planned feature set.
+See [ROADMAP.md](ROADMAP.md) for the product direction and release strategy.
 
 ---
 
@@ -106,7 +106,7 @@ See [ROADMAP.md](ROADMAP.md) for the full planned feature set.
 
 | Document | Contents |
 |---|---|
-| [ROADMAP.md](ROADMAP.md) | Product direction and feature priorities |
+| [ROADMAP.md](ROADMAP.md) | Product direction and UX philosophy |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, commands, and testing |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System topology and data model |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Significant technical decisions and rationale |

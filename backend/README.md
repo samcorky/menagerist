@@ -50,6 +50,8 @@ modules/<context>/
 
 `ports/` is a standalone package, not colocated inside `application/`, so it's importable by `application/`, `adapters/`, and tests without pulling in SQLAlchemy or FastAPI. In `adapters/persistence/`, a port's real and in-memory implementations are plain sibling files named to match the port they satisfy - no `impl/` subfolder.
 
+A module whose driven adapters aren't persistence at all - `system`'s health-check and app-info adapters, for instance - names that directory `adapters/platform/` instead of `adapters/persistence/`, since the folder name should describe what the adapters do, not just default to the common case.
+
 A module is created the day its first entity or use case is written, not scaffolded ahead of time. `graph`, modeling nodes, edges, node types, and edge types, is the first module in the codebase.
 
 Infra with no domain and nothing swappable behind it lives in `platform/` instead of a module - package metadata, logging config, the database engine. The test: is more than one implementation plausible? If yes (a second repository backend, a second notification channel), it's a port inside a module. If there's exactly one reasonable way to do it, it's a `platform/` primitive.

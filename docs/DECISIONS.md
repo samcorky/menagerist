@@ -84,7 +84,7 @@ Significant architectural choices and their rationale. Entries are added when a 
 
 **Decision:** The v1 `AuthorizationPort` implementation always permits every action. Routes depend on `get_current_actor` and use cases take `actor` in `handle()`, but no checks are enforced.
 
-**Rationale:** The wiring exists so that when the `identity` module lands, only the composition root changes — no route or use case signatures need updating. The app is single-user and self-hosted in v1; multi-user is a P3 roadmap item. Building real authorization before identity exists would require faking it in ways that add coupling.
+**Rationale:** The wiring exists so that when the `identity` module lands, only the composition root changes — no route or use case signatures need updating. The app is single-user and self-hosted in v1; multi-user support is a later roadmap item. Building real authorization before identity exists would require faking it in ways that add coupling.
 
 ---
 

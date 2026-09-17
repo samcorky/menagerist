@@ -29,7 +29,8 @@ backend/src/app/
 ├── entrypoints/     # FastAPI app factory, composition root, CLI entrypoints
 ├── modules/         # one directory per bounded context
 │   ├── graph/       # nodes, edges, node types, edge types
-│   └── media/       # attachments and images
+│   ├── media/       # attachments and images
+│   └── system/      # health, readiness, and version endpoints
 ├── shared_kernel/   # Actor, error base types, UoW protocol, CQRS protocols
 ├── platform/        # database engine, session factory, logging (one plausible implementation each)
 └── alembic/         # migrations — one environment for all modules
