@@ -33,16 +33,39 @@
 </script>
 
 <script lang="ts">
+	import Ajv from 'ajv';
+	import addFormats from 'ajv-formats';
 	import { Plus, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import type { Schema, SubField } from './schema-editor.svelte';
+	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import type { AttributesSchema, JsonSchemaProperty } from './schema-editor.svelte';
 
-	let { rows = $bindable(), schema = null }: { rows: AttributeRow[]; schema?: Schema | null } =
-		$props();
+	const ajv = new Ajv({ coerceTypes: true, allErrors: true });
+	addFormats(ajv);
 
-	let schemaKeys = $derived(schema?.fields.map((f) => f.key) ?? []);
+	let {
+		rows = $bindable(),
+		schema = null
+	}: { rows: AttributeRow[]; schema?: AttributesSchema | null } = $props();
+
+	let validate = $derived(schema ? ajv.compile(schema) : null);
+
+	let fieldErrors = $derived.by(() => {
+		if (!validate || !schema) return {} as Record<string, string>;
+		const attrs = rowsToAttributes(rows);
+		validate(attrs);
+		const errors: Record<string, string> = {};
+		for (const err of validate.errors ?? []) {
+			const key = err.instancePath.replace(/^\//, '');
+			if (key && !errors[key]) errors[key] = err.message ?? 'Invalid value';
+		}
+		return errors;
+	});
+
+	let schemaEntries = $derived(schema ? Object.entries(schema.properties) : []);
+	let schemaKeys = $derived(schemaEntries.map(([k]) => k));
 	let freeformRows = $derived(rows.filter((r) => !schemaKeys.includes(r.key)));
 
 	function getSchemaValue(key: string): string {
@@ -80,8 +103,8 @@
 		);
 	}
 
-	function addGroupRow(key: string, groupFields: SubField[]) {
-		const emptyRow: GroupRow = Object.fromEntries(groupFields.map((f) => [f.key, '']));
+	function addGroupRow(key: string, subProps: Record<string, JsonSchemaProperty>) {
+		const emptyRow: GroupRow = Object.fromEntries(Object.keys(subProps).map((k) => [k, '']));
 		setGroupRows(key, [...getGroupRows(key), emptyRow]);
 	}
 
@@ -99,24 +122,21 @@
 	function removeRow(row: AttributeRow) {
 		rows = rows.filter((existing) => existing !== row);
 	}
+
+	function inputType(prop: JsonSchemaProperty): string {
+		if (prop.type === 'number') return 'number';
+		if ('format' in prop && prop.format === 'date') return 'date';
+		return 'text';
+	}
 </script>
 
 {#snippet valueInput(
-	type: SubField['type'],
+	prop: JsonSchemaProperty,
 	value: string,
-	options: string[] | undefined,
 	ariaLabel: string,
 	onChange: (value: string) => void
 )}
-	{#if type === 'number'}
-		<Input
-			type="number"
-			{value}
-			oninput={(e) => onChange((e.target as HTMLInputElement).value)}
-			class="flex-1"
-			aria-label={ariaLabel}
-		/>
-	{:else if type === 'boolean'}
+	{#if prop.type === 'boolean'}
 		<label class="flex items-center gap-2">
 			<input
 				type="checkbox"
@@ -127,15 +147,7 @@
 			/>
 			<span class="sr-only">{ariaLabel}</span>
 		</label>
-	{:else if type === 'date'}
-		<Input
-			type="date"
-			{value}
-			oninput={(e) => onChange((e.target as HTMLInputElement).value)}
-			class="flex-1"
-			aria-label={ariaLabel}
-		/>
-	{:else if type === 'select'}
+	{:else if prop.type === 'string' && 'enum' in prop}
 		<select
 			{value}
 			onchange={(e) => onChange((e.target as HTMLSelectElement).value)}
@@ -143,13 +155,20 @@
 			aria-label={ariaLabel}
 		>
 			<option value="">— select —</option>
-			{#each options ?? [] as option (option)}
+			{#each prop.enum as option (option)}
 				<option value={option}>{option}</option>
 			{/each}
 		</select>
+	{:else if prop.type === 'string' && 'x-multiline' in prop && prop['x-multiline']}
+		<Textarea
+			{value}
+			oninput={(e) => onChange((e.target as HTMLTextAreaElement).value)}
+			class="flex-1"
+			aria-label={ariaLabel}
+		/>
 	{:else}
 		<Input
-			type="text"
+			type={inputType(prop)}
 			{value}
 			oninput={(e) => onChange((e.target as HTMLInputElement).value)}
 			class="flex-1"
@@ -161,39 +180,35 @@
 <div class="space-y-2">
 	<Label>Details</Label>
 
-	{#if schema && schema.fields.length > 0}
-		{#each schema.fields as field (field.key)}
-			<div class="flex gap-2 {field.type === 'group' ? 'items-start' : 'items-center'}">
+	{#if schema && schemaEntries.length > 0}
+		{#each schemaEntries as [key, prop] (key)}
+			{@const isRequired = schema.required?.includes(key) ?? false}
+			{@const error = fieldErrors[key]}
+			<div class="flex gap-2 {prop.type === 'array' ? 'items-start' : 'items-center'}">
 				<span class="w-32 shrink-0 pt-1.5 text-sm text-muted-foreground">
-					{field.label || field.key}{#if field.required}<span class="ml-0.5 text-destructive"
-							>*</span
-						>{/if}
+					{prop.title || key}{#if isRequired}<span class="ml-0.5 text-destructive">*</span>{/if}
 				</span>
-				{#if field.type === 'group'}
+				{#if prop.type === 'array'}
 					<div class="flex-1 space-y-2">
 						<div class="overflow-x-auto rounded-md border border-input">
 							<table class="w-full text-sm">
 								<thead>
 									<tr class="border-b border-input bg-muted/50">
-										{#each field.groupFields ?? [] as subField (subField.key)}
+										{#each Object.entries(prop.items.properties) as [sk, sp] (sk)}
 											<th class="px-2 py-1.5 text-left font-medium text-muted-foreground">
-												{subField.label || subField.key}
+												{sp.title || sk}
 											</th>
 										{/each}
 										<th class="w-9"></th>
 									</tr>
 								</thead>
 								<tbody>
-									{#each getGroupRows(field.key) as groupRow, ri (ri)}
+									{#each getGroupRows(key) as groupRow, ri (ri)}
 										<tr class="border-b border-input last:border-0">
-											{#each field.groupFields ?? [] as subField (subField.key)}
+											{#each Object.entries(prop.items.properties) as [sk, sp] (sk)}
 												<td class="px-2 py-1.5">
-													{@render valueInput(
-														subField.type,
-														groupRow[subField.key] ?? '',
-														subField.options,
-														subField.label || subField.key,
-														(value) => setGroupCellValue(field.key, ri, subField.key, value)
+													{@render valueInput(sp, groupRow[sk] ?? '', sp.title || sk, (value) =>
+														setGroupCellValue(key, ri, sk, value)
 													)}
 												</td>
 											{/each}
@@ -202,7 +217,7 @@
 													type="button"
 													variant="ghost"
 													size="icon"
-													onclick={() => removeGroupRow(field.key, ri)}
+													onclick={() => removeGroupRow(key, ri)}
 													aria-label="Remove row"
 												>
 													<X class="size-4" />
@@ -217,20 +232,21 @@
 							type="button"
 							variant="outline"
 							size="sm"
-							onclick={() => addGroupRow(field.key, field.groupFields ?? [])}
+							onclick={() => addGroupRow(key, prop.items.properties)}
 						>
 							<Plus class="size-4" />
 							Add row
 						</Button>
 					</div>
 				{:else}
-					{@render valueInput(
-						field.type,
-						getSchemaValue(field.key),
-						field.options,
-						field.label || field.key,
-						(value) => setSchemaValue(field.key, value)
-					)}
+					<div class="flex flex-1 flex-col gap-1">
+						{@render valueInput(prop, getSchemaValue(key), prop.title || key, (value) =>
+							setSchemaValue(key, value)
+						)}
+						{#if error}
+							<p class="text-xs text-destructive">{error}</p>
+						{/if}
+					</div>
 				{/if}
 			</div>
 		{/each}

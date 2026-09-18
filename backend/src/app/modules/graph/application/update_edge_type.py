@@ -2,10 +2,11 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+import jsonschema
 import structlog
 
 from app.modules.graph.domain.edge_type import EdgeType
-from app.modules.graph.domain.errors import EdgeTypeNotFoundError
+from app.modules.graph.domain.errors import EdgeTypeNotFoundError, InvalidSchemaError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.cqrs import CommandHandler
 
@@ -32,6 +33,13 @@ class UpdateEdgeType(CommandHandler[GraphUnitOfWork, UpdateEdgeTypeCommand, Edge
 
     async def handle(self, command: UpdateEdgeTypeCommand, actor: Actor) -> EdgeType:
         """Apply the update and commit."""
+        if command.attributes_schema is not None:
+            try:
+                jsonschema.validators.validator_for(
+                    command.attributes_schema
+                ).check_schema(command.attributes_schema)
+            except jsonschema.SchemaError as exc:
+                raise InvalidSchemaError(str(exc.message)) from exc
         async with self._uow as repos:
             edge_type = await repos.edge_types.get(command.edge_type_id)
             if edge_type is None:

@@ -20,7 +20,7 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import BackButton from '$lib/components/back-button.svelte';
-	import SchemaEditor, { type Schema } from '$lib/components/schema-editor.svelte';
+	import SchemaEditor, { type AttributesSchema } from '$lib/components/schema-editor.svelte';
 
 	const PAGE_SIZE = 50;
 	const loadingSkeletons = [1, 2, 3];
@@ -32,12 +32,12 @@
 	let label = $state('');
 	let description = $state('');
 	let submitting = $state(false);
-	let createSchema = $state<Schema | null>(null);
+	let createSchema = $state<AttributesSchema | null>(null);
 
 	let editingId = $state<string | null>(null);
 	let editLabel = $state('');
 	let editDescription = $state('');
-	let editSchema = $state<Schema | null>(null);
+	let editSchema = $state<AttributesSchema | null>(null);
 	let savingId = $state<string | null>(null);
 	let confirmingDeleteId = $state<string | null>(null);
 	let deletingId = $state<string | null>(null);
@@ -96,7 +96,7 @@
 		editingId = cat.id;
 		editLabel = cat.label;
 		editDescription = cat.description ?? '';
-		editSchema = (cat.attributes_schema as Schema | null) ?? null;
+		editSchema = (cat.attributes_schema as AttributesSchema | null) ?? null;
 		confirmingDeleteId = null;
 	}
 

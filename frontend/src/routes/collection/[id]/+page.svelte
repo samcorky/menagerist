@@ -26,7 +26,7 @@
 		rowsToAttributes,
 		type AttributeRow
 	} from '$lib/components/attributes-editor.svelte';
-	import type { Schema } from '$lib/components/schema-editor.svelte';
+	import type { AttributesSchema } from '$lib/components/schema-editor.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import TagsInput from '$lib/components/tags-input.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -53,10 +53,13 @@
 	let nodesById = $derived(new Map(otherNodes.map((candidate) => [candidate.id, candidate])));
 	let edgeTypesById = $derived(new Map(edgeTypes.map((et) => [et.slug, et])));
 	let nodeSchema = $derived(
-		(nodeTypes.find((nt) => nt.slug === node?.type)?.attributes_schema as Schema | null) ?? null
+		(nodeTypes.find((nt) => nt.slug === node?.type)
+			?.attributes_schema as AttributesSchema | null) ?? null
 	);
 	let attributeLabelsByKey = $derived(
-		new Map((nodeSchema?.fields ?? []).map((field) => [field.key, field.label || field.key]))
+		new Map(
+			Object.entries(nodeSchema?.properties ?? {}).map(([key, prop]) => [key, prop.title || key])
+		)
 	);
 	let loading = $state(true);
 	let notFound = $state(false);

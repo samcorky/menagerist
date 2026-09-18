@@ -16,7 +16,8 @@ from app.modules.graph.adapters.persistence.in_memory_node_type_repository impor
 )
 from app.modules.graph.application.update_edge import UpdateEdge, UpdateEdgeCommand
 from app.modules.graph.domain.edge import Edge
-from app.modules.graph.domain.errors import EdgeNotFoundError
+from app.modules.graph.domain.edge_type import EdgeType
+from app.modules.graph.domain.errors import EdgeNotFoundError, InvalidAttributesError
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
@@ -62,4 +63,35 @@ async def test_update_edge_raises_when_missing() -> None:
     with pytest.raises(EdgeNotFoundError):
         await use_case.handle(
             UpdateEdgeCommand(edge_id=uuid.uuid4(), attributes={}), SYSTEM_ACTOR
+        )
+
+
+async def test_update_edge_validates_attributes_against_schema() -> None:
+    """UpdateEdge rejects attributes that violate the edge type's JSON Schema."""
+    schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {"since": {"type": "string", "format": "date"}},
+        "required": ["since"],
+    }
+    edge_types = InMemoryEdgeTypeRepository()
+    await edge_types.add(
+        EdgeType.create(slug="owns", label="Owns", attributes_schema=schema)
+    )
+    repository = InMemoryEdgeRepository()
+    edge = Edge.create(source_id=uuid.uuid4(), target_id=uuid.uuid4(), type="owns")
+    await repository.add(edge)
+    repos = GraphRepos(
+        nodes=InMemoryNodeRepository(),
+        edges=repository,
+        node_types=InMemoryNodeTypeRepository(),
+        edge_types=edge_types,
+    )
+    uow = InMemoryUnitOfWork(repos)
+    use_case = UpdateEdge(uow)
+
+    with pytest.raises(InvalidAttributesError):
+        await use_case.handle(
+            UpdateEdgeCommand(edge_id=edge.id, attributes={"since": "not-a-date"}),
+            SYSTEM_ACTOR,
         )

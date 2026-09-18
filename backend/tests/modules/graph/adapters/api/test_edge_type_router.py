@@ -184,10 +184,10 @@ def test_delete_edge_type_succeeds_when_no_active_edges_use_it() -> None:
 def test_attributes_schema_round_trips_through_create_and_update() -> None:
     """attributes_schema is stored on create and can be updated via PATCH."""
     client = TestClient(_app_with_in_memory_graph())
-    schema = {
-        "fields": [
-            {"key": "since", "label": "Since", "type": "date", "required": False}
-        ]
+    schema: dict[str, object] = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {"since": {"title": "Since", "type": "string", "format": "date"}},
     }
 
     et = client.post(
@@ -200,7 +200,11 @@ def test_attributes_schema_round_trips_through_create_and_update() -> None:
     ).json()
     assert et["attributes_schema"] == schema
 
-    new_schema: dict[str, object] = {"fields": []}
+    new_schema: dict[str, object] = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+    }
     updated = client.patch(
         f"/api/v1/edge-type/{et['id']}",
         json={"attributes_schema": new_schema},

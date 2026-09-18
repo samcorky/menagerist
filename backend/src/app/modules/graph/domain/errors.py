@@ -1,4 +1,12 @@
-from app.shared_kernel.errors import ConflictError, NotFoundError
+from app.shared_kernel.errors import ConflictError, NotFoundError, ValidationError
+
+
+class InvalidSchemaError(ValidationError):
+    """Raised when attributes_schema is not valid JSON Schema."""
+
+
+class InvalidAttributesError(ValidationError):
+    """Raised when node or edge attributes fail schema validation."""
 
 
 class NodeNotFoundError(NotFoundError):

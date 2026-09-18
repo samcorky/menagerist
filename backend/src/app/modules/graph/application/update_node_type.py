@@ -2,9 +2,10 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+import jsonschema
 import structlog
 
-from app.modules.graph.domain.errors import NodeTypeNotFoundError
+from app.modules.graph.domain.errors import InvalidSchemaError, NodeTypeNotFoundError
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.cqrs import CommandHandler
@@ -30,6 +31,13 @@ class UpdateNodeType(CommandHandler[GraphUnitOfWork, UpdateNodeTypeCommand, Node
 
     async def handle(self, command: UpdateNodeTypeCommand, actor: Actor) -> NodeType:
         """Apply `command`'s changes to the node type and commit."""
+        if command.attributes_schema is not None:
+            try:
+                jsonschema.validators.validator_for(
+                    command.attributes_schema
+                ).check_schema(command.attributes_schema)
+            except jsonschema.SchemaError as exc:
+                raise InvalidSchemaError(str(exc.message)) from exc
         async with self._uow as repos:
             node_type = await repos.node_types.get(command.node_type_id)
             if node_type is None:

@@ -18,7 +18,7 @@ from app.modules.graph.application.update_node_type import (
     UpdateNodeType,
     UpdateNodeTypeCommand,
 )
-from app.modules.graph.domain.errors import NodeTypeNotFoundError
+from app.modules.graph.domain.errors import InvalidSchemaError, NodeTypeNotFoundError
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.actor import SYSTEM_ACTOR
@@ -55,14 +55,16 @@ async def test_update_node_type_persists_and_commits() -> None:
 
 
 async def test_update_node_type_persists_attributes_schema() -> None:
-    """UpdateNodeType stores attributes_schema when provided."""
+    """UpdateNodeType stores a valid JSON Schema when provided."""
     uow, repos = _make_uow()
     nt = NodeType.create(slug="film", label="Film")
     await repos.node_types.add(nt)
     schema = {
-        "fields": [
-            {"key": "year", "label": "Year", "type": "number", "required": False}
-        ]
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+            "year": {"title": "Year", "type": "number"},
+        },
     }
     use_case = UpdateNodeType(uow)
 
@@ -75,6 +77,23 @@ async def test_update_node_type_persists_attributes_schema() -> None:
     stored = await repos.node_types.get(nt.id)
     assert stored is not None
     assert stored.attributes_schema == schema
+
+
+async def test_update_node_type_raises_on_invalid_schema() -> None:
+    """UpdateNodeType rejects a schema that is not valid JSON Schema."""
+    uow, repos = _make_uow()
+    nt = NodeType.create(slug="film", label="Film")
+    await repos.node_types.add(nt)
+    use_case = UpdateNodeType(uow)
+
+    with pytest.raises(InvalidSchemaError):
+        await use_case.handle(
+            UpdateNodeTypeCommand(
+                node_type_id=nt.id,
+                attributes_schema={"type": "not-a-valid-type"},
+            ),
+            SYSTEM_ACTOR,
+        )
 
 
 async def test_update_node_type_raises_when_missing() -> None:

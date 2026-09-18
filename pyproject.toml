@@ -5,7 +5,6 @@ description = "A lightweight, self-hostable and flexible platform for organising
 requires-python = ">=3.14"
 
 dependencies = [
-    "cyclopts==4.23.1",
     "menagerist",
 ]
 
@@ -249,7 +248,7 @@ help = "Run all unit tests"
 heading = "Database"
 
 [tool.poe.groups.database.tasks.db-up]
-cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} up -d postgres"
+cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} up -d postgres migrate"
 uses = { COMPOSE_OVERRIDE = "_compose-override" }
 help = "Start the local Postgres container"
 
@@ -281,8 +280,13 @@ sequence = ["build-backend", "build-frontend"]
 help = "Build backend and frontend"
 
 [tool.poe.groups.run.tasks.serve-backend]
+deps = ["ensure-editable-backend"]
 cmd = "menagerist serve --host 0.0.0.0 --reload"
 help = "Run the backend API server with auto-reload for development"
+
+[tool.poe.groups.run.tasks.ensure-editable-backend]
+cmd = "uv pip install -e backend"
+help = "Editable install of the backend package (Windows-friendly alternative to uv sync)"
 
 [tool.poe.groups.run.tasks.serve-frontend]
 shell = "npm run dev -- --host 0.0.0.0"

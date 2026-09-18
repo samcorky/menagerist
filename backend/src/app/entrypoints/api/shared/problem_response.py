@@ -65,8 +65,26 @@ def error_response(
 
 
 def _problem_response(request: Request, exc: Exception) -> JSONResponse:
-    """Translate a `DomainError` into an RFC 9457 problem+json response."""
-    assert isinstance(exc, DomainError)
+    """Translate a `DomainError` into an RFC 9457 problem+json response.
+
+    Also handle non-domain exceptions (fallback) so the catch-all Exception
+    handler doesn't trigger an assertion when a framework or other error
+    occurs.
+    """
+    # If not a DomainError, return a 500 problem+json response instead of asserting.
+    if not isinstance(exc, DomainError):
+        return JSONResponse(
+            status_code=500,
+            media_type="application/problem+json",
+            content={
+                "type": "about:blank",
+                "title": type(exc).__name__,
+                "status": 500,
+                "detail": str(exc),
+                "instance": str(request.url),
+            },
+        )
+
     status_code = next(
         status
         for error_type, status in _STATUS_BY_DOMAIN_ERROR.items()

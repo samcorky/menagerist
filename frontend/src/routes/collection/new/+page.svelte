@@ -17,7 +17,7 @@
 		rowsToAttributes,
 		type AttributeRow
 	} from '$lib/components/attributes-editor.svelte';
-	import type { Schema } from '$lib/components/schema-editor.svelte';
+	import type { AttributesSchema } from '$lib/components/schema-editor.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import CategorySelect from '$lib/components/category-select.svelte';
 	import TagsInput from '$lib/components/tags-input.svelte';
@@ -39,7 +39,8 @@
 	let nodeTypes = $state<NodeTypeResponse[]>([]);
 
 	let nodeSchema = $derived(
-		(nodeTypes.find((nt) => nt.slug === selectedType)?.attributes_schema as Schema | null) ?? null
+		(nodeTypes.find((nt) => nt.slug === selectedType)
+			?.attributes_schema as AttributesSchema | null) ?? null
 	);
 
 	$effect(() => {

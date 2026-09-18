@@ -16,7 +16,10 @@ from app.modules.graph.application.create_node_type import (
     CreateNodeType,
     CreateNodeTypeCommand,
 )
-from app.modules.graph.domain.errors import NodeTypeSlugConflictError
+from app.modules.graph.domain.errors import (
+    InvalidSchemaError,
+    NodeTypeSlugConflictError,
+)
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
@@ -47,12 +50,14 @@ async def test_create_node_type_persists_and_commits() -> None:
 
 
 async def test_create_node_type_persists_attributes_schema() -> None:
-    """CreateNodeType stores attributes_schema when provided."""
+    """CreateNodeType stores a valid JSON Schema when provided."""
     uow, repos = _make_uow()
     schema = {
-        "fields": [
-            {"key": "year", "label": "Year", "type": "number", "required": False}
-        ]
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+            "year": {"title": "Year", "type": "number"},
+        },
     }
     use_case = CreateNodeType(uow)
 
@@ -64,6 +69,22 @@ async def test_create_node_type_persists_attributes_schema() -> None:
     stored = await repos.node_types.get(nt.id)
     assert stored is not None
     assert stored.attributes_schema == schema
+
+
+async def test_create_node_type_raises_on_invalid_schema() -> None:
+    """CreateNodeType rejects a schema that is not valid JSON Schema."""
+    uow, _ = _make_uow()
+    use_case = CreateNodeType(uow)
+
+    with pytest.raises(InvalidSchemaError):
+        await use_case.handle(
+            CreateNodeTypeCommand(
+                slug="film",
+                label="Film",
+                attributes_schema={"type": "not-a-valid-type"},
+            ),
+            SYSTEM_ACTOR,
+        )
 
 
 async def test_create_node_type_raises_on_slug_conflict() -> None:

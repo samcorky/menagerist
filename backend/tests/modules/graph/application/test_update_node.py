@@ -15,8 +15,9 @@ from app.modules.graph.adapters.persistence.in_memory_node_type_repository impor
     InMemoryNodeTypeRepository,
 )
 from app.modules.graph.application.update_node import UpdateNode, UpdateNodeCommand
-from app.modules.graph.domain.errors import NodeNotFoundError
+from app.modules.graph.domain.errors import InvalidAttributesError, NodeNotFoundError
 from app.modules.graph.domain.node import Node
+from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
@@ -116,3 +117,60 @@ async def test_update_node_creates_node_type_when_type_is_new() -> None:
     film_type = await node_types.get_by_slug("film")
     assert film_type is not None
     assert film_type.label == "Film"
+
+
+async def test_update_node_skips_validation_when_node_type_has_no_schema() -> None:
+    """UpdateNode allows any attributes when the node type defines no schema."""
+    node_types = InMemoryNodeTypeRepository()
+    await node_types.add(
+        NodeType.create(slug="film", label="Film", attributes_schema=None)
+    )
+    repository = InMemoryNodeRepository()
+    node = Node.create(name="Alien", type="film")
+    await repository.add(node)
+    repos = GraphRepos(
+        nodes=repository,
+        edges=InMemoryEdgeRepository(),
+        node_types=node_types,
+        edge_types=InMemoryEdgeTypeRepository(),
+    )
+    uow = InMemoryUnitOfWork(repos)
+    use_case = UpdateNode(uow)
+
+    result = await use_case.handle(
+        UpdateNodeCommand(node_id=node.id, attributes={"anything": "goes"}),
+        SYSTEM_ACTOR,
+    )
+
+    assert result.attributes == {"anything": "goes"}
+
+
+async def test_update_node_validates_attributes_against_schema() -> None:
+    """UpdateNode rejects attributes that violate the node type's JSON Schema."""
+    schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {"year": {"type": "number"}},
+        "required": ["year"],
+    }
+    node_types = InMemoryNodeTypeRepository()
+    await node_types.add(
+        NodeType.create(slug="film", label="Film", attributes_schema=schema)
+    )
+    repository = InMemoryNodeRepository()
+    node = Node.create(name="Alien", type="film")
+    await repository.add(node)
+    repos = GraphRepos(
+        nodes=repository,
+        edges=InMemoryEdgeRepository(),
+        node_types=node_types,
+        edge_types=InMemoryEdgeTypeRepository(),
+    )
+    uow = InMemoryUnitOfWork(repos)
+    use_case = UpdateNode(uow)
+
+    with pytest.raises(InvalidAttributesError):
+        await use_case.handle(
+            UpdateNodeCommand(node_id=node.id, attributes={"year": "not-a-number"}),
+            SYSTEM_ACTOR,
+        )

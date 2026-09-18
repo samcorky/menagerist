@@ -19,7 +19,7 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import BackButton from '$lib/components/back-button.svelte';
-	import SchemaEditor, { type Schema } from '$lib/components/schema-editor.svelte';
+	import SchemaEditor, { type AttributesSchema } from '$lib/components/schema-editor.svelte';
 
 	const PAGE_SIZE = 50;
 	const loadingSkeletons = [1, 2, 3];
@@ -33,14 +33,14 @@
 	let description = $state('');
 	let directional = $state(true);
 	let submitting = $state(false);
-	let createSchema = $state<Schema | null>(null);
+	let createSchema = $state<AttributesSchema | null>(null);
 
 	let editingId = $state<string | null>(null);
 	let editLabel = $state('');
 	let editReverseLabel = $state('');
 	let editDescription = $state('');
 	let editDirectional = $state(true);
-	let editSchema = $state<Schema | null>(null);
+	let editSchema = $state<AttributesSchema | null>(null);
 	let savingId = $state<string | null>(null);
 
 	async function fetchPage(after?: string) {
@@ -103,7 +103,7 @@
 		editReverseLabel = et.reverse_label ?? '';
 		editDescription = et.description ?? '';
 		editDirectional = et.directional;
-		editSchema = (et.attributes_schema as Schema | null) ?? null;
+		editSchema = (et.attributes_schema as AttributesSchema | null) ?? null;
 	}
 
 	function cancelEdit() {

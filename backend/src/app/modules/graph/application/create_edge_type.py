@@ -1,10 +1,14 @@
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+import jsonschema
 import structlog
 
 from app.modules.graph.domain.edge_type import EdgeType
-from app.modules.graph.domain.errors import EdgeTypeSlugConflictError
+from app.modules.graph.domain.errors import (
+    EdgeTypeSlugConflictError,
+    InvalidSchemaError,
+)
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
@@ -32,6 +36,13 @@ class CreateEdgeType(CommandHandler[GraphUnitOfWork, CreateEdgeTypeCommand, Edge
 
     async def handle(self, command: CreateEdgeTypeCommand, actor: Actor) -> EdgeType:
         """Create an edge type from `command` and commit it."""
+        if command.attributes_schema is not None:
+            try:
+                jsonschema.validators.validator_for(
+                    command.attributes_schema
+                ).check_schema(command.attributes_schema)
+            except jsonschema.SchemaError as exc:
+                raise InvalidSchemaError(str(exc.message)) from exc
         async with self._uow as repos:
             slug = slugify(command.slug)
             if await repos.edge_types.get_by_slug(slug) is not None:

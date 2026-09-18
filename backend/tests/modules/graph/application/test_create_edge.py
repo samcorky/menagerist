@@ -15,7 +15,8 @@ from app.modules.graph.adapters.persistence.in_memory_node_type_repository impor
     InMemoryNodeTypeRepository,
 )
 from app.modules.graph.application.create_edge import CreateEdge, CreateEdgeCommand
-from app.modules.graph.domain.errors import NodeNotFoundError
+from app.modules.graph.domain.edge_type import EdgeType
+from app.modules.graph.domain.errors import InvalidAttributesError, NodeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.actor import SYSTEM_ACTOR
@@ -80,6 +81,35 @@ async def test_create_edge_raises_when_target_missing() -> None:
         await use_case.handle(
             CreateEdgeCommand(
                 source_id=source.id, target_id=uuid.uuid4(), type="directed-by"
+            ),
+            SYSTEM_ACTOR,
+        )
+
+
+async def test_create_edge_validates_attributes_against_schema() -> None:
+    """CreateEdge rejects attributes that violate the edge type's JSON Schema."""
+    schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {"since": {"type": "string", "format": "date"}},
+        "required": ["since"],
+    }
+    repos, source, target = await _repos_with_two_nodes()
+    await repos.edge_types.add(
+        EdgeType.create(
+            slug="directed-by", label="Directed By", attributes_schema=schema
+        )
+    )
+    uow = InMemoryUnitOfWork(repos)
+    use_case = CreateEdge(uow)
+
+    with pytest.raises(InvalidAttributesError):
+        await use_case.handle(
+            CreateEdgeCommand(
+                source_id=source.id,
+                target_id=target.id,
+                type="directed-by",
+                attributes={"since": "not-a-date"},
             ),
             SYSTEM_ACTOR,
         )

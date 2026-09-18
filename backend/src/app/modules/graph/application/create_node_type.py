@@ -1,9 +1,13 @@
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+import jsonschema
 import structlog
 
-from app.modules.graph.domain.errors import NodeTypeSlugConflictError
+from app.modules.graph.domain.errors import (
+    InvalidSchemaError,
+    NodeTypeSlugConflictError,
+)
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.cqrs import CommandHandler
@@ -29,6 +33,13 @@ class CreateNodeType(CommandHandler[GraphUnitOfWork, CreateNodeTypeCommand, Node
 
     async def handle(self, command: CreateNodeTypeCommand, actor: Actor) -> NodeType:
         """Create a node type from `command` and commit it."""
+        if command.attributes_schema is not None:
+            try:
+                jsonschema.validators.validator_for(
+                    command.attributes_schema
+                ).check_schema(command.attributes_schema)
+            except jsonschema.SchemaError as exc:
+                raise InvalidSchemaError(str(exc.message)) from exc
         async with self._uow as repos:
             if await repos.node_types.get_by_slug(command.slug) is not None:
                 raise NodeTypeSlugConflictError(
