@@ -24,6 +24,8 @@ For UX and UI rules, see [DESIGN_GUIDELINES.md](DESIGN_GUIDELINES.md).
 
 **Paths** — always use `resolve()` from `$app/paths` when building internal hrefs so the app works under a non-root base path.
 
+**Schema-driven attributes** — `attributes_schema` and node/edge `attributes` are opaque `dict[str, Any]` as far as the backend is concerned; the `Schema`/`SchemaField` shape (`src/lib/components/schema-editor.svelte`) and its rendering (`src/lib/components/attributes-editor.svelte`) are a frontend-only convention, not backend-validated. A field's `type` can be `'group'`, giving it `groupFields: SubField[]` (sub-fields cannot themselves be groups — no nesting) and a value that is an array of sub-attribute records rather than a scalar.
+
 ## Development
 
 Install dependencies and generate the API client first (run from the repo root):
@@ -65,9 +67,16 @@ The schema dump step (`poe dump-schema`) writes `frontend/openapi.json`, which t
 ```sh
 poe typecheck-frontend   # svelte-check + tsc
 poe lint-frontend        # prettier + eslint
+poe test-frontend        # Vitest unit tests
 poe build-frontend       # production build
 poe check                # all of the above (from repo root)
 ```
+
+### Testing
+
+Vitest tests live in `frontend/tests/*.test.ts` (not colocated with components) and run in a Node, not browser, environment — there's no component-rendering test setup here, only unit tests against plain exports (including a `.svelte` file's `<script module>` exports, e.g. `attributes-editor.svelte`'s `attributesToRows`/`rowsToAttributes`).
+
+`vitest.config.ts` aliases `@lucide/svelte` and `bits-ui` to stubs in `tests/mocks/`. Without them, importing anything that pulls in those packages adds well over a minute per run: Vitest's Node/SSR transform has no browser-style dep pre-bundling, so their large module graphs (thousands of icon exports; floating-ui/melt internals) get compiled file-by-file every run instead of being pre-bundled once. If a test starts failing with a missing export from either package, add the missing name to the relevant stub file — don't remove the alias.
 
 ## Building
 
