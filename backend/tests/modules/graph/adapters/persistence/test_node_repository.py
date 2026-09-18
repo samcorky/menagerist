@@ -22,6 +22,7 @@ def _fields(node: Node) -> tuple[object, ...]:
         node.description,
         node.attributes,
         node.favourite,
+        node.tags,
         node.created_at,
         node.updated_at,
         node.deleted_at,
@@ -169,3 +170,22 @@ async def test_list_excludes_soft_deleted_nodes(db_session: AsyncSession) -> Non
     result = await repository.list(after=None, limit=10)
 
     assert [n.id for n in result] == [kept.id]
+
+
+async def test_tags_round_trip(db_session: AsyncSession) -> None:
+    """Tags are stored as JSONB and come back as the same list, and updates persist."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    node = Node.create(name="Alien", tags=["Sci-Fi", "horror"])
+    await repository.add(node)
+
+    result = await repository.get(node.id)
+
+    assert result is not None
+    assert result.tags == ["sci-fi", "horror"]
+
+    node.update(tags=["classic"])
+    await repository.save(node)
+    updated = await repository.get(node.id)
+
+    assert updated is not None
+    assert updated.tags == ["classic"]

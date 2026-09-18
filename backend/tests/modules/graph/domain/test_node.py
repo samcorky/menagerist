@@ -196,3 +196,35 @@ def test_update_leaves_favourite_unchanged_when_not_given() -> None:
     node.update(name="Alien (1979)")
 
     assert node.favourite is True
+
+
+def test_create_defaults_tags_to_empty() -> None:
+    """Node.create without tags yields an empty list."""
+    assert Node.create(name="Alien").tags == []
+
+
+def test_create_normalises_tags() -> None:
+    """Tags are trimmed, lowercased, de-duplicated and blanks dropped, in order."""
+    node = Node.create(name="Alien", tags=[" Sci-Fi ", "horror", "SCI-FI", "  "])
+
+    assert node.tags == ["sci-fi", "horror"]
+
+
+def test_update_sets_and_clears_tags() -> None:
+    """update() replaces tags (normalised) and an empty list clears them."""
+    node = Node.create(name="Alien", tags=["a"])
+
+    node.update(tags=["B", "b"])
+    assert node.tags == ["b"]
+
+    node.update(tags=[])
+    assert node.tags == []
+
+
+def test_update_leaves_tags_unchanged_when_not_given() -> None:
+    """update() without tags leaves the existing tags untouched."""
+    node = Node.create(name="Alien", tags=["a"])
+
+    node.update(name="Aliens")
+
+    assert node.tags == ["a"]

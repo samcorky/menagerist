@@ -31,6 +31,7 @@ class UpdateNodeCommand:
     description: str | None = field(default=None)
     attributes: dict[str, Any] | None = field(default=None)
     favourite: bool | None = field(default=None)
+    tags: list[str] | None = field(default=None)
 
 
 class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
@@ -49,6 +50,7 @@ class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
                 description=command.description,
                 attributes=command.attributes,
                 favourite=command.favourite,
+                tags=command.tags,
             )
 
             if command.type is not None:

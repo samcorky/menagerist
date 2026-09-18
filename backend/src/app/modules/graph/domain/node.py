@@ -8,6 +8,11 @@ from app.shared_kernel.mixins import Identifiable, SoftDeletable
 from app.shared_kernel.slug import slugify
 
 
+def _normalise_tags(tags: list[str]) -> list[str]:
+    """Trim and lowercase tags, dropping blanks and duplicates while keeping order."""
+    return list(dict.fromkeys(t for tag in tags if (t := tag.strip().lower())))
+
+
 @dataclass(kw_only=True, eq=False)
 class Node(Identifiable, SoftDeletable):
     """A single item in the collection graph - a collectible, person, event, etc."""
@@ -17,6 +22,7 @@ class Node(Identifiable, SoftDeletable):
     description: str | None = None
     attributes: dict[str, Any] = field(default_factory=dict)
     favourite: bool = False
+    tags: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Validate invariants and normalise fields after construction."""
@@ -29,6 +35,7 @@ class Node(Identifiable, SoftDeletable):
                 raise ValidationError("type must be a non-empty string when provided")
 
         self.attributes = self.attributes or {}
+        self.tags = _normalise_tags(self.tags)
 
     @classmethod
     def create(
@@ -39,6 +46,7 @@ class Node(Identifiable, SoftDeletable):
         description: str | None = None,
         attributes: dict[str, Any] | None = None,
         favourite: bool = False,
+        tags: list[str] | None = None,
     ) -> Node:
         """Create a new node, generating its id and timestamps."""
         now = datetime.now(UTC)
@@ -49,6 +57,7 @@ class Node(Identifiable, SoftDeletable):
             description=description,
             attributes=attributes or {},
             favourite=favourite,
+            tags=tags or [],
             created_at=now,
             updated_at=now,
         )
@@ -75,6 +84,7 @@ class Node(Identifiable, SoftDeletable):
         description: str | None = None,
         attributes: dict[str, Any] | None = None,
         favourite: bool | None = None,
+        tags: list[str] | None = None,
     ) -> None:
         """Apply partial changes to editable fields, validating invariants."""
         if name is not None:
@@ -88,4 +98,6 @@ class Node(Identifiable, SoftDeletable):
         self._set_if_given(
             description=description, attributes=attributes, favourite=favourite
         )
+        if tags is not None:
+            self.tags = _normalise_tags(tags)
         self.touch()

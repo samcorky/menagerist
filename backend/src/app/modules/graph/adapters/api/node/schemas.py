@@ -17,6 +17,7 @@ _NODE_EXAMPLE: dict[str, Any] = {
     "description": "A 1979 science fiction horror film directed by Ridley Scott.",
     "attributes": {"year": 1979},
     "favourite": False,
+    "tags": ["sci-fi", "horror"],
     "created_at": "2026-08-23T10:14:44.465954Z",
     "updated_at": "2026-08-23T10:14:44.465954Z",
 }
@@ -28,6 +29,7 @@ _NODE_MINIMAL_EXAMPLE: dict[str, Any] = {
     "description": None,
     "attributes": {},
     "favourite": False,
+    "tags": [],
     "created_at": "2026-08-23T10:14:44.465954Z",
     "updated_at": "2026-08-23T10:14:44.465954Z",
 }
@@ -58,6 +60,7 @@ class CreateNodeRequest(BaseModel):
     description: str | None = Field(default=None)
     attributes: dict[str, Any] = Field(default_factory=dict)
     favourite: bool = Field(default=False)
+    tags: list[str] = Field(default_factory=list)
 
     @field_validator("type", mode="before")
     @classmethod
@@ -75,6 +78,7 @@ class CreateNodeRequest(BaseModel):
             description=self.description,
             attributes=self.attributes,
             favourite=self.favourite,
+            tags=self.tags,
         )
 
 
@@ -101,6 +105,7 @@ class UpdateNodeRequest(BaseModel):
     description: str | None = Field(default=None)
     attributes: dict[str, Any] | None = Field(default=None)
     favourite: bool | None = Field(default=None)
+    tags: list[str] | None = Field(default=None)
 
     @field_validator("type", mode="before")
     @classmethod
@@ -119,6 +124,7 @@ class UpdateNodeRequest(BaseModel):
             description=self.description,
             attributes=self.attributes,
             favourite=self.favourite,
+            tags=self.tags,
         )
 
 
@@ -135,6 +141,7 @@ class NodeResponse(BaseModel):
     description: str | None = Field(default=None)
     attributes: dict[str, Any]
     favourite: bool
+    tags: list[str]
     created_at: datetime
     updated_at: datetime
 
@@ -148,6 +155,7 @@ class NodeResponse(BaseModel):
             description=node.description,
             attributes=node.attributes,
             favourite=node.favourite,
+            tags=node.tags,
             created_at=node.created_at,
             updated_at=node.updated_at,
         )

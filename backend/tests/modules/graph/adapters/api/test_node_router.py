@@ -337,6 +337,43 @@ def test_update_node_clears_favourite() -> None:
     assert response.json()["favourite"] is False
 
 
+def test_create_node_tags_default_to_empty() -> None:
+    """POST /api/v1/node without tags returns an empty tags list."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    response = client.post("/api/v1/node", json={"name": "Alien"})
+
+    assert response.status_code == 201
+    assert response.json()["tags"] == []
+
+
+def test_create_node_normalises_tags() -> None:
+    """POST /api/v1/node trims, lowercases and de-duplicates tags."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    response = client.post(
+        "/api/v1/node",
+        json={"name": "Alien", "tags": [" Sci-Fi ", "sci-fi", "", "Horror"]},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["tags"] == ["sci-fi", "horror"]
+
+
+def test_update_node_replaces_and_clears_tags() -> None:
+    """PATCH /api/v1/node/{id} replaces tags, and an empty list clears them."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien", "tags": ["a"]}).json()
+
+    replaced = client.patch(f"/api/v1/node/{node['id']}", json={"tags": ["B"]})
+    untouched = client.patch(f"/api/v1/node/{node['id']}", json={"name": "Aliens"})
+    cleared = client.patch(f"/api/v1/node/{node['id']}", json={"tags": []})
+
+    assert replaced.json()["tags"] == ["b"]
+    assert untouched.json()["tags"] == ["b"]
+    assert cleared.json()["tags"] == []
+
+
 def test_list_nodes_filters_by_favourite() -> None:
     """GET /api/v1/node?favourite=true returns only favourited nodes."""
     client = TestClient(_app_with_in_memory_graph())

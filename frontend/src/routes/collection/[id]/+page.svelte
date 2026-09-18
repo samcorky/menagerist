@@ -28,6 +28,8 @@
 	} from '$lib/components/attributes-editor.svelte';
 	import type { Schema } from '$lib/components/schema-editor.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
+	import TagsInput from '$lib/components/tags-input.svelte';
+	import { Badge } from '$lib/components/ui/badge/index.js';
 	import NotFound from '$lib/components/not-found.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Toggle } from '$lib/components/ui/toggle/index.js';
@@ -62,6 +64,7 @@
 
 	let name = $state('');
 	let description = $state('');
+	let tags = $state<string[]>([]);
 	let attributeRows = $state<AttributeRow[]>([]);
 	let saving = $state(false);
 	let deletingNode = $state(false);
@@ -119,6 +122,7 @@
 		node = nodeResult.data;
 		name = node.name;
 		description = node.description ?? '';
+		tags = node.tags;
 		attributeRows = attributesToRows(node.attributes);
 		edges = edgesResult.data ?? [];
 		otherNodes = (nodesResult.data ?? []).filter((candidate) => candidate.id !== nodeId);
@@ -159,6 +163,7 @@
 			body: {
 				name,
 				description: description || null,
+				tags,
 				attributes: rowsToAttributes(attributeRows)
 			}
 		});
@@ -180,6 +185,7 @@
 		if (node) {
 			name = node.name;
 			description = node.description ?? '';
+			tags = node.tags;
 			attributeRows = attributesToRows(node.attributes);
 		}
 		mode = 'read';
@@ -350,6 +356,8 @@
 									<Textarea id="description" bind:value={description} />
 								</div>
 
+								<TagsInput bind:tags />
+
 								<AttributesEditor bind:rows={attributeRows} schema={nodeSchema} />
 
 								<div class="flex flex-wrap items-center justify-between gap-2">
@@ -406,6 +414,18 @@
 										<p class="text-sm text-muted-foreground italic">No description.</p>
 									{/if}
 								</ShimmerSlot>
+
+								{#if !loading && node && node.tags.length > 0}
+									<ul class="flex flex-wrap gap-1.5" aria-label="Tags">
+										{#each node.tags as tag (tag)}
+											<li>
+												<Badge variant="secondary">
+													<span class="max-w-40 truncate" title={tag}>{tag}</span>
+												</Badge>
+											</li>
+										{/each}
+									</ul>
+								{/if}
 
 								{#if !loading && attributeRows.length > 0}
 									<div class="space-y-1.5">

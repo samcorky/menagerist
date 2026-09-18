@@ -24,6 +24,7 @@ class CreateNodeCommand:
     description: str | None = field(default=None)
     attributes: dict[str, Any] = field(default_factory=dict)
     favourite: bool = field(default=False)
+    tags: list[str] = field(default_factory=list)
 
 
 class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
@@ -41,6 +42,7 @@ class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
             description=command.description,
             attributes=command.attributes,
             favourite=command.favourite,
+            tags=command.tags,
         )
         async with self._uow as repos:
             if command.type is not None:

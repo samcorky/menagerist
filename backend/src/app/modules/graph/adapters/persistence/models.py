@@ -35,6 +35,7 @@ class NodeModel(IdentifiableMixin, SoftDeletableMixin, Base):
     description: Mapped[str | None]
     attributes: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     favourite: Mapped[bool] = mapped_column(default=False)
+    tags: Mapped[list[str]] = mapped_column(JSONB, default=list)
 
 
 class EdgeModel(IdentifiableMixin, SoftDeletableMixin, Base):

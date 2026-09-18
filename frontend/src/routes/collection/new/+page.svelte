@@ -20,6 +20,7 @@
 	import type { Schema } from '$lib/components/schema-editor.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import CategorySelect from '$lib/components/category-select.svelte';
+	import TagsInput from '$lib/components/tags-input.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -29,6 +30,7 @@
 	let name = $state('');
 	let description = $state('');
 	let selectedType = $state<string | null>(null);
+	let tags = $state<string[]>([]);
 	let attrRows = $state<AttributeRow[]>([]);
 	let saving = $state(false);
 	let photo = $state<File | null>(null);
@@ -85,6 +87,7 @@
 				name: name.trim(),
 				type: selectedType || null,
 				description: description || null,
+				tags,
 				attributes: rowsToAttributes(attrRows)
 			}
 		});
@@ -171,6 +174,8 @@
 						<Label for="description">Description</Label>
 						<Textarea id="description" bind:value={description} />
 					</div>
+
+					<TagsInput bind:tags />
 
 					<!-- Attributes (schema-aware when category selected) -->
 					<AttributesEditor bind:rows={attrRows} schema={nodeSchema} />
