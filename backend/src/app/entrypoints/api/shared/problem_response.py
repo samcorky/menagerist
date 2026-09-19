@@ -30,6 +30,7 @@ class ProblemDetail(BaseModel):
     status: int
     detail: str
     instance: str
+    errors: list[dict[str, str]] | None = None
 
 
 def _status_for(error_type: type[DomainError]) -> int:
@@ -90,16 +91,19 @@ def _problem_response(request: Request, exc: Exception) -> JSONResponse:
         for error_type, status in _STATUS_BY_DOMAIN_ERROR.items()
         if isinstance(exc, error_type)
     )
+    content: dict[str, Any] = {
+        "type": "about:blank",
+        "title": type(exc).__name__,
+        "status": status_code,
+        "detail": str(exc),
+        "instance": str(request.url),
+    }
+    if hasattr(exc, "validation_errors") and exc.validation_errors:
+        content["errors"] = exc.validation_errors
     return JSONResponse(
         status_code=status_code,
         media_type="application/problem+json",
-        content={
-            "type": "about:blank",
-            "title": type(exc).__name__,
-            "status": status_code,
-            "detail": str(exc),
-            "instance": str(request.url),
-        },
+        content=content,
     )
 
 

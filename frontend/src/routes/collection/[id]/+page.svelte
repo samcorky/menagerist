@@ -69,6 +69,7 @@
 	let description = $state('');
 	let tags = $state<string[]>([]);
 	let attributeRows = $state<AttributeRow[]>([]);
+	let attributeServerErrors = $state<Record<string, string> | null>(null);
 	let saving = $state(false);
 	let deletingNode = $state(false);
 	let confirmDeleteNode = $state(false);
@@ -161,6 +162,7 @@
 	async function handleSave(event: SubmitEvent) {
 		event.preventDefault();
 		saving = true;
+		attributeServerErrors = null;
 		const result = await updateNode({
 			path: { node_id: nodeId },
 			body: {
@@ -175,6 +177,15 @@
 				description: 'This item was edited elsewhere — refresh to see the latest version.'
 			});
 		} else if (result.error || !result.data) {
+			const fieldErrors =
+				(result.error as { errors?: Array<{ path?: string; message?: string }> } | null)?.errors ??
+				[];
+			const placed = fieldErrors.filter((e) => e.path && e.path !== '/');
+			if (placed.length) {
+				attributeServerErrors = Object.fromEntries(
+					placed.map((e) => [e.path!.replace(/^\//, ''), e.message ?? 'Invalid value'])
+				);
+			}
 			const { title, description: desc } = networkAwareError(result);
 			toast.error(title, { description: desc });
 		} else {
@@ -361,7 +372,11 @@
 
 								<TagsInput bind:tags />
 
-								<AttributesEditor bind:rows={attributeRows} schema={nodeSchema} />
+								<AttributesEditor
+									bind:rows={attributeRows}
+									schema={nodeSchema}
+									serverErrors={attributeServerErrors}
+								/>
 
 								<div class="flex flex-wrap items-center justify-between gap-2">
 									{#if !loading}

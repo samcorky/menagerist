@@ -2,10 +2,10 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-import jsonschema
 import structlog
 
-from app.modules.graph.domain.errors import InvalidAttributesError, NodeNotFoundError
+from app.modules.graph.application._validate_attributes import validate_attributes
+from app.modules.graph.domain.errors import NodeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
@@ -49,14 +49,7 @@ class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
                 slug = slugify(node.type)
                 node_type = await repos.node_types.get_by_slug(slug)
                 if node_type is not None and node_type.attributes_schema is not None:
-                    _schema = node_type.attributes_schema
-                    _cls = jsonschema.validators.validator_for(_schema)
-                    try:
-                        _cls(_schema, format_checker=_cls.FORMAT_CHECKER).validate(
-                            command.attributes
-                        )
-                    except jsonschema.ValidationError as exc:
-                        raise InvalidAttributesError(exc.message) from exc
+                    validate_attributes(node_type.attributes_schema, command.attributes)
 
             node.update(
                 name=command.name,

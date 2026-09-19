@@ -86,22 +86,29 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import { normalise, orderedKeys } from '$lib/layout';
 	const ajv = new Ajv2020({ allErrors: true });
 	addFormats(ajv);
 	ajv.addKeyword('x-multiline');
+	ajv.addKeyword('x-layout');
 
 	let {
 		rows = $bindable(),
-		schema = null
-	}: { rows: AttributeRow[]; schema?: AttributesSchema | null } = $props();
+		schema = null,
+		serverErrors = null
+	}: {
+		rows: AttributeRow[];
+		schema?: AttributesSchema | null;
+		serverErrors?: Record<string, string> | null;
+	} = $props();
 
 	let validate = $derived(schema ? ajv.compile(schema) : null);
 
 	let fieldErrors = $derived.by(() => {
-		if (!validate || !schema) return {} as Record<string, string>;
+		const errors: Record<string, string> = { ...serverErrors };
+		if (!validate || !schema) return errors;
 		const attrs = rowsToAttributes(rows, schema);
 		validate(attrs);
-		const errors: Record<string, string> = {};
 		for (const err of validate.errors ?? []) {
 			const key = err.instancePath.replace(/^\//, '');
 			if (key && !errors[key]) errors[key] = err.message ?? 'Invalid value';
@@ -109,7 +116,13 @@
 		return errors;
 	});
 
-	let schemaEntries = $derived(schema ? Object.entries(schema.properties) : []);
+	let schemaEntries = $derived(
+		schema
+			? orderedKeys(normalise(schema['x-layout'], schema.properties))
+					.filter((key) => key in schema.properties)
+					.map((key) => [key, schema.properties[key]] as [string, JsonSchemaProperty])
+			: []
+	);
 	let schemaKeys = $derived(schemaEntries.map(([k]) => k));
 	let freeformRows = $derived(rows.filter((r) => !schemaKeys.includes(r.key)));
 

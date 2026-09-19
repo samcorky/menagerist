@@ -1,4 +1,6 @@
 <script lang="ts" module>
+	import { normalise, orderedKeys, type XLayout } from '$lib/layout';
+
 	export type JsonSchemaProperty =
 		| { title: string; type: 'string'; 'x-multiline'?: true }
 		| { title: string; type: 'string'; format: 'date' }
@@ -16,6 +18,7 @@
 		type: 'object';
 		properties: Record<string, JsonSchemaProperty>;
 		required?: string[];
+		'x-layout'?: XLayout;
 	};
 
 	type FieldKind = 'text' | 'longtext' | 'number' | 'boolean' | 'date' | 'choice' | 'group';
@@ -109,24 +112,28 @@
 	function schemaToFields(schema: AttributesSchema | null): EditorField[] {
 		if (!schema) return [];
 		const required = new Set(schema.required ?? []);
-		return Object.entries(schema.properties).map(([key, prop]) =>
-			propertyToField(key, prop, required.has(key))
-		);
+		const layout = normalise(schema['x-layout'], schema.properties);
+		return orderedKeys(layout)
+			.filter((key) => key in schema.properties)
+			.map((key) => propertyToField(key, schema.properties[key], required.has(key)));
 	}
 
 	function fieldsToSchema(fields: EditorField[]): AttributesSchema | null {
 		if (fields.length === 0) return null;
 		const properties: Record<string, JsonSchemaProperty> = {};
 		const required: string[] = [];
+		const layout: XLayout = [];
 		for (const f of fields) {
 			if (!f.key) continue;
 			properties[f.key] = fieldToProperty(f);
 			if (f.required) required.push(f.key);
+			layout.push({ key: f.key });
 		}
 		return {
 			$schema: 'https://json-schema.org/draft/2020-12/schema',
 			type: 'object',
 			properties,
+			'x-layout': layout,
 			...(required.length > 0 ? { required } : {})
 		};
 	}

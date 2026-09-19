@@ -2,11 +2,11 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-import jsonschema
 import structlog
 
+from app.modules.graph.application._validate_attributes import validate_attributes
 from app.modules.graph.domain.edge import Edge
-from app.modules.graph.domain.errors import EdgeNotFoundError, InvalidAttributesError
+from app.modules.graph.domain.errors import EdgeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
@@ -42,14 +42,7 @@ class UpdateEdge(CommandHandler[GraphUnitOfWork, UpdateEdgeCommand, Edge]):
             if command.attributes is not None:
                 edge_type = await repos.edge_types.get_by_slug(slugify(edge.type))
                 if edge_type is not None and edge_type.attributes_schema is not None:
-                    _schema = edge_type.attributes_schema
-                    _cls = jsonschema.validators.validator_for(_schema)
-                    try:
-                        _cls(_schema, format_checker=_cls.FORMAT_CHECKER).validate(
-                            command.attributes
-                        )
-                    except jsonschema.ValidationError as exc:
-                        raise InvalidAttributesError(exc.message) from exc
+                    validate_attributes(edge_type.attributes_schema, command.attributes)
 
             edge.update(attributes=command.attributes)
 

@@ -32,6 +32,7 @@
 	let selectedType = $state<string | null>(null);
 	let tags = $state<string[]>([]);
 	let attrRows = $state<AttributeRow[]>([]);
+	let attrServerErrors = $state<Record<string, string> | null>(null);
 	let saving = $state(false);
 	let photo = $state<File | null>(null);
 	let photoPreview = $state<string | null>(null);
@@ -93,6 +94,15 @@
 			}
 		});
 		if (result.error || !result.data) {
+			const fieldErrors =
+				(result.error as { errors?: Array<{ path?: string; message?: string }> } | null)?.errors ??
+				[];
+			const placed = fieldErrors.filter((e) => e.path && e.path !== '/');
+			if (placed.length) {
+				attrServerErrors = Object.fromEntries(
+					placed.map((e) => [e.path!.replace(/^\//, ''), e.message ?? 'Invalid value'])
+				);
+			}
 			const { title, description: desc } = networkAwareError(result);
 			toast.error(title, { description: desc });
 			saving = false;
@@ -179,7 +189,11 @@
 					<TagsInput bind:tags />
 
 					<!-- Attributes (schema-aware when category selected) -->
-					<AttributesEditor bind:rows={attrRows} schema={nodeSchema} />
+					<AttributesEditor
+						bind:rows={attrRows}
+						schema={nodeSchema}
+						serverErrors={attrServerErrors}
+					/>
 
 					<div class="flex justify-end">
 						<Button type="submit" disabled={!name.trim() || saving}>
