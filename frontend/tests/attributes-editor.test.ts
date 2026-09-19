@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { Validator } from '@cfworker/json-schema';
 import {
 	attributesToRows,
 	rowsToAttributes,
@@ -157,5 +158,70 @@ describe('rowsToAttributes with schema', () => {
 			title: { title: 'Title', type: 'string' }
 		});
 		expect(rowsToAttributes(attributesToRows(original), s)).toEqual(original);
+	});
+});
+
+describe('@cfworker/json-schema validation', () => {
+	const mkSchema = (properties: AttributesSchema['properties'], required?: string[]): object => ({
+		$schema: 'https://json-schema.org/draft/2020-12/schema',
+		type: 'object',
+		properties,
+		...(required ? { required } : {})
+	});
+
+	it('passes valid data', () => {
+		const v = new Validator(
+			mkSchema({ year: { title: 'Year', type: 'number' } }),
+			'2020-12',
+			false
+		);
+		expect(v.validate({ year: 2020 }).valid).toBe(true);
+	});
+
+	it('fails on type mismatch and reports instanceLocation as #/field', () => {
+		const v = new Validator(
+			mkSchema({ year: { title: 'Year', type: 'number' } }),
+			'2020-12',
+			false
+		);
+		const result = v.validate({ year: 'bad' });
+		expect(result.valid).toBe(false);
+		const keys = result.errors.map((e) => e.instanceLocation.replace(/^#\/?/, '')).filter(Boolean);
+		expect(keys).toContain('year');
+	});
+
+	it('collects multiple errors when shortCircuit is false', () => {
+		const v = new Validator(
+			mkSchema(
+				{ year: { title: 'Year', type: 'number' }, title: { title: 'Title', type: 'string' } },
+				['year', 'title']
+			),
+			'2020-12',
+			false
+		);
+		expect(v.validate({}).valid).toBe(false);
+		expect(v.validate({}).errors.length).toBeGreaterThan(1);
+	});
+
+	it('ignores unknown x-* keywords without throwing', () => {
+		const s: object = {
+			$schema: 'https://json-schema.org/draft/2020-12/schema',
+			type: 'object',
+			properties: { bio: { title: 'Bio', type: 'string', 'x-multiline': true } },
+			'x-layout': [{ key: 'bio' }]
+		};
+		const v = new Validator(s, '2020-12', false);
+		expect(() => v.validate({ bio: 'text' })).not.toThrow();
+		expect(v.validate({ bio: 'text' }).valid).toBe(true);
+	});
+
+	it('validates date format', () => {
+		const v = new Validator(
+			mkSchema({ dob: { title: 'DoB', type: 'string', format: 'date' } }),
+			'2020-12',
+			false
+		);
+		expect(v.validate({ dob: '2024-01-15' }).valid).toBe(true);
+		expect(v.validate({ dob: 'not-a-date' }).valid).toBe(false);
 	});
 });

@@ -79,18 +79,13 @@
 </script>
 
 <script lang="ts">
-	import Ajv2020 from 'ajv/dist/2020';
-	import addFormats from 'ajv-formats';
+	import { Validator } from '@cfworker/json-schema';
 	import { Plus, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
-	import { normalise, orderedKeys } from '$lib/layout';
-	const ajv = new Ajv2020({ allErrors: true });
-	addFormats(ajv);
-	ajv.addKeyword('x-multiline');
-	ajv.addKeyword('x-layout');
+	import { normalise, orderedKeys, isSectionItem } from '$lib/layout';
 
 	let {
 		rows = $bindable(),
@@ -102,28 +97,24 @@
 		serverErrors?: Record<string, string> | null;
 	} = $props();
 
-	let validate = $derived(schema ? ajv.compile(schema) : null);
+	let validator = $derived(
+		schema ? new Validator($state.snapshot(schema) as object, '2020-12', false) : null
+	);
 
 	let fieldErrors = $derived.by(() => {
 		const errors: Record<string, string> = { ...serverErrors };
-		if (!validate || !schema) return errors;
+		if (!validator || !schema) return errors;
 		const attrs = rowsToAttributes(rows, schema);
-		validate(attrs);
-		for (const err of validate.errors ?? []) {
-			const key = err.instancePath.replace(/^\//, '');
-			if (key && !errors[key]) errors[key] = err.message ?? 'Invalid value';
+		const result = validator.validate(attrs);
+		for (const err of result.errors) {
+			const key = err.instanceLocation.replace(/^#\/?/, '');
+			if (key && !errors[key]) errors[key] = err.error ?? 'Invalid value';
 		}
 		return errors;
 	});
 
-	let schemaEntries = $derived(
-		schema
-			? orderedKeys(normalise(schema['x-layout'], schema.properties))
-					.filter((key) => key in schema.properties)
-					.map((key) => [key, schema.properties[key]] as [string, JsonSchemaProperty])
-			: []
-	);
-	let schemaKeys = $derived(schemaEntries.map(([k]) => k));
+	let schemaLayout = $derived(schema ? normalise(schema['x-layout'], schema.properties) : []);
+	let schemaKeys = $derived(orderedKeys(schemaLayout));
 	let freeformRows = $derived(rows.filter((r) => !schemaKeys.includes(r.key)));
 
 	function getSchemaValue(key: string): string {
@@ -238,75 +229,94 @@
 <div class="space-y-2">
 	<Label>Details</Label>
 
-	{#if schema && schemaEntries.length > 0}
-		{#each schemaEntries as [key, prop] (key)}
-			{@const isRequired = schema.required?.includes(key) ?? false}
-			{@const error = fieldErrors[key]}
-			<div class="flex gap-2 {prop.type === 'array' ? 'items-start' : 'items-center'}">
-				<span class="w-32 shrink-0 pt-1.5 text-sm text-muted-foreground">
-					{prop.title || key}{#if isRequired}<span class="ml-0.5 text-destructive">*</span>{/if}
-				</span>
-				{#if prop.type === 'array'}
-					<div class="flex-1 space-y-2">
-						<div class="overflow-x-auto rounded-md border border-input">
-							<table class="w-full text-sm">
-								<thead>
-									<tr class="border-b border-input bg-muted/50">
-										{#each Object.entries(prop.items.properties) as [sk, sp] (sk)}
-											<th class="px-2 py-1.5 text-left font-medium text-muted-foreground">
-												{sp.title || sk}
-											</th>
-										{/each}
-										<th class="w-9"></th>
-									</tr>
-								</thead>
-								<tbody>
-									{#each getGroupRows(key) as groupRow, ri (ri)}
-										<tr class="border-b border-input last:border-0">
-											{#each Object.entries(prop.items.properties) as [sk, sp] (sk)}
-												<td class="px-2 py-1.5">
-													{@render valueInput(sp, groupRow[sk] ?? '', sp.title || sk, (value) =>
-														setGroupCellValue(key, ri, sk, value)
-													)}
-												</td>
-											{/each}
-											<td class="px-2 py-1.5 text-right">
-												<Button
-													type="button"
-													variant="ghost"
-													size="icon"
-													onclick={() => removeGroupRow(key, ri)}
-													aria-label="Remove row"
-												>
-													<X class="size-4" />
-												</Button>
-											</td>
-										</tr>
+	{#snippet fieldEntry(key: string, prop: JsonSchemaProperty)}
+		{@const isRequired = schema?.required?.includes(key) ?? false}
+		{@const error = fieldErrors[key]}
+		<div class="flex gap-2 {prop.type === 'array' ? 'items-start' : 'items-center'}">
+			<span class="w-32 shrink-0 pt-1.5 text-sm text-muted-foreground">
+				{prop.title || key}{#if isRequired}<span class="ml-0.5 text-destructive">*</span>{/if}
+			</span>
+			{#if prop.type === 'array'}
+				<div class="flex-1 space-y-2">
+					<div class="overflow-x-auto rounded-md border border-input">
+						<table class="w-full text-sm">
+							<thead>
+								<tr class="border-b border-input bg-muted/50">
+									{#each Object.entries(prop.items.properties) as [sk, sp] (sk)}
+										<th class="px-2 py-1.5 text-left font-medium text-muted-foreground">
+											{sp.title || sk}
+										</th>
 									{/each}
-								</tbody>
-							</table>
-						</div>
-						<Button
-							type="button"
-							variant="outline"
-							size="sm"
-							onclick={() => addGroupRow(key, prop.items.properties)}
-						>
-							<Plus class="size-4" />
-							Add row
-						</Button>
+									<th class="w-9"></th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each getGroupRows(key) as groupRow, ri (ri)}
+									<tr class="border-b border-input last:border-0">
+										{#each Object.entries(prop.items.properties) as [sk, sp] (sk)}
+											<td class="px-2 py-1.5">
+												{@render valueInput(sp, groupRow[sk] ?? '', sp.title || sk, (value) =>
+													setGroupCellValue(key, ri, sk, value)
+												)}
+											</td>
+										{/each}
+										<td class="px-2 py-1.5 text-right">
+											<Button
+												type="button"
+												variant="ghost"
+												size="icon"
+												onclick={() => removeGroupRow(key, ri)}
+												aria-label="Remove row"
+											>
+												<X class="size-4" />
+											</Button>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
 					</div>
-				{:else}
-					<div class="flex flex-1 flex-col gap-1">
-						{@render valueInput(prop, getSchemaValue(key), prop.title || key, (value) =>
-							setSchemaValue(key, value)
-						)}
-						{#if error}
-							<p class="text-xs text-destructive">{error}</p>
-						{/if}
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onclick={() => addGroupRow(key, prop.items.properties)}
+					>
+						<Plus class="size-4" />
+						Add row
+					</Button>
+				</div>
+			{:else}
+				<div class="flex flex-1 flex-col gap-1">
+					{@render valueInput(prop, getSchemaValue(key), prop.title || key, (value) =>
+						setSchemaValue(key, value)
+					)}
+					{#if error}
+						<p class="text-xs text-destructive">{error}</p>
+					{/if}
+				</div>
+			{/if}
+		</div>
+	{/snippet}
+
+	{#if schema && schemaLayout.length > 0}
+		{#each schemaLayout as layoutItem (isSectionItem(layoutItem) ? layoutItem.id : layoutItem.key)}
+			{#if isSectionItem(layoutItem)}
+				<div class="space-y-2 pt-1">
+					<p class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+						{layoutItem.section}
+					</p>
+					<div class="space-y-2 rounded-md border border-input/60 bg-muted/20 p-3">
+						{#each layoutItem.items as { key } (key)}
+							{#if key in schema.properties}
+								{@render fieldEntry(key, schema.properties[key])}
+							{/if}
+						{/each}
 					</div>
-				{/if}
-			</div>
+				</div>
+			{:else if layoutItem.key in schema.properties}
+				{@render fieldEntry(layoutItem.key, schema.properties[layoutItem.key])}
+			{/if}
 		{/each}
 
 		<!-- Custom fields: collapsible when schema fields exist -->

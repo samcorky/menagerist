@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import { normalise, orderedKeys, type XLayout } from '$lib/layout';
+	import { normalise, isSectionItem, type XLayout } from '$lib/layout';
 
 	export type JsonSchemaProperty =
 		| { title: string; type: 'string'; 'x-multiline'?: true }
@@ -33,6 +33,19 @@
 		options: string[];
 		subFields: EditorSubField[];
 	};
+
+	type EditorSection = {
+		_section: true;
+		id: string;
+		sectionLabel: string;
+		fields: EditorField[];
+	};
+
+	type EditorItem = EditorField | EditorSection;
+
+	function isSection(item: EditorItem): item is EditorSection {
+		return '_section' in item;
+	}
 
 	function propertyToField(key: string, prop: JsonSchemaProperty, required: boolean): EditorField {
 		const base = { key, label: prop.title, required, options: [], subFields: [] };
@@ -109,26 +122,65 @@
 		}
 	}
 
-	function schemaToFields(schema: AttributesSchema | null): EditorField[] {
+	function schemaToItems(schema: AttributesSchema | null): EditorItem[] {
 		if (!schema) return [];
 		const required = new Set(schema.required ?? []);
 		const layout = normalise(schema['x-layout'], schema.properties);
-		return orderedKeys(layout)
-			.filter((key) => key in schema.properties)
-			.map((key) => propertyToField(key, schema.properties[key], required.has(key)));
+		return layout.flatMap((layoutItem): EditorItem[] => {
+			if (isSectionItem(layoutItem)) {
+				return [
+					{
+						_section: true,
+						id: layoutItem.id,
+						sectionLabel: layoutItem.section,
+						fields: layoutItem.items
+							.filter((i) => i.key in schema.properties)
+							.map((i) => propertyToField(i.key, schema.properties[i.key], required.has(i.key)))
+					}
+				];
+			} else {
+				if (!(layoutItem.key in schema.properties)) return [];
+				return [
+					propertyToField(
+						layoutItem.key,
+						schema.properties[layoutItem.key],
+						required.has(layoutItem.key)
+					)
+				];
+			}
+		});
 	}
 
-	function fieldsToSchema(fields: EditorField[]): AttributesSchema | null {
-		if (fields.length === 0) return null;
+	function itemsToSchema(items: EditorItem[]): AttributesSchema | null {
 		const properties: Record<string, JsonSchemaProperty> = {};
 		const required: string[] = [];
 		const layout: XLayout = [];
-		for (const f of fields) {
-			if (!f.key) continue;
-			properties[f.key] = fieldToProperty(f);
-			if (f.required) required.push(f.key);
-			layout.push({ key: f.key });
+
+		for (const item of items) {
+			if (isSection(item)) {
+				const sectionLayout: { key: string }[] = [];
+				for (const f of item.fields) {
+					if (!f.key) continue;
+					properties[f.key] = fieldToProperty(f);
+					if (f.required) required.push(f.key);
+					sectionLayout.push({ key: f.key });
+				}
+				if (sectionLayout.length > 0) {
+					layout.push({
+						id: item.id,
+						section: item.sectionLabel || 'Section',
+						items: sectionLayout
+					});
+				}
+			} else {
+				if (!item.key) continue;
+				properties[item.key] = fieldToProperty(item);
+				if (item.required) required.push(item.key);
+				layout.push({ key: item.key });
+			}
 		}
+
+		if (Object.keys(properties).length === 0) return null;
 		return {
 			$schema: 'https://json-schema.org/draft/2020-12/schema',
 			type: 'object',
@@ -140,7 +192,7 @@
 </script>
 
 <script lang="ts">
-	import { Plus, X } from '@lucide/svelte';
+	import { FolderOpen, Plus, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -149,27 +201,82 @@
 	let { schema = $bindable<AttributesSchema | null>(null) }: { schema?: AttributesSchema | null } =
 		$props();
 
-	let fields = $state<EditorField[]>(schemaToFields(schema));
+	let items = $state<EditorItem[]>(schemaToItems(schema));
 
 	$effect(() => {
-		schema = fieldsToSchema(fields);
+		schema = itemsToSchema(items);
 	});
 
 	function addField() {
-		fields = [
-			...fields,
+		items = [
+			...items,
 			{ key: '', label: '', kind: 'text', required: false, options: [], subFields: [] }
 		];
 	}
 
-	function removeField(index: number) {
-		fields = fields.filter((_, i) => i !== index);
+	function addSection() {
+		items = [
+			...items,
+			{
+				_section: true as const,
+				id:
+					typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+						? crypto.randomUUID()
+						: `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`,
+				sectionLabel: '',
+				fields: []
+			}
+		];
 	}
 
-	function handleLabelChange(index: number, value: string) {
-		fields = fields.map((f, i) => {
-			if (i !== index) return f;
-			return { ...f, label: value, key: f.key || slugify(value) };
+	function removeItem(index: number) {
+		items = items.filter((_, i) => i !== index);
+	}
+
+	function handleFieldLabelChange(index: number, value: string) {
+		items = items.map((item, i) => {
+			if (i !== index || isSection(item)) return item;
+			return { ...item, label: value, key: slugify(value) };
+		});
+	}
+
+	function handleSectionLabelChange(index: number, value: string) {
+		items = items.map((item, i) => {
+			if (i !== index || !isSection(item)) return item;
+			return { ...item, sectionLabel: value };
+		});
+	}
+
+	function addFieldToSection(sectionIndex: number) {
+		items = items.map((item, i) => {
+			if (i !== sectionIndex || !isSection(item)) return item;
+			return {
+				...item,
+				fields: [
+					...item.fields,
+					{ key: '', label: '', kind: 'text' as const, required: false, options: [], subFields: [] }
+				]
+			};
+		});
+	}
+
+	function removeFieldFromSection(sectionIndex: number, fieldIndex: number) {
+		items = items.map((item, i) => {
+			if (i !== sectionIndex || !isSection(item)) return item;
+			return { ...item, fields: item.fields.filter((_, fi) => fi !== fieldIndex) };
+		});
+	}
+
+	function handleSectionFieldLabelChange(sectionIndex: number, fieldIndex: number, value: string) {
+		items = items.map((item, i) => {
+			if (i !== sectionIndex || !isSection(item)) return item;
+			return {
+				...item,
+				fields: item.fields.map((f, fi) => {
+					if (fi !== fieldIndex) return f;
+					return { ...f, label: value, key: slugify(value) };
+				})
+			};
 		});
 	}
 
@@ -187,7 +294,7 @@
 	function handleSubFieldLabelChange(field: EditorField, index: number, value: string) {
 		field.subFields = field.subFields.map((sf, i) => {
 			if (i !== index) return sf;
-			return { ...sf, label: value, key: sf.key || slugify(value) };
+			return { ...sf, label: value, key: slugify(value) };
 		});
 	}
 </script>
@@ -290,17 +397,69 @@
 <div class="space-y-3">
 	<Label>Fields</Label>
 
-	{#each fields as field, i (i)}
-		{@render fieldRow(
-			field,
-			true,
-			(value) => handleLabelChange(i, value),
-			() => removeField(i)
-		)}
+	{#each items as item, i (i)}
+		{#if isSection(item)}
+			<div class="space-y-2 rounded-md border border-input bg-muted/30 p-3">
+				<div class="flex items-center gap-2">
+					<FolderOpen class="size-4 shrink-0 text-muted-foreground" />
+					<Input
+						value={item.sectionLabel}
+						placeholder="Section name"
+						class="h-8 w-44 text-sm font-medium"
+						aria-label="Section name"
+						oninput={(e) => handleSectionLabelChange(i, (e.target as HTMLInputElement).value)}
+					/>
+					<span class="text-xs text-muted-foreground">Section</span>
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon"
+						class="ml-auto size-7"
+						onclick={() => removeItem(i)}
+						aria-label="Remove section"
+					>
+						<X class="size-3.5" />
+					</Button>
+				</div>
+				<div class="ml-2 space-y-2 border-l border-input pl-3">
+					{#each item.fields as field, fi (fi)}
+						{@render fieldRow(
+							field,
+							false,
+							(value) => handleSectionFieldLabelChange(i, fi, value),
+							() => removeFieldFromSection(i, fi)
+						)}
+					{/each}
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						class="h-7 text-xs"
+						onclick={() => addFieldToSection(i)}
+					>
+						<Plus class="size-3" />
+						Add field
+					</Button>
+				</div>
+			</div>
+		{:else}
+			{@render fieldRow(
+				item,
+				true,
+				(value) => handleFieldLabelChange(i, value),
+				() => removeItem(i)
+			)}
+		{/if}
 	{/each}
 
-	<Button type="button" variant="outline" size="sm" onclick={addField}>
-		<Plus class="size-4" />
-		Add field
-	</Button>
+	<div class="flex gap-2">
+		<Button type="button" variant="outline" size="sm" onclick={addField}>
+			<Plus class="size-4" />
+			Add field
+		</Button>
+		<Button type="button" variant="outline" size="sm" onclick={addSection}>
+			<FolderOpen class="size-4" />
+			Add section
+		</Button>
+	</div>
 </div>
