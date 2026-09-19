@@ -167,7 +167,7 @@
 				name,
 				description: description || null,
 				tags,
-				attributes: rowsToAttributes(attributeRows)
+				attributes: rowsToAttributes(attributeRows, nodeSchema)
 			}
 		});
 		if (result.response?.status === 412) {

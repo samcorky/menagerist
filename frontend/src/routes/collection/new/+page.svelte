@@ -89,7 +89,7 @@
 				type: selectedType || null,
 				description: description || null,
 				tags,
-				attributes: rowsToAttributes(attrRows)
+				attributes: rowsToAttributes(attrRows, nodeSchema)
 			}
 		});
 		if (result.error || !result.data) {

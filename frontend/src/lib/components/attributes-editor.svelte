@@ -1,4 +1,6 @@
 <script lang="ts" module>
+	import type { AttributesSchema, JsonSchemaProperty } from './schema-editor.svelte';
+
 	export type GroupRow = Record<string, string>;
 	export type AttributeRow = { key: string; value: string | GroupRow[] };
 
@@ -24,26 +26,69 @@
 		});
 	}
 
-	/** Convert edited rows back into an `attributes` dict, dropping empty keys. */
-	export function rowsToAttributes(rows: AttributeRow[]): Record<string, string | GroupRow[]> {
+	function coerceScalar(value: string, prop: JsonSchemaProperty | undefined): unknown {
+		if (prop?.type === 'number') {
+			const n = Number(value);
+			return isNaN(n) ? value : n;
+		}
+		if (prop?.type === 'boolean') return value === 'true';
+		return value;
+	}
+
+	/**
+	 * Convert edited rows into a typed `attributes` dict ready for the API.
+	 * Pass `schema` so number/boolean fields are emitted as real JS types.
+	 * Empty number fields are omitted rather than sent as empty strings.
+	 */
+	export function rowsToAttributes(
+		rows: AttributeRow[],
+		schema?: AttributesSchema | null
+	): Record<string, unknown> {
+		const props = schema?.properties ?? {};
 		return Object.fromEntries(
-			rows.filter((row) => row.key.trim() !== '').map((row) => [row.key, row.value])
+			rows
+				.filter((row) => row.key.trim() !== '')
+				.flatMap((row): [string, unknown][] => {
+					const prop = props[row.key];
+					if (typeof row.value !== 'string') {
+						if (prop?.type === 'array') {
+							const subProps = prop.items.properties;
+							return [
+								[
+									row.key,
+									row.value.map((gr) =>
+										Object.fromEntries(
+											Object.entries(gr).map(([k, v]) => [k, coerceScalar(v, subProps[k])])
+										)
+									)
+								]
+							];
+						}
+						return [[row.key, row.value]];
+					}
+					if (prop?.type === 'number') {
+						if (row.value === '') return [];
+						const n = Number(row.value);
+						return isNaN(n) ? [[row.key, row.value]] : [[row.key, n]];
+					}
+					if (prop?.type === 'boolean') return [[row.key, row.value === 'true']];
+					return [[row.key, row.value]];
+				})
 		);
 	}
 </script>
 
 <script lang="ts">
-	import Ajv from 'ajv';
+	import Ajv2020 from 'ajv/dist/2020';
 	import addFormats from 'ajv-formats';
 	import { Plus, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
-	import type { AttributesSchema, JsonSchemaProperty } from './schema-editor.svelte';
-
-	const ajv = new Ajv({ coerceTypes: true, allErrors: true });
+	const ajv = new Ajv2020({ allErrors: true });
 	addFormats(ajv);
+	ajv.addKeyword('x-multiline');
 
 	let {
 		rows = $bindable(),
@@ -54,7 +99,7 @@
 
 	let fieldErrors = $derived.by(() => {
 		if (!validate || !schema) return {} as Record<string, string>;
-		const attrs = rowsToAttributes(rows);
+		const attrs = rowsToAttributes(rows, schema);
 		validate(attrs);
 		const errors: Record<string, string> = {};
 		for (const err of validate.errors ?? []) {
