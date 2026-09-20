@@ -19,7 +19,8 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import BackButton from '$lib/components/back-button.svelte';
-	import SchemaEditor, { type AttributesSchema } from '$lib/components/schema-editor.svelte';
+	import SchemaEditor from '$lib/components/schema-editor.svelte';
+	import type { AttributesSchema } from '$lib/schema-types';
 
 	const PAGE_SIZE = 50;
 	const loadingSkeletons = [1, 2, 3];

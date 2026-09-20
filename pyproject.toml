@@ -240,6 +240,11 @@ deps = ["sync"]
 cmd = "prek run"
 help = "Run pre-commit checks on changed files only"
 
+[tool.poe.groups.quality.tasks.validate-dev-compose]
+cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} config --quiet"
+uses = { COMPOSE_OVERRIDE = "_compose-override" }
+help = "Validate the development Docker Compose configuration"
+
 [tool.poe.groups.quality.tasks.test]
 sequence = ["test-backend", "test-frontend"]
 help = "Run all unit tests"

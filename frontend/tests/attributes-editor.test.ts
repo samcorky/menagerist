@@ -5,7 +5,7 @@ import {
 	rowsToAttributes,
 	type AttributeRow
 } from '../src/lib/components/attributes-editor.svelte';
-import type { AttributesSchema } from '../src/lib/components/schema-editor.svelte';
+import type { AttributesSchema } from '../src/lib/schema-types';
 
 const schema = (properties: AttributesSchema['properties']): AttributesSchema => ({
 	$schema: 'https://json-schema.org/draft/2020-12/schema',

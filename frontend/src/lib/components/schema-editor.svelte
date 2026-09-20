@@ -1,38 +1,7 @@
 <script lang="ts" module>
 	import { normalise, isSectionItem, type XLayout } from '$lib/layout';
-
-	export type JsonSchemaProperty =
-		| { title: string; type: 'string'; 'x-multiline'?: true }
-		| { title: string; type: 'string'; format: 'date' }
-		| { title: string; type: 'string'; enum: string[] }
-		| { title: string; type: 'number' }
-		| { title: string; type: 'boolean' }
-		| {
-				title: string;
-				type: 'array';
-				items: { type: 'object'; properties: Record<string, JsonSchemaProperty> };
-		  };
-
-	export type AttributesSchema = {
-		$schema: 'https://json-schema.org/draft/2020-12/schema';
-		type: 'object';
-		properties: Record<string, JsonSchemaProperty>;
-		required?: string[];
-		'x-layout'?: XLayout;
-	};
-
-	type FieldKind = 'text' | 'longtext' | 'number' | 'boolean' | 'date' | 'choice' | 'group';
-
-	type EditorSubField = { key: string; label: string; kind: Exclude<FieldKind, 'group'> };
-
-	type EditorField = {
-		key: string;
-		label: string;
-		kind: FieldKind;
-		required: boolean;
-		options: string[];
-		subFields: EditorSubField[];
-	};
+	import type { JsonSchemaProperty, AttributesSchema, EditorField } from '$lib/schema-types';
+	import { allDescriptors, getDescriptor } from '$lib/field-types';
 
 	type EditorSection = {
 		_section: true;
@@ -48,78 +17,17 @@
 	}
 
 	function propertyToField(key: string, prop: JsonSchemaProperty, required: boolean): EditorField {
-		const base = { key, label: prop.title, required, options: [], subFields: [] };
-		if (prop.type === 'array') {
-			return {
-				...base,
-				kind: 'group',
-				subFields: Object.entries(prop.items.properties).map(([sk, sp]) => ({
-					key: sk,
-					label: sp.title,
-					kind: subPropertyKind(sp)
-				}))
-			};
+		for (const desc of allDescriptors()) {
+			const field = desc.fromSchema(key, prop, required);
+			if (field) return field;
 		}
-		return { ...base, kind: scalarKind(prop) };
-	}
-
-	function scalarKind(prop: JsonSchemaProperty): Exclude<FieldKind, 'group'> {
-		if (prop.type === 'array') return 'text';
-		if (prop.type === 'number') return 'number';
-		if (prop.type === 'boolean') return 'boolean';
-		if ('format' in prop && prop.format === 'date') return 'date';
-		if ('enum' in prop) return 'choice';
-		if ('x-multiline' in prop && prop['x-multiline']) return 'longtext';
-		return 'text';
-	}
-
-	function subPropertyKind(prop: JsonSchemaProperty): Exclude<FieldKind, 'group'> {
-		return scalarKind(prop);
+		return { key, label: prop.title, kind: 'text', required, options: [], subFields: [] };
 	}
 
 	function fieldToProperty(f: EditorField): JsonSchemaProperty {
-		switch (f.kind) {
-			case 'number':
-				return { title: f.label, type: 'number' };
-			case 'boolean':
-				return { title: f.label, type: 'boolean' };
-			case 'date':
-				return { title: f.label, type: 'string', format: 'date' };
-			case 'choice':
-				return { title: f.label, type: 'string', enum: f.options };
-			case 'longtext':
-				return { title: f.label, type: 'string', 'x-multiline': true };
-			case 'group':
-				return {
-					title: f.label,
-					type: 'array',
-					items: {
-						type: 'object',
-						properties: Object.fromEntries(
-							f.subFields.map((sf) => [sf.key, subFieldToProperty(sf)])
-						)
-					}
-				};
-			default:
-				return { title: f.label, type: 'string' };
-		}
-	}
-
-	function subFieldToProperty(sf: EditorSubField): JsonSchemaProperty {
-		switch (sf.kind) {
-			case 'number':
-				return { title: sf.label, type: 'number' };
-			case 'boolean':
-				return { title: sf.label, type: 'boolean' };
-			case 'date':
-				return { title: sf.label, type: 'string', format: 'date' };
-			case 'choice':
-				return { title: sf.label, type: 'string', enum: [] };
-			case 'longtext':
-				return { title: sf.label, type: 'string', 'x-multiline': true };
-			default:
-				return { title: sf.label, type: 'string' };
-		}
+		const desc = getDescriptor(f.kind);
+		if (desc) return desc.toSchema(f);
+		return { title: f.label, type: 'string' };
 	}
 
 	function schemaToItems(schema: AttributesSchema | null): EditorItem[] {
@@ -138,16 +46,15 @@
 							.map((i) => propertyToField(i.key, schema.properties[i.key], required.has(i.key)))
 					}
 				];
-			} else {
-				if (!(layoutItem.key in schema.properties)) return [];
-				return [
-					propertyToField(
-						layoutItem.key,
-						schema.properties[layoutItem.key],
-						required.has(layoutItem.key)
-					)
-				];
 			}
+			if (!(layoutItem.key in schema.properties)) return [];
+			return [
+				propertyToField(
+					layoutItem.key,
+					schema.properties[layoutItem.key],
+					required.has(layoutItem.key)
+				)
+			];
 		});
 	}
 
@@ -196,7 +103,6 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import { slugify } from '$lib/utils.js';
 
 	let { schema = $bindable<AttributesSchema | null>(null) }: { schema?: AttributesSchema | null } =
 		$props();
@@ -207,25 +113,23 @@
 		schema = itemsToSchema(items);
 	});
 
+	function generateKey(): string {
+		return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+			? crypto.randomUUID()
+			: `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
+	}
+
 	function addField() {
 		items = [
 			...items,
-			{ key: '', label: '', kind: 'text', required: false, options: [], subFields: [] }
+			{ key: generateKey(), label: '', kind: 'text', required: false, options: [], subFields: [] }
 		];
 	}
 
 	function addSection() {
 		items = [
 			...items,
-			{
-				_section: true as const,
-				id:
-					typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-						? crypto.randomUUID()
-						: `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`,
-				sectionLabel: '',
-				fields: []
-			}
+			{ _section: true as const, id: generateKey(), sectionLabel: '', fields: [] }
 		];
 	}
 
@@ -236,7 +140,7 @@
 	function handleFieldLabelChange(index: number, value: string) {
 		items = items.map((item, i) => {
 			if (i !== index || isSection(item)) return item;
-			return { ...item, label: value, key: slugify(value) };
+			return { ...item, label: value };
 		});
 	}
 
@@ -254,7 +158,14 @@
 				...item,
 				fields: [
 					...item.fields,
-					{ key: '', label: '', kind: 'text' as const, required: false, options: [], subFields: [] }
+					{
+						key: generateKey(),
+						label: '',
+						kind: 'text',
+						required: false,
+						options: [],
+						subFields: []
+					}
 				]
 			};
 		});
@@ -272,29 +183,19 @@
 			if (i !== sectionIndex || !isSection(item)) return item;
 			return {
 				...item,
-				fields: item.fields.map((f, fi) => {
-					if (fi !== fieldIndex) return f;
-					return { ...f, label: value, key: slugify(value) };
-				})
+				fields: item.fields.map((f, fi) => (fi !== fieldIndex ? f : { ...f, label: value }))
 			};
 		});
 	}
 
-	function addSubField(field: EditorField) {
-		field.subFields = [
-			...field.subFields,
-			{ key: '', label: '', kind: 'text' as Exclude<FieldKind, 'group'> }
-		];
+	function handleFieldChange(index: number, field: EditorField) {
+		items = items.map((item, i) => (i !== index || isSection(item) ? item : field));
 	}
 
-	function removeSubField(field: EditorField, index: number) {
-		field.subFields = field.subFields.filter((_, i) => i !== index);
-	}
-
-	function handleSubFieldLabelChange(field: EditorField, index: number, value: string) {
-		field.subFields = field.subFields.map((sf, i) => {
-			if (i !== index) return sf;
-			return { ...sf, label: value, key: slugify(value) };
+	function handleSectionFieldChange(sectionIndex: number, fieldIndex: number, field: EditorField) {
+		items = items.map((item, i) => {
+			if (i !== sectionIndex || !isSection(item)) return item;
+			return { ...item, fields: item.fields.map((f, fi) => (fi !== fieldIndex ? f : field)) };
 		});
 	}
 </script>
@@ -303,7 +204,8 @@
 	field: EditorField,
 	allowGroup: boolean,
 	onLabelChange: (value: string) => void,
-	onRemove: () => void
+	onRemove: () => void,
+	onFieldChange: (f: EditorField) => void
 )}
 	<div class="flex flex-wrap items-center gap-2">
 		<Input
@@ -314,24 +216,21 @@
 			oninput={(e) => onLabelChange((e.target as HTMLInputElement).value)}
 		/>
 		<select
-			bind:value={field.kind}
+			value={field.kind}
+			onchange={(e) => onFieldChange({ ...field, kind: (e.target as HTMLSelectElement).value })}
 			class="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
-			aria-label="Field kind"
+			aria-label="Field type"
 		>
-			<option value="text">Text</option>
-			<option value="number">Number</option>
-			<option value="boolean">Yes/No</option>
-			<option value="date">Date</option>
-			<option value="choice">Choice</option>
-			<option value="longtext">Long text</option>
-			{#if allowGroup}
-				<option value="group">Group</option>
-			{/if}
+			{#each allDescriptors().filter((d) => allowGroup || d.kind !== 'group') as d (d.kind)}
+				<option value={d.kind}>{d.label}</option>
+			{/each}
 		</select>
 		<label class="flex items-center gap-1.5 text-sm">
 			<input
 				type="checkbox"
-				bind:checked={field.required}
+				checked={field.required}
+				onchange={(e) =>
+					onFieldChange({ ...field, required: (e.target as HTMLInputElement).checked })}
 				class="h-4 w-4 rounded border-input accent-primary"
 			/>
 			Required
@@ -341,63 +240,17 @@
 		</Button>
 	</div>
 
-	{#if allowGroup && field.kind === 'group'}
-		<div class="ml-6 space-y-2 border-l border-input pl-4">
-			{#each field.subFields as subField, si (si)}
-				{@render subFieldRow(
-					subField,
-					() => handleSubFieldLabelChange(field, si, subField.label),
-					() => removeSubField(field, si)
-				)}
-			{/each}
-			<Button type="button" variant="outline" size="sm" onclick={() => addSubField(field)}>
-				<Plus class="size-4" />
-				Add sub-field
-			</Button>
-		</div>
+	{@const desc = getDescriptor(field.kind)}
+	{#if desc?.EditorExtras}
+		{@const Extras = desc.EditorExtras}
+		<Extras {field} onChange={onFieldChange} />
 	{/if}
-{/snippet}
-
-{#snippet subFieldRow(subField: EditorSubField, onLabelChange: () => void, onRemove: () => void)}
-	<div class="flex flex-wrap items-center gap-2">
-		<Input
-			value={subField.label}
-			placeholder="Label"
-			class="w-40"
-			aria-label="Sub-field label"
-			oninput={(e) => {
-				subField.label = (e.target as HTMLInputElement).value;
-				if (!subField.key) subField.key = slugify(subField.label);
-				onLabelChange();
-			}}
-		/>
-		<select
-			bind:value={subField.kind}
-			class="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
-			aria-label="Sub-field kind"
-		>
-			<option value="text">Text</option>
-			<option value="number">Number</option>
-			<option value="boolean">Yes/No</option>
-			<option value="date">Date</option>
-			<option value="longtext">Long text</option>
-		</select>
-		<Button
-			type="button"
-			variant="ghost"
-			size="icon"
-			onclick={onRemove}
-			aria-label="Remove sub-field"
-		>
-			<X class="size-4" />
-		</Button>
-	</div>
 {/snippet}
 
 <div class="space-y-3">
 	<Label>Fields</Label>
 
-	{#each items as item, i (i)}
+	{#each items as item, i (isSection(item) ? item.id : item.key)}
 		{#if isSection(item)}
 			<div class="space-y-2 rounded-md border border-input bg-muted/30 p-3">
 				<div class="flex items-center gap-2">
@@ -422,12 +275,13 @@
 					</Button>
 				</div>
 				<div class="ml-2 space-y-2 border-l border-input pl-3">
-					{#each item.fields as field, fi (fi)}
+					{#each item.fields as field, fi (field.key)}
 						{@render fieldRow(
 							field,
 							false,
 							(value) => handleSectionFieldLabelChange(i, fi, value),
-							() => removeFieldFromSection(i, fi)
+							() => removeFieldFromSection(i, fi),
+							(f) => handleSectionFieldChange(i, fi, f)
 						)}
 					{/each}
 					<Button
@@ -447,7 +301,8 @@
 				item,
 				true,
 				(value) => handleFieldLabelChange(i, value),
-				() => removeItem(i)
+				() => removeItem(i),
+				(f) => handleFieldChange(i, f)
 			)}
 		{/if}
 	{/each}

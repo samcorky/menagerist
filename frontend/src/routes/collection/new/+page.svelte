@@ -17,7 +17,7 @@
 		rowsToAttributes,
 		type AttributeRow
 	} from '$lib/components/attributes-editor.svelte';
-	import type { AttributesSchema } from '$lib/components/schema-editor.svelte';
+	import type { AttributesSchema } from '$lib/schema-types';
 	import BackButton from '$lib/components/back-button.svelte';
 	import CategorySelect from '$lib/components/category-select.svelte';
 	import TagsInput from '$lib/components/tags-input.svelte';

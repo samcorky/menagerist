@@ -24,7 +24,7 @@ For UX and UI rules, see [DESIGN_GUIDELINES.md](DESIGN_GUIDELINES.md).
 
 **Paths** — always use `resolve()` from `$app/paths` when building internal hrefs so the app works under a non-root base path.
 
-**Schema-driven attributes** — `attributes_schema` and node/edge `attributes` are opaque `dict[str, Any]` as far as the backend is concerned; the `Schema`/`SchemaField` shape (`src/lib/components/schema-editor.svelte`) and its rendering (`src/lib/components/attributes-editor.svelte`) are a frontend-only convention, not backend-validated. A field's `type` can be `'group'`, giving it `groupFields: SubField[]` (sub-fields cannot themselves be groups — no nesting) and a value that is an array of sub-attribute records rather than a scalar.
+**Schema-driven attributes** — node and edge types carry an `attributes_schema` (JSON Schema 2020-12). The backend validates attribute payloads against this schema on every write. The frontend renders schema fields using a pluggable field-type registry (`src/lib/field-types/`): each field type owns its schema serialisation (`toSchema`/`fromSchema`), its edit widget (`InputWidget`), and an optional read-mode widget (`ViewWidget`). Adding a new field type requires only a descriptor file and one import line — no changes to the editor components. See [docs/field-types.md](../docs/field-types.md) for the full guide.
 
 ## Development
 

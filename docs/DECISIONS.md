@@ -88,6 +88,18 @@ Significant architectural choices and their rationale. Entries are added when a 
 
 ---
 
+## Pluggable field-type registry (frontend)
+
+**Decision:** The schema editor and attributes editor dispatch to field types via a registry (`field-types/registry.ts`) rather than switch/case blocks. Each type registers a `FieldTypeDescriptor` with `toSchema`, `fromSchema`, optional `EditorExtras`, `InputWidget`, and optional `ViewWidget`. New types are added by creating a descriptor file and one import line in `index.ts`.
+
+**Rationale:** A switch/case or `if`/`else if` chain in the editor components couples every field type to every component that renders them. The registry inverts that: each type owns its own rendering and serialisation logic, and the components are unaware of what types exist. `descriptorForProp` uses registration order as precedence — most-specific matchers (date, longtext, choice) register before the `text` fallback, so no descriptor needs to guard against other descriptors winning first.
+
+**Tradeoff:** Registration order is load-order dependent. The `index.ts` file is the canonical ordering point — it must be read before adding a new type. A misplaced import (e.g. `text` before `date`) silently causes `date` fields to render as plain text inputs.
+
+**Backend alignment:** All built-in field types use standard JSON Schema keywords (`type`, `format`, `enum`, `properties`, `items`). The backend validates with `jsonschema[format-nongpl]` which covers all standard `format` strings. A new type only needs backend code if it introduces a non-standard `format` string — see [field-types.md](field-types.md).
+
+---
+
 ## CalVer with a `0.` pre-stable prefix
 
 **Decision:** Version scheme is `0.YYYY.MM.PATCH` until the data model and API stabilise, then `YYYY.MM.PATCH`.

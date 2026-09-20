@@ -26,7 +26,9 @@
 		rowsToAttributes,
 		type AttributeRow
 	} from '$lib/components/attributes-editor.svelte';
-	import type { AttributesSchema } from '$lib/components/schema-editor.svelte';
+	import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
+	import { normalise, orderedKeys, isSectionItem } from '$lib/layout';
+	import { descriptorForProp } from '$lib/field-types';
 	import BackButton from '$lib/components/back-button.svelte';
 	import TagsInput from '$lib/components/tags-input.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -61,6 +63,10 @@
 			Object.entries(nodeSchema?.properties ?? {}).map(([key, prop]) => [key, prop.title || key])
 		)
 	);
+	let schemaLayout = $derived(
+		nodeSchema ? normalise(nodeSchema['x-layout'], nodeSchema.properties) : []
+	);
+	let schemaKeys = $derived(orderedKeys(schemaLayout));
 	let loading = $state(true);
 	let notFound = $state(false);
 	let mode = $state<'read' | 'edit'>('read');
@@ -69,6 +75,7 @@
 	let description = $state('');
 	let tags = $state<string[]>([]);
 	let attributeRows = $state<AttributeRow[]>([]);
+	let freeformAttrRows = $derived(attributeRows.filter((r) => !schemaKeys.includes(r.key)));
 	let attributeServerErrors = $state<Record<string, string> | null>(null);
 	let saving = $state(false);
 	let deletingNode = $state(false);
@@ -445,16 +452,69 @@
 									</ul>
 								{/if}
 
-								{#if !loading && attributeRows.length > 0}
-									<div class="space-y-1.5">
-										{#each attributeRows as row (row.key)}
-											<div class="flex items-center gap-2">
-												<span class="w-32 shrink-0 text-sm text-muted-foreground">
-													{attributeLabelsByKey.get(row.key) ?? row.key}
-												</span>
-												<span class="text-sm">{row.value}</span>
+								{#snippet attrField(key: string, prop: JsonSchemaProperty)}
+									{@const rawValue = attributeRows.find((r) => r.key === key)?.value}
+									{#if rawValue !== undefined}
+										{@const desc = descriptorForProp(prop)}
+										{@const ViewWidget = desc?.ViewWidget}
+										<div
+											class="flex gap-2 {prop.type === 'array' ? 'items-start' : 'items-center'}"
+										>
+											<span class="w-32 shrink-0 pt-0.5 text-sm text-muted-foreground">
+												{prop.title || key}
+											</span>
+											<div class="flex-1 text-sm">
+												{#if ViewWidget}
+													<ViewWidget value={rawValue} {prop} />
+												{:else}
+													{String(rawValue)}
+												{/if}
 											</div>
-										{/each}
+										</div>
+									{/if}
+								{/snippet}
+
+								{#if !loading && (schemaLayout.length > 0 || freeformAttrRows.length > 0)}
+									<div class="space-y-2">
+										{#if nodeSchema && schemaLayout.length > 0}
+											{#each schemaLayout as layoutItem (isSectionItem(layoutItem) ? layoutItem.id : layoutItem.key)}
+												{#if isSectionItem(layoutItem)}
+													<div class="space-y-1.5 pt-1">
+														<p
+															class="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+														>
+															{layoutItem.section}
+														</p>
+														<div
+															class="space-y-1.5 rounded-md border border-input/60 bg-muted/20 p-3"
+														>
+															{#each layoutItem.items as { key } (key)}
+																{#if key in nodeSchema.properties}
+																	{@render attrField(key, nodeSchema.properties[key])}
+																{/if}
+															{/each}
+														</div>
+													</div>
+												{:else if layoutItem.key in nodeSchema.properties}
+													{@render attrField(layoutItem.key, nodeSchema.properties[layoutItem.key])}
+												{/if}
+											{/each}
+										{/if}
+
+										{#if freeformAttrRows.length > 0}
+											{#each freeformAttrRows as row (row.key)}
+												<div class="flex items-center gap-2">
+													<span class="w-32 shrink-0 text-sm text-muted-foreground">
+														{attributeLabelsByKey.get(row.key) ?? row.key}
+													</span>
+													<span class="text-sm"
+														>{typeof row.value === 'string'
+															? row.value
+															: JSON.stringify(row.value)}</span
+													>
+												</div>
+											{/each}
+										{/if}
 									</div>
 								{/if}
 							</div>

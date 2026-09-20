@@ -36,5 +36,15 @@ repos:
     rev: 44.9.0
     hooks:
       - id: renovate-config-validator
+        name: Validate Renovate Config
         args: [--strict]
         files: ^\.github/renovate\.json$
+
+  - repo: local
+    hooks:
+      - id: validate-dev-compose
+        name: Validate Dev Docker Compose
+        entry: uv run poe validate-dev-compose
+        language: system
+        files: '(^|/)(?:docker-)?compose(?:\.[a-zA-Z0-9_-]+)?\.ya?ml$'
+        pass_filenames: false
