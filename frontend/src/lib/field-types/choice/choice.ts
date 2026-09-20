@@ -1,4 +1,4 @@
-import { register } from './registry';
+import { register } from '../registry';
 import ChoiceInput from './ChoiceInput.svelte';
 import ChoiceExtras from './ChoiceExtras.svelte';
 

@@ -1,5 +1,6 @@
-import { register } from './registry';
+import { register } from '../registry';
 import BooleanInput from './BooleanInput.svelte';
+import BooleanView from './BooleanView.svelte';
 
 register({
 	kind: 'boolean',
@@ -10,5 +11,6 @@ register({
 		prop.type === 'boolean'
 			? { key, label: prop.title, kind: 'boolean', required, options: [], subFields: [] }
 			: null,
-	InputWidget: BooleanInput
+	InputWidget: BooleanInput,
+	ViewWidget: BooleanView
 });

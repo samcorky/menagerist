@@ -2,7 +2,7 @@
 	import { Plus, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
-	import { allDescriptors } from './registry';
+	import { allDescriptors } from '../registry';
 	import type { EditorField } from '$lib/schema-types';
 
 	let {

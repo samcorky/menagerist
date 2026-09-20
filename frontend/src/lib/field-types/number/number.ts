@@ -1,5 +1,5 @@
-import { register } from './registry';
-import ScalarInput from './ScalarInput.svelte';
+import { register } from '../registry';
+import ScalarInput from '../ScalarInput.svelte';
 
 register({
 	kind: 'number',

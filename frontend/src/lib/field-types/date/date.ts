@@ -1,5 +1,6 @@
-import { register } from './registry';
-import ScalarInput from './ScalarInput.svelte';
+import { register } from '../registry';
+import DateInput from './DateInput.svelte';
+import DateView from './DateView.svelte';
 
 register({
 	kind: 'date',
@@ -10,5 +11,6 @@ register({
 		prop.type === 'string' && 'format' in prop && prop.format === 'date'
 			? { key, label: prop.title, kind: 'date', required, options: [], subFields: [] }
 			: null,
-	InputWidget: ScalarInput
+	InputWidget: DateInput,
+	ViewWidget: DateView
 });

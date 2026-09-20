@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { Plus, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { descriptorForProp } from './registry';
-	import ScalarInput from './ScalarInput.svelte';
+	import { descriptorForProp } from '../registry';
+	import ScalarInput from '../ScalarInput.svelte';
 	import type { JsonSchemaProperty } from '$lib/schema-types';
 
 	type GroupRow = Record<string, unknown>;

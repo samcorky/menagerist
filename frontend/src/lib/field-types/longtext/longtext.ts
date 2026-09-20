@@ -1,4 +1,4 @@
-import { register } from './registry';
+import { register } from '../registry';
 import LongtextInput from './LongtextInput.svelte';
 
 register({

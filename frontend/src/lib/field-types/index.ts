@@ -1,11 +1,11 @@
 // Registration order: most-specific types first, text last as fallback.
 // Scalars must be registered before group so sub-field fromSchema lookups work.
-import './date';
-import './longtext';
-import './choice';
-import './number';
-import './boolean';
-import './text';
-import './group';
+import './date/date';
+import './longtext/longtext';
+import './choice/choice';
+import './number/number';
+import './boolean/boolean';
+import './text/text';
+import './group/group';
 
 export { register, getDescriptor, allDescriptors, descriptorForProp } from './registry';

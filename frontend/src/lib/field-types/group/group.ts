@@ -1,4 +1,4 @@
-import { register, descriptorForProp, getDescriptor } from './registry';
+import { register, descriptorForProp, getDescriptor } from '../registry';
 import GroupInput from './GroupInput.svelte';
 import GroupExtras from './GroupExtras.svelte';
 import GroupView from './GroupView.svelte';
