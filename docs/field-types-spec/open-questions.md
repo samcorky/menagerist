@@ -61,3 +61,4 @@
 54. WI-2: should an untouched boolean cell in a group row stay `false` (current, no unset state) or be omitted? Default: `false`, recorded in `docs/DECISIONS.md`.
 55. WI-14: should changing a field's kind in the schema editor clear its `display` and `config` metadata? Default: keep it until WI-10 defines which kind changes are offered.
 56. WI-14: old-format item types lose layout, long-text rendering and required markers until re-saved. Default (decided in the spec): no migration; say so in release notes if the app has users by then.
+57. WI-20: the key follows the label while a field is unsaved and freezes on save. If the editor ever keeps a saved schema open in place (no reload after save), pending flags must be cleared on save. Today saving closes the editor, so no action is needed.

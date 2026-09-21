@@ -29,7 +29,10 @@
 	function addSubField() {
 		onChange({
 			...field,
-			subFields: [...field.subFields, { key: generateKey(), label: '', kind: 'text' }]
+			subFields: [
+				...field.subFields,
+				{ key: generateKey(), label: '', kind: 'text', keyPending: true }
+			]
 		});
 	}
 

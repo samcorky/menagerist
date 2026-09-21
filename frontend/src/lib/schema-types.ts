@@ -25,6 +25,8 @@ export type EditorSubField = {
 	key: string;
 	label: string;
 	kind: string;
+	/** True until the schema is saved: the key is still derived from the label. */
+	keyPending?: boolean;
 	meta?: PropertyMeta;
 	/** Original property for the `opaque` kind, written back unchanged on save. */
 	raw?: Record<string, unknown>;
@@ -37,6 +39,8 @@ export type EditorField = {
 	required: boolean;
 	options: string[];
 	subFields: EditorSubField[];
+	/** True until the schema is saved: the key is still derived from the label. */
+	keyPending?: boolean;
 	/** Metadata members carried through unchanged (display, archived, unknown members). */
 	meta?: PropertyMeta;
 	/** Original property for the `opaque` kind, written back unchanged on save. */

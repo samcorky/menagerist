@@ -2,6 +2,7 @@ import { register, fieldFromProperty, getDescriptor, propertyFromField } from '.
 import GroupInput from './GroupInput.svelte';
 import GroupExtras from './GroupExtras.svelte';
 import GroupView from './GroupView.svelte';
+import { resolvePendingKeys } from '$lib/field-key';
 import type { EditorField, JsonSchemaProperty } from '$lib/schema-types';
 
 register({
@@ -14,7 +15,7 @@ register({
 		items: {
 			type: 'object',
 			properties: Object.fromEntries(
-				f.subFields.map((sf) => [
+				resolvePendingKeys(f.subFields).map((sf) => [
 					sf.key,
 					propertyFromField({
 						key: sf.key,

@@ -7,22 +7,23 @@
 		fieldFromProperty,
 		propertyFromField
 	} from '$lib/field-types';
+	import { resolvePendingKeys } from '$lib/field-key';
 	import { META_VERSION, readSchemaMeta, withSchemaMeta, type SchemaMeta } from '$lib/schema-meta';
 
-	type EditorSection = {
+	export type EditorSection = {
 		_section: true;
 		id: string;
 		sectionLabel: string;
 		fields: EditorField[];
 	};
 
-	type EditorItem = EditorField | EditorSection;
+	export type EditorItem = EditorField | EditorSection;
 
 	function isSection(item: EditorItem): item is EditorSection {
 		return '_section' in item;
 	}
 
-	function schemaToItems(schema: AttributesSchema | null): EditorItem[] {
+	export function schemaToItems(schema: AttributesSchema | null): EditorItem[] {
 		if (!schema) return [];
 		const required = new Set(readSchemaMeta(schema).required ?? []);
 		const layout = normalise(readSchemaMeta(schema).layout, schema.properties);
@@ -50,17 +51,26 @@
 		});
 	}
 
-	function itemsToSchema(items: EditorItem[], baseMeta: SchemaMeta): AttributesSchema | null {
-		const properties: Record<string, JsonSchemaProperty> = {};
+	export function itemsToSchema(
+		items: EditorItem[],
+		baseMeta: SchemaMeta
+	): AttributesSchema | null {
+		// Resolve pending keys across the whole schema so they are unique globally.
+		const all = items.flatMap((item) => (isSection(item) ? item.fields : [item]));
+		const resolvedList = resolvePendingKeys(all);
+		const resolved = new Map(all.map((f, i) => [f, resolvedList[i]]));
+
+		const entries: [string, JsonSchemaProperty][] = [];
 		const required: string[] = [];
 		const layout: XLayout = [];
 
 		for (const item of items) {
 			if (isSection(item)) {
 				const sectionLayout: { key: string }[] = [];
-				for (const f of item.fields) {
+				for (const original of item.fields) {
+					const f = resolved.get(original)!;
 					if (!f.key) continue;
-					properties[f.key] = propertyFromField(f);
+					entries.push([f.key, propertyFromField(f)]);
 					if (f.required) required.push(f.key);
 					sectionLayout.push({ key: f.key });
 				}
@@ -72,18 +82,19 @@
 					});
 				}
 			} else {
-				if (!item.key) continue;
-				properties[item.key] = propertyFromField(item);
-				if (item.required) required.push(item.key);
-				layout.push({ key: item.key });
+				const f = resolved.get(item)!;
+				if (!f.key) continue;
+				entries.push([f.key, propertyFromField(f)]);
+				if (f.required) required.push(f.key);
+				layout.push({ key: f.key });
 			}
 		}
 
-		if (Object.keys(properties).length === 0) return null;
+		if (entries.length === 0) return null;
 		const base = {
 			$schema: 'https://json-schema.org/draft/2020-12/schema' as const,
 			type: 'object' as const,
-			properties
+			properties: Object.fromEntries(entries) as Record<string, JsonSchemaProperty>
 		};
 		return withSchemaMeta(base, { ...baseMeta, version: META_VERSION, layout, required });
 	}
@@ -116,7 +127,15 @@
 	function addField() {
 		items = [
 			...items,
-			{ key: generateKey(), label: '', kind: 'text', required: false, options: [], subFields: [] }
+			{
+				key: generateKey(),
+				keyPending: true,
+				label: '',
+				kind: 'text',
+				required: false,
+				options: [],
+				subFields: []
+			}
 		];
 	}
 
@@ -154,6 +173,7 @@
 					...item.fields,
 					{
 						key: generateKey(),
+						keyPending: true,
 						label: '',
 						kind: 'text',
 						required: false,

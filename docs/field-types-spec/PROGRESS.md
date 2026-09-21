@@ -6,7 +6,7 @@ Update at the end of every session. Read this first.
 |---|---|---|---|
 | WI-1 to WI-4 bug fixes | done, committed (138e7d5) | feature/initial-implementation | See "WI-1 to WI-4 session notes" below. |
 | WI-14 metadata namespace | done, awaiting user review and commit | feature/initial-implementation | See "WI-14 session notes" below. |
-| WI-20 readable field keys | todo | | |
+| WI-20 readable field keys | done, awaiting user review and commit | feature/initial-implementation | See "WI-20 session notes" below. |
 | WI-5 rating | todo | | |
 | WI-6 advisory required | todo | | |
 | WI-7 changed-keys validation | todo | | |
@@ -81,3 +81,26 @@ Update at the end of every session. Read this first.
 - Old-format schemas lose layout, long-text rendering and required markers until re-saved (accepted, no migration).
 - `uv sync --all-groups` in the repo root removes the backend dev dependencies. Use `uv sync --all-packages --group dev` (`poe sync-backend`) to repair; I had to do this once.
 - The Svelte MCP autofixer worked this session and found nothing.
+
+## WI-20 session notes
+
+**Status:** implemented, all frontend checks green, not committed. Next item: WI-5 (rating). Also in this working tree, from the user's request: `frontend/package.json` script caching flags and `.eslintcache` in `frontend/.gitignore`.
+
+**Done**
+- New `src/lib/field-key.ts`: `generateFieldKey(title, taken)` (NFKD ASCII slug, underscores, 40-character cap, `field` fallback, `_2`/`_3` uniqueness case-insensitive, avoids `Object.prototype` member names such as `constructor`) and `resolvePendingKeys`.
+- New fields (top-level, in sections, and group sub-fields) are created with a placeholder key and `keyPending: true`; the real key is derived from the label while serialising and frozen once saved (saving closes the editor and reopening re-reads stored keys). Saved fields never change key.
+- `schema-editor.svelte`: keys resolved across the whole schema (archived fields included); `properties` built with `Object.fromEntries` (safe for `__proto__`); `schemaToItems`, `itemsToSchema` and the item types are now exported for tests.
+- Docs: `docs/DECISIONS.md` entry; `docs/field-types.md` "Field keys" note.
+
+**Left (deferred on purpose)**
+- The "adopt an existing custom detail" prompt when a new key matches a custom detail name: needs the WI-18c custom-names query. Do it in WI-18c.
+- Integration tests with underscore keys (search, usage, purge): belong to WI-9 and WI-17.
+- `key in schema.properties` and `props[key]` lookups in the attributes editor and item page still see inherited names for API-authored keys such as `constructor`; generated keys avoid them.
+
+**Files touched:** `frontend/src/lib/field-key.ts` (new), `schema-types.ts`, `field-types/group/group.ts`, `components/schema-editor.svelte`, `field-types/group/GroupExtras.svelte`; tests `field-key.test.ts` (new), `schema-editor-keys.test.ts` (new); docs as above; `frontend/package.json`, `frontend/.gitignore`.
+
+**Checks run:** `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 124 tests in 12 files pass. Backend unchanged, backend checks not run.
+
+**Next session must know**
+- WI-5, WI-18 and WI-19 must create fields through the editor's pending-key path (`keyPending: true`) or call `generateFieldKey` against the target schema, so keys stay readable and unique.
+- The ESLint `no-control-regex` rule rejects `\x00` in regexes; the generator uses `[\u0080-\uffff]` to strip non-ASCII.

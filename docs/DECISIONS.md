@@ -125,3 +125,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** Flat vendor keywords scattered metadata across the schema, made a field's identity depend on guessing from its shape, and had no version marker. One namespace with an explicit `kind` gives a direct registry lookup, a place to version the format, and a clear test: removing `x-menagerist` must not change validity (apart from the two advisory exceptions above, which enforce that `required` never blocks a save).
 
 **Tradeoff:** Item types saved in the old format lose their layout, long-text rendering and required markers until they are re-saved. Accepted: no stored attribute data is affected and the app has no external users yet.
+
+---
+
+## Field keys are the slug of the title at creation, then immutable
+
+**Decision:** A new field's key is the ASCII slug of its title (underscores, at most 40 characters, `field` when nothing usable remains), made unique with `_2`, `_3` against every existing key including archived fields (case-insensitive) and names inherited from `Object.prototype`. The key follows the title only until the schema is saved; from then on renaming the label never changes it. Group sub-fields use the same rule within their group. Existing UUID keys keep working, and a schema may mix both.
+
+**Rationale:** Readable attribute keys make the API, exports and search context understandable without the schema, while immutability keeps the guarantees UUIDs gave: renaming a label never touches stored data and references by key (layout, `required`) stay valid. Names such as `constructor` are avoided because `in` and index lookups on `properties` would otherwise find inherited members.
+
+**Tradeoffs:** A key can drift from its label after a rename. Re-adding a same-titled field can reattach orphaned data, which is accepted. There is no "Change key" action in v1, and the key is never shown in the UI. Warning when a new key matches an existing custom detail name is deferred to the per-item custom fields work.
