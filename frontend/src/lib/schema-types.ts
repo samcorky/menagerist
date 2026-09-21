@@ -1,7 +1,7 @@
 import type { PropertyMeta, SchemaMeta } from '$lib/schema-meta';
 
 type JsonSchemaPropertyBase =
-	| { title: string; type: 'string' }
+	| { title: string; type: 'string'; pattern?: string; allOf?: Record<string, unknown>[] }
 	| { title: string; type: 'string'; format: 'date' }
 	| { title: string; type: 'string'; enum: string[] }
 	| { title: string; type: 'number'; minimum?: number; maximum?: number; multipleOf?: number }
@@ -29,6 +29,8 @@ export type EditorSubField = {
 	keyPending?: boolean;
 	/** Kind when loaded from a saved schema; limits which kinds it may change to. */
 	originalKind?: string;
+	/** Editor-only settings a descriptor maps to and from validation keywords. */
+	config?: Record<string, unknown>;
 	meta?: PropertyMeta;
 	/** Original property for the `opaque` kind, written back unchanged on save. */
 	raw?: Record<string, unknown>;

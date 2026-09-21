@@ -13,9 +13,9 @@ Update at the end of every session. Read this first.
 | WI-8 archive fields | done, committed (4d93625) | feature/initial-implementation | See "WI-8 session notes" below. |
 | WI-9 purge and usage | done, committed (a479871) | feature/initial-implementation | See "WI-9 session notes" below. |
 | WI-10 kind changes and option warnings | done, committed (602cfe4) | feature/initial-implementation | See "WI-10 session notes" below. |
-| WI-11 display options | done, awaiting user review and commit | feature/initial-implementation | See "WI-11 session notes" below. |
+| WI-11 display options | done, committed (2668afd) | feature/initial-implementation | See "WI-11 session notes" below. |
 | WI-12 rank matching (optional) | todo | | |
-| WI-15 text constraints | todo | | |
+| WI-15 text constraints | done, awaiting user review and commit | feature/initial-implementation | See "WI-15 session notes" below. |
 | WI-16 highlighted fields | todo | | |
 | WI-17 attribute search | todo | | |
 | WI-18 per-item custom fields | todo | | |
@@ -223,7 +223,7 @@ Update at the end of every session. Read this first.
 
 ## WI-11 session notes
 
-**Status:** implemented, frontend checks green, not committed. Next item: WI-15 (text constraints). WI-12 (rank matching) is optional and largely redundant since WI-14 made `kind` explicit; skip unless wanted.
+**Status:** implemented, frontend checks green, committed as 2668afd. Next item: WI-15 (text constraints). WI-12 (rank matching) is optional and largely redundant since WI-14 made `kind` explicit; skip unless wanted.
 
 **Done**
 - `FieldTypeDescriptor.displayOptions` (`{ key, label, choices, default }`); the schema editor renders a "Show as" style dropdown per option from it. `display` is stored in `x-menagerist.display` (default = unset); other keys are editor state in `EditorField.config` mapped to validation keywords by the descriptor. Helpers in `field-types/display-options.ts`; `changeKind` also clears `config`.
@@ -238,3 +238,35 @@ Update at the end of every session. Read this first.
 **Checks run:** `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 174 tests pass. Backend unchanged, backend checks not run.
 
 **Next session must know:** WI-15 also touches `rowsToAttributes` (an empty optional text with a pattern must be omitted) and adds backend schema-shape checks; keep it in the shared `check_meta_shape` helper.
+
+## WI-15 session notes
+
+**Status:** implemented, all backend and frontend checks green, not committed. Next item: WI-16 (highlighted fields). WI-12 stays optional.
+
+**Done**
+- Backend: `validate_attributes` errors now carry `keyword` and `value` next to `path` and `message` (`InvalidAttributesError.validation_errors` is `list[dict[str, Any]]`; the problem response passes them through). No new port, use case or endpoint. `check_schema` already rejects uncompilable patterns (also inside `allOf`) in all four type handlers; locked with tests.
+- Frontend: `field-types/text/constraints.ts` (escape, unescape, `constraintKeywords`, `parseConstraints`, `describePattern`, `describeConstraints`, `readTextConfig`). Text descriptor writes one `pattern` or an `allOf` of two, reads back only those forms, and keeps anything else as `config.custom` (inputs disabled, note shown). New `formatError(keyword, value)` hook on `FieldTypeDescriptor`.
+- `EditorSubField.config` added, so text sub-fields in a table carry constraints and `group.ts` passes `config` both ways (this also lets a rating sub-field keep its star count).
+- `safe-validator.ts` (`createSafeValidator`: a pattern JavaScript rejects makes it skip pattern rules and set `degraded`) and `validation-messages.ts` (`friendlyClientError`, `friendlyServerError`, `serverErrorsToFields`, `topLevelKey`).
+- UI (via svelte-file-editor): `TextExtras.svelte` and `ConstraintInputs.svelte` ("Validation (optional)" with "Starts with" and "Ends with"), the same inputs under text sub-fields in `GroupExtras.svelte`, helper text under a constrained field, client errors shown only after blur, a note when rules could not be checked, and both collection pages map server errors with `serverErrorsToFields`. An error inside a table row is now shown on the table (before it never matched a field).
+- `rowsToAttributes` omits an empty text value that has a `pattern` or `allOf` (top level and group cells).
+- Shared fixture `contract/fixtures/regex-conformance.json` read by pytest and vitest (answers open question 14 for regex cases).
+- Docs: `docs/DECISIONS.md`, `docs/field-types.md` ("Text constraints").
+
+**Left / deferred**
+- The WI-10 style warning ("N items would fail the new constraint") is not built: it needs a query that evaluates a pattern over stored values in Python or Postgres. Stale values never block other edits (WI-7).
+- The schema editor does not compile a pattern with `new RegExp` before saving: users only type literals, and the only way to get a bad pattern is the API (handled by the safe validator and by the backend `check_schema`).
+- Not tried in a browser (no component tests, by decision): the "Validation (optional)" section, helper text, blur-only errors, and the table-row error placement.
+- Switching a text field to long text drops its constraints (`changeKind` clears `config`).
+- Integration test for JSONB round trip of patterns added (`test_node_type_repository.py`); the API-level smoke (I-5) is covered by the router-free use-case tests only.
+
+**Files touched:** backend `domain/errors.py`, `application/_validate_attributes.py`; tests `test_text_constraints.py`, `adapters/persistence/test_node_type_repository.py` (new). Frontend `field-types/text/{text.ts,constraints.ts,TextExtras.svelte,ConstraintInputs.svelte}`, `field-types/registry.ts`, `field-types/group/{group.ts,GroupExtras.svelte}`, `schema-types.ts`, `safe-validator.ts`, `validation-messages.ts`, `components/attributes-editor.svelte`, `routes/collection/new/+page.svelte`, `routes/collection/[id]/+page.svelte`; test `text-constraints.test.ts`. `contract/fixtures/regex-conformance.json`; docs as above.
+
+**Checks run:** `poe lint-backend` pass; `poe typecheck-backend` clean; `poe coverage` all targets met (domain, application and shared kernel 100%, adapters 87%, platform 82%, 30 integration tests pass); `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing img-alt warnings); `poe test-frontend` 205 tests in 17 files pass.
+
+**Also changed:** `tests/schema-meta.test.ts` "single accessor" guard compared `path.relative` output (backslashes on Windows) with forward-slash names and failed on Windows; it now normalises the separator.
+
+**Next session must know**
+- Errors from the API are untyped in the OpenAPI schema (`errors` is a free-form list), so no client regeneration was needed.
+- A backslash written through some shell heredocs is halved; write patterns and JSON with the file tools.
+- `readTextConfig` lives in `constraints.ts` (not `text.ts`) to avoid an import cycle with the Svelte components.

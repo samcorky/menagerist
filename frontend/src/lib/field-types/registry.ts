@@ -27,6 +27,11 @@ export type FieldTypeDescriptor = {
 	selectable?: boolean;
 	/** Presentation settings offered in the schema editor; widgets read them from the property. */
 	displayOptions?: DisplayOption[];
+	/**
+	 * Friendly wording for a failed validation keyword (for example a `pattern` written by this
+	 * type), or null to fall back to the validator's own message. Used for client and server errors.
+	 */
+	formatError?: (keyword: string, value: unknown) => string | null;
 	/** Serialise an EditorField to a JSON Schema property. */
 	toSchema: (field: EditorField) => JsonSchemaProperty;
 	/**

@@ -42,6 +42,7 @@
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import ShimmerSlot from '$lib/components/shimmer-slot.svelte';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import { serverErrorsToFields } from '$lib/validation-messages';
 	import MediaGallery from '$lib/components/media-gallery.svelte';
 	import NodeCover from '$lib/components/node-cover.svelte';
 
@@ -189,13 +190,14 @@
 			});
 		} else if (result.error || !result.data) {
 			const fieldErrors =
-				(result.error as { errors?: Array<{ path?: string; message?: string }> } | null)?.errors ??
-				[];
-			const placed = fieldErrors.filter((e) => e.path && e.path !== '/');
-			if (placed.length) {
-				attributeServerErrors = Object.fromEntries(
-					placed.map((e) => [e.path!.replace(/^\//, ''), e.message ?? 'Invalid value'])
-				);
+				(
+					result.error as {
+						errors?: Array<{ path?: string; message?: string; keyword?: string; value?: unknown }>;
+					} | null
+				)?.errors ?? [];
+			const placed = serverErrorsToFields(nodeSchema, fieldErrors);
+			if (Object.keys(placed).length) {
+				attributeServerErrors = placed;
 			}
 			const { title, description: desc } = networkAwareError(result);
 			toast.error(title, { description: desc });

@@ -26,6 +26,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import { serverErrorsToFields } from '$lib/validation-messages';
 
 	let name = $state('');
 	let description = $state('');
@@ -95,13 +96,14 @@
 		});
 		if (result.error || !result.data) {
 			const fieldErrors =
-				(result.error as { errors?: Array<{ path?: string; message?: string }> } | null)?.errors ??
-				[];
-			const placed = fieldErrors.filter((e) => e.path && e.path !== '/');
-			if (placed.length) {
-				attrServerErrors = Object.fromEntries(
-					placed.map((e) => [e.path!.replace(/^\//, ''), e.message ?? 'Invalid value'])
-				);
+				(
+					result.error as {
+						errors?: Array<{ path?: string; message?: string; keyword?: string; value?: unknown }>;
+					} | null
+				)?.errors ?? [];
+			const placed = serverErrorsToFields(nodeSchema, fieldErrors);
+			if (Object.keys(placed).length) {
+				attrServerErrors = placed;
 			}
 			const { title, description: desc } = networkAwareError(result);
 			toast.error(title, { description: desc });

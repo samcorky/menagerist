@@ -24,6 +24,7 @@ register({
 						required: false,
 						options: [],
 						subFields: [],
+						config: sf.config,
 						meta: sf.meta,
 						raw: sf.raw
 					})
@@ -49,7 +50,8 @@ register({
 						label: sp.title,
 						kind: sub.kind,
 						meta: sub.meta,
-						originalKind: sub.kind
+						originalKind: sub.kind,
+						...(sub.config ? { config: sub.config } : {})
 					};
 				}
 				return { key: sk, label: sp.title, kind: 'opaque', raw: sp as Record<string, unknown> };

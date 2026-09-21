@@ -35,7 +35,8 @@ def validate_attributes(
     The root `required` array and archived properties are stripped first: the
     former is advisory only, the latter are hidden from forms.
     Uses iter_errors so all violations are collected in one pass.
-    Each error carries a JSON Pointer path (e.g. "/year", "/prices/0/amount").
+    Each error carries a JSON Pointer path (e.g. "/year", "/prices/0/amount"),
+    the failing keyword and its constraint value, so clients can word it.
 
     When `previous` is given (an update), errors under a top-level key whose
     value is unchanged are ignored, so a stale value never blocks an unrelated
@@ -50,6 +51,8 @@ def validate_attributes(
         {
             "path": "/" + "/".join(str(p) for p in err.absolute_path),
             "message": err.message,
+            "keyword": str(err.validator),
+            "value": err.validator_value,
         }
         for err in validator.iter_errors(attributes)
         if previous is None or not _is_unchanged(err, attributes, previous)

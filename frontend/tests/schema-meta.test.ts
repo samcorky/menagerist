@@ -91,6 +91,7 @@ describe('archived properties', () => {
 describe('single accessor', () => {
 	const srcDir = fileURLToPath(new URL('../src', import.meta.url));
 	const allowed = new Set(['lib/schema-meta.ts', 'lib/schema-types.ts']);
+	const rel = (file: string) => relative(srcDir, file).replaceAll('\\', '/');
 
 	function sourceFiles(dir: string): string[] {
 		return readdirSync(dir).flatMap((name) => {
@@ -103,8 +104,8 @@ describe('single accessor', () => {
 
 	it('no code outside the accessor and its types reads x-* keywords', () => {
 		const offenders = sourceFiles(srcDir)
-			.filter((file) => !allowed.has(relative(srcDir, file)))
+			.filter((file) => !allowed.has(rel(file)))
 			.filter((file) => /x-menagerist|x-layout|x-multiline/.test(readFileSync(file, 'utf8')));
-		expect(offenders.map((f) => relative(srcDir, f))).toEqual([]);
+		expect(offenders.map(rel)).toEqual([]);
 	});
 });

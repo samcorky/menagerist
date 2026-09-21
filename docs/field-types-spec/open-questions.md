@@ -16,9 +16,9 @@
 9. WI-13: should the backend validate the layout structure on node-type save?
 10. WI-13: which drag-and-drop library, given Svelte 5, touch, keyboard and nested containers?
 11. WI-14: `x-menagerist` is descriptive but long; is a shorter name wanted, given it is repeated on every property?
-12. WI-15: is case-sensitive matching enough? A case-insensitive option could be emitted as per-letter character classes for ASCII (`[Cc][Oo]...`), but it makes patterns unreadable and the editor's reverse-parse harder.
-13. WI-15: should min/max length and a free-form regex live in the same "Validation" section as advanced options? If free-form regex ships at all, the recommended route is the portable subset with backend-authoritative enforcement (see WI-15); otherwise keep constraints purely structured.
-14. `testing-strategy.md`: where should the shared contract fixtures live so both suites can read them (a top-level `contract/fixtures/` directory, or under `docs/`), and should CI path filters treat a change there as touching both backend and frontend?
+12. **Closed (WI-15):** case-sensitive only for v1 (decided by default). Was: is case-sensitive matching enough? A case-insensitive option could be emitted as per-letter character classes for ASCII (`[Cc][Oo]...`), but it makes patterns unreadable and the editor's reverse-parse harder.
+13. **Closed (WI-15):** structured constraints only (starts with, ends with); no free-form regex, and min/max length is not built. Was: should min/max length and a free-form regex live in the same "Validation" section as advanced options? If free-form regex ships at all, the recommended route is the portable subset with backend-authoritative enforcement (see WI-15); otherwise keep constraints purely structured.
+14. **Partly closed (WI-15):** the regex conformance fixture lives in `contract/fixtures/` at the repo root and both suites read it; CI path filters have not been checked. Was: where should the shared contract fixtures live so both suites can read them (a top-level `contract/fixtures/` directory, or under `docs/`), and should CI path filters treat a change there as touching both backend and frontend?
 15. **Closed:** the purge updates each node through the unit of work, so ETags change (decided).
 16. **Closed:** component tests are not part of this change; rely on the module-chain tests and Playwright (decided).
 17. **Closed:** no permission check on the purge for now; record the gap in DECISIONS (decided).
@@ -64,3 +64,5 @@
 57. WI-20: the key follows the label while a field is unsaved and freezes on save. If the editor ever keeps a saved schema open in place (no reload after save), pending flags must be cleared on save. Today saving closes the editor, so no action is needed.
 58. WI-6: required fields show an always-on red asterisk (`text-destructive`), which reads like an error. Should it be a neutral or "recommended" style, and should empty required fields be highlighted (guidelines §16a) now or with the §18 "items missing information" group? Default: leave as is.
 59. WI-8: should a restored field return to its previous position in the layout (needs the old position stored) or the end? Default: the end. Undo, by contrast, restores the exact previous editor state.
+60. WI-15: should a new constraint on a saved text field warn with the number of items whose value would fail it (as removing a choice option does)? It needs a query that evaluates the pattern over stored values. Default: no; stale values never block other edits.
+61. WI-15: should the attributes form show a rule's helper text always (as now) or only while the field is focused or empty? Default: always shown until there is an error.

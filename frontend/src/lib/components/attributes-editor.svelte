@@ -30,8 +30,14 @@
 	function isOmittedWhenEmpty(prop: JsonSchemaProperty | undefined): boolean {
 		if (!prop) return false;
 		if (prop.type === 'number') return true;
+		if (prop.type !== 'string') return false;
+		// An empty string fails an anchored pattern, so an empty constrained text field is omitted.
+		const p = prop as { pattern?: unknown; allOf?: unknown };
 		return (
-			prop.type === 'string' && ('enum' in prop || ('format' in prop && prop.format === 'date'))
+			'enum' in prop ||
+			('format' in prop && prop.format === 'date') ||
+			p.pattern !== undefined ||
+			p.allOf !== undefined
 		);
 	}
 
@@ -94,13 +100,16 @@
 </script>
 
 <script lang="ts">
-	import { Validator } from '@cfworker/json-schema';
 	import { Plus, X } from '@lucide/svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { normalise, orderedKeys, isSectionItem } from '$lib/layout';
 	import { descriptorForProp } from '$lib/field-types';
+	import { describeConstraints, parseConstraints } from '$lib/field-types/text/constraints';
+	import { createSafeValidator } from '$lib/safe-validator';
+	import { friendlyClientError, topLevelKey } from '$lib/validation-messages';
 
 	let {
 		rows = $bindable(),
@@ -114,22 +123,33 @@
 
 	// Required is advisory and never blocks, so validate without it.
 	let validator = $derived(
-		schema
-			? new Validator(validationSchema($state.snapshot(schema)) as object, '2020-12', false)
-			: null
+		schema ? createSafeValidator(validationSchema($state.snapshot(schema)) as object) : null
 	);
 
-	let fieldErrors = $derived.by(() => {
-		const errors: Record<string, string> = { ...serverErrors };
+	const touched = new SvelteSet<string>();
+
+	let clientErrors = $derived.by(() => {
+		const errors: Record<string, string> = {};
 		if (!validator || !schema) return errors;
-		const attrs = rowsToAttributes(rows, schema);
-		const result = validator.validate(attrs);
-		for (const err of result.errors) {
-			const key = err.instanceLocation.replace(/^#\/?/, '');
-			if (key && !errors[key]) errors[key] = err.error ?? 'Invalid value';
+		for (const err of validator.validate(rowsToAttributes(rows, schema))) {
+			const key = topLevelKey(err.instanceLocation);
+			if (key && !errors[key]) errors[key] = friendlyClientError(schema, err);
 		}
 		return errors;
 	});
+
+	// Server errors show immediately; client errors only once the field has been left.
+	let fieldErrors = $derived.by(() => {
+		const errors: Record<string, string> = { ...serverErrors };
+		for (const [key, message] of Object.entries(clientErrors)) {
+			if (!errors[key] && touched.has(key)) errors[key] = message;
+		}
+		return errors;
+	});
+
+	function markTouched(key: string) {
+		touched.add(key);
+	}
 
 	let schemaMeta = $derived(schema ? readSchemaMeta(schema) : null);
 	let requiredKeys = $derived(schemaMeta?.required ?? []);
@@ -167,7 +187,15 @@
 	{@const error = fieldErrors[key]}
 	{@const desc = descriptorForProp(prop)}
 	{@const Widget = desc?.InputWidget}
-	<div class="flex gap-2 {prop.type === 'array' ? 'items-start' : 'items-center'}">
+	{@const parsed =
+		prop.type === 'string'
+			? parseConstraints(prop as { pattern?: unknown; allOf?: unknown })
+			: null}
+	{@const rule = parsed && !parsed.custom ? describeConstraints(parsed.constraints) : null}
+	<div
+		class="flex gap-2 {prop.type === 'array' ? 'items-start' : 'items-center'}"
+		onfocusout={() => markTouched(key)}
+	>
 		<span class="w-32 shrink-0 pt-1.5 text-sm text-muted-foreground">
 			{prop.title || key}{#if isRequired}<span class="ml-0.5 text-destructive">*</span>{/if}
 		</span>
@@ -189,6 +217,8 @@
 			{/if}
 			{#if error}
 				<p class="text-xs text-destructive">{error}</p>
+			{:else if rule}
+				<p class="text-xs text-muted-foreground">{rule}</p>
 			{/if}
 		</div>
 	</div>
@@ -196,6 +226,11 @@
 
 <div class="space-y-2">
 	<Label>Details</Label>
+	{#if validator?.degraded}
+		<p class="text-xs text-muted-foreground" role="status">
+			Some rules could not be checked here. They are still checked when you save.
+		</p>
+	{/if}
 
 	{#if schema && schemaLayout.length > 0}
 		{#each schemaLayout as layoutItem (isSectionItem(layoutItem) ? layoutItem.id : layoutItem.key)}

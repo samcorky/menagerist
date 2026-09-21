@@ -1,3 +1,5 @@
+from typing import Any
+
 from app.shared_kernel.errors import ConflictError, NotFoundError, ValidationError
 
 
@@ -8,7 +10,7 @@ class InvalidSchemaError(ValidationError):
 class InvalidAttributesError(ValidationError):
     """Raised when node or edge attributes fail schema validation."""
 
-    def __init__(self, errors: list[dict[str, str]]) -> None:
+    def __init__(self, errors: list[dict[str, Any]]) -> None:
         self.validation_errors = errors
         super().__init__(errors[0]["message"] if errors else "Invalid attributes")
 

@@ -1,0 +1,125 @@
+{
+  "description": "Generated starts-with and ends-with patterns must give the same result in Python re.search and JavaScript RegExp with the u flag. Read by the backend and frontend suites.",
+  "cases": [
+    {
+      "pattern": "^cover-",
+      "value": "cover-front.jpg",
+      "expected": true
+    },
+    {
+      "pattern": "^cover-",
+      "value": "back-cover-front.jpg",
+      "expected": false
+    },
+    {
+      "pattern": "^cover-",
+      "value": "",
+      "expected": false
+    },
+    {
+      "pattern": "\\.jpg$",
+      "value": "cover-front.jpg",
+      "expected": true
+    },
+    {
+      "pattern": "\\.jpg$",
+      "value": "cover-front.jpg.png",
+      "expected": false
+    },
+    {
+      "pattern": "\\.jpg$",
+      "value": "xjpg",
+      "expected": false
+    },
+    {
+      "pattern": "^LP-",
+      "value": "LP-001",
+      "expected": true
+    },
+    {
+      "pattern": "^\\(a\\)",
+      "value": "(a) b",
+      "expected": true
+    },
+    {
+      "pattern": "^\\(a\\)",
+      "value": "a b",
+      "expected": false
+    },
+    {
+      "pattern": "\\[x\\]$",
+      "value": "done [x]",
+      "expected": true
+    },
+    {
+      "pattern": "\\[x\\]$",
+      "value": "done x",
+      "expected": false
+    },
+    {
+      "pattern": "^a\\/b",
+      "value": "a/b/c",
+      "expected": true
+    },
+    {
+      "pattern": "^a\\/b",
+      "value": "ab",
+      "expected": false
+    },
+    {
+      "pattern": "^\\\\server",
+      "value": "\\server\\share",
+      "expected": true
+    },
+    {
+      "pattern": "^\\\\server",
+      "value": "server",
+      "expected": false
+    },
+    {
+      "pattern": "^a\\+b\\*c\\?",
+      "value": "a+b*c?",
+      "expected": true
+    },
+    {
+      "pattern": "^a\\+b\\*c\\?",
+      "value": "aab",
+      "expected": false
+    },
+    {
+      "pattern": "^\\{1\\}\\|\\^",
+      "value": "{1}|^x",
+      "expected": true
+    },
+    {
+      "pattern": "^caf\u00e9",
+      "value": "caf\u00e9 au lait",
+      "expected": true
+    },
+    {
+      "pattern": "^caf\u00e9",
+      "value": "cafe",
+      "expected": false
+    },
+    {
+      "pattern": "^\ud83c\udfb5",
+      "value": "\ud83c\udfb5 song",
+      "expected": true
+    },
+    {
+      "pattern": "^\ud83c\udfb5",
+      "value": "song",
+      "expected": false
+    },
+    {
+      "pattern": "^a-b",
+      "value": "a-b",
+      "expected": true
+    },
+    {
+      "pattern": "^a-b",
+      "value": "a_b",
+      "expected": false
+    }
+  ]
+}

@@ -205,3 +205,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** One kind per stored data shape keeps the kind picker short and avoids competing shape matches; presentation is a setting on the field. Following the design guidelines, a boolean now defaults to a switch (it was a checkbox), which changes how existing boolean fields look until a type picks "Checkbox".
 
 **Tradeoff:** Group sub-fields have no "Show as" control yet; they render with each type's default.
+
+---
+
+## Text constraints are generated anchored patterns, worded from the pattern
+
+**Decision:** A text field's "Starts with" and "Ends with" rules are stored as standard JSON Schema: one anchored `pattern`, or an `allOf` of two for both, never a single combined regex. The pattern is the only stored copy: `text/constraints.ts` writes it and reads back exactly those forms; any other `pattern` or `allOf` is carried through unchanged as a "custom" rule. Users never type a regex. The API now returns `keyword` and `value` with every attribute validation error, and the client words a failed `pattern` (`Must start with "cover-"`) from the pattern itself, for its own and the server's errors. Client errors show once a field loses focus; the empty value of a constrained optional text field is omitted rather than sent as `''`.
+
+**Rationale:** Constraints affect validity, so they are standard keywords (the `x-menagerist` principle). Patterns built from escaped literals, `^` and `$` behave the same in Python `re` and JavaScript's `u`-flag RegExp, which a shared fixture (`contract/fixtures/regex-conformance.json`) checks in both suites. Two anchored halves keep `a` valid for `^a` plus `a$` and let each half say which part failed. Free-form regex was left out: the two dialects differ (lookbehind, named groups, `\d`), and a user pattern would run unbounded in Python `re` (ReDoS).
+
+**Tradeoff:** Case-sensitive only. Python's `$` also matches before a trailing newline where JavaScript's does not; form values are single-line, so this is accepted. A pattern JavaScript rejects (only possible through the API) makes the browser validator skip all pattern rules and note it; the server still enforces them. A warning with the number of items a new constraint would fail is not built (it needs a pattern-evaluating query); stale values never block other edits (changed-keys validation).

@@ -46,6 +46,11 @@ export type FieldTypeDescriptor = {
    * Defaults to true.
    */
   canBeSubField?: boolean;
+  /**
+   * Friendly wording for a failed validation keyword (client and server errors), or null to fall
+   * back to the validator's message. The text type words its own `pattern`s.
+   */
+  formatError?: (keyword: string, value: unknown) => string | null;
   /** Serialise an EditorField to a JSON Schema property. */
   toSchema: (field: EditorField) => JsonSchemaProperty;
   /**
@@ -75,7 +80,7 @@ export type FieldTypeDescriptor = {
 
 | Kind | JSON Schema shape | Backend validated | Notes |
 |---|---|---|---|
-| `text` | `{ type: 'string' }` | ✅ type | Fallback — matched last |
+| `text` | `{ type: 'string' }`, optionally with an anchored `pattern` or an `allOf` of two (see "Text constraints") | ✅ type + pattern | Fallback — matched last |
 | `number` | `{ type: 'number' }` | ✅ type | |
 | `boolean` | `{ type: 'boolean' }` | ✅ type | |
 | `date` | `{ type: 'string', format: 'date' }` | ✅ type + format | `jsonschema[format-nongpl]` validates ISO 8601 dates |
@@ -251,3 +256,15 @@ A saved field can only move to a kind listed in `frontend/src/lib/field-types/ki
 ### Display options ("Show as")
 
 Add `displayOptions` to a descriptor to offer presentation styles: `{ key: 'display', label, choices, default }` stores the choice in `x-menagerist.display`; any other `key` is editor state (`EditorField.config`) that the descriptor maps to a validation keyword in `fromSchema` / `toSchema` (as the rating star count does with `maximum`). The widget reads `readPropMeta(prop).display` and falls back to the default.
+
+### Text constraints (starts with, ends with)
+
+A text field can require a prefix and/or a suffix. These change validity, so they are standard keywords, not `x-menagerist` members: one constraint is a single anchored `pattern` (`"^cover-"`), both are an `allOf` of two (`[{ "pattern": "^cover-" }, { "pattern": "\\.jpg$" }]`). Never merge them into one regex: `^a.*a$` would reject `a`, and the message could not say which half failed.
+
+- The pattern is the only stored copy. `text/constraints.ts` writes it (`constraintKeywords`) and reads back exactly those forms (`parseConstraints`) into `EditorField.config` (`startsWith`, `endsWith`; group sub-fields use `EditorSubField.config`). Any other `pattern` or `allOf` is kept unchanged as `config.custom`, the two inputs are disabled and a note says so.
+- Users never type a regex. Only literal text is escaped (`\ ^ $ . * + ? ( ) [ ] { } | /`, never `-`, because `\-` is invalid under the `u` flag).
+- Two engines check the same pattern: Python `re.search` on the backend and `new RegExp(p, 'u')` in `@cfworker/json-schema`. Generated patterns behave identically in both, except that Python's `$` also matches before a trailing newline. Text typed into the form is single-line, so the difference is accepted. `contract/fixtures/regex-conformance.json` is read by both test suites, so they fail together if an engine disagrees.
+- A pattern JavaScript rejects (for example one authored through the API) makes `validate()` throw. `createSafeValidator` catches that, skips the pattern rules and the attributes editor says some rules could not be checked; the server still enforces them. The backend already rejects uncompilable patterns when a type is saved (`check_schema`).
+- An empty optional text field with a pattern is omitted from the payload (an empty string fails an anchored pattern), at the top level and in group rows.
+- Errors: `formatError` turns a failed `pattern` into `Must start with "cover-"` or `Must end with ".jpg"` from the pattern itself, for client errors (`friendlyClientError`) and server errors (`friendlyServerError`, using the `keyword` and `value` the API now returns for every attribute error). Client errors appear after the field loses focus; server errors appear on save.
+- Case-sensitive only. A stored value that no longer matches a newly added constraint never blocks saving other fields (changed-keys validation); editing that field re-validates it.

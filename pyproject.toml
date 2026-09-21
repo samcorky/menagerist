@@ -57,6 +57,7 @@ help = "Install frontend npm dependencies"
 cmd = "menagerist schema dump --output ../frontend/openapi.json"
 cwd = "backend"
 help = "Dump the backend's OpenAPI schema for frontend client generation"
+deps = ["sync-backend"]
 
 [tool.poe.groups.setup.tasks._run-frontend-generate]
 shell = "npm run generate"
