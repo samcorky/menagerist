@@ -9,8 +9,8 @@ Update at the end of every session. Read this first.
 | WI-20 readable field keys | done, committed (ce327e2) | feature/initial-implementation | See "WI-20 session notes" below. |
 | WI-5 rating | done, committed (c5a85f4) | feature/initial-implementation | See "WI-5 session notes" below. |
 | WI-6 advisory required | done, committed (ada4dea) | feature/initial-implementation | See "WI-6 session notes" below. |
-| WI-7 changed-keys validation | done, awaiting user review and commit | feature/initial-implementation | See "WI-7 session notes" below. |
-| WI-8 archive fields | todo | | |
+| WI-7 changed-keys validation | done, committed (14c4b53) | feature/initial-implementation | See "WI-7 session notes" below. |
+| WI-8 archive fields | done, awaiting user review and commit | feature/initial-implementation | See "WI-8 session notes" below. |
 | WI-9 purge and usage | todo | | |
 | WI-10 kind changes and option warnings | todo | | |
 | WI-11 display options | todo | | |
@@ -146,7 +146,7 @@ Update at the end of every session. Read this first.
 
 ## WI-7 session notes
 
-**Status:** implemented, all backend checks green, not committed. Next item: WI-8 (archive fields).
+**Status:** implemented, all backend checks green, committed as 14c4b53. Next item: WI-8 (archive fields).
 
 **Done**
 - `validate_attributes(schema, attributes, *, previous=None)`: with `previous` set (updates), errors under a top-level key whose value equals the stored value are dropped; root-level errors are kept; `previous=None` (create) is unchanged. Values compare as canonical JSON (type-strict), which the spec did not ask for but avoids `1 == True` hiding a change.
@@ -160,3 +160,24 @@ Update at the end of every session. Read this first.
 **Checks run:** `poe lint-backend` pass; `poe typecheck-backend` clean; `poe test-backend` 510 pass; `poe coverage` all targets met (application 100%). Frontend unchanged, frontend checks not run.
 
 **Next session must know:** WI-8 builds on `archived_keys` / `validation_schema` in `schema_meta.py`; the backend already ignores archived properties when validating, so WI-8 is mostly the editor UI (archive instead of delete, "Removed fields", restore) plus hiding archived fields from forms and "Additional details".
+
+## WI-8 session notes
+
+**Status:** implemented, all frontend checks green, not committed. Next item: WI-9 (purge and usage). It is backend plus a UI; read `wi-09-purge-and-usage.md`, `backend-surface.md` and testing rows I-x first.
+
+**Done**
+- Schema editor: removing a saved field (top-level, in a section, or a whole section) archives it (`x-menagerist.archived`) instead of deleting; unsaved fields are removed outright. A 5-second Undo toast restores the earlier editor state. A collapsed "Removed fields (N)" list has a Restore action that re-adds the field at the end of the layout.
+- `schemaToArchived()` and `itemsToSchema(items, baseMeta, archived)`: archived fields stay in `properties`, out of `layout` and `required`, and keep occupying their keys (a new same-titled field gets `_2`).
+- `normalise()` skips archived properties (even if the saved layout lists them); the attributes editor and the item page exclude archived keys from "Additional details"; `validationSchema()` also drops archived properties. Backend already ignored them (WI-14).
+- New helpers: `src/lib/field-archive.ts` (`archiveField`, `restoreField`), `archivedKeys()` in `schema-meta.ts`.
+- Docs: `docs/DECISIONS.md` entry, `docs/field-types.md` section, `frontend/DESIGN_GUIDELINES.md` §14 note (Undo for removing a field; confirmation only for permanent deletion).
+
+**Left:** the removal, Undo and Restore flow has not been checked in a browser (no component tests, by decision); try it once in the categories and relationships settings pages. A restored field returns at the end of the layout, not its old position (Q in the spec; default kept). The "archive-then-purge" DECISIONS entry is completed by WI-9. The read-only item page shows archived data nowhere, which is intended.
+
+**Files touched:** frontend `src/lib/layout.ts`, `schema-meta.ts`, `field-archive.ts` (new), `components/schema-editor.svelte`, `components/attributes-editor.svelte`, `routes/collection/[id]/+page.svelte`; tests `layout.test.ts`, `schema-meta.test.ts`, `schema-editor-keys.test.ts` (one WI-20 test updated), `field-archive.test.ts` (new); docs as above.
+
+**Checks run:** `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 146 tests in 13 files pass. Backend unchanged.
+
+**Next session must know**
+- `schemaToItems` no longer returns archived fields; callers that build a schema from items must pass `schemaToArchived(schema)` as the third argument to `itemsToSchema`, or archived fields are lost.
+- WI-9's purge should reuse `archivedKeys` and only be offered for archived fields.

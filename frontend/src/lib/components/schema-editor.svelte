@@ -8,7 +8,14 @@
 		propertyFromField
 	} from '$lib/field-types';
 	import { resolvePendingKeys } from '$lib/field-key';
-	import { META_VERSION, readSchemaMeta, withSchemaMeta, type SchemaMeta } from '$lib/schema-meta';
+	import {
+		META_VERSION,
+		archivedKeys,
+		readSchemaMeta,
+		withSchemaMeta,
+		type SchemaMeta
+	} from '$lib/schema-meta';
+	import { archiveField, restoreField } from '$lib/field-archive';
 
 	export type EditorSection = {
 		_section: true;
@@ -51,12 +58,23 @@
 		});
 	}
 
+	export function schemaToArchived(schema: AttributesSchema | null): EditorField[] {
+		if (!schema) return [];
+		const required = new Set(readSchemaMeta(schema).required ?? []);
+		return [...archivedKeys(schema)].map((key) =>
+			fieldFromProperty(key, schema.properties[key], required.has(key))
+		);
+	}
+
 	export function itemsToSchema(
 		items: EditorItem[],
-		baseMeta: SchemaMeta
+		baseMeta: SchemaMeta,
+		archived: EditorField[] = []
 	): AttributesSchema | null {
 		// Resolve pending keys across the whole schema so they are unique globally.
-		const all = items.flatMap((item) => (isSection(item) ? item.fields : [item]));
+		// Archived fields are included so they keep occupying their keys.
+		const visible = items.flatMap((item) => (isSection(item) ? item.fields : [item]));
+		const all = [...visible, ...archived];
 		const resolvedList = resolvePendingKeys(all);
 		const resolved = new Map(all.map((f, i) => [f, resolvedList[i]]));
 
@@ -90,6 +108,11 @@
 			}
 		}
 
+		for (const original of archived) {
+			const f = resolved.get(original)!;
+			if (f.key) entries.push([f.key, propertyFromField(f)]);
+		}
+
 		if (entries.length === 0) return null;
 		const base = {
 			$schema: 'https://json-schema.org/draft/2020-12/schema' as const,
@@ -102,6 +125,7 @@
 
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { toast } from 'svelte-sonner';
 	import { FolderOpen, Plus, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -113,10 +137,38 @@
 	// Captured once so unknown root members survive round-trips.
 	const baseMeta = untrack(() => readSchemaMeta(schema));
 	let items = $state<EditorItem[]>(schemaToItems(schema));
+	let archived = $state<EditorField[]>(untrack(() => schemaToArchived(schema)));
 
 	$effect(() => {
-		schema = itemsToSchema(items, baseMeta);
+		schema = itemsToSchema(items, baseMeta, archived);
 	});
+
+	// Saved fields are archived rather than deleted so their data is kept.
+	function toArchive(fields: EditorField[]): EditorField[] {
+		return fields.filter((f) => !f.keyPending).map(archiveField);
+	}
+
+	function removeWithUndo(message: string, apply: () => void, archives: boolean) {
+		const previousItems = $state.snapshot(items) as EditorItem[];
+		const previousArchived = $state.snapshot(archived) as EditorField[];
+		apply();
+		if (!archives) return;
+		toast(message, {
+			action: {
+				label: 'Undo',
+				onClick: () => {
+					items = previousItems;
+					archived = previousArchived;
+				}
+			},
+			duration: 5000
+		});
+	}
+
+	function restoreArchived(field: EditorField) {
+		archived = archived.filter((f) => f !== field);
+		items = [...items, restoreField(field)];
+	}
 
 	function generateKey(): string {
 		return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -147,7 +199,18 @@
 	}
 
 	function removeItem(index: number) {
-		items = items.filter((_, i) => i !== index);
+		const item = items[index];
+		if (!item) return;
+		const fields = isSection(item) ? item.fields : [item];
+		const saved = toArchive(fields);
+		removeWithUndo(
+			isSection(item) ? 'Section removed' : 'Field removed',
+			() => {
+				archived = [...archived, ...saved];
+				items = items.filter((_, i) => i !== index);
+			},
+			saved.length > 0
+		);
 	}
 
 	function handleFieldLabelChange(index: number, value: string) {
@@ -186,10 +249,20 @@
 	}
 
 	function removeFieldFromSection(sectionIndex: number, fieldIndex: number) {
-		items = items.map((item, i) => {
-			if (i !== sectionIndex || !isSection(item)) return item;
-			return { ...item, fields: item.fields.filter((_, fi) => fi !== fieldIndex) };
-		});
+		const section = items[sectionIndex];
+		if (!section || !isSection(section)) return;
+		const saved = toArchive(section.fields.filter((_, fi) => fi === fieldIndex));
+		removeWithUndo(
+			'Field removed',
+			() => {
+				archived = [...archived, ...saved];
+				items = items.map((item, i) => {
+					if (i !== sectionIndex || !isSection(item)) return item;
+					return { ...item, fields: item.fields.filter((_, fi) => fi !== fieldIndex) };
+				});
+			},
+			saved.length > 0
+		);
 	}
 
 	function handleSectionFieldLabelChange(sectionIndex: number, fieldIndex: number, value: string) {
@@ -335,4 +408,32 @@
 			Add section
 		</Button>
 	</div>
+
+	{#if archived.length > 0}
+		<details class="pt-1">
+			<summary
+				class="cursor-pointer text-xs text-muted-foreground select-none hover:text-foreground"
+			>
+				Removed fields ({archived.length})
+			</summary>
+			<div class="mt-2 space-y-1">
+				{#each archived as field (field.key)}
+					<div class="flex items-center gap-2">
+						<span class="flex-1 truncate text-sm text-muted-foreground">
+							{field.label || 'Untitled field'}
+						</span>
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							class="h-7 text-xs"
+							onclick={() => restoreArchived(field)}
+						>
+							Restore
+						</Button>
+					</div>
+				{/each}
+			</div>
+		</details>
+	{/if}
 </div>

@@ -476,6 +476,8 @@ Prefer Undo over a confirmation dialog wherever the action can be reversed:
 
 **Undo timeout:** The undo toast persists for **5 seconds** before the action is committed. This is the standard window across the app — do not use different durations in different places. The deletion (or other destructive action) is deferred on the server until the timeout elapses or the user navigates away, whichever comes first. If the user navigates away before 5 seconds, the action commits immediately.
 
+Removing a field from a category is reversible, so it uses Undo: the field is archived rather than deleted, its values are kept, and it can be brought back from "Removed fields". Only permanently deleting a field's values needs a confirmation.
+
 If an action cannot be undone (e.g. permanent deletion of a category with many items), do not use the undo pattern — use a confirmation dialog instead, and explain clearly what will be lost.
 
 ---

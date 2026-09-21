@@ -165,3 +165,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** The UI sends the whole attributes dict on every save, and editing a type's schema never touches existing items. Without this, tightening a schema (a removed choice option, a changed field kind, a new constraint) made an item unsaveable even when the user edited an unrelated field.
 
 **Tradeoff:** A stale invalid value stays in the data until someone edits it. Editing it to another invalid value is still rejected. Comparison is per top-level key, so a change anywhere inside a group re-validates the whole group.
+
+---
+
+## Removing a saved field archives it
+
+**Decision:** In the schema editor, removing a field that has been saved sets `x-menagerist.archived: true` instead of deleting the property. The property stays in `properties`, leaves the layout and `required`, and appears under "Removed fields" with a Restore action. Fields added in the current editing session are removed outright. Archived fields are skipped by `normalise()`, hidden from the attributes editor and from "Additional details", and ignored by both validators. Removing is reversible with a 5-second Undo toast, with no confirmation dialog. Permanently deleting a field's data is a separate, confirmed action (purge).
+
+**Rationale:** Stored item data lives in JSONB and is not touched when a type changes, so deleting a property used to leave orphaned values that resurfaced under raw keys. Archiving keeps the data, makes removal safely undoable (guidelines §14) and lets a restored field show its old values again.
+
+**Tradeoff:** A restored field returns at the end of the layout, not its old position (open question). Archived keys stay reserved, so a new field with the same title gets a `_2` suffix.

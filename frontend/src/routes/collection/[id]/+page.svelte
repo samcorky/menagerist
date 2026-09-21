@@ -27,7 +27,7 @@
 		type AttributeRow
 	} from '$lib/components/attributes-editor.svelte';
 	import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
-	import { readSchemaMeta } from '$lib/schema-meta';
+	import { archivedKeys, readSchemaMeta } from '$lib/schema-meta';
 	import { normalise, orderedKeys, isSectionItem } from '$lib/layout';
 	import { descriptorForProp } from '$lib/field-types';
 	import BackButton from '$lib/components/back-button.svelte';
@@ -76,7 +76,10 @@
 	let description = $state('');
 	let tags = $state<string[]>([]);
 	let attributeRows = $state<AttributeRow[]>([]);
-	let freeformAttrRows = $derived(attributeRows.filter((r) => !schemaKeys.includes(r.key)));
+	let hiddenKeys = $derived(archivedKeys(nodeSchema));
+	let freeformAttrRows = $derived(
+		attributeRows.filter((r) => !schemaKeys.includes(r.key) && !hiddenKeys.has(r.key))
+	);
 	let attributeServerErrors = $state<Record<string, string> | null>(null);
 	let saving = $state(false);
 	let deletingNode = $state(false);

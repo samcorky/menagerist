@@ -1,6 +1,6 @@
 <script lang="ts" module>
 	import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
-	import { readSchemaMeta, validationSchema } from '$lib/schema-meta';
+	import { archivedKeys, readSchemaMeta, validationSchema } from '$lib/schema-meta';
 
 	export type GroupRow = Record<string, string>;
 	export type AttributeRow = { key: string; value: string | GroupRow[] };
@@ -133,7 +133,10 @@
 	let requiredKeys = $derived(schemaMeta?.required ?? []);
 	let schemaLayout = $derived(schema ? normalise(schemaMeta?.layout, schema.properties) : []);
 	let schemaKeys = $derived(orderedKeys(schemaLayout));
-	let freeformRows = $derived(rows.filter((r) => !schemaKeys.includes(r.key)));
+	let hiddenKeys = $derived(archivedKeys(schema));
+	let freeformRows = $derived(
+		rows.filter((r) => !schemaKeys.includes(r.key) && !hiddenKeys.has(r.key))
+	);
 
 	function getValue(key: string): unknown {
 		return rows.find((r) => r.key === key)?.value ?? '';

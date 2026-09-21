@@ -1,3 +1,5 @@
+import { readPropMeta } from '$lib/schema-meta';
+
 export type LayoutFieldItem = { key: string };
 
 export type LayoutSectionItem = {
@@ -21,12 +23,15 @@ export function isSectionItem(item: LayoutItem): item is LayoutSectionItem {
  * - No layout → flat list in schema key order (JSONB-sorted, but consistent)
  * - Dangling keys (properties removed since layout was saved) are silently dropped
  * - Unplaced keys (properties added since layout was saved) are appended at the end
+ * - Archived properties are left out, even when the saved layout still lists them
  */
 export function normalise(
 	layout: XLayout | undefined,
 	properties: Record<string, unknown>
 ): XLayout {
-	const allKeys = Object.keys(properties);
+	const allKeys = Object.keys(properties).filter(
+		(key) => !readPropMeta(properties[key] as object).archived
+	);
 	if (!layout || layout.length === 0) {
 		return allKeys.map((key) => ({ key }));
 	}

@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
 	itemsToSchema,
+	schemaToArchived,
 	schemaToItems,
 	type EditorItem
 } from '../src/lib/components/schema-editor.svelte';
+import { archiveField, restoreField } from '../src/lib/field-archive';
 import type { AttributesSchema, EditorField } from '../src/lib/schema-types';
 
 const newField = (label: string, extra: Partial<EditorField> = {}): EditorField => ({
@@ -45,7 +47,10 @@ describe('editor keys', () => {
 			}
 		};
 		const items = [...schemaToItems(archived), newField('Director')];
-		expect(keysOf(itemsToSchema(items, {}))).toEqual(['director', 'director_2']);
+		expect(keysOf(itemsToSchema(items, {}, schemaToArchived(archived)))).toEqual([
+			'director_2',
+			'director'
+		]);
 	});
 
 	it('a non-Latin title gives field, then field_2', () => {
@@ -89,5 +94,53 @@ describe('editor keys', () => {
 		const out = itemsToSchema(schemaToItems(schema), {})!;
 		expect(Object.getPrototypeOf(out.properties)).toBe(Object.prototype);
 		expect(Object.keys(out.properties)).toContain('__proto__');
+	});
+});
+
+describe('archived fields', () => {
+	const saved = (key: string, label: string): EditorField => ({
+		key,
+		label,
+		kind: 'text',
+		required: false,
+		options: [],
+		subFields: []
+	});
+
+	it('an archived field stays in properties but leaves the layout and required', () => {
+		const items = [saved('year', 'Year')];
+		const archived = [archiveField({ ...saved('old', 'Old'), required: true })];
+		const schema = itemsToSchema(items, {}, archived)!;
+		expect(Object.keys(schema.properties)).toEqual(['year', 'old']);
+		expect(schema.properties.old['x-menagerist']?.archived).toBe(true);
+		expect(schema['x-menagerist']?.layout).toEqual([{ key: 'year' }]);
+		expect(schema['x-menagerist']?.required).toEqual([]);
+	});
+
+	it('round-trips: archived fields are split out on load and written back untouched', () => {
+		const items = [saved('year', 'Year')];
+		const first = itemsToSchema(items, {}, [archiveField(saved('old', 'Old'))])!;
+		expect(schemaToItems(first).map((i) => (i as EditorField).key)).toEqual(['year']);
+		const archived = schemaToArchived(first);
+		expect(archived.map((f) => f.key)).toEqual(['old']);
+		expect(itemsToSchema(schemaToItems(first), {}, archived)).toEqual(first);
+	});
+
+	it('restoring brings the field back with its key and clears the flag', () => {
+		const first = itemsToSchema([], {}, [archiveField(saved('old', 'Old'))])!;
+		const [field] = schemaToArchived(first);
+		const restored = itemsToSchema([restoreField(field)], {}, [])!;
+		expect(Object.keys(restored.properties)).toEqual(['old']);
+		expect(restored.properties.old['x-menagerist']?.archived).toBeUndefined();
+	});
+
+	it('a new field with the same title as an archived one gets a suffixed key', () => {
+		const archived = [archiveField(saved('director', 'Director'))];
+		const schema = itemsToSchema([newField('Director')], {}, archived)!;
+		expect(keysOf(schema)).toEqual(['director_2', 'director']);
+	});
+
+	it('a schema with only archived fields is still written', () => {
+		expect(itemsToSchema([], {}, [archiveField(saved('old', 'Old'))])).not.toBeNull();
 	});
 });

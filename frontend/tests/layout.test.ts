@@ -66,3 +66,25 @@ describe('orderedKeys', () => {
 		).toEqual(['a', 'b', 'c']);
 	});
 });
+
+describe('normalise with archived properties', () => {
+	const archivedProps = {
+		year: {},
+		old: { 'x-menagerist': { archived: true } },
+		director: {}
+	};
+
+	it('leaves archived properties out of a layout-less schema', () => {
+		expect(orderedKeys(normalise(undefined, archivedProps))).toEqual(['year', 'director']);
+	});
+
+	it('drops an archived key even when the saved layout still lists it', () => {
+		const layout = [{ key: 'old' }, { key: 'year' }];
+		expect(orderedKeys(normalise(layout, archivedProps))).toEqual(['year', 'director']);
+	});
+
+	it('drops archived keys from inside sections', () => {
+		const layout = [{ id: 's', section: 'S', items: [{ key: 'old' }, { key: 'year' }] }];
+		expect(orderedKeys(normalise(layout, archivedProps))).toEqual(['year', 'director']);
+	});
+});

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import { Validator } from '@cfworker/json-schema';
 import {
+	archivedKeys,
 	readPropMeta,
 	readSchemaMeta,
 	validationSchema,
@@ -61,6 +62,29 @@ describe('validationSchema', () => {
 		expect(strict.validate({}).valid).toBe(false);
 		expect(advisory.validate({}).valid).toBe(true);
 		expect(advisory.validate({ year: 'x' }).valid).toBe(false);
+	});
+});
+
+describe('archived properties', () => {
+	const schema = {
+		properties: {
+			year: { type: 'number' },
+			old: { type: 'string', 'x-menagerist': { archived: true } },
+			live: { type: 'string', 'x-menagerist': { archived: false } }
+		}
+	};
+
+	it('archivedKeys lists only archived top-level properties', () => {
+		expect([...archivedKeys(schema)]).toEqual(['old']);
+		expect(archivedKeys(null).size).toBe(0);
+	});
+
+	it('validationSchema drops archived properties so their values are never checked', () => {
+		const withArchived = { ...schema, type: 'object' };
+		const v = new Validator(validationSchema(withArchived) as object, '2020-12', false);
+		expect(v.validate({ old: 5 }).valid).toBe(true);
+		expect(v.validate({ year: 'x' }).valid).toBe(false);
+		expect(Object.keys(withArchived.properties)).toContain('old');
 	});
 });
 
