@@ -1,112 +1,22 @@
-<script lang="ts" module>
-	import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
-	import { archivedKeys, readSchemaMeta, validationSchema } from '$lib/schema-meta';
-
-	export type GroupRow = Record<string, string>;
-	export type AttributeRow = { key: string; value: string | GroupRow[] };
-
-	function isGroupValue(value: unknown): value is Record<string, unknown>[] {
-		return (
-			Array.isArray(value) &&
-			value.every((v) => typeof v === 'object' && v !== null && !Array.isArray(v))
-		);
-	}
-
-	/** Convert an API `attributes` dict into editable key/value rows. */
-	export function attributesToRows(attributes: Record<string, unknown>): AttributeRow[] {
-		return Object.entries(attributes).map(([key, value]) => {
-			if (isGroupValue(value)) {
-				return {
-					key,
-					value: value.map((entry) =>
-						Object.fromEntries(Object.entries(entry).map(([k, v]) => [k, String(v)]))
-					)
-				};
-			}
-			return { key, value: String(value) };
-		});
-	}
-
-	function isOmittedWhenEmpty(prop: JsonSchemaProperty | undefined): boolean {
-		if (!prop) return false;
-		if (prop.type === 'number') return true;
-		if (prop.type !== 'string') return false;
-		// An empty string fails an anchored pattern, so an empty constrained text field is omitted.
-		const p = prop as { pattern?: unknown; allOf?: unknown };
-		return (
-			'enum' in prop ||
-			('format' in prop && prop.format === 'date') ||
-			p.pattern !== undefined ||
-			p.allOf !== undefined
-		);
-	}
-
-	function coerceScalar(value: string, prop: JsonSchemaProperty | undefined): unknown {
-		if (prop?.type === 'number') {
-			const n = Number(value);
-			return isNaN(n) ? value : n;
-		}
-		// An untouched checkbox has no unset state, so '' becomes false.
-		if (prop?.type === 'boolean') return value === 'true';
-		return value;
-	}
-
-	/**
-	 * Convert edited rows into a typed `attributes` dict ready for the API.
-	 * Pass `schema` so number/boolean fields are emitted as real JS types.
-	 * Empty number, date and enum values are omitted rather than sent as empty strings.
-	 */
-	export function rowsToAttributes(
-		rows: AttributeRow[],
-		schema?: AttributesSchema | null
-	): Record<string, unknown> {
-		const props = schema?.properties ?? {};
-		return Object.fromEntries(
-			rows
-				.filter((row) => row.key.trim() !== '')
-				.flatMap((row): [string, unknown][] => {
-					const prop = props[row.key];
-					if (typeof row.value !== 'string') {
-						if (prop?.type === 'array' && prop.items?.type === 'object') {
-							const subProps = prop.items.properties ?? {};
-							return [
-								[
-									row.key,
-									row.value.map((gr) =>
-										Object.fromEntries(
-											Object.entries(gr)
-												.filter(([k, v]) => !(v === '' && isOmittedWhenEmpty(subProps[k])))
-												.map(([k, v]) => [k, coerceScalar(v, subProps[k])])
-										)
-									)
-								]
-							];
-						}
-						return [[row.key, row.value]];
-					}
-					if (row.value === '' && isOmittedWhenEmpty(prop)) return [];
-					if (prop?.type === 'number') {
-						if (row.value === '') return [];
-						const n = Number(row.value);
-						return isNaN(n) ? [[row.key, row.value]] : [[row.key, n]];
-					}
-					// An empty top-level boolean means "not recorded", not false.
-					if (prop?.type === 'boolean' && row.value === '') return [];
-					if (prop?.type === 'boolean') return [[row.key, row.value === 'true']];
-					return [[row.key, row.value]];
-				})
-		);
-	}
-</script>
-
 <script lang="ts">
 	import { Plus, X } from '@lucide/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
+	import { newDetailRow, rowsToAttributes } from '$lib/attribute-rows';
+	import type { AttributeRow, GroupRow } from '$lib/attribute-rows';
+	import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
+	import { readSchemaMeta, validationSchema } from '$lib/schema-meta';
+	import {
+		MAX_CUSTOM_DETAILS,
+		canAddDetail,
+		customDetailProblems,
+		displayDetailValue,
+		isDetailRow
+	} from '$lib/custom-details';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import { normalise, orderedKeys, isSectionItem } from '$lib/layout';
-	import { descriptorForProp } from '$lib/field-types';
+	import { normalise, isSectionItem } from '$lib/layout';
+	import { descriptorForProp, getDescriptor } from '$lib/field-types';
 	import { describeConstraints, parseConstraints } from '$lib/field-types/text/constraints';
 	import { createSafeValidator } from '$lib/safe-validator';
 	import { friendlyClientError, topLevelKey } from '$lib/validation-messages';
@@ -154,11 +64,8 @@
 	let schemaMeta = $derived(schema ? readSchemaMeta(schema) : null);
 	let requiredKeys = $derived(schemaMeta?.required ?? []);
 	let schemaLayout = $derived(schema ? normalise(schemaMeta?.layout, schema.properties) : []);
-	let schemaKeys = $derived(orderedKeys(schemaLayout));
-	let hiddenKeys = $derived(archivedKeys(schema));
-	let freeformRows = $derived(
-		rows.filter((r) => !schemaKeys.includes(r.key) && !hiddenKeys.has(r.key))
-	);
+	let freeformRows = $derived(rows.filter((r) => isDetailRow(r, schema)));
+	let problems = $derived(customDetailProblems(rows, schema));
 
 	function getValue(key: string): unknown {
 		return rows.find((r) => r.key === key)?.value ?? '';
@@ -174,7 +81,12 @@
 	}
 
 	function addRow() {
-		rows = [...rows, { key: '', value: '' }];
+		rows = [...rows, newDetailRow()];
+	}
+
+	function setKind(row: AttributeRow, kind: string) {
+		row.kind = kind as 'text' | 'number' | 'boolean';
+		row.value = kind === 'boolean' ? 'false' : '';
 	}
 
 	function removeRow(row: AttributeRow) {
@@ -224,6 +136,94 @@
 	</div>
 {/snippet}
 
+{#snippet detailRow(row: AttributeRow)}
+	{@const NumberWidget = getDescriptor('number')?.InputWidget}
+	{@const BooleanWidget = getDescriptor('boolean')?.InputWidget}
+	{@const error = problems.errors.get(row) ?? serverErrors?.[row.key.trim()]}
+	<div class="space-y-1">
+		<div class="flex items-center gap-2">
+			<Input
+				bind:value={row.key}
+				placeholder="Detail name"
+				class="flex-1"
+				aria-label="Detail name"
+			/>
+			{#if row.extra}
+				<select
+					value={row.kind ?? 'text'}
+					onchange={(e) => setKind(row, (e.target as HTMLSelectElement).value)}
+					class="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
+					aria-label="Value type"
+				>
+					<option value="text">Text</option>
+					<option value="number">Number</option>
+					<option value="boolean">Yes/No</option>
+				</select>
+			{/if}
+			{#if row.kind === 'number' && NumberWidget}
+				<NumberWidget
+					value={typeof row.value === 'string' ? row.value : ''}
+					onChange={(v) => (row.value = String(v))}
+					ariaLabel="Detail value"
+					prop={{ title: 'Value', type: 'number' }}
+				/>
+			{:else if row.kind === 'boolean' && BooleanWidget}
+				<div class="flex flex-1 items-center">
+					<BooleanWidget
+						value={typeof row.value === 'string' ? row.value : ''}
+						onChange={(v) => (row.value = String(v))}
+						ariaLabel="Detail value"
+						prop={{ title: 'Value', type: 'boolean' }}
+					/>
+				</div>
+			{:else if row.kind === 'json'}
+				<code
+					class="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 text-xs"
+					title={displayDetailValue(row)}>{displayDetailValue(row)}</code
+				>
+			{:else}
+				<Input
+					value={typeof row.value === 'string' ? row.value : ''}
+					oninput={(e) => (row.value = (e.target as HTMLInputElement).value)}
+					placeholder="Value"
+					class="flex-1"
+					aria-label="Detail value"
+				/>
+			{/if}
+			<Button
+				type="button"
+				variant="ghost"
+				size="icon"
+				onclick={() => removeRow(row)}
+				aria-label="Remove detail"
+			>
+				<X class="size-4" />
+			</Button>
+		</div>
+		{#if error}
+			<p class="text-xs text-destructive">{error}</p>
+		{/if}
+	</div>
+{/snippet}
+
+{#snippet addDetailButton()}
+	<Button
+		type="button"
+		variant="outline"
+		size="sm"
+		onclick={addRow}
+		disabled={!canAddDetail(rows, schema)}
+	>
+		<Plus class="size-4" />
+		Add detail
+	</Button>
+	{#if !canAddDetail(rows, schema)}
+		<p class="text-xs text-muted-foreground">
+			You can add up to {MAX_CUSTOM_DETAILS} extra details.
+		</p>
+	{/if}
+{/snippet}
+
 <div class="space-y-2">
 	<Label>Details</Label>
 	{#if validator?.degraded}
@@ -261,69 +261,16 @@
 			</summary>
 			<div class="mt-2 space-y-2">
 				{#each freeformRows as row (row)}
-					<div class="flex gap-2">
-						<Input
-							bind:value={row.key}
-							placeholder="Field name"
-							class="flex-1"
-							aria-label="Field name"
-						/>
-						<Input
-							value={typeof row.value === 'string' ? row.value : ''}
-							oninput={(e) => (row.value = (e.target as HTMLInputElement).value)}
-							placeholder="Value"
-							class="flex-1"
-							aria-label="Field value"
-						/>
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon"
-							onclick={() => removeRow(row)}
-							aria-label="Remove field"
-						>
-							<X class="size-4" />
-						</Button>
-					</div>
+					{@render detailRow(row)}
 				{/each}
-				<Button type="button" variant="outline" size="sm" onclick={addRow}>
-					<Plus class="size-4" />
-					Add detail
-				</Button>
+				{@render addDetailButton()}
 			</div>
 		</details>
 	{:else}
 		<!-- No schema: show freeform fields flat -->
 		{#each freeformRows as row (row)}
-			<div class="flex gap-2">
-				<Input
-					bind:value={row.key}
-					placeholder="Field name"
-					class="flex-1"
-					aria-label="Field name"
-				/>
-				<Input
-					value={typeof row.value === 'string' ? row.value : ''}
-					oninput={(e) => (row.value = (e.target as HTMLInputElement).value)}
-					placeholder="Value"
-					class="flex-1"
-					aria-label="Field value"
-				/>
-				<Button
-					type="button"
-					variant="ghost"
-					size="icon"
-					onclick={() => removeRow(row)}
-					aria-label="Remove field"
-				>
-					<X class="size-4" />
-				</Button>
-			</div>
+			{@render detailRow(row)}
 		{/each}
-
-		<Button type="button" variant="outline" size="sm" onclick={addRow}>
-			<Plus class="size-4" />
-			Add detail
-		</Button>
+		{@render addDetailButton()}
 	{/if}
 </div>

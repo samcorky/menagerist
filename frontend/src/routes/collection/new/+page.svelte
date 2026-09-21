@@ -13,10 +13,8 @@
 	} from '$lib/api/client';
 	import { networkAwareError } from '$lib/api/errors';
 	import { captureController, type StagedPhoto } from '$lib/capture.svelte.js';
-	import AttributesEditor, {
-		rowsToAttributes,
-		type AttributeRow
-	} from '$lib/components/attributes-editor.svelte';
+	import { rowsToAttributes, type AttributeRow } from '$lib/attribute-rows';
+	import AttributesEditor from '$lib/components/attributes-editor.svelte';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import BackButton from '$lib/components/back-button.svelte';
 	import CategorySelect from '$lib/components/category-select.svelte';
@@ -26,6 +24,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import { customDetailProblems } from '$lib/custom-details';
 	import { serverErrorsToFields } from '$lib/validation-messages';
 
 	let name = $state('');
@@ -44,6 +43,7 @@
 		(nodeTypes.find((nt) => nt.slug === selectedType)
 			?.attributes_schema as AttributesSchema | null) ?? null
 	);
+	let detailsBlocked = $derived(customDetailProblems(attrRows, nodeSchema).blocking);
 
 	$effect(() => {
 		listNodeTypes({ query: { limit: 200 } }).then((r) => {
@@ -198,7 +198,7 @@
 					/>
 
 					<div class="flex justify-end">
-						<Button type="submit" disabled={!name.trim() || saving}>
+						<Button type="submit" disabled={!name.trim() || saving || detailsBlocked}>
 							{saving ? 'Saving…' : 'Save'}
 						</Button>
 					</div>

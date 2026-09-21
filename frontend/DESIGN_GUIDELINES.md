@@ -541,6 +541,8 @@ This is the same kind set and widgets whether the field comes from a category sc
 
 On any item, regardless of whether its category has a schema, the user can add additional fields beyond the schema — or, for unschemaed types, any fields at all. These use the same Name + Kind flow as §16a, entered directly on the item rather than in Settings, and are not added to the category's schema automatically. If the same field name recurs across several items of a type, that's a signal the category could use a schema field for it (§16a) — but Menagerist doesn't do this automatically or nag the user to formalise it; it's a manual step the user takes in Settings if and when they want it.
 
+**Details keep their data safe:** a detail's name must be unique on the item (ignoring case), must not match one of the category's fields, and is limited to 100 characters, with at most 50 details per item. These are the one case where a form error disables Save, because two details with the same name would silently overwrite each other. Numbers and Yes/No values keep their type, and values the form cannot edit are shown read-only and saved unchanged. Details are listed alphabetically so they do not reshuffle after saving.
+
 ---
 
 ## 17. Relationships & Connections

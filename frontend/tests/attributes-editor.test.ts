@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Validator } from '@cfworker/json-schema';
-import {
-	attributesToRows,
-	rowsToAttributes,
-	type AttributeRow
-} from '../src/lib/components/attributes-editor.svelte';
+import { attributesToRows, rowsToAttributes, type AttributeRow } from '../src/lib/attribute-rows';
 import type { AttributesSchema } from '../src/lib/schema-types';
 
 const schema = (properties: AttributesSchema['properties']): AttributesSchema => ({
@@ -14,11 +10,11 @@ const schema = (properties: AttributesSchema['properties']): AttributesSchema =>
 });
 
 describe('attributesToRows', () => {
-	it('converts scalar attributes to string-valued rows', () => {
+	it('converts scalar attributes to string-valued rows in name order, keeping number and yes/no types', () => {
 		expect(attributesToRows({ colour: 'red', count: 3, active: true })).toEqual([
+			{ key: 'active', value: 'true', kind: 'boolean' },
 			{ key: 'colour', value: 'red' },
-			{ key: 'count', value: '3' },
-			{ key: 'active', value: 'true' }
+			{ key: 'count', value: '3', kind: 'number' }
 		]);
 	});
 
@@ -36,13 +32,20 @@ describe('attributesToRows', () => {
 				value: [
 					{ name: 'Flour', quantity: '200', unit: 'g' },
 					{ name: 'Sugar', quantity: '50', unit: 'g' }
+				],
+				kind: 'json',
+				raw: [
+					{ name: 'Flour', quantity: 200, unit: 'g' },
+					{ name: 'Sugar', quantity: 50, unit: 'g' }
 				]
 			}
 		]);
 	});
 
 	it('treats an empty group as an empty array of rows, not a scalar', () => {
-		expect(attributesToRows({ ingredients: [] })).toEqual([{ key: 'ingredients', value: [] }]);
+		expect(attributesToRows({ ingredients: [] })).toEqual([
+			{ key: 'ingredients', value: [], kind: 'json', raw: [] }
+		]);
 	});
 });
 

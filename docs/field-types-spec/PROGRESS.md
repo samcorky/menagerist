@@ -17,8 +17,8 @@ Update at the end of every session. Read this first.
 | WI-12 rank matching (optional) | todo | | |
 | WI-15 text constraints | done, committed (26fdaca) | feature/initial-implementation | See "WI-15 session notes" below. |
 | WI-16 highlighted fields | done, committed (44c01dc) | feature/initial-implementation | See "WI-16 session notes" below. |
-| WI-17 attribute search | done, awaiting user review and commit | feature/initial-implementation | See "WI-17 session notes" below. |
-| WI-18 per-item custom fields | todo | | |
+| WI-17 attribute search | done, committed (06b605b) | feature/initial-implementation | See "WI-17 session notes" below. |
+| WI-18 per-item custom fields | 18a done, awaiting user review and commit; 18b and 18c todo | feature/initial-implementation | See "WI-18a session notes" below. 18b and 18c wait for the WI-19d overlay. |
 | WI-19 presets | todo | | |
 | WI-19d per-item schema overlay | todo | | |
 | WI-21 value suggestions | todo | | |
@@ -301,7 +301,7 @@ Update at the end of every session. Read this first.
 
 ## WI-17 session notes
 
-**Status:** implemented, all backend and frontend checks green, not committed. Next item: WI-18 (per-item custom fields; 18a first). WI-12 stays optional.
+**Status:** implemented, all backend and frontend checks green, committed as 06b605b. Next item: WI-18 (per-item custom fields; 18a first). WI-12 stays optional.
 
 **Done**
 - Backend: `q` on the item list also matches every string and number inside `attributes` (group cells and undefined keys included; never key names, booleans or nulls). `search_excluded_keys(schema)` in `schema_meta.py` (archived, `search: false`, `NON_SEARCHABLE_KINDS = {rating}`). `NodeRepository.list` and `count` take `attribute_search_exclusions` (type slug to keys); SQLAlchemy adapter uses `jsonb_path_query` (`column_valued`) with one clause per type that has exclusions plus an unrestricted clause for other types and untyped items; in-memory adapter walks values with the same rules. `ListNodes` loads all item types (pages of 100) only when `q` is set.
@@ -325,4 +325,30 @@ Update at the end of every session. Read this first.
 **Next session must know**
 - Shell heredocs halve backslashes; the LIKE escape character is written with the file tools and the integration test builds the backslash with `chr(92)`.
 - The `svelte-file-editor` agent is unreliable on tab-indented edits; verify with a grep and the checks.
+- The stray staged `frontend/src/lib/field-types/BooleanView.svelte` (index only) is still in `git status`.
+
+## WI-18a session notes
+
+**Status:** 18a implemented, all backend and frontend checks green, not committed. 18b (promote a detail) and 18c (adopt across items, tips strip) are not started: they build on WI-19d (the node schema overlay), which replaces this stopgap for new typed per-item fields. Next in the table: WI-19 (presets) and WI-19d; read `wi-19-presets.md` and `wi-19d-per-item-schema-overlay.md` first. WI-12 stays optional.
+
+**Done**
+- Backend: new `application/custom_details.py` (`check_custom_details`, `MAX_CUSTOM_NAME_LENGTH` 100, `MAX_CUSTOM_DETAILS` 50) called from `CreateNode` and `UpdateNode`. It applies only to keys the type's schema does not define (archived ones count as defined), only to names that are new compared with the stored attributes, and the count only when it grows past the limit. Errors are `InvalidAttributesError` with keyword `customDetail`. This lives in the application layer, not in `Node` (the domain cannot see the schema, and its invariants run when nodes load from the database).
+- Frontend: the row functions moved from the editor's `<script module>` to `lib/attribute-rows.ts` (`attributesToRows`, `rowsToAttributes`, `newDetailRow`, `AttributeRow` with `kind`, `raw`, `extra`). Rows are ordered by name (case-insensitive); numbers and yes/no values keep their type; null, nested values and lists keep their original in `raw` and are written back unchanged; names are trimmed. `lib/custom-details.ts` has `customDetailProblems`, `isDetailRow`, `canAddDetail`, `displayDetailValue` and the limits.
+- UI: "Add detail" rows have a type choice (Text, Number, Yes/No) for new rows, matching value inputs, read-only JSON for uneditable values, inline errors, a limit hint, and Save disabled on both item forms while a detail-name problem exists. Read mode shows typed values. The editor's `<script module>` and its re-exports are gone (eslint `no-import-assign` rejects re-exporting names the instance script also imports): import the row helpers from `$lib/attribute-rows`.
+- Tests: `test_custom_details.py` (13), `custom-details.test.ts` (20); `attributes-editor.test.ts` expectations updated for the new row shape and ordering. Docs: `docs/DECISIONS.md`, `docs/field-types.md`, `frontend/DESIGN_GUIDELINES.md` 16b. Open question 24 closed by default; 66 added; three rows added to the re-review table in `decisions.md`.
+
+**Left / deferred**
+- 18b and 18c (see above). No highlighting or typing beyond Text, Number and Yes/No until the overlay.
+- Not tried in a browser (no component tests, by decision): the detail rows, type select, inline errors, disabled Save, and read mode.
+- Names containing a slash cannot be addressed by the per-field server error mapping. A duplicate name with different case is only detected on the client.
+- Edge types have no custom details.
+
+**Files touched:** backend `application/custom_details.py` (new), `create_node.py`, `update_node.py`; tests `test_custom_details.py` (new). Frontend `lib/attribute-rows.ts` and `lib/custom-details.ts` (new), `components/attributes-editor.svelte`, `routes/collection/new/+page.svelte`, `routes/collection/[id]/+page.svelte`; tests `custom-details.test.ts` (new), `attributes-editor.test.ts`, `text-constraints.test.ts` (import path). Docs as above.
+
+**Checks run:** `poe lint-backend` and `poe typecheck-backend` clean; `poe coverage` all targets met (application 100%); `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing img-alt warnings); `poe test-frontend` 254 tests in 20 files pass.
+
+**Next session must know**
+- Import `attributesToRows`, `rowsToAttributes` and `AttributeRow` from `$lib/attribute-rows`, not from the editor.
+- The `svelte-file-editor` agent needed three rounds this session (silent misses, a re-export lint rule, a use-before-declaration); always verify with lint and typecheck.
+- Heredocs in this shell halve backslashes.
 - The stray staged `frontend/src/lib/field-types/BooleanView.svelte` (index only) is still in `git status`.

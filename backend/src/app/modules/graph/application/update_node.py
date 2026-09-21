@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from app.modules.graph.application._validate_attributes import validate_attributes
+from app.modules.graph.application.custom_details import check_custom_details
 from app.modules.graph.domain.errors import NodeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
@@ -45,15 +46,18 @@ class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
             if node is None:
                 raise NodeNotFoundError(f"Node {command.node_id} not found")
 
-            if command.attributes is not None and node.type is not None:
-                slug = slugify(node.type)
-                node_type = await repos.node_types.get_by_slug(slug)
-                if node_type is not None and node_type.attributes_schema is not None:
+            if command.attributes is not None:
+                schema: dict[str, Any] | None = None
+                if node.type is not None:
+                    node_type = await repos.node_types.get_by_slug(slugify(node.type))
+                    schema = node_type.attributes_schema if node_type else None
+                if schema is not None:
                     validate_attributes(
-                        node_type.attributes_schema,
-                        command.attributes,
-                        previous=node.attributes,
+                        schema, command.attributes, previous=node.attributes
                     )
+                check_custom_details(
+                    schema, command.attributes, previous=node.attributes
+                )
 
             node.update(
                 name=command.name,

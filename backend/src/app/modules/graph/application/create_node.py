@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from app.modules.graph.application._validate_attributes import validate_attributes
+from app.modules.graph.application.custom_details import check_custom_details
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
@@ -46,6 +47,7 @@ class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
             tags=command.tags,
         )
         async with self._uow as repos:
+            schema: dict[str, Any] | None = None
             if command.type is not None:
                 slug = slugify(command.type)
                 node_type = await repos.node_types.get_by_slug(slug)
@@ -54,7 +56,9 @@ class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
                         NodeType.create(slug=slug, label=command.type)
                     )
                 elif node_type.attributes_schema is not None:
-                    validate_attributes(node_type.attributes_schema, command.attributes)
+                    schema = node_type.attributes_schema
+                    validate_attributes(schema, command.attributes)
+            check_custom_details(schema, command.attributes)
             await repos.nodes.add(node)
             await self._uow.commit()
         logger.info("node created", node_id=node.id, node_type=node.type)

@@ -21,14 +21,12 @@
 	} from '$lib/api/client';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { toast } from 'svelte-sonner';
-	import AttributesEditor, {
-		attributesToRows,
-		rowsToAttributes,
-		type AttributeRow
-	} from '$lib/components/attributes-editor.svelte';
+	import { attributesToRows, rowsToAttributes, type AttributeRow } from '$lib/attribute-rows';
+	import AttributesEditor from '$lib/components/attributes-editor.svelte';
 	import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
-	import { archivedKeys, readSchemaMeta } from '$lib/schema-meta';
-	import { normalise, orderedKeys, isSectionItem } from '$lib/layout';
+	import { readSchemaMeta } from '$lib/schema-meta';
+	import { customDetailProblems, displayDetailValue, isDetailRow } from '$lib/custom-details';
+	import { normalise, isSectionItem } from '$lib/layout';
 	import { descriptorForProp } from '$lib/field-types';
 	import BackButton from '$lib/components/back-button.svelte';
 	import TagsInput from '$lib/components/tags-input.svelte';
@@ -69,7 +67,6 @@
 	let schemaLayout = $derived(
 		nodeSchema ? normalise(readSchemaMeta(nodeSchema).layout, nodeSchema.properties) : []
 	);
-	let schemaKeys = $derived(orderedKeys(schemaLayout));
 	let loading = $state(true);
 	let notFound = $state(false);
 	let mode = $state<'read' | 'edit'>('read');
@@ -78,10 +75,8 @@
 	let description = $state('');
 	let tags = $state<string[]>([]);
 	let attributeRows = $state<AttributeRow[]>([]);
-	let hiddenKeys = $derived(archivedKeys(nodeSchema));
-	let freeformAttrRows = $derived(
-		attributeRows.filter((r) => !schemaKeys.includes(r.key) && !hiddenKeys.has(r.key))
-	);
+	let freeformAttrRows = $derived(attributeRows.filter((r) => isDetailRow(r, nodeSchema)));
+	let detailsBlocked = $derived(customDetailProblems(attributeRows, nodeSchema).blocking);
 	let attributeServerErrors = $state<Record<string, string> | null>(null);
 	let saving = $state(false);
 	let deletingNode = $state(false);
@@ -436,7 +431,7 @@
 										<Button type="button" variant="outline" onclick={handleCancelEdit}>
 											Cancel
 										</Button>
-										<Button type="submit" disabled={saving || loading}>
+										<Button type="submit" disabled={saving || loading || detailsBlocked}>
 											{saving ? 'Saving…' : 'Save changes'}
 										</Button>
 									</div>
@@ -514,16 +509,12 @@
 										{/if}
 
 										{#if freeformAttrRows.length > 0}
-											{#each freeformAttrRows as row (row.key)}
+											{#each freeformAttrRows as row (row)}
 												<div class="flex items-center gap-2">
 													<span class="w-32 shrink-0 text-sm text-muted-foreground">
 														{attributeLabelsByKey.get(row.key) ?? row.key}
 													</span>
-													<span class="text-sm"
-														>{typeof row.value === 'string'
-															? row.value
-															: JSON.stringify(row.value)}</span
-													>
+													<span class="text-sm">{displayDetailValue(row)}</span>
 												</div>
 											{/each}
 										{/if}

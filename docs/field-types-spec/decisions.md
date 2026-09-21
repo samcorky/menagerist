@@ -100,5 +100,8 @@ Everything below was implemented on a default while working through the spec. No
 | Attribute search | Tags not searched (Q20); numbers searched except rating (Q21); id-ordered results (Q22) | Q20 to Q22 | WI-17 |
 | Search opt-out | `search: false` honoured by the API, no editor control | Q63 | WI-17 |
 | Match context | "Matched in ..." shown on list and grid cards while searching | Q64 | WI-17 |
+| Detail limits | 100-character names, 50 details per item, details only, nodes only | Q24, Q26 | WI-18a |
+| Detail name problems | Block Save (exception to "client errors never block") | Q66 | WI-18a |
+| Detail value types | Text, Number, Yes/No for new details; anything else read-only JSON | | WI-18a |
 
 Also still proposed rather than confirmed (see the section above): connection details (WI-22), no free-form regex in v1, presets defaults (Q30 to Q32), the OpenStreetMap provider, and every other defaulted question in `open-questions.md`.

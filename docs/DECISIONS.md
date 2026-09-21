@@ -235,3 +235,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** Highlights (WI-16) are display only, so what can be found must not depend on what is shown on a card. Excluding archived fields stops an item matching on a value the user can no longer see. Scanning at query time needs no index to keep in step with schema changes; a maintained search column can replace it later without changing the port.
 
 **Tradeoff:** The scan is sequential, so very large collections may need an index (not measured yet). Results stay in id order, not by relevance. Tags are not searched. The set of non-searchable kinds is a constant on both sides (`NON_SEARCHABLE_KINDS`, `searchable: false`) and must be kept in step. There is no editor control for `search: false` yet.
+
+---
+
+## Per-item details keep their type, order and name rules; only name problems block saving
+
+**Decision:** "Add detail" stays a loose key in `attributes` with the name as the key (a stopgap until the WI-19d overlay). It is made safe: names are trimmed; a blank name with a value, a duplicate name (ignoring case and spaces) and a name equal to any field of the type (removed fields included, ignoring case) are shown as inline errors and disable Save on the item forms. New details can be Text, Number or Yes/No; numbers and yes/no values keep their JSON type, and values the form cannot edit (null, nested values, lists) show read-only as compact JSON and are written back unchanged (rows keep the original in `raw`, `attributesToRows` no longer stringifies). Details are listed alphabetically, ignoring case, because the database does not keep key order. Limits: names up to 100 characters and 50 details per item, applied to details only. The server enforces them for new or changed details in `CreateNode` and `UpdateNode` (`check_custom_details`): a name already stored, or an item already over the limit, does not block other edits.
+
+**Rationale:** Two rows with the same name silently overwrote each other (`Object.fromEntries`) and stringified values corrupted data set through the API, so these problems have to stop the save rather than warn. The guard lives in the application layer, not in `Node`: the domain cannot see which keys the schema defines, and its invariants also run when nodes are loaded from the database, so a limit there would make existing nodes unloadable.
+
+**Tradeoff:** This is an exception to "client-side errors never block Save" (WI-6): only detail-name problems block, because otherwise data is lost silently. Limits are constants (proposals from the spec), not settings. Edge types have no custom details. Details still cannot be highlighted, and the type choice is limited to three types until the overlay lands.

@@ -276,3 +276,7 @@ A text field can require a prefix and/or a suffix. These change validity, so the
 ### Attribute search
 
 The item list's `q` also searches attribute values (see `docs/DECISIONS.md`). Backend: `search_excluded_keys(schema)` in `schema_meta.py` returns the top-level keys a search skips (archived, `x-menagerist.search: false`, and the kinds in `NON_SEARCHABLE_KINDS`, currently `rating`). `ListNodes` maps each item type slug to those keys and passes them to `NodeRepository.list` / `count` as `attribute_search_exclusions`. A new non-text kind should be added to `NON_SEARCHABLE_KINDS` and given `searchable: false` on its frontend descriptor. Frontend: `matchContext(item, schema, q)` in `lib/search-context.ts` applies the same rules to say why an item matched.
+
+### Per-item details ("Add detail")
+
+Keys an item's type does not define are edited as loose "details". `lib/attribute-rows.ts` holds the row model (`attributesToRows`, `rowsToAttributes`, `newDetailRow`): rows are ordered by name, keep a `kind` (`text`, `number`, `boolean`, `json`) and, for values the form cannot edit, the stored `raw` value. `lib/custom-details.ts` has the name rules (`customDetailProblems`, `isDetailRow`, `canAddDetail`) and the limits (`MAX_CUSTOM_NAME_LENGTH` 100, `MAX_CUSTOM_DETAILS` 50). The backend applies the same limits to new or changed details in `application/custom_details.py` (`check_custom_details`, called from `CreateNode` and `UpdateNode`; errors carry the keyword `customDetail`). A field the type defines is never a detail, archived ones included.

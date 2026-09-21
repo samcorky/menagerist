@@ -10,7 +10,7 @@ import {
 	unescapeLiteral
 } from '../src/lib/field-types/text/constraints';
 import { fieldFromProperty, propertyFromField } from '../src/lib/field-types/index';
-import { rowsToAttributes } from '../src/lib/components/attributes-editor.svelte';
+import { rowsToAttributes } from '../src/lib/attribute-rows';
 import { createSafeValidator, stripPatterns } from '../src/lib/safe-validator';
 import {
 	friendlyClientError,

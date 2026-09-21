@@ -28,7 +28,7 @@
 21. **Closed (WI-17, default, not confirmed):** numbers are searched except ratings; yes/no and rating are the only non-searchable kinds. Was: should numbers be searchable by default (a year or price is, a rating is not)? Confirm boolean and rating as the only non-searchable kinds.
 22. **Closed (WI-17, default, not confirmed):** results stay in id order. Was: is id-ordered search acceptable for v1, given relevance ranking would need a different pagination cursor?
 23. **Closed:** typed per-item fields use the WI-19d overlay (decided).
-24. WI-18: limits for custom details (proposal: 100-character names, 50 per node). Right numbers, and should they apply to schema-defined keys as well?
+24. **Closed (WI-18a, default, not confirmed):** 100-character names and 50 details per item, applied to details only, not schema keys. Was: WI-18: limits for custom details (proposal: 100-character names, 50 per node). Right numbers, and should they apply to schema-defined keys as well?
 25. **Closed:** "create an item type from these details" is out of v1.
 26. WI-18c: do edge types get custom details, adoption and the suggestions strip too, or node types only?
 27. WI-18c: should adoption run in one transaction for all affected nodes, or in batches (a large type could be slow) with partial-progress reporting?
@@ -70,3 +70,4 @@
 63. WI-17: should `x-menagerist.search: false` get an editor control (a per-field "Include in search" option behind a "More options" section, guidelines-compliance row 12)? Default: no editor control yet; the API and both search paths honour it.
 64. WI-17: where should the "Matched in ..." line show? Default: on the list card and the grid card, one truncated line each, only while a search is active and the name and description did not match.
 65. WI-16: when a highlighted field's kind changes to a non-highlightable one, should the editor say so? Default: it drops silently (the pin is hidden for those kinds).
+66. WI-18a: detail-name problems (blank name with a value, duplicates, a name equal to a field) disable Save, an exception to "client errors never block Save" because the alternative is silent data loss. Keep the exception?
