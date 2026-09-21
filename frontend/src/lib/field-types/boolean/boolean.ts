@@ -6,6 +6,18 @@ register({
 	kind: 'boolean',
 	label: 'Yes/No',
 	canBeSubField: true,
+	displayOptions: [
+		{
+			key: 'display',
+			label: 'Show as',
+			choices: [
+				{ value: 'switch', label: 'Switch' },
+				{ value: 'checkbox', label: 'Checkbox' },
+				{ value: 'yes-no', label: 'Yes/No buttons' }
+			],
+			default: 'switch'
+		}
+	],
 	toSchema: (f) => ({ title: f.label, type: 'boolean' }),
 	fromSchema: (key, prop, required) =>
 		prop.type === 'boolean'

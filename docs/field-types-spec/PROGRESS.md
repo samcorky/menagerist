@@ -12,8 +12,8 @@ Update at the end of every session. Read this first.
 | WI-7 changed-keys validation | done, committed (14c4b53) | feature/initial-implementation | See "WI-7 session notes" below. |
 | WI-8 archive fields | done, committed (4d93625) | feature/initial-implementation | See "WI-8 session notes" below. |
 | WI-9 purge and usage | done, committed (a479871) | feature/initial-implementation | See "WI-9 session notes" below. |
-| WI-10 kind changes and option warnings | done, awaiting user review and commit | feature/initial-implementation | See "WI-10 session notes" below. |
-| WI-11 display options | todo | | |
+| WI-10 kind changes and option warnings | done, committed (602cfe4) | feature/initial-implementation | See "WI-10 session notes" below. |
+| WI-11 display options | done, awaiting user review and commit | feature/initial-implementation | See "WI-11 session notes" below. |
 | WI-12 rank matching (optional) | todo | | |
 | WI-15 text constraints | todo | | |
 | WI-16 highlighted fields | todo | | |
@@ -204,7 +204,7 @@ Update at the end of every session. Read this first.
 
 ## WI-10 session notes
 
-**Status:** implemented, all backend and frontend checks green, not committed. Phase 3 (schema evolution, WI-6 to WI-10) is complete. Next item in the table: WI-11 (display options); WI-12 is optional.
+**Status:** implemented, all backend and frontend checks green, committed as 602cfe4. Phase 3 (schema evolution, WI-6 to WI-10) is complete. Next item in the table: WI-11 (display options); WI-12 is optional.
 
 **Done**
 - Kind changes: `field-types/kind-changes.ts` holds a central matrix (`allowedKinds`, `kindChangeWarning`, `changeKind`). A saved field (`EditorField.originalKind`, set on load) can only switch to allowed kinds in the schema editor's dropdown and in group sub-field dropdowns; new fields can be any kind. Number to rating shows a warning; switching kind drops `display` and `config` (answers open question 55).
@@ -220,3 +220,21 @@ Update at the end of every session. Read this first.
 **Checks run:** `poe lint-backend` and `poe typecheck-backend` clean; `poe test-backend` 531 pass; `poe coverage` all targets met (application 100%); `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 162 pass.
 
 **Next session must know:** the schema editor now sets `SCHEMA_TYPE_CONTEXT` (type id and kind) for field extras that need usage counts. WI-11 (display options) should add per-kind `display` choices and read `meta.display`; `changeKind` already clears it when the kind changes.
+
+## WI-11 session notes
+
+**Status:** implemented, frontend checks green, not committed. Next item: WI-15 (text constraints). WI-12 (rank matching) is optional and largely redundant since WI-14 made `kind` explicit; skip unless wanted.
+
+**Done**
+- `FieldTypeDescriptor.displayOptions` (`{ key, label, choices, default }`); the schema editor renders a "Show as" style dropdown per option from it. `display` is stored in `x-menagerist.display` (default = unset); other keys are editor state in `EditorField.config` mapped to validation keywords by the descriptor. Helpers in `field-types/display-options.ts`; `changeKind` also clears `config`.
+- Boolean: Switch (new default, per the design guidelines) / Checkbox / Yes/No buttons (clearable to "not recorded"). Choice: Dropdown / Radio buttons / Chips (both with the "(no longer an option)" handling). Rating: 3, 5 or 10 stars, stored as `maximum`.
+- `rowsToAttributes` omits a top-level boolean whose value is `''` (the cleared Yes/No state); group cells still treat `''` as `false`.
+- Tests: `display-options.test.ts` (new) plus a boolean case in `attributes-editor.test.ts`. `docs/DECISIONS.md` and `docs/field-types.md` updated.
+
+**Left:** group sub-fields have no "Show as" control (they render with defaults). Not tried in a browser (no component tests, by decision). The boolean default changed from checkbox to switch, so existing boolean fields look different until set to Checkbox.
+
+**Files touched:** frontend `field-types/registry.ts`, `display-options.ts` (new), `kind-changes.ts`, `boolean/{boolean.ts,BooleanInput,BooleanView}`, `choice/{choice.ts,ChoiceInput}`, `rating/rating.ts`, `schema-types.ts`, `components/schema-editor.svelte`, `components/attributes-editor.svelte`; tests and docs as above. No backend changes.
+
+**Checks run:** `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 174 tests pass. Backend unchanged, backend checks not run.
+
+**Next session must know:** WI-15 also touches `rowsToAttributes` (an empty optional text with a pattern must be omitted) and adds backend schema-shape checks; keep it in the shared `check_meta_shape` helper.

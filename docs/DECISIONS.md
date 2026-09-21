@@ -195,3 +195,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** Values are stored untyped in JSONB. Widening to text heals itself on the next save, while narrowing would reject or misread existing data. Because updates only validate changed values (WI-7), leftover values never block saving.
 
 **Tradeoff:** The matrix is code, not per-descriptor, so a new kind needs an entry (unknown kinds may only keep themselves). Converting text to choice is only possible through a future suggestion that builds the options from existing values.
+
+---
+
+## Presentation variants are per-field "Show as" settings, not separate kinds
+
+**Decision:** A field type declares `displayOptions` on its descriptor and the schema editor renders a dropdown for each. A style is stored as `x-menagerist.display` (unset means the type's default); the rating star count is editor state that maps to the standard `maximum` keyword. Widgets read the style from the property they receive, so stored values and validation never depend on it. First users: boolean (switch by default, checkbox, Yes/No buttons), choice (dropdown by default, radio buttons, chips) and rating (3, 5 or 10 stars). Yes/No buttons and chips can be cleared, so a top-level boolean saved as "not recorded" is now omitted rather than stored as `false`.
+
+**Rationale:** One kind per stored data shape keeps the kind picker short and avoids competing shape matches; presentation is a setting on the field. Following the design guidelines, a boolean now defaults to a switch (it was a checkbox), which changes how existing boolean fields look until a type picks "Checkbox".
+
+**Tradeoff:** Group sub-fields have no "Show as" control yet; they render with each type's default.

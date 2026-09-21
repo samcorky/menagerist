@@ -105,6 +105,22 @@ describe('rowsToAttributes with schema', () => {
 		});
 	});
 
+	it('omits a top-level boolean that was cleared to "not recorded"', () => {
+		const rows: AttributeRow[] = [
+			{ key: 'signed', value: '' },
+			{ key: 'owned', value: 'false' }
+		];
+		expect(
+			rowsToAttributes(
+				rows,
+				schema({
+					signed: { title: 'Signed?', type: 'boolean' },
+					owned: { title: 'Owned', type: 'boolean' }
+				})
+			)
+		).toEqual({ owned: false });
+	});
+
 	it('coerces boolean fields: "true" → true, "false" → false', () => {
 		const rows: AttributeRow[] = [
 			{ key: 'owned', value: 'true' },

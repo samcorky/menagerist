@@ -43,5 +43,7 @@ export function changeKind<T extends { kind: string; meta?: PropertyMeta }>(
 	const meta = { ...field.meta };
 	delete meta.display;
 	delete meta.config;
-	return { ...field, kind, meta };
+	const next: T & { config?: unknown } = { ...field, kind, meta };
+	delete next.config;
+	return next;
 }

@@ -10,16 +10,36 @@ register({
 	kind: 'rating',
 	label: 'Rating',
 	canBeSubField: true,
+	displayOptions: [
+		{
+			key: 'stars',
+			label: 'Stars',
+			choices: [
+				{ value: '3', label: '3 stars' },
+				{ value: '5', label: '5 stars' },
+				{ value: '10', label: '10 stars' }
+			],
+			default: String(MAX_STARS)
+		}
+	],
 	toSchema: (f) => ({
 		title: f.label,
 		type: 'number',
 		minimum: 1,
-		maximum: MAX_STARS,
+		maximum: Number(f.config?.stars ?? MAX_STARS),
 		multipleOf: 1
 	}),
 	fromSchema: (key, prop, required) =>
 		prop.type === 'number' && readPropMeta(prop).kind === 'rating'
-			? { key, label: prop.title, kind: 'rating', required, options: [], subFields: [] }
+			? {
+					key,
+					label: prop.title,
+					kind: 'rating',
+					required,
+					options: [],
+					subFields: [],
+					config: { stars: String(prop.maximum ?? MAX_STARS) }
+				}
 			: null,
 	InputWidget: RatingInput,
 	ViewWidget: RatingView

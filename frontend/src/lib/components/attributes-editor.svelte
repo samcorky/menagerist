@@ -84,6 +84,8 @@
 						const n = Number(row.value);
 						return isNaN(n) ? [[row.key, row.value]] : [[row.key, n]];
 					}
+					// An empty top-level boolean means "not recorded", not false.
+					if (prop?.type === 'boolean' && row.value === '') return [];
 					if (prop?.type === 'boolean') return [[row.key, row.value === 'true']];
 					return [[row.key, row.value]];
 				})

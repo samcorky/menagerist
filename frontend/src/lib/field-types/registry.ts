@@ -2,6 +2,18 @@ import type { Component } from 'svelte';
 import type { JsonSchemaProperty, EditorField } from '$lib/schema-types';
 import { readPropMeta, withPropMeta } from '$lib/schema-meta';
 
+/** A per-field presentation setting, shown in the schema editor as a "Show as" style dropdown. */
+export type DisplayOption = {
+	/**
+	 * Where the value lives: `display` is stored in the property metadata; any other key is
+	 * editor state (`EditorField.config`) that the descriptor maps to a validation keyword.
+	 */
+	key: string;
+	label: string;
+	choices: { value: string; label: string }[];
+	default: string;
+};
+
 export type FieldTypeDescriptor = {
 	kind: string;
 	/** Human-readable label shown in the kind dropdown. */
@@ -13,6 +25,8 @@ export type FieldTypeDescriptor = {
 	canBeSubField?: boolean;
 	/** Set false to hide the kind from the kind dropdowns (e.g. `opaque`). */
 	selectable?: boolean;
+	/** Presentation settings offered in the schema editor; widgets read them from the property. */
+	displayOptions?: DisplayOption[];
 	/** Serialise an EditorField to a JSON Schema property. */
 	toSchema: (field: EditorField) => JsonSchemaProperty;
 	/**

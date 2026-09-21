@@ -247,3 +247,7 @@ The schema editor shows "Used by N items" (or connections) for each archived fie
 ### Changing a field's kind
 
 A saved field can only move to a kind listed in `frontend/src/lib/field-types/kind-changes.ts` (text and longtext swap; number, boolean, date and choice can become text; number and rating swap). Use "Replace" for anything else. New kinds must be added to that matrix.
+
+### Display options ("Show as")
+
+Add `displayOptions` to a descriptor to offer presentation styles: `{ key: 'display', label, choices, default }` stores the choice in `x-menagerist.display`; any other `key` is editor state (`EditorField.config`) that the descriptor maps to a validation keyword in `fromSchema` / `toSchema` (as the rating star count does with `maximum`). The widget reads `readPropMeta(prop).display` and falls back to the default.

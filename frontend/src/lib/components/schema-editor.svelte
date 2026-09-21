@@ -139,6 +139,7 @@
 	import { errorMessage } from '$lib/api/errors';
 	import { usageLabel, purgeWarning } from '$lib/field-usage';
 	import { allowedKinds, changeKind, kindChangeWarning } from '$lib/field-types/kind-changes';
+	import { displayChoices, displayValue, setDisplayValue } from '$lib/field-types/display-options';
 	import { SCHEMA_TYPE_CONTEXT, type SchemaTypeContext } from '$lib/schema-type-context';
 
 	let {
@@ -306,6 +307,10 @@
 		return listed.filter((d) => permitted.includes(d.kind));
 	}
 
+	function displayOptionsFor(field: EditorField) {
+		return field.kind === 'opaque' ? [] : (getDescriptor(field.kind)?.displayOptions ?? []);
+	}
+
 	function newTextField(from: EditorField): EditorField {
 		return {
 			key: generateKey(),
@@ -456,6 +461,20 @@
 				{/each}
 			</select>
 		{/if}
+		{#each displayOptionsFor(field) as option (option.key)}
+			<span class="text-xs text-muted-foreground">{option.label}</span>
+			<select
+				value={displayValue(field, option)}
+				onchange={(e) =>
+					onFieldChange(setDisplayValue(field, option, (e.target as HTMLSelectElement).value))}
+				class="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
+				aria-label={option.label}
+			>
+				{#each displayChoices(field, option) as choice (choice.value)}
+					<option value={choice.value}>{choice.label}</option>
+				{/each}
+			</select>
+		{/each}
 		<label class="flex items-center gap-1.5 text-sm">
 			<input
 				type="checkbox"
