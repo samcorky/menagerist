@@ -42,7 +42,11 @@ class UpdateEdge(CommandHandler[GraphUnitOfWork, UpdateEdgeCommand, Edge]):
             if command.attributes is not None:
                 edge_type = await repos.edge_types.get_by_slug(slugify(edge.type))
                 if edge_type is not None and edge_type.attributes_schema is not None:
-                    validate_attributes(edge_type.attributes_schema, command.attributes)
+                    validate_attributes(
+                        edge_type.attributes_schema,
+                        command.attributes,
+                        previous=edge.attributes,
+                    )
 
             edge.update(attributes=command.attributes)
 

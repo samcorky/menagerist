@@ -174,3 +174,47 @@ async def test_update_node_validates_attributes_against_schema() -> None:
             UpdateNodeCommand(node_id=node.id, attributes={"year": "not-a-number"}),
             SYSTEM_ACTOR,
         )
+
+
+async def test_update_node_ignores_stale_value_that_was_not_edited() -> None:
+    """A stale value that no longer matches the schema does not block other edits."""
+    schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+            "status": {"type": "string", "enum": ["Draft", "Published"]},
+            "year": {"type": "number"},
+        },
+    }
+    node_types = InMemoryNodeTypeRepository()
+    await node_types.add(
+        NodeType.create(slug="film", label="Film", attributes_schema=schema)
+    )
+    repository = InMemoryNodeRepository()
+    node = Node.create(
+        name="Alien", type="film", attributes={"status": "Archived", "year": 1979}
+    )
+    await repository.add(node)
+    repos = GraphRepos(
+        nodes=repository,
+        edges=InMemoryEdgeRepository(),
+        node_types=node_types,
+        edge_types=InMemoryEdgeTypeRepository(),
+    )
+    use_case = UpdateNode(InMemoryUnitOfWork(repos))
+
+    result = await use_case.handle(
+        UpdateNodeCommand(
+            node_id=node.id, attributes={"status": "Archived", "year": 1980}
+        ),
+        SYSTEM_ACTOR,
+    )
+    assert result.attributes == {"status": "Archived", "year": 1980}
+
+    with pytest.raises(InvalidAttributesError):
+        await use_case.handle(
+            UpdateNodeCommand(
+                node_id=node.id, attributes={"status": "Gone", "year": 1980}
+            ),
+            SYSTEM_ACTOR,
+        )

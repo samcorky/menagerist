@@ -95,3 +95,48 @@ async def test_update_edge_validates_attributes_against_schema() -> None:
             UpdateEdgeCommand(edge_id=edge.id, attributes={"since": "not-a-date"}),
             SYSTEM_ACTOR,
         )
+
+
+async def test_update_edge_ignores_stale_invalid_value_that_was_not_edited() -> None:
+    """A stale invalid value does not block editing another attribute."""
+    schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+            "since": {"type": "string", "format": "date"},
+            "note": {"type": "string"},
+        },
+    }
+    edge_types = InMemoryEdgeTypeRepository()
+    await edge_types.add(
+        EdgeType.create(slug="owns", label="Owns", attributes_schema=schema)
+    )
+    repository = InMemoryEdgeRepository()
+    edge = Edge.create(
+        source_id=uuid.uuid4(),
+        target_id=uuid.uuid4(),
+        type="owns",
+        attributes={"since": "long ago"},
+    )
+    await repository.add(edge)
+    repos = GraphRepos(
+        nodes=InMemoryNodeRepository(),
+        edges=repository,
+        node_types=InMemoryNodeTypeRepository(),
+        edge_types=edge_types,
+    )
+    use_case = UpdateEdge(InMemoryUnitOfWork(repos))
+
+    result = await use_case.handle(
+        UpdateEdgeCommand(
+            edge_id=edge.id, attributes={"since": "long ago", "note": "gift"}
+        ),
+        SYSTEM_ACTOR,
+    )
+    assert result.attributes["note"] == "gift"
+
+    with pytest.raises(InvalidAttributesError):
+        await use_case.handle(
+            UpdateEdgeCommand(edge_id=edge.id, attributes={"since": "yesterday"}),
+            SYSTEM_ACTOR,
+        )

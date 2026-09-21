@@ -8,8 +8,8 @@ Update at the end of every session. Read this first.
 | WI-14 metadata namespace | done, committed (093bca3) | feature/initial-implementation | See "WI-14 session notes" below. |
 | WI-20 readable field keys | done, committed (ce327e2) | feature/initial-implementation | See "WI-20 session notes" below. |
 | WI-5 rating | done, committed (c5a85f4) | feature/initial-implementation | See "WI-5 session notes" below. |
-| WI-6 advisory required | done, staged, awaiting commit | feature/initial-implementation | See "WI-6 session notes" below. |
-| WI-7 changed-keys validation | todo | | |
+| WI-6 advisory required | done, committed (ada4dea) | feature/initial-implementation | See "WI-6 session notes" below. |
+| WI-7 changed-keys validation | done, awaiting user review and commit | feature/initial-implementation | See "WI-7 session notes" below. |
 | WI-8 archive fields | todo | | |
 | WI-9 purge and usage | todo | | |
 | WI-10 kind changes and option warnings | todo | | |
@@ -128,7 +128,7 @@ Update at the end of every session. Read this first.
 
 ## WI-6 session notes
 
-**Status:** implemented, all checks green, staged but not yet committed. Next item: WI-7 (changed-keys validation).
+**Status:** implemented, all checks green, committed as ada4dea. Next item: WI-7 (changed-keys validation).
 
 **Done**
 - Most of WI-6 already landed with WI-14: the editor writes `x-menagerist.required` (never a root `required`), the asterisk reads it, and the backend `validate_attributes` strips the root `required`.
@@ -143,3 +143,20 @@ Update at the end of every session. Read this first.
 **Checks run:** `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 134 tests pass; `poe lint-backend` pass; `poe typecheck-backend` clean; `poe test-backend` 501 pass.
 
 **Next session must know:** WI-7 also edits `_validate_attributes.py`; apply its changed-keys logic on top of `validation_schema`.
+
+## WI-7 session notes
+
+**Status:** implemented, all backend checks green, not committed. Next item: WI-8 (archive fields).
+
+**Done**
+- `validate_attributes(schema, attributes, *, previous=None)`: with `previous` set (updates), errors under a top-level key whose value equals the stored value are dropped; root-level errors are kept; `previous=None` (create) is unchanged. Values compare as canonical JSON (type-strict), which the spec did not ask for but avoids `1 == True` hiding a change.
+- `UpdateNode` passes `node.attributes` and `UpdateEdge` passes `edge.attributes` as `previous`. Create paths untouched. No port, adapter or API change; no frontend change (the editor already maps server errors onto fields).
+- Tests: unchanged invalid key ignored, changed invalid key errors, changed valid key passes, group deep equality, `True` vs `1`, root-level errors kept, create validates everything; use-case tests for `UpdateNode` and `UpdateEdge`. `docs/DECISIONS.md` entry added.
+
+**Left:** nothing. Note that comparison is per top-level key, so an edit anywhere inside a group re-validates the whole group.
+
+**Files touched:** `backend/src/app/modules/graph/application/_validate_attributes.py`, `update_node.py`, `update_edge.py`; tests `test_validate_attributes.py`, `test_update_node.py`, `test_update_edge.py`; `docs/DECISIONS.md`.
+
+**Checks run:** `poe lint-backend` pass; `poe typecheck-backend` clean; `poe test-backend` 510 pass; `poe coverage` all targets met (application 100%). Frontend unchanged, frontend checks not run.
+
+**Next session must know:** WI-8 builds on `archived_keys` / `validation_schema` in `schema_meta.py`; the backend already ignores archived properties when validating, so WI-8 is mostly the editor UI (archive instead of delete, "Removed fields", restore) plus hiding archived fields from forms and "Additional details".

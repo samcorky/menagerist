@@ -155,3 +155,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** Design guideline §16a: required expresses what the collector considers a complete record, not a constraint the app enforces. Before this, adding a required field made every existing item of that type fail its next save, even when the user had not touched the field.
 
 **Tradeoff:** A malformed value still fails validation; only a missing value is tolerated. The "missing information" summary (§18) is a separate feature.
+
+---
+
+## Updates validate only the attributes that changed
+
+**Decision:** `UpdateNode` and `UpdateEdge` pass the stored attributes as `previous` to `validate_attributes`, which drops errors under any top-level key whose value is unchanged. Errors against the whole object are always kept, and create paths keep full validation. Values are compared as canonical JSON, so `1`, `1.0` and `true` count as different.
+
+**Rationale:** The UI sends the whole attributes dict on every save, and editing a type's schema never touches existing items. Without this, tightening a schema (a removed choice option, a changed field kind, a new constraint) made an item unsaveable even when the user edited an unrelated field.
+
+**Tradeoff:** A stale invalid value stays in the data until someone edits it. Editing it to another invalid value is still rejected. Comparison is per top-level key, so a change anywhere inside a group re-validates the whole group.

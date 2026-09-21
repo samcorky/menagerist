@@ -49,7 +49,11 @@ class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
                 slug = slugify(node.type)
                 node_type = await repos.node_types.get_by_slug(slug)
                 if node_type is not None and node_type.attributes_schema is not None:
-                    validate_attributes(node_type.attributes_schema, command.attributes)
+                    validate_attributes(
+                        node_type.attributes_schema,
+                        command.attributes,
+                        previous=node.attributes,
+                    )
 
             node.update(
                 name=command.name,
