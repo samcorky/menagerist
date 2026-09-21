@@ -73,6 +73,8 @@
 
 ## Defaults taken without owner confirmation (for re-review)
 
+**Review 2026-09-21 (owner):** confirmed as defaults: restore at the end of the layout (Q2, Q59), no `search: false` editor control yet (Q63), and the exception that detail-name problems disable Save (Q66). Changed: the required marker becomes a neutral asterisk with a soft "recommended" hint when empty (Q58, not yet implemented). Rows below marked *confirmed* need no further review.
+
 Everything below was implemented on a default while working through the spec. None is confirmed by the owner. Change a row here, in `open-questions.md` and in `docs/DECISIONS.md` together. "Q" numbers refer to `open-questions.md`.
 
 | Area | Default taken | Q | Session |
@@ -82,8 +84,8 @@ Everything below was implemented on a default while working through the spec. No
 | Metadata version | `x-menagerist.version` starts at 1 | Q5 | WI-14 |
 | Old-format schemas | No migration; layout, long-text and required markers are lost until re-saved | Q56 | WI-14 |
 | Rating colour | Fixed amber, not the theme accent | Q6 | WI-5 |
-| Required marker | Always-on red asterisk; no "recommended" style or missing-information group yet | Q58 | WI-6 |
-| Restoring a field | Returns at the end of the layout, not its old position (Undo restores exactly) | Q2, Q59 | WI-8 |
+| Required marker (CHANGED, to do) | Neutral asterisk, soft "recommended" hint when empty; the red asterisk is still in the code | Q58 | WI-6 |
+| Restoring a field (confirmed) | Returns at the end of the layout, not its old position (Undo restores exactly) | Q2, Q59 | WI-8 |
 | Purge | Takes effect immediately even if the form is then cancelled; no permission check | Q17 | WI-9 |
 | Kind changes | Matrix in code (widen only); text to choice deferred to WI-21; "Replace" wording not reviewed | Q55 | WI-10 |
 | Boolean default | Switch instead of checkbox, so existing boolean fields look different | | WI-11 |
@@ -98,10 +100,10 @@ Everything below was implemented on a default while working through the spec. No
 | Live card preview | Deferred | Q62 | WI-16 |
 | Highlight on kind change | Dropped silently, no editor note | Q65 | WI-16 |
 | Attribute search | Tags not searched (Q20); numbers searched except rating (Q21); id-ordered results (Q22) | Q20 to Q22 | WI-17 |
-| Search opt-out | `search: false` honoured by the API, no editor control | Q63 | WI-17 |
+| Search opt-out (confirmed) | `search: false` honoured by the API, no editor control | Q63 | WI-17 |
 | Match context | "Matched in ..." shown on list and grid cards while searching | Q64 | WI-17 |
 | Detail limits | 100-character names, 50 details per item, details only, nodes only | Q24, Q26 | WI-18a |
-| Detail name problems | Block Save (exception to "client errors never block") | Q66 | WI-18a |
+| Detail name problems (confirmed) | Block Save (exception to "client errors never block") | Q66 | WI-18a |
 | Detail value types | Text, Number, Yes/No for new details; anything else read-only JSON | | WI-18a |
 | Connection rows | Show the other item's card highlights and the connection's own details; remove is undoable (re-creates the connection) instead of confirmed | Q51 | WI-22a |
 

@@ -6,7 +6,7 @@
 
 
 1. **Closed:** checked in the code: the Save button is disabled only while saving or loading, so client-side errors never block it; the server rejects malformed values with a 422, which the editor maps back onto fields. WI-6 only has to keep `required` away from both validators.
-2. WI-8: on restore, should a field return to its previous layout position and section?
+2. **Closed (owner, review 2026-09-21):** end of the layout (see 59). Was: WI-8: on restore, should a field return to its previous layout position and section?
 3. **Closed:** moot: no event publisher or outbox exists; the outbox and WebSocket pattern can be added later.
 4. WI-4: is a visible "custom" badge on opaque fields the right UX, given the "never feel like configuring a database" principle?
 5. WI-14: should `version` start at 1 now, given there is no migration path yet?
@@ -62,12 +62,12 @@
 55. **Closed (WI-10):** changing a field's kind clears its `display` and `config` metadata; other metadata is kept.
 56. WI-14: old-format item types lose layout, long-text rendering and required markers until re-saved. Default (decided in the spec): no migration; say so in release notes if the app has users by then.
 57. WI-20: the key follows the label while a field is unsaved and freezes on save. If the editor ever keeps a saved schema open in place (no reload after save), pending flags must be cleared on save. Today saving closes the editor, so no action is needed.
-58. WI-6: required fields show an always-on red asterisk (`text-destructive`), which reads like an error. Should it be a neutral or "recommended" style, and should empty required fields be highlighted (guidelines §16a) now or with the §18 "items missing information" group? Default: leave as is.
-59. WI-8: should a restored field return to its previous position in the layout (needs the old position stored) or the end? Default: the end. Undo, by contrast, restores the exact previous editor state.
+58. **Decided (owner, review 2026-09-21):** neutral asterisk that becomes a soft "recommended" hint when the field is empty; never red, never blocking. NOT YET IMPLEMENTED (the red asterisk is still in `attributes-editor.svelte`). Was: WI-6: required fields show an always-on red asterisk (`text-destructive`), which reads like an error. Should it be a neutral or "recommended" style, and should empty required fields be highlighted (guidelines §16a) now or with the §18 "items missing information" group? Default: leave as is.
+59. **Closed (owner, review 2026-09-21):** a restored field returns at the end of the layout. Was: WI-8: should a restored field return to its previous position in the layout (needs the old position stored) or the end? Default: the end. Undo, by contrast, restores the exact previous editor state.
 60. WI-15: should a new constraint on a saved text field warn with the number of items whose value would fail it (as removing a choice option does)? It needs a query that evaluates the pattern over stored values. Default: no; stale values never block other edits.
 61. WI-15: should the attributes form show a rule's helper text always (as now) or only while the field is focused or empty? Default: always shown until there is an error.
 62. WI-16: add a live card preview at the top of the schema editor, using sample values (deferred, optional in the spec)?
-63. WI-17: should `x-menagerist.search: false` get an editor control (a per-field "Include in search" option behind a "More options" section, guidelines-compliance row 12)? Default: no editor control yet; the API and both search paths honour it.
+63. **Closed (owner, review 2026-09-21):** no editor control yet; revisit with a "More options" section. Was: WI-17: should `x-menagerist.search: false` get an editor control (a per-field "Include in search" option behind a "More options" section, guidelines-compliance row 12)? Default: no editor control yet; the API and both search paths honour it.
 64. WI-17: where should the "Matched in ..." line show? Default: on the list card and the grid card, one truncated line each, only while a search is active and the name and description did not match.
 65. WI-16: when a highlighted field's kind changes to a non-highlightable one, should the editor say so? Default: it drops silently (the pin is hidden for those kinds).
-66. WI-18a: detail-name problems (blank name with a value, duplicates, a name equal to a field) disable Save, an exception to "client errors never block Save" because the alternative is silent data loss. Keep the exception?
+66. **Closed (owner, review 2026-09-21):** keep the exception; detail-name problems disable Save. Was: WI-18a: detail-name problems (blank name with a value, duplicates, a name equal to a field) disable Save, an exception to "client errors never block Save" because the alternative is silent data loss. Keep the exception?
