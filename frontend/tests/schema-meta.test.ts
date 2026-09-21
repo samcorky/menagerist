@@ -2,7 +2,14 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
-import { readPropMeta, readSchemaMeta, withPropMeta, withSchemaMeta } from '../src/lib/schema-meta';
+import { Validator } from '@cfworker/json-schema';
+import {
+	readPropMeta,
+	readSchemaMeta,
+	validationSchema,
+	withPropMeta,
+	withSchemaMeta
+} from '../src/lib/schema-meta';
 
 describe('readers', () => {
 	it('return {} when the namespace is absent or malformed', () => {
@@ -31,6 +38,29 @@ describe('writers', () => {
 	it('withSchemaMeta writes version, layout and required', () => {
 		const next = withSchemaMeta({ type: 'object' }, { version: 1, layout: [{ key: 'a' }] });
 		expect(readSchemaMeta(next)).toEqual({ version: 1, layout: [{ key: 'a' }] });
+	});
+});
+
+describe('validationSchema', () => {
+	const schema = {
+		$schema: 'https://json-schema.org/draft/2020-12/schema',
+		type: 'object',
+		properties: { year: { title: 'Year', type: 'number' } },
+		required: ['year'],
+		'x-menagerist': { required: ['year'] }
+	};
+
+	it('drops a standard root required array without mutating the input', () => {
+		expect(validationSchema(schema)).not.toHaveProperty('required');
+		expect(schema.required).toEqual(['year']);
+	});
+
+	it('never turns a missing required field into an error', () => {
+		const strict = new Validator(schema as object, '2020-12', false);
+		const advisory = new Validator(validationSchema(schema) as object, '2020-12', false);
+		expect(strict.validate({}).valid).toBe(false);
+		expect(advisory.validate({}).valid).toBe(true);
+		expect(advisory.validate({ year: 'x' }).valid).toBe(false);
 	});
 });
 

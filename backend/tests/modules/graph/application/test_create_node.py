@@ -87,3 +87,26 @@ async def test_create_node_passes_valid_attributes() -> None:
     )
 
     assert node.attributes["year"] == 1979
+
+
+async def test_create_node_ignores_required_in_schema() -> None:
+    """A missing required attribute never blocks creation (required is advisory)."""
+    uow, repos = _make_uow()
+    schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {"year": {"type": "number"}},
+        "required": ["year"],
+        "x-menagerist": {"required": ["year"]},
+    }
+    await repos.node_types.add(
+        NodeType.create(slug="film", label="Film", attributes_schema=schema)
+    )
+    use_case = CreateNode(uow)
+
+    node = await use_case.handle(
+        CreateNodeCommand(name="Alien", type="film", attributes={}),
+        SYSTEM_ACTOR,
+    )
+
+    assert node.attributes == {}

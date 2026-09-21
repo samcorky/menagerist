@@ -61,6 +61,7 @@ describe('editor keys', () => {
 		const schema = itemsToSchema([legacy, newField('Notes', { required: true })], {})!;
 		expect(keysOf(schema)).toEqual([uuid, 'notes']);
 		expect(schema['x-menagerist']?.required).toEqual(['notes']);
+		expect(schema).not.toHaveProperty('required');
 	});
 
 	it('sub-field keys are unique within their group', () => {

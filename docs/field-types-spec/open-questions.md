@@ -62,3 +62,4 @@
 55. WI-14: should changing a field's kind in the schema editor clear its `display` and `config` metadata? Default: keep it until WI-10 defines which kind changes are offered.
 56. WI-14: old-format item types lose layout, long-text rendering and required markers until re-saved. Default (decided in the spec): no migration; say so in release notes if the app has users by then.
 57. WI-20: the key follows the label while a field is unsaved and freezes on save. If the editor ever keeps a saved schema open in place (no reload after save), pending flags must be cleared on save. Today saving closes the editor, so no action is needed.
+58. WI-6: required fields show an always-on red asterisk (`text-destructive`), which reads like an error. Should it be a neutral or "recommended" style, and should empty required fields be highlighted (guidelines §16a) now or with the §18 "items missing information" group? Default: leave as is.

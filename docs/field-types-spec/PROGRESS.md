@@ -5,10 +5,10 @@ Update at the end of every session. Read this first.
 | Item | Status | Branch | Notes for the next session |
 |---|---|---|---|
 | WI-1 to WI-4 bug fixes | done, committed (138e7d5) | feature/initial-implementation | See "WI-1 to WI-4 session notes" below. |
-| WI-14 metadata namespace | done, awaiting user review and commit | feature/initial-implementation | See "WI-14 session notes" below. |
-| WI-20 readable field keys | done, awaiting user review and commit | feature/initial-implementation | See "WI-20 session notes" below. |
-| WI-5 rating | done, awaiting user review and commit | feature/initial-implementation | See "WI-5 session notes" below. |
-| WI-6 advisory required | todo | | |
+| WI-14 metadata namespace | done, committed (093bca3) | feature/initial-implementation | See "WI-14 session notes" below. |
+| WI-20 readable field keys | done, committed (ce327e2) | feature/initial-implementation | See "WI-20 session notes" below. |
+| WI-5 rating | done, committed (c5a85f4) | feature/initial-implementation | See "WI-5 session notes" below. |
+| WI-6 advisory required | done, staged, awaiting commit | feature/initial-implementation | See "WI-6 session notes" below. |
 | WI-7 changed-keys validation | todo | | |
 | WI-8 archive fields | todo | | |
 | WI-9 purge and usage | todo | | |
@@ -56,7 +56,7 @@ Update at the end of every session. Read this first.
 
 ## WI-14 session notes
 
-**Status:** implemented, all checks green, not committed. Next item: WI-20 (readable field keys).
+**Status:** implemented, all checks green, committed as 093bca3. Next item: WI-20 (readable field keys).
 
 **Done**
 - Frontend: new `src/lib/schema-meta.ts` (`readSchemaMeta`, `readPropMeta`, `withSchemaMeta`, `withPropMeta`, `META_VERSION`); `layout` and `required` now live in root `x-menagerist`; `x-multiline` replaced by `kind: 'longtext'`; every property written by the editor carries `kind`; `display`, `archived` and unknown members are preserved through `EditorField.meta`.
@@ -84,7 +84,7 @@ Update at the end of every session. Read this first.
 
 ## WI-20 session notes
 
-**Status:** implemented, all frontend checks green, not committed. Next item: WI-5 (rating). Also in this working tree, from the user's request: `frontend/package.json` script caching flags and `.eslintcache` in `frontend/.gitignore`.
+**Status:** implemented, all frontend checks green, committed as ce327e2 (includes the `package.json` cache flags and `.eslintcache` ignore). Next item: WI-5 (rating). Also in this working tree, from the user's request: `frontend/package.json` script caching flags and `.eslintcache` in `frontend/.gitignore`.
 
 **Done**
 - New `src/lib/field-key.ts`: `generateFieldKey(title, taken)` (NFKD ASCII slug, underscores, 40-character cap, `field` fallback, `_2`/`_3` uniqueness case-insensitive, avoids `Object.prototype` member names such as `constructor`) and `resolvePendingKeys`.
@@ -107,7 +107,7 @@ Update at the end of every session. Read this first.
 
 ## WI-5 session notes
 
-**Status:** implemented, frontend checks green, not committed. Next item: WI-6 (advisory required).
+**Status:** implemented, frontend checks green, committed as c5a85f4. Next item: WI-6 (advisory required).
 
 **Done**
 - `field-types/rating/`: `rating.ts` (kind `rating`, stored as `type: number` with `minimum: 1`, `maximum: 5`, `multipleOf: 1` plus `kind`), `RatingInput.svelte` (radiogroup, hover preview, click sets, click on current clears, roving tabindex and arrow keys) and `RatingView.svelte`.
@@ -125,3 +125,21 @@ Update at the end of every session. Read this first.
 **Next session must know**
 - The radiogroup `div` has `tabindex="-1"` instead of the reference's `svelte-ignore` comment (silences the a11y warning); a click on the gap between stars can focus the `div`.
 - The example fixture's `my_rating` now round-trips through the real rating descriptor.
+
+## WI-6 session notes
+
+**Status:** implemented, all checks green, staged but not yet committed. Next item: WI-7 (changed-keys validation).
+
+**Done**
+- Most of WI-6 already landed with WI-14: the editor writes `x-menagerist.required` (never a root `required`), the asterisk reads it, and the backend `validate_attributes` strips the root `required`.
+- New here: `validationSchema()` in `schema-meta.ts` drops a standard root `required` before the attributes editor's client validator runs, so an API-authored schema cannot make required block a save. Wired into `attributes-editor.svelte`.
+- Confirmed the "Confirm before implementing" question (also closed as Q1): Save is disabled only while saving or loading (`collection/[id]`), or for an empty name (`collection/new`); client `fieldErrors` never gate it.
+- Tests: backend `CreateNode` with a missing required attribute succeeds; frontend `validationSchema` unit tests, and the schema editor emits no root `required`. `docs/DECISIONS.md` entry added.
+
+**Left:** WI-1's acceptance line "a required empty choice or date produces the required signal" now means only the asterisk: there is no error. A "recommended" highlight or the "items missing information" group (guidelines §16a and §18) is not built; the asterisk is always shown, red, whether or not the field is filled. Decide if that needs a softer style.
+
+**Files touched:** `frontend/src/lib/schema-meta.ts`, `components/attributes-editor.svelte`; tests `schema-meta.test.ts`, `schema-editor-keys.test.ts`, backend `test_create_node.py`; `docs/DECISIONS.md`.
+
+**Checks run:** `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 134 tests pass; `poe lint-backend` pass; `poe typecheck-backend` clean; `poe test-backend` 501 pass.
+
+**Next session must know:** WI-7 also edits `_validate_attributes.py`; apply its changed-keys logic on top of `validation_schema`.

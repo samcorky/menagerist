@@ -52,3 +52,14 @@ export function withSchemaMeta<T extends object>(schema: T, patch: SchemaMeta): 
 export function withPropMeta<T extends object>(prop: T, patch: PropertyMeta): T {
 	return { ...prop, [NAMESPACE]: { ...readPropMeta(prop), ...patch } };
 }
+
+/**
+ * Return a copy of `schema` for client-side validation. A standard root `required` array
+ * (for example from a schema authored through the API) is dropped: required is advisory
+ * and must never produce a blocking error. Mirrors the backend's `validation_schema`.
+ */
+export function validationSchema<T extends object>(schema: T): T {
+	const copy: Record<string, unknown> = { ...(schema as Record<string, unknown>) };
+	delete copy.required;
+	return copy as T;
+}

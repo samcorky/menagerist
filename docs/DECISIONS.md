@@ -145,3 +145,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** A constrained number needs no backend code, and both validators enforce the range. Matching on the explicit kind removes the registration-order dependency on `number` (they share `type: 'number'`), so a plain number with the same constraints is never captured.
 
 **Tradeoff:** The star count is fixed at 5 until display options (WI-11) make it configurable.
+
+---
+
+## `required` is advisory and never reaches a validator
+
+**Decision:** Required fields are stored in `x-menagerist.required` and shown with an asterisk only. The schema editor never writes a standard `required` array, and both validators (backend `validate_attributes`, client-side attributes editor) validate a copy of the schema with any root `required` removed, so a schema authored through the API cannot make required block a save.
+
+**Rationale:** Design guideline §16a: required expresses what the collector considers a complete record, not a constraint the app enforces. Before this, adding a required field made every existing item of that type fail its next save, even when the user had not touched the field.
+
+**Tradeoff:** A malformed value still fails validation; only a missing value is tolerated. The "missing information" summary (§18) is a separate feature.

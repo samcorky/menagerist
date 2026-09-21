@@ -1,6 +1,6 @@
 <script lang="ts" module>
 	import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
-	import { readSchemaMeta } from '$lib/schema-meta';
+	import { readSchemaMeta, validationSchema } from '$lib/schema-meta';
 
 	export type GroupRow = Record<string, string>;
 	export type AttributeRow = { key: string; value: string | GroupRow[] };
@@ -110,8 +110,11 @@
 		serverErrors?: Record<string, string> | null;
 	} = $props();
 
+	// Required is advisory and never blocks, so validate without it.
 	let validator = $derived(
-		schema ? new Validator($state.snapshot(schema) as object, '2020-12', false) : null
+		schema
+			? new Validator(validationSchema($state.snapshot(schema)) as object, '2020-12', false)
+			: null
 	);
 
 	let fieldErrors = $derived.by(() => {
