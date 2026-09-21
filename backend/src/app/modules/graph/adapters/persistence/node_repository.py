@@ -7,6 +7,7 @@ from app.modules.graph.adapters.persistence.models import NodeModel
 from app.modules.graph.domain.node import Node
 
 if TYPE_CHECKING:
+    import builtins
     import uuid
 
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -144,3 +145,38 @@ class SqlAlchemyNodeRepository:
         )
         await self._session.execute(stmt)
         await self._session.flush()
+
+    async def count_with_attribute(self, type_slug: str, key: str) -> int:
+        """Count non-deleted nodes of `type_slug` whose attributes contain `key`."""
+        logger.debug("counting nodes with attribute", type_slug=type_slug, key=key)
+        stmt = (
+            select(func.count())
+            .select_from(NodeModel)
+            .where(
+                NodeModel.deleted_at.is_(None),
+                NodeModel.type == type_slug,
+                NodeModel.attributes.has_key(key),
+            )
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one()
+
+    async def list_with_attribute(
+        self, type_slug: str, key: str, *, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[Node]:
+        """List non-deleted nodes of `type_slug` holding `key`, ordered by id."""
+        logger.debug("listing nodes with attribute", type_slug=type_slug, key=key)
+        stmt = (
+            select(NodeModel)
+            .where(
+                NodeModel.deleted_at.is_(None),
+                NodeModel.type == type_slug,
+                NodeModel.attributes.has_key(key),
+            )
+            .order_by(NodeModel.id)
+            .limit(limit)
+        )
+        if after is not None:
+            stmt = stmt.where(NodeModel.id > after)
+        result = await self._session.execute(stmt)
+        return [_to_domain(model) for model in result.scalars()]

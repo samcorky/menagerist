@@ -15,17 +15,27 @@ from app.entrypoints.api.shared.http_headers import (
 )
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.entrypoints.api.shared.problem_response import error_response
+from app.modules.graph.adapters.api.attribute_schemas import (
+    AttributePurgeResponse,
+    AttributeUsageResponse,
+)
 from app.modules.graph.adapters.api.dependencies import (
+    get_count_node_type_attribute_usage_use_case,
     get_create_node_type_use_case,
     get_delete_node_type_use_case,
     get_get_node_type_use_case,
     get_list_node_types_use_case,
+    get_purge_node_type_attribute_use_case,
     get_update_node_type_use_case,
 )
 from app.modules.graph.adapters.api.node_type.schemas import (
     CreateNodeTypeRequest,
     NodeTypeResponse,
     UpdateNodeTypeRequest,
+)
+from app.modules.graph.application.count_node_type_attribute_usage import (
+    CountNodeTypeAttributeUsage,
+    CountNodeTypeAttributeUsageQuery,
 )
 from app.modules.graph.application.create_node_type import CreateNodeType
 from app.modules.graph.application.delete_node_type import (
@@ -36,6 +46,10 @@ from app.modules.graph.application.get_node_type import GetNodeType, GetNodeType
 from app.modules.graph.application.list_node_types import (
     ListNodeTypes,
     ListNodeTypesQuery,
+)
+from app.modules.graph.application.purge_node_type_attribute import (
+    PurgeNodeTypeAttribute,
+    PurgeNodeTypeAttributeCommand,
 )
 from app.modules.graph.application.update_node_type import UpdateNodeType
 from app.modules.graph.domain.errors import (
@@ -168,3 +182,52 @@ async def delete_node_type(
 ) -> None:
     """Soft-delete a node type."""
     await use_case.handle(DeleteNodeTypeCommand(node_type_id=node_type_id), actor)
+
+
+@router.get(
+    "/{node_type_id}/attribute/{key}/usage",
+    response_model=AttributeUsageResponse,
+    operation_id="count_node_type_attribute_usage",
+    responses=error_response(
+        NodeTypeNotFoundError,
+        detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+    ),
+)
+async def count_node_type_attribute_usage(
+    node_type_id: uuid.UUID,
+    key: str,
+    use_case: Annotated[
+        CountNodeTypeAttributeUsage,
+        Depends(get_count_node_type_attribute_usage_use_case),
+    ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> AttributeUsageResponse:
+    """Count how many nodes of this type hold a value under `key`."""
+    count = await use_case.handle(
+        CountNodeTypeAttributeUsageQuery(node_type_id=node_type_id, key=key), actor
+    )
+    return AttributeUsageResponse(count=count)
+
+
+@router.delete(
+    "/{node_type_id}/attribute/{key}",
+    response_model=AttributePurgeResponse,
+    operation_id="purge_node_type_attribute",
+    responses=error_response(
+        NodeTypeNotFoundError,
+        detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+    ),
+)
+async def purge_node_type_attribute(
+    node_type_id: uuid.UUID,
+    key: str,
+    use_case: Annotated[
+        PurgeNodeTypeAttribute, Depends(get_purge_node_type_attribute_use_case)
+    ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> AttributePurgeResponse:
+    """Permanently remove `key` from every node of this type (cannot be undone)."""
+    purged = await use_case.handle(
+        PurgeNodeTypeAttributeCommand(node_type_id=node_type_id, key=key), actor
+    )
+    return AttributePurgeResponse(purged=purged)

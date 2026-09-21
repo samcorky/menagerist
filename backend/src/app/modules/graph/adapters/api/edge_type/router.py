@@ -15,17 +15,27 @@ from app.entrypoints.api.shared.http_headers import (
 )
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.entrypoints.api.shared.problem_response import error_response
+from app.modules.graph.adapters.api.attribute_schemas import (
+    AttributePurgeResponse,
+    AttributeUsageResponse,
+)
 from app.modules.graph.adapters.api.dependencies import (
+    get_count_edge_type_attribute_usage_use_case,
     get_create_edge_type_use_case,
     get_delete_edge_type_use_case,
     get_get_edge_type_use_case,
     get_list_edge_types_use_case,
+    get_purge_edge_type_attribute_use_case,
     get_update_edge_type_use_case,
 )
 from app.modules.graph.adapters.api.edge_type.schemas import (
     CreateEdgeTypeRequest,
     EdgeTypeResponse,
     UpdateEdgeTypeRequest,
+)
+from app.modules.graph.application.count_edge_type_attribute_usage import (
+    CountEdgeTypeAttributeUsage,
+    CountEdgeTypeAttributeUsageQuery,
 )
 from app.modules.graph.application.create_edge_type import CreateEdgeType
 from app.modules.graph.application.delete_edge_type import (
@@ -36,6 +46,10 @@ from app.modules.graph.application.get_edge_type import GetEdgeType, GetEdgeType
 from app.modules.graph.application.list_edge_types import (
     ListEdgeTypes,
     ListEdgeTypesQuery,
+)
+from app.modules.graph.application.purge_edge_type_attribute import (
+    PurgeEdgeTypeAttribute,
+    PurgeEdgeTypeAttributeCommand,
 )
 from app.modules.graph.application.update_edge_type import UpdateEdgeType
 from app.modules.graph.domain.errors import (
@@ -176,3 +190,52 @@ async def delete_edge_type(
 ) -> None:
     """Soft-delete an edge type."""
     await use_case.handle(DeleteEdgeTypeCommand(edge_type_id=edge_type_id), actor)
+
+
+@router.get(
+    "/{edge_type_id}/attribute/{key}/usage",
+    response_model=AttributeUsageResponse,
+    operation_id="count_edge_type_attribute_usage",
+    responses=error_response(
+        EdgeTypeNotFoundError,
+        detail="EdgeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+    ),
+)
+async def count_edge_type_attribute_usage(
+    edge_type_id: uuid.UUID,
+    key: str,
+    use_case: Annotated[
+        CountEdgeTypeAttributeUsage,
+        Depends(get_count_edge_type_attribute_usage_use_case),
+    ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> AttributeUsageResponse:
+    """Count how many edges of this type hold a value under `key`."""
+    count = await use_case.handle(
+        CountEdgeTypeAttributeUsageQuery(edge_type_id=edge_type_id, key=key), actor
+    )
+    return AttributeUsageResponse(count=count)
+
+
+@router.delete(
+    "/{edge_type_id}/attribute/{key}",
+    response_model=AttributePurgeResponse,
+    operation_id="purge_edge_type_attribute",
+    responses=error_response(
+        EdgeTypeNotFoundError,
+        detail="EdgeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+    ),
+)
+async def purge_edge_type_attribute(
+    edge_type_id: uuid.UUID,
+    key: str,
+    use_case: Annotated[
+        PurgeEdgeTypeAttribute, Depends(get_purge_edge_type_attribute_use_case)
+    ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> AttributePurgeResponse:
+    """Permanently remove `key` from every edge of this type (cannot be undone)."""
+    purged = await use_case.handle(
+        PurgeEdgeTypeAttributeCommand(edge_type_id=edge_type_id, key=key), actor
+    )
+    return AttributePurgeResponse(purged=purged)

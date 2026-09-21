@@ -332,7 +332,7 @@
 										/>
 										<Label for="edit-directional-{et.id}">Directional</Label>
 									</div>
-									<SchemaEditor bind:schema={editSchema} />
+									<SchemaEditor bind:schema={editSchema} typeId={et.id} typeKind="edge" />
 									<div class="flex justify-end gap-2">
 										<Button type="button" variant="ghost" size="sm" onclick={cancelEdit}>
 											<X class="size-4" />

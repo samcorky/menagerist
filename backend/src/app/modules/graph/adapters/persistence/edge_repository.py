@@ -1,12 +1,13 @@
 from typing import TYPE_CHECKING
 
 import structlog
-from sqlalchemy import exists, or_, select
+from sqlalchemy import exists, func, or_, select
 
 from app.modules.graph.adapters.persistence.models import EdgeModel
 from app.modules.graph.domain.edge import Edge
 
 if TYPE_CHECKING:
+    import builtins
     import uuid
 
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -113,3 +114,38 @@ class SqlAlchemyEdgeRepository:
         )
         result = await self._session.execute(stmt)
         return result.scalar_one()
+
+    async def count_with_attribute(self, type_slug: str, key: str) -> int:
+        """Count non-deleted edges of `type_slug` whose attributes contain `key`."""
+        logger.debug("counting edges with attribute", type_slug=type_slug, key=key)
+        stmt = (
+            select(func.count())
+            .select_from(EdgeModel)
+            .where(
+                EdgeModel.deleted_at.is_(None),
+                EdgeModel.type == type_slug,
+                EdgeModel.attributes.has_key(key),
+            )
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one()
+
+    async def list_with_attribute(
+        self, type_slug: str, key: str, *, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[Edge]:
+        """List non-deleted edges of `type_slug` holding `key`, ordered by id."""
+        logger.debug("listing edges with attribute", type_slug=type_slug, key=key)
+        stmt = (
+            select(EdgeModel)
+            .where(
+                EdgeModel.deleted_at.is_(None),
+                EdgeModel.type == type_slug,
+                EdgeModel.attributes.has_key(key),
+            )
+            .order_by(EdgeModel.id)
+            .limit(limit)
+        )
+        if after is not None:
+            stmt = stmt.where(EdgeModel.id > after)
+        result = await self._session.execute(stmt)
+        return [_to_domain(model) for model in result.scalars()]

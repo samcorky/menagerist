@@ -6,6 +6,12 @@ from app.modules.graph.adapters.persistence.unit_of_work import (
     build_graph_repos,
     create_graph_uow,
 )
+from app.modules.graph.application.count_edge_type_attribute_usage import (
+    CountEdgeTypeAttributeUsage,
+)
+from app.modules.graph.application.count_node_type_attribute_usage import (
+    CountNodeTypeAttributeUsage,
+)
 from app.modules.graph.application.create_edge import CreateEdge
 from app.modules.graph.application.create_edge_type import CreateEdgeType
 from app.modules.graph.application.create_node import CreateNode
@@ -22,6 +28,12 @@ from app.modules.graph.application.list_edge_types import ListEdgeTypes
 from app.modules.graph.application.list_edges import ListEdges
 from app.modules.graph.application.list_node_types import ListNodeTypes
 from app.modules.graph.application.list_nodes import ListNodes
+from app.modules.graph.application.purge_edge_type_attribute import (
+    PurgeEdgeTypeAttribute,
+)
+from app.modules.graph.application.purge_node_type_attribute import (
+    PurgeNodeTypeAttribute,
+)
 from app.modules.graph.application.update_edge import UpdateEdge
 from app.modules.graph.application.update_edge_type import UpdateEdgeType
 from app.modules.graph.application.update_node import UpdateNode
@@ -172,3 +184,27 @@ def get_delete_edge_type_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
 ) -> DeleteEdgeType:
     return DeleteEdgeType(uow)
+
+
+def get_count_node_type_attribute_usage_use_case(
+    repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+) -> CountNodeTypeAttributeUsage:
+    return CountNodeTypeAttributeUsage(repos)
+
+
+def get_purge_node_type_attribute_use_case(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+) -> PurgeNodeTypeAttribute:
+    return PurgeNodeTypeAttribute(uow)
+
+
+def get_count_edge_type_attribute_usage_use_case(
+    repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+) -> CountEdgeTypeAttributeUsage:
+    return CountEdgeTypeAttributeUsage(repos)
+
+
+def get_purge_edge_type_attribute_use_case(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+) -> PurgeEdgeTypeAttribute:
+    return PurgeEdgeTypeAttribute(uow)

@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import builtins
     import uuid
 
     from app.modules.graph.domain.node import Node
@@ -85,3 +86,28 @@ class InMemoryNodeRepository:
         for node in self._nodes.values():
             if not node.is_deleted and node.type == type_slug:
                 node.type = None
+
+    def _with_attribute(self, type_slug: str, key: str) -> builtins.list[Node]:
+        return sorted(
+            (
+                node
+                for node in self._nodes.values()
+                if not node.is_deleted
+                and node.type == type_slug
+                and key in node.attributes
+            ),
+            key=lambda node: node.id,
+        )
+
+    async def count_with_attribute(self, type_slug: str, key: str) -> int:
+        """Count non-deleted nodes of `type_slug` whose attributes contain `key`."""
+        return len(self._with_attribute(type_slug, key))
+
+    async def list_with_attribute(
+        self, type_slug: str, key: str, *, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[Node]:
+        """List non-deleted nodes of `type_slug` holding `key`, ordered by id."""
+        nodes = self._with_attribute(type_slug, key)
+        if after is not None:
+            nodes = [node for node in nodes if node.id > after]
+        return nodes[:limit]

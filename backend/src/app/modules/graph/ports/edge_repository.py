@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
+    import builtins
     import uuid
 
     from app.modules.graph.domain.edge import Edge
@@ -33,4 +34,14 @@ class EdgeRepository(Protocol):
 
     async def has_edges_of_type(self, type_slug: str) -> bool:
         """Return True if any non-deleted edges reference `type_slug`."""
+        ...
+
+    async def count_with_attribute(self, type_slug: str, key: str) -> int:
+        """Count non-deleted edges of `type_slug` whose attributes contain `key`."""
+        ...
+
+    async def list_with_attribute(
+        self, type_slug: str, key: str, *, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[Edge]:
+        """List non-deleted edges of `type_slug` holding `key`, ordered by id."""
         ...

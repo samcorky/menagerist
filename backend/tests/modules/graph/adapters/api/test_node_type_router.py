@@ -150,3 +150,29 @@ def test_attributes_schema_round_trips_through_create_and_update() -> None:
         json={"attributes_schema": new_schema},
     ).json()
     assert updated["attributes_schema"] == new_schema
+
+
+def test_attribute_usage_and_purge_round_trip() -> None:
+    """Usage counts nodes holding a key; purge removes it and reports the count."""
+    client = TestClient(_app_with_in_memory_graph())
+    nt = client.post("/api/v1/node-type", json={"slug": "film", "label": "Film"}).json()
+    for name, attrs in [("A", {"old": 1}), ("B", {"old": 2}), ("C", {})]:
+        client.post(
+            "/api/v1/node", json={"name": name, "type": "film", "attributes": attrs}
+        )
+    base = f"/api/v1/node-type/{nt['id']}/attribute/old"
+
+    assert client.get(f"{base}/usage").json() == {"count": 2}
+    purge = client.delete(base)
+    assert purge.status_code == 200
+    assert purge.json() == {"purged": 2}
+    assert client.get(f"{base}/usage").json() == {"count": 0}
+
+
+def test_attribute_usage_and_purge_return_404_for_missing_type() -> None:
+    """Both endpoints report a missing node type as 404."""
+    client = TestClient(_app_with_in_memory_graph())
+    base = f"/api/v1/node-type/{uuid.uuid4()}/attribute/old"
+
+    assert client.get(f"{base}/usage").status_code == 404
+    assert client.delete(base).status_code == 404

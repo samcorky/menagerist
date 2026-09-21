@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import builtins
     import uuid
 
     from app.modules.graph.domain.edge import Edge
@@ -60,3 +61,28 @@ class InMemoryEdgeRepository:
             not edge.is_deleted and edge.type == type_slug
             for edge in self._edges.values()
         )
+
+    def _with_attribute(self, type_slug: str, key: str) -> builtins.list[Edge]:
+        return sorted(
+            (
+                edge
+                for edge in self._edges.values()
+                if not edge.is_deleted
+                and edge.type == type_slug
+                and key in edge.attributes
+            ),
+            key=lambda edge: edge.id,
+        )
+
+    async def count_with_attribute(self, type_slug: str, key: str) -> int:
+        """Count non-deleted edges of `type_slug` whose attributes contain `key`."""
+        return len(self._with_attribute(type_slug, key))
+
+    async def list_with_attribute(
+        self, type_slug: str, key: str, *, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[Edge]:
+        """List non-deleted edges of `type_slug` holding `key`, ordered by id."""
+        edges = self._with_attribute(type_slug, key)
+        if after is not None:
+            edges = [edge for edge in edges if edge.id > after]
+        return edges[:limit]

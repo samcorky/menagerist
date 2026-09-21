@@ -143,3 +143,31 @@ async def test_list_for_node_respects_after_and_limit(
     page = await repository.list_for_node(node.id, after=edges[0].id, limit=2)
 
     assert [e.id for e in page] == [e.id for e in edges[1:3]]
+
+
+async def test_count_and_list_with_attribute_use_jsonb_key_lookup(
+    db_session: AsyncSession,
+) -> None:
+    """Only live edges of the type whose JSONB attributes hold the key match."""
+    repository = SqlAlchemyEdgeRepository(db_session)
+    source = await _make_node(db_session)
+    target = await _make_node(db_session)
+
+    def make(type_: str, attributes: dict[str, int]) -> Edge:
+        return Edge.create(
+            source_id=source.id, target_id=target.id, type=type_, attributes=attributes
+        )
+
+    edges = [make("owns", {"k": i}) for i in range(3)]
+    gone = make("owns", {"k": 9})
+    gone.soft_delete()
+    for edge in [*edges, make("likes", {"k": 1}), make("owns", {}), gone]:
+        await repository.add(edge)
+
+    assert await repository.count_with_attribute("owns", "k") == 3
+    page = await repository.list_with_attribute("owns", "k", after=None, limit=2)
+    rest = await repository.list_with_attribute(
+        "owns", "k", after=page[-1].id, limit=10
+    )
+    assert [e.id for e in [*page, *rest]] == sorted(e.id for e in edges)
+    assert await repository.count_with_attribute("owns", "missing") == 0

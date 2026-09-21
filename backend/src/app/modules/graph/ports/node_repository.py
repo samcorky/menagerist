@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
+    import builtins
     import uuid
 
     from app.modules.graph.domain.node import Node
@@ -45,4 +46,14 @@ class NodeRepository(Protocol):
 
     async def clear_type(self, type_slug: str) -> None:
         """Null out `type` on all non-deleted nodes that reference `type_slug`."""
+        ...
+
+    async def count_with_attribute(self, type_slug: str, key: str) -> int:
+        """Count non-deleted nodes of `type_slug` whose attributes contain `key`."""
+        ...
+
+    async def list_with_attribute(
+        self, type_slug: str, key: str, *, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[Node]:
+        """List non-deleted nodes of `type_slug` holding `key`, ordered by id."""
         ...

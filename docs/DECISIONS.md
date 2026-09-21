@@ -175,3 +175,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** Stored item data lives in JSONB and is not touched when a type changes, so deleting a property used to leave orphaned values that resurfaced under raw keys. Archiving keeps the data, makes removal safely undoable (guidelines §14) and lets a restored field show its old values again.
 
 **Tradeoff:** A restored field returns at the end of the layout, not its old position (open question). Archived keys stay reserved, so a new field with the same title gets a `_2` suffix.
+
+---
+
+## Purging a field's data: usage counts and a paged, per-item purge
+
+**Decision:** `GET /node-type/{id}/attribute/{key}/usage` and `DELETE /node-type/{id}/attribute/{key}` (and the same under `/edge-type`) count and permanently remove an attribute key across every item (or connection) of a type. New repository methods `count_with_attribute` and `list_with_attribute` use the JSONB `?` operator. The purge pages through the holders, removes the key from each and saves it through the unit of work, so `updated_at` and therefore the ETag change and a client holding a stale copy gets a 412. In the schema editor the action sits on archived fields as "Delete data permanently", behind a confirmation that repeats the count.
+
+**Rationale:** Archiving keeps data (WI-8), so there has to be an explicit way to get rid of it. Saving each item rather than one bulk `UPDATE` keeps ETags honest, at the cost of speed on very large types (page size 100). Dedicated repository methods were chosen over extending `list` and `count`, which the attribute-search work also changes.
+
+**Tradeoff:** No permission check for now, consistent with the other graph use cases: destructive commands such as the purge should check permissions once an authorisation model exists (`AuthorisedCommandHandler`, `AuthorizationPort` and `AllowAllAuthorizationAdapter` are ready). No events are emitted, because there is no publisher or outbox yet. The purge takes effect immediately on the server while the property is only removed from the schema when the form is saved. Keys containing `/` cannot be addressed by these routes.

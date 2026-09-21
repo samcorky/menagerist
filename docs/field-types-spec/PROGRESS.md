@@ -10,8 +10,8 @@ Update at the end of every session. Read this first.
 | WI-5 rating | done, committed (c5a85f4) | feature/initial-implementation | See "WI-5 session notes" below. |
 | WI-6 advisory required | done, committed (ada4dea) | feature/initial-implementation | See "WI-6 session notes" below. |
 | WI-7 changed-keys validation | done, committed (14c4b53) | feature/initial-implementation | See "WI-7 session notes" below. |
-| WI-8 archive fields | done, awaiting user review and commit | feature/initial-implementation | See "WI-8 session notes" below. |
-| WI-9 purge and usage | todo | | |
+| WI-8 archive fields | done, committed (4d93625) | feature/initial-implementation | See "WI-8 session notes" below. |
+| WI-9 purge and usage | done, awaiting user review and commit | feature/initial-implementation | See "WI-9 session notes" below. |
 | WI-10 kind changes and option warnings | todo | | |
 | WI-11 display options | todo | | |
 | WI-12 rank matching (optional) | todo | | |
@@ -163,7 +163,7 @@ Update at the end of every session. Read this first.
 
 ## WI-8 session notes
 
-**Status:** implemented, all frontend checks green, not committed. Next item: WI-9 (purge and usage). It is backend plus a UI; read `wi-09-purge-and-usage.md`, `backend-surface.md` and testing rows I-x first.
+**Status:** implemented, all frontend checks green, committed as 4d93625. Next item: WI-9 (purge and usage). It is backend plus a UI; read `wi-09-purge-and-usage.md`, `backend-surface.md` and testing rows I-x first.
 
 **Done**
 - Schema editor: removing a saved field (top-level, in a section, or a whole section) archives it (`x-menagerist.archived`) instead of deleting; unsaved fields are removed outright. A 5-second Undo toast restores the earlier editor state. A collapsed "Removed fields (N)" list has a Restore action that re-adds the field at the end of the layout.
@@ -181,3 +181,23 @@ Update at the end of every session. Read this first.
 **Next session must know**
 - `schemaToItems` no longer returns archived fields; callers that build a schema from items must pass `schemaToArchived(schema)` as the third argument to `itemsToSchema`, or archived fields are lost.
 - WI-9's purge should reuse `archivedKeys` and only be offered for archived fields.
+
+## WI-9 session notes
+
+**Status:** implemented, all backend and frontend checks green, not committed. Next item: WI-10 (kind changes and option warnings).
+
+**Done**
+- Backend: `NodeRepository` and `EdgeRepository` gained `count_with_attribute(type_slug, key)` and `list_with_attribute(type_slug, key, *, after, limit)` (SQLAlchemy via JSONB `has_key`, and in-memory siblings). New use cases `CountNodeTypeAttributeUsage`, `CountEdgeTypeAttributeUsage`, `PurgeNodeTypeAttribute`, `PurgeEdgeTypeAttribute`. The purge pages 100 at a time, removes the key and saves each item through the unit of work, so ETags change. Routes: `GET /node-type/{id}/attribute/{key}/usage`, `DELETE /node-type/{id}/attribute/{key}` and the `/edge-type` equivalents; shared response models in `adapters/api/attribute_schemas.py`. No permission checks (decided; recorded in DECISIONS).
+- Frontend: `SchemaEditor` takes `typeId` and `typeKind`; in the edit forms of the categories and relationships pages the "Removed fields" list shows "Used by N items/connections" and "Delete data permanently" with an inline confirmation repeating the count. A count of 0 just removes the field from the list. Copy helpers in `src/lib/field-usage.ts`.
+- Regenerated the API client with `poe generate-frontend-client` (generated code is gitignored).
+- Tests: use-case unit tests (usage, purge, paging, not found, ETag/`updated_at`), in-memory repository tests, router tests for both type kinds, two `@pytest.mark.integration` JSONB tests, `field-usage.test.ts`. `docs/DECISIONS.md` and `docs/field-types.md` updated.
+
+**Spec differences:** `EdgeRepository` had no `count`, `clear_type` or type filter as the spec assumed, so both repositories got dedicated `count_with_attribute` and `list_with_attribute` instead of a `has_attribute` filter on `list`. The optional `value=` argument (WI-10) is not added yet. Mypy needs `builtins.list[...]` in the new signatures because each repository has a method named `list`.
+
+**Left:** the purge UI has not been tried in a browser. The purge takes effect immediately while the property leaves the schema only when the form is saved (cancelling the form after a purge leaves an archived field with no data). Keys containing `/` cannot be addressed by these routes. No frontend component tests (decided).
+
+**Files touched:** backend `ports/{node,edge}_repository.py`, `adapters/persistence/{node,edge,in_memory_node,in_memory_edge}_repository.py`, new `application/{count,purge}_{node,edge}_type_attribute*.py`, `adapters/api/{dependencies.py,attribute_schemas.py,node_type/router.py,edge_type/router.py}`; frontend `components/schema-editor.svelte`, `routes/settings/{categories,relationships}/+page.svelte`, `src/lib/field-usage.ts`; tests and docs as above.
+
+**Checks run:** `poe lint-backend`, `poe typecheck-backend` clean; `poe test-backend` 525 pass; `poe coverage` all targets met (application 100%, integration tests included, 27 pass); `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 148 pass.
+
+**Next session must know:** WI-10 needs `count_with_attribute(type_slug, key, value=...)` for option-in-use counts; extend the two new methods and the `Count*AttributeUsage` queries and endpoints with an optional `?value=`. The "confirm on permanent deletion" wording lives in `frontend/DESIGN_GUIDELINES.md` §14 (added in WI-8).

@@ -130,9 +130,24 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import {
+		countNodeTypeAttributeUsage,
+		purgeNodeTypeAttribute,
+		countEdgeTypeAttributeUsage,
+		purgeEdgeTypeAttribute
+	} from '$lib/api/client';
+	import { errorMessage } from '$lib/api/errors';
+	import { usageLabel, purgeWarning } from '$lib/field-usage';
 
-	let { schema = $bindable<AttributesSchema | null>(null) }: { schema?: AttributesSchema | null } =
-		$props();
+	let {
+		schema = $bindable<AttributesSchema | null>(null),
+		typeId,
+		typeKind = 'node'
+	}: {
+		schema?: AttributesSchema | null;
+		typeId?: string;
+		typeKind?: 'node' | 'edge';
+	} = $props();
 
 	// Captured once so unknown root members survive round-trips.
 	const baseMeta = untrack(() => readSchemaMeta(schema));
@@ -166,8 +181,64 @@
 	}
 
 	function restoreArchived(field: EditorField) {
+		if (confirmingKey === field.key) confirmingKey = null;
 		archived = archived.filter((f) => f !== field);
 		items = [...items, restoreField(field)];
+	}
+
+	// Usage counts per archived field key: a number, 'loading' or 'error'.
+	let usage = $state<Record<string, number | 'loading' | 'error'>>({});
+	let removedOpen = $state(false);
+	let confirmingKey = $state<string | null>(null);
+	let busyKey = $state<string | null>(null);
+
+	async function loadUsage(key: string) {
+		if (!typeId) return;
+		usage[key] = 'loading';
+		const result =
+			typeKind === 'node'
+				? await countNodeTypeAttributeUsage({ path: { node_type_id: typeId, key } })
+				: await countEdgeTypeAttributeUsage({ path: { edge_type_id: typeId, key } });
+		usage[key] = result.error || !result.data ? 'error' : result.data.count;
+	}
+
+	$effect(() => {
+		if (!removedOpen || !typeId) return;
+		for (const field of archived) {
+			untrack(() => {
+				if (!(field.key in usage)) void loadUsage(field.key);
+			});
+		}
+	});
+
+	function dropArchived(field: EditorField) {
+		archived = archived.filter((f) => f !== field);
+	}
+
+	function startPurge(field: EditorField) {
+		const count = usage[field.key];
+		if (count === 0) {
+			dropArchived(field);
+			return;
+		}
+		if (typeof count === 'number') confirmingKey = field.key;
+	}
+
+	async function confirmPurge(field: EditorField) {
+		if (!typeId) return;
+		busyKey = field.key;
+		const result =
+			typeKind === 'node'
+				? await purgeNodeTypeAttribute({ path: { node_type_id: typeId, key: field.key } })
+				: await purgeEdgeTypeAttribute({ path: { edge_type_id: typeId, key: field.key } });
+		busyKey = null;
+		if (result.error) {
+			toast.error("Couldn't delete data", { description: errorMessage(result.error) });
+			return;
+		}
+		toast.success('Data deleted');
+		confirmingKey = null;
+		dropArchived(field);
 	}
 
 	function generateKey(): string {
@@ -410,7 +481,7 @@
 	</div>
 
 	{#if archived.length > 0}
-		<details class="pt-1">
+		<details class="pt-1" bind:open={removedOpen}>
 			<summary
 				class="cursor-pointer text-xs text-muted-foreground select-none hover:text-foreground"
 			>
@@ -418,19 +489,67 @@
 			</summary>
 			<div class="mt-2 space-y-1">
 				{#each archived as field (field.key)}
-					<div class="flex items-center gap-2">
+					{@const count = usage[field.key]}
+					{@const busy = busyKey === field.key}
+					<div class="flex flex-wrap items-center gap-2">
 						<span class="flex-1 truncate text-sm text-muted-foreground">
 							{field.label || 'Untitled field'}
 						</span>
-						<Button
-							type="button"
-							variant="ghost"
-							size="sm"
-							class="h-7 text-xs"
-							onclick={() => restoreArchived(field)}
-						>
-							Restore
-						</Button>
+						{#if typeId}
+							{#if count === 'loading'}
+								<span class="text-xs text-muted-foreground">Checking…</span>
+							{:else if typeof count === 'number'}
+								<span class="text-xs text-muted-foreground">{usageLabel(count, typeKind)}</span>
+							{/if}
+						{/if}
+						{#if confirmingKey === field.key && typeof count === 'number'}
+							<span class="text-xs text-destructive">
+								{purgeWarning(field.label || 'Untitled field', count, typeKind)}
+							</span>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								class="h-7 text-xs"
+								disabled={busy}
+								onclick={() => (confirmingKey = null)}
+							>
+								Cancel
+							</Button>
+							<Button
+								type="button"
+								variant="destructive"
+								size="sm"
+								class="h-7 text-xs"
+								disabled={busy}
+								onclick={() => confirmPurge(field)}
+							>
+								Delete permanently
+							</Button>
+						{:else}
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								class="h-7 text-xs"
+								disabled={busyKey !== null}
+								onclick={() => restoreArchived(field)}
+							>
+								Restore
+							</Button>
+							{#if typeId}
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									class="h-7 text-xs text-destructive hover:text-destructive"
+									disabled={busyKey !== null || typeof count !== 'number'}
+									onclick={() => startPurge(field)}
+								>
+									Delete data permanently
+								</Button>
+							{/if}
+						{/if}
 					</div>
 				{/each}
 			</div>

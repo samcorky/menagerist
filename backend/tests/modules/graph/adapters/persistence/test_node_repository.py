@@ -189,3 +189,34 @@ async def test_tags_round_trip(db_session: AsyncSession) -> None:
 
     assert updated is not None
     assert updated.tags == ["classic"]
+
+
+async def test_count_and_list_with_attribute_use_jsonb_key_lookup(
+    db_session: AsyncSession,
+) -> None:
+    """Only live nodes of the type whose JSONB attributes hold the key match."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    nodes = [
+        Node.create(name=f"n{i}", type="film", attributes={"k": i, "keep": 1})
+        for i in range(3)
+    ]
+    gone = Node.create(name="gone", type="film", attributes={"k": 9})
+    gone.soft_delete()
+    for node in [
+        *nodes,
+        Node.create(name="book", type="book", attributes={"k": 1}),
+        Node.create(name="bare", type="film", attributes={"keep": 1}),
+        Node.create(name="null", type="film", attributes={"k": None}),
+        gone,
+    ]:
+        await repository.add(node)
+
+    assert await repository.count_with_attribute("film", "k") == 4
+    page = await repository.list_with_attribute("film", "k", after=None, limit=2)
+    assert len(page) == 2
+    rest = await repository.list_with_attribute(
+        "film", "k", after=page[-1].id, limit=10
+    )
+    assert len(rest) == 2
+    assert {n.name for n in [*page, *rest]} == {"n0", "n1", "n2", "null"}
+    assert await repository.count_with_attribute("film", "missing") == 0

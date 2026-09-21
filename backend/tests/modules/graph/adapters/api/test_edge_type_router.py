@@ -210,3 +210,39 @@ def test_attributes_schema_round_trips_through_create_and_update() -> None:
         json={"attributes_schema": new_schema},
     ).json()
     assert updated["attributes_schema"] == new_schema
+
+
+def test_attribute_usage_and_purge_round_trip() -> None:
+    """Usage counts edges holding a key; purge removes it and reports the count."""
+    client = TestClient(_app_with_in_memory_graph())
+    et = client.post(
+        "/api/v1/edge-type", json={"slug": "directed-by", "label": "Directed by"}
+    ).json()
+    source = client.post("/api/v1/node", json={"name": "Alien"}).json()
+    target = client.post("/api/v1/node", json={"name": "Ridley Scott"}).json()
+    for attrs in ({"old": 1}, {"old": 2}, {}):
+        client.post(
+            "/api/v1/edge",
+            json={
+                "source_id": source["id"],
+                "target_id": target["id"],
+                "type": "directed-by",
+                "attributes": attrs,
+            },
+        )
+    base = f"/api/v1/edge-type/{et['id']}/attribute/old"
+
+    assert client.get(f"{base}/usage").json() == {"count": 2}
+    purge = client.delete(base)
+    assert purge.status_code == 200
+    assert purge.json() == {"purged": 2}
+    assert client.get(f"{base}/usage").json() == {"count": 0}
+
+
+def test_attribute_usage_and_purge_return_404_for_missing_type() -> None:
+    """Both endpoints report a missing edge type as 404."""
+    client = TestClient(_app_with_in_memory_graph())
+    base = f"/api/v1/edge-type/{uuid.uuid4()}/attribute/old"
+
+    assert client.get(f"{base}/usage").status_code == 404
+    assert client.delete(base).status_code == 404

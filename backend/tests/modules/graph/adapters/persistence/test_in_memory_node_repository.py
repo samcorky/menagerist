@@ -207,3 +207,25 @@ async def test_clear_type_ignores_soft_deleted_nodes() -> None:
     await repository.clear_type("film")
 
     assert deleted.type == "film"
+
+
+async def test_count_and_list_with_attribute_filter_by_type_key_and_deletion() -> None:
+    """Only live nodes of the type holding the key are counted and listed, by id."""
+    repository = InMemoryNodeRepository()
+    nodes = [
+        Node.create(name=f"n{i}", type="film", attributes={"k": i}) for i in range(3)
+    ]
+    other_type = Node.create(name="o", type="book", attributes={"k": 1})
+    no_key = Node.create(name="p", type="film", attributes={})
+    gone = Node.create(name="q", type="film", attributes={"k": 9})
+    gone.soft_delete()
+    for node in [*nodes, other_type, no_key, gone]:
+        await repository.add(node)
+
+    assert await repository.count_with_attribute("film", "k") == 3
+    page = await repository.list_with_attribute("film", "k", after=None, limit=2)
+    assert [n.id for n in page] == sorted(n.id for n in nodes)[:2]
+    rest = await repository.list_with_attribute(
+        "film", "k", after=page[-1].id, limit=10
+    )
+    assert [n.id for n in rest] == sorted(n.id for n in nodes)[2:]

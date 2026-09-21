@@ -148,3 +148,28 @@ async def test_has_edges_of_type_ignores_soft_deleted_edges() -> None:
     await repository.save(edge)
 
     assert await repository.has_edges_of_type("directed-by") is False
+
+
+async def test_count_and_list_with_attribute_filter_by_type_key_and_deletion() -> None:
+    """Only live edges of the type holding the key are counted and listed, by id."""
+    repository = InMemoryEdgeRepository()
+    source, target = uuid.uuid4(), uuid.uuid4()
+
+    def make(type_: str, attributes: dict[str, int]) -> Edge:
+        return Edge.create(
+            source_id=source, target_id=target, type=type_, attributes=attributes
+        )
+
+    edges = [make("owns", {"k": i}) for i in range(3)]
+    gone = make("owns", {"k": 9})
+    gone.soft_delete()
+    for edge in [*edges, make("likes", {"k": 1}), make("owns", {}), gone]:
+        await repository.add(edge)
+
+    assert await repository.count_with_attribute("owns", "k") == 3
+    page = await repository.list_with_attribute("owns", "k", after=None, limit=2)
+    assert [e.id for e in page] == sorted(e.id for e in edges)[:2]
+    rest = await repository.list_with_attribute(
+        "owns", "k", after=page[-1].id, limit=10
+    )
+    assert [e.id for e in rest] == sorted(e.id for e in edges)[2:]

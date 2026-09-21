@@ -239,3 +239,7 @@ A field's key (the name it has in `properties` and in a node's `attributes`) is 
 ### Archived fields
 
 `x-menagerist.archived: true` on a property hides the field while keeping its data. Frontend: `normalise()` skips it, the editors omit it from the layout and "Additional details", and `validationSchema()` drops it. Backend: `validation_schema()` drops it. `EditorField.meta` carries the flag through the schema editor, which keeps archived fields in a separate list and writes them back untouched.
+
+### Deleting an archived field's data
+
+The schema editor shows "Used by N items" (or connections) for each archived field and a "Delete data permanently" action, backed by `GET` and `DELETE /node-type/{id}/attribute/{key}` (and `/edge-type/...`). The purge is immediate and cannot be undone; removing the property from the type happens when the form is saved.
