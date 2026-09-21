@@ -124,9 +124,9 @@
 </script>
 
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { setContext, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import { FolderOpen, Plus, X } from '@lucide/svelte';
+	import { FolderOpen, Plus, Replace, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -138,6 +138,8 @@
 	} from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
 	import { usageLabel, purgeWarning } from '$lib/field-usage';
+	import { allowedKinds, changeKind, kindChangeWarning } from '$lib/field-types/kind-changes';
+	import { SCHEMA_TYPE_CONTEXT, type SchemaTypeContext } from '$lib/schema-type-context';
 
 	let {
 		schema = $bindable<AttributesSchema | null>(null),
@@ -148,6 +150,15 @@
 		typeId?: string;
 		typeKind?: 'node' | 'edge';
 	} = $props();
+
+	setContext<SchemaTypeContext>(SCHEMA_TYPE_CONTEXT, {
+		get typeId() {
+			return typeId;
+		},
+		get kind() {
+			return typeKind;
+		}
+	});
 
 	// Captured once so unknown root members survive round-trips.
 	const baseMeta = untrack(() => readSchemaMeta(schema));
@@ -284,6 +295,63 @@
 		);
 	}
 
+	function kindOptions(field: EditorField, allowGroup: boolean) {
+		const listed = allDescriptors().filter(
+			(d) => d.selectable !== false && (allowGroup || d.kind !== 'group')
+		);
+		const permitted = allowedKinds(
+			field.originalKind,
+			listed.map((d) => d.kind)
+		);
+		return listed.filter((d) => permitted.includes(d.kind));
+	}
+
+	function newTextField(from: EditorField): EditorField {
+		return {
+			key: generateKey(),
+			keyPending: true,
+			label: from.label,
+			kind: 'text',
+			required: from.required,
+			options: [],
+			subFields: []
+		};
+	}
+
+	function replaceItem(index: number) {
+		const item = items[index];
+		if (!item || isSection(item)) return;
+		removeWithUndo(
+			'Field replaced',
+			() => {
+				archived = [...archived, archiveField(item)];
+				items = items.map((it, i) => (i === index ? newTextField(item) : it));
+			},
+			true
+		);
+	}
+
+	function replaceSectionField(sectionIndex: number, fieldIndex: number) {
+		const section = items[sectionIndex];
+		if (!section || !isSection(section)) return;
+		const old = section.fields[fieldIndex];
+		if (!old) return;
+		removeWithUndo(
+			'Field replaced',
+			() => {
+				archived = [...archived, archiveField(old)];
+				items = items.map((item, i) => {
+					if (i !== sectionIndex || !isSection(item)) return item;
+					return {
+						...item,
+						fields: item.fields.map((f, fi) => (fi === fieldIndex ? newTextField(old) : f))
+					};
+				});
+			},
+			true
+		);
+	}
+
 	function handleFieldLabelChange(index: number, value: string) {
 		items = items.map((item, i) => {
 			if (i !== index || isSection(item)) return item;
@@ -363,6 +431,7 @@
 	allowGroup: boolean,
 	onLabelChange: (value: string) => void,
 	onRemove: () => void,
+	onReplace: () => void,
 	onFieldChange: (f: EditorField) => void
 )}
 	<div class="flex flex-wrap items-center gap-2">
@@ -378,11 +447,11 @@
 		{:else}
 			<select
 				value={field.kind}
-				onchange={(e) => onFieldChange({ ...field, kind: (e.target as HTMLSelectElement).value })}
+				onchange={(e) => onFieldChange(changeKind(field, (e.target as HTMLSelectElement).value))}
 				class="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
 				aria-label="Field type"
 			>
-				{#each allDescriptors().filter((d) => d.selectable !== false && (allowGroup || d.kind !== 'group')) as d (d.kind)}
+				{#each kindOptions(field, allowGroup) as d (d.kind)}
 					<option value={d.kind}>{d.label}</option>
 				{/each}
 			</select>
@@ -397,10 +466,26 @@
 			/>
 			Required
 		</label>
+		{#if !field.keyPending && field.kind !== 'opaque'}
+			<Button
+				type="button"
+				variant="ghost"
+				size="icon"
+				onclick={onReplace}
+				aria-label="Replace field"
+				title="Replace with a new field of a different type. The old field's values are kept until you delete them."
+			>
+				<Replace class="size-4" />
+			</Button>
+		{/if}
 		<Button type="button" variant="ghost" size="icon" onclick={onRemove} aria-label="Remove field">
 			<X class="size-4" />
 		</Button>
 	</div>
+	{@const warning = kindChangeWarning(field.originalKind, field.kind)}
+	{#if warning}
+		<p class="text-xs text-muted-foreground" role="status">{warning}</p>
+	{/if}
 
 	{@const desc = getDescriptor(field.kind)}
 	{#if desc?.EditorExtras}
@@ -443,6 +528,7 @@
 							false,
 							(value) => handleSectionFieldLabelChange(i, fi, value),
 							() => removeFieldFromSection(i, fi),
+							() => replaceSectionField(i, fi),
 							(f) => handleSectionFieldChange(i, fi, f)
 						)}
 					{/each}
@@ -464,6 +550,7 @@
 				true,
 				(value) => handleFieldLabelChange(i, value),
 				() => removeItem(i),
+				() => replaceItem(i),
 				(f) => handleFieldChange(i, f)
 			)}
 		{/if}

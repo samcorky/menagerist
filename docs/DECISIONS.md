@@ -185,3 +185,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** Archiving keeps data (WI-8), so there has to be an explicit way to get rid of it. Saving each item rather than one bulk `UPDATE` keeps ETags honest, at the cost of speed on very large types (page size 100). Dedicated repository methods were chosen over extending `list` and `count`, which the attribute-search work also changes.
 
 **Tradeoff:** No permission check for now, consistent with the other graph use cases: destructive commands such as the purge should check permissions once an authorisation model exists (`AuthorisedCommandHandler`, `AuthorizationPort` and `AllowAllAuthorizationAdapter` are ready). No events are emitted, because there is no publisher or outbox yet. The purge takes effect immediately on the server while the property is only removed from the schema when the form is saved. Keys containing `/` cannot be addressed by these routes.
+
+---
+
+## Saved fields may only change kind towards more permissive kinds
+
+**Decision:** A field loaded from a saved schema can switch to a kind allowed by a central matrix (`field-types/kind-changes.ts`): text and longtext swap; number, boolean, date and choice become text or longtext; number and rating swap (with a warning that values outside 1 to 5 will error when edited). Everything else, including anything to or from a group, goes through "Replace" (archive the old field, add a new one). Fields added this session can be any kind. Switching kind drops `display` and `config`. Removing a choice option that stored values use shows a count but never blocks; those values are shown as "(no longer an option)" in the form. The usage endpoints take an optional `?value=` (exact string match, JSONB containment).
+
+**Rationale:** Values are stored untyped in JSONB. Widening to text heals itself on the next save, while narrowing would reject or misread existing data. Because updates only validate changed values (WI-7), leftover values never block saving.
+
+**Tradeoff:** The matrix is code, not per-descriptor, so a new kind needs an entry (unknown kinds may only keep themselves). Converting text to choice is only possible through a future suggestion that builds the options from existing values.

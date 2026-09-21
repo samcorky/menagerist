@@ -246,3 +246,26 @@ def test_attribute_usage_and_purge_return_404_for_missing_type() -> None:
 
     assert client.get(f"{base}/usage").status_code == 404
     assert client.delete(base).status_code == 404
+
+
+def test_attribute_usage_can_filter_by_value() -> None:
+    """`?value=` counts only edges whose attribute equals that string."""
+    client = TestClient(_app_with_in_memory_graph())
+    et = client.post(
+        "/api/v1/edge-type", json={"slug": "directed-by", "label": "Directed by"}
+    ).json()
+    source = client.post("/api/v1/node", json={"name": "Alien"}).json()
+    target = client.post("/api/v1/node", json={"name": "Ridley Scott"}).json()
+    for status in ("Draft", "Live"):
+        client.post(
+            "/api/v1/edge",
+            json={
+                "source_id": source["id"],
+                "target_id": target["id"],
+                "type": "directed-by",
+                "attributes": {"status": status},
+            },
+        )
+    base = f"/api/v1/edge-type/{et['id']}/attribute/status/usage"
+
+    assert client.get(base, params={"value": "Draft"}).json() == {"count": 1}

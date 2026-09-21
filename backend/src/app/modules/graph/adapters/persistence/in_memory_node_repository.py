@@ -87,7 +87,9 @@ class InMemoryNodeRepository:
             if not node.is_deleted and node.type == type_slug:
                 node.type = None
 
-    def _with_attribute(self, type_slug: str, key: str) -> builtins.list[Node]:
+    def _with_attribute(
+        self, type_slug: str, key: str, *, value: str | None = None
+    ) -> builtins.list[Node]:
         return sorted(
             (
                 node
@@ -95,13 +97,16 @@ class InMemoryNodeRepository:
                 if not node.is_deleted
                 and node.type == type_slug
                 and key in node.attributes
+                and (value is None or node.attributes[key] == value)
             ),
             key=lambda node: node.id,
         )
 
-    async def count_with_attribute(self, type_slug: str, key: str) -> int:
+    async def count_with_attribute(
+        self, type_slug: str, key: str, *, value: str | None = None
+    ) -> int:
         """Count non-deleted nodes of `type_slug` whose attributes contain `key`."""
-        return len(self._with_attribute(type_slug, key))
+        return len(self._with_attribute(type_slug, key, value=value))
 
     async def list_with_attribute(
         self, type_slug: str, key: str, *, after: uuid.UUID | None, limit: int

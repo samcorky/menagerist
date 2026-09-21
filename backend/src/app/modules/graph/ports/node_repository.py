@@ -48,8 +48,13 @@ class NodeRepository(Protocol):
         """Null out `type` on all non-deleted nodes that reference `type_slug`."""
         ...
 
-    async def count_with_attribute(self, type_slug: str, key: str) -> int:
-        """Count non-deleted nodes of `type_slug` whose attributes contain `key`."""
+    async def count_with_attribute(
+        self, type_slug: str, key: str, *, value: str | None = None
+    ) -> int:
+        """Count non-deleted nodes of `type_slug` whose attributes contain `key`.
+
+        With `value`, only those where the attribute equals that string.
+        """
         ...
 
     async def list_with_attribute(

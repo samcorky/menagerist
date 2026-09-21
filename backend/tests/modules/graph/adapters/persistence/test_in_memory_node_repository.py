@@ -229,3 +229,16 @@ async def test_count_and_list_with_attribute_filter_by_type_key_and_deletion() -
         "film", "k", after=page[-1].id, limit=10
     )
     assert [n.id for n in rest] == sorted(n.id for n in nodes)[2:]
+
+
+async def test_count_with_attribute_can_match_a_value() -> None:
+    """With `value`, only nodes whose attribute equals it are counted."""
+    repository = InMemoryNodeRepository()
+    for name, status in [("a", "Draft"), ("b", "Draft"), ("c", "Live")]:
+        await repository.add(
+            Node.create(name=name, type="film", attributes={"s": status})
+        )
+
+    assert await repository.count_with_attribute("film", "s", value="Draft") == 2
+    assert await repository.count_with_attribute("film", "s", value="Gone") == 0
+    assert await repository.count_with_attribute("film", "s") == 3

@@ -220,3 +220,23 @@ async def test_count_and_list_with_attribute_use_jsonb_key_lookup(
     assert len(rest) == 2
     assert {n.name for n in [*page, *rest]} == {"n0", "n1", "n2", "null"}
     assert await repository.count_with_attribute("film", "missing") == 0
+
+
+async def test_count_with_attribute_matches_an_exact_string_value(
+    db_session: AsyncSession,
+) -> None:
+    """With `value`, JSONB containment counts only exact matches on that key."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    cases: list[tuple[str, dict[str, object]]] = [
+        ("a", {"s": "Draft"}),
+        ("b", {"s": "Draft", "x": 1}),
+        ("c", {"s": "Live"}),
+        ("d", {"s": 1}),
+        ("e", {"x": "Draft"}),
+    ]
+    for name, attrs in cases:
+        await repository.add(Node.create(name=name, type="film", attributes=attrs))
+
+    assert await repository.count_with_attribute("film", "s", value="Draft") == 2
+    assert await repository.count_with_attribute("film", "s", value="1") == 0
+    assert await repository.count_with_attribute("film", "s") == 4

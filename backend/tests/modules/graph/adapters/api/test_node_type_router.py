@@ -176,3 +176,18 @@ def test_attribute_usage_and_purge_return_404_for_missing_type() -> None:
 
     assert client.get(f"{base}/usage").status_code == 404
     assert client.delete(base).status_code == 404
+
+
+def test_attribute_usage_can_filter_by_value() -> None:
+    """`?value=` counts only nodes whose attribute equals that string."""
+    client = TestClient(_app_with_in_memory_graph())
+    nt = client.post("/api/v1/node-type", json={"slug": "film", "label": "Film"}).json()
+    for name, status in [("A", "Draft"), ("B", "Draft"), ("C", "Live")]:
+        client.post(
+            "/api/v1/node",
+            json={"name": name, "type": "film", "attributes": {"status": status}},
+        )
+    base = f"/api/v1/node-type/{nt['id']}/attribute/status/usage"
+
+    assert client.get(base, params={"value": "Draft"}).json() == {"count": 2}
+    assert client.get(base).json() == {"count": 3}

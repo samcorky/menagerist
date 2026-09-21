@@ -171,3 +171,24 @@ async def test_count_and_list_with_attribute_use_jsonb_key_lookup(
     )
     assert [e.id for e in [*page, *rest]] == sorted(e.id for e in edges)
     assert await repository.count_with_attribute("owns", "missing") == 0
+
+
+async def test_count_with_attribute_matches_an_exact_string_value(
+    db_session: AsyncSession,
+) -> None:
+    """With `value`, JSONB containment counts only exact matches on that key."""
+    repository = SqlAlchemyEdgeRepository(db_session)
+    source = await _make_node(db_session)
+    target = await _make_node(db_session)
+    for attrs in [{"s": "Draft"}, {"s": "Draft"}, {"s": "Live"}, {"x": "Draft"}]:
+        await repository.add(
+            Edge.create(
+                source_id=source.id,
+                target_id=target.id,
+                type="owns",
+                attributes=attrs,
+            )
+        )
+
+    assert await repository.count_with_attribute("owns", "s", value="Draft") == 2
+    assert await repository.count_with_attribute("owns", "s", value="Gone") == 0

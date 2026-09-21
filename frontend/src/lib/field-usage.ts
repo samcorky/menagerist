@@ -14,3 +14,8 @@ export function usageLabel(count: number, kind: UsageKind): string {
 export function purgeWarning(label: string, count: number, kind: UsageKind): string {
 	return `This permanently deletes “${label}” from ${count} ${noun(count, kind)}. It cannot be undone.`;
 }
+
+/** Note shown after removing a choice option that stored values still use. */
+export function optionRemovalWarning(option: string, count: number, kind: UsageKind): string {
+	return `“${option}” is used by ${count} ${noun(count, kind)}. They keep it, shown as (no longer an option).`;
+}

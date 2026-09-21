@@ -44,7 +44,13 @@ register({
 				const sub = fieldFromProperty(sk, sp, false);
 				const canNest = getDescriptor(sub.kind)?.canBeSubField !== false;
 				if (sub.kind !== 'opaque' && canNest) {
-					return { key: sk, label: sp.title, kind: sub.kind, meta: sub.meta };
+					return {
+						key: sk,
+						label: sp.title,
+						kind: sub.kind,
+						meta: sub.meta,
+						originalKind: sub.kind
+					};
 				}
 				return { key: sk, label: sp.title, kind: 'opaque', raw: sp as Record<string, unknown> };
 			})

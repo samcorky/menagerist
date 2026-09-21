@@ -11,8 +11,8 @@ Update at the end of every session. Read this first.
 | WI-6 advisory required | done, committed (ada4dea) | feature/initial-implementation | See "WI-6 session notes" below. |
 | WI-7 changed-keys validation | done, committed (14c4b53) | feature/initial-implementation | See "WI-7 session notes" below. |
 | WI-8 archive fields | done, committed (4d93625) | feature/initial-implementation | See "WI-8 session notes" below. |
-| WI-9 purge and usage | done, awaiting user review and commit | feature/initial-implementation | See "WI-9 session notes" below. |
-| WI-10 kind changes and option warnings | todo | | |
+| WI-9 purge and usage | done, committed (a479871) | feature/initial-implementation | See "WI-9 session notes" below. |
+| WI-10 kind changes and option warnings | done, awaiting user review and commit | feature/initial-implementation | See "WI-10 session notes" below. |
 | WI-11 display options | todo | | |
 | WI-12 rank matching (optional) | todo | | |
 | WI-15 text constraints | todo | | |
@@ -184,7 +184,7 @@ Update at the end of every session. Read this first.
 
 ## WI-9 session notes
 
-**Status:** implemented, all backend and frontend checks green, not committed. Next item: WI-10 (kind changes and option warnings).
+**Status:** implemented, all backend and frontend checks green, committed as a479871. Next item: WI-10 (kind changes and option warnings).
 
 **Done**
 - Backend: `NodeRepository` and `EdgeRepository` gained `count_with_attribute(type_slug, key)` and `list_with_attribute(type_slug, key, *, after, limit)` (SQLAlchemy via JSONB `has_key`, and in-memory siblings). New use cases `CountNodeTypeAttributeUsage`, `CountEdgeTypeAttributeUsage`, `PurgeNodeTypeAttribute`, `PurgeEdgeTypeAttribute`. The purge pages 100 at a time, removes the key and saves each item through the unit of work, so ETags change. Routes: `GET /node-type/{id}/attribute/{key}/usage`, `DELETE /node-type/{id}/attribute/{key}` and the `/edge-type` equivalents; shared response models in `adapters/api/attribute_schemas.py`. No permission checks (decided; recorded in DECISIONS).
@@ -201,3 +201,22 @@ Update at the end of every session. Read this first.
 **Checks run:** `poe lint-backend`, `poe typecheck-backend` clean; `poe test-backend` 525 pass; `poe coverage` all targets met (application 100%, integration tests included, 27 pass); `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 148 pass.
 
 **Next session must know:** WI-10 needs `count_with_attribute(type_slug, key, value=...)` for option-in-use counts; extend the two new methods and the `Count*AttributeUsage` queries and endpoints with an optional `?value=`. The "confirm on permanent deletion" wording lives in `frontend/DESIGN_GUIDELINES.md` §14 (added in WI-8).
+
+## WI-10 session notes
+
+**Status:** implemented, all backend and frontend checks green, not committed. Phase 3 (schema evolution, WI-6 to WI-10) is complete. Next item in the table: WI-11 (display options); WI-12 is optional.
+
+**Done**
+- Kind changes: `field-types/kind-changes.ts` holds a central matrix (`allowedKinds`, `kindChangeWarning`, `changeKind`). A saved field (`EditorField.originalKind`, set on load) can only switch to allowed kinds in the schema editor's dropdown and in group sub-field dropdowns; new fields can be any kind. Number to rating shows a warning; switching kind drops `display` and `config` (answers open question 55).
+- "Replace" button on saved fields: archives the old field and adds a new text field in the same place, with the 5-second Undo toast.
+- Choice options: removing an option that stored values use shows "“X” is used by N items. They keep it, shown as (no longer an option)." (non-blocking); the usage endpoints (`GET .../attribute/{key}/usage`) take an optional `?value=` (exact string match, JSONB containment). `ChoiceInput` shows a stored value that is no longer an option as selected, labelled "(no longer an option)".
+- Backend: `count_with_attribute(..., *, value=None)` on both repositories; `Count*AttributeUsage` queries and routers accept `value`. Client regenerated.
+- Tests: kind matrix, `changeKind`, `originalKind`, `staleChoice`, warning copy; backend value-match tests (in-memory, use case, router, integration). `docs/DECISIONS.md` and `docs/field-types.md` updated.
+
+**Left:** the dropdown filtering, Replace button, option warning and stale-option rendering are UI-only and untested in a browser (no component tests, by decision). The text-to-choice conversion is deferred to WI-21. The "Replace" copy has not been reviewed against the design guidelines' wording.
+
+**Files touched:** frontend `field-types/kind-changes.ts`, `choice/stale-choice.ts`, `schema-type-context.ts` (new), `field-usage.ts`, `schema-types.ts`, `field-types/registry.ts`, `group/group.ts`, `components/schema-editor.svelte`, `group/GroupExtras.svelte`, `choice/ChoiceExtras.svelte`, `choice/ChoiceInput.svelte`; backend ports, four repository adapters, two `Count*AttributeUsage` use cases, two routers; tests `kind-changes.test.ts` (new) plus backend test additions; docs.
+
+**Checks run:** `poe lint-backend` and `poe typecheck-backend` clean; `poe test-backend` 531 pass; `poe coverage` all targets met (application 100%); `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 162 pass.
+
+**Next session must know:** the schema editor now sets `SCHEMA_TYPE_CONTEXT` (type id and kind) for field extras that need usage counts. WI-11 (display options) should add per-kind `display` choices and read `meta.display`; `changeKind` already clears it when the kind changes.

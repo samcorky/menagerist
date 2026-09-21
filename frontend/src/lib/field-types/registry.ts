@@ -75,7 +75,7 @@ export function fieldFromProperty(
 ): EditorField {
 	const desc = descriptorForProp(prop);
 	const field = desc?.fromSchema(key, prop, required);
-	if (desc && field) return { ...field, meta: readPropMeta(prop) };
+	if (desc && field) return { ...field, meta: readPropMeta(prop), originalKind: field.kind };
 	return {
 		key,
 		label: prop.title,

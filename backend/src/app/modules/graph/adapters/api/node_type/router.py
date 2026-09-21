@@ -201,10 +201,14 @@ async def count_node_type_attribute_usage(
         Depends(get_count_node_type_attribute_usage_use_case),
     ],
     actor: Annotated[Actor, Depends(get_current_actor)],
+    value: str | None = None,
 ) -> AttributeUsageResponse:
-    """Count how many nodes of this type hold a value under `key`."""
+    """Count nodes of this type holding `key`, optionally where it equals `value`."""
     count = await use_case.handle(
-        CountNodeTypeAttributeUsageQuery(node_type_id=node_type_id, key=key), actor
+        CountNodeTypeAttributeUsageQuery(
+            node_type_id=node_type_id, key=key, value=value
+        ),
+        actor,
     )
     return AttributeUsageResponse(count=count)
 

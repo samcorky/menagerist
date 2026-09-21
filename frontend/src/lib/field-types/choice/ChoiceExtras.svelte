@@ -3,6 +3,10 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import { getContext } from 'svelte';
+	import { countEdgeTypeAttributeUsage, countNodeTypeAttributeUsage } from '$lib/api/client';
+	import { optionRemovalWarning } from '$lib/field-usage';
+	import { SCHEMA_TYPE_CONTEXT, type SchemaTypeContext } from '$lib/schema-type-context';
 	import type { EditorField } from '$lib/schema-types';
 
 	let {
@@ -13,7 +17,11 @@
 		onChange: (f: EditorField) => void;
 	} = $props();
 
+	const ctx = getContext<SchemaTypeContext | undefined>(SCHEMA_TYPE_CONTEXT);
+
 	let draft = $state('');
+	let removalWarning = $state<string | null>(null);
+	let removalRequest = 0;
 
 	function addOption() {
 		const trimmed = draft.trim();
@@ -21,12 +29,37 @@
 			draft = '';
 			return;
 		}
+		removalRequest++;
+		removalWarning = null;
 		onChange({ ...field, options: [...field.options, trimmed] });
 		draft = '';
 	}
 
-	function removeOption(opt: string) {
+	async function removeOption(opt: string) {
+		const request = ++removalRequest;
+		removalWarning = null;
 		onChange({ ...field, options: field.options.filter((o) => o !== opt) });
+		const typeId = ctx?.typeId;
+		if (!ctx || !typeId || field.keyPending) return;
+		const kind = ctx.kind;
+		try {
+			const result =
+				kind === 'node'
+					? await countNodeTypeAttributeUsage({
+							path: { node_type_id: typeId, key: field.key },
+							query: { value: opt }
+						})
+					: await countEdgeTypeAttributeUsage({
+							path: { edge_type_id: typeId, key: field.key },
+							query: { value: opt }
+						});
+			const count = result.data?.count ?? 0;
+			if (request === removalRequest && count > 0) {
+				removalWarning = optionRemovalWarning(opt, count, kind);
+			}
+		} catch {
+			// Usage is advisory; ignore failures.
+		}
 	}
 </script>
 
@@ -67,4 +100,7 @@
 			<Plus class="size-3" />
 		</Button>
 	</div>
+	{#if removalWarning}
+		<p class="text-xs text-muted-foreground" role="status">{removalWarning}</p>
+	{/if}
 </div>

@@ -3,7 +3,8 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { allDescriptors } from '../registry';
-	import type { EditorField } from '$lib/schema-types';
+	import { allowedKinds, changeKind } from '../kind-changes';
+	import type { EditorField, EditorSubField } from '$lib/schema-types';
 
 	let {
 		field,
@@ -19,6 +20,14 @@
 			(d) => d.selectable !== false && d.canBeSubField !== false && d.kind !== 'group'
 		)
 	);
+
+	function kindOptions(sf: EditorSubField) {
+		const permitted = allowedKinds(
+			sf.originalKind,
+			subFieldKinds.map((k) => k.kind)
+		);
+		return subFieldKinds.filter((d) => permitted.includes(d.kind));
+	}
 
 	function generateKey(): string {
 		return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -50,7 +59,7 @@
 	function updateSubFieldKind(i: number, kind: string) {
 		onChange({
 			...field,
-			subFields: field.subFields.map((sf, si) => (si === i ? { ...sf, kind } : sf))
+			subFields: field.subFields.map((sf, si) => (si === i ? changeKind(sf, kind) : sf))
 		});
 	}
 </script>
@@ -74,7 +83,7 @@
 					class="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
 					aria-label="Sub-field type"
 				>
-					{#each subFieldKinds as d (d.kind)}
+					{#each kindOptions(sf) as d (d.kind)}
 						<option value={d.kind}>{d.label}</option>
 					{/each}
 				</select>

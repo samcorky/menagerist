@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Select } from 'bits-ui';
 	import { ChevronDown } from '@lucide/svelte';
+	import { staleChoice } from './stale-choice';
 	import type { JsonSchemaProperty } from '$lib/schema-types';
 
 	let {
@@ -17,6 +18,8 @@
 
 	let selected = $derived(typeof value === 'string' ? value : '');
 	let options = $derived(prop.type === 'string' && 'enum' in prop ? prop.enum : []);
+	let stale = $derived(staleChoice(value, options));
+	let staleLabel = $derived(stale === null ? null : `${stale} (no longer an option)`);
 </script>
 
 <Select.Root type="single" value={selected} onValueChange={(v) => onChange(v ?? '')}>
@@ -24,7 +27,9 @@
 		class="flex h-9 flex-1 cursor-pointer items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors hover:bg-accent/10 focus:ring-1 focus:ring-ring focus:outline-none"
 		aria-label={ariaLabel}
 	>
-		<span class={selected ? '' : 'text-muted-foreground'}>{selected || '— select —'}</span>
+		<span class={selected && stale === null ? '' : 'text-muted-foreground'}
+			>{staleLabel ?? (selected || '— select —')}</span
+		>
 		<ChevronDown class="size-4 shrink-0 text-muted-foreground" />
 	</Select.Trigger>
 	<Select.Content
@@ -37,6 +42,15 @@
 		>
 			— select —
 		</Select.Item>
+		{#if stale !== null && staleLabel !== null}
+			<Select.Item
+				value={stale}
+				label={staleLabel}
+				class="flex cursor-pointer items-center rounded px-2 py-1.5 text-sm text-muted-foreground outline-none data-[highlighted]:bg-accent data-[selected]:font-medium"
+			>
+				{staleLabel}
+			</Select.Item>
+		{/if}
 		{#each options as option (option)}
 			<Select.Item
 				value={option}

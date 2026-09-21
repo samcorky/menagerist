@@ -173,3 +173,21 @@ async def test_count_and_list_with_attribute_filter_by_type_key_and_deletion() -
         "owns", "k", after=page[-1].id, limit=10
     )
     assert [e.id for e in rest] == sorted(e.id for e in edges)[2:]
+
+
+async def test_count_with_attribute_can_match_a_value() -> None:
+    """With `value`, only edges whose attribute equals it are counted."""
+    repository = InMemoryEdgeRepository()
+    source, target = uuid.uuid4(), uuid.uuid4()
+    for status in ["Draft", "Draft", "Live"]:
+        await repository.add(
+            Edge.create(
+                source_id=source,
+                target_id=target,
+                type="owns",
+                attributes={"s": status},
+            )
+        )
+
+    assert await repository.count_with_attribute("owns", "s", value="Draft") == 2
+    assert await repository.count_with_attribute("owns", "s", value="Gone") == 0

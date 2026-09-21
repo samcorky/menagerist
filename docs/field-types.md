@@ -243,3 +243,7 @@ A field's key (the name it has in `properties` and in a node's `attributes`) is 
 ### Deleting an archived field's data
 
 The schema editor shows "Used by N items" (or connections) for each archived field and a "Delete data permanently" action, backed by `GET` and `DELETE /node-type/{id}/attribute/{key}` (and `/edge-type/...`). The purge is immediate and cannot be undone; removing the property from the type happens when the form is saved.
+
+### Changing a field's kind
+
+A saved field can only move to a kind listed in `frontend/src/lib/field-types/kind-changes.ts` (text and longtext swap; number, boolean, date and choice can become text; number and rating swap). Use "Replace" for anything else. New kinds must be added to that matrix.

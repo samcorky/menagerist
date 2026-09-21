@@ -62,7 +62,9 @@ class InMemoryEdgeRepository:
             for edge in self._edges.values()
         )
 
-    def _with_attribute(self, type_slug: str, key: str) -> builtins.list[Edge]:
+    def _with_attribute(
+        self, type_slug: str, key: str, *, value: str | None = None
+    ) -> builtins.list[Edge]:
         return sorted(
             (
                 edge
@@ -70,13 +72,16 @@ class InMemoryEdgeRepository:
                 if not edge.is_deleted
                 and edge.type == type_slug
                 and key in edge.attributes
+                and (value is None or edge.attributes[key] == value)
             ),
             key=lambda edge: edge.id,
         )
 
-    async def count_with_attribute(self, type_slug: str, key: str) -> int:
+    async def count_with_attribute(
+        self, type_slug: str, key: str, *, value: str | None = None
+    ) -> int:
         """Count non-deleted edges of `type_slug` whose attributes contain `key`."""
-        return len(self._with_attribute(type_slug, key))
+        return len(self._with_attribute(type_slug, key, value=value))
 
     async def list_with_attribute(
         self, type_slug: str, key: str, *, after: uuid.UUID | None, limit: int

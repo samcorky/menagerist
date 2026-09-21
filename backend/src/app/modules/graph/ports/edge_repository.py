@@ -36,8 +36,13 @@ class EdgeRepository(Protocol):
         """Return True if any non-deleted edges reference `type_slug`."""
         ...
 
-    async def count_with_attribute(self, type_slug: str, key: str) -> int:
-        """Count non-deleted edges of `type_slug` whose attributes contain `key`."""
+    async def count_with_attribute(
+        self, type_slug: str, key: str, *, value: str | None = None
+    ) -> int:
+        """Count non-deleted edges of `type_slug` whose attributes contain `key`.
+
+        With `value`, only those where the attribute equals that string.
+        """
         ...
 
     async def list_with_attribute(

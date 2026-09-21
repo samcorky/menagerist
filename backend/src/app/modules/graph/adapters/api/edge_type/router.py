@@ -209,10 +209,14 @@ async def count_edge_type_attribute_usage(
         Depends(get_count_edge_type_attribute_usage_use_case),
     ],
     actor: Annotated[Actor, Depends(get_current_actor)],
+    value: str | None = None,
 ) -> AttributeUsageResponse:
-    """Count how many edges of this type hold a value under `key`."""
+    """Count edges of this type holding `key`, optionally where it equals `value`."""
     count = await use_case.handle(
-        CountEdgeTypeAttributeUsageQuery(edge_type_id=edge_type_id, key=key), actor
+        CountEdgeTypeAttributeUsageQuery(
+            edge_type_id=edge_type_id, key=key, value=value
+        ),
+        actor,
     )
     return AttributeUsageResponse(count=count)
 

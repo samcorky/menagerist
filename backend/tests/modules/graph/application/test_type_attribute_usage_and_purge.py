@@ -98,6 +98,34 @@ async def test_count_node_type_attribute_usage_counts_only_that_type() -> None:
     assert count == 2
 
 
+async def test_count_node_type_attribute_usage_can_match_a_value() -> None:
+    """With `value`, only nodes holding that exact value are counted."""
+    repos, node_type, _ = await _node_setup()
+
+    count = await CountNodeTypeAttributeUsage(repos).handle(
+        CountNodeTypeAttributeUsageQuery(
+            node_type_id=node_type.id, key="keep", value="a"
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    assert count == 1
+
+
+async def test_count_edge_type_attribute_usage_can_match_a_value() -> None:
+    """With `value`, only edges holding that exact value are counted."""
+    repos, edge_type, _ = await _edge_setup()
+
+    count = await CountEdgeTypeAttributeUsage(repos).handle(
+        CountEdgeTypeAttributeUsageQuery(
+            edge_type_id=edge_type.id, key="old", value="x"
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    assert count == 0
+
+
 async def test_count_node_type_attribute_usage_raises_for_missing_type() -> None:
     """An unknown node type id is a not-found error."""
     with pytest.raises(NodeTypeNotFoundError):

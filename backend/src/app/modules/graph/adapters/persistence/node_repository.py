@@ -146,7 +146,9 @@ class SqlAlchemyNodeRepository:
         await self._session.execute(stmt)
         await self._session.flush()
 
-    async def count_with_attribute(self, type_slug: str, key: str) -> int:
+    async def count_with_attribute(
+        self, type_slug: str, key: str, *, value: str | None = None
+    ) -> int:
         """Count non-deleted nodes of `type_slug` whose attributes contain `key`."""
         logger.debug("counting nodes with attribute", type_slug=type_slug, key=key)
         stmt = (
@@ -158,6 +160,8 @@ class SqlAlchemyNodeRepository:
                 NodeModel.attributes.has_key(key),
             )
         )
+        if value is not None:
+            stmt = stmt.where(NodeModel.attributes.contains({key: value}))
         result = await self._session.execute(stmt)
         return result.scalar_one()
 

@@ -27,6 +27,8 @@ export type EditorSubField = {
 	kind: string;
 	/** True until the schema is saved: the key is still derived from the label. */
 	keyPending?: boolean;
+	/** Kind when loaded from a saved schema; limits which kinds it may change to. */
+	originalKind?: string;
 	meta?: PropertyMeta;
 	/** Original property for the `opaque` kind, written back unchanged on save. */
 	raw?: Record<string, unknown>;
@@ -41,6 +43,8 @@ export type EditorField = {
 	subFields: EditorSubField[];
 	/** True until the schema is saved: the key is still derived from the label. */
 	keyPending?: boolean;
+	/** Kind when loaded from a saved schema; limits which kinds it may change to. */
+	originalKind?: string;
 	/** Metadata members carried through unchanged (display, archived, unknown members). */
 	meta?: PropertyMeta;
 	/** Original property for the `opaque` kind, written back unchanged on save. */

@@ -115,7 +115,9 @@ class SqlAlchemyEdgeRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
-    async def count_with_attribute(self, type_slug: str, key: str) -> int:
+    async def count_with_attribute(
+        self, type_slug: str, key: str, *, value: str | None = None
+    ) -> int:
         """Count non-deleted edges of `type_slug` whose attributes contain `key`."""
         logger.debug("counting edges with attribute", type_slug=type_slug, key=key)
         stmt = (
@@ -127,6 +129,8 @@ class SqlAlchemyEdgeRepository:
                 EdgeModel.attributes.has_key(key),
             )
         )
+        if value is not None:
+            stmt = stmt.where(EdgeModel.attributes.contains({key: value}))
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
