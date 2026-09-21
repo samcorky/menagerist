@@ -121,6 +121,16 @@
   },
   "x-menagerist": {
     "version": 1,
+    "highlights": {
+      "card": [
+        {
+          "key": "artist"
+        },
+        {
+          "key": "my_rating"
+        }
+      ]
+    },
     "required": [
       "title"
     ],

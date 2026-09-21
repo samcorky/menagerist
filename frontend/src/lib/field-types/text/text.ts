@@ -13,6 +13,7 @@ register({
 	kind: 'text',
 	label: 'Text',
 	canBeSubField: true,
+	highlightable: true,
 	toSchema: (f) => {
 		const { startsWith, endsWith, custom } = readTextConfig(f);
 		return {

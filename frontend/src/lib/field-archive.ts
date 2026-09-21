@@ -2,7 +2,8 @@ import type { EditorField } from '$lib/schema-types';
 
 /** Mark a saved field as archived: its data is kept, but forms no longer show it. */
 export function archiveField(field: EditorField): EditorField {
-	return { ...field, meta: { ...field.meta, archived: true } };
+	const { highlight: _highlight, ...rest } = field;
+	return { ...rest, meta: { ...field.meta, archived: true } };
 }
 
 /** Undo `archiveField`. */

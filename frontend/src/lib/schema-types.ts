@@ -47,6 +47,8 @@ export type EditorField = {
 	keyPending?: boolean;
 	/** Kind when loaded from a saved schema; limits which kinds it may change to. */
 	originalKind?: string;
+	/** 1-based position among the fields shown on cards; unset when not highlighted. */
+	highlight?: number;
 	/** Editor-only settings a descriptor maps to and from validation keywords (e.g. star count). */
 	config?: Record<string, unknown>;
 	/** Metadata members carried through unchanged (display, archived, unknown members). */

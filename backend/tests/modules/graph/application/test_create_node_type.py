@@ -116,3 +116,23 @@ async def test_create_node_type_raises_on_malformed_metadata() -> None:
             ),
             SYSTEM_ACTOR,
         )
+
+
+async def test_create_node_type_rejects_highlight_of_unknown_field() -> None:
+    """CreateNodeType rejects a highlight that names a field that does not exist."""
+    uow, _ = _make_uow()
+    use_case = CreateNodeType(uow)
+
+    with pytest.raises(InvalidSchemaError):
+        await use_case.handle(
+            CreateNodeTypeCommand(
+                slug="film",
+                label="Film",
+                attributes_schema={
+                    "type": "object",
+                    "properties": {},
+                    "x-menagerist": {"highlights": {"card": [{"key": "director"}]}},
+                },
+            ),
+            SYSTEM_ACTOR,
+        )

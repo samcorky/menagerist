@@ -205,6 +205,8 @@ The collection is the primary application view. It must support:
 
 **Cards:** Show only what's needed to identify an item. Avoid excessive badges, metadata, buttons, or decoration.
 
+**Highlighted values:** An item type may choose up to three fields to show on its cards (a rating, a director). They are shared by every item of that type, follow the truncation rules in 7c (one line, ellipsis, full value on hover) and never include long text. The cover and title keep priority, so the grid card shows at most two, the list card three, and empty values are simply left out.
+
 ### 7a. Filtering
 
 Filters must never look or feel like queries. The user selects from what exists in their collection — they never write expressions.

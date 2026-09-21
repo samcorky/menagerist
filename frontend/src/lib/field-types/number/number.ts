@@ -5,6 +5,7 @@ register({
 	kind: 'number',
 	label: 'Number',
 	canBeSubField: true,
+	highlightable: true,
 	toSchema: (f) => ({ title: f.label, type: 'number' }),
 	fromSchema: (key, prop, required) =>
 		prop.type === 'number'

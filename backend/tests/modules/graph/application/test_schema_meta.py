@@ -140,3 +140,53 @@ def test_only_schema_meta_reads_the_namespace() -> None:
     ]
 
     assert offenders == []
+
+
+def _with_highlights(highlights: object) -> dict[str, Any]:
+    return {
+        "properties": {
+            "a": {"type": "string"},
+            "b": {"type": "number"},
+            "c": {"type": "string"},
+            "d": {"type": "string"},
+            "old": {"type": "string", "x-menagerist": {"archived": True}},
+        },
+        "x-menagerist": {"highlights": highlights},
+    }
+
+
+def test_check_meta_shape_accepts_valid_highlights() -> None:
+    """Up to three unique, live fields pass; other lists are left alone."""
+    check_meta_shape(_with_highlights({"card": [{"key": "a"}, {"key": "b"}]}))
+    check_meta_shape(_with_highlights({"card": []}))
+    check_meta_shape(_with_highlights({}))
+    check_meta_shape(_with_highlights({"connection": "anything"}))
+    check_meta_shape(
+        _with_highlights({"card": [{"key": "a"}, {"key": "b"}, {"key": "c"}]})
+    )
+
+
+@pytest.mark.parametrize(
+    "highlights",
+    [
+        "no",
+        {"card": "a"},
+        {"card": [{"key": "a"}, {"key": "b"}, {"key": "c"}, {"key": "d"}]},
+        {"card": ["a"]},
+        {"card": [{"key": 1}]},
+        {"card": [{}]},
+        {"card": [{"key": "a"}, {"key": "a"}]},
+        {"card": [{"key": "missing"}]},
+        {"card": [{"key": "old"}]},
+    ],
+)
+def test_check_meta_shape_rejects_bad_highlights(highlights: object) -> None:
+    """Non-lists, too many, duplicates, unknown and archived keys are rejected."""
+    with pytest.raises(InvalidSchemaError):
+        check_meta_shape(_with_highlights(highlights))
+
+
+def test_check_meta_shape_rejects_highlights_without_properties() -> None:
+    """A highlight cannot refer to a field when the schema has no properties."""
+    with pytest.raises(InvalidSchemaError):
+        check_meta_shape({"x-menagerist": {"highlights": {"card": [{"key": "a"}]}}})

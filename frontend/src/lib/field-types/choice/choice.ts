@@ -1,11 +1,13 @@
 import { register } from '../registry';
 import ChoiceInput from './ChoiceInput.svelte';
 import ChoiceExtras from './ChoiceExtras.svelte';
+import ChoiceSummary from './ChoiceSummary.svelte';
 
 register({
 	kind: 'choice',
 	label: 'Choice',
 	canBeSubField: false,
+	highlightable: true,
 	displayOptions: [
 		{
 			key: 'display',
@@ -31,5 +33,6 @@ register({
 		};
 	},
 	EditorExtras: ChoiceExtras,
-	InputWidget: ChoiceInput
+	InputWidget: ChoiceInput,
+	SummaryWidget: ChoiceSummary
 });

@@ -2,6 +2,7 @@ import { register } from '../registry';
 import { readPropMeta } from '$lib/schema-meta';
 import RatingInput from './RatingInput.svelte';
 import RatingView from './RatingView.svelte';
+import RatingSummary from './RatingSummary.svelte';
 
 export const MAX_STARS = 5;
 
@@ -10,6 +11,7 @@ register({
 	kind: 'rating',
 	label: 'Rating',
 	canBeSubField: true,
+	highlightable: true,
 	displayOptions: [
 		{
 			key: 'stars',
@@ -42,5 +44,6 @@ register({
 				}
 			: null,
 	InputWidget: RatingInput,
-	ViewWidget: RatingView
+	ViewWidget: RatingView,
+	SummaryWidget: RatingSummary
 });

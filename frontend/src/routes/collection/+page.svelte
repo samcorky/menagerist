@@ -19,6 +19,8 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import NodeCover from '$lib/components/node-cover.svelte';
+	import NodeSummary from '$lib/components/node-summary.svelte';
+	import type { AttributesSchema } from '$lib/schema-types';
 
 	const PAGE_SIZE = 50;
 	const loadingSkeletons = [1, 2, 3, 4, 5];
@@ -99,6 +101,11 @@
 	async function fetchCategories() {
 		const result = await listNodeTypes({ query: { limit: 100 } });
 		if (result.data) allCategories = result.data;
+	}
+
+	function schemaOf(slug: string | null | undefined): AttributesSchema | null {
+		const cat = allCategories.find((c) => c.slug === slug);
+		return (cat?.attributes_schema as AttributesSchema | null | undefined) ?? null;
 	}
 
 	function selectType(type: string | null) {
@@ -302,6 +309,14 @@
 								{#if catLabel}
 									<p class="mt-0.5 truncate text-xs text-muted-foreground">{catLabel}</p>
 								{/if}
+								<div class="mt-1 empty:hidden">
+									<NodeSummary
+										attributes={item.attributes}
+										schema={schemaOf(item.type)}
+										surface="grid"
+										size="sm"
+									/>
+								</div>
 							</div>
 						</div>
 					</a>
@@ -313,11 +328,17 @@
 					<a href={resolve('/collection/[id]', { id: item.id })}>
 						<Card.Root class="transition-colors hover:bg-muted/50">
 							<Card.Header class="flex flex-row items-center justify-between gap-4 space-y-0">
-								<div>
+								<div class="min-w-0 space-y-1">
 									<Card.Title>{item.name}</Card.Title>
 									{#if item.description}
 										<Card.Description class="line-clamp-1">{item.description}</Card.Description>
 									{/if}
+									<NodeSummary
+										attributes={item.attributes}
+										schema={schemaOf(item.type)}
+										surface="list"
+										size="sm"
+									/>
 								</div>
 								{#if item.type}
 									{@const catLabel = allCategories.find((c) => c.slug === item.type)?.label}

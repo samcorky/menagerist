@@ -18,10 +18,14 @@ export type PropertyMeta = {
 	[member: string]: unknown;
 };
 
+export type HighlightEntry = { key: string };
+
 export type SchemaMeta = {
 	version?: number;
 	layout?: XLayout;
 	required?: string[];
+	/** Fields shown on cards (`card`); other lists (for example `connection`) are preserved. */
+	highlights?: { card?: HighlightEntry[]; [list: string]: unknown };
 	/** Unknown members are preserved on round-trip. */
 	[member: string]: unknown;
 };
@@ -51,6 +55,27 @@ export function withSchemaMeta<T extends object>(schema: T, patch: SchemaMeta): 
 /** Return a copy of `prop` with `patch` merged into its metadata. */
 export function withPropMeta<T extends object>(prop: T, patch: PropertyMeta): T {
 	return { ...prop, [NAMESPACE]: { ...readPropMeta(prop), ...patch } };
+}
+
+/** The stored card highlights, in order. Malformed entries are skipped. */
+export function readHighlights(schema: object | null | undefined): HighlightEntry[] {
+	const card = readSchemaMeta(schema).highlights?.card;
+	if (!Array.isArray(card)) return [];
+	return card.flatMap((e) =>
+		typeof e === 'object' && e !== null && typeof (e as HighlightEntry).key === 'string'
+			? [{ key: (e as HighlightEntry).key }]
+			: []
+	);
+}
+
+/** Return a copy of `schema` with its card highlights replaced. Other highlight lists are kept. */
+export function withHighlights<T extends object>(schema: T, card: HighlightEntry[]): T {
+	const { card: _previous, ...others } = readSchemaMeta(schema).highlights ?? {};
+	const highlights = card.length > 0 ? { ...others, card } : others;
+	const meta = { ...readSchemaMeta(schema) };
+	if (Object.keys(highlights).length > 0) meta.highlights = highlights;
+	else delete meta.highlights;
+	return { ...schema, [NAMESPACE]: meta };
 }
 
 /** Keys of top-level properties marked archived: hidden from forms, data kept. */

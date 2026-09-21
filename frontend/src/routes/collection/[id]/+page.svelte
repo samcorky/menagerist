@@ -45,6 +45,7 @@
 	import { serverErrorsToFields } from '$lib/validation-messages';
 	import MediaGallery from '$lib/components/media-gallery.svelte';
 	import NodeCover from '$lib/components/node-cover.svelte';
+	import NodeSummary from '$lib/components/node-summary.svelte';
 
 	let nodeId = $derived(page.params.id!);
 
@@ -150,6 +151,11 @@
 	$effect(() => {
 		void load();
 	});
+
+	function schemaOfType(slug: string | null | undefined): AttributesSchema | null {
+		const type = nodeTypes.find((nt) => nt.slug === slug);
+		return (type?.attributes_schema as AttributesSchema | null | undefined) ?? null;
+	}
 
 	function otherNodeId(edge: EdgeResponse): string {
 		return edge.source_id === nodeId ? edge.target_id : edge.source_id;
@@ -545,15 +551,26 @@
 											? et.label
 											: (et.reverse_label ?? et.label)
 										: edge.type}
+									{@const other = nodesById.get(otherNodeId(edge))}
 									<li class="flex items-center justify-between gap-2 rounded-lg border p-3">
-										<div class="text-sm">
-											<span class="font-medium">{relationLabel}</span>
-											<a
-												href={resolve('/collection/[id]', { id: otherNodeId(edge) })}
-												class="ml-2 text-muted-foreground underline"
-											>
-												{nodesById.get(otherNodeId(edge))?.name ?? 'View item'}
-											</a>
+										<div class="min-w-0 space-y-1 text-sm">
+											<div>
+												<span class="font-medium">{relationLabel}</span>
+												<a
+													href={resolve('/collection/[id]', { id: otherNodeId(edge) })}
+													class="ml-2 text-muted-foreground underline"
+												>
+													{other?.name ?? 'View item'}
+												</a>
+											</div>
+											{#if other}
+												<NodeSummary
+													attributes={other.attributes}
+													schema={schemaOfType(other.type)}
+													surface="row"
+													size="sm"
+												/>
+											{/if}
 										</div>
 										{#if confirmDeleteEdgeId === edge.id}
 											<div class="flex shrink-0 items-center gap-1.5">
@@ -679,8 +696,17 @@
 															edgeTargetOpen = false;
 														}}
 													>
-														<span>{candidate.name}</span>
-														<span class="text-xs text-muted-foreground">{candidate.type ?? ''}</span
+														<span class="flex min-w-0 items-center gap-2">
+															<span class="shrink-0">{candidate.name}</span>
+															<NodeSummary
+																attributes={candidate.attributes}
+																schema={schemaOfType(candidate.type)}
+																surface="picker"
+																size="sm"
+															/>
+														</span>
+														<span class="ml-2 shrink-0 text-xs text-muted-foreground"
+															>{candidate.type ?? ''}</span
 														>
 													</button>
 												</li>

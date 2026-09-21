@@ -22,7 +22,7 @@
 15. **Closed:** the purge updates each node through the unit of work, so ETags change (decided).
 16. **Closed:** component tests are not part of this change; rely on the module-chain tests and Playwright (decided).
 17. **Closed:** no permission check on the purge for now; record the gap in DECISIONS (decided).
-18. WI-16: are 3 highlighted fields and the per-surface counts (grid 2, list 3, picker 1, relationship row 2) right, and should explicit per-surface lists exist from the start or only when someone needs them?
+18. **Closed (WI-16):** defaults kept: 3 highlighted fields; grid 2, list 3, picker 1, row 2; no per-surface lists yet (not confirmed by the owner). Was: are 3 highlighted fields and the per-surface counts (grid 2, list 3, picker 1, relationship row 2) right, and should explicit per-surface lists exist from the start or only when someone needs them?
 19. **Closed:** relationship types get their own `highlights.connection` list, and connection details are shown and edited on the item page (WI-22).
 20. WI-17: should tags be searched too? They are not today, and this change touches the same query.
 21. WI-17: should numbers be searchable by default (a year or price is, a rating is not)? Confirm boolean and rating as the only non-searchable kinds.
@@ -66,3 +66,4 @@
 59. WI-8: should a restored field return to its previous position in the layout (needs the old position stored) or the end? Default: the end. Undo, by contrast, restores the exact previous editor state.
 60. WI-15: should a new constraint on a saved text field warn with the number of items whose value would fail it (as removing a choice option does)? It needs a query that evaluates the pattern over stored values. Default: no; stale values never block other edits.
 61. WI-15: should the attributes form show a rule's helper text always (as now) or only while the field is focused or empty? Default: always shown until there is an error.
+62. WI-16: add a live card preview at the top of the schema editor, using sample values (deferred, optional in the spec)?

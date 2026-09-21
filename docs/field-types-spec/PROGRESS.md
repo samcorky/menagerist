@@ -15,8 +15,8 @@ Update at the end of every session. Read this first.
 | WI-10 kind changes and option warnings | done, committed (602cfe4) | feature/initial-implementation | See "WI-10 session notes" below. |
 | WI-11 display options | done, committed (2668afd) | feature/initial-implementation | See "WI-11 session notes" below. |
 | WI-12 rank matching (optional) | todo | | |
-| WI-15 text constraints | done, awaiting user review and commit | feature/initial-implementation | See "WI-15 session notes" below. |
-| WI-16 highlighted fields | todo | | |
+| WI-15 text constraints | done, committed (26fdaca) | feature/initial-implementation | See "WI-15 session notes" below. |
+| WI-16 highlighted fields | done, awaiting user review and commit | feature/initial-implementation | See "WI-16 session notes" below. |
 | WI-17 attribute search | todo | | |
 | WI-18 per-item custom fields | todo | | |
 | WI-19 presets | todo | | |
@@ -241,7 +241,7 @@ Update at the end of every session. Read this first.
 
 ## WI-15 session notes
 
-**Status:** implemented, all backend and frontend checks green, not committed. Next item: WI-16 (highlighted fields). WI-12 stays optional.
+**Status:** implemented, all backend and frontend checks green, committed as 26fdaca. Next item: WI-16 (highlighted fields). WI-12 stays optional.
 
 **Done**
 - Backend: `validate_attributes` errors now carry `keyword` and `value` next to `path` and `message` (`InvalidAttributesError.validation_errors` is `list[dict[str, Any]]`; the problem response passes them through). No new port, use case or endpoint. `check_schema` already rejects uncompilable patterns (also inside `allOf`) in all four type handlers; locked with tests.
@@ -270,3 +270,31 @@ Update at the end of every session. Read this first.
 - Errors from the API are untyped in the OpenAPI schema (`errors` is a free-form list), so no client regeneration was needed.
 - A backslash written through some shell heredocs is halved; write patterns and JSON with the file tools.
 - `readTextConfig` lives in `constraints.ts` (not `text.ts`) to avoid an import cycle with the Svelte components.
+
+## WI-16 session notes
+
+**Status:** implemented, all backend and frontend checks green, not committed. Next item: WI-17 (attribute search). WI-12 stays optional.
+
+**Done**
+- Storage: `x-menagerist.highlights.card` (ordered `{key}` list, max 3). `schema-meta.ts` gained `readHighlights` and `withHighlights` (other highlight lists such as `connection` are kept; an empty list removes `highlights`).
+- `lib/highlights.ts`: `MAX_HIGHLIGHTS`, `SURFACE_LIMITS` (grid 2, list 3, picker 1, row 2), `normaliseHighlights`, `highlightRanks`, `toggledRanks` / `movedRanks` / `canHighlightMore`, `summaryItems` (empty values skipped, limit applied).
+- Descriptors: `highlightable`, `formatSummary` and `SummaryWidget` added to `FieldTypeDescriptor`. Text, number, boolean, date, choice and rating are highlightable; long text, table and custom are not. New `RatingSummary`, `ChoiceSummary`, `BooleanSummary`; date uses `formatSummary` (short date).
+- `node-summary.svelte` (one renderer) is used by the grid card, list card, connection picker (first value) and connection rows (two values).
+- Schema editor: opt-in `highlights` prop (passed by `settings/categories` only), a "Show on card" pin per eligible field, limit hint, "Shown on cards" list with move earlier/later. Ranks live on `EditorField.highlight`; `itemsToSchema` writes the list through `normaliseHighlights`; archiving or switching to a non-highlightable kind drops the field.
+- Backend: `check_meta_shape` validates `highlights.card` shape only (list, at most 3, `{key}` entries, unique, existing and non-archived properties); create/update handlers reject a bad list. No API change, no client regeneration.
+- Tests: backend `test_schema_meta.py` and `test_create_node_type.py`; frontend `highlights.test.ts`. The example fixture now carries `highlights`. Docs: `docs/DECISIONS.md`, `docs/field-types.md`, `frontend/DESIGN_GUIDELINES.md` section 7.
+
+**Left / deferred**
+- Live card preview in the editor (open question 62).
+- Not tried in a browser (no component tests, by decision): the pin toggles and reorder list, the cards, the picker and the connection rows. The picker shows name, then the value, then the type label, with no separator.
+- Group sub-fields cannot be highlighted. Relationship types have no highlight UI (WI-22).
+- A field switched to a non-highlightable kind is dropped from the list silently.
+
+**Files touched:** backend `application/schema_meta.py`; tests `test_schema_meta.py`, `test_create_node_type.py`. Frontend `lib/highlights.ts` (new), `schema-meta.ts`, `schema-types.ts`, `field-archive.ts`, `field-types/registry.ts`, `field-types/{boolean,choice,date,number,rating,text}/*.ts`, `field-types/{boolean/BooleanSummary,choice/ChoiceSummary,rating/RatingSummary}.svelte` (new), `components/node-summary.svelte` (new), `components/schema-editor.svelte`, `routes/collection/+page.svelte`, `routes/collection/[id]/+page.svelte`, `routes/settings/categories/+page.svelte`; test `highlights.test.ts` (new). Docs and `example-node-type-schema.json` as above.
+
+**Checks run:** `poe lint-backend` and `poe typecheck-backend` clean; `poe test-backend` 563 pass; `poe coverage` all targets met (application 100%); `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing img-alt warnings); `poe test-frontend` 227 tests in 18 files pass.
+
+**Next session must know**
+- The subagent twice reported edits done that were not on disk in WI-15; this session it re-read files, but still verify with lint, typecheck and a grep.
+- Heredocs in this shell halve backslashes; use the file tools for patterns.
+- The stray staged `frontend/src/lib/field-types/BooleanView.svelte` (index only, not on disk) is still in `git status`.

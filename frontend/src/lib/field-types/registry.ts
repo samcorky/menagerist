@@ -32,6 +32,12 @@ export type FieldTypeDescriptor = {
 	 * type), or null to fall back to the validator's own message. Used for client and server errors.
 	 */
 	formatError?: (keyword: string, value: unknown) => string | null;
+	/** Whether a field of this type may be shown on cards. Defaults to false. */
+	highlightable?: boolean;
+	/** Plain text for a highlighted value; null skips it. Defaults to `String(value)`. */
+	formatSummary?: (value: unknown, prop: JsonSchemaProperty) => string | null;
+	/** Compact rendering of a highlighted value on a card. Falls back to `formatSummary`. */
+	SummaryWidget?: Component<{ value: unknown; prop: JsonSchemaProperty; size: 'sm' | 'md' }>;
 	/** Serialise an EditorField to a JSON Schema property. */
 	toSchema: (field: EditorField) => JsonSchemaProperty;
 	/**

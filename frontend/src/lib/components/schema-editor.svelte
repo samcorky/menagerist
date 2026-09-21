@@ -12,10 +12,12 @@
 		META_VERSION,
 		archivedKeys,
 		readSchemaMeta,
+		withHighlights,
 		withSchemaMeta,
 		type SchemaMeta
 	} from '$lib/schema-meta';
 	import { archiveField, restoreField } from '$lib/field-archive';
+	import { highlightRanks, normaliseHighlights } from '$lib/highlights';
 
 	export type EditorSection = {
 		_section: true;
@@ -34,6 +36,12 @@
 		if (!schema) return [];
 		const required = new Set(readSchemaMeta(schema).required ?? []);
 		const layout = normalise(readSchemaMeta(schema).layout, schema.properties);
+		const ranks = highlightRanks(schema);
+		const load = (key: string): EditorField => {
+			const field = fieldFromProperty(key, schema.properties[key], required.has(key));
+			const rank = ranks.get(key);
+			return rank === undefined ? field : { ...field, highlight: rank };
+		};
 		return layout.flatMap((layoutItem): EditorItem[] => {
 			if (isSectionItem(layoutItem)) {
 				return [
@@ -43,18 +51,12 @@
 						sectionLabel: layoutItem.section,
 						fields: layoutItem.items
 							.filter((i) => i.key in schema.properties)
-							.map((i) => fieldFromProperty(i.key, schema.properties[i.key], required.has(i.key)))
+							.map((i) => load(i.key))
 					}
 				];
 			}
 			if (!(layoutItem.key in schema.properties)) return [];
-			return [
-				fieldFromProperty(
-					layoutItem.key,
-					schema.properties[layoutItem.key],
-					required.has(layoutItem.key)
-				)
-			];
+			return [load(layoutItem.key)];
 		});
 	}
 
@@ -119,14 +121,24 @@
 			type: 'object' as const,
 			properties: Object.fromEntries(entries) as Record<string, JsonSchemaProperty>
 		};
-		return withSchemaMeta(base, { ...baseMeta, version: META_VERSION, layout, required });
+		const card = visible
+			.filter((f) => f.highlight !== undefined)
+			.sort((a, b) => a.highlight! - b.highlight!)
+			.map((f) => ({ key: resolved.get(f)!.key }));
+		const withMeta = withSchemaMeta(base, {
+			...baseMeta,
+			version: META_VERSION,
+			layout,
+			required
+		});
+		return withHighlights(withMeta, normaliseHighlights(card, base.properties));
 	}
 </script>
 
 <script lang="ts">
 	import { setContext, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import { FolderOpen, Plus, Replace, X } from '@lucide/svelte';
+	import { ChevronDown, ChevronUp, FolderOpen, Pin, Plus, Replace, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -141,15 +153,18 @@
 	import { allowedKinds, changeKind, kindChangeWarning } from '$lib/field-types/kind-changes';
 	import { displayChoices, displayValue, setDisplayValue } from '$lib/field-types/display-options';
 	import { SCHEMA_TYPE_CONTEXT, type SchemaTypeContext } from '$lib/schema-type-context';
+	import { MAX_HIGHLIGHTS, canHighlightMore, movedRanks, toggledRanks } from '$lib/highlights';
 
 	let {
 		schema = $bindable<AttributesSchema | null>(null),
 		typeId,
-		typeKind = 'node'
+		typeKind = 'node',
+		highlights = false
 	}: {
 		schema?: AttributesSchema | null;
 		typeId?: string;
 		typeKind?: 'node' | 'edge';
+		highlights?: boolean;
 	} = $props();
 
 	setContext<SchemaTypeContext>(SCHEMA_TYPE_CONTEXT, {
@@ -195,7 +210,49 @@
 	function restoreArchived(field: EditorField) {
 		if (confirmingKey === field.key) confirmingKey = null;
 		archived = archived.filter((f) => f !== field);
-		items = [...items, restoreField(field)];
+		items = [...items, { ...restoreField(field), highlight: undefined }];
+	}
+
+	// Visible fields in display order, sections flattened; archived and sub-fields excluded.
+	let flatFields = $derived(items.flatMap((item) => (isSection(item) ? item.fields : [item])));
+	// Highlight ranks per flattened field, renumbered so removals leave no gaps.
+	let ranks = $derived.by(() => {
+		const raw = flatFields.map((f) => f.highlight);
+		const order = raw.filter((r): r is number => r !== undefined).sort((a, b) => a - b);
+		return raw.map((r) => (r === undefined ? undefined : order.indexOf(r) + 1));
+	});
+	let atHighlightLimit = $derived(!canHighlightMore(ranks));
+	let highlightedFields = $derived(
+		flatFields
+			.map((field, index) => ({ field, index, rank: ranks[index] }))
+			.filter((e) => e.rank !== undefined)
+			.sort((a, b) => a.rank! - b.rank!)
+	);
+
+	function isHighlightableField(field: EditorField): boolean {
+		return field.kind !== 'opaque' && getDescriptor(field.kind)?.highlightable === true;
+	}
+
+	function applyRanks(next: (number | undefined)[]) {
+		let n = 0;
+		const rerank = (f: EditorField): EditorField => ({ ...f, highlight: next[n++] });
+		items = items.map((item) =>
+			isSection(item) ? { ...item, fields: item.fields.map(rerank) } : rerank(item)
+		);
+	}
+
+	function toggleHighlight(field: EditorField) {
+		const index = flatFields.findIndex((f) => f.key === field.key);
+		if (index !== -1) applyRanks(toggledRanks(ranks, index));
+	}
+
+	function moveHighlight(index: number, direction: -1 | 1) {
+		applyRanks(movedRanks(ranks, index, direction));
+	}
+
+	function handleKindChange(field: EditorField, kind: string): EditorField {
+		const next = changeKind(field, kind);
+		return isHighlightableField(next) ? next : { ...next, highlight: undefined };
 	}
 
 	// Usage counts per archived field key: a number, 'loading' or 'error'.
@@ -452,7 +509,8 @@
 		{:else}
 			<select
 				value={field.kind}
-				onchange={(e) => onFieldChange(changeKind(field, (e.target as HTMLSelectElement).value))}
+				onchange={(e) =>
+					onFieldChange(handleKindChange(field, (e.target as HTMLSelectElement).value))}
 				class="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
 				aria-label="Field type"
 			>
@@ -485,6 +543,22 @@
 			/>
 			Required
 		</label>
+		{#if highlights && isHighlightableField(field)}
+			{@const pinned = field.highlight !== undefined}
+			<Button
+				type="button"
+				variant="ghost"
+				size="icon"
+				aria-pressed={pinned}
+				aria-label={pinned ? 'Stop showing on card' : 'Show on card'}
+				title={pinned ? 'Stop showing on card' : 'Show on card'}
+				disabled={!pinned && atHighlightLimit}
+				class={pinned ? 'text-primary' : 'text-muted-foreground'}
+				onclick={() => toggleHighlight(field)}
+			>
+				<Pin class="size-4 {pinned ? 'fill-current' : ''}" />
+			</Button>
+		{/if}
 		{#if !field.keyPending && field.kind !== 'opaque'}
 			<Button
 				type="button"
@@ -585,6 +659,50 @@
 			Add section
 		</Button>
 	</div>
+
+	{#if highlights}
+		{#if atHighlightLimit}
+			<p class="text-xs text-muted-foreground">
+				You can show up to {MAX_HIGHLIGHTS} fields on a card.
+			</p>
+		{/if}
+		{#if highlightedFields.length > 0}
+			<div class="space-y-1">
+				<Label>Shown on cards</Label>
+				<ol class="space-y-0.5">
+					{#each highlightedFields as entry, position (entry.field.key)}
+						{@const label = entry.field.label || 'Untitled field'}
+						<li class="flex items-center gap-1 text-sm">
+							<span class="w-4 text-xs text-muted-foreground">{position + 1}.</span>
+							<span class="min-w-0 flex-1 truncate">{label}</span>
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon"
+								class="size-7"
+								disabled={position === 0}
+								onclick={() => moveHighlight(entry.index, -1)}
+								aria-label="Move {label} earlier"
+							>
+								<ChevronUp class="size-4" />
+							</Button>
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon"
+								class="size-7"
+								disabled={position === highlightedFields.length - 1}
+								onclick={() => moveHighlight(entry.index, 1)}
+								aria-label="Move {label} later"
+							>
+								<ChevronDown class="size-4" />
+							</Button>
+						</li>
+					{/each}
+				</ol>
+			</div>
+		{/if}
+	{/if}
 
 	{#if archived.length > 0}
 		<details class="pt-1" bind:open={removedOpen}>

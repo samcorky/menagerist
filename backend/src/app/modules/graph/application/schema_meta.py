@@ -13,6 +13,7 @@ NAMESPACE = "x-menagerist"
 
 _PROPERTY_BOOL_MEMBERS = ("archived", "search", "suggest")
 _PROPERTY_STR_MEMBERS = ("kind", "display")
+MAX_CARD_HIGHLIGHTS = 3
 
 
 def _meta(node: object) -> dict[str, Any]:
@@ -90,15 +91,60 @@ def _check_root_meta(root: object) -> None:
         raise InvalidSchemaError(f"{NAMESPACE}/required must contain strings")
 
 
+def _check_highlight_entry(
+    entry: object, props: dict[str, Any], seen: set[str]
+) -> None:
+    key = entry.get("key") if isinstance(entry, dict) else None
+    if not isinstance(key, str):
+        raise InvalidSchemaError(
+            f"{NAMESPACE}/highlights/card entries need a string key"
+        )
+    if key in seen:
+        raise InvalidSchemaError(f"{NAMESPACE}/highlights/card repeats {key!r}")
+    seen.add(key)
+    if key not in props:
+        raise InvalidSchemaError(
+            f"{NAMESPACE}/highlights/card refers to unknown field {key!r}"
+        )
+    if _meta(props[key]).get("archived") is True:
+        raise InvalidSchemaError(
+            f"{NAMESPACE}/highlights/card refers to archived field {key!r}"
+        )
+
+
+def _check_highlights(root: object, properties: object) -> None:
+    """Check `highlights.card`: at most 3 unique keys of existing, live properties."""
+    highlights = root.get("highlights") if isinstance(root, dict) else None
+    if highlights is None:
+        return
+    if not isinstance(highlights, dict):
+        raise InvalidSchemaError(f"{NAMESPACE}/highlights must be an object")
+    card = highlights.get("card")
+    if card is None:
+        return
+    if not isinstance(card, list):
+        raise InvalidSchemaError(f"{NAMESPACE}/highlights/card must be an array")
+    if len(card) > MAX_CARD_HIGHLIGHTS:
+        raise InvalidSchemaError(
+            f"{NAMESPACE}/highlights/card allows at most {MAX_CARD_HIGHLIGHTS} fields"
+        )
+    props = properties if isinstance(properties, dict) else {}
+    seen: set[str] = set()
+    for entry in card:
+        _check_highlight_entry(entry, props, seen)
+
+
 def check_meta_shape(schema: dict[str, Any]) -> None:
     """Check that known `x-menagerist` members are correctly typed.
 
     Unknown members are allowed so newer clients stay forward compatible.
 
-    :raises InvalidSchemaError: when a known member has the wrong type.
+    :raises InvalidSchemaError: when a known member has the wrong type or a
+        highlight refers to a missing or archived field.
     """
     _check_root_meta(schema.get(NAMESPACE))
     properties = schema.get("properties")
+    _check_highlights(schema.get(NAMESPACE), properties)
     if not isinstance(properties, dict):
         return
     for key, prop in properties.items():

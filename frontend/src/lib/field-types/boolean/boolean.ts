@@ -1,11 +1,13 @@
 import { register } from '../registry';
 import BooleanInput from './BooleanInput.svelte';
 import BooleanView from './BooleanView.svelte';
+import BooleanSummary from './BooleanSummary.svelte';
 
 register({
 	kind: 'boolean',
 	label: 'Yes/No',
 	canBeSubField: true,
+	highlightable: true,
 	displayOptions: [
 		{
 			key: 'display',
@@ -24,5 +26,6 @@ register({
 			? { key, label: prop.title, kind: 'boolean', required, options: [], subFields: [] }
 			: null,
 	InputWidget: BooleanInput,
-	ViewWidget: BooleanView
+	ViewWidget: BooleanView,
+	SummaryWidget: BooleanSummary
 });

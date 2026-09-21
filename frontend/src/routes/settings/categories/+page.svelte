@@ -223,7 +223,7 @@
 							placeholder="Optional description"
 						/>
 					</div>
-					<SchemaEditor bind:schema={createSchema} />
+					<SchemaEditor bind:schema={createSchema} highlights />
 					<div class="flex justify-end">
 						<Button type="submit" disabled={submitting}>
 							{submitting ? 'Adding…' : 'Add category'}
@@ -319,7 +319,12 @@
 											placeholder="Optional description"
 										/>
 									</div>
-									<SchemaEditor bind:schema={editSchema} typeId={cat.id} typeKind="node" />
+									<SchemaEditor
+										bind:schema={editSchema}
+										typeId={cat.id}
+										typeKind="node"
+										highlights
+									/>
 									<div class="flex justify-end gap-2">
 										<Button type="button" variant="ghost" size="sm" onclick={cancelEdit}>
 											<X class="size-4" />
