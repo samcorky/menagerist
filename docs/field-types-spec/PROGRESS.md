@@ -22,7 +22,7 @@ Update at the end of every session. Read this first.
 | WI-19 presets | todo | | |
 | WI-19d per-item schema overlay | todo | | |
 | WI-21 value suggestions | todo | | |
-| WI-22 connection details | 22a done, awaiting user review and commit; 22b todo | feature/initial-implementation | See "WI-22a session notes" below. |
+| WI-22 connection details | 22a done, committed (66417f1); 22b todo | feature/initial-implementation | See "WI-22a session notes" below. |
 | WI-13 drag-and-drop layout (stretch) | todo | | |
 
 ## WI-1 to WI-4 session notes
@@ -329,7 +329,7 @@ Update at the end of every session. Read this first.
 
 ## WI-18a session notes
 
-**Status:** 18a implemented, all backend and frontend checks green, not committed. 18b (promote a detail) and 18c (adopt across items, tips strip) are not started: they build on WI-19d (the node schema overlay), which replaces this stopgap for new typed per-item fields. Next in the table: WI-19 (presets) and WI-19d; read `wi-19-presets.md` and `wi-19d-per-item-schema-overlay.md` first. WI-12 stays optional.
+**Status:** 18a implemented, all backend and frontend checks green, committed as d9dbdc6. 18b (promote a detail) and 18c (adopt across items, tips strip) are not started: they build on WI-19d (the node schema overlay), which replaces this stopgap for new typed per-item fields. Next in the table: WI-19 (presets) and WI-19d; read `wi-19-presets.md` and `wi-19d-per-item-schema-overlay.md` first. WI-12 stays optional.
 
 **Done**
 - Backend: new `application/custom_details.py` (`check_custom_details`, `MAX_CUSTOM_NAME_LENGTH` 100, `MAX_CUSTOM_DETAILS` 50) called from `CreateNode` and `UpdateNode`. It applies only to keys the type's schema does not define (archived ones count as defined), only to names that are new compared with the stored attributes, and the count only when it grows past the limit. Errors are `InvalidAttributesError` with keyword `customDetail`. This lives in the application layer, not in `Node` (the domain cannot see the schema, and its invariants run when nodes load from the database).
@@ -355,7 +355,7 @@ Update at the end of every session. Read this first.
 
 ## WI-22a session notes
 
-**Status:** 22a implemented, all backend and frontend checks green, not committed. 22b (add several connections at once, optional `CreateEdges`) is not started. Remaining table items: WI-19 (presets), WI-19d (overlay), then 18b/18c, WI-21, WI-13. WI-12 stays optional.
+**Status:** 22a implemented, all backend and frontend checks green, committed as 66417f1. 22b (add several connections at once, optional `CreateEdges`) is not started. Remaining table items: WI-19 (presets), WI-19d (overlay), then 18b/18c, WI-21, WI-13. WI-12 stays optional.
 
 **Done**
 - `highlights.connection` list (max 2) on relationship types. Shared code generalised: `readHighlights` / `withHighlights` take a `HighlightList` (`'card' | 'connection'`); `normaliseHighlights`, `highlightRanks`, `toggledRanks`, `canHighlightMore` take a max (`maxHighlights(list)`); `summaryItems(..., 'connection')` reads the connection list; `Surface` gained `'connection'`. Backend `check_meta_shape` validates both lists (card max 3, connection max 2, same rules); a non-list `connection` is now rejected.
