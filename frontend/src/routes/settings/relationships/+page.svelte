@@ -235,7 +235,7 @@
 							<p class="text-xs text-muted-foreground">Uncheck for symmetric (A ↔ B)</p>
 						</div>
 					</div>
-					<SchemaEditor bind:schema={createSchema} />
+					<SchemaEditor bind:schema={createSchema} highlights highlightList="connection" />
 					<div class="flex justify-end">
 						<Button type="submit" disabled={submitting}>
 							{submitting ? 'Adding…' : 'Add relationship type'}
@@ -332,7 +332,13 @@
 										/>
 										<Label for="edit-directional-{et.id}">Directional</Label>
 									</div>
-									<SchemaEditor bind:schema={editSchema} typeId={et.id} typeKind="edge" />
+									<SchemaEditor
+										bind:schema={editSchema}
+										typeId={et.id}
+										typeKind="edge"
+										highlights
+										highlightList="connection"
+									/>
 									<div class="flex justify-end gap-2">
 										<Button type="button" variant="ghost" size="sm" onclick={cancelEdit}>
 											<X class="size-4" />

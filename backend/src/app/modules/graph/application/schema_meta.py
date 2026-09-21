@@ -14,6 +14,11 @@ NAMESPACE = "x-menagerist"
 _PROPERTY_BOOL_MEMBERS = ("archived", "search", "suggest")
 _PROPERTY_STR_MEMBERS = ("kind", "display")
 MAX_CARD_HIGHLIGHTS = 3
+MAX_CONNECTION_HIGHLIGHTS = 2
+_HIGHLIGHT_LIMITS = {
+    "card": MAX_CARD_HIGHLIGHTS,
+    "connection": MAX_CONNECTION_HIGHLIGHTS,
+}
 # Kinds whose values are not free text (frontend descriptors: `searchable: false`).
 NON_SEARCHABLE_KINDS = frozenset({"rating"})
 
@@ -115,46 +120,49 @@ def _check_root_meta(root: object) -> None:
 
 
 def _check_highlight_entry(
-    entry: object, props: dict[str, Any], seen: set[str]
+    name: str, entry: object, props: dict[str, Any], seen: set[str]
 ) -> None:
+    where = f"{NAMESPACE}/highlights/{name}"
     key = entry.get("key") if isinstance(entry, dict) else None
     if not isinstance(key, str):
-        raise InvalidSchemaError(
-            f"{NAMESPACE}/highlights/card entries need a string key"
-        )
+        raise InvalidSchemaError(f"{where} entries need a string key")
     if key in seen:
-        raise InvalidSchemaError(f"{NAMESPACE}/highlights/card repeats {key!r}")
+        raise InvalidSchemaError(f"{where} repeats {key!r}")
     seen.add(key)
     if key not in props:
-        raise InvalidSchemaError(
-            f"{NAMESPACE}/highlights/card refers to unknown field {key!r}"
-        )
+        raise InvalidSchemaError(f"{where} refers to unknown field {key!r}")
     if _meta(props[key]).get("archived") is True:
+        raise InvalidSchemaError(f"{where} refers to archived field {key!r}")
+
+
+def _check_highlight_list(name: str, entries: object, properties: object) -> None:
+    where = f"{NAMESPACE}/highlights/{name}"
+    if not isinstance(entries, list):
+        raise InvalidSchemaError(f"{where} must be an array")
+    if len(entries) > _HIGHLIGHT_LIMITS[name]:
         raise InvalidSchemaError(
-            f"{NAMESPACE}/highlights/card refers to archived field {key!r}"
+            f"{where} allows at most {_HIGHLIGHT_LIMITS[name]} fields"
         )
+    props = properties if isinstance(properties, dict) else {}
+    seen: set[str] = set()
+    for entry in entries:
+        _check_highlight_entry(name, entry, props, seen)
 
 
 def _check_highlights(root: object, properties: object) -> None:
-    """Check `highlights.card`: at most 3 unique keys of existing, live properties."""
+    """Check `highlights.card` (max 3) and `highlights.connection` (max 2).
+
+    Each is a list of unique keys of existing, live properties. Other lists
+    are left alone.
+    """
     highlights = root.get("highlights") if isinstance(root, dict) else None
     if highlights is None:
         return
     if not isinstance(highlights, dict):
         raise InvalidSchemaError(f"{NAMESPACE}/highlights must be an object")
-    card = highlights.get("card")
-    if card is None:
-        return
-    if not isinstance(card, list):
-        raise InvalidSchemaError(f"{NAMESPACE}/highlights/card must be an array")
-    if len(card) > MAX_CARD_HIGHLIGHTS:
-        raise InvalidSchemaError(
-            f"{NAMESPACE}/highlights/card allows at most {MAX_CARD_HIGHLIGHTS} fields"
-        )
-    props = properties if isinstance(properties, dict) else {}
-    seen: set[str] = set()
-    for entry in card:
-        _check_highlight_entry(entry, props, seen)
+    for name in _HIGHLIGHT_LIMITS:
+        if highlights.get(name) is not None:
+            _check_highlight_list(name, highlights[name], properties)
 
 
 def check_meta_shape(schema: dict[str, Any]) -> None:

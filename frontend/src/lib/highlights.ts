@@ -1,14 +1,30 @@
 import { descriptorForProp } from '$lib/field-types';
-import { archivedKeys, readHighlights, type HighlightEntry } from '$lib/schema-meta';
+import {
+	archivedKeys,
+	readHighlights,
+	type HighlightEntry,
+	type HighlightList
+} from '$lib/schema-meta';
 import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
 
-/** Most fields a type may show on its cards. */
+/** Most fields a type may show on its cards, and a relationship type on its connection rows. */
 export const MAX_HIGHLIGHTS = 3;
+export const MAX_CONNECTION_HIGHLIGHTS = 2;
 
-export type Surface = 'grid' | 'list' | 'picker' | 'row';
+export function maxHighlights(list: HighlightList): number {
+	return list === 'connection' ? MAX_CONNECTION_HIGHLIGHTS : MAX_HIGHLIGHTS;
+}
+
+export type Surface = 'grid' | 'list' | 'picker' | 'row' | 'connection';
 
 /** How many highlighted values each surface shows; the cover and title keep priority (§3.2). */
-export const SURFACE_LIMITS: Record<Surface, number> = { grid: 2, list: 3, picker: 1, row: 2 };
+export const SURFACE_LIMITS: Record<Surface, number> = {
+	grid: 2,
+	list: 3,
+	picker: 1,
+	row: 2,
+	connection: 2
+};
 
 export function isHighlightable(prop: JsonSchemaProperty | undefined): boolean {
 	return prop !== undefined && descriptorForProp(prop)?.highlightable === true;
@@ -20,13 +36,14 @@ export function isHighlightable(prop: JsonSchemaProperty | undefined): boolean {
  */
 export function normaliseHighlights(
 	list: HighlightEntry[] | undefined,
-	properties: Record<string, JsonSchemaProperty>
+	properties: Record<string, JsonSchemaProperty>,
+	max = MAX_HIGHLIGHTS
 ): HighlightEntry[] {
 	const archived = archivedKeys({ properties });
 	const seen = new Set<string>();
 	const result: HighlightEntry[] = [];
 	for (const { key } of list ?? []) {
-		if (result.length >= MAX_HIGHLIGHTS) break;
+		if (result.length >= max) break;
 		if (seen.has(key) || !Object.hasOwn(properties, key) || archived.has(key)) continue;
 		if (!isHighlightable(properties[key])) continue;
 		seen.add(key);
@@ -36,10 +53,15 @@ export function normaliseHighlights(
 }
 
 /** 1-based rank of each highlighted key in a schema, for loading the editor. */
-export function highlightRanks(schema: AttributesSchema | null): Map<string, number> {
+export function highlightRanks(
+	schema: AttributesSchema | null,
+	list: HighlightList = 'card'
+): Map<string, number> {
 	if (!schema) return new Map();
 	return new Map(
-		normaliseHighlights(readHighlights(schema), schema.properties).map((e, i) => [e.key, i + 1])
+		normaliseHighlights(readHighlights(schema, list), schema.properties, maxHighlights(list)).map(
+			(e, i) => [e.key, i + 1]
+		)
 	);
 }
 
@@ -54,18 +76,22 @@ function renumber(ranks: (number | undefined)[]): (number | undefined)[] {
 }
 
 /** Whether another field may still be highlighted. */
-export function canHighlightMore(ranks: (number | undefined)[]): boolean {
-	return ranks.filter((r) => r !== undefined).length < MAX_HIGHLIGHTS;
+export function canHighlightMore(ranks: (number | undefined)[], max = MAX_HIGHLIGHTS): boolean {
+	return ranks.filter((r) => r !== undefined).length < max;
 }
 
 /** Ranks after toggling the field at `index`. Turning one on is ignored at the limit. */
-export function toggledRanks(ranks: (number | undefined)[], index: number): (number | undefined)[] {
+export function toggledRanks(
+	ranks: (number | undefined)[],
+	index: number,
+	max = MAX_HIGHLIGHTS
+): (number | undefined)[] {
 	const next = [...ranks];
 	if (next[index] !== undefined) {
 		next[index] = undefined;
 		return renumber(next);
 	}
-	if (!canHighlightMore(ranks)) return ranks;
+	if (!canHighlightMore(ranks, max)) return ranks;
 	next[index] = Math.max(0, ...ranks.filter((r): r is number => r !== undefined)) + 1;
 	return next;
 }
@@ -111,7 +137,13 @@ export function summaryItems(
 ): SummaryItem[] {
 	if (!schema || !attributes) return [];
 	const items: SummaryItem[] = [];
-	for (const { key } of normaliseHighlights(readHighlights(schema), schema.properties)) {
+	const list: HighlightList = surface === 'connection' ? 'connection' : 'card';
+	const entries = normaliseHighlights(
+		readHighlights(schema, list),
+		schema.properties,
+		maxHighlights(list)
+	);
+	for (const { key } of entries) {
 		if (items.length >= SURFACE_LIMITS[surface]) break;
 		const prop = schema.properties[key];
 		const value = attributes[key];

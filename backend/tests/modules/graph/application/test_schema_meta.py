@@ -160,7 +160,7 @@ def test_check_meta_shape_accepts_valid_highlights() -> None:
     check_meta_shape(_with_highlights({"card": [{"key": "a"}, {"key": "b"}]}))
     check_meta_shape(_with_highlights({"card": []}))
     check_meta_shape(_with_highlights({}))
-    check_meta_shape(_with_highlights({"connection": "anything"}))
+    check_meta_shape(_with_highlights({"other": "anything"}))
     check_meta_shape(
         _with_highlights({"card": [{"key": "a"}, {"key": "b"}, {"key": "c"}]})
     )
@@ -190,3 +190,16 @@ def test_check_meta_shape_rejects_highlights_without_properties() -> None:
     """A highlight cannot refer to a field when the schema has no properties."""
     with pytest.raises(InvalidSchemaError):
         check_meta_shape({"x-menagerist": {"highlights": {"card": [{"key": "a"}]}}})
+
+
+def test_check_meta_shape_limits_connection_highlights_to_two() -> None:
+    """The connection list allows two fields and follows the same rules."""
+    check_meta_shape(_with_highlights({"connection": [{"key": "a"}, {"key": "b"}]}))
+    for bad in (
+        {"connection": [{"key": "a"}, {"key": "b"}, {"key": "c"}]},
+        {"connection": [{"key": "old"}]},
+        {"connection": [{"key": "a"}, {"key": "a"}]},
+        {"connection": "a"},
+    ):
+        with pytest.raises(InvalidSchemaError):
+            check_meta_shape(_with_highlights(bad))

@@ -2,11 +2,13 @@ import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import '../src/lib/field-types/index';
 import {
+	MAX_CONNECTION_HIGHLIGHTS,
 	MAX_HIGHLIGHTS,
 	SURFACE_LIMITS,
 	canHighlightMore,
 	highlightRanks,
 	isHighlightable,
+	maxHighlights,
 	movedRanks,
 	normaliseHighlights,
 	summaryItems,
@@ -246,5 +248,76 @@ describe('example fixture', () => {
 		const stored = readHighlights(schema);
 		expect(stored.length).toBeGreaterThan(0);
 		expect(normaliseHighlights(stored, schema.properties)).toEqual(stored);
+	});
+});
+
+describe('connection highlights', () => {
+	const edgeSchema = {
+		$schema: 'https://json-schema.org/draft/2020-12/schema',
+		type: 'object',
+		properties: {
+			date: { title: 'Date', type: 'string', format: 'date' },
+			signed_by: { title: 'Signed by', type: 'string' },
+			place: { title: 'Place', type: 'string' },
+			old: { title: 'Old', type: 'string', 'x-menagerist': { kind: 'text', archived: true } }
+		},
+		'x-menagerist': {
+			version: 1,
+			highlights: {
+				card: [{ key: 'place' }],
+				connection: [{ key: 'date' }, { key: 'signed_by' }, { key: 'place' }]
+			}
+		}
+	} as unknown as AttributesSchema;
+
+	it('reads and writes the connection list without touching the card list', () => {
+		expect(readHighlights(edgeSchema, 'connection').map((e) => e.key)).toEqual([
+			'date',
+			'signed_by',
+			'place'
+		]);
+		const next = withHighlights(edgeSchema, [{ key: 'signed_by' }], 'connection');
+		expect(readHighlights(next, 'connection')).toEqual([{ key: 'signed_by' }]);
+		expect(readHighlights(next, 'card')).toEqual([{ key: 'place' }]);
+		const cleared = withHighlights(next, [], 'connection');
+		expect(readSchemaMeta(cleared).highlights).toEqual({ card: [{ key: 'place' }] });
+	});
+
+	it('allows two connection highlights', () => {
+		expect(MAX_CONNECTION_HIGHLIGHTS).toBe(2);
+		const props = edgeSchema.properties;
+		const three = ['date', 'signed_by', 'place'].map((key) => ({ key }));
+		expect(
+			normaliseHighlights(three, props, maxHighlights('connection')).map((e) => e.key)
+		).toEqual(['date', 'signed_by']);
+		expect(highlightRanks(edgeSchema, 'connection').size).toBe(2);
+		expect(toggledRanks([1, 2, undefined], 2, 2)).toEqual([1, 2, undefined]);
+		expect(canHighlightMore([1, 2], 2)).toBe(false);
+	});
+
+	it('summarises a connection from its own list, up to two values', () => {
+		const items = summaryItems(
+			{ date: '2024-03-12', signed_by: 'Bryan Cranston', place: 'London' },
+			edgeSchema,
+			'connection'
+		);
+		expect(items.map((i) => i.key)).toEqual(['date', 'signed_by']);
+		expect(items[1].text).toBe('Bryan Cranston');
+		const card = summaryItems({ place: 'London' }, edgeSchema, 'list');
+		expect(card.map((i) => i.key)).toEqual(['place']);
+	});
+
+	it('shows nothing when a connection has no highlighted values', () => {
+		expect(summaryItems({}, edgeSchema, 'connection')).toEqual([]);
+		expect(summaryItems({ date: '2024-03-12' }, null, 'connection')).toEqual([]);
+	});
+
+	it('writes the connection list from the editor and leaves the card list', () => {
+		const items = schemaToItems(edgeSchema, 'connection') as EditorField[];
+		expect(items.find((f) => f.key === 'date')?.highlight).toBe(1);
+		expect(items.find((f) => f.key === 'place')?.highlight).toBeUndefined();
+		const written = itemsToSchema(items, readSchemaMeta(edgeSchema), [], 'connection');
+		expect(readHighlights(written, 'connection').map((e) => e.key)).toEqual(['date', 'signed_by']);
+		expect(readHighlights(written, 'card')).toEqual([{ key: 'place' }]);
 	});
 });

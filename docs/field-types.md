@@ -280,3 +280,7 @@ The item list's `q` also searches attribute values (see `docs/DECISIONS.md`). Ba
 ### Per-item details ("Add detail")
 
 Keys an item's type does not define are edited as loose "details". `lib/attribute-rows.ts` holds the row model (`attributesToRows`, `rowsToAttributes`, `newDetailRow`): rows are ordered by name, keep a `kind` (`text`, `number`, `boolean`, `json`) and, for values the form cannot edit, the stored `raw` value. `lib/custom-details.ts` has the name rules (`customDetailProblems`, `isDetailRow`, `canAddDetail`) and the limits (`MAX_CUSTOM_NAME_LENGTH` 100, `MAX_CUSTOM_DETAILS` 50). The backend applies the same limits to new or changed details in `application/custom_details.py` (`check_custom_details`, called from `CreateNode` and `UpdateNode`; errors carry the keyword `customDetail`). A field the type defines is never a detail, archived ones included.
+
+### Connection highlights
+
+`x-menagerist.highlights.connection` on a relationship type's schema lists up to 2 fields shown on connection rows (`MAX_CONNECTION_HIGHLIGHTS`); the card list is separate. `readHighlights` / `withHighlights` take the list name (`'card'` or `'connection'`), `summaryItems(..., 'connection')` reads the connection list, and the schema editor takes `highlightList` (the relationships settings page passes `'connection'`). The backend shape check covers both lists (`check_meta_shape`).

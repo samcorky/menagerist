@@ -245,3 +245,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** Two rows with the same name silently overwrote each other (`Object.fromEntries`) and stringified values corrupted data set through the API, so these problems have to stop the save rather than warn. The guard lives in the application layer, not in `Node`: the domain cannot see which keys the schema defines, and its invariants also run when nodes are loaded from the database, so a limit there would make existing nodes unloadable.
 
 **Tradeoff:** This is an exception to "client-side errors never block Save" (WI-6): only detail-name problems block, because otherwise data is lost silently. Limits are constants (proposals from the spec), not settings. Edge types have no custom details. Details still cannot be highlighted, and the type choice is limited to three types until the overlay lands.
+
+---
+
+## Connections show and edit their own details through a second highlight list
+
+**Decision:** A relationship type's schema gets `x-menagerist.highlights.connection` (at most 2 fields, same rules as the card list: eligible kinds, unique, existing and not archived; the backend checks the shape in `check_meta_shape`). Connection rows on the item page show three single lines: the relationship label, the other item with its own card highlights, and the connection's highlighted details, using the same `node-summary` component with `surface="connection"`. Tapping "Edit connection" opens a sheet that reuses `attributes-editor` over the relationship type's schema and saves with `PATCH /edge/{id}` and its ETag. Removing a connection no longer asks to confirm: it removes at once with a 5-second Undo that re-creates the connection. The relationship type editor gets the same "Show on connection" pin as item types, capped at 2. No backend behaviour changed apart from the shape check.
+
+**Rationale:** The backend already stored, validated and returned connection details; only the UI was missing. Reusing the highlight list, summary component, attribute editor and detail rules keeps one mental model for items and connections (guidelines §16a, §16b, §17), and Undo replaces confirmation for a reversible action (§14).
+
+**Tradeoff:** Undo re-creates the connection, so its id and timestamps change. A row shows both the other item's highlights and the connection's own (open question 51). Adding several connections at once (WI-22b) and typed per-connection extras beyond the type's fields are not built.

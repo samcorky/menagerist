@@ -18,11 +18,11 @@ Update at the end of every session. Read this first.
 | WI-15 text constraints | done, committed (26fdaca) | feature/initial-implementation | See "WI-15 session notes" below. |
 | WI-16 highlighted fields | done, committed (44c01dc) | feature/initial-implementation | See "WI-16 session notes" below. |
 | WI-17 attribute search | done, committed (06b605b) | feature/initial-implementation | See "WI-17 session notes" below. |
-| WI-18 per-item custom fields | 18a done, awaiting user review and commit; 18b and 18c todo | feature/initial-implementation | See "WI-18a session notes" below. 18b and 18c wait for the WI-19d overlay. |
+| WI-18 per-item custom fields | 18a done, committed (d9dbdc6); 18b and 18c todo | feature/initial-implementation | See "WI-18a session notes" below. 18b and 18c wait for the WI-19d overlay. |
 | WI-19 presets | todo | | |
 | WI-19d per-item schema overlay | todo | | |
 | WI-21 value suggestions | todo | | |
-| WI-22 connection details | todo | | |
+| WI-22 connection details | 22a done, awaiting user review and commit; 22b todo | feature/initial-implementation | See "WI-22a session notes" below. |
 | WI-13 drag-and-drop layout (stretch) | todo | | |
 
 ## WI-1 to WI-4 session notes
@@ -351,4 +351,28 @@ Update at the end of every session. Read this first.
 - Import `attributesToRows`, `rowsToAttributes` and `AttributeRow` from `$lib/attribute-rows`, not from the editor.
 - The `svelte-file-editor` agent needed three rounds this session (silent misses, a re-export lint rule, a use-before-declaration); always verify with lint and typecheck.
 - Heredocs in this shell halve backslashes.
+- The stray staged `frontend/src/lib/field-types/BooleanView.svelte` (index only) is still in `git status`.
+
+## WI-22a session notes
+
+**Status:** 22a implemented, all backend and frontend checks green, not committed. 22b (add several connections at once, optional `CreateEdges`) is not started. Remaining table items: WI-19 (presets), WI-19d (overlay), then 18b/18c, WI-21, WI-13. WI-12 stays optional.
+
+**Done**
+- `highlights.connection` list (max 2) on relationship types. Shared code generalised: `readHighlights` / `withHighlights` take a `HighlightList` (`'card' | 'connection'`); `normaliseHighlights`, `highlightRanks`, `toggledRanks`, `canHighlightMore` take a max (`maxHighlights(list)`); `summaryItems(..., 'connection')` reads the connection list; `Surface` gained `'connection'`. Backend `check_meta_shape` validates both lists (card max 3, connection max 2, same rules); a non-list `connection` is now rejected.
+- Relationship type editor: `settings/relationships` passes `highlights highlightList="connection"`; the schema editor takes `highlightList` (texts "Show on connection", "Shown on connections"); `schemaToItems` and `itemsToSchema` take a trailing list argument.
+- Item page: connection rows show the relationship label, the other item with its card highlights, and the connection's highlighted details (`node-summary`, `surface="connection"`). An "Edit connection" button opens a bits-ui dialog reusing `attributes-editor` over the relationship type's schema; Save uses `updateEdge` (the existing interceptor sends the ETag), maps server errors onto fields, shows the edit-conflict toast on 412, and is disabled while a detail-name problem exists. Removal is immediate with a 5-second Undo that re-creates the connection (new id, appended at the end); the inline confirmation is gone.
+- Tests: connection cases in `highlights.test.ts` (list read/write, max 2, summary, editor round trip), backend shape tests. Docs: `docs/DECISIONS.md`, `docs/field-types.md`, `frontend/DESIGN_GUIDELINES.md` section 17, open question 51 closed by default, one row added to the re-review table.
+
+**Left / deferred**
+- 22b (multi-select add, duplicate skipping, optional `CreateEdges`). The add-connection form still has no details section and still says "Relationship" (follow-up 4).
+- Not tried in a browser (no component tests, by decision): the pins on the relationship editor, the three-line rows, the edit dialog, the Undo.
+- The dialog's muted line uses the loaded items (500) to name the other item; nothing is shown if it was not loaded. Undo changes the connection's id and list position. Item pages still do not show connection details for items with no relationship-type schema.
+
+**Files touched:** backend `application/schema_meta.py`; test `test_schema_meta.py`. Frontend `lib/schema-meta.ts`, `lib/highlights.ts`, `components/schema-editor.svelte`, `routes/collection/[id]/+page.svelte`, `routes/settings/relationships/+page.svelte`; test `highlights.test.ts`. Docs as above.
+
+**Checks run:** `poe lint-backend` and `poe typecheck-backend` clean; `poe coverage` all targets met; `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 259 tests pass.
+
+**Next session must know**
+- Use `write` tools or script files for anything with backslashes or nested quotes: shell heredocs break on both.
+- Verify subagent edits with lint, typecheck and a grep.
 - The stray staged `frontend/src/lib/field-types/BooleanView.svelte` (index only) is still in `git status`.

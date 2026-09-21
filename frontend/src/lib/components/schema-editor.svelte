@@ -14,10 +14,11 @@
 		readSchemaMeta,
 		withHighlights,
 		withSchemaMeta,
+		type HighlightList,
 		type SchemaMeta
 	} from '$lib/schema-meta';
 	import { archiveField, restoreField } from '$lib/field-archive';
-	import { highlightRanks, normaliseHighlights } from '$lib/highlights';
+	import { highlightRanks, maxHighlights, normaliseHighlights } from '$lib/highlights';
 
 	export type EditorSection = {
 		_section: true;
@@ -32,11 +33,14 @@
 		return '_section' in item;
 	}
 
-	export function schemaToItems(schema: AttributesSchema | null): EditorItem[] {
+	export function schemaToItems(
+		schema: AttributesSchema | null,
+		list: HighlightList = 'card'
+	): EditorItem[] {
 		if (!schema) return [];
 		const required = new Set(readSchemaMeta(schema).required ?? []);
 		const layout = normalise(readSchemaMeta(schema).layout, schema.properties);
-		const ranks = highlightRanks(schema);
+		const ranks = highlightRanks(schema, list);
 		const load = (key: string): EditorField => {
 			const field = fieldFromProperty(key, schema.properties[key], required.has(key));
 			const rank = ranks.get(key);
@@ -71,7 +75,8 @@
 	export function itemsToSchema(
 		items: EditorItem[],
 		baseMeta: SchemaMeta,
-		archived: EditorField[] = []
+		archived: EditorField[] = [],
+		list: HighlightList = 'card'
 	): AttributesSchema | null {
 		// Resolve pending keys across the whole schema so they are unique globally.
 		// Archived fields are included so they keep occupying their keys.
@@ -131,7 +136,11 @@
 			layout,
 			required
 		});
-		return withHighlights(withMeta, normaliseHighlights(card, base.properties));
+		return withHighlights(
+			withMeta,
+			normaliseHighlights(card, base.properties, maxHighlights(list)),
+			list
+		);
 	}
 </script>
 
@@ -153,19 +162,24 @@
 	import { allowedKinds, changeKind, kindChangeWarning } from '$lib/field-types/kind-changes';
 	import { displayChoices, displayValue, setDisplayValue } from '$lib/field-types/display-options';
 	import { SCHEMA_TYPE_CONTEXT, type SchemaTypeContext } from '$lib/schema-type-context';
-	import { MAX_HIGHLIGHTS, canHighlightMore, movedRanks, toggledRanks } from '$lib/highlights';
+	import { canHighlightMore, movedRanks, toggledRanks } from '$lib/highlights';
 
 	let {
 		schema = $bindable<AttributesSchema | null>(null),
 		typeId,
 		typeKind = 'node',
-		highlights = false
+		highlights = false,
+		highlightList = 'card'
 	}: {
 		schema?: AttributesSchema | null;
 		typeId?: string;
 		typeKind?: 'node' | 'edge';
 		highlights?: boolean;
+		highlightList?: HighlightList;
 	} = $props();
+
+	let maxShown = $derived(maxHighlights(highlightList));
+	let onConnections = $derived(highlightList === 'connection');
 
 	setContext<SchemaTypeContext>(SCHEMA_TYPE_CONTEXT, {
 		get typeId() {
@@ -178,11 +192,11 @@
 
 	// Captured once so unknown root members survive round-trips.
 	const baseMeta = untrack(() => readSchemaMeta(schema));
-	let items = $state<EditorItem[]>(schemaToItems(schema));
+	let items = $state<EditorItem[]>(untrack(() => schemaToItems(schema, highlightList)));
 	let archived = $state<EditorField[]>(untrack(() => schemaToArchived(schema)));
 
 	$effect(() => {
-		schema = itemsToSchema(items, baseMeta, archived);
+		schema = itemsToSchema(items, baseMeta, archived, highlightList);
 	});
 
 	// Saved fields are archived rather than deleted so their data is kept.
@@ -221,7 +235,7 @@
 		const order = raw.filter((r): r is number => r !== undefined).sort((a, b) => a - b);
 		return raw.map((r) => (r === undefined ? undefined : order.indexOf(r) + 1));
 	});
-	let atHighlightLimit = $derived(!canHighlightMore(ranks));
+	let atHighlightLimit = $derived(!canHighlightMore(ranks, maxShown));
 	let highlightedFields = $derived(
 		flatFields
 			.map((field, index) => ({ field, index, rank: ranks[index] }))
@@ -243,7 +257,7 @@
 
 	function toggleHighlight(field: EditorField) {
 		const index = flatFields.findIndex((f) => f.key === field.key);
-		if (index !== -1) applyRanks(toggledRanks(ranks, index));
+		if (index !== -1) applyRanks(toggledRanks(ranks, index, maxShown));
 	}
 
 	function moveHighlight(index: number, direction: -1 | 1) {
@@ -545,13 +559,14 @@
 		</label>
 		{#if highlights && isHighlightableField(field)}
 			{@const pinned = field.highlight !== undefined}
+			{@const target = onConnections ? 'connection' : 'card'}
 			<Button
 				type="button"
 				variant="ghost"
 				size="icon"
 				aria-pressed={pinned}
-				aria-label={pinned ? 'Stop showing on card' : 'Show on card'}
-				title={pinned ? 'Stop showing on card' : 'Show on card'}
+				aria-label={pinned ? `Stop showing on ${target}` : `Show on ${target}`}
+				title={pinned ? `Stop showing on ${target}` : `Show on ${target}`}
 				disabled={!pinned && atHighlightLimit}
 				class={pinned ? 'text-primary' : 'text-muted-foreground'}
 				onclick={() => toggleHighlight(field)}
@@ -663,12 +678,16 @@
 	{#if highlights}
 		{#if atHighlightLimit}
 			<p class="text-xs text-muted-foreground">
-				You can show up to {MAX_HIGHLIGHTS} fields on a card.
+				{#if onConnections}
+					You can show up to {maxShown} details on a connection row.
+				{:else}
+					You can show up to {maxShown} fields on a card.
+				{/if}
 			</p>
 		{/if}
 		{#if highlightedFields.length > 0}
 			<div class="space-y-1">
-				<Label>Shown on cards</Label>
+				<Label>{onConnections ? 'Shown on connections' : 'Shown on cards'}</Label>
 				<ol class="space-y-0.5">
 					{#each highlightedFields as entry, position (entry.field.key)}
 						{@const label = entry.field.label || 'Untitled field'}

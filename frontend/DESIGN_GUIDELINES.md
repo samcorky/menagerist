@@ -566,6 +566,8 @@ Related item
 
 The graph is something the user _experiences_, never something they need to _understand_.
 
+**Connection details:** a relationship type may choose up to two of its fields to show on each connection row (for example a date and "Signed by"), on one muted single line under the other item's name. Tapping the row's edit button opens an "Edit connection" sheet with the same fields and widgets as an item. Removing a connection is undoable for 5 seconds instead of asking first (§14).
+
 ---
 
 ## 18. Smart Groups

@@ -2,7 +2,8 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { Pencil, Star, Trash2 } from '@lucide/svelte';
+	import { Pencil, Star, Trash2, X } from '@lucide/svelte';
+	import { Dialog } from 'bits-ui';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import {
 		createEdge,
@@ -13,6 +14,7 @@
 		listEdgeTypes,
 		listNodeTypes,
 		listNodes,
+		updateEdge,
 		updateNode,
 		type EdgeResponse,
 		type EdgeTypeResponse,
@@ -24,7 +26,7 @@
 	import { attributesToRows, rowsToAttributes, type AttributeRow } from '$lib/attribute-rows';
 	import AttributesEditor from '$lib/components/attributes-editor.svelte';
 	import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
-	import { readSchemaMeta } from '$lib/schema-meta';
+	import { archivedKeys, readSchemaMeta } from '$lib/schema-meta';
 	import { customDetailProblems, displayDetailValue, isDetailRow } from '$lib/custom-details';
 	import { normalise, isSectionItem } from '$lib/layout';
 	import { descriptorForProp } from '$lib/field-types';
@@ -81,7 +83,15 @@
 	let saving = $state(false);
 	let deletingNode = $state(false);
 	let confirmDeleteNode = $state(false);
-	let confirmDeleteEdgeId = $state<string | null>(null);
+
+	let editingEdge = $state<EdgeResponse | null>(null);
+	let editRows = $state<AttributeRow[]>([]);
+	let editErrors = $state<Record<string, string> | null>(null);
+	let savingEdge = $state(false);
+	let edgeSchema = $derived(editingEdge ? edgeTypeSchemaOf(editingEdge) : null);
+	let edgeBlocked = $derived(customDetailProblems(editRows, edgeSchema).blocking);
+	let editingOther = $derived(editingEdge ? nodesById.get(otherNodeId(editingEdge)) : undefined);
+	let editTrigger: HTMLElement | null = null;
 
 	let newEdgeType = $state('');
 	let newEdgeTargetId = $state('');
@@ -279,15 +289,96 @@
 		creatingEdge = false;
 	}
 
+	function edgeTypeSchemaOf(edge: EdgeResponse): AttributesSchema | null {
+		const schema = edgeTypesById.get(edge.type)?.attributes_schema as AttributesSchema | null;
+		return schema ?? null;
+	}
+
+	function isEdgeEditable(edge: EdgeResponse): boolean {
+		if (Object.keys(edge.attributes ?? {}).length > 0) return true;
+		const schema = edgeTypeSchemaOf(edge);
+		if (!schema) return false;
+		const archived = archivedKeys(schema);
+		return Object.keys(schema.properties).some((key) => !archived.has(key));
+	}
+
+	function openEditEdge(edge: EdgeResponse, trigger: HTMLElement) {
+		editTrigger = trigger;
+		editRows = attributesToRows(edge.attributes);
+		editErrors = null;
+		editingEdge = edge;
+	}
+
+	function closeEditEdge() {
+		editingEdge = null;
+	}
+
+	async function handleSaveEdge(event: SubmitEvent) {
+		event.preventDefault();
+		const edge = editingEdge;
+		if (!edge || savingEdge) return;
+		savingEdge = true;
+		editErrors = null;
+		const result = await updateEdge({
+			path: { edge_id: edge.id },
+			body: { attributes: rowsToAttributes(editRows, edgeSchema) }
+		});
+		if (result.response?.status === 412) {
+			toast.error('Edit conflict', {
+				description: 'This connection was edited elsewhere — refresh to see the latest version.'
+			});
+		} else if (result.error || !result.data) {
+			const fieldErrors =
+				(
+					result.error as {
+						errors?: Array<{ path?: string; message?: string; keyword?: string; value?: unknown }>;
+					} | null
+				)?.errors ?? [];
+			const placed = serverErrorsToFields(edgeSchema, fieldErrors);
+			if (Object.keys(placed).length) {
+				editErrors = placed;
+			}
+			const { title, description: desc } = networkAwareError(result);
+			toast.error(title, { description: desc });
+		} else {
+			const saved = result.data;
+			edges = edges.map((e) => (e.id === saved.id ? saved : e));
+			editingEdge = null;
+			toast.success('Saved');
+		}
+		savingEdge = false;
+	}
+
 	async function handleDeleteEdge(edge: EdgeResponse) {
-		confirmDeleteEdgeId = null;
 		edges = edges.filter((e) => e.id !== edge.id);
 		const result = await deleteEdge({ path: { edge_id: edge.id } });
 		if (result.error) {
 			edges = [...edges, edge];
 			const { title, description: desc } = networkAwareError(result);
 			toast.error(title, { description: desc });
+			return;
 		}
+		toast('Connection removed', {
+			action: { label: 'Undo', onClick: () => void recreateEdge(edge) },
+			duration: 5000
+		});
+	}
+
+	async function recreateEdge(edge: EdgeResponse) {
+		const result = await createEdge({
+			body: {
+				source_id: edge.source_id,
+				target_id: edge.target_id,
+				type: edge.type,
+				attributes: edge.attributes ?? {}
+			}
+		});
+		if (result.error || !result.data) {
+			const { title, description: desc } = networkAwareError(result);
+			toast.error(title, { description: desc });
+			return;
+		}
+		edges = [...edges, result.data];
 	}
 </script>
 
@@ -543,57 +634,59 @@
 											: (et.reverse_label ?? et.label)
 										: edge.type}
 									{@const other = nodesById.get(otherNodeId(edge))}
+									{@const rowSchema = edgeTypeSchemaOf(edge)}
 									<li class="flex items-center justify-between gap-2 rounded-lg border p-3">
-										<div class="min-w-0 space-y-1 text-sm">
-											<div>
-												<span class="font-medium">{relationLabel}</span>
+										<div class="min-w-0 flex-1 space-y-1 text-sm">
+											<div class="truncate font-medium">{relationLabel}</div>
+											<div class="flex min-w-0 items-center gap-2">
 												<a
 													href={resolve('/collection/[id]', { id: otherNodeId(edge) })}
-													class="ml-2 text-muted-foreground underline"
+													class="truncate text-muted-foreground underline"
 												>
 													{other?.name ?? 'View item'}
 												</a>
+												{#if other}
+													<NodeSummary
+														attributes={other.attributes}
+														schema={schemaOfType(other.type)}
+														surface="row"
+														size="sm"
+													/>
+												{/if}
 											</div>
-											{#if other}
-												<NodeSummary
-													attributes={other.attributes}
-													schema={schemaOfType(other.type)}
-													surface="row"
-													size="sm"
-												/>
+											{#if rowSchema}
+												<div class="truncate">
+													<NodeSummary
+														attributes={edge.attributes}
+														schema={rowSchema}
+														surface="connection"
+														size="sm"
+													/>
+												</div>
 											{/if}
 										</div>
-										{#if confirmDeleteEdgeId === edge.id}
-											<div class="flex shrink-0 items-center gap-1.5">
-												<span class="text-xs text-muted-foreground">Remove?</span>
+										<div class="flex shrink-0 items-center">
+											{#if isEdgeEditable(edge)}
 												<Button
 													type="button"
-													variant="outline"
-													size="sm"
-													onclick={() => (confirmDeleteEdgeId = null)}
+													variant="ghost"
+													size="icon"
+													onclick={(e) => openEditEdge(edge, e.currentTarget)}
+													aria-label="Edit connection"
 												>
-													Cancel
+													<Pencil class="size-4" />
 												</Button>
-												<Button
-													type="button"
-													variant="destructive"
-													size="sm"
-													onclick={() => handleDeleteEdge(edge)}
-												>
-													Remove
-												</Button>
-											</div>
-										{:else}
+											{/if}
 											<Button
 												type="button"
 												variant="ghost"
 												size="icon"
-												onclick={() => (confirmDeleteEdgeId = edge.id)}
+												onclick={() => handleDeleteEdge(edge)}
 												aria-label="Remove connection"
 											>
 												<Trash2 class="size-4" />
 											</Button>
-										{/if}
+										</div>
 									</li>
 								{/each}
 							</ul>
@@ -731,3 +824,56 @@
 		{/if}
 	</div>
 </main>
+
+<Dialog.Root
+	open={editingEdge !== null}
+	onOpenChange={(v) => {
+		if (!v) closeEditEdge();
+	}}
+>
+	<Dialog.Portal>
+		<Dialog.Overlay class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
+		<Dialog.Content
+			aria-label="Edit connection"
+			onCloseAutoFocus={(e) => {
+				e.preventDefault();
+				editTrigger?.focus();
+			}}
+			class="fixed right-0 bottom-0 left-0 z-50 max-h-[90dvh] overflow-y-auto rounded-t-2xl border-t bg-background p-6 shadow-xl sm:inset-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border"
+		>
+			<div class="mx-auto mb-5 h-1.5 w-12 rounded-full bg-muted sm:hidden"></div>
+			<div class="flex items-center justify-between">
+				<Dialog.Title class="text-lg font-semibold">Edit connection</Dialog.Title>
+				<button
+					type="button"
+					onclick={closeEditEdge}
+					class="rounded-md p-1 text-muted-foreground hover:text-foreground"
+					aria-label="Close"
+				>
+					<X class="size-4" />
+				</button>
+			</div>
+			{#if editingEdge}
+				{@const editType = edgeTypesById.get(editingEdge.type)}
+				{@const outgoing = editingEdge.source_id === nodeId}
+				<Dialog.Description class="mt-1 truncate text-sm text-muted-foreground">
+					{editType
+						? outgoing
+							? editType.label
+							: (editType.reverse_label ?? editType.label)
+						: editingEdge.type}
+					{editingOther?.name ?? ''}
+				</Dialog.Description>
+				<form class="mt-4 space-y-4" onsubmit={handleSaveEdge}>
+					<AttributesEditor bind:rows={editRows} schema={edgeSchema} serverErrors={editErrors} />
+					<div class="flex justify-end gap-2">
+						<Button type="button" variant="outline" onclick={closeEditEdge}>Cancel</Button>
+						<Button type="submit" disabled={savingEdge || edgeBlocked}>
+							{savingEdge ? 'Saving…' : 'Save'}
+						</Button>
+					</div>
+				</form>
+			{/if}
+		</Dialog.Content>
+	</Dialog.Portal>
+</Dialog.Root>
