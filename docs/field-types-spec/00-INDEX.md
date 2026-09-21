@@ -66,7 +66,7 @@ Integration tests are written alongside each item (see `testing-strategy.md`). `
 | [`wi-20-readable-field-keys.md`](wi-20-readable-field-keys.md) | Field keys become the slug of the title at creation and never change. | 7 KB |
 | [`wi-21-value-suggestions.md`](wi-21-value-suggestions.md) | Passive tips in Settings, type-ahead, and a connect-items command. | 11 KB |
 | [`wi-22-connection-details.md`](wi-22-connection-details.md) | Show and edit a connection's details; highlights on relationship types; multi-add. | 7 KB |
-| [`decisions.md`](decisions.md) | What the owner has decided, and what is only proposed. | (see file) |
+| [`decisions.md`](decisions.md) | What the owner has decided, what is only proposed, and a table of defaults taken without confirmation (for re-review). | (see file) |
 | [`example-node-type-schema.json`](example-node-type-schema.json) | Example item type schema using readable keys, `x-menagerist`, rows and tabs. Useful as a contract fixture. | small |
 
 ## Where the original sections went

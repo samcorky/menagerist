@@ -16,8 +16,8 @@ Update at the end of every session. Read this first.
 | WI-11 display options | done, committed (2668afd) | feature/initial-implementation | See "WI-11 session notes" below. |
 | WI-12 rank matching (optional) | todo | | |
 | WI-15 text constraints | done, committed (26fdaca) | feature/initial-implementation | See "WI-15 session notes" below. |
-| WI-16 highlighted fields | done, awaiting user review and commit | feature/initial-implementation | See "WI-16 session notes" below. |
-| WI-17 attribute search | todo | | |
+| WI-16 highlighted fields | done, committed (44c01dc) | feature/initial-implementation | See "WI-16 session notes" below. |
+| WI-17 attribute search | done, awaiting user review and commit | feature/initial-implementation | See "WI-17 session notes" below. |
 | WI-18 per-item custom fields | todo | | |
 | WI-19 presets | todo | | |
 | WI-19d per-item schema overlay | todo | | |
@@ -273,7 +273,7 @@ Update at the end of every session. Read this first.
 
 ## WI-16 session notes
 
-**Status:** implemented, all backend and frontend checks green, not committed. Next item: WI-17 (attribute search). WI-12 stays optional.
+**Status:** implemented, all backend and frontend checks green, committed as 44c01dc. Next item: WI-17 (attribute search). WI-12 stays optional.
 
 **Done**
 - Storage: `x-menagerist.highlights.card` (ordered `{key}` list, max 3). `schema-meta.ts` gained `readHighlights` and `withHighlights` (other highlight lists such as `connection` are kept; an empty list removes `highlights`).
@@ -298,3 +298,31 @@ Update at the end of every session. Read this first.
 - The subagent twice reported edits done that were not on disk in WI-15; this session it re-read files, but still verify with lint, typecheck and a grep.
 - Heredocs in this shell halve backslashes; use the file tools for patterns.
 - The stray staged `frontend/src/lib/field-types/BooleanView.svelte` (index only, not on disk) is still in `git status`.
+
+## WI-17 session notes
+
+**Status:** implemented, all backend and frontend checks green, not committed. Next item: WI-18 (per-item custom fields; 18a first). WI-12 stays optional.
+
+**Done**
+- Backend: `q` on the item list also matches every string and number inside `attributes` (group cells and undefined keys included; never key names, booleans or nulls). `search_excluded_keys(schema)` in `schema_meta.py` (archived, `search: false`, `NON_SEARCHABLE_KINDS = {rating}`). `NodeRepository.list` and `count` take `attribute_search_exclusions` (type slug to keys); SQLAlchemy adapter uses `jsonb_path_query` (`column_valued`) with one clause per type that has exclusions plus an unrestricted clause for other types and untyped items; in-memory adapter walks values with the same rules. `ListNodes` loads all item types (pages of 100) only when `q` is set.
+- Fixed the LIKE wildcard bug: `%`, `_` and backslash in `q` are escaped (name and description too).
+- OpenAPI description added to `q`; client regenerated (generated code is gitignored).
+- Frontend: descriptor `searchable?: boolean` (false for boolean and rating); `lib/search-context.ts` `matchContext`; the list and grid cards show "Matched in Director: Ridley Scott" while searching when the name and description did not match.
+- Tests: `test_attribute_search.py` (11 unit), five `@pytest.mark.integration` tests in `test_node_repository.py` (values, exclusions per type, name and description, LIKE wildcards and backslash, deleted nodes; `count` checked against `list` in every case), `search-context.test.ts` (7). Docs: `docs/DECISIONS.md`, `docs/field-types.md`, `frontend/DESIGN_GUIDELINES.md` section 8. Open questions 20 to 22 closed by default; 63 and 64 added.
+- Added a "Defaults taken without owner confirmation (for re-review)" table to `decisions.md` listing every default taken so far, plus open questions 63 to 65.
+
+**Left / deferred**
+- No editor control for `x-menagerist.search: false` (open question 63). Tags are not searched. Results are id-ordered, not by relevance.
+- Scan speed on thousands of items not measured (the spec says measure before deciding); a `search_text` column with `pg_trgm` can replace the scan without changing the port.
+- The non-searchable kind list is duplicated (`NON_SEARCHABLE_KINDS` backend, `searchable: false` frontend); keep in step when adding a kind.
+- The "Matched in" line has not been tried in a browser (no component tests, by decision). A match inside a table shows the table's title and the cell text only.
+- No API-level (router) test for the search; the use case and repository levels are covered.
+
+**Files touched:** backend `application/schema_meta.py`, `application/list_nodes.py`, `ports/node_repository.py`, `adapters/persistence/node_repository.py`, `adapters/persistence/in_memory_node_repository.py`, `adapters/api/node/router.py`; tests `application/test_attribute_search.py` (new), `adapters/persistence/test_node_repository.py`. Frontend `lib/search-context.ts` (new), `field-types/registry.ts`, `field-types/{boolean,rating}/*.ts`, `routes/collection/+page.svelte`; test `search-context.test.ts` (new). Docs as above, `00-INDEX.md`, `decisions.md`, `open-questions.md`.
+
+**Checks run:** `poe lint-backend` and `poe typecheck-backend` clean; `poe coverage` all targets met (application 100%, adapters 88%, integration tests included); `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing img-alt warnings); `poe test-frontend` 234 tests in 19 files pass.
+
+**Next session must know**
+- Shell heredocs halve backslashes; the LIKE escape character is written with the file tools and the integration test builds the backslash with `chr(92)`.
+- The `svelte-file-editor` agent is unreliable on tab-indented edits; verify with a grep and the checks.
+- The stray staged `frontend/src/lib/field-types/BooleanView.svelte` (index only) is still in `git status`.

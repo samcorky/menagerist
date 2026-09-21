@@ -14,6 +14,8 @@ NAMESPACE = "x-menagerist"
 _PROPERTY_BOOL_MEMBERS = ("archived", "search", "suggest")
 _PROPERTY_STR_MEMBERS = ("kind", "display")
 MAX_CARD_HIGHLIGHTS = 3
+# Kinds whose values are not free text (frontend descriptors: `searchable: false`).
+NON_SEARCHABLE_KINDS = frozenset({"rating"})
 
 
 def _meta(node: object) -> dict[str, Any]:
@@ -40,6 +42,27 @@ def archived_keys(schema: dict[str, Any]) -> set[str]:
     return {
         key for key, prop in properties.items() if _meta(prop).get("archived") is True
     }
+
+
+def search_excluded_keys(schema: dict[str, Any]) -> list[str]:
+    """Return top-level keys whose values attribute search must skip.
+
+    Archived fields (hidden from users), fields marked `search: false`, and
+    non-searchable kinds such as ratings.
+    """
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return []
+    excluded: list[str] = []
+    for key, prop in properties.items():
+        meta = _meta(prop)
+        if (
+            meta.get("archived") is True
+            or meta.get("search") is False
+            or meta.get("kind") in NON_SEARCHABLE_KINDS
+        ):
+            excluded.append(key)
+    return excluded
 
 
 def validation_schema(schema: dict[str, Any]) -> dict[str, Any]:

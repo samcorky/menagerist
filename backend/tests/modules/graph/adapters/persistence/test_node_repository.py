@@ -240,3 +240,107 @@ async def test_count_with_attribute_matches_an_exact_string_value(
     assert await repository.count_with_attribute("film", "s", value="Draft") == 2
     assert await repository.count_with_attribute("film", "s", value="1") == 0
     assert await repository.count_with_attribute("film", "s") == 4
+
+
+_BACKSLASH = chr(92)
+_EXCLUSIONS = {"film": ["old_note", "internal", "stars"]}
+
+
+async def _search_ids(
+    repository: SqlAlchemyNodeRepository,
+    q: str,
+    exclusions: dict[str, list[str]] | None = None,
+) -> list[uuid.UUID]:
+    listed = await repository.list(
+        after=None, limit=50, q=q, attribute_search_exclusions=exclusions
+    )
+    counted = await repository.count(q=q, attribute_search_exclusions=exclusions)
+    assert counted == len(listed), q
+    return [node.id for node in listed]
+
+
+async def test_search_matches_attribute_values_but_not_keys(
+    db_session: AsyncSession,
+) -> None:
+    """Strings, numbers and group cells match; key names, booleans and nulls do not."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    film = Node.create(
+        name="Alien",
+        type="film",
+        attributes={
+            "director": "Ridley Scott",
+            "year": 1979,
+            "seen": True,
+            "nothing": None,
+            "cast": [{"name": "Sigourney Weaver", "role": "Ripley"}],
+        },
+    )
+    await repository.add(film)
+
+    for q in ("scott", "1979", "ripley", "WEAVER"):
+        assert await _search_ids(repository, q) == [film.id], q
+    for q in ("director", "true", "seen", "nothing", "role", "null"):
+        assert await _search_ids(repository, q) == [], q
+
+
+async def test_search_exclusions_apply_only_to_their_type(
+    db_session: AsyncSession,
+) -> None:
+    """Excluded keys are skipped for that type; the same key elsewhere still matches."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    film = Node.create(
+        name="Alien",
+        type="film",
+        attributes={"old_note": "gooey", "internal": "secret", "stars": 5},
+    )
+    person = Node.create(name="Ripley", type="person", attributes={"old_note": "gooey"})
+    untyped = Node.create(name="Loose", attributes={"internal": "secret"})
+    for node in (film, person, untyped):
+        await repository.add(node)
+
+    assert await _search_ids(repository, "gooey", _EXCLUSIONS) == [person.id]
+    assert await _search_ids(repository, "secret", _EXCLUSIONS) == [untyped.id]
+    assert await _search_ids(repository, "5", _EXCLUSIONS) == []
+    assert sorted(await _search_ids(repository, "gooey")) == sorted(
+        [film.id, person.id]
+    )
+
+
+async def test_search_still_matches_name_and_description(
+    db_session: AsyncSession,
+) -> None:
+    """A type with exclusions can still be found by name and description."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    film = Node.create(name="Alien", type="film", description="a xenomorph")
+    await repository.add(film)
+
+    assert await _search_ids(repository, "alien", _EXCLUSIONS) == [film.id]
+    assert await _search_ids(repository, "xeno", _EXCLUSIONS) == [film.id]
+
+
+async def test_search_treats_like_wildcards_and_backslash_literally(
+    db_session: AsyncSession,
+) -> None:
+    """`%`, `_` and the escape character in the query match only themselves."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    pct = Node.create(name="100% sure")
+    under = Node.create(name="a_b")
+    slash = Node.create(name="x", attributes={"path": "c:" + _BACKSLASH + "temp"})
+    plain = Node.create(name="Plain")
+    for node in (pct, under, slash, plain):
+        await repository.add(node)
+
+    assert await _search_ids(repository, "%") == [pct.id]
+    assert await _search_ids(repository, "_") == [under.id]
+    assert await _search_ids(repository, _BACKSLASH) == [slash.id]
+    assert await _search_ids(repository, _BACKSLASH + "temp") == [slash.id]
+
+
+async def test_search_ignores_deleted_nodes(db_session: AsyncSession) -> None:
+    """Soft-deleted nodes never match."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    node = Node.create(name="Gone", attributes={"note": "findme"})
+    node.deleted_at = node.created_at
+    await repository.add(node)
+
+    assert await _search_ids(repository, "findme") == []

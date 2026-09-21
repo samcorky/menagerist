@@ -32,6 +32,8 @@ export type FieldTypeDescriptor = {
 	 * type), or null to fall back to the validator's own message. Used for client and server errors.
 	 */
 	formatError?: (keyword: string, value: unknown) => string | null;
+	/** Whether attribute search reads values of this type. Defaults to true. */
+	searchable?: boolean;
 	/** Whether a field of this type may be shown on cards. Defaults to false. */
 	highlightable?: boolean;
 	/** Plain text for a highlighted value; null skips it. Defaults to `String(value)`. */

@@ -24,9 +24,9 @@
 17. **Closed:** no permission check on the purge for now; record the gap in DECISIONS (decided).
 18. **Closed (WI-16):** defaults kept: 3 highlighted fields; grid 2, list 3, picker 1, row 2; no per-surface lists yet (not confirmed by the owner). Was: are 3 highlighted fields and the per-surface counts (grid 2, list 3, picker 1, relationship row 2) right, and should explicit per-surface lists exist from the start or only when someone needs them?
 19. **Closed:** relationship types get their own `highlights.connection` list, and connection details are shown and edited on the item page (WI-22).
-20. WI-17: should tags be searched too? They are not today, and this change touches the same query.
-21. WI-17: should numbers be searchable by default (a year or price is, a rating is not)? Confirm boolean and rating as the only non-searchable kinds.
-22. WI-17: is id-ordered search acceptable for v1, given relevance ranking would need a different pagination cursor?
+20. **Closed (WI-17, default, not confirmed):** tags are not searched. Was: should tags be searched too? They are not today, and this change touches the same query.
+21. **Closed (WI-17, default, not confirmed):** numbers are searched except ratings; yes/no and rating are the only non-searchable kinds. Was: should numbers be searchable by default (a year or price is, a rating is not)? Confirm boolean and rating as the only non-searchable kinds.
+22. **Closed (WI-17, default, not confirmed):** results stay in id order. Was: is id-ordered search acceptable for v1, given relevance ranking would need a different pagination cursor?
 23. **Closed:** typed per-item fields use the WI-19d overlay (decided).
 24. WI-18: limits for custom details (proposal: 100-character names, 50 per node). Right numbers, and should they apply to schema-defined keys as well?
 25. **Closed:** "create an item type from these details" is out of v1.
@@ -67,3 +67,6 @@
 60. WI-15: should a new constraint on a saved text field warn with the number of items whose value would fail it (as removing a choice option does)? It needs a query that evaluates the pattern over stored values. Default: no; stale values never block other edits.
 61. WI-15: should the attributes form show a rule's helper text always (as now) or only while the field is focused or empty? Default: always shown until there is an error.
 62. WI-16: add a live card preview at the top of the schema editor, using sample values (deferred, optional in the spec)?
+63. WI-17: should `x-menagerist.search: false` get an editor control (a per-field "Include in search" option behind a "More options" section, guidelines-compliance row 12)? Default: no editor control yet; the API and both search paths honour it.
+64. WI-17: where should the "Matched in ..." line show? Default: on the list card and the grid card, one truncated line each, only while a search is active and the name and description did not match.
+65. WI-16: when a highlighted field's kind changes to a non-highlightable one, should the editor say so? Default: it drops silently (the pin is hidden for those kinds).

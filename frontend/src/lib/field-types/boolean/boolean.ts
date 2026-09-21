@@ -8,6 +8,7 @@ register({
 	label: 'Yes/No',
 	canBeSubField: true,
 	highlightable: true,
+	searchable: false,
 	displayOptions: [
 		{
 			key: 'display',

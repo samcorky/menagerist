@@ -1,7 +1,19 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
-from sqlalchemy import func, select, update
+from sqlalchemy import (
+    ARRAY,
+    Text,
+    and_,
+    bindparam,
+    exists,
+    func,
+    literal,
+    literal_column,
+    or_,
+    select,
+    update,
+)
 
 from app.modules.graph.adapters.persistence.models import NodeModel
 from app.modules.graph.domain.node import Node
@@ -9,7 +21,9 @@ from app.modules.graph.domain.node import Node
 if TYPE_CHECKING:
     import builtins
     import uuid
+    from collections.abc import Mapping, Sequence
 
+    from sqlalchemy import ColumnElement, SQLColumnExpression
     from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
@@ -44,6 +58,65 @@ def _to_model(node: Node) -> NodeModel:
         created_at=node.created_at,
         updated_at=node.updated_at,
         deleted_at=node.deleted_at,
+    )
+
+
+_LIKE_ESCAPE = "\\"
+
+
+def _like_pattern(q: str) -> str:
+    """Return a contains-pattern for `q` with LIKE wildcards escaped."""
+    escaped = q.replace(_LIKE_ESCAPE, _LIKE_ESCAPE * 2)
+    escaped = escaped.replace("%", _LIKE_ESCAPE + "%").replace("_", _LIKE_ESCAPE + "_")
+    return f"%{escaped}%"
+
+
+def _has_matching_value(
+    attributes: SQLColumnExpression[Any], pattern: str
+) -> ColumnElement[bool]:
+    """Whether any string or number anywhere inside `attributes` matches `pattern`.
+
+    Walks every nested value; key names, booleans and nulls never match.
+    """
+    value = func.jsonb_path_query(
+        attributes, literal_column("'strict $.**'")
+    ).column_valued("v")
+    text_value = value.op("#>>")(literal_column("'{}'"))
+    return exists(
+        select(literal(1)).where(
+            func.jsonb_typeof(value).in_(("string", "number")),
+            text_value.ilike(pattern, escape=_LIKE_ESCAPE),
+        )
+    )
+
+
+def _search_clause(
+    q: str, exclusions: Mapping[str, Sequence[str]] | None
+) -> ColumnElement[bool]:
+    """Match `q` against name, description and attribute values, per type exclusions."""
+    pattern = _like_pattern(q)
+    attributes = NodeModel.attributes
+    excluded = {slug: list(keys) for slug, keys in (exclusions or {}).items() if keys}
+    scans = [
+        and_(
+            NodeModel.type == slug,
+            _has_matching_value(
+                attributes.op("-")(bindparam(f"excl_{i}", keys, type_=ARRAY(Text))),
+                pattern,
+            ),
+        )
+        for i, (slug, keys) in enumerate(excluded.items())
+    ]
+    unrestricted = _has_matching_value(attributes, pattern)
+    if excluded:
+        unrestricted = and_(
+            or_(NodeModel.type.is_(None), NodeModel.type.not_in(list(excluded))),
+            unrestricted,
+        )
+    return (
+        NodeModel.name.ilike(pattern, escape=_LIKE_ESCAPE)
+        | NodeModel.description.ilike(pattern, escape=_LIKE_ESCAPE)
+        | or_(*scans, unrestricted)
     )
 
 
@@ -86,6 +159,7 @@ class SqlAlchemyNodeRepository:
         type: str | None = None,
         q: str | None = None,
         favourite: bool | None = None,
+        attribute_search_exclusions: Mapping[str, Sequence[str]] | None = None,
     ) -> list[Node]:
         """List non-deleted node ordered by id, starting after `after` if given."""
         logger.debug("listing nodes", after=after, limit=limit, type=type)
@@ -100,10 +174,7 @@ class SqlAlchemyNodeRepository:
         if after is not None:
             stmt = stmt.where(NodeModel.id > after)
         if q is not None:
-            pattern = f"%{q}%"
-            stmt = stmt.where(
-                NodeModel.name.ilike(pattern) | NodeModel.description.ilike(pattern)
-            )
+            stmt = stmt.where(_search_clause(q, attribute_search_exclusions))
         if favourite is not None:
             stmt = stmt.where(NodeModel.favourite == favourite)
         result = await self._session.execute(stmt)
@@ -115,6 +186,7 @@ class SqlAlchemyNodeRepository:
         type: str | None = None,
         q: str | None = None,
         favourite: bool | None = None,
+        attribute_search_exclusions: Mapping[str, Sequence[str]] | None = None,
     ) -> int:
         """Return the total number of non-deleted nodes matching the given filters."""
         logger.debug("counting nodes", type=type)
@@ -126,10 +198,7 @@ class SqlAlchemyNodeRepository:
         if type is not None:
             stmt = stmt.where(NodeModel.type == type)
         if q is not None:
-            pattern = f"%{q}%"
-            stmt = stmt.where(
-                NodeModel.name.ilike(pattern) | NodeModel.description.ilike(pattern)
-            )
+            stmt = stmt.where(_search_clause(q, attribute_search_exclusions))
         if favourite is not None:
             stmt = stmt.where(NodeModel.favourite == favourite)
         result = await self._session.execute(stmt)

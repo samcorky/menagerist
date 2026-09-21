@@ -1,10 +1,38 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import builtins
     import uuid
+    from collections.abc import Iterator, Mapping, Sequence
 
     from app.modules.graph.domain.node import Node
+
+
+def _scalar_values(value: Any) -> Iterator[str]:  # noqa: ANN401
+    """Yield every string and number inside `value`; never keys, booleans or nulls."""
+    if isinstance(value, dict):
+        for inner in value.values():
+            yield from _scalar_values(inner)
+    elif isinstance(value, list):
+        for inner in value:
+            yield from _scalar_values(inner)
+    elif isinstance(value, str):
+        yield value
+    elif isinstance(value, (int, float)) and not isinstance(value, bool):
+        yield str(value)
+
+
+def _matches(
+    node: Node,
+    needle: str,
+    exclusions: Mapping[str, Sequence[str]] | None,
+) -> bool:
+    """Whether `needle` (already casefolded) is found in the node's searchable text."""
+    if needle in node.name.casefold() or needle in (node.description or "").casefold():
+        return True
+    skipped = (exclusions or {}).get(node.type, ()) if node.type else ()
+    attributes = {k: v for k, v in node.attributes.items() if k not in skipped}
+    return any(needle in text.casefold() for text in _scalar_values(attributes))
 
 
 class InMemoryNodeRepository:
@@ -36,6 +64,7 @@ class InMemoryNodeRepository:
         type: str | None = None,
         q: str | None = None,
         favourite: bool | None = None,
+        attribute_search_exclusions: Mapping[str, Sequence[str]] | None = None,
     ) -> list[Node]:
         """List non-deleted node ordered by id, starting after `after` if given."""
         ordered = sorted(
@@ -51,8 +80,7 @@ class InMemoryNodeRepository:
             ordered = [
                 node
                 for node in ordered
-                if needle in node.name.casefold()
-                or needle in (node.description or "").casefold()
+                if _matches(node, needle, attribute_search_exclusions)
             ]
         if favourite is not None:
             ordered = [node for node in ordered if node.favourite == favourite]
@@ -64,6 +92,7 @@ class InMemoryNodeRepository:
         type: str | None = None,
         q: str | None = None,
         favourite: bool | None = None,
+        attribute_search_exclusions: Mapping[str, Sequence[str]] | None = None,
     ) -> int:
         """Return the total number of non-deleted nodes matching the given filters."""
         nodes = [n for n in self._nodes.values() if not n.is_deleted]
@@ -72,10 +101,7 @@ class InMemoryNodeRepository:
         if q is not None:
             needle = q.casefold()
             nodes = [
-                n
-                for n in nodes
-                if needle in n.name.casefold()
-                or needle in (n.description or "").casefold()
+                n for n in nodes if _matches(n, needle, attribute_search_exclusions)
             ]
         if favourite is not None:
             nodes = [n for n in nodes if n.favourite == favourite]

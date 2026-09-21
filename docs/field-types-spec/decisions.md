@@ -70,3 +70,35 @@
 48. **Closed:** no developer view of field keys and no "Change key" in v1 (decided).
 49. **Closed:** accept that a search can match a latitude for v1 (decided).
 50. **Closed:** include the "Use my current location" button (hidden when unavailable) and an OpenStreetMap "Open in map" link; a `geo:` link later (decided).
+
+## Defaults taken without owner confirmation (for re-review)
+
+Everything below was implemented on a default while working through the spec. None is confirmed by the owner. Change a row here, in `open-questions.md` and in `docs/DECISIONS.md` together. "Q" numbers refer to `open-questions.md`.
+
+| Area | Default taken | Q | Session |
+|---|---|---|---|
+| Opaque fields | Only the title is editable; a visible "custom" badge marks them | Q4, Q53 | WI-4 |
+| Group boolean cells | An untouched boolean cell stays `false` | Q54 | WI-2 |
+| Metadata version | `x-menagerist.version` starts at 1 | Q5 | WI-14 |
+| Old-format schemas | No migration; layout, long-text and required markers are lost until re-saved | Q56 | WI-14 |
+| Rating colour | Fixed amber, not the theme accent | Q6 | WI-5 |
+| Required marker | Always-on red asterisk; no "recommended" style or missing-information group yet | Q58 | WI-6 |
+| Restoring a field | Returns at the end of the layout, not its old position (Undo restores exactly) | Q2, Q59 | WI-8 |
+| Purge | Takes effect immediately even if the form is then cancelled; no permission check | Q17 | WI-9 |
+| Kind changes | Matrix in code (widen only); text to choice deferred to WI-21; "Replace" wording not reviewed | Q55 | WI-10 |
+| Boolean default | Switch instead of checkbox, so existing boolean fields look different | | WI-11 |
+| Sub-field display | Group sub-fields have no "Show as" control | | WI-11 |
+| Rank matching | WI-12 skipped: explicit `kind` makes it largely redundant | Q7 | WI-11 |
+| Text constraints | Case-sensitive only; no free-form regex, no min/max length | Q12, Q13 | WI-15 |
+| Contract fixtures | Live in `contract/fixtures/` at the repo root; CI path filters not checked | Q14 | WI-15 |
+| Constraint warning | No "N items would fail this new constraint" count | Q60 | WI-15 |
+| Constraint helper text | Shown under the field until an error replaces it | Q61 | WI-15 |
+| Kind switch on text | Text to long text drops the constraints | | WI-15 |
+| Highlight counts | 3 per type; grid 2, list 3, picker 1, connection row 2; no per-surface lists | Q18 | WI-16 |
+| Live card preview | Deferred | Q62 | WI-16 |
+| Highlight on kind change | Dropped silently, no editor note | Q65 | WI-16 |
+| Attribute search | Tags not searched (Q20); numbers searched except rating (Q21); id-ordered results (Q22) | Q20 to Q22 | WI-17 |
+| Search opt-out | `search: false` honoured by the API, no editor control | Q63 | WI-17 |
+| Match context | "Matched in ..." shown on list and grid cards while searching | Q64 | WI-17 |
+
+Also still proposed rather than confirmed (see the section above): connection details (WI-22), no free-form regex in v1, presets defaults (Q30 to Q32), the OpenStreetMap provider, and every other defaulted question in `open-questions.md`.

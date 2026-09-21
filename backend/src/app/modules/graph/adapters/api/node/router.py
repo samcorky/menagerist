@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -37,6 +37,11 @@ from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ValidationError
 
 router = APIRouter(prefix="/node", tags=["Nodes"], route_class=PermissionAwareRoute)
+
+_Q_DESCRIPTION = "Search text, matched case-insensitively."
+_Q_DESCRIPTION += " Looks in the name, the description and every text or number"
+_Q_DESCRIPTION += " value in the item's details. Field names, yes/no values, ratings,"
+_Q_DESCRIPTION += " removed fields and fields excluded from search are not searched."
 
 
 @router.post(
@@ -95,7 +100,7 @@ async def list_nodes(
     after: uuid.UUID | None = None,
     limit: int = 50,
     type: str | None = None,
-    q: str | None = None,
+    q: Annotated[str | None, Query(description=_Q_DESCRIPTION)] = None,
     favourite: bool | None = None,
 ) -> list[NodeResponse]:
     """List node, paginated by id."""

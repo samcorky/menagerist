@@ -317,6 +317,8 @@ keanu reeves
 recently added
 ```
 
+**What is searched:** The item's name and description and every text or number in its details, not only the fields shown on cards. When an item matches on a detail that its card does not show, the card says why in one muted line ("Matched in Director: Ridley Scott"), so a result never looks unrelated.
+
 **Result grouping:** Distinguish result kinds where useful (Items, People, Collections, Tags, other relevant entities) — but label them in plain language, not by their internal type.
 
 Search should remain useful even when the user doesn't know exactly what they're looking for (i.e., it should degrade gracefully to browsable/fuzzy results, not "no results found").

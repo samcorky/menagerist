@@ -12,6 +12,7 @@ register({
 	label: 'Rating',
 	canBeSubField: true,
 	highlightable: true,
+	searchable: false,
 	displayOptions: [
 		{
 			key: 'stars',

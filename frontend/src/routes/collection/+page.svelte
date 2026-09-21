@@ -21,6 +21,7 @@
 	import NodeCover from '$lib/components/node-cover.svelte';
 	import NodeSummary from '$lib/components/node-summary.svelte';
 	import type { AttributesSchema } from '$lib/schema-types';
+	import { matchContext } from '$lib/search-context';
 
 	const PAGE_SIZE = 50;
 	const loadingSkeletons = [1, 2, 3, 4, 5];
@@ -317,6 +318,17 @@
 										size="sm"
 									/>
 								</div>
+								{#if q}
+									{@const match = matchContext(item, schemaOf(item.type), q)}
+									{#if match}
+										<p
+											class="mt-1 truncate text-xs text-muted-foreground"
+											title="Matched in {match.label}: {match.text}"
+										>
+											Matched in {match.label}: {match.text}
+										</p>
+									{/if}
+								{/if}
 							</div>
 						</div>
 					</a>
@@ -339,6 +351,17 @@
 										surface="list"
 										size="sm"
 									/>
+									{#if q}
+										{@const match = matchContext(item, schemaOf(item.type), q)}
+										{#if match}
+											<p
+												class="truncate text-xs text-muted-foreground"
+												title="Matched in {match.label}: {match.text}"
+											>
+												Matched in {match.label}: {match.text}
+											</p>
+										{/if}
+									{/if}
 								</div>
 								{#if item.type}
 									{@const catLabel = allCategories.find((c) => c.slug === item.type)?.label}

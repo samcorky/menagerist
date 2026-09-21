@@ -225,3 +225,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** Highlights belong to the type, so every user and item of a type sees the same cards. Deriving the picker and connection rows from the same list avoids per-surface configuration until someone needs it, and keeping the cover and title dominant (guidelines §3.2) explains the lower grid count. Empty values are skipped rather than shown as blanks. Ranks live on the editor field, so reordering survives edits to the field and fields whose key is still pending.
 
 **Tradeoff:** A field that stops being highlightable (its kind changes, or it is archived) silently leaves the list. Other highlight lists, such as the connection details planned for relationship types, are preserved but not validated yet. There is no live card preview in the editor (deferred).
+
+---
+
+## Search reads every text and number value in an item's details
+
+**Decision:** `q` on the item list matches the name, the description and any string or number anywhere inside `attributes` (including table cells and details the type does not define), case-insensitively, as a substring. It never matches field names, booleans or nulls. Per item type it skips archived fields, fields with `x-menagerist.search: false`, and ratings (`search_excluded_keys` in `schema_meta.py`; the frontend descriptors carry `searchable: false` for rating and yes/no). Untyped items are scanned in full. The repository `list` and `count` take an optional `attribute_search_exclusions` (type slug to keys); `ListNodes` builds it from all item types when `q` is set. The query walks the values with `jsonb_path_query` and one clause per type that has exclusions; keys and the pattern are bind parameters. `%`, `_` and the escape character in `q` are now escaped, for the name and description match too. The API is unchanged apart from the description of `q`. The cards show "Matched in Director: Ridley Scott" when the match is not in the name or description (`matchContext`).
+
+**Rationale:** Highlights (WI-16) are display only, so what can be found must not depend on what is shown on a card. Excluding archived fields stops an item matching on a value the user can no longer see. Scanning at query time needs no index to keep in step with schema changes; a maintained search column can replace it later without changing the port.
+
+**Tradeoff:** The scan is sequential, so very large collections may need an index (not measured yet). Results stay in id order, not by relevance. Tags are not searched. The set of non-searchable kinds is a constant on both sides (`NON_SEARCHABLE_KINDS`, `searchable: false`) and must be kept in step. There is no editor control for `search: false` yet.
