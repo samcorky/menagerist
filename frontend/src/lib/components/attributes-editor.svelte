@@ -1,5 +1,6 @@
 <script lang="ts" module>
 	import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
+	import { readSchemaMeta } from '$lib/schema-meta';
 
 	export type GroupRow = Record<string, string>;
 	export type AttributeRow = { key: string; value: string | GroupRow[] };
@@ -125,7 +126,9 @@
 		return errors;
 	});
 
-	let schemaLayout = $derived(schema ? normalise(schema['x-layout'], schema.properties) : []);
+	let schemaMeta = $derived(schema ? readSchemaMeta(schema) : null);
+	let requiredKeys = $derived(schemaMeta?.required ?? []);
+	let schemaLayout = $derived(schema ? normalise(schemaMeta?.layout, schema.properties) : []);
 	let schemaKeys = $derived(orderedKeys(schemaLayout));
 	let freeformRows = $derived(rows.filter((r) => !schemaKeys.includes(r.key)));
 
@@ -152,7 +155,7 @@
 </script>
 
 {#snippet fieldEntry(key: string, prop: JsonSchemaProperty)}
-	{@const isRequired = schema?.required?.includes(key) ?? false}
+	{@const isRequired = requiredKeys.includes(key)}
 	{@const error = fieldErrors[key]}
 	{@const desc = descriptorForProp(prop)}
 	{@const Widget = desc?.InputWidget}

@@ -115,3 +115,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** Falling back to `text` silently dropped keywords such as `format` on the next save. Keeping the raw property makes open-edit-save lossless for schemas written through the API.
 
 **Related:** an untouched boolean cell in a group row saves as `false`, because a checkbox has no unset state; blank number, date and choice cells are omitted, while blank text stays `''`.
+
+---
+
+## One `x-menagerist` namespace for non-validation schema metadata
+
+**Decision:** Layout, advisory `required`, an explicit field `kind`, display hints and archived flags live under a single `x-menagerist` member (root and per property), read and written through one accessor module per side (`schema-meta.ts`, `schema_meta.py`). `x-multiline`, `x-layout` and the root `required` array are replaced with no migration and no legacy reader. The backend strips the root `required` array and archived properties before validating attributes.
+
+**Rationale:** Flat vendor keywords scattered metadata across the schema, made a field's identity depend on guessing from its shape, and had no version marker. One namespace with an explicit `kind` gives a direct registry lookup, a place to version the format, and a clear test: removing `x-menagerist` must not change validity (apart from the two advisory exceptions above, which enforce that `required` never blocks a save).
+
+**Tradeoff:** Item types saved in the old format lose their layout, long-text rendering and required markers until they are re-saved. Accepted: no stored attribute data is affected and the app has no external users yet.

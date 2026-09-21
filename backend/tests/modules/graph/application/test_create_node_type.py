@@ -100,3 +100,19 @@ async def test_create_node_type_raises_on_slug_conflict() -> None:
             CreateNodeTypeCommand(slug="film", label="Duplicate"),
             SYSTEM_ACTOR,
         )
+
+
+async def test_create_node_type_raises_on_malformed_metadata() -> None:
+    """CreateNodeType rejects a wrongly typed `x-menagerist` member."""
+    uow, _ = _make_uow()
+    use_case = CreateNodeType(uow)
+
+    with pytest.raises(InvalidSchemaError):
+        await use_case.handle(
+            CreateNodeTypeCommand(
+                slug="film",
+                label="Film",
+                attributes_schema={"type": "object", "x-menagerist": {"layout": {}}},
+            ),
+            SYSTEM_ACTOR,
+        )

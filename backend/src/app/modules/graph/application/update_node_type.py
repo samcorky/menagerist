@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 import jsonschema
 import structlog
 
+from app.modules.graph.application.schema_meta import check_meta_shape
 from app.modules.graph.domain.errors import InvalidSchemaError, NodeTypeNotFoundError
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
@@ -38,6 +39,7 @@ class UpdateNodeType(CommandHandler[GraphUnitOfWork, UpdateNodeTypeCommand, Node
                 ).check_schema(command.attributes_schema)
             except jsonschema.SchemaError as exc:
                 raise InvalidSchemaError(str(exc.message)) from exc
+            check_meta_shape(command.attributes_schema)
         async with self._uow as repos:
             node_type = await repos.node_types.get(command.node_type_id)
             if node_type is None:

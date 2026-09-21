@@ -59,4 +59,5 @@
 52. WI-22b: when creating people inline in a multi-add, which type do they get (untyped, or the type the picker is filtered to)? And is a single `CreateEdges` command wanted, or is calling `POST /edge` several times acceptable for v1?
 53. WI-4: should `opaque` fields be editable beyond the title (for example a "Convert to text" action that drops the unknown keywords), or stay read-only apart from the title until WI-14 defines unknown kinds? Default: title only.
 54. WI-2: should an untouched boolean cell in a group row stay `false` (current, no unset state) or be omitted? Default: `false`, recorded in `docs/DECISIONS.md`.
-
+55. WI-14: should changing a field's kind in the schema editor clear its `display` and `config` metadata? Default: keep it until WI-10 defines which kind changes are offered.
+56. WI-14: old-format item types lose layout, long-text rendering and required markers until re-saved. Default (decided in the spec): no migration; say so in release notes if the app has users by then.

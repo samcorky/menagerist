@@ -1,7 +1,7 @@
-import type { XLayout } from '$lib/layout';
+import type { PropertyMeta, SchemaMeta } from '$lib/schema-meta';
 
-export type JsonSchemaProperty =
-	| { title: string; type: 'string'; 'x-multiline'?: true }
+type JsonSchemaPropertyBase =
+	| { title: string; type: 'string' }
 	| { title: string; type: 'string'; format: 'date' }
 	| { title: string; type: 'string'; enum: string[] }
 	| { title: string; type: 'number' }
@@ -12,18 +12,20 @@ export type JsonSchemaProperty =
 			items: { type: 'object'; properties: Record<string, JsonSchemaProperty> };
 	  };
 
+export type JsonSchemaProperty = JsonSchemaPropertyBase & { 'x-menagerist'?: PropertyMeta };
+
 export type AttributesSchema = {
 	$schema: 'https://json-schema.org/draft/2020-12/schema';
 	type: 'object';
 	properties: Record<string, JsonSchemaProperty>;
-	required?: string[];
-	'x-layout'?: XLayout;
+	'x-menagerist'?: SchemaMeta;
 };
 
 export type EditorSubField = {
 	key: string;
 	label: string;
 	kind: string;
+	meta?: PropertyMeta;
 	/** Original property for the `opaque` kind, written back unchanged on save. */
 	raw?: Record<string, unknown>;
 };
@@ -35,6 +37,8 @@ export type EditorField = {
 	required: boolean;
 	options: string[];
 	subFields: EditorSubField[];
+	/** Metadata members carried through unchanged (display, archived, unknown members). */
+	meta?: PropertyMeta;
 	/** Original property for the `opaque` kind, written back unchanged on save. */
 	raw?: Record<string, unknown>;
 };

@@ -1,7 +1,13 @@
 <script lang="ts" module>
 	import { normalise, isSectionItem, type XLayout } from '$lib/layout';
 	import type { JsonSchemaProperty, AttributesSchema, EditorField } from '$lib/schema-types';
-	import { allDescriptors, getDescriptor } from '$lib/field-types';
+	import {
+		allDescriptors,
+		getDescriptor,
+		fieldFromProperty,
+		propertyFromField
+	} from '$lib/field-types';
+	import { META_VERSION, readSchemaMeta, withSchemaMeta, type SchemaMeta } from '$lib/schema-meta';
 
 	type EditorSection = {
 		_section: true;
@@ -16,32 +22,10 @@
 		return '_section' in item;
 	}
 
-	function propertyToField(key: string, prop: JsonSchemaProperty, required: boolean): EditorField {
-		for (const desc of allDescriptors()) {
-			const field = desc.fromSchema(key, prop, required);
-			if (field) return field;
-		}
-		return {
-			key,
-			label: prop.title,
-			kind: 'opaque',
-			required,
-			options: [],
-			subFields: [],
-			raw: prop as Record<string, unknown>
-		};
-	}
-
-	function fieldToProperty(f: EditorField): JsonSchemaProperty {
-		const desc = getDescriptor(f.kind);
-		if (desc) return desc.toSchema(f);
-		return { title: f.label, type: 'string' };
-	}
-
 	function schemaToItems(schema: AttributesSchema | null): EditorItem[] {
 		if (!schema) return [];
-		const required = new Set(schema.required ?? []);
-		const layout = normalise(schema['x-layout'], schema.properties);
+		const required = new Set(readSchemaMeta(schema).required ?? []);
+		const layout = normalise(readSchemaMeta(schema).layout, schema.properties);
 		return layout.flatMap((layoutItem): EditorItem[] => {
 			if (isSectionItem(layoutItem)) {
 				return [
@@ -51,13 +35,13 @@
 						sectionLabel: layoutItem.section,
 						fields: layoutItem.items
 							.filter((i) => i.key in schema.properties)
-							.map((i) => propertyToField(i.key, schema.properties[i.key], required.has(i.key)))
+							.map((i) => fieldFromProperty(i.key, schema.properties[i.key], required.has(i.key)))
 					}
 				];
 			}
 			if (!(layoutItem.key in schema.properties)) return [];
 			return [
-				propertyToField(
+				fieldFromProperty(
 					layoutItem.key,
 					schema.properties[layoutItem.key],
 					required.has(layoutItem.key)
@@ -66,7 +50,7 @@
 		});
 	}
 
-	function itemsToSchema(items: EditorItem[]): AttributesSchema | null {
+	function itemsToSchema(items: EditorItem[], baseMeta: SchemaMeta): AttributesSchema | null {
 		const properties: Record<string, JsonSchemaProperty> = {};
 		const required: string[] = [];
 		const layout: XLayout = [];
@@ -76,7 +60,7 @@
 				const sectionLayout: { key: string }[] = [];
 				for (const f of item.fields) {
 					if (!f.key) continue;
-					properties[f.key] = fieldToProperty(f);
+					properties[f.key] = propertyFromField(f);
 					if (f.required) required.push(f.key);
 					sectionLayout.push({ key: f.key });
 				}
@@ -89,24 +73,24 @@
 				}
 			} else {
 				if (!item.key) continue;
-				properties[item.key] = fieldToProperty(item);
+				properties[item.key] = propertyFromField(item);
 				if (item.required) required.push(item.key);
 				layout.push({ key: item.key });
 			}
 		}
 
 		if (Object.keys(properties).length === 0) return null;
-		return {
-			$schema: 'https://json-schema.org/draft/2020-12/schema',
-			type: 'object',
-			properties,
-			'x-layout': layout,
-			...(required.length > 0 ? { required } : {})
+		const base = {
+			$schema: 'https://json-schema.org/draft/2020-12/schema' as const,
+			type: 'object' as const,
+			properties
 		};
+		return withSchemaMeta(base, { ...baseMeta, version: META_VERSION, layout, required });
 	}
 </script>
 
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { FolderOpen, Plus, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -115,10 +99,12 @@
 	let { schema = $bindable<AttributesSchema | null>(null) }: { schema?: AttributesSchema | null } =
 		$props();
 
+	// Captured once so unknown root members survive round-trips.
+	const baseMeta = untrack(() => readSchemaMeta(schema));
 	let items = $state<EditorItem[]>(schemaToItems(schema));
 
 	$effect(() => {
-		schema = itemsToSchema(items);
+		schema = itemsToSchema(items, baseMeta);
 	});
 
 	function generateKey(): string {

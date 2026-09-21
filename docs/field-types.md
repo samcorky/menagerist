@@ -16,7 +16,7 @@ frontend/src/lib/field-types/
   number.ts
   boolean.ts
   date.ts              ← string + format: date
-  longtext.ts          ← string + x-multiline: true
+  longtext.ts          ← string + explicit kind: longtext
   choice.ts            ← string + enum
   group.ts             ← array of objects
   ScalarInput.svelte   ← shared widget for text / number / date
@@ -79,7 +79,7 @@ export type FieldTypeDescriptor = {
 | `number` | `{ type: 'number' }` | ✅ type | |
 | `boolean` | `{ type: 'boolean' }` | ✅ type | |
 | `date` | `{ type: 'string', format: 'date' }` | ✅ type + format | `jsonschema[format-nongpl]` validates ISO 8601 dates |
-| `longtext` | `{ type: 'string', 'x-multiline': true }` | ✅ type | `x-multiline` is a UI hint only — ignored by the backend validator |
+| `longtext` | `{ type: 'string' }` with `x-menagerist.kind: "longtext"` | ✅ type | Only matched by its explicit `kind`; the metadata is ignored by the validators |
 | `choice` | `{ type: 'string', enum: [...] }` | ✅ enum membership | |
 | `group` | `{ type: 'array', items: { type: 'object', properties: {...} } }` | ✅ structure + sub-fields | Sub-fields are validated recursively |
 
@@ -88,7 +88,7 @@ export type FieldTypeDescriptor = {
 ```ts
 // Most-specific string subtypes first so text doesn't match them:
 import './date';        // string + format: date
-import './longtext';    // string + x-multiline: true
+import './longtext';    // string + kind: longtext (explicit kind only)
 import './choice';      // string + enum
 import './number';
 import './boolean';
@@ -96,7 +96,7 @@ import './text';        // plain string — fallback, must be last among scalars
 import './group';       // after scalars so sub-field fromSchema lookups work
 ```
 
-`descriptorForProp(prop)` iterates the registry in insertion order and returns the first descriptor whose `fromSchema` returns non-null. Order matters — `text` would greedily match every string property if registered before `date`, `longtext`, and `choice`.
+`descriptorForProp(prop)` first looks at `x-menagerist.kind`: an explicit kind is a direct registry lookup, and the property must still match that descriptor's `fromSchema`. Without a `kind` it iterates the registry in insertion order and returns the first descriptor whose `fromSchema` returns non-null, so order matters — `text` would greedily match every string property if registered before `date` and `choice`. Anything unrecognised (an unknown `kind`, a `kind` that does not fit the shape, or a shape no descriptor matches) becomes the non-selectable `opaque` kind and is preserved unchanged.
 
 ---
 
@@ -180,7 +180,7 @@ The backend uses `jsonschema[format-nongpl]` (see `pyproject.toml`) which regist
 | Uses only standard JSON Schema keywords (`type`, `enum`, `properties`, `items`) | **None** — validated automatically |
 | Uses a standard `format` string (`date`, `uri`, `email`, etc.) | **None** — covered by `jsonschema[format-nongpl]` |
 | Uses a custom `format` string (e.g. `format: 'isbn'`) | **Yes** — register a format checker |
-| Uses a custom extension keyword (e.g. `x-multiline`) | **None** — unknown keywords are ignored by the validator |
+| Uses metadata in `x-menagerist` (e.g. `kind`, `display`) | **None** — unknown keywords are ignored by the validator |
 
 ### Registering a custom format checker
 
@@ -215,3 +215,17 @@ No other changes are required — `_validate_attributes.py` picks up all registe
 - [ ] Register in `field-types/index.ts` at the correct position (most-specific first)
 - [ ] **If using a custom `format`:** register a format checker in `platform/jsonschema_formats.py` and import it from the API entrypoint
 - [ ] **No changes needed** to `schema-editor.svelte`, `attributes-editor.svelte`, or any application-layer handler
+
+---
+
+## The `x-menagerist` namespace
+
+Standard JSON Schema keywords (`type`, `enum`, `format`, `minimum`, …) describe validation. Everything else lives under one `x-menagerist` member, at the schema root and on each property (including group sub-properties). Deleting every `x-menagerist` member never changes whether a value is valid, with two deliberate exceptions on the backend: the root `required` array and archived properties are stripped before validation (see below).
+
+Root: `version` (metadata format, currently `1`), `layout` (field order and sections), `required` (fields marked required; advisory only, never validated).
+Property: `kind` (the field type, always written by the editor), `display`, `archived`, `search`, `suggest`, `config`.
+
+- Unknown members are preserved on round-trip.
+- The frontend reads and writes the namespace only through `frontend/src/lib/schema-meta.ts`; the backend only through `backend/src/app/modules/graph/application/schema_meta.py`. Tests enforce that nothing else refers to it.
+- There is no migration and no compatibility reader: `x-multiline`, `x-layout` and a root `required` array are ignored. Re-save an item type from the schema editor to move it to the new format.
+- The backend validates the shape of known members when a node type or edge type is saved, and ignores a root `required` array and any property with `archived: true` when validating attributes.

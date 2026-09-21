@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 import jsonschema
 import structlog
 
+from app.modules.graph.application.schema_meta import check_meta_shape
 from app.modules.graph.domain.errors import (
     InvalidSchemaError,
     NodeTypeSlugConflictError,
@@ -40,6 +41,7 @@ class CreateNodeType(CommandHandler[GraphUnitOfWork, CreateNodeTypeCommand, Node
                 ).check_schema(command.attributes_schema)
             except jsonschema.SchemaError as exc:
                 raise InvalidSchemaError(str(exc.message)) from exc
+            check_meta_shape(command.attributes_schema)
         async with self._uow as repos:
             if await repos.node_types.get_by_slug(command.slug) is not None:
                 raise NodeTypeSlugConflictError(

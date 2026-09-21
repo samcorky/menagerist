@@ -17,7 +17,7 @@ const textDesc: FieldTypeDescriptor = {
 	label: 'Text',
 	toSchema: (f) => ({ title: f.label, type: 'string' }),
 	fromSchema: (key, prop, required) =>
-		prop.type === 'string' && !('format' in prop) && !('enum' in prop) && !('x-multiline' in prop)
+		prop.type === 'string' && !('format' in prop) && !('enum' in prop)
 			? { key, label: prop.title, kind: 'text', required, options: [], subFields: [] }
 			: null,
 	InputWidget: StubWidget

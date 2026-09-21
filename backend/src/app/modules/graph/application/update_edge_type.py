@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 import jsonschema
 import structlog
 
+from app.modules.graph.application.schema_meta import check_meta_shape
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import EdgeTypeNotFoundError, InvalidSchemaError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
@@ -40,6 +41,7 @@ class UpdateEdgeType(CommandHandler[GraphUnitOfWork, UpdateEdgeTypeCommand, Edge
                 ).check_schema(command.attributes_schema)
             except jsonschema.SchemaError as exc:
                 raise InvalidSchemaError(str(exc.message)) from exc
+            check_meta_shape(command.attributes_schema)
         async with self._uow as repos:
             edge_type = await repos.edge_types.get(command.edge_type_id)
             if edge_type is None:

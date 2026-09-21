@@ -273,12 +273,14 @@ describe('@cfworker/json-schema validation', () => {
 		expect(v.validate({}).errors.length).toBeGreaterThan(1);
 	});
 
-	it('ignores unknown x-* keywords without throwing', () => {
+	it('ignores the x-menagerist namespace without throwing or enforcing required', () => {
 		const s: object = {
 			$schema: 'https://json-schema.org/draft/2020-12/schema',
 			type: 'object',
-			properties: { bio: { title: 'Bio', type: 'string', 'x-multiline': true } },
-			'x-layout': [{ key: 'bio' }]
+			properties: {
+				bio: { title: 'Bio', type: 'string', 'x-menagerist': { kind: 'longtext' } }
+			},
+			'x-menagerist': { version: 1, layout: [{ key: 'bio' }], required: ['bio'] }
 		};
 		const v = new Validator(s, '2020-12', false);
 		expect(() => v.validate({ bio: 'text' })).not.toThrow();

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 import jsonschema
 import structlog
 
+from app.modules.graph.application.schema_meta import check_meta_shape
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import (
     EdgeTypeSlugConflictError,
@@ -43,6 +44,7 @@ class CreateEdgeType(CommandHandler[GraphUnitOfWork, CreateEdgeTypeCommand, Edge
                 ).check_schema(command.attributes_schema)
             except jsonschema.SchemaError as exc:
                 raise InvalidSchemaError(str(exc.message)) from exc
+            check_meta_shape(command.attributes_schema)
         async with self._uow as repos:
             slug = slugify(command.slug)
             if await repos.edge_types.get_by_slug(slug) is not None:

@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import { allDescriptors, descriptorForProp, getDescriptor } from '../src/lib/field-types/index';
+import { fieldFromProperty, propertyFromField } from '../src/lib/field-types/registry';
 import type { JsonSchemaProperty } from '../src/lib/schema-types';
 
 const EXPECTED_KINDS = ['text', 'number', 'boolean', 'date', 'longtext', 'choice', 'group'];
@@ -19,7 +22,7 @@ describe('descriptorForProp matching', () => {
 		['number', { title: 'Price', type: 'number' }],
 		['boolean', { title: 'Active', type: 'boolean' }],
 		['date', { title: 'Published', type: 'string', format: 'date' }],
-		['longtext', { title: 'Notes', type: 'string', 'x-multiline': true }],
+		['longtext', { title: 'Notes', type: 'string', 'x-menagerist': { kind: 'longtext' } }],
 		['choice', { title: 'Status', type: 'string', enum: ['Draft', 'Published'] }],
 		[
 			'group',
@@ -44,9 +47,8 @@ describe('text does not match specialised string props', () => {
 		expect(getDescriptor('text')!.fromSchema('x', dateProp, false)).toBeNull();
 	});
 
-	it('does not match longtext prop', () => {
-		const ltProp: JsonSchemaProperty = { title: 'X', type: 'string', 'x-multiline': true };
-		expect(getDescriptor('text')!.fromSchema('x', ltProp, false)).toBeNull();
+	it('does not infer longtext from shape alone', () => {
+		expect(descriptorForProp({ title: 'X', type: 'string' })?.kind).toBe('text');
 	});
 
 	it('does not match choice prop', () => {
@@ -160,7 +162,11 @@ describe('opaque round-trips', () => {
 		};
 		const field = group.fromSchema('cast', prop, false)!;
 		expect(field.subFields.map((sf) => sf.kind)).toEqual(['opaque', 'opaque', 'text']);
-		expect(group.toSchema(field)).toEqual(prop);
+		const written = propertyFromField(field) as Extract<JsonSchemaProperty, { type: 'array' }>;
+		expect(written.items.properties).toEqual({
+			...prop.items.properties,
+			name: { title: 'Name', type: 'string', 'x-menagerist': { kind: 'text' } }
+		});
 	});
 
 	it('group.fromSchema rejects an array of strings', () => {
@@ -169,4 +175,71 @@ describe('opaque round-trips', () => {
 			getDescriptor('group')!.fromSchema('tags', prop as unknown as JsonSchemaProperty, false)
 		).toBeNull();
 	});
+});
+
+describe('explicit kind and metadata', () => {
+	it('an explicit kind overrides shape inference', () => {
+		const prop = { title: 'X', type: 'string', 'x-menagerist': { kind: 'longtext' } };
+		expect(descriptorForProp(prop as JsonSchemaProperty)?.kind).toBe('longtext');
+	});
+
+	it('an explicit kind that does not match the shape becomes opaque', () => {
+		const prop = { title: 'X', type: 'number', 'x-menagerist': { kind: 'date' } };
+		expect(fieldFromProperty('x', prop as JsonSchemaProperty, false).kind).toBe('opaque');
+	});
+
+	it('an unknown kind becomes opaque and is preserved untouched', () => {
+		const prop = { title: 'X', type: 'string', 'x-menagerist': { kind: 'plugin:thing' } };
+		const field = fieldFromProperty('x', prop as JsonSchemaProperty, false);
+		expect(field.kind).toBe('opaque');
+		expect(propertyFromField(field)).toEqual(prop);
+	});
+
+	it('infers the kind from standard keywords when there is no namespace', () => {
+		const prop: JsonSchemaProperty = { title: 'D', type: 'string', format: 'date' };
+		expect(fieldFromProperty('d', prop, false).kind).toBe('date');
+	});
+
+	it('writes the kind and keeps display, archived and unknown members', () => {
+		const prop = {
+			title: 'Format',
+			type: 'string',
+			enum: ['LP'],
+			'x-menagerist': { kind: 'choice', display: 'radio', archived: true, future: { a: 1 } }
+		} as JsonSchemaProperty;
+		expect(propertyFromField(fieldFromProperty('format', prop, false))).toEqual(prop);
+	});
+
+	it('writes the kind for a new field with no prior metadata', () => {
+		const field = {
+			key: 'n',
+			label: 'N',
+			kind: 'number',
+			required: false,
+			options: [],
+			subFields: []
+		};
+		expect(propertyFromField(field)).toEqual({
+			title: 'N',
+			type: 'number',
+			'x-menagerist': { kind: 'number' }
+		});
+	});
+});
+
+describe('example schema contract fixture', () => {
+	const fixture = JSON.parse(
+		readFileSync(
+			fileURLToPath(
+				new URL('../../docs/field-types-spec/example-node-type-schema.json', import.meta.url)
+			),
+			'utf8'
+		)
+	) as { properties: Record<string, JsonSchemaProperty> };
+
+	for (const [key, prop] of Object.entries(fixture.properties)) {
+		it(`round-trips "${key}" unchanged`, () => {
+			expect(propertyFromField(fieldFromProperty(key, prop, false))).toEqual(prop);
+		});
+	}
 });

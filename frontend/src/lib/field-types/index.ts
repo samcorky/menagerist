@@ -9,4 +9,11 @@ import './text/text';
 import './group/group';
 import './opaque/opaque';
 
-export { register, getDescriptor, allDescriptors, descriptorForProp } from './registry';
+export {
+	register,
+	getDescriptor,
+	allDescriptors,
+	descriptorForProp,
+	fieldFromProperty,
+	propertyFromField
+} from './registry';

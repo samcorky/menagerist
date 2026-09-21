@@ -14,7 +14,7 @@ describe('normalise', () => {
 		expect(orderedKeys(result)).toEqual(['year', 'director']);
 	});
 
-	it('respects the order defined in x-layout', () => {
+	it('respects the order defined in the layout', () => {
 		const layout = [{ key: 'genre' }, { key: 'director' }, { key: 'year' }];
 		const result = normalise(layout, props(['year', 'director', 'genre']));
 		expect(orderedKeys(result)).toEqual(['genre', 'director', 'year']);

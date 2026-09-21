@@ -16,7 +16,7 @@ export function isSectionItem(item: LayoutItem): item is LayoutSectionItem {
 }
 
 /**
- * Produce a stable, renderable layout from a raw x-layout and the schema's properties.
+ * Produce a stable, renderable layout from a raw layout and the schema's properties.
  *
  * - No layout → flat list in schema key order (JSONB-sorted, but consistent)
  * - Dangling keys (properties removed since layout was saved) are silently dropped

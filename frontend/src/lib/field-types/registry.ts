@@ -1,5 +1,6 @@
 import type { Component } from 'svelte';
 import type { JsonSchemaProperty, EditorField } from '$lib/schema-types';
+import { readPropMeta, withPropMeta } from '$lib/schema-meta';
 
 export type FieldTypeDescriptor = {
 	kind: string;
@@ -50,14 +51,48 @@ export function allDescriptors(): FieldTypeDescriptor[] {
 }
 
 /**
- * Return the first descriptor whose fromSchema returns non-null for the given prop.
- * Registration order in index.ts determines precedence (most-specific first).
+ * Find the descriptor for a property. An explicit `kind` in the property metadata is a direct lookup
+ * (and must still match the property's shape); otherwise the first descriptor whose
+ * fromSchema matches wins, so registration order in index.ts sets precedence.
  */
 export function descriptorForProp(prop: JsonSchemaProperty): FieldTypeDescriptor | undefined {
+	const kind = readPropMeta(prop).kind;
+	if (kind !== undefined) {
+		const desc = registry.get(kind);
+		return desc && desc.fromSchema('_', prop, false) !== null ? desc : undefined;
+	}
 	for (const desc of registry.values()) {
 		if (desc.fromSchema('_', prop, false) !== null) return desc;
 	}
 	return undefined;
+}
+
+/** Build an EditorField from a property; anything unrecognised becomes `opaque`. */
+export function fieldFromProperty(
+	key: string,
+	prop: JsonSchemaProperty,
+	required: boolean
+): EditorField {
+	const desc = descriptorForProp(prop);
+	const field = desc?.fromSchema(key, prop, required);
+	if (desc && field) return { ...field, meta: readPropMeta(prop) };
+	return {
+		key,
+		label: prop.title,
+		kind: 'opaque',
+		required,
+		options: [],
+		subFields: [],
+		raw: prop as Record<string, unknown>
+	};
+}
+
+/** Serialise an EditorField, writing its `kind` and preserving its other metadata. */
+export function propertyFromField(f: EditorField): JsonSchemaProperty {
+	const desc = registry.get(f.kind);
+	if (!desc) return { title: f.label, type: 'string' };
+	const prop = desc.toSchema(f);
+	return f.kind === 'opaque' ? prop : withPropMeta(prop, { ...f.meta, kind: f.kind });
 }
 
 /** Remove all registrations — for use in tests only. */
