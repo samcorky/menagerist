@@ -26,11 +26,20 @@
 		});
 	}
 
+	function isOmittedWhenEmpty(prop: JsonSchemaProperty | undefined): boolean {
+		if (!prop) return false;
+		if (prop.type === 'number') return true;
+		return (
+			prop.type === 'string' && ('enum' in prop || ('format' in prop && prop.format === 'date'))
+		);
+	}
+
 	function coerceScalar(value: string, prop: JsonSchemaProperty | undefined): unknown {
 		if (prop?.type === 'number') {
 			const n = Number(value);
 			return isNaN(n) ? value : n;
 		}
+		// An untouched checkbox has no unset state, so '' becomes false.
 		if (prop?.type === 'boolean') return value === 'true';
 		return value;
 	}
@@ -38,7 +47,7 @@
 	/**
 	 * Convert edited rows into a typed `attributes` dict ready for the API.
 	 * Pass `schema` so number/boolean fields are emitted as real JS types.
-	 * Empty number fields are omitted rather than sent as empty strings.
+	 * Empty number, date and enum values are omitted rather than sent as empty strings.
 	 */
 	export function rowsToAttributes(
 		rows: AttributeRow[],
@@ -51,14 +60,16 @@
 				.flatMap((row): [string, unknown][] => {
 					const prop = props[row.key];
 					if (typeof row.value !== 'string') {
-						if (prop?.type === 'array') {
-							const subProps = prop.items.properties;
+						if (prop?.type === 'array' && prop.items?.type === 'object') {
+							const subProps = prop.items.properties ?? {};
 							return [
 								[
 									row.key,
 									row.value.map((gr) =>
 										Object.fromEntries(
-											Object.entries(gr).map(([k, v]) => [k, coerceScalar(v, subProps[k])])
+											Object.entries(gr)
+												.filter(([k, v]) => !(v === '' && isOmittedWhenEmpty(subProps[k])))
+												.map(([k, v]) => [k, coerceScalar(v, subProps[k])])
 										)
 									)
 								]
@@ -66,6 +77,7 @@
 						}
 						return [[row.key, row.value]];
 					}
+					if (row.value === '' && isOmittedWhenEmpty(prop)) return [];
 					if (prop?.type === 'number') {
 						if (row.value === '') return [];
 						const n = Number(row.value);

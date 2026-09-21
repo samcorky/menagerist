@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { JsonSchemaProperty } from '$lib/schema-types';
+	import { formatIsoDate } from '$lib/format-date';
 
 	let {
 		value,
@@ -9,18 +10,9 @@
 		prop: JsonSchemaProperty;
 	} = $props();
 
-	let display = $derived.by((): string => {
-		if (typeof value !== 'string' || value === '') return '—';
-		try {
-			return new Date(value + 'T00:00:00').toLocaleDateString(undefined, {
-				year: 'numeric',
-				month: 'long',
-				day: 'numeric'
-			});
-		} catch {
-			return String(value);
-		}
-	});
+	let display = $derived(
+		typeof value !== 'string' || value === '' ? '—' : formatIsoDate(value, 'long')
+	);
 </script>
 
 <span>{display}</span>

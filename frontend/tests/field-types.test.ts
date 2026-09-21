@@ -120,3 +120,53 @@ describe('toSchema / fromSchema round-trips', () => {
 		expect(back?.required).toBe(true);
 	});
 });
+
+describe('opaque round-trips', () => {
+	const opaque = getDescriptor('opaque')!;
+
+	it('is not user-selectable and never matches a property', () => {
+		expect(opaque.selectable).toBe(false);
+		expect(descriptorForProp({ title: 'x', type: 'string' })?.kind).toBe('text');
+	});
+
+	it('keeps a string property with a format, changing only the title', () => {
+		const prop = { title: 'Email', type: 'string', format: 'email' };
+		expect(descriptorForProp(prop as unknown as JsonSchemaProperty)).toBeUndefined();
+		const field = {
+			key: 'email',
+			label: 'Contact',
+			kind: 'opaque',
+			required: false,
+			options: [],
+			subFields: [],
+			raw: prop
+		};
+		expect(opaque.toSchema(field)).toEqual({ ...prop, title: 'Contact' });
+	});
+
+	it('group keeps an enum sub-property and a format sub-property unchanged', () => {
+		const group = getDescriptor('group')!;
+		const prop: JsonSchemaProperty = {
+			title: 'Cast',
+			type: 'array',
+			items: {
+				type: 'object',
+				properties: {
+					role: { title: 'Role', type: 'string', enum: ['Lead', 'Support'] },
+					mail: { title: 'Mail', type: 'string', format: 'email' } as unknown as JsonSchemaProperty,
+					name: { title: 'Name', type: 'string' }
+				}
+			}
+		};
+		const field = group.fromSchema('cast', prop, false)!;
+		expect(field.subFields.map((sf) => sf.kind)).toEqual(['opaque', 'opaque', 'text']);
+		expect(group.toSchema(field)).toEqual(prop);
+	});
+
+	it('group.fromSchema rejects an array of strings', () => {
+		const prop = { title: 'Tags', type: 'array', items: { type: 'string' } };
+		expect(
+			getDescriptor('group')!.fromSchema('tags', prop as unknown as JsonSchemaProperty, false)
+		).toBeNull();
+	});
+});

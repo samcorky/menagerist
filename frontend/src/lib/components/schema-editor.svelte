@@ -21,7 +21,15 @@
 			const field = desc.fromSchema(key, prop, required);
 			if (field) return field;
 		}
-		return { key, label: prop.title, kind: 'text', required, options: [], subFields: [] };
+		return {
+			key,
+			label: prop.title,
+			kind: 'opaque',
+			required,
+			options: [],
+			subFields: [],
+			raw: prop as Record<string, unknown>
+		};
 	}
 
 	function fieldToProperty(f: EditorField): JsonSchemaProperty {
@@ -215,16 +223,20 @@
 			aria-label="Field label"
 			oninput={(e) => onLabelChange((e.target as HTMLInputElement).value)}
 		/>
-		<select
-			value={field.kind}
-			onchange={(e) => onFieldChange({ ...field, kind: (e.target as HTMLSelectElement).value })}
-			class="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
-			aria-label="Field type"
-		>
-			{#each allDescriptors().filter((d) => allowGroup || d.kind !== 'group') as d (d.kind)}
-				<option value={d.kind}>{d.label}</option>
-			{/each}
-		</select>
+		{#if field.kind === 'opaque'}
+			<span class="rounded border border-input px-1.5 text-xs text-muted-foreground">custom</span>
+		{:else}
+			<select
+				value={field.kind}
+				onchange={(e) => onFieldChange({ ...field, kind: (e.target as HTMLSelectElement).value })}
+				class="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
+				aria-label="Field type"
+			>
+				{#each allDescriptors().filter((d) => d.selectable !== false && (allowGroup || d.kind !== 'group')) as d (d.kind)}
+					<option value={d.kind}>{d.label}</option>
+				{/each}
+			</select>
+		{/if}
 		<label class="flex items-center gap-1.5 text-sm">
 			<input
 				type="checkbox"

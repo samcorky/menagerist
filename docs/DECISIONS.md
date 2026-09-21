@@ -105,3 +105,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Decision:** Version scheme is `0.YYYY.MM.PATCH` until the data model and API stabilise, then `YYYY.MM.PATCH`.
 
 **Rationale:** CalVer communicates the release date naturally for a personal app without semantic versioning overhead. The `0.` prefix signals pre-stable — breaking migrations and API changes are expected — without requiring a formal major-version bump. Dropping the `0.` is the public signal that the schema and API are stable.
+
+---
+
+## Unrecognised schema properties round-trip as an `opaque` field kind (frontend)
+
+**Decision:** A property no field-type descriptor matches (for example `format: 'email'`, or an enum sub-property of a group) becomes an `opaque` field carrying the original property in `raw`. Its `toSchema` returns the raw property with only the title updated. `opaque` is not user-selectable, and the editors show a "custom" badge instead of a kind dropdown.
+
+**Rationale:** Falling back to `text` silently dropped keywords such as `format` on the next save. Keeping the raw property makes open-edit-save lossless for schemas written through the API.
+
+**Related:** an untouched boolean cell in a group row saves as `false`, because a checkbox has no unset state; blank number, date and choice cells are omitted, while blank text stays `''`.

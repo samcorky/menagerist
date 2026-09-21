@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { JsonSchemaProperty } from '$lib/schema-types';
+	import { formatIsoDate } from '$lib/format-date';
 
 	type GroupRow = Record<string, unknown>;
 
@@ -12,15 +13,7 @@
 		if (val === null || val === undefined || val === '') return '—';
 		if (sp.type === 'boolean') return val === true || val === 'true' ? 'Yes' : 'No';
 		if (sp.type === 'string' && 'format' in sp && sp.format === 'date') {
-			try {
-				return new Date(val as string).toLocaleDateString(undefined, {
-					year: 'numeric',
-					month: 'short',
-					day: 'numeric'
-				});
-			} catch {
-				return String(val);
-			}
+			return formatIsoDate(val as string, 'short');
 		}
 		return String(val);
 	}

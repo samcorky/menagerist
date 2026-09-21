@@ -143,6 +143,76 @@ describe('rowsToAttributes with schema', () => {
 		).toEqual({ prices: [{ currency: 'GBP', amount: 12.5 }] });
 	});
 
+	it('omits an empty choice and an empty date, keeps empty text', () => {
+		const rows: AttributeRow[] = [
+			{ key: 'status', value: '' },
+			{ key: 'released', value: '' },
+			{ key: 'name', value: '' }
+		];
+		expect(
+			rowsToAttributes(
+				rows,
+				schema({
+					status: { title: 'Status', type: 'string', enum: ['A', 'B'] },
+					released: { title: 'Released', type: 'string', format: 'date' },
+					name: { title: 'Name', type: 'string' }
+				})
+			)
+		).toEqual({ name: '' });
+	});
+
+	describe('group rows with blank cells', () => {
+		const groupSchema = schema({
+			recipe: {
+				title: 'Recipe',
+				type: 'array',
+				items: {
+					type: 'object',
+					properties: {
+						name: { title: 'Name', type: 'string' },
+						qty: { title: 'Qty', type: 'number' },
+						added: { title: 'Added', type: 'string', format: 'date' }
+					}
+				}
+			}
+		});
+
+		it('omits blank number and date cells but keeps blank text', () => {
+			const rows: AttributeRow[] = [
+				{
+					key: 'recipe',
+					value: [
+						{ name: 'Flour', qty: '', added: '' },
+						{ name: '', qty: '', added: '' }
+					]
+				}
+			];
+			expect(rowsToAttributes(rows, groupSchema)).toEqual({
+				recipe: [{ name: 'Flour' }, { name: '' }]
+			});
+		});
+
+		it('keeps a row with no keys as an empty object', () => {
+			const schemaNoText = schema({
+				recipe: {
+					title: 'Recipe',
+					type: 'array',
+					items: { type: 'object', properties: { qty: { title: 'Qty', type: 'number' } } }
+				}
+			});
+			const rows: AttributeRow[] = [{ key: 'recipe', value: [{ qty: '' }] }];
+			expect(rowsToAttributes(rows, schemaNoText)).toEqual({ recipe: [{}] });
+		});
+
+		it('does not throw for an array of non-object items', () => {
+			const rows: AttributeRow[] = [{ key: 'tags', value: [] }];
+			const s = schema({
+				tags: { title: 'Tags', type: 'array', items: { type: 'string' } }
+			} as unknown as AttributesSchema['properties']);
+			expect(() => rowsToAttributes(rows, s)).not.toThrow();
+		});
+	});
+
 	it('passes unknown keys through as strings regardless of schema', () => {
 		const rows: AttributeRow[] = [{ key: 'notes', value: 'free text' }];
 		expect(rowsToAttributes(rows, schema({ year: { title: 'Year', type: 'number' } }))).toEqual({

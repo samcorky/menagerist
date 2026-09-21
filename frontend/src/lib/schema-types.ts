@@ -24,6 +24,8 @@ export type EditorSubField = {
 	key: string;
 	label: string;
 	kind: string;
+	/** Original property for the `opaque` kind, written back unchanged on save. */
+	raw?: Record<string, unknown>;
 };
 
 export type EditorField = {
@@ -33,4 +35,6 @@ export type EditorField = {
 	required: boolean;
 	options: string[];
 	subFields: EditorSubField[];
+	/** Original property for the `opaque` kind, written back unchanged on save. */
+	raw?: Record<string, unknown>;
 };

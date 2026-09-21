@@ -23,7 +23,8 @@ register({
 								kind: sf.kind,
 								required: false,
 								options: [],
-								subFields: []
+								subFields: [],
+								raw: sf.raw
 							})
 						: { title: sf.label, type: 'string' };
 					return [sf.key, prop];
@@ -33,17 +34,20 @@ register({
 	}),
 	fromSchema: (key, prop, required) => {
 		if (prop.type !== 'array') return null;
+		if ((prop.items as { type?: string } | undefined)?.type !== 'object') return null;
 		return {
 			key,
 			label: prop.title,
 			kind: 'group',
 			required,
 			options: [],
-			subFields: Object.entries(prop.items.properties).map(([sk, sp]) => ({
-				key: sk,
-				label: sp.title,
-				kind: descriptorForProp(sp)?.kind ?? 'text'
-			}))
+			subFields: Object.entries(prop.items.properties ?? {}).map(([sk, sp]) => {
+				const d = descriptorForProp(sp);
+				if (!d || d.canBeSubField === false) {
+					return { key: sk, label: sp.title, kind: 'opaque', raw: sp as Record<string, unknown> };
+				}
+				return { key: sk, label: sp.title, kind: d.kind };
+			})
 		};
 	},
 	InputWidget: GroupInput,

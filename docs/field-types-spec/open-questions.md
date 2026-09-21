@@ -57,3 +57,6 @@
 50. **Closed:** include the "Use my current location" button (hidden when unavailable) and an OpenStreetMap "Open in map" link; a `geo:` link later (decided).
 51. WI-22: should a connection row show the other item's card highlights as well as the connection's own details (two levels of detail on one row), or the item title only when the connection has details?
 52. WI-22b: when creating people inline in a multi-add, which type do they get (untyped, or the type the picker is filtered to)? And is a single `CreateEdges` command wanted, or is calling `POST /edge` several times acceptable for v1?
+53. WI-4: should `opaque` fields be editable beyond the title (for example a "Convert to text" action that drops the unknown keywords), or stay read-only apart from the title until WI-14 defines unknown kinds? Default: title only.
+54. WI-2: should an untouched boolean cell in a group row stay `false` (current, no unset state) or be omitted? Default: `false`, recorded in `docs/DECISIONS.md`.
+

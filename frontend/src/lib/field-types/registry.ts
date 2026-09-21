@@ -10,6 +10,8 @@ export type FieldTypeDescriptor = {
 	 * Defaults to true; set false for types that cannot nest (group, choice).
 	 */
 	canBeSubField?: boolean;
+	/** Set false to hide the kind from the kind dropdowns (e.g. `opaque`). */
+	selectable?: boolean;
 	/** Serialise an EditorField to a JSON Schema property. */
 	toSchema: (field: EditorField) => JsonSchemaProperty;
 	/**

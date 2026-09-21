@@ -7,5 +7,6 @@ import './number/number';
 import './boolean/boolean';
 import './text/text';
 import './group/group';
+import './opaque/opaque';
 
 export { register, getDescriptor, allDescriptors, descriptorForProp } from './registry';

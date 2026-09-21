@@ -15,7 +15,9 @@
 
 	// Exclude group itself and types marked as sub-field-ineligible.
 	let subFieldKinds = $derived(
-		allDescriptors().filter((d) => d.canBeSubField !== false && d.kind !== 'group')
+		allDescriptors().filter(
+			(d) => d.selectable !== false && d.canBeSubField !== false && d.kind !== 'group'
+		)
 	);
 
 	function generateKey(): string {
@@ -60,16 +62,20 @@
 				aria-label="Sub-field label"
 				oninput={(e) => updateSubFieldLabel(si, (e.target as HTMLInputElement).value)}
 			/>
-			<select
-				value={sf.kind}
-				onchange={(e) => updateSubFieldKind(si, (e.target as HTMLSelectElement).value)}
-				class="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
-				aria-label="Sub-field type"
-			>
-				{#each subFieldKinds as d (d.kind)}
-					<option value={d.kind}>{d.label}</option>
-				{/each}
-			</select>
+			{#if sf.kind === 'opaque'}
+				<span class="rounded border border-input px-1.5 text-xs text-muted-foreground">custom</span>
+			{:else}
+				<select
+					value={sf.kind}
+					onchange={(e) => updateSubFieldKind(si, (e.target as HTMLSelectElement).value)}
+					class="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
+					aria-label="Sub-field type"
+				>
+					{#each subFieldKinds as d (d.kind)}
+						<option value={d.kind}>{d.label}</option>
+					{/each}
+				</select>
+			{/if}
 			<Button
 				type="button"
 				variant="ghost"
