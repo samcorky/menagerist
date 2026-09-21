@@ -4,6 +4,7 @@ import './date/date';
 import './longtext/longtext';
 import './choice/choice';
 import './number/number';
+import './rating/rating';
 import './boolean/boolean';
 import './text/text';
 import './group/group';

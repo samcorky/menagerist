@@ -135,3 +135,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** Readable attribute keys make the API, exports and search context understandable without the schema, while immutability keeps the guarantees UUIDs gave: renaming a label never touches stored data and references by key (layout, `required`) stay valid. Names such as `constructor` are avoided because `in` and index lookups on `properties` would otherwise find inherited members.
 
 **Tradeoffs:** A key can drift from its label after a rename. Re-adding a same-titled field can reattach orphaned data, which is accepted. There is no "Change key" action in v1, and the key is never shown in the UI. Warning when a new key matches an existing custom detail name is deferred to the per-item custom fields work.
+
+---
+
+## Rating is a constrained number matched by an explicit kind
+
+**Decision:** A rating is stored as a JSON number with `minimum: 1`, `maximum: 5` and `multipleOf: 1`, and `x-menagerist.kind: "rating"`. The descriptor only matches an explicit kind. An unset rating is omitted, and clicking the current star clears it. It can be a group sub-field.
+
+**Rationale:** A constrained number needs no backend code, and both validators enforce the range. Matching on the explicit kind removes the registration-order dependency on `number` (they share `type: 'number'`), so a plain number with the same constraints is never captured.
+
+**Tradeoff:** The star count is fixed at 5 until display options (WI-11) make it configurable.

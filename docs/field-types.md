@@ -81,6 +81,7 @@ export type FieldTypeDescriptor = {
 | `date` | `{ type: 'string', format: 'date' }` | ✅ type + format | `jsonschema[format-nongpl]` validates ISO 8601 dates |
 | `longtext` | `{ type: 'string' }` with `x-menagerist.kind: "longtext"` | ✅ type | Only matched by its explicit `kind`; the metadata is ignored by the validators |
 | `choice` | `{ type: 'string', enum: [...] }` | ✅ enum membership | |
+| `rating` | `{ type: 'number', minimum: 1, maximum: 5, multipleOf: 1 }` with `x-menagerist.kind: "rating"` | ✅ range + whole numbers | Star widget; only matched by its explicit `kind`, so it never captures a plain number. Unset is omitted. May be a group sub-field |
 | `group` | `{ type: 'array', items: { type: 'object', properties: {...} } }` | ✅ structure + sub-fields | Sub-fields are validated recursively |
 
 ### Registration order in `index.ts`
@@ -91,6 +92,7 @@ import './date';        // string + format: date
 import './longtext';    // string + kind: longtext (explicit kind only)
 import './choice';      // string + enum
 import './number';
+import './rating';    // number + kind: rating (explicit kind only)
 import './boolean';
 import './text';        // plain string — fallback, must be last among scalars
 import './group';       // after scalars so sub-field fromSchema lookups work

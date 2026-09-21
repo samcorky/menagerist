@@ -204,6 +204,30 @@ describe('rowsToAttributes with schema', () => {
 			expect(rowsToAttributes(rows, schemaNoText)).toEqual({ recipe: [{}] });
 		});
 
+		it('omits a blank rating cell and keeps a chosen one', () => {
+			const ratingSchema = schema({
+				reviews: {
+					title: 'Reviews',
+					type: 'array',
+					items: {
+						type: 'object',
+						properties: {
+							score: {
+								title: 'Score',
+								type: 'number',
+								minimum: 1,
+								maximum: 5,
+								multipleOf: 1,
+								'x-menagerist': { kind: 'rating' }
+							}
+						}
+					}
+				}
+			});
+			const rows: AttributeRow[] = [{ key: 'reviews', value: [{ score: '' }, { score: '4' }] }];
+			expect(rowsToAttributes(rows, ratingSchema)).toEqual({ reviews: [{}, { score: 4 }] });
+		});
+
 		it('does not throw for an array of non-object items', () => {
 			const rows: AttributeRow[] = [{ key: 'tags', value: [] }];
 			const s = schema({

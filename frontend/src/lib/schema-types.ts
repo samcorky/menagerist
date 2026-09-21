@@ -4,7 +4,7 @@ type JsonSchemaPropertyBase =
 	| { title: string; type: 'string' }
 	| { title: string; type: 'string'; format: 'date' }
 	| { title: string; type: 'string'; enum: string[] }
-	| { title: string; type: 'number' }
+	| { title: string; type: 'number'; minimum?: number; maximum?: number; multipleOf?: number }
 	| { title: string; type: 'boolean' }
 	| {
 			title: string;

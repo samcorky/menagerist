@@ -7,7 +7,7 @@ Update at the end of every session. Read this first.
 | WI-1 to WI-4 bug fixes | done, committed (138e7d5) | feature/initial-implementation | See "WI-1 to WI-4 session notes" below. |
 | WI-14 metadata namespace | done, awaiting user review and commit | feature/initial-implementation | See "WI-14 session notes" below. |
 | WI-20 readable field keys | done, awaiting user review and commit | feature/initial-implementation | See "WI-20 session notes" below. |
-| WI-5 rating | todo | | |
+| WI-5 rating | done, awaiting user review and commit | feature/initial-implementation | See "WI-5 session notes" below. |
 | WI-6 advisory required | todo | | |
 | WI-7 changed-keys validation | todo | | |
 | WI-8 archive fields | todo | | |
@@ -104,3 +104,24 @@ Update at the end of every session. Read this first.
 **Next session must know**
 - WI-5, WI-18 and WI-19 must create fields through the editor's pending-key path (`keyPending: true`) or call `generateFieldKey` against the target schema, so keys stay readable and unique.
 - The ESLint `no-control-regex` rule rejects `\x00` in regexes; the generator uses `[\u0080-\uffff]` to strip non-ASCII.
+
+## WI-5 session notes
+
+**Status:** implemented, frontend checks green, not committed. Next item: WI-6 (advisory required).
+
+**Done**
+- `field-types/rating/`: `rating.ts` (kind `rating`, stored as `type: number` with `minimum: 1`, `maximum: 5`, `multipleOf: 1` plus `kind`), `RatingInput.svelte` (radiogroup, hover preview, click sets, click on current clears, roving tabindex and arrow keys) and `RatingView.svelte`.
+- `fromSchema` matches only an explicit `kind: 'rating'`, so the registration-order rule in the spec no longer applies (WI-14). It is registered after `number` for the dropdown order only.
+- `canBeSubField: true`: WI-2 has landed, so a blank rating cell in a group row is omitted (tested).
+- `JsonSchemaProperty`'s number variant gained optional `minimum`, `maximum`, `multipleOf`.
+- Docs: `docs/field-types.md` row and `docs/DECISIONS.md` entry.
+
+**Left:** star count is fixed at 5 (configurable in WI-11). `GroupView` still prints a rating sub-field as a bare number; give it stars if wanted. Widget behaviour (hover, keys) is not covered by component tests (decided: no component tests in this change); check it manually in the browser once.
+
+**Files touched:** `src/lib/field-types/rating/{rating.ts,RatingInput.svelte,RatingView.svelte}` (new), `field-types/index.ts`, `schema-types.ts`; tests `field-types.test.ts`, `attributes-editor.test.ts`; `docs/field-types.md`, `docs/DECISIONS.md`.
+
+**Checks run:** `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 132 tests in 12 files pass. Backend unchanged.
+
+**Next session must know**
+- The radiogroup `div` has `tabindex="-1"` instead of the reference's `svelte-ignore` comment (silences the a11y warning); a click on the gap between stars can focus the `div`.
+- The example fixture's `my_rating` now round-trips through the real rating descriptor.

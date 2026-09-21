@@ -1,11 +1,21 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
+import { Validator } from '@cfworker/json-schema';
 import { allDescriptors, descriptorForProp, getDescriptor } from '../src/lib/field-types/index';
 import { fieldFromProperty, propertyFromField } from '../src/lib/field-types/registry';
 import type { JsonSchemaProperty } from '../src/lib/schema-types';
 
-const EXPECTED_KINDS = ['text', 'number', 'boolean', 'date', 'longtext', 'choice', 'group'];
+const EXPECTED_KINDS = [
+	'text',
+	'number',
+	'boolean',
+	'date',
+	'longtext',
+	'choice',
+	'rating',
+	'group'
+];
 
 describe('all built-in kinds are registered', () => {
 	const kinds = allDescriptors().map((d) => d.kind);
@@ -242,4 +252,65 @@ describe('example schema contract fixture', () => {
 			expect(propertyFromField(fieldFromProperty(key, prop, false))).toEqual(prop);
 		});
 	}
+});
+
+describe('rating', () => {
+	const ratingProp = {
+		title: 'My rating',
+		type: 'number',
+		minimum: 1,
+		maximum: 5,
+		multipleOf: 1,
+		'x-menagerist': { kind: 'rating' }
+	} as JsonSchemaProperty;
+
+	it('is matched by its explicit kind', () => {
+		expect(descriptorForProp(ratingProp)?.kind).toBe('rating');
+	});
+
+	it('does not capture a plain number, even one with the same constraints', () => {
+		const constrained = { title: 'N', type: 'number', minimum: 1, maximum: 5, multipleOf: 1 };
+		expect(descriptorForProp(constrained as JsonSchemaProperty)?.kind).toBe('number');
+		expect(descriptorForProp({ title: 'N', type: 'number' })?.kind).toBe('number');
+	});
+
+	it('round-trips through the editor field', () => {
+		expect(propertyFromField(fieldFromProperty('my_rating', ratingProp, false))).toEqual(
+			ratingProp
+		);
+	});
+
+	it('writes the constrained number shape for a new field', () => {
+		const field = {
+			key: 'r',
+			label: 'My rating',
+			kind: 'rating',
+			required: false,
+			options: [],
+			subFields: []
+		};
+		expect(propertyFromField(field)).toEqual(ratingProp);
+	});
+
+	it('can be a group sub-field', () => {
+		const group = getDescriptor('group')!;
+		const prop = {
+			title: 'Reviews',
+			type: 'array',
+			items: { type: 'object', properties: { score: ratingProp } }
+		} as JsonSchemaProperty;
+		const field = group.fromSchema('reviews', prop, false)!;
+		expect(field.subFields[0].kind).toBe('rating');
+	});
+
+	it('is validated as a whole number from 1 to 5', () => {
+		const v = new Validator(
+			{ type: 'object', properties: { r: ratingProp } } as object,
+			'2020-12',
+			false
+		);
+		for (const ok of [1, 3, 5]) expect(v.validate({ r: ok }).valid).toBe(true);
+		for (const bad of [0, 6, 2.5]) expect(v.validate({ r: bad }).valid).toBe(false);
+		expect(v.validate({}).valid).toBe(true);
+	});
 });
