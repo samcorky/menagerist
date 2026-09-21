@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "title": {
+      "title": "Title",
+      "type": "string",
+      "x-menagerist": {
+        "kind": "text"
+      }
+    },
+    "artist": {
+      "title": "Artist",
+      "type": "string",
+      "x-menagerist": {
+        "kind": "text"
+      }
+    },
+    "released": {
+      "title": "Released",
+      "type": "string",
+      "format": "date",
+      "x-menagerist": {
+        "kind": "date"
+      }
+    },
+    "format": {
+      "title": "Format",
+      "type": "string",
+      "enum": [
+        "LP",
+        "EP",
+        "Single",
+        "Box set"
+      ],
+      "x-menagerist": {
+        "kind": "choice",
+        "display": "radio"
+      }
+    },
+    "condition": {
+      "title": "Condition",
+      "type": "string",
+      "enum": [
+        "Mint",
+        "Near Mint",
+        "VG+",
+        "VG",
+        "Good"
+      ],
+      "x-menagerist": {
+        "kind": "choice"
+      }
+    },
+    "signed": {
+      "title": "Signed?",
+      "type": "boolean",
+      "x-menagerist": {
+        "kind": "boolean",
+        "display": "yes-no"
+      }
+    },
+    "my_rating": {
+      "title": "My rating",
+      "type": "number",
+      "minimum": 1,
+      "maximum": 5,
+      "multipleOf": 1,
+      "x-menagerist": {
+        "kind": "rating"
+      }
+    },
+    "notes": {
+      "title": "Notes",
+      "type": "string",
+      "x-menagerist": {
+        "kind": "longtext"
+      }
+    },
+    "tracklist": {
+      "title": "Tracklist",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "track_no": {
+            "title": "Track no.",
+            "type": "number",
+            "x-menagerist": {
+              "kind": "number"
+            }
+          },
+          "track": {
+            "title": "Track",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "length": {
+            "title": "Length",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          }
+        }
+      },
+      "x-menagerist": {
+        "kind": "group"
+      }
+    },
+    "price_paid": {
+      "title": "Price paid",
+      "type": "number",
+      "x-menagerist": {
+        "kind": "number",
+        "archived": true
+      }
+    }
+  },
+  "x-menagerist": {
+    "version": 1,
+    "required": [
+      "title"
+    ],
+    "layout": [
+      {
+        "key": "title"
+      },
+      {
+        "id": "c9c51bc4-9440-5386-be69-bbb18dbe072e",
+        "row": true,
+        "items": [
+          {
+            "key": "artist"
+          },
+          {
+            "key": "released"
+          }
+        ]
+      },
+      {
+        "id": "a52c0074-d55f-5218-8d84-9f7328b953b6",
+        "tabs": [
+          {
+            "id": "beae1d3f-e2e2-5e04-82c1-1ffe1a6a7dce",
+            "label": "Details",
+            "items": [
+              {
+                "id": "15b86b69-3dd2-5ee2-9fd0-3866174ae2b7",
+                "section": "Physical copy",
+                "collapsed": false,
+                "items": [
+                  {
+                    "key": "format"
+                  },
+                  {
+                    "key": "condition"
+                  }
+                ]
+              },
+              {
+                "key": "signed"
+              },
+              {
+                "key": "my_rating"
+              }
+            ]
+          },
+          {
+            "id": "b64e4d7a-1dc2-5ac6-9547-10dc8f1883b7",
+            "label": "Tracks",
+            "items": [
+              {
+                "key": "tracklist"
+              }
+            ]
+          },
+          {
+            "id": "9750ebfe-08da-5744-bc38-9f5de8db6411",
+            "label": "Notes",
+            "items": [
+              {
+                "key": "notes"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
