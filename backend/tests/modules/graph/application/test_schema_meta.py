@@ -6,6 +6,8 @@ import pytest
 from app.modules.graph.application.schema_meta import (
     archived_keys,
     check_meta_shape,
+    check_schema_definition,
+    merge_attribute_schemas,
     required_keys,
     validation_schema,
 )
@@ -203,3 +205,105 @@ def test_check_meta_shape_limits_connection_highlights_to_two() -> None:
     ):
         with pytest.raises(InvalidSchemaError):
             check_meta_shape(_with_highlights(bad))
+
+
+def test_check_schema_definition_accepts_a_well_shaped_schema() -> None:
+    """A valid JSON Schema with a valid `x-menagerist` passes both checks."""
+    check_schema_definition({"type": "object", "properties": {"a": {"type": "string"}}})
+
+
+def test_check_schema_definition_rejects_invalid_json_schema() -> None:
+    """A schema jsonschema itself rejects raises InvalidSchemaError."""
+    with pytest.raises(InvalidSchemaError):
+        check_schema_definition({"type": "not-a-type"})
+
+
+def test_check_schema_definition_rejects_bad_meta_shape() -> None:
+    """A structurally valid schema with a malformed `x-menagerist` still fails."""
+    with pytest.raises(InvalidSchemaError):
+        check_schema_definition({"type": "object", "x-menagerist": "nope"})
+
+
+def test_merge_attribute_schemas_returns_none_when_both_are_absent() -> None:
+    """Nothing to merge yields None."""
+    assert merge_attribute_schemas(None, None) is None
+
+
+def test_merge_attribute_schemas_returns_the_other_when_one_is_absent() -> None:
+    """A single schema passes through unchanged."""
+    schema = {"type": "object", "properties": {"a": {"type": "string"}}}
+    assert merge_attribute_schemas(schema, None) == {
+        "type": "object",
+        "properties": {"a": {"type": "string"}},
+    }
+    assert merge_attribute_schemas(None, schema) == {
+        "type": "object",
+        "properties": {"a": {"type": "string"}},
+    }
+
+
+def test_merge_attribute_schemas_combines_properties_from_both() -> None:
+    """Properties from the type and the overlay coexist in the merge."""
+    type_schema = {"type": "object", "properties": {"year": {"type": "number"}}}
+    extra = {"type": "object", "properties": {"signed": {"type": "boolean"}}}
+
+    merged = merge_attribute_schemas(type_schema, extra)
+
+    assert merged is not None
+    assert set(merged["properties"]) == {"year", "signed"}
+
+
+def test_merge_attribute_schemas_raises_on_a_shared_key() -> None:
+    """A per-item field cannot redefine a key the item type already has."""
+    type_schema = {"type": "object", "properties": {"year": {"type": "number"}}}
+    extra = {"type": "object", "properties": {"year": {"type": "string"}}}
+
+    with pytest.raises(InvalidSchemaError, match="year"):
+        merge_attribute_schemas(type_schema, extra)
+
+
+def test_merge_attribute_schemas_rejects_archived_key_reused_in_overlay() -> None:
+    """An archived type field's key stays reserved, even for the overlay."""
+    type_schema = {
+        "type": "object",
+        "properties": {"year": {"type": "number", "x-menagerist": {"archived": True}}},
+    }
+    extra = {"type": "object", "properties": {"year": {"type": "string"}}}
+
+    with pytest.raises(InvalidSchemaError):
+        merge_attribute_schemas(type_schema, extra)
+
+
+def test_merge_attribute_schemas_concatenates_required_and_layout() -> None:
+    """Type fields come first in required and layout, then overlay fields."""
+    type_schema = {
+        "type": "object",
+        "properties": {"year": {"type": "number"}},
+        "x-menagerist": {"required": ["year"], "layout": [{"key": "year"}]},
+    }
+    extra = {
+        "type": "object",
+        "properties": {"signed": {"type": "boolean"}},
+        "x-menagerist": {"required": ["signed"], "layout": [{"key": "signed"}]},
+    }
+
+    merged = merge_attribute_schemas(type_schema, extra)
+
+    assert merged is not None
+    assert merged["x-menagerist"]["required"] == ["year", "signed"]
+    assert merged["x-menagerist"]["layout"] == [{"key": "year"}, {"key": "signed"}]
+
+
+def test_merge_attribute_schemas_result_validates_identically_to_hand_written() -> None:
+    """The merged schema behaves like validate_attributes expects: strippable."""
+    merged = merge_attribute_schemas(
+        {"type": "object", "properties": {"year": {"type": "number"}}},
+        {
+            "type": "object",
+            "properties": {
+                "old": {"type": "string", "x-menagerist": {"archived": True}}
+            },
+        },
+    )
+    assert merged is not None
+    assert archived_keys(merged) == {"old"}

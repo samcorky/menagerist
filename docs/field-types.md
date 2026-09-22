@@ -284,3 +284,7 @@ Keys an item's type does not define are edited as loose "details". `lib/attribut
 ### Connection highlights
 
 `x-menagerist.highlights.connection` on a relationship type's schema lists up to 2 fields shown on connection rows (`MAX_CONNECTION_HIGHLIGHTS`); the card list is separate. `readHighlights` / `withHighlights` take the list name (`'card'` or `'connection'`), `summaryItems(..., 'connection')` reads the connection list, and the schema editor takes `highlightList` (the relationships settings page passes `'connection'`). The backend shape check covers both lists (`check_meta_shape`).
+
+### Per-item typed fields (`extra_schema`)
+
+A node may carry `extra_schema`, a schema in the same shape as a node type's `attributes_schema`, adding fields to that one item only. `application/schema_meta.merge_attribute_schemas` combines a node's type schema and its `extra_schema` for validation; a key defined by both is rejected. `highlights` is not merged — only a type's own schema controls card highlights. There is no editor UI for `extra_schema` yet; it is reachable only through the API (`CreateNodeRequest`/`UpdateNodeRequest`/`NodeResponse`).

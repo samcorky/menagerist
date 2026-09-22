@@ -15,7 +15,11 @@ from app.modules.graph.adapters.persistence.in_memory_node_type_repository impor
     InMemoryNodeTypeRepository,
 )
 from app.modules.graph.application.update_node import UpdateNode, UpdateNodeCommand
-from app.modules.graph.domain.errors import InvalidAttributesError, NodeNotFoundError
+from app.modules.graph.domain.errors import (
+    InvalidAttributesError,
+    InvalidSchemaError,
+    NodeNotFoundError,
+)
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
@@ -218,3 +222,117 @@ async def test_update_node_ignores_stale_value_that_was_not_edited() -> None:
             ),
             SYSTEM_ACTOR,
         )
+
+
+def _empty_repos() -> GraphRepos:
+    return GraphRepos(
+        nodes=InMemoryNodeRepository(),
+        edges=InMemoryEdgeRepository(),
+        node_types=InMemoryNodeTypeRepository(),
+        edge_types=InMemoryEdgeTypeRepository(),
+    )
+
+
+async def test_update_node_validates_attributes_against_an_extra_schema() -> None:
+    """A per-item overlay field is validated even without a node type schema."""
+    node = Node.create(name="Alien")
+    repos = _empty_repos()
+    await repos.nodes.add(node)
+    use_case = UpdateNode(InMemoryUnitOfWork(repos))
+
+    with pytest.raises(InvalidAttributesError):
+        await use_case.handle(
+            UpdateNodeCommand(
+                node_id=node.id,
+                attributes={"signed": "not-a-boolean"},
+                extra_schema={
+                    "type": "object",
+                    "properties": {"signed": {"type": "boolean"}},
+                },
+            ),
+            SYSTEM_ACTOR,
+        )
+
+
+async def test_update_node_reuses_the_stored_extra_schema_when_none_is_given() -> None:
+    """Updating only `attributes` still validates against the node's saved overlay."""
+    node = Node.create(
+        name="Alien",
+        extra_schema={
+            "type": "object",
+            "properties": {"signed": {"type": "boolean"}},
+        },
+    )
+    repos = _empty_repos()
+    await repos.nodes.add(node)
+    use_case = UpdateNode(InMemoryUnitOfWork(repos))
+
+    with pytest.raises(InvalidAttributesError):
+        await use_case.handle(
+            UpdateNodeCommand(node_id=node.id, attributes={"signed": "nope"}),
+            SYSTEM_ACTOR,
+        )
+
+
+async def test_update_node_rejects_extra_schema_redefining_a_type_field() -> None:
+    """The overlay cannot redefine a key the item type already has."""
+    node = Node.create(name="Alien", type="film")
+    repos = _empty_repos()
+    await repos.node_types.add(
+        NodeType.create(
+            slug="film",
+            label="Film",
+            attributes_schema={
+                "type": "object",
+                "properties": {"year": {"type": "number"}},
+            },
+        )
+    )
+    await repos.nodes.add(node)
+    use_case = UpdateNode(InMemoryUnitOfWork(repos))
+
+    with pytest.raises(InvalidSchemaError):
+        await use_case.handle(
+            UpdateNodeCommand(
+                node_id=node.id,
+                attributes={},
+                extra_schema={
+                    "type": "object",
+                    "properties": {"year": {"type": "string"}},
+                },
+            ),
+            SYSTEM_ACTOR,
+        )
+
+
+async def test_update_node_rejects_malformed_extra_schema_before_node_load() -> None:
+    """An invalid `extra_schema` is rejected even for a node id that does not exist."""
+    repos = _empty_repos()
+    use_case = UpdateNode(InMemoryUnitOfWork(repos))
+
+    with pytest.raises(InvalidSchemaError):
+        await use_case.handle(
+            UpdateNodeCommand(
+                node_id=uuid.uuid4(),
+                extra_schema={"type": "not-a-real-type"},
+            ),
+            SYSTEM_ACTOR,
+        )
+
+
+async def test_update_node_sets_extra_schema_and_leaves_it_when_not_given() -> None:
+    """`extra_schema` is stored, and omitting it on a later update keeps it."""
+    node = Node.create(name="Alien")
+    repos = _empty_repos()
+    await repos.nodes.add(node)
+    use_case = UpdateNode(InMemoryUnitOfWork(repos))
+    schema = {"type": "object", "properties": {"signed": {"type": "boolean"}}}
+
+    await use_case.handle(
+        UpdateNodeCommand(node_id=node.id, extra_schema=schema), SYSTEM_ACTOR
+    )
+    result = await use_case.handle(
+        UpdateNodeCommand(node_id=node.id, name="Alien (1979)"), SYSTEM_ACTOR
+    )
+
+    assert result.extra_schema == schema

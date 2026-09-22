@@ -5,6 +5,10 @@ import structlog
 
 from app.modules.graph.application._validate_attributes import validate_attributes
 from app.modules.graph.application.custom_details import check_custom_details
+from app.modules.graph.application.schema_meta import (
+    check_schema_definition,
+    merge_attribute_schemas,
+)
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
@@ -27,6 +31,7 @@ class CreateNodeCommand:
     attributes: dict[str, Any] = field(default_factory=dict)
     favourite: bool = field(default=False)
     tags: list[str] = field(default_factory=list)
+    extra_schema: dict[str, Any] | None = field(default=None)
 
 
 class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
@@ -38,6 +43,8 @@ class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
         If no NodeType exists for the given type slug, one is created automatically
         so the vocabulary builds itself as nodes are added.
         """
+        if command.extra_schema is not None:
+            check_schema_definition(command.extra_schema)
         node = Node.create(
             name=command.name,
             type=command.type,
@@ -45,9 +52,10 @@ class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
             attributes=command.attributes,
             favourite=command.favourite,
             tags=command.tags,
+            extra_schema=command.extra_schema,
         )
         async with self._uow as repos:
-            schema: dict[str, Any] | None = None
+            type_schema: dict[str, Any] | None = None
             if command.type is not None:
                 slug = slugify(command.type)
                 node_type = await repos.node_types.get_by_slug(slug)
@@ -55,9 +63,11 @@ class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
                     await repos.node_types.add(
                         NodeType.create(slug=slug, label=command.type)
                     )
-                elif node_type.attributes_schema is not None:
-                    schema = node_type.attributes_schema
-                    validate_attributes(schema, command.attributes)
+                else:
+                    type_schema = node_type.attributes_schema
+            schema = merge_attribute_schemas(type_schema, command.extra_schema)
+            if schema is not None:
+                validate_attributes(schema, command.attributes)
             check_custom_details(schema, command.attributes)
             await repos.nodes.add(node)
             await self._uow.commit()

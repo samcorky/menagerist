@@ -13,7 +13,7 @@ from app.modules.graph.adapters.persistence.in_memory_node_type_repository impor
     InMemoryNodeTypeRepository,
 )
 from app.modules.graph.application.create_node import CreateNode, CreateNodeCommand
-from app.modules.graph.domain.errors import InvalidAttributesError
+from app.modules.graph.domain.errors import InvalidAttributesError, InvalidSchemaError
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.actor import SYSTEM_ACTOR
@@ -110,3 +110,105 @@ async def test_create_node_ignores_required_in_schema() -> None:
     )
 
     assert node.attributes == {}
+
+
+async def test_create_node_validates_attributes_against_an_extra_schema() -> None:
+    """A per-item overlay field is validated even without a node type schema."""
+    uow, _ = _make_uow()
+    use_case = CreateNode(uow)
+
+    with pytest.raises(InvalidAttributesError):
+        await use_case.handle(
+            CreateNodeCommand(
+                name="Alien",
+                attributes={"signed": "not-a-boolean"},
+                extra_schema={
+                    "type": "object",
+                    "properties": {"signed": {"type": "boolean"}},
+                },
+            ),
+            SYSTEM_ACTOR,
+        )
+
+
+async def test_create_node_merges_type_schema_and_extra_schema() -> None:
+    """Attributes are checked against the type's fields and the per-item overlay."""
+    uow, repos = _make_uow()
+    await repos.node_types.add(
+        NodeType.create(
+            slug="film",
+            label="Film",
+            attributes_schema={
+                "type": "object",
+                "properties": {"year": {"type": "number"}},
+            },
+        )
+    )
+    use_case = CreateNode(uow)
+
+    node = await use_case.handle(
+        CreateNodeCommand(
+            name="Alien",
+            type="film",
+            attributes={"year": 1979, "signed": True},
+            extra_schema={
+                "type": "object",
+                "properties": {"signed": {"type": "boolean"}},
+            },
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    assert node.attributes == {"year": 1979, "signed": True}
+    assert node.extra_schema == {
+        "type": "object",
+        "properties": {"signed": {"type": "boolean"}},
+    }
+
+
+async def test_create_node_rejects_extra_schema_redefining_a_type_field() -> None:
+    """The overlay cannot redefine a key the item type already has."""
+    uow, repos = _make_uow()
+    await repos.node_types.add(
+        NodeType.create(
+            slug="film",
+            label="Film",
+            attributes_schema={
+                "type": "object",
+                "properties": {"year": {"type": "number"}},
+            },
+        )
+    )
+    use_case = CreateNode(uow)
+
+    with pytest.raises(InvalidSchemaError):
+        await use_case.handle(
+            CreateNodeCommand(
+                name="Alien",
+                type="film",
+                attributes={},
+                extra_schema={
+                    "type": "object",
+                    "properties": {"year": {"type": "string"}},
+                },
+            ),
+            SYSTEM_ACTOR,
+        )
+
+
+async def test_create_node_rejects_a_malformed_extra_schema() -> None:
+    """An invalid JSON Schema in `extra_schema` is rejected before anything is saved."""
+    uow, repos = _make_uow()
+    use_case = CreateNode(uow)
+
+    with pytest.raises(InvalidSchemaError):
+        await use_case.handle(
+            CreateNodeCommand(
+                name="Alien",
+                attributes={},
+                extra_schema={"type": "not-a-real-type"},
+            ),
+            SYSTEM_ACTOR,
+        )
+
+    assert await repos.nodes.count() == 0

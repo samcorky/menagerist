@@ -228,3 +228,37 @@ def test_update_leaves_tags_unchanged_when_not_given() -> None:
     node.update(name="Aliens")
 
     assert node.tags == ["a"]
+
+
+def test_create_accepts_an_extra_schema() -> None:
+    """A per-item overlay schema is stored on creation."""
+    schema = {"type": "object", "properties": {"signed": {"type": "boolean"}}}
+
+    node = Node.create(name="Alien", extra_schema=schema)
+
+    assert node.extra_schema == schema
+
+
+def test_create_defaults_extra_schema_to_none() -> None:
+    """A node with no overlay leaves extra_schema as None."""
+    assert Node.create(name="Alien").extra_schema is None
+
+
+def test_update_sets_extra_schema() -> None:
+    """Passing extra_schema on update stores it."""
+    node = Node.create(name="Alien")
+    schema = {"type": "object", "properties": {"signed": {"type": "boolean"}}}
+
+    node.update(extra_schema=schema)
+
+    assert node.extra_schema == schema
+
+
+def test_update_with_no_extra_schema_leaves_it_unchanged() -> None:
+    """Omitting extra_schema on update keeps the existing one."""
+    schema = {"type": "object", "properties": {"signed": {"type": "boolean"}}}
+    node = Node.create(name="Alien", extra_schema=schema)
+
+    node.update(name="Alien (1979)")
+
+    assert node.extra_schema == schema

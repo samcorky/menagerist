@@ -23,6 +23,7 @@ def _fields(node: Node) -> tuple[object, ...]:
         node.attributes,
         node.favourite,
         node.tags,
+        node.extra_schema,
         node.created_at,
         node.updated_at,
         node.deleted_at,
@@ -39,6 +40,52 @@ async def test_add_and_get_round_trips(db_session: AsyncSession) -> None:
 
     assert result is not None
     assert _fields(result) == _fields(node)
+
+
+async def test_add_and_get_round_trips_a_null_extra_schema(
+    db_session: AsyncSession,
+) -> None:
+    """A node with no overlay stores and returns `extra_schema` as None."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    node = Node.create(name="Alien", type="film")
+
+    await repository.add(node)
+    result = await repository.get(node.id)
+
+    assert result is not None
+    assert result.extra_schema is None
+
+
+async def test_add_and_get_round_trips_an_extra_schema(
+    db_session: AsyncSession,
+) -> None:
+    """A node's per-item overlay schema survives a round trip through JSONB."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    schema = {
+        "type": "object",
+        "properties": {"signed": {"type": "boolean", "x-menagerist": {}}},
+    }
+    node = Node.create(name="Alien", type="film", extra_schema=schema)
+
+    await repository.add(node)
+    result = await repository.get(node.id)
+
+    assert result is not None
+    assert result.extra_schema == schema
+
+
+async def test_save_persists_a_changed_extra_schema(db_session: AsyncSession) -> None:
+    """Updating extra_schema on an existing node and saving it persists the change."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    node = Node.create(name="Alien", type="film")
+    await repository.add(node)
+
+    node.update(extra_schema={"type": "object", "properties": {}})
+    await repository.save(node)
+    result = await repository.get(node.id)
+
+    assert result is not None
+    assert result.extra_schema == {"type": "object", "properties": {}}
 
 
 async def test_get_returns_none_for_missing_node(db_session: AsyncSession) -> None:

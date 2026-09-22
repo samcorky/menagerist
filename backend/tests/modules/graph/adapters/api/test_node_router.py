@@ -95,6 +95,54 @@ def test_update_node_returns_404_when_missing() -> None:
     assert response.status_code == 404
 
 
+def test_create_node_with_an_extra_schema_round_trips_and_validates() -> None:
+    """A per-item overlay is returned as-is and validates its own fields."""
+    client = TestClient(_app_with_in_memory_graph())
+    schema = {"type": "object", "properties": {"signed": {"type": "boolean"}}}
+
+    create_response = client.post(
+        "/api/v1/node",
+        json={"name": "Alien", "attributes": {"signed": True}, "extra_schema": schema},
+    )
+    assert create_response.status_code == 201
+    assert create_response.json()["extra_schema"] == schema
+
+    invalid_response = client.post(
+        "/api/v1/node",
+        json={
+            "name": "Alien 2",
+            "attributes": {"signed": "nope"},
+            "extra_schema": schema,
+        },
+    )
+    assert invalid_response.status_code == 400
+
+
+def test_create_node_rejects_a_malformed_extra_schema() -> None:
+    """A structurally invalid `extra_schema` is rejected with a client error."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    response = client.post(
+        "/api/v1/node",
+        json={"name": "Alien", "extra_schema": {"type": "not-a-real-type"}},
+    )
+
+    assert response.status_code == 400
+
+
+def test_update_node_extra_schema_persists_and_is_kept_when_omitted() -> None:
+    """PATCH stores extra_schema, and a later PATCH without it leaves it in place."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien"}).json()
+    schema = {"type": "object", "properties": {"signed": {"type": "boolean"}}}
+
+    first = client.patch(f"/api/v1/node/{node['id']}", json={"extra_schema": schema})
+    assert first.json()["extra_schema"] == schema
+
+    second = client.patch(f"/api/v1/node/{node['id']}", json={"name": "Alien (1979)"})
+    assert second.json()["extra_schema"] == schema
+
+
 def test_delete_node_then_get_and_list_no_longer_find_it() -> None:
     """DELETE soft-deletes the node, so subsequent GET/LIST treat it as gone."""
     client = TestClient(_app_with_in_memory_graph())

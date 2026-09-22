@@ -18,6 +18,7 @@ _NODE_EXAMPLE: dict[str, Any] = {
     "attributes": {"year": 1979},
     "favourite": False,
     "tags": ["sci-fi", "horror"],
+    "extra_schema": None,
     "created_at": "2026-08-23T10:14:44.465954Z",
     "updated_at": "2026-08-23T10:14:44.465954Z",
 }
@@ -30,6 +31,7 @@ _NODE_MINIMAL_EXAMPLE: dict[str, Any] = {
     "attributes": {},
     "favourite": False,
     "tags": [],
+    "extra_schema": None,
     "created_at": "2026-08-23T10:14:44.465954Z",
     "updated_at": "2026-08-23T10:14:44.465954Z",
 }
@@ -61,6 +63,7 @@ class CreateNodeRequest(BaseModel):
     attributes: dict[str, Any] = Field(default_factory=dict)
     favourite: bool = Field(default=False)
     tags: list[str] = Field(default_factory=list)
+    extra_schema: dict[str, Any] | None = Field(default=None)
 
     @field_validator("type", mode="before")
     @classmethod
@@ -79,6 +82,7 @@ class CreateNodeRequest(BaseModel):
             attributes=self.attributes,
             favourite=self.favourite,
             tags=self.tags,
+            extra_schema=self.extra_schema,
         )
 
 
@@ -106,6 +110,7 @@ class UpdateNodeRequest(BaseModel):
     attributes: dict[str, Any] | None = Field(default=None)
     favourite: bool | None = Field(default=None)
     tags: list[str] | None = Field(default=None)
+    extra_schema: dict[str, Any] | None = Field(default=None)
 
     @field_validator("type", mode="before")
     @classmethod
@@ -125,6 +130,7 @@ class UpdateNodeRequest(BaseModel):
             attributes=self.attributes,
             favourite=self.favourite,
             tags=self.tags,
+            extra_schema=self.extra_schema,
         )
 
 
@@ -142,6 +148,7 @@ class NodeResponse(BaseModel):
     attributes: dict[str, Any]
     favourite: bool
     tags: list[str]
+    extra_schema: dict[str, Any] | None = Field(default=None)
     created_at: datetime
     updated_at: datetime
 
@@ -156,6 +163,7 @@ class NodeResponse(BaseModel):
             attributes=node.attributes,
             favourite=node.favourite,
             tags=node.tags,
+            extra_schema=node.extra_schema,
             created_at=node.created_at,
             updated_at=node.updated_at,
         )

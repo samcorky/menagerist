@@ -23,6 +23,7 @@ class Node(Identifiable, SoftDeletable):
     attributes: dict[str, Any] = field(default_factory=dict)
     favourite: bool = False
     tags: list[str] = field(default_factory=list)
+    extra_schema: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         """Validate invariants and normalise fields after construction."""
@@ -47,6 +48,7 @@ class Node(Identifiable, SoftDeletable):
         attributes: dict[str, Any] | None = None,
         favourite: bool = False,
         tags: list[str] | None = None,
+        extra_schema: dict[str, Any] | None = None,
     ) -> Node:
         """Create a new node, generating its id and timestamps."""
         now = datetime.now(UTC)
@@ -58,6 +60,7 @@ class Node(Identifiable, SoftDeletable):
             attributes=attributes or {},
             favourite=favourite,
             tags=tags or [],
+            extra_schema=extra_schema,
             created_at=now,
             updated_at=now,
         )
@@ -85,8 +88,13 @@ class Node(Identifiable, SoftDeletable):
         attributes: dict[str, Any] | None = None,
         favourite: bool | None = None,
         tags: list[str] | None = None,
+        extra_schema: dict[str, Any] | None = None,
     ) -> None:
-        """Apply partial changes to editable fields, validating invariants."""
+        """Apply partial changes to editable fields, validating invariants.
+
+        `extra_schema` follows the same convention as `attributes_schema` on a
+        node type: `None` leaves it unchanged (there is no way to clear it yet).
+        """
         if name is not None:
             if name.strip() == "":
                 raise ValidationError("name must be provided")
@@ -96,7 +104,10 @@ class Node(Identifiable, SoftDeletable):
             self._apply_type(type)
 
         self._set_if_given(
-            description=description, attributes=attributes, favourite=favourite
+            description=description,
+            attributes=attributes,
+            favourite=favourite,
+            extra_schema=extra_schema,
         )
         if tags is not None:
             self.tags = _normalise_tags(tags)

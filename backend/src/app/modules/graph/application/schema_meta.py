@@ -7,6 +7,8 @@ Nothing else in the backend reads `x-*` keywords directly.
 
 from typing import Any
 
+import jsonschema
+
 from app.modules.graph.domain.errors import InvalidSchemaError
 
 NAMESPACE = "x-menagerist"
@@ -68,6 +70,63 @@ def search_excluded_keys(schema: dict[str, Any]) -> list[str]:
         ):
             excluded.append(key)
     return excluded
+
+
+def check_schema_definition(schema: dict[str, Any]) -> None:
+    """Check that `schema` is valid JSON Schema with a well-shaped `x-menagerist`.
+
+    Used wherever a schema is authored: node types, edge types and a node's
+    `extra_schema` overlay.
+
+    :raises InvalidSchemaError: on either problem.
+    """
+    try:
+        jsonschema.validators.validator_for(schema).check_schema(schema)
+    except jsonschema.SchemaError as exc:
+        raise InvalidSchemaError(str(exc.message)) from exc
+    check_meta_shape(schema)
+
+
+def merge_attribute_schemas(
+    type_schema: dict[str, Any] | None, extra_schema: dict[str, Any] | None
+) -> dict[str, Any] | None:
+    """Combine a node type's schema with a node's per-item overlay (WI-19d).
+
+    Both describe properties of the same `attributes` dict, so validation needs
+    one merged schema. `required` and `layout` are concatenated (type fields
+    first); `highlights` stays type-only and is not merged. Returns `None`
+    when neither schema is given.
+
+    :raises InvalidSchemaError: when a key is defined by both schemas.
+    """
+    if type_schema is None and extra_schema is None:
+        return None
+    type_props = type_schema.get("properties") if type_schema else None
+    extra_props = extra_schema.get("properties") if extra_schema else None
+    type_props = type_props if isinstance(type_props, dict) else {}
+    extra_props = extra_props if isinstance(extra_props, dict) else {}
+    overlap = set(type_props) & set(extra_props)
+    if overlap:
+        raise InvalidSchemaError(
+            "extra_schema redefines field(s) already on the item type: "
+            + ", ".join(sorted(overlap))
+        )
+    merged: dict[str, Any] = {
+        "type": "object",
+        "properties": {**type_props, **extra_props},
+    }
+    type_meta = _meta(type_schema)
+    extra_meta = _meta(extra_schema)
+    required = [*type_meta.get("required", []), *extra_meta.get("required", [])]
+    layout = [*type_meta.get("layout", []), *extra_meta.get("layout", [])]
+    meta: dict[str, Any] = {}
+    if required:
+        meta["required"] = required
+    if layout:
+        meta["layout"] = layout
+    if meta:
+        merged[NAMESPACE] = meta
+    return merged
 
 
 def validation_schema(schema: dict[str, Any]) -> dict[str, Any]:

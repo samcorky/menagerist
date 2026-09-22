@@ -20,7 +20,7 @@ Update at the end of every session. Read this first.
 | WI-17 attribute search | done, committed (06b605b) | feature/initial-implementation | See "WI-17 session notes" below. |
 | WI-18 per-item custom fields | 18a done, committed (d9dbdc6); 18b and 18c todo | feature/initial-implementation | See "WI-18a session notes" below. 18b and 18c wait for the WI-19d overlay. |
 | WI-19 presets | todo | | |
-| WI-19d per-item schema overlay | todo | | |
+| WI-19d per-item schema overlay | done, awaiting user review and commit | feature/initial-implementation | See "WI-19d session notes" below. |
 | WI-21 value suggestions | todo | | |
 | WI-22 connection details | 22a done, committed (66417f1); 22b todo | feature/initial-implementation | See "WI-22a session notes" below. |
 | WI-13 drag-and-drop layout (stretch) | todo | | |
@@ -376,3 +376,34 @@ Update at the end of every session. Read this first.
 - Use `write` tools or script files for anything with backslashes or nested quotes: shell heredocs break on both.
 - Verify subagent edits with lint, typecheck and a grep.
 - The stray staged `frontend/src/lib/field-types/BooleanView.svelte` (index only) is still in `git status`.
+
+## WI-19d session notes
+
+**Status:** implemented, all backend and frontend checks green, not committed. Next item: WI-19 (presets), then WI-18b/18c (their UI builds on this overlay), WI-21, WI-22b, WI-13. WI-12 stays optional.
+
+**Scope decision:** `wi-19d-per-item-schema-overlay.md` is light on implementation detail, but `backend-surface.md` is explicit: "WI-19d (overlay, decided) adds a column and API fields, not a port." This session delivered that backend plumbing only — a nullable `extra_schema` on nodes, merged validation, and the API surface. It does **not** add an item-page editor for adding per-item typed fields; that is WI-18b/18c's UI, now unblocked.
+
+**Done**
+- Migration `d4e5f6a7b8c9` adds nullable `extra_schema` JSONB to `nodes` (v1: nodes only, not edges), applied via `poe db-up`.
+- `Node` domain entity, `NodeModel`, both node repository adapters (SQLAlchemy and in-memory) gain `extra_schema`. `extra_schema=None` on update means "leave unchanged", matching `attributes_schema` on a node type.
+- New `application/schema_meta.merge_attribute_schemas(type_schema, extra_schema)`: combines properties from both (raises `InvalidSchemaError` on a shared key, including one only archived on the type), concatenates `required` and `layout` (type first), leaves `highlights` type-only.
+- New `application/schema_meta.check_schema_definition(schema)`: the jsonschema-validity + `check_meta_shape` pair already duplicated across the four node-type/edge-type use cases, now shared. `CreateNode`/`UpdateNode` call it on a given `extra_schema`, then validate `attributes` and custom-detail limits against the merged schema.
+- API: `CreateNodeRequest`, `UpdateNodeRequest`, `NodeResponse` gain `extra_schema`. Client regenerated (`poe generate-frontend-client`); no frontend source changed, but typecheck/lint/tests re-run clean against the new generated types.
+- Tests: domain (`test_node.py`), `schema_meta` (`merge_attribute_schemas`, `check_schema_definition`), `CreateNode`/`UpdateNode` (validation against the overlay alone, merged with a type schema, the key-collision rejection, "None keeps the stored overlay"), SQLAlchemy round-trip (`@pytest.mark.integration`, including a changed-and-saved case), router tests (create/update round-trip, malformed schema, 400 not 422 — `ValidationError` subclasses map to 400 in `problem_response.py`).
+- Docs: `docs/DECISIONS.md`, `docs/field-types.md`.
+
+**Left / deferred**
+- No UI to create or edit `extra_schema`; only reachable via the API. WI-18b/18c build that.
+- WI-17 attribute search does not exclude non-searchable overlay fields (e.g. a per-item rating) the way it does for type fields — exclusions are computed per type in `ListNodes`, not per node. Left for later; not a regression (an overlay rating is searched as text today, same as any custom detail was).
+- Edges have no overlay (v1 scope, per spec).
+- Not tried against a running frontend (no UI touches this yet).
+
+**Files touched:** backend `domain/node.py`, `adapters/persistence/models.py`, `adapters/persistence/node_repository.py`, `adapters/persistence/in_memory_node_repository.py` (no code change needed, generic), `application/schema_meta.py`, `application/create_node.py`, `application/update_node.py`, `adapters/api/node/schemas.py`, new migration `d4e5f6a7b8c9_add_extra_schema_to_nodes.py`; tests `test_node.py`, `test_schema_meta.py`, `test_create_node.py`, `test_update_node.py`, `test_node_repository.py`, `test_node_router.py`. Frontend: only the generated API client. Docs as above.
+
+**Checks run:** `poe lint-backend` and `poe typecheck-backend` clean; `poe test-backend` 614 pass; `poe coverage` (with `poe db-up` running Postgres and the new migration) 38 integration tests pass, all targets met (application 100%); `poe lint-frontend`, `poe typecheck-frontend` (0 errors, 2 existing warnings) and `poe test-frontend` (259 pass) all clean after the client regeneration.
+
+**Next session must know**
+- `merge_attribute_schemas` and `check_schema_definition` are the two functions WI-18b/18c and WI-19 (if it ever touches nodes directly) should reuse rather than re-deriving overlay logic.
+- `ValidationError` subclasses (`InvalidSchemaError`, `InvalidAttributesError`) map to HTTP 400, not 422 — a couple of my first test assertions guessed 422 and had to be fixed.
+- The migration chain head is now `d4e5f6a7b8c9`; `poe db-up` (which runs the `migrate` compose service) applied it cleanly in this session.
+- `Node.update`/`Node.create` and both `Create/UpdateNodeCommand`s take `extra_schema` as an additional keyword-only field with a default, so no existing call site needed changes.

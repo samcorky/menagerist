@@ -255,3 +255,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** The backend already stored, validated and returned connection details; only the UI was missing. Reusing the highlight list, summary component, attribute editor and detail rules keeps one mental model for items and connections (guidelines §16a, §16b, §17), and Undo replaces confirmation for a reversible action (§14).
 
 **Tradeoff:** Undo re-creates the connection, so its id and timestamps change. A row shows both the other item's highlights and the connection's own (open question 51). Adding several connections at once (WI-22b) and typed per-connection extras beyond the type's fields are not built.
+
+---
+
+## A nullable `extra_schema` overlay gives nodes per-item typed fields
+
+**Decision:** Nodes gain a nullable `extra_schema` column (v1: nodes only, not edges), in the same JSON Schema shape as a node type's `attributes_schema` (properties with `x-menagerist`, a `version`, `required`, `layout`). `application/schema_meta.merge_attribute_schemas(type_schema, extra_schema)` combines both into one schema for validation: properties from each side, `required` and `layout` concatenated (type first), and `highlights` left type-only (never merged). `CreateNode`/`UpdateNode` check a given `extra_schema`'s own JSON Schema validity and `x-menagerist` shape (`check_schema_definition`, shared with the node-type and edge-type use cases), then validate `attributes` and check custom-detail limits against the merged schema instead of the type schema alone. A key defined by both schemas is rejected as `InvalidSchemaError`, including a key that is only archived on the type (its slot stays reserved). `extra_schema` follows the existing "`None` on update means unchanged" convention (there is no way to clear it yet, matching `attributes_schema` on a node type).
+
+**Rationale:** Reuses the existing field-type registry, editor components, validation and search unchanged for per-item fields, instead of a parallel typed-field system. `backend-surface.md` scopes WI-19d to "a column and API fields, not a port" — this session is that plumbing. The frontend UI to add typed per-item fields (WI-18b/18c) is separate and builds on this.
+
+**Tradeoff:** No item-page UI yet to create or edit `extra_schema` entries directly; only the API surface exists. WI-17 attribute search does not yet exclude non-searchable overlay fields (for example a per-item rating) the way it does for type fields, since exclusions are computed per type, not per node — left for later. No migration path to remove per-item fields beyond archiving them inside `extra_schema` itself, same as a type schema.

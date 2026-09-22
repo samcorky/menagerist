@@ -71,3 +71,5 @@
 64. WI-17: where should the "Matched in ..." line show? Default: on the list card and the grid card, one truncated line each, only while a search is active and the name and description did not match.
 65. WI-16: when a highlighted field's kind changes to a non-highlightable one, should the editor say so? Default: it drops silently (the pin is hidden for those kinds).
 66. **Closed (owner, review 2026-09-21):** keep the exception; detail-name problems disable Save. Was: WI-18a: detail-name problems (blank name with a value, duplicates, a name equal to a field) disable Save, an exception to "client errors never block Save" because the alternative is silent data loss. Keep the exception?
+67. WI-19d: `extra_schema` has no way to be cleared once set (matches the existing `attributes_schema` limitation on node types). Worth a dedicated "clear" path, or wait until it is a real need?
+68. WI-19d/WI-17: should attribute search exclude non-searchable per-item overlay fields (e.g. a rating added via `extra_schema`), the way it already does for type-schema fields? Needs per-node exclusions in `ListNodes`, not just per-type. Default: left as a gap for now.
