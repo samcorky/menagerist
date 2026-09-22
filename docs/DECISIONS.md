@@ -285,3 +285,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** The spec calls this out explicitly as structural over convention: N client calls to `POST /edge` would not be atomic and could leave a half-connected state on a partial failure, whereas the batch command commits once. Reusing `list_for_node` for the duplicate check avoids a new repository method.
 
 **Tradeoff:** Undo removes the created edges one at a time (no batch delete exists), best-effort. Creating new items inline from the picker (typing a name that doesn't match anything) is not implemented; only existing items can be selected.
+
+---
+
+## Rank-based matching for kind-less properties (WI-12)
+
+**Decision:** `FieldTypeDescriptor` gained an optional `rank?: (prop) => number`. `descriptorForProp` now picks the highest-ranked descriptor whose `fromSchema` matches an unkinded (API-authored) property, defaulting unranked matches to `1`; ties fall back to registration order. An explicit `x-menagerist.kind` is unaffected — it was, and remains, a direct lookup.
+
+**Rationale:** Correctness no longer depends on import order in `field-types/index.ts`. No current built-in kind actually needs a non-default rank: every scalar's `fromSchema` already excludes the shapes the others claim (checked directly — `text` excludes `format`/`enum`, `date`/`choice` require them, `rating`/`longtext` only ever match an explicit `kind`), so this is infrastructure for the overlapping kinds the spec anticipates (multi-choice, partial date, identifier, URL/email), not a fix for a live bug.
+
+**Tradeoff:** None beyond the small added surface on the descriptor type.

@@ -14,7 +14,7 @@ Update at the end of every session. Read this first.
 | WI-9 purge and usage | done, committed (a479871) | feature/initial-implementation | See "WI-9 session notes" below. |
 | WI-10 kind changes and option warnings | done, committed (602cfe4) | feature/initial-implementation | See "WI-10 session notes" below. |
 | WI-11 display options | done, committed (2668afd) | feature/initial-implementation | See "WI-11 session notes" below. |
-| WI-12 rank matching (optional) | todo | | |
+| WI-12 rank matching (optional) | done, awaiting user review and commit | feature/initial-implementation | See "WI-12 session notes" below. |
 | WI-15 text constraints | done, committed (26fdaca) | feature/initial-implementation | See "WI-15 session notes" below. |
 | WI-16 highlighted fields | done, committed (44c01dc) | feature/initial-implementation | See "WI-16 session notes" below. |
 | WI-17 attribute search | done, committed (06b605b) | feature/initial-implementation | See "WI-17 session notes" below. |
@@ -22,7 +22,7 @@ Update at the end of every session. Read this first.
 | WI-19 presets | 19a done, awaiting user review and commit; 19b and 19c todo | feature/initial-implementation | See "WI-19a session notes" below. |
 | WI-19d per-item schema overlay | done, committed (e1a17b8) | feature/initial-implementation | See "WI-19d session notes" below. |
 | WI-21 value suggestions | todo | | |
-| WI-22 connection details | 22a done, committed (66417f1); 22b done, awaiting user review and commit | feature/initial-implementation | See "WI-22a session notes" below. |
+| WI-22 connection details | 22a done, committed (66417f1); 22b done, committed (5706c51) | feature/initial-implementation | See "WI-22a session notes" below. |
 | WI-13 drag-and-drop layout (stretch) | todo | | |
 
 ## WI-1 to WI-4 session notes
@@ -454,3 +454,19 @@ Update at the end of every session. Read this first.
 **Files touched:** backend `application/create_edges.py` (new), `adapters/api/edge/{schemas.py,router.py}`, `adapters/api/dependencies.py`; tests `test_create_edges.py` (new), `test_edge_router.py`. Frontend `routes/collection/[id]/+page.svelte`. Docs as above.
 
 **Checks run:** `poe lint-backend`/`typecheck-backend` clean; `poe test-backend` 677 pass; `poe coverage` all targets met (application 100%, 46 integration tests pass); `poe lint-frontend`/`typecheck-frontend` (0 errors, 2 existing warnings) clean; `poe test-frontend` 266 pass.
+
+## WI-12 session notes
+
+**Status:** implemented, all frontend checks green, not committed. Remaining table items: WI-19b/19c, WI-21, WI-13.
+
+**Done**
+- `FieldTypeDescriptor.rank?: (prop) => number` (registry.ts). `descriptorForProp`'s no-`kind` fallback now picks the highest-ranked matching descriptor (unranked defaults to 1), ties broken by registration order. The `x-menagerist.kind` direct-lookup path is unchanged.
+- No built-in kind was given a non-default rank: checked each scalar's `fromSchema` and none currently overlap (confirmed in the DECISIONS entry), so this session only adds the mechanism, as the spec's own closing note anticipated ("worth doing only if more overlapping types are coming").
+- Updated the `index.ts` ordering comment (order now only breaks ties) and the `field-types.md` matching description.
+- Tests: 3 new cases in `registry.test.ts` (rank picks the winner regardless of registration order, ties fall back to order, rank 0 means no match). `docs/DECISIONS.md` updated.
+
+**Left:** nothing planned; this stays dormant until a genuinely overlapping kind (multi-choice, partial date, identifier, URL/email) is added, which should set `rank` instead of relying on import order.
+
+**Files touched:** frontend `field-types/registry.ts`, `field-types/index.ts`; tests `registry.test.ts`. Docs as above. No backend changes.
+
+**Checks run:** `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 269 pass. Backend unchanged, backend checks not run.

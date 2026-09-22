@@ -94,3 +94,98 @@ describe('descriptorForProp', () => {
 		expect(descriptorForProp(prop)).toBeUndefined();
 	});
 });
+
+describe('rank-based matching', () => {
+	const genericProp: JsonSchemaProperty = { title: 'X', type: 'string' };
+
+	beforeEach(() => {
+		_clearRegistry();
+	});
+
+	it('picks the higher-ranked match regardless of registration order', () => {
+		const generic: FieldTypeDescriptor = {
+			...textDesc,
+			kind: 'generic',
+			fromSchema: () => ({
+				key: '_',
+				label: 'X',
+				kind: 'generic',
+				required: false,
+				options: [],
+				subFields: []
+			})
+		};
+		const specific: FieldTypeDescriptor = {
+			...textDesc,
+			kind: 'specific',
+			fromSchema: () => ({
+				key: '_',
+				label: 'X',
+				kind: 'specific',
+				required: false,
+				options: [],
+				subFields: []
+			}),
+			rank: () => 2
+		};
+
+		register(generic);
+		register(specific);
+		expect(descriptorForProp(genericProp)?.kind).toBe('specific');
+
+		_clearRegistry();
+		register(specific);
+		register(generic);
+		expect(descriptorForProp(genericProp)?.kind).toBe('specific');
+	});
+
+	it('breaks a tie by registration order', () => {
+		const first: FieldTypeDescriptor = {
+			...textDesc,
+			kind: 'first',
+			fromSchema: () => ({
+				key: '_',
+				label: 'X',
+				kind: 'first',
+				required: false,
+				options: [],
+				subFields: []
+			})
+		};
+		const second: FieldTypeDescriptor = {
+			...textDesc,
+			kind: 'second',
+			fromSchema: () => ({
+				key: '_',
+				label: 'X',
+				kind: 'second',
+				required: false,
+				options: [],
+				subFields: []
+			})
+		};
+
+		register(first);
+		register(second);
+		expect(descriptorForProp(genericProp)?.kind).toBe('first');
+	});
+
+	it('a rank of 0 is treated as no match', () => {
+		const zero: FieldTypeDescriptor = {
+			...textDesc,
+			kind: 'zero',
+			fromSchema: () => ({
+				key: '_',
+				label: 'X',
+				kind: 'zero',
+				required: false,
+				options: [],
+				subFields: []
+			}),
+			rank: () => 0
+		};
+
+		register(zero);
+		expect(descriptorForProp(genericProp)).toBeUndefined();
+	});
+});

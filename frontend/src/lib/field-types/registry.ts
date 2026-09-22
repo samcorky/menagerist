@@ -25,6 +25,13 @@ export type FieldTypeDescriptor = {
 	canBeSubField?: boolean;
 	/** Set false to hide the kind from the kind dropdowns (e.g. `opaque`). */
 	selectable?: boolean;
+	/**
+	 * Match strength for a property with no explicit `kind` (API-authored). Higher wins;
+	 * `0` (or a matching `fromSchema` returning null) means "does not match". When absent,
+	 * a match defaults to rank 1. Only needed once two descriptors' `fromSchema` can both
+	 * match the same shape; ties fall back to registration order.
+	 */
+	rank?: (prop: JsonSchemaProperty) => number;
 	/** Presentation settings offered in the schema editor; widgets read them from the property. */
 	displayOptions?: DisplayOption[];
 	/**
@@ -78,9 +85,10 @@ export function allDescriptors(): FieldTypeDescriptor[] {
 }
 
 /**
- * Find the descriptor for a property. An explicit `kind` in the property metadata is a direct lookup
- * (and must still match the property's shape); otherwise the first descriptor whose
- * fromSchema matches wins, so registration order in index.ts sets precedence.
+ * Find the descriptor for a property. An explicit `kind` in the property metadata is a direct
+ * lookup (and must still match the property's shape); otherwise the highest-ranked descriptor
+ * whose fromSchema matches wins (see `FieldTypeDescriptor.rank`), ties broken by registration
+ * order in index.ts.
  */
 export function descriptorForProp(prop: JsonSchemaProperty): FieldTypeDescriptor | undefined {
 	const kind = readPropMeta(prop).kind;
@@ -88,10 +96,17 @@ export function descriptorForProp(prop: JsonSchemaProperty): FieldTypeDescriptor
 		const desc = registry.get(kind);
 		return desc && desc.fromSchema('_', prop, false) !== null ? desc : undefined;
 	}
+	let best: FieldTypeDescriptor | undefined;
+	let bestRank = 0;
 	for (const desc of registry.values()) {
-		if (desc.fromSchema('_', prop, false) !== null) return desc;
+		if (desc.fromSchema('_', prop, false) === null) continue;
+		const rank = desc.rank ? desc.rank(prop) : 1;
+		if (rank > bestRank) {
+			bestRank = rank;
+			best = desc;
+		}
 	}
-	return undefined;
+	return best;
 }
 
 /** Build an EditorField from a property; anything unrecognised becomes `opaque`. */

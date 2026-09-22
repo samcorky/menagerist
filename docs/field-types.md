@@ -103,7 +103,7 @@ import './text';        // plain string — fallback, must be last among scalars
 import './group';       // after scalars so sub-field fromSchema lookups work
 ```
 
-`descriptorForProp(prop)` first looks at `x-menagerist.kind`: an explicit kind is a direct registry lookup, and the property must still match that descriptor's `fromSchema`. Without a `kind` it iterates the registry in insertion order and returns the first descriptor whose `fromSchema` returns non-null, so order matters — `text` would greedily match every string property if registered before `date` and `choice`. Anything unrecognised (an unknown `kind`, a `kind` that does not fit the shape, or a shape no descriptor matches) becomes the non-selectable `opaque` kind and is preserved unchanged.
+`descriptorForProp(prop)` first looks at `x-menagerist.kind`: an explicit kind is a direct registry lookup, and the property must still match that descriptor's `fromSchema`. Without a `kind` it picks the highest-ranked descriptor whose `fromSchema` matches (`FieldTypeDescriptor.rank`, default rank 1 when a descriptor doesn't declare one), ties broken by registration order in `index.ts`. No built-in kind currently declares a non-default rank, since none of their shapes overlap; a future kind that does overlap with an existing one (for example a multi-choice type sharing `enum` with `choice`) should declare a higher `rank` rather than relying on import order. Anything unrecognised (an unknown `kind`, a `kind` that does not fit the shape, or a shape no descriptor matches) becomes the non-selectable `opaque` kind and is preserved unchanged.
 
 ---
 

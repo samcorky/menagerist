@@ -1,4 +1,5 @@
-// Registration order: most-specific types first, text last as fallback.
+// descriptorForProp ranks matches (see registry.ts), so order no longer decides
+// correctness — only ties, which none of the current kinds' shapes produce.
 // Scalars must be registered before group so sub-field fromSchema lookups work.
 import './date/date';
 import './longtext/longtext';
