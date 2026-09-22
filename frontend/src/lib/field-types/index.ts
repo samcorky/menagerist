@@ -9,6 +9,7 @@ import './rating/rating';
 import './boolean/boolean';
 import './text/text';
 import './group/group';
+import './quantity/quantity';
 import './opaque/opaque';
 
 export {

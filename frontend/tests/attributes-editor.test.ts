@@ -272,6 +272,59 @@ describe('rowsToAttributes with schema', () => {
 		});
 		expect(rowsToAttributes(attributesToRows(original), s)).toEqual(original);
 	});
+
+	describe('composite (type: object) fields', () => {
+		const quantitySchema = schema({
+			weight: {
+				title: 'Weight',
+				type: 'object',
+				properties: {
+					value: { title: 'Value', type: 'number' },
+					unit: { title: 'Unit', type: 'string' }
+				}
+			}
+		});
+
+		it('attributesToRows hydrates a schema-defined object as an editable flat row', () => {
+			expect(attributesToRows({ weight: { value: 180, unit: 'g' } }, quantitySchema)).toEqual([
+				{ key: 'weight', value: { value: '180', unit: 'g' } }
+			]);
+		});
+
+		it('attributesToRows keeps an object under an unknown key as read-only json', () => {
+			expect(attributesToRows({ weight: { value: 180, unit: 'g' } })).toEqual([
+				{
+					key: 'weight',
+					value: '{"value":180,"unit":"g"}',
+					kind: 'json',
+					raw: { value: 180, unit: 'g' }
+				}
+			]);
+		});
+
+		it('rowsToAttributes coerces and round-trips a composite value', () => {
+			const rows: AttributeRow[] = [{ key: 'weight', value: { value: '180', unit: 'g' } }];
+			expect(rowsToAttributes(rows, quantitySchema)).toEqual({ weight: { value: 180, unit: 'g' } });
+		});
+
+		it('rowsToAttributes omits a composite field whose sub-values are all blank', () => {
+			const rows: AttributeRow[] = [{ key: 'weight', value: { value: '', unit: '' } }];
+			expect(rowsToAttributes(rows, quantitySchema)).toEqual({});
+		});
+
+		it('rowsToAttributes keeps a partially filled composite value, blank text sub-value and all', () => {
+			const rows: AttributeRow[] = [{ key: 'weight', value: { value: '180', unit: '' } }];
+			// unit is a plain text sub-value, so a blank one is kept, same as a group's text cells.
+			expect(rowsToAttributes(rows, quantitySchema)).toEqual({ weight: { value: 180, unit: '' } });
+		});
+
+		it('round-trips a composite value end to end', () => {
+			const original = { weight: { value: 180, unit: 'g' } };
+			expect(rowsToAttributes(attributesToRows(original, quantitySchema), quantitySchema)).toEqual(
+				original
+			);
+		});
+	});
 });
 
 describe('@cfworker/json-schema validation', () => {

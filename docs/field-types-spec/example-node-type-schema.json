@@ -122,6 +122,23 @@
         "kind": "number",
         "archived": true
       }
+    },
+    "weight": {
+      "title": "Weight",
+      "type": "object",
+      "properties": {
+        "value": {
+          "title": "Value",
+          "type": "number"
+        },
+        "unit": {
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "x-menagerist": {
+        "kind": "quantity"
+      }
     }
   },
   "x-menagerist": {

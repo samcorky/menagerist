@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Plus, X } from '@lucide/svelte';
+	import { ChevronDown, ChevronUp, Plus, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import ConstraintInputs from '../text/ConstraintInputs.svelte';
@@ -44,6 +44,13 @@
 				{ key: generateKey(), label: '', kind: 'text', keyPending: true }
 			]
 		});
+	}
+
+	function moveSubField(i: number, direction: -1 | 1) {
+		const j = i + direction;
+		const subFields = [...field.subFields];
+		[subFields[i], subFields[j]] = [subFields[j], subFields[i]];
+		onChange({ ...field, subFields });
 	}
 
 	function removeSubField(i: number) {
@@ -99,6 +106,26 @@
 						{/each}
 					</select>
 				{/if}
+				<Button
+					type="button"
+					variant="ghost"
+					size="icon"
+					disabled={si === 0}
+					onclick={() => moveSubField(si, -1)}
+					aria-label="Move {sf.label || 'column'} earlier"
+				>
+					<ChevronUp class="size-4" />
+				</Button>
+				<Button
+					type="button"
+					variant="ghost"
+					size="icon"
+					disabled={si === field.subFields.length - 1}
+					onclick={() => moveSubField(si, 1)}
+					aria-label="Move {sf.label || 'column'} later"
+				>
+					<ChevronDown class="size-4" />
+				</Button>
 				<Button
 					type="button"
 					variant="ghost"

@@ -148,11 +148,14 @@
 		name = node.name;
 		description = node.description ?? '';
 		tags = node.tags;
-		attributeRows = attributesToRows(node.attributes);
 		edges = edgesResult.data ?? [];
 		otherNodes = (nodesResult.data ?? []).filter((candidate) => candidate.id !== nodeId);
 		edgeTypes = edgeTypesResult.data ?? [];
 		nodeTypes = nodeTypesResult.data ?? [];
+		// nodeSchema is a $derived and hasn't reacted to the nodeTypes assignment above
+		// yet within this synchronous block, so use schemaOfType (reads nodeTypes directly)
+		// rather than nodeSchema here.
+		attributeRows = attributesToRows(node.attributes, schemaOfType(node.type));
 		loading = false;
 	}
 
@@ -227,7 +230,7 @@
 			name = node.name;
 			description = node.description ?? '';
 			tags = node.tags;
-			attributeRows = attributesToRows(node.attributes);
+			attributeRows = attributesToRows(node.attributes, nodeSchema);
 		}
 		mode = 'read';
 	}
@@ -334,7 +337,7 @@
 
 	function openEditEdge(edge: EdgeResponse, trigger: HTMLElement) {
 		editTrigger = trigger;
-		editRows = attributesToRows(edge.attributes);
+		editRows = attributesToRows(edge.attributes, edgeTypeSchemaOf(edge));
 		editErrors = null;
 		editingEdge = edge;
 	}

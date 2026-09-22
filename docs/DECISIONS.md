@@ -313,3 +313,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** Verified directly against Postgres: nested JSONB object keys are not stored in insertion order (`{zeta_field, region, a_long_custom_name, aa, k1}` came back as `{aa, k1, region, zeta_field, a_long_custom_name}`), the same reordering WI-18a already found for loose attribute keys. A table field's columns were derived from `Object.entries(prop.items.properties)` with no explicit order recorded anywhere, unlike top-level fields (`x-menagerist.layout`), so a table's column order silently scrambled after any save and reload.
 
 **Tradeoff:** Existing table fields saved before this fix keep their JSONB-scrambled order until re-saved from the schema editor — the same no-migration pattern as every other `x-menagerist` addition.
+
+---
+
+## Quantity field kind, and a general object-valued field fix
+
+**Decision:** A new `quantity` kind stores `{value: number, unit: string}` (e.g. "180 g"), matched only by its explicit `x-menagerist.kind` (shape alone isn't distinctive). Not a group sub-field in v1 - a table cell is a plain string, not an object, so nesting needs a second follow-up. Getting there required widening `AttributeRow.value` to `string | GroupRow[] | GroupRow` and giving `attributesToRows` an optional `schema` argument: a key the schema defines as `type: 'object'` now hydrates as an editable flat row instead of falling into the generic read-only-JSON branch; `rowsToAttributes` gained the matching write-back branch. A composite sub-value follows the same blank-handling as a group cell (a blank number/date/enum sub-value is omitted, a blank text sub-value like `unit` is kept); the whole field is omitted only when every raw sub-value was blank to begin with.
+
+**Rationale:** This is exactly the prerequisite the candidate `location` kind was already waiting on (`further-field-types.md`), so quantity unblocks it too. Matching only the explicit kind avoids a future kind colliding on the same `type: 'object'` shape.
+
+**Tradeoff:** Group column reordering (WI-23) landed alongside this: `GroupExtras.svelte` gained up/down buttons per sub-field, using the `x-menagerist.columns` order the group column-order fix already writes - no further storage change needed.

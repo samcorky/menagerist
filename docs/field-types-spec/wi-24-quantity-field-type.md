@@ -25,10 +25,12 @@ A value is `{"value": 180, "unit": "g"}`. Both parts are independently optional 
 
 **Unit input (v1: free text).** A plain text input next to the number, not a fixed list — "g", "cups", "minutes", "pages" all need to fit without pre-registering every possible unit. A "Show as" display option (WI-11 pattern) offering a short curated preset list (mass, length, time) is worth adding once there's a concrete need for it; not in v1. If it lands, it's a natural fit for a `choice_list` preset (WI-19c) rather than a hardcoded list in this kind.
 
-**Sub-field use (the motivating case).** `canBeSubField: true` — unlike `location`, this kind is explicitly meant to appear inside a table (`group`), since "amount" as one quantity column is the whole point of the ingredients example. A table row then needs only two columns (`name`, `amount`) instead of three (`name`, `quantity`, `unit`).
+**Sub-field use (the motivating case) — deferred in v1.** The whole point of the ingredients example is "amount" as one quantity column instead of two (`quantity`, `unit`), but a group *cell* is typed `Record<string, string>` — a plain string per cell, not an object — so nesting a quantity inside a table needs cell-level object values, a second layer on top of the top-level-field prerequisite this item already needed. Implemented as `canBeSubField: false` for v1; revisit once there is a concrete driver, same policy as every other deferred piece in this spec.
+
+**Prerequisite (done as part of this item).** `AttributeRow.value` (the shared row type the attributes editor uses for every field, schema-defined or custom) widened to `string | GroupRow[] | GroupRow`; `attributesToRows` takes an optional `schema` so a key the schema defines as `type: 'object'` hydrates as an editable flat row instead of falling into the generic read-only-JSON branch; `rowsToAttributes` gained the matching write-back branch (coerce sub-properties, omit the whole key when every sub-value is blank). This is exactly the fix `location` (`further-field-types.md`) was waiting on too.
 
 **In the app.**
-- **Entering:** a number input and a short text input side by side, sharing one field row (or one table cell when a sub-field). Placeholder text on the unit input, no validation beyond "is a string" — this is deliberately loose in v1.
+- **Entering:** a number input and a short text input side by side, sharing one field row. Placeholder text on the unit input, no validation beyond "is a string" — this is deliberately loose in v1.
 - **Viewing:** `"{value} {unit}"` when both are present ("180 g"); just the value or just the unit when only one is set; `—` when the whole field is empty (unset, matching every other empty-field convention in this spec).
 - **Highlights (WI-16):** highlightable; `formatSummary` renders the same `"{value} {unit}"` text.
 - **Search (WI-17):** the `unit` string is nested one level inside an object, not a bare top-level string value — check whether the current search implementation recurses into an object value or only scans top-level scalars and group rows before assuming this is free; if it does not, this kind needs the same extension WI-17 would need for `location`'s `label`.
@@ -39,6 +41,6 @@ A value is `{"value": 180, "unit": "g"}`. Both parts are independently optional 
 **Acceptance.**
 - A quantity field round-trips `{value, unit}` through `toSchema`/`fromSchema` unchanged.
 - Entering only a number, or only a unit, saves that partial value; entering neither omits the key entirely.
-- A quantity can be used as a group (table) sub-field and displays correctly in both the data-entry table and the read-mode table.
+- Group (table) sub-field use is out of scope for v1 (see above); `canBeSubField: false`.
 
-**Tests.** Unit: `toSchema`/`fromSchema` round-trip (both parts, value-only, unit-only); the empty-object omission in `rowsToAttributes`; `formatSummary` output for each of the three non-empty states. Contract fixture: add a quantity example (for instance a "Weight" field) to `example-node-type-schema.json` once implemented, matching how `my_rating` and `tracklist` already serve that role for their kinds.
+**Tests.** Unit: `toSchema`/`fromSchema` round-trip (both parts, value-only, unit-only, explicit-kind-only matching); the empty/partial-value omission in `attributesToRows`/`rowsToAttributes`; `formatSummary` output for each of the three non-empty states. Contract fixture: add a quantity example (for instance a "Weight" field) to `example-node-type-schema.json`, matching how `my_rating` and `tracklist` already serve that role for their kinds.

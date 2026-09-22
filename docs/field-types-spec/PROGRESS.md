@@ -24,8 +24,8 @@ Update at the end of every session. Read this first.
 | WI-21 value suggestions | todo | | |
 | WI-22 connection details | 22a done, committed (66417f1); 22b done, committed (5706c51) | feature/initial-implementation | See "WI-22a session notes" below. |
 | WI-13 drag-and-drop layout (stretch) | todo | | |
-| WI-23 table column reordering | todo | | New, from the 2026-09-22 column-order fix discussion. |
-| WI-24 quantity field type | todo | | New; promoted from further-field-types.md's "Measurement" row. |
+| WI-23 table column reordering | done, awaiting user review and commit | feature/initial-implementation | See "WI-23/WI-24 session notes" below. |
+| WI-24 quantity field type | done, awaiting user review and commit | feature/initial-implementation | See "WI-23/WI-24 session notes" below. |
 
 ## WI-1 to WI-4 session notes
 
@@ -496,3 +496,23 @@ Update at the end of every session. Read this first.
 **Checks run:** `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 275 pass. `poe lint-backend`/`typecheck-backend` clean; `poe test-backend` 679 pass; `poe coverage` all targets met (application 100%, 46 integration tests pass).
 
 **Left:** existing table fields saved before this fix keep JSONB-scrambled column order until the item type is re-saved from the schema editor (no migration, consistent with every other `x-menagerist` addition).
+
+## WI-23/WI-24 session notes
+
+**Status:** implemented, all frontend checks green, not committed. Next: WI-19b/19c, WI-21, WI-22b's inline-creation follow-up, or WI-13.
+
+**WI-23 (column reordering) — done.** `GroupExtras.svelte` gained up/down (`ChevronUp`/`ChevronDown`) buttons per sub-field row, swapping entries in `field.subFields`; disabled at the ends. No backend or other file changes needed — `toSchema` already writes the resulting order into `x-menagerist.columns` (the earlier column-order fix), so reordering flows through to a save automatically.
+
+**WI-24 (quantity kind) — done, scope reduced from the spec's draft.** New `quantity` kind (`{value: number, unit: string}`, e.g. "180 g"), matched only by an explicit `kind`. Its own prerequisite (shared with the candidate `location` kind) is done: `AttributeRow.value` widened to `string | GroupRow[] | GroupRow`; `attributesToRows` takes an optional `schema` so an object-shaped value under a schema-defined key hydrates as an editable flat row instead of read-only JSON; `rowsToAttributes` gained the write-back branch (a blank text sub-value like `unit` is kept, a blank number/date/enum sub-value is omitted, the whole field is omitted only when every raw sub-value was blank). **Scope reduction:** `canBeSubField: false` for v1 (the spec's draft said `true`) — a group cell is a plain string, not an object, so nesting a quantity inside a table needs a second, cell-level fix; deferred, noted in `wi-24-quantity-field-type.md`.
+- Two widgets: `QuantityInput.svelte` (number + short text input side by side), `QuantityView.svelte` ("180 g" / "180" / "g" / "—").
+- Three `attributesToRows` call sites in `collection/[id]/+page.svelte` now pass a schema. Two needed care: inside `load()`, the reactive `nodeSchema`/`nodeTypes` haven't updated within that synchronous block yet, so those two use `schemaOfType(node.type)` (which reads the `nodeTypes` state variable directly, already reassigned earlier in the same block) instead of the `nodeSchema` derived value; the edge-editing call site uses the existing `edgeTypeSchemaOf(edge)`, unaffected by that timing issue since it only runs from a later user-triggered handler.
+- Contract fixture: added a "Weight" (`quantity`) property to `example-node-type-schema.json` (unplaced in the layout, so it appends at the end per `normalise()`'s rule — harmless, still valid).
+- Tests: `quantity.test.ts` (new: `quantityText`, descriptor matching/round-trip, `formatSummary`, `canBeSubField: false`); composite-field cases added to `attributes-editor.test.ts` (`attributesToRows`/`rowsToAttributes` hydration, coercion, blank-handling, unknown-key fallback, end-to-end round trip). One test's own expectation was initially wrong (expected `unit: ''` to be dropped) and was corrected to match the intentional group-cell-style blank-text-is-kept behaviour, not the code.
+
+**Left:** quantity as a group sub-field (needs cell-level object-value support — separate follow-up, noted in the spec). Not tried in a browser (no component tests, by decision).
+
+**Files touched:** frontend `field-types/group/GroupExtras.svelte`; `field-types/quantity/{quantity.ts,format.ts,QuantityInput.svelte,QuantityView.svelte}` (new), `field-types/index.ts`, `schema-types.ts` (new `object` variant), `attribute-rows.ts`, `components/attributes-editor.svelte`, `routes/collection/[id]/+page.svelte`; tests `quantity.test.ts` (new), `attributes-editor.test.ts`. Docs: `DECISIONS.md`, `field-types.md`, `wi-24-quantity-field-type.md` (scope corrections), `example-node-type-schema.json`.
+
+**Checks run:** `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 290 pass. Backend unchanged, backend checks not run.
+
+**Next session must know:** two subagent runs for this item were interrupted mid-task by the weekly usage limit resetting; both had left partial-but-correct work (no corruption), picked up and finished directly rather than re-run from scratch. If a subagent report cuts off mid-sentence, check `git status`/`git diff` before assuming nothing happened.

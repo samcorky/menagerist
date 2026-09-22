@@ -73,15 +73,21 @@
 
 	function isEmptyValue(value: unknown): boolean {
 		if (value === null || value === undefined || value === '') return true;
-		return Array.isArray(value) && value.length === 0;
+		if (Array.isArray(value)) return value.length === 0;
+		if (typeof value === 'object') {
+			return Object.values(value).every((v) => v === '' || v === null || v === undefined);
+		}
+		return false;
 	}
 
 	function setValue(key: string, value: unknown) {
 		const existing = rows.find((r) => r.key === key);
 		if (existing) {
-			rows = rows.map((r) => (r.key === key ? { ...r, value: value as string | GroupRow[] } : r));
+			rows = rows.map((r) =>
+				r.key === key ? { ...r, value: value as string | GroupRow[] | GroupRow } : r
+			);
 		} else {
-			rows = [...rows, { key, value: value as string | GroupRow[] }];
+			rows = [...rows, { key, value: value as string | GroupRow[] | GroupRow }];
 		}
 	}
 

@@ -10,7 +10,8 @@ type JsonSchemaPropertyBase =
 			title: string;
 			type: 'array';
 			items: { type: 'object'; properties: Record<string, JsonSchemaProperty> };
-	  };
+	  }
+	| { title: string; type: 'object'; properties: Record<string, JsonSchemaProperty> };
 
 export type JsonSchemaProperty = JsonSchemaPropertyBase & { 'x-menagerist'?: PropertyMeta };
 

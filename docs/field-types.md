@@ -296,3 +296,11 @@ A `field` or `choice_list` preset can be saved from the schema editor ("Save for
 ### Table (group) column order
 
 A `group` field's own `x-menagerist.columns` records its sub-property keys in order; `GroupInput`, `GroupView` and `fromSchema` all read it through `field-types/group/columns.ts`'s `orderedColumns(prop)` rather than `Object.entries`, because nested JSONB object keys are not stored in insertion order (verified against Postgres). A property with no `columns` falls back to `Object.entries` order.
+
+### Quantity kind and object-valued fields
+
+`quantity` stores `{value: number, unit: string}` (e.g. "180 g"), matched only by an explicit `x-menagerist.kind: "quantity"`. Not a group sub-field in v1. `attributesToRows` takes an optional `schema` argument so a key the schema defines as `type: 'object'` hydrates as an editable row instead of read-only JSON; `AttributeRow.value` is `string | GroupRow[] | GroupRow`. A blank text sub-value (e.g. `unit`) is kept, same as a group's text cells; a blank number/date/enum sub-value is omitted; the whole field is omitted only when every sub-value was blank.
+
+### Table (group) column reordering
+
+`GroupExtras.svelte` has up/down buttons per sub-field (WI-23), swapping entries in `field.subFields`; `toSchema` already writes the resulting order into `x-menagerist.columns`.
