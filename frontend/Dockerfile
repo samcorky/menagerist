@@ -21,6 +21,9 @@ FROM generate AS build
 COPY frontend/*.json frontend/*.js frontend/*.mjs frontend/*.ts frontend/*.cjs frontend/*.config.* ./
 COPY frontend/src ./src
 COPY frontend/static ./static
+# Keep the client generated from the schema rather than the ignored copy in the
+# build context.
+COPY --from=generate /app/src/lib/api/generated ./src/lib/api/generated
 
 RUN npm run build
 
