@@ -8,12 +8,10 @@ export type DetailKind = 'text' | 'number' | 'boolean' | 'json';
 export type AttributeRow = {
 	key: string;
 	value: string | GroupRow[] | GroupRow;
-	/** Type of a detail without a field; text when unset. Ignored for fields the type defines. */
+	/** Type of a value under a key no schema defines; text when unset. Ignored for defined fields. */
 	kind?: DetailKind;
-	/** The stored value of a detail the form cannot edit; written back unchanged. */
+	/** The stored value of a row the form cannot edit; written back unchanged. */
 	raw?: unknown;
-	/** Set on rows added with "Add detail", so they stay details even if the name matches a field. */
-	extra?: boolean;
 };
 
 function isGroupValue(value: unknown): value is Record<string, unknown>[] {
@@ -69,11 +67,6 @@ export function attributesToRows(
 			if (typeof value === 'boolean') return { key, value: String(value), kind: 'boolean' };
 			return { key, value: JSON.stringify(value) ?? '', kind: 'json', raw: value };
 		});
-}
-
-/** A new, empty row for "Add detail". */
-export function newDetailRow(kind: DetailKind = 'text'): AttributeRow {
-	return { key: '', value: kind === 'boolean' ? 'false' : '', kind, extra: true };
 }
 
 function isOmittedWhenEmpty(prop: JsonSchemaProperty | undefined): boolean {

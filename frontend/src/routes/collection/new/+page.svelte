@@ -24,7 +24,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
-	import { customDetailProblems } from '$lib/custom-details';
+	import { mergeAttributeSchemas } from '$lib/schema-meta';
 	import { serverErrorsToFields } from '$lib/validation-messages';
 
 	let name = $state('');
@@ -32,6 +32,7 @@
 	let selectedType = $state<string | null>(null);
 	let tags = $state<string[]>([]);
 	let attrRows = $state<AttributeRow[]>([]);
+	let extraSchema = $state<AttributesSchema | null>(null);
 	let attrServerErrors = $state<Record<string, string> | null>(null);
 	let saving = $state(false);
 	let photo = $state<File | null>(null);
@@ -43,7 +44,6 @@
 		(nodeTypes.find((nt) => nt.slug === selectedType)
 			?.attributes_schema as AttributesSchema | null) ?? null
 	);
-	let detailsBlocked = $derived(customDetailProblems(attrRows, nodeSchema).blocking);
 
 	$effect(() => {
 		listNodeTypes({ query: { limit: 200 } }).then((r) => {
@@ -91,7 +91,8 @@
 				type: selectedType || null,
 				description: description || null,
 				tags,
-				attributes: rowsToAttributes(attrRows, nodeSchema)
+				attributes: rowsToAttributes(attrRows, mergeAttributeSchemas(nodeSchema, extraSchema)),
+				extra_schema: extraSchema
 			}
 		});
 		if (result.error || !result.data) {
@@ -193,12 +194,14 @@
 					<!-- Attributes (schema-aware when category selected) -->
 					<AttributesEditor
 						bind:rows={attrRows}
+						bind:extraSchema
 						schema={nodeSchema}
+						supportsExtraFields={true}
 						serverErrors={attrServerErrors}
 					/>
 
 					<div class="flex justify-end">
-						<Button type="submit" disabled={!name.trim() || saving || detailsBlocked}>
+						<Button type="submit" disabled={!name.trim() || saving}>
 							{saving ? 'Saving…' : 'Save'}
 						</Button>
 					</div>

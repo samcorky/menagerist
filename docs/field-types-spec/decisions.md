@@ -17,7 +17,7 @@
 **Features**
 - Highlights are display only. They are scoped to the item type (`highlights.card`, shared by every user and item of that type) (`wi-16-highlighted-fields.md`).
 - Search scans all attribute values, not only highlighted ones (`wi-17-attribute-search.md`).
-- Typed per-item fields use a node schema overlay (`extra_schema` on nodes); loose string details are a stopgap (`wi-19d-per-item-schema-overlay.md`, `wi-18-per-item-custom-fields.md`).
+- Typed per-item fields use a node schema overlay (`extra_schema` on nodes). The loose string-detail stopgap is retired (dropped, not migrated — no legacy data); per-item fields are now created through the same Name + Kind flow as schema fields (`wi-19d-per-item-schema-overlay.md`, `wi-18-per-item-custom-fields.md`, revised 2026-09-22).
 - Suggestions are passive tips inside Settings only, with type-ahead; no inline hints while browsing. This amends guidelines §16b and may be revisited (`wi-21-value-suggestions.md`).
 - Reusable parts live in a new backend module `presets`. UI names: the `group` kind is labelled "Table"; a reusable named set is a "Field group" (`field_set` in code); the Settings page is "Saved fields" (`settings/saved-fields`) with Fields, Field groups and Lists; actions are "Save for reuse" and "Add from saved fields" (`wi-19-presets.md`).
 - "Item type" replaces "Category" in the UI as a **separate** change, with a redirect from `settings/categories`.
@@ -102,9 +102,10 @@ Everything below was implemented on a default while working through the spec. No
 | Attribute search | Tags not searched (Q20); numbers searched except rating (Q21); id-ordered results (Q22) | Q20 to Q22 | WI-17 |
 | Search opt-out (confirmed) | `search: false` honoured by the API, no editor control | Q63 | WI-17 |
 | Match context | "Matched in ..." shown on list and grid cards while searching | Q64 | WI-17 |
-| Detail limits | 100-character names, 50 details per item, details only, nodes only | Q24, Q26 | WI-18a |
-| Detail name problems (confirmed) | Block Save (exception to "client errors never block") | Q66 | WI-18a |
-| Detail value types | Text, Number, Yes/No for new details; anything else read-only JSON | | WI-18a |
+| Overlay field limits (revised 2026-09-22, supersedes the three rows below) | 50 fields per item overlay, no label-length cap, full kind picker, nodes only (not edges) | Q24, Q26 | WI-18a (revised) |
+| ~~Detail limits~~ (superseded) | ~~100-character names, 50 details per item, details only, nodes only~~ | Q24, Q26 | WI-18a |
+| ~~Detail name problems~~ (superseded — no longer applicable, keys are generated, not user-typed) | ~~Block Save (exception to "client errors never block")~~ | Q66 | WI-18a |
+| ~~Detail value types~~ (superseded) | ~~Text, Number, Yes/No for new details; anything else read-only JSON~~ | | WI-18a |
 | Connection rows | Show the other item's card highlights and the connection's own details; remove is undoable (re-creates the connection) instead of confirmed | Q51 | WI-22a |
 
 Also still proposed rather than confirmed (see the section above): connection details (WI-22), no free-form regex in v1, presets defaults (Q30 to Q32), the OpenStreetMap provider, and every other defaulted question in `open-questions.md`.

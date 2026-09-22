@@ -5,12 +5,14 @@ import { describe, it, expect } from 'vitest';
 import { Validator } from '@cfworker/json-schema';
 import {
 	archivedKeys,
+	mergeAttributeSchemas,
 	readPropMeta,
 	readSchemaMeta,
 	validationSchema,
 	withPropMeta,
 	withSchemaMeta
 } from '../src/lib/schema-meta';
+import type { AttributesSchema } from '../src/lib/schema-types';
 
 describe('readers', () => {
 	it('return {} when the namespace is absent or malformed', () => {
@@ -107,5 +109,54 @@ describe('single accessor', () => {
 			.filter((file) => !allowed.has(rel(file)))
 			.filter((file) => /x-menagerist|x-layout|x-multiline/.test(readFileSync(file, 'utf8')));
 		expect(offenders.map(rel)).toEqual([]);
+	});
+});
+
+describe('mergeAttributeSchemas', () => {
+	const schema = (properties: AttributesSchema['properties']): AttributesSchema => ({
+		$schema: 'https://json-schema.org/draft/2020-12/schema',
+		type: 'object',
+		properties
+	});
+
+	it('returns null when both schemas are null', () => {
+		expect(mergeAttributeSchemas(null, null)).toBeNull();
+	});
+
+	it('returns the type schema unchanged when there is no overlay', () => {
+		const type = schema({ title: { title: 'Title', type: 'string' } });
+		expect(mergeAttributeSchemas(type, null)).toEqual(type);
+	});
+
+	it('returns the overlay as the schema when there is no type', () => {
+		const extra = schema({ condition: { title: 'Condition', type: 'string' } });
+		expect(mergeAttributeSchemas(null, extra)).toEqual(extra);
+	});
+
+	it('merges properties from both schemas', () => {
+		const type = schema({ title: { title: 'Title', type: 'string' } });
+		const extra = schema({ condition: { title: 'Condition', type: 'string' } });
+		const merged = mergeAttributeSchemas(type, extra);
+		expect(Object.keys(merged?.properties ?? {}).sort()).toEqual(['condition', 'title']);
+	});
+
+	it('concatenates required and layout, type fields first', () => {
+		const type = withSchemaMeta(schema({ title: { title: 'Title', type: 'string' } }), {
+			required: ['title'],
+			layout: [{ key: 'title' }]
+		});
+		const extra = withSchemaMeta(schema({ condition: { title: 'Condition', type: 'string' } }), {
+			required: ['condition'],
+			layout: [{ key: 'condition' }]
+		});
+		const merged = mergeAttributeSchemas(type, extra);
+		expect(readSchemaMeta(merged).required).toEqual(['title', 'condition']);
+		expect(readSchemaMeta(merged).layout).toEqual([{ key: 'title' }, { key: 'condition' }]);
+	});
+
+	it('throws when a key is defined on both schemas', () => {
+		const type = schema({ condition: { title: 'Condition', type: 'string' } });
+		const extra = schema({ condition: { title: 'Condition 2', type: 'string' } });
+		expect(() => mergeAttributeSchemas(type, extra)).toThrow();
 	});
 });

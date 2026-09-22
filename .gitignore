@@ -28,3 +28,6 @@ coverage.xml
 
 # Other
 openapi.json
+
+# Worktrees
+.worktrees/

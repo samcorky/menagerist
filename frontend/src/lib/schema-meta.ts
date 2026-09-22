@@ -1,4 +1,5 @@
 import type { XLayout } from '$lib/layout';
+import type { AttributesSchema } from '$lib/schema-types';
 
 /**
  * Accessors for the `x-menagerist` namespace. Standard JSON Schema keywords describe
@@ -128,4 +129,43 @@ export function validationSchema<T extends object>(schema: T): T {
 		);
 	}
 	return copy as T;
+}
+
+/**
+ * Combine a node type's schema with a node's per-item `extra_schema` overlay (WI-19d).
+ * Mirrors the backend's `merge_attribute_schemas`: `required` and `layout` are
+ * concatenated (type fields first); `highlights` stays type-only. Returns `null`
+ * when both inputs are `null`.
+ *
+ * @throws when a key is defined by both schemas (including one archived on the type).
+ */
+export function mergeAttributeSchemas(
+	typeSchema: AttributesSchema | null,
+	extraSchema: AttributesSchema | null
+): AttributesSchema | null {
+	if (!typeSchema && !extraSchema) return null;
+	if (!extraSchema) return typeSchema;
+	if (!typeSchema) return extraSchema;
+
+	const overlap = Object.keys(typeSchema.properties).filter((key) =>
+		Object.hasOwn(extraSchema.properties, key)
+	);
+	if (overlap.length > 0) {
+		throw new Error(
+			`extra_schema redefines field(s) already on the item type: ${overlap.join(', ')}`
+		);
+	}
+
+	const typeMeta = readSchemaMeta(typeSchema);
+	const extraMeta = readSchemaMeta(extraSchema);
+	const merged: AttributesSchema = {
+		$schema: 'https://json-schema.org/draft/2020-12/schema',
+		type: 'object',
+		properties: { ...typeSchema.properties, ...extraSchema.properties }
+	};
+	return withSchemaMeta(merged, {
+		...typeMeta,
+		required: [...(typeMeta.required ?? []), ...(extraMeta.required ?? [])],
+		layout: [...(typeMeta.layout ?? []), ...(extraMeta.layout ?? [])]
+	});
 }

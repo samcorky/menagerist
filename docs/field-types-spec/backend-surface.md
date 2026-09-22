@@ -15,11 +15,10 @@ Verified against the current `graph` module: one use case per file in `applicati
 | `CountEdgeTypeAttributeUsage` | query | WI-9, WI-10 | Same for edges. |
 | `PurgeNodeTypeAttribute` | command | WI-9 | Removes a key from every node of the type, returns the count. |
 | `PurgeEdgeTypeAttribute` | command | WI-9 | Same for edges. |
-| `ListNodeTypeCustomAttributes` | query | WI-18c | Keys used by nodes of the type that the schema does not define, with counts. |
 | `CreatePreset`, `GetPreset`, `ListPresets`, `UpdatePreset`, `DeletePreset`, `ExportPresets`, `ImportPresets` | commands and queries in a **new `presets` module** | WI-19 | Store and serve saved fields, field sets and choice lists; import and export packs. No dependency on `graph`. |
 | `ListAttributeValues`, `ListAttributeValueSuggestions` | queries | WI-21 | Distinct values for type-ahead; clusters of repeated values with existing-item matches and a link-or-choice classification. |
 | `LinkAttributeValueToNode` | command | WI-21 | Creates the target item if needed and the edges in one transaction, skipping existing edges. |
-| `AdoptNodeTypeCustomAttribute` | command | WI-18b, WI-18c | Adds the new field to the item type and moves values from a custom key to it, per node, where they validate, in one transaction; returns moved and skipped counts. |
+| `PromoteExtraSchemaField` | command | WI-18b (revised, see `wi-18-per-item-custom-fields.md`) | Moves one property from a node's `extra_schema` into its item type's `attributes_schema`, in one transaction (`UpdateNodeType` + `UpdateNode` via `JoinedUnitOfWork`); the value is untouched. `ListNodeTypeCustomAttributes`/`AdoptNodeTypeCustomAttribute` (WI-18c) are dropped along with the loose-custom-detail stopgap. |
 
 Supporting changes: new methods on `NodeRepository` and `EdgeRepository` (for example `count_with_attribute(type_slug, key, value=...)`) with SQLAlchemy JSONB implementations and in-memory siblings.
 
@@ -31,9 +30,8 @@ Supporting changes: new methods on `NodeRepository` and `EdgeRepository` (for ex
 | `DELETE /node-type/{node_type_id}/attribute/{key}` | `purge_node_type_attribute` | Returns `{purged}`, so 200 rather than 204. |
 | `GET /edge-type/{edge_type_id}/attribute/{key}/usage` | `count_edge_type_attribute_usage` | Same for edge types. |
 | `DELETE /edge-type/{edge_type_id}/attribute/{key}` | `purge_edge_type_attribute` | Same for edge types. |
-| `GET /node-type/{node_type_id}/custom-attribute` | `list_node_type_custom_attributes` | Returns `[{key, count}]` (WI-18c). |
 | `GET /node-type/{node_type_id}/attribute/{key}/values`, `GET /node-type/{node_type_id}/attribute/{key}/suggestions`, `POST /node-type/{node_type_id}/attribute/{key}/link` | `list_attribute_values`, `list_attribute_value_suggestions`, `link_attribute_value_to_node` | Type-ahead, suggestions and linking (WI-21). |
-| `POST /node-type/{node_type_id}/attribute/{key}/adopt` | `adopt_node_type_custom_attribute` | Body `{from_key, property, node_ids?}`, returns `{moved, skipped}` (WI-18b/c). |
+| `POST /node/{node_id}/attribute/{key}/promote` | `promote_extra_schema_field` | Body `{node_type_id}`, returns the updated node (WI-18b, revised). |
 | `POST /preset`, `GET /preset`, `GET/PATCH/DELETE /preset/{id}`, `GET /preset/export`, `POST /preset/import` | `create_preset`, `list_presets`, `get_preset`, `update_preset`, `delete_preset`, `export_presets`, `import_presets` | Preset CRUD and packs (WI-19). |
 
 Route shapes are a proposal; match the existing conventions if they differ. Adding these changes the OpenAPI document, so the frontend client must be regenerated (`uv run poe generate-frontend-client`, which CI already runs).
@@ -58,8 +56,7 @@ The architecture tests pick layers by folder pattern (`*domain*`, `*ports*`, and
 |---|---|---|
 | `NodeRepository` | `count_with_attribute(type_slug, key, value=None)` | WI-9, WI-10 |
 | `NodeRepository` | `list` and `count` gain an optional `attribute_search_exclusions` argument | WI-17 |
-| `NodeRepository` | `list_custom_attribute_counts(type_slug, schema_keys)` | WI-18c |
-| `NodeRepository` | a way to page nodes that hold a key (for example a `has_attribute` filter on `list`); the purge (WI-9) and adopt (WI-18) both page and `save` through the unit of work, so no `remove_attribute` method is needed | WI-9, WI-18b, WI-18c |
+| `NodeRepository` | none needed for WI-18b (revised): `PromoteExtraSchemaField` operates on one node by id, fetched with the existing `get` | WI-9, WI-18b |
 | `NodeRepository` | `attribute_value_counts(type_slug, key, q=None)`, one method serving both type-ahead and clustering | WI-21 |
 | `NodeRepository` | `find_by_normalised_names(names)`, or reuse `list(q=...)` and filter in Python to avoid a new method | WI-21 |
 | `EdgeRepository` | `count_with_attribute` (edge-type version only); edge purge pages and saves like nodes | WI-9 |
@@ -70,7 +67,7 @@ The architecture tests pick layers by folder pattern (`*domain*`, `*ports*`, and
 - Schema-meta accessors and the `validate_attributes` changes (application layer; `jsonschema` is already used there and allowed by the architecture tests).
 - The portable-subset pattern check (WI-15), only if free-form regex ships.
 - The WI-21 value-normalisation helper belongs in `shared_kernel` next to `slug.py`: `unicodedata` is permitted there but not in the domain layer.
-- Node invariants for name limits (WI-18a) are plain domain checks.
+- Node invariants for label/count limits on `extra_schema` (WI-18a, revised) are plain domain checks.
 - Pack serialisation (WI-19c) is ordinary application code: the pack travels as an HTTP body, so there is no file-storage port.
 
 **Deliberately no new port.**
@@ -81,7 +78,7 @@ The architecture tests pick layers by folder pattern (`*domain*`, `*ports*`, and
 - Built-in preset source: only needed if built-ins load from packaged JSON at startup; seeding through a migration needs none (open question 31).
 - Media: Image and File fields are not scheduled. WI-19d (overlay, decided) adds a column and API fields, not a port.
 
-Composite commands (adopt, link) reuse the existing `UnitOfWork` and `JoinedUnitOfWork`.
+Composite commands (promote, link) reuse the existing `UnitOfWork` and `JoinedUnitOfWork`.
 
 ## Existing use cases that change (no new endpoints)
 
@@ -90,7 +87,7 @@ Composite commands (adopt, link) reuse the existing `UnitOfWork` and `JoinedUnit
 | Changed-keys-only validation | `UpdateNode`, `UpdateEdge`, `_validate_attributes.py` (`previous=` argument) | WI-7 |
 | Ignore top-level `required` and archived properties when validating | `_validate_attributes.py` | WI-6, WI-8 |
 | Extra schema checks on save (portable-subset pattern check, optional `x-menagerist`, layout and `highlights` shape checks), in one shared helper instead of four copies | `CreateNodeType`, `UpdateNodeType`, `CreateEdgeType`, `UpdateEdgeType` (they already call `check_schema`) | WI-13, WI-14, WI-15 |
-| Attribute name limits (length, count per node, non-blank trimmed names) as a domain invariant | `Node.__post_init__` / `Node.update` | WI-18a |
+| Overlay field limits (label length, count per node) as a domain invariant on `extra_schema` | `Node.__post_init__` / `Node.update` | WI-18a (revised) |
 | Attribute search: `ListNodes` also loads node types to build per-type exclusions; `NodeRepository.list` and `count` take `attribute_search_exclusions`; `%` and `_` escaped in `q` | `ListNodes`, `node_repository.py`, in-memory repository | WI-17 |
 | Structured validation errors: each error carries `path`, `keyword`, the constraint value and a message, so the client can show "Must start with ..." | `InvalidAttributesError` and its problem-details response | WI-15 |
 

@@ -27,8 +27,7 @@
 	import { attributesToRows, rowsToAttributes, type AttributeRow } from '$lib/attribute-rows';
 	import AttributesEditor from '$lib/components/attributes-editor.svelte';
 	import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
-	import { archivedKeys, readSchemaMeta } from '$lib/schema-meta';
-	import { customDetailProblems, displayDetailValue, isDetailRow } from '$lib/custom-details';
+	import { archivedKeys, mergeAttributeSchemas, readSchemaMeta } from '$lib/schema-meta';
 	import { normalise, isSectionItem } from '$lib/layout';
 	import { descriptorForProp } from '$lib/field-types';
 	import BackButton from '$lib/components/back-button.svelte';
@@ -62,11 +61,6 @@
 		(nodeTypes.find((nt) => nt.slug === node?.type)
 			?.attributes_schema as AttributesSchema | null) ?? null
 	);
-	let attributeLabelsByKey = $derived(
-		new Map(
-			Object.entries(nodeSchema?.properties ?? {}).map(([key, prop]) => [key, prop.title || key])
-		)
-	);
 	let schemaLayout = $derived(
 		nodeSchema ? normalise(readSchemaMeta(nodeSchema).layout, nodeSchema.properties) : []
 	);
@@ -78,8 +72,10 @@
 	let description = $state('');
 	let tags = $state<string[]>([]);
 	let attributeRows = $state<AttributeRow[]>([]);
-	let freeformAttrRows = $derived(attributeRows.filter((r) => isDetailRow(r, nodeSchema)));
-	let detailsBlocked = $derived(customDetailProblems(attributeRows, nodeSchema).blocking);
+	let extraSchema = $state<AttributesSchema | null>(null);
+	let extraLayout = $derived(
+		extraSchema ? normalise(readSchemaMeta(extraSchema).layout, extraSchema.properties) : []
+	);
 	let attributeServerErrors = $state<Record<string, string> | null>(null);
 	let saving = $state(false);
 	let deletingNode = $state(false);
@@ -90,7 +86,6 @@
 	let editErrors = $state<Record<string, string> | null>(null);
 	let savingEdge = $state(false);
 	let edgeSchema = $derived(editingEdge ? edgeTypeSchemaOf(editingEdge) : null);
-	let edgeBlocked = $derived(customDetailProblems(editRows, edgeSchema).blocking);
 	let editingOther = $derived(editingEdge ? nodesById.get(otherNodeId(editingEdge)) : undefined);
 	let editTrigger: HTMLElement | null = null;
 
@@ -155,7 +150,11 @@
 		// nodeSchema is a $derived and hasn't reacted to the nodeTypes assignment above
 		// yet within this synchronous block, so use schemaOfType (reads nodeTypes directly)
 		// rather than nodeSchema here.
-		attributeRows = attributesToRows(node.attributes, schemaOfType(node.type));
+		extraSchema = (node.extra_schema as AttributesSchema | null) ?? null;
+		attributeRows = attributesToRows(
+			node.attributes,
+			mergeAttributeSchemas(schemaOfType(node.type), extraSchema)
+		);
 		loading = false;
 	}
 
@@ -198,7 +197,8 @@
 				name,
 				description: description || null,
 				tags,
-				attributes: rowsToAttributes(attributeRows, nodeSchema)
+				attributes: rowsToAttributes(attributeRows, mergeAttributeSchemas(nodeSchema, extraSchema)),
+				extra_schema: extraSchema
 			}
 		});
 		if (result.response?.status === 412) {
@@ -230,7 +230,11 @@
 			name = node.name;
 			description = node.description ?? '';
 			tags = node.tags;
-			attributeRows = attributesToRows(node.attributes, nodeSchema);
+			extraSchema = (node.extra_schema as AttributesSchema | null) ?? null;
+			attributeRows = attributesToRows(
+				node.attributes,
+				mergeAttributeSchemas(nodeSchema, extraSchema)
+			);
 		}
 		mode = 'read';
 	}
@@ -512,8 +516,13 @@
 
 								<AttributesEditor
 									bind:rows={attributeRows}
+									bind:extraSchema
 									schema={nodeSchema}
+									supportsExtraFields={true}
+									nodeId={node?.id}
+									nodeTypeId={nodeTypes.find((nt) => nt.slug === node?.type)?.id}
 									serverErrors={attributeServerErrors}
+									onPromoted={load}
 								/>
 
 								<div class="flex flex-wrap items-center justify-between gap-2">
@@ -555,7 +564,7 @@
 										<Button type="button" variant="outline" onclick={handleCancelEdit}>
 											Cancel
 										</Button>
-										<Button type="submit" disabled={saving || loading || detailsBlocked}>
+										<Button type="submit" disabled={saving || loading}>
 											{saving ? 'Saving…' : 'Save changes'}
 										</Button>
 									</div>
@@ -605,7 +614,7 @@
 									{/if}
 								{/snippet}
 
-								{#if !loading && (schemaLayout.length > 0 || freeformAttrRows.length > 0)}
+								{#if !loading && (schemaLayout.length > 0 || extraLayout.length > 0)}
 									<div class="space-y-2">
 										{#if nodeSchema && schemaLayout.length > 0}
 											{#each schemaLayout as layoutItem (isSectionItem(layoutItem) ? layoutItem.id : layoutItem.key)}
@@ -632,14 +641,14 @@
 											{/each}
 										{/if}
 
-										{#if freeformAttrRows.length > 0}
-											{#each freeformAttrRows as row (row)}
-												<div class="flex items-center gap-2">
-													<span class="w-32 shrink-0 text-sm text-muted-foreground">
-														{attributeLabelsByKey.get(row.key) ?? row.key}
-													</span>
-													<span class="text-sm">{displayDetailValue(row)}</span>
-												</div>
+										{#if extraSchema && extraLayout.length > 0}
+											{#each extraLayout as layoutItem (isSectionItem(layoutItem) ? layoutItem.id : layoutItem.key)}
+												{#if !isSectionItem(layoutItem) && layoutItem.key in extraSchema.properties}
+													{@render attrField(
+														layoutItem.key,
+														extraSchema.properties[layoutItem.key]
+													)}
+												{/if}
 											{/each}
 										{/if}
 									</div>
@@ -927,7 +936,7 @@
 					<AttributesEditor bind:rows={editRows} schema={edgeSchema} serverErrors={editErrors} />
 					<div class="flex justify-end gap-2">
 						<Button type="button" variant="outline" onclick={closeEditEdge}>Cancel</Button>
-						<Button type="submit" disabled={savingEdge || edgeBlocked}>
+						<Button type="submit" disabled={savingEdge}>
 							{savingEdge ? 'Saving…' : 'Save'}
 						</Button>
 					</div>

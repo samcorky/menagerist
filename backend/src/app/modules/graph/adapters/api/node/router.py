@@ -20,19 +20,29 @@ from app.modules.graph.adapters.api.dependencies import (
     get_delete_node_use_case,
     get_get_node_use_case,
     get_list_nodes_use_case,
+    get_promote_extra_schema_field_use_case,
     get_update_node_use_case,
 )
 from app.modules.graph.adapters.api.node.schemas import (
     CreateNodeRequest,
     NodeResponse,
+    PromoteExtraSchemaFieldRequest,
     UpdateNodeRequest,
 )
 from app.modules.graph.application.create_node import CreateNode
 from app.modules.graph.application.delete_node import DeleteNode, DeleteNodeCommand
 from app.modules.graph.application.get_node import GetNode, GetNodeQuery
 from app.modules.graph.application.list_nodes import ListNodes, ListNodesQuery
+from app.modules.graph.application.promote_extra_schema_field import (
+    PromoteExtraSchemaField,
+    PromoteExtraSchemaFieldCommand,
+)
 from app.modules.graph.application.update_node import UpdateNode
-from app.modules.graph.domain.errors import NodeNotFoundError
+from app.modules.graph.domain.errors import (
+    InvalidSchemaError,
+    NodeNotFoundError,
+    NodeTypeNotFoundError,
+)
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ValidationError
 
@@ -146,6 +156,43 @@ async def update_node(
         return earlier
     node = await update_usecase.handle(payload.to_command(node_id), actor)
     cond.set_response_etag(node)
+    return NodeResponse.from_domain(node)
+
+
+@router.post(
+    "/{node_id}/attribute/{key}/promote",
+    response_model=NodeResponse,
+    operation_id="promote_extra_schema_field",
+    responses={
+        **error_response(
+            NodeNotFoundError,
+            detail="Node 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10 not found",
+        ),
+        **error_response(
+            NodeTypeNotFoundError,
+            detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+        ),
+        **error_response(
+            InvalidSchemaError, detail="'condition' already exists on this item type"
+        ),
+    },
+)
+async def promote_extra_schema_field(
+    node_id: uuid.UUID,
+    key: str,
+    payload: PromoteExtraSchemaFieldRequest,
+    use_case: Annotated[
+        PromoteExtraSchemaField, Depends(get_promote_extra_schema_field_use_case)
+    ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> NodeResponse:
+    """Move an overlay field's definition onto the item type; the value is unchanged."""
+    node = await use_case.handle(
+        PromoteExtraSchemaFieldCommand(
+            node_id=node_id, node_type_id=payload.node_type_id, key=key
+        ),
+        actor,
+    )
     return NodeResponse.from_domain(node)
 
 

@@ -323,3 +323,17 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** This is exactly the prerequisite the candidate `location` kind was already waiting on (`further-field-types.md`), so quantity unblocks it too. Matching only the explicit kind avoids a future kind colliding on the same `type: 'object'` shape.
 
 **Tradeoff:** Group column reordering (WI-23) landed alongside this: `GroupExtras.svelte` gained up/down buttons per sub-field, using the `x-menagerist.columns` order the group column-order fix already writes - no further storage change needed.
+
+---
+
+## Per-item custom fields moved from a loose, untyped stopgap to the typed `extra_schema` overlay
+
+**Decision:** "Add detail" (WI-18a's Text/Number/Yes-No loose-key stopgap) is retired, not deprecated — deleted (`lib/attribute-rows.ts`'s `extra`/`newDetailRow`, `lib/custom-details.ts`, `application/custom_details.py`, all gone). Per-item extras are now typed fields in the node's `extra_schema` overlay (WI-19d), created through the same Name + Kind flow the schema editor uses (`FieldKindRow.svelte`, extracted from `schema-editor.svelte`'s field-creation row), for both typed and untyped nodes. WI-18c (adopt-across-items, `ListNodeTypeCustomAttributes`/`AdoptNodeTypeCustomAttribute`) is dropped entirely — there is no loose-key data left to adopt. Edges also lose ad-hoc fields (the overlay is nodes-only in v1); a connection can only use fields its relationship type's schema defines.
+
+**Promotion:** WI-18b becomes `PromoteExtraSchemaField` (`application/promote_extra_schema_field.py`) — a pure move of a property from a node's overlay onto its item type's schema, in one transaction via `JoinedUnitOfWork` (composing `UpdateNodeType` and `UpdateNode`, the same pattern `upload_and_attach_media.py` uses). No value coercion is needed, since the value already satisfied the property's schema as an overlay field.
+
+**Rationale:** The stopgap could not support constrained or typed kinds (rating, date, choice, quantity, table, constrained text) without duplicating validation logic the registry and backend schema validation already own — exactly the gap `decisions.md` already flagged it as ("a stopgap"). Since this is a pre-release application with no real user data, there was nothing to migrate, so the simpler, architecturally-correct path (typed overlay everywhere) was taken directly instead of building a bridge from the old model.
+
+**Found along the way:** `UpdateNodeCommand.extra_schema=None` means "leave unchanged" (the same convention as `attributes_schema` on a node type), so a node's overlay can never actually be cleared to empty by sending `null` — both `PromoteExtraSchemaField` and `attributes-editor.svelte`'s "remove the last overlay field" path always write a real `{"properties": {}}` object instead, never `null`, so the clearing write actually takes effect. This is a latent, pre-existing gap in the `None`-means-unchanged convention itself (not something this change introduced), worth a proper fix (e.g. a sentinel) if a future session needs to clear other optional fields on this command the same way.
+
+**Tradeoff:** No label-length cap on overlay fields (only a schema field's ordinary `title`, unlike the old 100-character detail-name limit) — an intentional asymmetry removed, since the key is now slug-generated (WI-20), not the label itself. The 50-fields-per-item count limit carries over (`MAX_EXTRA_SCHEMA_FIELDS`).

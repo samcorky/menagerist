@@ -1,147 +1,5 @@
 <script lang="ts" module>
-	import { normalise, isSectionItem, type XLayout } from '$lib/layout';
-	import type { JsonSchemaProperty, AttributesSchema, EditorField } from '$lib/schema-types';
-	import {
-		allDescriptors,
-		getDescriptor,
-		fieldFromProperty,
-		propertyFromField
-	} from '$lib/field-types';
-	import { resolvePendingKeys } from '$lib/field-key';
-	import {
-		META_VERSION,
-		archivedKeys,
-		readSchemaMeta,
-		withHighlights,
-		withSchemaMeta,
-		type HighlightList,
-		type SchemaMeta
-	} from '$lib/schema-meta';
-	import { archiveField, restoreField } from '$lib/field-archive';
-	import { highlightRanks, maxHighlights, normaliseHighlights } from '$lib/highlights';
-
-	export type EditorSection = {
-		_section: true;
-		id: string;
-		sectionLabel: string;
-		fields: EditorField[];
-	};
-
-	export type EditorItem = EditorField | EditorSection;
-
-	function isSection(item: EditorItem): item is EditorSection {
-		return '_section' in item;
-	}
-
-	export function schemaToItems(
-		schema: AttributesSchema | null,
-		list: HighlightList = 'card'
-	): EditorItem[] {
-		if (!schema) return [];
-		const required = new Set(readSchemaMeta(schema).required ?? []);
-		const layout = normalise(readSchemaMeta(schema).layout, schema.properties);
-		const ranks = highlightRanks(schema, list);
-		const load = (key: string): EditorField => {
-			const field = fieldFromProperty(key, schema.properties[key], required.has(key));
-			const rank = ranks.get(key);
-			return rank === undefined ? field : { ...field, highlight: rank };
-		};
-		return layout.flatMap((layoutItem): EditorItem[] => {
-			if (isSectionItem(layoutItem)) {
-				return [
-					{
-						_section: true,
-						id: layoutItem.id,
-						sectionLabel: layoutItem.section,
-						fields: layoutItem.items
-							.filter((i) => i.key in schema.properties)
-							.map((i) => load(i.key))
-					}
-				];
-			}
-			if (!(layoutItem.key in schema.properties)) return [];
-			return [load(layoutItem.key)];
-		});
-	}
-
-	export function schemaToArchived(schema: AttributesSchema | null): EditorField[] {
-		if (!schema) return [];
-		const required = new Set(readSchemaMeta(schema).required ?? []);
-		return [...archivedKeys(schema)].map((key) =>
-			fieldFromProperty(key, schema.properties[key], required.has(key))
-		);
-	}
-
-	export function itemsToSchema(
-		items: EditorItem[],
-		baseMeta: SchemaMeta,
-		archived: EditorField[] = [],
-		list: HighlightList = 'card'
-	): AttributesSchema | null {
-		// Resolve pending keys across the whole schema so they are unique globally.
-		// Archived fields are included so they keep occupying their keys.
-		const visible = items.flatMap((item) => (isSection(item) ? item.fields : [item]));
-		const all = [...visible, ...archived];
-		const resolvedList = resolvePendingKeys(all);
-		const resolved = new Map(all.map((f, i) => [f, resolvedList[i]]));
-
-		const entries: [string, JsonSchemaProperty][] = [];
-		const required: string[] = [];
-		const layout: XLayout = [];
-
-		for (const item of items) {
-			if (isSection(item)) {
-				const sectionLayout: { key: string }[] = [];
-				for (const original of item.fields) {
-					const f = resolved.get(original)!;
-					if (!f.key) continue;
-					entries.push([f.key, propertyFromField(f)]);
-					if (f.required) required.push(f.key);
-					sectionLayout.push({ key: f.key });
-				}
-				if (sectionLayout.length > 0) {
-					layout.push({
-						id: item.id,
-						section: item.sectionLabel || 'Section',
-						items: sectionLayout
-					});
-				}
-			} else {
-				const f = resolved.get(item)!;
-				if (!f.key) continue;
-				entries.push([f.key, propertyFromField(f)]);
-				if (f.required) required.push(f.key);
-				layout.push({ key: f.key });
-			}
-		}
-
-		for (const original of archived) {
-			const f = resolved.get(original)!;
-			if (f.key) entries.push([f.key, propertyFromField(f)]);
-		}
-
-		if (entries.length === 0) return null;
-		const base = {
-			$schema: 'https://json-schema.org/draft/2020-12/schema' as const,
-			type: 'object' as const,
-			properties: Object.fromEntries(entries) as Record<string, JsonSchemaProperty>
-		};
-		const card = visible
-			.filter((f) => f.highlight !== undefined)
-			.sort((a, b) => a.highlight! - b.highlight!)
-			.map((f) => ({ key: resolved.get(f)!.key }));
-		const withMeta = withSchemaMeta(base, {
-			...baseMeta,
-			version: META_VERSION,
-			layout,
-			required
-		});
-		return withHighlights(
-			withMeta,
-			normaliseHighlights(card, base.properties, maxHighlights(list)),
-			list
-		);
-	}
+	import type { AttributesSchema, EditorField } from '$lib/schema-types';
 </script>
 
 <script lang="ts">
@@ -168,10 +26,18 @@
 	} from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
 	import { usageLabel, purgeWarning } from '$lib/field-usage';
-	import { allowedKinds, changeKind, kindChangeWarning } from '$lib/field-types/kind-changes';
-	import { displayChoices, displayValue, setDisplayValue } from '$lib/field-types/display-options';
+	import { getDescriptor } from '$lib/field-types';
 	import { SCHEMA_TYPE_CONTEXT, type SchemaTypeContext } from '$lib/schema-type-context';
-	import { canHighlightMore, movedRanks, toggledRanks } from '$lib/highlights';
+	import { readSchemaMeta, type HighlightList } from '$lib/schema-meta';
+	import {
+		isSection,
+		schemaToItems,
+		schemaToArchived,
+		itemsToSchema,
+		type EditorItem
+	} from '$lib/schema-editor-items';
+	import { archiveField, restoreField } from '$lib/field-archive';
+	import { canHighlightMore, maxHighlights, movedRanks, toggledRanks } from '$lib/highlights';
 	import {
 		definitionToField,
 		fieldToDefinition,
@@ -180,6 +46,7 @@
 	} from '$lib/presets';
 	import SavePresetDialog from '$lib/components/save-preset-dialog.svelte';
 	import PresetPickerDialog from '$lib/components/preset-picker-dialog.svelte';
+	import FieldKindRow from '$lib/components/field-kind-row.svelte';
 
 	let {
 		schema = $bindable<AttributesSchema | null>(null),
@@ -281,9 +148,14 @@
 		applyRanks(movedRanks(ranks, index, direction));
 	}
 
-	function handleKindChange(field: EditorField, kind: string): EditorField {
-		const next = changeKind(field, kind);
-		return isHighlightableField(next) ? next : { ...next, highlight: undefined };
+	// FieldKindRow reports any field change (kind, display option, required) through one
+	// callback; only an actual kind change can make a field non-highlightable, so only
+	// clear the highlight when the kind itself changed.
+	function handleFieldRowChange(field: EditorField, next: EditorField): EditorField {
+		if (next.kind !== field.kind && !isHighlightableField(next)) {
+			return { ...next, highlight: undefined };
+		}
+		return next;
 	}
 
 	// Usage counts per archived field key: a number, 'loading' or 'error'.
@@ -394,21 +266,6 @@
 			},
 			saved.length > 0
 		);
-	}
-
-	function kindOptions(field: EditorField, allowGroup: boolean) {
-		const listed = allDescriptors().filter(
-			(d) => d.selectable !== false && (allowGroup || d.kind !== 'group')
-		);
-		const permitted = allowedKinds(
-			field.originalKind,
-			listed.map((d) => d.kind)
-		);
-		return listed.filter((d) => permitted.includes(d.kind));
-	}
-
-	function displayOptionsFor(field: EditorField) {
-		return field.kind === 'opaque' ? [] : (getDescriptor(field.kind)?.displayOptions ?? []);
 	}
 
 	function newTextField(from: EditorField): EditorField {
@@ -540,52 +397,12 @@
 	onFieldChange: (f: EditorField) => void
 )}
 	<div class="flex flex-wrap items-center gap-2">
-		<Input
-			value={field.label}
-			placeholder="Label"
-			class="w-40"
-			aria-label="Field label"
-			oninput={(e) => onLabelChange((e.target as HTMLInputElement).value)}
+		<FieldKindRow
+			{field}
+			{allowGroup}
+			{onLabelChange}
+			onFieldChange={(next) => onFieldChange(handleFieldRowChange(field, next))}
 		/>
-		{#if field.kind === 'opaque'}
-			<span class="rounded border border-input px-1.5 text-xs text-muted-foreground">custom</span>
-		{:else}
-			<select
-				value={field.kind}
-				onchange={(e) =>
-					onFieldChange(handleKindChange(field, (e.target as HTMLSelectElement).value))}
-				class="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
-				aria-label="Field type"
-			>
-				{#each kindOptions(field, allowGroup) as d (d.kind)}
-					<option value={d.kind}>{d.label}</option>
-				{/each}
-			</select>
-		{/if}
-		{#each displayOptionsFor(field) as option (option.key)}
-			<span class="text-xs text-muted-foreground">{option.label}</span>
-			<select
-				value={displayValue(field, option)}
-				onchange={(e) =>
-					onFieldChange(setDisplayValue(field, option, (e.target as HTMLSelectElement).value))}
-				class="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
-				aria-label={option.label}
-			>
-				{#each displayChoices(field, option) as choice (choice.value)}
-					<option value={choice.value}>{choice.label}</option>
-				{/each}
-			</select>
-		{/each}
-		<label class="flex items-center gap-1.5 text-sm">
-			<input
-				type="checkbox"
-				checked={field.required}
-				onchange={(e) =>
-					onFieldChange({ ...field, required: (e.target as HTMLInputElement).checked })}
-				class="h-4 w-4 rounded border-input accent-primary"
-			/>
-			Required
-		</label>
 		{#if highlights && isHighlightableField(field)}
 			{@const pinned = field.highlight !== undefined}
 			{@const target = onConnections ? 'connection' : 'card'}
@@ -631,16 +448,6 @@
 			<X class="size-4" />
 		</Button>
 	</div>
-	{@const warning = kindChangeWarning(field.originalKind, field.kind)}
-	{#if warning}
-		<p class="text-xs text-muted-foreground" role="status">{warning}</p>
-	{/if}
-
-	{@const desc = getDescriptor(field.kind)}
-	{#if desc?.EditorExtras}
-		{@const Extras = desc.EditorExtras}
-		<Extras {field} onChange={onFieldChange} />
-	{/if}
 {/snippet}
 
 <div class="space-y-3">

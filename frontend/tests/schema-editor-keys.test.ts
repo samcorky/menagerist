@@ -4,7 +4,7 @@ import {
 	schemaToArchived,
 	schemaToItems,
 	type EditorItem
-} from '../src/lib/components/schema-editor.svelte';
+} from '../src/lib/schema-editor-items';
 import { archiveField, restoreField } from '../src/lib/field-archive';
 import type { AttributesSchema, EditorField } from '../src/lib/schema-types';
 

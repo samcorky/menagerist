@@ -134,6 +134,12 @@ class UpdateNodeRequest(BaseModel):
         )
 
 
+class PromoteExtraSchemaFieldRequest(BaseModel):
+    """Request body for promoting one overlay field onto the item type."""
+
+    node_type_id: uuid.UUID
+
+
 class NodeResponse(BaseModel):
     """A node as returned by the API."""
 

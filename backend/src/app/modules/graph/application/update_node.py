@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from app.modules.graph.application._validate_attributes import validate_attributes
-from app.modules.graph.application.custom_details import check_custom_details
+from app.modules.graph.application.extra_schema_limits import check_extra_schema_limits
 from app.modules.graph.application.schema_meta import (
     check_schema_definition,
     merge_attribute_schemas,
@@ -53,6 +53,11 @@ class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
             if node is None:
                 raise NodeNotFoundError(f"Node {command.node_id} not found")
 
+            if command.extra_schema is not None:
+                check_extra_schema_limits(
+                    command.extra_schema, previous=node.extra_schema
+                )
+
             if command.attributes is not None:
                 await self._validate(repos, node, command.attributes, command)
 
@@ -98,4 +103,3 @@ class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
         schema = merge_attribute_schemas(type_schema, extra_schema)
         if schema is not None:
             validate_attributes(schema, attributes, previous=node.attributes)
-        check_custom_details(schema, attributes, previous=node.attributes)

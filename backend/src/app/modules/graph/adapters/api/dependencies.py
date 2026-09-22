@@ -29,6 +29,9 @@ from app.modules.graph.application.list_edge_types import ListEdgeTypes
 from app.modules.graph.application.list_edges import ListEdges
 from app.modules.graph.application.list_node_types import ListNodeTypes
 from app.modules.graph.application.list_nodes import ListNodes
+from app.modules.graph.application.promote_extra_schema_field import (
+    PromoteExtraSchemaField,
+)
 from app.modules.graph.application.purge_edge_type_attribute import (
     PurgeEdgeTypeAttribute,
 )
@@ -95,6 +98,12 @@ def get_delete_node_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
 ) -> DeleteNode:
     return DeleteNode(uow)
+
+
+def get_promote_extra_schema_field_use_case(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+) -> PromoteExtraSchemaField:
+    return PromoteExtraSchemaField(uow)
 
 
 def get_create_edge_use_case(

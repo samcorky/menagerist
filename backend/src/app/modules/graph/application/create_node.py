@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from app.modules.graph.application._validate_attributes import validate_attributes
-from app.modules.graph.application.custom_details import check_custom_details
+from app.modules.graph.application.extra_schema_limits import check_extra_schema_limits
 from app.modules.graph.application.schema_meta import (
     check_schema_definition,
     merge_attribute_schemas,
@@ -45,6 +45,7 @@ class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
         """
         if command.extra_schema is not None:
             check_schema_definition(command.extra_schema)
+        check_extra_schema_limits(command.extra_schema)
         node = Node.create(
             name=command.name,
             type=command.type,
@@ -68,7 +69,6 @@ class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
             schema = merge_attribute_schemas(type_schema, command.extra_schema)
             if schema is not None:
                 validate_attributes(schema, command.attributes)
-            check_custom_details(schema, command.attributes)
             await repos.nodes.add(node)
             await self._uow.commit()
         logger.info("node created", node_id=node.id, node_type=node.type)

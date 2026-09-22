@@ -29,7 +29,7 @@ Integration tests are written alongside each item (see `testing-strategy.md`). `
 | 4. Display options and matching | [`wi-11-display-options.md`](wi-11-display-options.md), [`wi-12-rank-matching.md`](wi-12-rank-matching.md) | WI-12 is optional. |
 | 5. More field types and constraints | [`wi-15-text-constraints.md`](wi-15-text-constraints.md), [`further-field-types.md`](further-field-types.md) | `further-field-types.md` lists candidates, including the location kind; none scheduled. |
 | 5b. Highlights and attribute search | [`wi-16-highlighted-fields.md`](wi-16-highlighted-fields.md), [`wi-17-attribute-search.md`](wi-17-attribute-search.md) |  |
-| 5c. Per-item custom fields | [`wi-18-per-item-custom-fields.md`](wi-18-per-item-custom-fields.md) | 18a first; 18b and 18c after WI-19d is understood. |
+| 5c. Per-item custom fields | [`wi-18-per-item-custom-fields.md`](wi-18-per-item-custom-fields.md) | Revised 2026-09-22: overlay-based "Add field" + 18b promote only; 18a's loose-detail stopgap and 18c are dropped (see the file's "Revised design"). |
 | 5d. Reusable presets and per-item typed fields | [`wi-19-presets.md`](wi-19-presets.md), [`wi-19d-per-item-schema-overlay.md`](wi-19d-per-item-schema-overlay.md) | 19d (overlay) is decided. |
 | 5e. Value suggestions | [`wi-21-value-suggestions.md`](wi-21-value-suggestions.md) | Later; needs WI-18c. |
 | 5f. Connection details | [`wi-22-connection-details.md`](wi-22-connection-details.md) | Frontend; needs WI-16. |

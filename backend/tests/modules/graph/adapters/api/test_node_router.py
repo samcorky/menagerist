@@ -452,6 +452,52 @@ def test_list_nodes_x_total_count_reflects_favourite_filter() -> None:
     assert response.headers["Total-Count"] == "3"
 
 
+def test_promote_extra_schema_field_moves_the_property() -> None:
+    """POST .../attribute/{key}/promote moves the overlay field onto the item type."""
+    client = TestClient(_app_with_in_memory_graph())
+    node_type = client.post(
+        "/api/v1/node-type", json={"slug": "film", "label": "Film"}
+    ).json()
+    schema = {"type": "object", "properties": {"condition": {"type": "string"}}}
+    node = client.post(
+        "/api/v1/node",
+        json={
+            "name": "Alien",
+            "type": "film",
+            "attributes": {"condition": "mint"},
+            "extra_schema": schema,
+        },
+    ).json()
+
+    response = client.post(
+        f"/api/v1/node/{node['id']}/attribute/condition/promote",
+        json={"node_type_id": node_type["id"]},
+    )
+
+    assert response.status_code == 200
+    promoted = response.json()
+    assert "condition" not in (promoted["extra_schema"] or {}).get("properties", {})
+    assert promoted["attributes"]["condition"] == "mint"
+
+    updated_type = client.get(f"/api/v1/node-type/{node_type['id']}").json()
+    assert "condition" in updated_type["attributes_schema"]["properties"]
+
+
+def test_promote_extra_schema_field_returns_404_when_node_missing() -> None:
+    """POST .../attribute/{key}/promote on a nonexistent node returns 404."""
+    client = TestClient(_app_with_in_memory_graph())
+    node_type = client.post(
+        "/api/v1/node-type", json={"slug": "film", "label": "Film"}
+    ).json()
+
+    response = client.post(
+        f"/api/v1/node/{uuid.uuid4()}/attribute/condition/promote",
+        json={"node_type_id": node_type["id"]},
+    )
+
+    assert response.status_code == 404
+
+
 def test_list_nodes_x_total_count_matches_full_count_across_pages() -> None:
     """Total-Count equals the full total even when pagination limits the page."""
     client = TestClient(_app_with_in_memory_graph())

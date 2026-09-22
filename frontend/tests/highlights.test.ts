@@ -15,7 +15,7 @@ import {
 	toggledRanks
 } from '../src/lib/highlights';
 import { readHighlights, readSchemaMeta, withHighlights } from '../src/lib/schema-meta';
-import { itemsToSchema, schemaToItems } from '../src/lib/components/schema-editor.svelte';
+import { itemsToSchema, schemaToItems } from '../src/lib/schema-editor-items';
 import { archiveField } from '../src/lib/field-archive';
 import type { AttributesSchema, EditorField, JsonSchemaProperty } from '../src/lib/schema-types';
 
