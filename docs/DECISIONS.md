@@ -275,3 +275,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** Copy-on-apply keeps every node type's schema a standalone JSON Schema both validators already understand, so deleting a preset never breaks a type that used it — the alternative, a live link, is parked as a v2 idea (`SyncChoiceList`). The `group` field kind's UI label changes to "Table" (code name unchanged) to free "Field group" for the new reusable-set concept.
 
 **Tradeoff:** No UI yet for saved fields from a custom detail, for field groups (save/apply as a labelled section), for per-item application (needs the WI-19d overlay's own editor), or for packs/import-export/built-ins (WI-19c). These are separate, later items.
+
+---
+
+## Multi-add uses a single `CreateEdges` batch command
+
+**Decision:** `POST /edge/batch` (`CreateEdgesCommand`/`CreateEdges`) connects one source to several targets of the same relationship type in one transaction, sharing the same attributes across every new connection. A target already connected by an edge of that type (in either direction) is skipped, not duplicated, using the same `list_for_node` paging the purge use cases already use. The item page's "Connect item" form becomes a multi-select; on success it shows a count (created, and skipped if any) with a 5-second Undo that deletes the created edges individually.
+
+**Rationale:** The spec calls this out explicitly as structural over convention: N client calls to `POST /edge` would not be atomic and could leave a half-connected state on a partial failure, whereas the batch command commits once. Reusing `list_for_node` for the duplicate check avoids a new repository method.
+
+**Tradeoff:** Undo removes the created edges one at a time (no batch delete exists), best-effort. Creating new items inline from the picker (typing a name that doesn't match anything) is not implemented; only existing items can be selected.

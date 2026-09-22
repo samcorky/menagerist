@@ -17,6 +17,7 @@ from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRou
 from app.entrypoints.api.shared.problem_response import error_response
 from app.modules.graph.adapters.api.dependencies import (
     get_create_edge_use_case,
+    get_create_edges_use_case,
     get_delete_edge_use_case,
     get_get_edge_use_case,
     get_list_edges_use_case,
@@ -24,10 +25,13 @@ from app.modules.graph.adapters.api.dependencies import (
 )
 from app.modules.graph.adapters.api.edge.schemas import (
     CreateEdgeRequest,
+    CreateEdgesRequest,
+    CreateEdgesResponse,
     EdgeResponse,
     UpdateEdgeRequest,
 )
 from app.modules.graph.application.create_edge import CreateEdge
+from app.modules.graph.application.create_edges import CreateEdges
 from app.modules.graph.application.delete_edge import DeleteEdge, DeleteEdgeCommand
 from app.modules.graph.application.get_edge import GetEdge, GetEdgeQuery
 from app.modules.graph.application.list_edges import ListEdges, ListEdgesQuery
@@ -60,6 +64,32 @@ async def create_edge(
     """Create a new edge between two existing node."""
     edge = await use_case.handle(payload.to_command(), actor)
     return EdgeResponse.from_domain(edge)
+
+
+@router.post(
+    "/batch",
+    response_model=CreateEdgesResponse,
+    status_code=201,
+    operation_id="create_edges",
+    responses={
+        **error_response(ValidationError, detail="type must be provided"),
+        **error_response(
+            NodeNotFoundError,
+            detail="Node 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10 not found",
+        ),
+    },
+)
+async def create_edges(
+    payload: CreateEdgesRequest,
+    use_case: Annotated[CreateEdges, Depends(get_create_edges_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> CreateEdgesResponse:
+    """Connect one source to several targets at once, skipping existing connections."""
+    result = await use_case.handle(payload.to_command(), actor)
+    return CreateEdgesResponse(
+        created=[EdgeResponse.from_domain(edge) for edge in result.created],
+        skipped=result.skipped,
+    )
 
 
 @router.get(

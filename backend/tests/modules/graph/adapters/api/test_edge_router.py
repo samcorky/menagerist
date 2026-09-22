@@ -316,3 +316,46 @@ def test_list_edges_no_link_header_on_last_page() -> None:
 
     assert response.status_code == 200
     assert "Link" not in response.headers
+
+
+def test_create_edges_batch_creates_and_skips_existing() -> None:
+    """POST /edge/batch connects every new target and reports one skipped."""
+    client = TestClient(_app_with_in_memory_graph())
+    source = _create_node(client, name="Photo", type_="photo")
+    a = _create_node(client, name="A", type_="person")
+    b = _create_node(client, name="B", type_="person")
+    client.post(
+        "/api/v1/edge",
+        json={"source_id": source["id"], "target_id": a["id"], "type": "pictured-with"},
+    )
+
+    response = client.post(
+        "/api/v1/edge/batch",
+        json={
+            "source_id": source["id"],
+            "target_ids": [a["id"], b["id"]],
+            "type": "pictured-with",
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert [e["target_id"] for e in body["created"]] == [b["id"]]
+    assert body["skipped"] == [a["id"]]
+
+
+def test_create_edges_batch_returns_404_for_a_missing_node() -> None:
+    """A missing source or target id is a 404."""
+    client = TestClient(_app_with_in_memory_graph())
+    source = _create_node(client, name="Photo", type_="photo")
+
+    response = client.post(
+        "/api/v1/edge/batch",
+        json={
+            "source_id": source["id"],
+            "target_ids": [str(uuid.uuid4())],
+            "type": "pictured-with",
+        },
+    )
+
+    assert response.status_code == 404

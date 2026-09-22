@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.graph.application.create_edge import CreateEdgeCommand
+from app.modules.graph.application.create_edges import CreateEdgesCommand
 from app.modules.graph.application.update_edge import UpdateEdgeCommand
 
 if TYPE_CHECKING:
@@ -52,6 +53,44 @@ class CreateEdgeRequest(BaseModel):
         )
 
 
+class CreateEdgesRequest(BaseModel):
+    """Request body for connecting one source to several targets at once.
+
+    Attributes apply to every edge. A target already connected to the source
+    by an edge of the same type is skipped, not duplicated.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "source_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                    "target_ids": [
+                        "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e12",
+                        "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e13",
+                    ],
+                    "type": "pictured-with",
+                    "attributes": {},
+                }
+            ]
+        }
+    )
+
+    source_id: uuid.UUID
+    target_ids: list[uuid.UUID]
+    type: str
+    attributes: dict[str, Any] = Field(default_factory=dict)
+
+    def to_command(self) -> CreateEdgesCommand:
+        """Convert this request into a `CreateEdgesCommand`."""
+        return CreateEdgesCommand(
+            source_id=self.source_id,
+            target_ids=self.target_ids,
+            type=self.type,
+            attributes=self.attributes,
+        )
+
+
 class UpdateEdgeRequest(BaseModel):
     """Request body for updating an edge. Omitted fields are left unchanged."""
 
@@ -91,3 +130,10 @@ class EdgeResponse(BaseModel):
             created_at=edge.created_at,
             updated_at=edge.updated_at,
         )
+
+
+class CreateEdgesResponse(BaseModel):
+    """Edges created, and targets skipped because a matching edge already existed."""
+
+    created: list[EdgeResponse]
+    skipped: list[uuid.UUID]

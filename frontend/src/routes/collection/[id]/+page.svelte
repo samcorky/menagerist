@@ -7,6 +7,7 @@
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import {
 		createEdge,
+		createEdges,
 		deleteEdge,
 		deleteNode,
 		getNode,
@@ -94,16 +95,18 @@
 	let editTrigger: HTMLElement | null = null;
 
 	let newEdgeType = $state('');
-	let newEdgeTargetId = $state('');
+	let selectedTargets = $state<NodeResponse[]>([]);
+	let newEdgeRows = $state<AttributeRow[]>([]);
 	let creatingEdge = $state(false);
 	let edgeTargetSearch = $state('');
 	let edgeTargetOpen = $state(false);
 	let filteredNodes = $derived(
-		otherNodes.filter((n) =>
-			`${n.name} ${n.type ?? ''}`.toLowerCase().includes(edgeTargetSearch.toLowerCase())
+		otherNodes.filter(
+			(n) =>
+				!selectedTargets.some((t) => t.id === n.id) &&
+				`${n.name} ${n.type ?? ''}`.toLowerCase().includes(edgeTargetSearch.toLowerCase())
 		)
 	);
-	let selectedNodeLabel = $derived(otherNodes.find((n) => n.id === newEdgeTargetId)?.name ?? '');
 
 	// Autocomplete for relationship types
 	let edgeTypeSearch = $state('');
@@ -256,37 +259,64 @@
 		}
 	}
 
+	function addSelectedTarget(candidate: NodeResponse) {
+		if (selectedTargets.some((t) => t.id === candidate.id)) return;
+		selectedTargets = [...selectedTargets, candidate];
+		edgeTargetSearch = '';
+	}
+
+	function removeSelectedTarget(id: string) {
+		selectedTargets = selectedTargets.filter((t) => t.id !== id);
+	}
+
 	async function handleCreateEdge(event: SubmitEvent) {
 		event.preventDefault();
-		if (!newEdgeTargetId) {
-			toast.error('Please select an item to connect to');
+		if (selectedTargets.length === 0) {
+			toast.error('Please select at least one item to connect to');
 			return;
 		}
 		creatingEdge = true;
-		const result = await createEdge({
+		const result = await createEdges({
 			body: {
 				source_id: nodeId,
-				target_id: newEdgeTargetId,
+				target_ids: selectedTargets.map((t) => t.id),
 				type: newEdgeType.trim(),
-				attributes: {}
+				attributes: rowsToAttributes(
+					newEdgeRows,
+					edgeTypesById.get(newEdgeType)?.attributes_schema as AttributesSchema | null
+				)
 			}
 		});
 		if (result.error || !result.data) {
 			const { title, description: desc } = networkAwareError(result);
 			toast.error(title, { description: desc });
-			if (result.response?.status === 404) {
-				newEdgeTargetId = '';
-				edgeTargetSearch = '';
-			}
 		} else {
-			toast.success('Connection added');
-			edges = [...edges, result.data];
+			const { created, skipped } = result.data;
+			edges = [...edges, ...created];
+			const itemWord = created.length === 1 ? 'item' : 'items';
+			const message =
+				skipped.length === 0
+					? `${created.length} ${itemWord} connected`
+					: `${created.length} ${itemWord} connected, ${skipped.length} already connected`;
+			toast(message, {
+				action: { label: 'Undo', onClick: () => void undoCreateEdges(created) },
+				duration: 5000
+			});
 			newEdgeType = '';
-			newEdgeTargetId = '';
+			selectedTargets = [];
 			edgeTargetSearch = '';
 			edgeTypeSearch = '';
+			newEdgeRows = [];
 		}
 		creatingEdge = false;
+	}
+
+	async function undoCreateEdges(created: EdgeResponse[]) {
+		const createdIds = new Set(created.map((e) => e.id));
+		edges = edges.filter((e) => !createdIds.has(e.id));
+		await Promise.all(
+			created.map((edge) => deleteEdge({ path: { edge_id: edge.id } }).catch(() => undefined))
+		);
 	}
 
 	function edgeTypeSchemaOf(edge: EdgeResponse): AttributesSchema | null {
@@ -708,6 +738,7 @@
 										oninput={(e) => {
 											edgeTypeSearch = (e.target as HTMLInputElement).value;
 											newEdgeType = edgeTypeSearch;
+											newEdgeRows = [];
 											edgeTypeOpen = true;
 										}}
 										onfocus={() => {
@@ -728,6 +759,7 @@
 														onmousedown={() => {
 															newEdgeType = et.slug;
 															edgeTypeSearch = et.label;
+															newEdgeRows = [];
 															edgeTypeOpen = false;
 														}}
 													>
@@ -746,23 +778,34 @@
 
 							<div class="space-y-2">
 								<ShimmerSlot {loading} class="h-4 w-24">
-									<Label for="edge-target">Item</Label>
+									<Label for="edge-target">{selectedTargets.length > 1 ? 'Items' : 'Item'}</Label>
 								</ShimmerSlot>
+								{#if selectedTargets.length > 0}
+									<ul class="flex flex-wrap gap-1.5">
+										{#each selectedTargets as target (target.id)}
+											<li>
+												<Badge variant="secondary" class="pr-1">
+													<span class="max-w-40 truncate" title={target.name}>{target.name}</span>
+													<button
+														type="button"
+														onclick={() => removeSelectedTarget(target.id)}
+														aria-label="Remove {target.name}"
+														class="rounded-full p-0.5 hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+													>
+														<X class="size-3" />
+													</button>
+												</Badge>
+											</li>
+										{/each}
+									</ul>
+								{/if}
 								<div class="relative">
 									<Input
 										id="edge-target"
-										value={edgeTargetOpen ? edgeTargetSearch : selectedNodeLabel}
+										bind:value={edgeTargetSearch}
 										placeholder="Search items…"
 										autocomplete="off"
-										oninput={(e) => {
-											edgeTargetSearch = (e.target as HTMLInputElement).value;
-											edgeTargetOpen = true;
-											newEdgeTargetId = '';
-										}}
-										onfocus={() => {
-											edgeTargetOpen = true;
-											edgeTargetSearch = '';
-										}}
+										onfocus={() => (edgeTargetOpen = true)}
 										onblur={() => setTimeout(() => (edgeTargetOpen = false), 150)}
 									/>
 									{#if edgeTargetOpen && filteredNodes.length > 0}
@@ -774,10 +817,9 @@
 													<button
 														type="button"
 														class="flex w-full items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent"
-														onmousedown={() => {
-															newEdgeTargetId = candidate.id;
-															edgeTargetSearch = candidate.name;
-															edgeTargetOpen = false;
+														onmousedown={(e) => {
+															e.preventDefault();
+															addSelectedTarget(candidate);
 														}}
 													>
 														<span class="flex min-w-0 items-center gap-2">
@@ -797,13 +839,27 @@
 											{/each}
 										</ul>
 									{/if}
-									<input type="hidden" name="edge-target" value={newEdgeTargetId} />
 								</div>
 							</div>
 
+							{#if edgeTypesById.get(newEdgeType)?.attributes_schema}
+								<div class="space-y-2">
+									<p class="text-xs text-muted-foreground">Applies to every connection you add.</p>
+									<AttributesEditor
+										bind:rows={newEdgeRows}
+										schema={edgeTypesById.get(newEdgeType)
+											?.attributes_schema as AttributesSchema | null}
+									/>
+								</div>
+							{/if}
+
 							<div class="flex justify-end">
 								<Button type="submit" disabled={creatingEdge}>
-									{creatingEdge ? 'Connecting…' : 'Connect item'}
+									{creatingEdge
+										? 'Connecting…'
+										: selectedTargets.length > 1
+											? 'Connect items'
+											: 'Connect item'}
 								</Button>
 							</div>
 						</form>

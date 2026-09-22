@@ -14,6 +14,7 @@ from app.modules.graph.application.count_node_type_attribute_usage import (
 )
 from app.modules.graph.application.create_edge import CreateEdge
 from app.modules.graph.application.create_edge_type import CreateEdgeType
+from app.modules.graph.application.create_edges import CreateEdges
 from app.modules.graph.application.create_node import CreateNode
 from app.modules.graph.application.create_node_type import CreateNodeType
 from app.modules.graph.application.delete_edge import DeleteEdge
@@ -100,6 +101,12 @@ def get_create_edge_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
 ) -> CreateEdge:
     return CreateEdge(uow)
+
+
+def get_create_edges_use_case(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+) -> CreateEdges:
+    return CreateEdges(uow)
 
 
 def get_get_edge_use_case(

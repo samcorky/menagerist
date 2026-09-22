@@ -22,7 +22,7 @@ Update at the end of every session. Read this first.
 | WI-19 presets | 19a done, awaiting user review and commit; 19b and 19c todo | feature/initial-implementation | See "WI-19a session notes" below. |
 | WI-19d per-item schema overlay | done, committed (e1a17b8) | feature/initial-implementation | See "WI-19d session notes" below. |
 | WI-21 value suggestions | todo | | |
-| WI-22 connection details | 22a done, committed (66417f1); 22b todo | feature/initial-implementation | See "WI-22a session notes" below. |
+| WI-22 connection details | 22a done, committed (66417f1); 22b done, awaiting user review and commit | feature/initial-implementation | See "WI-22a session notes" below. |
 | WI-13 drag-and-drop layout (stretch) | todo | | |
 
 ## WI-1 to WI-4 session notes
@@ -439,3 +439,18 @@ Update at the end of every session. Read this first.
 - Migration head is `e5f6a7b8c9d0`; `poe db-up` applied both `d4e5f6a7b8c9` (WI-19d) and `e5f6a7b8c9d0` (WI-19a) this session.
 - `origin` is stored as an arbitrary member of `PropertyMeta`'s index signature in `schema-meta.ts` — no dedicated type was added there; `$lib/presets.ts` defines its own `Origin` type for it.
 - `check_definition`'s `field_set` shape check exists and is tested, ready for WI-19b to use when it builds the save/apply UI.
+
+## WI-22b session notes
+
+**Status:** implemented, all backend and frontend checks green, not committed. Next: WI-19b/19c, WI-21, or WI-13.
+
+**Done**
+- Backend: `CreateEdgesCommand`/`CreateEdges` (new `application/create_edges.py`) connects one source to several targets of one relationship type in a single transaction, sharing attributes; a target already connected (either direction) is skipped via the existing `list_for_node` paging (mirrors the purge use cases' pattern). Route `POST /edge/batch` (`CreateEdgesRequest`/`CreateEdgesResponse` in `edge/schemas.py`), registered before `/edge/{edge_id}` so it isn't shadowed. No migration (no schema change).
+- Frontend: the item page's "Connect item" form is now multi-select (`selectedTargets`, removable chips); a details form (`AttributesEditor`) appears when the chosen relationship type has fields and applies to every connection created. Submit calls the batch endpoint; success shows "N item(s) connected" (plus a skipped count if any) with a 5-second Undo that deletes the created edges individually (best-effort, no batch delete exists).
+- Tests: 10 new backend tests (use case incl. dedupe in both directions, missing source/target, schema validation, auto-create type; router). `docs/DECISIONS.md` updated.
+
+**Left / deferred:** creating a new item inline from the picker (typing a name that matches nothing) is not implemented — only existing items can be selected, per the spec's own note that this could be split out. Not tried in a browser.
+
+**Files touched:** backend `application/create_edges.py` (new), `adapters/api/edge/{schemas.py,router.py}`, `adapters/api/dependencies.py`; tests `test_create_edges.py` (new), `test_edge_router.py`. Frontend `routes/collection/[id]/+page.svelte`. Docs as above.
+
+**Checks run:** `poe lint-backend`/`typecheck-backend` clean; `poe test-backend` 677 pass; `poe coverage` all targets met (application 100%, 46 integration tests pass); `poe lint-frontend`/`typecheck-frontend` (0 errors, 2 existing warnings) clean; `poe test-frontend` 266 pass.
