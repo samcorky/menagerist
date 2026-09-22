@@ -31,6 +31,10 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "Endpoints for managing media assets.",
     },
     {
+        "name": "Presets",
+        "description": "Endpoints for managing presets.",
+    },
+    {
         "name": "v1",
         "description": "Version 1 of the API.",
     },

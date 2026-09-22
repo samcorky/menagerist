@@ -29,11 +29,25 @@ _PRESET_EXAMPLE: dict[str, Any] = {
     "updated_at": "2026-08-23T10:14:44.465954Z",
 }
 
+_CREATE_PRESET_EXAMPLE: dict[str, Any] = {
+    "kind": "field",
+    "label": "Condition",
+    "description": None,
+    "definition": {
+        "property": {
+            "title": "Condition",
+            "type": "string",
+            "enum": ["Mint", "Near Mint", "VG+"],
+            "x-menagerist": {"kind": "choice"},
+        }
+    },
+}
+
 
 class CreatePresetRequest(BaseModel):
     """Request body for saving a new preset."""
 
-    model_config = ConfigDict(json_schema_extra={"examples": [_PRESET_EXAMPLE]})
+    model_config = ConfigDict(json_schema_extra={"examples": [_CREATE_PRESET_EXAMPLE]})
 
     kind: str
     label: str
