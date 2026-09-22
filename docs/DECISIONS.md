@@ -313,4 +313,3 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** Verified directly against Postgres: nested JSONB object keys are not stored in insertion order (`{zeta_field, region, a_long_custom_name, aa, k1}` came back as `{aa, k1, region, zeta_field, a_long_custom_name}`), the same reordering WI-18a already found for loose attribute keys. A table field's columns were derived from `Object.entries(prop.items.properties)` with no explicit order recorded anywhere, unlike top-level fields (`x-menagerist.layout`), so a table's column order silently scrambled after any save and reload.
 
 **Tradeoff:** Existing table fields saved before this fix keep their JSONB-scrambled order until re-saved from the schema editor — the same no-migration pattern as every other `x-menagerist` addition.
-

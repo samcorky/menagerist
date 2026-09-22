@@ -296,4 +296,3 @@ A `field` or `choice_list` preset can be saved from the schema editor ("Save for
 ### Table (group) column order
 
 A `group` field's own `x-menagerist.columns` records its sub-property keys in order; `GroupInput`, `GroupView` and `fromSchema` all read it through `field-types/group/columns.ts`'s `orderedColumns(prop)` rather than `Object.entries`, because nested JSONB object keys are not stored in insertion order (verified against Postgres). A property with no `columns` falls back to `Object.entries` order.
-

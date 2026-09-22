@@ -24,6 +24,8 @@ Update at the end of every session. Read this first.
 | WI-21 value suggestions | todo | | |
 | WI-22 connection details | 22a done, committed (66417f1); 22b done, committed (5706c51) | feature/initial-implementation | See "WI-22a session notes" below. |
 | WI-13 drag-and-drop layout (stretch) | todo | | |
+| WI-23 table column reordering | todo | | New, from the 2026-09-22 column-order fix discussion. |
+| WI-24 quantity field type | todo | | New; promoted from further-field-types.md's "Measurement" row. |
 
 ## WI-1 to WI-4 session notes
 
@@ -494,4 +496,3 @@ Update at the end of every session. Read this first.
 **Checks run:** `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 275 pass. `poe lint-backend`/`typecheck-backend` clean; `poe test-backend` 679 pass; `poe coverage` all targets met (application 100%, 46 integration tests pass).
 
 **Left:** existing table fields saved before this fix keep JSONB-scrambled column order until the item type is re-saved from the schema editor (no migration, consistent with every other `x-menagerist` addition).
-
