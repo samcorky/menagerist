@@ -14,7 +14,7 @@ Update at the end of every session. Read this first.
 | WI-9 purge and usage | done, committed (a479871) | feature/initial-implementation | See "WI-9 session notes" below. |
 | WI-10 kind changes and option warnings | done, committed (602cfe4) | feature/initial-implementation | See "WI-10 session notes" below. |
 | WI-11 display options | done, committed (2668afd) | feature/initial-implementation | See "WI-11 session notes" below. |
-| WI-12 rank matching (optional) | done, awaiting user review and commit | feature/initial-implementation | See "WI-12 session notes" below. |
+| WI-12 rank matching (optional) | done, committed (92db277) | feature/initial-implementation | See "WI-12 session notes" below. |
 | WI-15 text constraints | done, committed (26fdaca) | feature/initial-implementation | See "WI-15 session notes" below. |
 | WI-16 highlighted fields | done, committed (44c01dc) | feature/initial-implementation | See "WI-16 session notes" below. |
 | WI-17 attribute search | done, committed (06b605b) | feature/initial-implementation | See "WI-17 session notes" below. |
@@ -457,7 +457,7 @@ Update at the end of every session. Read this first.
 
 ## WI-12 session notes
 
-**Status:** implemented, all frontend checks green, not committed. Remaining table items: WI-19b/19c, WI-21, WI-13.
+**Status:** implemented, all frontend checks green, committed as 92db277. Remaining table items: WI-19b/19c, WI-21, WI-13.
 
 **Done**
 - `FieldTypeDescriptor.rank?: (prop) => number` (registry.ts). `descriptorForProp`'s no-`kind` fallback now picks the highest-ranked matching descriptor (unranked defaults to 1), ties broken by registration order. The `x-menagerist.kind` direct-lookup path is unchanged.
