@@ -71,6 +71,11 @@
 		return rows.find((r) => r.key === key)?.value ?? '';
 	}
 
+	function isEmptyValue(value: unknown): boolean {
+		if (value === null || value === undefined || value === '') return true;
+		return Array.isArray(value) && value.length === 0;
+	}
+
 	function setValue(key: string, value: unknown) {
 		const existing = rows.find((r) => r.key === key);
 		if (existing) {
@@ -109,7 +114,9 @@
 		onfocusout={() => markTouched(key)}
 	>
 		<span class="w-32 shrink-0 pt-1.5 text-sm text-muted-foreground">
-			{prop.title || key}{#if isRequired}<span class="ml-0.5 text-destructive">*</span>{/if}
+			{prop.title || key}{#if isRequired}{#if isEmptyValue(getValue(key))}<span
+						class="ml-1 text-xs text-muted-foreground">Recommended</span
+					>{:else}<span class="ml-0.5 text-muted-foreground">*</span>{/if}{/if}
 		</span>
 		<div class="flex flex-1 flex-col gap-1">
 			{#if Widget}

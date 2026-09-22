@@ -470,3 +470,13 @@ Update at the end of every session. Read this first.
 **Files touched:** frontend `field-types/registry.ts`, `field-types/index.ts`; tests `registry.test.ts`. Docs as above. No backend changes.
 
 **Checks run:** `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 269 pass. Backend unchanged, backend checks not run.
+
+## Required-field styling fix (open question 58)
+
+**Status:** implemented, frontend checks green, not committed.
+
+**Done:** `attributes-editor.svelte`'s required-field asterisk is now `text-muted-foreground` (was `text-destructive`), and becomes a "Recommended" text hint when the field is empty. Closes open question 58 (owner decided 2026-09-21, code hadn't caught up). Also closed open questions 7 (WI-12, answered by its own commit) and partly closed 52 (WI-22b's `CreateEdges` half).
+
+**Checks run:** `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 269 pass (no new test added — this is a small visual/styling change, consistent with no component tests in this codebase by decision).
+
+**Files touched:** frontend `components/attributes-editor.svelte`. Docs: `docs/DECISIONS.md`, this file, `open-questions.md` (58 closed, 7 closed, 52 partly closed).

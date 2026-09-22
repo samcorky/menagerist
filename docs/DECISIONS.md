@@ -295,3 +295,11 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** Correctness no longer depends on import order in `field-types/index.ts`. No current built-in kind actually needs a non-default rank: every scalar's `fromSchema` already excludes the shapes the others claim (checked directly — `text` excludes `format`/`enum`, `date`/`choice` require them, `rating`/`longtext` only ever match an explicit `kind`), so this is infrastructure for the overlapping kinds the spec anticipates (multi-choice, partial date, identifier, URL/email), not a fix for a live bug.
 
 **Tradeoff:** None beyond the small added surface on the descriptor type.
+
+---
+
+## Required-field marker is neutral, not red
+
+**Decision:** In the attributes editor, a required field's asterisk is `text-muted-foreground`, not `text-destructive`. When the field is currently empty, the asterisk is replaced by a small "Recommended" text hint instead. Neither ever blocks saving.
+
+**Rationale:** Required is advisory only (WI-6, guidelines §16a); a red asterisk reads as a validation error even though nothing is actually being validated. Implements open question 58 (owner decision, 2026-09-21), which had been recorded but not yet built.

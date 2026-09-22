@@ -11,7 +11,7 @@
 4. WI-4: is a visible "custom" badge on opaque fields the right UX, given the "never feel like configuring a database" principle?
 5. WI-14: should `version` start at 1 now, given there is no migration path yet?
 6. Rating colour: fixed amber or theme accent (`primary`)?
-7. WI-12: is rank-based matching worth it now, or only once a second overlapping type (multi-choice, partial date, identifier) is scheduled?
+7. **Closed:** implemented (WI-12, commit 92db277) as dormant infrastructure — no built-in kind needs a non-default rank yet; it activates once a genuinely overlapping kind (multi-choice, partial date, identifier) is added.
 8. WI-13: is depth 3 with tabs at the top level the right limit, or should tabs be dropped until asked for?
 9. WI-13: should the backend validate the layout structure on node-type save?
 10. WI-13: which drag-and-drop library, given Svelte 5, touch, keyboard and nested containers?
@@ -56,13 +56,13 @@
 49. **Closed:** accept that a search can match a latitude for v1 (decided).
 50. **Closed:** include the "Use my current location" button (hidden when unavailable) and an OpenStreetMap "Open in map" link; a `geo:` link later (decided).
 51. **Closed (WI-22a, default, not confirmed):** a connection row shows both the other item's card highlights and the connection's own details. Was: WI-22: should a connection row show the other item's card highlights as well as the connection's own details (two levels of detail on one row), or the item title only when the connection has details?
-52. WI-22b: when creating people inline in a multi-add, which type do they get (untyped, or the type the picker is filtered to)? And is a single `CreateEdges` command wanted, or is calling `POST /edge` several times acceptable for v1?
+52. **Partly closed (WI-22b, commit 5706c51):** a single `CreateEdges` command was built (preferred over N calls, per the spec). Still open: inline creation of new items from the multi-add picker was not implemented this pass, so "which type does a newly created person get" remains unanswered until that lands.
 53. WI-4: should `opaque` fields be editable beyond the title (for example a "Convert to text" action that drops the unknown keywords), or stay read-only apart from the title until WI-14 defines unknown kinds? Default: title only.
 54. WI-2: should an untouched boolean cell in a group row stay `false` (current, no unset state) or be omitted? Default: `false`, recorded in `docs/DECISIONS.md`.
 55. **Closed (WI-10):** changing a field's kind clears its `display` and `config` metadata; other metadata is kept.
 56. WI-14: old-format item types lose layout, long-text rendering and required markers until re-saved. Default (decided in the spec): no migration; say so in release notes if the app has users by then.
 57. WI-20: the key follows the label while a field is unsaved and freezes on save. If the editor ever keeps a saved schema open in place (no reload after save), pending flags must be cleared on save. Today saving closes the editor, so no action is needed.
-58. **Decided (owner, review 2026-09-21):** neutral asterisk that becomes a soft "recommended" hint when the field is empty; never red, never blocking. NOT YET IMPLEMENTED (the red asterisk is still in `attributes-editor.svelte`). Was: WI-6: required fields show an always-on red asterisk (`text-destructive`), which reads like an error. Should it be a neutral or "recommended" style, and should empty required fields be highlighted (guidelines §16a) now or with the §18 "items missing information" group? Default: leave as is.
+58. **Closed (owner, review 2026-09-21; implemented):** neutral asterisk (`text-muted-foreground`) that becomes a "Recommended" text hint when the field is empty; never red, never blocking. Was: WI-6: required fields show an always-on red asterisk, which reads like an error.
 59. **Closed (owner, review 2026-09-21):** a restored field returns at the end of the layout. Was: WI-8: should a restored field return to its previous position in the layout (needs the old position stored) or the end? Default: the end. Undo, by contrast, restores the exact previous editor state.
 60. WI-15: should a new constraint on a saved text field warn with the number of items whose value would fail it (as removing a choice option does)? It needs a query that evaluates the pattern over stored values. Default: no; stale values never block other edits.
 61. WI-15: should the attributes form show a rule's helper text always (as now) or only while the field is focused or empty? Default: always shown until there is an error.
