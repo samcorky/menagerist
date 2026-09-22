@@ -107,7 +107,12 @@
         }
       },
       "x-menagerist": {
-        "kind": "group"
+        "kind": "group",
+        "columns": [
+          "track_no",
+          "track",
+          "length"
+        ]
       }
     },
     "price_paid": {

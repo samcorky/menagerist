@@ -145,12 +145,7 @@ def validation_schema(schema: dict[str, Any]) -> dict[str, Any]:
     return stripped
 
 
-def _check_property_meta(path: str, prop: object) -> None:
-    meta = prop.get(NAMESPACE) if isinstance(prop, dict) else None
-    if meta is None:
-        return
-    if not isinstance(meta, dict):
-        raise InvalidSchemaError(f"{path}/{NAMESPACE} must be an object")
+def _check_property_meta_shape(path: str, meta: dict[str, Any]) -> None:
     for member in _PROPERTY_STR_MEMBERS:
         if member in meta and not isinstance(meta[member], str):
             raise InvalidSchemaError(f"{path}/{NAMESPACE}/{member} must be a string")
@@ -159,6 +154,23 @@ def _check_property_meta(path: str, prop: object) -> None:
             raise InvalidSchemaError(f"{path}/{NAMESPACE}/{member} must be a boolean")
     if "config" in meta and not isinstance(meta["config"], dict):
         raise InvalidSchemaError(f"{path}/{NAMESPACE}/config must be an object")
+    if "columns" in meta:
+        columns = meta["columns"]
+        if not isinstance(columns, list) or not all(
+            isinstance(c, str) for c in columns
+        ):
+            raise InvalidSchemaError(
+                f"{path}/{NAMESPACE}/columns must be an array of strings"
+            )
+
+
+def _check_property_meta(path: str, prop: object) -> None:
+    meta = prop.get(NAMESPACE) if isinstance(prop, dict) else None
+    if meta is None:
+        return
+    if not isinstance(meta, dict):
+        raise InvalidSchemaError(f"{path}/{NAMESPACE} must be an object")
+    _check_property_meta_shape(path, meta)
 
 
 def _check_root_meta(root: object) -> None:

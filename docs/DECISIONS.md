@@ -303,3 +303,14 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Decision:** In the attributes editor, a required field's asterisk is `text-muted-foreground`, not `text-destructive`. When the field is currently empty, the asterisk is replaced by a small "Recommended" text hint instead. Neither ever blocks saving.
 
 **Rationale:** Required is advisory only (WI-6, guidelines §16a); a red asterisk reads as a validation error even though nothing is actually being validated. Implements open question 58 (owner decision, 2026-09-21), which had been recorded but not yet built.
+
+---
+
+## A table (group) field's column order is stored explicitly
+
+**Decision:** A `group` property's own metadata gains a `columns` member: an ordered array of its sub-property keys, written by `toSchema` from the in-memory sub-field order and read by `fromSchema`, `GroupInput.svelte` and `GroupView.svelte` via a shared `orderedColumns(prop)` helper (`field-types/group/columns.ts`). A property with no `columns` (saved before this fix, or authored through the API) falls back to `Object.entries` order. The backend's `check_meta_shape` validates `columns` is an array of strings, alongside the other property metadata members.
+
+**Rationale:** Verified directly against Postgres: nested JSONB object keys are not stored in insertion order (`{zeta_field, region, a_long_custom_name, aa, k1}` came back as `{aa, k1, region, zeta_field, a_long_custom_name}`), the same reordering WI-18a already found for loose attribute keys. A table field's columns were derived from `Object.entries(prop.items.properties)` with no explicit order recorded anywhere, unlike top-level fields (`x-menagerist.layout`), so a table's column order silently scrambled after any save and reload.
+
+**Tradeoff:** Existing table fields saved before this fix keep their JSONB-scrambled order until re-saved from the schema editor — the same no-migration pattern as every other `x-menagerist` addition.
+

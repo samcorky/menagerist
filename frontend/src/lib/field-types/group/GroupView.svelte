@@ -1,13 +1,14 @@
 <script lang="ts">
 	import type { JsonSchemaProperty } from '$lib/schema-types';
 	import { formatIsoDate } from '$lib/format-date';
+	import { orderedColumns } from './columns';
 
 	type GroupRow = Record<string, unknown>;
 
 	let { value, prop }: { value: unknown; prop: JsonSchemaProperty } = $props();
 
 	let rows = $derived(Array.isArray(value) ? (value as GroupRow[]) : []);
-	let columns = $derived(prop.type === 'array' ? Object.entries(prop.items.properties) : []);
+	let columns = $derived(orderedColumns(prop));
 
 	function formatValue(val: unknown, sp: JsonSchemaProperty): string {
 		if (val === null || val === undefined || val === '') return '—';

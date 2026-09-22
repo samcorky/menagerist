@@ -480,3 +480,18 @@ Update at the end of every session. Read this first.
 **Checks run:** `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 269 pass (no new test added — this is a small visual/styling change, consistent with no component tests in this codebase by decision).
 
 **Files touched:** frontend `components/attributes-editor.svelte`. Docs: `docs/DECISIONS.md`, this file, `open-questions.md` (58 closed, 7 closed, 52 partly closed).
+
+## Table (group) column order fix
+
+**Status:** implemented, all backend and frontend checks green, not committed.
+
+**Bug (user-reported):** a `group`/"Table" field's column order was not preserved across a save and reload. Confirmed directly against Postgres: nested JSONB object keys are reordered on storage, the same issue WI-18a found for loose attribute keys — but `GroupInput.svelte`, `GroupView.svelte` and `group.ts`'s `fromSchema` all derived column order from raw `Object.entries(prop.items.properties)`, with no explicit order recorded (unlike top-level fields, which have `x-menagerist.layout`).
+
+**Fix:** new `x-menagerist.columns` on the group property itself (an ordered array of sub-property keys), written by `toSchema` and read by a new shared helper `field-types/group/columns.ts`'s `orderedColumns(prop)`, used by `fromSchema` and both widgets. Falls back to `Object.entries` order when absent (old schemas, API-authored). Backend `check_meta_shape` validates `columns` is an array of strings.
+
+**Files touched:** frontend `field-types/group/columns.ts` (new), `group.ts`, `GroupInput.svelte`, `GroupView.svelte`, `schema-meta.ts` (`PropertyMeta.columns` type); tests `group-columns.test.ts` (new), `field-types.test.ts` (fixture round-trip), `text-constraints.test.ts` (updated expectation). Backend `application/schema_meta.py` (`_check_property_meta_shape` extracted to keep complexity down); tests `test_schema_meta.py`. `docs/field-types-spec/example-node-type-schema.json` fixture updated with an explicit `columns` order. Docs: `DECISIONS.md`, `field-types.md`.
+
+**Checks run:** `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 275 pass. `poe lint-backend`/`typecheck-backend` clean; `poe test-backend` 679 pass; `poe coverage` all targets met (application 100%, 46 integration tests pass).
+
+**Left:** existing table fields saved before this fix keep JSONB-scrambled column order until the item type is re-saved from the schema editor (no migration, consistent with every other `x-menagerist` addition).
+

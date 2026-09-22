@@ -293,7 +293,10 @@ describe('text descriptor', () => {
 		} as unknown as JsonSchemaProperty;
 		const field = fieldFromProperty('tracks', group, false);
 		expect(field.subFields[0].config).toEqual({ startsWith: 'LP-', endsWith: '' });
-		expect(propertyFromField(field)).toEqual(group);
+		expect(propertyFromField(field)).toEqual({
+			...group,
+			'x-menagerist': { kind: 'group', columns: ['code'] }
+		});
 	});
 
 	it('never generates a pattern cfworker rejects', () => {

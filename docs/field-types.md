@@ -292,3 +292,8 @@ A node may carry `extra_schema`, a schema in the same shape as a node type's `at
 ### Saved fields and lists (presets)
 
 A `field` or `choice_list` preset can be saved from the schema editor ("Save for reuse" on a field; "Save these options as a list" on a choice field) and applied to another item type ("Add from saved fields…"; "Use a saved list"), via the new `presets` backend module (`POST /preset`, `GET /preset`, `PATCH /preset/{id}`, `DELETE /preset/{id}`). Applying copies the definition with a fresh key and writes `x-menagerist.origin: {preset, version}`; a choice field whose linked preset has a newer version shows "Update options" (with the existing in-use warning). Manage saved presets at `settings/saved-fields`. `$lib/presets.ts` holds the frontend conversion helpers (`fieldToDefinition`, `definitionToField`, `optionsToDefinition`, `listUpdateAvailable`).
+
+### Table (group) column order
+
+A `group` field's own `x-menagerist.columns` records its sub-property keys in order; `GroupInput`, `GroupView` and `fromSchema` all read it through `field-types/group/columns.ts`'s `orderedColumns(prop)` rather than `Object.entries`, because nested JSONB object keys are not stored in insertion order (verified against Postgres). A property with no `columns` falls back to `Object.entries` order.
+

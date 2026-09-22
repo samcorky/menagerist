@@ -96,6 +96,7 @@ def test_check_meta_shape_accepts_valid_and_unknown_members() -> None:
             "x-menagerist": {"version": 1, "layout": [], "required": ["a"], "z": 0},
         }
     )
+    check_meta_shape({"properties": {"g": {"x-menagerist": {"columns": ["a", "b"]}}}})
     check_meta_shape({"type": "object"})
     check_meta_shape({"properties": {"a": {"items": {"type": "string"}}}})
     check_meta_shape({"properties": {"a": "not-a-dict"}})
@@ -114,6 +115,8 @@ def test_check_meta_shape_accepts_valid_and_unknown_members() -> None:
         {"properties": {"a": {"x-menagerist": {"kind": 1}}}},
         {"properties": {"a": {"x-menagerist": {"archived": "yes"}}}},
         {"properties": {"a": {"x-menagerist": {"config": []}}}},
+        {"properties": {"a": {"x-menagerist": {"columns": "not-a-list"}}}},
+        {"properties": {"a": {"x-menagerist": {"columns": [1, 2]}}}},
         {
             "properties": {
                 "g": {"items": {"properties": {"s": {"x-menagerist": {"kind": 1}}}}}

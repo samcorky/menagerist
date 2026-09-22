@@ -4,6 +4,7 @@
 	import { descriptorForProp } from '../registry';
 	import ScalarInput from '../ScalarInput.svelte';
 	import type { JsonSchemaProperty } from '$lib/schema-types';
+	import { orderedColumns } from './columns';
 
 	type GroupRow = Record<string, unknown>;
 
@@ -20,7 +21,7 @@
 	} = $props();
 
 	let rows = $derived(Array.isArray(value) ? (value as GroupRow[]) : []);
-	let columns = $derived(prop.type === 'array' ? Object.entries(prop.items.properties) : []);
+	let columns = $derived(orderedColumns(prop));
 
 	function addRow() {
 		if (prop.type !== 'array') return;
