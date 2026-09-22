@@ -265,3 +265,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Rationale:** Reuses the existing field-type registry, editor components, validation and search unchanged for per-item fields, instead of a parallel typed-field system. `backend-surface.md` scopes WI-19d to "a column and API fields, not a port" — this session is that plumbing. The frontend UI to add typed per-item fields (WI-18b/18c) is separate and builds on this.
 
 **Tradeoff:** No item-page UI yet to create or edit `extra_schema` entries directly; only the API surface exists. WI-17 attribute search does not yet exclude non-searchable overlay fields (for example a per-item rating) the way it does for type fields, since exclusions are computed per type, not per node — left for later. No migration path to remove per-item fields beyond archiving them inside `extra_schema` itself, same as a type schema.
+
+---
+
+## Reusable field and list presets: copy-on-apply with provenance
+
+**Decision:** A new `presets` backend module (own hexagonal layers, no dependency on `graph`) stores saved fields, field groups (`field_set`, "field group" in the UI) and lists (`choice_list`) as `{kind, label, description, definition, version, builtin}`, soft-deletable, with a definition-shape check per kind (`application/preset_definitions.py`). Applying a preset **copies** its definition into the target schema with a fresh key (WI-20) and records `x-menagerist.origin: {preset, version}` on the property; provenance is metadata only and never affects validation. Editing a preset's `definition` bumps `version`, so a copy showing an older version can offer "update available". `field` (a single field, "Save for reuse" from a schema-editor field) and `choice_list` (a set of options, "Save these options as a list" / "Use a saved list" on a choice field, with "Update options" reusing the WI-9/10 in-use warning) are wired up this session; `field_set` is stored and validated but has no save/apply UI yet.
+
+**Rationale:** Copy-on-apply keeps every node type's schema a standalone JSON Schema both validators already understand, so deleting a preset never breaks a type that used it — the alternative, a live link, is parked as a v2 idea (`SyncChoiceList`). The `group` field kind's UI label changes to "Table" (code name unchanged) to free "Field group" for the new reusable-set concept.
+
+**Tradeoff:** No UI yet for saved fields from a custom detail, for field groups (save/apply as a labelled section), for per-item application (needs the WI-19d overlay's own editor), or for packs/import-export/built-ins (WI-19c). These are separate, later items.

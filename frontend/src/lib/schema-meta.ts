@@ -64,6 +64,14 @@ export function withPropMeta<T extends object>(prop: T, patch: PropertyMeta): T 
 	return { ...prop, [NAMESPACE]: { ...readPropMeta(prop), ...patch } };
 }
 
+/** Return a copy of `prop` with its metadata replaced wholesale, not merged. */
+export function replacePropMeta<T extends object>(prop: T, meta: PropertyMeta): T {
+	const copy = { ...prop } as Record<string, unknown>;
+	if (Object.keys(meta).length > 0) copy[NAMESPACE] = meta;
+	else delete copy[NAMESPACE];
+	return copy as T;
+}
+
 /** A stored highlight list, in order. Malformed entries are skipped. */
 export function readHighlights(
 	schema: object | null | undefined,

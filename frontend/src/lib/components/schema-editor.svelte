@@ -147,7 +147,16 @@
 <script lang="ts">
 	import { setContext, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import { ChevronDown, ChevronUp, FolderOpen, Pin, Plus, Replace, X } from '@lucide/svelte';
+	import {
+		BookmarkPlus,
+		ChevronDown,
+		ChevronUp,
+		FolderOpen,
+		Pin,
+		Plus,
+		Replace,
+		X
+	} from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -163,6 +172,14 @@
 	import { displayChoices, displayValue, setDisplayValue } from '$lib/field-types/display-options';
 	import { SCHEMA_TYPE_CONTEXT, type SchemaTypeContext } from '$lib/schema-type-context';
 	import { canHighlightMore, movedRanks, toggledRanks } from '$lib/highlights';
+	import {
+		definitionToField,
+		fieldToDefinition,
+		type FieldDefinition,
+		type Preset
+	} from '$lib/presets';
+	import SavePresetDialog from '$lib/components/save-preset-dialog.svelte';
+	import PresetPickerDialog from '$lib/components/preset-picker-dialog.svelte';
 
 	let {
 		schema = $bindable<AttributesSchema | null>(null),
@@ -343,6 +360,18 @@
 				subFields: []
 			}
 		];
+	}
+
+	// Field currently targeted by the "save for reuse" dialog.
+	let savingField = $state<EditorField | null>(null);
+	let pickerOpen = $state(false);
+
+	function addFieldFromPreset(preset: Preset) {
+		const field = definitionToField(preset.definition as FieldDefinition, {
+			preset: preset.id,
+			version: preset.version
+		});
+		items = [...items, field];
 	}
 
 	function addSection() {
@@ -586,6 +615,18 @@
 				<Replace class="size-4" />
 			</Button>
 		{/if}
+		{#if field.kind !== 'opaque'}
+			<Button
+				type="button"
+				variant="ghost"
+				size="icon"
+				onclick={() => (savingField = field)}
+				aria-label="Save field for reuse"
+				title="Save this field for reuse"
+			>
+				<BookmarkPlus class="size-4" />
+			</Button>
+		{/if}
 		<Button type="button" variant="ghost" size="icon" onclick={onRemove} aria-label="Remove field">
 			<X class="size-4" />
 		</Button>
@@ -672,6 +713,10 @@
 		<Button type="button" variant="outline" size="sm" onclick={addSection}>
 			<FolderOpen class="size-4" />
 			Add section
+		</Button>
+		<Button type="button" variant="ghost" size="sm" onclick={() => (pickerOpen = true)}>
+			<BookmarkPlus class="size-4" />
+			Add from saved fields…
 		</Button>
 	</div>
 
@@ -799,3 +844,23 @@
 		</details>
 	{/if}
 </div>
+
+{#if savingField}
+	<SavePresetDialog
+		open={savingField !== null}
+		kind="field"
+		definition={fieldToDefinition(savingField)}
+		onOpenChange={(v) => {
+			if (!v) savingField = null;
+		}}
+		onSaved={() => {}}
+	/>
+{/if}
+
+<PresetPickerDialog
+	open={pickerOpen}
+	kind="field"
+	title="Add from saved fields"
+	onOpenChange={(v) => (pickerOpen = v)}
+	onPick={addFieldFromPreset}
+/>

@@ -7,7 +7,8 @@ import type { EditorField, JsonSchemaProperty } from '$lib/schema-types';
 
 register({
 	kind: 'group',
-	label: 'Group',
+	// UI label only (WI-19a); the code name stays 'group' so stored definitions don't change.
+	label: 'Table',
 	canBeSubField: false,
 	toSchema: (f: EditorField): JsonSchemaProperty => ({
 		title: f.label,

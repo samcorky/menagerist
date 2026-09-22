@@ -288,3 +288,7 @@ Keys an item's type does not define are edited as loose "details". `lib/attribut
 ### Per-item typed fields (`extra_schema`)
 
 A node may carry `extra_schema`, a schema in the same shape as a node type's `attributes_schema`, adding fields to that one item only. `application/schema_meta.merge_attribute_schemas` combines a node's type schema and its `extra_schema` for validation; a key defined by both is rejected. `highlights` is not merged — only a type's own schema controls card highlights. There is no editor UI for `extra_schema` yet; it is reachable only through the API (`CreateNodeRequest`/`UpdateNodeRequest`/`NodeResponse`).
+
+### Saved fields and lists (presets)
+
+A `field` or `choice_list` preset can be saved from the schema editor ("Save for reuse" on a field; "Save these options as a list" on a choice field) and applied to another item type ("Add from saved fields…"; "Use a saved list"), via the new `presets` backend module (`POST /preset`, `GET /preset`, `PATCH /preset/{id}`, `DELETE /preset/{id}`). Applying copies the definition with a fresh key and writes `x-menagerist.origin: {preset, version}`; a choice field whose linked preset has a newer version shows "Update options" (with the existing in-use warning). Manage saved presets at `settings/saved-fields`. `$lib/presets.ts` holds the frontend conversion helpers (`fieldToDefinition`, `definitionToField`, `optionsToDefinition`, `listUpdateAvailable`).

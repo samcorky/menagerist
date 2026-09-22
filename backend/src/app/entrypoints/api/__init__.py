@@ -15,6 +15,7 @@ from app.modules.graph.adapters.api.edge_type.router import router as edge_type_
 from app.modules.graph.adapters.api.node.router import router as graph_router
 from app.modules.graph.adapters.api.node_type.router import router as node_type_router
 from app.modules.media.adapters.api.media.router import router as media_router
+from app.modules.presets.adapters.api.preset.router import router as preset_router
 from app.modules.system.adapters.api.router import router as system_router
 from app.platform.app_info import load_app_info
 from app.platform.config import get_api_settings
@@ -35,6 +36,7 @@ api_v1_router.include_router(edge_router)
 api_v1_router.include_router(node_type_router)
 api_v1_router.include_router(edge_type_router)
 api_v1_router.include_router(media_router)
+api_v1_router.include_router(preset_router)
 
 api_router.include_router(api_v1_router)
 

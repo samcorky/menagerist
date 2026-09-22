@@ -19,8 +19,8 @@ Update at the end of every session. Read this first.
 | WI-16 highlighted fields | done, committed (44c01dc) | feature/initial-implementation | See "WI-16 session notes" below. |
 | WI-17 attribute search | done, committed (06b605b) | feature/initial-implementation | See "WI-17 session notes" below. |
 | WI-18 per-item custom fields | 18a done, committed (d9dbdc6); 18b and 18c todo | feature/initial-implementation | See "WI-18a session notes" below. 18b and 18c wait for the WI-19d overlay. |
-| WI-19 presets | todo | | |
-| WI-19d per-item schema overlay | done, awaiting user review and commit | feature/initial-implementation | See "WI-19d session notes" below. |
+| WI-19 presets | 19a done, awaiting user review and commit; 19b and 19c todo | feature/initial-implementation | See "WI-19a session notes" below. |
+| WI-19d per-item schema overlay | done, committed (e1a17b8) | feature/initial-implementation | See "WI-19d session notes" below. |
 | WI-21 value suggestions | todo | | |
 | WI-22 connection details | 22a done, committed (66417f1); 22b todo | feature/initial-implementation | See "WI-22a session notes" below. |
 | WI-13 drag-and-drop layout (stretch) | todo | | |
@@ -379,7 +379,7 @@ Update at the end of every session. Read this first.
 
 ## WI-19d session notes
 
-**Status:** implemented, all backend and frontend checks green, not committed. Next item: WI-19 (presets), then WI-18b/18c (their UI builds on this overlay), WI-21, WI-22b, WI-13. WI-12 stays optional.
+**Status:** implemented, all backend and frontend checks green, committed as e1a17b8. Next item: WI-19 (presets), then WI-18b/18c (their UI builds on this overlay), WI-21, WI-22b, WI-13. WI-12 stays optional.
 
 **Scope decision:** `wi-19d-per-item-schema-overlay.md` is light on implementation detail, but `backend-surface.md` is explicit: "WI-19d (overlay, decided) adds a column and API fields, not a port." This session delivered that backend plumbing only — a nullable `extra_schema` on nodes, merged validation, and the API surface. It does **not** add an item-page editor for adding per-item typed fields; that is WI-18b/18c's UI, now unblocked.
 
@@ -407,3 +407,35 @@ Update at the end of every session. Read this first.
 - `ValidationError` subclasses (`InvalidSchemaError`, `InvalidAttributesError`) map to HTTP 400, not 422 — a couple of my first test assertions guessed 422 and had to be fixed.
 - The migration chain head is now `d4e5f6a7b8c9`; `poe db-up` (which runs the `migrate` compose service) applied it cleanly in this session.
 - `Node.update`/`Node.create` and both `Create/UpdateNodeCommand`s take `extra_schema` as an additional keyword-only field with a default, so no existing call site needed changes.
+
+## WI-19a session notes
+
+**Status:** implemented, all backend and frontend checks green, not committed. Next item: WI-19b (field groups, ad hoc per-item apply, copy details between items) or WI-19c (packs/import-export/built-ins), or WI-21/WI-22b/WI-13. WI-12 stays optional.
+
+**Scope decision:** the spec splits presets into 19a (core: save/apply a field or a list, management page), 19b (field groups, ad hoc per-item application, copy-details-between-items) and 19c (packs, import/export, built-ins). This session delivered 19a only.
+
+**Done**
+- New backend module `presets` (own hexagonal layers, no dependency on `graph`, mirrors the `media` module's shape): domain `Preset` (kind/label/description/definition/version/builtin, soft-deletable; built-in presets reject edit/delete with `BuiltinPresetError`, 409), `ports/preset_repository.py`, SQLAlchemy + in-memory adapters, five use cases (`Create/Get/List/Update/DeletePreset`), router at `/preset` (POST, GET, GET/{id}, PATCH/{id} conditional, DELETE/{id}), registered in `entrypoints/api/__init__.py` and `alembic/env.py`. Migration `e5f6a7b8c9d0` creates the `presets` table (head is now `e5f6a7b8c9d0`, after WI-19d's `d4e5f6a7b8c9`).
+- `application/preset_definitions.check_definition(kind, definition)`: structural shape check per kind (`field` needs a typed `property`; `field_set` needs a `section` and typed `properties`; `choice_list` needs non-blank `options`). Storage/validation supports all three kinds even though only `field` and `choice_list` have UI this session.
+- Frontend: `$lib/presets.ts` (`fieldToDefinition`, `optionsToDefinition`, `definitionToField`, `listUpdateAvailable`, types). New `schema-meta.ts` accessor `replacePropMeta` (wholesale replace, not merge) so `fieldToDefinition` can drop `archived`/`origin` without touching `x-menagerist` outside the accessor file (the "only the accessor reads x-*" test caught the first attempt).
+- Schema editor: "Save field for reuse" (any non-opaque field, saved or pending) and "Add from saved fields…" (inserts a pending field with fresh `origin`). `group` kind's UI label is now "Table" (code name unchanged), freeing "Field group" for WI-19b.
+- `ChoiceExtras`: "Save these options as a list", "Use a saved list" (sets `origin`), and for a field with `origin`, an advisory fetch of the linked preset plus "Update available" / "Update options" (reuses the WI-9/10 in-use warning per removed option before replacing).
+- New Settings page `settings/saved-fields` (Fields and Lists sections, list + delete with the 5-second Undo pattern; a "Field groups aren't available yet" placeholder) and a nav tile on `settings/+page.svelte`.
+- Tests: domain, `preset_definitions`, all five use cases, in-memory repository, SQLAlchemy repository (`@pytest.mark.integration`), router — 53 new backend tests. Frontend: `presets.test.ts` for the conversion helpers. `docs/DECISIONS.md` and `docs/field-types.md` updated.
+
+**Left / deferred (19b, 19c)**
+- Field groups: no save/apply UI (the `field_set` kind is stored and validated but unreachable from the editor).
+- No ad hoc per-item application (needs the WI-19d overlay's own editor, which doesn't exist yet either) and no "copy details from another item".
+- No packs, import/export or built-in presets.
+- "Save for reuse" from a custom detail (loose, per-item key) is not wired; only schema-editor fields and choice options are.
+- Not tried in a browser (no component tests, by decision): the two dialogs, the schema-editor buttons, the "Update options" flow, the Settings page.
+- The generated `PresetResponse.kind`/`.definition` types are looser (`string`/`Record<string, unknown>`) than the frontend's `PresetKind`/`FieldDefinition` types; call sites cast with `as unknown as X` at the API boundary rather than adding a runtime check, matching how other generated-client boundaries in this codebase are handled.
+
+**Files touched:** backend `modules/presets/**` (new), `alembic/env.py`, `alembic/versions/e5f6a7b8c9d0_create_presets_table.py` (new), `entrypoints/api/__init__.py`; tests `tests/modules/presets/**` (new). Frontend `field-types/group/group.ts`, `schema-meta.ts`, `presets.ts` (new), `components/schema-editor.svelte`, `field-types/choice/ChoiceExtras.svelte`, `components/save-preset-dialog.svelte` (new), `components/preset-picker-dialog.svelte` (new), `routes/settings/+page.svelte`, `routes/settings/saved-fields/+page.svelte` (new); tests `presets.test.ts` (new). Docs as above.
+
+**Checks run:** `poe lint-backend` and `poe typecheck-backend` clean; `poe test-backend` 667 pass; `poe coverage` (Postgres via `poe db-up`, both new migrations applied) 46 integration tests pass, all targets met (application 100%); `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing warnings); `poe test-frontend` 266 pass.
+
+**Next session must know**
+- Migration head is `e5f6a7b8c9d0`; `poe db-up` applied both `d4e5f6a7b8c9` (WI-19d) and `e5f6a7b8c9d0` (WI-19a) this session.
+- `origin` is stored as an arbitrary member of `PropertyMeta`'s index signature in `schema-meta.ts` — no dedicated type was added there; `$lib/presets.ts` defines its own `Origin` type for it.
+- `check_definition`'s `field_set` shape check exists and is tested, ready for WI-19b to use when it builds the save/apply UI.

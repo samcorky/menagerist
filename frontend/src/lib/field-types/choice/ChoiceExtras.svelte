@@ -1,13 +1,20 @@
 <script lang="ts">
-	import { Plus, X } from '@lucide/svelte';
+	import { BookmarkPlus, Plus, X } from '@lucide/svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
-	import { getContext } from 'svelte';
-	import { countEdgeTypeAttributeUsage, countNodeTypeAttributeUsage } from '$lib/api/client';
+	import { getContext, untrack } from 'svelte';
+	import {
+		countEdgeTypeAttributeUsage,
+		countNodeTypeAttributeUsage,
+		getPreset
+	} from '$lib/api/client';
 	import { optionRemovalWarning } from '$lib/field-usage';
 	import { SCHEMA_TYPE_CONTEXT, type SchemaTypeContext } from '$lib/schema-type-context';
 	import type { EditorField } from '$lib/schema-types';
+	import { listUpdateAvailable, optionsToDefinition, type Origin, type Preset } from '$lib/presets';
+	import SavePresetDialog from '$lib/components/save-preset-dialog.svelte';
+	import PresetPickerDialog from '$lib/components/preset-picker-dialog.svelte';
 
 	let {
 		field,
@@ -35,12 +42,10 @@
 		draft = '';
 	}
 
-	async function removeOption(opt: string) {
-		const request = ++removalRequest;
-		removalWarning = null;
-		onChange({ ...field, options: field.options.filter((o) => o !== opt) });
+	/** In-use warning for one option, or null. Advisory only; failures are ignored. */
+	async function optionUsageWarning(opt: string): Promise<string | null> {
 		const typeId = ctx?.typeId;
-		if (!ctx || !typeId || field.keyPending) return;
+		if (!ctx || !typeId || field.keyPending) return null;
 		const kind = ctx.kind;
 		try {
 			const result =
@@ -54,12 +59,67 @@
 							query: { value: opt }
 						});
 			const count = result.data?.count ?? 0;
-			if (request === removalRequest && count > 0) {
-				removalWarning = optionRemovalWarning(opt, count, kind);
-			}
+			return count > 0 ? optionRemovalWarning(opt, count, kind) : null;
 		} catch {
-			// Usage is advisory; ignore failures.
+			return null;
 		}
+	}
+
+	async function removeOption(opt: string) {
+		const request = ++removalRequest;
+		removalWarning = null;
+		onChange({ ...field, options: field.options.filter((o) => o !== opt) });
+		const warning = await optionUsageWarning(opt);
+		if (request === removalRequest && warning) removalWarning = warning;
+	}
+
+	// Saved-list linking: "save these options" and "use a saved list" / update flow.
+	let savePresetOpen = $state(false);
+	let pickerOpen = $state(false);
+	let linkedPreset = $state<Preset | undefined>(undefined);
+	let updating = $state(false);
+
+	const origin = $derived(field.meta?.origin as Origin | undefined);
+	const updateAvailable = $derived(listUpdateAvailable(field, linkedPreset));
+
+	$effect(() => {
+		const presetId = origin?.preset;
+		if (!presetId) {
+			untrack(() => (linkedPreset = undefined));
+			return;
+		}
+		void getPreset({ path: { preset_id: presetId } }).then((result) => {
+			if (result.data) linkedPreset = result.data as unknown as Preset;
+		});
+	});
+
+	function useSavedList(preset: Preset) {
+		const options = (preset.definition as { options: string[] }).options;
+		onChange({
+			...field,
+			options,
+			meta: { ...field.meta, origin: { preset: preset.id, version: preset.version } }
+		});
+	}
+
+	async function updateFromPreset() {
+		if (!linkedPreset) return;
+		updating = true;
+		const nextOptions = (linkedPreset.definition as { options: string[] }).options;
+		const removed = field.options.filter((o) => !nextOptions.includes(o));
+		const warnings = (await Promise.all(removed.map((o) => optionUsageWarning(o)))).filter(
+			(w): w is string => w !== null
+		);
+		onChange({
+			...field,
+			options: nextOptions,
+			meta: {
+				...field.meta,
+				origin: { preset: linkedPreset.id, version: linkedPreset.version }
+			}
+		});
+		removalWarning = warnings.length > 0 ? warnings.join(' ') : null;
+		updating = false;
 	}
 </script>
 
@@ -103,4 +163,61 @@
 	{#if removalWarning}
 		<p class="text-xs text-muted-foreground" role="status">{removalWarning}</p>
 	{/if}
+
+	<div class="flex flex-wrap items-center gap-2">
+		<Button
+			type="button"
+			variant="ghost"
+			size="sm"
+			class="h-7 text-xs"
+			disabled={field.options.length === 0}
+			onclick={() => (savePresetOpen = true)}
+		>
+			<BookmarkPlus class="size-3" />
+			Save these options as a list
+		</Button>
+		{#if !origin}
+			<Button
+				type="button"
+				variant="ghost"
+				size="sm"
+				class="h-7 text-xs"
+				onclick={() => (pickerOpen = true)}
+			>
+				Use a saved list
+			</Button>
+		{/if}
+	</div>
+
+	{#if origin && updateAvailable}
+		<div class="flex flex-wrap items-center gap-2">
+			<p class="text-xs text-muted-foreground" role="status">Update available</p>
+			<Button
+				type="button"
+				variant="ghost"
+				size="sm"
+				class="h-7 text-xs"
+				disabled={updating}
+				onclick={updateFromPreset}
+			>
+				{updating ? 'Updating…' : 'Update options'}
+			</Button>
+		</div>
+	{/if}
 </div>
+
+<SavePresetDialog
+	open={savePresetOpen}
+	kind="choice_list"
+	definition={optionsToDefinition(field.options)}
+	onOpenChange={(v) => (savePresetOpen = v)}
+	onSaved={() => {}}
+/>
+
+<PresetPickerDialog
+	open={pickerOpen}
+	kind="choice_list"
+	title="Use a saved list"
+	onOpenChange={(v) => (pickerOpen = v)}
+	onPick={useSavedList}
+/>
