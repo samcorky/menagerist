@@ -1,4 +1,3 @@
-import asyncio
 from typing import TYPE_CHECKING
 
 from app.modules.system.domain.readiness import (
@@ -16,8 +15,13 @@ if TYPE_CHECKING:
 class ReadinessCheckRegistry:
     """`HealthCheckPort` adapter that runs a set of pluggable `ReadinessCheck`s.
 
-    Checks run concurrently; their observations are merged (grouped by key) and
-    the aggregate status is the worst of any individual observation.
+    Checks run sequentially, in registration order — not concurrently. Some
+    checks observe shared, mutable state (e.g. connection-pool utilisation) that
+    other checks affect while they run (they hold a pooled connection open for
+    their query); running everything concurrently would make those readings
+    reflect the probe's own in-flight load rather than a settled baseline.
+    Their observations are merged (grouped by key) and the aggregate status is
+    the worst of any individual observation.
     """
 
     def __init__(self, checks: Sequence[ReadinessCheck]) -> None:
@@ -25,10 +29,9 @@ class ReadinessCheckRegistry:
 
     async def check(self) -> ReadinessReport:
         """Run all registered checks and return their aggregate result."""
-        results = await asyncio.gather(*(check.run() for check in self._checks))
-
         checks: dict[str, list[CheckObservation]] = {}
-        for result in results:
+        for readiness_check in self._checks:
+            result = await readiness_check.run()
             for key, observation in result.items():
                 checks.setdefault(key, []).append(observation)
 
