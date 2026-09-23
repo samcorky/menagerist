@@ -2,10 +2,11 @@
 	import { Star } from '@lucide/svelte';
 	import type { JsonSchemaProperty } from '$lib/schema-types';
 	import { MAX_STARS } from './rating';
+	import { filledStarClass } from './colour';
 
 	let { value, prop }: { value: unknown; prop: JsonSchemaProperty } = $props();
 
-	const FILLED = 'fill-amber-400 text-amber-400';
+	let FILLED = $derived(filledStarClass(prop));
 
 	let max = $derived(prop.type === 'number' ? (prop.maximum ?? MAX_STARS) : MAX_STARS);
 	let current = $derived(value === '' || value == null ? 0 : Number(value) || 0);

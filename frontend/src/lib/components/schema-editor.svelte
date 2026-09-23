@@ -153,6 +153,13 @@
 	// clear the highlight when the kind itself changed.
 	function handleFieldRowChange(field: EditorField, next: EditorField): EditorField {
 		if (next.kind !== field.kind && !isHighlightableField(next)) {
+			if (field.highlight !== undefined) {
+				const label = field.label || 'Untitled field';
+				const kindLabel = getDescriptor(next.kind)?.label.toLowerCase();
+				toast(onConnections ? 'No longer shown on connections' : 'No longer shown on cards', {
+					description: `"${label}" can no longer be highlighted as a ${kindLabel} field.`
+				});
+			}
 			return { ...next, highlight: undefined };
 		}
 		return next;

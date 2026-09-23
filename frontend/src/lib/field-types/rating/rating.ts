@@ -23,6 +23,15 @@ register({
 				{ value: '10', label: '10 stars' }
 			],
 			default: String(MAX_STARS)
+		},
+		{
+			key: 'display',
+			label: 'Colour',
+			choices: [
+				{ value: 'amber', label: 'Amber' },
+				{ value: 'accent', label: 'Theme accent' }
+			],
+			default: 'amber'
 		}
 	],
 	toSchema: (f) => ({

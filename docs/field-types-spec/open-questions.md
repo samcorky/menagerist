@@ -10,7 +10,7 @@
 3. **Closed:** moot: no event publisher or outbox exists; the outbox and WebSocket pattern can be added later.
 4. WI-4: is a visible "custom" badge on opaque fields the right UX, given the "never feel like configuring a database" principle?
 5. WI-14: should `version` start at 1 now, given there is no migration path yet?
-6. Rating colour: fixed amber or theme accent (`primary`)?
+6. **Closed (owner, 2026-09-23):** amber stays the default; colour becomes a per-field display option (`amber` / `accent`) instead of a single fixed choice. Was: fixed amber or theme accent (`primary`)?
 7. **Closed:** implemented (WI-12, commit 92db277) as dormant infrastructure — no built-in kind needs a non-default rank yet; it activates once a genuinely overlapping kind (multi-choice, partial date, identifier) is added.
 8. WI-13: is depth 3 with tabs at the top level the right limit, or should tabs be dropped until asked for?
 9. WI-13: should the backend validate the layout structure on node-type save?
@@ -69,7 +69,7 @@
 62. WI-16: add a live card preview at the top of the schema editor, using sample values (deferred, optional in the spec)?
 63. **Closed (owner, review 2026-09-21):** no editor control yet; revisit with a "More options" section. Was: WI-17: should `x-menagerist.search: false` get an editor control (a per-field "Include in search" option behind a "More options" section, guidelines-compliance row 12)? Default: no editor control yet; the API and both search paths honour it.
 64. WI-17: where should the "Matched in ..." line show? Default: on the list card and the grid card, one truncated line each, only while a search is active and the name and description did not match.
-65. WI-16: when a highlighted field's kind changes to a non-highlightable one, should the editor say so? Default: it drops silently (the pin is hidden for those kinds).
+65. **Closed (2026-09-23):** yes — a toast now fires ("No longer shown on cards"/"...on connections") when a highlighted field's kind changes to a non-highlightable one. Was: should the editor say so? Default was: it drops silently (the pin is hidden for those kinds).
 66. **Closed (owner, review 2026-09-21):** keep the exception; detail-name problems disable Save. Was: WI-18a: detail-name problems (blank name with a value, duplicates, a name equal to a field) disable Save, an exception to "client errors never block Save" because the alternative is silent data loss. Keep the exception?
 67. WI-19d: `extra_schema` has no way to be cleared once set (matches the existing `attributes_schema` limitation on node types). Worth a dedicated "clear" path, or wait until it is a real need?
 68. WI-19d/WI-17: should attribute search exclude non-searchable per-item overlay fields (e.g. a rating added via `extra_schema`), the way it already does for type-schema fields? Needs per-node exclusions in `ListNodes`, not just per-type. Default: left as a gap for now.

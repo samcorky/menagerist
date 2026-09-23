@@ -337,3 +337,13 @@ Significant architectural choices and their rationale. Entries are added when a 
 **Found along the way:** `UpdateNodeCommand.extra_schema=None` means "leave unchanged" (the same convention as `attributes_schema` on a node type), so a node's overlay can never actually be cleared to empty by sending `null` — both `PromoteExtraSchemaField` and `attributes-editor.svelte`'s "remove the last overlay field" path always write a real `{"properties": {}}` object instead, never `null`, so the clearing write actually takes effect. This is a latent, pre-existing gap in the `None`-means-unchanged convention itself (not something this change introduced), worth a proper fix (e.g. a sentinel) if a future session needs to clear other optional fields on this command the same way.
 
 **Tradeoff:** No label-length cap on overlay fields (only a schema field's ordinary `title`, unlike the old 100-character detail-name limit) — an intentional asymmetry removed, since the key is now slug-generated (WI-20), not the label itself. The 50-fields-per-item count limit carries over (`MAX_EXTRA_SCHEMA_FIELDS`).
+
+---
+
+## Rating colour is a per-field display option; kind changes that drop a highlight now say so
+
+**Decision:** Rating gained a second display option, `display: 'amber' | 'accent'` (default `amber`), read by `RatingInput`/`RatingView`/`RatingSummary` via a shared `filledStarClass(prop)` helper (`field-types/rating/colour.ts`). Closes open question 6 (was undecided between a fixed colour and the theme accent — the owner wants amber to stay the default but be overridable per field).
+
+Separately, `schema-editor.svelte`'s `handleFieldRowChange` now toasts ("No longer shown on cards" / "...on connections", matching whichever `highlightList` the editor is in) when a kind change makes a currently-highlighted field non-highlightable, instead of dropping the pin silently. Closes open question 65.
+
+**Rationale:** Both were small, low-risk additions to existing mechanisms (the generic `displayOptions`/`meta.display` plumbing already used by boolean and choice; the existing toast pattern already used elsewhere in the same file for archive/remove/purge actions) rather than new UI surface.

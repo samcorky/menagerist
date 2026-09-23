@@ -26,6 +26,7 @@ Update at the end of every session. Read this first.
 | WI-13 drag-and-drop layout (stretch) | todo | | |
 | WI-23 table column reordering | done, awaiting user review and commit | feature/initial-implementation | See "WI-23/WI-24 session notes" below. |
 | WI-24 quantity field type | done, awaiting user review and commit | feature/initial-implementation | See "WI-23/WI-24 session notes" below. |
+| Rating colour option + highlight-drop toast (open questions 6, 65) | done, all frontend checks green, not committed | feature/initial-implementation | Rating gained a `display: 'amber'\|'accent'` option (`field-types/rating/colour.ts`); `schema-editor.svelte`'s `handleFieldRowChange` now toasts when a kind change drops a highlight pin instead of doing so silently. See `docs/DECISIONS.md`. Open question 76 (two-press save / 412 on first attempt) was investigated but not fixed this session — root cause not found via static analysis of the backend conditional-check logic or the frontend ETag interceptor (both look correct in isolation); needs live reproduction with Network-tab evidence (GET's `ETag` vs. the failing PATCH's `If-Match`) before attempting a fix. |
 
 ## WI-1 to WI-4 session notes
 
