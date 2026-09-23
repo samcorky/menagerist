@@ -10,6 +10,7 @@
 		ChevronDown,
 		ChevronUp,
 		FolderOpen,
+		MoreVertical,
 		Pin,
 		Plus,
 		Replace,
@@ -18,6 +19,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import {
 		countNodeTypeAttributeUsage,
 		purgeNodeTypeAttribute,
@@ -427,29 +429,34 @@
 				<Pin class="size-4 {pinned ? 'fill-current' : ''}" />
 			</Button>
 		{/if}
-		{#if !field.keyPending && field.kind !== 'opaque'}
-			<Button
-				type="button"
-				variant="ghost"
-				size="icon"
-				onclick={onReplace}
-				aria-label="Replace field"
-				title="Replace with a new field of a different type. The old field's values are kept until you delete them."
-			>
-				<Replace class="size-4" />
-			</Button>
-		{/if}
 		{#if field.kind !== 'opaque'}
-			<Button
-				type="button"
-				variant="ghost"
-				size="icon"
-				onclick={() => (savingField = field)}
-				aria-label="Save field for reuse"
-				title="Save this field for reuse"
-			>
-				<BookmarkPlus class="size-4" />
-			</Button>
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger>
+					{#snippet child({ props })}
+						<Button
+							{...props}
+							type="button"
+							variant="ghost"
+							size="icon"
+							aria-label="More field actions"
+						>
+							<MoreVertical class="size-4" />
+						</Button>
+					{/snippet}
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content align="end">
+					{#if !field.keyPending}
+						<DropdownMenu.Item onSelect={onReplace}>
+							<Replace class="size-4" />
+							Replace field
+						</DropdownMenu.Item>
+					{/if}
+					<DropdownMenu.Item onSelect={() => (savingField = field)}>
+						<BookmarkPlus class="size-4" />
+						Save field for reuse
+					</DropdownMenu.Item>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
 		{/if}
 		<Button type="button" variant="ghost" size="icon" onclick={onRemove} aria-label="Remove field">
 			<X class="size-4" />

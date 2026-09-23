@@ -53,7 +53,7 @@
 	role="radiogroup"
 	tabindex="-1"
 	aria-label={ariaLabel}
-	class="flex flex-1 items-center gap-0.5"
+	class="flex flex-1 flex-wrap items-center gap-1"
 	onmouseleave={() => (hovered = 0)}
 	onkeydown={onKeydown}
 >

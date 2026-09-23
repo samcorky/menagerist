@@ -14,7 +14,7 @@
 
 {#if current > 0}
 	<span
-		class="inline-flex items-center gap-0.5"
+		class="inline-flex flex-wrap items-center gap-0.5"
 		role="img"
 		aria-label="{current} out of {max} stars"
 	>

@@ -347,3 +347,27 @@ Significant architectural choices and their rationale. Entries are added when a 
 Separately, `schema-editor.svelte`'s `handleFieldRowChange` now toasts ("No longer shown on cards" / "...on connections", matching whichever `highlightList` the editor is in) when a kind change makes a currently-highlighted field non-highlightable, instead of dropping the pin silently. Closes open question 65.
 
 **Rationale:** Both were small, low-risk additions to existing mechanisms (the generic `displayOptions`/`meta.display` plumbing already used by boolean and choice; the existing toast pattern already used elsewhere in the same file for archive/remove/purge actions) rather than new UI surface.
+
+---
+
+## Field-row icon crowding, invalid-field styling, and overlay-field distinction (open questions 73, 74, 75)
+
+**Decision (73, revised same session):** an earlier pass in this session closed 73 as "keep everything always-visible" (no precedent for an alternative existed yet). The owner overruled that as too cluttered and asked for a proper overflow control that works well on mobile. Landed: pin/highlight and remove stay standalone (most frequent actions); "Replace field" and "Save field for reuse" move into a `MoreVertical` kebab menu using a newly-scaffolded `dropdown-menu` component (`frontend/src/lib/components/ui/dropdown-menu/`, via `npx shadcn-svelte add dropdown-menu` — built on `bits-ui`, already a dependency, so no new package). A kebab was chosen over a settings-cog icon (the owner's other suggestion) because a cog conventionally signals "configuration," not "actions on this item"; bits-ui's menu handles touch/keyboard/positioning itself, meeting the mobile requirement without extra work. This is the first use of a dropdown menu anywhere in the app — a real precedent now exists for the next row-action question.
+
+**Decision (74):** `attributes-editor.svelte`'s `fieldEntry` snippet now wraps the widget/input in a `ring-destructive/60` ring (150ms transition, §22's "state change" bucket) whenever the field has an error, and sets `aria-invalid` on the plain-text `Input` fallback. Deliberately no shake or other one-off animation — matches §16a's soft, non-alarming tone already established for required-field feedback. `aria-invalid` is not threaded into the per-kind `Widget` components (rating, choice, date, ...), since each has its own prop contract; left for later if wanted.
+
+**Decision (75):** Per-item overlay fields (WI-19d's `extra_schema`) get a small "Per-item" badge next to the label in `attributes-editor.svelte`, reusing the opaque-field "custom" badge styling from `field-kind-row.svelte` for visual consistency. Node-type fields get no badge (the implicit, default case). Per-item custom details no longer exist to distinguish (retired by the WI-18 revision), so this only separates the two kinds that remain.
+
+**Rationale:** All three were reviewed together since they're all about the same underlying pressure (the field row accumulating more distinct pieces of information and actions as the spec has grown); 74 and 75 got small, additive visual treatments reusing existing styles, while 73 stayed as-is rather than trading a real crowding problem for a bigger, unproven interaction pattern.
+
+---
+
+## Weak ETags to survive a compressing proxy (open question 76)
+
+**Decision:** `shared_kernel/etag.py`'s `etag_from_entity` now emits weak ETags (`W/"<digest>"`), not strong ones. `ConditionalRequest.check_get`/`check_patch` (`entrypoints/api/shared/conditional_request.py`) compare `If-None-Match`/`If-Match` against the current ETag with a leading `W/` stripped from both sides first, so a weak and a strong form of the same underlying tag are treated as equal.
+
+**Root cause (found from live Network-tab evidence, not guessed):** `frontend/nginx.conf` gzip-compresses `/api/` JSON responses. Something in the proxy chain in front of the backend rewrites a *strong* ETag to a *weak* one whenever the response it's attached to actually gets compressed (confirmed directly: a 412 response, which has no body and so is never gzipped, kept the backend's original strong ETag untouched; the very next 200, which did have `content-encoding: gzip`, carried a weak one). The frontend's ETag cache correctly stores whatever the response actually said - the weakened value - so the following PATCH's `If-Match` carried that weakened form, while the backend recomputed a fresh strong ETag and did a strict string comparison against it. Mismatch, every time a save followed a compressed GET, which is normal browser behaviour - hence "the first save always fails, the second always succeeds" (the 412 response clears the client's cache, so the retry sends no `If-Match` at all and the conditional check is skipped).
+
+**Rationale:** Weak validators are specified to survive exactly this kind of representation change (RFC 7232 §2.1) - emitting one ourselves from the start makes a downstream rewrite a no-op instead of a footgun. The comparison-side tolerance is defence in depth in case some other layer someday does the reverse (adds a `W/` that wasn't there) or a client normalises it away.
+
+**Not investigated:** which specific layer (nginx itself, or something between it and the public domain) performs the rewrite - the fix doesn't depend on knowing, and chasing it further across infrastructure outside this repo wasn't worth it once the fix was clear.

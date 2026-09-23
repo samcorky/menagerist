@@ -10,6 +10,11 @@ from app.shared_kernel.etag import ETaggable, etag_from_entity
 from .http_headers import http_date, parse_http_date
 
 
+def _unweak(value: str) -> str:
+    """Strip a leading `W/` so weak and strong forms of the same tag compare equal."""
+    return value[2:] if value.startswith("W/") else value
+
+
 class ConditionalRequest:
     """Handles conditional GET (304) and PATCH (412) via ETag / Last-Modified."""
 
@@ -29,7 +34,9 @@ class ConditionalRequest:
         self._res.headers["Cache-Control"] = "private, no-cache"
 
         if_none_match = self._req.headers.get("If-None-Match")
-        if if_none_match and (if_none_match == etag or if_none_match == "*"):
+        if if_none_match and (
+            if_none_match == "*" or _unweak(if_none_match) == _unweak(etag)
+        ):
             return Response(
                 status_code=304, headers={"ETag": etag, "Last-Modified": last_mod}
             )
@@ -56,7 +63,7 @@ class ConditionalRequest:
 
         etag = etag_from_entity(current)
 
-        if if_match and if_match != "*" and if_match != etag:
+        if if_match and if_match != "*" and _unweak(if_match) != _unweak(etag):
             return Response(status_code=412, headers={"ETag": etag})
 
         if if_unmodified_since:

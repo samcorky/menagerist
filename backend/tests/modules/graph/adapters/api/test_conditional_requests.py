@@ -157,3 +157,39 @@ def test_etag_changes_on_mutation_and_stale_if_match_returns_412() -> None:
 
     assert response.status_code == 412
     assert response.headers.get("ETag") != etag1
+
+
+def test_etag_is_weak() -> None:
+    """ETags are emitted weak.
+
+    So a compressing proxy that rewrites a strong ETag to weak on the way out
+    (nginx gzips `/api/` responses) is a no-op, and a client's cached copy
+    still matches on its next conditional request.
+    """
+    client = TestClient(_app_with_in_memory_graph())
+    node = _create_node(client, name="Alien", type_="film")
+
+    resp = client.get(f"/api/v1/node/{node['id']}")
+    assert resp.headers["ETag"].startswith('W/"')
+
+
+def test_patch_accepts_if_match_with_mismatched_weak_strong_form() -> None:
+    """A client that echoes back an ETag with its weak marker stripped or added.
+
+    By something along the way still satisfies If-Match, since only the
+    underlying validator - not weak/strong form - should determine a match.
+    """
+    client = TestClient(_app_with_in_memory_graph())
+    node = _create_node(client, name="Alien", type_="film")
+
+    etag = client.get(f"/api/v1/node/{node['id']}").headers["ETag"]
+    assert etag.startswith("W/")
+    stripped = etag[2:]  # as if a proxy or client normalised away the weak marker
+
+    response = client.patch(
+        f"/api/v1/node/{node['id']}",
+        json={"name": "Alien (1979)"},
+        headers={"If-Match": stripped},
+    )
+
+    assert response.status_code == 200

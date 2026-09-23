@@ -203,7 +203,7 @@
 	}
 </script>
 
-{#snippet fieldEntry(key: string, prop: JsonSchemaProperty)}
+{#snippet fieldEntry(key: string, prop: JsonSchemaProperty, overlay: boolean = false)}
 	{@const isRequired = requiredKeys.includes(key)}
 	{@const error = fieldErrors[key]}
 	{@const desc = descriptorForProp(prop)}
@@ -214,30 +214,42 @@
 			: null}
 	{@const rule = parsed && !parsed.custom ? describeConstraints(parsed.constraints) : null}
 	<div
-		class="flex gap-2 {prop.type === 'array' ? 'items-start' : 'items-center'}"
+		class="flex flex-col gap-2 sm:flex-row {prop.type === 'array'
+			? 'sm:items-start'
+			: 'sm:items-center'}"
 		onfocusout={() => markTouched(key)}
 	>
-		<span class="w-32 shrink-0 pt-1.5 text-sm text-muted-foreground">
+		<span class="w-full pt-1.5 text-sm text-muted-foreground sm:w-32 sm:shrink-0">
 			{prop.title || key}{#if isRequired}{#if isEmptyValue(getValue(key))}<span
 						class="ml-1 text-xs text-muted-foreground">Recommended</span
-					>{:else}<span class="ml-0.5 text-muted-foreground">*</span>{/if}{/if}
+					>{:else}<span class="ml-0.5 text-muted-foreground">*</span>{/if}{/if}{#if overlay}<span
+					class="ml-1.5 rounded border border-input px-1.5 text-xs text-muted-foreground"
+					>This item only</span
+				>{/if}
 		</span>
 		<div class="flex flex-1 flex-col gap-1">
-			{#if Widget}
-				<Widget
-					value={getValue(key)}
-					onChange={(v) => setValue(key, v)}
-					ariaLabel={prop.title || key}
-					{prop}
-				/>
-			{:else}
-				<Input
-					value={typeof getValue(key) === 'string' ? String(getValue(key)) : ''}
-					oninput={(e) => setValue(key, (e.target as HTMLInputElement).value)}
-					class="flex-1"
-					aria-label={prop.title || key}
-				/>
-			{/if}
+			<div
+				class="rounded-md transition-colors duration-150 {error
+					? 'ring-1 ring-destructive/60'
+					: ''}"
+			>
+				{#if Widget}
+					<Widget
+						value={getValue(key)}
+						onChange={(v) => setValue(key, v)}
+						ariaLabel={prop.title || key}
+						{prop}
+					/>
+				{:else}
+					<Input
+						value={typeof getValue(key) === 'string' ? String(getValue(key)) : ''}
+						oninput={(e) => setValue(key, (e.target as HTMLInputElement).value)}
+						class="flex-1"
+						aria-label={prop.title || key}
+						aria-invalid={!!error}
+					/>
+				{/if}
+			</div>
 			{#if error}
 				<p class="text-xs text-destructive">{error}</p>
 			{:else if rule}
@@ -281,32 +293,34 @@
 			{#if !isSectionItem(layoutItem) && layoutItem.key in extraSchema.properties}
 				{@const key = layoutItem.key}
 				{@const prop = extraSchema.properties[key]}
-				<div class="flex items-start gap-2">
+				<div class="flex flex-col gap-2 sm:flex-row sm:items-start">
 					<div class="min-w-0 flex-1">
-						{@render fieldEntry(key, prop)}
+						{@render fieldEntry(key, prop, true)}
 					</div>
-					{#if supportsExtraFields && nodeId && nodeTypeId}
+					<div class="flex flex-wrap items-center gap-2 sm:shrink-0">
+						{#if supportsExtraFields && nodeId && nodeTypeId}
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								class="mt-1 h-7 text-xs"
+								disabled={promotingKey === key}
+								onclick={() => promoteField(key)}
+							>
+								Make this a field
+							</Button>
+						{/if}
 						<Button
 							type="button"
 							variant="ghost"
-							size="sm"
-							class="mt-1 h-7 text-xs"
-							disabled={promotingKey === key}
-							onclick={() => promoteField(key)}
+							size="icon"
+							class="mt-1"
+							onclick={() => removeExtraField(key)}
+							aria-label="Remove field"
 						>
-							Make this a field
+							<X class="size-4" />
 						</Button>
-					{/if}
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						class="mt-1"
-						onclick={() => removeExtraField(key)}
-						aria-label="Remove field"
-					>
-						<X class="size-4" />
-					</Button>
+					</div>
 				</div>
 			{/if}
 		{/each}
