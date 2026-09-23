@@ -28,4 +28,4 @@ class ReadinessReport:
     """Aggregate readiness result, keyed by `component:metric`."""
 
     status: CheckStatus
-    checks: dict[str, CheckObservation]
+    checks: dict[str, list[CheckObservation]]

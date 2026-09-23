@@ -8,6 +8,7 @@ from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
 from app.modules.system.adapters.api.dependencies import get_get_health_ready_use_case
+from app.modules.system.adapters.platform.checks import database_pool_utilization_check
 from app.modules.system.adapters.platform.in_memory_health_check_adapter import (
     InMemoryHealthCheckAdapter,
 )
@@ -25,9 +26,7 @@ if TYPE_CHECKING:
 
     from fastapi import FastAPI
 
-_PATCH_GET_ENGINE = (
-    "app.modules.system.adapters.platform.health_check_adapter.get_engine"
-)
+_PATCH_GET_ENGINE = f"{database_pool_utilization_check.__name__}.get_engine"
 
 
 class _FakeAsyncCM:
@@ -102,7 +101,7 @@ def test_readiness_503_when_db_unreachable() -> None:
         "database:version",
         "database:migrationRevision",
     ):
-        check = data["checks"][key]
+        check = data["checks"][key][0]
         assert check["status"] == "fail", f"{key} should be fail"
         assert "output" in check, f"{key} should have output populated"
         assert check["output"], f"{key} output should be non-empty"
@@ -116,7 +115,7 @@ def test_readiness_output_absent_on_passing_checks() -> None:
         response = client.get("/api/health/ready")
 
     data = response.json()
-    pool_check = data["checks"]["database:poolUtilization"]
+    pool_check = data["checks"]["database:poolUtilization"][0]
     # Pool is healthy (0/5): status is pass and output must not appear in the payload.
     assert pool_check["status"] == "pass"
     assert "output" not in pool_check
@@ -130,7 +129,7 @@ def test_pool_saturated_reports_fail_with_output() -> None:
         response = client.get("/api/health/ready")
 
     data = response.json()
-    pool_check = data["checks"]["database:poolUtilization"]
+    pool_check = data["checks"]["database:poolUtilization"][0]
     assert pool_check["status"] == "fail"
     assert "output" in pool_check
     assert "5/5" in pool_check["output"]
@@ -144,7 +143,7 @@ def test_pool_healthy_omits_output() -> None:
         response = client.get("/api/health/ready")
 
     data = response.json()
-    pool_check = data["checks"]["database:poolUtilization"]
+    pool_check = data["checks"]["database:poolUtilization"][0]
     assert pool_check["status"] == "pass"
     assert "output" not in pool_check
 
@@ -154,14 +153,16 @@ def test_readiness_reports_warn_status_without_503() -> None:
     report = ReadinessReport(
         status=CheckStatus.WARN,
         checks={
-            "database:poolUtilization": CheckObservation(
-                component_type="datastore",
-                observed_value=80.0,
-                observed_unit="percent",
-                status=CheckStatus.WARN,
-                time=datetime.now(UTC),
-                output="4/5 connections checked out, 1 available",
-            )
+            "database:poolUtilization": [
+                CheckObservation(
+                    component_type="datastore",
+                    observed_value=80.0,
+                    observed_unit="percent",
+                    status=CheckStatus.WARN,
+                    time=datetime.now(UTC),
+                    output="4/5 connections checked out, 1 available",
+                )
+            ]
         },
     )
     app = create_app()
@@ -175,7 +176,7 @@ def test_readiness_reports_warn_status_without_503() -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "warn"
-    assert data["checks"]["database:poolUtilization"]["status"] == "warn"
+    assert data["checks"]["database:poolUtilization"][0]["status"] == "warn"
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +209,9 @@ def test_readiness_passes_with_real_db(ready_client: TestClient) -> None:
     data = response.json()
     assert data["status"] == "pass"
 
-    for key, check in data["checks"].items():
-        assert check["status"] == "pass", f"{key} should pass against live migrated DB"
-        assert "output" not in check, f"{key} should have no output when passing"
+    for key, checks in data["checks"].items():
+        for check in checks:
+            assert check["status"] == "pass", (
+                f"{key} should pass against live migrated DB"
+            )
+            assert "output" not in check, f"{key} should have no output when passing"

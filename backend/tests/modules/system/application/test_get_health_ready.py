@@ -20,13 +20,15 @@ async def test_get_health_ready_delegates_to_health_check_port() -> None:
     report = ReadinessReport(
         status=CheckStatus.PASS,
         checks={
-            "database:responseTime": CheckObservation(
-                component_type="datastore",
-                observed_value=1.23,
-                observed_unit="ms",
-                status=CheckStatus.PASS,
-                time=datetime.now(UTC),
-            )
+            "database:responseTime": [
+                CheckObservation(
+                    component_type="datastore",
+                    observed_value=1.23,
+                    observed_unit="ms",
+                    status=CheckStatus.PASS,
+                    time=datetime.now(UTC),
+                )
+            ]
         },
     )
     use_case = GetHealthReady(InMemoryHealthCheckAdapter(report))

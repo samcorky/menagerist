@@ -89,10 +89,13 @@
 		(): SvelteMap<string, Array<{ label: string; obs: CheckObservation }>> => {
 			const map = new SvelteMap<string, Array<{ label: string; obs: CheckObservation }>>();
 			if (!ready?.checks) return map;
-			for (const [key, obs] of Object.entries(ready.checks)) {
+			for (const [key, observations] of Object.entries(ready.checks)) {
 				const [groupKey, metricName] = key.includes(':') ? key.split(':', 2) : ['other', key];
 				if (!map.has(groupKey)) map.set(groupKey, []);
-				map.get(groupKey)!.push({ label: metricName, obs });
+				for (const [index, obs] of observations.entries()) {
+					const label = observations.length > 1 ? `${metricName} (${index + 1})` : metricName;
+					map.get(groupKey)!.push({ label, obs });
+				}
 			}
 			return map;
 		}
@@ -133,7 +136,7 @@
 
 	const healthSummary = $derived.by(() => {
 		if (!ready?.checks) return { total: 0, pass: 0, fail: 0 };
-		const checks = Object.values(ready.checks);
+		const checks = Object.values(ready.checks).flat();
 		return {
 			total: checks.length,
 			pass: checks.filter((check) => check.status === 'pass').length,

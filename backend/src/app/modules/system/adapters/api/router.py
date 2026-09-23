@@ -118,8 +118,8 @@ class ReadyResponse(BaseModel):
         ),
     ]
     checks: Annotated[
-        dict[str, CheckObservation],
-        Field(description="Named check observations keyed by component:metric."),
+        dict[str, list[CheckObservation]],
+        Field(description="Named check observation lists keyed by component:metric."),
     ]
 
     @classmethod
@@ -128,8 +128,8 @@ class ReadyResponse(BaseModel):
         return cls(
             status=report.status.value,
             checks={
-                key: CheckObservation.from_domain(observation)
-                for key, observation in report.checks.items()
+                key: [CheckObservation.from_domain(obs) for obs in observations]
+                for key, observations in report.checks.items()
             },
         )
 
@@ -221,14 +221,14 @@ _RESPONSE_200: dict[str, object] = {
             "example": {
                 "status": "pass",
                 "checks": {
-                    "database:responseTime": _check_ex("ms", 1.23, status="pass"),
-                    "database:version": _check_ex("version", "18.2.1", status="pass"),
-                    "database:migrationRevision": _check_ex(
-                        "revision", "a1b2c3d4e5f6", status="pass"
-                    ),
-                    "database:poolUtilization": _check_ex(
-                        "percent", 20.0, status="pass"
-                    ),
+                    "database:responseTime": [_check_ex("ms", 1.23, status="pass")],
+                    "database:version": [_check_ex("version", "18.2.1", status="pass")],
+                    "database:migrationRevision": [
+                        _check_ex("revision", "a1b2c3d4e5f6", status="pass")
+                    ],
+                    "database:poolUtilization": [
+                        _check_ex("percent", 20.0, status="pass")
+                    ],
                 },
             }
         }
@@ -242,12 +242,12 @@ _RESPONSE_503: dict[str, object] = {
             "example": {
                 "status": "fail",
                 "checks": {
-                    "database:responseTime": _check_ex("ms", output=_ERR),
-                    "database:version": _check_ex("version", output=_ERR),
-                    "database:migrationRevision": _check_ex("revision", output=_ERR),
-                    "database:poolUtilization": _check_ex(
-                        "percent", 0.0, status="pass"
-                    ),
+                    "database:responseTime": [_check_ex("ms", output=_ERR)],
+                    "database:version": [_check_ex("version", output=_ERR)],
+                    "database:migrationRevision": [_check_ex("revision", output=_ERR)],
+                    "database:poolUtilization": [
+                        _check_ex("percent", 0.0, status="pass")
+                    ],
                 },
             }
         }
