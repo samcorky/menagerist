@@ -6,14 +6,14 @@ import Root from './tooltip.svelte';
 
 export {
 	Root,
-	Content,
 	Trigger,
-	Portal,
+	Content,
 	Provider,
+	Portal,
 	//
 	Root as Tooltip,
 	Content as TooltipContent,
 	Trigger as TooltipTrigger,
-	Portal as TooltipPortal,
-	Provider as TooltipProvider
+	Provider as TooltipProvider,
+	Portal as TooltipPortal
 };

@@ -20,6 +20,7 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import BackButton from '$lib/components/back-button.svelte';
+	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import SchemaEditor from '$lib/components/schema-editor.svelte';
 	import type { AttributesSchema } from '$lib/schema-types';
 
@@ -40,7 +41,7 @@
 	let editDescription = $state('');
 	let editSchema = $state<AttributesSchema | null>(null);
 	let savingId = $state<string | null>(null);
-	let confirmingDeleteId = $state<string | null>(null);
+	let confirmTarget = $state<NodeTypeResponse | null>(null);
 	let deletingId = $state<string | null>(null);
 
 	async function fetchPage(after?: string) {
@@ -98,7 +99,6 @@
 		editLabel = cat.label;
 		editDescription = cat.description ?? '';
 		editSchema = (cat.attributes_schema as AttributesSchema | null) ?? null;
-		confirmingDeleteId = null;
 	}
 
 	function cancelEdit() {
@@ -133,27 +133,13 @@
 
 		if (hasItems) {
 			// Destructive — items will lose their category. Require explicit confirmation.
-			if (confirmingDeleteId !== cat.id) {
-				confirmingDeleteId = cat.id;
-				editingId = null;
-				return;
-			}
-			confirmingDeleteId = null;
-			deletingId = cat.id;
-			const result = await deleteNodeType({ path: { node_type_id: cat.id } });
-			if (result.error) {
-				toast.error("Couldn't delete category", { description: errorMessage(result.error) });
-			} else {
-				categories = categories.filter((c) => c.id !== cat.id);
-				toast.success('Category deleted');
-			}
-			deletingId = null;
+			editingId = null;
+			confirmTarget = cat;
 			return;
 		}
 
 		// No items — optimistic removal with undo window
 		editingId = null;
-		confirmingDeleteId = null;
 		categories = categories.filter((c) => c.id !== cat.id);
 
 		let undone = false;
@@ -177,6 +163,21 @@
 			},
 			duration: 5000
 		});
+	}
+
+	async function confirmDelete() {
+		const cat = confirmTarget;
+		if (!cat) return;
+		deletingId = cat.id;
+		const result = await deleteNodeType({ path: { node_type_id: cat.id } });
+		if (result.error) {
+			toast.error("Couldn't delete category", { description: errorMessage(result.error) });
+		} else {
+			categories = categories.filter((c) => c.id !== cat.id);
+			toast.success('Category deleted');
+		}
+		deletingId = null;
+		confirmTarget = null;
 	}
 
 	$effect(() => {
@@ -263,46 +264,25 @@
 							</div>
 							<div class="flex flex-wrap items-center gap-1 sm:shrink-0">
 								<Badge variant="secondary">{cat.slug}</Badge>
-								{#if confirmingDeleteId === cat.id}
-									<span class="text-xs text-destructive">Items will lose this category</span>
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										onclick={() => (confirmingDeleteId = null)}
-									>
-										Cancel
-									</Button>
-									<Button
-										type="button"
-										variant="destructive"
-										size="sm"
-										disabled={deletingId === cat.id}
-										onclick={() => handleDelete(cat)}
-									>
-										Delete anyway
-									</Button>
-								{:else}
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										onclick={() => startEdit(cat)}
-										aria-label="Edit category"
-									>
-										<Pencil class="size-4" />
-									</Button>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										disabled={deletingId === cat.id}
-										onclick={() => handleDelete(cat)}
-										aria-label="Delete category"
-									>
-										<Trash2 class="size-4" />
-									</Button>
-								{/if}
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									onclick={() => startEdit(cat)}
+									aria-label="Edit category"
+								>
+									<Pencil class="size-4" />
+								</Button>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									disabled={deletingId === cat.id}
+									onclick={() => handleDelete(cat)}
+									aria-label="Delete category"
+								>
+									<Trash2 class="size-4" />
+								</Button>
 							</div>
 						</Card.Header>
 
@@ -367,3 +347,18 @@
 		{/if}
 	</div>
 </main>
+
+<ConfirmDialog
+	open={confirmTarget !== null}
+	title="Delete category?"
+	description={confirmTarget
+		? `Items using "${confirmTarget.label}" will lose this category.`
+		: undefined}
+	busy={deletingId !== null}
+	busyLabel="Deleting…"
+	confirmLabel="Delete anyway"
+	onOpenChange={(v) => {
+		if (!v) confirmTarget = null;
+	}}
+	onConfirm={confirmDelete}
+/>

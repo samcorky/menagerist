@@ -1,11 +1,9 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { Dialog } from 'bits-ui';
 	import {
 		X,
 		File as FileIcon,
 		Star,
-		StarOff,
 		Pencil,
 		Download,
 		Trash2,
@@ -27,6 +25,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Attachment from '$lib/components/ui/attachment/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import ConfirmDialog from './confirm-dialog.svelte';
 	import FileDrop from './file-drop.svelte';
@@ -305,34 +304,22 @@
 								alt={asset.filename}
 								loading="lazy"
 							/>
-							{#if coverIds.has(asset.id)}
-								<div
-									class="pointer-events-none absolute top-1 left-1 rounded-full bg-black/60 p-0.5"
-								>
-									<Star class="size-3 fill-yellow-400 text-yellow-400" />
-								</div>
-							{/if}
 						</Attachment.Media>
 						<Attachment.Content>
 							<Attachment.Title>{asset.filename}</Attachment.Title>
 							<Attachment.Description>{formatSize(asset.size)}</Attachment.Description>
 						</Attachment.Content>
 						<Attachment.Actions>
-							{#if coverIds.has(asset.id)}
-								<Attachment.Action
-									onclick={() => removeCover(asset)}
-									aria-label="Remove cover for {asset.filename}"
-								>
-									<StarOff />
-								</Attachment.Action>
-							{:else}
-								<Attachment.Action
-									onclick={() => setCover(asset)}
-									aria-label="Set as cover {asset.filename}"
-								>
-									<Star />
-								</Attachment.Action>
-							{/if}
+							<Attachment.Action
+								onclick={() => (coverIds.has(asset.id) ? removeCover(asset) : setCover(asset))}
+								aria-pressed={coverIds.has(asset.id)}
+								aria-label={coverIds.has(asset.id)
+									? `Remove cover for ${asset.filename}`
+									: `Set as cover ${asset.filename}`}
+								class={coverIds.has(asset.id) ? 'text-primary' : undefined}
+							>
+								<Star class={coverIds.has(asset.id) ? 'fill-current' : ''} />
+							</Attachment.Action>
 							<DropdownMenu.Root>
 								<DropdownMenu.Trigger>
 									{#snippet child({ props })}
@@ -490,50 +477,31 @@
 	</div>
 {/if}
 
-<!-- Rename dialog -->
-<Dialog.Root
+<ResponsiveDialog.Root
 	open={renameTarget !== null}
 	onOpenChange={(v) => {
 		if (!v) cancelRename();
 	}}
 >
-	<Dialog.Portal>
-		<Dialog.Overlay class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
-		<Dialog.Content
-			aria-label="Rename file"
-			class="fixed right-0 bottom-0 left-0 z-50 max-h-[90dvh] overflow-y-auto rounded-t-2xl border-t bg-background p-6 shadow-xl sm:inset-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-full sm:max-w-sm sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border"
-		>
-			<div class="mx-auto mb-5 h-1.5 w-12 rounded-full bg-muted sm:hidden"></div>
-			<div class="flex items-center justify-between">
-				<Dialog.Title class="text-lg font-semibold">Rename file</Dialog.Title>
-				<button
-					type="button"
-					onclick={cancelRename}
-					class="relative rounded-md p-1 text-muted-foreground after:absolute after:-inset-2 after:content-[''] hover:text-foreground"
-					aria-label="Close"
-				>
-					<X class="size-4" />
-				</button>
+	<ResponsiveDialog.Content title="Rename file" size="sm">
+		<form class="mt-4 space-y-4" onsubmit={saveRename}>
+			<Input
+				bind:value={renameValue}
+				bind:ref={renameInput}
+				aria-label="Filename"
+				onkeydown={(e) => {
+					if (e.key === 'Escape') cancelRename();
+				}}
+			/>
+			<div class="flex justify-end gap-2">
+				<Button type="button" variant="outline" onclick={cancelRename}>Cancel</Button>
+				<Button type="submit" disabled={renameSaving || !renameValue.trim()}>
+					{renameSaving ? 'Saving…' : 'Save'}
+				</Button>
 			</div>
-			<form class="mt-4 space-y-4" onsubmit={saveRename}>
-				<Input
-					bind:value={renameValue}
-					bind:ref={renameInput}
-					aria-label="Filename"
-					onkeydown={(e) => {
-						if (e.key === 'Escape') cancelRename();
-					}}
-				/>
-				<div class="flex justify-end gap-2">
-					<Button type="button" variant="outline" onclick={cancelRename}>Cancel</Button>
-					<Button type="submit" disabled={renameSaving || !renameValue.trim()}>
-						{renameSaving ? 'Saving…' : 'Save'}
-					</Button>
-				</div>
-			</form>
-		</Dialog.Content>
-	</Dialog.Portal>
-</Dialog.Root>
+		</form>
+	</ResponsiveDialog.Content>
+</ResponsiveDialog.Root>
 
 <ConfirmDialog
 	open={deleteTarget !== null}

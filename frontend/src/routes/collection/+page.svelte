@@ -17,7 +17,7 @@
 	import { networkAwareError } from '$lib/api/errors';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import * as Card from '$lib/components/ui/card/index.js';
+	import * as Item from '$lib/components/ui/item/index.js';
 	import NodeCover from '$lib/components/node-cover.svelte';
 	import NodeSummary from '$lib/components/node-summary.svelte';
 	import TagList from '$lib/components/tag-list.svelte';
@@ -343,15 +343,15 @@
 				{/each}
 			</div>
 		{:else}
-			<div class="grid gap-3">
+			<Item.Group>
 				{#each items as item (item.id)}
-					<a href={resolve('/collection/[id]', { id: item.id })}>
-						<Card.Root class="transition-colors hover:bg-muted/50">
-							<Card.Header class="flex flex-row items-center justify-between gap-4 space-y-0">
-								<div class="min-w-0 space-y-1">
-									<Card.Title>{item.name}</Card.Title>
+					<Item.Root variant="outline">
+						{#snippet child({ props })}
+							<a {...props} href={resolve('/collection/[id]', { id: item.id })}>
+								<Item.Content class="gap-1.5">
+									<Item.Title class="font-heading text-base">{item.name}</Item.Title>
 									{#if item.description}
-										<Card.Description class="line-clamp-1">{item.description}</Card.Description>
+										<p class="line-clamp-1 text-sm text-muted-foreground">{item.description}</p>
 									{/if}
 									{#if item.tags.length > 0}
 										<TagList tags={item.tags} max={4} />
@@ -373,18 +373,20 @@
 											</p>
 										{/if}
 									{/if}
-								</div>
+								</Item.Content>
 								{#if item.type}
 									{@const catLabel = allCategories.find((c) => c.slug === item.type)?.label}
-									<Badge variant="secondary" class="shrink-0">
-										{catLabel ?? item.type}
-									</Badge>
+									<Item.Actions>
+										<Badge variant="secondary" class="shrink-0">
+											{catLabel ?? item.type}
+										</Badge>
+									</Item.Actions>
 								{/if}
-							</Card.Header>
-						</Card.Root>
-					</a>
+							</a>
+						{/snippet}
+					</Item.Root>
 				{/each}
-			</div>
+			</Item.Group>
 		{/if}
 
 		{#if items.length === 0 && !loading}

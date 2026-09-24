@@ -3,7 +3,6 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { Pencil, Star, Trash2, X } from '@lucide/svelte';
-	import { Dialog } from 'bits-ui';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import {
 		createEdge,
@@ -41,7 +40,9 @@
 	import { Toggle } from '$lib/components/ui/toggle/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import * as Item from '$lib/components/ui/item/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import ShimmerSlot from '$lib/components/shimmer-slot.svelte';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
@@ -697,58 +698,60 @@
 										: edge.type}
 									{@const other = nodesById.get(otherNodeId(edge))}
 									{@const rowSchema = edgeTypeSchemaOf(edge)}
-									<li class="flex items-center justify-between gap-2 rounded-lg border p-3">
-										<div class="min-w-0 flex-1 space-y-1 text-sm">
-											<div class="truncate font-medium">{relationLabel}</div>
-											<div class="flex min-w-0 items-center gap-2">
-												<a
-													href={resolve('/collection/[id]', { id: otherNodeId(edge) })}
-													class="truncate text-muted-foreground underline"
-												>
-													{other?.name ?? 'View item'}
-												</a>
-												{#if other}
-													<NodeSummary
-														attributes={other.attributes}
-														schema={schemaOfType(other.type)}
-														surface="row"
-														size="sm"
-													/>
-												{/if}
-											</div>
-											{#if rowSchema}
-												<div class="truncate">
-													<NodeSummary
-														attributes={edge.attributes}
-														schema={rowSchema}
-														surface="connection"
-														size="sm"
-													/>
+									<li>
+										<Item.Root variant="outline">
+											<Item.Content class="text-sm">
+												<Item.Title class="truncate">{relationLabel}</Item.Title>
+												<div class="flex min-w-0 items-center gap-2">
+													<a
+														href={resolve('/collection/[id]', { id: otherNodeId(edge) })}
+														class="truncate text-muted-foreground underline"
+													>
+														{other?.name ?? 'View item'}
+													</a>
+													{#if other}
+														<NodeSummary
+															attributes={other.attributes}
+															schema={schemaOfType(other.type)}
+															surface="row"
+															size="sm"
+														/>
+													{/if}
 												</div>
-											{/if}
-										</div>
-										<div class="flex shrink-0 items-center gap-1">
-											{#if isEdgeEditable(edge)}
+												{#if rowSchema}
+													<div class="truncate">
+														<NodeSummary
+															attributes={edge.attributes}
+															schema={rowSchema}
+															surface="connection"
+															size="sm"
+														/>
+													</div>
+												{/if}
+											</Item.Content>
+											<Item.Actions>
+												{#if isEdgeEditable(edge)}
+													<Button
+														type="button"
+														variant="ghost"
+														size="icon"
+														onclick={(e) => openEditEdge(edge, e.currentTarget)}
+														aria-label="Edit connection"
+													>
+														<Pencil class="size-4" />
+													</Button>
+												{/if}
 												<Button
 													type="button"
 													variant="ghost"
 													size="icon"
-													onclick={(e) => openEditEdge(edge, e.currentTarget)}
-													aria-label="Edit connection"
+													onclick={() => handleDeleteEdge(edge)}
+													aria-label="Remove connection"
 												>
-													<Pencil class="size-4" />
+													<Trash2 class="size-4" />
 												</Button>
-											{/if}
-											<Button
-												type="button"
-												variant="ghost"
-												size="icon"
-												onclick={() => handleDeleteEdge(edge)}
-												aria-label="Remove connection"
-											>
-												<Trash2 class="size-4" />
-											</Button>
-										</div>
+											</Item.Actions>
+										</Item.Root>
 									</li>
 								{/each}
 							</ul>
@@ -925,58 +928,43 @@
 	</div>
 </main>
 
-<Dialog.Root
+<ResponsiveDialog.Root
 	open={editingEdge !== null}
 	onOpenChange={(v) => {
 		if (!v) closeEditEdge();
 	}}
 >
-	<Dialog.Portal>
-		<Dialog.Overlay class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
-		<Dialog.Content
-			aria-label="Edit connection"
-			onCloseAutoFocus={(e) => {
-				e.preventDefault();
-				editTrigger?.focus();
-			}}
-			class="fixed right-0 bottom-0 left-0 z-50 max-h-[90dvh] overflow-y-auto rounded-t-2xl border-t bg-background p-6 shadow-xl sm:inset-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border"
-		>
-			<div class="mx-auto mb-5 h-1.5 w-12 rounded-full bg-muted sm:hidden"></div>
-			<div class="flex items-center justify-between">
-				<Dialog.Title class="text-lg font-semibold">Edit connection</Dialog.Title>
-				<button
-					type="button"
-					onclick={closeEditEdge}
-					class="relative rounded-md p-1 text-muted-foreground after:absolute after:-inset-2 after:content-[''] hover:text-foreground"
-					aria-label="Close"
-				>
-					<X class="size-4" />
-				</button>
-			</div>
-			{#if editingEdge}
-				{@const editType = edgeTypesById.get(editingEdge.type)}
-				{@const outgoing = editingEdge.source_id === nodeId}
-				<Dialog.Description class="mt-1 truncate text-sm text-muted-foreground">
-					{editType
-						? outgoing
-							? editType.label
-							: (editType.reverse_label ?? editType.label)
-						: editingEdge.type}
-					{editingOther?.name ?? ''}
-				</Dialog.Description>
-				<form class="mt-4 space-y-4" onsubmit={handleSaveEdge}>
-					<AttributesEditor bind:rows={editRows} schema={edgeSchema} serverErrors={editErrors} />
-					<div class="flex justify-end gap-2">
-						<Button type="button" variant="outline" onclick={closeEditEdge}>Cancel</Button>
-						<Button type="submit" disabled={savingEdge}>
-							{savingEdge ? 'Saving…' : 'Save'}
-						</Button>
-					</div>
-				</form>
-			{/if}
-		</Dialog.Content>
-	</Dialog.Portal>
-</Dialog.Root>
+	<ResponsiveDialog.Content
+		title="Edit connection"
+		size="lg"
+		onCloseAutoFocus={(e) => {
+			e.preventDefault();
+			editTrigger?.focus();
+		}}
+	>
+		{#if editingEdge}
+			{@const editType = edgeTypesById.get(editingEdge.type)}
+			{@const outgoing = editingEdge.source_id === nodeId}
+			<ResponsiveDialog.Description class="truncate">
+				{editType
+					? outgoing
+						? editType.label
+						: (editType.reverse_label ?? editType.label)
+					: editingEdge.type}
+				{editingOther?.name ?? ''}
+			</ResponsiveDialog.Description>
+			<form class="mt-4 space-y-4" onsubmit={handleSaveEdge}>
+				<AttributesEditor bind:rows={editRows} schema={edgeSchema} serverErrors={editErrors} />
+				<div class="flex justify-end gap-2">
+					<Button type="button" variant="outline" onclick={closeEditEdge}>Cancel</Button>
+					<Button type="submit" disabled={savingEdge}>
+						{savingEdge ? 'Saving…' : 'Save'}
+					</Button>
+				</div>
+			</form>
+		{/if}
+	</ResponsiveDialog.Content>
+</ResponsiveDialog.Root>
 
 <ConfirmDialog
 	open={confirmDeleteNode}
