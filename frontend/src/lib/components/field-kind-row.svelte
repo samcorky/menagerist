@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Input } from '$lib/components/ui/input/index.js';
+	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select/index.js';
 	import { allDescriptors, getDescriptor } from '$lib/field-types';
 	import { allowedKinds, changeKind, kindChangeWarning } from '$lib/field-types/kind-changes';
 	import { displayChoices, displayValue, setDisplayValue } from '$lib/field-types/display-options';
@@ -47,30 +48,28 @@
 	{#if field.kind === 'opaque'}
 		<span class="rounded border border-input px-1.5 text-xs text-muted-foreground">custom</span>
 	{:else}
-		<select
+		<NativeSelect
 			value={field.kind}
 			onchange={(e) => onFieldChange(changeKind(field, (e.target as HTMLSelectElement).value))}
-			class="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
 			aria-label="Field type"
 		>
 			{#each kindOptions() as d (d.kind)}
-				<option value={d.kind}>{d.label}</option>
+				<NativeSelectOption value={d.kind}>{d.label}</NativeSelectOption>
 			{/each}
-		</select>
+		</NativeSelect>
 	{/if}
 	{#each displayOptionsFor() as option (option.key)}
 		<span class="text-xs text-muted-foreground">{option.label}</span>
-		<select
+		<NativeSelect
 			value={displayValue(field, option)}
 			onchange={(e) =>
 				onFieldChange(setDisplayValue(field, option, (e.target as HTMLSelectElement).value))}
-			class="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
 			aria-label={option.label}
 		>
 			{#each displayChoices(field, option) as choice (choice.value)}
-				<option value={choice.value}>{choice.label}</option>
+				<NativeSelectOption value={choice.value}>{choice.label}</NativeSelectOption>
 			{/each}
-		</select>
+		</NativeSelect>
 	{/each}
 	<label class="flex items-center gap-1.5 text-sm">
 		<input
