@@ -496,6 +496,14 @@ If an action cannot be undone (e.g. permanent deletion of a category with many i
 - Validate at useful moments (not eagerly on every keystroke).
 - Validation copy should read as helpful guidance, not a programmer's warning.
 
+**Pick-one-from-a-list controls default to a real native `<select>`** (`ui/native-select`), not a custom-built dropdown. The OS renders its own picker on mobile — full-screen, correctly sized touch targets, native screen-reader support — for free, which is exactly what §23 asks for. Reach for something custom only when native `<select>` genuinely can't do the job:
+
+- **Type-ahead search or rich per-option rendering** the option list needs (e.g. a relationship-target picker showing each candidate's attributes, not just its name).
+- **It triggers an action, not a value pick** — that's a menu (`DropdownMenu`), not a select.
+- **The option set is open-ended and user-authored**, not a fixed enum (e.g. categories, which also want an inline "+ New" affordance) — a chip/search picker fits better than a giant native dropdown.
+
+Default to native; justify the exception, not the other way round.
+
 ---
 
 ## 16. Metadata Presentation

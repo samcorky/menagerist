@@ -12,6 +12,7 @@
 	} from '$lib/api/client';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
+	import * as Item from '$lib/components/ui/item/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 
 	// 30-day window per §18a
@@ -180,24 +181,26 @@
 							</p>
 						</div>
 					</div>
-					<div class="grid gap-2">
+					<Item.Group>
 						{#each favouriteItems as item (item.id)}
 							{@const catLabel = categoryBySlug.get(item.type ?? '')?.label}
-							<a href={resolve('/collection/[id]', { id: item.id })}>
-								<div
-									class="flex items-center justify-between gap-3 rounded-lg border px-4 py-3 transition-colors hover:bg-muted/40"
-								>
-									<div class="min-w-0">
-										<p class="truncate text-sm font-medium">{item.name}</p>
-										{#if catLabel}
-											<p class="text-xs text-muted-foreground">{catLabel}</p>
-										{/if}
-									</div>
-									<Star class="size-3.5 shrink-0 fill-current text-muted-foreground" />
-								</div>
-							</a>
+							<Item.Root variant="outline">
+								{#snippet child({ props })}
+									<a {...props} href={resolve('/collection/[id]', { id: item.id })}>
+										<Item.Content>
+											<Item.Title>{item.name}</Item.Title>
+											{#if catLabel}
+												<Item.Description>{catLabel}</Item.Description>
+											{/if}
+										</Item.Content>
+										<Item.Actions>
+											<Star class="size-3.5 fill-current text-muted-foreground" />
+										</Item.Actions>
+									</a>
+								{/snippet}
+							</Item.Root>
 						{/each}
-					</div>
+					</Item.Group>
 				</section>
 			{/if}
 
@@ -213,27 +216,27 @@
 							</p>
 						</div>
 					</div>
-					<div class="grid gap-2">
+					<Item.Group>
 						{#each missingDetails.slice(0, 5) as item (item.id)}
 							{@const catLabel = categoryBySlug.get(item.type ?? '')?.label}
-							<a href={resolve('/collection/[id]', { id: item.id })}>
-								<div
-									class="flex items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3 transition-colors hover:bg-muted/40"
-								>
-									<div class="min-w-0">
-										<p class="truncate text-sm font-medium">{item.name}</p>
-										{#if catLabel}
-											<p class="text-xs text-muted-foreground">{catLabel}</p>
-										{/if}
-									</div>
-									<div class="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-										<AlertCircle class="size-3.5" />
-										Add information
-									</div>
-								</div>
-							</a>
+							<Item.Root variant="outline" class="border-dashed">
+								{#snippet child({ props })}
+									<a {...props} href={resolve('/collection/[id]', { id: item.id })}>
+										<Item.Content>
+											<Item.Title>{item.name}</Item.Title>
+											{#if catLabel}
+												<Item.Description>{catLabel}</Item.Description>
+											{/if}
+										</Item.Content>
+										<Item.Actions class="text-xs text-muted-foreground">
+											<AlertCircle class="size-3.5" />
+											Add information
+										</Item.Actions>
+									</a>
+								{/snippet}
+							</Item.Root>
 						{/each}
-					</div>
+					</Item.Group>
 				</section>
 			{/if}
 
