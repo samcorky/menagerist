@@ -1,14 +1,15 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
+	import { Dialog } from 'bits-ui';
 	import {
 		X,
 		File as FileIcon,
 		Star,
 		StarOff,
 		Pencil,
-		Check,
 		Download,
-		Trash2
+		Trash2,
+		MoreVertical
 	} from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -22,9 +23,12 @@
 		type NodeMediaItemResponse
 	} from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Attachment from '$lib/components/ui/attachment/index.js';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
+	import ConfirmDialog from './confirm-dialog.svelte';
 	import FileDrop from './file-drop.svelte';
 
 	let { nodeId }: { nodeId: string } = $props();
@@ -39,9 +43,12 @@
 	let assets = $state<NodeMediaItemResponse[]>([]);
 	let uploading = $state<UploadingEntry[]>([]);
 	let loading = $state(true);
-	let confirmDeleteAssetId = $state<string | null>(null);
-	let renamingAssetId = $state<string | null>(null);
+	let deleteTarget = $state<NodeMediaItemResponse | null>(null);
+	let deleting = $state(false);
+	let renameTarget = $state<NodeMediaItemResponse | null>(null);
 	let renameValue = $state('');
+	let renameSaving = $state(false);
+	let renameInput = $state<HTMLInputElement | null>(null);
 
 	let lightboxAsset = $state<NodeMediaItemResponse | null>(null);
 	let lightboxFullLoaded = $state(false);
@@ -157,8 +164,10 @@
 		}
 	});
 
-	async function handleDelete(asset: NodeMediaItemResponse) {
-		confirmDeleteAssetId = null;
+	async function confirmDelete() {
+		const asset = deleteTarget;
+		if (!asset) return;
+		deleting = true;
 		const removed = assets.filter((a) => a.id === asset.id);
 		assets = assets.filter((a) => a.id !== asset.id);
 		const result = await deleteMedia({ path: { asset_id: asset.id } });
@@ -166,6 +175,15 @@
 			assets = [...assets, ...removed];
 			toast.error('Delete failed', { description: errorMessage(result.error) });
 		}
+		deleting = false;
+		deleteTarget = null;
+	}
+
+	function downloadAsset(asset: NodeMediaItemResponse) {
+		const a = document.createElement('a');
+		a.href = asset.content_url;
+		a.download = asset.filename;
+		a.click();
 	}
 
 	async function setCover(asset: NodeMediaItemResponse) {
@@ -193,25 +211,30 @@
 	}
 
 	function startRename(asset: NodeMediaItemResponse) {
-		renamingAssetId = asset.id;
+		renameTarget = asset;
 		renameValue = asset.filename;
 	}
 
 	function cancelRename() {
-		renamingAssetId = null;
+		renameTarget = null;
 	}
 
-	async function saveRename(asset: NodeMediaItemResponse) {
+	async function saveRename(event?: SubmitEvent) {
+		event?.preventDefault();
+		const asset = renameTarget;
+		if (!asset) return;
 		const trimmed = renameValue.trim();
 		if (!trimmed || trimmed === asset.filename) {
 			cancelRename();
 			return;
 		}
 
+		renameSaving = true;
 		const result = await updateMedia({
 			path: { asset_id: asset.id },
 			body: { filename: trimmed }
 		});
+		renameSaving = false;
 
 		if (result.response?.status === 412) {
 			toast.error('Edit conflict', {
@@ -226,6 +249,10 @@
 
 		cancelRename();
 	}
+
+	$effect(() => {
+		if (renameTarget) renameInput?.focus();
+	});
 
 	function isImage(asset: NodeMediaItemResponse) {
 		return asset.content_type.startsWith('image/');
@@ -286,85 +313,49 @@
 								</div>
 							{/if}
 						</Attachment.Media>
-						{#if renamingAssetId === asset.id}
-							<Attachment.Content>
-								<Input
-									bind:value={renameValue}
-									autofocus
-									class="h-7 text-xs"
-									aria-label="Rename {asset.filename}"
-									onkeydown={(e) => {
-										if (e.key === 'Enter') saveRename(asset);
-										if (e.key === 'Escape') cancelRename();
-									}}
-								/>
-							</Attachment.Content>
-						{:else}
-							<Attachment.Content>
-								<Attachment.Title>{asset.filename}</Attachment.Title>
-								<Attachment.Description>{formatSize(asset.size)}</Attachment.Description>
-							</Attachment.Content>
-						{/if}
+						<Attachment.Content>
+							<Attachment.Title>{asset.filename}</Attachment.Title>
+							<Attachment.Description>{formatSize(asset.size)}</Attachment.Description>
+						</Attachment.Content>
 						<Attachment.Actions>
-							{#if renamingAssetId === asset.id}
-								<Attachment.Action onclick={cancelRename} aria-label="Cancel rename">
-									<X />
-								</Attachment.Action>
-								<Attachment.Action onclick={() => saveRename(asset)} aria-label="Save rename">
-									<Check />
-								</Attachment.Action>
-							{:else if confirmDeleteAssetId === asset.id}
+							{#if coverIds.has(asset.id)}
 								<Attachment.Action
-									onclick={() => (confirmDeleteAssetId = null)}
-									aria-label="Cancel delete"
+									onclick={() => removeCover(asset)}
+									aria-label="Remove cover for {asset.filename}"
 								>
-									<X />
-								</Attachment.Action>
-								<Attachment.Action
-									variant="destructive"
-									onclick={() => handleDelete(asset)}
-									aria-label="Confirm delete {asset.filename}"
-								>
-									<Trash2 />
+									<StarOff />
 								</Attachment.Action>
 							{:else}
-								{#if coverIds.has(asset.id)}
-									<Attachment.Action
-										onclick={() => removeCover(asset)}
-										aria-label="Remove cover for {asset.filename}"
-									>
-										<StarOff />
-									</Attachment.Action>
-								{:else}
-									<Attachment.Action
-										onclick={() => setCover(asset)}
-										aria-label="Set as cover {asset.filename}"
-									>
-										<Star />
-									</Attachment.Action>
-								{/if}
 								<Attachment.Action
-									onclick={() => startRename(asset)}
-									aria-label="Rename {asset.filename}"
+									onclick={() => setCover(asset)}
+									aria-label="Set as cover {asset.filename}"
 								>
-									<Pencil />
-								</Attachment.Action>
-								<!-- eslint-disable svelte/no-navigation-without-resolve -->
-								<Attachment.Action
-									href={asset.content_url}
-									download={asset.filename}
-									aria-label="Download {asset.filename}"
-								>
-									<Download />
-								</Attachment.Action>
-								<!-- eslint-enable svelte/no-navigation-without-resolve -->
-								<Attachment.Action
-									onclick={() => (confirmDeleteAssetId = asset.id)}
-									aria-label="Delete {asset.filename}"
-								>
-									<Trash2 />
+									<Star />
 								</Attachment.Action>
 							{/if}
+							<DropdownMenu.Root>
+								<DropdownMenu.Trigger>
+									{#snippet child({ props })}
+										<Attachment.Action {...props} aria-label="More actions for {asset.filename}">
+											<MoreVertical />
+										</Attachment.Action>
+									{/snippet}
+								</DropdownMenu.Trigger>
+								<DropdownMenu.Content align="end">
+									<DropdownMenu.Item onSelect={() => startRename(asset)}>
+										<Pencil class="size-4" />
+										Rename
+									</DropdownMenu.Item>
+									<DropdownMenu.Item onSelect={() => downloadAsset(asset)}>
+										<Download class="size-4" />
+										Download
+									</DropdownMenu.Item>
+									<DropdownMenu.Item variant="destructive" onSelect={() => (deleteTarget = asset)}>
+										<Trash2 class="size-4" />
+										Delete
+									</DropdownMenu.Item>
+								</DropdownMenu.Content>
+							</DropdownMenu.Root>
 						</Attachment.Actions>
 					</Attachment.Root>
 				{/each}
@@ -397,70 +388,34 @@
 						<Attachment.Media>
 							<FileIcon />
 						</Attachment.Media>
-						{#if renamingAssetId === asset.id}
-							<Attachment.Content>
-								<Input
-									bind:value={renameValue}
-									autofocus
-									class="h-7 text-xs"
-									aria-label="Rename {asset.filename}"
-									onkeydown={(e) => {
-										if (e.key === 'Enter') saveRename(asset);
-										if (e.key === 'Escape') cancelRename();
-									}}
-								/>
-							</Attachment.Content>
-						{:else}
-							<Attachment.Content>
-								<Attachment.Title>{asset.filename}</Attachment.Title>
-								<Attachment.Description>{formatSize(asset.size)}</Attachment.Description>
-							</Attachment.Content>
-						{/if}
+						<Attachment.Content>
+							<Attachment.Title>{asset.filename}</Attachment.Title>
+							<Attachment.Description>{formatSize(asset.size)}</Attachment.Description>
+						</Attachment.Content>
 						<Attachment.Actions>
-							{#if renamingAssetId === asset.id}
-								<Attachment.Action onclick={cancelRename} aria-label="Cancel rename">
-									<X />
-								</Attachment.Action>
-								<Attachment.Action onclick={() => saveRename(asset)} aria-label="Save rename">
-									<Check />
-								</Attachment.Action>
-							{:else if confirmDeleteAssetId === asset.id}
-								<Attachment.Action
-									onclick={() => (confirmDeleteAssetId = null)}
-									aria-label="Cancel delete"
-								>
-									<X />
-								</Attachment.Action>
-								<Attachment.Action
-									variant="destructive"
-									onclick={() => handleDelete(asset)}
-									aria-label="Confirm delete {asset.filename}"
-								>
-									<Trash2 />
-								</Attachment.Action>
-							{:else}
-								<Attachment.Action
-									onclick={() => startRename(asset)}
-									aria-label="Rename {asset.filename}"
-								>
-									<Pencil />
-								</Attachment.Action>
-								<!-- eslint-disable svelte/no-navigation-without-resolve -->
-								<Attachment.Action
-									href={asset.content_url}
-									download={asset.filename}
-									aria-label="Download {asset.filename}"
-								>
-									<Download />
-								</Attachment.Action>
-								<!-- eslint-enable svelte/no-navigation-without-resolve -->
-								<Attachment.Action
-									onclick={() => (confirmDeleteAssetId = asset.id)}
-									aria-label="Delete {asset.filename}"
-								>
-									<Trash2 />
-								</Attachment.Action>
-							{/if}
+							<DropdownMenu.Root>
+								<DropdownMenu.Trigger>
+									{#snippet child({ props })}
+										<Attachment.Action {...props} aria-label="More actions for {asset.filename}">
+											<MoreVertical />
+										</Attachment.Action>
+									{/snippet}
+								</DropdownMenu.Trigger>
+								<DropdownMenu.Content align="end">
+									<DropdownMenu.Item onSelect={() => startRename(asset)}>
+										<Pencil class="size-4" />
+										Rename
+									</DropdownMenu.Item>
+									<DropdownMenu.Item onSelect={() => downloadAsset(asset)}>
+										<Download class="size-4" />
+										Download
+									</DropdownMenu.Item>
+									<DropdownMenu.Item variant="destructive" onSelect={() => (deleteTarget = asset)}>
+										<Trash2 class="size-4" />
+										Delete
+									</DropdownMenu.Item>
+								</DropdownMenu.Content>
+							</DropdownMenu.Root>
 						</Attachment.Actions>
 					</Attachment.Root>
 				{/each}
@@ -487,7 +442,7 @@
 		<a
 			href={asset.content_url}
 			download={asset.filename}
-			class="absolute top-4 right-16 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+			class="absolute top-4 right-16 rounded-full bg-white/10 p-2 text-white after:absolute after:-inset-2 after:content-[''] hover:bg-white/20"
 			aria-label="Download {asset.filename}"
 		>
 			<Download class="size-5" />
@@ -495,7 +450,7 @@
 		<!-- eslint-enable svelte/no-navigation-without-resolve -->
 		<button
 			type="button"
-			class="absolute top-4 right-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+			class="absolute top-4 right-4 rounded-full bg-white/10 p-2 text-white after:absolute after:-inset-2 after:content-[''] hover:bg-white/20"
 			onclick={() => (lightboxAsset = null)}
 			aria-label="Close"
 		>
@@ -534,3 +489,61 @@
 		</div>
 	</div>
 {/if}
+
+<!-- Rename dialog -->
+<Dialog.Root
+	open={renameTarget !== null}
+	onOpenChange={(v) => {
+		if (!v) cancelRename();
+	}}
+>
+	<Dialog.Portal>
+		<Dialog.Overlay class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
+		<Dialog.Content
+			aria-label="Rename file"
+			class="fixed right-0 bottom-0 left-0 z-50 max-h-[90dvh] overflow-y-auto rounded-t-2xl border-t bg-background p-6 shadow-xl sm:inset-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-full sm:max-w-sm sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border"
+		>
+			<div class="mx-auto mb-5 h-1.5 w-12 rounded-full bg-muted sm:hidden"></div>
+			<div class="flex items-center justify-between">
+				<Dialog.Title class="text-lg font-semibold">Rename file</Dialog.Title>
+				<button
+					type="button"
+					onclick={cancelRename}
+					class="relative rounded-md p-1 text-muted-foreground after:absolute after:-inset-2 after:content-[''] hover:text-foreground"
+					aria-label="Close"
+				>
+					<X class="size-4" />
+				</button>
+			</div>
+			<form class="mt-4 space-y-4" onsubmit={saveRename}>
+				<Input
+					bind:value={renameValue}
+					bind:ref={renameInput}
+					aria-label="Filename"
+					onkeydown={(e) => {
+						if (e.key === 'Escape') cancelRename();
+					}}
+				/>
+				<div class="flex justify-end gap-2">
+					<Button type="button" variant="outline" onclick={cancelRename}>Cancel</Button>
+					<Button type="submit" disabled={renameSaving || !renameValue.trim()}>
+						{renameSaving ? 'Saving…' : 'Save'}
+					</Button>
+				</div>
+			</form>
+		</Dialog.Content>
+	</Dialog.Portal>
+</Dialog.Root>
+
+<ConfirmDialog
+	open={deleteTarget !== null}
+	title="Delete file?"
+	description={deleteTarget ? `${deleteTarget.filename} will be permanently deleted.` : undefined}
+	busy={deleting}
+	busyLabel="Deleting…"
+	confirmLabel="Delete"
+	onOpenChange={(v) => {
+		if (!v) deleteTarget = null;
+	}}
+	onConfirm={confirmDelete}
+/>

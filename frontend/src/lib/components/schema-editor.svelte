@@ -405,62 +405,72 @@
 	onReplace: () => void,
 	onFieldChange: (f: EditorField) => void
 )}
-	<div class="flex flex-wrap items-center gap-2">
-		<FieldKindRow
-			{field}
-			{allowGroup}
-			{onLabelChange}
-			onFieldChange={(next) => onFieldChange(handleFieldRowChange(field, next))}
-		/>
-		{#if highlights && isHighlightableField(field)}
-			{@const pinned = field.highlight !== undefined}
-			{@const target = onConnections ? 'connection' : 'card'}
+	<div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+		<div class="min-w-0 sm:flex-1">
+			<FieldKindRow
+				{field}
+				{allowGroup}
+				{onLabelChange}
+				onFieldChange={(next) => onFieldChange(handleFieldRowChange(field, next))}
+			/>
+		</div>
+		<div class="flex items-center justify-end gap-1 sm:justify-start">
+			{#if highlights && isHighlightableField(field)}
+				{@const pinned = field.highlight !== undefined}
+				{@const target = onConnections ? 'connection' : 'card'}
+				<Button
+					type="button"
+					variant="ghost"
+					size="icon"
+					aria-pressed={pinned}
+					aria-label={pinned ? `Stop showing on ${target}` : `Show on ${target}`}
+					title={pinned ? `Stop showing on ${target}` : `Show on ${target}`}
+					disabled={!pinned && atHighlightLimit}
+					class={pinned ? 'text-primary' : 'text-muted-foreground'}
+					onclick={() => toggleHighlight(field)}
+				>
+					<Pin class="size-4 {pinned ? 'fill-current' : ''}" />
+				</Button>
+			{/if}
+			{#if field.kind !== 'opaque'}
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger>
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								type="button"
+								variant="ghost"
+								size="icon"
+								aria-label="More field actions"
+							>
+								<MoreVertical class="size-4" />
+							</Button>
+						{/snippet}
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content align="end">
+						{#if !field.keyPending}
+							<DropdownMenu.Item onSelect={onReplace}>
+								<Replace class="size-4" />
+								Replace field
+							</DropdownMenu.Item>
+						{/if}
+						<DropdownMenu.Item onSelect={() => (savingField = field)}>
+							<BookmarkPlus class="size-4" />
+							Save field for reuse
+						</DropdownMenu.Item>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
+			{/if}
 			<Button
 				type="button"
 				variant="ghost"
 				size="icon"
-				aria-pressed={pinned}
-				aria-label={pinned ? `Stop showing on ${target}` : `Show on ${target}`}
-				title={pinned ? `Stop showing on ${target}` : `Show on ${target}`}
-				disabled={!pinned && atHighlightLimit}
-				class={pinned ? 'text-primary' : 'text-muted-foreground'}
-				onclick={() => toggleHighlight(field)}
+				onclick={onRemove}
+				aria-label="Remove field"
 			>
-				<Pin class="size-4 {pinned ? 'fill-current' : ''}" />
+				<X class="size-4" />
 			</Button>
-		{/if}
-		{#if field.kind !== 'opaque'}
-			<DropdownMenu.Root>
-				<DropdownMenu.Trigger>
-					{#snippet child({ props })}
-						<Button
-							{...props}
-							type="button"
-							variant="ghost"
-							size="icon"
-							aria-label="More field actions"
-						>
-							<MoreVertical class="size-4" />
-						</Button>
-					{/snippet}
-				</DropdownMenu.Trigger>
-				<DropdownMenu.Content align="end">
-					{#if !field.keyPending}
-						<DropdownMenu.Item onSelect={onReplace}>
-							<Replace class="size-4" />
-							Replace field
-						</DropdownMenu.Item>
-					{/if}
-					<DropdownMenu.Item onSelect={() => (savingField = field)}>
-						<BookmarkPlus class="size-4" />
-						Save field for reuse
-					</DropdownMenu.Item>
-				</DropdownMenu.Content>
-			</DropdownMenu.Root>
-		{/if}
-		<Button type="button" variant="ghost" size="icon" onclick={onRemove} aria-label="Remove field">
-			<X class="size-4" />
-		</Button>
+		</div>
 	</div>
 {/snippet}
 
@@ -475,20 +485,20 @@
 					<Input
 						value={item.sectionLabel}
 						placeholder="Section name"
-						class="h-8 w-44 text-sm font-medium"
+						class="h-8 min-w-0 flex-1 text-sm font-medium sm:w-44 sm:flex-none"
 						aria-label="Section name"
 						oninput={(e) => handleSectionLabelChange(i, (e.target as HTMLInputElement).value)}
 					/>
-					<span class="text-xs text-muted-foreground">Section</span>
+					<span class="hidden text-xs text-muted-foreground sm:inline">Section</span>
 					<Button
 						type="button"
 						variant="ghost"
 						size="icon"
-						class="ml-auto size-7"
+						class="ml-auto"
 						onclick={() => removeItem(i)}
 						aria-label="Remove section"
 					>
-						<X class="size-3.5" />
+						<X class="size-4" />
 					</Button>
 				</div>
 				<div class="ml-2 space-y-2 border-l border-input pl-3">

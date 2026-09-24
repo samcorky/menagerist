@@ -30,7 +30,10 @@
 	import { archivedKeys, mergeAttributeSchemas, readSchemaMeta } from '$lib/schema-meta';
 	import { normalise, isSectionItem } from '$lib/layout';
 	import { descriptorForProp } from '$lib/field-types';
+	import { formatDateTime, formatRelativeTime } from '$lib/format-date';
 	import BackButton from '$lib/components/back-button.svelte';
+	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
+	import TagList from '$lib/components/tag-list.svelte';
 	import TagsInput from '$lib/components/tags-input.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import NotFound from '$lib/components/not-found.svelte';
@@ -42,6 +45,7 @@
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import ShimmerSlot from '$lib/components/shimmer-slot.svelte';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { serverErrorsToFields } from '$lib/validation-messages';
 	import MediaGallery from '$lib/components/media-gallery.svelte';
 	import NodeCover from '$lib/components/node-cover.svelte';
@@ -64,6 +68,29 @@
 	let schemaLayout = $derived(
 		nodeSchema ? normalise(readSchemaMeta(nodeSchema).layout, nodeSchema.properties) : []
 	);
+	let now = $state(new Date());
+	$effect(() => {
+		const id = setInterval(() => (now = new Date()), 60_000);
+		return () => clearInterval(id);
+	});
+
+	let createdAt = $derived(
+		node
+			? {
+					relative: formatRelativeTime(node.created_at, now),
+					utc: formatDateTime(node.created_at).utc
+				}
+			: null
+	);
+	let updatedAt = $derived(
+		node
+			? {
+					relative: formatRelativeTime(node.updated_at, now),
+					utc: formatDateTime(node.updated_at).utc
+				}
+			: null
+	);
+	let wasEdited = $derived(node ? node.updated_at !== node.created_at : false);
 	let loading = $state(true);
 	let notFound = $state(false);
 	let mode = $state<'read' | 'edit'>('read');
@@ -462,7 +489,7 @@
 													type="button"
 													onclick={() => handleSetType(nt.slug)}
 													disabled={settingType}
-													class="rounded-full border border-border bg-background px-2.5 py-0.5 text-xs transition-colors hover:border-primary/50 hover:bg-muted disabled:opacity-50"
+													class="relative rounded-full border border-border bg-background px-2.5 py-1 text-xs transition-colors after:absolute after:-inset-1 after:content-[''] hover:border-primary/50 hover:bg-muted disabled:opacity-50"
 												>
 													{nt.label}
 												</button>
@@ -527,38 +554,15 @@
 
 								<div class="flex flex-wrap items-center justify-between gap-2">
 									{#if !loading}
-										{#if confirmDeleteNode}
-											<div class="flex items-center gap-2">
-												<span class="text-sm text-muted-foreground">Delete this item?</span>
-												<Button
-													type="button"
-													variant="outline"
-													size="sm"
-													onclick={() => (confirmDeleteNode = false)}
-												>
-													Cancel
-												</Button>
-												<Button
-													type="button"
-													variant="destructive"
-													size="sm"
-													disabled={deletingNode}
-													onclick={handleDeleteNode}
-												>
-													{deletingNode ? 'Deleting…' : 'Delete'}
-												</Button>
-											</div>
-										{:else}
-											<Button
-												type="button"
-												variant="destructive"
-												disabled={deletingNode}
-												onclick={() => (confirmDeleteNode = true)}
-											>
-												<Trash2 class="size-4" />
-												Delete
-											</Button>
-										{/if}
+										<Button
+											type="button"
+											variant="destructive"
+											disabled={deletingNode}
+											onclick={() => (confirmDeleteNode = true)}
+										>
+											<Trash2 class="size-4" />
+											Delete
+										</Button>
 									{/if}
 									<div class="ml-auto flex items-center gap-2">
 										<Button type="button" variant="outline" onclick={handleCancelEdit}>
@@ -580,16 +584,8 @@
 									{/if}
 								</ShimmerSlot>
 
-								{#if !loading && node && node.tags.length > 0}
-									<ul class="flex flex-wrap gap-1.5" aria-label="Tags">
-										{#each node.tags as tag (tag)}
-											<li>
-												<Badge variant="secondary">
-													<span class="max-w-40 truncate" title={tag}>{tag}</span>
-												</Badge>
-											</li>
-										{/each}
-									</ul>
+								{#if !loading && node}
+									<TagList tags={node.tags} />
 								{/if}
 
 								{#snippet attrField(key: string, prop: JsonSchemaProperty)}
@@ -653,6 +649,30 @@
 										{/if}
 									</div>
 								{/if}
+
+								{#if !loading && createdAt && updatedAt}
+									<p class="border-t border-input/60 pt-3 text-xs text-muted-foreground">
+										<Tooltip.Root>
+											<Tooltip.Trigger>
+												{#snippet child({ props })}
+													<span {...props} tabindex="-1">Added {createdAt.relative}</span>
+												{/snippet}
+											</Tooltip.Trigger>
+											<Tooltip.Content>{createdAt.utc}</Tooltip.Content>
+										</Tooltip.Root>
+										{#if wasEdited}
+											·
+											<Tooltip.Root>
+												<Tooltip.Trigger>
+													{#snippet child({ props })}
+														<span {...props} tabindex="-1">Updated {updatedAt.relative}</span>
+													{/snippet}
+												</Tooltip.Trigger>
+												<Tooltip.Content>{updatedAt.utc}</Tooltip.Content>
+											</Tooltip.Root>
+										{/if}
+									</p>
+								{/if}
 							</div>
 						{/if}
 					</Card.Content>
@@ -707,7 +727,7 @@
 												</div>
 											{/if}
 										</div>
-										<div class="flex shrink-0 items-center">
+										<div class="flex shrink-0 items-center gap-1">
 											{#if isEdgeEditable(edge)}
 												<Button
 													type="button"
@@ -760,14 +780,20 @@
 										onblur={() => setTimeout(() => (edgeTypeOpen = false), 150)}
 									/>
 									{#if edgeTypeOpen && filteredEdgeTypes.length > 0}
+										<div
+											class="fixed inset-0 z-40 bg-black/40 sm:hidden"
+											onmousedown={() => (edgeTypeOpen = false)}
+											aria-hidden="true"
+										></div>
 										<ul
-											class="absolute z-10 mt-1 max-h-40 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md"
+											class="fixed inset-x-0 bottom-0 z-50 max-h-[60dvh] overflow-auto rounded-t-2xl border-t bg-popover p-2 shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:mt-1 sm:max-h-40 sm:w-full sm:rounded-md sm:border sm:p-1 sm:shadow-md"
 										>
+											<li class="mx-auto mb-2 h-1.5 w-12 rounded-full bg-muted sm:hidden"></li>
 											{#each filteredEdgeTypes as et (et.slug)}
 												<li>
 													<button
 														type="button"
-														class="flex w-full items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent"
+														class="flex w-full items-center justify-between rounded px-2 py-2.5 text-sm hover:bg-accent sm:py-1.5"
 														onmousedown={() => {
 															newEdgeType = et.slug;
 															edgeTypeSearch = et.label;
@@ -802,7 +828,7 @@
 														type="button"
 														onclick={() => removeSelectedTarget(target.id)}
 														aria-label="Remove {target.name}"
-														class="rounded-full p-0.5 hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+														class="relative rounded-full p-0.5 after:absolute after:-inset-2 after:content-[''] hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 													>
 														<X class="size-3" />
 													</button>
@@ -821,14 +847,20 @@
 										onblur={() => setTimeout(() => (edgeTargetOpen = false), 150)}
 									/>
 									{#if edgeTargetOpen && filteredNodes.length > 0}
+										<div
+											class="fixed inset-0 z-40 bg-black/40 sm:hidden"
+											onmousedown={() => (edgeTargetOpen = false)}
+											aria-hidden="true"
+										></div>
 										<ul
-											class="absolute z-10 mt-1 max-h-52 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md"
+											class="fixed inset-x-0 bottom-0 z-50 max-h-[60dvh] overflow-auto rounded-t-2xl border-t bg-popover p-2 shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:mt-1 sm:max-h-52 sm:w-full sm:rounded-md sm:border sm:p-1 sm:shadow-md"
 										>
+											<li class="mx-auto mb-2 h-1.5 w-12 rounded-full bg-muted sm:hidden"></li>
 											{#each filteredNodes as candidate (candidate.id)}
 												<li>
 													<button
 														type="button"
-														class="flex w-full items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent"
+														class="flex w-full items-center justify-between rounded px-2 py-2.5 text-sm hover:bg-accent sm:py-1.5"
 														onmousedown={(e) => {
 															e.preventDefault();
 															addSelectedTarget(candidate);
@@ -915,7 +947,7 @@
 				<button
 					type="button"
 					onclick={closeEditEdge}
-					class="rounded-md p-1 text-muted-foreground hover:text-foreground"
+					class="relative rounded-md p-1 text-muted-foreground after:absolute after:-inset-2 after:content-[''] hover:text-foreground"
 					aria-label="Close"
 				>
 					<X class="size-4" />
@@ -945,3 +977,14 @@
 		</Dialog.Content>
 	</Dialog.Portal>
 </Dialog.Root>
+
+<ConfirmDialog
+	open={confirmDeleteNode}
+	title="Delete item?"
+	description={node ? `"${node.name}" and its connections will be permanently deleted.` : undefined}
+	busy={deletingNode}
+	busyLabel="Deleting…"
+	confirmLabel="Delete"
+	onOpenChange={(v) => (confirmDeleteNode = v)}
+	onConfirm={handleDeleteNode}
+/>

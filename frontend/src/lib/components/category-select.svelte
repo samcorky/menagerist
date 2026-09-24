@@ -79,7 +79,7 @@
 				<button
 					type="button"
 					onclick={() => select(nt.slug)}
-					class="flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs transition-colors {value ===
+					class="relative flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors after:absolute after:-inset-1 after:content-[''] {value ===
 					nt.slug
 						? 'border-primary bg-primary text-primary-foreground'
 						: 'border-border bg-background hover:border-primary/50'}"

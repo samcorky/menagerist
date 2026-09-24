@@ -45,7 +45,7 @@
 							type="button"
 							onclick={() => removeTag(tag)}
 							aria-label="Remove tag {tag}"
-							class="rounded-full p-0.5 hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+							class="relative rounded-full p-0.5 after:absolute after:-inset-2 after:content-[''] hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 						>
 							<X class="size-3" />
 						</button>

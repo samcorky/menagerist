@@ -69,7 +69,7 @@
 				<button
 					type="button"
 					onclick={() => onOpenChange(false)}
-					class="rounded-md p-1 text-muted-foreground hover:text-foreground"
+					class="relative rounded-md p-1 text-muted-foreground after:absolute after:-inset-2 after:content-[''] hover:text-foreground"
 					aria-label="Close"
 				>
 					<X class="size-4" />

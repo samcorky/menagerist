@@ -6,5 +6,5 @@
 </script>
 
 {#if (value === true || value === 'true') && prop.title}
-	<Badge variant="outline" class="max-w-32 truncate" title={prop.title}>{prop.title}</Badge>
+	<Badge variant="outline" class="max-w-32 truncate">{prop.title}</Badge>
 {/if}

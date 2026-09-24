@@ -99,7 +99,7 @@
 				<Dialog.Title class="text-lg font-semibold">Quick capture</Dialog.Title>
 				<button
 					onclick={close}
-					class="rounded-md p-1 text-muted-foreground hover:text-foreground"
+					class="relative rounded-md p-1 text-muted-foreground after:absolute after:-inset-2 after:content-[''] hover:text-foreground"
 					aria-label="Close"
 				>
 					<X class="size-4" />
@@ -119,9 +119,9 @@
 							type="button"
 							onclick={clearPhoto}
 							aria-label="Remove photo"
-							class="absolute top-2 right-2 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
+							class="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 text-white after:absolute after:-inset-2 after:content-[''] hover:bg-black/70"
 						>
-							<X class="size-3" />
+							<X class="size-3.5" />
 						</button>
 					</div>
 				{:else}

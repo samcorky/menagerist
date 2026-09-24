@@ -7,5 +7,5 @@
 </script>
 
 {#if text !== ''}
-	<Badge variant="secondary" class="max-w-32 truncate" title={text}>{text}</Badge>
+	<Badge variant="secondary" class="max-w-32 truncate">{text}</Badge>
 {/if}
