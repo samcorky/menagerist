@@ -252,14 +252,16 @@
 			<div class="grid gap-3">
 				{#each categories as cat (cat.id)}
 					<Card.Root>
-						<Card.Header class="flex flex-row items-start justify-between gap-4 space-y-0">
+						<Card.Header
+							class="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+						>
 							<div class="min-w-0 flex-1">
 								<Card.Title>{cat.label}</Card.Title>
 								{#if cat.description}
 									<Card.Description>{cat.description}</Card.Description>
 								{/if}
 							</div>
-							<div class="flex shrink-0 items-center gap-1">
+							<div class="flex flex-wrap items-center gap-1 sm:shrink-0">
 								<Badge variant="secondary">{cat.slug}</Badge>
 								{#if confirmingDeleteId === cat.id}
 									<span class="text-xs text-destructive">Items will lose this category</span>
