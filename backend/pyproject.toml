@@ -19,7 +19,7 @@ dependencies = [
     "python-multipart>=0.0.20",
     "filetype>=1.2.0",
     "Pillow>=11.0.0",
-    "jsonschema[format-nongpl]>=4.23.0",
+    "jsonschema>=4.23.0",
 ]
 
 [dependency-groups]
