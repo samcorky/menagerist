@@ -264,7 +264,9 @@
 			<div class="grid gap-3">
 				{#each relTypes as et (et.id)}
 					<Card.Root>
-						<Card.Header class="flex flex-row items-start justify-between gap-4 space-y-0">
+						<Card.Header
+							class="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+						>
 							<div class="min-w-0 flex-1">
 								<Card.Title>{et.label}</Card.Title>
 								{#if et.reverse_label}
@@ -274,7 +276,7 @@
 									<Card.Description>{et.description}</Card.Description>
 								{/if}
 							</div>
-							<div class="flex shrink-0 flex-wrap items-center gap-1">
+							<div class="flex flex-wrap items-center gap-1 sm:shrink-0">
 								<Badge variant="secondary">{et.slug}</Badge>
 								<Badge variant="outline">
 									{et.directional ? 'Directional →' : 'Symmetric ↔'}

@@ -161,14 +161,16 @@
 				<div class="grid gap-3">
 					{#each fields as preset (preset.id)}
 						<Card.Root>
-							<Card.Header class="flex flex-row items-start justify-between gap-4 space-y-0">
+							<Card.Header
+								class="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+							>
 								<div class="min-w-0 flex-1">
 									<Card.Title>{preset.label}</Card.Title>
 									{#if preset.description}
 										<Card.Description>{preset.description}</Card.Description>
 									{/if}
 								</div>
-								<div class="flex shrink-0 items-center gap-1">
+								<div class="flex flex-wrap items-center gap-1 sm:shrink-0">
 									<Button
 										type="button"
 										variant="ghost"
@@ -226,7 +228,9 @@
 					{#each lists as preset (preset.id)}
 						{@const optionCount = listOptionCount(preset)}
 						<Card.Root>
-							<Card.Header class="flex flex-row items-start justify-between gap-4 space-y-0">
+							<Card.Header
+								class="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+							>
 								<div class="min-w-0 flex-1">
 									<Card.Title>{preset.label}</Card.Title>
 									{#if preset.description}
@@ -239,7 +243,7 @@
 										</p>
 									{/if}
 								</div>
-								<div class="flex shrink-0 items-center gap-1">
+								<div class="flex flex-wrap items-center gap-1 sm:shrink-0">
 									<Button
 										type="button"
 										variant="ghost"
