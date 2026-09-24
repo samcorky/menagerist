@@ -2,6 +2,7 @@
 	import { ChevronDown, ChevronUp, Plus, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select/index.js';
 	import ConstraintInputs from '../text/ConstraintInputs.svelte';
 	import { allDescriptors } from '../registry';
 	import { allowedKinds, changeKind } from '../kind-changes';
@@ -95,16 +96,15 @@
 						>custom</span
 					>
 				{:else}
-					<select
+					<NativeSelect
 						value={sf.kind}
 						onchange={(e) => updateSubFieldKind(si, (e.target as HTMLSelectElement).value)}
-						class="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
 						aria-label="Sub-field type"
 					>
 						{#each kindOptions(sf) as d (d.kind)}
-							<option value={d.kind}>{d.label}</option>
+							<NativeSelectOption value={d.kind}>{d.label}</NativeSelectOption>
 						{/each}
-					</select>
+					</NativeSelect>
 				{/if}
 				<Button
 					type="button"
