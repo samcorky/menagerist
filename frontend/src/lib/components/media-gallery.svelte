@@ -1,6 +1,15 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { X, File as FileIcon, Star, StarOff, Pencil, Check, Download } from '@lucide/svelte';
+	import {
+		X,
+		File as FileIcon,
+		Star,
+		StarOff,
+		Pencil,
+		Check,
+		Download,
+		Trash2
+	} from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { SvelteSet } from 'svelte/reactivity';
 	import {
@@ -14,6 +23,8 @@
 	} from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import * as Attachment from '$lib/components/ui/attachment/index.js';
+	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import FileDrop from './file-drop.svelte';
 
 	let { nodeId }: { nodeId: string } = $props();
@@ -61,6 +72,12 @@
 	const coverIds = $derived(
 		new SvelteSet(assets.filter((a) => a.attribute_key === 'cover').map((a) => a.id))
 	);
+
+	// Images render as media cards; everything else (PDFs, docs, ...) as a smaller row below.
+	const displayImages = $derived(displayAssets.filter(isImage));
+	const displayFiles = $derived(displayAssets.filter((a) => !isImage(a)));
+	const uploadingImages = $derived(uploading.filter((u) => u.previewUrl !== undefined));
+	const uploadingFiles = $derived(uploading.filter((u) => u.previewUrl === undefined));
 
 	async function loadMedia() {
 		loading = true;
@@ -221,201 +238,234 @@
 	}
 </script>
 
-<div class="space-y-3">
+<div class="space-y-4">
 	<FileDrop onFiles={uploadFiles} />
 
 	<!-- Loading skeleton -->
 	{#if loading}
-		<div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
+		<div class="grid grid-cols-3 gap-3 sm:grid-cols-4">
 			{#each [1, 2, 3] as s (s)}
-				<div class="aspect-square animate-pulse rounded-lg bg-muted"></div>
+				<div class="aspect-square animate-pulse rounded-2xl bg-muted"></div>
 			{/each}
 		</div>
-	{:else if displayAssets.length > 0 || uploading.length > 0}
-		<div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
-			<!-- In-flight uploads -->
-			{#each uploading as u (u.id)}
-				{#if u.previewUrl}
-					<div
-						class="relative aspect-square overflow-hidden rounded-lg border bg-muted/50 {u.progress ===
-						'error'
-							? 'border-destructive/50'
-							: ''}"
-					>
-						<img src={u.previewUrl} alt={u.name} class="h-full w-full object-cover opacity-60" />
-						<div class="absolute inset-0 flex items-center justify-center">
-							<div
-								class="size-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground {u.progress ===
-								'error'
-									? 'hidden'
-									: ''}"
-							></div>
-							{#if u.progress === 'error'}
-								<X class="size-4 text-destructive" />
-							{/if}
-						</div>
-					</div>
-				{:else}
-					<div
-						class="relative flex aspect-square flex-col items-center justify-center gap-1.5 rounded-lg border bg-muted/50 p-2 text-center {u.progress ===
-						'error'
-							? 'border-destructive/50'
-							: ''}"
-					>
-						<div
-							class="size-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground {u.progress ===
-							'error'
-								? 'hidden'
-								: ''}"
-						></div>
-						{#if u.progress === 'error'}
-							<X class="size-4 text-destructive" />
-						{/if}
-						<span class="line-clamp-2 text-xs text-muted-foreground">{u.name}</span>
-					</div>
-				{/if}
-			{/each}
+	{:else if displayImages.length > 0 || displayFiles.length > 0 || uploading.length > 0}
+		<!-- Images: media cards in a grid -->
+		{#if displayImages.length > 0 || uploadingImages.length > 0}
+			<div class="grid grid-cols-3 gap-3 sm:grid-cols-4">
+				{#each uploadingImages as u (u.id)}
+					<Attachment.Root orientation="vertical" state={u.progress} class="w-full">
+						<Attachment.Media variant="image">
+							<img src={u.previewUrl} alt={u.name} class="opacity-60" />
+						</Attachment.Media>
+						<Attachment.Content>
+							<Attachment.Title>{u.name}</Attachment.Title>
+							<Attachment.Description>
+								{u.progress === 'error' ? 'Upload failed' : 'Uploading…'}
+							</Attachment.Description>
+						</Attachment.Content>
+					</Attachment.Root>
+				{/each}
 
-			<!-- Uploaded assets -->
-			{#each displayAssets as asset (asset.id)}
-				<div class="group relative aspect-square overflow-hidden rounded-lg border bg-muted/30">
-					{#if isImage(asset)}
-						<!-- Clickable image (full tile) -->
-						<button
-							type="button"
-							class="h-full w-full"
+				{#each displayImages as asset (asset.id)}
+					<Attachment.Root orientation="vertical" state="done" class="w-full">
+						<Attachment.Trigger
 							onclick={() => (lightboxAsset = asset)}
 							aria-label="View {asset.filename}"
-						>
+						/>
+						<Attachment.Media variant="image">
 							<img
 								src={asset.thumbnail_url ?? asset.content_url}
 								alt={asset.filename}
-								class="h-full w-full object-cover"
 								loading="lazy"
 							/>
-						</button>
-						<!-- Cover badge (top-left, absolute, non-interactive) -->
-						{#if coverIds.has(asset.id)}
-							<div class="pointer-events-none absolute top-1 left-1 rounded-full bg-black/60 p-0.5">
-								<Star class="size-3 fill-yellow-400 text-yellow-400" />
-							</div>
-						{/if}
-					{:else}
-						<div class="flex h-full flex-col items-center justify-center gap-1.5 p-2 text-center">
-							<FileIcon class="size-6 text-muted-foreground" />
-							<span class="line-clamp-2 text-xs text-muted-foreground">{asset.filename}</span>
-							<span class="text-xs text-muted-foreground/60">{formatSize(asset.size)}</span>
-						</div>
-					{/if}
-
-					<!-- Hover overlay (action buttons) -->
-					<div
-						class="pointer-events-none absolute inset-0 flex flex-col items-end justify-start gap-1 bg-black/20 p-1 transition-colors sm:bg-black/0 sm:group-hover:bg-black/40"
-					>
+							{#if coverIds.has(asset.id)}
+								<div
+									class="pointer-events-none absolute top-1 left-1 rounded-full bg-black/60 p-0.5"
+								>
+									<Star class="size-3 fill-yellow-400 text-yellow-400" />
+								</div>
+							{/if}
+						</Attachment.Media>
 						{#if renamingAssetId === asset.id}
-							<div class="pointer-events-auto flex w-full flex-col items-end gap-1">
+							<Attachment.Content>
 								<Input
 									bind:value={renameValue}
 									autofocus
-									class="h-6 w-full rounded bg-black/70 px-1.5 py-0.5 text-xs text-white outline-none"
+									class="h-7 text-xs"
 									aria-label="Rename {asset.filename}"
 									onkeydown={(e) => {
 										if (e.key === 'Enter') saveRename(asset);
 										if (e.key === 'Escape') cancelRename();
 									}}
 								/>
-								<div class="flex gap-1">
-									<button
-										type="button"
-										onclick={cancelRename}
-										class="rounded-full bg-black/70 p-1 text-white hover:bg-black/90"
-										aria-label="Cancel rename"
-									>
-										<X class="size-3" />
-									</button>
-									<button
-										type="button"
-										onclick={() => saveRename(asset)}
-										class="rounded-full bg-black/70 p-1 text-white hover:bg-black/90"
-										aria-label="Save rename"
-									>
-										<Check class="size-3" />
-									</button>
-								</div>
-							</div>
+							</Attachment.Content>
 						{:else}
-							{#if isImage(asset)}
+							<Attachment.Content>
+								<Attachment.Title>{asset.filename}</Attachment.Title>
+								<Attachment.Description>{formatSize(asset.size)}</Attachment.Description>
+							</Attachment.Content>
+						{/if}
+						<Attachment.Actions>
+							{#if renamingAssetId === asset.id}
+								<Attachment.Action onclick={cancelRename} aria-label="Cancel rename">
+									<X />
+								</Attachment.Action>
+								<Attachment.Action onclick={() => saveRename(asset)} aria-label="Save rename">
+									<Check />
+								</Attachment.Action>
+							{:else if confirmDeleteAssetId === asset.id}
+								<Attachment.Action
+									onclick={() => (confirmDeleteAssetId = null)}
+									aria-label="Cancel delete"
+								>
+									<X />
+								</Attachment.Action>
+								<Attachment.Action
+									variant="destructive"
+									onclick={() => handleDelete(asset)}
+									aria-label="Confirm delete {asset.filename}"
+								>
+									<Trash2 />
+								</Attachment.Action>
+							{:else}
 								{#if coverIds.has(asset.id)}
-									<button
-										type="button"
+									<Attachment.Action
 										onclick={() => removeCover(asset)}
-										class="pointer-events-auto rounded-full bg-black/70 p-1 text-yellow-400 transition-opacity hover:bg-black/90 sm:opacity-0 sm:group-hover:opacity-100"
 										aria-label="Remove cover for {asset.filename}"
 									>
-										<StarOff class="size-3" />
-									</button>
+										<StarOff />
+									</Attachment.Action>
 								{:else}
-									<button
-										type="button"
+									<Attachment.Action
 										onclick={() => setCover(asset)}
-										class="pointer-events-auto rounded-full bg-black/70 p-1 text-white transition-opacity hover:bg-black/90 sm:opacity-0 sm:group-hover:opacity-100"
 										aria-label="Set as cover {asset.filename}"
 									>
-										<Star class="size-3" />
-									</button>
+										<Star />
+									</Attachment.Action>
 								{/if}
-							{/if}
-							<button
-								type="button"
-								onclick={() => startRename(asset)}
-								class="pointer-events-auto rounded-full bg-black/70 p-1 text-white transition-opacity hover:bg-black/90 sm:opacity-0 sm:group-hover:opacity-100"
-								aria-label="Rename {asset.filename}"
-							>
-								<Pencil class="size-3" />
-							</button>
-							<!-- eslint-disable svelte/no-navigation-without-resolve -->
-							<a
-								href={asset.content_url}
-								download={asset.filename}
-								class="pointer-events-auto rounded-full bg-black/70 p-1 text-white transition-opacity hover:bg-black/90 sm:opacity-0 sm:group-hover:opacity-100"
-								aria-label="Download {asset.filename}"
-							>
-								<Download class="size-3" />
-							</a>
-							<!-- eslint-enable svelte/no-navigation-without-resolve -->
-							{#if confirmDeleteAssetId === asset.id}
-								<div class="pointer-events-auto flex flex-col items-end gap-1">
-									<span class="rounded bg-black/70 px-1.5 py-0.5 text-xs text-white">Delete?</span>
-									<button
-										type="button"
-										onclick={() => (confirmDeleteAssetId = null)}
-										class="rounded-full bg-black/70 px-2 py-0.5 text-xs text-white hover:bg-black/90"
-									>
-										Cancel
-									</button>
-									<button
-										type="button"
-										onclick={() => handleDelete(asset)}
-										class="rounded-full bg-destructive/90 px-2 py-0.5 text-xs text-white hover:bg-destructive"
-									>
-										Delete
-									</button>
-								</div>
-							{:else}
-								<button
-									type="button"
+								<Attachment.Action
+									onclick={() => startRename(asset)}
+									aria-label="Rename {asset.filename}"
+								>
+									<Pencil />
+								</Attachment.Action>
+								<!-- eslint-disable svelte/no-navigation-without-resolve -->
+								<Attachment.Action
+									href={asset.content_url}
+									download={asset.filename}
+									aria-label="Download {asset.filename}"
+								>
+									<Download />
+								</Attachment.Action>
+								<!-- eslint-enable svelte/no-navigation-without-resolve -->
+								<Attachment.Action
 									onclick={() => (confirmDeleteAssetId = asset.id)}
-									class="pointer-events-auto rounded-full bg-black/70 p-1 text-white transition-opacity hover:bg-black/90 sm:opacity-0 sm:group-hover:opacity-100"
 									aria-label="Delete {asset.filename}"
 								>
-									<X class="size-3" />
-								</button>
+									<Trash2 />
+								</Attachment.Action>
 							{/if}
+						</Attachment.Actions>
+					</Attachment.Root>
+				{/each}
+			</div>
+		{/if}
+
+		<!-- Other files: smaller rows below -->
+		{#if displayFiles.length > 0 || uploadingFiles.length > 0}
+			<div class="flex flex-col gap-2">
+				{#each uploadingFiles as u (u.id)}
+					<Attachment.Root size="sm" state={u.progress} class="w-full">
+						<Attachment.Media>
+							{#if u.progress === 'error'}
+								<X class="text-destructive" />
+							{:else}
+								<Spinner />
+							{/if}
+						</Attachment.Media>
+						<Attachment.Content>
+							<Attachment.Title>{u.name}</Attachment.Title>
+							<Attachment.Description>
+								{u.progress === 'error' ? 'Upload failed' : 'Uploading…'}
+							</Attachment.Description>
+						</Attachment.Content>
+					</Attachment.Root>
+				{/each}
+
+				{#each displayFiles as asset (asset.id)}
+					<Attachment.Root size="sm" state="done" class="w-full">
+						<Attachment.Media>
+							<FileIcon />
+						</Attachment.Media>
+						{#if renamingAssetId === asset.id}
+							<Attachment.Content>
+								<Input
+									bind:value={renameValue}
+									autofocus
+									class="h-7 text-xs"
+									aria-label="Rename {asset.filename}"
+									onkeydown={(e) => {
+										if (e.key === 'Enter') saveRename(asset);
+										if (e.key === 'Escape') cancelRename();
+									}}
+								/>
+							</Attachment.Content>
+						{:else}
+							<Attachment.Content>
+								<Attachment.Title>{asset.filename}</Attachment.Title>
+								<Attachment.Description>{formatSize(asset.size)}</Attachment.Description>
+							</Attachment.Content>
 						{/if}
-					</div>
-				</div>
-			{/each}
-		</div>
+						<Attachment.Actions>
+							{#if renamingAssetId === asset.id}
+								<Attachment.Action onclick={cancelRename} aria-label="Cancel rename">
+									<X />
+								</Attachment.Action>
+								<Attachment.Action onclick={() => saveRename(asset)} aria-label="Save rename">
+									<Check />
+								</Attachment.Action>
+							{:else if confirmDeleteAssetId === asset.id}
+								<Attachment.Action
+									onclick={() => (confirmDeleteAssetId = null)}
+									aria-label="Cancel delete"
+								>
+									<X />
+								</Attachment.Action>
+								<Attachment.Action
+									variant="destructive"
+									onclick={() => handleDelete(asset)}
+									aria-label="Confirm delete {asset.filename}"
+								>
+									<Trash2 />
+								</Attachment.Action>
+							{:else}
+								<Attachment.Action
+									onclick={() => startRename(asset)}
+									aria-label="Rename {asset.filename}"
+								>
+									<Pencil />
+								</Attachment.Action>
+								<!-- eslint-disable svelte/no-navigation-without-resolve -->
+								<Attachment.Action
+									href={asset.content_url}
+									download={asset.filename}
+									aria-label="Download {asset.filename}"
+								>
+									<Download />
+								</Attachment.Action>
+								<!-- eslint-enable svelte/no-navigation-without-resolve -->
+								<Attachment.Action
+									onclick={() => (confirmDeleteAssetId = asset.id)}
+									aria-label="Delete {asset.filename}"
+								>
+									<Trash2 />
+								</Attachment.Action>
+							{/if}
+						</Attachment.Actions>
+					</Attachment.Root>
+				{/each}
+			</div>
+		{/if}
 	{:else}
 		<p class="text-center text-xs text-muted-foreground">No files attached yet.</p>
 	{/if}
