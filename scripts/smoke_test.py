@@ -22,6 +22,8 @@ Checks:
   `serve --migrate` applied migrations and reached the database)
 - the running container actually honours compose.yaml's hardening
   (read-only rootfs, uid 1000, dropped capabilities, no-new-privileges)
+- the granian worker's own boot (import + app construction) stays fast,
+  catching regressions like a heavy import pulled in at module scope
 - the SPA and API are both served correctly on one port (shell, client-side
   route fallback, missing-asset 404, unknown /api/* 404)
 - the image's version label and the running app's reported version match
@@ -36,11 +38,13 @@ it, only exercises it.
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -189,6 +193,54 @@ def check_hardening(client: docker.DockerClient) -> None:
         raise SmokeTestError(f"process(es) not running as uid 1000: {uids}")
 
 
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+_LOG_TIMESTAMP = re.compile(r"^(\S+Z)")
+
+# Generous relative to the ~0.6-0.8s this takes on a modern dev machine -
+# wide enough to absorb slow CI/NAS-class hardware, tight enough to still
+# catch a regression like jsonschema[format-nongpl] silently adding ~1s of
+# regex-compilation import cost (see backend/pyproject.toml history).
+_MAX_WORKER_STARTUP_SECONDS = 5.0
+
+
+def _log_line_timestamp(logs: str, marker: str) -> float:
+    """Return the Unix timestamp of the first log line containing `marker`."""
+    for line in logs.splitlines():
+        clean = _ANSI_ESCAPE.sub("", line)
+        if marker not in clean:
+            continue
+        match = _LOG_TIMESTAMP.match(clean)
+        if not match:
+            continue
+        return datetime.strptime(match.group(1), "%Y-%m-%dT%H:%M:%S.%fZ").replace(
+            tzinfo=UTC
+        ).timestamp()
+    raise SmokeTestError(f"no log line found containing {marker!r}")
+
+
+def check_startup_time(client: docker.DockerClient) -> None:
+    """Confirm the app's own worker boot (import + app construction) stays fast.
+
+    Deliberately measures just the granian worker's spawn-to-ready gap, not
+    the whole container's time-to-healthy - that also includes Postgres
+    startup and migrations, which have nothing to do with app import cost
+    and would make this check noisy without adding any regression coverage.
+    """
+    print("checking the worker starts up quickly...")
+    logs = get_container(client).logs().decode()
+    spawned_at = _log_line_timestamp(logs, "Spawning worker-1")
+    started_at = _log_line_timestamp(logs, "Started worker-1")
+    duration = started_at - spawned_at
+
+    if duration > _MAX_WORKER_STARTUP_SECONDS:
+        raise SmokeTestError(
+            f"worker took {duration:.2f}s to start "
+            + f"(limit {_MAX_WORKER_STARTUP_SECONDS:.2f}s) - "
+            + "check for a heavy import pulled in at module scope"
+        )
+    print(f"  worker started in {duration:.2f}s")
+
+
 def check_version_lockstep(client: docker.DockerClient) -> None:
     """Confirm the image's version label matches the running app's own report."""
     print("checking the image label and the running app report the same version...")
@@ -270,6 +322,7 @@ def main() -> int:
 
         wait_healthy(client)
         check_hardening(client)
+        check_startup_time(client)
         check_version_lockstep(client)
         check_spa_and_api()
         check_migrate_upgrade_standalone()
