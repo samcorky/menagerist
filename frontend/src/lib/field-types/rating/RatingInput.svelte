@@ -68,7 +68,7 @@
 			onmouseenter={() => (hovered = n)}
 			onfocus={() => (hovered = n)}
 			onblur={() => (hovered = 0)}
-			class="cursor-pointer rounded p-0.5 transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+			class="relative cursor-pointer rounded p-0.5 transition-transform after:absolute after:-inset-1 after:content-[''] hover:scale-110 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 		>
 			<Star class="size-6 transition-colors {n <= shown ? FILLED : 'text-muted-foreground/40'}" />
 		</button>

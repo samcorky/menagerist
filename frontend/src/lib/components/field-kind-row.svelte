@@ -41,7 +41,7 @@
 	<Input
 		value={field.label}
 		placeholder="Label"
-		class="w-40"
+		class="w-full min-w-32 flex-1 sm:w-40 sm:flex-none"
 		aria-label="Field label"
 		oninput={(e) => onLabelChange((e.target as HTMLInputElement).value)}
 	/>
@@ -59,17 +59,19 @@
 		</NativeSelect>
 	{/if}
 	{#each displayOptionsFor() as option (option.key)}
-		<span class="text-xs text-muted-foreground">{option.label}</span>
-		<NativeSelect
-			value={displayValue(field, option)}
-			onchange={(e) =>
-				onFieldChange(setDisplayValue(field, option, (e.target as HTMLSelectElement).value))}
-			aria-label={option.label}
-		>
-			{#each displayChoices(field, option) as choice (choice.value)}
-				<NativeSelectOption value={choice.value}>{choice.label}</NativeSelectOption>
-			{/each}
-		</NativeSelect>
+		<span class="inline-flex items-center gap-1.5">
+			<span class="text-xs text-muted-foreground">{option.label}</span>
+			<NativeSelect
+				value={displayValue(field, option)}
+				onchange={(e) =>
+					onFieldChange(setDisplayValue(field, option, (e.target as HTMLSelectElement).value))}
+				aria-label={option.label}
+			>
+				{#each displayChoices(field, option) as choice (choice.value)}
+					<NativeSelectOption value={choice.value}>{choice.label}</NativeSelectOption>
+				{/each}
+			</NativeSelect>
+		</span>
 	{/each}
 	<label class="flex items-center gap-1.5 text-sm">
 		<input

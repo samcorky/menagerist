@@ -24,10 +24,13 @@
 				xs: "h-6 gap-1 px-2.5 text-xs has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg:not([class*='size-'])]:size-3",
 				sm: 'h-7 gap-1 px-3 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
 				lg: 'h-9 gap-1.5 px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3',
-				icon: 'size-8',
-				'icon-xs': "size-6 [&_svg:not([class*='size-'])]:size-3",
-				'icon-sm': 'size-7',
-				'icon-lg': 'size-9'
+				// Icon buttons stay visually compact, but get an invisible hit-slop (via ::after)
+				// so the tappable area meets a ~40-44px comfortable touch target regardless.
+				icon: "relative size-8 after:absolute after:-inset-1.5 after:content-['']",
+				'icon-xs':
+					"relative size-6 after:absolute after:-inset-2 after:content-[''] [&_svg:not([class*='size-'])]:size-3",
+				'icon-sm': "relative size-7 after:absolute after:-inset-2 after:content-['']",
+				'icon-lg': "relative size-9 after:absolute after:-inset-1 after:content-['']"
 			}
 		},
 		defaultVariants: {

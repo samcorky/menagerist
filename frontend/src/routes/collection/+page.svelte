@@ -20,6 +20,7 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 	import NodeCover from '$lib/components/node-cover.svelte';
 	import NodeSummary from '$lib/components/node-summary.svelte';
+	import TagList from '$lib/components/tag-list.svelte';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import { matchContext } from '$lib/search-context';
 
@@ -212,18 +213,19 @@
 			</Button>
 		</div>
 
-		<div class="flex items-center gap-2">
+		<div class="flex flex-wrap items-center gap-2">
 			<input
 				use:focusRef
 				bind:value={searchInput}
 				type="search"
 				placeholder="Search your collection…"
-				class="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:max-w-sm"
+				class="flex h-9 min-w-0 flex-1 basis-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:max-w-sm sm:basis-auto"
 			/>
 			<div class="ml-auto flex items-center gap-1">
 				<button
 					onclick={() => (viewMode = 'list')}
-					class="rounded-md p-1.5 transition-colors {viewMode === 'list'
+					class="relative rounded-md p-1.5 transition-colors after:absolute after:-inset-1.5 after:content-[''] {viewMode ===
+					'list'
 						? 'bg-muted text-foreground'
 						: 'text-muted-foreground hover:text-foreground'}"
 					aria-label="List view"
@@ -233,7 +235,8 @@
 				</button>
 				<button
 					onclick={() => (viewMode = 'grid')}
-					class="rounded-md p-1.5 transition-colors {viewMode === 'grid'
+					class="relative rounded-md p-1.5 transition-colors after:absolute after:-inset-1.5 after:content-[''] {viewMode ===
+					'grid'
 						? 'bg-muted text-foreground'
 						: 'text-muted-foreground hover:text-foreground'}"
 					aria-label="Grid view"
@@ -310,6 +313,11 @@
 								{#if catLabel}
 									<p class="mt-0.5 truncate text-xs text-muted-foreground">{catLabel}</p>
 								{/if}
+								{#if item.tags.length > 0}
+									<div class="mt-1">
+										<TagList tags={item.tags} max={2} compact />
+									</div>
+								{/if}
 								<div class="mt-1 empty:hidden">
 									<NodeSummary
 										attributes={item.attributes}
@@ -344,6 +352,9 @@
 									<Card.Title>{item.name}</Card.Title>
 									{#if item.description}
 										<Card.Description class="line-clamp-1">{item.description}</Card.Description>
+									{/if}
+									{#if item.tags.length > 0}
+										<TagList tags={item.tags} max={4} />
 									{/if}
 									<NodeSummary
 										attributes={item.attributes}

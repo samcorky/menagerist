@@ -135,7 +135,7 @@
 							type="button"
 							onclick={() => removeOption(opt)}
 							aria-label="Remove option {opt}"
-							class="ml-1 rounded-full p-0.5 hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+							class="relative ml-1 rounded-full p-0.5 after:absolute after:-inset-2 after:content-[''] hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 						>
 							<X class="size-3" />
 						</button>
