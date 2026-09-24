@@ -214,7 +214,8 @@
 			: null}
 	{@const rule = parsed && !parsed.custom ? describeConstraints(parsed.constraints) : null}
 	<div
-		class="flex flex-col gap-2 sm:flex-row {prop.type === 'array'
+		class="-mx-2 flex flex-col gap-2 rounded-md p-2 transition-colors focus-within:bg-muted/40 sm:flex-row {prop.type ===
+		'array'
 			? 'sm:items-start'
 			: 'sm:items-center'}"
 		onfocusout={() => markTouched(key)}
