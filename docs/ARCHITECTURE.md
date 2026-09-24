@@ -8,17 +8,17 @@ Menagerist is a three-tier web application: a SvelteKit SPA frontend, a FastAPI 
 Browser
   │
   ▼
-nginx (port 8080, Chainguard distroless)
+menagerist (port 8000, distroless)
   ├── /*      → SvelteKit static build (served directly)
-  └── /api/*  → FastAPI backend (port 8000)
+  └── /api/*  → FastAPI (same process)
               │
               ▼
          PostgreSQL
 ```
 
-The nginx container serves the pre-built frontend as a static SPA and proxies all `/api/*` traffic to the backend. No server-side rendering, no API gateway, no service mesh.
+A single `menagerist` container runs the FastAPI process, which serves the pre-built frontend as a static SPA (`entrypoints/api/spa.py`, mounted at `/` after every API router) alongside the API itself — one process, one port, no reverse proxy in front of it. No server-side rendering, no API gateway, no service mesh.
 
-Docker Compose orchestrates the full stack. A development override (`compose.dev.yaml`) mounts source and enables hot reload. A machine-specific override (`compose.override.yml`) handles per-machine configuration. Container images use Chainguard distroless bases — non-root, minimal attack surface.
+Docker Compose (`compose.yaml`) orchestrates the stack: PostgreSQL plus the `menagerist` service. A machine-specific override (`compose.override.yml`) handles per-machine configuration and is picked up automatically. The container image uses a distroless base (`gcr.io/distroless/base-debian13:nonroot`) — non-root, minimal attack surface.
 
 ## Backend
 
@@ -55,7 +55,7 @@ See [backend/README.md](../backend/README.md) for the full description of every 
 
 ## Frontend
 
-Static SPA built with SvelteKit (static adapter), served by nginx.
+Static SPA built with SvelteKit (static adapter), served by the backend process itself.
 
 ```
 frontend/src/

@@ -42,9 +42,16 @@ repos:
 
   - repo: local
     hooks:
-      - id: validate-dev-compose
-        name: Validate Dev Docker Compose
-        entry: uv run poe validate-dev-compose
+      - id: validate-compose
+        name: Validate Docker Compose
+        entry: uv run poe validate-compose
+        language: system
+        files: '(^|/)(?:docker-)?compose(?:\.[a-zA-Z0-9_-]+)?\.ya?ml$'
+        pass_filenames: false
+
+      - id: validate-smoke-compose
+        name: Validate Docker Compose (smoke-test override)
+        entry: uv run poe validate-smoke-compose
         language: system
         files: '(^|/)(?:docker-)?compose(?:\.[a-zA-Z0-9_-]+)?\.ya?ml$'
         pass_filenames: false

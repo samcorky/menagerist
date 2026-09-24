@@ -5,8 +5,7 @@ const mockState = Object.assign(<T>(value: T): T => value, {
 });
 
 Object.assign(globalThis, {
-	$state: mockState,
-	__EXPECTED_BACKEND_VERSION__: '2.0.0'
+	$state: mockState
 });
 
 export {};

@@ -44,30 +44,21 @@ variable "IMAGE_TAG" {
   default = "dev"
 }
 
-function "tag" {
-  params = [component]
-  result = [
-    "${REGISTRY}/${OWNER}/${IMAGE_NAME}-${component}:${IMAGE_TAG}",
-    "${REGISTRY}/${OWNER}/${IMAGE_NAME}-${component}:latest",
-  ]
-}
-
 group "default" {
-  targets = ["backend", "frontend"]
+  targets = ["menagerist"]
 }
 
-target "_common" {
-  platforms = split(",", PLATFORMS)
-}
-
-target "backend" {
-  inherits   = ["_common"]
+target "menagerist" {
   context    = "."
-  dockerfile = "backend/Dockerfile"
-  tags       = tag("backend")
+  dockerfile = "Dockerfile"
+  platforms  = split(",", PLATFORMS)
+  tags = [
+    "${REGISTRY}/${OWNER}/${IMAGE_NAME}:${IMAGE_TAG}",
+    "${REGISTRY}/${OWNER}/${IMAGE_NAME}:latest",
+  ]
 
   args = {
-    SETUPTOOLS_SCM_PRETEND_VERSION  = "${VERSION}"
+    VERSION                         = "${VERSION}"
     MENAGERIST_BUILD_COMMIT_SHA     = "${COMMIT_SHA}"
     MENAGERIST_BUILD_BRANCH         = "${BRANCH}"
     MENAGERIST_BUILD_REPOSITORY_URL = "${REPOSITORY_URL}"
@@ -76,33 +67,13 @@ target "backend" {
   }
 }
 
-target "frontend" {
-  inherits   = ["_common"]
-  context    = "."
-  dockerfile = "frontend/Dockerfile"
-  tags       = tag("frontend")
-
-  args = {
-    VERSION                    = "${VERSION}"
-    MENAGERIST_BUILD_COMMIT_SHA = "${COMMIT_SHA}"
-    MENAGERIST_BUILD_TIMESTAMP  = "${BUILD_TIMESTAMP}"
-  }
-}
-
 group "local" {
-  targets = ["backend-local", "frontend-local"]
+  targets = ["local"]
 }
 
-target "backend-local" {
-  inherits  = ["backend"]
+target "local" {
+  inherits  = ["menagerist"]
   platforms = ["linux/amd64"]
-  tags      = ["${IMAGE_NAME}-backend:local"]
-  output    = ["type=docker"]
-}
-
-target "frontend-local" {
-  inherits  = ["frontend"]
-  platforms = ["linux/amd64"]
-  tags      = ["${IMAGE_NAME}-frontend:local"]
+  tags      = ["${IMAGE_NAME}:local"]
   output    = ["type=docker"]
 }

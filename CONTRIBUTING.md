@@ -35,7 +35,7 @@ Start the full stack (Docker required):
 ```sh
 poe db-up && poe migrate && poe serve  # Postgres in Docker + backend at :8000 + frontend at :5173
 # or
-docker compose -f compose.dev.yaml up  # full stack including Postgres, all containerized
+docker compose up  # full stack including Postgres, all containerized
 ```
 
 ### Manually, without `poe`
@@ -44,7 +44,7 @@ docker compose -f compose.dev.yaml up  # full stack including Postgres, all cont
 uv sync --all-packages --group dev
 cd frontend && npm install && cd ..
 
-docker compose -f compose.dev.yaml up -d postgres
+docker compose up -d postgres
 
 uv run menagerist migrate upgrade
 uv run menagerist serve --host 0.0.0.0 --reload   # backend at :8000

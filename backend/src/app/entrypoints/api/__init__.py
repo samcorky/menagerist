@@ -10,6 +10,7 @@ from app.entrypoints.api.shared.request_context_middleware import (
 )
 from app.entrypoints.api.shared.security_headers import SecurityHeadersMiddleware
 from app.entrypoints.api.shared.version_header import VersionHeaderMiddleware
+from app.entrypoints.api.spa import SpaStaticFiles
 from app.modules.graph.adapters.api.edge.router import router as edge_router
 from app.modules.graph.adapters.api.edge_type.router import router as edge_type_router
 from app.modules.graph.adapters.api.node.router import router as graph_router
@@ -81,6 +82,10 @@ def create_app() -> FastAPI:
     fastapi_app.include_router(api_router)
     register_exception_handlers(fastapi_app)
     configure_openapi(fastapi_app)
+
+    # Last, so every API route above wins; the SPA only sees what is left.
+    if (frontend_dist_path := get_api_settings().frontend_dist_path) is not None:
+        fastapi_app.mount("/", SpaStaticFiles(directory=frontend_dist_path), name="spa")
 
     return fastapi_app
 

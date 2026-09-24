@@ -1,4 +1,4 @@
-FROM debian:trixie-slim AS builder
+FROM debian:trixie-slim AS backend-builder
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -33,7 +33,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 COPY backend/ backend/
 
-ARG SETUPTOOLS_SCM_PRETEND_VERSION=""
+ARG VERSION=""
 ARG MENAGERIST_BUILD_COMMIT_SHA=""
 ARG MENAGERIST_BUILD_BRANCH=""
 ARG MENAGERIST_BUILD_REPOSITORY_URL=""
@@ -45,13 +45,19 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=.git,target=/app/.git,ro \
     --mount=type=bind,source=.,target=/src,ro \
     GIT_DIR=/app/.git GIT_WORK_TREE=/src \
-    SETUPTOOLS_SCM_PRETEND_VERSION=${SETUPTOOLS_SCM_PRETEND_VERSION} \
+    SETUPTOOLS_SCM_PRETEND_VERSION=${VERSION} \
     MENAGERIST_BUILD_COMMIT_SHA=${MENAGERIST_BUILD_COMMIT_SHA} \
     MENAGERIST_BUILD_BRANCH=${MENAGERIST_BUILD_BRANCH} \
     MENAGERIST_BUILD_REPOSITORY_URL=${MENAGERIST_BUILD_REPOSITORY_URL} \
     MENAGERIST_BUILD_TIMESTAMP=${MENAGERIST_BUILD_TIMESTAMP} \
     MENAGERIST_BUILD_DIRTY=${MENAGERIST_BUILD_DIRTY} \
     uv sync --locked --no-editable --reinstall-package menagerist
+
+# The frontend build needs the API's OpenAPI schema to generate its typed
+# client against - dump it now while the app is fully built, no DB needed
+# (create_app().openapi() only introspects routes).
+RUN mkdir -p /out \
+    && .venv/bin/menagerist schema dump --output /out/openapi.json
 
 # Keep the minimal terminal database needed for readline/curses CLI usage.
 RUN PYTHON_DIR="$(find /opt/python -mindepth 1 -maxdepth 1 -type d -name 'cpython-*' -print -quit)" \
@@ -112,7 +118,54 @@ RUN PYTHON_DIR="$(find /opt/python -mindepth 1 -maxdepth 1 -type d -name 'cpytho
     && du -sh /app/.venv \
     && du -sh /opt/terminfo-min
 
+# libgcc_s/libstdc++ are needed at runtime (e.g. by greenlet's C extension)
+# but distroless doesn't ship them. Mirror wherever this build's own libc
+# multiarch directory actually is (x86_64-linux-gnu, aarch64-linux-gnu, ...)
+# under /opt/runtime-libs, so the runtime stage's COPY below works
+# unmodified on every platform docker buildx bake builds for.
+RUN for lib in libgcc_s.so.1 libstdc++.so.6; do \
+        src="$(find /usr/lib -maxdepth 2 -name "${lib}" -print -quit)"; \
+        [ -n "${src}" ] || { echo "missing ${lib}" >&2; exit 1; }; \
+        dest="/opt/runtime-libs${src#/usr/lib}"; \
+        mkdir -p "$(dirname "${dest}")"; \
+        cp "${src}" "${dest}"; \
+    done
+
 RUN mkdir -p /data/media && chown 1000:1000 /data/media
+
+
+FROM node:22-slim AS frontend-deps
+
+WORKDIR /app
+
+# Only the lockfile determines install output, so this layer is cached
+# across builds until dependencies actually change - unaffected by every
+# other change below (generated client, source, config).
+COPY frontend/package.json frontend/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci
+
+
+FROM frontend-deps AS frontend-generate
+
+# The schema changes far less often than application source. Isolating
+# codegen in its own layer means source-only edits (the common case) skip
+# regenerating the API client entirely and reuse this layer from cache.
+COPY frontend/openapi-ts.config.ts ./
+COPY --from=backend-builder /out/openapi.json ./openapi.json
+RUN npm run generate
+
+
+FROM frontend-generate AS frontend-build
+
+COPY frontend/*.json frontend/*.js frontend/*.mjs frontend/*.ts frontend/*.cjs frontend/*.config.* ./
+COPY frontend/src ./src
+COPY frontend/static ./static
+# Keep the client generated from the schema rather than the ignored copy in the
+# build context.
+COPY --from=frontend-generate /app/src/lib/api/generated ./src/lib/api/generated
+
+RUN npm run build
+
 
 FROM gcr.io/distroless/base-debian13:nonroot AS runtime
 
@@ -123,8 +176,8 @@ ARG MENAGERIST_BUILD_REPOSITORY_URL=""
 ARG MENAGERIST_BUILD_TIMESTAMP=""
 ARG MENAGERIST_BUILD_DIRTY=""
 
-LABEL org.opencontainers.image.title="Menagerist backend" \
-      org.opencontainers.image.description="FastAPI backend for Menagerist, a self-hostable personal collection manager." \
+LABEL org.opencontainers.image.title="Menagerist" \
+      org.opencontainers.image.description="A lightweight, self-hostable and flexible platform for organising the things you care about." \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.source="https://github.com/samcorky/menagerist" \
       org.opencontainers.image.url="https://github.com/samcorky/menagerist" \
@@ -132,34 +185,29 @@ LABEL org.opencontainers.image.title="Menagerist backend" \
       org.opencontainers.image.revision="${MENAGERIST_BUILD_COMMIT_SHA}" \
       org.opencontainers.image.created="${MENAGERIST_BUILD_TIMESTAMP}"
 
-COPY --from=builder \
-    /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 \
-    /usr/lib/x86_64-linux-gnu/libgcc_s.so.1
+COPY --from=backend-builder /opt/runtime-libs/ /usr/lib/
 
-COPY --from=builder \
-    /usr/lib/x86_64-linux-gnu/libstdc++.so.6 \
-    /usr/lib/x86_64-linux-gnu/libstdc++.so.6
-
-COPY --from=builder \
+COPY --from=backend-builder \
     /opt/terminfo-min \
     /usr/share/terminfo
-
 
 WORKDIR /app
 
 ENV \
     PATH="/opt/python/bin:/app/.venv/bin" \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    MENAGERIST_FRONTEND_DIST_PATH=/app/frontend
 
-COPY --from=builder /opt/python /opt/python
-COPY --from=builder /app/.venv /app/.venv
-COPY --from=builder /app/backend/scripts/healthcheck.py /app/healthcheck.py
-COPY --from=builder --chown=1000:1000 /data/media /data/media
+COPY --from=backend-builder /opt/python /opt/python
+COPY --from=backend-builder /app/.venv /app/.venv
+COPY --from=backend-builder /app/backend/scripts/healthcheck.py /app/healthcheck.py
+COPY --from=backend-builder --chown=1000:1000 /data/media /data/media
+COPY --from=frontend-build --chown=1000:1000 /app/build /app/frontend
 
 EXPOSE 8000
 
-USER nonroot
+USER 1000:1000
 
 HEALTHCHECK \
     --interval=30s \
@@ -169,4 +217,4 @@ HEALTHCHECK \
     CMD ["/app/.venv/bin/python", "/app/healthcheck.py"]
 
 ENTRYPOINT ["menagerist"]
-CMD ["serve", "--host", "0.0.0.0"]
+CMD ["serve", "--host", "0.0.0.0", "--migrate"]

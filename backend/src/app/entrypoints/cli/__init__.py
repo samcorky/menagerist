@@ -87,6 +87,7 @@ def serve(
     reload: bool = False,
     access_log: bool = True,
     log_level: ServeLogLevel = ServeLogLevel.info,
+    migrate: bool = False,
 ) -> None:
     """Run the API server.
 
@@ -97,6 +98,9 @@ def serve(
         reload: Restart workers when application code changes.
         access_log: Whether to log access events.
         log_level: Minimum level for Granian's own server logs.
+        migrate: Apply pending database migrations before starting. Meant for
+            single-instance deployments; run `migrate upgrade` separately when
+            several instances share one database.
     """
     from granian import Granian
     from granian.constants import Interfaces, Loops
@@ -106,6 +110,9 @@ def serve(
         GRANIAN_ACCESS_LOG_FORMAT,
         granian_log_dictconfig,
     )
+
+    if migrate:
+        upgrade()
 
     server = Granian(
         target="app.entrypoints.api:app",

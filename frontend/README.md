@@ -1,6 +1,6 @@
 # Menagerist — Frontend
 
-Static SPA served by nginx. API calls proxy through `/api/*` to the backend.
+Static SPA served by the backend process itself (`entrypoints/api/spa.py` in `backend/`). API calls go through `/api/*` on the same origin.
 
 Coding conventions (British English, comment style, dependency policy) are in [AGENTS.md](../AGENTS.md#general-rules) — nothing frontend-specific to add here.
 
@@ -10,7 +10,6 @@ Coding conventions (British English, comment style, dependency policy) are in [A
 - [Tailwind CSS v4](https://tailwindcss.com) + [shadcn-svelte](https://shadcn-svelte.com) + [bits-ui](https://bits-ui.com)
 - TypeScript
 - Typed API client auto-generated from the backend's OpenAPI schema via [`@hey-api/openapi-ts`](https://heyapi.dev)
-- Chainguard distroless nginx, non-root, port 8080
 
 For UX and UI rules, see [DESIGN_GUIDELINES.md](DESIGN_GUIDELINES.md).
 
@@ -47,7 +46,7 @@ npm run dev          # from this directory
 The backend must be running separately for API calls to work:
 
 ```sh
-poe serve         # from repo root, or use docker compose -f compose.dev.yaml up
+poe serve         # from repo root, or use docker compose up
 ```
 
 ## API client
@@ -86,4 +85,4 @@ Vitest tests live in `frontend/tests/*.test.ts` (not colocated with components) 
 npm run build
 ```
 
-Output goes to `build/`. In production this is served by the nginx container defined in `frontend/Dockerfile`.
+Output goes to `build/`. In production this is copied into the `menagerist` image by the root `Dockerfile` and served by the backend process itself (`MENAGERIST_FRONTEND_DIST_PATH`).

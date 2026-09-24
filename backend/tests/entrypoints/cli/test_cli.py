@@ -115,6 +115,54 @@ def test_serve_configures_granian_from_the_given_options(
     assert granian_calls[1] == "served"
 
 
+def test_serve_migrates_before_starting_when_asked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`serve --migrate` applies migrations first, then starts the server."""
+    from app.platform import alembic_runner
+
+    order: list[str] = []
+
+    class FakeGranian:
+        def __init__(self, **kwargs: object) -> None:
+            order.append("configured")
+
+        def serve(self) -> None:
+            order.append("served")
+
+    monkeypatch.setattr("granian.Granian", FakeGranian)
+    monkeypatch.setattr(
+        alembic_runner, "upgrade", lambda revision: order.append(f"upgrade:{revision}")
+    )
+
+    cli.serve(migrate=True)
+
+    assert order == ["upgrade:head", "configured", "served"]
+
+
+def test_serve_does_not_migrate_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without `--migrate`, starting the server never touches the schema."""
+    from app.platform import alembic_runner
+
+    calls: list[str] = []
+
+    class FakeGranian:
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        def serve(self) -> None:
+            pass
+
+    monkeypatch.setattr("granian.Granian", FakeGranian)
+    monkeypatch.setattr(
+        alembic_runner, "upgrade", lambda revision: calls.append(revision)
+    )
+
+    cli.serve()
+
+    assert calls == []
+
+
 def test_migrate_upgrade_enables_migration_logs_and_delegates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

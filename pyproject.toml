@@ -80,22 +80,22 @@ help = "Initialize the local development environment"
 heading = "Quality"
 
 [tool.poe.groups.quality.tasks.format-backend]
-cmd = "ruff format ."
+cmd = "ruff format . ../scripts"
 cwd = "backend"
 help = "Format backend Python files with Ruff"
 
 [tool.poe.groups.quality.tasks.lint-backend]
-cmd = "ruff check ."
+cmd = "ruff check . ../scripts"
 cwd = "backend"
 help = "Lint backend Python files with Ruff"
 
 [tool.poe.groups.quality.tasks.lint-backend-fix]
-cmd = "ruff check . --fix"
+cmd = "ruff check . ../scripts --fix"
 cwd = "backend"
 help = "Lint backend Python files with Ruff and apply safe fixes"
 
 [tool.poe.groups.quality.tasks.lint-backend-fix-unsafe]
-cmd = "ruff check . --fix --unsafe-fixes"
+cmd = "ruff check . ../scripts --fix --unsafe-fixes"
 cwd = "backend"
 help = "Lint backend Python files with Ruff and apply safe and unsafe fixes"
 
@@ -241,10 +241,13 @@ deps = ["sync"]
 cmd = "prek run"
 help = "Run pre-commit checks on changed files only"
 
-[tool.poe.groups.quality.tasks.validate-dev-compose]
-cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} config --quiet"
-uses = { COMPOSE_OVERRIDE = "_compose-override" }
-help = "Validate the development Docker Compose configuration"
+[tool.poe.groups.quality.tasks.validate-compose]
+cmd = "docker compose config --quiet"
+help = "Validate the Docker Compose configuration"
+
+[tool.poe.groups.quality.tasks.validate-smoke-compose]
+cmd = "docker compose -f compose.yaml -f compose.smoke.yaml config --quiet"
+help = "Validate compose.yaml merged with the smoke-test override"
 
 [tool.poe.groups.quality.tasks.test]
 sequence = ["test-backend", "test-frontend"]
@@ -254,14 +257,12 @@ help = "Run all unit tests"
 heading = "Database"
 
 [tool.poe.groups.database.tasks.db-up]
-cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} up -d postgres migrate"
-uses = { COMPOSE_OVERRIDE = "_compose-override" }
+cmd = "docker compose up -d postgres"
 help = "Start the local Postgres container"
 
 [tool.poe.groups.database.tasks.db-down]
-cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} down"
-uses = { COMPOSE_OVERRIDE = "_compose-override" }
-help = "Stop and remove the local Postgres container"
+cmd = "docker compose down"
+help = "Stop and remove local Docker Compose containers"
 
 [tool.poe.groups.database.tasks.migrate]
 cmd = "menagerist migrate upgrade"
@@ -306,65 +307,30 @@ help = "Run the app for local development"
 # Ctrl+C exits the server non-zero; without this poe reports it as a failed task.
 ignore_fail = true
 
-[tool.poe.groups.run.tasks.docker-build-backend]
-cmd = "docker buildx bake -f docker-bake.hcl backend-local"
-help = "Build the backend Docker image"
-
-[tool.poe.groups.run.tasks.docker-build-frontend]
-cmd = "docker buildx bake -f docker-bake.hcl frontend-local"
-help = "Build the frontend Docker image"
-deps = ["dump-schema"]
+[tool.poe.groups.run.tasks._docker-version]
+shell = "uv run --with hatch hatch --no-interactive version"
+interpreter = ["powershell", "posix"]
+cwd = "backend"
 
 [tool.poe.groups.run.tasks.docker-build]
-sequence = ["docker-build-backend", "docker-build-frontend"]
-help = "Build backend and frontend Docker images"
-
-[tool.poe.groups.run.tasks._compose-override]
-expr = """
-(lambda p: f'-f {p}' if p else '')(
-    next((f for f in ('compose.override.yml', 'compose.override.yaml')
-          if __import__('pathlib').Path(f).exists()), None)
-)
-"""
-help = "Internal: resolves to -f <override file> if compose.override.yml or .yaml exists, else empty"
+cmd = "docker buildx bake -f docker-bake.hcl local"
+help = "Build the Menagerist Docker image, with VERSION set from hatch-vcs"
+uses = { VERSION = "_docker-version" }
 
 [tool.poe.groups.run.tasks.docker-config]
-cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} config"
-uses = { COMPOSE_OVERRIDE = "_compose-override" }
+cmd = "docker compose config"
 help = "Print the fully merged Docker Compose config (base + override applied)"
 
-[tool.poe.groups.run.tasks.docker-run-backend]
-cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} up backend"
-uses = { COMPOSE_OVERRIDE = "_compose-override" }
-help = "Run the backend stack (postgres + backend) via Docker Compose"
-ignore_fail = true
-
-[tool.poe.groups.run.tasks.docker-run-frontend]
-cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} up frontend"
-uses = { COMPOSE_OVERRIDE = "_compose-override" }
-help = "Run the full stack including frontend via Docker Compose"
-ignore_fail = true
-
-[tool.poe.groups.run.tasks.docker-run]
-cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} up"
-uses = { COMPOSE_OVERRIDE = "_compose-override" }
-help = "Run the full app via Docker Compose"
-ignore_fail = true
-
-[tool.poe.groups.run.tasks.docker-up-backend]
-cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} up -d --force-recreate migrate backend"
-uses = { COMPOSE_OVERRIDE = "_compose-override" }
-help = "Build and (re)start the backend container detached (runs migrations first)"
-deps = ["docker-build-backend"]
-
-[tool.poe.groups.run.tasks.docker-up-frontend]
-cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} up -d --force-recreate frontend"
-uses = { COMPOSE_OVERRIDE = "_compose-override" }
-help = "Build and (re)start the frontend container detached"
-deps = ["docker-build-frontend"]
-
 [tool.poe.groups.run.tasks.docker-up]
-cmd = "docker compose -f compose.dev.yaml ${COMPOSE_OVERRIDE} up -d --force-recreate"
-uses = { COMPOSE_OVERRIDE = "_compose-override" }
-help = "Build and (re)start all containers detached"
+cmd = "docker compose up -d --force-recreate"
+help = "Build and (re)start the stack detached"
+deps = ["docker-build"]
+
+[tool.poe.groups.run.tasks.docker-down]
+cmd = "docker compose down"
+help = "Stop and remove the stack"
+
+[tool.poe.groups.run.tasks.smoke-test]
+cmd = "uv run --script scripts/smoke_test.py"
+help = "Smoke test the built image through its own compose.yaml"
 deps = ["docker-build"]

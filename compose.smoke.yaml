@@ -1,0 +1,23 @@
+# Override for scripts/smoke_test.py only. compose.yaml pins container
+# names, a host port, and a bridge interface name so a real deployment is
+# predictable - but that means the smoke test would collide with a
+# dev stack already running from the same compose.yaml. This override
+# renames/reroutes everything project-local so `poe smoke-test` is safe to
+# run alongside `poe serve` / an existing `docker compose up`.
+name: menagerist-smoke
+services:
+  postgres:
+    container_name: db
+
+  menagerist:
+    container_name: app
+    ports: !override
+      - "18080:8000"
+
+networks:
+  # Linux interface names are capped at 15 chars (IFNAMSIZ) - "menagerist-smoke"
+  # is 16 and the kernel rejects it with an opaque "numerical result out of
+  # range", so this needs its own short name rather than compose.yaml's.
+  menagerist:
+    driver_opts:
+      com.docker.network.bridge.name: mgr-smoke

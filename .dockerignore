@@ -30,6 +30,11 @@ node_modules
 dist
 build
 
+# Generated from the backend's schema during the build itself - a stale
+# local copy in the build context must never shadow that.
+frontend/openapi.json
+frontend/src/lib/api/generated
+
 # NOTE: docs/, README.md, LICENSE, .github/ used to be excluded here.
 # They're git-tracked, and backend/Dockerfile bind-mounts this whole
 # context read-only at /src as git's work tree, purely to compute build

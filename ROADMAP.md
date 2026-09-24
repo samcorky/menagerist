@@ -34,7 +34,7 @@ Versioning follows CalVer. The project is currently on a `0.`-prefixed scheme (`
 
 The `0.` prefix signals that the API, data model, and features are still evolving — no need to wait for the full feature backlog. The merge bar is "solid enough to self-host without embarrassment."
 
-**Public images on GHCR** — publish `ghcr.io/…/menagerist-backend` and `ghcr.io/…/menagerist-frontend` on every merge to `main` via CI. Tagged as `0.YYYY.MM.DD` and `latest`. Makes self-hosting a one-liner without needing to build from source.
+**Public image on GHCR** — publish `ghcr.io/…/menagerist` on every merge to `main` via CI. Tagged as `0.YYYY.MM.DD` and `latest`. Makes self-hosting a one-liner without needing to build from source.
 
 **Stable release (`YYYY.MM.PATCH`)** — drop the `0.` prefix once the core feature set is complete and the data model is unlikely to have breaking migrations. At that point CalVer without the leading zero becomes the normal scheme and `latest` tracks it.
 

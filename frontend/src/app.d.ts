@@ -8,8 +8,6 @@ declare global {
 		// interface PageState {}
 		// interface Platform {}
 	}
-
-	const __EXPECTED_BACKEND_VERSION__: string;
 }
 
 export {};

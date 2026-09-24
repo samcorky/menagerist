@@ -65,63 +65,24 @@ services:
     networks:
       - menagerist
 
-  migrate:
+  menagerist:
     <<: [*hardened, *logging]
-    container_name: menagerist-migrate
-    image: menagerist-backend:local
-    mem_limit: 256m
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    command: ["migrate", "upgrade"]
-    environment:
-      MENAGERIST_DATABASE_URL: postgresql+asyncpg://menagerist:menagerist@postgres:5432/menagerist
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: no
-
-  backend:
-    <<: [*hardened, *logging]
-    container_name: menagerist-backend
-    image: menagerist-backend:local
+    container_name: menagerist
+    image: menagerist:local
     mem_limit: 512m
     build:
       context: .
-      dockerfile: backend/Dockerfile
+      dockerfile: Dockerfile
+    command: ["serve", "--host", "0.0.0.0", "--migrate"]
     restart: unless-stopped
     environment:
       MENAGERIST_DATABASE_URL: postgresql+asyncpg://menagerist:menagerist@postgres:5432/menagerist
     volumes:
       - media-data:/data/media
+    ports:
+      - "8080:8000"
     depends_on:
       postgres:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-
-  frontend:
-    <<: [*hardened, *logging]
-    container_name: menagerist-frontend
-    image: menagerist-frontend:local
-    mem_limit: 128m
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-    restart: unless-stopped
-    read_only: true
-    # ammnt/nginx chowns /etc/nginx to 10001:10001 at 550/440 — overrides
-    # the hardened anchor's 1000:1000, which can't traverse those dirs.
-    user: "10001:10001"
-    tmpfs:
-      # noexec/nosuid/nodev block this tmpfs from being used to smuggle in
-      # or run anything; size is a cap, not a reservation, so 1G costs
-      # nothing at rest. uid/gid pin ownership regardless of process user.
-      - /tmp:mode=1700,size=1G,noexec,nosuid,nodev,uid=10001,gid=10001
-    ports:
-      - "8080:8080"
-    depends_on:
-      backend:
         condition: service_healthy
 
 volumes:

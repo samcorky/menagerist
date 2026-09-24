@@ -46,13 +46,13 @@ The core is working end-to-end:
 |---|---|
 | Backend | Python / FastAPI / SQLAlchemy / Alembic / PostgreSQL |
 | Frontend | SvelteKit / TypeScript / Tailwind CSS |
-| Container | Docker / Chainguard distroless images |
+| Container | Docker / distroless image |
 
 ---
 
 ## Running locally
 
-All of these run the full stack (Postgres + backend + frontend) via Docker. There are no pre-built images yet — `menagerist-backend`/`menagerist-frontend` (or their `ghcr.io/samcorky/menagerist-*` equivalents) don't exist on a registry until the first tagged release, so every option below builds the images locally rather than pulling them. The frontend image build also needs `frontend/openapi.json` (the backend's API schema) to already exist — it's generated, not committed, so a fresh clone doesn't have one yet.
+All of these run the full stack (Postgres + Menagerist) via Docker. There's no pre-built image yet — `menagerist` (or its `ghcr.io/samcorky/menagerist` equivalent) doesn't exist on a registry until the first tagged release, so every option below builds the image locally rather than pulling it. The build produces the backend's OpenAPI schema and the frontend's typed client itself, so a fresh clone needs nothing pre-generated.
 
 ### Easiest
 
@@ -79,17 +79,15 @@ The app is available at [http://localhost:8080](http://localhost:8080).
 
 ```sh
 uv run poe init            # sync deps + install git hooks
-uv run poe dump-schema     # write frontend/openapi.json from the backend
-uv run poe docker-build    # build the backend + frontend images
-uv run poe docker-up       # start Postgres + backend + frontend, detached
+uv run poe docker-build    # build the Menagerist image
+uv run poe docker-up       # start Postgres + Menagerist, detached
 ```
 
 ### What `poe` is actually running (no `poe`)
 
 ```sh
-cd backend && uv run menagerist schema dump --output ../frontend/openapi.json && cd ..
 docker buildx bake -f docker-bake.hcl local
-docker compose -f compose.dev.yaml up -d --force-recreate
+docker compose up -d --force-recreate
 ```
 
 `uv run` syncs and resolves the backend package on its own — no separate install step. If you've activated the project's venv instead (see [CONTRIBUTING.md](CONTRIBUTING.md)), drop the `uv run` prefix and call `menagerist` directly.
