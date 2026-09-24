@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { beforeNavigate, afterNavigate, goto } from '$app/navigation';
 	import { browser } from '$app/environment';
-	import { List, Plus, SearchX, LayoutGrid, Package } from '@lucide/svelte';
+	import { List, Plus, SearchX, LayoutGrid } from '@lucide/svelte';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
@@ -18,9 +18,8 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Item from '$lib/components/ui/item/index.js';
-	import NodeCover from '$lib/components/node-cover.svelte';
-	import NodeSummary from '$lib/components/node-summary.svelte';
-	import TagList from '$lib/components/tag-list.svelte';
+	import NodeCard from '$lib/components/node-card.svelte';
+	import NodeGridCard from '$lib/components/node-grid-card.svelte';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import { matchContext } from '$lib/search-context';
 
@@ -295,96 +294,23 @@
 		{:else if viewMode === 'grid'}
 			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
 				{#each items as item (item.id)}
-					{@const catLabel = allCategories.find((c) => c.slug === item.type)?.label}
-					<a href={resolve('/collection/[id]', { id: item.id })} class="group block">
-						<div
-							class="flex aspect-[3/4] flex-col overflow-hidden rounded-xl border bg-muted/30 transition-colors group-hover:bg-muted/60"
-						>
-							<!-- Cover image or generic placeholder (§7b: muted background + category icon) -->
-							<div class="min-h-0 flex-1 overflow-hidden">
-								<NodeCover nodeId={item.id} class="h-full w-full">
-									<div class="flex h-full w-full items-center justify-center bg-muted">
-										<Package class="size-8 text-muted-foreground/40" />
-									</div>
-								</NodeCover>
-							</div>
-							<div class="border-t bg-background/80 px-2.5 py-2">
-								<p class="truncate text-sm leading-tight font-medium">{item.name}</p>
-								{#if catLabel}
-									<p class="mt-0.5 truncate text-xs text-muted-foreground">{catLabel}</p>
-								{/if}
-								{#if item.tags.length > 0}
-									<div class="mt-1">
-										<TagList tags={item.tags} max={2} compact />
-									</div>
-								{/if}
-								<div class="mt-1 empty:hidden">
-									<NodeSummary
-										attributes={item.attributes}
-										schema={schemaOf(item.type)}
-										surface="grid"
-										size="sm"
-									/>
-								</div>
-								{#if q}
-									{@const match = matchContext(item, schemaOf(item.type), q)}
-									{#if match}
-										<p
-											class="mt-1 truncate text-xs text-muted-foreground"
-											title="Matched in {match.label}: {match.text}"
-										>
-											Matched in {match.label}: {match.text}
-										</p>
-									{/if}
-								{/if}
-							</div>
-						</div>
-					</a>
+					<NodeGridCard
+						{item}
+						schema={schemaOf(item.type)}
+						categoryLabel={allCategories.find((c) => c.slug === item.type)?.label}
+						match={q ? matchContext(item, schemaOf(item.type), q) : null}
+					/>
 				{/each}
 			</div>
 		{:else}
 			<Item.Group>
 				{#each items as item (item.id)}
-					<Item.Root variant="outline">
-						{#snippet child({ props })}
-							<a {...props} href={resolve('/collection/[id]', { id: item.id })}>
-								<Item.Content class="gap-1.5">
-									<Item.Title class="font-heading text-base">{item.name}</Item.Title>
-									{#if item.description}
-										<p class="line-clamp-1 text-sm text-muted-foreground">{item.description}</p>
-									{/if}
-									{#if item.tags.length > 0}
-										<TagList tags={item.tags} max={4} />
-									{/if}
-									<NodeSummary
-										attributes={item.attributes}
-										schema={schemaOf(item.type)}
-										surface="list"
-										size="sm"
-									/>
-									{#if q}
-										{@const match = matchContext(item, schemaOf(item.type), q)}
-										{#if match}
-											<p
-												class="truncate text-xs text-muted-foreground"
-												title="Matched in {match.label}: {match.text}"
-											>
-												Matched in {match.label}: {match.text}
-											</p>
-										{/if}
-									{/if}
-								</Item.Content>
-								{#if item.type}
-									{@const catLabel = allCategories.find((c) => c.slug === item.type)?.label}
-									<Item.Actions>
-										<Badge variant="secondary" class="shrink-0">
-											{catLabel ?? item.type}
-										</Badge>
-									</Item.Actions>
-								{/if}
-							</a>
-						{/snippet}
-					</Item.Root>
+					<NodeCard
+						{item}
+						schema={schemaOf(item.type)}
+						categoryLabel={allCategories.find((c) => c.slug === item.type)?.label}
+						match={q ? matchContext(item, schemaOf(item.type), q) : null}
+					/>
 				{/each}
 			</Item.Group>
 		{/if}
