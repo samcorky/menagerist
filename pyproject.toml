@@ -41,7 +41,7 @@ help = "Sync the backend environment with all workspace members and their depend
 
 [tool.poe.groups.setup.tasks.repair-backend]
 cmd = "uv sync --all-packages --group dev --reinstall"
-help = "Force-reinstall all backend packages to repair a corrupted venv (e.g. after an interrupted sync)"
+help = "Force-reinstall all backend packages to repair a corrupted venv (e.g. after an interrupted sync). On Windows this reinstalls poe.exe itself, which is locked while it's the running process — invoke via `python -m poethepoet repair` (or `.venv/Scripts/python.exe -m poethepoet repair`) instead of `poe repair` if you hit an 'Access is denied' error"
 
 [tool.poe.groups.setup.tasks.repair]
 sequence = ["repair-backend"]
@@ -162,6 +162,7 @@ help = "Fail CI when any component is below its Codecov threshold"
 [tool.poe.groups.quality.tasks.test-and-status]
 sequence = ["test-backend-all", "coverage-status"]
 help = "Run all backend tests and print per-component coverage status without failing"
+deps = ["sync-backend"]
 
 [tool.poe.groups.quality.tasks.coverage-report]
 cmd = "coverage xml"
