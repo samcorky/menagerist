@@ -164,7 +164,8 @@ COPY frontend/static ./static
 # build context.
 COPY --from=frontend-generate /app/src/lib/api/generated ./src/lib/api/generated
 
-RUN npm run build
+RUN --mount=type=cache,target=/app/node_modules/.vite \
+    npm run build
 
 
 FROM gcr.io/distroless/base-debian13:nonroot AS runtime
