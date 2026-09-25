@@ -192,3 +192,46 @@ async def test_count_with_attribute_matches_an_exact_string_value(
 
     assert await repository.count_with_attribute("owns", "s", value="Draft") == 2
     assert await repository.count_with_attribute("owns", "s", value="Gone") == 0
+
+
+async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
+    db_session: AsyncSession,
+) -> None:
+    """With `sub_key`, `key` names a group array and its rows are matched instead."""
+    repository = SqlAlchemyEdgeRepository(db_session)
+    source = await _make_node(db_session)
+    target = await _make_node(db_session)
+
+    def make(attributes: dict[str, object]) -> Edge:
+        return Edge.create(
+            source_id=source.id,
+            target_id=target.id,
+            type="loaned-to",
+            attributes=attributes,
+        )
+
+    has_terms = make({"terms": [{"note": "handle with care", "duration": "2w"}]})
+    other_row_shape = make({"terms": [{"note": "fragile"}]})
+    for edge in [has_terms, other_row_shape, make({"terms": []}), make({})]:
+        await repository.add(edge)
+
+    assert (
+        await repository.count_with_attribute("loaned-to", "terms", sub_key="duration")
+        == 1
+    )
+    page = await repository.list_with_attribute(
+        "loaned-to", "terms", sub_key="duration", after=None, limit=10
+    )
+    assert [e.id for e in page] == [has_terms.id]
+    assert (
+        await repository.count_with_attribute(
+            "loaned-to", "terms", sub_key="duration", value="2w"
+        )
+        == 1
+    )
+    assert (
+        await repository.count_with_attribute(
+            "loaned-to", "terms", sub_key="duration", value="1w"
+        )
+        == 0
+    )

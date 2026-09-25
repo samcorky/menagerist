@@ -20,7 +20,7 @@ export type FieldTypeDescriptor = {
 	label: string;
 	/**
 	 * Whether this type may appear as a group sub-field.
-	 * Defaults to true; set false for types that cannot nest (group, choice).
+	 * Defaults to true; set false for types that cannot nest (group itself).
 	 */
 	canBeSubField?: boolean;
 	/** Set false to hide the kind from the kind dropdowns (e.g. `opaque`). */

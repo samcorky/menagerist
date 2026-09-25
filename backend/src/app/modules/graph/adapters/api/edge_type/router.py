@@ -210,11 +210,16 @@ async def count_edge_type_attribute_usage(
     ],
     actor: Annotated[Actor, Depends(get_current_actor)],
     value: str | None = None,
+    sub_key: str | None = None,
 ) -> AttributeUsageResponse:
-    """Count edges of this type holding `key`, optionally where it equals `value`."""
+    """Count edges of this type holding `key`, optionally where it equals `value`.
+
+    With `sub_key`, `key` names a group (table) property and this counts edges
+    where any row of that array holds `sub_key`.
+    """
     count = await use_case.handle(
         CountEdgeTypeAttributeUsageQuery(
-            edge_type_id=edge_type_id, key=key, value=value
+            edge_type_id=edge_type_id, key=key, sub_key=sub_key, value=value
         ),
         actor,
     )
@@ -237,9 +242,17 @@ async def purge_edge_type_attribute(
         PurgeEdgeTypeAttribute, Depends(get_purge_edge_type_attribute_use_case)
     ],
     actor: Annotated[Actor, Depends(get_current_actor)],
+    sub_key: str | None = None,
 ) -> AttributePurgeResponse:
-    """Permanently remove `key` from every edge of this type (cannot be undone)."""
+    """Permanently remove `key` from every edge of this type (cannot be undone).
+
+    With `sub_key`, `key` names a group (table) property and only `sub_key` is
+    removed from each row of it, leaving the rest of the row in place.
+    """
     purged = await use_case.handle(
-        PurgeEdgeTypeAttributeCommand(edge_type_id=edge_type_id, key=key), actor
+        PurgeEdgeTypeAttributeCommand(
+            edge_type_id=edge_type_id, key=key, sub_key=sub_key
+        ),
+        actor,
     )
     return AttributePurgeResponse(purged=purged)

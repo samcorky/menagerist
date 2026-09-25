@@ -94,7 +94,7 @@
 				<div class="relative">
 					<img
 						src={stagedAsset.previewUrl}
-						alt="Photo preview"
+						alt="Preview"
 						class="max-h-48 w-full rounded-lg object-cover"
 					/>
 					<button

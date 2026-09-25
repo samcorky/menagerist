@@ -20,6 +20,7 @@ class CountEdgeTypeAttributeUsageQuery:
 
     edge_type_id: uuid.UUID
     key: str
+    sub_key: str | None = None
     value: str | None = None
 
 
@@ -36,7 +37,10 @@ class CountEdgeTypeAttributeUsage(
         if edge_type is None:
             raise EdgeTypeNotFoundError(f"EdgeType {query.edge_type_id} not found")
         count = await self._repos.edges.count_with_attribute(
-            str(edge_type.slug), query.key, value=query.value
+            str(edge_type.slug),
+            query.key,
+            sub_key=query.sub_key,
+            value=query.value,
         )
         logger.debug(
             "edge type attribute usage counted",

@@ -88,6 +88,8 @@ export type FieldTypeDescriptor = {
 | `choice` | `{ type: 'string', enum: [...] }` | ✅ enum membership | |
 | `rating` | `{ type: 'number', minimum: 1, maximum: 5, multipleOf: 1 }` with `x-menagerist.kind: "rating"` | ✅ range + whole numbers | Star widget; only matched by its explicit `kind`, so it never captures a plain number. Unset is omitted. May be a group sub-field |
 | `group` | `{ type: 'array', items: { type: 'object', properties: {...} } }` | ✅ structure + sub-fields | Sub-fields are validated recursively |
+| `list` | `{ type: 'array', items: { type: 'string' } }` with `x-menagerist.kind: "list"` | ✅ structure | Ordered free-text items; numbered/bulleted is display-only, storage is unaffected. Only matched by its explicit `kind`. Not a group sub-field |
+| `checklist` | `{ type: 'array', items: { type: 'object', properties: { text, done } } }` with `x-menagerist.kind: "checklist"` | ✅ structure | Each item's `done` tick is real persisted data, not a display choice — see "Ordered list and checklist" below for why this needed its own kind rather than being a `list` display variant. Only matched by its explicit `kind`. Not a group sub-field |
 
 ### Registration order in `index.ts`
 
@@ -301,8 +303,22 @@ A `group` field's own `x-menagerist.columns` records its sub-property keys in or
 
 ### Quantity kind and object-valued fields
 
-`quantity` stores `{value: number, unit: string}` (e.g. "180 g"), matched only by an explicit `x-menagerist.kind: "quantity"`. Not a group sub-field in v1. `attributesToRows` takes an optional `schema` argument so a key the schema defines as `type: 'object'` hydrates as an editable row instead of read-only JSON; `AttributeRow.value` is `string | GroupRow[] | GroupRow`. A blank text sub-value (e.g. `unit`) is kept, same as a group's text cells; a blank number/date/enum sub-value is omitted; the whole field is omitted only when every sub-value was blank.
+`quantity` stores `{value: number, unit: string}` (e.g. "180 g"), matched only by an explicit `x-menagerist.kind: "quantity"`. May be a group sub-field. `attributesToRows` takes an optional `schema` argument so a key the schema defines as `type: 'object'` hydrates as an editable row instead of read-only JSON; `AttributeRow.value` is `string | GroupRow[] | GroupRow`, where a table cell may itself be a nested `{value, unit}`-shaped row. A blank text sub-value (e.g. `unit`) is kept, same as a group's text cells; a blank number/date/enum sub-value is omitted; the whole field (or, inside a table row, the whole cell) is omitted only when every sub-value was blank. `attribute-rows.ts`'s `coerceObjectValue`/`coerceGroupRow` share this rule between a top-level composite field and a composite table cell.
 
 ### Table (group) column reordering
 
 `GroupExtras.svelte` has up/down buttons per sub-field (WI-23), swapping entries in `field.subFields`; `toSchema` already writes the resulting order into `x-menagerist.columns`.
+
+### Choice and quantity as table sub-fields, and in-use checks on table columns
+
+`choice` and `quantity` are both `canBeSubField: true`. A choice column gets its own options editor in `GroupExtras.svelte` (add/remove chips, scoped to `EditorSubField.options`), independent of the top-level choice field's preset/saved-list machinery, which choice columns do not use. `GroupView.svelte` renders a `rating`/`quantity` column with that kind's own `ViewWidget` (stars, "180 g") instead of the table's plain-text fallback; every other kind is unchanged.
+
+The backend's per-key usage/purge endpoints (`GET .../attribute/{key}/usage`, `DELETE .../attribute/{key}`, both node-type and edge-type) take an optional `sub_key`: with it, `key` names a group array and matching happens against each row (`jsonb_array_elements`, not raw JSON path strings) instead of the top-level value. `count_with_attribute`/`list_with_attribute` on both repositories, and `Count/PurgeNodeTypeAttributeUsage`/`Count/PurgeEdgeTypeAttributeUsage`, take the same optional `sub_key`; purge with `sub_key` strips only that key from each row, leaving the array and the rest of each row in place.
+
+The frontend mirrors the two existing top-level patterns, scoped to `{key, sub_key}`: removing a choice column's option removes it immediately and shows a non-blocking "used by N" advisory after the fact (WI-10 style, `optionRemovalWarning`); removing a column itself queries usage first and, if any items hold it, shows an inline confirm ("used by N, cannot be undone") before actually removing (WI-9 style, `purgeWarning`) rather than the silent immediate removal columns had before. Unlike a top-level field, a removed column has no archive/restore step — confirming just splices it out of the schema; there is no separate purge call to make since removing the column already is the permanent action.
+
+### Ordered list and checklist (WI-25)
+
+`list` stores a plain array of free-text strings (`docs/field-types-spec/wi-25-ordered-list-and-checklist-field-types.md`), with a `display: 'numbered' | 'bulleted'` "Show as" option that is purely cosmetic — the numbered/bulleted choice never changes what is stored, same principle as boolean's switch/checkbox/buttons. Order needs no `x-menagerist.columns`-style bookkeeping the way `group` does: JSONB reorders an *object's* keys, not a JSON *array*'s element order, so a list's positions survive a save/reload for free.
+
+`checklist` stores an array of `{text: string, done: boolean}` rows — deliberately **not** a `list` display variant, because a checklist item's tick is real per-item data that gets persisted, and `list`'s `display` option is designed to never affect storage. Both kinds' raw stored values are an array (of strings, or of plain objects), and a checklist's shape in particular collides with `group`'s own array-of-objects rows and with `attribute-rows.ts`'s generic `isGroupValue` catch-all (used for any array-of-objects value under a key the schema doesn't type). `attributesToRows` checks the schema's declared `x-menagerist.kind` for `checklist` *before* falling through to that generic path — reversing the order would silently coerce a checklist's `done: true`/`false` through `coerceGroupRow`'s string-only cell coercion and always produce `false`. Both kinds are matched only by an explicit `kind`, `canBeSubField: false`, and not highlightable.

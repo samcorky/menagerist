@@ -13,7 +13,8 @@ Not scheduled. Each follows the registry pattern (one directory with descriptor,
 | Money | number (+ optional currency code in the schema) | Two-decimal handling, currency shown in view. For purchase price and value. |
 | URL / Email / Phone | string with `format: uri` / `email` and a pattern for phone | Cheap. URL is already sketched in `docs/field-types.md`. Depends on WI-4 so `format` strings are recognised. |
 | Multi-choice | array of strings with `items.enum` | Tick several options, from a fixed set. **Collision:** `group.fromSchema` currently matches any `type: 'array'`. Register multi-choice before group, and make group require `items.type === 'object'` (WI-4). |
-| Ordered list | array of strings, no `enum` | Free-text items, order matters, no per-item structure — aliases, ingredients without quantities, instruction steps. Distinct from multi-choice (items are open text, not picked from a fixed set) and from `group`/Table (one dimension, no sub-fields; a table with a single "value" column is the wrong tool for a plain list). See below. |
+| Ordered list | array of strings, no `enum` | Free-text items, order matters, no per-item structure — aliases, ingredients without quantities, instruction steps. Distinct from multi-choice (items are open text, not picked from a fixed set) and from `group`/Table (one dimension, no sub-fields; a table with a single "value" column is the wrong tool for a plain list). **Scheduled:** see `wi-25-ordered-list-and-checklist-field-types.md` (kind `list`). |
+| Checklist | array of `{text, done}` | A list where each item also has its own persisted tick — packing lists, shopping lists. Not a display variant of Ordered list (numbered/bulleted are cosmetic only; a tick is real per-item data, so it needed its own kind and its own stored shape). **Scheduled:** see `wi-25-ordered-list-and-checklist-field-types.md` (kind `checklist`). |
 | Identifier | string with `pattern` | ISBN, catalogue number, barcode. Builds on the WI-15 pattern and friendly-error machinery. Later a hook for enrichment lookups (TMDB, MusicBrainz, books). |
 | Duration | number of seconds, or string | Entered as `mm:ss` / `h:mm:ss`. Track and film lengths. |
 | Measurement | number with a unit stored in the schema | Dimensions, weight, duration, page count. **Scheduled:** see `wi-24-quantity-field-type.md` (kind `quantity`). |
@@ -43,13 +44,14 @@ Column-order-style problem does **not** apply here: `x-menagerist.columns` exist
 
 **Sequence number display (WI-11 "Show as" pattern).** The list is always ordered (that is the point of the kind — items reorder the same way WI-23 gives table columns), but whether the *sequence number itself* is shown is a presentation choice, separate from the ordering: `displayOptions: [{ key: 'display', choices: ['numbered', 'bulleted'], default: 'numbered' }]`. Numbered ("1. Preheat the oven", "2. Mix the flour and sugar") suits instructions, where the position is meaningful. Bulleted (a plain dash or dot, no number) suits aliases, ingredients or other lists where the order only exists for the user's own tidiness, not because position 3 means something. Both read and edit views respect it — the data-entry rows show the same prefix style as the read view, not just the read view. Storage is unaffected either way (still a plain array of strings); this is display-only metadata, same as boolean's switch/checkbox/buttons.
 
-**Open questions, if scheduled:**
-- Value type: strings only in v1, or should a sub-kind be pluggable later (a list of numbers)? Lean strings-only until a concrete second case appears — mirrors this spec's general bias against speculative generality.
-- `canBeSubField`: probably not (a list inside a table cell is a step too far for v1; a group is already the "nested structure" answer).
-- Highlightable: a list is naturally awkward as a compact card value (unlike a single quantity or a short text). Likely not highlightable in v1, or truncated to the first N items with a "+N more" if it is.
-- Search: each item is a bare string in an array, which is exactly the shape WI-17 already scans (group rows are `array of objects`; this is `array of strings` — simpler, not harder).
+**Resolved on implementation** (see `wi-25-ordered-list-and-checklist-field-types.md` for the full session notes):
+- Value type: strings only, as proposed. No pluggable sub-kind was added.
+- `canBeSubField`: `false`, as proposed.
+- Highlightable: `false`, as proposed (no truncated "+N more" summary was built).
+- Search: works for free, as proposed — the existing recursive scalar scan already walks into the array.
+- Checklist (not anticipated by this candidate write-up, added the same session on request): a list where the tick itself is real per-item data could not be a `display` variant of `list` (display options are cosmetic-only, storage-unaffected, by this file's own design) — it needed its own kind and its own stored shape (`array of {text, done}` rather than `array of string`), registered separately as `checklist`.
 
-**Not scheduled.** Written up as a candidate because it was asked about directly; promote it to its own `wi-*.md` (following the WI-23/WI-24 pattern) when there's a concrete driver, same policy as every other row in this table.
+**Scheduled and implemented.** See `wi-25-ordered-list-and-checklist-field-types.md`.
 
 ## Location kind (candidate, any item type)
 

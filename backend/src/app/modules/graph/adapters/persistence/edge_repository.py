@@ -1,7 +1,8 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
-from sqlalchemy import exists, func, or_, select
+from sqlalchemy import column, exists, func, literal, or_, select
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.modules.graph.adapters.persistence.models import EdgeModel
 from app.modules.graph.domain.edge import Edge
@@ -10,9 +11,24 @@ if TYPE_CHECKING:
     import builtins
     import uuid
 
+    from sqlalchemy import ColumnElement, SQLColumnExpression
     from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
+
+
+def _has_matching_row(
+    attributes: SQLColumnExpression[Any], key: str, sub_key: str, value: str | None
+) -> ColumnElement[bool]:
+    """Whether any row of group array `key` holds `sub_key`, optionally == `value`."""
+    elements = func.jsonb_array_elements(attributes[key]).table_valued(
+        column("value", JSONB), name="elem"
+    )
+    row = elements.c.value
+    conditions = [row.has_key(sub_key)]
+    if value is not None:
+        conditions.append(row.contains({sub_key: value}))
+    return exists(select(literal(1)).select_from(elements).where(*conditions))
 
 
 def _to_domain(model: EdgeModel) -> Edge:
@@ -116,39 +132,52 @@ class SqlAlchemyEdgeRepository:
         return result.scalar_one()
 
     async def count_with_attribute(
-        self, type_slug: str, key: str, *, value: str | None = None
+        self,
+        type_slug: str,
+        key: str,
+        *,
+        sub_key: str | None = None,
+        value: str | None = None,
     ) -> int:
         """Count non-deleted edges of `type_slug` whose attributes contain `key`."""
         logger.debug("counting edges with attribute", type_slug=type_slug, key=key)
         stmt = (
             select(func.count())
             .select_from(EdgeModel)
-            .where(
-                EdgeModel.deleted_at.is_(None),
-                EdgeModel.type == type_slug,
-                EdgeModel.attributes.has_key(key),
-            )
+            .where(EdgeModel.deleted_at.is_(None), EdgeModel.type == type_slug)
         )
-        if value is not None:
-            stmt = stmt.where(EdgeModel.attributes.contains({key: value}))
+        if sub_key is None:
+            stmt = stmt.where(EdgeModel.attributes.has_key(key))
+            if value is not None:
+                stmt = stmt.where(EdgeModel.attributes.contains({key: value}))
+        else:
+            stmt = stmt.where(
+                _has_matching_row(EdgeModel.attributes, key, sub_key, value)
+            )
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
     async def list_with_attribute(
-        self, type_slug: str, key: str, *, after: uuid.UUID | None, limit: int
+        self,
+        type_slug: str,
+        key: str,
+        *,
+        sub_key: str | None = None,
+        after: uuid.UUID | None,
+        limit: int,
     ) -> builtins.list[Edge]:
         """List non-deleted edges of `type_slug` holding `key`, ordered by id."""
         logger.debug("listing edges with attribute", type_slug=type_slug, key=key)
-        stmt = (
-            select(EdgeModel)
-            .where(
-                EdgeModel.deleted_at.is_(None),
-                EdgeModel.type == type_slug,
-                EdgeModel.attributes.has_key(key),
-            )
-            .order_by(EdgeModel.id)
-            .limit(limit)
+        stmt = select(EdgeModel).where(
+            EdgeModel.deleted_at.is_(None), EdgeModel.type == type_slug
         )
+        if sub_key is None:
+            stmt = stmt.where(EdgeModel.attributes.has_key(key))
+        else:
+            stmt = stmt.where(
+                _has_matching_row(EdgeModel.attributes, key, sub_key, None)
+            )
+        stmt = stmt.order_by(EdgeModel.id).limit(limit)
         if after is not None:
             stmt = stmt.where(EdgeModel.id > after)
         result = await self._session.execute(stmt)

@@ -46,7 +46,7 @@
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import ShimmerSlot from '$lib/components/shimmer-slot.svelte';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
-	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import * as Tooltip from '$lib/components/ui/popover-tooltip/index.js';
 	import { serverErrorsToFields } from '$lib/validation-messages';
 	import MediaGallery from '$lib/components/media-gallery.svelte';
 	import NodeCover from '$lib/components/node-cover.svelte';

@@ -13,7 +13,7 @@ from app.modules.graph.domain.errors import InvalidSchemaError
 
 NAMESPACE = "x-menagerist"
 
-_PROPERTY_BOOL_MEMBERS = ("archived", "search", "suggest")
+_PROPERTY_BOOL_MEMBERS = ("archived", "search", "suggest", "multiline")
 _PROPERTY_STR_MEMBERS = ("kind", "display")
 MAX_CARD_HIGHLIGHTS = 3
 MAX_CONNECTION_HIGHLIGHTS = 2

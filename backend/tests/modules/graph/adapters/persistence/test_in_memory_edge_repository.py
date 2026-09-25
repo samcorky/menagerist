@@ -191,3 +191,45 @@ async def test_count_with_attribute_can_match_a_value() -> None:
 
     assert await repository.count_with_attribute("owns", "s", value="Draft") == 2
     assert await repository.count_with_attribute("owns", "s", value="Gone") == 0
+
+
+async def test_count_and_list_with_attribute_can_match_a_group_sub_key() -> None:
+    """With `sub_key`, `key` names a group array and rows are matched instead."""
+    repository = InMemoryEdgeRepository()
+    source, target = uuid.uuid4(), uuid.uuid4()
+    has_terms = Edge.create(
+        source_id=source,
+        target_id=target,
+        type="loaned-to",
+        attributes={"terms": [{"note": "handle with care", "duration": "2w"}]},
+    )
+    other_row_shape = Edge.create(
+        source_id=source,
+        target_id=target,
+        type="loaned-to",
+        attributes={"terms": [{"note": "fragile"}]},
+    )
+    no_key = Edge.create(source_id=source, target_id=target, type="loaned-to")
+    for edge in [has_terms, other_row_shape, no_key]:
+        await repository.add(edge)
+
+    assert (
+        await repository.count_with_attribute("loaned-to", "terms", sub_key="duration")
+        == 1
+    )
+    page = await repository.list_with_attribute(
+        "loaned-to", "terms", sub_key="duration", after=None, limit=10
+    )
+    assert [e.id for e in page] == [has_terms.id]
+    assert (
+        await repository.count_with_attribute(
+            "loaned-to", "terms", sub_key="duration", value="2w"
+        )
+        == 1
+    )
+    assert (
+        await repository.count_with_attribute(
+            "loaned-to", "terms", sub_key="duration", value="1w"
+        )
+        == 0
+    )

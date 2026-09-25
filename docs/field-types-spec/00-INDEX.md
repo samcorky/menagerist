@@ -36,6 +36,7 @@ Integration tests are written alongside each item (see `testing-strategy.md`). `
 | 6. Stretch: drag-and-drop layout editor | [`wi-13-drag-and-drop-layout.md`](wi-13-drag-and-drop-layout.md) | After WI-8; benefits from WI-11. |
 | 6b. Table column reordering | [`wi-23-column-reordering.md`](wi-23-column-reordering.md) | Small; needs the group column-order fix (2026-09-22). |
 | 6c. Quantity field type | [`wi-24-quantity-field-type.md`](wi-24-quantity-field-type.md) | Promoted from `further-field-types.md`'s "Measurement" row. |
+| 6d. Ordered list and checklist field types | [`wi-25-ordered-list-and-checklist-field-types.md`](wi-25-ordered-list-and-checklist-field-types.md) | Promoted from `further-field-types.md`'s "Ordered list" row; checklist added the same session. |
 
 ## All files
 
@@ -70,6 +71,7 @@ Integration tests are written alongside each item (see `testing-strategy.md`). `
 | [`wi-22-connection-details.md`](wi-22-connection-details.md) | Show and edit a connection's details; highlights on relationship types; multi-add. | 7 KB |
 | [`wi-23-column-reordering.md`](wi-23-column-reordering.md) | Up/down reordering of a table (group) field's columns. | 2 KB |
 | [`wi-24-quantity-field-type.md`](wi-24-quantity-field-type.md) | New `quantity` kind: a number plus a free-text unit, usable as a group sub-field. | 3 KB |
+| [`wi-25-ordered-list-and-checklist-field-types.md`](wi-25-ordered-list-and-checklist-field-types.md) | New `list` kind (ordered free-text array, numbered/bulleted display) and `checklist` kind (array of `{text, done}` with a real persisted tick per item). | small |
 | [`decisions.md`](decisions.md) | What the owner has decided, what is only proposed, and a table of defaults taken without confirmation (for re-review). | (see file) |
 | [`example-node-type-schema.json`](example-node-type-schema.json) | Example item type schema using readable keys, `x-menagerist`, rows and tabs. Useful as a contract fixture. | small |
 

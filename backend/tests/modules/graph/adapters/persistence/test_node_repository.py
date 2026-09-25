@@ -289,6 +289,49 @@ async def test_count_with_attribute_matches_an_exact_string_value(
     assert await repository.count_with_attribute("film", "s") == 4
 
 
+async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
+    db_session: AsyncSession,
+) -> None:
+    """With `sub_key`, `key` names a group array and its rows are matched instead."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    has_ingredient = Node.create(
+        name="a",
+        type="recipe",
+        attributes={"ingredients": [{"name": "Flour", "unit": "g"}]},
+    )
+    other_row_shape = Node.create(
+        name="b", type="recipe", attributes={"ingredients": [{"name": "Salt"}]}
+    )
+    for node in [
+        has_ingredient,
+        other_row_shape,
+        Node.create(name="c", type="recipe", attributes={"ingredients": []}),
+        Node.create(name="d", type="recipe", attributes={}),
+    ]:
+        await repository.add(node)
+
+    assert (
+        await repository.count_with_attribute("recipe", "ingredients", sub_key="unit")
+        == 1
+    )
+    page = await repository.list_with_attribute(
+        "recipe", "ingredients", sub_key="unit", after=None, limit=10
+    )
+    assert [n.id for n in page] == [has_ingredient.id]
+    assert (
+        await repository.count_with_attribute(
+            "recipe", "ingredients", sub_key="unit", value="g"
+        )
+        == 1
+    )
+    assert (
+        await repository.count_with_attribute(
+            "recipe", "ingredients", sub_key="unit", value="kg"
+        )
+        == 0
+    )
+
+
 _BACKSLASH = chr(92)
 _EXCLUSIONS = {"film": ["old_note", "internal", "stars"]}
 

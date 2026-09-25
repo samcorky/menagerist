@@ -202,11 +202,16 @@ async def count_node_type_attribute_usage(
     ],
     actor: Annotated[Actor, Depends(get_current_actor)],
     value: str | None = None,
+    sub_key: str | None = None,
 ) -> AttributeUsageResponse:
-    """Count nodes of this type holding `key`, optionally where it equals `value`."""
+    """Count nodes of this type holding `key`, optionally where it equals `value`.
+
+    With `sub_key`, `key` names a group (table) property and this counts nodes
+    where any row of that array holds `sub_key`.
+    """
     count = await use_case.handle(
         CountNodeTypeAttributeUsageQuery(
-            node_type_id=node_type_id, key=key, value=value
+            node_type_id=node_type_id, key=key, sub_key=sub_key, value=value
         ),
         actor,
     )
@@ -229,9 +234,17 @@ async def purge_node_type_attribute(
         PurgeNodeTypeAttribute, Depends(get_purge_node_type_attribute_use_case)
     ],
     actor: Annotated[Actor, Depends(get_current_actor)],
+    sub_key: str | None = None,
 ) -> AttributePurgeResponse:
-    """Permanently remove `key` from every node of this type (cannot be undone)."""
+    """Permanently remove `key` from every node of this type (cannot be undone).
+
+    With `sub_key`, `key` names a group (table) property and only `sub_key` is
+    removed from each row of it, leaving the rest of the row in place.
+    """
     purged = await use_case.handle(
-        PurgeNodeTypeAttributeCommand(node_type_id=node_type_id, key=key), actor
+        PurgeNodeTypeAttributeCommand(
+            node_type_id=node_type_id, key=key, sub_key=sub_key
+        ),
+        actor,
     )
     return AttributePurgeResponse(purged=purged)

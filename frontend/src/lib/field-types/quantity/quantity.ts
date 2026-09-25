@@ -6,12 +6,10 @@ import QuantityView from './QuantityView.svelte';
 
 // Shape alone (an object with `value`/`unit`) is not distinctive enough to infer from -
 // a future kind could use the same shape - so this only matches an explicit kind.
-// Not a group sub-field in v1: a group cell holds a plain string, not an object; making
-// quantity nestable needs cell-level object values, which is its own follow-up.
 register({
 	kind: 'quantity',
 	label: 'Quantity',
-	canBeSubField: false,
+	canBeSubField: true,
 	highlightable: true,
 	formatSummary: (value) => {
 		const text = quantityText(value);

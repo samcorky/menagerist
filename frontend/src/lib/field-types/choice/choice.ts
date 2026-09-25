@@ -6,7 +6,7 @@ import ChoiceSummary from './ChoiceSummary.svelte';
 register({
 	kind: 'choice',
 	label: 'Choice',
-	canBeSubField: false,
+	canBeSubField: true,
 	highlightable: true,
 	displayOptions: [
 		{

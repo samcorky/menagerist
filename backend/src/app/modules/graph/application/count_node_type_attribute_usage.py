@@ -20,6 +20,7 @@ class CountNodeTypeAttributeUsageQuery:
 
     node_type_id: uuid.UUID
     key: str
+    sub_key: str | None = None
     value: str | None = None
 
 
@@ -36,7 +37,10 @@ class CountNodeTypeAttributeUsage(
         if node_type is None:
             raise NodeTypeNotFoundError(f"NodeType {query.node_type_id} not found")
         count = await self._repos.nodes.count_with_attribute(
-            str(node_type.slug), query.key, value=query.value
+            str(node_type.slug),
+            query.key,
+            sub_key=query.sub_key,
+            value=query.value,
         )
         logger.debug(
             "node type attribute usage counted",

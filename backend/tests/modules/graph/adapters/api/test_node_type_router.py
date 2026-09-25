@@ -191,3 +191,30 @@ def test_attribute_usage_can_filter_by_value() -> None:
 
     assert client.get(base, params={"value": "Draft"}).json() == {"count": 2}
     assert client.get(base).json() == {"count": 3}
+
+
+def test_attribute_usage_and_purge_can_target_a_group_sub_key() -> None:
+    """`?sub_key=` counts and purges rows of a group array, not the whole key."""
+    client = TestClient(_app_with_in_memory_graph())
+    nt = client.post(
+        "/api/v1/node-type", json={"slug": "recipe", "label": "Recipe"}
+    ).json()
+    client.post(
+        "/api/v1/node",
+        json={
+            "name": "A",
+            "type": "recipe",
+            "attributes": {"ingredients": [{"name": "Flour", "unit": "g"}]},
+        },
+    )
+    base = f"/api/v1/node-type/{nt['id']}/attribute/ingredients"
+
+    assert client.get(f"{base}/usage", params={"sub_key": "unit"}).json() == {
+        "count": 1
+    }
+    purge = client.delete(base, params={"sub_key": "unit"})
+    assert purge.status_code == 200
+    assert purge.json() == {"purged": 1}
+    assert client.get(f"{base}/usage", params={"sub_key": "unit"}).json() == {
+        "count": 0
+    }

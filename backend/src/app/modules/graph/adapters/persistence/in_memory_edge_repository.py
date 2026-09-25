@@ -63,31 +63,53 @@ class InMemoryEdgeRepository:
         )
 
     def _with_attribute(
-        self, type_slug: str, key: str, *, value: str | None = None
+        self,
+        type_slug: str,
+        key: str,
+        *,
+        sub_key: str | None = None,
+        value: str | None = None,
     ) -> builtins.list[Edge]:
+        def matches(edge: Edge) -> bool:
+            if edge.is_deleted or edge.type != type_slug or key not in edge.attributes:
+                return False
+            if sub_key is None:
+                return value is None or edge.attributes[key] == value
+            rows = edge.attributes[key]
+            return isinstance(rows, list) and any(
+                isinstance(row, dict)
+                and sub_key in row
+                and (value is None or row[sub_key] == value)
+                for row in rows
+            )
+
         return sorted(
-            (
-                edge
-                for edge in self._edges.values()
-                if not edge.is_deleted
-                and edge.type == type_slug
-                and key in edge.attributes
-                and (value is None or edge.attributes[key] == value)
-            ),
+            (edge for edge in self._edges.values() if matches(edge)),
             key=lambda edge: edge.id,
         )
 
     async def count_with_attribute(
-        self, type_slug: str, key: str, *, value: str | None = None
+        self,
+        type_slug: str,
+        key: str,
+        *,
+        sub_key: str | None = None,
+        value: str | None = None,
     ) -> int:
         """Count non-deleted edges of `type_slug` whose attributes contain `key`."""
-        return len(self._with_attribute(type_slug, key, value=value))
+        return len(self._with_attribute(type_slug, key, sub_key=sub_key, value=value))
 
     async def list_with_attribute(
-        self, type_slug: str, key: str, *, after: uuid.UUID | None, limit: int
+        self,
+        type_slug: str,
+        key: str,
+        *,
+        sub_key: str | None = None,
+        after: uuid.UUID | None,
+        limit: int,
     ) -> builtins.list[Edge]:
         """List non-deleted edges of `type_slug` holding `key`, ordered by id."""
-        edges = self._with_attribute(type_slug, key)
+        edges = self._with_attribute(type_slug, key, sub_key=sub_key)
         if after is not None:
             edges = [edge for edge in edges if edge.id > after]
         return edges[:limit]

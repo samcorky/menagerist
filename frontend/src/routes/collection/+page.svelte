@@ -270,7 +270,7 @@
 		{#if loadingDisplay.show && items.length === 0}
 			<Shimmer loading={true}>
 				{#if viewMode === 'grid'}
-					<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+					<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
 						{#each loadingSkeletons as skeleton (skeleton)}
 							<div class="aspect-[3/4] animate-pulse rounded-xl bg-muted"></div>
 						{/each}
@@ -292,7 +292,7 @@
 				{/if}
 			</Shimmer>
 		{:else if viewMode === 'grid'}
-			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
 				{#each items as item (item.id)}
 					<NodeGridCard
 						{item}

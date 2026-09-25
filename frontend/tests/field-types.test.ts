@@ -171,10 +171,19 @@ describe('opaque round-trips', () => {
 			}
 		};
 		const field = group.fromSchema('cast', prop, false)!;
-		expect(field.subFields.map((sf) => sf.kind)).toEqual(['opaque', 'opaque', 'text']);
-		const written = propertyFromField(field) as Extract<JsonSchemaProperty, { type: 'array' }>;
+		expect(field.subFields.map((sf) => sf.kind)).toEqual(['choice', 'opaque', 'text']);
+		const written = propertyFromField(field) as Extract<
+			JsonSchemaProperty,
+			{ type: 'array'; items: { type: 'object' } }
+		>;
 		expect(written.items.properties).toEqual({
 			...prop.items.properties,
+			role: {
+				title: 'Role',
+				type: 'string',
+				enum: ['Lead', 'Support'],
+				'x-menagerist': { kind: 'choice' }
+			},
 			name: { title: 'Name', type: 'string', 'x-menagerist': { kind: 'text' } }
 		});
 	});

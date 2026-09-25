@@ -1,3 +1,5 @@
+import { formatDistance } from 'date-fns';
+
 /**
  * Format a `YYYY-MM-DD` string as a local date. `new Date('YYYY-MM-DD')` parses as UTC
  * midnight and renders a day early in negative UTC offsets, so the time is pinned locally.
@@ -29,27 +31,21 @@ export function formatDateTime(value: string): { local: string; utc: string } {
 	};
 }
 
-const RELATIVE_UNITS: { unit: Intl.RelativeTimeFormatUnit; ms: number }[] = [
-	{ unit: 'year', ms: 365 * 24 * 60 * 60 * 1000 },
-	{ unit: 'month', ms: 30 * 24 * 60 * 60 * 1000 },
-	{ unit: 'week', ms: 7 * 24 * 60 * 60 * 1000 },
-	{ unit: 'day', ms: 24 * 60 * 60 * 1000 },
-	{ unit: 'hour', ms: 60 * 60 * 1000 },
-	{ unit: 'minute', ms: 60 * 1000 }
-];
-
-/** Format a UTC timestamp as "just now" / "3 hours ago" / "in 2 days", relative to `now`. */
+/**
+ * Format a UTC timestamp as "just now" / "about 2 hours ago", relative to `now`. Uses
+ * `date-fns`'s `formatDistance` for its more conversational wording ("about", "over", "almost")
+ * than a bare `Intl.RelativeTimeFormat` count; English only, no locale switching. Within 30
+ * seconds either way is "just now" rather than date-fns' own "less than a minute ago".
+ *
+ * `value` (a `created_at`/`updated_at`) is always in the past from the server's perspective, so
+ * a positive difference is clamped to "just now" rather than shown as "in X" - it can only be a
+ * client/server clock drift or (most commonly) `now` not yet having ticked forward since a save
+ * produced a fresher timestamp than the caller's last-refreshed `now`, never a real future date.
+ */
 export function formatRelativeTime(value: string, now: Date = new Date()): string {
 	const date = new Date(value);
 	if (isNaN(date.getTime())) return value;
 	const diffMs = date.getTime() - now.getTime();
-	if (Math.abs(diffMs) < 45_000) return 'Just now';
-
-	const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
-	for (const { unit, ms } of RELATIVE_UNITS) {
-		if (Math.abs(diffMs) >= ms || unit === 'minute') {
-			return rtf.format(Math.round(diffMs / ms), unit);
-		}
-	}
-	return rtf.format(0, 'minute');
+	if (diffMs > 0 || Math.abs(diffMs) < 30_000) return 'just now';
+	return formatDistance(date, now, { addSuffix: true });
 }

@@ -11,6 +11,7 @@ type JsonSchemaPropertyBase =
 			type: 'array';
 			items: { type: 'object'; properties: Record<string, JsonSchemaProperty> };
 	  }
+	| { title: string; type: 'array'; items: { type: 'string' } }
 	| { title: string; type: 'object'; properties: Record<string, JsonSchemaProperty> };
 
 export type JsonSchemaProperty = JsonSchemaPropertyBase & { 'x-menagerist'?: PropertyMeta };
@@ -26,6 +27,8 @@ export type EditorSubField = {
 	key: string;
 	label: string;
 	kind: string;
+	/** A choice sub-field's options; empty for every other kind. */
+	options?: string[];
 	/** True until the schema is saved: the key is still derived from the label. */
 	keyPending?: boolean;
 	/** Kind when loaded from a saved schema; limits which kinds it may change to. */

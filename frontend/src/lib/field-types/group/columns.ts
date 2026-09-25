@@ -11,7 +11,7 @@ import type { JsonSchemaProperty } from '$lib/schema-types';
  * edited through the API, falls back to whatever order the properties come in.
  */
 export function orderedColumns(prop: JsonSchemaProperty): [string, JsonSchemaProperty][] {
-	if (prop.type !== 'array') return [];
+	if (prop.type !== 'array' || prop.items.type !== 'object') return [];
 	const properties = (prop.items.properties ?? {}) as Record<string, JsonSchemaProperty>;
 	const order = readPropMeta(prop).columns;
 	if (!Array.isArray(order)) return Object.entries(properties);

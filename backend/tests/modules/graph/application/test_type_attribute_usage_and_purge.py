@@ -230,3 +230,126 @@ async def test_purge_edge_type_attribute_raises_for_missing_type() -> None:
             PurgeEdgeTypeAttributeCommand(edge_type_id=uuid.uuid4(), key="old"),
             SYSTEM_ACTOR,
         )
+
+
+async def test_count_node_type_attribute_usage_can_match_a_group_sub_key() -> None:
+    """With `sub_key`, `key` names a group array and rows are matched instead."""
+    repos = _repos()
+    node_type = NodeType.create(slug="recipe", label="Recipe")
+    await repos.node_types.add(node_type)
+    await repos.nodes.add(
+        Node.create(
+            name="A",
+            type="recipe",
+            attributes={"ingredients": [{"name": "Flour", "unit": "g"}]},
+        )
+    )
+    await repos.nodes.add(
+        Node.create(
+            name="B", type="recipe", attributes={"ingredients": [{"name": "Salt"}]}
+        )
+    )
+
+    count = await CountNodeTypeAttributeUsage(repos).handle(
+        CountNodeTypeAttributeUsageQuery(
+            node_type_id=node_type.id, key="ingredients", sub_key="unit"
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    assert count == 1
+
+
+async def test_purge_node_type_attribute_strips_a_group_sub_key_from_every_row() -> (
+    None
+):
+    """With `sub_key`, only that key is removed from each row; the array is kept."""
+    repos = _repos()
+    node_type = NodeType.create(slug="recipe", label="Recipe")
+    await repos.node_types.add(node_type)
+    node = Node.create(
+        name="A",
+        type="recipe",
+        attributes={
+            "ingredients": [
+                {"name": "Flour", "unit": "g"},
+                {"name": "Salt"},
+                "not-a-row",
+            ],
+            "keep": 1,
+        },
+    )
+    await repos.nodes.add(node)
+
+    purged = await PurgeNodeTypeAttribute(InMemoryUnitOfWork(repos)).handle(
+        PurgeNodeTypeAttributeCommand(
+            node_type_id=node_type.id, key="ingredients", sub_key="unit"
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    assert purged == 1
+    assert node.attributes == {
+        "ingredients": [{"name": "Flour"}, {"name": "Salt"}, "not-a-row"],
+        "keep": 1,
+    }
+
+
+async def test_count_edge_type_attribute_usage_can_match_a_group_sub_key() -> None:
+    """With `sub_key`, `key` names a group array and rows are matched instead."""
+    repos = _repos()
+    edge_type = EdgeType.create(slug="loaned-to", label="Loaned to")
+    await repos.edge_types.add(edge_type)
+    source, target = uuid.uuid4(), uuid.uuid4()
+    await repos.edges.add(
+        Edge.create(
+            source_id=source,
+            target_id=target,
+            type="loaned-to",
+            attributes={"terms": [{"note": "handle with care", "duration": "2w"}]},
+        )
+    )
+    await repos.edges.add(
+        Edge.create(
+            source_id=source,
+            target_id=target,
+            type="loaned-to",
+            attributes={"terms": [{"note": "fragile"}]},
+        )
+    )
+
+    count = await CountEdgeTypeAttributeUsage(repos).handle(
+        CountEdgeTypeAttributeUsageQuery(
+            edge_type_id=edge_type.id, key="terms", sub_key="duration"
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    assert count == 1
+
+
+async def test_purge_edge_type_attribute_strips_a_group_sub_key_from_every_row() -> (
+    None
+):
+    """With `sub_key`, only that key is removed from each row; the array is kept."""
+    repos = _repos()
+    edge_type = EdgeType.create(slug="loaned-to", label="Loaned to")
+    await repos.edge_types.add(edge_type)
+    source, target = uuid.uuid4(), uuid.uuid4()
+    edge = Edge.create(
+        source_id=source,
+        target_id=target,
+        type="loaned-to",
+        attributes={"terms": [{"note": "care", "duration": "2w"}]},
+    )
+    await repos.edges.add(edge)
+
+    purged = await PurgeEdgeTypeAttribute(InMemoryUnitOfWork(repos)).handle(
+        PurgeEdgeTypeAttributeCommand(
+            edge_type_id=edge_type.id, key="terms", sub_key="duration"
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    assert purged == 1
+    assert edge.attributes == {"terms": [{"note": "care"}]}

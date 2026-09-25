@@ -149,7 +149,7 @@
 						<div class="relative">
 							<img
 								src={photoPreview}
-								alt="Cover photo preview"
+								alt="Cover preview"
 								class="max-h-48 w-full rounded-lg object-cover"
 							/>
 							<button

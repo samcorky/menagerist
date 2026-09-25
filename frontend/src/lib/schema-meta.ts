@@ -17,6 +17,8 @@ export type PropertyMeta = {
 	config?: Record<string, unknown>;
 	/** A `group` (table) field's sub-property keys in order. See `field-types/group/columns.ts`. */
 	columns?: string[];
+	/** A `list` field's items are edited/shown as a growing textarea rather than one line. */
+	multiline?: boolean;
 	/** Unknown members are preserved on round-trip. */
 	[member: string]: unknown;
 };

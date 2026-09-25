@@ -4,9 +4,20 @@
 	import { descriptorForProp } from '../registry';
 	import ScalarInput from '../ScalarInput.svelte';
 	import type { JsonSchemaProperty } from '$lib/schema-types';
+	import { readPropMeta } from '$lib/schema-meta';
 	import { orderedColumns } from './columns';
 
 	type GroupRow = Record<string, unknown>;
+
+	function compactColumnWidth(sp: JsonSchemaProperty): string | null {
+		if (sp.type === 'boolean') return 'w-24';
+		if (sp.type === 'number') return 'w-24';
+		if (sp.type === 'string' && 'format' in sp && sp.format === 'date') return 'w-24';
+		const kind = readPropMeta(sp).kind;
+		if (kind === 'rating') return 'w-24';
+		if (kind === 'quantity') return 'w-48';
+		return null;
+	}
 
 	let {
 		value,
@@ -24,7 +35,7 @@
 	let columns = $derived(orderedColumns(prop));
 
 	function addRow() {
-		if (prop.type !== 'array') return;
+		if (prop.type !== 'array' || prop.items.type !== 'object') return;
 		const emptyRow = Object.fromEntries(Object.keys(prop.items.properties).map((k) => [k, '']));
 		onChange([...rows, emptyRow]);
 	}
@@ -45,7 +56,11 @@
 				<thead>
 					<tr class="border-b border-input bg-muted/50">
 						{#each columns as [sk, sp] (sk)}
-							<th class="px-2 py-1 text-left text-xs font-medium text-muted-foreground">
+							<th
+								class="px-2 py-1 text-left text-xs font-medium text-muted-foreground {compactColumnWidth(
+									sp
+								) ?? ''}"
+							>
 								{sp.title || sk}
 							</th>
 						{/each}
@@ -65,9 +80,9 @@
 							{#each columns as [sk, sp] (sk)}
 								{@const desc = descriptorForProp(sp)}
 								{@const Widget = desc?.InputWidget ?? ScalarInput}
-								<td class="px-1 py-0.5">
+								<td class="px-1 py-0.5 {compactColumnWidth(sp) ?? ''}">
 									<div
-										class="[&_input]:h-7 [&_input]:border-transparent [&_input]:bg-transparent [&_input]:px-1.5 [&_input]:shadow-none [&_input]:focus-visible:ring-1"
+										class="[&_input]:h-7 [&_input]:border-transparent [&_input]:px-1.5 [&_input]:shadow-none [&_input]:focus-visible:ring-1"
 									>
 										<Widget
 											value={row[sk] ?? ''}

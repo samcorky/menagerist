@@ -43,6 +43,18 @@ const props = {
 		type: 'array',
 		items: { type: 'object', properties: { name: { title: 'Name', type: 'string' } } }
 	},
+	packing: {
+		title: 'Packing list',
+		type: 'array',
+		items: {
+			type: 'object',
+			properties: {
+				text: { title: 'Text', type: 'string' },
+				done: { title: 'Done', type: 'boolean' }
+			}
+		},
+		'x-menagerist': { kind: 'checklist' }
+	},
 	old: { title: 'Old', type: 'string', 'x-menagerist': { kind: 'text', archived: true } }
 } as unknown as Record<string, JsonSchemaProperty>;
 
@@ -61,6 +73,7 @@ describe('isHighlightable', () => {
 			expect(isHighlightable(props[key]), key).toBe(true);
 		}
 		for (const key of ['notes', 'cast']) expect(isHighlightable(props[key]), key).toBe(false);
+		expect(isHighlightable(props.packing)).toBe(true);
 		expect(isHighlightable({ title: 'x', type: 'string', 'x-menagerist': { kind: 'zzz' } })).toBe(
 			false
 		);
@@ -234,6 +247,17 @@ describe('summaryItems', () => {
 	it('ignores highlights that no longer apply', () => {
 		const stale = schemaWith([{ key: 'old' }, { key: 'notes' }, { key: 'director' }]);
 		expect(summaryItems({ old: 'a', notes: 'b', director: 'c' }, stale, 'list')).toHaveLength(1);
+	});
+
+	it('shows a checklist as "checked/total", and skips an empty one', () => {
+		const packing = schemaWith([{ key: 'packing' }]);
+		const items = summaryItems(
+			{ packing: [{ text: 'Passport', done: true }, { text: 'Charger' }] },
+			packing,
+			'list'
+		);
+		expect(items.map((i) => i.text)).toEqual(['1/2']);
+		expect(summaryItems({ packing: [] }, packing, 'list')).toEqual([]);
 	});
 });
 

@@ -114,31 +114,53 @@ class InMemoryNodeRepository:
                 node.type = None
 
     def _with_attribute(
-        self, type_slug: str, key: str, *, value: str | None = None
+        self,
+        type_slug: str,
+        key: str,
+        *,
+        sub_key: str | None = None,
+        value: str | None = None,
     ) -> builtins.list[Node]:
+        def matches(node: Node) -> bool:
+            if node.is_deleted or node.type != type_slug or key not in node.attributes:
+                return False
+            if sub_key is None:
+                return value is None or node.attributes[key] == value
+            rows = node.attributes[key]
+            return isinstance(rows, list) and any(
+                isinstance(row, dict)
+                and sub_key in row
+                and (value is None or row[sub_key] == value)
+                for row in rows
+            )
+
         return sorted(
-            (
-                node
-                for node in self._nodes.values()
-                if not node.is_deleted
-                and node.type == type_slug
-                and key in node.attributes
-                and (value is None or node.attributes[key] == value)
-            ),
+            (node for node in self._nodes.values() if matches(node)),
             key=lambda node: node.id,
         )
 
     async def count_with_attribute(
-        self, type_slug: str, key: str, *, value: str | None = None
+        self,
+        type_slug: str,
+        key: str,
+        *,
+        sub_key: str | None = None,
+        value: str | None = None,
     ) -> int:
         """Count non-deleted nodes of `type_slug` whose attributes contain `key`."""
-        return len(self._with_attribute(type_slug, key, value=value))
+        return len(self._with_attribute(type_slug, key, sub_key=sub_key, value=value))
 
     async def list_with_attribute(
-        self, type_slug: str, key: str, *, after: uuid.UUID | None, limit: int
+        self,
+        type_slug: str,
+        key: str,
+        *,
+        sub_key: str | None = None,
+        after: uuid.UUID | None,
+        limit: int,
     ) -> builtins.list[Node]:
         """List non-deleted nodes of `type_slug` holding `key`, ordered by id."""
-        nodes = self._with_attribute(type_slug, key)
+        nodes = self._with_attribute(type_slug, key, sub_key=sub_key)
         if after is not None:
             nodes = [node for node in nodes if node.id > after]
         return nodes[:limit]

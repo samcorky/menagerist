@@ -393,3 +393,45 @@ Separately, `field-kind-row.svelte`/`GroupExtras.svelte`'s three dropdowns (fiel
 **Rationale:** Nothing had been published yet, so there was no compatibility cost to dropping the split. A reverse proxy in front of a single backend process earns its keep when it terminates TLS, load-balances across replicas, or fronts more than one origin — Menagerist is single-process and self-hosted behind whatever the operator already puts in front of it (their own reverse proxy, a tunnel, or nothing). Running nginx purely to serve a handful of static files and forward `/api/*` added a second container, a second set of security headers to keep in sync with the backend's `SecurityHeadersMiddleware`, a duplicate 10 MB upload cap that silently disagreed with the backend's real 100 MB limit, and a second image to build, scan, and version. `SpaStaticFiles` reproduces nginx's behaviour exactly (hashed `_app/immutable/*` cached a year, other files an hour, missing asset-like paths 404 instead of falling back to the shell, dotfiles hidden except `.well-known`, `/favicon.ico` → `/favicon.svg`, the SPA shell never cached) and mirrors `frontend/nginx.conf` line for line — no serving behaviour changed, only where it runs (the same OS process as the API, not a separate container). `serve --migrate` folds the standalone `migrate` compose service into the app's own startup for single-instance deployments; multi-instance deployments still run `migrate upgrade` as a separate step.
 
 **Tradeoff:** The image is CPU/framework-coupled to Python for something that's pure static file serving — nginx would out-perform it under heavy static-asset load. Not a concern at Menagerist's scale (self-hosted, single operator, no CDN-scale traffic). If that changes, the split can come back; `frontend_dist_path` being a plain setting (not baked into the app's structure) keeps that reversible.
+
+---
+
+## Quantity and choice as table sub-fields; usage/purge extended to group sub-keys
+
+**Decision:** `quantity` and `choice` are now `canBeSubField: true` (a table column can be a quantity or a choice, not just text/number/boolean/date/rating). Backend `count_with_attribute`/`list_with_attribute` (both `NodeRepository` and `EdgeRepository`, SQLAlchemy and in-memory adapters) and the `Count/PurgeNodeTypeAttributeUsage`/`Count/PurgeEdgeTypeAttributeUsage` use cases and their routes take an optional `sub_key`: with it, `key` names a group array and matching/purging happens per row (via `jsonb_array_elements`, not a hand-built JSON path string) instead of against the top-level value. Frontend: removing a choice columns option is advisory (remove immediately, warn after if in use - WI-10 style); removing a column itself queries usage first and requires confirming if any items hold it (WI-9 style) - but a removed column has no archive/restore step, since none existed for columns before this either; confirming is the permanent action, there is no separate purge call.
+
+**Rationale:** The owner asked for parity with the existing top-level field in-use checks when making more types nestable, rather than adding new types silently and leaving column removal unchecked. Building full archive/Undo/"Removed columns" infrastructure for table columns (mirroring WI-8 exactly) was explicitly scoped out as bigger than needed; a confirm-before-delete gate keeps the safety property (no silent data loss) without a second archive-restore surface.
+
+---
+
+## Ordered list (`list`) and checklist (`checklist`) field types
+
+**Decision:** Two new field kinds. `list` stores a plain array of free-text strings with a purely cosmetic `display: numbered|bulleted` "Show as" option (storage unaffected either way). `checklist` stores an array of `{text, done}` objects, with a real, persisted boolean tick per item. Checklist is not a `list` display variant: `list`'s display option is designed to never change storage, and a tick is real data, not a rendering choice, so it needed its own kind and its own stored shape. Both are `canBeSubField: false`, not highlightable, matched only by an explicit `x-menagerist.kind` (never inferred from shape alone), and need no `x-menagerist.columns`-style ordering bookkeeping (JSONB array order survives a save/reload for free; only object-key order needs it).
+
+**Rationale:** The owner asked directly for an ordered-list kind (already a documented but unscheduled candidate in `further-field-types.md`), then separately asked for a checklist while discussing list display styles. A first instinct to fold checklist in as a third `display` value on `list` was rejected: that option only ever controls presentation in this codebase (boolean's switch/checkbox/buttons behave identically), and overloading it with a storage-shape change would break that invariant for every future reader of the code. `attributesToRows` must check the schema's declared `checklist` kind before its existing generic array-of-objects fallback (shared with `group`'s untyped-key catch-all) - otherwise a checklist's boolean `done` silently degrades through the group cell coercion path built for arbitrary string-typed table columns, always producing `false`. A regression test locks this ordering in (`attributes-editor.test.ts`).
+
+See `docs/field-types-spec/wi-25-ordered-list-and-checklist-field-types.md` for full implementation notes.
+
+---
+
+## Bugfix: a quantity's read-mode display showed only the unit
+
+**Bug (user-reported):** A quantity field's read-mode rendering (the item detail page, and a quantity table column) showed only the unit (e.g. "g"), dropping the numeric value entirely.
+
+**Root cause:** `quantityText` (`field-types/quantity/format.ts`) only accepted a JS `number` for `value`. Every read-mode caller reaches it through `attributesToRows`, which stringifies every sub-value of an object-typed field for editing (so a stored `180` arrives as the string `"180"`) - `typeof value === 'number'` was therefore always false for that path, silently dropping the numeric part while the unit (a string already) passed through untouched.
+
+**Fix:** `quantityText` now also accepts a numeric string, converting it with `Number(...)` and validating with `isNaN`. Covered by new cases in `quantity.test.ts`.
+
+---
+
+## Hybrid Tooltip/Popover for touch devices; `date-fns` for relative time
+
+**Decision (tooltip):** New `ui/popover-tooltip/` component (`Root`/`Trigger`/`Content`, same shape as `ui/tooltip` and `ui/popover`): at runtime, `MediaQuery('any-hover: none')` (from `svelte/reactivity`) picks `Popover` (tap-to-open) on a touch device or `Tooltip` (hover-to-open) otherwise, so call sites don't change. Both real usages (`node-summary.svelte`'s card-highlight tooltips, the item detail page's "Added/Updated X ago" timestamps) now import this instead of the plain `Tooltip`.
+
+**Root cause:** confirmed directly in the installed `bits-ui` (2.19.0) source, not just from the upstream shadcn-svelte issue's age: `Tooltip`'s `pointerenter`/`pointermove` handlers explicitly bail on `e.pointerType === 'touch'`, and `pointerdown`/`click` only ever close it, never open it. Combined with this app's `tabindex="-1"` on both trigger spans, these two tooltips were completely unreachable on a touch device, not merely awkward.
+
+**Rationale:** matches the community-vetted fix from the linked upstream issue (huntabyte/shadcn-svelte#1044) - a maintainer-suggested "conditional check of which device a user is on and swapping between `Tooltip` & `Popover`" - adapted to this repo's own themed wrapper components (self-closing pass-throughs, like every other `ui/` primitive here) rather than the community snippet's slightly more verbose re-render pattern, which is unnecessary once `child`/`children` already flow through via prop spreading the way every other wrapper in this codebase already relies on.
+
+**Decision (relative time):** `formatRelativeTime` (`lib/format-date.ts`) now uses `date-fns`'s `formatDistance(date, now, { addSuffix: true })` instead of a hand-rolled `Intl.RelativeTimeFormat` walk over fixed unit thresholds. Its "Just now" special-case for sub-45-second differences was removed on request; the function now returns exactly what `date-fns` produces at every threshold (e.g. "less than a minute ago"), no override layer on top.
+
+**Rationale:** requested directly, for `date-fns`'s more conversational wording ("about 2 hours ago", "over 1 year ago") than a bare numeric `Intl.RelativeTimeFormat` count. English-only was an explicit, deliberate trade-off (confirmed with the owner): the previous implementation auto-localised via `Intl.RelativeTimeFormat(undefined, ...)`, which `date-fns` does not do out of the box (would need per-locale imports wired to the browser's detected language) - not worth it for a self-hosted personal app.

@@ -79,7 +79,9 @@ describe('editor keys', () => {
 		});
 		const schema = itemsToSchema([group], {})!;
 		const cast = schema.properties.cast;
-		expect(cast.type === 'array' && Object.keys(cast.items.properties)).toEqual(['name', 'name_2']);
+		expect(
+			cast.type === 'array' && cast.items.type === 'object' && Object.keys(cast.items.properties)
+		).toEqual(['name', 'name_2']);
 	});
 
 	it('a __proto__ key is kept as an own property and does not change the prototype', () => {

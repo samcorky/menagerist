@@ -123,6 +123,7 @@ export type SummaryItem = {
 
 function isEmpty(value: unknown, prop: JsonSchemaProperty): boolean {
 	if (value === undefined || value === null || value === '') return true;
+	if (Array.isArray(value) && value.length === 0) return true;
 	return prop.type === 'boolean' && value !== true && value !== 'true';
 }
 

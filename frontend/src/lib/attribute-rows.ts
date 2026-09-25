@@ -1,13 +1,18 @@
+import { readPropMeta } from '$lib/schema-meta';
 import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
 
-export type GroupRow = Record<string, string>;
+/** A table row's cells; a quantity column's cell is its own nested `{value, unit}`-shaped row. */
+export type GroupRow = Record<string, string | Record<string, string>>;
+
+/** A checklist's stored row: free text plus its own persisted tick. */
+export type ChecklistRow = { text: string; done: boolean };
 
 /** How a detail that the type's fields do not define is edited and stored. */
 export type DetailKind = 'text' | 'number' | 'boolean' | 'json';
 
 export type AttributeRow = {
 	key: string;
-	value: string | GroupRow[] | GroupRow;
+	value: string | GroupRow[] | GroupRow | string[] | ChecklistRow[];
 	/** Type of a value under a key no schema defines; text when unset. Ignored for defined fields. */
 	kind?: DetailKind;
 	/** The stored value of a row the form cannot edit; written back unchanged. */
@@ -23,6 +28,14 @@ function isGroupValue(value: unknown): value is Record<string, unknown>[] {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** A table cell's value as edited text; a quantity cell keeps its own nested shape. */
+function stringifyCell(value: unknown): string | Record<string, string> {
+	if (isPlainObject(value)) {
+		return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, String(v)]));
+	}
+	return String(value);
 }
 
 function compareKeys(a: string, b: string): number {
@@ -46,15 +59,39 @@ export function attributesToRows(
 	return Object.entries(attributes)
 		.sort(([a], [b]) => compareKeys(a, b))
 		.map(([key, value]): AttributeRow => {
+			// Checked before the generic group-shape check below: a checklist's stored value is
+			// also an array of plain objects, but it has its own fixed {text, done} shape rather
+			// than a group's arbitrary, per-type sub-field columns.
+			if (
+				props[key]?.type === 'array' &&
+				props[key]?.items?.type === 'object' &&
+				readPropMeta(props[key]).kind === 'checklist' &&
+				Array.isArray(value)
+			) {
+				return {
+					key,
+					value: value.map((item): ChecklistRow => {
+						const row = isPlainObject(item) ? item : {};
+						return { text: String(row.text ?? ''), done: row.done === true };
+					})
+				};
+			}
 			if (isGroupValue(value)) {
 				return {
 					key,
 					value: value.map((entry) =>
-						Object.fromEntries(Object.entries(entry).map(([k, v]) => [k, String(v)]))
+						Object.fromEntries(Object.entries(entry).map(([k, v]) => [k, stringifyCell(v)]))
 					),
 					kind: 'json',
 					raw: value
 				};
+			}
+			if (
+				props[key]?.type === 'array' &&
+				props[key]?.items?.type === 'string' &&
+				Array.isArray(value)
+			) {
+				return { key, value: value.map((v) => String(v)) };
 			}
 			if (props[key]?.type === 'object' && isPlainObject(value)) {
 				return {
@@ -93,6 +130,41 @@ function coerceScalar(value: string, prop: JsonSchemaProperty | undefined): unkn
 	return value;
 }
 
+/**
+ * Coerce an object-shaped value (e.g. a quantity's `{value, unit}`) against its sub-properties,
+ * or `null` if every sub-value was blank (the whole thing is then omitted, as for a blank
+ * scalar). A blank text sub-value like a unit is kept, matching a group's text cells.
+ */
+function coerceObjectValue(
+	value: GroupRow,
+	subProps: Record<string, JsonSchemaProperty>
+): Record<string, unknown> | null {
+	if (Object.values(value).every((v) => v === '')) return null;
+	const entries = Object.entries(value)
+		.map(([k, v]): [string, string] => [k, typeof v === 'string' ? v : ''])
+		.filter(([k, v]) => !(v === '' && isOmittedWhenEmpty(subProps[k])))
+		.map(([k, v]) => [k, coerceScalar(v, subProps[k])] as const);
+	return Object.fromEntries(entries);
+}
+
+/** Coerce one table row's cells against the group's sub-properties. */
+function coerceGroupRow(
+	row: GroupRow,
+	subProps: Record<string, JsonSchemaProperty>
+): Record<string, unknown> {
+	return Object.fromEntries(
+		Object.entries(row).flatMap(([k, v]): [string, unknown][] => {
+			const sp = subProps[k];
+			if (sp?.type === 'object' && typeof v !== 'string') {
+				const coerced = coerceObjectValue(v, sp.properties ?? {});
+				return coerced === null ? [] : [[k, coerced]];
+			}
+			const scalar = typeof v === 'string' ? v : '';
+			return scalar === '' && isOmittedWhenEmpty(sp) ? [] : [[k, coerceScalar(scalar, sp)]];
+		})
+	);
+}
+
 /** Write a detail (a key the schema does not define) back with its own type. */
 function detailEntry(key: string, row: AttributeRow): [string, unknown][] {
 	if (row.raw !== undefined && (row.kind === 'json' || typeof row.value !== 'string')) {
@@ -129,31 +201,30 @@ export function rowsToAttributes(
 				const prop = Object.hasOwn(props, key) ? props[key] : undefined;
 				if (!prop) return detailEntry(key, row);
 				if (typeof row.value !== 'string') {
+					if (
+						prop.type === 'array' &&
+						prop.items?.type === 'object' &&
+						readPropMeta(prop).kind === 'checklist' &&
+						Array.isArray(row.value)
+					) {
+						// A blank item (no text typed in yet) is dropped, its tick along with it;
+						// an entirely blank checklist omits the key, same as an ordered list.
+						const items = (row.value as ChecklistRow[]).filter((r) => r.text.trim() !== '');
+						return items.length === 0 ? [] : [[key, items]];
+					}
 					if (prop.type === 'array' && prop.items?.type === 'object' && Array.isArray(row.value)) {
 						const subProps = prop.items.properties ?? {};
-						return [
-							[
-								key,
-								row.value.map((gr) =>
-									Object.fromEntries(
-										Object.entries(gr)
-											.filter(([k, v]) => !(v === '' && isOmittedWhenEmpty(subProps[k])))
-											.map(([k, v]) => [k, coerceScalar(v, subProps[k])])
-									)
-								)
-							]
-						];
+						return [[key, (row.value as GroupRow[]).map((gr) => coerceGroupRow(gr, subProps))]];
+					}
+					if (prop.type === 'array' && prop.items?.type === 'string' && Array.isArray(row.value)) {
+						// A blank item (e.g. a fresh "Add item" row not yet typed into) is dropped,
+						// same as any other blank scalar; an entirely blank list omits the key.
+						const items = (row.value as string[]).filter((v) => v.trim() !== '');
+						return items.length === 0 ? [] : [[key, items]];
 					}
 					if (prop.type === 'object' && !Array.isArray(row.value)) {
-						// Nothing entered at all omits the whole field, checked on the raw values
-						// (not the filtered ones below) so a blank text sub-value like a unit -
-						// kept deliberately, same as a group's text cells - doesn't count as "filled".
-						if (Object.values(row.value).every((v) => v === '')) return [];
-						const subProps = prop.properties ?? {};
-						const entries = Object.entries(row.value)
-							.filter(([k, v]) => !(v === '' && isOmittedWhenEmpty(subProps[k])))
-							.map(([k, v]) => [k, coerceScalar(v, subProps[k])]);
-						return [[key, Object.fromEntries(entries)]];
+						const coerced = coerceObjectValue(row.value, prop.properties ?? {});
+						return coerced === null ? [] : [[key, coerced]];
 					}
 					return [[key, row.value]];
 				}

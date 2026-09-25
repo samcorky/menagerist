@@ -10,6 +10,8 @@ import './boolean/boolean';
 import './text/text';
 import './group/group';
 import './quantity/quantity';
+import './list/list';
+import './checklist/checklist';
 import './opaque/opaque';
 
 export {

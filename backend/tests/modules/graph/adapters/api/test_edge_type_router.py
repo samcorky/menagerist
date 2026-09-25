@@ -269,3 +269,33 @@ def test_attribute_usage_can_filter_by_value() -> None:
     base = f"/api/v1/edge-type/{et['id']}/attribute/status/usage"
 
     assert client.get(base, params={"value": "Draft"}).json() == {"count": 1}
+
+
+def test_attribute_usage_and_purge_can_target_a_group_sub_key() -> None:
+    """`?sub_key=` counts and purges rows of a group array, not the whole key."""
+    client = TestClient(_app_with_in_memory_graph())
+    et = client.post(
+        "/api/v1/edge-type", json={"slug": "loaned-to", "label": "Loaned to"}
+    ).json()
+    source = client.post("/api/v1/node", json={"name": "Drill"}).json()
+    target = client.post("/api/v1/node", json={"name": "Neighbour"}).json()
+    client.post(
+        "/api/v1/edge",
+        json={
+            "source_id": source["id"],
+            "target_id": target["id"],
+            "type": "loaned-to",
+            "attributes": {"terms": [{"note": "care", "duration": "2w"}]},
+        },
+    )
+    base = f"/api/v1/edge-type/{et['id']}/attribute/terms"
+
+    assert client.get(f"{base}/usage", params={"sub_key": "duration"}).json() == {
+        "count": 1
+    }
+    purge = client.delete(base, params={"sub_key": "duration"})
+    assert purge.status_code == 200
+    assert purge.json() == {"purged": 1}
+    assert client.get(f"{base}/usage", params={"sub_key": "duration"}).json() == {
+        "count": 0
+    }

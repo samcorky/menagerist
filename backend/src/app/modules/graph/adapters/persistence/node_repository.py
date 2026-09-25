@@ -6,6 +6,7 @@ from sqlalchemy import (
     Text,
     and_,
     bindparam,
+    column,
     exists,
     func,
     literal,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     select,
     update,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.modules.graph.adapters.persistence.models import NodeModel
 from app.modules.graph.domain.node import Node
@@ -71,6 +73,20 @@ def _like_pattern(q: str) -> str:
     escaped = q.replace(_LIKE_ESCAPE, _LIKE_ESCAPE * 2)
     escaped = escaped.replace("%", _LIKE_ESCAPE + "%").replace("_", _LIKE_ESCAPE + "_")
     return f"%{escaped}%"
+
+
+def _has_matching_row(
+    attributes: SQLColumnExpression[Any], key: str, sub_key: str, value: str | None
+) -> ColumnElement[bool]:
+    """Whether any row of group array `key` holds `sub_key`, optionally == `value`."""
+    elements = func.jsonb_array_elements(attributes[key]).table_valued(
+        column("value", JSONB), name="elem"
+    )
+    row = elements.c.value
+    conditions = [row.has_key(sub_key)]
+    if value is not None:
+        conditions.append(row.contains({sub_key: value}))
+    return exists(select(literal(1)).select_from(elements).where(*conditions))
 
 
 def _has_matching_value(
@@ -218,39 +234,52 @@ class SqlAlchemyNodeRepository:
         await self._session.flush()
 
     async def count_with_attribute(
-        self, type_slug: str, key: str, *, value: str | None = None
+        self,
+        type_slug: str,
+        key: str,
+        *,
+        sub_key: str | None = None,
+        value: str | None = None,
     ) -> int:
         """Count non-deleted nodes of `type_slug` whose attributes contain `key`."""
         logger.debug("counting nodes with attribute", type_slug=type_slug, key=key)
         stmt = (
             select(func.count())
             .select_from(NodeModel)
-            .where(
-                NodeModel.deleted_at.is_(None),
-                NodeModel.type == type_slug,
-                NodeModel.attributes.has_key(key),
-            )
+            .where(NodeModel.deleted_at.is_(None), NodeModel.type == type_slug)
         )
-        if value is not None:
-            stmt = stmt.where(NodeModel.attributes.contains({key: value}))
+        if sub_key is None:
+            stmt = stmt.where(NodeModel.attributes.has_key(key))
+            if value is not None:
+                stmt = stmt.where(NodeModel.attributes.contains({key: value}))
+        else:
+            stmt = stmt.where(
+                _has_matching_row(NodeModel.attributes, key, sub_key, value)
+            )
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
     async def list_with_attribute(
-        self, type_slug: str, key: str, *, after: uuid.UUID | None, limit: int
+        self,
+        type_slug: str,
+        key: str,
+        *,
+        sub_key: str | None = None,
+        after: uuid.UUID | None,
+        limit: int,
     ) -> builtins.list[Node]:
         """List non-deleted nodes of `type_slug` holding `key`, ordered by id."""
         logger.debug("listing nodes with attribute", type_slug=type_slug, key=key)
-        stmt = (
-            select(NodeModel)
-            .where(
-                NodeModel.deleted_at.is_(None),
-                NodeModel.type == type_slug,
-                NodeModel.attributes.has_key(key),
-            )
-            .order_by(NodeModel.id)
-            .limit(limit)
+        stmt = select(NodeModel).where(
+            NodeModel.deleted_at.is_(None), NodeModel.type == type_slug
         )
+        if sub_key is None:
+            stmt = stmt.where(NodeModel.attributes.has_key(key))
+        else:
+            stmt = stmt.where(
+                _has_matching_row(NodeModel.attributes, key, sub_key, None)
+            )
+        stmt = stmt.order_by(NodeModel.id).limit(limit)
         if after is not None:
             stmt = stmt.where(NodeModel.id > after)
         result = await self._session.execute(stmt)

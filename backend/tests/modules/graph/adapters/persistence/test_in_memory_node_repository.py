@@ -242,3 +242,43 @@ async def test_count_with_attribute_can_match_a_value() -> None:
     assert await repository.count_with_attribute("film", "s", value="Draft") == 2
     assert await repository.count_with_attribute("film", "s", value="Gone") == 0
     assert await repository.count_with_attribute("film", "s") == 3
+
+
+async def test_count_and_list_with_attribute_can_match_a_group_sub_key() -> None:
+    """With `sub_key`, `key` names a group array and rows are matched instead."""
+    repository = InMemoryNodeRepository()
+    has_ingredient = Node.create(
+        name="a",
+        type="recipe",
+        attributes={"ingredients": [{"name": "Flour", "unit": "g"}]},
+    )
+    other_row_shape = Node.create(
+        name="b", type="recipe", attributes={"ingredients": [{"name": "Salt"}]}
+    )
+    empty_group = Node.create(name="c", type="recipe", attributes={"ingredients": []})
+    not_a_list = Node.create(name="d", type="recipe", attributes={"ingredients": "x"})
+    no_key = Node.create(name="e", type="recipe", attributes={})
+    for node in [has_ingredient, other_row_shape, empty_group, not_a_list, no_key]:
+        await repository.add(node)
+
+    assert (
+        await repository.count_with_attribute("recipe", "ingredients", sub_key="unit")
+        == 1
+    )
+    page = await repository.list_with_attribute(
+        "recipe", "ingredients", sub_key="unit", after=None, limit=10
+    )
+    assert [n.id for n in page] == [has_ingredient.id]
+
+    assert (
+        await repository.count_with_attribute(
+            "recipe", "ingredients", sub_key="unit", value="g"
+        )
+        == 1
+    )
+    assert (
+        await repository.count_with_attribute(
+            "recipe", "ingredients", sub_key="unit", value="kg"
+        )
+        == 0
+    )

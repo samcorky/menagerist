@@ -69,7 +69,9 @@ describe('group toSchema/fromSchema column order', () => {
 		]);
 
 		// Simulate the JSONB key reordering a save/reload round trip can introduce.
-		if (prop.type !== 'array') throw new Error('expected an array property');
+		if (prop.type !== 'array' || prop.items.type !== 'object') {
+			throw new Error('expected an array-of-objects property');
+		}
 		const reordered = {
 			...prop,
 			items: {

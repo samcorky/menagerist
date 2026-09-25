@@ -2,7 +2,7 @@
 	import { descriptorForProp } from '$lib/field-types';
 	import { summaryItems, type Surface } from '$lib/highlights';
 	import type { AttributesSchema } from '$lib/schema-types';
-	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import * as Tooltip from '$lib/components/ui/popover-tooltip/index.js';
 
 	let {
 		attributes,

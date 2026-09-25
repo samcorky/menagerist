@@ -58,16 +58,34 @@ class NodeRepository(Protocol):
         ...
 
     async def count_with_attribute(
-        self, type_slug: str, key: str, *, value: str | None = None
+        self,
+        type_slug: str,
+        key: str,
+        *,
+        sub_key: str | None = None,
+        value: str | None = None,
     ) -> int:
         """Count non-deleted nodes of `type_slug` whose attributes contain `key`.
 
-        With `value`, only those where the attribute equals that string.
+        With `value`, only those where the attribute equals that string. With
+        `sub_key`, `key` names a group (array-of-objects) property and this
+        counts nodes where any row of that array holds `sub_key` (optionally
+        equal to `value`), rather than `key` itself.
         """
         ...
 
     async def list_with_attribute(
-        self, type_slug: str, key: str, *, after: uuid.UUID | None, limit: int
+        self,
+        type_slug: str,
+        key: str,
+        *,
+        sub_key: str | None = None,
+        after: uuid.UUID | None,
+        limit: int,
     ) -> builtins.list[Node]:
-        """List non-deleted nodes of `type_slug` holding `key`, ordered by id."""
+        """List non-deleted nodes of `type_slug` holding `key`, ordered by id.
+
+        With `sub_key`, `key` names a group property and this lists nodes
+        where any row of that array holds `sub_key`.
+        """
         ...

@@ -212,9 +212,11 @@ def _log_line_timestamp(logs: str, marker: str) -> float:
         match = _LOG_TIMESTAMP.match(clean)
         if not match:
             continue
-        return datetime.strptime(match.group(1), "%Y-%m-%dT%H:%M:%S.%fZ").replace(
-            tzinfo=UTC
-        ).timestamp()
+        return (
+            datetime.strptime(match.group(1), "%Y-%m-%dT%H:%M:%S.%fZ")
+            .replace(tzinfo=UTC)
+            .timestamp()
+        )
     raise SmokeTestError(f"no log line found containing {marker!r}")
 
 

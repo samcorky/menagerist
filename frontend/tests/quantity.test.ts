@@ -19,6 +19,13 @@ describe('quantityText', () => {
 		expect(quantityText('180 g')).toBe('');
 		expect(quantityText({ value: 180, unit: '' })).toBe('180');
 	});
+
+	it('accepts a numeric string value, as read-mode rendering passes through attributesToRows', () => {
+		expect(quantityText({ value: '180', unit: 'g' })).toBe('180 g');
+		expect(quantityText({ value: '180' })).toBe('180');
+		expect(quantityText({ value: '', unit: 'g' })).toBe('g');
+		expect(quantityText({ value: 'not-a-number', unit: 'g' })).toBe('g');
+	});
 });
 
 describe('quantity descriptor', () => {
@@ -50,8 +57,8 @@ describe('quantity descriptor', () => {
 		);
 	});
 
-	it('is not offered as a group sub-field in v1', () => {
-		expect(getDescriptor('quantity')?.canBeSubField).toBe(false);
+	it('is offered as a group sub-field', () => {
+		expect(getDescriptor('quantity')?.canBeSubField).toBe(true);
 	});
 
 	it('formatSummary renders "{value} {unit}" or null when empty', () => {

@@ -254,6 +254,100 @@ describe('rowsToAttributes with schema', () => {
 			} as unknown as AttributesSchema['properties']);
 			expect(() => rowsToAttributes(rows, s)).not.toThrow();
 		});
+
+		it('omits a blank choice cell and keeps a chosen one', () => {
+			const choiceSchema = schema({
+				cast: {
+					title: 'Cast',
+					type: 'array',
+					items: {
+						type: 'object',
+						properties: {
+							role: {
+								title: 'Role',
+								type: 'string',
+								enum: ['Lead', 'Support'],
+								'x-menagerist': { kind: 'choice' }
+							}
+						}
+					}
+				}
+			});
+			const rows: AttributeRow[] = [{ key: 'cast', value: [{ role: '' }, { role: 'Lead' }] }];
+			expect(rowsToAttributes(rows, choiceSchema)).toEqual({ cast: [{}, { role: 'Lead' }] });
+		});
+
+		it('coerces a quantity cell and omits it only when both sub-values are blank', () => {
+			const quantitySchema = schema({
+				ingredients: {
+					title: 'Ingredients',
+					type: 'array',
+					items: {
+						type: 'object',
+						properties: {
+							name: { title: 'Name', type: 'string' },
+							amount: {
+								title: 'Amount',
+								type: 'object',
+								properties: {
+									value: { title: 'Value', type: 'number' },
+									unit: { title: 'Unit', type: 'string' }
+								},
+								'x-menagerist': { kind: 'quantity' }
+							}
+						}
+					}
+				}
+			});
+			const rows: AttributeRow[] = [
+				{ key: 'ingredients', value: [{ name: 'Flour', amount: { value: '180', unit: 'g' } }] }
+			];
+			expect(rowsToAttributes(rows, quantitySchema)).toEqual({
+				ingredients: [{ name: 'Flour', amount: { value: 180, unit: 'g' } }]
+			});
+
+			const blankAmount: AttributeRow[] = [
+				{ key: 'ingredients', value: [{ name: 'Salt', amount: { value: '', unit: '' } }] }
+			];
+			expect(rowsToAttributes(blankAmount, quantitySchema)).toEqual({
+				ingredients: [{ name: 'Salt' }]
+			});
+
+			const unitOnly: AttributeRow[] = [
+				{ key: 'ingredients', value: [{ name: 'Pinch', amount: { value: '', unit: 'g' } }] }
+			];
+			expect(rowsToAttributes(unitOnly, quantitySchema)).toEqual({
+				ingredients: [{ name: 'Pinch', amount: { unit: 'g' } }]
+			});
+		});
+
+		it('round-trips a quantity column through attributesToRows then rowsToAttributes', () => {
+			const quantitySchema = schema({
+				ingredients: {
+					title: 'Ingredients',
+					type: 'array',
+					items: {
+						type: 'object',
+						properties: {
+							name: { title: 'Name', type: 'string' },
+							amount: {
+								title: 'Amount',
+								type: 'object',
+								properties: {
+									value: { title: 'Value', type: 'number' },
+									unit: { title: 'Unit', type: 'string' }
+								},
+								'x-menagerist': { kind: 'quantity' }
+							}
+						}
+					}
+				}
+			});
+			const original = { ingredients: [{ name: 'Flour', amount: { value: 180, unit: 'g' } }] };
+			expect(rowsToAttributes(attributesToRows(original, quantitySchema), quantitySchema)).toEqual(
+				original
+			);
+		});
 	});
 
 	it('passes unknown keys through as strings regardless of schema', () => {
@@ -323,6 +417,142 @@ describe('rowsToAttributes with schema', () => {
 			expect(rowsToAttributes(attributesToRows(original, quantitySchema), quantitySchema)).toEqual(
 				original
 			);
+		});
+	});
+
+	describe('ordered list (type: array, items: type string) fields', () => {
+		const listSchema = schema({
+			instructions: { title: 'Instructions', type: 'array', items: { type: 'string' } }
+		});
+
+		it('attributesToRows hydrates a schema-defined string array as an editable list', () => {
+			expect(attributesToRows({ instructions: ['Preheat', 'Mix'] }, listSchema)).toEqual([
+				{ key: 'instructions', value: ['Preheat', 'Mix'] }
+			]);
+		});
+
+		it('attributesToRows keeps a string array under an unknown key as read-only json', () => {
+			expect(attributesToRows({ instructions: ['Preheat', 'Mix'] })).toEqual([
+				{
+					key: 'instructions',
+					value: '["Preheat","Mix"]',
+					kind: 'json',
+					raw: ['Preheat', 'Mix']
+				}
+			]);
+		});
+
+		it('rowsToAttributes drops a blank item and keeps the rest, in order', () => {
+			const rows: AttributeRow[] = [{ key: 'instructions', value: ['Preheat', '', 'Mix', '  '] }];
+			expect(rowsToAttributes(rows, listSchema)).toEqual({ instructions: ['Preheat', 'Mix'] });
+		});
+
+		it('rowsToAttributes omits the key when every item is blank', () => {
+			const rows: AttributeRow[] = [{ key: 'instructions', value: ['', '  '] }];
+			expect(rowsToAttributes(rows, listSchema)).toEqual({});
+		});
+
+		it('round-trips a list value end to end', () => {
+			const original = { instructions: ['Preheat', 'Mix', 'Bake'] };
+			expect(rowsToAttributes(attributesToRows(original, listSchema), listSchema)).toEqual(
+				original
+			);
+		});
+	});
+
+	describe('checklist (array of {text, done}) fields', () => {
+		const checklistSchema = schema({
+			packing_list: {
+				title: 'Packing list',
+				type: 'array',
+				items: {
+					type: 'object',
+					properties: {
+						text: { title: 'Text', type: 'string' },
+						done: { title: 'Done', type: 'boolean' }
+					}
+				},
+				'x-menagerist': { kind: 'checklist' }
+			}
+		});
+
+		it('attributesToRows hydrates a schema-defined checklist as {text, done} rows', () => {
+			expect(
+				attributesToRows(
+					{ packing_list: [{ text: 'Passport', done: true }, { text: 'Charger' }] },
+					checklistSchema
+				)
+			).toEqual([
+				{
+					key: 'packing_list',
+					value: [
+						{ text: 'Passport', done: true },
+						{ text: 'Charger', done: false }
+					]
+				}
+			]);
+		});
+
+		it('does not confuse a checklist with a plain group (array of objects)', () => {
+			// Same raw shape (array of plain objects) as a `group` field's rows; only the
+			// schema's explicit checklist kind should route it to {text, done} rows, not
+			// the generic group stringify/json path.
+			const rows = attributesToRows(
+				{ packing_list: [{ text: 'Passport', done: true }] },
+				checklistSchema
+			);
+			expect(rows[0].kind).toBeUndefined();
+			expect(rows[0].raw).toBeUndefined();
+		});
+
+		it('attributesToRows keeps a checklist-shaped array under an unknown key as generic group rows', () => {
+			// With no schema to say "checklist", this array-of-objects value falls back to the
+			// same generic stringified-cell treatment any group/table value gets.
+			const value = [{ text: 'Passport', done: true }];
+			expect(attributesToRows({ packing_list: value })).toEqual([
+				{
+					key: 'packing_list',
+					value: [{ text: 'Passport', done: 'true' }],
+					kind: 'json',
+					raw: value
+				}
+			]);
+		});
+
+		it('rowsToAttributes drops a blank-text item, tick and all, and keeps the rest', () => {
+			const rows: AttributeRow[] = [
+				{
+					key: 'packing_list',
+					value: [
+						{ text: 'Passport', done: true },
+						{ text: '', done: true },
+						{ text: 'Charger', done: false }
+					]
+				}
+			];
+			expect(rowsToAttributes(rows, checklistSchema)).toEqual({
+				packing_list: [
+					{ text: 'Passport', done: true },
+					{ text: 'Charger', done: false }
+				]
+			});
+		});
+
+		it('rowsToAttributes omits the key when every item is blank', () => {
+			const rows: AttributeRow[] = [{ key: 'packing_list', value: [{ text: '  ', done: false }] }];
+			expect(rowsToAttributes(rows, checklistSchema)).toEqual({});
+		});
+
+		it('round-trips a checklist value end to end', () => {
+			const original = {
+				packing_list: [
+					{ text: 'Passport', done: true },
+					{ text: 'Charger', done: false }
+				]
+			};
+			expect(
+				rowsToAttributes(attributesToRows(original, checklistSchema), checklistSchema)
+			).toEqual(original);
 		});
 	});
 });
