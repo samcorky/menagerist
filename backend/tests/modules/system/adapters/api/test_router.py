@@ -92,6 +92,7 @@ def test_readiness_503_when_db_unreachable() -> None:
 
     assert response.status_code == 503
     assert response.headers["content-type"].startswith("application/health+json")
+    assert response.headers["cache-control"] == "max-age=10"
 
     data = response.json()
     assert data["status"] == "fail"
@@ -174,6 +175,7 @@ def test_readiness_reports_warn_status_without_503() -> None:
     response = client.get("/api/health/ready")
 
     assert response.status_code == 200
+    assert response.headers["cache-control"] == "max-age=10"
     data = response.json()
     assert data["status"] == "warn"
     assert data["checks"]["database:poolUtilization"][0]["status"] == "warn"

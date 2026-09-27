@@ -283,6 +283,7 @@ async def get_health_ready(
     use_case: Annotated[GetHealthReady, Depends(get_get_health_ready_use_case)],
 ) -> ReadyResponse:
     """Report readiness by verifying all required dependencies are reachable."""
+    response.headers["Cache-Control"] = "max-age=10"
     report = await use_case.handle(GetHealthReadyQuery(), SYSTEM_ACTOR)
     if report.status is CheckStatus.FAIL:
         response.status_code = 503
