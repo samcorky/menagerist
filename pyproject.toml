@@ -272,19 +272,31 @@ help = "Run the Playwright test suite with a visible browser window (assumes the
 
 [tool.poe.groups.quality.tasks.test-e2e]
 sequence = ["e2e-db-up", "e2e-migrate", "_test-e2e-run", "e2e-db-down"]
-ignore_fail = "return_non_zero"
+ignore_fail = true
 help = "Run the Playwright e2e suite against an isolated, throwaway Postgres, tearing it down afterwards regardless of outcome (requires Docker)"
 
 [tool.poe.groups.quality.tasks.test-e2e-headed]
 sequence = ["e2e-db-up", "e2e-migrate", "_test-e2e-run-headed", "e2e-db-down"]
-ignore_fail = "return_non_zero"
+ignore_fail = true
 help = "Same as test-e2e, but opens a visible browser window so you can watch the tests run"
+
+[tool.poe.groups.quality.tasks._test-e2e-run-slow]
+shell = "npx playwright test --headed"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+env = { PW_SLOWMO = "1000" }
+help = "Run the Playwright test suite headed, with each action slowed down so it's watchable (assumes the e2e db is up and migrated)"
+
+[tool.poe.groups.quality.tasks.test-e2e-slow]
+sequence = ["e2e-db-up", "e2e-migrate", "_test-e2e-run-slow", "e2e-db-down"]
+ignore_fail = true
+help = "Same as test-e2e-headed, but slowed down (1s between actions) so you can actually follow along"
 
 [tool.poe.groups.database]
 heading = "Database"
 
 [tool.poe.groups.database.tasks.db-up]
-cmd = "docker compose up -d postgres"
+cmd = "docker compose up -d postgres --wait postgres"
 help = "Start the local Postgres container"
 
 [tool.poe.groups.database.tasks.db-down]

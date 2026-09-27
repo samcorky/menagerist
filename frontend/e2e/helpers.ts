@@ -12,6 +12,8 @@ export function uniqueName(prefix: string): string {
 
 export type FieldSpec = {
 	label: string;
+	/** Kind key from the field-types registry (e.g. 'money', 'url'); defaults to 'text'. */
+	kind?: string;
 };
 
 /** Creates an item type from Settings > Item types, optionally with fields, and returns its label. */
@@ -32,6 +34,9 @@ export async function createItemType(
 	for (const field of options.fields ?? []) {
 		await form.getByRole('button', { name: 'Add field', exact: true }).click();
 		await form.getByLabel('Field label').last().fill(field.label);
+		if (field.kind && field.kind !== 'text') {
+			await form.getByLabel('Field type').last().selectOption(field.kind);
+		}
 	}
 
 	await form.getByRole('button', { name: 'Add item type' }).click();

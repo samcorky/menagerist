@@ -2,7 +2,7 @@ import type { PropertyMeta, SchemaMeta } from '$lib/schema-meta';
 
 type JsonSchemaPropertyBase =
 	| { title: string; type: 'string'; pattern?: string; allOf?: Record<string, unknown>[] }
-	| { title: string; type: 'string'; format: 'date' }
+	| { title: string; type: 'string'; format: 'date' | 'uri' | 'email' }
 	| { title: string; type: 'string'; enum: string[] }
 	| { title: string; type: 'number'; minimum?: number; maximum?: number; multipleOf?: number }
 	| { title: string; type: 'boolean' }

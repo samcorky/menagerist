@@ -14,7 +14,11 @@ const EXPECTED_KINDS = [
 	'longtext',
 	'choice',
 	'rating',
-	'group'
+	'group',
+	'money',
+	'url',
+	'email',
+	'phone'
 ];
 
 describe('all built-in kinds are registered', () => {
@@ -32,6 +36,9 @@ describe('descriptorForProp matching', () => {
 		['number', { title: 'Price', type: 'number' }],
 		['boolean', { title: 'Active', type: 'boolean' }],
 		['date', { title: 'Published', type: 'string', format: 'date' }],
+		['url', { title: 'Website', type: 'string', format: 'uri' }],
+		['email', { title: 'Contact email', type: 'string', format: 'email' }],
+		['phone', { title: 'Phone number', type: 'string', pattern: '^[0-9+()\\-\\s]{3,32}$' }],
 		['longtext', { title: 'Notes', type: 'string', 'x-menagerist': { kind: 'longtext' } }],
 		['choice', { title: 'Status', type: 'string', enum: ['Draft', 'Published'] }],
 		[
@@ -141,11 +148,13 @@ describe('opaque round-trips', () => {
 		expect(descriptorForProp({ title: 'x', type: 'string' })?.kind).toBe('text');
 	});
 
-	it('keeps a string property with a format, changing only the title', () => {
-		const prop = { title: 'Email', type: 'string', format: 'email' };
+	it('keeps a string property with an unrecognised format, changing only the title', () => {
+		// email/uri are now recognised (WI-27), so this uses a format this app does not know,
+		// to keep exercising the opaque fallback WI-4 describes.
+		const prop = { title: 'Home page', type: 'string', format: 'hostname' };
 		expect(descriptorForProp(prop as unknown as JsonSchemaProperty)).toBeUndefined();
 		const field = {
-			key: 'email',
+			key: 'home_page',
 			label: 'Contact',
 			kind: 'opaque',
 			required: false,
@@ -156,7 +165,7 @@ describe('opaque round-trips', () => {
 		expect(opaque.toSchema(field)).toEqual({ ...prop, title: 'Contact' });
 	});
 
-	it('group keeps an enum sub-property and a format sub-property unchanged', () => {
+	it('group keeps an enum sub-property and an unrecognised-format sub-property unchanged', () => {
 		const group = getDescriptor('group')!;
 		const prop: JsonSchemaProperty = {
 			title: 'Cast',
@@ -165,7 +174,13 @@ describe('opaque round-trips', () => {
 				type: 'object',
 				properties: {
 					role: { title: 'Role', type: 'string', enum: ['Lead', 'Support'] },
-					mail: { title: 'Mail', type: 'string', format: 'email' } as unknown as JsonSchemaProperty,
+					// email/uri are now recognised (WI-27); this stays a genuinely unknown format
+					// to keep exercising the opaque fallback.
+					mail: {
+						title: 'Mail',
+						type: 'string',
+						format: 'hostname'
+					} as unknown as JsonSchemaProperty,
 					name: { title: 'Name', type: 'string' }
 				}
 			}

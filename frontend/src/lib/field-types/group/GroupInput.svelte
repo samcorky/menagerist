@@ -16,6 +16,7 @@
 		const kind = readPropMeta(sp).kind;
 		if (kind === 'rating') return 'w-24';
 		if (kind === 'quantity') return 'w-48';
+		if (kind === 'money') return 'w-56';
 		return null;
 	}
 

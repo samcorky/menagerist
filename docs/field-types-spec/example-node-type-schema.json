@@ -139,6 +139,47 @@
       "x-menagerist": {
         "kind": "quantity"
       }
+    },
+    "purchase_price": {
+      "title": "Purchase price",
+      "type": "object",
+      "properties": {
+        "value": {
+          "title": "Value",
+          "type": "number"
+        },
+        "currency": {
+          "title": "Currency",
+          "type": "string"
+        }
+      },
+      "x-menagerist": {
+        "kind": "money"
+      }
+    },
+    "website": {
+      "title": "Website",
+      "type": "string",
+      "format": "uri",
+      "x-menagerist": {
+        "kind": "url"
+      }
+    },
+    "contact_email": {
+      "title": "Contact email",
+      "type": "string",
+      "format": "email",
+      "x-menagerist": {
+        "kind": "email"
+      }
+    },
+    "phone_number": {
+      "title": "Phone number",
+      "type": "string",
+      "pattern": "^[0-9+()\\-\\s]{3,32}$",
+      "x-menagerist": {
+        "kind": "phone"
+      }
     }
   },
   "x-menagerist": {

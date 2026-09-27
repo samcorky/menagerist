@@ -5,7 +5,7 @@
 	import { getDescriptor } from '../registry';
 	import { orderedColumns } from './columns';
 
-	const VIEW_WIDGET_KINDS = new Set(['rating', 'quantity']);
+	const VIEW_WIDGET_KINDS = new Set(['rating', 'quantity', 'money']);
 
 	type GroupRow = Record<string, unknown>;
 
@@ -28,7 +28,7 @@
 		if (sp.type === 'number') return true;
 		if (sp.type === 'string' && 'format' in sp && sp.format === 'date') return true;
 		const kind = readPropMeta(sp).kind;
-		return kind === 'rating' || kind === 'quantity';
+		return kind === 'rating' || kind === 'quantity' || kind === 'money';
 	}
 </script>
 

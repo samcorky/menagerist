@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Input } from '$lib/components/ui/input/index.js';
+	import { readPropMeta } from '$lib/schema-meta';
 	import type { JsonSchemaProperty } from '$lib/schema-types';
 
 	let {
@@ -17,6 +18,12 @@
 	function inputType(): string {
 		if (prop.type === 'number') return 'number';
 		if (prop.type === 'string' && 'format' in prop && prop.format === 'date') return 'date';
+		if (prop.type === 'string') {
+			const kind = readPropMeta(prop).kind;
+			if (kind === 'url') return 'url';
+			if (kind === 'email') return 'email';
+			if (kind === 'phone') return 'tel';
+		}
 		return 'text';
 	}
 </script>

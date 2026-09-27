@@ -120,6 +120,36 @@
       "pattern": "^a-b",
       "value": "a_b",
       "expected": false
+    },
+    {
+      "pattern": "^[0-9+()\\-\\s]{3,32}$",
+      "value": "+1 (555) 123-4567",
+      "expected": true
+    },
+    {
+      "pattern": "^[0-9+()\\-\\s]{3,32}$",
+      "value": "123",
+      "expected": true
+    },
+    {
+      "pattern": "^[0-9+()\\-\\s]{3,32}$",
+      "value": "12",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9+()\\-\\s]{3,32}$",
+      "value": "123456789012345678901234567890123",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9+()\\-\\s]{3,32}$",
+      "value": "call me",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9+()\\-\\s]{3,32}$",
+      "value": "",
+      "expected": false
     }
   ]
 }

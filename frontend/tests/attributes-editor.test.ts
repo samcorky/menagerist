@@ -348,6 +348,76 @@ describe('rowsToAttributes with schema', () => {
 				original
 			);
 		});
+
+		it('coerces a money cell and omits it only when both sub-values are blank', () => {
+			const moneySchema = schema({
+				items: {
+					title: 'Items',
+					type: 'array',
+					items: {
+						type: 'object',
+						properties: {
+							name: { title: 'Name', type: 'string' },
+							price: {
+								title: 'Price',
+								type: 'object',
+								properties: {
+									value: { title: 'Value', type: 'number' },
+									currency: { title: 'Currency', type: 'string' }
+								},
+								'x-menagerist': { kind: 'money' }
+							}
+						}
+					}
+				}
+			});
+			const rows: AttributeRow[] = [
+				{ key: 'items', value: [{ name: 'Vase', price: { value: '45', currency: 'GBP' } }] }
+			];
+			expect(rowsToAttributes(rows, moneySchema)).toEqual({
+				items: [{ name: 'Vase', price: { value: 45, currency: 'GBP' } }]
+			});
+
+			const blankPrice: AttributeRow[] = [
+				{ key: 'items', value: [{ name: 'Bowl', price: { value: '', currency: '' } }] }
+			];
+			expect(rowsToAttributes(blankPrice, moneySchema)).toEqual({ items: [{ name: 'Bowl' }] });
+
+			const currencyOnly: AttributeRow[] = [
+				{ key: 'items', value: [{ name: 'Jug', price: { value: '', currency: 'GBP' } }] }
+			];
+			expect(rowsToAttributes(currencyOnly, moneySchema)).toEqual({
+				items: [{ name: 'Jug', price: { currency: 'GBP' } }]
+			});
+		});
+
+		it('round-trips a money column through attributesToRows then rowsToAttributes', () => {
+			const moneySchema = schema({
+				items: {
+					title: 'Items',
+					type: 'array',
+					items: {
+						type: 'object',
+						properties: {
+							name: { title: 'Name', type: 'string' },
+							price: {
+								title: 'Price',
+								type: 'object',
+								properties: {
+									value: { title: 'Value', type: 'number' },
+									currency: { title: 'Currency', type: 'string' }
+								},
+								'x-menagerist': { kind: 'money' }
+							}
+						}
+					}
+				}
+			});
+			const original = { items: [{ name: 'Vase', price: { value: 45, currency: 'GBP' } }] };
+			expect(rowsToAttributes(attributesToRows(original, moneySchema), moneySchema)).toEqual(
+				original
+			);
+		});
 	});
 
 	it('passes unknown keys through as strings regardless of schema', () => {
@@ -415,6 +485,58 @@ describe('rowsToAttributes with schema', () => {
 		it('round-trips a composite value end to end', () => {
 			const original = { weight: { value: 180, unit: 'g' } };
 			expect(rowsToAttributes(attributesToRows(original, quantitySchema), quantitySchema)).toEqual(
+				original
+			);
+		});
+	});
+
+	describe('money (type: object) fields', () => {
+		const moneySchema = schema({
+			price: {
+				title: 'Purchase price',
+				type: 'object',
+				properties: {
+					value: { title: 'Value', type: 'number' },
+					currency: { title: 'Currency', type: 'string' }
+				},
+				'x-menagerist': { kind: 'money' }
+			}
+		});
+
+		it('attributesToRows hydrates a money value as an editable flat row', () => {
+			expect(attributesToRows({ price: { value: 45, currency: 'GBP' } }, moneySchema)).toEqual([
+				{ key: 'price', value: { value: '45', currency: 'GBP' } }
+			]);
+		});
+
+		it('rowsToAttributes coerces and round-trips a money value', () => {
+			const rows: AttributeRow[] = [{ key: 'price', value: { value: '45', currency: 'GBP' } }];
+			expect(rowsToAttributes(rows, moneySchema)).toEqual({
+				price: { value: 45, currency: 'GBP' }
+			});
+		});
+
+		it('rowsToAttributes omits a money field whose sub-values are all blank', () => {
+			const rows: AttributeRow[] = [{ key: 'price', value: { value: '', currency: '' } }];
+			expect(rowsToAttributes(rows, moneySchema)).toEqual({});
+		});
+
+		it('rowsToAttributes keeps only an amount, or only a currency, as a partial value', () => {
+			// currency is a plain text sub-value, so a blank one is kept, same as quantity's unit.
+			const amountOnly: AttributeRow[] = [{ key: 'price', value: { value: '45', currency: '' } }];
+			expect(rowsToAttributes(amountOnly, moneySchema)).toEqual({
+				price: { value: 45, currency: '' }
+			});
+
+			const currencyOnly: AttributeRow[] = [
+				{ key: 'price', value: { value: '', currency: 'GBP' } }
+			];
+			expect(rowsToAttributes(currencyOnly, moneySchema)).toEqual({ price: { currency: 'GBP' } });
+		});
+
+		it('round-trips a money value end to end', () => {
+			const original = { price: { value: 45, currency: 'GBP' } };
+			expect(rowsToAttributes(attributesToRows(original, moneySchema), moneySchema)).toEqual(
 				original
 			);
 		});

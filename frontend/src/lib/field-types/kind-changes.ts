@@ -17,7 +17,13 @@ const ALLOWED: Record<string, string[]> = {
 	// Object-shaped like `group`: its stored value is `{value, unit}`, not a scalar, so it
 	// cannot become text without a shape change. Falls back to this anyway if omitted
 	// (`ALLOWED[original] ?? [original]`), but listed explicitly like every other kind.
-	quantity: ['quantity']
+	quantity: ['quantity'],
+	// Object-shaped like quantity: its stored value is `{value, currency}`, not a scalar.
+	money: ['money'],
+	// Plain strings, same as date: can degrade to text without losing data.
+	url: ['url', ...TO_TEXT],
+	email: ['email', ...TO_TEXT],
+	phone: ['phone', ...TO_TEXT]
 };
 
 /**

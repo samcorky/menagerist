@@ -4,12 +4,16 @@
 import './date/date';
 import './longtext/longtext';
 import './choice/choice';
+import './url/url';
+import './email/email';
+import './phone/phone';
 import './number/number';
 import './rating/rating';
 import './boolean/boolean';
 import './text/text';
 import './group/group';
 import './quantity/quantity';
+import './money/money';
 import './list/list';
 import './checklist/checklist';
 import './opaque/opaque';
