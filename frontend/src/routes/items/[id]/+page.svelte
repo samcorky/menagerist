@@ -30,6 +30,7 @@
 	import { normalise, isSectionItem } from '$lib/layout';
 	import { descriptorForProp } from '$lib/field-types';
 	import { formatDateTime, formatRelativeTime } from '$lib/format-date';
+	import { slugify } from '$lib/utils.js';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import TagList from '$lib/components/tag-list.svelte';
@@ -347,6 +348,24 @@
 		creatingEdge = false;
 	}
 
+	async function handleLinkAttributeValue(key: string, item: { id: string; name: string }) {
+		const label = mergeAttributeSchemas(nodeSchema, extraSchema)?.properties?.[key]?.title ?? key;
+		const slug = slugify(label);
+		const result = await createEdges({
+			body: { source_id: nodeId, target_ids: [item.id], type: slug, attributes: {} }
+		});
+		if (result.error || !result.data) {
+			const { title, description: desc } = networkAwareError(result);
+			toast.error(title, { description: desc });
+			return;
+		}
+		edges = [...edges, ...result.data.created];
+		toast(`Linked to ${item.name}`, {
+			action: { label: 'Undo', onClick: () => void undoCreateEdges(result.data.created) },
+			duration: 5000
+		});
+	}
+
 	async function undoCreateEdges(created: EdgeResponse[]) {
 		const createdIds = new Set(created.map((e) => e.id));
 		edges = edges.filter((e) => !createdIds.has(e.id));
@@ -550,6 +569,8 @@
 									supportsExtraFields={true}
 									nodeId={node?.id}
 									nodeTypeId={nodeTypes.find((nt) => nt.slug === node?.type)?.id}
+									nodeCandidates={otherNodes.map((n) => ({ id: n.id, name: n.name }))}
+									onLinkItem={handleLinkAttributeValue}
 									serverErrors={attributeServerErrors}
 									onPromoted={load}
 								/>

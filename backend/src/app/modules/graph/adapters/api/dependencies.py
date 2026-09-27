@@ -25,6 +25,7 @@ from app.modules.graph.application.get_edge import GetEdge
 from app.modules.graph.application.get_edge_type import GetEdgeType
 from app.modules.graph.application.get_node import GetNode
 from app.modules.graph.application.get_node_type import GetNodeType
+from app.modules.graph.application.list_attribute_values import ListAttributeValues
 from app.modules.graph.application.list_edge_types import ListEdgeTypes
 from app.modules.graph.application.list_edges import ListEdges
 from app.modules.graph.application.list_node_types import ListNodeTypes
@@ -212,6 +213,12 @@ def get_purge_node_type_attribute_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
 ) -> PurgeNodeTypeAttribute:
     return PurgeNodeTypeAttribute(uow)
+
+
+def get_list_attribute_values_use_case(
+    repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+) -> ListAttributeValues:
+    return ListAttributeValues(repos)
 
 
 def get_count_edge_type_attribute_usage_use_case(

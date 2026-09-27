@@ -24,11 +24,13 @@ from app.modules.graph.adapters.api.dependencies import (
     get_create_node_type_use_case,
     get_delete_node_type_use_case,
     get_get_node_type_use_case,
+    get_list_attribute_values_use_case,
     get_list_node_types_use_case,
     get_purge_node_type_attribute_use_case,
     get_update_node_type_use_case,
 )
 from app.modules.graph.adapters.api.node_type.schemas import (
+    AttributeValueCountResponse,
     CreateNodeTypeRequest,
     NodeTypeResponse,
     UpdateNodeTypeRequest,
@@ -43,6 +45,10 @@ from app.modules.graph.application.delete_node_type import (
     DeleteNodeTypeCommand,
 )
 from app.modules.graph.application.get_node_type import GetNodeType, GetNodeTypeQuery
+from app.modules.graph.application.list_attribute_values import (
+    ListAttributeValues,
+    ListAttributeValuesQuery,
+)
 from app.modules.graph.application.list_node_types import (
     ListNodeTypes,
     ListNodeTypesQuery,
@@ -216,6 +222,37 @@ async def count_node_type_attribute_usage(
         actor,
     )
     return AttributeUsageResponse(count=count)
+
+
+@router.get(
+    "/{node_type_id}/attribute/{key}/values",
+    response_model=list[AttributeValueCountResponse],
+    operation_id="list_attribute_values",
+    responses=error_response(
+        NodeTypeNotFoundError,
+        detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+    ),
+)
+async def list_attribute_values(
+    node_type_id: uuid.UUID,
+    key: str,
+    use_case: Annotated[
+        ListAttributeValues, Depends(get_list_attribute_values_use_case)
+    ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+    q: str | None = None,
+    limit: int = 20,
+) -> list[AttributeValueCountResponse]:
+    """List previously-used string values of `key` on nodes of this type.
+
+    Ordered most-used first, optionally filtered by a case-insensitive
+    substring `q`.
+    """
+    values = await use_case.handle(
+        ListAttributeValuesQuery(node_type_id=node_type_id, key=key, q=q, limit=limit),
+        actor,
+    )
+    return [AttributeValueCountResponse(value=v.value, count=v.count) for v in values]
 
 
 @router.delete(

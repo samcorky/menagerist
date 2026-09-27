@@ -284,3 +284,30 @@ class SqlAlchemyNodeRepository:
             stmt = stmt.where(NodeModel.id > after)
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
+
+    async def list_attribute_values(
+        self,
+        type_slug: str,
+        key: str,
+        *,
+        q: str | None = None,
+        limit: int = 20,
+    ) -> builtins.list[tuple[str, int]]:
+        """Distinct string values of `key` on non-deleted nodes of `type_slug`."""
+        logger.debug("listing attribute values", type_slug=type_slug, key=key)
+        raw_value = NodeModel.attributes[key]
+        value = raw_value.astext
+        stmt = (
+            select(value, func.count())
+            .where(
+                NodeModel.deleted_at.is_(None),
+                NodeModel.type == type_slug,
+                func.jsonb_typeof(raw_value) == "string",
+            )
+            .group_by(value)
+        )
+        if q is not None:
+            stmt = stmt.where(value.ilike(_like_pattern(q), escape=_LIKE_ESCAPE))
+        stmt = stmt.order_by(func.count().desc(), value.asc()).limit(limit)
+        result = await self._session.execute(stmt)
+        return [(row[0], row[1]) for row in result.all()]

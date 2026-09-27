@@ -107,3 +107,14 @@ class NodeTypeResponse(BaseModel):
             created_at=node_type.created_at,
             updated_at=node_type.updated_at,
         )
+
+
+class AttributeValueCountResponse(BaseModel):
+    """A previously-used attribute value and how many nodes hold it."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"value": "Draft", "count": 12}]}
+    )
+
+    value: str
+    count: int

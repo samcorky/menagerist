@@ -218,3 +218,47 @@ def test_attribute_usage_and_purge_can_target_a_group_sub_key() -> None:
     assert client.get(f"{base}/usage", params={"sub_key": "unit"}).json() == {
         "count": 0
     }
+
+
+def test_list_attribute_values_returns_distinct_values_most_used_first() -> None:
+    """Distinct string values are returned with counts, most-used first."""
+    client = TestClient(_app_with_in_memory_graph())
+    nt = client.post("/api/v1/node-type", json={"slug": "film", "label": "Film"}).json()
+    for name, status in [("A", "Draft"), ("B", "Draft"), ("C", "Live")]:
+        client.post(
+            "/api/v1/node",
+            json={"name": name, "type": "film", "attributes": {"status": status}},
+        )
+    base = f"/api/v1/node-type/{nt['id']}/attribute/status/values"
+
+    response = client.get(base)
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"value": "Draft", "count": 2},
+        {"value": "Live", "count": 1},
+    ]
+
+
+def test_list_attribute_values_can_filter_by_q() -> None:
+    """`?q=` filters values by a case-insensitive substring."""
+    client = TestClient(_app_with_in_memory_graph())
+    nt = client.post("/api/v1/node-type", json={"slug": "film", "label": "Film"}).json()
+    for name, status in [("A", "Draft"), ("B", "Live")]:
+        client.post(
+            "/api/v1/node",
+            json={"name": name, "type": "film", "attributes": {"status": status}},
+        )
+    base = f"/api/v1/node-type/{nt['id']}/attribute/status/values"
+
+    response = client.get(base, params={"q": "dra"})
+
+    assert response.json() == [{"value": "Draft", "count": 1}]
+
+
+def test_list_attribute_values_returns_404_for_missing_type() -> None:
+    """A missing node type is reported as 404."""
+    client = TestClient(_app_with_in_memory_graph())
+    base = f"/api/v1/node-type/{uuid.uuid4()}/attribute/status/values"
+
+    assert client.get(base).status_code == 404

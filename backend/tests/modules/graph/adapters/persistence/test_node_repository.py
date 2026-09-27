@@ -332,6 +332,49 @@ async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
     )
 
 
+async def test_list_attribute_values_counts_distinct_strings_most_used_first(
+    db_session: AsyncSession,
+) -> None:
+    """Only string-typed JSONB values count; ordered by count desc then value asc."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    deleted = Node.create(name="y", type="film", attributes={"status": "Draft"})
+    deleted.soft_delete()
+    for node in [
+        Node.create(name="a", type="film", attributes={"status": "Draft"}),
+        Node.create(name="b", type="film", attributes={"status": "Draft"}),
+        Node.create(name="c", type="film", attributes={"status": "Live"}),
+        Node.create(name="d", type="film", attributes={"status": 1}),
+        Node.create(name="e", type="film", attributes={"status": True}),
+        Node.create(name="f", type="film", attributes={"status": None}),
+        Node.create(name="g", type="film", attributes={}),
+        Node.create(name="h", type="book", attributes={"status": "Draft"}),
+        deleted,
+    ]:
+        await repository.add(node)
+
+    values = await repository.list_attribute_values("film", "status")
+
+    assert values == [("Draft", 2), ("Live", 1)]
+
+
+async def test_list_attribute_values_filters_by_q_and_limit(
+    db_session: AsyncSession,
+) -> None:
+    """`q` filters case-insensitively by substring; `limit` caps the results."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    for name, status in [("a", "Draft"), ("b", "Draft"), ("c", "Live")]:
+        await repository.add(
+            Node.create(name=name, type="film", attributes={"status": status})
+        )
+
+    assert await repository.list_attribute_values("film", "status", q="live") == [
+        ("Live", 1)
+    ]
+    assert await repository.list_attribute_values("film", "status", limit=1) == [
+        ("Draft", 2)
+    ]
+
+
 _BACKSLASH = chr(92)
 _EXCLUSIONS = {"film": ["old_note", "internal", "stars"]}
 

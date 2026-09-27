@@ -89,3 +89,21 @@ class NodeRepository(Protocol):
         where any row of that array holds `sub_key`.
         """
         ...
+
+    async def list_attribute_values(
+        self,
+        type_slug: str,
+        key: str,
+        *,
+        q: str | None = None,
+        limit: int = 20,
+    ) -> builtins.list[tuple[str, int]]:
+        """Distinct string values of `key` on non-deleted nodes of `type_slug`.
+
+        Returned with counts. Only string-typed values are considered
+        (numbers/booleans/nulls/objects/arrays are ignored). Case-sensitive
+        value grouping (exact string match), but `q` if given filters
+        case-insensitively by substring. Ordered by count descending, then
+        value ascending. At most `limit` rows.
+        """
+        ...

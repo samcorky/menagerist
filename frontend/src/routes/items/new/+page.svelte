@@ -197,6 +197,7 @@
 						bind:extraSchema
 						schema={nodeSchema}
 						supportsExtraFields={true}
+						nodeTypeId={nodeTypes.find((nt) => nt.slug === selectedType)?.id}
 						serverErrors={attrServerErrors}
 					/>
 

@@ -164,3 +164,26 @@ class InMemoryNodeRepository:
         if after is not None:
             nodes = [node for node in nodes if node.id > after]
         return nodes[:limit]
+
+    async def list_attribute_values(
+        self,
+        type_slug: str,
+        key: str,
+        *,
+        q: str | None = None,
+        limit: int = 20,
+    ) -> builtins.list[tuple[str, int]]:
+        """Distinct string values of `key` on non-deleted nodes of `type_slug`."""
+        counts: dict[str, int] = {}
+        for node in self._nodes.values():
+            if node.is_deleted or node.type != type_slug:
+                continue
+            value = node.attributes.get(key)
+            if not isinstance(value, str):
+                continue
+            counts[value] = counts.get(value, 0) + 1
+        if q is not None:
+            needle = q.casefold()
+            counts = {v: c for v, c in counts.items() if needle in v.casefold()}
+        ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+        return ordered[:limit]

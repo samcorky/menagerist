@@ -16,7 +16,7 @@
 	import { describeConstraints, parseConstraints } from '$lib/field-types/text/constraints';
 	import { createSafeValidator } from '$lib/safe-validator';
 	import { friendlyClientError, topLevelKey } from '$lib/validation-messages';
-	import { promoteExtraSchemaField } from '$lib/api/client';
+	import { listAttributeValues, promoteExtraSchemaField } from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
 	import FieldKindRow from '$lib/components/field-kind-row.svelte';
 	import PresetPickerDialog from '$lib/components/preset-picker-dialog.svelte';
@@ -32,6 +32,8 @@
 		supportsExtraFields = false,
 		nodeId,
 		nodeTypeId,
+		nodeCandidates = [],
+		onLinkItem,
 		onPromoted,
 		serverErrors = null
 	}: {
@@ -41,6 +43,8 @@
 		supportsExtraFields?: boolean;
 		nodeId?: string;
 		nodeTypeId?: string;
+		nodeCandidates?: { id: string; name: string }[];
+		onLinkItem?: (key: string, item: { id: string; name: string }) => void;
 		onPromoted?: () => void;
 		serverErrors?: Record<string, string> | null;
 	} = $props();
@@ -109,6 +113,25 @@
 			);
 		} else {
 			rows = [...rows, { key, value: value as string | GroupRow[] | GroupRow }];
+		}
+	}
+
+	// -- Value type-ahead for text fields on a node's own attributes -------------
+
+	let typeaheadOpenKey = $state<string | null>(null);
+	let previousValuesByKey = $state<Record<string, { value: string; count: number }[]>>({});
+
+	async function fetchPreviousValues(key: string, q: string) {
+		if (!nodeTypeId || !q) {
+			previousValuesByKey = { ...previousValuesByKey, [key]: [] };
+			return;
+		}
+		const result = await listAttributeValues({
+			path: { node_type_id: nodeTypeId, key },
+			query: { q, limit: 8 }
+		});
+		if (result.data) {
+			previousValuesByKey = { ...previousValuesByKey, [key]: result.data };
 		}
 	}
 
@@ -264,7 +287,69 @@
 					? 'ring-1 ring-destructive/60'
 					: ''}"
 			>
-				{#if Widget}
+				{#if desc?.kind === 'text' && nodeTypeId}
+					{@const currentValue = typeof getValue(key) === 'string' ? String(getValue(key)) : ''}
+					{@const previousValues = previousValuesByKey[key] ?? []}
+					{@const matchingCandidates =
+						nodeCandidates.length > 0 && onLinkItem
+							? nodeCandidates
+									.filter((c) => c.name.toLowerCase().includes(currentValue.toLowerCase()))
+									.slice(0, 8)
+							: []}
+					<div class="relative">
+						<Input
+							value={currentValue}
+							autocomplete="off"
+							oninput={(e) => {
+								const v = (e.target as HTMLInputElement).value;
+								setValue(key, v);
+								void fetchPreviousValues(key, v);
+							}}
+							onfocus={() => {
+								typeaheadOpenKey = key;
+								if (currentValue) void fetchPreviousValues(key, currentValue);
+							}}
+							onblur={() => setTimeout(() => (typeaheadOpenKey = null), 150)}
+							class="flex-1"
+							aria-label={prop.title || key}
+							aria-invalid={!!error}
+						/>
+						{#if typeaheadOpenKey === key && (previousValues.length > 0 || matchingCandidates.length > 0)}
+							<ul class="absolute z-50 mt-1 w-full rounded-md border bg-popover p-1 shadow-md">
+								{#each previousValues as pv (pv.value)}
+									<li>
+										<button
+											type="button"
+											class="flex w-full items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent"
+											onmousedown={() => {
+												setValue(key, pv.value);
+												typeaheadOpenKey = null;
+											}}
+										>
+											<span class="truncate">{pv.value}</span>
+											<span class="ml-2 shrink-0 text-xs text-muted-foreground">{pv.count}</span>
+										</button>
+									</li>
+								{/each}
+								{#each matchingCandidates as candidate (candidate.id)}
+									<li>
+										<button
+											type="button"
+											class="flex w-full items-center rounded px-2 py-1.5 text-sm hover:bg-accent"
+											onmousedown={() => {
+												onLinkItem?.(key, candidate);
+												setValue(key, '');
+												typeaheadOpenKey = null;
+											}}
+										>
+											<span class="truncate">{candidate.name}</span>
+										</button>
+									</li>
+								{/each}
+							</ul>
+						{/if}
+					</div>
+				{:else if Widget}
 					<Widget
 						value={getValue(key)}
 						onChange={(v) => setValue(key, v)}
