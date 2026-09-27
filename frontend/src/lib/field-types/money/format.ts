@@ -24,3 +24,9 @@ export function moneyText(raw: unknown): string {
 	const symbol = currencyByCode(code)?.symbol;
 	return symbol ? `${symbol}${amount}` : `${amount} ${code}`;
 }
+
+export function moneyCurrencyName(raw: unknown): string | undefined {
+	if (typeof raw !== 'object' || raw === null) return undefined;
+	const { currency } = raw as { currency?: unknown };
+	return typeof currency === 'string' ? currencyByCode(currency)?.name : undefined;
+}

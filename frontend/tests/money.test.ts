@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { moneyText } from '../src/lib/field-types/money/format';
+import { moneyCurrencyName, moneyText } from '../src/lib/field-types/money/format';
 import { CURRENCIES, currencyByCode } from '../src/lib/field-types/money/currencies';
 import { getDescriptor, fieldFromProperty, propertyFromField } from '../src/lib/field-types';
 import type { JsonSchemaProperty } from '../src/lib/schema-types';
@@ -29,6 +29,13 @@ describe('moneyText', () => {
 		expect(moneyText({ value: '45', currency: 'GBP' })).toBe('£45.00');
 		expect(moneyText({ value: 'not-a-number', currency: 'GBP' })).toBe('GBP');
 	});
+
+	it('looks up the full currency name for the money view tooltip', () => {
+		expect(moneyCurrencyName({ value: 45, currency: 'GPL' })).toBe('Gold-Pressed Latinum');
+		expect(moneyCurrencyName({ value: 45, currency: 'GBP' })).toBe('British Pound');
+		expect(moneyCurrencyName({ value: 45, currency: 'ZZZ' })).toBeUndefined();
+		expect(moneyCurrencyName({ value: 45 })).toBeUndefined();
+	});
 });
 
 describe('currencies', () => {
@@ -48,6 +55,12 @@ describe('currencies', () => {
 
 	it('returns undefined for an unknown code', () => {
 		expect(currencyByCode('ZZZ')).toBeUndefined();
+	});
+
+	it('includes fictional currencies as selectable options', () => {
+		expect(currencyByCode('GPL')).toEqual({ code: 'GPL', name: 'Gold-Pressed Latinum' });
+		expect(currencyByCode('ZRU')).toEqual({ code: 'ZRU', name: 'Hyrule Rupee' });
+		expect(moneyText({ value: 25, currency: 'GPL' })).toBe('25.00 GPL');
 	});
 });
 

@@ -76,11 +76,20 @@
 		return Wrench;
 	}
 
+	function latestObservationTime(report: ReadyResponse): Date | null {
+		let latest = Number.NEGATIVE_INFINITY;
+		for (const observation of Object.values(report.checks).flat()) {
+			const timestamp = Date.parse(observation.time);
+			if (Number.isFinite(timestamp) && timestamp > latest) latest = timestamp;
+		}
+		return Number.isFinite(latest) ? new Date(latest) : null;
+	}
+
 	let ready = $state<ReadyResponse | null>(null);
 	let version = $state<VersionResponse | null>(null);
 	let loading = $state(true);
 	let loadError = $state<string | null>(null);
-	let lastChecked = $state<Date | null>(null);
+	let lastCheckTime = $state<Date | null>(null);
 	let refreshing = $state(false);
 	let autoRefreshEnabled = $state(true);
 	const autoRefreshMs = 30000;
@@ -159,8 +168,8 @@
 			]);
 
 			ready = (await readyRes.json()) as ReadyResponse;
+			lastCheckTime = latestObservationTime(ready);
 			version = versionRes.data as VersionResponse;
-			lastChecked = new Date();
 		} catch (err) {
 			loadError = err instanceof Error ? err.message : 'Unknown error';
 		} finally {
@@ -182,7 +191,10 @@
 	});
 
 	function formatTime(date: Date): string {
-		return date.toLocaleTimeString(undefined, {
+		return date.toLocaleString(undefined, {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
 			hour: '2-digit',
 			minute: '2-digit',
 			second: '2-digit'
@@ -204,9 +216,9 @@
 					Operations
 				</p>
 				<h1 class="font-heading text-3xl font-semibold tracking-tight">System Status</h1>
-				{#if lastChecked}
+				{#if lastCheckTime}
 					<p class="mt-1 text-sm text-muted-foreground">
-						Last checked at {formatTime(lastChecked)}
+						Health checks last ran at {formatTime(lastCheckTime)}
 					</p>
 				{/if}
 				<p class="mt-1 text-xs text-muted-foreground">

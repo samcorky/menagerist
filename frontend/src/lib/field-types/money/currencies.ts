@@ -1,4 +1,4 @@
-/** A curated, active ISO 4217 currency: three-letter code, common name, and symbol when one exists. */
+/** A currency option: three-letter code, common name, and symbol when one exists. */
 export type Currency = { code: string; name: string; symbol?: string };
 
 // Active ISO 4217 currencies. Not every symbol-bearing currency lists one here - only where a
@@ -157,7 +157,10 @@ export const CURRENCIES: Currency[] = [
 	{ code: 'YER', name: 'Yemeni Rial' },
 	{ code: 'ZAR', name: 'South African Rand', symbol: 'R' },
 	{ code: 'ZMW', name: 'Zambian Kwacha' },
-	{ code: 'ZWL', name: 'Zimbabwean Dollar' }
+	{ code: 'ZWL', name: 'Zimbabwean Dollar' },
+	// Fictional currencies use app-local codes and are not ISO 4217 currencies.
+	{ code: 'GPL', name: 'Gold-Pressed Latinum' },
+	{ code: 'ZRU', name: 'Hyrule Rupee' }
 ];
 
 const byCode = new Map(CURRENCIES.map((c) => [c.code, c]));
