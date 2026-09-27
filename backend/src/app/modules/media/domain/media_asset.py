@@ -97,7 +97,7 @@ class MediaAsset(Identifiable, Timestamped):
         """Record that a thumbnail has been generated for this asset.
 
         `sha256` is the hash of the thumbnail's own bytes, not the
-        original's — thumbnails are cached under it independently so
+        original's - thumbnails are cached under it independently so
         that regenerating one (e.g. a thumbnailing bug fix) changes its
         cache key even though the original file's `sha256` never does.
         """

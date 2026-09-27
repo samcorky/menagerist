@@ -56,7 +56,7 @@ export type FieldTypeDescriptor = {
   /**
    * Attempt to deserialise a JSON Schema property into an EditorField.
    * Return null if this descriptor does not match the property shape.
-   * Registration order in index.ts determines precedence — most-specific first.
+   * Registration order in index.ts determines precedence - most-specific first.
    */
   fromSchema: (key: string, prop: JsonSchemaProperty, required: boolean) => EditorField | null;
   /**
@@ -80,7 +80,7 @@ export type FieldTypeDescriptor = {
 
 | Kind | JSON Schema shape | Backend validated | Notes |
 |---|---|---|---|
-| `text` | `{ type: 'string' }`, optionally with an anchored `pattern` or an `allOf` of two (see "Text constraints") | ✅ type + pattern | Fallback — matched last |
+| `text` | `{ type: 'string' }`, optionally with an anchored `pattern` or an `allOf` of two (see "Text constraints") | ✅ type + pattern | Fallback - matched last |
 | `number` | `{ type: 'number' }` | ✅ type | |
 | `boolean` | `{ type: 'boolean' }` | ✅ type | |
 | `date` | `{ type: 'string', format: 'date' }` | ✅ type + format | `jsonschema[format-nongpl]` validates ISO 8601 dates |
@@ -89,7 +89,7 @@ export type FieldTypeDescriptor = {
 | `rating` | `{ type: 'number', minimum: 1, maximum: 5, multipleOf: 1 }` with `x-menagerist.kind: "rating"` | ✅ range + whole numbers | Star widget; only matched by its explicit `kind`, so it never captures a plain number. Unset is omitted. May be a group sub-field |
 | `group` | `{ type: 'array', items: { type: 'object', properties: {...} } }` | ✅ structure + sub-fields | Sub-fields are validated recursively |
 | `list` | `{ type: 'array', items: { type: 'string' } }` with `x-menagerist.kind: "list"` | ✅ structure | Ordered free-text items; numbered/bulleted is display-only, storage is unaffected. Only matched by its explicit `kind`. Not a group sub-field |
-| `checklist` | `{ type: 'array', items: { type: 'object', properties: { text, done } } }` with `x-menagerist.kind: "checklist"` | ✅ structure | Each item's `done` tick is real persisted data, not a display choice — see "Ordered list and checklist" below for why this needed its own kind rather than being a `list` display variant. Only matched by its explicit `kind`. Not a group sub-field |
+| `checklist` | `{ type: 'array', items: { type: 'object', properties: { text, done } } }` with `x-menagerist.kind: "checklist"` | ✅ structure | Each item's `done` tick is real persisted data, not a display choice - see "Ordered list and checklist" below for why this needed its own kind rather than being a `list` display variant. Only matched by its explicit `kind`. Not a group sub-field |
 
 ### Registration order in `index.ts`
 
@@ -101,7 +101,7 @@ import './choice';      // string + enum
 import './number';
 import './rating';    // number + kind: rating (explicit kind only)
 import './boolean';
-import './text';        // plain string — fallback, must be last among scalars
+import './text';        // plain string - fallback, must be last among scalars
 import './group';       // after scalars so sub-field fromSchema lookups work
 ```
 
@@ -186,10 +186,10 @@ The backend uses `jsonschema[format-nongpl]` (see `pyproject.toml`) which regist
 
 | Field type scenario | Backend work needed |
 |---|---|
-| Uses only standard JSON Schema keywords (`type`, `enum`, `properties`, `items`) | **None** — validated automatically |
-| Uses a standard `format` string (`date`, `uri`, `email`, etc.) | **None** — covered by `jsonschema[format-nongpl]` |
-| Uses a custom `format` string (e.g. `format: 'isbn'`) | **Yes** — register a format checker |
-| Uses metadata in `x-menagerist` (e.g. `kind`, `display`) | **None** — unknown keywords are ignored by the validator |
+| Uses only standard JSON Schema keywords (`type`, `enum`, `properties`, `items`) | **None** - validated automatically |
+| Uses a standard `format` string (`date`, `uri`, `email`, etc.) | **None** - covered by `jsonschema[format-nongpl]` |
+| Uses a custom `format` string (e.g. `format: 'isbn'`) | **Yes** - register a format checker |
+| Uses metadata in `x-menagerist` (e.g. `kind`, `display`) | **None** - unknown keywords are ignored by the validator |
 
 ### Registering a custom format checker
 
@@ -212,14 +212,14 @@ Import the module in the API entrypoint for its side-effect:
 import app.platform.jsonschema_formats  # noqa: F401
 ```
 
-No other changes are required — `_validate_attributes.py` picks up all registered checkers via `FORMAT_CHECKER`.
+No other changes are required - `_validate_attributes.py` picks up all registered checkers via `FORMAT_CHECKER`.
 
 ### Alignment checklist for a new field type
 
-- [ ] `frontend/src/lib/field-types/<kind>.ts` — descriptor with `toSchema` / `fromSchema`
-- [ ] `frontend/src/lib/field-types/<kind>-input.svelte` — `InputWidget` component
-- [ ] (optional) `<kind>-extras.svelte` — `EditorExtras` for custom schema-editor controls
-- [ ] (optional) `<kind>-view.svelte` — `ViewWidget` for read-mode display
+- [ ] `frontend/src/lib/field-types/<kind>.ts` - descriptor with `toSchema` / `fromSchema`
+- [ ] `frontend/src/lib/field-types/<kind>-input.svelte` - `InputWidget` component
+- [ ] (optional) `<kind>-extras.svelte` - `EditorExtras` for custom schema-editor controls
+- [ ] (optional) `<kind>-view.svelte` - `ViewWidget` for read-mode display
 - [ ] Add the shape to the `JsonSchemaProperty` union in `schema-types.ts` if new
 - [ ] Register in `field-types/index.ts` at the correct position (most-specific first)
 - [ ] **If using a custom `format`:** register a format checker in `platform/jsonschema_formats.py` and import it from the API entrypoint
@@ -285,17 +285,19 @@ The item list's `q` also searches attribute values (see `docs/DECISIONS.md`). Ba
 
 ### Per-item typed fields (`extra_schema`, "Add field")
 
-A node may carry `extra_schema`, a schema in the same shape as a node type's `attributes_schema`, adding fields to that one item only (nodes only in v1, not edges). `application/schema_meta.merge_attribute_schemas` (backend) / `lib/schema-meta.ts`'s `mergeAttributeSchemas` (frontend, mirrors it) combine a node's type schema and its `extra_schema` for validation; a key defined by both is rejected. `highlights` is not merged — only a type's own schema controls card highlights.
+A node may carry `extra_schema`, a schema in the same shape as a node type's `attributes_schema`, adding fields to that one item only (nodes only in v1, not edges). `application/schema_meta.merge_attribute_schemas` (backend) / `lib/schema-meta.ts`'s `mergeAttributeSchemas` (frontend, mirrors it) combine a node's type schema and its `extra_schema` for validation; a key defined by both is rejected. `highlights` is not merged - only a type's own schema controls card highlights.
 
-**Editor UI.** `attributes-editor.svelte` renders overlay fields through the same `fieldEntry` snippet as type fields (identical widgets, identical validation — the merged schema drives both). "Add field" opens an inline `field-kind-row.svelte` (extracted from the schema editor's own field-creation row: label, kind picker, kind-specific extras) — full registry of kinds, not a restricted subset. On confirm, the key is generated via `generateFieldKey` (`lib/field-key.ts`) against the union of the type's and the overlay's existing keys, so it can never collide with either. Removing a field drops it from `extraSchema` and its value from `attributes`, with a 5-second Undo. Limit: `MAX_EXTRA_SCHEMA_FIELDS` (50, `extra_schema_limits.py` backend / matching literal in `attributes-editor.svelte`) on the overlay's property count; no label-length cap (a label is an ordinary `title`, same as a schema field's).
+**Editor UI.** `attributes-editor.svelte` renders overlay fields through the same `fieldEntry` snippet as type fields (identical widgets, identical validation - the merged schema drives both). "Add field" opens an inline `field-kind-row.svelte` (extracted from the schema editor's own field-creation row: label, kind picker, kind-specific extras) - full registry of kinds, not a restricted subset. On confirm, the key is generated via `generateFieldKey` (`lib/field-key.ts`) against the union of the type's and the overlay's existing keys, so it can never collide with either. Removing a field drops it from `extraSchema` and its value from `attributes`, with a 5-second Undo. Limit: `MAX_EXTRA_SCHEMA_FIELDS` (50, `extra_schema_limits.py` backend / matching literal in `attributes-editor.svelte`) on the overlay's property count; no label-length cap (a label is an ordinary `title`, same as a schema field's).
 
-**Promoting a field to the item type.** "Make this a field on `<item type>`" (shown only when the node has a type) calls `POST /node/{node_id}/attribute/{key}/promote`, backed by `application/promote_extra_schema_field.py`'s `PromoteExtraSchemaField`: composes `UpdateNodeType` (add the property) and `UpdateNode` (remove it from the overlay) through `JoinedUnitOfWork` — one transaction, the same pattern `media/application/upload_and_attach_media.py` uses. The value is untouched (it already satisfied the property's schema as an overlay field). A node's `extra_schema` can never be cleared by sending `null` — `UpdateNode`'s `extra_schema=None` means "leave unchanged" (`node.py`'s own convention, shared with every other optional field on that command) — so both this command and `attributes-editor.svelte`'s remove-the-last-field path always write a real `{"properties": {}}` object instead, never `null`.
+**Promoting a field to the item type.** "Make this a field on `<item type>`" (shown only when the node has a type) calls `POST /node/{node_id}/attribute/{key}/promote`, backed by `application/promote_extra_schema_field.py`'s `PromoteExtraSchemaField`: composes `UpdateNodeType` (add the property) and `UpdateNode` (remove it from the overlay) through `JoinedUnitOfWork` - one transaction, the same pattern `media/application/upload_and_attach_media.py` uses. The value is untouched (it already satisfied the property's schema as an overlay field). A node's `extra_schema` can never be cleared by sending `null` - `UpdateNode`'s `extra_schema=None` means "leave unchanged" (`node.py`'s own convention, shared with every other optional field on that command) - so both this command and `attributes-editor.svelte`'s remove-the-last-field path always write a real `{"properties": {}}` object instead, never `null`.
 
 **Superseded:** the old loose, untyped "Additional details" model (`lib/attribute-rows.ts`'s `AttributeRow.extra`, `newDetailRow`, and `lib/custom-details.ts`) is gone, along with per-connection custom fields (edges have no overlay). See `docs/field-types-spec/wi-18-per-item-custom-fields.md`'s "Revised design" for the full history and reasoning.
 
 ### Saved fields and lists (presets)
 
-A `field` or `choice_list` preset can be saved from the schema editor ("Save for reuse" on a field; "Save these options as a list" on a choice field) and applied to another item type ("Add from saved fields…"; "Use a saved list"), via the new `presets` backend module (`POST /preset`, `GET /preset`, `PATCH /preset/{id}`, `DELETE /preset/{id}`). Applying copies the definition with a fresh key and writes `x-menagerist.origin: {preset, version}`; a choice field whose linked preset has a newer version shows "Update options" (with the existing in-use warning). Manage saved presets at `settings/saved-fields`. `$lib/presets.ts` holds the frontend conversion helpers (`fieldToDefinition`, `definitionToField`, `optionsToDefinition`, `listUpdateAvailable`).
+A `field`, `field_set` or `choice_list` preset can be saved from the schema editor ("Save for reuse" on a field; "Save field group for reuse" on a section; "Save these options as a list" on a choice field) and applied to another item type ("Add from saved fields…"; "Add saved field group…"; "Use a saved list"), via the `presets` backend module (`POST /preset`, `GET /preset`, `PATCH /preset/{id}`, `DELETE /preset/{id}`), which already stores and validates all three kinds generically (`preset_definitions.check_definition`). Applying a field or a field group's properties copies each with a fresh key and writes `x-menagerist.origin: {preset, version}`; a field group's properties are inserted as a new labelled section. A choice field whose linked preset has a newer version shows "Update options" (with the existing in-use warning). Manage saved presets at `settings/saved-fields` (Fields, Lists, Field groups). `$lib/presets.ts` holds the frontend conversion helpers (`fieldToDefinition`, `definitionToField`, `fieldSetToDefinition`, `definitionToFieldSet`, `optionsToDefinition`, `listUpdateAvailable`).
+
+A field group can also be applied ad hoc to a single item: `attributes-editor.svelte`'s "Add saved field group…" (shown alongside "Add field" whenever `supportsExtraFields`) merges the group's properties into the item's `extra_schema` overlay with fresh keys (same key-generation path as "Add field"), rather than the node type's schema - the fields stay per-item unless promoted individually afterwards with the existing "Make this a field" action. Applying a field group directly to a node type's own schema (rather than a single item) uses the schema editor's own "Add saved field group…", above.
 
 ### Table (group) column order
 
@@ -315,10 +317,10 @@ A `group` field's own `x-menagerist.columns` records its sub-property keys in or
 
 The backend's per-key usage/purge endpoints (`GET .../attribute/{key}/usage`, `DELETE .../attribute/{key}`, both node-type and edge-type) take an optional `sub_key`: with it, `key` names a group array and matching happens against each row (`jsonb_array_elements`, not raw JSON path strings) instead of the top-level value. `count_with_attribute`/`list_with_attribute` on both repositories, and `Count/PurgeNodeTypeAttributeUsage`/`Count/PurgeEdgeTypeAttributeUsage`, take the same optional `sub_key`; purge with `sub_key` strips only that key from each row, leaving the array and the rest of each row in place.
 
-The frontend mirrors the two existing top-level patterns, scoped to `{key, sub_key}`: removing a choice column's option removes it immediately and shows a non-blocking "used by N" advisory after the fact (WI-10 style, `optionRemovalWarning`); removing a column itself queries usage first and, if any items hold it, shows an inline confirm ("used by N, cannot be undone") before actually removing (WI-9 style, `purgeWarning`) rather than the silent immediate removal columns had before. Unlike a top-level field, a removed column has no archive/restore step — confirming just splices it out of the schema; there is no separate purge call to make since removing the column already is the permanent action.
+The frontend mirrors the two existing top-level patterns, scoped to `{key, sub_key}`: removing a choice column's option removes it immediately and shows a non-blocking "used by N" advisory after the fact (WI-10 style, `optionRemovalWarning`); removing a column itself queries usage first and, if any items hold it, shows an inline confirm ("used by N, cannot be undone") before actually removing (WI-9 style, `purgeWarning`) rather than the silent immediate removal columns had before. Unlike a top-level field, a removed column has no archive/restore step - confirming just splices it out of the schema; there is no separate purge call to make since removing the column already is the permanent action.
 
 ### Ordered list and checklist (WI-25)
 
-`list` stores a plain array of free-text strings (`docs/field-types-spec/wi-25-ordered-list-and-checklist-field-types.md`), with a `display: 'numbered' | 'bulleted'` "Show as" option that is purely cosmetic — the numbered/bulleted choice never changes what is stored, same principle as boolean's switch/checkbox/buttons. Order needs no `x-menagerist.columns`-style bookkeeping the way `group` does: JSONB reorders an *object's* keys, not a JSON *array*'s element order, so a list's positions survive a save/reload for free.
+`list` stores a plain array of free-text strings (`docs/field-types-spec/wi-25-ordered-list-and-checklist-field-types.md`), with a `display: 'numbered' | 'bulleted'` "Show as" option that is purely cosmetic - the numbered/bulleted choice never changes what is stored, same principle as boolean's switch/checkbox/buttons. Order needs no `x-menagerist.columns`-style bookkeeping the way `group` does: JSONB reorders an *object's* keys, not a JSON *array*'s element order, so a list's positions survive a save/reload for free.
 
-`checklist` stores an array of `{text: string, done: boolean}` rows — deliberately **not** a `list` display variant, because a checklist item's tick is real per-item data that gets persisted, and `list`'s `display` option is designed to never affect storage. Both kinds' raw stored values are an array (of strings, or of plain objects), and a checklist's shape in particular collides with `group`'s own array-of-objects rows and with `attribute-rows.ts`'s generic `isGroupValue` catch-all (used for any array-of-objects value under a key the schema doesn't type). `attributesToRows` checks the schema's declared `x-menagerist.kind` for `checklist` *before* falling through to that generic path — reversing the order would silently coerce a checklist's `done: true`/`false` through `coerceGroupRow`'s string-only cell coercion and always produce `false`. Both kinds are matched only by an explicit `kind`, `canBeSubField: false`, and not highlightable.
+`checklist` stores an array of `{text: string, done: boolean}` rows - deliberately **not** a `list` display variant, because a checklist item's tick is real per-item data that gets persisted, and `list`'s `display` option is designed to never affect storage. Both kinds' raw stored values are an array (of strings, or of plain objects), and a checklist's shape in particular collides with `group`'s own array-of-objects rows and with `attribute-rows.ts`'s generic `isGroupValue` catch-all (used for any array-of-objects value under a key the schema doesn't type). `attributesToRows` checks the schema's declared `x-menagerist.kind` for `checklist` *before* falling through to that generic path - reversing the order would silently coerce a checklist's `done: true`/`false` through `coerceGroupRow`'s string-only cell coercion and always produce `false`. Both kinds are matched only by an explicit `kind`, `canBeSubField: false`, and not highlightable.

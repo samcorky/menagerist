@@ -23,9 +23,9 @@
 				icon: PackageSearch,
 				heading: "We couldn't find this page",
 				description: "The page you're looking for doesn't exist, or may have been moved.",
-				primaryLabel: 'Back to collection',
+				primaryLabel: 'Back to items',
 				primaryAction: 'href',
-				primaryHref: resolve('/collection')
+				primaryHref: resolve('/items')
 			};
 		}
 		if (status >= 500 && status < 600) {
@@ -36,7 +36,7 @@
 					'Something went wrong on our end. Try reloading the page, or check back in a moment.',
 				primaryLabel: 'Reload',
 				primaryAction: 'reload',
-				secondaryLabel: 'Back to collection',
+				secondaryLabel: 'Back to items',
 				secondaryHref: resolve('/')
 			};
 		}
@@ -46,7 +46,7 @@
 			description: 'An unexpected error occurred. Try reloading the page.',
 			primaryLabel: 'Reload',
 			primaryAction: 'reload',
-			secondaryLabel: 'Back to collection',
+			secondaryLabel: 'Back to items',
 			secondaryHref: resolve('/')
 		};
 	});
@@ -55,7 +55,7 @@
 </script>
 
 <svelte:head>
-	<title>Error {page.status} — Menagerist</title>
+	<title>Error {page.status} - Menagerist</title>
 </svelte:head>
 
 <main class="flex-1 px-4 py-8 sm:px-6">

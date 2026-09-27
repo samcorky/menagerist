@@ -26,7 +26,7 @@
 
 <Item.Root variant="outline">
 	{#snippet child({ props })}
-		<a {...props} href={resolve('/collection/[id]', { id: item.id })}>
+		<a {...props} href={resolve('/items/[id]', { id: item.id })}>
 			<Item.Content class="gap-1.5">
 				<Item.Title class="font-heading text-base">{item.name}</Item.Title>
 				{#if item.description}

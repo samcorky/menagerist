@@ -7,7 +7,12 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
-	import type { ChoiceListDefinition, FieldDefinition, Preset } from '$lib/presets';
+	import type {
+		ChoiceListDefinition,
+		FieldDefinition,
+		FieldSetDefinition,
+		Preset
+	} from '$lib/presets';
 
 	let {
 		open,
@@ -17,8 +22,8 @@
 		onSaved
 	}: {
 		open: boolean;
-		kind: 'field' | 'choice_list';
-		definition: FieldDefinition | ChoiceListDefinition;
+		kind: 'field' | 'field_set' | 'choice_list';
+		definition: FieldDefinition | FieldSetDefinition | ChoiceListDefinition;
 		onOpenChange: (open: boolean) => void;
 		onSaved: (preset: Preset) => void;
 	} = $props();

@@ -191,7 +191,7 @@
 </script>
 
 <svelte:head>
-	<title>System Status — Menagerist</title>
+	<title>System Status - Menagerist</title>
 </svelte:head>
 
 <main class="flex-1 px-4 py-8 sm:px-6">

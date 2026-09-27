@@ -67,7 +67,7 @@ def _app_with_failing_db() -> FastAPI:
 
 
 # ---------------------------------------------------------------------------
-# Unit tests — no Docker / real database required
+# Unit tests - no Docker / real database required
 # ---------------------------------------------------------------------------
 
 
@@ -108,7 +108,7 @@ def test_readiness_503_when_db_unreachable() -> None:
 
 
 def test_readiness_output_absent_on_passing_checks() -> None:
-    """Passing checks must omit output entirely — not serialize it as null."""
+    """Passing checks must omit output entirely - not serialize it as null."""
     engine = _make_mock_engine(checkedout=0, pool_size=5)
     with patch(_PATCH_GET_ENGINE, return_value=engine):
         client = TestClient(_app_with_failing_db())
@@ -180,7 +180,7 @@ def test_readiness_reports_warn_status_without_503() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Integration tests — require a real Postgres (testcontainers)
+# Integration tests - require a real Postgres (testcontainers)
 # ---------------------------------------------------------------------------
 
 

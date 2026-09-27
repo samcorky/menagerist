@@ -19,6 +19,8 @@
 	import { promoteExtraSchemaField } from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
 	import FieldKindRow from '$lib/components/field-kind-row.svelte';
+	import PresetPickerDialog from '$lib/components/preset-picker-dialog.svelte';
+	import { definitionToFieldSet, type FieldSetDefinition, type Preset } from '$lib/presets';
 
 	/** Matches the backend's `MAX_EXTRA_SCHEMA_FIELDS` (extra_schema_limits.py). */
 	const MAX_EXTRA_SCHEMA_FIELDS = 50;
@@ -164,7 +166,7 @@
 		const previousRows = $state.snapshot(rows) as AttributeRow[];
 		// itemsToSchema returns null for an empty item list, but the backend's
 		// UpdateNode treats a null extra_schema as "leave unchanged" (same fix as
-		// PromoteExtraSchemaField) — build a real, empty schema instead so removing
+		// PromoteExtraSchemaField) - build a real, empty schema instead so removing
 		// the last overlay field and saving actually clears it server-side.
 		extraSchema = itemsToSchema(remainingItems, readSchemaMeta(extraSchema), []) ?? {
 			$schema: 'https://json-schema.org/draft/2020-12/schema',
@@ -182,6 +184,34 @@
 			},
 			duration: 5000
 		});
+	}
+
+	// Ad hoc field groups ("Add saved field group") -----------------------------
+
+	let fieldSetPickerOpen = $state(false);
+
+	function addFieldSetFromPreset(preset: Preset) {
+		const definition = preset.definition as FieldSetDefinition;
+		const section = definitionToFieldSet(
+			definition,
+			{ preset: preset.id, version: preset.version },
+			'field-set'
+		);
+		const taken = [
+			...Object.keys(schema?.properties ?? {}),
+			...Object.keys(extraSchema?.properties ?? {})
+		];
+		const newFields: EditorField[] = [];
+		for (const field of section.fields) {
+			const key = generateFieldKey(field.label, [...taken, ...newFields.map((f) => f.key)]);
+			newFields.push({ ...field, key, keyPending: false });
+		}
+		const items = schemaToItems(extraSchema).filter((i): i is EditorField => !isSection(i));
+		extraSchema = itemsToSchema([...items, ...newFields], readSchemaMeta(extraSchema), []);
+		rows = [
+			...rows,
+			...newFields.map((f) => ({ key: f.key, value: f.kind === 'boolean' ? 'false' : '' }))
+		];
 	}
 
 	let promotingKey = $state<string | null>(null);
@@ -349,16 +379,27 @@
 				</div>
 			</div>
 		{:else}
-			<Button
-				type="button"
-				variant="outline"
-				size="sm"
-				onclick={startAddField}
-				disabled={extraFieldCount >= MAX_EXTRA_SCHEMA_FIELDS}
-			>
-				<Plus class="size-4" />
-				Add field
-			</Button>
+			<div class="flex flex-wrap gap-2">
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					onclick={startAddField}
+					disabled={extraFieldCount >= MAX_EXTRA_SCHEMA_FIELDS}
+				>
+					<Plus class="size-4" />
+					Add field
+				</Button>
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					onclick={() => (fieldSetPickerOpen = true)}
+					disabled={extraFieldCount >= MAX_EXTRA_SCHEMA_FIELDS}
+				>
+					Add saved field group…
+				</Button>
+			</div>
 			{#if extraFieldCount >= MAX_EXTRA_SCHEMA_FIELDS}
 				<p class="text-xs text-muted-foreground">
 					You can add up to {MAX_EXTRA_SCHEMA_FIELDS} extra fields.
@@ -367,3 +408,11 @@
 		{/if}
 	{/if}
 </div>
+
+<PresetPickerDialog
+	open={fieldSetPickerOpen}
+	kind="field_set"
+	title="Add saved field group"
+	onOpenChange={(v) => (fieldSetPickerOpen = v)}
+	onPick={addFieldSetFromPreset}
+/>

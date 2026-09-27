@@ -28,7 +28,7 @@ source .venv/bin/activate       # Linux/macOS
 .venv\Scripts\Activate.ps1      # Windows PowerShell
 ```
 
-Skipping activation is fine too — just prefix each command with `uv run` instead, e.g. `uv run poe test`.
+Skipping activation is fine too - just prefix each command with `uv run` instead, e.g. `uv run poe test`.
 
 Start the full stack (Docker required):
 
@@ -69,7 +69,7 @@ poe db-up / poe db-down       # start/stop the local Postgres container
 poe typecheck   # mypy --strict + svelte-check + tsc
 poe lint        # ruff check + prettier + eslint
 poe format      # ruff format + prettier (writes in place)
-poe check       # full pre-commit hooks + coverage gate (re-syncs deps first — this is what CI runs)
+poe check       # full pre-commit hooks + coverage gate (re-syncs deps first - this is what CI runs)
 poe check-changed # run pre-commit checks on changed files only
 ```
 
@@ -79,8 +79,8 @@ poe check-changed # run pre-commit checks on changed files only
 
 ```sh
 poe test                      # all unit tests (backend + frontend)
-poe test-backend              # backend unit + router tests — fast, no infrastructure needed
-poe test-backend-integration  # backend integration tests — requires live Postgres
+poe test-backend              # backend unit + router tests - fast, no infrastructure needed
+poe test-backend-integration  # backend integration tests - requires live Postgres
 poe test-backend-all          # unit + integration with combined coverage data
 poe test-frontend             # Vitest unit tests
 poe coverage                  # full test suite + enforce all coverage thresholds
@@ -93,15 +93,15 @@ Tests mirror the source layout under `backend/tests/`:
 ```
 tests/
 ├── modules/<context>/
-│   ├── domain/         # pure unit tests — no infrastructure
-│   ├── application/    # use-case tests — in-memory adapters only
+│   ├── domain/         # pure unit tests - no infrastructure
+│   ├── application/    # use-case tests - in-memory adapters only
 │   └── adapters/
-│       ├── api/        # router tests — FastAPI TestClient + in-memory adapters
-│       └── persistence/# @pytest.mark.integration — require live Postgres
-└── architecture/       # archunitpython dependency-rule tests — always run, no infrastructure
+│       ├── api/        # router tests - FastAPI TestClient + in-memory adapters
+│       └── persistence/# @pytest.mark.integration - require live Postgres
+└── architecture/       # archunitpython dependency-rule tests - always run, no infrastructure
 ```
 
-**Use in-memory adapters, not mocks.** Every port ships a first-class in-memory implementation in `adapters/persistence/` as a sibling to the real adapter. Use those in domain, application, and router tests. `unittest.mock` is not used for repository or service boundaries — in-memory adapters exercise the real port contract.
+**Use in-memory adapters, not mocks.** Every port ships a first-class in-memory implementation in `adapters/persistence/` as a sibling to the real adapter. Use those in domain, application, and router tests. `unittest.mock` is not used for repository or service boundaries - in-memory adapters exercise the real port contract.
 
 **Integration tests** are tagged `@pytest.mark.integration`. They are excluded from `poe test-backend` and connect to a real Postgres instance.
 
@@ -118,7 +118,7 @@ Enforced by Codecov on every PR and locally via `poe coverage`:
 | adapters | 80% |
 | platform | 70% |
 
-`ports/` holds `Protocol` interfaces — the stub method bodies (`...`) never execute, so a hard 100% floor wouldn't test anything real. Codecov tracks it for visibility (`target: auto` in `codecov.yml`) without gating on it.
+`ports/` holds `Protocol` interfaces - the stub method bodies (`...`) never execute, so a hard 100% floor wouldn't test anything real. Codecov tracks it for visibility (`target: auto` in `codecov.yml`) without gating on it.
 
 ### Adding a new bounded context
 

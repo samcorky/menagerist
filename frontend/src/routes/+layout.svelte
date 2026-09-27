@@ -41,7 +41,7 @@
 
 	const pathname = $derived(page.url.pathname);
 	const homeActive = $derived(pathname === resolve('/'));
-	const collectionActive = $derived(pathname.startsWith(resolve('/collection')));
+	const itemsActive = $derived(pathname.startsWith(resolve('/items')));
 	const exploreActive = $derived(pathname.startsWith(resolve('/explore')));
 	const newActive = $derived(captureController.open);
 	const settingsActive = $derived(pathname.startsWith(resolve('/settings')));
@@ -92,13 +92,9 @@
 						<House class="size-4" />
 						Home
 					</Button>
-					<Button
-						variant={collectionActive ? 'secondary' : 'ghost'}
-						size="sm"
-						href={resolve('/collection')}
-					>
+					<Button variant={itemsActive ? 'secondary' : 'ghost'} size="sm" href={resolve('/items')}>
 						<LayoutGrid class="size-4" />
-						Collection
+						Items
 					</Button>
 					<Button
 						variant={exploreActive ? 'secondary' : 'ghost'}
@@ -108,7 +104,7 @@
 						<Telescope class="size-4" />
 						Explore
 					</Button>
-					<Button size="sm" onclick={() => goto(resolve('/collection/new'))}>
+					<Button size="sm" onclick={() => goto(resolve('/items/new'))}>
 						<CirclePlus class="size-4" />
 						New item
 					</Button>
@@ -159,14 +155,14 @@
 				</a>
 
 				<a
-					href={resolve('/collection')}
-					class="flex flex-col items-center gap-0.5 rounded-xl px-3 py-2 transition-colors {collectionActive
+					href={resolve('/items')}
+					class="flex flex-col items-center gap-0.5 rounded-xl px-3 py-2 transition-colors {itemsActive
 						? 'text-foreground'
 						: 'text-muted-foreground hover:text-foreground'}"
-					aria-current={collectionActive ? 'page' : undefined}
+					aria-current={itemsActive ? 'page' : undefined}
 				>
 					<LayoutGrid class="size-5" />
-					<span class="text-[10px] font-medium">Collection</span>
+					<span class="text-[10px] font-medium">Items</span>
 				</a>
 
 				<a

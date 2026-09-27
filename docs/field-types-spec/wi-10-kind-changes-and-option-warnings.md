@@ -18,7 +18,7 @@
 
 Implement by giving each `FieldTypeDescriptor` an optional `convertibleFrom?: string[]` (or a central matrix), and filter the kind dropdown for existing fields. New, unsaved fields can be any kind.
 
-**Removing a choice option that is in use.** Show a warning with a count of affected nodes (reuse the WI-9 count query, matching value equality on the key). Do not block. Nodes keep the value (WI-7 stops it blocking saves). In the attributes editor, when a stored value is not among the options, render it as a selected item labelled "(no longer an option)" instead of showing "— select —".
+**Removing a choice option that is in use.** Show a warning with a count of affected nodes (reuse the WI-9 count query, matching value equality on the key). Do not block. Nodes keep the value (WI-7 stops it blocking saves). In the attributes editor, when a stored value is not among the options, render it as a selected item labelled "(no longer an option)" instead of showing "- select -".
 
 **Tests:** dropdown filtering; the "no longer an option" rendering.
 

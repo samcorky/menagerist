@@ -1,4 +1,4 @@
-"""Tests for AttachMedia — the single-asset attach handler."""
+"""Tests for AttachMedia - the single-asset attach handler."""
 
 import uuid
 

@@ -89,7 +89,7 @@ class CreateNodeRequest(BaseModel):
 class UpdateNodeRequest(BaseModel):
     """Request body for updating a node. Omitted fields are left unchanged.
 
-    `type` may only be set once — if the node already has a type this field is ignored.
+    `type` may only be set once - if the node already has a type this field is ignored.
     """
 
     model_config = ConfigDict(

@@ -16,5 +16,5 @@ class GetHealth(UseCase[GetHealthQuery, None]):
     """Report that the process is up and able to accept requests."""
 
     async def handle(self, query: GetHealthQuery, actor: Actor) -> None:
-        """Liveness has no dependencies to check — succeeding is the signal."""
+        """Liveness has no dependencies to check - succeeding is the signal."""
         return None

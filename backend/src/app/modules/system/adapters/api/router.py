@@ -113,7 +113,7 @@ class ReadyResponse(BaseModel):
     status: Annotated[
         Literal["pass", "warn", "fail"],
         Field(
-            description="Overall readiness — fail beats warn beats pass.",
+            description="Overall readiness - fail beats warn beats pass.",
             examples=["pass"],
         ),
     ]

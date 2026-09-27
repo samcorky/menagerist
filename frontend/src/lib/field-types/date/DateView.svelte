@@ -11,7 +11,7 @@
 	} = $props();
 
 	let display = $derived(
-		typeof value !== 'string' || value === '' ? '—' : formatIsoDate(value, 'long')
+		typeof value !== 'string' || value === '' ? '-' : formatIsoDate(value, 'long')
 	);
 </script>
 

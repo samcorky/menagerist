@@ -2,7 +2,7 @@ from datetime import UTC
 from typing import Annotated
 
 from fastapi import Depends
-from starlette.requests import Request  # noqa: TC002 — FastAPI resolves this at runtime
+from starlette.requests import Request  # noqa: TC002 - FastAPI resolves this at runtime
 from starlette.responses import Response
 
 from app.shared_kernel.etag import ETaggable, etag_from_entity

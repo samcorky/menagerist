@@ -9,7 +9,7 @@
 </script>
 
 {#if items.length === 0}
-	<span class="text-muted-foreground">—</span>
+	<span class="text-muted-foreground">-</span>
 {:else if bulleted}
 	<ul class="list-inside list-disc space-y-0.5 text-sm">
 		{#each items as item, i (i)}

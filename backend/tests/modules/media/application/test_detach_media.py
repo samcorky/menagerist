@@ -1,4 +1,4 @@
-"""Tests for DetachMedia — remove an attachment and orphan if unreferenced."""
+"""Tests for DetachMedia - remove an attachment and orphan if unreferenced."""
 
 import uuid
 

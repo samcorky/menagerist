@@ -44,7 +44,7 @@ def test_create_rejects_empty_or_blank_label(label: str) -> None:
 
 
 def test_slug_is_immutable() -> None:
-    """update() has no slug parameter — the slug cannot be changed after creation."""
+    """update() has no slug parameter - the slug cannot be changed after creation."""
     nt = NodeType.create(slug="film", label="Film")
     original_slug = nt.slug
 

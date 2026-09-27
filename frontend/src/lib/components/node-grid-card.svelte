@@ -21,7 +21,7 @@
 	} = $props();
 </script>
 
-<a href={resolve('/collection/[id]', { id: item.id })} class="group block">
+<a href={resolve('/items/[id]', { id: item.id })} class="group block">
 	<div
 		class="flex aspect-[3/4] flex-col overflow-hidden rounded-xl border bg-muted/30 transition-colors group-hover:bg-muted/60"
 	>

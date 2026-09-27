@@ -1,4 +1,4 @@
-"""Tests for UploadAndAttachMedia — the composite stage+attach handler.
+"""Tests for UploadAndAttachMedia - the composite stage+attach handler.
 
 Key invariants:
 - Both DB writes land in a single transaction (one commit).
@@ -198,7 +198,7 @@ async def test_policy_violation_propagates_and_no_storage_move() -> None:
     """A policy rejection propagates and no file is ever moved to attached storage.
 
     The in-memory repos don't undo writes (only a real DB session rolls back),
-    but the key invariant — no on_commit callback fires — is fully verifiable
+    but the key invariant - no on_commit callback fires - is fully verifiable
     here: nothing ends up in the "attached" storage bucket.
     """
     node_id = uuid.uuid4()

@@ -19,4 +19,4 @@
 - Saving the item type and reloading it keeps the new order (exercises the column-order fix and this control together).
 - The first row cannot move up; the last cannot move down (buttons disabled, not hidden, so the row count stays visually stable).
 
-**Tests.** Unit: a small reorder helper (swap by index, no-op at the ends) if extracted, or drive it through `GroupExtras`'s exported logic if kept inline. No new backend tests needed — `columns` round-trips are already covered by the column-order fix's tests. No component tests (decided elsewhere in this spec); check the buttons once in a browser.
+**Tests.** Unit: a small reorder helper (swap by index, no-op at the ends) if extracted, or drive it through `GroupExtras`'s exported logic if kept inline. No new backend tests needed - `columns` round-trips are already covered by the column-order fix's tests. No component tests (decided elsewhere in this spec); check the buttons once in a browser.

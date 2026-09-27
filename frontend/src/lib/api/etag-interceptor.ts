@@ -35,7 +35,7 @@ client.interceptors.response.use(async (response, request) => {
 			try {
 				data = await response.clone().json();
 			} catch {
-				// non-JSON body — store headers only
+				// non-JSON body - store headers only
 			}
 		}
 		setEtag(key, {

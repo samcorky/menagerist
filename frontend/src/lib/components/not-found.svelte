@@ -6,7 +6,7 @@
 		heading = 'Item not found',
 		description = "This item doesn't exist, or may have been deleted.",
 		backHref,
-		backLabel = 'Back to collection'
+		backLabel = 'Back to items'
 	}: {
 		heading?: string;
 		description?: string;

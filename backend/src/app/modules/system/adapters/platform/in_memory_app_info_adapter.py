@@ -5,7 +5,7 @@ if TYPE_CHECKING:
 
 
 class InMemoryAppInfoAdapter:
-    """Fixed-info `AppInfoPort` for tests — no packaged build required."""
+    """Fixed-info `AppInfoPort` for tests - no packaged build required."""
 
     def __init__(self, app_info: AppInfo) -> None:
         self._app_info = app_info

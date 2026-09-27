@@ -13,7 +13,11 @@ const ALLOWED: Record<string, string[]> = {
 	boolean: ['boolean', ...TO_TEXT],
 	date: ['date', ...TO_TEXT],
 	choice: ['choice', ...TO_TEXT],
-	group: ['group']
+	group: ['group'],
+	// Object-shaped like `group`: its stored value is `{value, unit}`, not a scalar, so it
+	// cannot become text without a shape change. Falls back to this anyway if omitted
+	// (`ALLOWED[original] ?? [original]`), but listed explicitly like every other kind.
+	quantity: ['quantity']
 };
 
 /**

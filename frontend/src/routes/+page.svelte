@@ -32,7 +32,7 @@
 
 	let categoryBySlug = $derived(new Map(categories.map((c) => [c.slug, c])));
 
-	// "Recently added" — items with a created_at within the last 30 days
+	// "Recently added" - items with a created_at within the last 30 days
 	let recentItems = $derived(
 		allItems.filter((item) => {
 			if (!item.created_at) return true; // no timestamp → include by default
@@ -41,7 +41,7 @@
 		})
 	);
 
-	// "Missing details" — no description and no attributes
+	// "Missing details" - no description and no attributes
 	let missingDetails = $derived(
 		allItems.filter(
 			(item) => !item.description?.trim() && Object.keys(item.attributes ?? {}).length === 0
@@ -100,14 +100,14 @@
 				</div>
 				<div class="space-y-1.5">
 					<h1 class="font-heading text-2xl font-semibold tracking-tight">
-						Your collection is empty
+						You don't have any items yet
 					</h1>
 					<p class="max-w-xs text-muted-foreground">
-						Start by adding your first item — a film, a signed poster, a person, or anything you
+						Start by adding your first item - a film, a signed poster, a person, or anything you
 						collect.
 					</p>
 				</div>
-				<Button onclick={() => goto(resolve('/collection/new'))} size="lg">
+				<Button onclick={() => goto(resolve('/items/new'))} size="lg">
 					<Plus class="size-4" />
 					Add your first item
 				</Button>
@@ -115,17 +115,17 @@
 		{:else if !loading}
 			<div class="flex items-start justify-between gap-4">
 				<div>
-					<h1 class="font-heading text-3xl font-semibold tracking-tight">My Collection</h1>
+					<h1 class="font-heading text-3xl font-semibold tracking-tight">My items</h1>
 					<p class="mt-1 text-sm text-muted-foreground">
 						{totalItems}
 						{totalItems === 1 ? 'item' : 'items'}
 						{#if categories.length > 0}
 							· {categories.length}
-							{categories.length === 1 ? 'category' : 'categories'}
+							{categories.length === 1 ? 'item type' : 'item types'}
 						{/if}
 					</p>
 				</div>
-				<Button onclick={() => goto(resolve('/collection/new'))}>
+				<Button onclick={() => goto(resolve('/items/new'))}>
 					<Plus class="size-4" />
 					New item
 				</Button>
@@ -140,7 +140,7 @@
 							<p class="text-xs text-muted-foreground">Added in the last {RECENT_DAYS} days</p>
 						</div>
 						<a
-							href={resolve('/collection')}
+							href={resolve('/items')}
 							class="flex items-center gap-0.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
 						>
 							Browse all
@@ -150,7 +150,7 @@
 					<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 						{#each recentItems.slice(0, 6) as item (item.id)}
 							{@const catLabel = categoryBySlug.get(item.type ?? '')?.label}
-							<a href={resolve('/collection/[id]', { id: item.id })} class="group block">
+							<a href={resolve('/items/[id]', { id: item.id })} class="group block">
 								<Card.Root class="h-full transition-colors group-hover:bg-muted/50">
 									<Card.Header class="p-4">
 										<Card.Title class="line-clamp-2 text-sm leading-snug">{item.name}</Card.Title>
@@ -186,7 +186,7 @@
 							{@const catLabel = categoryBySlug.get(item.type ?? '')?.label}
 							<Item.Root variant="outline">
 								{#snippet child({ props })}
-									<a {...props} href={resolve('/collection/[id]', { id: item.id })}>
+									<a {...props} href={resolve('/items/[id]', { id: item.id })}>
 										<Item.Content>
 											<Item.Title>{item.name}</Item.Title>
 											{#if catLabel}
@@ -221,7 +221,7 @@
 							{@const catLabel = categoryBySlug.get(item.type ?? '')?.label}
 							<Item.Root variant="outline" class="border-dashed">
 								{#snippet child({ props })}
-									<a {...props} href={resolve('/collection/[id]', { id: item.id })}>
+									<a {...props} href={resolve('/items/[id]', { id: item.id })}>
 										<Item.Content>
 											<Item.Title>{item.name}</Item.Title>
 											{#if catLabel}
@@ -240,21 +240,21 @@
 				</section>
 			{/if}
 
-			<!-- By category -->
+			<!-- By item type -->
 			{#if categories.length > 0}
 				<section class="space-y-3">
-					<h2 class="font-heading text-lg font-semibold">By category</h2>
+					<h2 class="font-heading text-lg font-semibold">By item type</h2>
 					<div class="flex flex-wrap gap-2">
 						{#each categories as cat (cat.slug)}
 							<a
-								href="{resolve('/collection')}?type={cat.slug}"
+								href="{resolve('/items')}?type={cat.slug}"
 								class="flex items-center gap-1.5 rounded-full border border-border bg-background px-3.5 py-1.5 text-sm font-medium transition-colors hover:border-primary/40 hover:bg-muted"
 							>
 								{cat.label}
 							</a>
 						{/each}
 						<a
-							href={resolve('/collection')}
+							href={resolve('/items')}
 							class="flex items-center gap-1.5 rounded-full border border-dashed border-border px-3.5 py-1.5 text-sm text-muted-foreground transition-colors hover:border-border hover:text-foreground"
 						>
 							All items
@@ -265,16 +265,16 @@
 
 			{#if showNudge}
 				<div class="rounded-xl border border-dashed bg-muted/30 p-5">
-					<p class="font-heading font-medium">Tip: organise with categories</p>
+					<p class="font-heading font-medium">Tip: organise with item types</p>
 					<p class="mt-1 text-sm text-muted-foreground">
-						Give your items types like "Film", "Person", or "Event" to filter and browse your
-						collection more easily.
+						Give your items types like "Film", "Person", or "Event" to filter and browse your items
+						more easily.
 					</p>
 					<a
-						href={resolve('/settings/categories')}
+						href={resolve('/settings/item-types')}
 						class="mt-3 inline-flex items-center gap-1 text-sm font-medium underline-offset-2 hover:underline"
 					>
-						Set up categories
+						Set up item types
 						<ChevronRight class="size-3.5" />
 					</a>
 				</div>

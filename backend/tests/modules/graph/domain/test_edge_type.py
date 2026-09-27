@@ -50,7 +50,7 @@ def test_create_rejects_empty_or_blank_label(label: str) -> None:
 
 
 def test_slug_is_immutable() -> None:
-    """update() has no slug parameter — the slug cannot be changed after creation."""
+    """update() has no slug parameter - the slug cannot be changed after creation."""
     et = EdgeType.create(slug="directed-by", label="Directed By")
     original_slug = et.slug
 

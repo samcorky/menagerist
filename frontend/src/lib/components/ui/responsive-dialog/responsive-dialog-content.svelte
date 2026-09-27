@@ -3,7 +3,7 @@
 
 	/**
 	 * A bottom sheet on mobile (drag handle, slides up from the bottom edge) that becomes a
-	 * centered dialog at the `sm` breakpoint — the app's one modal shape, per DESIGN_GUIDELINES §23.
+	 * centered dialog at the `sm` breakpoint - the app's one modal shape, per DESIGN_GUIDELINES §23.
 	 */
 	export const responsiveDialogContentVariants = tv({
 		base: 'fixed right-0 bottom-0 left-0 z-50 max-h-[90dvh] overflow-y-auto rounded-t-2xl border-t bg-background p-6 shadow-xl sm:inset-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-full sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border',

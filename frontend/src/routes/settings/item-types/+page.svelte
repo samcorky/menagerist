@@ -48,7 +48,7 @@
 		loading = true;
 		const result = await listNodeTypes({ query: { after, limit: PAGE_SIZE } });
 		if (result.error || !result.data) {
-			toast.error("Couldn't load categories", { description: errorMessage(result.error) });
+			toast.error("Couldn't load item types", { description: errorMessage(result.error) });
 		} else {
 			categories = after ? [...categories, ...result.data] : result.data;
 			hasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
@@ -83,13 +83,13 @@
 			}
 		});
 		if (result.error || !result.data) {
-			toast.error("Couldn't create category", { description: errorMessage(result.error) });
+			toast.error("Couldn't create item type", { description: errorMessage(result.error) });
 		} else {
 			categories = [result.data, ...categories];
 			label = '';
 			description = '';
 			createSchema = null;
-			toast.success('Category created');
+			toast.success('Item type created');
 		}
 		submitting = false;
 	}
@@ -122,7 +122,7 @@
 		} else {
 			categories = categories.map((c) => (c.id === id ? result.data! : c));
 			editingId = null;
-			toast.success('Category updated');
+			toast.success('Item type updated');
 		}
 		savingId = null;
 	}
@@ -132,13 +132,13 @@
 		const hasItems = (inUse.data?.length ?? 0) > 0;
 
 		if (hasItems) {
-			// Destructive — items will lose their category. Require explicit confirmation.
+			// Destructive - items will lose their item type. Require explicit confirmation.
 			editingId = null;
 			confirmTarget = cat;
 			return;
 		}
 
-		// No items — optimistic removal with undo window
+		// No items - optimistic removal with undo window
 		editingId = null;
 		categories = categories.filter((c) => c.id !== cat.id);
 
@@ -148,11 +148,11 @@
 			const result = await deleteNodeType({ path: { node_type_id: cat.id } });
 			if (result.error) {
 				categories = [cat, ...categories];
-				toast.error("Couldn't delete category", { description: errorMessage(result.error) });
+				toast.error("Couldn't delete item type", { description: errorMessage(result.error) });
 			}
 		}, 5000);
 
-		toast('Category deleted', {
+		toast('Item type deleted', {
 			action: {
 				label: 'Undo',
 				onClick: () => {
@@ -171,10 +171,10 @@
 		deletingId = cat.id;
 		const result = await deleteNodeType({ path: { node_type_id: cat.id } });
 		if (result.error) {
-			toast.error("Couldn't delete category", { description: errorMessage(result.error) });
+			toast.error("Couldn't delete item type", { description: errorMessage(result.error) });
 		} else {
 			categories = categories.filter((c) => c.id !== cat.id);
-			toast.success('Category deleted');
+			toast.success('Item type deleted');
 		}
 		deletingId = null;
 		confirmTarget = null;
@@ -186,7 +186,7 @@
 </script>
 
 <svelte:head>
-	<title>Categories — Menagerist</title>
+	<title>Item types - Menagerist</title>
 </svelte:head>
 
 <main class="flex-1 px-4 py-6 sm:px-6">
@@ -194,15 +194,15 @@
 		<BackButton fallback={resolve('/settings')} />
 
 		<div>
-			<h1 class="font-heading text-3xl font-semibold tracking-tight">Categories</h1>
+			<h1 class="font-heading text-3xl font-semibold tracking-tight">Item types</h1>
 			<p class="mt-1 text-muted-foreground">
-				Organise your collection with types like "Film", "Person", or "Event".
+				Organise your items with types like "Film", "Person", or "Event".
 			</p>
 		</div>
 
 		<Card.Root>
 			<Card.Header>
-				<Card.Title class="font-heading">New category</Card.Title>
+				<Card.Title class="font-heading">New item type</Card.Title>
 			</Card.Header>
 			<Card.Content>
 				<form class="space-y-4" onsubmit={handleSubmit}>
@@ -227,7 +227,7 @@
 					<SchemaEditor bind:schema={createSchema} highlights />
 					<div class="flex justify-end">
 						<Button type="submit" disabled={submitting}>
-							{submitting ? 'Adding…' : 'Add category'}
+							{submitting ? 'Adding…' : 'Add item type'}
 						</Button>
 					</div>
 				</form>
@@ -269,7 +269,7 @@
 									variant="ghost"
 									size="icon"
 									onclick={() => startEdit(cat)}
-									aria-label="Edit category"
+									aria-label="Edit item type"
 								>
 									<Pencil class="size-4" />
 								</Button>
@@ -279,7 +279,7 @@
 									size="icon"
 									disabled={deletingId === cat.id}
 									onclick={() => handleDelete(cat)}
-									aria-label="Delete category"
+									aria-label="Delete item type"
 								>
 									<Trash2 class="size-4" />
 								</Button>
@@ -327,10 +327,8 @@
 				<div class="flex flex-col items-center gap-3 py-12 text-center">
 					<Tag class="size-10 text-muted-foreground/50" />
 					<div>
-						<p class="font-medium">No categories yet</p>
-						<p class="text-sm text-muted-foreground">
-							Create one to start organising your collection.
-						</p>
+						<p class="font-medium">No item types yet</p>
+						<p class="text-sm text-muted-foreground">Create one to start organising your items.</p>
 					</div>
 				</div>
 			{/if}
@@ -350,9 +348,9 @@
 
 <ConfirmDialog
 	open={confirmTarget !== null}
-	title="Delete category?"
+	title="Delete item type?"
 	description={confirmTarget
-		? `Items using "${confirmTarget.label}" will lose this category.`
+		? `Items using "${confirmTarget.label}" will lose this item type.`
 		: undefined}
 	busy={deletingId !== null}
 	busyLabel="Deleting…"

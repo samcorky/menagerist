@@ -1,4 +1,4 @@
-"""Tests for ClearMediaCover — the regression coverage for the cover-detach bug."""
+"""Tests for ClearMediaCover - the regression coverage for the cover-detach bug."""
 
 import uuid
 

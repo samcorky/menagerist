@@ -20,6 +20,10 @@
 	let listsLoading = $state(false);
 	let listsHasMore = $state(true);
 
+	let fieldSets = $state<PresetResponse[]>([]);
+	let fieldSetsLoading = $state(false);
+	let fieldSetsHasMore = $state(true);
+
 	async function fetchFields(after?: string) {
 		fieldsLoading = true;
 		const result = await listPresets({ query: { kind: 'field', after, limit: PAGE_SIZE } });
@@ -42,6 +46,18 @@
 			listsHasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
 		}
 		listsLoading = false;
+	}
+
+	async function fetchFieldSets(after?: string) {
+		fieldSetsLoading = true;
+		const result = await listPresets({ query: { kind: 'field_set', after, limit: PAGE_SIZE } });
+		if (result.error || !result.data) {
+			toast.error("Couldn't load saved field groups", { description: errorMessage(result.error) });
+		} else {
+			fieldSets = after ? [...fieldSets, ...result.data] : result.data;
+			fieldSetsHasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
+		}
+		fieldSetsLoading = false;
 	}
 
 	function fieldsSentinel(node: HTMLElement) {
@@ -76,14 +92,16 @@
 		};
 	}
 
-	function handleDelete(preset: PresetResponse, collection: 'fields' | 'lists') {
+	function handleDelete(preset: PresetResponse, collection: 'fields' | 'lists' | 'fieldSets') {
 		const setItems =
 			collection === 'fields'
 				? (v: PresetResponse[]) => (fields = v)
-				: (v: PresetResponse[]) => (lists = v);
-		const current = collection === 'fields' ? fields : lists;
+				: collection === 'lists'
+					? (v: PresetResponse[]) => (lists = v)
+					: (v: PresetResponse[]) => (fieldSets = v);
+		const current = collection === 'fields' ? fields : collection === 'lists' ? lists : fieldSets;
 
-		// No items ever depend on a preset the way categories depend on connections — always
+		// No items ever depend on a preset the way categories depend on connections - always
 		// use the optimistic undo path.
 		setItems(current.filter((p) => p.id !== preset.id));
 
@@ -92,29 +110,59 @@
 			if (undone) return;
 			const result = await deletePreset({ path: { preset_id: preset.id } });
 			if (result.error) {
-				const restored = collection === 'fields' ? fields : lists;
+				const restored =
+					collection === 'fields' ? fields : collection === 'lists' ? lists : fieldSets;
 				setItems([preset, ...restored]);
 				toast.error("Couldn't delete", { description: errorMessage(result.error) });
 			}
 		}, 5000);
 
-		toast(collection === 'fields' ? 'Field deleted' : 'List deleted', {
-			action: {
-				label: 'Undo',
-				onClick: () => {
-					undone = true;
-					clearTimeout(timerId);
-					const restored = collection === 'fields' ? fields : lists;
-					setItems([preset, ...restored]);
-				}
-			},
-			duration: 5000
-		});
+		toast(
+			collection === 'fields'
+				? 'Field deleted'
+				: collection === 'lists'
+					? 'List deleted'
+					: 'Field group deleted',
+			{
+				action: {
+					label: 'Undo',
+					onClick: () => {
+						undone = true;
+						clearTimeout(timerId);
+						const restored =
+							collection === 'fields' ? fields : collection === 'lists' ? lists : fieldSets;
+						setItems([preset, ...restored]);
+					}
+				},
+				duration: 5000
+			}
+		);
 	}
 
 	function listOptionCount(preset: PresetResponse): number | undefined {
 		const options = (preset.definition as { options?: unknown }).options;
 		return Array.isArray(options) ? options.length : undefined;
+	}
+
+	function fieldSetPropertyCount(preset: PresetResponse): number | undefined {
+		const properties = (preset.definition as { properties?: unknown }).properties;
+		return Array.isArray(properties) ? properties.length : undefined;
+	}
+
+	function fieldSetsSentinel(node: HTMLElement) {
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0].isIntersecting && fieldSetsHasMore && !fieldSetsLoading)
+					void fetchFieldSets(fieldSets.at(-1)?.id);
+			},
+			{ rootMargin: '200px' }
+		);
+		observer.observe(node);
+		return {
+			destroy() {
+				observer.disconnect();
+			}
+		};
 	}
 
 	$effect(() => {
@@ -124,10 +172,14 @@
 	$effect(() => {
 		void fetchLists();
 	});
+
+	$effect(() => {
+		void fetchFieldSets();
+	});
 </script>
 
 <svelte:head>
-	<title>Saved fields — Menagerist</title>
+	<title>Saved fields - Menagerist</title>
 </svelte:head>
 
 <main class="flex-1 px-4 py-6 sm:px-6">
@@ -282,12 +334,75 @@
 
 		<div class="flex flex-col gap-3">
 			<h2 class="font-heading text-lg font-semibold">Field groups</h2>
-			<Card.Root>
-				<Card.Content class="flex items-center gap-3 py-6 text-muted-foreground">
-					<Layers class="size-5 shrink-0" />
-					<p class="text-sm">Field groups aren't available yet.</p>
-				</Card.Content>
-			</Card.Root>
+
+			{#if fieldSetsLoading && fieldSets.length === 0}
+				<Shimmer loading={true}>
+					<div class="grid gap-3">
+						{#each loadingSkeletons as s (s)}
+							<div class="rounded-lg border p-4">
+								<div class="space-y-1">
+									<div class="h-5 w-48 rounded bg-muted"></div>
+									<div class="h-4 w-32 rounded-full bg-muted"></div>
+								</div>
+							</div>
+						{/each}
+					</div>
+				</Shimmer>
+			{:else}
+				<div class="grid gap-3">
+					{#each fieldSets as preset (preset.id)}
+						{@const propertyCount = fieldSetPropertyCount(preset)}
+						<Card.Root>
+							<Card.Header
+								class="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+							>
+								<div class="min-w-0 flex-1">
+									<Card.Title>{preset.label}</Card.Title>
+									{#if preset.description}
+										<Card.Description>{preset.description}</Card.Description>
+									{/if}
+									{#if propertyCount !== undefined}
+										<p class="mt-0.5 text-xs text-muted-foreground">
+											{propertyCount}
+											{propertyCount === 1 ? 'field' : 'fields'}
+										</p>
+									{/if}
+								</div>
+								<div class="flex flex-wrap items-center gap-1 sm:shrink-0">
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon"
+										disabled={preset.builtin}
+										title={preset.builtin ? "Built-in field groups can't be deleted" : undefined}
+										onclick={() => handleDelete(preset, 'fieldSets')}
+										aria-label="Delete field group"
+									>
+										<Trash2 class="size-4" />
+									</Button>
+								</div>
+							</Card.Header>
+						</Card.Root>
+					{/each}
+				</div>
+
+				{#if fieldSets.length === 0 && !fieldSetsLoading}
+					<div class="flex flex-col items-center gap-3 py-10 text-center">
+						<Layers class="size-10 text-muted-foreground/50" />
+						<p class="font-medium">No saved field groups yet</p>
+					</div>
+				{/if}
+			{/if}
+
+			{#if fieldSetsHasMore}
+				<div use:fieldSetsSentinel class="flex justify-center py-2" aria-hidden="true">
+					{#if fieldSetsLoading}
+						<div
+							class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
+						></div>
+					{/if}
+				</div>
+			{/if}
 		</div>
 	</div>
 </main>

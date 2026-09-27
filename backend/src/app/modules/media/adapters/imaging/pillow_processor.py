@@ -12,7 +12,7 @@ class PillowImageProcessor:
     """Pillow-backed thumbnail generation.
 
     Tolerant of undecodable input: this is a safety net for corrupt or
-    mislabelled files, not the primary gate — thumbnail_eligibility.py's
+    mislabelled files, not the primary gate - thumbnail_eligibility.py's
     content-type check is what should keep non-image bytes from reaching
     this in the first place.
     """

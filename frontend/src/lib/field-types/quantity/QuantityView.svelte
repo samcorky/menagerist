@@ -5,4 +5,4 @@
 	let { value, prop: _prop }: { value: unknown; prop: JsonSchemaProperty } = $props();
 </script>
 
-<span>{quantityText(value) || '—'}</span>
+<span>{quantityText(value) || '-'}</span>

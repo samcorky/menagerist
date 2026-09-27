@@ -18,7 +18,7 @@
 	} = $props();
 
 	// Initialise from the parent-provided list if given; otherwise start empty and fetch.
-	// Using a single local list means newly-created categories always appear immediately,
+	// Using a single local list means newly-created item types always appear immediately,
 	// regardless of whether the parent provided an initial set.
 	// svelte-ignore state_referenced_locally
 	let allTypes = $state<NodeTypeResponse[]>(externalTypes ?? []);
@@ -58,7 +58,7 @@
 		const slug = slugify(newLabel.trim());
 		const result = await createNodeType({ body: { slug, label: newLabel.trim() } });
 		if (result.error || !result.data) {
-			toast.error("Couldn't create category", { description: errorMessage(result.error) });
+			toast.error("Couldn't create item type", { description: errorMessage(result.error) });
 			creating = false;
 			return;
 		}
@@ -71,7 +71,7 @@
 </script>
 
 <div class="space-y-2">
-	<Input bind:value={search} placeholder="Search categories…" />
+	<Input bind:value={search} placeholder="Search item types…" />
 
 	{#if filtered.length > 0}
 		<div class="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
@@ -90,7 +90,7 @@
 			{/each}
 		</div>
 	{:else if search && !showNewForm}
-		<p class="text-xs text-muted-foreground">No matching categories</p>
+		<p class="text-xs text-muted-foreground">No matching item types</p>
 	{/if}
 
 	{#if !showNewForm}
@@ -99,7 +99,7 @@
 			onclick={() => (showNewForm = true)}
 			class="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
 		>
-			+ New category
+			+ New item type
 		</button>
 	{:else}
 		<form
@@ -111,7 +111,7 @@
 		>
 			<Input
 				bind:value={newLabel}
-				placeholder="Category label…"
+				placeholder="Item type label…"
 				class="h-7 flex-1 text-xs"
 				autofocus
 			/>

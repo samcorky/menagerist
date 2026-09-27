@@ -3,7 +3,7 @@
 </script>
 
 <svelte:head>
-	<title>Explore — Menagerist</title>
+	<title>Explore - Menagerist</title>
 </svelte:head>
 
 <main class="flex-1 px-4 py-8 sm:px-6">
@@ -20,8 +20,7 @@
 			<div class="space-y-1.5">
 				<p class="font-heading text-xl font-semibold">Coming soon</p>
 				<p class="max-w-xs text-sm text-muted-foreground">
-					The connections map will let you visually explore relationships across your entire
-					collection.
+					The connections map will let you visually explore relationships across all your items.
 				</p>
 			</div>
 		</div>

@@ -197,5 +197,5 @@ async def test_joined_uow_on_commit_not_fired_if_owner_rolls_back() -> None:
 
 
 async def _append[T](lst: list[T], value: T) -> None:
-    """Async helper that appends a value — usable as an on_commit callback."""
+    """Async helper that appends a value - usable as an on_commit callback."""
     lst.append(value)

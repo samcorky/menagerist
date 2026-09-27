@@ -15,7 +15,7 @@
 	let columns = $derived(orderedColumns(prop));
 
 	function formatValue(val: unknown, sp: JsonSchemaProperty): string {
-		if (val === null || val === undefined || val === '') return '—';
+		if (val === null || val === undefined || val === '') return '-';
 		if (sp.type === 'boolean') return val === true || val === 'true' ? 'Yes' : 'No';
 		if (sp.type === 'string' && 'format' in sp && sp.format === 'date') {
 			return formatIsoDate(val as string, 'short');

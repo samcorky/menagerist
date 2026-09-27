@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 class ReadinessCheck(Protocol):
     """A single pluggable readiness probe.
 
-    Returns one or more keyed observations (`component:metric` -> observation) — a
+    Returns one or more keyed observations (`component:metric` -> observation) - a
     check may cover several metrics at once when they share a resource, e.g. a
     database connectivity check reusing one session for responseTime and version.
     """

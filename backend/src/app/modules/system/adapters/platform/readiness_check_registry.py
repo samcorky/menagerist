@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 class ReadinessCheckRegistry:
     """`HealthCheckPort` adapter that runs a set of pluggable `ReadinessCheck`s.
 
-    Checks run sequentially, in registration order — not concurrently. Some
+    Checks run sequentially, in registration order - not concurrently. Some
     checks observe shared, mutable state (e.g. connection-pool utilisation) that
     other checks affect while they run (they hold a pooled connection open for
     their query); running everything concurrently would make those readings

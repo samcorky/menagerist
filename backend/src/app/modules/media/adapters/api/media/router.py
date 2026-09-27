@@ -266,7 +266,7 @@ async def stream_media_content(
 
     ``Content-Disposition: inline`` lets browsers render images and PDFs
     directly; unsafe types (e.g. HTML, SVG) are forced to ``attachment``.
-    For an explicit download, point an ``<a download>`` tag at this URL —
+    For an explicit download, point an ``<a download>`` tag at this URL -
     the ``download`` attribute overrides the inline disposition client-side
     without needing a separate endpoint.
     """

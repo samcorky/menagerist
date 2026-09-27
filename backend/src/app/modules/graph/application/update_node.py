@@ -27,7 +27,7 @@ logger = structlog.get_logger()
 class UpdateNodeCommand:
     """Request to update a node's editable fields.
 
-    A field left as `None` is unchanged. `type` is one-time-settable — it can
+    A field left as `None` is unchanged. `type` is one-time-settable - it can
     be assigned when currently `None` but cannot be changed once set.
     """
 

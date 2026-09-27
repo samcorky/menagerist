@@ -39,7 +39,7 @@ def _expand_access_log_fields(
         if isinstance(query_string, bytes):
             event_dict["query_string"] = query_string.decode("utf-8", "replace")
         # Granian names header atoms positionally (_h0, _h1, …). _h0 is
-        # the Request-Id header — the only header atom in GRANIAN_ACCESS_LOG_FORMAT.
+        # the Request-Id header - the only header atom in GRANIAN_ACCESS_LOG_FORMAT.
         # Granian emits "-" for a missing header (same convention as nginx).
         request_id = event_dict.pop("_h0", None)
         if request_id and request_id != "-":

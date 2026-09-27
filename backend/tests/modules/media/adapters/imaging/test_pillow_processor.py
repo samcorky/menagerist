@@ -50,7 +50,7 @@ def test_pillow_image_processor_corrects_exif_orientation() -> None:
     processor = PillowImageProcessor()
 
     # Create a 200x100 landscape image then embed orientation=6 (rotate 90° CW),
-    # which simulates a portrait shot stored sideways — raw pixels are 200x100
+    # which simulates a portrait shot stored sideways - raw pixels are 200x100
     # but the EXIF tag says "display as 100x200".
     img = Image.new("RGB", (200, 100), color=(0, 0, 255))
     buffer = io.BytesIO()

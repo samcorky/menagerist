@@ -1,4 +1,4 @@
-"""Tests for SetMediaCover — atomically move the cover flag between attachments."""
+"""Tests for SetMediaCover - atomically move the cover flag between attachments."""
 
 import uuid
 
@@ -81,7 +81,7 @@ async def test_set_cover_atomically_unsets_previous_cover() -> None:
     assert result.attribute_key is AttachmentKey.COVER
     assert attachments._store[new_attachment.id].attribute_key is AttachmentKey.COVER
     assert attachments._store[old_attachment.id].attribute_key is None
-    # Neither row is removed — only the flag moved.
+    # Neither row is removed - only the flag moved.
     assert old_attachment.id in attachments._store
     assert new_attachment.id in attachments._store
 

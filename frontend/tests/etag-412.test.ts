@@ -47,7 +47,7 @@ describe('etag interceptor - 412 conflict handling', () => {
 		});
 		expect(res1).toEqual({ id: '123', name: 'node1' });
 
-		// attempt PATCH with stale ETag — 412 clears the cache; assert via subsequent GET
+		// attempt PATCH with stale ETag - 412 clears the cache; assert via subsequent GET
 		await client.patch({
 			url: '/api/node/123',
 			body: { name: 'x' },

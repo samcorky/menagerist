@@ -36,14 +36,18 @@
 		schemaToItems,
 		schemaToArchived,
 		itemsToSchema,
-		type EditorItem
+		type EditorItem,
+		type EditorSection
 	} from '$lib/schema-editor-items';
 	import { archiveField, restoreField } from '$lib/field-archive';
 	import { canHighlightMore, maxHighlights, movedRanks, toggledRanks } from '$lib/highlights';
 	import {
 		definitionToField,
+		definitionToFieldSet,
+		fieldSetToDefinition,
 		fieldToDefinition,
 		type FieldDefinition,
+		type FieldSetDefinition,
 		type Preset
 	} from '$lib/presets';
 	import SavePresetDialog from '$lib/components/save-preset-dialog.svelte';
@@ -253,6 +257,19 @@
 			version: preset.version
 		});
 		items = [...items, field];
+	}
+
+	// Section currently targeted by the "save field group for reuse" dialog.
+	let savingSection = $state<EditorSection | null>(null);
+	let fieldSetPickerOpen = $state(false);
+
+	function addFieldSetFromPreset(preset: Preset) {
+		const section = definitionToFieldSet(
+			preset.definition as FieldSetDefinition,
+			{ preset: preset.id, version: preset.version },
+			generateKey()
+		);
+		items = [...items, section];
 	}
 
 	function addSection() {
@@ -494,7 +511,18 @@
 						type="button"
 						variant="ghost"
 						size="icon"
-						class="ml-auto"
+						class={item.fields.length > 0 ? '' : 'ml-auto'}
+						disabled={item.fields.length === 0}
+						title="Save field group for reuse"
+						onclick={() => (savingSection = item)}
+						aria-label="Save field group for reuse"
+					>
+						<BookmarkPlus class="size-4" />
+					</Button>
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon"
 						onclick={() => removeItem(i)}
 						aria-label="Remove section"
 					>
@@ -548,6 +576,10 @@
 		<Button type="button" variant="ghost" size="sm" onclick={() => (pickerOpen = true)}>
 			<BookmarkPlus class="size-4" />
 			Add from saved fields…
+		</Button>
+		<Button type="button" variant="ghost" size="sm" onclick={() => (fieldSetPickerOpen = true)}>
+			<FolderOpen class="size-4" />
+			Add saved field group…
 		</Button>
 	</div>
 
@@ -688,10 +720,30 @@
 	/>
 {/if}
 
+{#if savingSection}
+	<SavePresetDialog
+		open={savingSection !== null}
+		kind="field_set"
+		definition={fieldSetToDefinition(savingSection.sectionLabel, savingSection.fields)}
+		onOpenChange={(v) => {
+			if (!v) savingSection = null;
+		}}
+		onSaved={() => {}}
+	/>
+{/if}
+
 <PresetPickerDialog
 	open={pickerOpen}
 	kind="field"
 	title="Add from saved fields"
 	onOpenChange={(v) => (pickerOpen = v)}
 	onPick={addFieldFromPreset}
+/>
+
+<PresetPickerDialog
+	open={fieldSetPickerOpen}
+	kind="field_set"
+	title="Add saved field group"
+	onOpenChange={(v) => (fieldSetPickerOpen = v)}
+	onPick={addFieldSetFromPreset}
 />

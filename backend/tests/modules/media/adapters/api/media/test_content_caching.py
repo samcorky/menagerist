@@ -100,7 +100,7 @@ def test_thumbnail_cache_headers_falls_back_to_content_hash() -> None:
 def test_regenerated_thumbnail_gets_a_new_etag() -> None:
     """A regenerated thumbnail's new hash produces a different ETag.
 
-    So a client holding the old ETag is no longer served a 304 for it — even
+    So a client holding the old ETag is no longer served a 304 for it - even
     though the original file's sha256 is unchanged.
     """
     stale = _dummy_asset(thumbnail_sha256="old-thumb-hash")

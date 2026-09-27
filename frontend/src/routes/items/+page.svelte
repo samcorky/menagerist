@@ -53,13 +53,13 @@
 	// Initialise view mode from localStorage
 	$effect(() => {
 		if (browser) {
-			const stored = localStorage.getItem('collection-view');
+			const stored = localStorage.getItem('items-view');
 			if (stored === 'grid' || stored === 'list') viewMode = stored;
 		}
 	});
 
 	$effect(() => {
-		if (browser) localStorage.setItem('collection-view', viewMode);
+		if (browser) localStorage.setItem('items-view', viewMode);
 	});
 
 	// Pick up ?type= from URL (from dashboard category chips)
@@ -185,13 +185,13 @@
 
 	// Scroll preservation: save before navigating into an item, restore on return
 	beforeNavigate(({ to }) => {
-		if (to?.url.pathname.startsWith(resolve('/collection/'))) {
+		if (to?.url.pathname.startsWith(resolve('/items/'))) {
 			savedScrollTop = document.getElementById('main-scroll')?.scrollTop ?? 0;
 		}
 	});
 
 	afterNavigate(({ from }) => {
-		if (from?.url.pathname.startsWith(resolve('/collection/'))) {
+		if (from?.url.pathname.startsWith(resolve('/items/'))) {
 			const el = document.getElementById('main-scroll');
 			if (el) el.scrollTop = savedScrollTop;
 		}
@@ -199,14 +199,14 @@
 </script>
 
 <svelte:head>
-	<title>My Collection — Menagerist</title>
+	<title>My items - Menagerist</title>
 </svelte:head>
 
 <main class="flex-1 px-4 py-6 sm:px-6">
 	<div class="mx-auto flex max-w-4xl flex-col gap-6">
 		<div class="flex items-center justify-between gap-4">
-			<h1 class="font-heading text-3xl font-semibold tracking-tight">My Collection</h1>
-			<Button onclick={() => goto(resolve('/collection/new'))}>
+			<h1 class="font-heading text-3xl font-semibold tracking-tight">My items</h1>
+			<Button onclick={() => goto(resolve('/items/new'))}>
 				<Plus class="size-4" />
 				New item
 			</Button>
@@ -217,7 +217,7 @@
 				use:focusRef
 				bind:value={searchInput}
 				type="search"
-				placeholder="Search your collection…"
+				placeholder="Search your items…"
 				class="flex h-9 min-w-0 flex-1 basis-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:max-w-sm sm:basis-auto"
 			/>
 			<div class="ml-auto flex items-center gap-1">
@@ -335,7 +335,7 @@
 							> to see everything.
 						</p>
 					</div>
-					<Button size="sm" onclick={() => goto(resolve('/collection/new'))}>
+					<Button size="sm" onclick={() => goto(resolve('/items/new'))}>
 						<Plus class="size-4" />
 						New item
 					</Button>
@@ -345,7 +345,7 @@
 						<p class="font-medium">Nothing here yet</p>
 						<p class="text-sm text-muted-foreground">Add your first item to get started</p>
 					</div>
-					<Button onclick={() => goto(resolve('/collection/new'))}>
+					<Button onclick={() => goto(resolve('/items/new'))}>
 						<Plus class="size-4" />
 						Add your first item
 					</Button>

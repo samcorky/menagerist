@@ -51,7 +51,7 @@ def content_cache_headers(asset: MediaAsset) -> dict[str, str]:
     across the entire lifecycle, so this is safe to cache as ``immutable``
     regardless of the asset's current status.
 
-    Covers only the original file's bytes — see ``thumbnail_cache_headers``
+    Covers only the original file's bytes - see ``thumbnail_cache_headers``
     for the derived thumbnail, which is keyed on its own hash.
     """
     return _cache_headers(etag_hash=asset.sha256, last_modified=asset.created_at)
@@ -65,7 +65,7 @@ def check_content_not_modified(request: Request, asset: MediaAsset) -> Response 
     injected `response` dependency, which only reaches the client when a route
     returns a plain model for FastAPI to serialize. stream_media_content (and
     stream_media_thumbnail) return their own StreamingResponse instead, which
-    would silently discard anything written to the injected response — so the
+    would silently discard anything written to the injected response - so the
     200-path headers are attached directly via content_cache_headers() at the
     call site, and this function only ever returns a bare Response for the
     304 branch.
@@ -79,7 +79,7 @@ def thumbnail_cache_headers(asset: MediaAsset) -> dict[str, str]:
     """Immutable cache headers for a generated thumbnail, keyed on its own hash.
 
     A thumbnail's bytes can change independently of the original file it was
-    derived from — ``RegenerateThumbnails`` re-encodes attached assets after
+    derived from - ``RegenerateThumbnails`` re-encodes attached assets after
     a thumbnailing fix (EXIF orientation, encoder quality) without touching
     the original. Keying the thumbnail's ETag on the *original's* `sha256`
     (as content_cache_headers does) made a freshly regenerated thumbnail

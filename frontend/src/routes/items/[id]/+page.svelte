@@ -204,13 +204,13 @@
 		const result = await updateNode({ path: { node_id: nodeId }, body: { type: slug } });
 		if (result.response?.status === 412) {
 			toast.error('Edit conflict', {
-				description: 'This item was updated elsewhere — refresh to see the latest version.'
+				description: 'This item was updated elsewhere - refresh to see the latest version.'
 			});
 		} else if (result.error || !result.data) {
-			toast.error("Couldn't set category", { description: errorMessage(result.error) });
+			toast.error("Couldn't set item type", { description: errorMessage(result.error) });
 		} else {
 			node = result.data;
-			toast.success('Category set');
+			toast.success('Item type set');
 		}
 		settingType = false;
 	}
@@ -231,7 +231,7 @@
 		});
 		if (result.response?.status === 412) {
 			toast.error('Edit conflict', {
-				description: 'This item was edited elsewhere — refresh to see the latest version.'
+				description: 'This item was edited elsewhere - refresh to see the latest version.'
 			});
 		} else if (result.error || !result.data) {
 			const fieldErrors =
@@ -277,7 +277,7 @@
 			toast.error(title, { description: desc });
 			return;
 		}
-		await goto(resolve('/collection'));
+		await goto(resolve('/items'));
 	}
 
 	async function handleToggleFavourite() {
@@ -390,7 +390,7 @@
 		});
 		if (result.response?.status === 412) {
 			toast.error('Edit conflict', {
-				description: 'This connection was edited elsewhere — refresh to see the latest version.'
+				description: 'This connection was edited elsewhere - refresh to see the latest version.'
 			});
 		} else if (result.error || !result.data) {
 			const fieldErrors =
@@ -448,15 +448,15 @@
 </script>
 
 <svelte:head>
-	<title>{node?.name ?? 'Item'} — Menagerist</title>
+	<title>{node?.name ?? 'Item'} - Menagerist</title>
 </svelte:head>
 
 <main class="flex-1 px-4 py-6 sm:px-6">
 	<div class="mx-auto flex max-w-2xl flex-col gap-6">
-		<BackButton fallback={resolve('/collection')} />
+		<BackButton fallback={resolve('/items')} />
 
 		{#if notFound}
-			<NotFound backHref={resolve('/collection')} />
+			<NotFound backHref={resolve('/items')} />
 		{:else}
 			<Shimmer {loading}>
 				<Card.Root class="overflow-hidden">
@@ -477,13 +477,13 @@
 										{:else}
 											<span
 												class="font-mono text-xs text-muted-foreground/60 italic"
-												title="This category no longer exists">{node.type}</span
+												title="This item type no longer exists">{node.type}</span
 											>
 										{/if}
 									</Card.Description>
 								{:else if !loading && nodeTypes.length > 0}
 									<div class="mt-2 space-y-1.5">
-										<p class="text-xs text-muted-foreground">No category — pick one:</p>
+										<p class="text-xs text-muted-foreground">No item type - pick one:</p>
 										<div class="flex flex-wrap gap-1.5">
 											{#each nodeTypes as nt (nt.slug)}
 												<button
@@ -704,7 +704,7 @@
 												<Item.Title class="truncate">{relationLabel}</Item.Title>
 												<div class="flex min-w-0 items-center gap-2">
 													<a
-														href={resolve('/collection/[id]', { id: otherNodeId(edge) })}
+														href={resolve('/items/[id]', { id: otherNodeId(edge) })}
 														class="truncate text-muted-foreground underline"
 													>
 														{other?.name ?? 'View item'}
@@ -762,7 +762,7 @@
 						<form class="space-y-3" onsubmit={handleCreateEdge}>
 							<div class="space-y-2">
 								<ShimmerSlot {loading} class="h-4 w-32">
-									<Label for="edge-type">Relationship</Label>
+									<Label for="edge-type">Connection</Label>
 								</ShimmerSlot>
 								<div class="relative">
 									<Input

@@ -5,7 +5,7 @@ if TYPE_CHECKING:
 
 
 class InMemoryHealthCheckAdapter:
-    """Fixed-report `HealthCheckPort` for tests — no database required."""
+    """Fixed-report `HealthCheckPort` for tests - no database required."""
 
     def __init__(self, report: ReadinessReport) -> None:
         self._report = report

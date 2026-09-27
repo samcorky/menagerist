@@ -167,7 +167,7 @@ There's no bus or mediator between a router/CLI command and the use case it call
 
 The backend uses **structlog** (configured in `platform/logging_config.py`) with two output modes: colourised console in development, JSON in production (`MENAGERIST_LOG_JSON=true`). The effective log level is controlled by `MENAGERIST_LOG_LEVEL` (default: `INFO`).
 
-**Where loggers live** — application-layer use cases and adapter modules only. The domain layer has zero framework imports, so it carries no logger. In-memory adapters are test infrastructure and are also logger-free.
+**Where loggers live** - application-layer use cases and adapter modules only. The domain layer has zero framework imports, so it carries no logger. In-memory adapters are test infrastructure and are also logger-free.
 
 **Level semantics:**
 
@@ -178,7 +178,7 @@ The backend uses **structlog** (configured in `platform/logging_config.py`) with
 | `WARNING` | Recoverable anomalies that need attention (content-type mismatch, degraded trust level). |
 | `ERROR` | Unhandled exceptions, caught by the global exception handler. |
 
-**SQL query logging** is automatic at `DEBUG` level — SQLAlchemy emits every compiled statement through Python's `logging.getLogger("sqlalchemy.engine")`, which structlog's stdlib bridge picks up. No parameters are logged. Enable with `MENAGERIST_LOG_LEVEL=DEBUG`.
+**SQL query logging** is automatic at `DEBUG` level - SQLAlchemy emits every compiled statement through Python's `logging.getLogger("sqlalchemy.engine")`, which structlog's stdlib bridge picks up. No parameters are logged. Enable with `MENAGERIST_LOG_LEVEL=DEBUG`.
 
 **Call-site pattern:**
 
@@ -194,7 +194,7 @@ logger.info("node created", node_id=node.id, node_type=node.type)
 logger.debug("fetching node", node_id=node_id)
 ```
 
-Pass values directly — `uuid.UUID` objects are serialised to strings automatically by the `_serialise_uuids` processor in the shared pipeline. Never use f-strings or string formatting for structured fields.
+Pass values directly - `uuid.UUID` objects are serialised to strings automatically by the `_serialise_uuids` processor in the shared pipeline. Never use f-strings or string formatting for structured fields.
 
 **Future:** when an event bus / pipeline behavior is introduced, cross-cutting logging will migrate to a central pipeline stage. The per-use-case logger calls will be removed at that point.
 

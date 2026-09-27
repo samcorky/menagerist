@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class InMemoryMediaStorage:
-    """Dict-backed `MediaStoragePort` for tests — no filesystem required."""
+    """Dict-backed `MediaStoragePort` for tests - no filesystem required."""
 
     def __init__(self) -> None:
         self._files: dict[tuple[uuid.UUID, str], bytes] = {}

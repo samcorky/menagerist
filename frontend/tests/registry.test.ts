@@ -9,7 +9,7 @@ import {
 } from '../src/lib/field-types/registry';
 import type { JsonSchemaProperty } from '../src/lib/schema-types';
 
-// Minimal stub — Component type is complex; cast to satisfy the interface in tests.
+// Minimal stub - Component type is complex; cast to satisfy the interface in tests.
 const StubWidget = {} as FieldTypeDescriptor['InputWidget'];
 
 const textDesc: FieldTypeDescriptor = {

@@ -65,7 +65,7 @@
 		name = '';
 		selectedType = null;
 		stagedAsset = null;
-		void goto(resolve('/collection/new'));
+		void goto(resolve('/items/new'));
 	}
 
 	function close() {
@@ -136,9 +136,9 @@
 				}}
 			/>
 
-			<!-- Category -->
+			<!-- Item type -->
 			<div class="space-y-1.5">
-				<Label class="text-xs text-muted-foreground">Category</Label>
+				<Label class="text-xs text-muted-foreground">Item type</Label>
 				<CategorySelect bind:value={selectedType} />
 			</div>
 

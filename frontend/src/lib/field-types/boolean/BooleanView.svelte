@@ -15,7 +15,7 @@
 </script>
 
 {#if value === ''}
-	<span class="text-muted-foreground">—</span>
+	<span class="text-muted-foreground">-</span>
 {:else if yesNo}
 	<span>{checked ? 'Yes' : 'No'}</span>
 {:else}

@@ -137,7 +137,7 @@ export function propertyFromField(f: EditorField): JsonSchemaProperty {
 	return f.kind === 'opaque' ? prop : withPropMeta(prop, { ...f.meta, kind: f.kind });
 }
 
-/** Remove all registrations — for use in tests only. */
+/** Remove all registrations - for use in tests only. */
 export function _clearRegistry(): void {
 	registry.clear();
 }

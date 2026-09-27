@@ -58,7 +58,7 @@ def _normalise_openapi_schemas(openapi_schema: dict[str, Any]) -> None:
     """Rename FastAPI's auto-generated `Body_<operation_id>` schemas.
 
     FastAPI synthesises a request-body model named ``Body_<operation_id>`` for
-    any endpoint that combines a file upload with other form fields — there is
+    any endpoint that combines a file upload with other form fields - there is
     no supported way to name that wrapper model per-endpoint (see
     `backend/README.md` for the underlying constraint). Rename it here instead,
     e.g. ``Body_upload_and_attach_media`` -> ``UploadAndAttachMediaBody``.

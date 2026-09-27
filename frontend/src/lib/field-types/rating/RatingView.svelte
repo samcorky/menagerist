@@ -23,5 +23,5 @@
 		{/each}
 	</span>
 {:else}
-	<span>—</span>
+	<span>-</span>
 {/if}

@@ -23,7 +23,7 @@
 	let fullLoaded = $state(false);
 
 	$effect(() => {
-		void nodeId; // reactive dependency — reset when nodeId changes
+		void nodeId; // reactive dependency - reset when nodeId changes
 		fullLoaded = false;
 	});
 </script>

@@ -9,7 +9,7 @@
 </script>
 
 {#if items.length === 0}
-	<span class="text-muted-foreground">—</span>
+	<span class="text-muted-foreground">-</span>
 {:else}
 	<ul class="space-y-0.5 text-sm">
 		{#each items as item, i (i)}

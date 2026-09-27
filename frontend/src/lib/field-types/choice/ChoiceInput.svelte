@@ -81,7 +81,7 @@
 			aria-label={ariaLabel}
 		>
 			<span class={selected && stale === null ? '' : 'text-muted-foreground'}
-				>{staleLabel ?? (selected || '— select —')}</span
+				>{staleLabel ?? (selected || '- select -')}</span
 			>
 			<ChevronDown class="size-4 shrink-0 text-muted-foreground" />
 		</Select.Trigger>
@@ -90,10 +90,10 @@
 		>
 			<Select.Item
 				value=""
-				label="— select —"
+				label="- select -"
 				class="flex cursor-pointer items-center rounded px-2 py-1.5 text-sm text-muted-foreground outline-none data-[highlighted]:bg-accent"
 			>
-				— select —
+				- select -
 			</Select.Item>
 			{#if stale !== null && staleLabel !== null}
 				<Select.Item

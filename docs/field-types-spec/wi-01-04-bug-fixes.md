@@ -7,9 +7,9 @@
 
 All confirmed by reading the code and running a throwaway vitest probe against `rowsToAttributes` plus `@cfworker/json-schema`.
 
-## WI-1 — Clearing a Choice or Date field blocks saving
+## WI-1 - Clearing a Choice or Date field blocks saving
 
-**Problem.** `ChoiceInput` ("— select —") calls `onChange('')`, and `DateInput` calls `onChange('')` when the date is deselected. `rowsToAttributes` passes the empty string through for string-typed props. Both validators then reject it: the client (`Instance does not match any of [...]`, `String does not match format "date"`) and the backend (`jsonschema` with `FORMAT_CHECKER`). This happens even on optional fields.
+**Problem.** `ChoiceInput` ("- select -") calls `onChange('')`, and `DateInput` calls `onChange('')` when the date is deselected. `rowsToAttributes` passes the empty string through for string-typed props. Both validators then reject it: the client (`Instance does not match any of [...]`, `String does not match format "date"`) and the backend (`jsonschema` with `FORMAT_CHECKER`). This happens even on optional fields.
 
 **Spec.** In `rowsToAttributes` (`frontend/src/lib/components/attributes-editor.svelte`, module script), omit a top-level value when it is `''` and the property is a string with `enum` or `format: 'date'`, exactly as empty numbers are already omitted. Keep `''` for plain text and longtext (an empty string is a legitimate value there), **except** for a text property that carries a `pattern` (see WI-15): an empty string fails any anchored pattern, so a cleared optional field must be omitted instead.
 
@@ -19,7 +19,7 @@ All confirmed by reading the code and running a throwaway vitest probe against `
 
 **Tests** (`frontend/tests/attributes-editor.test.ts`): choice `''` omitted; date `''` omitted; text `''` kept.
 
-## WI-2 — Blank cells in group rows
+## WI-2 - Blank cells in group rows
 
 **Problem.** `GroupInput.addRow` seeds every cell with `''`. In `coerceScalar`, `Number('')` is `0`, so a blank number cell is saved as `0` (top-level numbers correctly omit blanks). A blank date cell is sent as `''` and fails format validation, which blocks the whole save.
 
@@ -29,7 +29,7 @@ All confirmed by reading the code and running a throwaway vitest probe against `
 
 **Tests:** extend the existing type-coercion tests for group rows (blank number, blank date, blank text).
 
-## WI-3 — `GroupView` shows dates a day early in negative UTC offsets
+## WI-3 - `GroupView` shows dates a day early in negative UTC offsets
 
 **Problem.** `GroupView.formatValue` uses `new Date(val)`. A `YYYY-MM-DD` string is parsed as UTC midnight, so it renders as the previous day in the Americas. `DateView` already avoids this with `new Date(value + 'T00:00:00')`.
 
@@ -37,7 +37,7 @@ All confirmed by reading the code and running a throwaway vitest probe against `
 
 **Tests:** helper unit test run with `TZ=America/Los_Angeles` (or a fake timezone) asserting the day does not shift.
 
-## WI-4 — Unrecognised schema properties are silently rewritten (minor)
+## WI-4 - Unrecognised schema properties are silently rewritten (minor)
 
 **Problem.** Two related symptoms, both caused by `fromSchema` returning `null` or a lossy result:
 - `text.fromSchema` rejects any string with a `format` (for example `email`). `propertyToField` then falls back to kind `text`, and `toSchema` drops the `format` on the next save.

@@ -1,4 +1,4 @@
-"""Tests for ListNodeMedia — fetch all assets attached to a node."""
+"""Tests for ListNodeMedia - fetch all assets attached to a node."""
 
 import uuid
 

@@ -45,7 +45,7 @@ def conditional_get_responses() -> dict[int | str, dict[str, Any]]:
                 "Cache-Control": {"schema": {"type": "string"}},
             }
         },
-        304: {"description": "Not Modified — condition matched; no body."},
+        304: {"description": "Not Modified - condition matched; no body."},
     }
 
 
@@ -53,7 +53,7 @@ def conditional_patch_responses() -> dict[int | str, dict[str, Any]]:
     """OpenAPI docs for 412 Precondition Failed on conditional PATCH endpoints."""
     return {
         412: {
-            "description": "Precondition Failed — conditional header check failed.",
+            "description": "Precondition Failed - conditional header check failed.",
             "headers": {
                 "ETag": {
                     "description": "Current ETag of the resource.",

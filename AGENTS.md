@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Menagerist is a self-hostable collection management platform — a SvelteKit SPA frontend, a FastAPI backend, and a PostgreSQL database, deployed via Docker Compose. This file contains working instructions for AI coding agents.
+Menagerist is a self-hostable collection management platform - a SvelteKit SPA frontend, a FastAPI backend, and a PostgreSQL database, deployed via Docker Compose. This file contains working instructions for AI coding agents.
 
 ## Docs map
 
@@ -21,8 +21,8 @@ Menagerist is a self-hostable collection management platform — a SvelteKit SPA
 backend/src/app/
 ├── modules/            # bounded contexts: graph, media, …
 │   └── <context>/
-│       ├── domain/     # entities, value objects — no framework imports
-│       ├── application/# use cases — no ports here, no adapter imports
+│       ├── domain/     # entities, value objects - no framework imports
+│       ├── application/# use cases - no ports here, no adapter imports
 │       ├── ports/      # Protocol interfaces defining what use cases need
 │       └── adapters/
 │           ├── api/            # FastAPI router (driving)
@@ -33,16 +33,16 @@ backend/src/app/
 └── entrypoints/        # FastAPI app factory, composition root
 
 frontend/src/
-├── routes/             # SvelteKit file-based routes (client-rendered — no +page.server.ts)
+├── routes/             # SvelteKit file-based routes (client-rendered - no +page.server.ts)
 └── lib/
     ├── api/
-    │   └── generated/  # auto-generated — never edit by hand
+    │   └── generated/  # auto-generated - never edit by hand
     └── …
 ```
 
 ## Commands
 
-All tasks run via `poe` from the repo root. Do not invent commands — read `pyproject.toml`.
+All tasks run via `poe` from the repo root. Do not invent commands - read `pyproject.toml`.
 
 ```sh
 poe init                      # first-time setup: sync all deps + install git hooks
@@ -53,8 +53,8 @@ poe serve-backend             # FastAPI at localhost:8000 (--reload)
 poe serve-frontend            # SvelteKit at localhost:5173
 
 poe test                      # all unit tests (backend + frontend)
-poe test-backend              # backend unit + router tests — no infrastructure required
-poe test-backend-integration  # integration tests — requires live Postgres
+poe test-backend              # backend unit + router tests - no infrastructure required
+poe test-backend-integration  # integration tests - requires live Postgres
 poe test-backend-all          # unit + integration with combined coverage
 poe test-frontend             # Vitest unit tests
 
@@ -81,17 +81,17 @@ poe generate-frontend-client  # regenerate typed API client from OpenAPI schema
 
 Read [backend/README.md](backend/README.md) in full before writing backend code. Key rules:
 
-**Dependency direction** — `entrypoints → adapters → application → domain`. Nothing on the right imports anything on the left. Architecture tests in `backend/tests/architecture/` enforce this with `archunitpython` and always run in CI.
+**Dependency direction** - `entrypoints → adapters → application → domain`. Nothing on the right imports anything on the left. Architecture tests in `backend/tests/architecture/` enforce this with `archunitpython` and always run in CI.
 
-**Business logic location** — domain and application layers only. Routers translate HTTP into use-case calls and the result back into a response — nothing else. CLI commands follow the identical pattern: they are driving adapters for the same use cases.
+**Business logic location** - domain and application layers only. Routers translate HTTP into use-case calls and the result back into a response - nothing else. CLI commands follow the identical pattern: they are driving adapters for the same use cases.
 
-**In-memory adapters** — every port ships a first-class in-memory implementation as a sibling file in `adapters/persistence/` (e.g. `in_memory_node_repository.py` alongside `node_repository.py`). Application-layer and router tests wire the in-memory adapter directly. Only tests verifying the real persistence adapter are `@pytest.mark.integration`.
+**In-memory adapters** - every port ships a first-class in-memory implementation as a sibling file in `adapters/persistence/` (e.g. `in_memory_node_repository.py` alongside `node_repository.py`). Application-layer and router tests wire the in-memory adapter directly. Only tests verifying the real persistence adapter are `@pytest.mark.integration`.
 
-**CQRS convention** — commands depend on `UnitOfWork` and call `commit()`. Queries depend on a repository directly and do not commit.
+**CQRS convention** - commands depend on `UnitOfWork` and call `commit()`. Queries depend on a repository directly and do not commit.
 
-**Error handling** — domain errors subclass `shared_kernel.errors` base types. No `try/except` in routers. `register_exception_handlers()` maps base types to RFC 9457 HTTP responses globally; module-specific subclasses get the correct status for free.
+**Error handling** - domain errors subclass `shared_kernel.errors` base types. No `try/except` in routers. `register_exception_handlers()` maps base types to RFC 9457 HTTP responses globally; module-specific subclasses get the correct status for free.
 
-**Entity conventions** — primary keys are `uuid7`. Timestamps set in domain methods via `datetime.now(UTC)`, not via DB defaults. All entity/mixin dataclasses use `kw_only=True, eq=False`.
+**Entity conventions** - primary keys are `uuid7`. Timestamps set in domain methods via `datetime.now(UTC)`, not via DB defaults. All entity/mixin dataclasses use `kw_only=True, eq=False`.
 
 **Coverage floors** (enforced by `poe coverage` and Codecov):
 
@@ -106,18 +106,18 @@ Read [backend/README.md](backend/README.md) in full before writing backend code.
 
 `poe coverage` is a full verification step, not a quick iteration command: it runs the full backend test suite and fails if any layer drops below the thresholds above. Use targeted backend tests while developing, then run `poe coverage` before considering backend work complete. It is intentionally heavier than `poe test-backend` and is the source of truth for the repository's coverage gate.
 
-`ports/` holds `Protocol` interfaces — the stub method bodies (`...`) never execute, so a hard 100% floor wouldn't test anything real. Codecov tracks it for visibility (`target: auto` in `codecov.yml`) without gating on it.
+`ports/` holds `Protocol` interfaces - the stub method bodies (`...`) never execute, so a hard 100% floor wouldn't test anything real. Codecov tracks it for visibility (`target: auto` in `codecov.yml`) without gating on it.
 
 ## Frontend conventions
 
 Read [frontend/README.md](frontend/README.md) and [frontend/DESIGN_GUIDELINES.md](frontend/DESIGN_GUIDELINES.md) before writing frontend code.
 
-- **Svelte 5 runes** — use `$state`, `$derived`, `$effect` throughout. No Svelte 4 stores except the two existing singleton controllers (`src/lib/theme.svelte.ts`, `src/lib/capture.svelte.ts`).
-- **Generated API client** — `src/lib/api/generated/` is auto-generated by `@hey-api/openapi-ts`. Never edit those files. Import all API calls through `src/lib/api/client.ts`.
-- **No SSR** — no `+page.server.ts`. Data is fetched client-side inside components.
-- **Internal hrefs** — always use `resolve()` from `$app/paths`.
-- **Design system** — shadcn-svelte + Tailwind CSS v4 + Lucide icons. Reuse existing patterns before creating new components. Prefer a shadcn-svelte/bits-ui component over a native HTML element where one exists and fits — see [frontend/README.md](frontend/README.md#key-patterns) for how to add one and when native is still the right call.
-- **UX rules** — [frontend/DESIGN_GUIDELINES.md](frontend/DESIGN_GUIDELINES.md) is binding. Graph terminology (node, edge, graph) must not appear in any user-visible text. Read it before implementing UI.
+- **Svelte 5 runes** - use `$state`, `$derived`, `$effect` throughout. No Svelte 4 stores except the two existing singleton controllers (`src/lib/theme.svelte.ts`, `src/lib/capture.svelte.ts`).
+- **Generated API client** - `src/lib/api/generated/` is auto-generated by `@hey-api/openapi-ts`. Never edit those files. Import all API calls through `src/lib/api/client.ts`.
+- **No SSR** - no `+page.server.ts`. Data is fetched client-side inside components.
+- **Internal hrefs** - always use `resolve()` from `$app/paths`.
+- **Design system** - shadcn-svelte + Tailwind CSS v4 + Lucide icons. Reuse existing patterns before creating new components. Prefer a shadcn-svelte/bits-ui component over a native HTML element where one exists and fits - see [frontend/README.md](frontend/README.md#key-patterns) for how to add one and when native is still the right call.
+- **UX rules** - [frontend/DESIGN_GUIDELINES.md](frontend/DESIGN_GUIDELINES.md) is binding. Graph terminology (node, edge, graph) must not appear in any user-visible text. Read it before implementing UI.
 
 ## General rules
 

@@ -126,17 +126,17 @@
 				}
 			});
 		}
-		await goto(resolve('/collection/[id]', { id: result.data.id }));
+		await goto(resolve('/items/[id]', { id: result.data.id }));
 	}
 </script>
 
 <svelte:head>
-	<title>New item — Menagerist</title>
+	<title>New item - Menagerist</title>
 </svelte:head>
 
 <main class="flex-1 px-4 py-6 sm:px-6">
 	<div class="mx-auto flex max-w-2xl flex-col gap-6">
-		<BackButton fallback={resolve('/collection')} />
+		<BackButton fallback={resolve('/items')} />
 
 		<Card.Root>
 			<Card.Header>
@@ -177,9 +177,9 @@
 						<Input id="name" bind:value={name} required autofocus />
 					</div>
 
-					<!-- Category -->
+					<!-- Item type -->
 					<div class="space-y-2">
-						<Label>Category</Label>
+						<Label>Item type</Label>
 						<CategorySelect bind:value={selectedType} />
 					</div>
 
@@ -191,7 +191,7 @@
 
 					<TagsInput bind:tags />
 
-					<!-- Attributes (schema-aware when category selected) -->
+					<!-- Attributes (schema-aware when item type selected) -->
 					<AttributesEditor
 						bind:rows={attrRows}
 						bind:extraSchema

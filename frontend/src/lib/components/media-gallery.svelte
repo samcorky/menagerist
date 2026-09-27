@@ -237,7 +237,7 @@
 
 		if (result.response?.status === 412) {
 			toast.error('Edit conflict', {
-				description: 'This file was updated elsewhere — refresh to see the latest version.'
+				description: 'This file was updated elsewhere - refresh to see the latest version.'
 			});
 		} else if (result.error || !result.data) {
 			toast.error('Rename failed', { description: errorMessage(result.error) });

@@ -8,7 +8,7 @@ Significant architectural choices and their rationale. Entries are added when a 
 
 **Decision:** The backend uses hexagonal (ports and adapters) architecture. The enforced dependency direction is `entrypoints → adapters → application → domain`. Domain has zero framework imports; application depends only on port Protocols it defines itself.
 
-**Rationale:** Keeps business logic testable without running a web server or database. Domain entities and use cases can be instantiated with no infrastructure. The dependency rule is not convention — it is checked at CI time by `archunitpython` tests in `backend/tests/architecture/`.
+**Rationale:** Keeps business logic testable without running a web server or database. Domain entities and use cases can be instantiated with no infrastructure. The dependency rule is not convention - it is checked at CI time by `archunitpython` tests in `backend/tests/architecture/`.
 
 **Tradeoff:** More boilerplate per bounded context than a flat structure. The test-speed and design-clarity benefits are judged to compound as the codebase grows.
 
@@ -18,7 +18,7 @@ Significant architectural choices and their rationale. Entries are added when a 
 
 **Decision:** Code is organised as `modules/<context>/` (domain, application, ports, adapters), not as repo-wide `models/`, `services/`, `routers/` directories.
 
-**Rationale:** Horizontal organisation couples every feature to every other feature at the import level. Vertical slices keep a module's internals self-contained — adding a bounded context does not require touching every layer. The organising question is "what domain concept is this about?", not "what kind of code is this?".
+**Rationale:** Horizontal organisation couples every feature to every other feature at the import level. Vertical slices keep a module's internals self-contained - adding a bounded context does not require touching every layer. The organising question is "what domain concept is this about?", not "what kind of code is this?".
 
 ---
 
@@ -34,7 +34,7 @@ Significant architectural choices and their rationale. Entries are added when a 
 
 **Decision:** Every port ships an in-memory implementation alongside its SQLAlchemy implementation as a sibling file in `adapters/persistence/`. Application-layer and router tests wire the in-memory adapter directly.
 
-**Rationale:** Mock-based tests can pass while the real adapter is broken — this has happened once where mock/prod divergence masked a broken migration. In-memory adapters satisfy the same port Protocol as the real adapter, so tests exercise the actual contract. They also keep the unit test loop near-instant.
+**Rationale:** Mock-based tests can pass while the real adapter is broken - this has happened once where mock/prod divergence masked a broken migration. In-memory adapters satisfy the same port Protocol as the real adapter, so tests exercise the actual contract. They also keep the unit test loop near-instant.
 
 **Tradeoff:** Two implementations per port. In-memory implementations are typically trivial (an in-memory dict or list) and the test-correctness and speed benefits are worth it.
 
@@ -52,15 +52,15 @@ Significant architectural choices and their rationale. Entries are added when a 
 
 **Decision:** `shared_kernel/unit_of_work.py` defines `UnitOfWork[TRepos]` once. Two concrete implementations exist (`SqlAlchemySessionUnitOfWork` in `platform/`, `InMemoryUnitOfWork` in `shared_kernel/`), written once and reused by every module. A module contributes only a `Repos` dataclass and two one-line factory functions.
 
-**Rationale:** A per-module UoW subclass repeats session lifecycle code (begin/rollback/close/commit) N times. A single central UoW listing all modules' repos was rejected — it couples modules to each other and implies transactions spanning bounded contexts, which DDD treats as the wrong boundary.
+**Rationale:** A per-module UoW subclass repeats session lifecycle code (begin/rollback/close/commit) N times. A single central UoW listing all modules' repos was rejected - it couples modules to each other and implies transactions spanning bounded contexts, which DDD treats as the wrong boundary.
 
 ---
 
 ## CQRS as a typing convention, not a bus
 
-**Decision:** `shared_kernel/cqrs.py` defines `CommandHandler[TCommand, TResult]` and `QueryHandler[TQuery, TResult]` Protocols. Every use case implements one. Routers call use cases directly — there is no mediator, dispatcher, or pipeline.
+**Decision:** `shared_kernel/cqrs.py` defines `CommandHandler[TCommand, TResult]` and `QueryHandler[TQuery, TResult]` Protocols. Every use case implements one. Routers call use cases directly - there is no mediator, dispatcher, or pipeline.
 
-**Rationale:** The pattern enforces a consistent shape for every use case and makes `mypy --strict` verify it. A bus with pipeline behaviors would give a single seam for cross-cutting concerns, but nothing currently requires that uniformity enforced. Adding a bus later is possible — the typed-handler convention is a prerequisite and is already in place.
+**Rationale:** The pattern enforces a consistent shape for every use case and makes `mypy --strict` verify it. A bus with pipeline behaviors would give a single seam for cross-cutting concerns, but nothing currently requires that uniformity enforced. Adding a bus later is possible - the typed-handler convention is a prerequisite and is already in place.
 
 ---
 
@@ -68,7 +68,7 @@ Significant architectural choices and their rationale. Entries are added when a 
 
 **Decision:** The SvelteKit frontend uses the static adapter. No `+page.server.ts`. Data is fetched client-side inside components.
 
-**Rationale:** Menagerist is a self-hosted personal app, not a public-facing site requiring SEO or SSR performance. A static build simplifies deployment (the backend serves the built files directly — see "Single-image deployment" below), eliminates a Node.js runtime from the production image, and makes the Docker setup self-contained. First-load skeleton states are an acceptable tradeoff.
+**Rationale:** Menagerist is a self-hosted personal app, not a public-facing site requiring SEO or SSR performance. A static build simplifies deployment (the backend serves the built files directly - see "Single-image deployment" below), eliminates a Node.js runtime from the production image, and makes the Docker setup self-contained. First-load skeleton states are an acceptable tradeoff.
 
 ---
 
@@ -84,7 +84,7 @@ Significant architectural choices and their rationale. Entries are added when a 
 
 **Decision:** The v1 `AuthorizationPort` implementation always permits every action. Routes depend on `get_current_actor` and use cases take `actor` in `handle()`, but no checks are enforced.
 
-**Rationale:** The wiring exists so that when the `identity` module lands, only the composition root changes — no route or use case signatures need updating. The app is single-user and self-hosted in v1; multi-user support is a later roadmap item. Building real authorization before identity exists would require faking it in ways that add coupling.
+**Rationale:** The wiring exists so that when the `identity` module lands, only the composition root changes - no route or use case signatures need updating. The app is single-user and self-hosted in v1; multi-user support is a later roadmap item. Building real authorization before identity exists would require faking it in ways that add coupling.
 
 ---
 
@@ -92,11 +92,11 @@ Significant architectural choices and their rationale. Entries are added when a 
 
 **Decision:** The schema editor and attributes editor dispatch to field types via a registry (`field-types/registry.ts`) rather than switch/case blocks. Each type registers a `FieldTypeDescriptor` with `toSchema`, `fromSchema`, optional `EditorExtras`, `InputWidget`, and optional `ViewWidget`. New types are added by creating a descriptor file and one import line in `index.ts`.
 
-**Rationale:** A switch/case or `if`/`else if` chain in the editor components couples every field type to every component that renders them. The registry inverts that: each type owns its own rendering and serialisation logic, and the components are unaware of what types exist. `descriptorForProp` uses registration order as precedence — most-specific matchers (date, longtext, choice) register before the `text` fallback, so no descriptor needs to guard against other descriptors winning first.
+**Rationale:** A switch/case or `if`/`else if` chain in the editor components couples every field type to every component that renders them. The registry inverts that: each type owns its own rendering and serialisation logic, and the components are unaware of what types exist. `descriptorForProp` uses registration order as precedence - most-specific matchers (date, longtext, choice) register before the `text` fallback, so no descriptor needs to guard against other descriptors winning first.
 
-**Tradeoff:** Registration order is load-order dependent. The `index.ts` file is the canonical ordering point — it must be read before adding a new type. A misplaced import (e.g. `text` before `date`) silently causes `date` fields to render as plain text inputs.
+**Tradeoff:** Registration order is load-order dependent. The `index.ts` file is the canonical ordering point - it must be read before adding a new type. A misplaced import (e.g. `text` before `date`) silently causes `date` fields to render as plain text inputs.
 
-**Backend alignment:** All built-in field types use standard JSON Schema keywords (`type`, `format`, `enum`, `properties`, `items`). The backend validates with `jsonschema[format-nongpl]` which covers all standard `format` strings. A new type only needs backend code if it introduces a non-standard `format` string — see [field-types.md](field-types.md).
+**Backend alignment:** All built-in field types use standard JSON Schema keywords (`type`, `format`, `enum`, `properties`, `items`). The backend validates with `jsonschema[format-nongpl]` which covers all standard `format` strings. A new type only needs backend code if it introduces a non-standard `format` string - see [field-types.md](field-types.md).
 
 ---
 
@@ -104,7 +104,7 @@ Significant architectural choices and their rationale. Entries are added when a 
 
 **Decision:** Version scheme is `0.YYYY.MM.PATCH` until the data model and API stabilise, then `YYYY.MM.PATCH`.
 
-**Rationale:** CalVer communicates the release date naturally for a personal app without semantic versioning overhead. The `0.` prefix signals pre-stable — breaking migrations and API changes are expected — without requiring a formal major-version bump. Dropping the `0.` is the public signal that the schema and API are stable.
+**Rationale:** CalVer communicates the release date naturally for a personal app without semantic versioning overhead. The `0.` prefix signals pre-stable - breaking migrations and API changes are expected - without requiring a formal major-version bump. Dropping the `0.` is the public signal that the schema and API are stable.
 
 ---
 
@@ -262,9 +262,9 @@ Significant architectural choices and their rationale. Entries are added when a 
 
 **Decision:** Nodes gain a nullable `extra_schema` column (v1: nodes only, not edges), in the same JSON Schema shape as a node type's `attributes_schema` (properties with `x-menagerist`, a `version`, `required`, `layout`). `application/schema_meta.merge_attribute_schemas(type_schema, extra_schema)` combines both into one schema for validation: properties from each side, `required` and `layout` concatenated (type first), and `highlights` left type-only (never merged). `CreateNode`/`UpdateNode` check a given `extra_schema`'s own JSON Schema validity and `x-menagerist` shape (`check_schema_definition`, shared with the node-type and edge-type use cases), then validate `attributes` and check custom-detail limits against the merged schema instead of the type schema alone. A key defined by both schemas is rejected as `InvalidSchemaError`, including a key that is only archived on the type (its slot stays reserved). `extra_schema` follows the existing "`None` on update means unchanged" convention (there is no way to clear it yet, matching `attributes_schema` on a node type).
 
-**Rationale:** Reuses the existing field-type registry, editor components, validation and search unchanged for per-item fields, instead of a parallel typed-field system. `backend-surface.md` scopes WI-19d to "a column and API fields, not a port" — this session is that plumbing. The frontend UI to add typed per-item fields (WI-18b/18c) is separate and builds on this.
+**Rationale:** Reuses the existing field-type registry, editor components, validation and search unchanged for per-item fields, instead of a parallel typed-field system. `backend-surface.md` scopes WI-19d to "a column and API fields, not a port" - this session is that plumbing. The frontend UI to add typed per-item fields (WI-18b/18c) is separate and builds on this.
 
-**Tradeoff:** No item-page UI yet to create or edit `extra_schema` entries directly; only the API surface exists. WI-17 attribute search does not yet exclude non-searchable overlay fields (for example a per-item rating) the way it does for type fields, since exclusions are computed per type, not per node — left for later. No migration path to remove per-item fields beyond archiving them inside `extra_schema` itself, same as a type schema.
+**Tradeoff:** No item-page UI yet to create or edit `extra_schema` entries directly; only the API surface exists. WI-17 attribute search does not yet exclude non-searchable overlay fields (for example a per-item rating) the way it does for type fields, since exclusions are computed per type, not per node - left for later. No migration path to remove per-item fields beyond archiving them inside `extra_schema` itself, same as a type schema.
 
 ---
 
@@ -272,7 +272,7 @@ Significant architectural choices and their rationale. Entries are added when a 
 
 **Decision:** A new `presets` backend module (own hexagonal layers, no dependency on `graph`) stores saved fields, field groups (`field_set`, "field group" in the UI) and lists (`choice_list`) as `{kind, label, description, definition, version, builtin}`, soft-deletable, with a definition-shape check per kind (`application/preset_definitions.py`). Applying a preset **copies** its definition into the target schema with a fresh key (WI-20) and records `x-menagerist.origin: {preset, version}` on the property; provenance is metadata only and never affects validation. Editing a preset's `definition` bumps `version`, so a copy showing an older version can offer "update available". `field` (a single field, "Save for reuse" from a schema-editor field) and `choice_list` (a set of options, "Save these options as a list" / "Use a saved list" on a choice field, with "Update options" reusing the WI-9/10 in-use warning) are wired up this session; `field_set` is stored and validated but has no save/apply UI yet.
 
-**Rationale:** Copy-on-apply keeps every node type's schema a standalone JSON Schema both validators already understand, so deleting a preset never breaks a type that used it — the alternative, a live link, is parked as a v2 idea (`SyncChoiceList`). The `group` field kind's UI label changes to "Table" (code name unchanged) to free "Field group" for the new reusable-set concept.
+**Rationale:** Copy-on-apply keeps every node type's schema a standalone JSON Schema both validators already understand, so deleting a preset never breaks a type that used it - the alternative, a live link, is parked as a v2 idea (`SyncChoiceList`). The `group` field kind's UI label changes to "Table" (code name unchanged) to free "Field group" for the new reusable-set concept.
 
 **Tradeoff:** No UI yet for saved fields from a custom detail, for field groups (save/apply as a labelled section), for per-item application (needs the WI-19d overlay's own editor), or for packs/import-export/built-ins (WI-19c). These are separate, later items.
 
@@ -290,9 +290,9 @@ Significant architectural choices and their rationale. Entries are added when a 
 
 ## Rank-based matching for kind-less properties (WI-12)
 
-**Decision:** `FieldTypeDescriptor` gained an optional `rank?: (prop) => number`. `descriptorForProp` now picks the highest-ranked descriptor whose `fromSchema` matches an unkinded (API-authored) property, defaulting unranked matches to `1`; ties fall back to registration order. An explicit `x-menagerist.kind` is unaffected — it was, and remains, a direct lookup.
+**Decision:** `FieldTypeDescriptor` gained an optional `rank?: (prop) => number`. `descriptorForProp` now picks the highest-ranked descriptor whose `fromSchema` matches an unkinded (API-authored) property, defaulting unranked matches to `1`; ties fall back to registration order. An explicit `x-menagerist.kind` is unaffected - it was, and remains, a direct lookup.
 
-**Rationale:** Correctness no longer depends on import order in `field-types/index.ts`. No current built-in kind actually needs a non-default rank: every scalar's `fromSchema` already excludes the shapes the others claim (checked directly — `text` excludes `format`/`enum`, `date`/`choice` require them, `rating`/`longtext` only ever match an explicit `kind`), so this is infrastructure for the overlapping kinds the spec anticipates (multi-choice, partial date, identifier, URL/email), not a fix for a live bug.
+**Rationale:** Correctness no longer depends on import order in `field-types/index.ts`. No current built-in kind actually needs a non-default rank: every scalar's `fromSchema` already excludes the shapes the others claim (checked directly - `text` excludes `format`/`enum`, `date`/`choice` require them, `rating`/`longtext` only ever match an explicit `kind`), so this is infrastructure for the overlapping kinds the spec anticipates (multi-choice, partial date, identifier, URL/email), not a fix for a live bug.
 
 **Tradeoff:** None beyond the small added surface on the descriptor type.
 
@@ -312,7 +312,7 @@ Significant architectural choices and their rationale. Entries are added when a 
 
 **Rationale:** Verified directly against Postgres: nested JSONB object keys are not stored in insertion order (`{zeta_field, region, a_long_custom_name, aa, k1}` came back as `{aa, k1, region, zeta_field, a_long_custom_name}`), the same reordering WI-18a already found for loose attribute keys. A table field's columns were derived from `Object.entries(prop.items.properties)` with no explicit order recorded anywhere, unlike top-level fields (`x-menagerist.layout`), so a table's column order silently scrambled after any save and reload.
 
-**Tradeoff:** Existing table fields saved before this fix keep their JSONB-scrambled order until re-saved from the schema editor — the same no-migration pattern as every other `x-menagerist` addition.
+**Tradeoff:** Existing table fields saved before this fix keep their JSONB-scrambled order until re-saved from the schema editor - the same no-migration pattern as every other `x-menagerist` addition.
 
 ---
 
@@ -328,21 +328,21 @@ Significant architectural choices and their rationale. Entries are added when a 
 
 ## Per-item custom fields moved from a loose, untyped stopgap to the typed `extra_schema` overlay
 
-**Decision:** "Add detail" (WI-18a's Text/Number/Yes-No loose-key stopgap) is retired, not deprecated — deleted (`lib/attribute-rows.ts`'s `extra`/`newDetailRow`, `lib/custom-details.ts`, `application/custom_details.py`, all gone). Per-item extras are now typed fields in the node's `extra_schema` overlay (WI-19d), created through the same Name + Kind flow the schema editor uses (`FieldKindRow.svelte`, extracted from `schema-editor.svelte`'s field-creation row), for both typed and untyped nodes. WI-18c (adopt-across-items, `ListNodeTypeCustomAttributes`/`AdoptNodeTypeCustomAttribute`) is dropped entirely — there is no loose-key data left to adopt. Edges also lose ad-hoc fields (the overlay is nodes-only in v1); a connection can only use fields its relationship type's schema defines.
+**Decision:** "Add detail" (WI-18a's Text/Number/Yes-No loose-key stopgap) is retired, not deprecated - deleted (`lib/attribute-rows.ts`'s `extra`/`newDetailRow`, `lib/custom-details.ts`, `application/custom_details.py`, all gone). Per-item extras are now typed fields in the node's `extra_schema` overlay (WI-19d), created through the same Name + Kind flow the schema editor uses (`FieldKindRow.svelte`, extracted from `schema-editor.svelte`'s field-creation row), for both typed and untyped nodes. WI-18c (adopt-across-items, `ListNodeTypeCustomAttributes`/`AdoptNodeTypeCustomAttribute`) is dropped entirely - there is no loose-key data left to adopt. Edges also lose ad-hoc fields (the overlay is nodes-only in v1); a connection can only use fields its relationship type's schema defines.
 
-**Promotion:** WI-18b becomes `PromoteExtraSchemaField` (`application/promote_extra_schema_field.py`) — a pure move of a property from a node's overlay onto its item type's schema, in one transaction via `JoinedUnitOfWork` (composing `UpdateNodeType` and `UpdateNode`, the same pattern `upload_and_attach_media.py` uses). No value coercion is needed, since the value already satisfied the property's schema as an overlay field.
+**Promotion:** WI-18b becomes `PromoteExtraSchemaField` (`application/promote_extra_schema_field.py`) - a pure move of a property from a node's overlay onto its item type's schema, in one transaction via `JoinedUnitOfWork` (composing `UpdateNodeType` and `UpdateNode`, the same pattern `upload_and_attach_media.py` uses). No value coercion is needed, since the value already satisfied the property's schema as an overlay field.
 
-**Rationale:** The stopgap could not support constrained or typed kinds (rating, date, choice, quantity, table, constrained text) without duplicating validation logic the registry and backend schema validation already own — exactly the gap `decisions.md` already flagged it as ("a stopgap"). Since this is a pre-release application with no real user data, there was nothing to migrate, so the simpler, architecturally-correct path (typed overlay everywhere) was taken directly instead of building a bridge from the old model.
+**Rationale:** The stopgap could not support constrained or typed kinds (rating, date, choice, quantity, table, constrained text) without duplicating validation logic the registry and backend schema validation already own - exactly the gap `decisions.md` already flagged it as ("a stopgap"). Since this is a pre-release application with no real user data, there was nothing to migrate, so the simpler, architecturally-correct path (typed overlay everywhere) was taken directly instead of building a bridge from the old model.
 
-**Found along the way:** `UpdateNodeCommand.extra_schema=None` means "leave unchanged" (the same convention as `attributes_schema` on a node type), so a node's overlay can never actually be cleared to empty by sending `null` — both `PromoteExtraSchemaField` and `attributes-editor.svelte`'s "remove the last overlay field" path always write a real `{"properties": {}}` object instead, never `null`, so the clearing write actually takes effect. This is a latent, pre-existing gap in the `None`-means-unchanged convention itself (not something this change introduced), worth a proper fix (e.g. a sentinel) if a future session needs to clear other optional fields on this command the same way.
+**Found along the way:** `UpdateNodeCommand.extra_schema=None` means "leave unchanged" (the same convention as `attributes_schema` on a node type), so a node's overlay can never actually be cleared to empty by sending `null` - both `PromoteExtraSchemaField` and `attributes-editor.svelte`'s "remove the last overlay field" path always write a real `{"properties": {}}` object instead, never `null`, so the clearing write actually takes effect. This is a latent, pre-existing gap in the `None`-means-unchanged convention itself (not something this change introduced), worth a proper fix (e.g. a sentinel) if a future session needs to clear other optional fields on this command the same way.
 
-**Tradeoff:** No label-length cap on overlay fields (only a schema field's ordinary `title`, unlike the old 100-character detail-name limit) — an intentional asymmetry removed, since the key is now slug-generated (WI-20), not the label itself. The 50-fields-per-item count limit carries over (`MAX_EXTRA_SCHEMA_FIELDS`).
+**Tradeoff:** No label-length cap on overlay fields (only a schema field's ordinary `title`, unlike the old 100-character detail-name limit) - an intentional asymmetry removed, since the key is now slug-generated (WI-20), not the label itself. The 50-fields-per-item count limit carries over (`MAX_EXTRA_SCHEMA_FIELDS`).
 
 ---
 
 ## Rating colour is a per-field display option; kind changes that drop a highlight now say so
 
-**Decision:** Rating gained a second display option, `display: 'amber' | 'accent'` (default `amber`), read by `RatingInput`/`RatingView`/`RatingSummary` via a shared `filledStarClass(prop)` helper (`field-types/rating/colour.ts`). Closes open question 6 (was undecided between a fixed colour and the theme accent — the owner wants amber to stay the default but be overridable per field).
+**Decision:** Rating gained a second display option, `display: 'amber' | 'accent'` (default `amber`), read by `RatingInput`/`RatingView`/`RatingSummary` via a shared `filledStarClass(prop)` helper (`field-types/rating/colour.ts`). Closes open question 6 (was undecided between a fixed colour and the theme accent - the owner wants amber to stay the default but be overridable per field).
 
 Separately, `schema-editor.svelte`'s `handleFieldRowChange` now toasts ("No longer shown on cards" / "...on connections", matching whichever `highlightList` the editor is in) when a kind change makes a currently-highlighted field non-highlightable, instead of dropping the pin silently. Closes open question 65.
 
@@ -352,9 +352,9 @@ Separately, `schema-editor.svelte`'s `handleFieldRowChange` now toasts ("No long
 
 ## Field-row icon crowding, invalid-field styling, and overlay-field distinction (open questions 73, 74, 75)
 
-**Decision (73, revised same session):** an earlier pass in this session closed 73 as "keep everything always-visible" (no precedent for an alternative existed yet). The owner overruled that as too cluttered and asked for a proper overflow control that works well on mobile. Landed: pin/highlight and remove stay standalone (most frequent actions); "Replace field" and "Save field for reuse" move into a `MoreVertical` kebab menu using a newly-scaffolded `dropdown-menu` component (`frontend/src/lib/components/ui/dropdown-menu/`, via `npx shadcn-svelte add dropdown-menu` — built on `bits-ui`, already a dependency, so no new package). A kebab was chosen over a settings-cog icon (the owner's other suggestion) because a cog conventionally signals "configuration," not "actions on this item"; bits-ui's menu handles touch/keyboard/positioning itself, meeting the mobile requirement without extra work. This is the first use of a dropdown menu anywhere in the app — a real precedent now exists for the next row-action question.
+**Decision (73, revised same session):** an earlier pass in this session closed 73 as "keep everything always-visible" (no precedent for an alternative existed yet). The owner overruled that as too cluttered and asked for a proper overflow control that works well on mobile. Landed: pin/highlight and remove stay standalone (most frequent actions); "Replace field" and "Save field for reuse" move into a `MoreVertical` kebab menu using a newly-scaffolded `dropdown-menu` component (`frontend/src/lib/components/ui/dropdown-menu/`, via `npx shadcn-svelte add dropdown-menu` - built on `bits-ui`, already a dependency, so no new package). A kebab was chosen over a settings-cog icon (the owner's other suggestion) because a cog conventionally signals "configuration," not "actions on this item"; bits-ui's menu handles touch/keyboard/positioning itself, meeting the mobile requirement without extra work. This is the first use of a dropdown menu anywhere in the app - a real precedent now exists for the next row-action question.
 
-**Decision (74):** `attributes-editor.svelte`'s `fieldEntry` snippet now wraps the widget/input in a `ring-destructive/60` ring (150ms transition, §22's "state change" bucket) whenever the field has an error, and sets `aria-invalid` on the plain-text `Input` fallback. Deliberately no shake or other one-off animation — matches §16a's soft, non-alarming tone already established for required-field feedback. `aria-invalid` is not threaded into the per-kind `Widget` components (rating, choice, date, ...), since each has its own prop contract; left for later if wanted.
+**Decision (74):** `attributes-editor.svelte`'s `fieldEntry` snippet now wraps the widget/input in a `ring-destructive/60` ring (150ms transition, §22's "state change" bucket) whenever the field has an error, and sets `aria-invalid` on the plain-text `Input` fallback. Deliberately no shake or other one-off animation - matches §16a's soft, non-alarming tone already established for required-field feedback. `aria-invalid` is not threaded into the per-kind `Widget` components (rating, choice, date, ...), since each has its own prop contract; left for later if wanted.
 
 **Decision (75):** Per-item overlay fields (WI-19d's `extra_schema`) get a small "Per-item" badge next to the label in `attributes-editor.svelte`, reusing the opaque-field "custom" badge styling from `field-kind-row.svelte` for visual consistency. Node-type fields get no badge (the implicit, default case). Per-item custom details no longer exist to distinguish (retired by the WI-18 revision), so this only separates the two kinds that remain.
 
@@ -388,11 +388,11 @@ Separately, `field-kind-row.svelte`/`GroupExtras.svelte`'s three dropdowns (fiel
 
 ## Single-image deployment: one `menagerist` container, not `menagerist-backend` + `menagerist-frontend` behind nginx
 
-**Decision:** There is one published image, `menagerist`. The FastAPI process serves the built SvelteKit SPA itself (`entrypoints/api/spa.py`, a `StaticFiles` subclass mounted at `/` after every API router) instead of a separate nginx container proxying to the backend. `frontend_dist_path` (`MENAGERIST_FRONTEND_DIST_PATH`) controls it: set, the process serves the SPA alongside the API; unset (the default for local `poe serve-backend` dev), it's API-only. The root `Dockerfile` builds both in one multi-stage build — a Python stage that also dumps the OpenAPI schema (`menagerist schema dump`), a Node stage that generates the typed client from that schema and builds the SPA, and a distroless runtime stage with both outputs. `docker-bake.hcl` has one `menagerist` target (plus `local`, its single-platform `type=docker` variant for `poe docker-build`); `compose.yaml` runs Postgres plus one `menagerist` service (`serve --host 0.0.0.0 --migrate`, exposed on `8080:8000`).
+**Decision:** There is one published image, `menagerist`. The FastAPI process serves the built SvelteKit SPA itself (`entrypoints/api/spa.py`, a `StaticFiles` subclass mounted at `/` after every API router) instead of a separate nginx container proxying to the backend. `frontend_dist_path` (`MENAGERIST_FRONTEND_DIST_PATH`) controls it: set, the process serves the SPA alongside the API; unset (the default for local `poe serve-backend` dev), it's API-only. The root `Dockerfile` builds both in one multi-stage build - a Python stage that also dumps the OpenAPI schema (`menagerist schema dump`), a Node stage that generates the typed client from that schema and builds the SPA, and a distroless runtime stage with both outputs. `docker-bake.hcl` has one `menagerist` target (plus `local`, its single-platform `type=docker` variant for `poe docker-build`); `compose.yaml` runs Postgres plus one `menagerist` service (`serve --host 0.0.0.0 --migrate`, exposed on `8080:8000`).
 
-**Rationale:** Nothing had been published yet, so there was no compatibility cost to dropping the split. A reverse proxy in front of a single backend process earns its keep when it terminates TLS, load-balances across replicas, or fronts more than one origin — Menagerist is single-process and self-hosted behind whatever the operator already puts in front of it (their own reverse proxy, a tunnel, or nothing). Running nginx purely to serve a handful of static files and forward `/api/*` added a second container, a second set of security headers to keep in sync with the backend's `SecurityHeadersMiddleware`, a duplicate 10 MB upload cap that silently disagreed with the backend's real 100 MB limit, and a second image to build, scan, and version. `SpaStaticFiles` reproduces nginx's behaviour exactly (hashed `_app/immutable/*` cached a year, other files an hour, missing asset-like paths 404 instead of falling back to the shell, dotfiles hidden except `.well-known`, `/favicon.ico` → `/favicon.svg`, the SPA shell never cached) and mirrors `frontend/nginx.conf` line for line — no serving behaviour changed, only where it runs (the same OS process as the API, not a separate container). `serve --migrate` folds the standalone `migrate` compose service into the app's own startup for single-instance deployments; multi-instance deployments still run `migrate upgrade` as a separate step.
+**Rationale:** Nothing had been published yet, so there was no compatibility cost to dropping the split. A reverse proxy in front of a single backend process earns its keep when it terminates TLS, load-balances across replicas, or fronts more than one origin - Menagerist is single-process and self-hosted behind whatever the operator already puts in front of it (their own reverse proxy, a tunnel, or nothing). Running nginx purely to serve a handful of static files and forward `/api/*` added a second container, a second set of security headers to keep in sync with the backend's `SecurityHeadersMiddleware`, a duplicate 10 MB upload cap that silently disagreed with the backend's real 100 MB limit, and a second image to build, scan, and version. `SpaStaticFiles` reproduces nginx's behaviour exactly (hashed `_app/immutable/*` cached a year, other files an hour, missing asset-like paths 404 instead of falling back to the shell, dotfiles hidden except `.well-known`, `/favicon.ico` → `/favicon.svg`, the SPA shell never cached) and mirrors `frontend/nginx.conf` line for line - no serving behaviour changed, only where it runs (the same OS process as the API, not a separate container). `serve --migrate` folds the standalone `migrate` compose service into the app's own startup for single-instance deployments; multi-instance deployments still run `migrate upgrade` as a separate step.
 
-**Tradeoff:** The image is CPU/framework-coupled to Python for something that's pure static file serving — nginx would out-perform it under heavy static-asset load. Not a concern at Menagerist's scale (self-hosted, single operator, no CDN-scale traffic). If that changes, the split can come back; `frontend_dist_path` being a plain setting (not baked into the app's structure) keeps that reversible.
+**Tradeoff:** The image is CPU/framework-coupled to Python for something that's pure static file serving - nginx would out-perform it under heavy static-asset load. Not a concern at Menagerist's scale (self-hosted, single operator, no CDN-scale traffic). If that changes, the split can come back; `frontend_dist_path` being a plain setting (not baked into the app's structure) keeps that reversible.
 
 ---
 
@@ -435,3 +435,19 @@ See `docs/field-types-spec/wi-25-ordered-list-and-checklist-field-types.md` for 
 **Decision (relative time):** `formatRelativeTime` (`lib/format-date.ts`) now uses `date-fns`'s `formatDistance(date, now, { addSuffix: true })` instead of a hand-rolled `Intl.RelativeTimeFormat` walk over fixed unit thresholds. Its "Just now" special-case for sub-45-second differences was removed on request; the function now returns exactly what `date-fns` produces at every threshold (e.g. "less than a minute ago"), no override layer on top.
 
 **Rationale:** requested directly, for `date-fns`'s more conversational wording ("about 2 hours ago", "over 1 year ago") than a bare numeric `Intl.RelativeTimeFormat` count. English-only was an explicit, deliberate trade-off (confirmed with the owner): the previous implementation auto-localised via `Intl.RelativeTimeFormat(undefined, ...)`, which `date-fns` does not do out of the box (would need per-locale imports wired to the browser's detected language) - not worth it for a self-hosted personal app.
+
+---
+
+## Kind-change matrix entry for `quantity`; field groups (WI-19b, scoped)
+
+**Decision (kind-change matrix):** `kind-changes.ts`'s `ALLOWED` map now lists `quantity: ['quantity']` explicitly, matching `group`'s existing self-only entry. Behaviour is unchanged (`allowedKinds` already fell back to `[original]` for any kind missing from the map), but every other kind is listed explicitly there and `quantity`'s omission read as an oversight rather than a deliberate choice. `choice` already had an entry (`['choice', ...TO_TEXT]`) from WI-15/WI-10; only `quantity` was missing.
+
+**Rationale:** `quantity`'s stored value is an object (`{value, unit}`), not a scalar, the same reason `group` is self-only - switching it to `text` would leave a stored object under a `type: 'string'` schema until the value itself was re-entered, unlike a genuine number-to-text widening.
+
+**Decision (WI-19b, field groups):** Implemented the "field groups" half of WI-19b - saving a schema editor section as a `field_set` preset ("Save field group for reuse"), inserting one into a node type's schema as a new labelled section ("Add saved field group…" in `schema-editor.svelte`), the `settings/saved-fields` "Field groups" listing (was a placeholder), and applying a field group ad hoc to a single item's `extra_schema` overlay ("Add saved field group…" in `attributes-editor.svelte`, alongside "Add field"). `$lib/presets.ts` gained `fieldSetToDefinition`/`definitionToFieldSet`; `SavePresetDialog`'s `kind` prop widened to include `field_set`. No backend change was needed - the `presets` module (WI-19a) already stores and validates all three preset kinds generically.
+
+**Scoped out of this session, left for later (see `wi-19-presets.md`'s WI-19b bullets):**
+- **"Add these to `<item type>` instead"** when applying a field group ad hoc - not built as a bulk action. The existing per-field "Make this a field" action (promotes one overlay field to the node type at a time, already shipped) covers the same end state one field at a time; a type author can also use the schema editor's own "Add saved field group…" directly. A dedicated bulk-promote endpoint was judged more than this session's scope justified without a way to exercise it end to end in this sandbox (see the environment note below).
+- **"Copy details from another item"** (copy another item's overlay field *names*, not values, into the current item) - needs a new item-picker UI (search across nodes, ideally of the same type) that doesn't exist yet in a reusable form; the closest precedent (the item page's multi-select connection picker) loads all nodes client-side and is specific to that flow. Not started.
+
+**Environment note:** frontend client codegen (`poe generate-frontend-client`) could not be run in this sandbox - the backend CLI fails at import time under the container's Python 3.14.0rc2 with a pydantic/typing incompatibility inside `pydantic`'s own 3.14 forward-compat shim (unrelated to this repo's code; `app.shared_kernel.cqrs.UseCase`'s `TYPE_CHECKING`-only `Actor` import confirms the codebase is intentionally written for 3.14's lazy annotation evaluation, so downgrading the interpreter isn't a fix either). Verified instead with a local, un-committed stub of `src/lib/api/generated/` (that directory is gitignored) sufficient to run `eslint`, `prettier` and the full `vitest` suite (300/300 pre-existing tests still pass; the two ETag-interceptor test files were excluded, since they assert on the stub's necessarily-fake HTTP behaviour, not on anything this session changed). `svelte-check` was not clean, but every error traced to the stub's loose typing (`any`/`never` on response shapes it can't know), not to real code - none were inside a file this session touched. Regenerate the real client and re-run `poe check` before trusting this fully.

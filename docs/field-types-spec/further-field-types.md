@@ -13,8 +13,8 @@ Not scheduled. Each follows the registry pattern (one directory with descriptor,
 | Money | number (+ optional currency code in the schema) | Two-decimal handling, currency shown in view. For purchase price and value. |
 | URL / Email / Phone | string with `format: uri` / `email` and a pattern for phone | Cheap. URL is already sketched in `docs/field-types.md`. Depends on WI-4 so `format` strings are recognised. |
 | Multi-choice | array of strings with `items.enum` | Tick several options, from a fixed set. **Collision:** `group.fromSchema` currently matches any `type: 'array'`. Register multi-choice before group, and make group require `items.type === 'object'` (WI-4). |
-| Ordered list | array of strings, no `enum` | Free-text items, order matters, no per-item structure — aliases, ingredients without quantities, instruction steps. Distinct from multi-choice (items are open text, not picked from a fixed set) and from `group`/Table (one dimension, no sub-fields; a table with a single "value" column is the wrong tool for a plain list). **Scheduled:** see `wi-25-ordered-list-and-checklist-field-types.md` (kind `list`). |
-| Checklist | array of `{text, done}` | A list where each item also has its own persisted tick — packing lists, shopping lists. Not a display variant of Ordered list (numbered/bulleted are cosmetic only; a tick is real per-item data, so it needed its own kind and its own stored shape). **Scheduled:** see `wi-25-ordered-list-and-checklist-field-types.md` (kind `checklist`). |
+| Ordered list | array of strings, no `enum` | Free-text items, order matters, no per-item structure - aliases, ingredients without quantities, instruction steps. Distinct from multi-choice (items are open text, not picked from a fixed set) and from `group`/Table (one dimension, no sub-fields; a table with a single "value" column is the wrong tool for a plain list). **Scheduled:** see `wi-25-ordered-list-and-checklist-field-types.md` (kind `list`). |
+| Checklist | array of `{text, done}` | A list where each item also has its own persisted tick - packing lists, shopping lists. Not a display variant of Ordered list (numbered/bulleted are cosmetic only; a tick is real per-item data, so it needed its own kind and its own stored shape). **Scheduled:** see `wi-25-ordered-list-and-checklist-field-types.md` (kind `checklist`). |
 | Identifier | string with `pattern` | ISBN, catalogue number, barcode. Builds on the WI-15 pattern and friendly-error machinery. Later a hook for enrichment lookups (TMDB, MusicBrainz, books). |
 | Duration | number of seconds, or string | Entered as `mm:ss` / `h:mm:ss`. Track and film lengths. |
 | Measurement | number with a unit stored in the schema | Dimensions, weight, duration, page count. **Scheduled:** see `wi-24-quantity-field-type.md` (kind `quantity`). |
@@ -27,7 +27,7 @@ Not proposed: a "link to another item" field. Edges already model that.
 
 ## Ordered list kind (candidate)
 
-A `list` kind: an ordered array of plain text items, each editable, addable and removable, with the same up/down reordering WI-23 gives table columns. Unlike `group`, there is no per-item structure — one string per entry, not a row of sub-fields. Unlike `choice`, entries are free text the user types, not picked from a fixed option set.
+A `list` kind: an ordered array of plain text items, each editable, addable and removable, with the same up/down reordering WI-23 gives table columns. Unlike `group`, there is no per-item structure - one string per entry, not a row of sub-fields. Unlike `choice`, entries are free text the user types, not picked from a fixed option set.
 
 **Stored as:**
 
@@ -40,16 +40,16 @@ A `list` kind: an ordered array of plain text items, each editable, addable and 
 }
 ```
 
-Column-order-style problem does **not** apply here: `x-menagerist.columns` exists because Postgres JSONB reorders the *keys of a nested object*, but a JSON *array*'s element order is preserved through JSONB storage (arrays are ordered by position, not by key) — verified alongside the column-order fix. A plain list kind's item order therefore needs no extra bookkeeping; it survives a save/reload for free.
+Column-order-style problem does **not** apply here: `x-menagerist.columns` exists because Postgres JSONB reorders the *keys of a nested object*, but a JSON *array*'s element order is preserved through JSONB storage (arrays are ordered by position, not by key) - verified alongside the column-order fix. A plain list kind's item order therefore needs no extra bookkeeping; it survives a save/reload for free.
 
-**Sequence number display (WI-11 "Show as" pattern).** The list is always ordered (that is the point of the kind — items reorder the same way WI-23 gives table columns), but whether the *sequence number itself* is shown is a presentation choice, separate from the ordering: `displayOptions: [{ key: 'display', choices: ['numbered', 'bulleted'], default: 'numbered' }]`. Numbered ("1. Preheat the oven", "2. Mix the flour and sugar") suits instructions, where the position is meaningful. Bulleted (a plain dash or dot, no number) suits aliases, ingredients or other lists where the order only exists for the user's own tidiness, not because position 3 means something. Both read and edit views respect it — the data-entry rows show the same prefix style as the read view, not just the read view. Storage is unaffected either way (still a plain array of strings); this is display-only metadata, same as boolean's switch/checkbox/buttons.
+**Sequence number display (WI-11 "Show as" pattern).** The list is always ordered (that is the point of the kind - items reorder the same way WI-23 gives table columns), but whether the *sequence number itself* is shown is a presentation choice, separate from the ordering: `displayOptions: [{ key: 'display', choices: ['numbered', 'bulleted'], default: 'numbered' }]`. Numbered ("1. Preheat the oven", "2. Mix the flour and sugar") suits instructions, where the position is meaningful. Bulleted (a plain dash or dot, no number) suits aliases, ingredients or other lists where the order only exists for the user's own tidiness, not because position 3 means something. Both read and edit views respect it - the data-entry rows show the same prefix style as the read view, not just the read view. Storage is unaffected either way (still a plain array of strings); this is display-only metadata, same as boolean's switch/checkbox/buttons.
 
 **Resolved on implementation** (see `wi-25-ordered-list-and-checklist-field-types.md` for the full session notes):
 - Value type: strings only, as proposed. No pluggable sub-kind was added.
 - `canBeSubField`: `false`, as proposed.
 - Highlightable: `false`, as proposed (no truncated "+N more" summary was built).
-- Search: works for free, as proposed — the existing recursive scalar scan already walks into the array.
-- Checklist (not anticipated by this candidate write-up, added the same session on request): a list where the tick itself is real per-item data could not be a `display` variant of `list` (display options are cosmetic-only, storage-unaffected, by this file's own design) — it needed its own kind and its own stored shape (`array of {text, done}` rather than `array of string`), registered separately as `checklist`.
+- Search: works for free, as proposed - the existing recursive scalar scan already walks into the array.
+- Checklist (not anticipated by this candidate write-up, added the same session on request): a list where the tick itself is real per-item data could not be a `display` variant of `list` (display options are cosmetic-only, storage-unaffected, by this file's own design) - it needed its own kind and its own stored shape (`array of {text, done}` rather than `array of string`), registered separately as `checklist`.
 
 **Scheduled and implemented.** See `wi-25-ordered-list-and-checklist-field-types.md`.
 

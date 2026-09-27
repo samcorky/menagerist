@@ -146,7 +146,7 @@
 			const result = await deleteEdgeType({ path: { edge_type_id: et.id } });
 			if (result.response?.status === 409) {
 				relTypes = [et, ...relTypes];
-				toast.error("Can't delete — connections still use this type", {
+				toast.error("Can't delete - connections still use this type", {
 					description: 'Remove those connections first, or keep this relationship type.'
 				});
 			} else if (result.error) {
@@ -176,7 +176,7 @@
 </script>
 
 <svelte:head>
-	<title>Relationship types — Menagerist</title>
+	<title>Relationship types - Menagerist</title>
 </svelte:head>
 
 <main class="flex-1 px-4 py-6 sm:px-6">
@@ -186,7 +186,7 @@
 		<div>
 			<h1 class="font-heading text-3xl font-semibold tracking-tight">Relationship types</h1>
 			<p class="mt-1 text-muted-foreground">
-				Define how items connect — "Directed by", "Signed by", "Part of".
+				Define how items connect - "Directed by", "Signed by", "Part of".
 			</p>
 		</div>
 
@@ -363,7 +363,7 @@
 					<div>
 						<p class="font-medium">No relationship types yet</p>
 						<p class="text-sm text-muted-foreground">
-							Connections still work — relationship types just add labels and meaning.
+							Connections still work - relationship types just add labels and meaning.
 						</p>
 					</div>
 				</div>

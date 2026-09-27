@@ -82,7 +82,7 @@ async def test_delete_edge_type_succeeds_when_no_edges_reference_it() -> None:
     uow, repos = _make_uow()
     et = EdgeType.create(slug="directed-by", label="Directed By")
     await repos.edge_types.add(et)
-    # Edge with a different type — should not block deletion
+    # Edge with a different type - should not block deletion
     other_edge = Edge.create(
         source_id=uuid.uuid4(), target_id=uuid.uuid4(), type="produced-by"
     )

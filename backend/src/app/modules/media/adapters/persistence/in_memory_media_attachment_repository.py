@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 class InMemoryMediaAttachmentRepository:
-    """Dict-backed `MediaAttachmentRepository` for tests — no database required."""
+    """Dict-backed `MediaAttachmentRepository` for tests - no database required."""
 
     def __init__(self) -> None:
         self._store: dict[uuid.UUID, MediaAttachment] = {}

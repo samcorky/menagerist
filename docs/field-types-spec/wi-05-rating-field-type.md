@@ -22,7 +22,7 @@ Prototype built and verified in a scratch clone (field-type tests pass, svelte-c
 - Touch: no hover, tap to set.
 - Accent is currently amber (`fill-amber-400 text-amber-400`). Swap to `fill-primary text-primary` if the theme accent is wanted. Keep it in one place.
 
-**View widget.** Read-only stars, `role="img"` with `aria-label="N out of 5 stars"`, or `—` when empty.
+**View widget.** Read-only stars, `role="img"` with `aria-label="N out of 5 stars"`, or `-` when empty.
 
 **Reference implementation.**
 
@@ -161,7 +161,7 @@ register({
 		{/each}
 	</span>
 {:else}
-	<span>—</span>
+	<span>-</span>
 {/if}
 ```
 

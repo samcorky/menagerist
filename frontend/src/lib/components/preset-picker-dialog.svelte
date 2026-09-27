@@ -26,10 +26,18 @@
 	let search = $state('');
 
 	const emptyLabel = $derived(
-		kind === 'choice_list' ? 'No saved lists yet' : 'No saved fields yet'
+		kind === 'choice_list'
+			? 'No saved lists yet'
+			: kind === 'field_set'
+				? 'No saved field groups yet'
+				: 'No saved fields yet'
 	);
 	const searchLabel = $derived(
-		kind === 'choice_list' ? 'Search saved lists' : 'Search saved fields'
+		kind === 'choice_list'
+			? 'Search saved lists'
+			: kind === 'field_set'
+				? 'Search saved field groups'
+				: 'Search saved fields'
 	);
 
 	async function load() {

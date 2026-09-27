@@ -103,7 +103,7 @@ async def test_retrieve_works_in_chunks(tmp_path: Path) -> None:
     """retrieve() handles content larger than the internal chunk size."""
     storage = _storage(tmp_path)
     asset = _asset()
-    data = b"z" * (128 * 1024)  # 128 KiB — larger than the 64 KiB chunk size
+    data = b"z" * (128 * 1024)  # 128 KiB - larger than the 64 KiB chunk size
 
     await storage.store(asset.id, MediaStatus.STAGED, _stream(data))
 

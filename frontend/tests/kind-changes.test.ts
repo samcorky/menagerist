@@ -39,8 +39,9 @@ describe('allowedKinds', () => {
 		expect(allowedKinds('rating', ALL)).toContain('number');
 	});
 
-	it('keeps groups as groups and unknown kinds as themselves', () => {
+	it('keeps groups and quantities as themselves, and unknown kinds as themselves', () => {
 		expect(allowedKinds('group', ALL)).toEqual(['group']);
+		expect(allowedKinds('quantity', [...ALL, 'quantity'])).toEqual(['quantity']);
 		expect(allowedKinds('plugin:thing', [...ALL, 'plugin:thing'])).toEqual(['plugin:thing']);
 	});
 
