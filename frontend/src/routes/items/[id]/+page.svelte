@@ -249,6 +249,7 @@
 		} else {
 			toast.success('Saved');
 			node = result.data;
+			mode = 'read';
 		}
 		saving = false;
 	}
