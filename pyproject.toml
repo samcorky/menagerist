@@ -264,10 +264,21 @@ interpreter = ["powershell", "posix"]
 cwd = "frontend"
 help = "Run the Playwright test suite (assumes the e2e db is up and migrated)"
 
+[tool.poe.groups.quality.tasks._test-e2e-run-headed]
+shell = "npx playwright test --headed"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Run the Playwright test suite with a visible browser window (assumes the e2e db is up and migrated)"
+
 [tool.poe.groups.quality.tasks.test-e2e]
 sequence = ["e2e-db-up", "e2e-migrate", "_test-e2e-run", "e2e-db-down"]
 ignore_fail = "return_non_zero"
 help = "Run the Playwright e2e suite against an isolated, throwaway Postgres, tearing it down afterwards regardless of outcome (requires Docker)"
+
+[tool.poe.groups.quality.tasks.test-e2e-headed]
+sequence = ["e2e-db-up", "e2e-migrate", "_test-e2e-run-headed", "e2e-db-down"]
+ignore_fail = "return_non_zero"
+help = "Same as test-e2e, but opens a visible browser window so you can watch the tests run"
 
 [tool.poe.groups.database]
 heading = "Database"
