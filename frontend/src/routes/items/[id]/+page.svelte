@@ -300,6 +300,7 @@
 		if (selectedTargets.some((t) => t.id === candidate.id)) return;
 		selectedTargets = [...selectedTargets, candidate];
 		edgeTargetSearch = '';
+		edgeTargetOpen = false;
 	}
 
 	function removeSelectedTarget(id: string) {

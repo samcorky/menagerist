@@ -1,0 +1,20 @@
+# Override for the Playwright e2e suite only (poe test-e2e). compose.yaml
+# pins container names, a host port, and a bridge interface name for a real
+# deployment - but that means the e2e stack would collide with a dev stack
+# already running from the same compose.yaml. This override renames/reroutes
+# everything project-local so `poe test-e2e` is safe to run alongside
+# `poe serve` / an existing `docker compose up`.
+name: menagerist-e2e
+services:
+  postgres:
+    container_name: menagerist-e2e-db
+    ports:
+      - "55433:5432"
+
+networks:
+  # Linux interface names are capped at 15 chars (IFNAMSIZ) - "menagerist-e2e"
+  # is fine at 14, but this still needs its own short name rather than
+  # compose.yaml's "menagerist" to avoid colliding with a real bridge.
+  menagerist:
+    driver_opts:
+      com.docker.network.bridge.name: mgr-e2e

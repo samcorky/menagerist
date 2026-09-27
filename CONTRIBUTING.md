@@ -83,7 +83,20 @@ poe test-backend              # backend unit + router tests - fast, no infrastru
 poe test-backend-integration  # backend integration tests - requires live Postgres
 poe test-backend-all          # unit + integration with combined coverage data
 poe test-frontend             # Vitest unit tests
+poe test-e2e                  # Playwright end-to-end tests - requires Docker
 poe coverage                  # full test suite + enforce all coverage thresholds
+```
+
+### End-to-end tests
+
+`poe test-e2e` runs the Playwright suite in `frontend/e2e/` against an isolated, throwaway Postgres (via `compose.e2e.yaml`), starting the backend and frontend dev servers itself and tearing the database down again afterwards. It requires Docker. It covers the roadmap's core happy paths: creating an item, setting an item type, adding a connection, quick capture, and managing item types.
+
+To iterate on a single spec without paying the full up/migrate/down cycle each time:
+
+```sh
+poe e2e-db-up && poe e2e-migrate   # once, leave running
+cd frontend && npx playwright test e2e/create-item.spec.ts
+poe e2e-db-down                    # when done
 ```
 
 ### Backend test structure

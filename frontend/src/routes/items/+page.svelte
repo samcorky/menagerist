@@ -185,13 +185,13 @@
 
 	// Scroll preservation: save before navigating into an item, restore on return
 	beforeNavigate(({ to }) => {
-		if (to?.url.pathname.startsWith(resolve('/items/'))) {
+		if (to?.url?.pathname.startsWith(resolve('/items/'))) {
 			savedScrollTop = document.getElementById('main-scroll')?.scrollTop ?? 0;
 		}
 	});
 
 	afterNavigate(({ from }) => {
-		if (from?.url.pathname.startsWith(resolve('/items/'))) {
+		if (from?.url?.pathname.startsWith(resolve('/items/'))) {
 			const el = document.getElementById('main-scroll');
 			if (el) el.scrollTop = savedScrollTop;
 		}

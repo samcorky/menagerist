@@ -14,7 +14,8 @@
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write --cache --cache-strategy content .",
 		"generate": "openapi-ts",
-		"test": "vitest"
+		"test": "vitest",
+		"test:e2e": "playwright test"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
@@ -22,6 +23,7 @@
 		"@hey-api/openapi-ts": "^0.99.0",
 		"@internationalized/date": "^3.12.3",
 		"@lucide/svelte": "^1.48.0",
+		"@playwright/test": "^1.63.0",
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.63.0",
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",

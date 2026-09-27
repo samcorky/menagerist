@@ -28,3 +28,9 @@ vite.config.ts.timestamp-*
 # Generated API client (run `poe generate-frontend-client` to regenerate)
 /openapi.json
 /src/lib/api/generated
+
+# Playwright
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache

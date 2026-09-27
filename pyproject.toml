@@ -250,9 +250,24 @@ help = "Validate the Docker Compose configuration"
 cmd = "docker compose -f compose.yaml -f compose.smoke.yaml config --quiet"
 help = "Validate compose.yaml merged with the smoke-test override"
 
+[tool.poe.groups.quality.tasks.validate-e2e-compose]
+cmd = "docker compose -f compose.yaml -f compose.e2e.yaml config --quiet"
+help = "Validate compose.yaml merged with the e2e-test override"
+
 [tool.poe.groups.quality.tasks.test]
 sequence = ["test-backend", "test-frontend"]
 help = "Run all unit tests"
+
+[tool.poe.groups.quality.tasks._test-e2e-run]
+shell = "npx playwright test"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Run the Playwright test suite (assumes the e2e db is up and migrated)"
+
+[tool.poe.groups.quality.tasks.test-e2e]
+sequence = ["e2e-db-up", "e2e-migrate", "_test-e2e-run", "e2e-db-down"]
+ignore_fail = "return_non_zero"
+help = "Run the Playwright e2e suite against an isolated, throwaway Postgres, tearing it down afterwards regardless of outcome (requires Docker)"
 
 [tool.poe.groups.database]
 heading = "Database"
@@ -269,6 +284,20 @@ help = "Stop and remove local Docker Compose containers"
 cmd = "menagerist migrate upgrade"
 cwd = "backend"
 help = "Apply database migrations up to the latest revision"
+
+[tool.poe.groups.database.tasks.e2e-db-up]
+cmd = "docker compose -f compose.yaml -f compose.e2e.yaml up -d --wait postgres"
+help = "Start the isolated Postgres container used by the Playwright e2e suite, waiting for its healthcheck before returning"
+
+[tool.poe.groups.database.tasks.e2e-migrate]
+cmd = "menagerist migrate upgrade"
+cwd = "backend"
+env = { MENAGERIST_DATABASE_URL = "postgresql+asyncpg://menagerist:menagerist@localhost:55433/menagerist" }
+help = "Apply migrations to the isolated e2e Postgres database"
+
+[tool.poe.groups.database.tasks.e2e-db-down]
+cmd = "docker compose -f compose.yaml -f compose.e2e.yaml down -v"
+help = "Stop and remove the isolated e2e Postgres container and its volume"
 
 [tool.poe.groups.run]
 heading = "Build & Run"
