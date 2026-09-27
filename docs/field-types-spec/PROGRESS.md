@@ -34,6 +34,7 @@ Update at the end of every session. Read this first.
 | `quantity` kind-change matrix entry | done, frontend checks green, not committed | feature/initial-implementation | `kind-changes.ts`'s `ALLOWED` now lists `quantity: ['quantity']` explicitly (behaviour unchanged; was already the fallback). See "WI-19b session notes (field groups)" below and `docs/DECISIONS.md`. |
 | WI-19b field groups (scoped) | done, frontend checks green, not committed | feature/initial-implementation | Save/apply a field group at the schema-editor level and ad hoc on a single item's overlay. "Add these to `<item type>` instead" and "Copy details from another item" not built - see "WI-19b session notes (field groups)" below. |
 | Add-connection picker label ("Relationship" → "Connection", follow-up 4) | done, frontend checks green, not committed | feature/initial-implementation | One-line copy fix in `collection/[id]/+page.svelte`, closing item (4) of `01-context-and-conventions.md`'s "connection follow-ups" note. |
+| WI-26 money field type | todo | | Promoted from `further-field-types.md`'s "Money" row on direct request; read `wi-26-money-field-type.md` first. Full ISO 4217 currency list, sub-field support from v1 (reuses `quantity`'s `coerceObjectValue`/`coerceGroupRow` infrastructure). |
 
 ## WI-1 to WI-4 session notes
 

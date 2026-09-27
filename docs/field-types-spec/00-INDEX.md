@@ -37,6 +37,7 @@ Integration tests are written alongside each item (see `testing-strategy.md`). `
 | 6b. Table column reordering | [`wi-23-column-reordering.md`](wi-23-column-reordering.md) | Small; needs the group column-order fix (2026-09-22). |
 | 6c. Quantity field type | [`wi-24-quantity-field-type.md`](wi-24-quantity-field-type.md) | Promoted from `further-field-types.md`'s "Measurement" row. |
 | 6d. Ordered list and checklist field types | [`wi-25-ordered-list-and-checklist-field-types.md`](wi-25-ordered-list-and-checklist-field-types.md) | Promoted from `further-field-types.md`'s "Ordered list" row; checklist added the same session. |
+| 6e. Money field type | [`wi-26-money-field-type.md`](wi-26-money-field-type.md) | Promoted from `further-field-types.md`'s "Money" row. Reuses `quantity`'s sub-field infrastructure; sub-field support in from v1. |
 
 ## All files
 
@@ -72,6 +73,7 @@ Integration tests are written alongside each item (see `testing-strategy.md`). `
 | [`wi-23-column-reordering.md`](wi-23-column-reordering.md) | Up/down reordering of a table (group) field's columns. | 2 KB |
 | [`wi-24-quantity-field-type.md`](wi-24-quantity-field-type.md) | New `quantity` kind: a number plus a free-text unit, usable as a group sub-field. | 3 KB |
 | [`wi-25-ordered-list-and-checklist-field-types.md`](wi-25-ordered-list-and-checklist-field-types.md) | New `list` kind (ordered free-text array, numbered/bulleted display) and `checklist` kind (array of `{text, done}` with a real persisted tick per item). | small |
+| [`wi-26-money-field-type.md`](wi-26-money-field-type.md) | New `money` kind: a number plus a fixed ISO 4217 currency dropdown, usable as a group sub-field from v1. | small |
 | [`decisions.md`](decisions.md) | What the owner has decided, what is only proposed, and a table of defaults taken without confirmation (for re-review). | (see file) |
 | [`example-node-type-schema.json`](example-node-type-schema.json) | Example item type schema using readable keys, `x-menagerist`, rows and tabs. Useful as a contract fixture. | small |
 
