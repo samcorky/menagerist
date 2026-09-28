@@ -1,16 +1,21 @@
 <script lang="ts">
 	import type { JsonSchemaProperty } from '$lib/schema-types';
+	import { checklistCount } from './format';
 
 	let { value, prop: _prop }: { value: unknown; prop: JsonSchemaProperty } = $props();
 
 	let items = $derived(
 		Array.isArray(value) ? value.map((it) => it as { text: unknown; done: unknown }) : []
 	);
+	let count = $derived(checklistCount(value));
 </script>
 
 {#if items.length === 0}
 	<span class="text-muted-foreground">-</span>
 {:else}
+	{#if count}
+		<p class="mb-1 text-xs text-muted-foreground">{count.checked}/{count.total} done</p>
+	{/if}
 	<ul class="space-y-0.5 text-sm">
 		{#each items as item, i (i)}
 			{@const done = item.done === true}

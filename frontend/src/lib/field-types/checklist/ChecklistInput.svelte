@@ -3,6 +3,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import type { JsonSchemaProperty } from '$lib/schema-types';
+	import { checklistCount } from './format';
 
 	let {
 		value,
@@ -17,6 +18,7 @@
 	} = $props();
 
 	let items = $derived(Array.isArray(value) ? (value as { text: string; done: boolean }[]) : []);
+	let count = $derived(checklistCount(items));
 
 	function setText(i: number, text: string) {
 		onChange(items.map((it, ii) => (ii === i ? { ...it, text } : it)));
@@ -46,6 +48,9 @@
 	{#if items.length === 0}
 		<p class="text-xs text-muted-foreground">No items yet</p>
 	{:else}
+		{#if count}
+			<p class="mb-1 text-xs text-muted-foreground">{count.checked}/{count.total} done</p>
+		{/if}
 		<ul class="space-y-1">
 			{#each items as item, i (i)}
 				<li class="flex items-center gap-2">
