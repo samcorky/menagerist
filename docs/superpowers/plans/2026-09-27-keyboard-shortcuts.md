@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Implementation note (superseded in part):** this plan was executed, and the code differs from it in ways that matter. Do **not** reuse the registry code in Task 1 or the root `tinykeys` `$effect` in Task 2: that design froze the app and lost registrations (see "Keyboard shortcuts: one registry, one listener" in `docs/DECISIONS.md`). Other deviations: the help key is `[Shift]+?` and search is `[Shift]+/`; the table e2e test builds a real group field; the rating assertion is "1 star"; e2e runs on ports 8100/5273.
+
 **Goal:** Replace the frontend's scattered, ad hoc `keydown` listeners with one shared shortcut registry, ship a documented global shortcut set (navigation, search, add-item, item actions), a `?` help overlay, and spreadsheet-style arrow-key movement inside table/group fields.
 
 **Architecture:** A new singleton module `frontend/src/lib/shortcuts.svelte.ts` (same pattern as the existing `theme.svelte.ts`/`capture.svelte.ts` controllers) holds a reactive list of shortcut registrations that components add/remove via `$effect`. One root `$effect` in `+layout.svelte` rebuilds a [tinykeys](https://github.com/jamiebuilds/tinykeys) binding map from that list whenever it changes and (re)attaches a single `window`-level listener. A shared input guard (skip firing while the user is typing, unless the registration opts in) replaces the three different copies of that guard that exist today.

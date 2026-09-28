@@ -664,6 +664,19 @@ Not optional. Every screen must provide:
 - Modals that close on Escape must return focus to the trigger.
 - Do not move focus automatically for non-modal UI updates (toasts, inline feedback, count badges) - only move focus when the user has explicitly triggered a transition.
 
+### 20b. Keyboard Shortcuts
+
+Shortcuts speed up frequent actions; they never replace a visible control. Every shortcut must have a button, link or menu item that does the same thing.
+
+**Rules:**
+
+- Register through the shortcut registry (`src/lib/shortcuts.svelte.ts`); no ad hoc `window` `keydown` listeners. Anything registered appears in the `?` help overlay, so give it a plain-English description and the right group.
+- Bare-letter shortcuts must not fire while the user is typing (inputs, textareas, selects, contenteditable) or interacting with an overlay (dialog, listbox, menu). Opt in with `allowInInputs` only for modified combinations such as `Cmd/Ctrl+S`.
+- Escape belongs to the topmost layer. A handler must not act on an Escape that an overlay has already handled.
+- Register a shortcut only while it applies (for example, "Edit" only in read mode) so the help overlay stays truthful.
+- Layout-dependent keys (`?`, `/`) declare `Shift` as optional (`[Shift]+?`): some layouts need it, others do not.
+- Sequences (`g` then `c`) may be abandoned at any time; an unfinished sequence must never swallow a keystroke or block typing.
+
 ---
 
 ## 21. Visual Design

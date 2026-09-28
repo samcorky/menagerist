@@ -53,6 +53,18 @@ interpreter = ["powershell", "posix"]
 cwd = "frontend"
 help = "Install frontend npm dependencies"
 
+[tool.poe.groups.setup.tasks.install-e2e-browser]
+shell = "npx playwright install chromium"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Download the Chromium build the Playwright e2e suite drives (no-op once installed)"
+
+[tool.poe.groups.setup.tasks.install-e2e-deps]
+# sudo needs a real terminal to prompt, which a poe subprocess doesn't get, and it
+# resets PATH (picking root's older Node). So print the command rather than run it.
+cmd = "echo 'Run in your own terminal: cd frontend && sudo env \"PATH=$PATH\" npx playwright install-deps chromium'"
+help = "Linux only: print the one-off command that installs the system libraries Chromium needs"
+
 [tool.poe.groups.setup.tasks.dump-schema]
 cmd = "menagerist schema dump --output ../frontend/openapi.json"
 cwd = "backend"
@@ -69,7 +81,7 @@ sequence = ["dump-schema", "_run-frontend-generate"]
 help = "Generate the frontend's typed API client from the OpenAPI schema"
 
 [tool.poe.groups.setup.tasks.sync]
-sequence = ["sync-backend", "sync-frontend", "generate-frontend-client"]
+sequence = ["sync-backend", "sync-frontend", "install-e2e-browser", "generate-frontend-client"]
 help = "Sync all project dependencies"
 
 [tool.poe.groups.setup.tasks.init]

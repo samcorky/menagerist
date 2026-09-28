@@ -11,8 +11,12 @@
 	import { themeController } from '$lib/theme.svelte.js';
 	import { captureController } from '$lib/capture.svelte.js';
 	import CaptureSheet from '$lib/components/capture-sheet.svelte';
+	import { registerShortcut, attachShortcuts } from '$lib/shortcuts.svelte';
+	import ShortcutsHelpDialog from '$lib/components/shortcuts-help-dialog.svelte';
 
 	let { children } = $props();
+
+	let helpOpen = $state(false);
 
 	$effect(() => {
 		themeController.init();
@@ -47,18 +51,83 @@
 	const settingsActive = $derived(pathname.startsWith(resolve('/settings')));
 
 	$effect(() => {
-		function handleKeydown(e: KeyboardEvent) {
-			const tag = (e.target as HTMLElement).tagName;
-			if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable)
-				return;
-			if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+		return registerShortcut({
+			id: 'global-quick-capture-mod-k',
+			keys: '$mod+k',
+			description: 'Quick capture',
+			group: 'Add item',
+			handler: (e) => {
 				e.preventDefault();
 				captureController.show();
 			}
-		}
-		window.addEventListener('keydown', handleKeydown);
-		return () => window.removeEventListener('keydown', handleKeydown);
+		});
 	});
+
+	$effect(() => {
+		return registerShortcut({
+			id: 'global-quick-capture-n',
+			keys: 'n',
+			description: 'Quick capture',
+			group: 'Add item',
+			handler: () => captureController.show()
+		});
+	});
+
+	$effect(() => {
+		return registerShortcut({
+			id: 'global-nav-collection',
+			keys: 'g c',
+			description: 'Go to Collection',
+			group: 'Global',
+			handler: () => goto(resolve('/items'))
+		});
+	});
+
+	$effect(() => {
+		return registerShortcut({
+			id: 'global-nav-settings',
+			keys: 'g s',
+			description: 'Go to Settings',
+			group: 'Global',
+			handler: () => goto(resolve('/settings'))
+		});
+	});
+
+	$effect(() => {
+		return registerShortcut({
+			id: 'global-nav-explore',
+			keys: 'g e',
+			description: 'Go to Explore',
+			group: 'Global',
+			handler: () => goto(resolve('/explore'))
+		});
+	});
+
+	$effect(() => {
+		return registerShortcut({
+			id: 'global-help',
+			keys: '[Shift]+?',
+			description: 'Show keyboard shortcuts',
+			group: 'Global',
+			handler: () => (helpOpen = true)
+		});
+	});
+
+	$effect(() => {
+		if (pathname === resolve('/items')) return;
+		return registerShortcut({
+			id: 'global-focus-search',
+			keys: '[Shift]+/',
+			description: 'Focus search',
+			group: 'Search',
+			handler: (e) => {
+				e.preventDefault();
+				void goto(resolve('/items?search=1'));
+			}
+		});
+	});
+
+	$effect(() => attachShortcuts(window));
 </script>
 
 <svelte:head>
@@ -67,6 +136,7 @@
 
 <Toaster richColors position="top-right" offset={{ top: '76px' }} mobileOffset={{ top: '68px' }} />
 <CaptureSheet />
+<ShortcutsHelpDialog open={helpOpen} onOpenChange={(v) => (helpOpen = v)} />
 
 <TooltipProvider>
 	<div class="flex h-dvh flex-col">

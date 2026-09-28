@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { beforeNavigate, afterNavigate, goto } from '$app/navigation';
 	import { browser } from '$app/environment';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { List, Plus, SearchX, LayoutGrid } from '@lucide/svelte';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
@@ -22,6 +23,7 @@
 	import NodeGridCard from '$lib/components/node-grid-card.svelte';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import { matchContext } from '$lib/search-context';
+	import { registerShortcut } from '$lib/shortcuts.svelte';
 
 	const PAGE_SIZE = 50;
 	const loadingSkeletons = [1, 2, 3, 4, 5];
@@ -38,6 +40,7 @@
 	let searchInput = $state('');
 	let q = $state('');
 	let searchEl = $state<HTMLInputElement | null>(null);
+	let searchFocused = $state(false);
 	let viewMode = $state<'list' | 'grid'>('list');
 
 	// §13a: don't flash a skeleton for loads under 300ms
@@ -156,30 +159,44 @@
 	});
 
 	$effect(() => {
-		function handleKey(e: KeyboardEvent) {
-			if (
-				e.key === '/' &&
-				document.activeElement?.tagName !== 'INPUT' &&
-				document.activeElement?.tagName !== 'TEXTAREA'
-			) {
+		return registerShortcut({
+			id: 'items-focus-search',
+			keys: '[Shift]+/',
+			description: 'Focus search',
+			group: 'Search',
+			handler: (e) => {
 				e.preventDefault();
 				searchEl?.focus();
 			}
-			if (e.key === 'Escape' && document.activeElement === searchEl) {
+		});
+	});
+
+	$effect(() => {
+		if (!searchFocused) return;
+		return registerShortcut({
+			id: 'items-clear-search',
+			keys: 'Escape',
+			description: 'Clear search',
+			group: 'Search',
+			allowInInputs: true,
+			handler: () => {
 				searchInput = '';
 				searchEl?.blur();
 			}
-		}
-		window.addEventListener('keydown', handleKey);
-		return () => window.removeEventListener('keydown', handleKey);
+		});
 	});
 
 	$effect(() => {
 		if (page.url.searchParams.get('search') === '1') {
 			setTimeout(() => searchEl?.focus(), 50);
-			const url = new URL(window.location.href);
-			url.searchParams.delete('search');
-			history.replaceState({}, '', url);
+			const params = new SvelteURLSearchParams(page.url.searchParams);
+			params.delete('search');
+			const query = params.toString();
+			void goto(resolve(query ? `/items?${query}` : '/items'), {
+				replaceState: true,
+				keepFocus: true,
+				noScroll: true
+			});
 		}
 	});
 
@@ -215,6 +232,8 @@
 		<div class="flex flex-wrap items-center gap-2">
 			<input
 				use:focusRef
+				onfocus={() => (searchFocused = true)}
+				onblur={() => (searchFocused = false)}
 				bind:value={searchInput}
 				type="search"
 				placeholder="Search your items…"

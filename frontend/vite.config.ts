@@ -16,7 +16,8 @@ export default defineConfig({
 		// the frontend always calls a same-origin relative `/api/...` and never
 		// needs to know the backend's host/port.
 		proxy: {
-			'/api': 'http://localhost:8000'
+			// Overridden by the e2e suite so it can run beside a dev stack on :8000.
+			'/api': process.env.MENAGERIST_API_PROXY_TARGET ?? 'http://localhost:8000'
 		}
 	},
 	optimizeDeps: {

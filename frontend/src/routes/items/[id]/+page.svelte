@@ -52,6 +52,7 @@
 	import MediaGallery from '$lib/components/media-gallery.svelte';
 	import NodeCover from '$lib/components/node-cover.svelte';
 	import NodeSummary from '$lib/components/node-summary.svelte';
+	import { registerShortcut } from '$lib/shortcuts.svelte';
 
 	let nodeId = $derived(page.params.id!);
 
@@ -96,6 +97,7 @@
 	let loading = $state(true);
 	let notFound = $state(false);
 	let mode = $state<'read' | 'edit'>('read');
+	let editFormEl = $state<HTMLFormElement | null>(null);
 
 	let name = $state('');
 	let description = $state('');
@@ -268,6 +270,43 @@
 		}
 		mode = 'read';
 	}
+
+	$effect(() => {
+		if (mode !== 'read' || !node) return;
+		return registerShortcut({
+			id: 'item-edit',
+			keys: 'e',
+			description: 'Edit item',
+			group: 'Item',
+			handler: () => (mode = 'edit')
+		});
+	});
+
+	$effect(() => {
+		if (mode !== 'edit') return;
+		return registerShortcut({
+			id: 'item-cancel-edit',
+			keys: 'Escape',
+			description: 'Cancel edit',
+			group: 'Item',
+			handler: () => handleCancelEdit()
+		});
+	});
+
+	$effect(() => {
+		if (mode !== 'edit') return;
+		return registerShortcut({
+			id: 'item-save',
+			keys: '$mod+s',
+			description: 'Save item',
+			group: 'Item',
+			allowInInputs: true,
+			handler: (e) => {
+				e.preventDefault();
+				editFormEl?.requestSubmit();
+			}
+		});
+	});
 
 	async function handleDeleteNode() {
 		deletingNode = true;
@@ -546,7 +585,7 @@
 					</Card.Header>
 					<Card.Content>
 						{#if mode === 'edit'}
-							<form class="space-y-4" onsubmit={handleSave}>
+							<form class="space-y-4" bind:this={editFormEl} onsubmit={handleSave}>
 								<div class="space-y-2">
 									<ShimmerSlot {loading} class="h-4 w-12">
 										<Label for="name">Name</Label>

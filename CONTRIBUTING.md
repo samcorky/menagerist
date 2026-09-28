@@ -57,7 +57,7 @@ cd frontend && npm run dev -- --host 0.0.0.0       # frontend at :5173, in a sec
 ## Common tasks
 
 ```sh
-poe sync                      # re-sync all deps and regenerate the API client (run after pulling)
+poe sync                      # re-sync all deps, the e2e browser and the API client (run after pulling)
 poe generate-frontend-client  # regenerate the typed API client after a backend schema change
 poe migrate                   # apply Alembic migrations
 poe db-up / poe db-down       # start/stop the local Postgres container
@@ -90,6 +90,10 @@ poe coverage                  # full test suite + enforce all coverage threshold
 ### End-to-end tests
 
 `poe test-e2e` runs the Playwright suite in `frontend/e2e/` against an isolated, throwaway Postgres (via `compose.e2e.yaml`), starting the backend and frontend dev servers itself and tearing the database down again afterwards. It requires Docker. It covers the roadmap's core happy paths: creating an item, setting an item type, adding a connection, quick capture, and managing item types.
+
+`poe sync` (and so `poe init`) downloads the Chromium build Playwright drives (`poe install-e2e-browser`). On Linux, Chromium also needs a few system libraries; if the suite fails with `error while loading shared libraries`, run `poe install-e2e-deps` for the one-off command that fixes it (it needs `sudo` and a real terminal, so it prints the command rather than running it).
+
+Playwright launches its own backend and frontend dev servers, wired to that throwaway database. They listen on ports **8100** (backend) and **5273** (frontend) rather than the dev defaults (8000/5173), so the suite can run alongside `poe serve` or a deployed `docker compose up` without colliding with it, and can never reuse a server that points at your real data. Override the ports with `E2E_BACKEND_PORT` / `E2E_FRONTEND_PORT` if either is taken. Locally, servers already running on the e2e ports are reused, which is what makes the single-spec workflow below fast.
 
 To iterate on a single spec without paying the full up/migrate/down cycle each time:
 
