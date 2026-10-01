@@ -81,11 +81,11 @@ Vitest tests live in `frontend/tests/*.test.ts` (not colocated with components) 
 
 `vitest.config.ts` aliases `@lucide/svelte` and `bits-ui` to stubs in `tests/mocks/`. Without them, importing anything that pulls in those packages adds well over a minute per run: Vitest's Node/SSR transform has no browser-style dep pre-bundling, so their large module graphs (thousands of icon exports; floating-ui/melt internals) get compiled file-by-file every run instead of being pre-bundled once. If a test starts failing with a missing export from either package, add the missing name to the relevant stub file - don't remove the alias.
 
-**`$effect` does not run under Vitest.** The config uses Svelte's server build, where `$effect` is a no-op, so effect timing and ordering cannot be unit-tested here. Keep logic in plain, exported functions and cover effect-driven behaviour (shortcut registration, focus, navigation) with the Playwright suite in `frontend/e2e/`.
+**`$effect` does not run under Vitest.** The config uses Svelte's server build, where `$effect` is a no-op, so effect timing and ordering cannot be unit-tested here. Keep logic in plain, exported functions and cover effect-driven behaviour (shortcut registration, focus, navigation) with the Playwright suite in `frontend/tests/e2e/`.
 
 ### End-to-end tests
 
-Playwright specs live in `frontend/e2e/` and start their own backend and frontend on ports 8100 and 5273 against a throwaway Postgres, so they never touch a dev or deployed stack on 8000/5173. `poe sync` downloads the Chromium build; on Linux run the one-off command printed by `poe install-e2e-deps` for its system libraries. Wait for a page to settle (a heading, or the Edit button) before pressing keys: pages register their own shortcuts as they mount. Setup, ports and the single-spec workflow are in [CONTRIBUTING.md](../CONTRIBUTING.md#end-to-end-tests).
+Playwright specs live in `frontend/tests/e2e/` and start their own backend and frontend on ports 8100 and 5273 against a throwaway Postgres, so they never touch a dev or deployed stack on 8000/5173. `poe sync` downloads the Chromium build; on Linux run the one-off command printed by `poe install-e2e-deps` for its system libraries. Wait for a page to settle (a heading, or the Edit button) before pressing keys: pages register their own shortcuts as they mount. Setup, ports and the single-spec workflow are in [CONTRIBUTING.md](../CONTRIBUTING.md#end-to-end-tests).
 
 ## Building
 

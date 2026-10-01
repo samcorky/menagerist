@@ -98,6 +98,7 @@
 	let notFound = $state(false);
 	let mode = $state<'read' | 'edit'>('read');
 	let editFormEl = $state<HTMLFormElement | null>(null);
+	let nameInputEl = $state<HTMLInputElement | null>(null);
 
 	let name = $state('');
 	let description = $state('');
@@ -272,13 +273,22 @@
 	}
 
 	$effect(() => {
+		if (mode !== 'edit') return;
+		nameInputEl?.focus();
+		nameInputEl?.select();
+	});
+
+	$effect(() => {
 		if (mode !== 'read' || !node) return;
 		return registerShortcut({
 			id: 'item-edit',
 			keys: 'e',
 			description: 'Edit item',
 			group: 'Item',
-			handler: () => (mode = 'edit')
+			handler: (e) => {
+				e.preventDefault();
+				mode = 'edit';
+			}
 		});
 	});
 
@@ -298,6 +308,21 @@
 		return registerShortcut({
 			id: 'item-save',
 			keys: '$mod+s',
+			description: 'Save item',
+			group: 'Item',
+			allowInInputs: true,
+			handler: (e) => {
+				e.preventDefault();
+				editFormEl?.requestSubmit();
+			}
+		});
+	});
+
+	$effect(() => {
+		if (mode !== 'edit') return;
+		return registerShortcut({
+			id: 'item-save-enter',
+			keys: '$mod+Enter',
 			description: 'Save item',
 			group: 'Item',
 			allowInInputs: true,
@@ -590,7 +615,7 @@
 									<ShimmerSlot {loading} class="h-4 w-12">
 										<Label for="name">Name</Label>
 									</ShimmerSlot>
-									<Input id="name" bind:value={name} required />
+									<Input id="name" bind:value={name} required bind:ref={nameInputEl} />
 								</div>
 
 								<div class="space-y-2">

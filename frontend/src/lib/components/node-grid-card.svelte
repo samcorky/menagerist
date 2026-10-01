@@ -7,6 +7,7 @@
 	import NodeCover from './node-cover.svelte';
 	import NodeSummary from './node-summary.svelte';
 	import TagList from './tag-list.svelte';
+	import { nextCardIndex } from './card-grid-nav';
 
 	let {
 		item,
@@ -19,9 +20,33 @@
 		categoryLabel?: string | null;
 		match?: MatchContext | null;
 	} = $props();
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (
+			e.key !== 'ArrowUp' &&
+			e.key !== 'ArrowDown' &&
+			e.key !== 'ArrowLeft' &&
+			e.key !== 'ArrowRight'
+		)
+			return;
+		const link = e.currentTarget as HTMLAnchorElement;
+		const container = link.closest<HTMLElement>('[data-slot="node-grid"]');
+		if (!container) return;
+		const links = Array.from(container.querySelectorAll<HTMLAnchorElement>('a[href]'));
+		const currentIndex = links.indexOf(link);
+		if (currentIndex === -1) return;
+		const rects = links.map((el) => {
+			const rect = el.getBoundingClientRect();
+			return { top: rect.top, left: rect.left };
+		});
+		const nextIndex = nextCardIndex(e.key, currentIndex, rects, 'grid');
+		if (nextIndex === null) return;
+		e.preventDefault();
+		links[nextIndex]?.focus();
+	}
 </script>
 
-<a href={resolve('/items/[id]', { id: item.id })} class="group block">
+<a href={resolve('/items/[id]', { id: item.id })} class="group block" onkeydown={handleKeydown}>
 	<div
 		class="flex aspect-[3/4] flex-col overflow-hidden rounded-xl border bg-muted/30 transition-colors group-hover:bg-muted/60"
 	>

@@ -7,6 +7,7 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import NodeSummary from './node-summary.svelte';
 	import TagList from './tag-list.svelte';
+	import { nextCardIndex } from './card-grid-nav';
 
 	let {
 		item,
@@ -22,11 +23,29 @@
 
 	// Falls back to the raw type slug so a category that's since been deleted still shows something.
 	const categoryText = $derived(categoryLabel ?? item.type ?? undefined);
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+		const link = e.currentTarget as HTMLAnchorElement;
+		const container = link.closest<HTMLElement>('[role="list"]');
+		if (!container) return;
+		const links = Array.from(container.querySelectorAll<HTMLAnchorElement>('a[href]'));
+		const currentIndex = links.indexOf(link);
+		if (currentIndex === -1) return;
+		const rects = links.map((el) => {
+			const rect = el.getBoundingClientRect();
+			return { top: rect.top, left: rect.left };
+		});
+		const nextIndex = nextCardIndex(e.key, currentIndex, rects, 'list');
+		if (nextIndex === null) return;
+		e.preventDefault();
+		links[nextIndex]?.focus();
+	}
 </script>
 
 <Item.Root variant="outline">
 	{#snippet child({ props })}
-		<a {...props} href={resolve('/items/[id]', { id: item.id })}>
+		<a {...props} href={resolve('/items/[id]', { id: item.id })} onkeydown={handleKeydown}>
 			<Item.Content class="gap-1.5">
 				<Item.Title class="font-heading text-base">{item.name}</Item.Title>
 				{#if item.description}

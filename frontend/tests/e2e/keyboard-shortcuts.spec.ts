@@ -83,6 +83,27 @@ test('e / Esc / Cmd+S drive edit mode on an item', async ({ page }) => {
 	await expect(page.getByText(`${name} (saved)`, { exact: true }).first()).toBeVisible();
 });
 
+test('entering edit mode focuses and selects the Name field, and Control+Enter also saves', async ({
+	page
+}) => {
+	const name = uniqueName('Shortcut autofocus item');
+	await createItem(page, { name });
+	const editButton = page.getByRole('button', { name: 'Edit', exact: true });
+	await expect(editButton).toBeVisible();
+
+	await page.keyboard.press('e');
+	const nameInput = page.getByLabel('Name');
+	await expect(nameInput).toBeFocused();
+
+	// The field's contents are selected on entry, so typing replaces the name outright.
+	await page.keyboard.type(`${name} (via Control+Enter)`);
+	await page.keyboard.press('Control+Enter');
+	await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+	await expect(
+		page.getByText(`${name} (via Control+Enter)`, { exact: true }).first()
+	).toBeVisible();
+});
+
 test('arrow keys move between text cells in a table field, without breaking mid-text cursor movement', async ({
 	page
 }) => {
@@ -213,4 +234,51 @@ test('Back returns to the previous page after / navigated to the items list', as
 	await page.goBack();
 	await expect(page).toHaveURL(/\/items$/);
 	await expect(page.getByRole('heading', { name: 'My items' })).toBeVisible();
+});
+
+test('arrow keys move focus between item cards in list view', async ({ page }) => {
+	const prefix = uniqueName('Shortcut list nav');
+	await createItem(page, { name: `${prefix} A` });
+	await createItem(page, { name: `${prefix} B` });
+
+	await page.goto('/items');
+	await page.getByPlaceholder('Search your items…').fill(prefix);
+	// The search box debounces for 300ms before refetching, which swaps in a
+	// fresh (filtered) set of card elements - focus a stale pre-filter card
+	// and the debounced refetch drops focus to <body> out from under it, so
+	// wait for the filtered count before focusing anything.
+	await expect(page.locator('[role="list"] a[href]')).toHaveCount(2);
+
+	const linkA = page.getByRole('link', { name: new RegExp(`${prefix} A`) });
+	const linkB = page.getByRole('link', { name: new RegExp(`${prefix} B`) });
+
+	// Creation order (uuid7 ids) puts A above B.
+	await linkA.focus();
+	await page.keyboard.press('ArrowDown');
+	await expect(linkB).toBeFocused();
+	await page.keyboard.press('ArrowUp');
+	await expect(linkA).toBeFocused();
+});
+
+test('arrow keys move focus between item cards in grid view', async ({ page }) => {
+	const prefix = uniqueName('Shortcut grid nav');
+	await createItem(page, { name: `${prefix} A` });
+	await createItem(page, { name: `${prefix} B` });
+
+	await page.goto('/items');
+	await page.getByRole('button', { name: 'Grid view' }).click();
+	await page.getByPlaceholder('Search your items…').fill(prefix);
+	// See the list-view test above: wait for the debounced, filtered set of
+	// cards before focusing one, or the refetch drops focus to <body>.
+	await expect(page.locator('[data-slot="node-grid"] a[href]')).toHaveCount(2);
+
+	const linkA = page.locator('[data-slot="node-grid"] a', { hasText: `${prefix} A` });
+	const linkB = page.locator('[data-slot="node-grid"] a', { hasText: `${prefix} B` });
+
+	// Creation order (uuid7 ids) puts A before B in document order.
+	await linkA.focus();
+	await page.keyboard.press('ArrowRight');
+	await expect(linkB).toBeFocused();
+	await page.keyboard.press('ArrowLeft');
+	await expect(linkA).toBeFocused();
 });

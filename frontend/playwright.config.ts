@@ -14,7 +14,7 @@ const FRONTEND_PORT = Number(process.env.E2E_FRONTEND_PORT ?? 5273);
 const slowMo = process.env.PW_SLOWMO ? Number(process.env.PW_SLOWMO) : undefined;
 
 export default defineConfig({
-	testDir: './e2e',
+	testDir: './tests/e2e',
 	// A single shared dev backend/frontend/database backs every worker (no
 	// per-worker isolation), so parallel workers cause real contention and
 	// timeouts under load rather than exercising independent state.

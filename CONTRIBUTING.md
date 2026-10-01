@@ -89,7 +89,7 @@ poe coverage                  # full test suite + enforce all coverage threshold
 
 ### End-to-end tests
 
-`poe test-e2e` runs the Playwright suite in `frontend/e2e/` against an isolated, throwaway Postgres (via `compose.e2e.yaml`), starting the backend and frontend dev servers itself and tearing the database down again afterwards. It requires Docker. It covers the roadmap's core happy paths: creating an item, setting an item type, adding a connection, quick capture, and managing item types.
+`poe test-e2e` runs the Playwright suite in `frontend/tests/e2e/` against an isolated, throwaway Postgres (via `compose.e2e.yaml`), starting the backend and frontend dev servers itself and tearing the database down again afterwards. It requires Docker. It covers the roadmap's core happy paths: creating an item, setting an item type, adding a connection, quick capture, and managing item types.
 
 `poe sync` (and so `poe init`) downloads the Chromium build Playwright drives (`poe install-e2e-browser`). On Linux, Chromium also needs a few system libraries; if the suite fails with `error while loading shared libraries`, run `poe install-e2e-deps` for the one-off command that fixes it (it needs `sudo` and a real terminal, so it prints the command rather than running it).
 
@@ -99,7 +99,7 @@ To iterate on a single spec without paying the full up/migrate/down cycle each t
 
 ```sh
 poe e2e-db-up && poe e2e-migrate   # once, leave running
-cd frontend && npx playwright test e2e/create-item.spec.ts
+cd frontend && npx playwright test tests/e2e/create-item.spec.ts
 poe e2e-db-down                    # when done
 ```
 
