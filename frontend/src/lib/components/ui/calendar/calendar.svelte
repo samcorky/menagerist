@@ -5,6 +5,7 @@
 	import * as Calendar from './index.js';
 	import type { ButtonVariant } from '../button/button.svelte';
 	import type { Snippet } from 'svelte';
+	import { FIRST_DAY_OF_WEEK } from '$lib/calendar-settings';
 
 	let {
 		ref = $bindable(null),
@@ -12,6 +13,7 @@
 		placeholder = $bindable(),
 		class: className,
 		weekdayFormat = 'short',
+		weekStartsOn = FIRST_DAY_OF_WEEK,
 		buttonVariant = 'ghost',
 		captionLayout = 'label',
 		locale = 'en-US',
@@ -48,6 +50,7 @@ get along, so we shut typescript up by casting `value` to `never`.
 	bind:ref
 	bind:placeholder
 	{weekdayFormat}
+	{weekStartsOn}
 	{disableDaysOutsideMonth}
 	class={cn(
 		'group/calendar bg-background p-3 [--cell-radius:var(--radius-2xl)] [--cell-size:--spacing(8)] in-data-[slot=card-content]:bg-transparent in-data-[slot=popover-content]:bg-transparent',

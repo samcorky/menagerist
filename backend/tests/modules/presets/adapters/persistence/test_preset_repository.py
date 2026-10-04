@@ -2,7 +2,9 @@ import uuid
 from typing import TYPE_CHECKING
 
 import pytest
+from sqlalchemy import delete
 
+from app.modules.presets.adapters.persistence.models import PresetModel
 from app.modules.presets.adapters.persistence.preset_repository import (
     SqlAlchemyPresetRepository,
 )
@@ -12,6 +14,12 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 pytestmark = pytest.mark.integration
+
+
+@pytest.fixture(autouse=True)
+async def _hide_seeded_builtins(db_session: AsyncSession) -> None:
+    """Remove the migration-seeded built-in lists so list() sees only test rows."""
+    await db_session.execute(delete(PresetModel).where(PresetModel.builtin.is_(True)))
 
 
 def _fields(preset: Preset) -> tuple[object, ...]:

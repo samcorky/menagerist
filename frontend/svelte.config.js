@@ -1,4 +1,5 @@
 import adapter from '@sveltejs/adapter-static';
+import { fileURLToPath } from 'node:url';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 const config = {
@@ -11,6 +12,10 @@ const config = {
 	},
 
 	kit: {
+		// Data shared with the backend. Resolves to repo/shared locally and /shared in Docker.
+		alias: {
+			$shared: fileURLToPath(new URL('../shared', import.meta.url))
+		},
 		adapter: adapter({
 			pages: 'build',
 			assets: 'build',

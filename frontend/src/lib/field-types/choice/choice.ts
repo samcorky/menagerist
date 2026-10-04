@@ -20,7 +20,11 @@ register({
 			default: 'dropdown'
 		}
 	],
-	toSchema: (f) => ({ title: f.label, type: 'string', enum: f.options }),
+	// A linked field stores only its list reference; the API fills `enum` on read.
+	toSchema: (f) =>
+		f.meta?.list !== undefined
+			? { title: f.label, type: 'string' }
+			: { title: f.label, type: 'string', enum: f.options },
 	fromSchema: (key, prop, required) => {
 		if (prop.type !== 'string' || !('enum' in prop)) return null;
 		return {

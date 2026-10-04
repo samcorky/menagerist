@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from app.modules.graph.application._validate_attributes import validate_attributes
+from app.modules.graph.application.choice_lists import resolve_choice_lists
 from app.modules.graph.application.extra_schema_limits import check_extra_schema_limits
 from app.modules.graph.application.schema_meta import (
     check_schema_definition,
@@ -13,6 +14,9 @@ from app.modules.graph.application.schema_meta import (
 from app.modules.graph.domain.errors import NodeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
+
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos, GraphUnitOfWork
 from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
@@ -43,6 +47,12 @@ class UpdateNodeCommand:
 
 class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
     """Update an existing node's editable fields."""
+
+    def __init__(
+        self, uow: GraphUnitOfWork, choice_lists: ChoiceListSource | None = None
+    ) -> None:
+        super().__init__(uow)
+        self._choice_lists = choice_lists
 
     async def handle(self, command: UpdateNodeCommand, actor: Actor) -> Node:
         """Apply `command`'s changes to the node and commit."""
@@ -100,6 +110,8 @@ class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
             if command.extra_schema is not None
             else node.extra_schema
         )
-        schema = merge_attribute_schemas(type_schema, extra_schema)
+        schema = await resolve_choice_lists(
+            merge_attribute_schemas(type_schema, extra_schema), self._choice_lists
+        )
         if schema is not None:
             validate_attributes(schema, attributes, previous=node.attributes)

@@ -160,6 +160,8 @@ FROM frontend-generate AS frontend-build
 COPY frontend/*.json frontend/*.js frontend/*.mjs frontend/*.ts frontend/*.cjs frontend/*.config.* ./
 COPY frontend/src ./src
 COPY frontend/static ./static
+# Shared data (see shared/). The frontend alias '$shared' resolves to /shared here.
+COPY shared/ /shared/
 # Keep the client generated from the schema rather than the ignored copy in the
 # build context.
 COPY --from=frontend-generate /app/src/lib/api/generated ./src/lib/api/generated
@@ -198,13 +200,15 @@ ENV \
     PATH="/opt/python/bin:/app/.venv/bin" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    MENAGERIST_FRONTEND_DIST_PATH=/app/frontend
+    MENAGERIST_FRONTEND_DIST_PATH=/app/frontend \
+    MENAGERIST_SHARED_DIR=/app/shared
 
 COPY --from=backend-builder /opt/python /opt/python
 COPY --from=backend-builder /app/.venv /app/.venv
 COPY --from=backend-builder /app/backend/scripts/healthcheck.py /app/healthcheck.py
 COPY --from=backend-builder --chown=1000:1000 /data/media /data/media
 COPY --from=frontend-build --chown=1000:1000 /app/build /app/frontend
+COPY shared/ /app/shared/
 
 EXPOSE 8000
 

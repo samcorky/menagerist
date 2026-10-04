@@ -32,7 +32,7 @@ describe('moneyText', () => {
 
 	it('looks up the full currency name for the money view tooltip', () => {
 		expect(moneyCurrencyName({ value: 45, currency: 'GPL' })).toBe('Gold-Pressed Latinum');
-		expect(moneyCurrencyName({ value: 45, currency: 'GBP' })).toBe('British Pound');
+		expect(moneyCurrencyName({ value: 45, currency: 'GBP' })).toBe('Pound Sterling');
 		expect(moneyCurrencyName({ value: 45, currency: 'ZZZ' })).toBeUndefined();
 		expect(moneyCurrencyName({ value: 45 })).toBeUndefined();
 	});
@@ -41,7 +41,7 @@ describe('moneyText', () => {
 describe('currencies', () => {
 	it('includes the full curated list with codes, names and symbols where known', () => {
 		expect(CURRENCIES.length).toBeGreaterThan(100);
-		expect(currencyByCode('GBP')).toEqual({ code: 'GBP', name: 'British Pound', symbol: '£' });
+		expect(currencyByCode('GBP')).toEqual({ code: 'GBP', name: 'Pound Sterling', symbol: '£' });
 		expect(currencyByCode('USD')?.symbol).toBe('$');
 		expect(currencyByCode('EUR')?.symbol).toBe('€');
 		expect(currencyByCode('JPY')?.symbol).toBe('¥');

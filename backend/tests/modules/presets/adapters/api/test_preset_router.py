@@ -175,3 +175,64 @@ def test_delete_preset_returns_404_when_missing() -> None:
     response = client.delete(f"/api/v1/preset/{uuid.uuid4()}")
 
     assert response.status_code == 404
+
+
+def test_export_then_import_into_a_fresh_store_reproduces_the_presets() -> None:
+    """A pack exported from one store imports into another and dedupes on repeat."""
+    source = TestClient(_app_with_in_memory_presets())
+    created = source.post(
+        "/api/v1/preset",
+        json={
+            "kind": "choice_list",
+            "label": "Condition grades",
+            "definition": {"options": ["Mint", "Good"]},
+        },
+    ).json()
+
+    export = source.get("/api/v1/preset/export", params={"ids": created["id"]})
+    assert export.status_code == 200
+    pack = export.json()
+    assert pack["format"] == "menagerist-presets"
+    assert pack["version"] == 1
+    assert pack["items"] == [
+        {
+            "kind": "choice_list",
+            "label": "Condition grades",
+            "description": None,
+            "definition": {"options": ["Mint", "Good"]},
+        }
+    ]
+
+    target = TestClient(_app_with_in_memory_presets())
+    first = target.post("/api/v1/preset/import", json=pack)
+    assert first.status_code == 200
+    assert first.json() == {"created": 1, "skipped": 0}
+    second = target.post("/api/v1/preset/import", json=pack)
+    assert second.json() == {"created": 0, "skipped": 1}
+
+
+def test_export_of_a_missing_id_is_404() -> None:
+    """Exporting an id that is not stored returns 404."""
+    client = TestClient(_app_with_in_memory_presets())
+
+    response = client.get("/api/v1/preset/export", params={"ids": str(uuid.uuid7())})
+
+    assert response.status_code == 404
+
+
+def test_export_requires_at_least_one_id() -> None:
+    """An export with no ids is rejected rather than returning an empty pack."""
+    client = TestClient(_app_with_in_memory_presets())
+
+    assert client.get("/api/v1/preset/export").status_code == 422
+
+
+def test_import_rejects_an_unknown_format() -> None:
+    """A body that is not a menagerist-presets pack is refused with 400."""
+    client = TestClient(_app_with_in_memory_presets())
+
+    response = client.post(
+        "/api/v1/preset/import", json={"format": "other", "version": 1, "items": []}
+    )
+
+    assert response.status_code == 400

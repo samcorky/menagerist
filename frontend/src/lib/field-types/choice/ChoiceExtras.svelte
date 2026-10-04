@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { BookmarkPlus, Plus, X } from '@lucide/svelte';
+	import { toast } from 'svelte-sonner';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -7,14 +8,25 @@
 	import {
 		countEdgeTypeAttributeUsage,
 		countNodeTypeAttributeUsage,
-		getPreset
+		getPreset,
+		type PresetResponse
 	} from '$lib/api/client';
 	import { optionRemovalWarning } from '$lib/field-usage';
 	import { SCHEMA_TYPE_CONTEXT, type SchemaTypeContext } from '$lib/schema-type-context';
 	import type { EditorField } from '$lib/schema-types';
-	import { listUpdateAvailable, optionsToDefinition, type Origin, type Preset } from '$lib/presets';
+	import {
+		linkToList,
+		linkedListId,
+		listOptions,
+		listUpdateAvailable,
+		optionsToDefinition,
+		unlinkField,
+		type Origin,
+		type Preset
+	} from '$lib/presets';
 	import SavePresetDialog from '$lib/components/save-preset-dialog.svelte';
 	import PresetPickerDialog from '$lib/components/preset-picker-dialog.svelte';
+	import EditListDialog from '$lib/components/edit-list-dialog.svelte';
 
 	let {
 		field,
@@ -80,10 +92,15 @@
 	let updating = $state(false);
 
 	const origin = $derived(field.meta?.origin as Origin | undefined);
+	const linked = $derived(linkedListId(field) !== undefined);
 	const updateAvailable = $derived(listUpdateAvailable(field, linkedPreset));
 
+	let editOpen = $state(false);
+	let listToEdit = $state<PresetResponse | null>(null);
+	let opening = $state(false);
+
 	$effect(() => {
-		const presetId = origin?.preset;
+		const presetId = linkedListId(field) ?? origin?.preset;
 		if (!presetId) {
 			untrack(() => (linkedPreset = undefined));
 			return;
@@ -94,12 +111,33 @@
 	});
 
 	function useSavedList(preset: Preset) {
-		const options = (preset.definition as { options: string[] }).options;
-		onChange({
-			...field,
-			options,
-			meta: { ...field.meta, origin: { preset: preset.id, version: preset.version } }
-		});
+		onChange(linkToList(field, preset));
+	}
+
+	async function openEditList() {
+		const presetId = linkedListId(field);
+		if (!presetId) return;
+		opening = true;
+		listToEdit = null;
+		const result = await getPreset({ path: { preset_id: presetId } });
+		opening = false;
+		if (result.data) {
+			listToEdit = result.data;
+			editOpen = true;
+		} else {
+			toast.error("We couldn't open this list. Try again.");
+		}
+	}
+
+	function listSaved(saved: PresetResponse) {
+		const preset = saved as unknown as Preset;
+		linkedPreset = preset;
+		onChange({ ...field, options: listOptions(preset) });
+	}
+
+	function unlink() {
+		onChange(unlinkField(field));
+		toast.success('Options are now a copy');
 	}
 
 	async function updateFromPreset() {
@@ -125,84 +163,116 @@
 
 <div class="mt-1.5 ml-4 space-y-1.5 border-l border-input pl-3">
 	<p class="text-xs text-muted-foreground">Options</p>
-	{#if field.options.length > 0}
-		<ul class="flex flex-wrap gap-1">
-			{#each field.options as opt (opt)}
-				<li>
-					<Badge variant="secondary" class="pr-1">
-						<span class="max-w-32 truncate" title={opt}>{opt}</span>
-						<button
-							type="button"
-							onclick={() => removeOption(opt)}
-							aria-label="Remove option {opt}"
-							class="relative ml-1 rounded-full p-0.5 after:absolute after:-inset-2 after:content-[''] hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-						>
-							<X class="size-3" />
-						</button>
-					</Badge>
-				</li>
-			{/each}
-		</ul>
-	{/if}
-	<div class="flex gap-1.5">
-		<Input
-			bind:value={draft}
-			placeholder="Add option…"
-			class="h-7 w-36 text-xs"
-			onkeydown={(e) => {
-				if (e.key === 'Enter') {
-					e.preventDefault();
-					addOption();
-				}
-			}}
-		/>
-		<Button type="button" variant="ghost" size="sm" class="h-7 px-2" onclick={addOption}>
-			<Plus class="size-3" />
-		</Button>
-	</div>
-	{#if removalWarning}
-		<p class="text-xs text-muted-foreground" role="status">{removalWarning}</p>
-	{/if}
-
-	<div class="flex flex-wrap items-center gap-2">
-		<Button
-			type="button"
-			variant="ghost"
-			size="sm"
-			class="h-7 text-xs"
-			disabled={field.options.length === 0}
-			onclick={() => (savePresetOpen = true)}
-		>
-			<BookmarkPlus class="size-3" />
-			Save these options as a list
-		</Button>
-		{#if !origin}
-			<Button
-				type="button"
-				variant="ghost"
-				size="sm"
-				class="h-7 text-xs"
-				onclick={() => (pickerOpen = true)}
-			>
-				Use a saved list
-			</Button>
+	{#if linked}
+		<p class="text-xs text-muted-foreground" role="status">
+			From the saved list “{linkedPreset?.label ?? 'Saved list'}”
+		</p>
+		{#if field.options.length > 0}
+			<ul class="flex flex-wrap gap-1" aria-label="Options from the saved list">
+				{#each field.options as opt (opt)}
+					<li>
+						<Badge variant="secondary">
+							<span class="max-w-32 truncate" title={opt}>{opt}</span>
+						</Badge>
+					</li>
+				{/each}
+			</ul>
 		{/if}
-	</div>
-
-	{#if origin && updateAvailable}
 		<div class="flex flex-wrap items-center gap-2">
-			<p class="text-xs text-muted-foreground" role="status">Update available</p>
 			<Button
 				type="button"
 				variant="ghost"
 				size="sm"
 				class="h-7 text-xs"
-				disabled={updating}
-				onclick={updateFromPreset}
+				disabled={opening}
+				onclick={openEditList}
 			>
-				{updating ? 'Updating…' : 'Update options'}
+				Edit list
+			</Button>
+			<Button type="button" variant="ghost" size="sm" class="h-7 text-xs" onclick={unlink}>
+				Unlink
 			</Button>
 		</div>
+	{:else}
+		{#if field.options.length > 0}
+			<ul class="flex flex-wrap gap-1">
+				{#each field.options as opt (opt)}
+					<li>
+						<Badge variant="secondary" class="pr-1">
+							<span class="max-w-32 truncate" title={opt}>{opt}</span>
+							<button
+								type="button"
+								onclick={() => removeOption(opt)}
+								aria-label="Remove option {opt}"
+								class="relative ml-1 rounded-full p-0.5 after:absolute after:-inset-2 after:content-[''] hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+							>
+								<X class="size-3" />
+							</button>
+						</Badge>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+		<div class="flex gap-1.5">
+			<Input
+				bind:value={draft}
+				placeholder="Add option…"
+				class="h-7 w-36 text-xs"
+				onkeydown={(e) => {
+					if (e.key === 'Enter') {
+						e.preventDefault();
+						addOption();
+					}
+				}}
+			/>
+			<Button type="button" variant="ghost" size="sm" class="h-7 px-2" onclick={addOption}>
+				<Plus class="size-3" />
+			</Button>
+		</div>
+		{#if removalWarning}
+			<p class="text-xs text-muted-foreground" role="status">{removalWarning}</p>
+		{/if}
+
+		<div class="flex flex-wrap items-center gap-2">
+			<Button
+				type="button"
+				variant="ghost"
+				size="sm"
+				class="h-7 text-xs"
+				disabled={field.options.length === 0}
+				onclick={() => (savePresetOpen = true)}
+			>
+				<BookmarkPlus class="size-3" />
+				Save these options as a list
+			</Button>
+			{#if !origin}
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					class="h-7 text-xs"
+					onclick={() => (pickerOpen = true)}
+				>
+					Use a saved list
+				</Button>
+			{/if}
+		</div>
+
+		{#if origin && updateAvailable}
+			<div class="flex flex-wrap items-center gap-2">
+				<p class="text-xs text-muted-foreground" role="status">Update available</p>
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					class="h-7 text-xs"
+					disabled={updating}
+					onclick={updateFromPreset}
+				>
+					{updating ? 'Updating…' : 'Update options'}
+				</Button>
+			</div>
+		{/if}
 	{/if}
 </div>
 
@@ -221,3 +291,12 @@
 	onOpenChange={(v) => (pickerOpen = v)}
 	onPick={useSavedList}
 />
+
+{#if listToEdit}
+	<EditListDialog
+		preset={listToEdit}
+		open={editOpen}
+		onOpenChange={(v) => (editOpen = v)}
+		onsaved={listSaved}
+	/>
+{/if}

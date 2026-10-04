@@ -11,3 +11,7 @@ class InvalidPresetDefinitionError(ValidationError):
 
 class BuiltinPresetError(ConflictError):
     """Raised when trying to update or delete a built-in preset."""
+
+
+class PresetInUseError(ConflictError):
+    """Raised when deleting a preset that item types still reference."""

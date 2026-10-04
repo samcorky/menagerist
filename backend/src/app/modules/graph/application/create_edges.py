@@ -5,9 +5,13 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from app.modules.graph.application._validate_attributes import validate_attributes
+from app.modules.graph.application.choice_lists import resolve_choice_lists
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import NodeNotFoundError
+
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos, GraphUnitOfWork
 from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
@@ -65,6 +69,12 @@ class CreateEdges(
 ):
     """Create edges from one source to several targets in a single transaction."""
 
+    def __init__(
+        self, uow: GraphUnitOfWork, choice_lists: ChoiceListSource | None = None
+    ) -> None:
+        super().__init__(uow)
+        self._choice_lists = choice_lists
+
     async def handle(
         self, command: CreateEdgesCommand, actor: Actor
     ) -> CreateEdgesResult:
@@ -82,7 +92,10 @@ class CreateEdges(
                     )
                 )
             elif edge_type.attributes_schema is not None:
-                validate_attributes(edge_type.attributes_schema, command.attributes)
+                schema = await resolve_choice_lists(
+                    edge_type.attributes_schema, self._choice_lists
+                )
+                validate_attributes(schema, command.attributes)
 
             existing = await _existing_targets(repos, command.source_id, command.type)
 

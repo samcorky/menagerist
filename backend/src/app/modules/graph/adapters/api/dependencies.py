@@ -2,6 +2,10 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
 
+from app.entrypoints.api.shared.choice_list_source import (
+    PresetChoiceListSource,
+    get_choice_list_source,
+)
 from app.modules.graph.adapters.persistence.unit_of_work import (
     build_graph_repos,
     create_graph_uow,
@@ -73,8 +77,9 @@ async def get_graph_repos(
 
 def get_create_node_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+    choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
 ) -> CreateNode:
-    return CreateNode(uow)
+    return CreateNode(uow, choice_lists)
 
 
 def get_get_node_use_case(
@@ -91,8 +96,9 @@ def get_list_nodes_use_case(
 
 def get_update_node_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+    choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
 ) -> UpdateNode:
-    return UpdateNode(uow)
+    return UpdateNode(uow, choice_lists)
 
 
 def get_delete_node_use_case(
@@ -109,14 +115,16 @@ def get_promote_extra_schema_field_use_case(
 
 def get_create_edge_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+    choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
 ) -> CreateEdge:
-    return CreateEdge(uow)
+    return CreateEdge(uow, choice_lists)
 
 
 def get_create_edges_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+    choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
 ) -> CreateEdges:
-    return CreateEdges(uow)
+    return CreateEdges(uow, choice_lists)
 
 
 def get_get_edge_use_case(
@@ -133,8 +141,9 @@ def get_list_edges_use_case(
 
 def get_update_edge_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+    choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
 ) -> UpdateEdge:
-    return UpdateEdge(uow)
+    return UpdateEdge(uow, choice_lists)
 
 
 def get_delete_edge_use_case(
@@ -145,26 +154,30 @@ def get_delete_edge_use_case(
 
 def get_create_node_type_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+    choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
 ) -> CreateNodeType:
-    return CreateNodeType(uow)
+    return CreateNodeType(uow, choice_lists)
 
 
 def get_get_node_type_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
 ) -> GetNodeType:
-    return GetNodeType(repos)
+    return GetNodeType(repos, choice_lists)
 
 
 def get_list_node_types_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
 ) -> ListNodeTypes:
-    return ListNodeTypes(repos)
+    return ListNodeTypes(repos, choice_lists)
 
 
 def get_update_node_type_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+    choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
 ) -> UpdateNodeType:
-    return UpdateNodeType(uow)
+    return UpdateNodeType(uow, choice_lists)
 
 
 def get_delete_node_type_use_case(
@@ -175,26 +188,30 @@ def get_delete_node_type_use_case(
 
 def get_create_edge_type_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+    choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
 ) -> CreateEdgeType:
-    return CreateEdgeType(uow)
+    return CreateEdgeType(uow, choice_lists)
 
 
 def get_get_edge_type_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
 ) -> GetEdgeType:
-    return GetEdgeType(repos)
+    return GetEdgeType(repos, choice_lists)
 
 
 def get_list_edge_types_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
 ) -> ListEdgeTypes:
-    return ListEdgeTypes(repos)
+    return ListEdgeTypes(repos, choice_lists)
 
 
 def get_update_edge_type_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+    choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
 ) -> UpdateEdgeType:
-    return UpdateEdgeType(uow)
+    return UpdateEdgeType(uow, choice_lists)
 
 
 def get_delete_edge_type_use_case(

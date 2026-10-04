@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.presets.application.create_preset import CreatePresetCommand
+from app.modules.presets.application.import_presets import ImportPresetsCommand
 from app.modules.presets.application.update_preset import UpdatePresetCommand
 from app.platform.request_model import RequestModel
 
@@ -118,3 +119,75 @@ class PresetResponse(BaseModel):
             created_at=preset.created_at,
             updated_at=preset.updated_at,
         )
+
+
+_PACK_EXAMPLE: dict[str, Any] = {
+    "format": "menagerist-presets",
+    "version": 1,
+    "items": [
+        {
+            "kind": "choice_list",
+            "label": "Condition grades",
+            "description": None,
+            "definition": {"options": ["Mint", "Near Mint", "Good"]},
+        }
+    ],
+}
+
+
+class PackRequest(RequestModel):
+    """A pack of presets to import: the `menagerist-presets` envelope."""
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        json_schema_extra={
+            "examples": [
+                {
+                    "format": "menagerist-presets",
+                    "version": 1,
+                    "items": [
+                        {
+                            "kind": "choice_list",
+                            "label": "Condition grades",
+                            "description": None,
+                            "definition": {"options": ["Mint", "Near Mint", "Good"]},
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+
+    format_: str = Field(alias="format")
+    version: int
+    items: list[dict[str, Any]] = Field(default_factory=list)
+
+    def to_command(self) -> ImportPresetsCommand:
+        """Convert this pack into an `ImportPresetsCommand`."""
+        return ImportPresetsCommand(
+            pack_format=self.format_, pack_version=self.version, items=self.items
+        )
+
+
+class PackResponse(BaseModel):
+    """A pack of presets as exported, using the same envelope as `PackRequest`."""
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        json_schema_extra={"examples": [_PACK_EXAMPLE]},
+    )
+
+    format_: str = Field(alias="format")
+    version: int
+    items: list[dict[str, Any]]
+
+
+class ImportPresetsResponse(BaseModel):
+    """How many presets an import created and how many were skipped as repeats."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"created": 1, "skipped": 1}]}
+    )
+
+    created: int
+    skipped: int

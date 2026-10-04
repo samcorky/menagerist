@@ -5,8 +5,12 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from app.modules.graph.application._validate_attributes import validate_attributes
+from app.modules.graph.application.choice_lists import resolve_choice_lists
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.errors import EdgeNotFoundError
+
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
@@ -32,6 +36,12 @@ class UpdateEdgeCommand:
 class UpdateEdge(CommandHandler[GraphUnitOfWork, UpdateEdgeCommand, Edge]):
     """Update an existing edge's editable fields."""
 
+    def __init__(
+        self, uow: GraphUnitOfWork, choice_lists: ChoiceListSource | None = None
+    ) -> None:
+        super().__init__(uow)
+        self._choice_lists = choice_lists
+
     async def handle(self, command: UpdateEdgeCommand, actor: Actor) -> Edge:
         """Apply `command`'s changes to the edge and commit."""
         async with self._uow as repos:
@@ -42,8 +52,11 @@ class UpdateEdge(CommandHandler[GraphUnitOfWork, UpdateEdgeCommand, Edge]):
             if command.attributes is not None:
                 edge_type = await repos.edge_types.get_by_slug(slugify(edge.type))
                 if edge_type is not None and edge_type.attributes_schema is not None:
+                    schema = await resolve_choice_lists(
+                        edge_type.attributes_schema, self._choice_lists
+                    )
                     validate_attributes(
-                        edge_type.attributes_schema,
+                        schema,
                         command.attributes,
                         previous=edge.attributes,
                     )

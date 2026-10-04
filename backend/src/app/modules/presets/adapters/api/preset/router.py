@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -18,12 +18,17 @@ from app.entrypoints.api.shared.problem_response import error_response
 from app.modules.presets.adapters.api.dependencies import (
     get_create_preset_use_case,
     get_delete_preset_use_case,
+    get_export_presets_use_case,
     get_get_preset_use_case,
+    get_import_presets_use_case,
     get_list_presets_use_case,
     get_update_preset_use_case,
 )
 from app.modules.presets.adapters.api.preset.schemas import (
     CreatePresetRequest,
+    ImportPresetsResponse,
+    PackRequest,
+    PackResponse,
     PresetResponse,
     UpdatePresetRequest,
 )
@@ -32,8 +37,14 @@ from app.modules.presets.application.delete_preset import (
     DeletePreset,
     DeletePresetCommand,
 )
+from app.modules.presets.application.export_presets import (
+    ExportPresets,
+    ExportPresetsQuery,
+)
 from app.modules.presets.application.get_preset import GetPreset, GetPresetQuery
+from app.modules.presets.application.import_presets import ImportPresets
 from app.modules.presets.application.list_presets import ListPresets, ListPresetsQuery
+from app.modules.presets.application.pack import PACK_FORMAT, PACK_VERSION
 from app.modules.presets.application.update_preset import UpdatePreset
 from app.modules.presets.domain.errors import (
     BuiltinPresetError,
@@ -71,6 +82,50 @@ async def create_preset(
     """Save a new preset (a saved field, field group or list)."""
     preset = await use_case.handle(payload.to_command(), actor)
     return PresetResponse.from_domain(preset)
+
+
+@router.get(
+    "/export",
+    response_model=PackResponse,
+    operation_id="export_presets",
+    responses=_INVALID_DEFINITION,
+)
+async def export_presets(
+    use_case: Annotated[ExportPresets, Depends(get_export_presets_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+    ids: Annotated[list[uuid.UUID], Query(min_length=1)],
+) -> PackResponse:
+    """Export the presets with `ids` as a `menagerist-presets` pack."""
+    presets = await use_case.handle(ExportPresetsQuery(ids=ids), actor)
+    return PackResponse(
+        format_=PACK_FORMAT,
+        version=PACK_VERSION,
+        items=[
+            {
+                "kind": p.kind,
+                "label": p.label,
+                "description": p.description,
+                "definition": p.definition,
+            }
+            for p in presets
+        ],
+    )
+
+
+@router.post(
+    "/import",
+    response_model=ImportPresetsResponse,
+    operation_id="import_presets",
+    responses=_INVALID_DEFINITION,
+)
+async def import_presets(
+    payload: PackRequest,
+    use_case: Annotated[ImportPresets, Depends(get_import_presets_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> ImportPresetsResponse:
+    """Import a pack. Presets already present (same content) are skipped."""
+    result = await use_case.handle(payload.to_command(), actor)
+    return ImportPresetsResponse(created=result.created, skipped=result.skipped)
 
 
 @router.get(

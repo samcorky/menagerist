@@ -32,6 +32,7 @@ dev = [
     "httpx2>=2.12.0",
     "mypy>=2.3.1",
     "psycopg[binary]>=3.3.4",
+    "pycountry>=26.2.16",
     "pypiwin32>=223; sys_platform == 'win32'",
     "pytest>=9.1.1",
     "pytest-alembic>=0.12.1",
@@ -203,6 +204,12 @@ explicit_package_bases = true
 warn_unused_configs = true
 show_error_codes = true
 pretty = true
+
+# scripts/generate_iso_data.py is a PEP 723 script with its own pycountry dependency,
+# which is not installed in the backend environment.
+[[tool.mypy.overrides]]
+module = ["pycountry"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

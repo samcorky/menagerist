@@ -80,6 +80,10 @@ cwd = "frontend"
 sequence = ["dump-schema", "_run-frontend-generate"]
 help = "Generate the frontend's typed API client from the OpenAPI schema"
 
+[tool.poe.groups.setup.tasks.generate-iso-data]
+cmd = "uv run --script scripts/generate_iso_data.py"
+help = "Regenerate shared/iso-data.json (ISO 3166-1 countries, ISO 4217 currencies) from pycountry"
+
 [tool.poe.groups.setup.tasks.sync]
 sequence = ["sync-backend", "sync-frontend", "install-e2e-browser", "generate-frontend-client"]
 help = "Sync all project dependencies"

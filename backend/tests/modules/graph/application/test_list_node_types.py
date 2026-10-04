@@ -66,3 +66,34 @@ async def test_list_node_types_excludes_deleted() -> None:
     results = await use_case.handle(ListNodeTypesQuery(), SYSTEM_ACTOR)
 
     assert nt not in results
+
+
+async def test_list_node_types_fills_in_linked_choice_options() -> None:
+    """Listing returns linked choice fields with their list's options filled in."""
+    schema = {
+        "type": "object",
+        "properties": {
+            "condition": {
+                "type": "string",
+                "x-menagerist": {
+                    "kind": "choice",
+                    "list": "6f1d2a7e-3c4b-4e5f-8a9b-0c1d2e3f4a5b",
+                },
+            }
+        },
+    }
+    node_types = InMemoryNodeTypeRepository()
+    film = NodeType.create(slug="film", label="Film", attributes_schema=schema)
+    await node_types.add(film)
+
+    class _Options:
+        async def options(self, list_id: str) -> list[str]:
+            """Return fixed options."""
+            return ["Mint"]
+
+    results = await ListNodeTypes(_make_repos(node_types), _Options()).handle(
+        ListNodeTypesQuery(), SYSTEM_ACTOR
+    )
+
+    assert results[0].attributes_schema is not None
+    assert results[0].attributes_schema["properties"]["condition"]["enum"] == ["Mint"]

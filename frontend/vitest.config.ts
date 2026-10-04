@@ -7,6 +7,7 @@ export default defineConfig({
 	resolve: {
 		alias: [
 			{ find: '$lib', replacement: fileURLToPath(new URL('./src/lib', import.meta.url)) },
+			{ find: '$shared', replacement: fileURLToPath(new URL('../shared', import.meta.url)) },
 			// Vitest's Node/SSR transform has no browser-style dep pre-bundling,
 			// so importing the real @lucide/svelte barrel (thousands of icons)
 			// here adds well over a minute per run - see tests/mocks/lucide-svelte.ts.

@@ -5,9 +5,13 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from app.modules.graph.application._validate_attributes import validate_attributes
+from app.modules.graph.application.choice_lists import resolve_choice_lists
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import NodeNotFoundError
+
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
@@ -31,6 +35,12 @@ class CreateEdgeCommand:
 class CreateEdge(CommandHandler[GraphUnitOfWork, CreateEdgeCommand, Edge]):
     """Create and persist a new edge, auto-creating its EdgeType if not yet known."""
 
+    def __init__(
+        self, uow: GraphUnitOfWork, choice_lists: ChoiceListSource | None = None
+    ) -> None:
+        super().__init__(uow)
+        self._choice_lists = choice_lists
+
     async def handle(self, command: CreateEdgeCommand, actor: Actor) -> Edge:
         """Create an edge from `command` and commit it.
 
@@ -53,7 +63,10 @@ class CreateEdge(CommandHandler[GraphUnitOfWork, CreateEdgeCommand, Edge]):
                     )
                 )
             elif edge_type.attributes_schema is not None:
-                validate_attributes(edge_type.attributes_schema, command.attributes)
+                schema = await resolve_choice_lists(
+                    edge_type.attributes_schema, self._choice_lists
+                )
+                validate_attributes(schema, command.attributes)
 
             edge = Edge.create(
                 source_id=command.source_id,

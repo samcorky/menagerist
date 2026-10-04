@@ -19,7 +19,7 @@ Update at the end of every session. Read this first.
 | WI-16 highlighted fields | done, committed (44c01dc) | feature/initial-implementation | See "WI-16 session notes" below. |
 | WI-17 attribute search | done, committed (06b605b) | feature/initial-implementation | See "WI-17 session notes" below. |
 | WI-18 per-item custom fields | 18a done, committed (d9dbdc6); 18b and 18c todo | feature/initial-implementation | See "WI-18a session notes" below. 18b and 18c wait for the WI-19d overlay. |
-| WI-19 presets | 19a done, committed; 19b field groups done (scoped, see notes), not committed; 19c todo | feature/initial-implementation | See "WI-19a session notes" and "WI-19b session notes (field groups)" below. |
+| WI-19 presets | 19a done, committed; 19b field groups done (scoped, see notes), not committed; 19c built-ins, import/export, copy and previews done, not committed; linked choice lists: done (see the linked-lists paragraph in docs/field-types.md for gaps) | feature/initial-implementation | See "WI-19a session notes" and "WI-19b session notes (field groups)" below. |
 | WI-19d per-item schema overlay | done, committed (e1a17b8) | feature/initial-implementation | See "WI-19d session notes" below. |
 | WI-21a value suggestions (type-ahead) | done, committed (0418eac) | feature/initial-implementation | See "WI-21a session notes" below. Full WI-21 (detector/clustering, connect/turn-into-choice actions) not started - depended on WI-18c, which was dropped; needs rescoping. |
 | WI-22 connection details | 22a done, committed (66417f1); 22b done, committed (5706c51) | feature/initial-implementation | See "WI-22a session notes" below. |
@@ -684,3 +684,26 @@ Update at the end of every session. Read this first.
 **Next session must know**
 - This doc-cleanup pass (2026-10-01) is what flipped WI-26/WI-27 from "todo" to "done" in the table above and in both WI files' status lines, and `further-field-types.md`'s Money/URL rows from Scheduled to Done - the code and e2e tests were already complete from `c732e47`, only the spec docs had drifted.
 - The field-type registry now has 16 kinds; `index.ts`'s registration-order comment is still accurate (money/url/email/phone each need to register before `text`/`group` the same way every other string- or object-shaped kind does).
+
+
+## WI-19c session notes (built-ins, import and export, linked lists)
+
+**Status:** implemented, not committed. At the last run, backend checks (lint, typecheck, 867 tests, coverage gate) and frontend checks (lint, typecheck, 417 tests) passed. Browser checks of the new settings-page controls, the picker toggle and the calendar change have not been done.
+
+**Done**
+- Built-in presets (lists, fields and field groups) seeded by one migration, `e6f7a8b9c0d1`, with each preset's final shape (Recipe's ingredients are a table).
+- Pack export and import (`application/pack.py`, `export_presets.py`, `import_presets.py`, router, tests), with size limits and content-hash deduplication.
+- Settings page: import and export per section and per card; Copy; Edit for custom lists (`edit-list-dialog.svelte`); "Try it" with an editable preview and a read-only view; "Show built-in" toggle, also in the picker.
+- Shared ISO data (`shared/iso-data.json`, `scripts/generate_iso_data.py`, `poe generate-iso-data`), the `$shared` alias, and Docker copies.
+- Calendar weeks start on Monday, from `calendar-settings.ts`.
+- Linked choice lists, backend: `ports/choice_list_source.py`, `application/choice_lists.py`, the presets-backed source in `entrypoints/api/shared/choice_list_source.py`, wired into create and update for nodes and node types, and into node-type reads.
+
+**Left**
+- Export of node types that reference lists (inline, or ship the list).
+- Custom currencies: out of scope for now.
+- Browser check at phone width for the settings page and the "Try it" preview.
+
+**Next session must know**
+- `ChoiceListSource` is imported at runtime in the six graph handler files. `inspect.signature` in the CQRS test evaluates annotations, so a `TYPE_CHECKING`-only import fails that test. The `noqa: TC001` comments say why.
+- Read paths return the same object when no list is linked, so identity checks in tests still hold.
+- The four seed revisions were collapsed into `e6f7a8b9c0d1`. A dev database stamped at one of the removed revisions (`f7a8…`, `a8b9…`, `b9c0…`) will fail `alembic upgrade`; run `alembic stamp e6f7a8b9c0d1` on it (the seed rows already exist), or use a fresh database.

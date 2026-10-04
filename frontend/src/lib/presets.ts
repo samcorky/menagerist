@@ -31,7 +31,11 @@ export function fieldToDefinition(field: EditorField): FieldDefinition {
 	const meta = { ...readPropMeta(prop) };
 	delete meta.archived;
 	delete meta.origin;
-	return { property: replacePropMeta(prop, meta) };
+	// A saved field stands alone: a linked field's options are copied in, not referenced.
+	const linked = meta.list !== undefined;
+	delete meta.list;
+	const copied = linked ? { ...prop, enum: [...field.options] } : prop;
+	return { property: replacePropMeta(copied, meta) };
 }
 
 /** Build a `choice_list` preset definition from a choice field's current options. */
@@ -78,8 +82,34 @@ export function definitionToFieldSet(
 	};
 }
 
-/** Whether a choice field's stored list is out of date with the preset it came from. */
+/** The options a `choice_list` preset holds. */
+export function listOptions(preset: Preset): string[] {
+	return (preset.definition as { options: string[] }).options;
+}
+
+/** The saved list a choice field is linked to, or undefined for a copy. */
+export function linkedListId(field: EditorField): string | undefined {
+	return field.meta?.list;
+}
+
+/** Link a choice field to a saved list: its options become the list's, and any copy origin is dropped. */
+export function linkToList(field: EditorField, preset: Preset): EditorField {
+	const { origin: _origin, ...meta } = field.meta ?? {};
+	return { ...field, options: listOptions(preset), meta: { ...meta, list: preset.id } };
+}
+
+/** Turn a linked choice field into an ordinary copy, keeping its current options. */
+export function unlinkField(field: EditorField): EditorField {
+	const { list: _list, ...meta } = field.meta ?? {};
+	return { ...field, meta };
+}
+
+/**
+ * Whether a choice field's stored list is out of date with the preset it came from.
+ * Linked fields always see the current list, so they never report an update.
+ */
 export function listUpdateAvailable(field: EditorField, preset: Preset | undefined): boolean {
+	if (linkedListId(field) !== undefined) return false;
 	const origin = field.meta?.origin as Origin | undefined;
 	return origin !== undefined && preset !== undefined && preset.version > origin.version;
 }

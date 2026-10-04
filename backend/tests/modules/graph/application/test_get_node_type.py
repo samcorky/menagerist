@@ -48,3 +48,44 @@ async def test_get_node_type_raises_when_missing() -> None:
 
     with pytest.raises(NodeTypeNotFoundError):
         await use_case.handle(GetNodeTypeQuery(node_type_id=uuid.uuid4()), SYSTEM_ACTOR)
+
+
+async def test_get_node_type_fills_in_linked_choice_options() -> None:
+    """A linked choice field is returned with its options, not stored as them."""
+    schema = {
+        "type": "object",
+        "properties": {
+            "condition": {
+                "type": "string",
+                "x-menagerist": {"kind": "choice", "list": LIST_ID},
+            }
+        },
+    }
+    node_types = InMemoryNodeTypeRepository()
+    nt = NodeType.create(slug="film", label="Film", attributes_schema=schema)
+    await node_types.add(nt)
+    use_case = GetNodeType(_make_repos(node_types), _Options(["Mint", "Good"]))
+
+    result = await use_case.handle(GetNodeTypeQuery(node_type_id=nt.id), SYSTEM_ACTOR)
+
+    assert result.attributes_schema is not None
+    assert result.attributes_schema["properties"]["condition"]["enum"] == [
+        "Mint",
+        "Good",
+    ]
+    assert nt.attributes_schema is schema
+    assert "enum" not in schema["properties"]["condition"]  # type: ignore[index]
+
+
+class _Options:
+    """A choice list source that returns the same options for any list."""
+
+    def __init__(self, options: list[str]) -> None:
+        self._options = options
+
+    async def options(self, list_id: str) -> list[str]:
+        """Return the fixed options."""
+        return self._options
+
+
+LIST_ID = "6f1d2a7e-3c4b-4e5f-8a9b-0c1d2e3f4a5b"

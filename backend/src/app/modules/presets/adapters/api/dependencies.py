@@ -2,13 +2,16 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
 
+from app.entrypoints.api.shared.preset_usage import GraphPresetUsage, get_preset_usage
 from app.modules.presets.adapters.persistence.unit_of_work import (
     build_preset_repos,
     create_preset_uow,
 )
 from app.modules.presets.application.create_preset import CreatePreset
 from app.modules.presets.application.delete_preset import DeletePreset
+from app.modules.presets.application.export_presets import ExportPresets
 from app.modules.presets.application.get_preset import GetPreset
+from app.modules.presets.application.import_presets import ImportPresets
 from app.modules.presets.application.list_presets import ListPresets
 from app.modules.presets.application.update_preset import UpdatePreset
 from app.modules.presets.ports.unit_of_work import PresetRepos, PresetUnitOfWork
@@ -65,5 +68,18 @@ def get_update_preset_use_case(
 
 def get_delete_preset_use_case(
     uow: Annotated[PresetUnitOfWork, Depends(get_preset_uow)],
+    usage: Annotated[GraphPresetUsage, Depends(get_preset_usage)],
 ) -> DeletePreset:
-    return DeletePreset(uow)
+    return DeletePreset(uow, usage)
+
+
+def get_export_presets_use_case(
+    repos: Annotated[PresetRepos, Depends(get_preset_repos)],
+) -> ExportPresets:
+    return ExportPresets(repos)
+
+
+def get_import_presets_use_case(
+    uow: Annotated[PresetUnitOfWork, Depends(get_preset_uow)],
+) -> ImportPresets:
+    return ImportPresets(uow)

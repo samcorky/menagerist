@@ -1,8 +1,13 @@
 import tailwindcss from '@tailwindcss/vite';
+import { fileURLToPath } from 'node:url';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+	resolve: {
+		// Mirrors svelte.config.js's kit alias; Vite (and vitest) need it too.
+		alias: { $shared: fileURLToPath(new URL('../shared', import.meta.url)) }
+	},
 	plugins: [
 		tailwindcss(),
 		// Passing any options here (compilerOptions, adapter, ...) makes this

@@ -1003,6 +1003,7 @@ dev = [
     { name = "httpx2" },
     { name = "mypy" },
     { name = "psycopg", extra = ["binary"] },
+    { name = "pycountry" },
     { name = "pypiwin32", marker = "sys_platform == 'win32'" },
     { name = "pytest" },
     { name = "pytest-alembic" },
@@ -1045,6 +1046,7 @@ dev = [
     { name = "httpx2", specifier = ">=2.12.0" },
     { name = "mypy", specifier = ">=2.3.1" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
+    { name = "pycountry", specifier = ">=26.2.16" },
     { name = "pypiwin32", marker = "sys_platform == 'win32'", specifier = ">=223" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-alembic", specifier = ">=0.12.1" },
@@ -1328,6 +1330,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/20/e5/16ff212c1e452235a90aeb09066144d0c5a6a8c0834397e03f5224495c4e/ptyprocess-0.7.0.tar.gz", hash = "sha256:5c5d0a3b48ceee0b48485e0c26037c0acd7d29765ca3fbb5cb3831d347423220", size = 70762, upload-time = "2020-12-28T15:15:30.155Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/22/a6/858897256d0deac81a172289110f31629fc4cee19b6f01283303e18c8db3/ptyprocess-0.7.0-py2.py3-none-any.whl", hash = "sha256:4b41f3967fce3af57cc7e94b888626c18bf37a083e3651ca8feeb66d492fef35", size = 13993, upload-time = "2020-12-28T15:15:28.35Z" },
+]
+
+[[package]]
+name = "pycountry"
+version = "26.2.16"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/de/1d/061b9e7a48b85cfd69f33c33d2ef784a531c359399ad764243399673c8f5/pycountry-26.2.16.tar.gz", hash = "sha256:5b6027d453fcd6060112b951dd010f01f168b51b4bf8a1f1fc8c95c8d94a0801", size = 7711342, upload-time = "2026-02-17T03:42:52.367Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9c/42/7703bd45b62fecd44cd7d3495423097e2f7d28bc2e99e7c1af68892ab157/pycountry-26.2.16-py3-none-any.whl", hash = "sha256:115c4baf7cceaa30f59a4694d79483c9167dbce7a9de4d3d571c5f3ea77c305a", size = 8044600, upload-time = "2026-02-17T03:42:49.777Z" },
 ]
 
 [[package]]
