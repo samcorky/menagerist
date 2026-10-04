@@ -34,8 +34,10 @@ Update at the end of every session. Read this first.
 | `quantity` kind-change matrix entry | done, frontend checks green, not committed | feature/initial-implementation | `kind-changes.ts`'s `ALLOWED` now lists `quantity: ['quantity']` explicitly (behaviour unchanged; was already the fallback). See "WI-19b session notes (field groups)" below and `docs/DECISIONS.md`. |
 | WI-19b field groups (scoped) | done, frontend checks green, not committed | feature/initial-implementation | Save/apply a field group at the schema-editor level and ad hoc on a single item's overlay. "Add these to `<item type>` instead" and "Copy details from another item" not built - see "WI-19b session notes (field groups)" below. |
 | Add-connection picker label ("Relationship" → "Connection", follow-up 4) | done, frontend checks green, not committed | feature/initial-implementation | One-line copy fix in `collection/[id]/+page.svelte`, closing item (4) of `01-context-and-conventions.md`'s "connection follow-ups" note. |
-| WI-26 money field type | todo | | Promoted from `further-field-types.md`'s "Money" row on direct request; read `wi-26-money-field-type.md` first. Full ISO 4217 currency list, sub-field support from v1 (reuses `quantity`'s `coerceObjectValue`/`coerceGroupRow` infrastructure). |
-| WI-27 URL, email and phone field types | todo | | Promoted from `further-field-types.md`'s "URL / Email / Phone" row on direct request; read `wi-27-url-email-phone-field-types.md` first. Three separate scalar kinds, no new prerequisites. |
+| WI-26 money field type | done, committed (c732e47) | feature/initial-implementation | See "WI-26/WI-27" session notes below. |
+| WI-27 URL, email and phone field types | done, committed (c732e47) | feature/initial-implementation | See "WI-26/WI-27" session notes below. |
+| Checklist checked/total progress | done, committed (02f6708) | feature/initial-implementation | Small follow-up; see "WI-26/WI-27" session notes below. |
+| Money currency name lookup + tooltip | done, committed (25cfebb) | feature/initial-implementation | Small follow-up; see "WI-26/WI-27" session notes below. |
 
 ## WI-1 to WI-4 session notes
 
@@ -659,3 +661,26 @@ Update at the end of every session. Read this first.
 
 **Next session must know**
 - A same-session Playwright e2e pass (see the repo's `CONTRIBUTING.md` "End-to-end tests" section, `poe test-e2e`) incidentally exercised this item form and found two unrelated real bugs, now fixed (committed as 819cab6/later): `routes/items/+page.svelte`'s nav-scroll handler didn't guard a nullable `.url`, and the "Connect item" picker's dropdown didn't close after picking a candidate. Neither is WI-21a-specific but both live in files this item shares.
+
+## WI-26/WI-27 session notes (money, URL, email, phone)
+
+**Status:** both implemented, all frontend checks green, committed as `c732e47`. Next in the table: WI-13 (drag-and-drop layout, stretch) is the only item left unscheduled in this phase; otherwise see the priority list for what's next overall.
+
+**Done**
+- WI-26: new `money` kind (`field-types/money/{money.ts,format.ts,currencies.ts,MoneyInput.svelte,MoneyView.svelte}`), `{value, currency}` shape mirroring `quantity`, full hardcoded ISO 4217 currency list, `canBeSubField: true` from v1 (reuses `quantity`'s `coerceObjectValue`/`coerceGroupRow` table-cell infrastructure directly, as planned).
+- WI-27: new `url`, `email`, `phone` scalar kinds (`field-types/{url,email,phone}/`), all sharing the existing `ScalarInput` widget (extended for the right `<input>` type/keyboard per kind) rather than duplicating it three times; each renders as a real link in view mode (external / `mailto:` / `tel:`).
+- **Fixed a stored-XSS finding found during implementation**, not anticipated by either spec file: `UrlView`'s `href` was bound directly to the stored string with no scheme check, so a `javascript:` value would execute on click. Now only `http(s)` values render as a clickable link; anything else renders as plain text.
+- e2e coverage added (`frontend/e2e/field-types.spec.ts`) exercising all 16 registered kinds live in a browser. Also fixed a latent locator bug in `manage-item-types.spec.ts` found along the way: its "card" locator matched ancestor divs around the whole item-type list rather than the target card, so `.first()` could click the wrong type's edit button once enough item types existed in the shared e2e database (exposed by this change adding more). Scoped to the card's own `[data-slot="card"]` boundary with an explicit count assertion.
+- Added `poe test-e2e-slow` (headed, 1s delay between actions) for watching the e2e suite run.
+- Follow-ups in the same area, separate commits: checklist gained a "`n`/`m` done" progress line above its rows in both edit and read mode (`02f6708`); `MoneyView` gained a currency-name lookup and tooltip on hover (`25cfebb`).
+- Docs updated as part of `c732e47`: `00-INDEX.md`, `PROGRESS.md` (this file, at the time just the one-line status flip), `further-field-types.md` (Money row flipped to Scheduled - the Done flip for both rows happened in this later doc pass), new `wi-27-url-email-phone-field-types.md` content notes.
+
+**Left / deferred:** nothing noted beyond what each WI file's own "Left" items already call out (no currency conversion for money, no real `format` assertion for url/email, phone's pattern stays permissive/international). Not tried in a browser beyond the e2e suite (no component-testing infrastructure in this repo, by standing decision) - the e2e coverage is the live-browser check for this item specifically, unlike most earlier items in this file.
+
+**Files touched:** frontend `field-types/money/*` (new), `field-types/url/*` (new), `field-types/email/*` (new), `field-types/phone/*` (new), `field-types/index.ts`, `schema-types.ts`; `frontend/e2e/field-types.spec.ts` (new), `frontend/e2e/manage-item-types.spec.ts`, `frontend/e2e/helpers.ts`; `contract/fixtures/regex-conformance.json`, `docs/field-types-spec/example-node-type-schema.json`; docs as above. Backend unchanged (no port, no migration, by both specs' own design).
+
+**Checks run:** e2e suite (`poe test-e2e`) green across all 16 kinds; standard frontend checks clean (exact pass counts not recorded in the commit message - re-run `poe lint-frontend`/`poe typecheck-frontend`/`poe test-frontend` if verifying from scratch).
+
+**Next session must know**
+- This doc-cleanup pass (2026-10-01) is what flipped WI-26/WI-27 from "todo" to "done" in the table above and in both WI files' status lines, and `further-field-types.md`'s Money/URL rows from Scheduled to Done - the code and e2e tests were already complete from `c732e47`, only the spec docs had drifted.
+- The field-type registry now has 16 kinds; `index.ts`'s registration-order comment is still accurate (money/url/email/phone each need to register before `text`/`group` the same way every other string- or object-shaped kind does).

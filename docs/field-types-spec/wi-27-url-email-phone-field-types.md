@@ -3,7 +3,7 @@
 > Part of the field-types spec. Read `00-INDEX.md` and `01-context-and-conventions.md` first (skip the second if this is that file).
 > **Depends on:** WI-4 (`opaque` fallback for an unrecognised shape - the safety net if a format value this app doesn't know is ever encountered), WI-15 (pattern/friendly-error machinery, reused directly by `phone`).
 > "WI-n" refers to `wi-*.md` files listed in `00-INDEX.md`; "open question N" refers to `open-questions.md`.
-> **Status:** proposed, not yet implemented. Promoted from `further-field-types.md`'s "URL / Email / Phone" candidate row on direct request.
+> **Status:** implemented, committed (`c732e47`). Promoted from `further-field-types.md`'s "URL / Email / Phone" candidate row on direct request. See `PROGRESS.md`'s "WI-26/WI-27" session notes for the actual session record, including a stored-XSS fix in the `url` view (`href` bound to the raw value with no scheme check) not anticipated by this spec.
 
 **Motivating case.** A website, an email address, a phone number - each already fits comfortably as a scalar string with a format or pattern; the only reason they're not just `text` is that they display better as a clickable `mailto:`/`tel:`/external link and deserve their own friendly kind label rather than every user reinventing a text-constraint pattern for the same thing.
 

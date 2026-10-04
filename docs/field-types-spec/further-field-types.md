@@ -1,7 +1,7 @@
 # Further field types and the location kind
 
 > Part of the field-types spec. Read `00-INDEX.md` and `01-context-and-conventions.md` first (skip the second if this is that file).
-> **Type:** reference file of candidate kinds. Measurement, Ordered list and Checklist have since been promoted and implemented; Money has been promoted and scheduled but not yet implemented (see their rows below). The rest remain candidates only. The location kind depends on WI-14 and WI-20.
+> **Type:** reference file of candidate kinds. Measurement, Ordered list, Checklist, Money and URL/Email/Phone have since been promoted and implemented (see their rows below). The rest remain candidates only. The location kind depends on WI-14 and WI-20.
 > "WI-n" refers to `wi-*.md` files listed in `00-INDEX.md`; "open question N" refers to `open-questions.md`.
 
 
@@ -10,8 +10,8 @@ Each row marked **Done** or **Scheduled** has its own `wi-*.md` file with the re
 | Type | Stored as | Done | Notes |
 |---|---|---|---|
 | Partial date | string, pattern `YYYY`, `YYYY-MM` or `YYYY-MM-DD` | | For "1973" or "Mar 1973" when the day is unknown. Current Date needs a full date. Also suits the planned GEDCOM import (partial dates). Register before `text`. |
-| Money | number (+ optional currency code in the schema) | Scheduled | Two-decimal handling, currency shown in view. For purchase price and value. See `wi-26-money-field-type.md` (kind `money`). |
-| URL / Email / Phone | string with `format: uri` / `email` and a pattern for phone | Scheduled | Cheap. URL is already sketched in `docs/field-types.md`. See `wi-27-url-email-phone-field-types.md` (kinds `url`, `email`, `phone`). |
+| Money | number (+ optional currency code in the schema) | Done | Two-decimal handling, currency shown in view. For purchase price and value. See `wi-26-money-field-type.md` (kind `money`). |
+| URL / Email / Phone | string with `format: uri` / `email` and a pattern for phone | Done | Cheap. URL is already sketched in `docs/field-types.md`. See `wi-27-url-email-phone-field-types.md` (kinds `url`, `email`, `phone`). |
 | Multi-choice | array of strings with `items.enum` | | Tick several options, from a fixed set. **Collision:** `group.fromSchema` currently matches any `type: 'array'`. Register multi-choice before group, and make group require `items.type === 'object'` (WI-4). |
 | Ordered list | array of strings, no `enum` | Done | Free-text items, order matters, no per-item structure - aliases, ingredients without quantities, instruction steps. Distinct from multi-choice (items are open text, not picked from a fixed set) and from `group`/Table (one dimension, no sub-fields; a table with a single "value" column is the wrong tool for a plain list). See `wi-25-ordered-list-and-checklist-field-types.md` (kind `list`). |
 | Checklist | array of `{text, done}` | Done | A list where each item also has its own persisted tick - packing lists, shopping lists. Not a display variant of Ordered list (numbered/bulleted are cosmetic only; a tick is real per-item data, so it needed its own kind and its own stored shape). See `wi-25-ordered-list-and-checklist-field-types.md` (kind `checklist`). |

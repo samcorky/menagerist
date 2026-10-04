@@ -3,7 +3,7 @@
 > Part of the field-types spec. Read `00-INDEX.md` and `01-context-and-conventions.md` first (skip the second if this is that file).
 > **Depends on:** WI-14 (`x-menagerist.kind`), WI-1 (empty-value omission pattern), the `quantity` kind's (WI-24) `coerceObjectValue`/`coerceGroupRow` sub-field infrastructure in `attribute-rows.ts`, which this kind reuses directly rather than re-deriving.
 > "WI-n" refers to `wi-*.md` files listed in `00-INDEX.md`; "open question N" refers to `open-questions.md`.
-> **Status:** proposed, not yet implemented. Promoted from `further-field-types.md`'s "Money" candidate row on direct request.
+> **Status:** implemented, committed (`c732e47`). Promoted from `further-field-types.md`'s "Money" candidate row on direct request. See `PROGRESS.md`'s "WI-26/WI-27" session notes for the actual session record.
 
 **Motivating case.** Purchase price, insured value, sale price - "£45.00", "$120.50". Structurally the same shape as `quantity` (a number plus a short qualifier, entered and displayed together), but two real differences justify its own kind rather than a `quantity` display variant: the qualifier is a **closed set** (currency codes), not free text, and the view format is currency-conventional (`"£45.00"`, two decimals, symbol prefixed) rather than `quantity`'s `"{value} {unit}"`.
 

@@ -8,27 +8,36 @@ New field types can be added without modifying any central switch/case in `schem
 
 ### File layout
 
+Each kind lives in its own subdirectory (descriptor plus its widgets); shared infrastructure sits at the top level:
+
 ```
 frontend/src/lib/field-types/
-  registry.ts          ← register() / getDescriptor() / allDescriptors() / descriptorForProp()
-  schema-types.ts      ← shared JsonSchemaProperty, AttributesSchema, EditorField types
-  text.ts              ← plain string
-  number.ts
-  boolean.ts
-  date.ts              ← string + format: date
-  longtext.ts          ← string + explicit kind: longtext
-  choice.ts            ← string + enum
-  group.ts             ← array of objects
-  ScalarInput.svelte   ← shared widget for text / number / date
-  BooleanInput.svelte
-  LongtextInput.svelte
-  ChoiceInput.svelte   ← bits-ui Select
-  ChoiceExtras.svelte  ← options tag-editor (EditorExtras)
-  GroupInput.svelte    ← editable table of rows
-  GroupExtras.svelte   ← sub-field list editor (EditorExtras)
-  GroupView.svelte     ← read-mode table (ViewWidget)
-  index.ts             ← side-effect imports in registration order
+  registry.ts           ← register() / getDescriptor() / allDescriptors() / descriptorForProp()
+  schema-types.ts        (in $lib/, not here) shared JsonSchemaProperty, AttributesSchema, EditorField types
+  ScalarInput.svelte     ← shared widget for text / number / date / url / email / phone
+  display-options.ts     ← "Show as" helpers (FieldTypeDescriptor.displayOptions)
+  kind-changes.ts        ← the saved-field kind-change matrix
+  index.ts               ← side-effect imports in registration order
+
+  text/       ← plain string (+ "starts with"/"ends with" constraints)
+  number/
+  boolean/    ← switch / checkbox / Yes-No buttons display options
+  date/       ← string + format: date
+  longtext/   ← string + explicit kind: longtext
+  choice/     ← string + enum
+  rating/     ← number + explicit kind: rating; star widget, colour display option
+  group/      ← array of objects ("Table"); column order/reorder, sub-field kinds
+  quantity/   ← object {value, unit}; group sub-field
+  money/      ← object {value, currency}; ISO 4217 list, group sub-field from v1
+  list/       ← array of strings ("Ordered list"); numbered/bulleted display option
+  checklist/  ← array of {text, done}
+  url/        ← string + format: uri
+  email/      ← string + format: email
+  phone/      ← string + pattern (no native JSON Schema format)
+  opaque/     ← non-selectable fallback for an unrecognised shape or kind
 ```
+
+Each kind directory follows the same naming convention: `<kind>.ts` (the descriptor), `<Kind>Input.svelte` (data entry, when it needs more than the shared `ScalarInput`), `<Kind>View.svelte` (read mode), `<Kind>Extras.svelte` (schema-editor controls, when the kind needs any), `<Kind>Summary.svelte` (card/highlight rendering, when `formatSummary` isn't enough).
 
 ### `FieldTypeDescriptor` (from `registry.ts`)
 
@@ -36,27 +45,50 @@ frontend/src/lib/field-types/
 import type { Component } from 'svelte';
 import type { JsonSchemaProperty, EditorField } from '$lib/schema-types';
 
+export type DisplayOption = {
+  /** Where the value lives: `display` is stored in property metadata; any other key is editor state. */
+  key: string;
+  label: string;
+  choices: { value: string; label: string }[];
+  default: string;
+};
+
 export type FieldTypeDescriptor = {
   kind: string;
   /** Label shown in the kind dropdown in schema-editor. */
   label: string;
   /**
    * Whether this type may appear as a group sub-field.
-   * Set to false for types that cannot nest (choice, group).
-   * Defaults to true.
+   * Defaults to true; set false for types that cannot nest (group itself).
    */
   canBeSubField?: boolean;
+  /** Set false to hide the kind from the kind dropdowns (e.g. `opaque`). */
+  selectable?: boolean;
+  /**
+   * Match strength for a property with no explicit `kind` (API-authored). Higher wins; ties fall
+   * back to registration order. Defaults to rank 1 for any matching `fromSchema`.
+   */
+  rank?: (prop: JsonSchemaProperty) => number;
+  /** Presentation settings ("Show as" dropdown) offered in the schema editor. */
+  displayOptions?: DisplayOption[];
   /**
    * Friendly wording for a failed validation keyword (client and server errors), or null to fall
    * back to the validator's message. The text type words its own `pattern`s.
    */
   formatError?: (keyword: string, value: unknown) => string | null;
+  /** Whether attribute search reads values of this type. Defaults to true. */
+  searchable?: boolean;
+  /** Whether a field of this type may be pinned to show on cards (WI-16). Defaults to false. */
+  highlightable?: boolean;
+  /** Plain text for a highlighted value; null skips it. Defaults to `String(value)`. */
+  formatSummary?: (value: unknown, prop: JsonSchemaProperty) => string | null;
+  /** Compact rendering of a highlighted value on a card. Falls back to `formatSummary`. */
+  SummaryWidget?: Component<{ value: unknown; prop: JsonSchemaProperty; size: 'sm' | 'md' }>;
   /** Serialise an EditorField to a JSON Schema property. */
   toSchema: (field: EditorField) => JsonSchemaProperty;
   /**
    * Attempt to deserialise a JSON Schema property into an EditorField.
    * Return null if this descriptor does not match the property shape.
-   * Registration order in index.ts determines precedence - most-specific first.
    */
   fromSchema: (key: string, prop: JsonSchemaProperty, required: boolean) => EditorField | null;
   /**
@@ -90,19 +122,34 @@ export type FieldTypeDescriptor = {
 | `group` | `{ type: 'array', items: { type: 'object', properties: {...} } }` | ✅ structure + sub-fields | Sub-fields are validated recursively |
 | `list` | `{ type: 'array', items: { type: 'string' } }` with `x-menagerist.kind: "list"` | ✅ structure | Ordered free-text items; numbered/bulleted is display-only, storage is unaffected. Only matched by its explicit `kind`. Not a group sub-field |
 | `checklist` | `{ type: 'array', items: { type: 'object', properties: { text, done } } }` with `x-menagerist.kind: "checklist"` | ✅ structure | Each item's `done` tick is real persisted data, not a display choice - see "Ordered list and checklist" below for why this needed its own kind rather than being a `list` display variant. Only matched by its explicit `kind`. Not a group sub-field |
+| `quantity` | `{ type: 'object', properties: { value, unit } }` with `x-menagerist.kind: "quantity"` | ✅ structure | Number plus a free-text unit, e.g. "180 g". Only matched by its explicit `kind`. May be a group sub-field |
+| `money` | `{ type: 'object', properties: { value, currency } }` with `x-menagerist.kind: "money"` | ✅ structure | Number plus a fixed ISO 4217 currency, formatted two-decimal and symbol-prefixed in view mode (e.g. "£45.00"); no currency conversion. Only matched by its explicit `kind`. May be a group sub-field from v1 |
+| `url` | `{ type: 'string', format: 'uri' }` with `x-menagerist.kind: "url"` | ✅ type (format is annotation-only) | Renders as an external link in view mode; only `http(s)` values are linkified, anything else renders as plain text (stored-XSS fix - a `javascript:` value never becomes a clickable `href`) |
+| `email` | `{ type: 'string', format: 'email' }` with `x-menagerist.kind: "email"` | ✅ type (format is annotation-only) | Renders as a `mailto:` link in view mode |
+| `phone` | `{ type: 'string', pattern: '^[0-9+()\\-\\s]{3,32}$' }` with `x-menagerist.kind: "phone"` | ✅ type + pattern | Renders as a `tel:` link in view mode; permissive pattern, not validated against a specific country's format |
 
 ### Registration order in `index.ts`
 
 ```ts
-// Most-specific string subtypes first so text doesn't match them:
-import './date';        // string + format: date
-import './longtext';    // string + kind: longtext (explicit kind only)
-import './choice';      // string + enum
-import './number';
-import './rating';    // number + kind: rating (explicit kind only)
-import './boolean';
-import './text';        // plain string - fallback, must be last among scalars
-import './group';       // after scalars so sub-field fromSchema lookups work
+// descriptorForProp ranks matches (see registry.ts), so order no longer decides
+// correctness - only ties, which none of the current kinds' shapes produce.
+// Scalars must be registered before group so sub-field fromSchema lookups work.
+import './date/date';
+import './longtext/longtext';
+import './choice/choice';
+import './url/url';
+import './email/email';
+import './phone/phone';
+import './number/number';
+import './rating/rating';
+import './boolean/boolean';
+import './text/text';
+import './group/group';
+import './quantity/quantity';
+import './money/money';
+import './list/list';
+import './checklist/checklist';
+import './opaque/opaque';
 ```
 
 `descriptorForProp(prop)` first looks at `x-menagerist.kind`: an explicit kind is a direct registry lookup, and the property must still match that descriptor's `fromSchema`. Without a `kind` it picks the highest-ranked descriptor whose `fromSchema` matches (`FieldTypeDescriptor.rank`, default rank 1 when a descriptor doesn't declare one), ties broken by registration order in `index.ts`. No built-in kind currently declares a non-default rank, since none of their shapes overlap; a future kind that does overlap with an existing one (for example a multi-choice type sharing `enum` with `choice`) should declare a higher `rank` rather than relying on import order. Anything unrecognised (an unknown `kind`, a `kind` that does not fit the shape, or a shape no descriptor matches) becomes the non-selectable `opaque` kind and is preserved unchanged.
@@ -111,48 +158,50 @@ import './group';       // after scalars so sub-field fromSchema lookups work
 
 ## Adding a new field type
 
-### Example: adding a `url` type
+### Worked example (illustrative - `url` is now a real built-in kind; see `field-types/url/url.ts` for what it actually looks like, including the `ScalarInput` reuse and `highlightable`/`ViewWidget` wiring described below)
 
-**1. Create `field-types/url.ts`:**
+**1. Create `field-types/<kind>/<kind>.ts`:**
 
 ```ts
-import { register } from './registry';
-import UrlInput from './UrlInput.svelte';
+import { register } from '../registry';
+import ScalarInput from '../ScalarInput.svelte'; // reuse the shared text/number/date widget where the input is just a styled <input>
+import UrlView from './UrlView.svelte';
 
 register({
   kind: 'url',
   label: 'URL',
   canBeSubField: true,
+  highlightable: true,
   toSchema: (f) => ({ title: f.label, type: 'string', format: 'uri' }),
   fromSchema: (key, prop, required) =>
     prop.type === 'string' && 'format' in prop && prop.format === 'uri'
       ? { key, label: prop.title, kind: 'url', required, options: [], subFields: [] }
       : null,
-  InputWidget: UrlInput,
+  InputWidget: ScalarInput,
+  ViewWidget: UrlView,
 });
 ```
 
-**2. Create `UrlInput.svelte`** (a simple Svelte 5 component):
+**2. Create `field-types/<kind>/<Kind>View.svelte`** for read-mode display (only needed when `String(value)` isn't right - here it renders a real link, and only for a safe `http(s)` scheme):
 
 ```svelte
 <script lang="ts">
-  import { Input } from '$lib/components/ui/input/index.js';
-  let { value, onChange, ariaLabel }: { value: unknown; onChange: (v: unknown) => void; ariaLabel: string } = $props();
+  let { value }: { value: unknown } = $props();
+  const safe = typeof value === 'string' && /^https?:\/\//i.test(value);
 </script>
 
-<Input
-  type="url"
-  value={typeof value === 'string' ? value : ''}
-  oninput={(e) => onChange((e.target as HTMLInputElement).value)}
-  aria-label={ariaLabel}
-/>
+{#if typeof value === 'string' && value}
+  {#if safe}<a href={value} target="_blank" rel="noopener noreferrer">{value}</a>{:else}{value}{/if}
+{:else}
+  -
+{/if}
 ```
 
-**3. Register in `index.ts`** (before `text` since it also matches `string`):
+**3. Register in `index.ts`** (before `text`, since a bare `{type: 'string'}` with no explicit `kind` would otherwise fall through to `text`'s own `fromSchema`):
 
 ```ts
-import './url';   // add before text
-import './text';
+import './url/url';   // add before text
+import './text/text';
 ```
 
 **4. Add the JSON Schema type to `schema-types.ts`** if the shape is new:
