@@ -23,16 +23,16 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "Endpoints for managing edge types in the graph.",
     },
     {
-        "name": "System",
-        "description": "System-level endpoints for health checks and diagnostics.",
-    },
-    {
         "name": "Media",
         "description": "Endpoints for managing media assets.",
     },
     {
         "name": "Presets",
         "description": "Endpoints for managing presets.",
+    },
+    {
+        "name": "System",
+        "description": "System-level endpoints for health checks and diagnostics.",
     },
     {
         "name": "v1",
