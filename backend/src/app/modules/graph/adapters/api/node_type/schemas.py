@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.graph.application.create_node_type import CreateNodeTypeCommand
 from app.modules.graph.application.update_node_type import UpdateNodeTypeCommand
+from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
     from app.modules.graph.domain.node_type import NodeType
@@ -21,7 +22,7 @@ _NODE_TYPE_EXAMPLE: dict[str, Any] = {
 }
 
 
-class CreateNodeTypeRequest(BaseModel):
+class CreateNodeTypeRequest(RequestModel):
     """Request body for creating a node type."""
 
     model_config = ConfigDict(
@@ -51,7 +52,7 @@ class CreateNodeTypeRequest(BaseModel):
         )
 
 
-class UpdateNodeTypeRequest(BaseModel):
+class UpdateNodeTypeRequest(RequestModel):
     """Request body for updating a node type.
 
     `slug` is immutable. Omitted fields are left unchanged.

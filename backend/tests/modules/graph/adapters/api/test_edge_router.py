@@ -243,11 +243,11 @@ def test_update_edge_returns_412_when_if_match_stale() -> None:
     etag = initial_response.headers["ETag"]
 
     # Update the edge to change its ETag
-    client.patch(f"/api/v1/edge/{edge['id']}", json={"type": "updated_test"})
+    client.patch(f"/api/v1/edge/{edge['id']}", json={"attributes": {"v": "1"}})
 
     response = client.patch(
         f"/api/v1/edge/{edge['id']}",
-        json={"type": "another_test"},
+        json={"attributes": {"v": "2"}},
         headers={"If-Match": etag},
     )
 

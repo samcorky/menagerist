@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.presets.application.create_preset import CreatePresetCommand
 from app.modules.presets.application.update_preset import UpdatePresetCommand
+from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
     from app.modules.presets.domain.preset import Preset
@@ -44,7 +45,7 @@ _CREATE_PRESET_EXAMPLE: dict[str, Any] = {
 }
 
 
-class CreatePresetRequest(BaseModel):
+class CreatePresetRequest(RequestModel):
     """Request body for saving a new preset."""
 
     model_config = ConfigDict(json_schema_extra={"examples": [_CREATE_PRESET_EXAMPLE]})
@@ -64,11 +65,15 @@ class CreatePresetRequest(BaseModel):
         )
 
 
-class UpdatePresetRequest(BaseModel):
+class UpdatePresetRequest(RequestModel):
     """Request body for updating a preset. Omitted fields are left unchanged.
 
     Setting `definition` bumps the preset's `version`.
     """
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"label": "Condition (graded)"}]}
+    )
 
     label: str | None = Field(default=None)
     description: str | None = Field(default=None)

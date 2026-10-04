@@ -2,17 +2,32 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.graph.application.create_edge_type import CreateEdgeTypeCommand
 from app.modules.graph.application.update_edge_type import UpdateEdgeTypeCommand
+from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
     from app.modules.graph.domain.edge_type import EdgeType
 
 
-class CreateEdgeTypeRequest(BaseModel):
+class CreateEdgeTypeRequest(RequestModel):
     """Request body for POST /edge-type."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "slug": "directed-by",
+                    "label": "Directed by",
+                    "reverse_label": "Directed",
+                    "description": "Links a film to its director.",
+                    "directional": True,
+                }
+            ]
+        }
+    )
 
     slug: str
     label: str
@@ -33,8 +48,12 @@ class CreateEdgeTypeRequest(BaseModel):
         )
 
 
-class UpdateEdgeTypeRequest(BaseModel):
+class UpdateEdgeTypeRequest(RequestModel):
     """Request body for PATCH /edge-type/{id}."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"label": "Directed by", "directional": False}]}
+    )
 
     label: str | None = Field(default=None)
     reverse_label: str | None = Field(default=None)
@@ -56,6 +75,24 @@ class UpdateEdgeTypeRequest(BaseModel):
 
 class EdgeTypeResponse(BaseModel):
     """Response shape for a single edge type."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40",
+                    "slug": "directed-by",
+                    "label": "Directed by",
+                    "reverse_label": "Directed",
+                    "description": "Links a film to its director.",
+                    "directional": True,
+                    "attributes_schema": {"type": "object"},
+                    "created_at": "2026-08-23T10:14:44.465954Z",
+                    "updated_at": "2026-08-23T10:14:44.465954Z",
+                }
+            ]
+        }
+    )
 
     id: uuid.UUID
     slug: str
