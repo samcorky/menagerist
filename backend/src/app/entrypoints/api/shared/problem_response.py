@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.shared_kernel.errors import (
     ConflictError,
@@ -24,6 +24,20 @@ _STATUS_BY_DOMAIN_ERROR: dict[type[DomainError], int] = {
 
 class ProblemDetail(BaseModel):
     """RFC 9457 `application/problem+json` body every `DomainError` maps to."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "type": "about:blank",
+                    "title": "NodeNotFoundError",
+                    "status": 404,
+                    "detail": "Node 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10 not found",
+                    "instance": "https://localhost/api/v1/node/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                }
+            ]
+        }
+    )
 
     type: str
     title: str

@@ -49,6 +49,33 @@ async def test_update_edge_persists_and_commits() -> None:
     assert uow.committed is True
 
 
+async def test_update_edge_keeps_attributes_when_omitted() -> None:
+    """UpdateEdge leaves attributes unchanged when the command omits them."""
+    repository = InMemoryEdgeRepository()
+    edge = Edge.create(
+        source_id=uuid.uuid4(),
+        target_id=uuid.uuid4(),
+        type="owns",
+        attributes={"since": "1979"},
+    )
+    await repository.add(edge)
+    repos = GraphRepos(
+        nodes=InMemoryNodeRepository(),
+        edges=repository,
+        node_types=InMemoryNodeTypeRepository(),
+        edge_types=InMemoryEdgeTypeRepository(),
+    )
+    uow = InMemoryUnitOfWork(repos)
+
+    result = await UpdateEdge(uow).handle(
+        UpdateEdgeCommand(edge_id=edge.id, attributes=None),
+        SYSTEM_ACTOR,
+    )
+
+    assert result.attributes == {"since": "1979"}
+    assert uow.committed is True
+
+
 async def test_update_edge_raises_when_missing() -> None:
     """UpdateEdge raises EdgeNotFoundError when the edge doesn't exist."""
     repos = GraphRepos(

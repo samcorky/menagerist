@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.modules.graph.application.create_node import CreateNodeCommand
 from app.modules.graph.application.update_node import UpdateNodeCommand
+from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
     from app.modules.graph.domain.node import Node
@@ -37,7 +38,7 @@ _NODE_MINIMAL_EXAMPLE: dict[str, Any] = {
 }
 
 
-class CreateNodeRequest(BaseModel):
+class CreateNodeRequest(RequestModel):
     """Request body for creating a node. Only `name` is required."""
 
     model_config = ConfigDict(
@@ -86,7 +87,7 @@ class CreateNodeRequest(BaseModel):
         )
 
 
-class UpdateNodeRequest(BaseModel):
+class UpdateNodeRequest(RequestModel):
     """Request body for updating a node. Omitted fields are left unchanged.
 
     `type` may only be set once - if the node already has a type this field is ignored.
@@ -134,8 +135,14 @@ class UpdateNodeRequest(BaseModel):
         )
 
 
-class PromoteExtraSchemaFieldRequest(BaseModel):
+class PromoteExtraSchemaFieldRequest(RequestModel):
     """Request body for promoting one overlay field onto the item type."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [{"node_type_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20"}]
+        }
+    )
 
     node_type_id: uuid.UUID
 

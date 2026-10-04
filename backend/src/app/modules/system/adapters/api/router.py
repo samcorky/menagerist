@@ -39,6 +39,8 @@ class HealthJSONResponse(JSONResponse):
 class HealthResponse(BaseModel):
     """Liveness status."""
 
+    model_config = ConfigDict(json_schema_extra={"examples": [{"status": "pass"}]})
+
     status: Annotated[
         Literal["pass"],
         Field(description="Status of the application.", examples=["pass"]),
@@ -48,7 +50,21 @@ class HealthResponse(BaseModel):
 class CheckObservation(BaseModel):
     """Single health check observation (IETF draft-inadarei-api-health-check-06)."""
 
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        json_schema_extra={
+            "examples": [
+                {
+                    "componentType": "datastore",
+                    "observedValue": 1.23,
+                    "observedUnit": "ms",
+                    "status": "pass",
+                    "time": _EXAMPLE_ISO,
+                }
+            ]
+        },
+    )
 
     component_type: Annotated[
         str,
@@ -110,6 +126,27 @@ class CheckObservation(BaseModel):
 class ReadyResponse(BaseModel):
     """Readiness status (IETF draft-inadarei-api-health-check-06)."""
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "status": "pass",
+                    "checks": {
+                        "database:responseTime": [
+                            {
+                                "componentType": "datastore",
+                                "observedValue": 1.23,
+                                "observedUnit": "ms",
+                                "status": "pass",
+                                "time": _EXAMPLE_ISO,
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
+    )
+
     status: Annotated[
         Literal["pass", "warn", "fail"],
         Field(
@@ -136,6 +173,23 @@ class ReadyResponse(BaseModel):
 
 class VersionResponse(BaseModel):
     """Build and version metadata."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "name": "menagerist",
+                    "current_version": "1.2.3",
+                    "commit_sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+                    "short_sha": "a1b2c3d",
+                    "branch": "main",
+                    "dirty": False,
+                    "build_timestamp": _EXAMPLE_ISO,
+                    "migration_head": ["a1b2c3d4e5f6"],
+                }
+            ]
+        }
+    )
 
     name: Annotated[
         str,

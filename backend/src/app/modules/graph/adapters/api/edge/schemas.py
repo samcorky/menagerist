@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.modules.graph.application.create_edge import CreateEdgeCommand
 from app.modules.graph.application.create_edges import CreateEdgesCommand
 from app.modules.graph.application.update_edge import UpdateEdgeCommand
+from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
     from app.modules.graph.domain.edge import Edge
@@ -22,7 +23,7 @@ _EDGE_EXAMPLE: dict[str, Any] = {
 }
 
 
-class CreateEdgeRequest(BaseModel):
+class CreateEdgeRequest(RequestModel):
     """Request body for creating an edge between two node."""
 
     model_config = ConfigDict(
@@ -53,7 +54,7 @@ class CreateEdgeRequest(BaseModel):
         )
 
 
-class CreateEdgesRequest(BaseModel):
+class CreateEdgesRequest(RequestModel):
     """Request body for connecting one source to several targets at once.
 
     Attributes apply to every edge. A target already connected to the source
@@ -91,7 +92,7 @@ class CreateEdgesRequest(BaseModel):
         )
 
 
-class UpdateEdgeRequest(BaseModel):
+class UpdateEdgeRequest(RequestModel):
     """Request body for updating an edge. Omitted fields are left unchanged."""
 
     model_config = ConfigDict(
@@ -134,6 +135,17 @@ class EdgeResponse(BaseModel):
 
 class CreateEdgesResponse(BaseModel):
     """Edges created, and targets skipped because a matching edge already existed."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "created": [_EDGE_EXAMPLE],
+                    "skipped": ["01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e13"],
+                }
+            ]
+        }
+    )
 
     created: list[EdgeResponse]
     skipped: list[uuid.UUID]

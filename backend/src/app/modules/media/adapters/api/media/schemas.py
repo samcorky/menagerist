@@ -11,6 +11,7 @@ from app.modules.media.application.set_media_cover import SetMediaCoverCommand
 from app.modules.media.application.update_media import UpdateMediaCommand
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
+from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
     from app.modules.media.application.list_node_media import NodeMediaItem
@@ -24,7 +25,7 @@ _ATTACHMENT_EXAMPLE: dict[str, Any] = {
 }
 
 
-class AttachMediaRequest(BaseModel):
+class AttachMediaRequest(RequestModel):
     """Request body for attaching an already-staged asset to a graph entity."""
 
     model_config = ConfigDict(json_schema_extra={"examples": [_ATTACHMENT_EXAMPLE]})
@@ -43,7 +44,7 @@ class AttachMediaRequest(BaseModel):
         )
 
 
-class DetachMediaRequest(BaseModel):
+class DetachMediaRequest(RequestModel):
     """Request body identifying the attachment to remove for a given asset."""
 
     model_config = ConfigDict(json_schema_extra={"examples": [_ATTACHMENT_EXAMPLE]})
@@ -62,7 +63,7 @@ class DetachMediaRequest(BaseModel):
         )
 
 
-class CoverRequest(BaseModel):
+class CoverRequest(RequestModel):
     """Request body identifying the target whose cover to set or clear."""
 
     model_config = ConfigDict(
@@ -96,7 +97,7 @@ class CoverRequest(BaseModel):
         )
 
 
-class UpdateMediaRequest(BaseModel):
+class UpdateMediaRequest(RequestModel):
     """Request body for updating a media asset."""
 
     model_config = ConfigDict(
@@ -162,6 +163,12 @@ class MediaAssetResponse(BaseModel):
 class NodeMediaItemResponse(BaseModel):
     """A media asset with its attachment slot label, as returned by list_node_media."""
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [{**_EXAMPLE, "attribute_key": "cover"}],
+        }
+    )
+
     id: uuid.UUID
     filename: str
     content_type: str
@@ -183,6 +190,21 @@ class NodeMediaItemResponse(BaseModel):
 
 class MediaAttachmentResponse(BaseModel):
     """A media attachment record as returned by the API."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e21",
+                    "asset_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                    "target_type": "node",
+                    "target_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                    "attribute_key": "cover",
+                    "created_at": "2026-09-07T10:00:00Z",
+                }
+            ]
+        }
+    )
 
     id: uuid.UUID
     asset_id: uuid.UUID
