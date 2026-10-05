@@ -10,6 +10,21 @@ export function formatIsoDate(value: string, month: 'long' | 'short'): string {
 	return date.toLocaleDateString(undefined, { year: 'numeric', month, day: 'numeric' });
 }
 
+/**
+ * Format a `YYYY`, `YYYY-MM` or `YYYY-MM-DD` string at the precision it was entered
+ * ("1973", "Mar 1973", "14 Mar 1973"). A value that is not one of those is returned as is.
+ */
+export function formatPartialDate(value: string, month: 'long' | 'short'): string {
+	const parts = /^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?$/.exec(value);
+	if (!parts) return value;
+	const [, year, mm, dd] = parts;
+	if (mm === undefined) return year;
+	if (dd !== undefined) return formatIsoDate(value, month);
+	const date = new Date(`${year}-${mm}-01T00:00:00`);
+	if (isNaN(date.getTime())) return value;
+	return date.toLocaleDateString(undefined, { year: 'numeric', month });
+}
+
 const DATE_TIME_OPTS: Intl.DateTimeFormatOptions = {
 	year: 'numeric',
 	month: 'short',

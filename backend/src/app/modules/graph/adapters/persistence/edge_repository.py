@@ -149,7 +149,13 @@ class SqlAlchemyEdgeRepository:
         if sub_key is None:
             stmt = stmt.where(EdgeModel.attributes.has_key(key))
             if value is not None:
-                stmt = stmt.where(EdgeModel.attributes.contains({key: value}))
+                # A string value, or a multiple-choice array holding it.
+                stmt = stmt.where(
+                    or_(
+                        EdgeModel.attributes.contains({key: value}),
+                        EdgeModel.attributes.contains({key: [value]}),
+                    )
+                )
         else:
             stmt = stmt.where(
                 _has_matching_row(EdgeModel.attributes, key, sub_key, value)

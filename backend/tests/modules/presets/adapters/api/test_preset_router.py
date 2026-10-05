@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
+from app.entrypoints.api.shared.preset_usage import GraphPresetUsage, get_preset_usage
 from app.modules.presets.adapters.api.dependencies import (
     get_preset_repos,
     get_preset_uow,
@@ -21,6 +22,16 @@ if TYPE_CHECKING:
     from fastapi import FastAPI
 
 
+class _NoUsage(GraphPresetUsage):
+    """Reports that no item type links to any list, without touching the graph."""
+
+    def __init__(self) -> None:
+        pass
+
+    async def types_using(self, preset_id: uuid.UUID) -> list[str]:
+        return []
+
+
 def _app_with_in_memory_presets() -> FastAPI:
     """Build the app with the presets module wired to a fresh in-memory repository."""
     app = create_app()
@@ -29,6 +40,7 @@ def _app_with_in_memory_presets() -> FastAPI:
         repos
     )
     app.dependency_overrides[get_preset_repos] = lambda: repos
+    app.dependency_overrides[get_preset_usage] = _NoUsage
     return app
 
 

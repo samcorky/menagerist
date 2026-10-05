@@ -4,11 +4,14 @@
 import './date/date';
 import './longtext/longtext';
 import './choice/choice';
+import './multichoice/multichoice';
 import './url/url';
 import './email/email';
 import './phone/phone';
+import './partialdate/partialdate';
 import './number/number';
 import './rating/rating';
+import './duration/duration';
 import './boolean/boolean';
 import './text/text';
 import './group/group';

@@ -251,7 +251,13 @@ class SqlAlchemyNodeRepository:
         if sub_key is None:
             stmt = stmt.where(NodeModel.attributes.has_key(key))
             if value is not None:
-                stmt = stmt.where(NodeModel.attributes.contains({key: value}))
+                # A string value, or a multiple-choice array holding it.
+                stmt = stmt.where(
+                    or_(
+                        NodeModel.attributes.contains({key: value}),
+                        NodeModel.attributes.contains({key: [value]}),
+                    )
+                )
         else:
             stmt = stmt.where(
                 _has_matching_row(NodeModel.attributes, key, sub_key, value)

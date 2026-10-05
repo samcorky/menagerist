@@ -244,6 +244,18 @@ async def test_count_with_attribute_can_match_a_value() -> None:
     assert await repository.count_with_attribute("film", "s") == 3
 
 
+async def test_count_with_attribute_value_matches_array_membership() -> None:
+    """With `value`, an array holding it counts; a partial match does not."""
+    repository = InMemoryNodeRepository()
+    for name, held in [("a", ["CD", "Tape"]), ("b", ["Vinyl"]), ("c", "CD")]:
+        await repository.add(
+            Node.create(name=name, type="film", attributes={"f": held})
+        )
+
+    assert await repository.count_with_attribute("film", "f", value="CD") == 2
+    assert await repository.count_with_attribute("film", "f", value="C") == 0
+
+
 async def test_count_and_list_with_attribute_can_match_a_group_sub_key() -> None:
     """With `sub_key`, `key` names a group array and rows are matched instead."""
     repository = InMemoryNodeRepository()

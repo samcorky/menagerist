@@ -29,6 +29,9 @@ frontend/src/lib/field-types/
   group/      ← array of objects ("Table"); column order/reorder, sub-field kinds
   quantity/   ← object {value, unit}; group sub-field
   money/      ← object {value, currency}; ISO 4217 list, group sub-field from v1
+  multichoice/ ← array of strings from a fixed set ("Multiple choice"); chips/checkboxes display option
+  duration/   ← number of whole seconds + explicit kind: duration; m:ss entry, clock/words display
+  partialdate/ ← string + pattern: YYYY, YYYY-MM or YYYY-MM-DD
   list/       ← array of strings ("Ordered list"); numbered/bulleted display option
   checklist/  ← array of {text, done}
   url/        ← string + format: uri
@@ -120,6 +123,9 @@ export type FieldTypeDescriptor = {
 | `choice` | `{ type: 'string', enum: [...] }` | ✅ enum membership | |
 | `rating` | `{ type: 'number', minimum: 1, maximum: 5, multipleOf: 1 }` with `x-menagerist.kind: "rating"` | ✅ range + whole numbers | Star widget; only matched by its explicit `kind`, so it never captures a plain number. Unset is omitted. May be a group sub-field |
 | `group` | `{ type: 'array', items: { type: 'object', properties: {...} } }` | ✅ structure + sub-fields | Sub-fields are validated recursively |
+| `duration` | `{ type: 'number', minimum: 0, multipleOf: 1 }` with `x-menagerist.kind: "duration"` | ✅ type + range + whole seconds | Whole seconds, so values sort and add up. Only matched by its explicit `kind`, so it never captures a plain number. Entry accepts `3:45`, `1:02:03`, `1h 2m 3s` or bare seconds (`field-types/duration/format.ts`; with two clock parts the first is minutes, so `75:30` is 75 minutes). Unparseable text is passed through unchanged: the form shows the friendly type error and the server rejects the save. "Show as": clock or words. Group sub-field; highlightable. A number may change to this kind with a warning |
+| `partialdate` | `{ type: 'string', pattern: '^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$' }` | ✅ pattern | One string at the precision entered (`1973`, `1973-03`, `1973-03-14`), not a range; the strings sort chronologically. The pattern checks ranges but not month lengths (`1973-02-30` passes). `[0-9]`, not `\d`, because Python's `\d` matches non-ASCII digits. Same exact-pattern matching as `phone`. A `date` field may change to this kind, not the reverse. The input shows a placeholder and a live "March 1973" preview. Cases in `contract/fixtures/regex-conformance.json` |
+| `multichoice` | `{ type: 'array', items: { type: 'string', enum: [...] }, uniqueItems: true }` | ✅ enum membership per item | Tick several options from a fixed set. Matched by shape as well as by explicit `kind` (`list` needs an explicit kind and `group` needs object items, so there is no overlap). Not a group sub-field; highlightable (comma-separated on cards). Chips or checkboxes "Show as". Removing an option warns when it is in use; no linked lists yet |
 | `list` | `{ type: 'array', items: { type: 'string' } }` with `x-menagerist.kind: "list"` | ✅ structure | Ordered free-text items; numbered/bulleted is display-only, storage is unaffected. Only matched by its explicit `kind`. Not a group sub-field |
 | `checklist` | `{ type: 'array', items: { type: 'object', properties: { text, done } } }` with `x-menagerist.kind: "checklist"` | ✅ structure | Each item's `done` tick is real persisted data, not a display choice - see "Ordered list and checklist" below for why this needed its own kind rather than being a `list` display variant. Only matched by its explicit `kind`. Not a group sub-field |
 | `quantity` | `{ type: 'object', properties: { value, unit } }` with `x-menagerist.kind: "quantity"` | ✅ structure | Number plus a free-text unit, e.g. "180 g". Only matched by its explicit `kind`. May be a group sub-field |
@@ -137,11 +143,14 @@ export type FieldTypeDescriptor = {
 import './date/date';
 import './longtext/longtext';
 import './choice/choice';
+import './multichoice/multichoice';
 import './url/url';
 import './email/email';
 import './phone/phone';
+import './partialdate/partialdate';
 import './number/number';
 import './rating/rating';
+import './duration/duration';
 import './boolean/boolean';
 import './text/text';
 import './group/group';
@@ -384,6 +393,10 @@ A `group` field's own `x-menagerist.columns` records its sub-property keys in or
 The backend's per-key usage/purge endpoints (`GET .../attribute/{key}/usage`, `DELETE .../attribute/{key}`, both node-type and edge-type) take an optional `sub_key`: with it, `key` names a group array and matching happens against each row (`jsonb_array_elements`, not raw JSON path strings) instead of the top-level value. `count_with_attribute`/`list_with_attribute` on both repositories, and `Count/PurgeNodeTypeAttributeUsage`/`Count/PurgeEdgeTypeAttributeUsage`, take the same optional `sub_key`; purge with `sub_key` strips only that key from each row, leaving the array and the rest of each row in place.
 
 The frontend mirrors the two existing top-level patterns, scoped to `{key, sub_key}`: removing a choice column's option removes it immediately and shows a non-blocking "used by N" advisory after the fact (WI-10 style, `optionRemovalWarning`); removing a column itself queries usage first and, if any items hold it, shows an inline confirm ("used by N, cannot be undone") before actually removing (WI-9 style, `purgeWarning`) rather than the silent immediate removal columns had before. Unlike a top-level field, a removed column has no archive/restore step - confirming just splices it out of the schema; there is no separate purge call to make since removing the column already is the permanent action.
+
+### Multiple choice
+
+`multichoice` stores an array of option strings. The in-use warning on removing an option relies on `count_with_attribute(value=...)` matching either a string value or an array holding it (JSONB `contains` of `{key: value}` or `{key: [value]}`; the in-memory adapters mirror this). Linked choice lists remain choice-only. A stale stored option shows as "(no longer an option)" in the input widget; the read-mode view shows it as stored.
 
 ### Ordered list and checklist (WI-25)
 

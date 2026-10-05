@@ -388,3 +388,163 @@ test('longtext field: input and view', async ({ page }) => {
 	await page.reload();
 	await expect(page.getByText('Bought at a car boot sale.')).toBeVisible();
 });
+
+test('multiple choice field: options set in the schema editor, tick several, and view', async ({
+	page
+}) => {
+	const typeLabel = uniqueName('Release');
+	await page.goto('/settings/item-types');
+	const form = page
+		.locator('form')
+		.filter({ has: page.getByRole('button', { name: 'Add item type' }) });
+	await form.getByLabel('Name').fill(typeLabel);
+	await form.getByRole('button', { name: 'Add field', exact: true }).click();
+	await form.getByLabel('Field label').last().fill('Formats');
+	await form.getByLabel('Field type').last().selectOption('multichoice');
+	for (const option of ['CD', 'Vinyl', 'Tape']) {
+		await form.getByPlaceholder('Add option…').last().fill(option);
+		await form.getByPlaceholder('Add option…').last().press('Enter');
+	}
+	await form.getByRole('button', { name: 'Add item type' }).click();
+	await expect(page.getByText('Item type created')).toBeVisible();
+
+	await page.goto('/items/new');
+	await page.getByLabel('Name').fill(uniqueName('Kind of Blue'));
+	await page.getByPlaceholder('Search item types…').fill(typeLabel);
+	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+
+	const group = page.getByRole('group', { name: 'Formats' });
+	await group.getByRole('button', { name: 'Vinyl', exact: true }).click();
+	await group.getByRole('button', { name: 'CD', exact: true }).click();
+	await expect(group.getByRole('button', { name: 'Vinyl', exact: true })).toHaveAttribute(
+		'aria-pressed',
+		'true'
+	);
+	await expect(group.getByRole('button', { name: 'Tape', exact: true })).toHaveAttribute(
+		'aria-pressed',
+		'false'
+	);
+	await page.getByRole('button', { name: 'Save', exact: true }).click();
+	await page.waitForURL(/\/items\/(?!new$)[^/]+$/);
+
+	await expect(page.getByText('CD', { exact: true })).toBeVisible();
+	await expect(page.getByText('Vinyl', { exact: true })).toBeVisible();
+	await expect(page.getByText('Tape', { exact: true })).toHaveCount(0);
+	await page.reload();
+	await expect(page.getByText('CD', { exact: true })).toBeVisible();
+	await expect(page.getByText('Vinyl', { exact: true })).toBeVisible();
+});
+
+test('partial date field: placeholder, live preview, and view at the precision entered', async ({
+	page
+}) => {
+	const typeLabel = uniqueName('Record');
+	await createItemType(page, {
+		label: typeLabel,
+		fields: [{ label: 'Pressed', kind: 'partialdate' }]
+	});
+
+	await page.goto('/items/new');
+	await page.getByLabel('Name').fill(uniqueName('Blue'));
+	await page.getByPlaceholder('Search item types…').fill(typeLabel);
+	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+
+	const input = page.getByLabel('Pressed');
+	await expect(input).toHaveAttribute('placeholder', 'YYYY, YYYY-MM or YYYY-MM-DD');
+	await input.fill('1973-03');
+	await expect(page.getByText('March 1973', { exact: true })).toBeVisible();
+
+	await page.getByRole('button', { name: 'Save', exact: true }).click();
+	await page.waitForURL(/\/items\/(?!new$)[^/]+$/);
+
+	await expect(page.getByText('March 1973', { exact: true })).toBeVisible();
+	await page.reload();
+	await expect(page.getByText('March 1973', { exact: true })).toBeVisible();
+});
+
+test('partial date field: a year alone is kept as a year, and a bad value shows an error', async ({
+	page
+}) => {
+	const typeLabel = uniqueName('Record');
+	await createItemType(page, {
+		label: typeLabel,
+		fields: [{ label: 'Pressed', kind: 'partialdate' }]
+	});
+
+	await page.goto('/items/new');
+	await page.getByLabel('Name').fill(uniqueName('Rumours'));
+	await page.getByPlaceholder('Search item types…').fill(typeLabel);
+	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+
+	const input = page.getByLabel('Pressed');
+	await input.fill('1973-13');
+	// Client errors only surface once the field has been left.
+	await page.getByLabel('Name').click();
+	await expect(page.locator('p.text-destructive')).toContainText('1973-03-14');
+
+	await input.fill('1977');
+	await page.getByLabel('Name').click();
+	await expect(page.locator('p.text-destructive')).toHaveCount(0);
+
+	await page.getByRole('button', { name: 'Save', exact: true }).click();
+	await page.waitForURL(/\/items\/(?!new$)[^/]+$/);
+	await expect(page.getByText('1977', { exact: true })).toBeVisible();
+});
+
+test('duration field: m:ss entry, tidied on blur, and shown as a clock', async ({ page }) => {
+	const typeLabel = uniqueName('Album');
+	await createItemType(page, {
+		label: typeLabel,
+		fields: [{ label: 'Running time', kind: 'duration' }]
+	});
+
+	await page.goto('/items/new');
+	await page.getByLabel('Name').fill(uniqueName('Abbey Road'));
+	await page.getByPlaceholder('Search item types…').fill(typeLabel);
+	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+
+	const input = page.getByLabel('Running time');
+	await input.fill('1h 2m 3s');
+	await page.getByLabel('Name').click();
+	await expect(input).toHaveValue('1:02:03');
+
+	await input.fill('225');
+	await page.getByLabel('Name').click();
+	await expect(input).toHaveValue('3:45');
+
+	await page.getByRole('button', { name: 'Save', exact: true }).click();
+	await page.waitForURL(/\/items\/(?!new$)[^/]+$/);
+
+	await expect(page.getByText('3:45', { exact: true })).toBeVisible();
+	await page.reload();
+	await expect(page.getByText('3:45', { exact: true })).toBeVisible();
+});
+
+test('duration field: unreadable text shows an error and the save is rejected until it is fixed', async ({
+	page
+}) => {
+	const typeLabel = uniqueName('Album');
+	await createItemType(page, {
+		label: typeLabel,
+		fields: [{ label: 'Running time', kind: 'duration' }]
+	});
+
+	await page.goto('/items/new');
+	await page.getByLabel('Name').fill(uniqueName('Revolver'));
+	await page.getByPlaceholder('Search item types…').fill(typeLabel);
+	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+
+	const input = page.getByLabel('Running time');
+	await input.fill('about three minutes');
+	await page.getByLabel('Name').click();
+	await expect(page.locator('p.text-destructive')).toContainText('3:45');
+
+	// The server rejects the value; its error stays until the next save.
+	await page.getByRole('button', { name: 'Save', exact: true }).click();
+	await expect(page).toHaveURL(/\/items\/new$/);
+
+	await input.fill('3:45');
+	await page.getByRole('button', { name: 'Save', exact: true }).click();
+	await page.waitForURL(/\/items\/(?!new$)[^/]+$/);
+	await expect(page.getByText('3:45', { exact: true })).toBeVisible();
+});

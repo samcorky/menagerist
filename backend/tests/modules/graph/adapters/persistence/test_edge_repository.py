@@ -194,6 +194,27 @@ async def test_count_with_attribute_matches_an_exact_string_value(
     assert await repository.count_with_attribute("owns", "s", value="Gone") == 0
 
 
+async def test_count_with_attribute_value_matches_array_membership(
+    db_session: AsyncSession,
+) -> None:
+    """With `value`, an array holding it counts; a partial match does not."""
+    repository = SqlAlchemyEdgeRepository(db_session)
+    source = await _make_node(db_session)
+    target = await _make_node(db_session)
+    for held in [["CD", "Tape"], ["Vinyl"], "CD"]:
+        await repository.add(
+            Edge.create(
+                source_id=source.id,
+                target_id=target.id,
+                type="owns",
+                attributes={"f": held},
+            )
+        )
+
+    assert await repository.count_with_attribute("owns", "f", value="CD") == 2
+    assert await repository.count_with_attribute("owns", "f", value="C") == 0
+
+
 async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
     db_session: AsyncSession,
 ) -> None:

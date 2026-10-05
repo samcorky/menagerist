@@ -289,6 +289,20 @@ async def test_count_with_attribute_matches_an_exact_string_value(
     assert await repository.count_with_attribute("film", "s") == 4
 
 
+async def test_count_with_attribute_value_matches_array_membership(
+    db_session: AsyncSession,
+) -> None:
+    """With `value`, an array holding it counts; a partial match does not."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    for name, held in [("a", ["CD", "Tape"]), ("b", ["Vinyl"]), ("c", "CD")]:
+        await repository.add(
+            Node.create(name=name, type="film", attributes={"f": held})
+        )
+
+    assert await repository.count_with_attribute("film", "f", value="CD") == 2
+    assert await repository.count_with_attribute("film", "f", value="C") == 0
+
+
 async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
     db_session: AsyncSession,
 ) -> None:

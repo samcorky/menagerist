@@ -1,5 +1,5 @@
 {
-  "description": "Generated starts-with and ends-with patterns must give the same result in Python re.search and JavaScript RegExp with the u flag. Read by the backend and frontend suites.",
+  "description": "Generated starts-with and ends-with patterns, and the built-in phone and partial date patterns, must give the same result in Python re.search and JavaScript RegExp with the u flag. Read by the backend and frontend suites.",
   "cases": [
     {
       "pattern": "^cover-",
@@ -149,6 +149,116 @@
     {
       "pattern": "^[0-9+()\\-\\s]{3,32}$",
       "value": "",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "1973",
+      "expected": true
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "1973-03",
+      "expected": true
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "1973-03-14",
+      "expected": true
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "1973-01-01",
+      "expected": true
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "1973-12-31",
+      "expected": true
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "0001",
+      "expected": true
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "73",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "19730",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "1973-3",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "1973-13",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "1973-00",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "1973-03-32",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "1973-03-00",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "1973-03-1",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "1973-03-14x",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "1973/03/14",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": " 1973",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "1973 ",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "1973-03-",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "\u0661\u0669\u0667\u0663",
+      "expected": false
+    },
+    {
+      "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+      "value": "1973-\u0660\u0663",
       "expected": false
     }
   ]

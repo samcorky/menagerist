@@ -193,6 +193,24 @@ async def test_count_with_attribute_can_match_a_value() -> None:
     assert await repository.count_with_attribute("owns", "s", value="Gone") == 0
 
 
+async def test_count_with_attribute_value_matches_array_membership() -> None:
+    """With `value`, an array holding it counts; a partial match does not."""
+    repository = InMemoryEdgeRepository()
+    source, target = uuid.uuid4(), uuid.uuid4()
+    for held in [["CD", "Tape"], ["Vinyl"], "CD"]:
+        await repository.add(
+            Edge.create(
+                source_id=source,
+                target_id=target,
+                type="owns",
+                attributes={"f": held},
+            )
+        )
+
+    assert await repository.count_with_attribute("owns", "f", value="CD") == 2
+    assert await repository.count_with_attribute("owns", "f", value="C") == 0
+
+
 async def test_count_and_list_with_attribute_can_match_a_group_sub_key() -> None:
     """With `sub_key`, `key` names a group array and rows are matched instead."""
     repository = InMemoryEdgeRepository()

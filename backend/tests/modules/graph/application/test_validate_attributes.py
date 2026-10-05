@@ -129,3 +129,33 @@ async def test_validate_attributes_without_previous_validates_everything() -> No
     """Create keeps full validation."""
     with pytest.raises(InvalidAttributesError):
         validate_attributes(_STALE_SCHEMA, {"status": "Archived"})
+
+
+_DURATION_SCHEMA = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "length": {
+            "title": "Length",
+            "type": "number",
+            "minimum": 0,
+            "multipleOf": 1,
+            "x-menagerist": {"kind": "duration"},
+        },
+    },
+}
+
+
+@pytest.mark.parametrize("seconds", [0, 1, 225, 3723, 86400])
+async def test_duration_accepts_whole_non_negative_seconds(seconds: int) -> None:
+    """A duration is stored as whole seconds, as the frontend writes it."""
+    validate_attributes(_DURATION_SCHEMA, {"length": seconds})
+
+
+@pytest.mark.parametrize("bad", [-1, 1.5, "3:45", None])
+async def test_duration_rejects_negative_fractional_and_text(bad: object) -> None:
+    """The backend refuses anything that is not whole non-negative seconds."""
+    with pytest.raises(InvalidAttributesError) as exc_info:
+        validate_attributes(_DURATION_SCHEMA, {"length": bad})
+
+    assert exc_info.value.validation_errors[0]["path"] == "/length"

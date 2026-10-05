@@ -74,7 +74,12 @@ class InMemoryEdgeRepository:
             if edge.is_deleted or edge.type != type_slug or key not in edge.attributes:
                 return False
             if sub_key is None:
-                return value is None or edge.attributes[key] == value
+                held = edge.attributes[key]
+                return (
+                    value is None
+                    or held == value
+                    or (isinstance(held, list) and value in held)
+                )
             rows = edge.attributes[key]
             return isinstance(rows, list) and any(
                 isinstance(row, dict)

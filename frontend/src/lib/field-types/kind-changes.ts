@@ -8,12 +8,17 @@ const TO_TEXT = ['text', 'longtext'];
 const ALLOWED: Record<string, string[]> = {
 	text: ['text', 'longtext'],
 	longtext: ['longtext', 'text'],
-	number: ['number', 'rating', ...TO_TEXT],
+	number: ['number', 'rating', 'duration', ...TO_TEXT],
 	rating: ['rating', 'number', ...TO_TEXT],
+	duration: ['duration', 'number', ...TO_TEXT],
 	boolean: ['boolean', ...TO_TEXT],
-	date: ['date', ...TO_TEXT],
+	// Every full date is a valid partial date, so it may be loosened (not the reverse).
+	date: ['date', 'partialdate', ...TO_TEXT],
+	partialdate: ['partialdate', ...TO_TEXT],
 	choice: ['choice', ...TO_TEXT],
 	group: ['group'],
+	// Array-shaped like list and checklist: it cannot become text without a shape change.
+	multichoice: ['multichoice'],
 	// Object-shaped like `group`: its stored value is `{value, unit}`, not a scalar, so it
 	// cannot become text without a shape change. Falls back to this anyway if omitted
 	// (`ALLOWED[original] ?? [original]`), but listed explicitly like every other kind.
@@ -40,6 +45,9 @@ export function allowedKinds(original: string | undefined, available: string[]):
 export function kindChangeWarning(original: string | undefined, kind: string): string | null {
 	if (original === 'number' && kind === 'rating') {
 		return 'Values outside 1 to 5 will show an error when edited.';
+	}
+	if (original === 'number' && kind === 'duration') {
+		return 'Values that are negative or not whole seconds will show an error when edited.';
 	}
 	return null;
 }

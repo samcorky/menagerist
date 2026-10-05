@@ -125,7 +125,12 @@ class InMemoryNodeRepository:
             if node.is_deleted or node.type != type_slug or key not in node.attributes:
                 return False
             if sub_key is None:
-                return value is None or node.attributes[key] == value
+                held = node.attributes[key]
+                return (
+                    value is None
+                    or held == value
+                    or (isinstance(held, list) and value in held)
+                )
             rows = node.attributes[key]
             return isinstance(rows, list) and any(
                 isinstance(row, dict)

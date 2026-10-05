@@ -18,7 +18,10 @@ const EXPECTED_KINDS = [
 	'money',
 	'url',
 	'email',
-	'phone'
+	'phone',
+	'partialdate',
+	'multichoice',
+	'duration'
 ];
 
 describe('all built-in kinds are registered', () => {
