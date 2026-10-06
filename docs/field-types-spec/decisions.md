@@ -92,7 +92,7 @@ Everything below was implemented on a default while working through the spec. No
 | Sub-field display | Group sub-fields have no "Show as" control | | WI-11 |
 | Rank matching | WI-12 skipped: explicit `kind` makes it largely redundant | Q7 | WI-11 |
 | Text constraints | Case-sensitive only; no free-form regex, no min/max length | Q12, Q13 | WI-15 |
-| Contract fixtures | Live in `contract/fixtures/` at the repo root; CI path filters not checked | Q14 | WI-15 |
+| Contract fixtures | Live in `shared/contracts/`; CI path filters not checked | Q14 | WI-15 |
 | Constraint warning | No "N items would fail this new constraint" count | Q60 | WI-15 |
 | Constraint helper text | Shown under the field until an error replaces it | Q61 | WI-15 |
 | Kind switch on text | Text to long text drops the constraints | | WI-15 |

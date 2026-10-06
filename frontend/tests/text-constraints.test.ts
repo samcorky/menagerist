@@ -387,10 +387,7 @@ describe('safe validator', () => {
 
 describe('regex conformance fixture', () => {
 	const fixture = JSON.parse(
-		readFileSync(
-			new URL('../../contract/fixtures/regex-conformance.json', import.meta.url),
-			'utf-8'
-		)
+		readFileSync(new URL('../../shared/contracts/regex-conformance.json', import.meta.url), 'utf-8')
 	) as { cases: { pattern: string; value: string; expected: boolean }[] };
 
 	it('agrees with JavaScript (the backend suite checks Python)', () => {

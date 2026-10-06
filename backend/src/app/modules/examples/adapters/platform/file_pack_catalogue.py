@@ -1,5 +1,7 @@
 import json
-from typing import TYPE_CHECKING, Any
+from importlib.resources import files
+from pathlib import Path
+from typing import Any
 
 from app.modules.examples.adapters.platform.pack_parser import (
     PACK_ID,
@@ -9,14 +11,10 @@ from app.modules.examples.adapters.platform.pack_parser import (
 )
 from app.modules.examples.domain.errors import InvalidPackError
 from app.modules.examples.domain.pack import ExamplePack, PackSummary
-from app.platform.shared_data import shared_data_path
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class FilePackCatalogue:
-    """Reads the packs shipped in `shared/examples/`.
+    """Reads the packs shipped in `app/modules/examples/packs/`.
 
     Packs never change at runtime, so each file is parsed once and kept. File reads
     block the event loop, which is acceptable for small, cached files.
@@ -28,7 +26,9 @@ class FilePackCatalogue:
         self._packs: dict[str, ExamplePack] = {}
 
     def _dir(self) -> Path:
-        return self._root if self._root is not None else shared_data_path("examples")
+        if self._root is not None:
+            return self._root
+        return Path(str(files("app.modules.examples") / "packs"))
 
     def _read(self, name: str) -> Any:  # noqa: ANN401
         path = self._dir() / name

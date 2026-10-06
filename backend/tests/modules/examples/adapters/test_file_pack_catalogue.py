@@ -83,15 +83,12 @@ async def test_a_pack_is_parsed_once(tmp_path: Path, pack_data: dict[str, Any]) 
     assert await catalogue.get("demo") is first
 
 
-async def test_defaults_to_the_shared_examples_directory(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """Without a root, packs are read from the shared `examples` directory."""
-    (tmp_path / "examples").mkdir()
-    _write(tmp_path / "examples", [], {})
-    monkeypatch.setenv("MENAGERIST_SHARED_DIR", str(tmp_path))
+async def test_defaults_to_the_packaged_directory() -> None:
+    """Without a root, the packs shipped inside the module are listed."""
+    packs = await FilePackCatalogue().list_packs()
 
-    assert await FilePackCatalogue().list_packs() == []
+    assert packs
+    assert all(p.counts.items > 0 for p in packs)
 
 
 async def test_an_unsafe_index_id_never_reads_outside_the_directory(

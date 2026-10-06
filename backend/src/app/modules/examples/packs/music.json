@@ -1,0 +1,785 @@
+{
+  "format": "menagerist-example-pack",
+  "version": 1,
+  "id": "music",
+  "presets": [
+    {
+      "ref": "signing-surface",
+      "kind": "choice_list",
+      "label": "Signing surface",
+      "description": "Where on a record a signature is.",
+      "definition": {
+        "options": [
+          "Cover",
+          "Sleeve",
+          "Inner sleeve",
+          "Label",
+          "Booklet",
+          "Ticket"
+        ]
+      }
+    }
+  ],
+  "relationship_types": [
+    {
+      "ref": "by",
+      "slug": "music-by",
+      "label": "By",
+      "reverse_label": "Recordings",
+      "description": "Which artist made a record.",
+      "directional": true
+    },
+    {
+      "ref": "featured",
+      "slug": "music-featured",
+      "label": "Featured",
+      "reverse_label": "Played at",
+      "description": "Which artists played at a gig.",
+      "directional": true
+    },
+    {
+      "ref": "at",
+      "slug": "music-at",
+      "label": "At",
+      "reverse_label": "Hosted",
+      "description": "Which venue a gig was held at.",
+      "directional": true
+    },
+    {
+      "ref": "went-to",
+      "slug": "music-went-to",
+      "label": "Went to",
+      "reverse_label": "Went with",
+      "description": "Who came along to a gig.",
+      "directional": true
+    },
+    {
+      "ref": "member-of",
+      "slug": "music-member-of",
+      "label": "Member of",
+      "reverse_label": "Members",
+      "description": "Who is, or was, in an artist, with their role and dates.",
+      "directional": true,
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "role": {
+            "title": "Role",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "joined": {
+            "title": "Joined",
+            "type": "string",
+            "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+            "x-menagerist": {
+              "kind": "partialdate"
+            }
+          },
+          "left": {
+            "title": "Left",
+            "type": "string",
+            "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+            "x-menagerist": {
+              "kind": "partialdate"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "role"
+            },
+            {
+              "key": "joined"
+            },
+            {
+              "key": "left"
+            }
+          ],
+          "required": []
+        }
+      }
+    },
+    {
+      "ref": "signed-by",
+      "slug": "music-signed-by",
+      "label": "Signed by",
+      "reverse_label": "Signed",
+      "description": "Who signed a record, and where on it.",
+      "directional": true,
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "surface": {
+            "title": "Surface",
+            "type": "string",
+            "x-menagerist": {
+              "list": {
+                "$preset": "signing-surface"
+              },
+              "kind": "choice"
+            }
+          },
+          "signed_on": {
+            "title": "Signed on",
+            "type": "string",
+            "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+            "x-menagerist": {
+              "kind": "partialdate"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "surface"
+            },
+            {
+              "key": "signed_on"
+            }
+          ],
+          "required": []
+        }
+      }
+    },
+    {
+      "ref": "signed-at",
+      "slug": "music-signed-at",
+      "label": "Signed at",
+      "reverse_label": "Signings",
+      "description": "The gig where a record was signed.",
+      "directional": true
+    }
+  ],
+  "item_types": [
+    {
+      "ref": "record",
+      "slug": "music-record",
+      "label": "Record",
+      "description": "A record in the collection, with how it was pressed, how it plays and what it cost.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pressing_year": {
+            "title": "Pressing year",
+            "type": "string",
+            "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+            "x-menagerist": {
+              "kind": "partialdate"
+            }
+          },
+          "formats": {
+            "title": "Formats",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "LP",
+                "EP",
+                "7 inch",
+                "12 inch",
+                "Cassette",
+                "CD"
+              ]
+            },
+            "uniqueItems": true,
+            "x-menagerist": {
+              "kind": "multichoice"
+            }
+          },
+          "running_time": {
+            "title": "Running time",
+            "type": "number",
+            "minimum": 0,
+            "multipleOf": 1,
+            "x-menagerist": {
+              "kind": "duration"
+            }
+          },
+          "condition": {
+            "title": "Condition",
+            "type": "string",
+            "enum": [
+              "Mint",
+              "Near Mint",
+              "Very Good Plus",
+              "Very Good",
+              "Good",
+              "Fair",
+              "Poor"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "price_paid": {
+            "title": "Price paid",
+            "type": "object",
+            "properties": {
+              "value": {
+                "title": "Value",
+                "type": "number"
+              },
+              "currency": {
+                "title": "Currency",
+                "type": "string"
+              }
+            },
+            "x-menagerist": {
+              "kind": "money"
+            }
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "longtext"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "pressing_year"
+            },
+            {
+              "key": "formats"
+            },
+            {
+              "key": "running_time"
+            },
+            {
+              "key": "condition"
+            },
+            {
+              "key": "price_paid"
+            },
+            {
+              "key": "notes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "condition"
+              },
+              {
+                "key": "price_paid"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "artist",
+      "slug": "music-artist",
+      "label": "Artist",
+      "description": "A band or solo performer.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "started": {
+            "title": "Started",
+            "type": "string",
+            "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+            "x-menagerist": {
+              "kind": "partialdate"
+            }
+          },
+          "website": {
+            "title": "Website",
+            "type": "string",
+            "format": "uri",
+            "x-menagerist": {
+              "kind": "url"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "started"
+            },
+            {
+              "key": "website"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "started"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "gig",
+      "slug": "music-gig",
+      "label": "Gig",
+      "description": "A night out to see an artist play live.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string",
+            "format": "date",
+            "x-menagerist": {
+              "kind": "date"
+            }
+          },
+          "rating": {
+            "title": "Rating",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5,
+            "multipleOf": 1,
+            "x-menagerist": {
+              "kind": "rating"
+            }
+          },
+          "ticket_stub_kept": {
+            "title": "Ticket stub kept",
+            "type": "boolean",
+            "x-menagerist": {
+              "kind": "boolean"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "date"
+            },
+            {
+              "key": "rating"
+            },
+            {
+              "key": "ticket_stub_kept"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "date"
+              },
+              {
+                "key": "rating"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "venue",
+      "slug": "music-venue",
+      "label": "Venue",
+      "description": "A place that hosts gigs.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "city": {
+            "title": "City",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "website": {
+            "title": "Website",
+            "type": "string",
+            "format": "uri",
+            "x-menagerist": {
+              "kind": "url"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "city"
+            },
+            {
+              "key": "website"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "city"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "person",
+      "slug": "music-person",
+      "label": "Person",
+      "description": "A friend, or a member of a band."
+    }
+  ],
+  "items": [
+    {
+      "ref": "the-velvet-static",
+      "type": "artist",
+      "name": "The Velvet Static",
+      "description": "Dream-pop guitars and quiet vocals from Manchester, best heard loud in a small room.",
+      "attributes": {
+        "started": "1989",
+        "website": "https://thevelvetstatic.example"
+      },
+      "tags": [
+        "shoegaze"
+      ]
+    },
+    {
+      "ref": "marguerite-odell",
+      "type": "artist",
+      "name": "Marguerite Odell",
+      "description": "A solo singer-songwriter from Northumberland with a voice like a cold morning on the moors.",
+      "attributes": {
+        "started": "1996",
+        "website": "https://margueriteodell.example"
+      },
+      "tags": [
+        "folk"
+      ]
+    },
+    {
+      "ref": "tomcat-alibi",
+      "type": "artist",
+      "name": "Tomcat Alibi",
+      "description": "A Newcastle trio of loud, muddy blues-rock who split up around 2015.",
+      "attributes": {
+        "started": "2008"
+      },
+      "tags": [
+        "blues-rock"
+      ]
+    },
+    {
+      "ref": "priya-nair",
+      "type": "person",
+      "name": "Priya Nair",
+      "description": "The friend who always buys the tickets and never lets anyone forget it."
+    },
+    {
+      "ref": "dan-whitcombe",
+      "type": "person",
+      "name": "Dan Whitcombe",
+      "description": "A friend with a van, which makes him very popular on gig nights."
+    },
+    {
+      "ref": "ines-calloway",
+      "type": "person",
+      "name": "Ines Calloway",
+      "description": "Vocals and guitar, and the heart of The Velvet Static."
+    },
+    {
+      "ref": "rob-pennington",
+      "type": "person",
+      "name": "Rob Pennington",
+      "description": "Drums, and the loudest laugh in the band."
+    },
+    {
+      "ref": "aisha-rahman",
+      "type": "person",
+      "name": "Aisha Rahman",
+      "description": "Bass, who left to study and never quite stopped playing."
+    },
+    {
+      "ref": "the-lamplighter",
+      "type": "venue",
+      "name": "The Lamplighter",
+      "description": "A small independent venue in Sheffield with a sticky floor and excellent sound.",
+      "attributes": {
+        "city": "Sheffield",
+        "website": "https://lamplighter.example"
+      }
+    },
+    {
+      "ref": "cobbles-social-club",
+      "type": "venue",
+      "name": "Cobbles Social Club",
+      "description": "A former working men's club in Leeds, still with the original bar and a very good raffle.",
+      "attributes": {
+        "city": "Leeds",
+        "website": "https://cobblessocial.example"
+      }
+    },
+    {
+      "ref": "the-velvet-static-at-the-lamplighter",
+      "type": "gig",
+      "name": "The Velvet Static at the Lamplighter",
+      "description": "A loud, glorious night; ears rang until the following Tuesday.",
+      "attributes": {
+        "date": "2019-03-14",
+        "rating": 5,
+        "ticket_stub_kept": true
+      }
+    },
+    {
+      "ref": "marguerite-odell-at-the-lamplighter",
+      "type": "gig",
+      "name": "Marguerite Odell at the Lamplighter",
+      "description": "A hushed, seated set where you could hear the radiators tick.",
+      "attributes": {
+        "date": "2016-12-03",
+        "rating": 4,
+        "ticket_stub_kept": false
+      }
+    },
+    {
+      "ref": "folk-and-fuzz-night-at-cobbles",
+      "type": "gig",
+      "name": "Folk and Fuzz night at Cobbles",
+      "description": "Two very different bands on one bill, and somehow it worked.",
+      "attributes": {
+        "date": "2023-11-11",
+        "rating": 4,
+        "ticket_stub_kept": true
+      }
+    },
+    {
+      "ref": "night-drive",
+      "type": "record",
+      "name": "Night Drive",
+      "description": "The band's second album, best played on a long road home after dark.",
+      "attributes": {
+        "pressing_year": "1991",
+        "formats": [
+          "LP"
+        ],
+        "running_time": 2530,
+        "condition": "Very Good Plus",
+        "price_paid": {
+          "value": 34,
+          "currency": "GBP"
+        },
+        "notes": "Found in a Hebden Bridge shop; tiny ring wear on one corner."
+      },
+      "tags": [
+        "favourite"
+      ]
+    },
+    {
+      "ref": "paper-lanterns",
+      "type": "record",
+      "name": "Paper Lanterns",
+      "description": "A single with a chiming, wistful B-side that outshines the A.",
+      "attributes": {
+        "pressing_year": "1994",
+        "formats": [
+          "7 inch"
+        ],
+        "running_time": 228,
+        "condition": "Mint",
+        "notes": "A present, so no price."
+      }
+    },
+    {
+      "ref": "salt-marsh-sessions",
+      "type": "record",
+      "name": "Salt Marsh Sessions",
+      "description": "Recorded live in a church hall, with the odd cough left in.",
+      "attributes": {
+        "pressing_year": "2016",
+        "formats": [
+          "LP"
+        ],
+        "running_time": 2305,
+        "condition": "Near Mint",
+        "price_paid": {
+          "value": 22,
+          "currency": "GBP"
+        },
+        "notes": "Bought at the gig."
+      }
+    },
+    {
+      "ref": "thirteen-bells",
+      "type": "record",
+      "name": "Thirteen Bells",
+      "description": "A scrappy, brilliant debut that deserved a better pressing.",
+      "attributes": {
+        "pressing_year": "2012",
+        "formats": [
+          "Cassette"
+        ],
+        "condition": "Good",
+        "price_paid": {
+          "value": 3,
+          "currency": "GBP"
+        },
+        "notes": "Car boot sale find; plays with a slight warble."
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "night-drive",
+      "to": "the-velvet-static",
+      "type": "by"
+    },
+    {
+      "from": "paper-lanterns",
+      "to": "the-velvet-static",
+      "type": "by"
+    },
+    {
+      "from": "salt-marsh-sessions",
+      "to": "marguerite-odell",
+      "type": "by"
+    },
+    {
+      "from": "thirteen-bells",
+      "to": "tomcat-alibi",
+      "type": "by"
+    },
+    {
+      "from": "the-velvet-static-at-the-lamplighter",
+      "to": "the-velvet-static",
+      "type": "featured"
+    },
+    {
+      "from": "marguerite-odell-at-the-lamplighter",
+      "to": "marguerite-odell",
+      "type": "featured"
+    },
+    {
+      "from": "folk-and-fuzz-night-at-cobbles",
+      "to": "the-velvet-static",
+      "type": "featured"
+    },
+    {
+      "from": "folk-and-fuzz-night-at-cobbles",
+      "to": "marguerite-odell",
+      "type": "featured"
+    },
+    {
+      "from": "the-velvet-static-at-the-lamplighter",
+      "to": "the-lamplighter",
+      "type": "at"
+    },
+    {
+      "from": "marguerite-odell-at-the-lamplighter",
+      "to": "the-lamplighter",
+      "type": "at"
+    },
+    {
+      "from": "folk-and-fuzz-night-at-cobbles",
+      "to": "cobbles-social-club",
+      "type": "at"
+    },
+    {
+      "from": "priya-nair",
+      "to": "the-velvet-static-at-the-lamplighter",
+      "type": "went-to"
+    },
+    {
+      "from": "dan-whitcombe",
+      "to": "the-velvet-static-at-the-lamplighter",
+      "type": "went-to"
+    },
+    {
+      "from": "priya-nair",
+      "to": "folk-and-fuzz-night-at-cobbles",
+      "type": "went-to"
+    },
+    {
+      "from": "ines-calloway",
+      "to": "the-velvet-static",
+      "type": "member-of",
+      "attributes": {
+        "role": "Vocals and guitar",
+        "joined": "1989"
+      }
+    },
+    {
+      "from": "rob-pennington",
+      "to": "the-velvet-static",
+      "type": "member-of",
+      "attributes": {
+        "role": "Drums",
+        "joined": "1989"
+      }
+    },
+    {
+      "from": "aisha-rahman",
+      "to": "the-velvet-static",
+      "type": "member-of",
+      "attributes": {
+        "role": "Bass",
+        "joined": "1991",
+        "left": "1996"
+      }
+    },
+    {
+      "from": "night-drive",
+      "to": "the-velvet-static",
+      "type": "signed-by",
+      "attributes": {
+        "surface": "Cover",
+        "signed_on": "2019-03-14"
+      }
+    },
+    {
+      "from": "salt-marsh-sessions",
+      "to": "marguerite-odell",
+      "type": "signed-by",
+      "attributes": {
+        "surface": "Inner sleeve",
+        "signed_on": "2016-12-03"
+      }
+    },
+    {
+      "from": "paper-lanterns",
+      "to": "ines-calloway",
+      "type": "signed-by",
+      "attributes": {
+        "surface": "Sleeve",
+        "signed_on": "2023-11-11"
+      }
+    },
+    {
+      "from": "night-drive",
+      "to": "the-velvet-static-at-the-lamplighter",
+      "type": "signed-at"
+    },
+    {
+      "from": "salt-marsh-sessions",
+      "to": "marguerite-odell-at-the-lamplighter",
+      "type": "signed-at"
+    },
+    {
+      "from": "paper-lanterns",
+      "to": "folk-and-fuzz-night-at-cobbles",
+      "type": "signed-at"
+    }
+  ]
+}

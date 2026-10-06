@@ -1,10 +1,10 @@
-import iso from '$shared/iso-data.json';
+import iso from '$shared/data/iso-data.json';
 
 /** A currency option: three-letter code, common name, and symbol when one exists. */
 export type Currency = { code: string; name: string; symbol?: string };
 
 // Single-symbol currencies only: where one common symbol is unambiguous. Everything else
-// falls back to "{value} {code}" in the view. Codes and names come from shared/iso-data.json.
+// falls back to "{value} {code}" in the view. Codes and names come from shared/data/iso-data.json.
 const SYMBOLS: Record<string, string> = {
 	ARS: '$',
 	AUD: '$',

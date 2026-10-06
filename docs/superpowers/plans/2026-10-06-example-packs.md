@@ -263,7 +263,7 @@ Implementation per spec section 4, using `decide_removal`. Order of operations i
 
 **Files:** `adapters/platform/file_pack_catalogue.py`; tests `backend/tests/modules/examples/adapters/test_file_pack_catalogue.py`
 
-- [ ] Reads `index.json` and `<id>.json` through `shared_data_path("examples/...")` (`app/platform/shared_data.py`; tests point `MENAGERIST_SHARED_DIR` at a temp directory).
+- [ ] Reads `index.json` and `<id>.json` from the module's packaged `packs/` directory (`importlib.resources.files("app.modules.examples") / "packs"`; tests pass an explicit temp directory).
 - [ ] Parses JSON into the domain values (the adapter does the parsing; the domain stays pure). Rejects: wrong `format` or `version` on index or pack; an index entry with no file; a file with an `id` that differs from its name or index entry; unknown top-level sections; non-object JSON; unreadable file (raises `InvalidPackError`, never a bare `KeyError`).
 - [ ] Caches parsed packs for the process lifetime (packs ship with the app and do not change at runtime); tests assert a second `get` does not re-read.
 - [ ] Section counts for `PackSummary` computed here.
@@ -301,9 +301,9 @@ Implementation per spec section 4, using `decide_removal`. Order of operations i
 
 ### Task 2.1: Index and the contract test (before the content)
 
-**Files:** `shared/examples/index.json`; `backend/tests/modules/examples/test_shipped_packs.py`
+**Files:** `backend/src/app/modules/examples/packs/index.json`; `backend/tests/modules/examples/application/test_shipped_packs.py`; `frontend/tests/example-packs.test.ts` (every field in every shipped pack must map to a known field kind)
 
-- [ ] Write the contract test first, parametrised over every pack listed in `shared/examples/index.json` (so a new pack is covered automatically). For each pack:
+- [ ] Write the contract test first, parametrised over every pack listed in `packs/index.json` (so a new pack is covered automatically). For each pack:
   - the file catalogue loads it (format, version, refs, limits);
   - it installs on in-memory graph and presets stores via the real `InstallExamplePack`;
   - **every item passes `validate_attributes` against its type's schema** (the use cases do this on create, so a bad item fails the install; assert the install succeeds);
@@ -311,36 +311,40 @@ Implementation per spec section 4, using `decide_removal`. Order of operations i
   - uninstall leaves **zero live entities** from the pack, and a second install succeeds;
   - a **quality floor:** at least one connection per pack; no empty `description` on the index entry, item types or relationship types; every item type has at least one item; every pack preset is referenced by some schema; no duplicate names within a type; all text is British English by a small word-list check (colour, organise, favourite spellings; keep the list short and obvious).
 - [ ] It fails until a pack exists. That is intended.
-- [ ] Create `shared/examples/index.json` with the three entries (id, name, description) so the catalogue tests have real data.
+- [ ] Create `packs/index.json` with an entry per pack (id, name, description) so the catalogue tests have real data.
 
 ### Task 2.2: Author the packs
 
-**Files:** `shared/examples/{vinyl,recipes,workshop}.json`
+**Files:** `backend/src/app/modules/examples/packs/{music,recipes,parts,movies}.json`
 
 **Authoring method (so the JSON shapes are exact):** build each item type in the real UI (Settings, Item types) using the actual field kinds, then copy the schema from `GET /api/v1/node-type` and `GET /api/v1/edge-type`. Do not hand-write schema JSON. Strip server fields (`id`, timestamps) and add `ref`s. Items and connections are written by hand against those schemas.
 
 **Content rules:** all people, bands, companies, albums and events are **fictional**. Never assert real provenance about a real person (no "signed by" a real name). Prefer fields that show off the product: connections that answer a question ("which recipes use eggs?", "what was signed at this event?"), money, partial dates, durations, tables, checklists. Each pack is small enough to read in a sitting.
 
-Draft content for review (change freely; these are starting points):
+Agreed content direction (conversation of 2026-10-06; refine each pack as a readable table with the user before writing JSON):
 
-1. **`vinyl` - Vinyl and signed items** (provenance, collection of physical things)
-   - Presets: `signing-surface` choice list (Cover, Inner sleeve, Label, Booklet, Ticket).
-   - Item types: `record` (Pressing year `partialdate`, Formats `multichoice`, Running time `duration`, Condition `choice`, Price paid `money`, Notes `longtext`), `artist` (Formed `partialdate`, Website `url`), `signing` (event: Date `date`, Venue `text`).
-   - Relationship types: `by` (Recorded by / Recordings), `signed-by` (Signed by / Signed; attributes: Surface linked to `signing-surface`, Signed on `partialdate`), `signed-at` (Signed at / Signings).
-   - Items: about 4 records by 2 fictional artists, 2 artists, 2 signings.
-   - Shows: provenance across three kinds of item; a record signed by an artist at a specific event; searching the artist shows what they signed.
-2. **`recipes` - Recipes** (structured data, repeating rows)
-   - Item types: `recipe` (Servings `number`, Prep and Cook time `duration`, Dietary `multichoice`, Ingredients `group` table with name, `quantity` and a note, Method `list`, Source `url`), `cookbook` (Author `text`, Year `partialdate`).
-   - Relationship types: `from` (From / Recipes), `inspired-by` (Inspired by / Inspired).
-   - Items: about 4 recipes, 1 or 2 cookbooks.
-   - Shows: the ingredients table (the board's name/quantity/unit example), timings, and a recipe that links to where it came from.
-3. **`workshop` - Workshop parts** (inventory, components, references)
-   - Item types: `part` (Part number `text`, In stock `number`, Reorder at `number`, Price `money`, Datasheet `url`), `assembly` (Built `partialdate`, Build steps `checklist`), `supplier` (Website `url`, Email `email`, Phone `phone`).
-   - Relationship types: `part-of` (Part of / Parts), `supplied-by` (Supplied by / Supplies; attribute: Price at supplier `money`).
-   - Items: 1 or 2 assemblies, about 8 parts, 2 suppliers.
-   - Shows: a bill of materials via "Part of", links to datasheets, who supplies what.
+**Style:** UK flavour (prices in GBP, UK places with invented venue and shop names, British dates and spelling, metric units); all people, bands, companies, films and venues fictional; small and finished (8 to 15 items per pack, every item well filled in, a few fields left blank on purpose so blanks look normal); each pack has at least one "wait, it links to that?" path.
 
-- [ ] One pack at a time, in the order above; run Task 2.1's test after each. Stop and ask the user to read each pack before starting the next (content quality is the point of this phase).
+1. **`music` - Music (records, artists, gigs, venues, people)** (collector and gigs attended in ONE pack so the provenance story is connected). Agreed table of 2026-10-06:
+   - Item types: `record` (pressing year as partial date, formats multiple choice, running time, condition, price paid, notes), `artist` (started as partial date, website), `gig` (date, rating 1 to 5, ticket stub kept), `venue` (city, website), `person` (friends and band members).
+   - Items (17): artists The Velvet Static (1989, shoegaze), Marguerite Odell (1996, folk, solo), Tomcat Alibi (2008, no website, split up around 2015); people Priya Nair and Dan Whitcombe (friends) and Ines Calloway, Rob Pennington, Aisha Rahman (Velvet Static members; Aisha played bass 1991 to 1996); venues The Lamplighter (Sheffield) and Cobbles Social Club (Leeds); gigs The Velvet Static at the Lamplighter (14 Mar 2019, 5, stub kept), Marguerite Odell at the Lamplighter (3 Dec 2016, 4, no friends, no stub), Folk and Fuzz night at Cobbles (11 Nov 2023, 4, stub kept, both artists); records Night Drive (LP, 1991, 42:10, Very Good Plus, £34), Paper Lanterns (7", 1994, 3:48, Mint, price blank, a present), Salt Marsh Sessions (LP, 2016, 38:25, Near Mint, £22), Thirteen Bells by Tomcat Alibi (cassette, 2012, Good, £3, car boot sale, running time blank).
+   - Relationship types (7): *by*, *featured*, *at*, *went with* (person to gig), *member of* (person to artist; role and joined/left partial dates), *signed by*, *signed at* (signed by carries a surface from a pack choice list and a "signed on" partial date).
+   - Connections (about 24): record by artist (4); gig featured artist (4); gig at venue (3); went with (3: Priya and Dan to the 2019 gig, Priya to Cobbles); member of (3); three signings, each signed by plus signed at: Night Drive by the band at the Lamplighter gig (cover, 14 Mar 2019), Salt Marsh Sessions by Marguerite Odell at her Lamplighter gig (inner sleeve, 3 Dec 2016), Paper Lanterns by Ines Calloway only (a person, to show "signed by" may point at a person or an act) at the Cobbles night (sleeve, 11 Nov 2023).
+   - Decided against: modelling members who did not tour or did not sign ("three of four"), a second anniversary edition, Tomcat Alibi's gig and members, a friend who is also a former member.
+2. **`movies` - Movies watched**
+   - Decision: a *viewing* is its own item (film, cinema, date, rating, who with), like a gig, so re-watches are natural. Item types: `film` (year, runtime, genres), `person` (director or actor), `cinema`, `viewing`.
+   - Connections: viewing *of* film, viewing *at* cinema, film *directed by* / *stars* person.
+3. **`parts` - Electronic parts**
+   - Item types: `part` (part number, in stock, reorder level, price, datasheet link), `assembly` (a build, with a checklist of steps), `supplier`.
+   - Decision: "used in" is a connection that carries a quantity (part *used in* assembly, quantity 4), not a table on the assembly. Part *supplied by* supplier carries the price at that supplier. A couple of parts are low on stock.
+4. **`recipes` - Recipes**
+   - Item types: `recipe` (servings, prep and cook time, dietary tags, ingredients table of name/quantity/unit, method as an ordered list), `source` (cookbook, person, "Nan's recipe tin"), and `ingredient` for a handful of key ingredients (cheddar, leeks, flour).
+   - Decision: ingredients as table rows (quantities) AND light connections to key ingredient items ("which recipes use cheddar?"). Recipe *from* source; recipe *inspired by* recipe.
+5. **Koillection-style mixed collection - parked.** Needs collections (#265) to be honest rather than faked; revisit when they exist. Open question still: what the user wants people to see (mixed collection, wishlist or value tracking).
+
+Follow-ups: add-on packs with `requires` (for example gig history on top of a collector base) are recorded above and not part of v1.
+
+- [ ] One pack at a time, in the order above (music, recipes, parts, movies; draft each as a readable table first); run Task 2.1's test after each. Stop and ask the user to read each pack before starting the next (content quality is the point of this phase).
 - [ ] Keep each pack to roughly 3 item types, 8 to 15 items, 8 to 20 connections.
 - [ ] Add any gaps the content exposes (for example a field kind that cannot express something) to a short "Content findings" note in the final report rather than fixing them in this plan.
 
@@ -411,7 +415,7 @@ Run against the throwaway database (`poe e2e-db-up`, `poe e2e-migrate`, `npx pla
 
 ## Phase 4: Documentation
 
-- [ ] `docs/DECISIONS.md` (style: `## Title`, then **Decision**, **Rationale**, optionally **Consequence** or **Not decided**): entries for (0) the intent to extract a generic bundle layer for import and export later (Phase 5), and why it is not built now (no second consumer yet, so the merge policy and export refs would be guesses); (1) the `examples` module and why not the presets pack format or a `source_pack` column; (2) install as per-module commits with compensation, not a cross-module transaction; (3) edit detection by content hash, with the keep rules; (4) the partial slug index and "the application owns every constraint"; (5) pack files in `shared/examples/`; (6) install as an ordered list of steps (media later); (7) the first-run link and why no wizard.
+- [ ] `docs/DECISIONS.md` (style: `## Title`, then **Decision**, **Rationale**, optionally **Consequence** or **Not decided**): entries for (0) the intent to extract a generic bundle layer for import and export later (Phase 5), and why it is not built now (no second consumer yet, so the merge policy and export refs would be guesses); (1) the `examples` module and why not the presets pack format or a `source_pack` column; (2) install as per-module commits with compensation, not a cross-module transaction; (3) edit detection by content hash, with the keep rules; (4) the partial slug index and "the application owns every constraint"; (5) pack files as package data inside the `examples` module (not `shared/`, which is for data both sides read); (6) install as an ordered list of steps (media later); (7) the first-run link and why no wizard.
 - [ ] `docs/ARCHITECTURE.md`: add `examples/` to the module list and the structure block.
 - [ ] `backend/README.md`: a short paragraph in the cross-module section pointing at the target-port pattern (`entrypoints/api/shared/example_targets.py` beside `preset_usage.py`).
 - [ ] `frontend/README.md`: note the examples settings page and `lib/examples.ts` if it lists pages and helpers.
@@ -473,10 +477,11 @@ Do nothing for this in Phases 0 to 4 except keep names and boundaries generic wh
 
 ## Follow-ups (separate specs)
 
-- **Built-in Countries** through a `builtin:countries` choice source resolved from `shared/iso-data.json` (no database row; currencies already work this way). The graph module's `ChoiceListSource` port already exists, so a composite source in `entrypoints/api/shared/` can serve both ids and `builtin:` names; `check_list_refs` currently insists on a UUID and needs to accept the `builtin:` form; the frontend list picker needs a built-in entry.
+- **Built-in Countries** through a `builtin:countries` choice source resolved from `shared/data/iso-data.json` (no database row; currencies already work this way). The graph module's `ChoiceListSource` port already exists, so a composite source in `entrypoints/api/shared/` can serve both ids and `builtin:` names; `check_list_refs` currently insists on a UUID and needs to accept the `builtin:` form; the frontend list picker needs a built-in entry.
+- **Add-on packs with `requires`.** A pack may declare it needs another pack (for example "Gig history" requires "Collector"), refer to that pack's entities, and be offered on the Examples page once its base is installed ("Adds to: Collector"). The dependency runs one way, so the add-on owns its new connections and ownership stays clear. Needs: a `requires` field in the pack format (version bump), cross-pack refs resolved from the required installation's recorded entities, a guard so the base cannot be removed while an add-on is installed (or removing it removes the add-on first), and a UI state for "needs X first". Considered and rejected: fully conditional bridge links that appear whenever two packs are both installed, because their ownership across two installations breaks the keep rules (a link owned by neither pack makes its endpoint items count as user data) and would need cross-installation bookkeeping. v1 instead ships connected material (records, artists and gigs) inside one Music pack.
 - **Reusable bundles for import and export** (see Phase 5 above): extract a generic bundle layer from `examples`, add export, a merge policy and a UI.
 - **Opinionated built-in presets as a starter pack** (grades, formats, field groups), once examples exist.
-- **Example images.** Needs a media step in the installer (one more entry in the ordered step list), a media-asset source, and removal of attachments. Prefer placeholders generated locally at install time over fetching from an external placeholder service: self-hosted instances may be offline and the server should not pull third-party content. If real pictures are wanted, ship a few small CC0 images in `shared/examples/`.
+- **Example images.** Needs a media step in the installer (one more entry in the ordered step list), a media-asset source, and removal of attachments. Prefer placeholders generated locally at install time over fetching from an external placeholder service: self-hosted instances may be offline and the server should not pull third-party content. If real pictures are wanted, ship a few small CC0 images beside the packs in the module's `packs/` directory.
 - **A `collections` section** in the pack format once #265 lands (needs a version bump).
 - **An "Example" marker** on items in lists and on the item page (needs an endpoint mapping item ids to installations).
 - **`graph` and `presets` independence rule** in the architecture tests, mirroring the one added for `examples`.

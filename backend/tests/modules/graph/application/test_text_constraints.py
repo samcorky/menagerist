@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -37,12 +36,11 @@ from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import InvalidAttributesError, InvalidSchemaError
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.platform.shared_data import shared_data_path
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
-_FIXTURE = (
-    Path(__file__).parents[5] / "contract" / "fixtures" / "regex-conformance.json"
-)
+_FIXTURE = shared_data_path("contracts/regex-conformance.json")
 
 
 def _text_schema(**constraints: object) -> dict[str, Any]:

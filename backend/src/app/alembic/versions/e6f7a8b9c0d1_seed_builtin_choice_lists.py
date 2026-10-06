@@ -28,7 +28,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 _NAMESPACE = uuid.UUID("6f1d2a7e-3c4b-4e5f-8a9b-0c1d2e3f4a5b")
-_ISO_DATA = "iso-data.json"
+_ISO_DATA = "data/iso-data.json"
 _GRADES = [
     "Mint",
     "Near Mint",

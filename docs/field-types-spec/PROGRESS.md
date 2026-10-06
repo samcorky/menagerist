@@ -39,7 +39,7 @@ Update at the end of every session. Read this first.
 | Checklist checked/total progress | done, committed (02f6708) | feature/initial-implementation | Small follow-up; see "WI-26/WI-27" session notes below. |
 | Money currency name lookup + tooltip | done, committed (25cfebb) | feature/initial-implementation | Small follow-up; see "WI-26/WI-27" session notes below. |
 | Multiple choice (`multichoice`) | done, backend and frontend checks green, committed (48c4b67) | feature/initial-implementation | Frontend only: descriptor, input/extras/view widgets, kind-change entry, `tests/multichoice.test.ts`. Backend `count_with_attribute(value=)` now also matches array membership (all four node/edge repositories, with tests) so removing an in-use option warns. Gaps: no linked lists; read view does not flag stale options; not tried in a browser. Also fixed `test_delete_preset_then_get_and_list_no_longer_find_it`, which hit real Postgres because it did not override `get_preset_usage`. See `docs/field-types.md` "Multiple choice". |
-| Partial date (`partialdate`) | done, frontend checks green, committed (48c4b67) | feature/initial-implementation | Frontend only: `field-types/partialdate/*`, `formatPartialDate` in `format-date.ts`, `date` -> `partialdate` kind change. Pattern cases added to `contract/fixtures/regex-conformance.json` (read by pytest and vitest). Not tried in a browser; no sort/filter UI changes. |
+| Partial date (`partialdate`) | done, frontend checks green, committed (48c4b67) | feature/initial-implementation | Frontend only: `field-types/partialdate/*`, `formatPartialDate` in `format-date.ts`, `date` -> `partialdate` kind change. Pattern cases added to `shared/contracts/regex-conformance.json` (read by pytest and vitest). Not tried in a browser; no sort/filter UI changes. |
 | Duration (`duration`) and partial date input polish | done, backend and frontend checks green, committed (48c4b67) | feature/initial-implementation | Duration: whole seconds, `field-types/duration/*`, parse/format in `format.ts`, number -> duration kind change with a warning, backend schema test in `test_validate_attributes.py`. Partial date now has its own input (placeholder, live preview). Neither tried in a browser. |
 
 ## WI-1 to WI-4 session notes
@@ -267,7 +267,7 @@ Update at the end of every session. Read this first.
 - `safe-validator.ts` (`createSafeValidator`: a pattern JavaScript rejects makes it skip pattern rules and set `degraded`) and `validation-messages.ts` (`friendlyClientError`, `friendlyServerError`, `serverErrorsToFields`, `topLevelKey`).
 - UI (via svelte-file-editor): `TextExtras.svelte` and `ConstraintInputs.svelte` ("Validation (optional)" with "Starts with" and "Ends with"), the same inputs under text sub-fields in `GroupExtras.svelte`, helper text under a constrained field, client errors shown only after blur, a note when rules could not be checked, and both collection pages map server errors with `serverErrorsToFields`. An error inside a table row is now shown on the table (before it never matched a field).
 - `rowsToAttributes` omits an empty text value that has a `pattern` or `allOf` (top level and group cells).
-- Shared fixture `contract/fixtures/regex-conformance.json` read by pytest and vitest (answers open question 14 for regex cases).
+- Shared fixture `shared/contracts/regex-conformance.json` read by pytest and vitest (answers open question 14 for regex cases).
 - Docs: `docs/DECISIONS.md`, `docs/field-types.md` ("Text constraints").
 
 **Left / deferred**
@@ -277,7 +277,7 @@ Update at the end of every session. Read this first.
 - Switching a text field to long text drops its constraints (`changeKind` clears `config`).
 - Integration test for JSONB round trip of patterns added (`test_node_type_repository.py`); the API-level smoke (I-5) is covered by the router-free use-case tests only.
 
-**Files touched:** backend `domain/errors.py`, `application/_validate_attributes.py`; tests `test_text_constraints.py`, `adapters/persistence/test_node_type_repository.py` (new). Frontend `field-types/text/{text.ts,constraints.ts,TextExtras.svelte,ConstraintInputs.svelte}`, `field-types/registry.ts`, `field-types/group/{group.ts,GroupExtras.svelte}`, `schema-types.ts`, `safe-validator.ts`, `validation-messages.ts`, `components/attributes-editor.svelte`, `routes/collection/new/+page.svelte`, `routes/collection/[id]/+page.svelte`; test `text-constraints.test.ts`. `contract/fixtures/regex-conformance.json`; docs as above.
+**Files touched:** backend `domain/errors.py`, `application/_validate_attributes.py`; tests `test_text_constraints.py`, `adapters/persistence/test_node_type_repository.py` (new). Frontend `field-types/text/{text.ts,constraints.ts,TextExtras.svelte,ConstraintInputs.svelte}`, `field-types/registry.ts`, `field-types/group/{group.ts,GroupExtras.svelte}`, `schema-types.ts`, `safe-validator.ts`, `validation-messages.ts`, `components/attributes-editor.svelte`, `routes/collection/new/+page.svelte`, `routes/collection/[id]/+page.svelte`; test `text-constraints.test.ts`. `shared/contracts/regex-conformance.json`; docs as above.
 
 **Checks run:** `poe lint-backend` pass; `poe typecheck-backend` clean; `poe coverage` all targets met (domain, application and shared kernel 100%, adapters 87%, platform 82%, 30 integration tests pass); `poe lint-frontend` pass; `poe typecheck-frontend` 0 errors (2 existing img-alt warnings); `poe test-frontend` 205 tests in 17 files pass.
 
@@ -680,7 +680,7 @@ Update at the end of every session. Read this first.
 
 **Left / deferred:** nothing noted beyond what each WI file's own "Left" items already call out (no currency conversion for money, no real `format` assertion for url/email, phone's pattern stays permissive/international). Not tried in a browser beyond the e2e suite (no component-testing infrastructure in this repo, by standing decision) - the e2e coverage is the live-browser check for this item specifically, unlike most earlier items in this file.
 
-**Files touched:** frontend `field-types/money/*` (new), `field-types/url/*` (new), `field-types/email/*` (new), `field-types/phone/*` (new), `field-types/index.ts`, `schema-types.ts`; `frontend/e2e/field-types.spec.ts` (new), `frontend/e2e/manage-item-types.spec.ts`, `frontend/e2e/helpers.ts`; `contract/fixtures/regex-conformance.json`, `docs/field-types-spec/example-node-type-schema.json`; docs as above. Backend unchanged (no port, no migration, by both specs' own design).
+**Files touched:** frontend `field-types/money/*` (new), `field-types/url/*` (new), `field-types/email/*` (new), `field-types/phone/*` (new), `field-types/index.ts`, `schema-types.ts`; `frontend/e2e/field-types.spec.ts` (new), `frontend/e2e/manage-item-types.spec.ts`, `frontend/e2e/helpers.ts`; `shared/contracts/regex-conformance.json`, `docs/field-types-spec/example-node-type-schema.json`; docs as above. Backend unchanged (no port, no migration, by both specs' own design).
 
 **Checks run:** e2e suite (`poe test-e2e`) green across all 16 kinds; standard frontend checks clean (exact pass counts not recorded in the commit message - re-run `poe lint-frontend`/`poe typecheck-frontend`/`poe test-frontend` if verifying from scratch).
 
@@ -697,7 +697,7 @@ Update at the end of every session. Read this first.
 - Built-in presets (lists, fields and field groups) seeded by one migration, `e6f7a8b9c0d1`, with each preset's final shape (Recipe's ingredients are a table).
 - Pack export and import (`application/pack.py`, `export_presets.py`, `import_presets.py`, router, tests), with size limits and content-hash deduplication.
 - Settings page: import and export per section and per card; Copy; Edit for custom lists (`edit-list-dialog.svelte`); "Try it" with an editable preview and a read-only view; "Show built-in" toggle, also in the picker.
-- Shared ISO data (`shared/iso-data.json`, `scripts/generate_iso_data.py`, `poe generate-iso-data`), the `$shared` alias, and Docker copies.
+- Shared ISO data (`shared/data/iso-data.json`, `scripts/generate_iso_data.py`, `poe generate-iso-data`), the `$shared` alias, and Docker copies.
 - Calendar weeks start on Monday, from `calendar-settings.ts`.
 - Linked choice lists, backend: `ports/choice_list_source.py`, `application/choice_lists.py`, the presets-backed source in `entrypoints/api/shared/choice_list_source.py`, wired into create and update for nodes and node types, and into node-type reads.
 

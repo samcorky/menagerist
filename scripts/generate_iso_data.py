@@ -5,9 +5,9 @@
 """Regenerate the ISO 3166-1 countries and ISO 4217 currencies data files.
 
 Run from the repo root with `poe generate-iso-data` (or `uv run --script
-scripts/generate_iso_data.py`). Writes `shared/iso-data.json`, which the backend seed
-migration and the frontend currency picker both read. The Dockerfile copies `shared/`
-into both images, so there is only one copy in the repository.
+scripts/generate_iso_data.py`). Writes `shared/data/iso-data.json`, which the backend
+seed migration and the frontend currency picker both read. The Dockerfile copies
+`shared/` into both images, so there is only one copy in the repository.
 """
 
 import json
@@ -23,7 +23,7 @@ FICTIONAL_CURRENCIES = [
 ]
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUTS = [ROOT / "shared/iso-data.json"]
+OUTPUTS = [ROOT / "shared/data/iso-data.json"]
 
 
 def _get_countries() -> list[dict[str, str]]:

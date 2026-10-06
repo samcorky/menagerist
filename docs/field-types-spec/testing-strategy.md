@@ -33,7 +33,7 @@ Add to `backend/tests/modules/graph/adapters/persistence/` (and one small API-le
 
 The riskiest seam is the frontend emitting a schema the backend then interprets differently (two regex engines, `x-menagerist`, `required`). Test that seam with shared golden files instead of mocking either side.
 
-- Check a set of fixtures into the repo at one location that both suites read (for example `contract/fixtures/`; see the open question). Each fixture holds a schema plus `valid` and `invalid` attribute documents, and for regex cases the `{pattern, value, expected}` conformance list from WI-15.
+- Check a set of fixtures into the repo at one location that both suites read (for example `shared/contracts/`; see the open question). Each fixture holds a schema plus `valid` and `invalid` attribute documents, and for regex cases the `{pattern, value, expected}` conformance list from WI-15.
 - First fixture: a realistic all-kinds schema, such as the Vinyl Record example delivered with this spec (`example-node-type-schema.json`). Add fixtures for a legacy-free minimal schema, a rating, a display-only change (must not change validity), archived fields, a constrained text field, and a layout with rows and tabs (WI-13), and a presets pack (WI-19).
 - Frontend (vitest): building the schema from `EditorField`s via the descriptors and `itemsToSchema` produces exactly the fixture's schema; the client validator gives the fixture's expected result for every `valid`/`invalid` document.
 - Backend (pytest, unit level): `validate_attributes` gives the same expected result for every document; stripping `x-menagerist` never changes a result (the WI-14 principle); regex conformance cases agree with the frontend's results.

@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Executed (2026-10-06).** This plan was carried out. Afterwards the user moved the pack files from `shared/examples/` to the module's own `packs/` directory (package data), and the catalogue now reads them with `importlib.resources`; references to `shared/examples` below are historical.
+
 **Goal:** A backend `examples` module that lists shipped example packs, installs one (item types, relationship types, items, connections and presets), and uninstalls it, keeping anything the user changed. Reachable through three API routes.
 
 **Architecture:** A new bounded context with its own domain, application, ports and adapters. It imports neither `graph` nor `presets`. It reaches them through two driven ports it owns (`PresetTarget`, `GraphTarget`), implemented in `entrypoints/api/shared/example_targets.py` by calling the real use cases. Install is an ordered list of steps; every created entity is recorded and committed immediately; failure triggers the same removal routine that uninstall uses.

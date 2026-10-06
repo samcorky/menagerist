@@ -1,0 +1,11 @@
+{
+  "format": "menagerist-examples-index",
+  "version": 1,
+  "packs": [
+    {
+      "id": "music",
+      "name": "Music: records, gigs and friends",
+      "description": "A small record collection with the artists, gigs, venues and friends around it, including who signed what and where."
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 # Example packs
 
 **Status:** design agreed in conversation on 2026-10-06 (answers to the four open questions are recorded at the end). Written spec not yet formally reviewed.
-**Scope:** backend (new `examples` module, two migrations), frontend (settings page, first-run link), shared data (`shared/examples/`), docs.
+**Scope:** backend (new `examples` module, two migrations), frontend (settings page, first-run link), pack files as package data inside the module (`backend/src/app/modules/examples/packs/`), docs.
 **Tracks #266** (loadable example collection). Collections are not modelled here: they are becoming first-class entities (#265), not items, and nothing in this design depends on them.
 
 ## Problem
@@ -41,14 +41,14 @@ Database constraints and indexes are a convenience and a backstop, never the onl
 | `CreateNode` and `CreateEdge` auto-create unknown types. `DeleteNodeType` clears `type` on live items of that slug. | The installer creates types explicitly first. Uninstall must remove items before their type. |
 | `DeletePreset` is guarded by `PresetUsage` (cannot delete a preset an item type still references). | Gives us the shared-preset rule for free: a preset another pack or the user still uses is kept and reported. |
 | Backend layer rules are folder-based. Nothing stops one module importing another. | Add an architecture test that `examples` imports neither `graph` nor `presets`. |
-| `shared_data_path()` plus the Dockerfile already carry `shared/` into the runtime image (`MENAGERIST_SHARED_DIR`). | Pack files go in `shared/examples/`. No packaging or Dockerfile change. |
+| `shared/` means "data both the backend and the frontend read" (see `shared/README.md`); only the backend reads the packs. Hatchling includes every file under a package in the wheel, and the Docker image installs that package. | Pack files live inside the module as package data (`backend/src/app/modules/examples/packs/`), read with `importlib.resources`. No Dockerfile or environment-variable change. |
 | `DESIGN_GUIDELINES.md` §3.6: no setup wizard, tour or blocking modal at first run; the empty state is the onboarding with one CTA. §14: confirm destructive actions that cannot be undone. | The first-run link is a quiet secondary link under the single CTA. Removal is confirmed in a dialog that states what is removed and what is kept. UI says "examples", never "pack", "node" or "graph". |
 
 ## Design
 
 ### 1. Pack files
 
-`shared/examples/index.json` is the catalogue. `shared/examples/<id>.json` is one pack. Names and descriptions live only in the index.
+`packs/index.json` is the catalogue. `packs/<id>.json` is one pack (both under `backend/src/app/modules/examples/`). Names and descriptions live only in the index.
 
 ```json
 { "format": "menagerist-examples-index", "version": 1,
@@ -79,7 +79,7 @@ modules/examples/
   adapters/
     api/         router (+ schemas, dependencies)
     persistence/ models, SqlAlchemy + in-memory InstallationRepository, unit_of_work
-    platform/    file_pack_catalogue (reads shared/examples), in_memory_pack_catalogue
+    platform/    file_pack_catalogue (reads the packaged packs/ directory), in_memory_pack_catalogue
 ```
 
 `PresetTarget` and `GraphTarget` are driven ports owned by `examples`. Their concrete adapters live in `entrypoints/api/shared/example_targets.py` and call the real presets and graph use cases, constructed from unit-of-work factories so application tests can run them over the in-memory graph and presets unit of work with no database.
@@ -146,7 +146,7 @@ Three packs for v1, matching the board's list, each small enough to read in one 
 
 - **Domain** (100%): pack invariants (duplicate refs, dangling refs, limits), removal rules as a truth table, installation state transitions, hashing stability.
 - **Application** (100%): install, uninstall, list, over the in-memory unit of work and the *real* target adapters on the in-memory graph and presets stores. Cover pre-flight clash, mid-install failure with compensation, kept-because-edited, kept-because-connection, kept-because-preset-in-use, reinstall after removal, double install (409).
-- **Contract test over shipped content:** every pack in `shared/examples/` passes schema and ref validation, installs into the in-memory stores, passes `validate_attributes` for every item, uninstalls to zero live entities, and installs again. Adding a pack automatically adds this coverage.
+- **Contract test over shipped content:** every pack in `packs/` passes schema and ref validation, installs into the in-memory stores, passes `validate_attributes` for every item, uninstalls to zero live entities, and installs again. Adding a pack automatically adds this coverage.
 - **Adapters** (80%): router tests with dependency overrides; file catalogue against a temp directory; integration tests (`@pytest.mark.integration`) for the SQLAlchemy repository, the partial unique index (delete then recreate a slug), and one end-to-end install and uninstall on Postgres.
 - **Architecture:** `examples` imports neither `graph` nor `presets`; existing layer rules cover the rest.
 - **Frontend:** vitest for the summary and pluralisation helpers and the banner dismissal logic.
@@ -159,13 +159,14 @@ Three packs for v1, matching the board's list, each small enough to read in one 
 - **Compensation over a cross-module transaction**, per the README.
 - **Content hash over `updated_at`** for edit detection: touching an entity without changing it must not block removal.
 - **No `requires` between packs:** ownership and the preset delete guard cover the shared-preset case.
-- **Pack files in `shared/examples/`** over module package data: the path helper and Dockerfile copy already exist.
+- **Pack files as package data inside the module** (`backend/src/app/modules/examples/packs/`) over `shared/` (which is for data both sides read, and only the backend reads packs) and over a new top-level folder: it travels with the code, needs no Docker or environment change, and a wheel build was checked to include the JSON files.
 
 ## Follow-ups (not in this plan)
 
 - Built-in Countries via a `builtin:countries` choice source from the shared ISO file (no database row; currencies already work this way). Independent of examples.
 - Move the opinionated built-in presets (grades, formats, field groups) into a starter pack, once examples exist.
-- Example images. Needs a media step and a binary-asset source. Prefer placeholders generated locally at install time (for example a deterministic tile with the item's initials) over a call to an external placeholder service: self-hosted installs may be offline, and the server should not fetch third-party content. If real pictures are wanted later, ship a few small CC0 images in `shared/examples/`.
+- Example images. Needs a media step and a binary-asset source. Prefer placeholders generated locally at install time (for example a deterministic tile with the item's initials) over a call to an external placeholder service: self-hosted installs may be offline, and the server should not fetch third-party content. If real pictures are wanted later, ship a few small CC0 images beside the packs, in the module's `packs/` directory.
+- **Add-on packs (`requires`).** One-way dependencies between packs so an add-on (for example gig history) can link to a base pack's entities; see the master plan's follow-ups for the shape and why fully conditional bridge links were rejected. v1 keeps connected material inside one pack instead.
 - **Reusable bundles for import and export.** The pack format, parser, creation targets and provenance record are not example-specific; a later phase extracts them into a generic bundle layer so user import and export of items, types and collections share the code (see Phase 5 in the master plan). Not built now: there is no second consumer yet, and the merge policy and export refs would be guesses.
 - A `collections` pack section, once #265 lands.
 - An "Example" marker on items.
