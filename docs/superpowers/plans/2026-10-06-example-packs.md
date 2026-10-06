@@ -96,6 +96,8 @@ These use `_make_uow()` over the in-memory repositories. Verified while planning
 
 ## Phase 1: `examples` backend module
 
+> **The detailed, code-level plan for this phase is `docs/superpowers/plans/2026-10-06-example-packs-phase-1-backend.md`.** It supersedes this section where they differ. Differences found while planning it: targets need no `owned_ids` (uninstall order makes it unnecessary); `InstallFailedError` is a plain `Exception` so the existing catch-all returns 500; entity records carry a `label`; every created entity is persisted immediately; the failure rollback and uninstall share one routine; pack files are parsed by a separate strict `pack_parser`. The task list below is kept as the overview.
+
 Build inside-out: domain, application, in-memory adapters, targets, persistence, API.
 
 ### Task 1.1: Module skeleton and architecture rule
@@ -202,7 +204,7 @@ class GraphTarget(Protocol):
 - [ ] `inspect` for an item: `content = {name, type, description, attributes, tags, extra_schema}` (no `favourite`); `has_user_data` is true if a live edge touches the item whose id is not among the installation's recorded connection ids (the application passes the owned connection ids in), or any media attachment exists (`list_for_target`); `still_in_use` is always false for items. For a type: `has_user_data` false; `still_in_use` true if a live item or connection of that type exists that is **not** in the set being removed (the application passes the ids it is removing).
 - [ ] For `remove`, delete in the order the application requests; `DeleteNodeType` clears `type` on remaining items (so the application must never ask to remove a type that still has kept items, per the rules).
 - [ ] Tests over the in-memory graph, presets and media stores (`create_in_memory_graph_uow`, `create_in_memory_preset_uow`, and media's in-memory equivalents): each method; `inspect` shows a changed content after an update; a foreign connection or an attachment flips `has_user_data`; a preset referenced by a type returns `REFUSED_IN_USE`; the placeholder substitution; no auto-created types.
-- [ ] Signature of the application-facing extras: `inspect(kind, entity_id, *, owned_connection_ids: frozenset[UUID], removing: frozenset[UUID])`. Update the port in Task 1.3 to match when you reach this task; the port and this adapter change together.
+- [ ] `inspect(kind, entity_id)` takes no extra parameters: uninstall settles connections, then items, then types, then presets, so "any live connection touches this item" and "any live item has this type" already mean user data and in-use (see the Phase 1 plan's refinements).
 
 ### Task 1.6: Application — hashing and queries
 
@@ -409,13 +411,43 @@ Run against the throwaway database (`poe e2e-db-up`, `poe e2e-migrate`, `npx pla
 
 ## Phase 4: Documentation
 
-- [ ] `docs/DECISIONS.md` (style: `## Title`, then **Decision**, **Rationale**, optionally **Consequence** or **Not decided**): entries for (1) the `examples` module and why not the presets pack format or a `source_pack` column; (2) install as per-module commits with compensation, not a cross-module transaction; (3) edit detection by content hash, with the keep rules; (4) the partial slug index and "the application owns every constraint"; (5) pack files in `shared/examples/`; (6) install as an ordered list of steps (media later); (7) the first-run link and why no wizard.
+- [ ] `docs/DECISIONS.md` (style: `## Title`, then **Decision**, **Rationale**, optionally **Consequence** or **Not decided**): entries for (0) the intent to extract a generic bundle layer for import and export later (Phase 5), and why it is not built now (no second consumer yet, so the merge policy and export refs would be guesses); (1) the `examples` module and why not the presets pack format or a `source_pack` column; (2) install as per-module commits with compensation, not a cross-module transaction; (3) edit detection by content hash, with the keep rules; (4) the partial slug index and "the application owns every constraint"; (5) pack files in `shared/examples/`; (6) install as an ordered list of steps (media later); (7) the first-run link and why no wizard.
 - [ ] `docs/ARCHITECTURE.md`: add `examples/` to the module list and the structure block.
 - [ ] `backend/README.md`: a short paragraph in the cross-module section pointing at the target-port pattern (`entrypoints/api/shared/example_targets.py` beside `preset_usage.py`).
 - [ ] `frontend/README.md`: note the examples settings page and `lib/examples.ts` if it lists pages and helpers.
 - [ ] "Writing an example pack" (format, `ref`s, `$preset`, the authoring method from Task 2.2, the contract test). **AGENTS.md says not to create documentation files unless asked.** Ask the user whether this should be a new `docs/example-packs.md` or a section of `backend/README.md`, and do that.
 - [ ] `docs/field-types-spec/PROGRESS.md`: only if field-type docs are touched; otherwise leave it.
 - [ ] Mark this plan and the spec's status lines as implemented, with a short "what changed from the plan" note, once it is.
+
+## Phase 5 (not scheduled): reusable bundles for import and export
+
+Raised during Phase 1: user-facing import and export of items, types and (later) collections should use the same code as example packs, not a parallel implementation. This phase is a placeholder with intent and open questions. It needs its own brainstorm and spec before any work starts.
+
+**What Phase 1 already provides (reusable as is)**
+- The bundle itself: presets, relationship types, item types, items and connections linked by local refs, with strict parsing and self-validation (`ExamplePack`, `pack_parser`).
+- Creation through the normal graph and presets use cases (the target adapters), so imported data gets the same validation as anything typed in by hand.
+- Provenance: the installation record with content hashes, which supports "undo this import" and "remove what I have not touched".
+
+**What would be new**
+- **Export:** the reverse direction. Read entities and generate stable refs, turn saved-list ids back into `$preset` markers, and decide how media binaries travel (examples are text only).
+- **A merge policy for import into existing data:** examples refuse on a slug clash; user imports need rename, merge or skip, chosen per import.
+- **Ownership and permissions** once RBAC (#225) exists.
+- **Collections:** a new bundle section once #265 lands (needs a format version bump).
+
+**Intended shape**
+1. Split the module in two: a generic bundle layer (format, parser, domain, target ports and adapters, creation and settle steps) and, on top of it, the examples catalogue and installation tracking. Phase 1's layering already isolates these, so this is an extraction and rename (`examples` to something like `bundles`), not a rewrite.
+2. Converge the existing preset pack format (`menagerist-presets`, `presets/application/pack.py`) so it becomes one section of the bundle rather than a third format.
+3. Add export use cases, an import use case with a merge policy, API routes and a UI, in that order.
+
+**Open questions for that spec**
+- One envelope format for everything, or per-kind packs that can be combined?
+- Are refs stable across exports so a re-import can update, or is every import a new copy?
+- What does "remove an import" mean for items the user has since edited (reuse the keep rules)?
+- Where do attachments live in a bundle (a zip with a manifest?), and how does that interact with the 16 MB-style size limits elsewhere?
+
+Do nothing for this in Phases 0 to 4 except keep names and boundaries generic where it is free to do so. Record the intent as a decision entry in `docs/DECISIONS.md` during Phase 4.
+
+---
 
 ## Risks and how the plan handles them
 
@@ -442,6 +474,7 @@ Run against the throwaway database (`poe e2e-db-up`, `poe e2e-migrate`, `npx pla
 ## Follow-ups (separate specs)
 
 - **Built-in Countries** through a `builtin:countries` choice source resolved from `shared/iso-data.json` (no database row; currencies already work this way). The graph module's `ChoiceListSource` port already exists, so a composite source in `entrypoints/api/shared/` can serve both ids and `builtin:` names; `check_list_refs` currently insists on a UUID and needs to accept the `builtin:` form; the frontend list picker needs a built-in entry.
+- **Reusable bundles for import and export** (see Phase 5 above): extract a generic bundle layer from `examples`, add export, a merge policy and a UI.
 - **Opinionated built-in presets as a starter pack** (grades, formats, field groups), once examples exist.
 - **Example images.** Needs a media step in the installer (one more entry in the ordered step list), a media-asset source, and removal of attachments. Prefer placeholders generated locally at install time over fetching from an external placeholder service: self-hosted instances may be offline and the server should not pull third-party content. If real pictures are wanted, ship a few small CC0 images in `shared/examples/`.
 - **A `collections` section** in the pack format once #265 lands (needs a version bump).

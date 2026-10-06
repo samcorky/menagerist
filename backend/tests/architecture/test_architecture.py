@@ -137,3 +137,16 @@ def test_no_circular_dependencies() -> None:
     """The application must have no circular dependencies across files."""
     rule = project_files(SRC_PATH).should().have_no_cycles()
     assert_passes(rule)
+
+
+def test_examples_module_is_independent_of_graph_and_presets() -> None:
+    """`examples` reaches `graph` and `presets` only through its own ports."""
+    for other in ("graph", "presets"):
+        rule = (
+            project_files(SRC_PATH)
+            .in_folder("*modules/examples*")
+            .should_not()
+            .depend_on_files()
+            .in_folder(f"*modules/{other}*")
+        )
+        assert_passes(rule)

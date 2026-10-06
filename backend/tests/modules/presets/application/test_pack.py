@@ -196,3 +196,31 @@ async def test_import_detects_repeats_beyond_the_first_page() -> None:
     )
 
     assert (result.created, result.skipped) == (0, 1)
+
+
+async def test_import_reports_an_id_for_every_item_including_repeats() -> None:
+    """Each item gets an id in pack order; repeats report the existing preset."""
+    repos = PresetRepos(presets=InMemoryPresetRepository())
+    existing = Preset.create(kind="choice_list", label="Grades", definition=_GRADES)
+    await repos.presets.add(existing)
+
+    result = await _importer(repos).handle(
+        ImportPresetsCommand(
+            pack_format="menagerist-presets",
+            pack_version=1,
+            items=[
+                _item(label="Grades", definition=_GRADES),
+                _item(label="Formats", definition={"options": ["LP"]}),
+                _item(label="Formats", definition={"options": ["LP"]}),
+            ],
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    assert (result.created, result.skipped) == (1, 2)
+    assert result.items[0].id == existing.id
+    assert result.items[0].created is False
+    assert result.items[1].created is True
+    assert result.items[2].id == result.items[1].id
+    assert result.items[2].created is False
+    assert await repos.presets.get(result.items[1].id) is not None

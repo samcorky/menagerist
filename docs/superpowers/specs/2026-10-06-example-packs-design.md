@@ -166,6 +166,7 @@ Three packs for v1, matching the board's list, each small enough to read in one 
 - Built-in Countries via a `builtin:countries` choice source from the shared ISO file (no database row; currencies already work this way). Independent of examples.
 - Move the opinionated built-in presets (grades, formats, field groups) into a starter pack, once examples exist.
 - Example images. Needs a media step and a binary-asset source. Prefer placeholders generated locally at install time (for example a deterministic tile with the item's initials) over a call to an external placeholder service: self-hosted installs may be offline, and the server should not fetch third-party content. If real pictures are wanted later, ship a few small CC0 images in `shared/examples/`.
+- **Reusable bundles for import and export.** The pack format, parser, creation targets and provenance record are not example-specific; a later phase extracts them into a generic bundle layer so user import and export of items, types and collections share the code (see Phase 5 in the master plan). Not built now: there is no second consumer yet, and the merge policy and export refs would be guesses.
 - A `collections` pack section, once #265 lands.
 - An "Example" marker on items.
 
