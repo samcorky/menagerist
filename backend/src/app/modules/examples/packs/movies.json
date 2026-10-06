@@ -1,0 +1,763 @@
+{
+  "format": "menagerist-example-pack",
+  "version": 1,
+  "id": "movies",
+  "relationship_types": [
+    {
+      "ref": "of",
+      "slug": "movies-of",
+      "label": "Of",
+      "reverse_label": "Viewings",
+      "description": "Which film a viewing was of.",
+      "directional": true
+    },
+    {
+      "ref": "at",
+      "slug": "movies-at",
+      "label": "At",
+      "reverse_label": "Hosted",
+      "description": "Where a viewing took place.",
+      "directional": true
+    },
+    {
+      "ref": "directed-by",
+      "slug": "movies-directed-by",
+      "label": "Directed by",
+      "reverse_label": "Directed",
+      "description": "Who directed a film.",
+      "directional": true
+    },
+    {
+      "ref": "stars",
+      "slug": "movies-stars",
+      "label": "Stars",
+      "reverse_label": "Starred in",
+      "description": "Who stars in a film.",
+      "directional": true
+    },
+    {
+      "ref": "went-to",
+      "slug": "movies-went-to",
+      "label": "Went to",
+      "reverse_label": "Went with",
+      "description": "Who came along to a viewing.",
+      "directional": true
+    },
+    {
+      "ref": "memorabilia-for",
+      "slug": "movies-memorabilia-for",
+      "label": "For",
+      "reverse_label": "Memorabilia",
+      "description": "Which film a piece of memorabilia belongs to.",
+      "directional": true
+    },
+    {
+      "ref": "signed-by",
+      "slug": "movies-signed-by",
+      "label": "Signed by",
+      "reverse_label": "Signed",
+      "description": "Who signed a piece of memorabilia, and when.",
+      "directional": true,
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "signed_on": {
+            "title": "Signed on",
+            "type": "string",
+            "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+            "x-menagerist": {
+              "kind": "partialdate"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "signed_on"
+            }
+          ],
+          "required": []
+        }
+      }
+    },
+    {
+      "ref": "signed-at",
+      "slug": "movies-signed-at",
+      "label": "Signed at",
+      "reverse_label": "Signings",
+      "description": "Where a piece of memorabilia was signed.",
+      "directional": true
+    }
+  ],
+  "item_types": [
+    {
+      "ref": "film",
+      "slug": "movies-film",
+      "label": "Film",
+      "description": "A film you have watched or want to remember.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "year": {
+            "title": "Year",
+            "type": "string",
+            "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+            "x-menagerist": {
+              "kind": "partialdate"
+            }
+          },
+          "runtime": {
+            "title": "Runtime",
+            "type": "number",
+            "minimum": 0,
+            "multipleOf": 1,
+            "x-menagerist": {
+              "kind": "duration"
+            }
+          },
+          "genres": {
+            "title": "Genres",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Drama",
+                "Thriller",
+                "Comedy",
+                "Animation",
+                "Family",
+                "Horror",
+                "Sci-fi",
+                "Documentary",
+                "Romance"
+              ]
+            },
+            "uniqueItems": true,
+            "x-menagerist": {
+              "kind": "multichoice"
+            }
+          },
+          "rating": {
+            "title": "My rating",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5,
+            "multipleOf": 1,
+            "x-menagerist": {
+              "kind": "rating"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "year"
+            },
+            {
+              "key": "runtime"
+            },
+            {
+              "key": "genres"
+            },
+            {
+              "key": "rating"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "rating"
+              },
+              {
+                "key": "year"
+              },
+              {
+                "key": "genres"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "person",
+      "slug": "movies-person",
+      "label": "Person",
+      "description": "A director, an actor or a friend to watch with."
+    },
+    {
+      "ref": "place",
+      "slug": "movies-place",
+      "label": "Place",
+      "description": "Somewhere you watch films, or collect their posters.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "city": {
+            "title": "City",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "city"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "city"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "viewing",
+      "slug": "movies-viewing",
+      "label": "Viewing",
+      "description": "One occasion of watching a film, and how it went.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string",
+            "format": "date",
+            "x-menagerist": {
+              "kind": "date"
+            }
+          },
+          "rating": {
+            "title": "Rating",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5,
+            "multipleOf": 1,
+            "x-menagerist": {
+              "kind": "rating"
+            }
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "date"
+            },
+            {
+              "key": "rating"
+            },
+            {
+              "key": "notes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "date"
+              },
+              {
+                "key": "rating"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "memorabilia",
+      "slug": "movies-memorabilia",
+      "label": "Memorabilia",
+      "description": "A poster, ticket stub or programme from the collection.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string",
+            "enum": [
+              "Poster",
+              "Ticket stub",
+              "Programme"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "size": {
+            "title": "Size",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "condition": {
+            "title": "Condition",
+            "type": "string",
+            "enum": [
+              "Mint",
+              "Near Mint",
+              "Very Good Plus",
+              "Very Good",
+              "Good",
+              "Fair",
+              "Poor"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "price_paid": {
+            "title": "Price paid",
+            "type": "object",
+            "properties": {
+              "value": {
+                "title": "Value",
+                "type": "number"
+              },
+              "currency": {
+                "title": "Currency",
+                "type": "string"
+              }
+            },
+            "x-menagerist": {
+              "kind": "money"
+            }
+          },
+          "framed": {
+            "title": "Framed",
+            "type": "boolean",
+            "x-menagerist": {
+              "kind": "boolean"
+            }
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "longtext"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "kind"
+            },
+            {
+              "key": "size"
+            },
+            {
+              "key": "condition"
+            },
+            {
+              "key": "price_paid"
+            },
+            {
+              "key": "framed"
+            },
+            {
+              "key": "notes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "condition"
+              },
+              {
+                "key": "price_paid"
+              },
+              {
+                "key": "framed"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "items": [
+    {
+      "ref": "cold-harbour",
+      "type": "film",
+      "name": "Cold Harbour",
+      "description": "A ferry crossing, a missing passenger and a very long night.",
+      "attributes": {
+        "year": "2016",
+        "runtime": 6420,
+        "genres": [
+          "Thriller",
+          "Drama"
+        ],
+        "rating": 5
+      }
+    },
+    {
+      "ref": "the-night-bus-sessions",
+      "type": "film",
+      "name": "The Night Bus Sessions",
+      "description": "Four strangers, one night bus and no phone signal.",
+      "attributes": {
+        "year": "2019",
+        "runtime": 5640,
+        "genres": [
+          "Comedy"
+        ],
+        "rating": 4
+      }
+    },
+    {
+      "ref": "quiet-hours",
+      "type": "film",
+      "name": "Quiet Hours",
+      "description": "A librarian, a flood and an unexpected friendship.",
+      "attributes": {
+        "year": "2022",
+        "runtime": 6720,
+        "genres": [
+          "Drama"
+        ],
+        "rating": 3
+      }
+    },
+    {
+      "ref": "marmalade",
+      "type": "film",
+      "name": "Marmalade",
+      "description": "An animated tale of a cat who runs a marmalade factory.",
+      "attributes": {
+        "year": "2023",
+        "runtime": 5100,
+        "genres": [
+          "Animation",
+          "Family"
+        ],
+        "rating": 4
+      }
+    },
+    {
+      "ref": "maggie-trevelyan",
+      "type": "person",
+      "name": "Maggie Trevelyan",
+      "description": "A director who prefers rainy locations."
+    },
+    {
+      "ref": "callum-frith",
+      "type": "person",
+      "name": "Callum Frith",
+      "description": "An actor who also directed one film and never lets anyone forget it."
+    },
+    {
+      "ref": "imogen-park",
+      "type": "person",
+      "name": "Imogen Park",
+      "description": "An actor who is in everything worth watching."
+    },
+    {
+      "ref": "hannah-okoye",
+      "type": "person",
+      "name": "Hannah Okoye",
+      "description": "A friend with strong opinions about endings."
+    },
+    {
+      "ref": "gareth-rees",
+      "type": "person",
+      "name": "Gareth Rees",
+      "description": "A friend who falls asleep in every film and denies it."
+    },
+    {
+      "ref": "the-regent-picture-house",
+      "type": "place",
+      "name": "The Regent Picture House",
+      "description": "A single-screen cinema with a velvet curtain and a very loud heater.",
+      "attributes": {
+        "city": "Huddersfield"
+      }
+    },
+    {
+      "ref": "dockside-multiplex",
+      "type": "place",
+      "name": "Dockside Multiplex",
+      "description": "Eight screens and one working popcorn machine.",
+      "attributes": {
+        "city": "Hull"
+      }
+    },
+    {
+      "ref": "the-sofa",
+      "type": "place",
+      "name": "The sofa",
+      "description": "The best seat in the house if you can find the remote."
+    },
+    {
+      "ref": "northern-film-and-comic-fair",
+      "type": "place",
+      "name": "Northern Film and Comic Fair",
+      "description": "A weekend of stalls, queues and slightly damp carpets.",
+      "attributes": {
+        "city": "Leeds"
+      }
+    },
+    {
+      "ref": "cold-harbour-at-the-regent",
+      "type": "viewing",
+      "name": "Cold Harbour at the Regent",
+      "description": "A dark ferry thriller on the big screen, with a friend and a complaining heater.",
+      "attributes": {
+        "date": "2024-01-12",
+        "rating": 4,
+        "notes": "Sat behind a very tall hat."
+      }
+    },
+    {
+      "ref": "cold-harbour-on-the-sofa",
+      "type": "viewing",
+      "name": "Cold Harbour on the sofa",
+      "description": "A second look, alone, with the ferry in focus this time.",
+      "attributes": {
+        "date": "2024-11-03",
+        "rating": 5,
+        "notes": "Better the second time. Noticed the ferry."
+      }
+    },
+    {
+      "ref": "quiet-hours-at-dockside",
+      "type": "viewing",
+      "name": "Quiet Hours at Dockside",
+      "description": "A quiet drama in a not-quiet multiplex.",
+      "attributes": {
+        "date": "2023-04-20",
+        "rating": 3,
+        "notes": "Lovely, but the sound was too quiet."
+      }
+    },
+    {
+      "ref": "marmalade-at-dockside",
+      "type": "viewing",
+      "name": "Marmalade at Dockside",
+      "description": "A half-term outing with cartoon cats and sticky seats.",
+      "attributes": {
+        "date": "2023-10-28",
+        "rating": 4,
+        "notes": "Half-term. Everyone sang along."
+      }
+    },
+    {
+      "ref": "the-night-bus-sessions-on-the-sofa",
+      "type": "viewing",
+      "name": "The Night Bus Sessions on the sofa",
+      "description": "A comedy and a curry on a Saturday night.",
+      "attributes": {
+        "date": "2025-02-15",
+        "rating": 4,
+        "notes": "Takeaway curry, no regrets."
+      }
+    },
+    {
+      "ref": "cold-harbour-poster",
+      "type": "memorabilia",
+      "name": "Cold Harbour poster",
+      "description": "A poster for a ferry-bound thriller, signed in blue pen.",
+      "attributes": {
+        "kind": "Poster",
+        "size": "A3",
+        "condition": "Very Good",
+        "price_paid": {
+          "value": 12,
+          "currency": "GBP"
+        },
+        "framed": true,
+        "notes": "Bought at the fair; Imogen Park signed it in blue pen."
+      }
+    },
+    {
+      "ref": "quiet-hours-poster",
+      "type": "memorabilia",
+      "name": "Quiet Hours poster",
+      "description": "A quiet poster for a quiet film.",
+      "attributes": {
+        "kind": "Poster",
+        "size": "Quad (UK cinema size)",
+        "condition": "Good",
+        "price_paid": {
+          "value": 4,
+          "currency": "GBP"
+        },
+        "framed": false,
+        "notes": "Charity shop find. Folded once, flattened under the dictionary."
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "cold-harbour-at-the-regent",
+      "to": "cold-harbour",
+      "type": "of"
+    },
+    {
+      "from": "cold-harbour-on-the-sofa",
+      "to": "cold-harbour",
+      "type": "of"
+    },
+    {
+      "from": "quiet-hours-at-dockside",
+      "to": "quiet-hours",
+      "type": "of"
+    },
+    {
+      "from": "marmalade-at-dockside",
+      "to": "marmalade",
+      "type": "of"
+    },
+    {
+      "from": "the-night-bus-sessions-on-the-sofa",
+      "to": "the-night-bus-sessions",
+      "type": "of"
+    },
+    {
+      "from": "cold-harbour-at-the-regent",
+      "to": "the-regent-picture-house",
+      "type": "at"
+    },
+    {
+      "from": "cold-harbour-on-the-sofa",
+      "to": "the-sofa",
+      "type": "at"
+    },
+    {
+      "from": "quiet-hours-at-dockside",
+      "to": "dockside-multiplex",
+      "type": "at"
+    },
+    {
+      "from": "marmalade-at-dockside",
+      "to": "dockside-multiplex",
+      "type": "at"
+    },
+    {
+      "from": "the-night-bus-sessions-on-the-sofa",
+      "to": "the-sofa",
+      "type": "at"
+    },
+    {
+      "from": "cold-harbour",
+      "to": "maggie-trevelyan",
+      "type": "directed-by"
+    },
+    {
+      "from": "quiet-hours",
+      "to": "maggie-trevelyan",
+      "type": "directed-by"
+    },
+    {
+      "from": "marmalade",
+      "to": "maggie-trevelyan",
+      "type": "directed-by"
+    },
+    {
+      "from": "the-night-bus-sessions",
+      "to": "callum-frith",
+      "type": "directed-by"
+    },
+    {
+      "from": "cold-harbour",
+      "to": "callum-frith",
+      "type": "stars"
+    },
+    {
+      "from": "cold-harbour",
+      "to": "imogen-park",
+      "type": "stars"
+    },
+    {
+      "from": "the-night-bus-sessions",
+      "to": "imogen-park",
+      "type": "stars"
+    },
+    {
+      "from": "quiet-hours",
+      "to": "imogen-park",
+      "type": "stars"
+    },
+    {
+      "from": "marmalade",
+      "to": "callum-frith",
+      "type": "stars"
+    },
+    {
+      "from": "hannah-okoye",
+      "to": "cold-harbour-at-the-regent",
+      "type": "went-to"
+    },
+    {
+      "from": "gareth-rees",
+      "to": "quiet-hours-at-dockside",
+      "type": "went-to"
+    },
+    {
+      "from": "hannah-okoye",
+      "to": "marmalade-at-dockside",
+      "type": "went-to"
+    },
+    {
+      "from": "gareth-rees",
+      "to": "marmalade-at-dockside",
+      "type": "went-to"
+    },
+    {
+      "from": "gareth-rees",
+      "to": "the-night-bus-sessions-on-the-sofa",
+      "type": "went-to"
+    },
+    {
+      "from": "cold-harbour-poster",
+      "to": "cold-harbour",
+      "type": "memorabilia-for"
+    },
+    {
+      "from": "quiet-hours-poster",
+      "to": "quiet-hours",
+      "type": "memorabilia-for"
+    },
+    {
+      "from": "cold-harbour-poster",
+      "to": "imogen-park",
+      "type": "signed-by",
+      "attributes": {
+        "signed_on": "2023-09-16"
+      }
+    },
+    {
+      "from": "cold-harbour-poster",
+      "to": "northern-film-and-comic-fair",
+      "type": "signed-at"
+    }
+  ]
+}

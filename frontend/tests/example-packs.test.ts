@@ -81,6 +81,13 @@ describe('shipped example packs', () => {
 					expect(descriptor, `${at} has no descriptor`).toBeDefined();
 					const field = fieldFromProperty(key, prop, false);
 					expect(field.kind, `${at} is opaque`).not.toBe('opaque');
+					const columns =
+						(prop as { items?: { properties?: Record<string, JsonSchemaProperty> } }).items
+							?.properties ?? {};
+					for (const sub of field.subFields) {
+						expect(sub.kind, `${at}.${sub.key} is opaque`).not.toBe('opaque');
+						expect(descriptorForProp(columns[sub.key]), `${at}.${sub.key}`).toBeDefined();
+					}
 					const stored = prop['x-menagerist']?.kind;
 					if (stored !== undefined) {
 						expect(stored, `${at} stored kind`).toBe(descriptor!.kind);
@@ -102,10 +109,28 @@ describe('shipped example packs', () => {
 					Object.keys(t.attributes_schema?.properties ?? {})
 				])
 			);
+			const schemaByItemType = new Map(
+				(pack.item_types ?? []).map((t) => [t.ref, t.attributes_schema])
+			);
 			for (const item of pack.items ?? []) {
 				const known = keysByItemType.get(item.type) ?? [];
 				for (const key of Object.keys(item.attributes ?? {})) {
 					expect(known, `item ${item.ref}.${key}`).toContain(key);
+				}
+				// Table rows may only use the columns their property declares.
+				const props = schemaByItemType.get(item.type)?.properties ?? {};
+				for (const [key, value] of Object.entries(item.attributes ?? {})) {
+					const meta = props[key]?.['x-menagerist'] as
+						{ kind?: string; columns?: string[] } | undefined;
+					if (meta?.kind !== 'group') continue;
+					expect(Array.isArray(value), `item ${item.ref}.${key} is rows`).toBe(true);
+					for (const [i, row] of (value as unknown[]).entries()) {
+						const at = `item ${item.ref}.${key}[${i}]`;
+						expect(row !== null && typeof row === 'object', `${at} is an object`).toBe(true);
+						for (const col of Object.keys(row as object)) {
+							expect(meta.columns ?? [], `${at}.${col}`).toContain(col);
+						}
+					}
 				}
 			}
 			for (const c of pack.connections ?? []) {

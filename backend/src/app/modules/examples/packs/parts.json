@@ -1,0 +1,966 @@
+{
+  "format": "menagerist-example-pack",
+  "version": 1,
+  "id": "parts",
+  "relationship_types": [
+    {
+      "ref": "used-in",
+      "slug": "parts-used-in",
+      "label": "Used in",
+      "reverse_label": "Uses",
+      "description": "Which assemblies a part goes into, and how many.",
+      "directional": true,
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "quantity": {
+            "title": "Quantity",
+            "type": "number",
+            "x-menagerist": {
+              "kind": "number"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "quantity"
+            }
+          ],
+          "required": []
+        }
+      }
+    },
+    {
+      "ref": "supplied-by",
+      "slug": "parts-supplied-by",
+      "label": "Supplied by",
+      "reverse_label": "Supplies",
+      "description": "Who sells a part, and at what price.",
+      "directional": true,
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "price": {
+            "title": "Price",
+            "type": "object",
+            "properties": {
+              "value": {
+                "title": "Value",
+                "type": "number"
+              },
+              "currency": {
+                "title": "Currency",
+                "type": "string"
+              }
+            },
+            "x-menagerist": {
+              "kind": "money"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "price"
+            }
+          ],
+          "required": []
+        }
+      }
+    }
+  ],
+  "item_types": [
+    {
+      "ref": "part",
+      "slug": "parts-part",
+      "label": "Part",
+      "description": "A component or consumable in the parts drawer.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "part_number": {
+            "title": "Part number",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "in_stock": {
+            "title": "In stock",
+            "type": "number",
+            "x-menagerist": {
+              "kind": "number"
+            }
+          },
+          "reorder_at": {
+            "title": "Reorder at",
+            "type": "number",
+            "x-menagerist": {
+              "kind": "number"
+            }
+          },
+          "typical_price": {
+            "title": "Typical price",
+            "type": "object",
+            "properties": {
+              "value": {
+                "title": "Value",
+                "type": "number"
+              },
+              "currency": {
+                "title": "Currency",
+                "type": "string"
+              }
+            },
+            "x-menagerist": {
+              "kind": "money"
+            }
+          },
+          "datasheet": {
+            "title": "Datasheet",
+            "type": "string",
+            "format": "uri",
+            "x-menagerist": {
+              "kind": "url"
+            }
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "part_number"
+            },
+            {
+              "key": "in_stock"
+            },
+            {
+              "key": "reorder_at"
+            },
+            {
+              "key": "typical_price"
+            },
+            {
+              "key": "datasheet"
+            },
+            {
+              "key": "notes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "in_stock"
+              },
+              {
+                "key": "reorder_at"
+              },
+              {
+                "key": "typical_price"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "assembly",
+      "slug": "parts-assembly",
+      "label": "Assembly",
+      "description": "Something you have built, or are building, from the drawer.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "built": {
+            "title": "Built",
+            "type": "string",
+            "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+            "x-menagerist": {
+              "kind": "partialdate"
+            }
+          },
+          "build_steps": {
+            "title": "Build steps",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "title": "Text",
+                  "type": "string"
+                },
+                "done": {
+                  "title": "Done",
+                  "type": "boolean"
+                }
+              }
+            },
+            "x-menagerist": {
+              "kind": "checklist"
+            }
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "longtext"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "built"
+            },
+            {
+              "key": "build_steps"
+            },
+            {
+              "key": "notes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "built"
+              },
+              {
+                "key": "build_steps"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "supplier",
+      "slug": "parts-supplier",
+      "label": "Supplier",
+      "description": "A shop you buy parts from.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "website": {
+            "title": "Website",
+            "type": "string",
+            "format": "uri",
+            "x-menagerist": {
+              "kind": "url"
+            }
+          },
+          "email": {
+            "title": "Email",
+            "type": "string",
+            "format": "email",
+            "x-menagerist": {
+              "kind": "email"
+            }
+          },
+          "phone": {
+            "title": "Phone",
+            "type": "string",
+            "pattern": "^[0-9+()\\-\\s]{3,32}$",
+            "x-menagerist": {
+              "kind": "phone"
+            }
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "website"
+            },
+            {
+              "key": "email"
+            },
+            {
+              "key": "phone"
+            },
+            {
+              "key": "notes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "website"
+              },
+              {
+                "key": "phone"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "items": [
+    {
+      "ref": "10k-resistor-025-w",
+      "type": "part",
+      "name": "10k resistor, 0.25 W",
+      "description": "The workhorse of every circuit, bought in hundreds and still never enough.",
+      "attributes": {
+        "part_number": "R-10K",
+        "in_stock": 240,
+        "reorder_at": 50,
+        "typical_price": {
+          "value": 0.05,
+          "currency": "GBP"
+        },
+        "datasheet": "https://datasheets.example/r-10k.pdf",
+        "notes": "The drawer you can never find the right one in."
+      }
+    },
+    {
+      "ref": "100-nf-ceramic-capacitor",
+      "type": "part",
+      "name": "100 nF ceramic capacitor",
+      "description": "Decoupling duty on practically every board in the house.",
+      "attributes": {
+        "part_number": "C-100N",
+        "in_stock": 180,
+        "reorder_at": 40,
+        "typical_price": {
+          "value": 0.08,
+          "currency": "GBP"
+        },
+        "datasheet": "https://datasheets.example/c-100n.pdf"
+      }
+    },
+    {
+      "ref": "470-uf-electrolytic-capacitor",
+      "type": "part",
+      "name": "470 \u00b5F electrolytic capacitor",
+      "description": "A chunky can for smoothing out a power supply's ripples.",
+      "attributes": {
+        "part_number": "C-470U",
+        "in_stock": 12,
+        "reorder_at": 10,
+        "typical_price": {
+          "value": 0.45,
+          "currency": "GBP"
+        },
+        "datasheet": "https://datasheets.example/c-470u.pdf",
+        "notes": "Close to the reorder line."
+      }
+    },
+    {
+      "ref": "lm317-voltage-regulator",
+      "type": "part",
+      "name": "LM317 voltage regulator",
+      "description": "An adjustable regulator that has outlived most of its rivals.",
+      "attributes": {
+        "part_number": "LM317",
+        "in_stock": 3,
+        "reorder_at": 5,
+        "typical_price": {
+          "value": 0.89,
+          "currency": "GBP"
+        },
+        "datasheet": "https://datasheets.example/lm317.pdf",
+        "notes": "Low on stock."
+      }
+    },
+    {
+      "ref": "1n4007-diode",
+      "type": "part",
+      "name": "1N4007 diode",
+      "description": "A humble rectifier diode, one-way traffic only.",
+      "attributes": {
+        "part_number": "1N4007",
+        "in_stock": 60,
+        "reorder_at": 20,
+        "typical_price": {
+          "value": 0.06,
+          "currency": "GBP"
+        },
+        "datasheet": "https://datasheets.example/1n4007.pdf"
+      }
+    },
+    {
+      "ref": "red-led-5-mm",
+      "type": "part",
+      "name": "Red LED, 5 mm",
+      "description": "The classic power-on light, and the first thing anyone blinks.",
+      "attributes": {
+        "part_number": "LED-R5",
+        "in_stock": 85,
+        "reorder_at": 20,
+        "typical_price": {
+          "value": 0.1,
+          "currency": "GBP"
+        },
+        "datasheet": "https://datasheets.example/led-r5.pdf"
+      }
+    },
+    {
+      "ref": "10-turn-trimmer-potentiometer",
+      "type": "part",
+      "name": "10-turn trimmer potentiometer",
+      "description": "For setting a voltage just so, with a very small screwdriver.",
+      "attributes": {
+        "part_number": "POT-10T",
+        "in_stock": 2,
+        "reorder_at": 3,
+        "typical_price": {
+          "value": 1.2,
+          "currency": "GBP"
+        },
+        "datasheet": "https://datasheets.example/pot-10t.pdf",
+        "notes": "Low on stock."
+      }
+    },
+    {
+      "ref": "banana-socket-pair-red-and-black",
+      "type": "part",
+      "name": "Banana socket pair (red and black)",
+      "description": "Red and black sockets for the front of anything that needs probing.",
+      "attributes": {
+        "part_number": "BAN-RB",
+        "in_stock": 6,
+        "reorder_at": 2,
+        "typical_price": {
+          "value": 1.8,
+          "currency": "GBP"
+        }
+      }
+    },
+    {
+      "ref": "raspberry-pi-pico-2-w",
+      "type": "part",
+      "name": "Raspberry Pi Pico 2 W",
+      "description": "A tiny wireless microcontroller board that goes into every idea.",
+      "attributes": {
+        "part_number": "PICO2W",
+        "in_stock": 2,
+        "reorder_at": 1,
+        "typical_price": {
+          "value": 7.2,
+          "currency": "GBP"
+        },
+        "datasheet": "https://datasheets.example/pico2w.pdf",
+        "notes": "Wireless, and always one short."
+      }
+    },
+    {
+      "ref": "solder-wire-08-mm-100-g-reel",
+      "type": "part",
+      "name": "Solder wire, 0.8 mm, 100 g reel",
+      "description": "A reel that lasts for months and vanishes the day you need it.",
+      "attributes": {
+        "part_number": "SOLD-08",
+        "in_stock": 1,
+        "reorder_at": 1,
+        "typical_price": {
+          "value": 8.5,
+          "currency": "GBP"
+        },
+        "notes": "A consumable, so it is not in any bill of materials."
+      }
+    },
+    {
+      "ref": "green-led-5-mm",
+      "type": "part",
+      "name": "Green LED, 5 mm",
+      "description": "The cheerful sibling of the red one, for go signals.",
+      "attributes": {
+        "part_number": "LED-G5",
+        "in_stock": 70,
+        "reorder_at": 20,
+        "typical_price": {
+          "value": 0.1,
+          "currency": "GBP"
+        },
+        "datasheet": "https://datasheets.example/led-g5.pdf"
+      }
+    },
+    {
+      "ref": "tactile-push-button-6-mm",
+      "type": "part",
+      "name": "Tactile push button, 6 mm",
+      "description": "Clicks satisfyingly and bounces unforgivably.",
+      "attributes": {
+        "part_number": "BTN-6",
+        "in_stock": 40,
+        "reorder_at": 10,
+        "typical_price": {
+          "value": 0.12,
+          "currency": "GBP"
+        },
+        "datasheet": "https://datasheets.example/btn-6.pdf"
+      }
+    },
+    {
+      "ref": "half-size-breadboard",
+      "type": "part",
+      "name": "Half-size breadboard",
+      "description": "For trying an idea out before committing it to solder.",
+      "attributes": {
+        "part_number": "BB-HALF",
+        "in_stock": 3,
+        "reorder_at": 1,
+        "typical_price": {
+          "value": 4.5,
+          "currency": "GBP"
+        },
+        "datasheet": "https://datasheets.example/bb-half.pdf"
+      }
+    },
+    {
+      "ref": "bench-power-supply",
+      "type": "assembly",
+      "name": "Bench power supply",
+      "description": "A variable bench supply built around a salvaged transformer.",
+      "attributes": {
+        "built": "2024-05",
+        "build_steps": [
+          {
+            "text": "Drill the case",
+            "done": true
+          },
+          {
+            "text": "Mount the transformer",
+            "done": true
+          },
+          {
+            "text": "Solder the regulator board",
+            "done": true
+          },
+          {
+            "text": "Wire the front panel",
+            "done": true
+          },
+          {
+            "text": "Test with a dummy load",
+            "done": true
+          },
+          {
+            "text": "Label the sockets",
+            "done": false
+          }
+        ]
+      }
+    },
+    {
+      "ref": "fuzz-pedal",
+      "type": "assembly",
+      "name": "Fuzz pedal",
+      "description": "A noisy, glorious fuzz box.",
+      "attributes": {
+        "built": "2023",
+        "build_steps": [
+          {
+            "text": "Etch the board",
+            "done": true
+          },
+          {
+            "text": "Solder the components",
+            "done": true
+          },
+          {
+            "text": "Wire the jacks",
+            "done": true
+          },
+          {
+            "text": "Fit it in the enclosure",
+            "done": false
+          }
+        ]
+      }
+    },
+    {
+      "ref": "pico-reaction-game",
+      "type": "assembly",
+      "name": "Pico reaction game",
+      "description": "Whoever presses first when the LED lights wins.",
+      "attributes": {
+        "built": "2025-11",
+        "build_steps": [
+          {
+            "text": "Seat the Pico on the breadboard",
+            "done": true
+          },
+          {
+            "text": "Wire the LEDs and resistors",
+            "done": true
+          },
+          {
+            "text": "Wire the two buttons",
+            "done": true
+          },
+          {
+            "text": "Flash the game code",
+            "done": true
+          },
+          {
+            "text": "Add a buzzer",
+            "done": false
+          }
+        ]
+      }
+    },
+    {
+      "ref": "spark-and-solder-ltd",
+      "type": "supplier",
+      "name": "Spark & Solder Ltd",
+      "description": "A Wakefield component shop with a good drawer of everything.",
+      "attributes": {
+        "website": "https://sparkandsolder.example",
+        "email": "orders@sparkandsolder.example",
+        "phone": "01632 960123",
+        "notes": "Next-day delivery on orders before 2 pm."
+      }
+    },
+    {
+      "ref": "bench-bits",
+      "type": "supplier",
+      "name": "Bench Bits",
+      "description": "A one-person Bristol shop that answers emails at midnight.",
+      "attributes": {
+        "website": "https://benchbits.example",
+        "email": "hello@benchbits.example",
+        "phone": "01632 960456",
+        "notes": "Cheapest for resistors, slowest to arrive."
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "lm317-voltage-regulator",
+      "to": "bench-power-supply",
+      "type": "used-in",
+      "attributes": {
+        "quantity": 1
+      }
+    },
+    {
+      "from": "1n4007-diode",
+      "to": "bench-power-supply",
+      "type": "used-in",
+      "attributes": {
+        "quantity": 4
+      }
+    },
+    {
+      "from": "470-uf-electrolytic-capacitor",
+      "to": "bench-power-supply",
+      "type": "used-in",
+      "attributes": {
+        "quantity": 2
+      }
+    },
+    {
+      "from": "100-nf-ceramic-capacitor",
+      "to": "bench-power-supply",
+      "type": "used-in",
+      "attributes": {
+        "quantity": 3
+      }
+    },
+    {
+      "from": "10-turn-trimmer-potentiometer",
+      "to": "bench-power-supply",
+      "type": "used-in",
+      "attributes": {
+        "quantity": 1
+      }
+    },
+    {
+      "from": "banana-socket-pair-red-and-black",
+      "to": "bench-power-supply",
+      "type": "used-in",
+      "attributes": {
+        "quantity": 2
+      }
+    },
+    {
+      "from": "red-led-5-mm",
+      "to": "bench-power-supply",
+      "type": "used-in",
+      "attributes": {
+        "quantity": 1
+      }
+    },
+    {
+      "from": "10k-resistor-025-w",
+      "to": "fuzz-pedal",
+      "type": "used-in",
+      "attributes": {
+        "quantity": 3
+      }
+    },
+    {
+      "from": "100-nf-ceramic-capacitor",
+      "to": "fuzz-pedal",
+      "type": "used-in",
+      "attributes": {
+        "quantity": 2
+      }
+    },
+    {
+      "from": "470-uf-electrolytic-capacitor",
+      "to": "fuzz-pedal",
+      "type": "used-in",
+      "attributes": {
+        "quantity": 1
+      }
+    },
+    {
+      "from": "1n4007-diode",
+      "to": "fuzz-pedal",
+      "type": "used-in",
+      "attributes": {
+        "quantity": 2
+      }
+    },
+    {
+      "from": "red-led-5-mm",
+      "to": "fuzz-pedal",
+      "type": "used-in",
+      "attributes": {
+        "quantity": 1
+      }
+    },
+    {
+      "from": "raspberry-pi-pico-2-w",
+      "to": "pico-reaction-game",
+      "type": "used-in",
+      "attributes": {
+        "quantity": 1
+      }
+    },
+    {
+      "from": "half-size-breadboard",
+      "to": "pico-reaction-game",
+      "type": "used-in",
+      "attributes": {
+        "quantity": 1
+      }
+    },
+    {
+      "from": "tactile-push-button-6-mm",
+      "to": "pico-reaction-game",
+      "type": "used-in",
+      "attributes": {
+        "quantity": 2
+      }
+    },
+    {
+      "from": "red-led-5-mm",
+      "to": "pico-reaction-game",
+      "type": "used-in",
+      "attributes": {
+        "quantity": 1
+      }
+    },
+    {
+      "from": "green-led-5-mm",
+      "to": "pico-reaction-game",
+      "type": "used-in",
+      "attributes": {
+        "quantity": 1
+      }
+    },
+    {
+      "from": "10k-resistor-025-w",
+      "to": "pico-reaction-game",
+      "type": "used-in",
+      "attributes": {
+        "quantity": 2
+      }
+    },
+    {
+      "from": "100-nf-ceramic-capacitor",
+      "to": "spark-and-solder-ltd",
+      "type": "supplied-by",
+      "attributes": {
+        "price": {
+          "value": 0.08,
+          "currency": "GBP"
+        }
+      }
+    },
+    {
+      "from": "470-uf-electrolytic-capacitor",
+      "to": "spark-and-solder-ltd",
+      "type": "supplied-by",
+      "attributes": {
+        "price": {
+          "value": 0.45,
+          "currency": "GBP"
+        }
+      }
+    },
+    {
+      "from": "lm317-voltage-regulator",
+      "to": "spark-and-solder-ltd",
+      "type": "supplied-by",
+      "attributes": {
+        "price": {
+          "value": 0.89,
+          "currency": "GBP"
+        }
+      }
+    },
+    {
+      "from": "1n4007-diode",
+      "to": "spark-and-solder-ltd",
+      "type": "supplied-by",
+      "attributes": {
+        "price": {
+          "value": 0.06,
+          "currency": "GBP"
+        }
+      }
+    },
+    {
+      "from": "red-led-5-mm",
+      "to": "spark-and-solder-ltd",
+      "type": "supplied-by",
+      "attributes": {
+        "price": {
+          "value": 0.1,
+          "currency": "GBP"
+        }
+      }
+    },
+    {
+      "from": "green-led-5-mm",
+      "to": "spark-and-solder-ltd",
+      "type": "supplied-by",
+      "attributes": {
+        "price": {
+          "value": 0.1,
+          "currency": "GBP"
+        }
+      }
+    },
+    {
+      "from": "10-turn-trimmer-potentiometer",
+      "to": "spark-and-solder-ltd",
+      "type": "supplied-by",
+      "attributes": {
+        "price": {
+          "value": 1.2,
+          "currency": "GBP"
+        }
+      }
+    },
+    {
+      "from": "banana-socket-pair-red-and-black",
+      "to": "spark-and-solder-ltd",
+      "type": "supplied-by",
+      "attributes": {
+        "price": {
+          "value": 1.8,
+          "currency": "GBP"
+        }
+      }
+    },
+    {
+      "from": "raspberry-pi-pico-2-w",
+      "to": "spark-and-solder-ltd",
+      "type": "supplied-by",
+      "attributes": {
+        "price": {
+          "value": 7.2,
+          "currency": "GBP"
+        }
+      }
+    },
+    {
+      "from": "tactile-push-button-6-mm",
+      "to": "spark-and-solder-ltd",
+      "type": "supplied-by",
+      "attributes": {
+        "price": {
+          "value": 0.12,
+          "currency": "GBP"
+        }
+      }
+    },
+    {
+      "from": "half-size-breadboard",
+      "to": "spark-and-solder-ltd",
+      "type": "supplied-by",
+      "attributes": {
+        "price": {
+          "value": 4.5,
+          "currency": "GBP"
+        }
+      }
+    },
+    {
+      "from": "solder-wire-08-mm-100-g-reel",
+      "to": "spark-and-solder-ltd",
+      "type": "supplied-by",
+      "attributes": {
+        "price": {
+          "value": 9.2,
+          "currency": "GBP"
+        }
+      }
+    },
+    {
+      "from": "10k-resistor-025-w",
+      "to": "bench-bits",
+      "type": "supplied-by",
+      "attributes": {
+        "price": {
+          "value": 0.04,
+          "currency": "GBP"
+        }
+      }
+    },
+    {
+      "from": "lm317-voltage-regulator",
+      "to": "bench-bits",
+      "type": "supplied-by",
+      "attributes": {
+        "price": {
+          "value": 0.79,
+          "currency": "GBP"
+        }
+      }
+    },
+    {
+      "from": "solder-wire-08-mm-100-g-reel",
+      "to": "bench-bits",
+      "type": "supplied-by",
+      "attributes": {
+        "price": {
+          "value": 8.5,
+          "currency": "GBP"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,784 @@
+{
+  "format": "menagerist-example-pack",
+  "version": 1,
+  "id": "recipes",
+  "relationship_types": [
+    {
+      "ref": "from",
+      "slug": "recipes-from",
+      "label": "From",
+      "reverse_label": "Recipes",
+      "description": "Where a recipe came from.",
+      "directional": true
+    },
+    {
+      "ref": "inspired-by",
+      "slug": "recipes-inspired-by",
+      "label": "Inspired by",
+      "reverse_label": "Inspired",
+      "description": "A recipe that grew out of another.",
+      "directional": true
+    },
+    {
+      "ref": "uses",
+      "slug": "recipes-uses",
+      "label": "Uses",
+      "reverse_label": "Used in",
+      "description": "An ingredient a recipe relies on, for the ones worth tracking.",
+      "directional": true
+    }
+  ],
+  "item_types": [
+    {
+      "ref": "recipe",
+      "slug": "recipes-recipe",
+      "label": "Recipe",
+      "description": "A recipe with its timings, ingredients table and full method.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "servings": {
+            "title": "Serves",
+            "type": "number",
+            "x-menagerist": {
+              "kind": "number"
+            }
+          },
+          "prep_time": {
+            "title": "Prep time",
+            "type": "number",
+            "minimum": 0,
+            "multipleOf": 1,
+            "x-menagerist": {
+              "kind": "duration"
+            }
+          },
+          "cook_time": {
+            "title": "Cook time",
+            "type": "number",
+            "minimum": 0,
+            "multipleOf": 1,
+            "x-menagerist": {
+              "kind": "duration"
+            }
+          },
+          "dietary": {
+            "title": "Dietary",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Vegetarian",
+                "Vegan",
+                "Gluten-free",
+                "Dairy-free",
+                "Contains nuts"
+              ]
+            },
+            "uniqueItems": true,
+            "x-menagerist": {
+              "kind": "multichoice"
+            }
+          },
+          "rating": {
+            "title": "Rating",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5,
+            "multipleOf": 1,
+            "x-menagerist": {
+              "kind": "rating"
+            }
+          },
+          "ingredients": {
+            "title": "Ingredients",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ingredient": {
+                  "title": "Ingredient",
+                  "type": "string",
+                  "x-menagerist": {
+                    "kind": "text"
+                  }
+                },
+                "quantity": {
+                  "title": "Quantity",
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "title": "Value",
+                      "type": "number"
+                    },
+                    "unit": {
+                      "title": "Unit",
+                      "type": "string"
+                    }
+                  },
+                  "x-menagerist": {
+                    "kind": "quantity"
+                  }
+                }
+              }
+            },
+            "x-menagerist": {
+              "columns": [
+                "ingredient",
+                "quantity"
+              ],
+              "kind": "group"
+            }
+          },
+          "method": {
+            "title": "Method",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "x-menagerist": {
+              "kind": "list"
+            }
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "longtext"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "servings"
+            },
+            {
+              "key": "prep_time"
+            },
+            {
+              "key": "cook_time"
+            },
+            {
+              "key": "dietary"
+            },
+            {
+              "key": "rating"
+            },
+            {
+              "key": "ingredients"
+            },
+            {
+              "key": "method"
+            },
+            {
+              "key": "notes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "rating"
+              },
+              {
+                "key": "cook_time"
+              },
+              {
+                "key": "dietary"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "source",
+      "slug": "recipes-source",
+      "label": "Source",
+      "description": "Where a recipe came from: a tin of cards, a cookbook or a person.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string",
+            "enum": [
+              "Handwritten",
+              "Cookbook",
+              "Person",
+              "Website"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "author": {
+            "title": "Author",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "year": {
+            "title": "Year",
+            "type": "string",
+            "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+            "x-menagerist": {
+              "kind": "partialdate"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "kind"
+            },
+            {
+              "key": "author"
+            },
+            {
+              "key": "year"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "kind"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "ingredient",
+      "slug": "recipes-ingredient",
+      "label": "Ingredient",
+      "description": "A staple worth tracking, and where it lives in the kitchen.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kept": {
+            "title": "Kept",
+            "type": "string",
+            "enum": [
+              "Fridge",
+              "Cupboard",
+              "Freezer"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "kept"
+            },
+            {
+              "key": "notes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "kept"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "items": [
+    {
+      "ref": "nan-s-recipe-tin",
+      "type": "source",
+      "name": "Nan's recipe tin",
+      "description": "A biscuit tin of splattered index cards in three different handwritings.",
+      "attributes": {
+        "kind": "Handwritten",
+        "author": "Nan"
+      }
+    },
+    {
+      "ref": "the-hungry-weekend",
+      "type": "source",
+      "name": "The Hungry Weekend",
+      "description": "Bought for a birthday and used constantly.",
+      "attributes": {
+        "kind": "Cookbook",
+        "author": "Ruth Pemberton",
+        "year": "2014"
+      }
+    },
+    {
+      "ref": "auntie-jean",
+      "type": "source",
+      "name": "Auntie Jean",
+      "description": "Rings up with instructions and never writes anything down.",
+      "attributes": {
+        "kind": "Person",
+        "author": "Jean"
+      }
+    },
+    {
+      "ref": "mature-cheddar",
+      "type": "ingredient",
+      "name": "Mature cheddar",
+      "description": "A sharp block that does most of the work in this kitchen.",
+      "attributes": {
+        "kept": "Fridge",
+        "notes": "Never mild."
+      }
+    },
+    {
+      "ref": "plain-flour",
+      "type": "ingredient",
+      "name": "Plain flour",
+      "description": "Goes into everything, usually with a cloud of dust.",
+      "attributes": {
+        "kept": "Cupboard",
+        "notes": "Buy the big bag."
+      }
+    },
+    {
+      "ref": "leeks",
+      "type": "ingredient",
+      "name": "Leeks",
+      "description": "Gritty until they are washed twice.",
+      "attributes": {
+        "kept": "Fridge",
+        "notes": "Wash them twice."
+      }
+    },
+    {
+      "ref": "black-treacle",
+      "type": "ingredient",
+      "name": "Black treacle",
+      "description": "Dark, sticky and stubborn about leaving the tin.",
+      "attributes": {
+        "kept": "Cupboard",
+        "notes": "Warm the tin in hot water first."
+      }
+    },
+    {
+      "ref": "cheese-and-onion-pie",
+      "type": "recipe",
+      "name": "Cheese and onion pie",
+      "description": "The pie that settles every argument.",
+      "attributes": {
+        "servings": 6,
+        "prep_time": 1800,
+        "cook_time": 2700,
+        "dietary": [
+          "Vegetarian"
+        ],
+        "rating": 5,
+        "ingredients": [
+          {
+            "ingredient": "Plain flour",
+            "quantity": {
+              "value": 300,
+              "unit": "g"
+            }
+          },
+          {
+            "ingredient": "Butter",
+            "quantity": {
+              "value": 150,
+              "unit": "g"
+            }
+          },
+          {
+            "ingredient": "Mature cheddar",
+            "quantity": {
+              "value": 250,
+              "unit": "g"
+            }
+          },
+          {
+            "ingredient": "Onions",
+            "quantity": {
+              "value": 3,
+              "unit": "whole"
+            }
+          },
+          {
+            "ingredient": "Potatoes",
+            "quantity": {
+              "value": 400,
+              "unit": "g"
+            }
+          },
+          {
+            "ingredient": "Egg",
+            "quantity": {
+              "value": 1,
+              "unit": "whole"
+            }
+          },
+          {
+            "ingredient": "Milk",
+            "quantity": {
+              "value": 2,
+              "unit": "tbsp"
+            }
+          }
+        ],
+        "method": [
+          "Rub the butter into the flour, bind with a splash of cold water and chill.",
+          "Boil the potatoes until just tender and soften the onions slowly in butter.",
+          "Mix both with the grated cheddar and plenty of black pepper.",
+          "Line a tin with two thirds of the pastry, fill it and add a lid.",
+          "Brush with the beaten egg and milk, then bake at 200C for 45 minutes until deep golden."
+        ],
+        "notes": "Nan said never use mild cheddar. Serve with brown sauce, obviously."
+      },
+      "tags": [
+        "pie",
+        "comfort food"
+      ]
+    },
+    {
+      "ref": "leek-and-cheddar-scones",
+      "type": "recipe",
+      "name": "Leek and cheddar scones",
+      "description": "Pie flavours in scone form, for when there is no time for pastry.",
+      "attributes": {
+        "servings": 8,
+        "prep_time": 900,
+        "cook_time": 1200,
+        "dietary": [
+          "Vegetarian"
+        ],
+        "rating": 4,
+        "ingredients": [
+          {
+            "ingredient": "Plain flour",
+            "quantity": {
+              "value": 350,
+              "unit": "g"
+            }
+          },
+          {
+            "ingredient": "Baking powder",
+            "quantity": {
+              "value": 4,
+              "unit": "tsp"
+            }
+          },
+          {
+            "ingredient": "Butter",
+            "quantity": {
+              "value": 85,
+              "unit": "g"
+            }
+          },
+          {
+            "ingredient": "Mature cheddar",
+            "quantity": {
+              "value": 150,
+              "unit": "g"
+            }
+          },
+          {
+            "ingredient": "Leeks",
+            "quantity": {
+              "value": 1,
+              "unit": "whole"
+            }
+          },
+          {
+            "ingredient": "Egg",
+            "quantity": {
+              "value": 1,
+              "unit": "whole"
+            }
+          },
+          {
+            "ingredient": "Milk",
+            "quantity": {
+              "value": 175,
+              "unit": "ml"
+            }
+          },
+          {
+            "ingredient": "Mustard powder",
+            "quantity": {
+              "value": 1,
+              "unit": "tsp"
+            }
+          }
+        ],
+        "method": [
+          "Heat the oven to 220C and flour a baking tray.",
+          "Soften the sliced leek in a little butter, then let it cool.",
+          "Rub the butter into the flour, baking powder and mustard powder.",
+          "Stir in most of the cheddar and the leek, then mix to a soft dough with the milk and egg.",
+          "Pat out to 3 cm thick, cut into rounds and scatter with the rest of the cheddar.",
+          "Bake for 15 to 20 minutes until risen and golden."
+        ],
+        "notes": "Best eaten warm, with too much butter."
+      },
+      "tags": [
+        "baking"
+      ]
+    },
+    {
+      "ref": "sunday-roast-chicken",
+      "type": "recipe",
+      "name": "Sunday roast chicken",
+      "description": "The reason Sunday afternoons exist.",
+      "attributes": {
+        "servings": 4,
+        "prep_time": 1200,
+        "cook_time": 5400,
+        "dietary": [
+          "Dairy-free"
+        ],
+        "rating": 4,
+        "ingredients": [
+          {
+            "ingredient": "Chicken",
+            "quantity": {
+              "value": 1.6,
+              "unit": "kg"
+            }
+          },
+          {
+            "ingredient": "Potatoes",
+            "quantity": {
+              "value": 1,
+              "unit": "kg"
+            }
+          },
+          {
+            "ingredient": "Carrots",
+            "quantity": {
+              "value": 4,
+              "unit": "whole"
+            }
+          },
+          {
+            "ingredient": "Onions",
+            "quantity": {
+              "value": 2,
+              "unit": "whole"
+            }
+          },
+          {
+            "ingredient": "Olive oil",
+            "quantity": {
+              "value": 3,
+              "unit": "tbsp"
+            }
+          },
+          {
+            "ingredient": "Garlic",
+            "quantity": {
+              "value": 1,
+              "unit": "whole"
+            }
+          },
+          {
+            "ingredient": "Thyme",
+            "quantity": {
+              "value": 4,
+              "unit": "sprigs"
+            }
+          },
+          {
+            "ingredient": "Chicken stock",
+            "quantity": {
+              "value": 500,
+              "unit": "ml"
+            }
+          }
+        ],
+        "method": [
+          "Take the chicken out of the fridge an hour before and heat the oven to 200C.",
+          "Rub the bird with oil, salt and pepper and tuck the garlic and thyme inside.",
+          "Roast for 1 hour 30 minutes, basting once or twice.",
+          "Parboil the potatoes, shake them rough and roast in hot oil for the last hour.",
+          "Rest the chicken under foil for 20 minutes while you make gravy from the tin and the stock.",
+          "Carve at the table and take the credit."
+        ],
+        "notes": "Rest it for twenty minutes. Nobody waits. Everyone should."
+      },
+      "tags": [
+        "sunday roast"
+      ]
+    },
+    {
+      "ref": "parkin",
+      "type": "recipe",
+      "name": "Parkin",
+      "description": "A sticky ginger cake that is better on day three.",
+      "attributes": {
+        "servings": 12,
+        "prep_time": 1200,
+        "cook_time": 3600,
+        "dietary": [
+          "Vegetarian"
+        ],
+        "ingredients": [
+          {
+            "ingredient": "Plain flour",
+            "quantity": {
+              "value": 225,
+              "unit": "g"
+            }
+          },
+          {
+            "ingredient": "Medium oatmeal",
+            "quantity": {
+              "value": 100,
+              "unit": "g"
+            }
+          },
+          {
+            "ingredient": "Black treacle",
+            "quantity": {
+              "value": 175,
+              "unit": "g"
+            }
+          },
+          {
+            "ingredient": "Golden syrup",
+            "quantity": {
+              "value": 100,
+              "unit": "g"
+            }
+          },
+          {
+            "ingredient": "Butter",
+            "quantity": {
+              "value": 125,
+              "unit": "g"
+            }
+          },
+          {
+            "ingredient": "Dark brown sugar",
+            "quantity": {
+              "value": 100,
+              "unit": "g"
+            }
+          },
+          {
+            "ingredient": "Ground ginger",
+            "quantity": {
+              "value": 3,
+              "unit": "tsp"
+            }
+          },
+          {
+            "ingredient": "Egg",
+            "quantity": {
+              "value": 1,
+              "unit": "whole"
+            }
+          },
+          {
+            "ingredient": "Milk",
+            "quantity": {
+              "value": 2,
+              "unit": "tbsp"
+            }
+          }
+        ],
+        "method": [
+          "Heat the oven to 150C and line a square tin.",
+          "Melt the butter, treacle, syrup and sugar gently together and let it cool a little.",
+          "Mix the flour, oatmeal and ginger in a bowl.",
+          "Stir in the melted mixture, then the beaten egg and milk to a pourable batter.",
+          "Bake for 1 hour until firm, then keep it in the tin for three days before cutting."
+        ],
+        "notes": "Improves if left in the tin for three days. Almost impossible to manage."
+      },
+      "tags": [
+        "baking",
+        "yorkshire"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "cheese-and-onion-pie",
+      "to": "nan-s-recipe-tin",
+      "type": "from"
+    },
+    {
+      "from": "leek-and-cheddar-scones",
+      "to": "the-hungry-weekend",
+      "type": "from"
+    },
+    {
+      "from": "sunday-roast-chicken",
+      "to": "the-hungry-weekend",
+      "type": "from"
+    },
+    {
+      "from": "parkin",
+      "to": "auntie-jean",
+      "type": "from"
+    },
+    {
+      "from": "leek-and-cheddar-scones",
+      "to": "cheese-and-onion-pie",
+      "type": "inspired-by"
+    },
+    {
+      "from": "cheese-and-onion-pie",
+      "to": "mature-cheddar",
+      "type": "uses"
+    },
+    {
+      "from": "cheese-and-onion-pie",
+      "to": "plain-flour",
+      "type": "uses"
+    },
+    {
+      "from": "leek-and-cheddar-scones",
+      "to": "mature-cheddar",
+      "type": "uses"
+    },
+    {
+      "from": "leek-and-cheddar-scones",
+      "to": "plain-flour",
+      "type": "uses"
+    },
+    {
+      "from": "leek-and-cheddar-scones",
+      "to": "leeks",
+      "type": "uses"
+    },
+    {
+      "from": "parkin",
+      "to": "plain-flour",
+      "type": "uses"
+    },
+    {
+      "from": "parkin",
+      "to": "black-treacle",
+      "type": "uses"
+    }
+  ]
+}

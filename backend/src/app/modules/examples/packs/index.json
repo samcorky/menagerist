@@ -6,6 +6,21 @@
       "id": "music",
       "name": "Music: records, gigs and friends",
       "description": "A small record collection with the artists, gigs, venues and friends around it, including who signed what and where."
+    },
+    {
+      "id": "recipes",
+      "name": "Recipes",
+      "description": "A few family and cookbook recipes with ingredient tables, full methods, and where each one came from."
+    },
+    {
+      "id": "movies",
+      "name": "Movies",
+      "description": "Films you have watched, where and with whom, plus the posters you have collected and who signed them."
+    },
+    {
+      "id": "parts",
+      "name": "Electronic parts",
+      "description": "A small parts drawer: what is in stock, what is running low, what each build uses and who sells it."
     }
   ]
 }
