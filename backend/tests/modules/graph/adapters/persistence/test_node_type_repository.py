@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.modules.graph.adapters.persistence.node_type_repository import (
     SqlAlchemyNodeTypeRepository,
@@ -44,3 +45,28 @@ async def test_constraint_patterns_round_trip_through_jsonb(
     assert stored.attributes_schema == _SCHEMA
     cover = stored.attributes_schema["properties"]["cover_file"]
     assert [p["pattern"] for p in cover["allOf"]] == ["^cover-", r"\.jpg$"]
+
+
+async def test_slug_can_be_reused_after_soft_delete(db_session: AsyncSession) -> None:
+    """A soft-deleted node type stops reserving its slug."""
+    repository = SqlAlchemyNodeTypeRepository(db_session)
+    first = NodeType.create(slug="record", label="Record")
+    await repository.add(first)
+    first.soft_delete()
+    await repository.save(first)
+
+    second = NodeType.create(slug="record", label="Record again")
+    await repository.add(second)
+
+    live = await repository.get_by_slug("record")
+    assert live is not None
+    assert live.id == second.id
+
+
+async def test_live_node_types_cannot_share_a_slug(db_session: AsyncSession) -> None:
+    """The index backs the use case's check: two live types cannot share a slug."""
+    repository = SqlAlchemyNodeTypeRepository(db_session)
+    await repository.add(NodeType.create(slug="record", label="Record"))
+
+    with pytest.raises(IntegrityError):
+        await repository.add(NodeType.create(slug="record", label="Duplicate"))

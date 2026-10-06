@@ -1,7 +1,7 @@
 import uuid
 from typing import Any
 
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, Index, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -16,8 +16,17 @@ class NodeTypeModel(IdentifiableMixin, SoftDeletableMixin, Base):
     """
 
     __tablename__ = "node_types"
+    # Only live rows reserve a slug; the use cases check this too, the index backs them.
+    __table_args__ = (
+        Index(
+            "uq_node_types_slug_live",
+            "slug",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+    )
 
-    slug: Mapped[str] = mapped_column(unique=True, index=True)
+    slug: Mapped[str] = mapped_column(index=True)
     label: Mapped[str]
     description: Mapped[str | None]
     attributes_schema: Mapped[dict[str, Any] | None] = mapped_column(
@@ -54,8 +63,16 @@ class EdgeTypeModel(IdentifiableMixin, SoftDeletableMixin, Base):
     """ORM row for an edge type."""
 
     __tablename__ = "edge_types"
+    __table_args__ = (
+        Index(
+            "uq_edge_types_slug_live",
+            "slug",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+    )
 
-    slug: Mapped[str] = mapped_column(unique=True, index=True)
+    slug: Mapped[str] = mapped_column(index=True)
     label: Mapped[str]
     reverse_label: Mapped[str | None]
     description: Mapped[str | None]

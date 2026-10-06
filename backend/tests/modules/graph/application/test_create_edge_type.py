@@ -16,6 +16,10 @@ from app.modules.graph.application.create_edge_type import (
     CreateEdgeType,
     CreateEdgeTypeCommand,
 )
+from app.modules.graph.application.delete_edge_type import (
+    DeleteEdgeType,
+    DeleteEdgeTypeCommand,
+)
 from app.modules.graph.domain.errors import (
     EdgeTypeSlugConflictError,
     InvalidSchemaError,
@@ -86,6 +90,30 @@ async def test_create_edge_type_raises_on_invalid_schema() -> None:
                 attributes_schema={"type": "not-a-valid-type"},
             ),
             SYSTEM_ACTOR,
+        )
+
+
+async def test_create_edge_type_succeeds_after_delete_of_same_slug() -> None:
+    """A deleted edge type stops reserving its slug; the live one wins afterwards."""
+    uow, repos = _make_uow()
+    first = await CreateEdgeType(uow).handle(
+        CreateEdgeTypeCommand(slug="directed-by", label="Directed By"), SYSTEM_ACTOR
+    )
+    await DeleteEdgeType(uow).handle(
+        DeleteEdgeTypeCommand(edge_type_id=first.id), SYSTEM_ACTOR
+    )
+
+    second = await CreateEdgeType(uow).handle(
+        CreateEdgeTypeCommand(slug="directed-by", label="Directed By again"),
+        SYSTEM_ACTOR,
+    )
+
+    assert second.id != first.id
+    assert await repos.edge_types.get_by_slug("directed-by") is second
+
+    with pytest.raises(EdgeTypeSlugConflictError):
+        await CreateEdgeType(uow).handle(
+            CreateEdgeTypeCommand(slug="directed-by", label="Third"), SYSTEM_ACTOR
         )
 
 

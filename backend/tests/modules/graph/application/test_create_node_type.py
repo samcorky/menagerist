@@ -16,6 +16,10 @@ from app.modules.graph.application.create_node_type import (
     CreateNodeType,
     CreateNodeTypeCommand,
 )
+from app.modules.graph.application.delete_node_type import (
+    DeleteNodeType,
+    DeleteNodeTypeCommand,
+)
 from app.modules.graph.domain.errors import (
     InvalidSchemaError,
     NodeTypeSlugConflictError,
@@ -99,6 +103,29 @@ async def test_create_node_type_raises_on_slug_conflict() -> None:
         await use_case.handle(
             CreateNodeTypeCommand(slug="film", label="Duplicate"),
             SYSTEM_ACTOR,
+        )
+
+
+async def test_create_node_type_succeeds_after_delete_of_same_slug() -> None:
+    """A deleted node type stops reserving its slug; the live one wins afterwards."""
+    uow, repos = _make_uow()
+    first = await CreateNodeType(uow).handle(
+        CreateNodeTypeCommand(slug="film", label="Film"), SYSTEM_ACTOR
+    )
+    await DeleteNodeType(uow).handle(
+        DeleteNodeTypeCommand(node_type_id=first.id), SYSTEM_ACTOR
+    )
+
+    second = await CreateNodeType(uow).handle(
+        CreateNodeTypeCommand(slug="film", label="Film again"), SYSTEM_ACTOR
+    )
+
+    assert second.id != first.id
+    assert await repos.node_types.get_by_slug("film") is second
+
+    with pytest.raises(NodeTypeSlugConflictError):
+        await CreateNodeType(uow).handle(
+            CreateNodeTypeCommand(slug="film", label="Third"), SYSTEM_ACTOR
         )
 
 
