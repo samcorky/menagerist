@@ -1,0 +1,75 @@
+import type {
+	KeptEntityResponse,
+	PackCountsResponse,
+	UninstallResultResponse
+} from '$lib/api/client';
+
+const COUNT_PARTS: [keyof PackCountsResponse, string, string][] = [
+	['item_types', 'item type', 'item types'],
+	['items', 'item', 'items'],
+	['connections', 'connection', 'connections'],
+	['relationship_types', 'connection type', 'connection types'],
+	['presets', 'preset', 'presets']
+];
+
+function plural(n: number, one: string, many: string): string {
+	return `${n} ${n === 1 ? one : many}`;
+}
+
+/** "3 item types, 14 items": the non-zero parts of a pack, in a fixed order. */
+export function describeCounts(counts: PackCountsResponse): string {
+	return COUNT_PARTS.filter(([key]) => counts[key] > 0)
+		.map(([key, one, many]) => plural(counts[key], one, many))
+		.join(', ');
+}
+
+const REASON_LABELS: Record<string, string> = {
+	edited: 'you edited them',
+	'has your connections or files': 'they have your connections or files',
+	'still in use': 'they are still in use'
+};
+
+/** A friendly phrase for why something was kept; unknown reasons stay neutral. */
+export function reasonLabel(reason: string): string {
+	return REASON_LABELS[reason] ?? 'they are no longer just examples';
+}
+
+/** Kept entries grouped by reason, in first-seen order. */
+export function groupKept(kept: KeptEntityResponse[]): { reason: string; count: number }[] {
+	const groups = new Map<string, number>();
+	for (const entry of kept) groups.set(entry.reason, (groups.get(entry.reason) ?? 0) + 1);
+	return [...groups].map(([reason, count]) => ({ reason, count }));
+}
+
+/** The toast text after removal: what went, then what stayed and why. */
+export function describeRemoval(report: UninstallResultResponse): string {
+	const removed = describeCounts(report.removed);
+	const first = removed ? `Removed ${removed}.` : 'Nothing needed removing.';
+	if (report.kept.length === 0) return first;
+	const kept = groupKept(report.kept)
+		.map(
+			({ reason, count }) =>
+				`${plural(count, 'item was', 'items were')} kept because ${reasonLabel(reason)}`
+		)
+		.join('; ');
+	return `${first} ${kept}.`;
+}
+
+const BANNER_KEY = 'menagerist.examples.bannerDismissed';
+
+/** Whether the "you have examples" line was dismissed; a private window may refuse storage. */
+export function isExamplesBannerDismissed(): boolean {
+	try {
+		return localStorage.getItem(BANNER_KEY) === 'true';
+	} catch {
+		return false;
+	}
+}
+
+export function dismissExamplesBanner(): void {
+	try {
+		localStorage.setItem(BANNER_KEY, 'true');
+	} catch {
+		// Storage unavailable: the line returns on the next visit.
+	}
+}

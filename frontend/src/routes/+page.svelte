@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { goto } from '$app/navigation';
-	import { Package, Plus, ChevronRight, AlertCircle, Star } from '@lucide/svelte';
+	import { Package, Plus, ChevronRight, AlertCircle, Star, X } from '@lucide/svelte';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import {
 		listNodes,
 		listNodeTypes,
+		listExamplePacks,
 		type NodeResponse,
 		type NodeTypeResponse
 	} from '$lib/api/client';
@@ -14,6 +15,7 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Item from '$lib/components/ui/item/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { dismissExamplesBanner, isExamplesBannerDismissed } from '$lib/examples';
 
 	// 30-day window per §18a
 	const RECENT_DAYS = 30;
@@ -56,19 +58,26 @@
 	});
 
 	let favouriteItems = $state<NodeResponse[]>([]);
+	// null until the pack list has loaded, so the line never shifts the layout
+	let hasExamples = $state<boolean | null>(null);
+	let examplesDismissed = $state(isExamplesBannerDismissed());
 
 	async function loadData() {
 		loading = true;
-		const [itemsResult, categoriesResult, favouritesResult] = await Promise.all([
+		const [itemsResult, categoriesResult, favouritesResult, examplesResult] = await Promise.all([
 			listNodes({ query: { limit: RECENT_LIMIT } }),
 			listNodeTypes({ query: { limit: 50 } }),
-			listNodes({ query: { limit: 100, favourite: true } })
+			listNodes({ query: { limit: 100, favourite: true } }),
+			listExamplePacks().catch(() => null)
 		]);
 		allItems = itemsResult.data ?? [];
 		const rawTotal = itemsResult.response?.headers.get('Total-Count');
 		totalItems = rawTotal ? parseInt(rawTotal, 10) : allItems.length;
 		categories = categoriesResult.data ?? [];
 		favouriteItems = favouritesResult.data ?? [];
+		hasExamples = examplesResult?.data
+			? examplesResult.data.some((pack) => pack.installation?.status === 'installed')
+			: null;
 		loading = false;
 	}
 
@@ -111,8 +120,38 @@
 					<Plus class="size-4" />
 					Add your first item
 				</Button>
+				<a
+					href={resolve('/settings/examples')}
+					class="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+				>
+					Or look around with some examples
+				</a>
 			</div>
 		{:else if !loading}
+			{#if hasExamples && !examplesDismissed}
+				<div
+					class="flex items-center justify-between gap-3 rounded-xl border bg-muted/30 px-4 py-3 text-sm"
+				>
+					<p>
+						You have example items. Remove them when you're ready.
+						<a
+							href={resolve('/settings/examples')}
+							class="font-medium underline-offset-2 hover:underline">Manage examples</a
+						>
+					</p>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						aria-label="Dismiss"
+						onclick={() => {
+							dismissExamplesBanner();
+							examplesDismissed = true;
+						}}
+					>
+						<X class="size-4" />
+					</Button>
+				</div>
+			{/if}
 			<div class="flex items-start justify-between gap-4">
 				<div>
 					<h1 class="font-heading text-3xl font-semibold tracking-tight">My items</h1>

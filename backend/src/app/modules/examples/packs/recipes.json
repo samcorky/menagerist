@@ -51,7 +51,8 @@
             "minimum": 0,
             "multipleOf": 1,
             "x-menagerist": {
-              "kind": "duration"
+              "kind": "duration",
+              "display": "words"
             }
           },
           "cook_time": {
@@ -60,7 +61,8 @@
             "minimum": 0,
             "multipleOf": 1,
             "x-menagerist": {
-              "kind": "duration"
+              "kind": "duration",
+              "display": "words"
             }
           },
           "dietary": {

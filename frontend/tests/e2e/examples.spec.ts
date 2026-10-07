@@ -1,0 +1,216 @@
+import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { createItem, createItemType, uniqueName } from './helpers';
+
+/**
+ * Example packs: install and remove from Settings > Examples, with the Home line and
+ * empty-state link. Installs are global per pack and the database is shared, so the suite is
+ * serial and every test cleans up through the API afterwards.
+ */
+test.describe.configure({ mode: 'serial' });
+
+const PACK_IDS = ['music', 'recipes', 'movies', 'parts'];
+const MUSIC = /^Music/;
+const MOVIES = /^Movies/;
+
+// Names of items this spec created or renamed, deleted again in cleanup.
+let ownNames: string[] = [];
+
+async function cleanUp(request: APIRequestContext) {
+	for (const id of PACK_IDS) {
+		await request.delete(`/api/v1/example/${id}/installation`);
+	}
+	const nodes = await request.get('/api/v1/node?limit=500');
+	for (const node of (await nodes.json()) as { id: string; name: string }[]) {
+		if (ownNames.includes(node.name)) await request.delete(`/api/v1/node/${node.id}`);
+	}
+	const types = await request.get('/api/v1/node-type?limit=500');
+	for (const type of (await types.json()) as { id: string; slug: string }[]) {
+		if (type.slug.startsWith('music-')) await request.delete(`/api/v1/node-type/${type.id}`);
+	}
+	ownNames = [];
+}
+
+test.beforeEach(({ request }) => cleanUp(request));
+test.afterEach(({ request }) => cleanUp(request));
+
+async function install(page: Page, pack: RegExp) {
+	await page.goto('/settings/examples');
+	await page.getByRole('button', { name: new RegExp(`^Add ${pack.source.slice(1)}`) }).click();
+	await expect(page.getByText('Examples added')).toBeVisible();
+	await expect(
+		page.getByRole('button', { name: new RegExp(`^Remove ${pack.source.slice(1)}`) })
+	).toBeVisible();
+}
+
+async function remove(page: Page, pack: RegExp) {
+	await page.goto('/settings/examples');
+	await page.getByRole('button', { name: new RegExp(`^Remove ${pack.source.slice(1)}`) }).click();
+	await page
+		.getByRole('dialog', { name: 'Remove these examples?' })
+		.getByRole('button', { name: 'Remove', exact: true })
+		.click();
+}
+
+async function openItem(page: Page, name: string) {
+	await page.goto('/items');
+	await page.getByPlaceholder('Search your items…').fill(name);
+	await page.getByRole('link', { name }).first().click();
+	await page.waitForURL(/\/items\/(?!new$)[^/]+$/);
+	await expect(page.getByText(name, { exact: true }).first()).toBeVisible();
+}
+
+test('installs a pack, shows the Home line, and keeps it dismissed after reload', async ({
+	page
+}) => {
+	await install(page, MUSIC);
+
+	await page.goto('/items');
+	await page.getByPlaceholder('Search your items…').fill('Night Drive');
+	await expect(page.getByRole('link', { name: 'Night Drive' }).first()).toBeVisible();
+
+	await page.goto('/');
+	const line = page.getByText('You have example items.');
+	await expect(line).toBeVisible();
+	await page.getByRole('button', { name: 'Dismiss' }).click();
+	await expect(line).toHaveCount(0);
+
+	await page.reload();
+	await expect(page.getByRole('heading', { name: 'My items' })).toBeVisible();
+	await expect(line).toHaveCount(0);
+});
+
+test('follows a connection between example items', async ({ page }) => {
+	await install(page, MUSIC);
+	await openItem(page, 'Night Drive');
+
+	await page.getByRole('link', { name: 'The Velvet Static', exact: true }).first().click();
+	await expect(page.getByText('The Velvet Static', { exact: true }).first()).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Night Drive' }).first()).toBeVisible();
+});
+
+test('removing a pack removes its items and item types', async ({ page }) => {
+	await install(page, MUSIC);
+	await page.goto('/settings/item-types');
+	await expect(page.getByText('music-record', { exact: true })).toBeVisible();
+
+	await remove(page, MUSIC);
+	await expect(page.getByText(/^Removed /)).toBeVisible();
+	await expect(page.getByRole('button', { name: /^Add Music/ })).toBeVisible();
+
+	await page.goto('/items');
+	await page.getByPlaceholder('Search your items…').fill('Night Drive');
+	await expect(page.getByRole('link', { name: 'Night Drive' })).toHaveCount(0);
+
+	await page.goto('/settings/item-types');
+	await expect(page.getByRole('heading', { name: 'Item types' })).toBeVisible();
+	await expect(page.getByText('music-record', { exact: true })).toHaveCount(0);
+});
+
+test('keeps an edited example item on removal and says why', async ({ page }) => {
+	await install(page, MUSIC);
+	await openItem(page, 'Paper Lanterns');
+
+	const edited = uniqueName('Edited Lanterns');
+	ownNames.push(edited);
+	await page.getByRole('button', { name: 'Edit', exact: true }).click();
+	await page.getByLabel('Name').fill(edited);
+	await page.getByRole('button', { name: 'Save changes' }).click();
+	await expect(page.getByText(edited, { exact: true }).first()).toBeVisible();
+
+	await remove(page, MUSIC);
+	await expect(page.getByRole('region', { name: /Notifications/ })).toContainText(
+		'kept because you edited them'
+	);
+	await expect(page.getByText('item was kept because you edited them.')).toBeVisible();
+
+	await page.goto('/items');
+	await page.getByPlaceholder('Search your items…').fill(edited);
+	await expect(page.getByRole('link', { name: edited }).first()).toBeVisible();
+});
+
+test('keeps an example item that has your own connection', async ({ page }) => {
+	await install(page, MOVIES);
+	const own = uniqueName('My own item');
+	ownNames.push(own);
+	await createItem(page, { name: own });
+
+	await page.goto('/items');
+	await page.getByPlaceholder('Search your items…').fill('');
+	const firstExample = await page.request
+		.get('/api/v1/node?limit=500')
+		.then((r) => r.json() as Promise<{ id: string; name: string; type: string | null }[]>)
+		.then((nodes) => nodes.find((n) => n.type?.startsWith('movies-')));
+	expect(firstExample).toBeTruthy();
+	ownNames.push(firstExample!.name);
+
+	await page.goto(`/items/${firstExample!.id}`);
+	await expect(page.getByText(firstExample!.name, { exact: true }).first()).toBeVisible();
+	// Example items already have connections, so scope the label to the form's own input.
+	await page.getByRole('textbox', { name: 'Connection', exact: true }).fill('related-to');
+	const targetSearch = page.getByPlaceholder('Search items…');
+	await targetSearch.fill(own);
+	await page
+		.getByRole('button', { name: new RegExp(own) })
+		.first()
+		.click();
+	await targetSearch.blur();
+	await page.waitForTimeout(250);
+	await page.getByRole('button', { name: /^Connect items?$/ }).click();
+	await expect(page.getByRole('link', { name: own })).toBeVisible();
+
+	await remove(page, MOVIES);
+	await expect(
+		page.getByText('item was kept because they have your connections or files.')
+	).toBeVisible();
+
+	await page.goto(`/items/${firstExample!.id}`);
+	await expect(page.getByText(firstExample!.name, { exact: true }).first()).toBeVisible();
+});
+
+test('reinstalls a pack after removing it', async ({ page }) => {
+	await install(page, MUSIC);
+	await remove(page, MUSIC);
+	await expect(page.getByRole('button', { name: /^Add Music/ })).toBeVisible();
+
+	await install(page, MUSIC);
+	await openItem(page, 'Night Drive');
+});
+
+test('a clashing item type slug gives a friendly error and creates nothing', async ({
+	page,
+	request
+}) => {
+	await createItemType(page, { label: 'Music Person' });
+
+	await page.goto('/settings/examples');
+	await page.getByRole('button', { name: /^Add Music/ }).click();
+	await expect(page.getByText("Couldn't add these examples")).toBeVisible();
+	await expect(page.getByRole('button', { name: /^Add Music/ })).toBeVisible();
+
+	const nodes = (await (await request.get('/api/v1/node?limit=500')).json()) as { name: string }[];
+	expect(nodes.some((n) => n.name === 'Night Drive')).toBe(false);
+	const types = (await (await request.get('/api/v1/node-type?limit=500')).json()) as {
+		slug: string;
+	}[];
+	expect(types.some((t) => t.slug === 'music-record')).toBe(false);
+});
+
+test('the empty-state link opens the examples page, and only shows with no items', async ({
+	page,
+	request
+}) => {
+	const link = page.getByRole('link', { name: 'Or look around with some examples' });
+
+	const probe = await request.get('/api/v1/node?limit=1');
+	if (Number(probe.headers()['total-count'] ?? '0') === 0) {
+		await page.goto('/');
+		await link.click();
+		await expect(page).toHaveURL(/\/settings\/examples$/);
+		await expect(page.getByRole('heading', { name: 'Examples' })).toBeVisible();
+	}
+
+	await install(page, MUSIC);
+	await page.goto('/');
+	await expect(page.getByRole('heading', { name: 'My items' })).toBeVisible();
+	await expect(link).toHaveCount(0);
+});

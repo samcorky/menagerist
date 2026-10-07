@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { Tag, ArrowLeftRight, Bookmark, ChevronRight, Activity } from '@lucide/svelte';
+	import { Tag, ArrowLeftRight, Bookmark, ChevronRight, Activity, Sparkles } from '@lucide/svelte';
 </script>
 
 <svelte:head>
@@ -75,6 +75,29 @@
 							<p class="font-heading font-semibold">Saved fields</p>
 							<p class="mt-0.5 text-sm text-muted-foreground">
 								Reuse a field or a list of choices across item types.
+							</p>
+						</div>
+					</div>
+					<ChevronRight
+						class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+					/>
+				</div>
+			</a>
+
+			<a href={resolve('/settings/examples')} class="group block">
+				<div
+					class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
+				>
+					<div class="flex items-start gap-4">
+						<div
+							class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
+						>
+							<Sparkles class="size-5" />
+						</div>
+						<div>
+							<p class="font-heading font-semibold">Examples</p>
+							<p class="mt-0.5 text-sm text-muted-foreground">
+								Explore Menagerist with ready-made example items.
 							</p>
 						</div>
 					</div>
