@@ -492,5 +492,12 @@ Do nothing for this in Phases 0 to 4 except keep names and boundaries generic wh
 - **Opinionated built-in presets as a starter pack** (grades, formats, field groups), once examples exist.
 - **Example images.** Needs a media step in the installer (one more entry in the ordered step list), a media-asset source, and removal of attachments. Prefer placeholders generated locally at install time over fetching from an external placeholder service: self-hosted instances may be offline and the server should not pull third-party content. If real pictures are wanted, ship a few small CC0 images beside the packs in the module's `packs/` directory.
 - **A `collections` section** in the pack format once #265 lands (needs a version bump).
-- **An "Example" marker** on items in lists and on the item page (needs an endpoint mapping item ids to installations).
+- **Done (2026-10-07): the "Example" marker.** `GET /api/v1/example/entities` returns the owned item and item type ids; items show an "Example" badge on cards and in the read view, the items list has an All items / Hide examples / Only examples filter, and example item types are badged on Settings > Item types. Not done: a badge in the item type picker (`category-select.svelte`, a row of pills that a badge would crowd at phone width).
 - **`graph` and `presets` independence rule** in the architecture tests, mirroring the one added for `examples`.
+- **Koillection-style collector pack** (parked): needs collections as first-class entities (#265, then #191) before a pack can show them.
+- **`DeleteNodeType` in-use guard.** Deleting an item type that still has items is not blocked; example removal relies on its own keep rules instead. Related: a referenced choice list can be deleted while in use.
+- **Item types in the Hide/Only filter.** The filter applies to items only; the Settings item types list shows the badge but has no filter.
+- **`poe test-e2e` ignores failures** (`ignore_fail`), so a green exit does not mean the suite passed. Worth reviewing why it is set.
+- **Browser walk-through at phone width** of the Examples page, the items filter and the badges (the Phase 3 definition of done asks for it; not yet done by a person).
+
+Candidates for board cards: example images, add-on packs with `requires`, built-in Countries, the reusable import/export bundles, the starter pack for built-in presets, the `DeleteNodeType` guard, and the `test-e2e` exit code.

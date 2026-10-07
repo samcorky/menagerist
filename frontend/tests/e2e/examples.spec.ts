@@ -14,6 +14,7 @@ const MOVIES = /^Movies/;
 
 // Names of items this spec created or renamed, deleted again in cleanup.
 let ownNames: string[] = [];
+const ownTypeLabels: string[] = [];
 
 async function cleanUp(request: APIRequestContext) {
 	for (const id of PACK_IDS) {
@@ -181,8 +182,18 @@ test('follows a connection between example items', async ({ page }) => {
 
 test('removing a pack removes its items and item types', async ({ page }) => {
 	await install(page, MUSIC);
+	const ownType = uniqueName('Plain Type');
+	ownTypeLabels.push(ownType);
+	await createItemType(page, { label: ownType });
+
 	await page.goto('/settings/item-types');
-	await expect(page.getByText('music-record', { exact: true })).toBeVisible();
+	const typeCard = (text: string) =>
+		page.locator('[data-slot="card"]').filter({ has: page.getByText(text, { exact: true }) });
+	const exampleCard = typeCard('music-record');
+	await expect(exampleCard).toBeVisible();
+	await expect(exampleCard.getByText('Example', { exact: true })).toBeVisible();
+	await expect(typeCard(ownType)).toBeVisible();
+	await expect(typeCard(ownType).getByText('Example', { exact: true })).toHaveCount(0);
 
 	await remove(page, MUSIC);
 	await expect(page.getByText(/^Removed /)).toBeVisible();
@@ -197,6 +208,9 @@ test('removing a pack removes its items and item types', async ({ page }) => {
 	await page.goto('/settings/item-types');
 	await expect(page.getByRole('heading', { name: 'Item types' })).toBeVisible();
 	await expect(page.getByText('music-record', { exact: true })).toHaveCount(0);
+	await expect(page.getByText(/^music-/)).toHaveCount(0);
+	await expect(typeCard(ownType)).toBeVisible();
+	await expect(page.getByText('Example', { exact: true })).toHaveCount(0);
 });
 
 test('keeps an edited example item on removal and says why', async ({ page }) => {

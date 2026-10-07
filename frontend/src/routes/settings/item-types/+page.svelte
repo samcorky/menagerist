@@ -13,6 +13,7 @@
 	} from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
 	import { slugify } from '$lib/utils.js';
+	import { loadExampleIds } from '$lib/examples';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -29,6 +30,7 @@
 
 	let categories = $state<NodeTypeResponse[]>([]);
 	let loading = $state(false);
+	let exampleTypeIds = $state<ReadonlySet<string>>(new Set());
 	let hasMore = $state(true);
 
 	let label = $state('');
@@ -182,6 +184,7 @@
 
 	$effect(() => {
 		void fetchPage();
+		void loadExampleIds().then((ids) => (exampleTypeIds = ids.itemTypes));
 	});
 </script>
 
@@ -257,7 +260,12 @@
 							class="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
 						>
 							<div class="min-w-0 flex-1">
-								<Card.Title>{cat.label}</Card.Title>
+								<Card.Title>
+									{cat.label}
+									{#if exampleTypeIds.has(cat.id)}
+										<Badge variant="outline" class="shrink-0 text-muted-foreground">Example</Badge>
+									{/if}
+								</Card.Title>
 								{#if cat.description}
 									<Card.Description>{cat.description}</Card.Description>
 								{/if}
