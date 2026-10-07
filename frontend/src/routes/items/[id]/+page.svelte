@@ -31,6 +31,7 @@
 	import { descriptorForProp } from '$lib/field-types';
 	import { formatDateTime, formatRelativeTime } from '$lib/format-date';
 	import { slugify } from '$lib/utils.js';
+	import { loadExampleIds } from '$lib/examples';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import TagList from '$lib/components/tag-list.svelte';
@@ -192,6 +193,12 @@
 
 	$effect(() => {
 		void load();
+	});
+
+	let isExample = $state(false);
+	$effect(() => {
+		const id = nodeId;
+		void loadExampleIds().then((ids) => (isExample = ids.items.has(id)));
 	});
 
 	function schemaOfType(slug: string | null | undefined): AttributesSchema | null {
@@ -551,7 +558,12 @@
 					<Card.Header class="flex flex-row items-start justify-between gap-4 space-y-0">
 						<div class="min-w-0 flex-1">
 							<ShimmerSlot {loading} class="h-6 w-40">
-								<Card.Title class="font-heading text-xl">{node?.name ?? ''}</Card.Title>
+								<div class="flex flex-wrap items-center gap-2">
+									<Card.Title class="font-heading text-xl">{node?.name ?? ''}</Card.Title>
+									{#if isExample}
+										<Badge variant="outline" class="text-muted-foreground">Example</Badge>
+									{/if}
+								</div>
 							</ShimmerSlot>
 							<ShimmerSlot {loading} class="mt-1 h-4 w-56">
 								{#if node?.type}

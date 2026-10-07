@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -8,6 +9,7 @@ from app.modules.examples.domain.installation import InstallationStatus
 
 if TYPE_CHECKING:
     from app.modules.examples.application.install_example_pack import InstallResult
+    from app.modules.examples.application.list_example_entities import ExampleEntities
     from app.modules.examples.application.list_example_packs import ExamplePackStatus
     from app.modules.examples.application.removal import KeptEntity
     from app.modules.examples.application.uninstall_example_pack import UninstallResult
@@ -181,3 +183,26 @@ class UninstallResultResponse(BaseModel):
             removed=PackCountsResponse.from_domain(result.removed),
             kept=[KeptEntityResponse.from_domain(k) for k in result.kept],
         )
+
+
+class ExampleEntitiesResponse(BaseModel):
+    """The items and item types that example sets currently own."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "item_ids": ["0198f1c2-7b1e-7c3a-9d4e-2f6a8b0c1d23"],
+                    "item_type_ids": ["0198f1c2-7b1e-7c3a-9d4e-2f6a8b0c1d24"],
+                }
+            ]
+        }
+    )
+
+    item_ids: list[uuid.UUID]
+    item_type_ids: list[uuid.UUID]
+
+    @classmethod
+    def from_domain(cls, entities: ExampleEntities) -> ExampleEntitiesResponse:
+        """Build from the list-entities query result."""
+        return cls(item_ids=entities.item_ids, item_type_ids=entities.item_type_ids)

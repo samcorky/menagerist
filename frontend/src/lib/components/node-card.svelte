@@ -13,12 +13,14 @@
 		item,
 		schema,
 		categoryLabel,
-		match
+		match,
+		isExample = false
 	}: {
 		item: NodeResponse;
 		schema: AttributesSchema | null;
 		categoryLabel?: string | null;
 		match?: MatchContext | null;
+		isExample?: boolean;
 	} = $props();
 
 	// Falls back to the raw type slug so a category that's since been deleted still shows something.
@@ -47,7 +49,12 @@
 	{#snippet child({ props })}
 		<a {...props} href={resolve('/items/[id]', { id: item.id })} onkeydown={handleKeydown}>
 			<Item.Content class="gap-1.5">
-				<Item.Title class="font-heading text-base">{item.name}</Item.Title>
+				<Item.Title class="font-heading text-base">
+					{item.name}
+					{#if isExample}
+						<Badge variant="outline" class="shrink-0 text-muted-foreground">Example</Badge>
+					{/if}
+				</Item.Title>
 				{#if item.description}
 					<p class="line-clamp-1 text-sm text-muted-foreground">{item.description}</p>
 				{/if}

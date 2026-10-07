@@ -4,6 +4,7 @@
 	import type { NodeResponse } from '$lib/api/client';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import type { MatchContext } from '$lib/search-context';
+	import { Badge } from '$lib/components/ui/badge/index.js';
 	import NodeCover from './node-cover.svelte';
 	import NodeSummary from './node-summary.svelte';
 	import TagList from './tag-list.svelte';
@@ -13,12 +14,14 @@
 		item,
 		schema,
 		categoryLabel,
-		match
+		match,
+		isExample = false
 	}: {
 		item: NodeResponse;
 		schema: AttributesSchema | null;
 		categoryLabel?: string | null;
 		match?: MatchContext | null;
+		isExample?: boolean;
 	} = $props();
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -59,7 +62,14 @@
 			</NodeCover>
 		</div>
 		<div class="border-t bg-background/80 px-2.5 py-2">
-			<p class="truncate text-sm leading-tight font-medium">{item.name}</p>
+			<div class="flex items-center gap-1.5">
+				<p class="min-w-0 truncate text-sm leading-tight font-medium">{item.name}</p>
+				{#if isExample}
+					<Badge variant="outline" class="shrink-0 px-1.5 py-0 text-xs text-muted-foreground"
+						>Example</Badge
+					>
+				{/if}
+			</div>
 			{#if categoryLabel}
 				<p class="mt-0.5 truncate text-xs text-muted-foreground">{categoryLabel}</p>
 			{/if}

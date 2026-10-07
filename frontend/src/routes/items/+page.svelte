@@ -4,7 +4,7 @@
 	import { beforeNavigate, afterNavigate, goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
-	import { List, Plus, SearchX, LayoutGrid } from '@lucide/svelte';
+	import { EyeOff, List, Plus, SearchX, LayoutGrid } from '@lucide/svelte';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
@@ -22,6 +22,15 @@
 	import NodeCard from '$lib/components/node-card.svelte';
 	import NodeGridCard from '$lib/components/node-grid-card.svelte';
 	import type { AttributesSchema } from '$lib/schema-types';
+	import {
+		EXAMPLE_FILTER_LABELS,
+		loadExampleIds,
+		readExampleFilter,
+		visibleItems,
+		writeExampleFilter,
+		type ExampleFilter
+	} from '$lib/examples';
+	import * as NativeSelect from '$lib/components/ui/native-select/index.js';
 	import { matchContext } from '$lib/search-context';
 	import { registerShortcut } from '$lib/shortcuts.svelte';
 
@@ -42,6 +51,20 @@
 	let searchEl = $state<HTMLInputElement | null>(null);
 	let searchFocused = $state(false);
 	let viewMode = $state<'list' | 'grid'>('list');
+	let exampleItemIds = $state<ReadonlySet<string>>(new Set());
+	let exampleFilter = $state<ExampleFilter>(readExampleFilter());
+	const showExampleFilter = $derived(exampleItemIds.size > 0 || exampleFilter !== 'all');
+	const shownItems = $derived(visibleItems(items, exampleItemIds, exampleFilter));
+	const exampleFilters = Object.keys(EXAMPLE_FILTER_LABELS) as ExampleFilter[];
+
+	function setExampleFilter(filter: ExampleFilter) {
+		exampleFilter = filter;
+		writeExampleFilter(filter);
+	}
+
+	$effect(() => {
+		void loadExampleIds().then((ids) => (exampleItemIds = ids.items));
+	});
 
 	// §13a: don't flash a skeleton for loads under 300ms
 	const loadingDisplay = delayedLoading();
@@ -239,29 +262,45 @@
 				placeholder="Search your items…"
 				class="flex h-9 min-w-0 flex-1 basis-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:max-w-sm sm:basis-auto"
 			/>
-			<div class="ml-auto flex items-center gap-1">
-				<button
-					onclick={() => (viewMode = 'list')}
-					class="relative rounded-md p-1.5 transition-colors after:absolute after:-inset-1.5 after:content-[''] {viewMode ===
-					'list'
-						? 'bg-muted text-foreground'
-						: 'text-muted-foreground hover:text-foreground'}"
-					aria-label="List view"
-					aria-pressed={viewMode === 'list'}
-				>
-					<List class="size-4" />
-				</button>
-				<button
-					onclick={() => (viewMode = 'grid')}
-					class="relative rounded-md p-1.5 transition-colors after:absolute after:-inset-1.5 after:content-[''] {viewMode ===
-					'grid'
-						? 'bg-muted text-foreground'
-						: 'text-muted-foreground hover:text-foreground'}"
-					aria-label="Grid view"
-					aria-pressed={viewMode === 'grid'}
-				>
-					<LayoutGrid class="size-4" />
-				</button>
+			<div class="ml-auto flex items-center gap-2">
+				{#if showExampleFilter}
+					<NativeSelect.Root
+						size="sm"
+						aria-label="Examples"
+						value={exampleFilter}
+						onchange={(e) => setExampleFilter(e.currentTarget.value as ExampleFilter)}
+					>
+						{#each exampleFilters as filter (filter)}
+							<NativeSelect.Option value={filter}>
+								{EXAMPLE_FILTER_LABELS[filter]}
+							</NativeSelect.Option>
+						{/each}
+					</NativeSelect.Root>
+				{/if}
+				<div class="flex items-center gap-1">
+					<button
+						onclick={() => (viewMode = 'list')}
+						class="relative rounded-md p-1.5 transition-colors after:absolute after:-inset-1.5 after:content-[''] {viewMode ===
+						'list'
+							? 'bg-muted text-foreground'
+							: 'text-muted-foreground hover:text-foreground'}"
+						aria-label="List view"
+						aria-pressed={viewMode === 'list'}
+					>
+						<List class="size-4" />
+					</button>
+					<button
+						onclick={() => (viewMode = 'grid')}
+						class="relative rounded-md p-1.5 transition-colors after:absolute after:-inset-1.5 after:content-[''] {viewMode ===
+						'grid'
+							? 'bg-muted text-foreground'
+							: 'text-muted-foreground hover:text-foreground'}"
+						aria-label="Grid view"
+						aria-pressed={viewMode === 'grid'}
+					>
+						<LayoutGrid class="size-4" />
+					</button>
+				</div>
 			</div>
 		</div>
 
@@ -286,7 +325,7 @@
 			</div>
 		{/if}
 
-		{#if loadingDisplay.show && items.length === 0}
+		{#if loadingDisplay.show && shownItems.length === 0}
 			<Shimmer loading={true}>
 				{#if viewMode === 'grid'}
 					<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
@@ -315,29 +354,47 @@
 				data-slot="node-grid"
 				class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
 			>
-				{#each items as item (item.id)}
+				{#each shownItems as item (item.id)}
 					<NodeGridCard
 						{item}
 						schema={schemaOf(item.type)}
 						categoryLabel={allCategories.find((c) => c.slug === item.type)?.label}
 						match={q ? matchContext(item, schemaOf(item.type), q) : null}
+						isExample={exampleItemIds.has(item.id)}
 					/>
 				{/each}
 			</div>
 		{:else}
 			<Item.Group>
-				{#each items as item (item.id)}
+				{#each shownItems as item (item.id)}
 					<NodeCard
 						{item}
 						schema={schemaOf(item.type)}
 						categoryLabel={allCategories.find((c) => c.slug === item.type)?.label}
 						match={q ? matchContext(item, schemaOf(item.type), q) : null}
+						isExample={exampleItemIds.has(item.id)}
 					/>
 				{/each}
 			</Item.Group>
 		{/if}
 
-		{#if items.length === 0 && !loading}
+		{#if items.length > 0 && shownItems.length === 0 && !loading && !hasMore}
+			<div class="flex flex-col items-center gap-3 py-12 text-center">
+				<EyeOff class="size-10 text-muted-foreground/50" />
+				<p class="text-sm text-muted-foreground">
+					{#if exampleFilter === 'only'}
+						No example items match.
+					{:else}
+						{q || selectedType
+							? 'Everything that matched is a hidden example.'
+							: 'All your items are hidden examples.'} Choose All items to see them.
+					{/if}
+				</p>
+				<Button variant="outline" size="sm" onclick={() => setExampleFilter('all')}>
+					Show all items
+				</Button>
+			</div>
+		{:else if items.length === 0 && !loading}
 			<div class="flex flex-col items-center gap-3 py-12 text-center">
 				{#if q}
 					<SearchX class="size-10 text-muted-foreground/50" />

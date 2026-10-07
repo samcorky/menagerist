@@ -1,3 +1,4 @@
+import { listExampleEntities } from '$lib/api/client';
 import type {
 	KeptEntityResponse,
 	PackCountsResponse,
@@ -72,4 +73,70 @@ export function dismissExamplesBanner(): void {
 	} catch {
 		// Storage unavailable: the line returns on the next visit.
 	}
+}
+
+const FILTER_KEY = 'menagerist.examples.filter';
+const LEGACY_HIDE_KEY = 'menagerist.examples.hide';
+
+export type ExampleFilter = 'all' | 'hide' | 'only';
+
+export const EXAMPLE_FILTER_LABELS: Record<ExampleFilter, string> = {
+	all: 'All items',
+	hide: 'Hide examples',
+	only: 'Only examples'
+};
+
+/** Which items the list shows; defaults to all. Reads the older hide-only flag too. */
+export function readExampleFilter(): ExampleFilter {
+	try {
+		const saved = localStorage.getItem(FILTER_KEY);
+		if (saved === 'hide' || saved === 'only') return saved;
+		if (saved === null && localStorage.getItem(LEGACY_HIDE_KEY) === 'true') return 'hide';
+		return 'all';
+	} catch {
+		return 'all';
+	}
+}
+
+export function writeExampleFilter(filter: ExampleFilter): void {
+	try {
+		localStorage.setItem(FILTER_KEY, filter);
+	} catch {
+		// Storage unavailable: the choice applies to this page only.
+	}
+}
+
+export interface ExampleIds {
+	items: ReadonlySet<string>;
+	itemTypes: ReadonlySet<string>;
+}
+
+const NO_EXAMPLES: ExampleIds = { items: new Set(), itemTypes: new Set() };
+let cached: Promise<ExampleIds> | null = null;
+
+/** Ids owned by an installed example pack; empty if the lookup fails. Cached until invalidated. */
+export function loadExampleIds(): Promise<ExampleIds> {
+	cached ??= listExampleEntities()
+		.then((result) =>
+			result.data
+				? { items: new Set(result.data.item_ids), itemTypes: new Set(result.data.item_type_ids) }
+				: NO_EXAMPLES
+		)
+		.catch(() => NO_EXAMPLES);
+	return cached;
+}
+
+/** Forget the cached ids; call after an install or removal. */
+export function invalidateExampleIds(): void {
+	cached = null;
+}
+
+/** Keep all items, only the non-examples, or only the examples. */
+export function visibleItems<T extends { id: string }>(
+	items: T[],
+	exampleIds: ReadonlySet<string>,
+	filter: ExampleFilter
+): T[] {
+	if (filter === 'all') return items;
+	return items.filter((item) => exampleIds.has(item.id) === (filter === 'only'));
 }

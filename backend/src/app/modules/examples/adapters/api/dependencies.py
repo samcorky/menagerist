@@ -15,6 +15,7 @@ from app.modules.examples.adapters.persistence.unit_of_work import (
 )
 from app.modules.examples.adapters.platform.file_pack_catalogue import FilePackCatalogue
 from app.modules.examples.application.install_example_pack import InstallExamplePack
+from app.modules.examples.application.list_example_entities import ListExampleEntities
 from app.modules.examples.application.list_example_packs import ListExamplePacks
 from app.modules.examples.application.uninstall_example_pack import UninstallExamplePack
 from app.modules.examples.ports.pack_catalogue import PackCatalogue
@@ -61,6 +62,12 @@ def get_list_example_packs_use_case(
     catalogue: Annotated[PackCatalogue, Depends(get_pack_catalogue)],
 ) -> ListExamplePacks:
     return ListExamplePacks(repos, catalogue)
+
+
+def get_list_example_entities_use_case(
+    repos: Annotated[ExampleRepos, Depends(get_example_repos)],
+) -> ListExampleEntities:
+    return ListExampleEntities(repos)
 
 
 def get_install_example_pack_use_case(

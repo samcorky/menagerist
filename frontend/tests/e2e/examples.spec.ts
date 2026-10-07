@@ -66,6 +66,30 @@ test('installs a pack, shows the Home line, and keeps it dismissed after reload'
 
 	await page.goto('/items');
 	await page.getByPlaceholder('Search your items…').fill('Night Drive');
+	const card = page.getByRole('link', { name: 'Night Drive' }).first();
+	await expect(card).toBeVisible();
+	await expect(card.getByText('Example', { exact: true })).toBeVisible();
+
+	await page.getByRole('button', { name: 'Grid view' }).click();
+	await expect(card).toBeVisible();
+	await expect(card.getByText('Example', { exact: true })).toBeVisible();
+	await page.getByRole('button', { name: 'List view' }).click();
+
+	// Hiding examples removes them from the list and the choice survives a reload.
+	const filter = page.getByLabel('Examples', { exact: true });
+	await expect(filter).toHaveValue('all');
+	await filter.selectOption({ label: 'Hide examples' });
+	await expect(filter).toHaveValue('hide');
+	await expect(page.getByRole('link', { name: 'Night Drive' })).toHaveCount(0);
+
+	await page.reload();
+	await expect(filter).toHaveValue('hide');
+	await page.getByPlaceholder('Search your items…').fill('Night Drive');
+	await expect(page.getByText('Everything that matched is a hidden example.')).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Night Drive' })).toHaveCount(0);
+
+	await page.getByRole('button', { name: 'Show all items' }).click();
+	await expect(filter).toHaveValue('all');
 	await expect(page.getByRole('link', { name: 'Night Drive' }).first()).toBeVisible();
 
 	await page.goto('/');
@@ -79,9 +103,76 @@ test('installs a pack, shows the Home line, and keeps it dismissed after reload'
 	await expect(line).toHaveCount(0);
 });
 
+test('filters to only examples, keeps the choice, and restores everything', async ({ page }) => {
+	await install(page, MUSIC);
+	const own = uniqueName('Night Own');
+	ownNames.push(own);
+	await createItem(page, { name: own });
+
+	await page.goto('/items');
+	await page.getByPlaceholder('Search your items…').fill('Night');
+	const filter = page.getByLabel('Examples', { exact: true });
+	const example = page.getByRole('link', { name: 'Night Drive' }).first();
+	const mine = page.getByRole('link', { name: own }).first();
+	await expect(example).toBeVisible();
+	await expect(mine).toBeVisible();
+
+	await filter.selectOption({ label: 'Only examples' });
+	await expect(filter).toHaveValue('only');
+	await expect(example).toBeVisible();
+	await expect(page.getByRole('link', { name: own })).toHaveCount(0);
+
+	await page.reload();
+	await expect(filter).toHaveValue('only');
+	await page.getByPlaceholder('Search your items…').fill('Night');
+	await expect(example).toBeVisible();
+	await expect(page.getByRole('link', { name: own })).toHaveCount(0);
+
+	await filter.selectOption({ label: 'All items' });
+	await expect(filter).toHaveValue('all');
+	await expect(example).toBeVisible();
+	await expect(mine).toBeVisible();
+
+	// A search matching only the user's item leaves nothing under "Only examples".
+	await filter.selectOption({ label: 'Only examples' });
+	await page.getByPlaceholder('Search your items…').fill(own);
+	await expect(page.getByText('No example items match.')).toBeVisible();
+	await page.getByRole('button', { name: 'Show all items' }).click();
+	await expect(filter).toHaveValue('all');
+	await expect(mine).toBeVisible();
+});
+
+test('a stale Only examples filter keeps the select so you can go back to All', async ({
+	page
+}) => {
+	await install(page, MUSIC);
+	const own = uniqueName('Stale Own');
+	ownNames.push(own);
+	await createItem(page, { name: own });
+
+	await page.goto('/items');
+	const filter = page.getByLabel('Examples', { exact: true });
+	await filter.selectOption({ label: 'Only examples' });
+	await expect(filter).toHaveValue('only');
+
+	await remove(page, MUSIC);
+	await expect(page.getByRole('button', { name: /^Add Music/ })).toBeVisible();
+
+	await page.goto('/items');
+	await expect(filter).toHaveValue('only');
+	await expect(page.getByText('No example items match.')).toBeVisible();
+	await filter.selectOption({ label: 'All items' });
+	await expect(page.getByRole('link', { name: own }).first()).toBeVisible();
+
+	// Back on All with no examples left, the select goes away.
+	await page.reload();
+	await expect(filter).toHaveCount(0);
+});
+
 test('follows a connection between example items', async ({ page }) => {
 	await install(page, MUSIC);
 	await openItem(page, 'Night Drive');
+	await expect(page.getByText('Example', { exact: true })).toBeVisible();
 
 	await page.getByRole('link', { name: 'The Velvet Static', exact: true }).first().click();
 	await expect(page.getByText('The Velvet Static', { exact: true }).first()).toBeVisible();
@@ -100,6 +191,8 @@ test('removing a pack removes its items and item types', async ({ page }) => {
 	await page.goto('/items');
 	await page.getByPlaceholder('Search your items…').fill('Night Drive');
 	await expect(page.getByRole('link', { name: 'Night Drive' })).toHaveCount(0);
+	await expect(page.getByLabel('Examples', { exact: true })).toHaveCount(0);
+	await expect(page.getByText('Example', { exact: true })).toHaveCount(0);
 
 	await page.goto('/settings/item-types');
 	await expect(page.getByRole('heading', { name: 'Item types' })).toBeVisible();
@@ -125,7 +218,14 @@ test('keeps an edited example item on removal and says why', async ({ page }) =>
 
 	await page.goto('/items');
 	await page.getByPlaceholder('Search your items…').fill(edited);
-	await expect(page.getByRole('link', { name: edited }).first()).toBeVisible();
+	const keptCard = page.getByRole('link', { name: edited }).first();
+	await expect(keptCard).toBeVisible();
+	await expect(keptCard.getByText('Example', { exact: true })).toHaveCount(0);
+	await expect(page.getByLabel('Examples', { exact: true })).toHaveCount(0);
+
+	await keptCard.click();
+	await expect(page.getByText(edited, { exact: true }).first()).toBeVisible();
+	await expect(page.getByText('Example', { exact: true })).toHaveCount(0);
 });
 
 test('keeps an example item that has your own connection', async ({ page }) => {

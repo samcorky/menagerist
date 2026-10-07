@@ -1,10 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const { listExampleEntities } = vi.hoisted(() => ({ listExampleEntities: vi.fn() }));
+vi.mock('$lib/api/client', () => ({ listExampleEntities }));
 import {
 	describeCounts,
 	describeRemoval,
 	dismissExamplesBanner,
 	groupKept,
+	invalidateExampleIds,
 	isExamplesBannerDismissed,
+	loadExampleIds,
+	readExampleFilter,
+	visibleItems,
+	writeExampleFilter,
 	reasonLabel
 } from '$lib/examples';
 
@@ -95,5 +103,83 @@ describe('examples banner dismissal', () => {
 		});
 		expect(isExamplesBannerDismissed()).toBe(false);
 		expect(() => dismissExamplesBanner()).not.toThrow();
+	});
+});
+
+function stubStorage(initial: Record<string, string> = {}): void {
+	const store = new Map(Object.entries(initial));
+	vi.stubGlobal('localStorage', {
+		getItem: (key: string) => store.get(key) ?? null,
+		setItem: (key: string, value: string) => store.set(key, value)
+	});
+}
+
+describe('example filter preference', () => {
+	afterEach(() => vi.unstubAllGlobals());
+	it('defaults to all and remembers the choice', () => {
+		stubStorage();
+		expect(readExampleFilter()).toBe('all');
+		writeExampleFilter('only');
+		expect(readExampleFilter()).toBe('only');
+		writeExampleFilter('hide');
+		expect(readExampleFilter()).toBe('hide');
+	});
+	it('honours the older hide flag until a choice is saved', () => {
+		stubStorage({ 'menagerist.examples.hide': 'true' });
+		expect(readExampleFilter()).toBe('hide');
+		writeExampleFilter('all');
+		expect(readExampleFilter()).toBe('all');
+	});
+	it('falls back to all for an unknown saved value', () => {
+		stubStorage({ 'menagerist.examples.filter': 'nonsense' });
+		expect(readExampleFilter()).toBe('all');
+	});
+	it('does not throw when storage throws', () => {
+		vi.stubGlobal('localStorage', {
+			getItem: () => {
+				throw new Error('blocked');
+			},
+			setItem: () => {
+				throw new Error('blocked');
+			}
+		});
+		expect(readExampleFilter()).toBe('all');
+		expect(() => writeExampleFilter('hide')).not.toThrow();
+	});
+});
+
+describe('visibleItems', () => {
+	const items = [{ id: 'a' }, { id: 'b' }];
+	const examples = new Set(['a']);
+	it('filters by the chosen mode', () => {
+		expect(visibleItems(items, examples, 'all')).toEqual(items);
+		expect(visibleItems(items, examples, 'hide')).toEqual([{ id: 'b' }]);
+		expect(visibleItems(items, examples, 'only')).toEqual([{ id: 'a' }]);
+	});
+});
+
+describe('loadExampleIds', () => {
+	afterEach(() => {
+		invalidateExampleIds();
+		listExampleEntities.mockReset();
+	});
+	it('loads once, then serves the cache until invalidated', async () => {
+		listExampleEntities.mockResolvedValue({ data: { item_ids: ['a'], item_type_ids: ['t'] } });
+		const first = await loadExampleIds();
+		await loadExampleIds();
+		expect(first.items.has('a')).toBe(true);
+		expect(first.itemTypes.has('t')).toBe(true);
+		expect(listExampleEntities).toHaveBeenCalledTimes(1);
+		invalidateExampleIds();
+		await loadExampleIds();
+		expect(listExampleEntities).toHaveBeenCalledTimes(2);
+	});
+	it('is empty when the lookup fails', async () => {
+		listExampleEntities.mockRejectedValue(new Error('down'));
+		expect((await loadExampleIds()).items.size).toBe(0);
+	});
+	it('is empty when the response has no data', async () => {
+		listExampleEntities.mockResolvedValue({ error: { detail: 'x' } });
+		expect((await loadExampleIds()).items.size).toBe(0);
 	});
 });

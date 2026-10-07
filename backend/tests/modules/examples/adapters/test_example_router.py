@@ -164,3 +164,23 @@ def test_openapi_documents_the_installation_status_values(
     ]
     enum = schema["components"]["schemas"][status["$ref"].rsplit("/", 1)[-1]]
     assert enum["enum"] == ["installing", "installed", "removed", "failed"]
+
+
+def test_entities_lists_owned_item_and_item_type_ids(make_world: MakeWorld) -> None:
+    """Once installed, the pack's items and item types are listed; none before."""
+    client = _client(make_world())
+    assert client.get("/api/v1/example/entities").json() == {
+        "item_ids": [],
+        "item_type_ids": [],
+    }
+
+    assert client.put("/api/v1/example/demo/installation").status_code == 200
+    body = client.get("/api/v1/example/entities").json()
+    assert len(body["item_ids"]) == 2
+    assert len(body["item_type_ids"]) == 2
+
+    assert client.delete("/api/v1/example/demo/installation").status_code == 200
+    assert client.get("/api/v1/example/entities").json() == {
+        "item_ids": [],
+        "item_type_ids": [],
+    }

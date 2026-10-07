@@ -12,7 +12,13 @@
 	} from '$lib/api/client';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
-	import { describeCounts, describeRemoval, groupKept, reasonLabel } from '$lib/examples';
+	import {
+		describeCounts,
+		describeRemoval,
+		groupKept,
+		invalidateExampleIds,
+		reasonLabel
+	} from '$lib/examples';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -66,6 +72,7 @@
 				});
 			}
 		} else {
+			invalidateExampleIds();
 			const refreshed = await listExamplePacks();
 			if (refreshed.data) packs = refreshed.data;
 			toast.success('Examples added', {
@@ -88,6 +95,7 @@
 			return;
 		}
 		confirmPack = null;
+		invalidateExampleIds();
 		toast.success(describeRemoval(result.data));
 		const refreshed = await listExamplePacks();
 		if (refreshed.data) packs = refreshed.data;

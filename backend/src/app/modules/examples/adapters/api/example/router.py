@@ -7,10 +7,12 @@ from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRou
 from app.entrypoints.api.shared.problem_response import error_response
 from app.modules.examples.adapters.api.dependencies import (
     get_install_example_pack_use_case,
+    get_list_example_entities_use_case,
     get_list_example_packs_use_case,
     get_uninstall_example_pack_use_case,
 )
 from app.modules.examples.adapters.api.example.schemas import (
+    ExampleEntitiesResponse,
     ExamplePackResponse,
     InstallResultResponse,
     UninstallResultResponse,
@@ -18,6 +20,10 @@ from app.modules.examples.adapters.api.example.schemas import (
 from app.modules.examples.application.install_example_pack import (
     InstallExamplePack,
     InstallExamplePackCommand,
+)
+from app.modules.examples.application.list_example_entities import (
+    ListExampleEntities,
+    ListExampleEntitiesQuery,
 )
 from app.modules.examples.application.list_example_packs import (
     ListExamplePacks,
@@ -59,6 +65,22 @@ async def list_example_packs(
     """List the example sets this server ships and which are installed."""
     statuses = await use_case.handle(ListExamplePacksQuery(), actor)
     return [ExamplePackResponse.from_status(s) for s in statuses]
+
+
+@router.get(
+    "/entities",
+    response_model=ExampleEntitiesResponse,
+    operation_id="list_example_entities",
+)
+async def list_example_entities(
+    use_case: Annotated[
+        ListExampleEntities, Depends(get_list_example_entities_use_case)
+    ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> ExampleEntitiesResponse:
+    """List the items and item types that added example sets still own."""
+    entities = await use_case.handle(ListExampleEntitiesQuery(), actor)
+    return ExampleEntitiesResponse.from_domain(entities)
 
 
 @router.put(
