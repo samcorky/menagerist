@@ -29,6 +29,8 @@ For UX and UI rules, see [DESIGN_GUIDELINES.md](DESIGN_GUIDELINES.md).
 
 **Schema-driven attributes** - node and edge types carry an `attributes_schema` (JSON Schema 2020-12). The backend validates attribute payloads against this schema on every write. The frontend renders schema fields using a pluggable field-type registry (`src/lib/field-types/`): each field type owns its schema serialisation (`toSchema`/`fromSchema`), its edit widget (`InputWidget`), and an optional read-mode widget (`ViewWidget`). Adding a new field type requires only a descriptor file and one import line - no changes to the editor components. See [docs/field-types.md](../docs/field-types.md) for the full guide.
 
+**Examples** - Settings > Examples (`src/routes/settings/examples/`) adds and removes the shipped example packs. Home links to it from the empty state and shows a dismissible line while examples are installed. The wording helpers (counts, removal messages, dismissal in `localStorage`) live in `src/lib/examples.ts` so they can be unit tested.
+
 ## Development
 
 Install dependencies and generate the API client first (run from the repo root):

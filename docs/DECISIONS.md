@@ -503,3 +503,43 @@ So a plain private array is the source of truth, `active` is a write-only `$stat
 **Decision:** built-in presets stay in the database and in every picker. A "Show built-in" toggle hides them on the settings page and in the picker. The choice is stored per browser in `localStorage`.
 
 **Rationale:** the built-ins are the only example content a new user has, so they must stay available, but they crowd the screen once a user has their own. A server-side setting would be per instance, and this is a per-viewer preference.
+
+## Example packs: an `examples` module, not the presets format or a `source_pack` column
+
+**Decision:** optional example packs (item types, connection types, items, connections and presets) live in their own `examples` module. A pack is a JSON file shipped inside the module (`modules/examples/packs/`, listed by `index.json`). Installing records every entity it creates in an `example_installations` row, so removal knows exactly what the pack owns.
+
+**Rationale:** the presets pack format describes reusable field definitions, not items and connections between them. A `source_pack` column on nodes and types would touch every table, and every query that lists them, to answer a question only one screen asks. The module owns its own ports (`PresetTarget`, `GraphTarget`) and never imports `graph` or `presets`; the adapters that call the real use cases sit in `entrypoints/api/shared/example_targets.py`, beside `preset_usage.py`.
+
+**Consequence:** the packs are package data, not content in `shared/`, which is only for files both the backend and the frontend read.
+
+## Example install is per-module commits with compensation, not one transaction
+
+**Decision:** installing is an ordered list of steps (presets, connection types, item types, items, connections). Each step goes through the real use case of the module that owns the entity, commits on its own, and is recorded in the installation straight away. If a step fails, the installation is marked failed and everything already created is removed again.
+
+**Rationale:** `graph` and `presets` each own their unit of work, and bounded contexts accept eventual consistency rather than a cross-module transaction (see ARCHITECTURE.md). Recording each entity as it is created means a crash part-way leaves a record of exactly what to clean up. Modelling install as a list of steps also lets media (example images) become another step later without reshaping the use case.
+
+## Removing examples keeps anything the user has touched
+
+**Decision:** an installed entity records a content hash. Removal runs in reverse order and, per entity, applies the first matching rule: already gone, edited since install (hash differs), carries the user's own data (connections or files), still in use by something the pack did not create, otherwise remove. Anything kept is reported with its reason. A preset that existed before the install is never owned by it.
+
+**Rationale:** people explore by editing and connecting examples. Silently deleting something they changed would destroy their work, and keeping everything would defeat "remove them when you're ready". A hash compares what is stored with what the pack wrote without needing an `edited` flag on every entity.
+
+## The application owns every constraint; database indexes are backstops
+
+**Decision:** type slugs are unique among live types through a partial unique index (`WHERE deleted_at IS NULL`), and the use cases check the same rule before writing. A soft-deleted type's slug can be reused.
+
+**Rationale:** with soft delete everywhere, a plain unique index made removing and re-adding examples fail on the deleted row's slug. The domain and application layers must reject bad input with a useful message; the database index only catches what slips past, and must agree with the application's rule.
+
+## First-run link to examples, no wizard
+
+**Decision:** an empty Home shows one primary button (add your first item) and a small text link, "Or look around with some examples", to Settings > Examples. While examples are installed, Home shows a dismissible line saying so. There is no onboarding wizard.
+
+**Rationale:** the product problem is that people cannot tell what Menagerist is for until they see connected items, so the way to examples must be visible at first run. A wizard would put a decision in front of someone who has not seen anything yet, and the link keeps a single primary action (DESIGN_GUIDELINES sections 3.5 and 3.6).
+
+## A generic bundle layer for import and export is deliberately not built yet
+
+**Decision:** example packs have their own format and installer. A shared bundle layer for importing and exporting items, collections and types (the same format for examples and for user data) is a planned later phase, not part of this work.
+
+**Rationale:** there is one consumer today. The merge policy (what happens when an imported slug or item already exists) and how an export refers to its own entities would both be guesses. When import and export arrive, the pack format's local `ref`s and the installer's ordered steps are the intended starting point.
+
+**Not decided:** whether add-on packs that need another pack (`requires`) become part of that bundle layer.

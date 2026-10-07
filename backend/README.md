@@ -198,6 +198,22 @@ Pass values directly - `uuid.UUID` objects are serialised to strings automatical
 
 **Future:** when an event bus / pipeline behavior is introduced, cross-cutting logging will migrate to a central pipeline stage. The per-use-case logger calls will be removed at that point.
 
+## Example packs
+
+`modules/examples/` installs and removes optional example content (item types, connection types, items, connections and presets). It does not import `graph` or `presets`: it defines its own ports (`PresetTarget`, `GraphTarget`) and `entrypoints/api/shared/example_targets.py` supplies adapters that call the real use cases, the same pattern as `preset_usage.py` for cross-module reads. Install is an ordered list of steps with one commit per step and compensation on failure; removal keeps anything the user edited, connected or attached (rules in `docs/DECISIONS.md`).
+
+### Writing an example pack
+
+Packs are package data in `modules/examples/packs/`, read with `importlib.resources`. To add one:
+
+1. Create `<id>.json` and add `{id, name, description}` to `index.json`. The id is lowercase letters, digits and hyphens, and prefixes every type slug (`music-person`), so packs never clash with a user's own types.
+2. The file has `format` (`menagerist-example-pack`), `version` (`1`), `id` and five sections: `presets`, `relationship_types`, `item_types`, `items`, `connections`. Parsing is strict: unknown or missing keys are errors.
+3. Every entity has a local `ref` (lowercase ASCII letters, digits and hyphens). Items name their type by `type`, connections name their endpoints `from` and `to` and their connection type `type`, all by `ref`. A schema refers to a preset with `{"$preset": "<ref>"}`.
+4. Item and connection values must use keys their type's `attributes_schema` defines. Write schemas the way the editor would (`x-menagerist` carries the field kind and display options, for example `"display": "words"` on a duration).
+5. Content: fictional, British English, small and finished, with a few deliberate blanks so an item looks lived in.
+
+`tests/modules/examples/application/test_shipped_packs.py` runs against every pack listed in `index.json`: it installs, removes and reinstalls cleanly, checks slug prefixes, descriptions, British spelling, valid schemas and that all values match their type. `frontend/tests/example-packs.test.ts` checks the same packs from the frontend side. Neither needs editing when a pack is added.
+
 ## Cross-cutting concerns
 
 **Permissions - wired, not enforced.** `shared_kernel/actor.py::Actor` (an id plus opaque `roles`) and `shared_kernel/authorization.py::AuthorizationPort` (`check(actor, action) -> None`, raising `ForbiddenError`) live in `shared_kernel/` since no bounded context owns authorization yet. The v1 concrete adapter, `entrypoints/api/shared/authorization.py::AllowAllAuthorizationAdapter`, always permits, and is wired at the composition root (`entrypoints/api/shared/dependencies.py`) rather than in `shared_kernel/` or a module, since it's a real adapter with no bounded-context owner yet. Routes depend on `get_current_actor` (v1: a fixed single-owner `Actor`); use cases take `actor` in `handle()` regardless of whether anything is actually checked. When the `identity` module lands (the OIDC roadmap step), only `get_current_actor` and the `AuthorizationPort` adapter get swapped - no route or use case signature changes, since they were only ever written against the port.

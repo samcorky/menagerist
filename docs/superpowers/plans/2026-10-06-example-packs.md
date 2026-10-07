@@ -10,7 +10,9 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-06-example-packs-design.md`. Read it first. Its open questions are resolved (end of that file).
 
-**State of this plan:** planning only. No code has been written. Nothing here is committed.
+**State of this plan:** Phases 0 to 4 implemented (2026-10-07); Phase 5 and the follow-ups are not scheduled.
+
+**What changed from the plan:** packs live inside the module as package data, not in `shared/`; `shared/` was split into `data/` and `contracts/` and documented; the movies pack gained a film rating; recipe times use the words display; the backend contract test now also checks every value against its type schema; the "writing an example pack" guide is a section of `backend/README.md`, not a new file.
 
 ## Global Constraints
 

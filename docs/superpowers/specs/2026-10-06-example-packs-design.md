@@ -1,6 +1,6 @@
 # Example packs
 
-**Status:** design agreed in conversation on 2026-10-06 (answers to the four open questions are recorded at the end). Written spec not yet formally reviewed.
+**Status:** implemented (2026-10-07): backend module, four packs, Settings > Examples page, first-run link and docs. Design agreed in conversation on 2026-10-06 (answers to the four open questions are recorded at the end).
 **Scope:** backend (new `examples` module, two migrations), frontend (settings page, first-run link), pack files as package data inside the module (`backend/src/app/modules/examples/packs/`), docs.
 **Tracks #266** (loadable example collection). Collections are not modelled here: they are becoming first-class entities (#265), not items, and nothing in this design depends on them.
 
