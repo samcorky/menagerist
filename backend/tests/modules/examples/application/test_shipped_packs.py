@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from app.modules.examples.adapters.platform.file_pack_catalogue import FilePackCatalogue
 from app.modules.examples.adapters.platform.pack_parser import parse_index
@@ -205,3 +206,57 @@ async def test_pack_text_uses_british_spelling(pack_id: str) -> None:
     for where, text in _texts(pack):
         match = _AMERICAN.search(text)
         assert match is None, f"{pack_id}: {where} uses '{match and match.group()}'"
+
+
+def _schema_problems(
+    owner: str, schema: dict[str, Any] | None, attributes: dict[str, Any]
+) -> Iterator[str]:
+    """Yield what is wrong with `attributes` against `schema`."""
+    if not attributes:
+        return
+    if schema is None:
+        yield f"{owner} has attributes but its type has no schema"
+        return
+    unknown = set(attributes) - set(schema.get("properties", {}))
+    for key in sorted(unknown):
+        yield f"{owner} sets '{key}', which its type does not define"
+    for error in Draft202012Validator(schema).iter_errors(attributes):
+        yield f"{owner}: {error.message}"
+
+
+@pytest.mark.parametrize("pack_id", _PACK_IDS)
+async def test_pack_type_schemas_are_valid_json_schemas(pack_id: str) -> None:
+    """Every item and relationship type schema is itself a valid JSON Schema."""
+    pack = await _load(pack_id)
+
+    schemas = [
+        *(t.attributes_schema for t in pack.item_types),
+        *(t.attributes_schema for t in pack.relationship_types),
+    ]
+    for schema in schemas:
+        if schema is not None:
+            Draft202012Validator.check_schema(schema)
+
+
+@pytest.mark.parametrize("pack_id", _PACK_IDS)
+async def test_pack_attributes_match_their_type_schemas(pack_id: str) -> None:
+    """Item and connection values use keys their type defines and pass its schema."""
+    pack = await _load(pack_id)
+    item_schemas = {t.ref: t.attributes_schema for t in pack.item_types}
+    rel_schemas = {t.ref: t.attributes_schema for t in pack.relationship_types}
+
+    problems: list[str] = []
+    for item in pack.items:
+        schema = item_schemas[item.type_ref]
+        if item.extra_schema:
+            properties = {
+                **((schema or {}).get("properties", {})),
+                **item.extra_schema.get("properties", {}),
+            }
+            schema = {**(schema or {}), "properties": properties}
+        problems += _schema_problems(f"item '{item.ref}'", schema, item.attributes)
+    for c in pack.connections:
+        owner = f"connection '{c.source_ref}' -> '{c.target_ref}'"
+        problems += _schema_problems(owner, rel_schemas[c.type_ref], c.attributes)
+
+    assert not problems, f"{pack_id}: " + "; ".join(problems)
