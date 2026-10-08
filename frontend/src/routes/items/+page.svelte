@@ -262,6 +262,7 @@
 				{#if showExampleFilter}
 					<NativeSelect.Root
 						size="sm"
+						class="max-sm:[&_select[data-size]]:h-11"
 						aria-label="Examples"
 						value={exampleFilter}
 						onchange={(e) => setExampleFilter(e.currentTarget.value as ExampleFilter)}

@@ -173,6 +173,7 @@
 								<Button
 									variant="outline"
 									disabled={busy}
+									class="min-h-11"
 									aria-label="Remove {pack.name}"
 									bind:ref={() => buttons[pack.id] ?? null, (el) => (buttons[pack.id] = el)}
 									onclick={() => (confirmPack = pack)}
@@ -182,6 +183,7 @@
 							{:else}
 								<Button
 									disabled={busy}
+									class="min-h-11"
 									aria-label="Add {pack.name}"
 									bind:ref={() => buttons[pack.id] ?? null, (el) => (buttons[pack.id] = el)}
 									onclick={() => void install(pack)}

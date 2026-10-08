@@ -201,7 +201,7 @@
 							onclick={() => void removeFrom(collection)}
 							disabled={busyId === collection.id}
 							aria-label="Remove from {collection.name}"
-							class="relative rounded-r-full p-1.5 text-muted-foreground transition-colors after:absolute after:-inset-1 after:content-[''] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50"
+							class="relative rounded-r-full p-2 text-muted-foreground transition-colors after:absolute after:-inset-x-2 after:-inset-y-2 after:content-[''] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50"
 						>
 							<X class="size-3.5" />
 						</button>

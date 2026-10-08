@@ -42,6 +42,36 @@ async function fits(page: Page, b: Box): Promise<boolean> {
 	return inside(b, vp.w, vp.h);
 }
 
+/**
+ * Side of the largest square around the element's centre that a finger would still hit the
+ * element in. The visible box can be smaller than this when an ::after pseudo-element extends it.
+ */
+async function hitArea(locator: Locator): Promise<number> {
+	return locator.evaluate((el) => {
+		const r = el.getBoundingClientRect();
+		const cx = r.x + r.width / 2;
+		const cy = r.y + r.height / 2;
+		let best = 0;
+		for (let half = 4; half <= 40; half += 1) {
+			// Probe just inside the edge: a box's far edge is not part of it.
+			const d = half - 0.5;
+			const corners = [
+				[cx - d, cy - d],
+				[cx + d, cy - d],
+				[cx - d, cy + d],
+				[cx + d, cy + d]
+			];
+			const hit = corners.every(([x, y]) => {
+				const t = document.elementFromPoint(x, y);
+				return !!t && el.contains(t);
+			});
+			if (!hit) break;
+			best = half * 2;
+		}
+		return best;
+	});
+}
+
 function round(n: number) {
 	return Math.round(n * 10) / 10;
 }
@@ -261,31 +291,7 @@ for (const size of SIZES) {
 			// Centre it so the bottom bar can't cover part of its hit area.
 			await remove.evaluate((el) => el.scrollIntoView({ block: 'center' }));
 			const b = await box(remove);
-			// The visible button is smaller than its hit area, which an ::after pseudo-element
-			// extends, so probe what a finger would actually hit around its centre.
-			const reach = await remove.evaluate((el) => {
-				const r = el.getBoundingClientRect();
-				const cx = r.x + r.width / 2;
-				const cy = r.y + r.height / 2;
-				let best = 0;
-				for (let half = 4; half <= 40; half += 1) {
-					// Probe just inside the edge: a box's far edge is not part of it.
-					const d = half - 0.5;
-					const corners = [
-						[cx - d, cy - d],
-						[cx + d, cy - d],
-						[cx - d, cy + d],
-						[cx + d, cy + d]
-					];
-					const hit = corners.every(([x, y]) => {
-						const t = document.elementFromPoint(x, y);
-						return !!t && el.contains(t);
-					});
-					if (!hit) break;
-					best = half * 2;
-				}
-				return best;
-			});
+			const reach = await hitArea(remove);
 			test.info().annotations.push({
 				type: `remove target ${size.width}`,
 				description: `box ${round(b.width)}x${round(b.height)}, hit area about ${reach}x${reach}`
@@ -295,6 +301,21 @@ for (const size of SIZES) {
 
 			await remove.tap();
 			await expect(page.getByText('Nothing in this collection yet.')).toBeVisible();
+		});
+
+		test('item page remove-from-collection is a 44px touch target', async ({ page, request }) => {
+			const { collection, item } = await seed(request);
+			await page.goto(`/items/${item.id}`);
+			const remove = page.getByRole('button', { name: `Remove from ${collection.name}` });
+			await remove.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+			const b = await box(remove);
+			const reach = await hitArea(remove);
+			test.info().annotations.push({
+				type: `item remove target ${size.width}`,
+				description: `box ${round(b.width)}x${round(b.height)}, hit area about ${reach}x${reach}`
+			});
+			expect(Math.max(b.width, reach)).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
+			expect(Math.max(b.height, reach)).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
 		});
 
 		test('Examples controls are visible and tappable', async ({ page }) => {
@@ -307,12 +328,15 @@ for (const size of SIZES) {
 				description: `${round(a.width)}x${round(a.height)}`
 			});
 			expect(await fits(page, a)).toBe(true);
+			expect(a.height).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
 			installedPacks.push('music');
 			await add.tap();
 			const remove = page.getByRole('button', { name: /^Remove Music/ });
 			await expect(remove).toBeVisible();
 			await remove.scrollIntoViewIfNeeded();
-			expect(await fits(page, await box(remove))).toBe(true);
+			const r = await box(remove);
+			expect(await fits(page, r)).toBe(true);
+			expect(r.height).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
 
 			await page.goto('/items');
 			const select = page.getByLabel('Examples');
@@ -323,6 +347,7 @@ for (const size of SIZES) {
 				description: `${round(s.width)}x${round(s.height)} at x=${round(s.x)}`
 			});
 			expect(await fits(page, s)).toBe(true);
+			expect(s.height).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
 			await select.tap();
 			await select.selectOption({ index: 1 });
 		});
