@@ -89,17 +89,28 @@ poe coverage                  # full test suite + enforce all coverage threshold
 
 ### End-to-end tests
 
-`poe test-e2e` runs the Playwright suite in `frontend/tests/e2e/` against an isolated, throwaway Postgres (via `compose.e2e.yaml`), starting the backend and frontend dev servers itself and tearing the database down again afterwards. It requires Docker. It covers the roadmap's core happy paths: creating an item, setting an item type, adding a connection, quick capture, and managing item types.
+`poe test-e2e` runs the Playwright suite in `frontend/tests/e2e/` against an isolated, throwaway Postgres (via `compose.e2e.yaml`). It builds the production frontend (`poe e2e-build`, `npm run build`, roughly two minutes), runs the specs in parallel, and removes the database container afterwards whatever the outcome. It requires Docker. It covers the roadmap's core happy paths: creating an item, setting an item type, adding a connection, quick capture, and managing item types.
 
 `poe sync` (and so `poe init`) downloads the Chromium build Playwright drives (`poe install-e2e-browser`). On Linux, Chromium also needs a few system libraries; if the suite fails with `error while loading shared libraries`, run `poe install-e2e-deps` for the one-off command that fixes it (it needs `sudo` and a real terminal, so it prints the command rather than running it).
 
-Playwright launches its own backend and frontend dev servers, wired to that throwaway database. They listen on ports **8100** (backend) and **5273** (frontend) rather than the dev defaults (8000/5173), so the suite can run alongside `poe serve` or a deployed `docker compose up` without colliding with it, and can never reuse a server that points at your real data. Override the ports with `E2E_BACKEND_PORT` / `E2E_FRONTEND_PORT` if either is taken. Locally, servers already running on the e2e ports are reused, which is what makes the single-spec workflow below fast.
+```sh
+poe test-e2e                      # one worker per CPU core
+poe test-e2e --workers 2          # or -w 2; --workers 1 runs serially
+poe test-e2e --skip-build         # reuse frontend/build - only when it is current
+```
 
-To iterate on a single spec without paying the full up/migrate/down cycle each time:
+`test-e2e-headed` and `test-e2e-slow` take the same arguments.
+
+Each worker has its own database (`menagerist_w0`, `menagerist_w1`, ... in the one Postgres container on port 55433) and its own backend on port **8100 + worker index**. Each backend serves the built SPA from `frontend/build`, so there is no Vite dev server. Files run in parallel across workers; tests inside a file stay ordered. The ports are deliberately not the dev defaults (8000/5173), so the suite can run alongside `poe serve` or a deployed `docker compose up` and can never reuse a server that points at your real data. Override the base port with `E2E_BACKEND_PORT`. Locally, servers already running on those ports are reused, which makes the single-spec workflow below fast.
+
+Every worker is a browser plus a backend, so memory and CPU use grow with `--workers`. If tests time out on a small machine, lower the count.
+
+To iterate on a single spec without paying the full up/build/migrate/down cycle each time (the build must be current):
 
 ```sh
-poe e2e-db-up && poe e2e-migrate   # once, leave running
-cd frontend && npx playwright test tests/e2e/create-item.spec.ts
+poe e2e-db-up && poe e2e-build
+E2E_WORKERS=1 poe e2e-migrate      # once, leave running
+cd frontend && E2E_WORKERS=1 npx playwright test tests/e2e/create-item.spec.ts
 poe e2e-db-down                    # when done
 ```
 

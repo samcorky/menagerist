@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { createItemType, uniqueName } from './helpers';
 
 test('creates an item type with a field and uses it on a new item', async ({ page }) => {

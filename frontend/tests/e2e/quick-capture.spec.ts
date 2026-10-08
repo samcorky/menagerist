@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { openQuickCapture, uniqueName } from './helpers';
 
 test('captures an item from the quick capture dialog', async ({ page }) => {

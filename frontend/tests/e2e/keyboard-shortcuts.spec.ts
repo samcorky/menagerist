@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { createItem, createItemType, uniqueName } from './helpers';
 
 test('g c / g s / g e navigate between the main sections', async ({ page }) => {

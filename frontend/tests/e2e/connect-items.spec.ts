@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { createItem, connectToItem, uniqueName } from './helpers';
 
 test('connects one item to another and shows the connection', async ({ page }) => {

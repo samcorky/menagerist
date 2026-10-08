@@ -274,38 +274,28 @@ help = "Validate compose.yaml merged with the e2e-test override"
 sequence = ["test-backend", "test-frontend"]
 help = "Run all unit tests"
 
-[tool.poe.groups.quality.tasks._test-e2e-run]
-shell = "npx playwright test"
-interpreter = ["powershell", "posix"]
-cwd = "frontend"
-help = "Run the Playwright test suite (assumes the e2e db is up and migrated)"
-
-[tool.poe.groups.quality.tasks._test-e2e-run-headed]
-shell = "npx playwright test --headed"
-interpreter = ["powershell", "posix"]
-cwd = "frontend"
-help = "Run the Playwright test suite with a visible browser window (assumes the e2e db is up and migrated)"
-
 [tool.poe.groups.quality.tasks.test-e2e]
-sequence = ["e2e-db-up", "e2e-migrate", "_test-e2e-run", "e2e-db-down"]
-ignore_fail = true
-help = "Run the Playwright e2e suite against an isolated, throwaway Postgres, tearing it down afterwards regardless of outcome (requires Docker)"
+script = "scripts.e2e:main(workers=workers, skip_build=skip_build)"
+args = [
+  { name = "workers", options = ["-w", "--workers"], type = "integer", help = "Parallel workers, each with its own database and backend (default: CPU cores)" },
+  { name = "skip_build", options = ["--skip-build"], type = "boolean", help = "Reuse the existing frontend/build (only when it is current)" },
+]
+help = "Run the Playwright e2e suite in parallel against a throwaway Postgres, building the frontend first and tearing the database down afterwards (requires Docker)"
 
 [tool.poe.groups.quality.tasks.test-e2e-headed]
-sequence = ["e2e-db-up", "e2e-migrate", "_test-e2e-run-headed", "e2e-db-down"]
-ignore_fail = true
+script = "scripts.e2e:main(workers=workers, skip_build=skip_build, mode='headed')"
+args = [
+  { name = "workers", options = ["-w", "--workers"], type = "integer", help = "Parallel workers, each with its own database and backend (default: CPU cores)" },
+  { name = "skip_build", options = ["--skip-build"], type = "boolean", help = "Reuse the existing frontend/build (only when it is current)" },
+]
 help = "Same as test-e2e, but opens a visible browser window so you can watch the tests run"
 
-[tool.poe.groups.quality.tasks._test-e2e-run-slow]
-shell = "npx playwright test --headed"
-interpreter = ["powershell", "posix"]
-cwd = "frontend"
-env = { PW_SLOWMO = "1000" }
-help = "Run the Playwright test suite headed, with each action slowed down so it's watchable (assumes the e2e db is up and migrated)"
-
 [tool.poe.groups.quality.tasks.test-e2e-slow]
-sequence = ["e2e-db-up", "e2e-migrate", "_test-e2e-run-slow", "e2e-db-down"]
-ignore_fail = true
+script = "scripts.e2e:main(workers=workers, skip_build=skip_build, mode='slow')"
+args = [
+  { name = "workers", options = ["-w", "--workers"], type = "integer", help = "Parallel workers, each with its own database and backend (default: CPU cores)" },
+  { name = "skip_build", options = ["--skip-build"], type = "boolean", help = "Reuse the existing frontend/build (only when it is current)" },
+]
 help = "Same as test-e2e-headed, but slowed down (1s between actions) so you can actually follow along"
 
 [tool.poe.groups.database]
@@ -329,10 +319,14 @@ cmd = "docker compose -f compose.yaml -f compose.e2e.yaml up -d --wait postgres"
 help = "Start the isolated Postgres container used by the Playwright e2e suite, waiting for its healthcheck before returning"
 
 [tool.poe.groups.database.tasks.e2e-migrate]
-cmd = "menagerist migrate upgrade"
-cwd = "backend"
-env = { MENAGERIST_DATABASE_URL = "postgresql+asyncpg://menagerist:menagerist@localhost:55433/menagerist" }
-help = "Apply migrations to the isolated e2e Postgres database"
+script = "scripts.e2e_migrate:main"
+help = "Create and migrate one database per e2e worker (menagerist_w0..; count from E2E_WORKERS, default CPU cores)"
+
+[tool.poe.groups.database.tasks.e2e-build]
+shell = "npm run build"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Build the production frontend (frontend/build) that the e2e backends serve"
 
 [tool.poe.groups.database.tasks.e2e-db-down]
 cmd = "docker compose -f compose.yaml -f compose.e2e.yaml down -v"

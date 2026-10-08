@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { createItemType, addFieldToItemType, uniqueName } from './helpers';
 
 test('creates an item type, then edits it and persists the change', async ({ page }) => {

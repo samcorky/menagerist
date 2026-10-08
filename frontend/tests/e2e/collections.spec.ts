@@ -1,5 +1,5 @@
-import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
-import { uniqueName } from './helpers';
+import { test, expect, type Page } from './fixtures';
+import { openNav, ownedData, uniqueName } from './helpers';
 
 /**
  * Collections: create, fill from both sides, search, remove with undo, rename and delete.
@@ -8,48 +8,16 @@ import { uniqueName } from './helpers';
  */
 test.describe.configure({ mode: 'serial' });
 
-// Ids of collections and items this spec created, deleted again in cleanup.
-let ownCollectionIds: string[] = [];
-let ownItemIds: string[] = [];
-
-async function cleanUp(request: APIRequestContext) {
-	for (const id of ownCollectionIds) await request.delete(`/api/v1/collection/${id}`);
-	for (const id of ownItemIds) await request.delete(`/api/v1/node/${id}`);
-	ownCollectionIds = [];
-	ownItemIds = [];
-}
+const {
+	makeCollection,
+	makeItem,
+	addToCollection,
+	trackCollection,
+	trackCollectionFromUrl,
+	cleanUp
+} = ownedData();
 
 test.afterEach(({ request }) => cleanUp(request));
-
-/** Tracks the collection whose page the browser is on and returns its id. */
-function trackCollectionFromUrl(page: Page): string {
-	const id = new URL(page.url()).pathname.split('/').pop()!;
-	ownCollectionIds.push(id);
-	return id;
-}
-
-async function makeCollection(request: APIRequestContext, name: string, description?: string) {
-	const res = await request.post('/api/v1/collection', { data: { name, description } });
-	expect(res.status()).toBe(201);
-	const created = (await res.json()) as { id: string; name: string };
-	ownCollectionIds.push(created.id);
-	return created;
-}
-
-async function makeItem(request: APIRequestContext, name: string) {
-	const res = await request.post('/api/v1/node', { data: { name } });
-	expect(res.status()).toBe(201);
-	const created = (await res.json()) as { id: string; name: string };
-	ownItemIds.push(created.id);
-	return created;
-}
-
-async function addToCollection(request: APIRequestContext, collectionId: string, ids: string[]) {
-	const res = await request.put(`/api/v1/collection/${collectionId}/item`, {
-		data: { item_ids: ids }
-	});
-	expect(res.ok()).toBeTruthy();
-}
 
 async function expectNoShelfCopy(page: Page) {
 	await expect(page.locator('body')).not.toContainText(/shelf|shelves|Not items/i);
@@ -130,7 +98,7 @@ test('creates and adds from the item page', async ({ page, request }) => {
 	await expect(page.getByText(`Added to ${name}`)).toBeVisible();
 	const link = page.getByRole('link', { name, exact: true });
 	await expect(link).toBeVisible();
-	ownCollectionIds.push((await link.getAttribute('href'))!.split('/').pop()!);
+	trackCollection((await link.getAttribute('href'))!.split('/').pop()!);
 });
 
 test('adds items from the collection page and marks ones already added', async ({
@@ -418,7 +386,7 @@ test('an empty collection shows the empty state with an Add items button', async
 
 test('the Collections navigation entry opens /collections', async ({ page }) => {
 	await page.goto('/');
-	await page.getByRole('link', { name: 'Collections' }).first().click();
+	await openNav(page, 'Collections');
 	await page.waitForURL(/\/collections$/);
 	await expect(page.getByRole('heading', { name: 'Collections', level: 1 })).toBeVisible();
 });

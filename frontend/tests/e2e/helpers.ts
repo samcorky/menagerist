@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Page } from './fixtures';
 
 /**
  * Reusable flows shared across e2e specs. Each helper drives the real UI (no
@@ -106,6 +106,20 @@ export async function connectToItem(
 	await page.getByRole('button', { name: /^Connect items?$/ }).click();
 }
 
+export type NavEntry = 'Home' | 'Items' | 'Collections' | 'Explore' | 'Settings';
+
+/**
+ * Follows a main navigation link using whichever bar is visible for the current viewport (the
+ * top bar on desktop, the bottom bar on a phone). Hidden links are ignored by role queries, so
+ * `.first()` picks the visible one. The Settings link is an icon-only button in the top bar,
+ * labelled "Settings".
+ */
+export async function openNav(page: Page, entry: NavEntry): Promise<void> {
+	const link = page.getByRole('link', { name: entry, exact: true }).first();
+	await expect(link).toBeVisible();
+	await link.click();
+}
+
 /**
  * Opens the quick capture dialog via its global keyboard shortcut. Waits for
  * the app shell to hydrate first - this is a client-rendered SPA, so the
@@ -113,8 +127,59 @@ export async function connectToItem(
  */
 export async function openQuickCapture(page: Page) {
 	await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
-	await page.keyboard.press('Control+k');
+	// On a phone the bottom bar's "New" button opens it; on desktop the shortcut does.
+	const phoneButton = page.getByRole('button', { name: 'New', exact: true });
+	if (await phoneButton.isVisible()) await phoneButton.tap();
+	else await page.keyboard.press('Control+k');
 	const dialog = page.getByRole('dialog', { name: 'Quick capture' });
 	await expect(dialog).toBeVisible();
 	return dialog;
+}
+
+/**
+ * Creates collections and items through the API and remembers their ids, so a spec can delete
+ * exactly what it made (the database is shared, so list-and-match cleanup could miss rows).
+ * Call `cleanUp` from `afterEach`.
+ */
+export function ownedData() {
+	let collectionIds: string[] = [];
+	let itemIds: string[] = [];
+
+	return {
+		trackCollection(id: string) {
+			collectionIds.push(id);
+		},
+		/** Tracks the collection whose page the browser is on and returns its id. */
+		trackCollectionFromUrl(page: Page): string {
+			const id = new URL(page.url()).pathname.split('/').pop()!;
+			collectionIds.push(id);
+			return id;
+		},
+		async makeCollection(request: APIRequestContext, name: string, description?: string) {
+			const res = await request.post('/api/v1/collection', { data: { name, description } });
+			expect(res.status()).toBe(201);
+			const created = (await res.json()) as { id: string; name: string };
+			collectionIds.push(created.id);
+			return created;
+		},
+		async makeItem(request: APIRequestContext, name: string) {
+			const res = await request.post('/api/v1/node', { data: { name } });
+			expect(res.status()).toBe(201);
+			const created = (await res.json()) as { id: string; name: string };
+			itemIds.push(created.id);
+			return created;
+		},
+		async addToCollection(request: APIRequestContext, collectionId: string, ids: string[]) {
+			const res = await request.put(`/api/v1/collection/${collectionId}/item`, {
+				data: { item_ids: ids }
+			});
+			expect(res.ok()).toBeTruthy();
+		},
+		async cleanUp(request: APIRequestContext) {
+			for (const id of collectionIds) await request.delete(`/api/v1/collection/${id}`);
+			for (const id of itemIds) await request.delete(`/api/v1/node/${id}`);
+			collectionIds = [];
+			itemIds = [];
+		}
+	};
 }
