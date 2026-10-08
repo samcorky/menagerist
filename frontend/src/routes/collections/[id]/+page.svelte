@@ -467,7 +467,7 @@
 					<div class="flex items-center gap-1">
 						<button
 							onclick={() => (viewMode = 'list')}
-							class="relative rounded-md p-1.5 transition-colors after:absolute after:-inset-1.5 after:content-[''] {viewMode ===
+							class="relative rounded-md p-1.5 transition-colors after:absolute after:-inset-2.5 after:content-[''] {viewMode ===
 							'list'
 								? 'bg-muted text-foreground'
 								: 'text-muted-foreground hover:text-foreground'}"
@@ -478,7 +478,7 @@
 						</button>
 						<button
 							onclick={() => (viewMode = 'grid')}
-							class="relative rounded-md p-1.5 transition-colors after:absolute after:-inset-1.5 after:content-[''] {viewMode ===
+							class="relative rounded-md p-1.5 transition-colors after:absolute after:-inset-2.5 after:content-[''] {viewMode ===
 							'grid'
 								? 'bg-muted text-foreground'
 								: 'text-muted-foreground hover:text-foreground'}"
@@ -533,7 +533,7 @@
 								data-remove-id={item.id}
 								aria-label="Remove {item.name} from this collection"
 								title="Remove from collection"
-								class="absolute top-2 right-2 rounded-full bg-background/90 p-1.5 text-muted-foreground shadow-sm transition-colors after:absolute after:-inset-1.5 after:content-[''] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+								class="absolute top-2 right-2 rounded-full bg-background/90 p-1.5 text-muted-foreground shadow-sm transition-colors after:absolute after:-inset-2.5 after:content-[''] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 							>
 								<X class="size-4" />
 							</button>
@@ -560,7 +560,7 @@
 								data-remove-id={item.id}
 								aria-label="Remove {item.name} from this collection"
 								title="Remove from collection"
-								class="relative shrink-0 self-center rounded-md p-2 text-muted-foreground transition-colors after:absolute after:-inset-1 after:content-[''] hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+								class="relative shrink-0 self-center rounded-md p-2 text-muted-foreground transition-colors after:absolute after:-inset-2 after:content-[''] hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 							>
 								<X class="size-4" />
 							</button>

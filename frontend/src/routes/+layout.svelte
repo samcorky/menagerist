@@ -229,70 +229,72 @@
 			style="view-transition-name: site-nav; padding-bottom: env(safe-area-inset-bottom)"
 			class="shrink-0 border-t bg-background/95 backdrop-blur md:hidden"
 		>
-			<div class="flex items-center justify-around px-2 py-1">
+			<div class="flex items-center px-0 py-1">
 				<a
 					href={resolve('/')}
-					class="flex flex-col items-center gap-0.5 rounded-xl px-4 py-2 transition-colors {homeActive
+					class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {homeActive
 						? 'text-foreground'
 						: 'text-muted-foreground hover:text-foreground'}"
 					aria-current={homeActive ? 'page' : undefined}
 				>
 					<House class="size-5" />
-					<span class="text-[10px] font-medium">Home</span>
+					<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">Home</span>
 				</a>
 
 				<a
 					href={resolve('/items')}
-					class="flex flex-col items-center gap-0.5 rounded-xl px-3 py-2 transition-colors {itemsActive
+					class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {itemsActive
 						? 'text-foreground'
 						: 'text-muted-foreground hover:text-foreground'}"
 					aria-current={itemsActive ? 'page' : undefined}
 				>
 					<LayoutGrid class="size-5" />
-					<span class="text-[10px] font-medium">Items</span>
+					<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">Items</span>
 				</a>
 
 				<a
 					href={resolve('/collections')}
-					class="flex flex-col items-center gap-0.5 rounded-xl px-2 py-2 transition-colors {collectionsActive
+					class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {collectionsActive
 						? 'text-foreground'
 						: 'text-muted-foreground hover:text-foreground'}"
 					aria-current={collectionsActive ? 'page' : undefined}
 				>
 					<Library class="size-5" />
-					<span class="text-[10px] font-medium">Collections</span>
+					<span class="max-w-full truncate text-[10px] font-medium tracking-tighter"
+						>Collections</span
+					>
 				</a>
 
 				<a
 					href={resolve('/explore')}
-					class="flex flex-col items-center gap-0.5 rounded-xl px-3 py-2 transition-colors {exploreActive
+					class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {exploreActive
 						? 'text-foreground'
 						: 'text-muted-foreground hover:text-foreground'}"
 					aria-current={exploreActive ? 'page' : undefined}
 				>
 					<Telescope class="size-5" />
-					<span class="text-[10px] font-medium">Explore</span>
+					<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">Explore</span>
 				</a>
 
 				<button
 					onclick={() => captureController.show()}
-					class="flex flex-col items-center gap-0.5 rounded-xl px-4 py-2 transition-colors {newActive
+					class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {newActive
 						? 'text-primary'
 						: 'text-muted-foreground hover:text-foreground'}"
 				>
 					<CirclePlus class="size-6" />
-					<span class="text-[10px] font-medium">New</span>
+					<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">New</span>
 				</button>
 
 				<a
 					href={resolve('/settings')}
-					class="flex flex-col items-center gap-0.5 rounded-xl px-4 py-2 transition-colors {settingsActive
+					class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {settingsActive
 						? 'text-foreground'
 						: 'text-muted-foreground hover:text-foreground'}"
 					aria-current={settingsActive ? 'page' : undefined}
 				>
 					<Settings class="size-5" />
-					<span class="text-[10px] font-medium">Settings</span>
+					<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">Settings</span>
 				</a>
 			</div>
 		</nav>
