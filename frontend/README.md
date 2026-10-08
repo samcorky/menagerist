@@ -31,6 +31,8 @@ For UX and UI rules, see [DESIGN_GUIDELINES.md](DESIGN_GUIDELINES.md).
 
 **Examples** - Settings > Examples (`src/routes/settings/examples/`) adds and removes the shipped example packs. Home links to it from the empty state and shows a dismissible line while examples are installed. The wording helpers (counts, removal messages, dismissal in `localStorage`) live in `src/lib/examples.ts` so they can be unit tested.
 
+**Collections** - `/collections` lists collections and creates them, and `/collections/[id]` shows one: its items (the shared item cards, with search, list and grid views, and the Examples filter), rename and delete, an Add items dialog (`lib/components/add-items-dialog.svelte`) and Remove with Undo. The item page has a Collections card (`lib/components/item-collections.svelte`). Wording and error messages live in `src/lib/collections.ts`. The collection page deliberately does not share its list code with the items page; keep the search debounce and the paging in step if you change either.
+
 ## Development
 
 Install dependencies and generate the API client first (run from the repo root):

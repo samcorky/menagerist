@@ -50,6 +50,7 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Tooltip from '$lib/components/ui/popover-tooltip/index.js';
 	import { serverErrorsToFields } from '$lib/validation-messages';
+	import ItemCollections from '$lib/components/item-collections.svelte';
 	import MediaGallery from '$lib/components/media-gallery.svelte';
 	import NodeCover from '$lib/components/node-cover.svelte';
 	import NodeSummary from '$lib/components/node-summary.svelte';
@@ -1013,6 +1014,8 @@
 				</Card.Root>
 
 				{#if !loading}
+					<ItemCollections itemId={nodeId} />
+
 					<Card.Root>
 						<Card.Header>
 							<Card.Title class="font-heading">Files</Card.Title>

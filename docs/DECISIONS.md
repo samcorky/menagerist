@@ -543,3 +543,51 @@ So a plain private array is the source of truth, `active` is a write-only `$stat
 **Rationale:** there is one consumer today. The merge policy (what happens when an imported slug or item already exists) and how an export refers to its own entities would both be guesses. When import and export arrive, the pack format's local `ref`s and the installer's ordered steps are the intended starting point.
 
 **Not decided:** whether add-on packs that need another pack (`requires`) become part of that bundle layer.
+
+## Collections are named lists of items, in their own module
+
+**Decision:** a collection is a first-class entity, not an item. It has a name, a slug, an optional description and an owner, and it refers to items by id: an item can be in any number of collections, and deleting a collection never deletes or changes items. It lives in its own `collections` module. Only manual collections are built; the `kind` field leaves room for dynamic ones (a saved search, #190), which wait until search can filter on more than type, text and favourite.
+
+**Rationale:** modelling a collection as an item with "contains" connections would put one more concept into every list, search and type picker, and a person grouping their vinyl does not want a record. A folder that items live in was rejected: it would force each item into one place and tie type and fields to the folder. `graph` already holds four concepts, and the ownership and visibility rules apply to collections in ways they do not apply to items, so they belong in a module of their own.
+
+**Consequence:** a collection's page reuses the item cards, the search box, the list and grid views and the Examples filter, but not the items page's type filter (yet). It deliberately does not share its list code with the items page. Collections are shown to people as "collection"; the words "shelf", node, edge and graph do not appear.
+
+## Collection membership is by id, and liveness is checked when reading
+
+**Decision:** a membership row stores a collection id, an item id and when it was added, with no foreign key to items. Deleting an item leaves its rows alone. Every read goes through an `ItemLookup` port that returns which of a set of ids are live items, so counts and lists ignore deleted ones.
+
+**Rationale:** modules reference each other by id and accept eventual consistency, so `collections` cannot cascade into `graph`'s tables, and item deletion needs no cleanup step that could be forgotten. The cost is one extra lookup per collection when counting, which is chunked and cheap at the sizes expected.
+
+## Two ports and one filter join collections and items
+
+**Decision:** `collections` never imports `graph`, and `graph` never imports `collections` (architecture tests enforce both directions). `collections` owns `ItemLookup`; `graph` owns `CollectionMembers`, used by the `?collection=<id>` filter on the item list. Adapters for both live in `entrypoints/api/shared/`, which may import both modules. The filter passes the member ids to the item query as an `ids` restriction, so the search, type and favourite filters, paging and the total all work unchanged.
+
+**Rationale:** the same pattern as `examples` and the choice-list source. A missing or deleted collection is a 404, so an empty collection (an empty list, total 0) is distinguishable from a wrong id.
+
+**Consequence:** the ids go into an `IN (...)` list, which is fine for hundreds or a few thousand items (the database caps bind parameters at 32 767). If collections grow far beyond that, switch the adapter to a join; the port hides it.
+
+## A collection's ETag covers its item count and its membership
+
+**Decision:** the response includes `item_count`, so the ETag is built from the collection's `updated_at` and the live item count, and adding or removing items bumps `updated_at`. `If-Modified-Since` is ignored when `If-None-Match` is present, and `If-Unmodified-Since` when `If-Match` is present, as RFC 9110 requires.
+
+**Rationale:** an ETag from `updated_at` alone gave a stale 304 when an item was deleted elsewhere. Browsers send both validators, and the old fall-through to the date check re-introduced the same bug, so it had to be fixed in the shared helper as well. Other routers' ETags are unchanged because the new input is optional.
+
+**Consequence:** an `If-Match` taken before a membership change now fails with 412 on rename, which is correct because the collection changed.
+
+## Collection slugs: immutable, derived from the name, unique among live collections
+
+**Decision:** each collection has a slug for pretty links. It is derived from the name (`slugify`, falling back to `collection`, then `-2`, `-3` until free) or given explicitly, and it never changes on rename, so a saved link never breaks. It is unique among collections that have not been deleted (a partial unique index backs the check), so a deleted collection's slug can be reused. Slugs are global for now.
+
+**Not decided:** per-owner uniqueness when multi-user arrives; that is an index and use-case change in one place.
+
+## Collection ownership is stored but not enforced: a precondition for multi-user
+
+**Decision:** every collection records an `owner_id` and a `visibility` (private), and use cases take the acting user, but nothing is checked yet because there is one fixed user. Enforcement through `AuthorizationPort` is a hard precondition for shipping multi-user, on every path that touches a collection: get, list, update, delete, adding and removing items, and the read path behind `GET /node?collection=`, where the `CollectionMembers` bridge and `ListNodes` will need to take the requesting user (a port-signature change, not a one-line check).
+
+**Rationale:** the rest of the application is wired the same way (permissions are wired, not enforced). Adding owner checks now could wrongly reject legitimate callers, such as the system user, and would be tested against a user model that does not exist. An automated review flagged the missing owner checks as an authorisation gap; they are deliberately absent until multi-user, and this entry is where that is written down.
+
+**Consequence:** if multi-user ships without this work, any user could read, change or delete another user's collections.
+
+## Collection errors: 400 for domain validation, 422 for malformed requests
+
+**Decision:** a blank name, an unknown item id and similar domain failures return 400, the application's existing mapping for domain `ValidationError`. Requests that fail Pydantic validation (a name over 120 characters, more than 500 ids in one request, a malformed id, unknown fields) return 422. The client treats both as "invalid input".

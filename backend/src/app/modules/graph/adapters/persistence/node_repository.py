@@ -22,6 +22,7 @@ from app.modules.graph.domain.node import Node
 
 if TYPE_CHECKING:
     import builtins
+    import collections.abc
     import uuid
     from collections.abc import Mapping, Sequence
 
@@ -177,16 +178,21 @@ class SqlAlchemyNodeRepository:
         type: str | None = None,
         q: str | None = None,
         favourite: bool | None = None,
+        ids: collections.abc.Collection[uuid.UUID] | None = None,
         attribute_search_exclusions: Mapping[str, Sequence[str]] | None = None,
     ) -> list[Node]:
         """List non-deleted node ordered by id, starting after `after` if given."""
         logger.debug("listing nodes", after=after, limit=limit, type=type)
+        if ids is not None and not ids:
+            return []
         stmt = (
             select(NodeModel)
             .where(NodeModel.deleted_at.is_(None))
             .order_by(NodeModel.id)
             .limit(limit)
         )
+        if ids is not None:
+            stmt = stmt.where(NodeModel.id.in_(ids))
         if type is not None:
             stmt = stmt.where(NodeModel.type == type)
         if after is not None:
@@ -204,15 +210,20 @@ class SqlAlchemyNodeRepository:
         type: str | None = None,
         q: str | None = None,
         favourite: bool | None = None,
+        ids: collections.abc.Collection[uuid.UUID] | None = None,
         attribute_search_exclusions: Mapping[str, Sequence[str]] | None = None,
     ) -> int:
         """Return the total number of non-deleted nodes matching the given filters."""
         logger.debug("counting nodes", type=type)
+        if ids is not None and not ids:
+            return 0
         stmt = (
             select(func.count())
             .select_from(NodeModel)
             .where(NodeModel.deleted_at.is_(None))
         )
+        if ids is not None:
+            stmt = stmt.where(NodeModel.id.in_(ids))
         if type is not None:
             stmt = stmt.where(NodeModel.type == type)
         if q is not None:

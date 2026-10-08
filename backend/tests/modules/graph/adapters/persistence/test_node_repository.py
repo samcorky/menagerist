@@ -491,3 +491,83 @@ async def test_search_ignores_deleted_nodes(db_session: AsyncSession) -> None:
     await repository.add(node)
 
     assert await _search_ids(repository, "findme") == []
+
+
+async def _seed_for_ids(
+    db_session: AsyncSession,
+) -> tuple[SqlAlchemyNodeRepository, list[Node]]:
+    """Add four nodes (film, film, film favourite, book) and return them by id order."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    nodes = [
+        Node.create(name="Alien", type="film"),
+        Node.create(name="Aliens", type="film"),
+        Node.create(name="Blade Runner", type="film", favourite=True),
+        Node.create(name="Dune", type="book"),
+    ]
+    for node in nodes:
+        await repository.add(node)
+    return repository, nodes
+
+
+async def test_ids_restricts_list_and_count(db_session: AsyncSession) -> None:
+    """`ids` limits list() and count() to those nodes, in id order."""
+    repository, nodes = await _seed_for_ids(db_session)
+    wanted = {nodes[3].id, nodes[1].id}
+
+    result = await repository.list(after=None, limit=10, ids=wanted)
+
+    assert [n.id for n in result] == [nodes[1].id, nodes[3].id]
+    assert await repository.count(ids=wanted) == 2
+
+
+async def test_ids_none_means_no_restriction(db_session: AsyncSession) -> None:
+    """`ids=None` applies no id restriction."""
+    repository, nodes = await _seed_for_ids(db_session)
+
+    assert len(await repository.list(after=None, limit=10, ids=None)) == len(nodes)
+    assert await repository.count(ids=None) == len(nodes)
+
+
+async def test_empty_ids_returns_nothing(db_session: AsyncSession) -> None:
+    """An empty `ids` collection yields no results and a zero count."""
+    repository, _ = await _seed_for_ids(db_session)
+
+    assert await repository.list(after=None, limit=10, ids=set()) == []
+    assert await repository.count(ids=set()) == 0
+
+
+async def test_ids_ignores_unknown_and_deleted_nodes(db_session: AsyncSession) -> None:
+    """Ids of missing or soft-deleted nodes never appear."""
+    repository, nodes = await _seed_for_ids(db_session)
+    nodes[0].soft_delete()
+    await repository.save(nodes[0])
+    wanted = [nodes[0].id, nodes[1].id, uuid.uuid4()]
+
+    result = await repository.list(after=None, limit=10, ids=wanted)
+
+    assert [n.id for n in result] == [nodes[1].id]
+    assert await repository.count(ids=wanted) == 1
+
+
+async def test_ids_combines_with_other_filters(db_session: AsyncSession) -> None:
+    """`ids` is ANDed with type, q, favourite, after and limit."""
+    repository, nodes = await _seed_for_ids(db_session)
+    everything = {n.id for n in nodes}
+    films = {nodes[0].id, nodes[1].id, nodes[3].id}
+
+    by_type = await repository.list(after=None, limit=10, ids=films, type="film")
+    assert [n.id for n in by_type] == [nodes[0].id, nodes[1].id]
+    assert await repository.count(ids=films, type="film") == 2
+
+    by_q = await repository.list(after=None, limit=10, ids=films, q="alien")
+    assert [n.id for n in by_q] == [nodes[0].id, nodes[1].id]
+    assert await repository.count(ids=films, q="alien") == 2
+
+    by_fav = await repository.list(after=None, limit=10, ids=films, favourite=True)
+    assert by_fav == []
+    assert await repository.count(ids=everything, favourite=True) == 1
+
+    paged = await repository.list(after=nodes[0].id, limit=1, ids=films)
+    assert [n.id for n in paged] == [nodes[1].id]
+    nxt = await repository.list(after=nodes[1].id, limit=5, ids=films)
+    assert [n.id for n in nxt] == [nodes[3].id]

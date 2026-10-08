@@ -4,7 +4,11 @@ from typing import TYPE_CHECKING
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
+from app.entrypoints.api.shared.collection_members import get_collection_members
 from app.modules.graph.adapters.api.dependencies import get_graph_repos, get_graph_uow
+from app.modules.graph.adapters.persistence.in_memory_collection_members import (
+    InMemoryCollectionMembers,
+)
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -509,3 +513,65 @@ def test_list_nodes_x_total_count_matches_full_count_across_pages() -> None:
     assert response.status_code == 200
     assert len(response.json()) == 10
     assert response.headers["Total-Count"] == "15"
+
+
+def _app_with_collection(
+    collection_id: uuid.UUID, item_ids: list[uuid.UUID]
+) -> FastAPI:
+    app = _app_with_in_memory_graph()
+    members = InMemoryCollectionMembers()
+    members.add_collection(collection_id, item_ids)
+    app.dependency_overrides[get_collection_members] = lambda: members
+    return app
+
+
+def test_list_nodes_collection_restricts_and_combines_with_filters_and_paging() -> None:
+    """?collection= restricts items, Total-Count and Link to the collection."""
+    plain = _app_with_in_memory_graph()
+    client = TestClient(plain)
+    ids = [
+        client.post("/api/v1/node", json={"name": f"Film {i}", "type": "film"}).json()[
+            "id"
+        ]
+        for i in range(4)
+    ]
+    client.post("/api/v1/node", json={"name": "Outside", "type": "film"})
+    collection_id = uuid.uuid4()
+    members = InMemoryCollectionMembers()
+    members.add_collection(collection_id, [uuid.UUID(i) for i in ids])
+    plain.dependency_overrides[get_collection_members] = lambda: members
+
+    page = client.get(f"/api/v1/node?collection={collection_id}&limit=3")
+    searched = client.get(f"/api/v1/node?collection={collection_id}&q=outside")
+
+    assert page.status_code == 200
+    assert len(page.json()) == 3
+    assert page.headers["Total-Count"] == "4"
+    assert 'rel="next"' in page.headers["Link"]
+    assert searched.json() == []
+    assert searched.headers["Total-Count"] == "0"
+
+
+def test_list_nodes_unknown_collection_returns_404() -> None:
+    """?collection= for an unknown collection is a 404 problem response."""
+    app = _app_with_in_memory_graph()
+    members = InMemoryCollectionMembers()
+    app.dependency_overrides[get_collection_members] = lambda: members
+    client = TestClient(app)
+
+    response = client.get(f"/api/v1/node?collection={uuid.uuid4()}")
+
+    assert response.status_code == 404
+
+
+def test_list_nodes_empty_collection_returns_empty_list() -> None:
+    """A collection with no items lists nothing, with Total-Count 0."""
+    collection_id = uuid.uuid4()
+    client = TestClient(_app_with_collection(collection_id, []))
+    client.post("/api/v1/node", json={"name": "Alien", "type": "film"})
+
+    response = client.get(f"/api/v1/node?collection={collection_id}")
+
+    assert response.status_code == 200
+    assert response.json() == []
+    assert response.headers["Total-Count"] == "0"

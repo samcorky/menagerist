@@ -6,6 +6,10 @@ from app.entrypoints.api.shared.choice_list_source import (
     PresetChoiceListSource,
     get_choice_list_source,
 )
+from app.entrypoints.api.shared.collection_members import (
+    CollectionsMembers,
+    get_collection_members,
+)
 from app.modules.graph.adapters.persistence.unit_of_work import (
     build_graph_repos,
     create_graph_uow,
@@ -90,8 +94,9 @@ def get_get_node_use_case(
 
 def get_list_nodes_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    collection_members: Annotated[CollectionsMembers, Depends(get_collection_members)],
 ) -> ListNodes:
-    return ListNodes(repos)
+    return ListNodes(repos, collection_members)
 
 
 def get_update_node_use_case(

@@ -5,7 +5,9 @@ from typing import TYPE_CHECKING
 import structlog
 
 from app.modules.graph.application.schema_meta import search_excluded_keys
+from app.modules.graph.domain.errors import CollectionNotFoundError
 from app.modules.graph.domain.node import Node
+from app.modules.graph.ports.collection_members import CollectionMembers  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.cqrs import QueryHandler
 
@@ -26,6 +28,7 @@ class ListNodesQuery:
     type: str | None = None
     q: str | None = None
     favourite: bool | None = None
+    collection: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -38,6 +41,29 @@ class ListNodesResult:
 
 class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
     """List node with keyset pagination."""
+
+    def __init__(
+        self,
+        repos: GraphRepos,
+        collection_members: CollectionMembers | None = None,
+    ) -> None:
+        super().__init__(repos)
+        self._collection_members = collection_members
+
+    async def _collection_item_ids(
+        self, collection_id: uuid.UUID | None
+    ) -> set[uuid.UUID] | None:
+        """Resolve a collection to its item ids, or None when unrestricted."""
+        if collection_id is None:
+            return None
+        if self._collection_members is None:
+            msg = "ListNodes needs collection members to filter by collection"
+            raise RuntimeError(msg)
+        ids = await self._collection_members.item_ids(collection_id)
+        if ids is None:
+            msg = f"Collection {collection_id} not found"
+            raise CollectionNotFoundError(msg)
+        return ids
 
     async def _search_exclusions(self) -> dict[str, list[str]]:
         """Map each node type slug to the attribute keys a search must skip."""
@@ -56,6 +82,7 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
     async def handle(self, query: ListNodesQuery, actor: Actor) -> ListNodesResult:
         """Return a page of nodes and total count matching the query."""
         exclusions = await self._search_exclusions() if query.q is not None else None
+        ids = await self._collection_item_ids(query.collection)
         items = await self._repos.nodes.list(
             after=query.after,
             limit=query.limit,
@@ -63,12 +90,14 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
             q=query.q,
             favourite=query.favourite,
             attribute_search_exclusions=exclusions,
+            ids=ids,
         )
         total = await self._repos.nodes.count(
             type=query.type,
             q=query.q,
             favourite=query.favourite,
             attribute_search_exclusions=exclusions,
+            ids=ids,
         )
         result = ListNodesResult(items=items, total=total)
         logger.debug("nodes listed", count=len(result.items), total=result.total)

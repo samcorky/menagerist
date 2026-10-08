@@ -8,6 +8,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Connection
+from app.modules.collections.adapters.persistence import (  # noqa: F401
+    models as collection_models,
+)
 from app.modules.examples.adapters.persistence import (  # noqa: F401
     models as example_models,
 )

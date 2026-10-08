@@ -150,3 +150,28 @@ def test_examples_module_is_independent_of_graph_and_presets() -> None:
             .in_folder(f"*modules/{other}*")
         )
         assert_passes(rule)
+
+
+def test_collections_module_is_independent_of_graph_and_presets() -> None:
+    """`collections` reaches `graph` and `presets` only through its own ports."""
+    for other in ("graph", "presets"):
+        rule = (
+            project_files(SRC_PATH)
+            .in_folder("*modules/collections*")
+            .should_not()
+            .depend_on_files()
+            .in_folder(f"*modules/{other}*")
+        )
+        assert_passes(rule)
+
+
+def test_graph_module_is_independent_of_collections() -> None:
+    """`graph` reaches `collections` only through its own ports."""
+    rule = (
+        project_files(SRC_PATH)
+        .in_folder("*modules/graph*")
+        .should_not()
+        .depend_on_files()
+        .in_folder("*modules/collections*")
+    )
+    assert_passes(rule)

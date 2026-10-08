@@ -13,7 +13,7 @@ class ETaggable(Protocol):
     updated_at: datetime
 
 
-def etag_from_entity(entity: ETaggable) -> str:
+def etag_from_entity(entity: ETaggable, extra: str | None = None) -> str:
     """Weak ETag derived from entity ID and last-modified timestamp.
 
     Weak (`W/"..."`) rather than strong: nginx gzip-compresses `/api/` JSON
@@ -23,8 +23,12 @@ def etag_from_entity(entity: ETaggable) -> str:
     happens - is a no-op, so the value a client caches from a GET always
     matches what a later PATCH's conditional check compares against. See
     `docs/DECISIONS.md` ("weak ETags to survive a compressing proxy").
+
+    `extra` folds in any other state the representation shows that does not
+    move `updated_at` (for example a computed count).
     """
-    digest = hashlib.sha256(
-        f"{entity.id}:{entity.updated_at.isoformat()}".encode()
-    ).hexdigest()[:16]
+    material = f"{entity.id}:{entity.updated_at.isoformat()}"
+    if extra is not None:
+        material += f":{extra}"
+    digest = hashlib.sha256(material.encode()).hexdigest()[:16]
     return f'W/"{digest}"'

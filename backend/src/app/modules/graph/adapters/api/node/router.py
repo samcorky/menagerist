@@ -39,6 +39,7 @@ from app.modules.graph.application.promote_extra_schema_field import (
 )
 from app.modules.graph.application.update_node import UpdateNode
 from app.modules.graph.domain.errors import (
+    CollectionNotFoundError,
     InvalidSchemaError,
     NodeNotFoundError,
     NodeTypeNotFoundError,
@@ -100,7 +101,13 @@ async def get_node(
     "",
     response_model=list[NodeResponse],
     operation_id="list_nodes",
-    responses={**link_header_responses()},
+    responses={
+        **link_header_responses(),
+        **error_response(
+            CollectionNotFoundError,
+            detail="Collection 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10 not found",
+        ),
+    },
 )
 async def list_nodes(
     use_case: Annotated[ListNodes, Depends(get_list_nodes_use_case)],
@@ -112,11 +119,20 @@ async def list_nodes(
     type: str | None = None,
     q: Annotated[str | None, Query(description=_Q_DESCRIPTION)] = None,
     favourite: bool | None = None,
+    collection: Annotated[
+        uuid.UUID | None,
+        Query(description="Restrict the list to items on this collection."),
+    ] = None,
 ) -> list[NodeResponse]:
     """List node, paginated by id."""
     result = await use_case.handle(
         ListNodesQuery(
-            after=after, limit=limit + 1, type=type, q=q, favourite=favourite
+            after=after,
+            limit=limit + 1,
+            type=type,
+            q=q,
+            favourite=favourite,
+            collection=collection,
         ),
         actor,
     )

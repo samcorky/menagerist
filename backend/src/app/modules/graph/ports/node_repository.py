@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     import builtins
+    import collections.abc
     import uuid
     from collections.abc import Mapping, Sequence
 
@@ -31,6 +32,7 @@ class NodeRepository(Protocol):
         type: str | None = None,
         q: str | None = None,
         favourite: bool | None = None,
+        ids: collections.abc.Collection[uuid.UUID] | None = None,
         attribute_search_exclusions: Mapping[str, Sequence[str]] | None = None,
     ) -> list[Node]:
         """List non-deleted node ordered by id, starting after `after` if given.
@@ -38,7 +40,8 @@ class NodeRepository(Protocol):
         `q` matches the name, the description and any string or number value in
         the attributes (never key names, booleans or nulls). For a node whose
         type is a key of `attribute_search_exclusions`, the listed top-level
-        attribute keys are not searched.
+        attribute keys are not searched. `ids` restricts results to those nodes:
+        `None` applies no restriction, an empty collection matches nothing.
         """
         ...
 
@@ -48,6 +51,7 @@ class NodeRepository(Protocol):
         type: str | None = None,
         q: str | None = None,
         favourite: bool | None = None,
+        ids: collections.abc.Collection[uuid.UUID] | None = None,
         attribute_search_exclusions: Mapping[str, Sequence[str]] | None = None,
     ) -> int:
         """Return the total number of non-deleted nodes matching the given filters."""

@@ -22,24 +22,25 @@ class ConditionalRequest:
         self._req = request
         self._res = response
 
-    def check_get(self, entity: ETaggable) -> Response | None:
+    def check_get(self, entity: ETaggable, extra: str | None = None) -> Response | None:
         """Set ETag/Last-Modified on the outgoing response.
 
         Returns a 304 Response if the client's copy is current, else None.
         """
-        etag = etag_from_entity(entity)
+        etag = etag_from_entity(entity, extra)
         last_mod = http_date(entity.updated_at)
         self._res.headers["ETag"] = etag
         self._res.headers["Last-Modified"] = last_mod
         self._res.headers["Cache-Control"] = "private, no-cache"
 
         if_none_match = self._req.headers.get("If-None-Match")
-        if if_none_match and (
-            if_none_match == "*" or _unweak(if_none_match) == _unweak(etag)
-        ):
-            return Response(
-                status_code=304, headers={"ETag": etag, "Last-Modified": last_mod}
-            )
+        if if_none_match:
+            # RFC 9110 13.1.3: If-Modified-Since is ignored when If-None-Match is sent.
+            if if_none_match == "*" or _unweak(if_none_match) == _unweak(etag):
+                return Response(
+                    status_code=304, headers={"ETag": etag, "Last-Modified": last_mod}
+                )
+            return None
 
         if_modified_since = self._req.headers.get("If-Modified-Since")
         if if_modified_since:
@@ -54,19 +55,22 @@ class ConditionalRequest:
 
         return None
 
-    def check_patch(self, current: ETaggable) -> Response | None:
+    def check_patch(
+        self, current: ETaggable, extra: str | None = None
+    ) -> Response | None:
         """Return 412 if If-Match or If-Unmodified-Since fails, else None."""
         if_match = self._req.headers.get("If-Match")
         if_unmodified_since = self._req.headers.get("If-Unmodified-Since")
         if not if_match and not if_unmodified_since:
             return None
 
-        etag = etag_from_entity(current)
+        etag = etag_from_entity(current, extra)
 
         if if_match and if_match != "*" and _unweak(if_match) != _unweak(etag):
             return Response(status_code=412, headers={"ETag": etag})
 
-        if if_unmodified_since:
+        # RFC 9110 13.1.4: If-Unmodified-Since is ignored when If-Match is sent.
+        if if_unmodified_since and not if_match:
             since = parse_http_date(if_unmodified_since)
             utc_updated = current.updated_at.astimezone(UTC)
             # Compare at second resolution. RFC 1123 omits sub-second precision.
@@ -75,9 +79,9 @@ class ConditionalRequest:
 
         return None
 
-    def set_response_etag(self, entity: ETaggable) -> None:
+    def set_response_etag(self, entity: ETaggable, extra: str | None = None) -> None:
         """Attach ETag/Last-Modified to the response after a successful mutation."""
-        self._res.headers["ETag"] = etag_from_entity(entity)
+        self._res.headers["ETag"] = etag_from_entity(entity, extra)
         self._res.headers["Last-Modified"] = http_date(entity.updated_at)
 
 

@@ -11,6 +11,9 @@ from app.entrypoints.api.shared.request_context_middleware import (
 from app.entrypoints.api.shared.security_headers import SecurityHeadersMiddleware
 from app.entrypoints.api.shared.version_header import VersionHeaderMiddleware
 from app.entrypoints.api.spa import SpaStaticFiles
+from app.modules.collections.adapters.api.collection.router import (
+    router as collection_router,
+)
 from app.modules.examples.adapters.api.example.router import router as example_router
 from app.modules.graph.adapters.api.edge.router import router as edge_router
 from app.modules.graph.adapters.api.edge_type.router import router as edge_type_router
@@ -40,6 +43,7 @@ api_v1_router.include_router(edge_type_router)
 api_v1_router.include_router(media_router)
 api_v1_router.include_router(preset_router)
 api_v1_router.include_router(example_router)
+api_v1_router.include_router(collection_router)
 
 api_router.include_router(api_v1_router)
 

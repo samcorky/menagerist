@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import builtins
+    import collections.abc
     import uuid
     from collections.abc import Iterator, Mapping, Sequence
 
@@ -64,6 +65,7 @@ class InMemoryNodeRepository:
         type: str | None = None,
         q: str | None = None,
         favourite: bool | None = None,
+        ids: collections.abc.Collection[uuid.UUID] | None = None,
         attribute_search_exclusions: Mapping[str, Sequence[str]] | None = None,
     ) -> list[Node]:
         """List non-deleted node ordered by id, starting after `after` if given."""
@@ -71,6 +73,8 @@ class InMemoryNodeRepository:
             (node for node in self._nodes.values() if not node.is_deleted),
             key=lambda node: node.id,
         )
+        if ids is not None:
+            ordered = [node for node in ordered if node.id in ids]
         if type is not None:
             ordered = [node for node in ordered if node.type == type]
         if after is not None:
@@ -92,10 +96,13 @@ class InMemoryNodeRepository:
         type: str | None = None,
         q: str | None = None,
         favourite: bool | None = None,
+        ids: collections.abc.Collection[uuid.UUID] | None = None,
         attribute_search_exclusions: Mapping[str, Sequence[str]] | None = None,
     ) -> int:
         """Return the total number of non-deleted nodes matching the given filters."""
         nodes = [n for n in self._nodes.values() if not n.is_deleted]
+        if ids is not None:
+            nodes = [n for n in nodes if n.id in ids]
         if type is not None:
             nodes = [n for n in nodes if n.type == type]
         if q is not None:

@@ -3,7 +3,15 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { onNavigate, goto } from '$app/navigation';
-	import { CirclePlus, LayoutGrid, House, Settings, Telescope, BookOpen } from '@lucide/svelte';
+	import {
+		CirclePlus,
+		LayoutGrid,
+		House,
+		Settings,
+		Telescope,
+		BookOpen,
+		Library
+	} from '@lucide/svelte';
 	import { Toaster } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { TooltipProvider } from '$lib/components/ui/tooltip/index.js';
@@ -46,6 +54,7 @@
 	const pathname = $derived(page.url.pathname);
 	const homeActive = $derived(pathname === resolve('/'));
 	const itemsActive = $derived(pathname.startsWith(resolve('/items')));
+	const collectionsActive = $derived(pathname.startsWith(resolve('/collections')));
 	const exploreActive = $derived(pathname.startsWith(resolve('/explore')));
 	const newActive = $derived(captureController.open);
 	const settingsActive = $derived(pathname.startsWith(resolve('/settings')));
@@ -167,6 +176,14 @@
 						Items
 					</Button>
 					<Button
+						variant={collectionsActive ? 'secondary' : 'ghost'}
+						size="sm"
+						href={resolve('/collections')}
+					>
+						<Library class="size-4" />
+						Collections
+					</Button>
+					<Button
 						variant={exploreActive ? 'secondary' : 'ghost'}
 						size="sm"
 						href={resolve('/explore')}
@@ -233,6 +250,17 @@
 				>
 					<LayoutGrid class="size-5" />
 					<span class="text-[10px] font-medium">Items</span>
+				</a>
+
+				<a
+					href={resolve('/collections')}
+					class="flex flex-col items-center gap-0.5 rounded-xl px-2 py-2 transition-colors {collectionsActive
+						? 'text-foreground'
+						: 'text-muted-foreground hover:text-foreground'}"
+					aria-current={collectionsActive ? 'page' : undefined}
+				>
+					<Library class="size-5" />
+					<span class="text-[10px] font-medium">Collections</span>
 				</a>
 
 				<a
