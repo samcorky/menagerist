@@ -89,7 +89,7 @@ poe coverage                  # full test suite + enforce all coverage threshold
 
 ### End-to-end tests
 
-`poe test-e2e` runs the Playwright suite in `frontend/tests/e2e/` against an isolated, throwaway Postgres (via `compose.e2e.yaml`). It builds the production frontend (`poe e2e-build`, `npm run build`, roughly two minutes), runs the specs in parallel, and removes the database container afterwards whatever the outcome. It requires Docker. It covers the roadmap's core happy paths: creating an item, setting an item type, adding a connection, quick capture, and managing item types.
+`poe test-e2e` runs the Playwright suite in `frontend/tests/e2e/` against an isolated, throwaway Postgres (via `compose.e2e.yaml`). It builds the production frontend (`poe e2e-build`, `npm run build`, roughly two minutes), runs the specs in parallel, and removes the database container afterwards whatever the outcome. It requires Docker. CI runs it as its own `e2e` job, retrying a failed test once and uploading the traces of failures. It covers the roadmap's core happy paths: creating an item, setting an item type, adding a connection, quick capture, and managing item types.
 
 `poe sync` (and so `poe init`) downloads the Chromium build Playwright drives (`poe install-e2e-browser`). On Linux, Chromium also needs a few system libraries; if the suite fails with `error while loading shared libraries`, run `poe install-e2e-deps` for the one-off command that fixes it (it needs `sudo` and a real terminal, so it prints the command rather than running it).
 

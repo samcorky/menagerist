@@ -83,3 +83,49 @@ jobs:
 
       - name: Run backend integration tests
         run: uv run poe test-backend-integration
+
+  e2e:
+    name: End-to-end Tests (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-packages --group dev
+          npm --prefix frontend ci
+
+      - name: Generate frontend API client
+        run: uv run poe generate-frontend-client
+
+      - name: Install Chromium and its system libraries
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: Run end-to-end tests
+        run: uv run poe test-e2e
+
+      - name: Upload failure traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
