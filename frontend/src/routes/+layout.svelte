@@ -8,9 +8,9 @@
 		LayoutGrid,
 		House,
 		Settings,
-		Telescope,
 		BookOpen,
-		Library
+		Library,
+		Search
 	} from '@lucide/svelte';
 	import { Toaster } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -18,6 +18,8 @@
 	import ThemeToggle from '$lib/components/theme-toggle.svelte';
 	import { themeController } from '$lib/theme.svelte.js';
 	import { captureController } from '$lib/capture.svelte.js';
+	import { searchPaletteController } from '$lib/search-palette.svelte.js';
+	import SearchPalette from '$lib/components/search-palette.svelte';
 	import CaptureSheet from '$lib/components/capture-sheet.svelte';
 	import { registerShortcut, attachShortcuts } from '$lib/shortcuts.svelte';
 	import ShortcutsHelpDialog from '$lib/components/shortcuts-help-dialog.svelte';
@@ -55,8 +57,8 @@
 	const homeActive = $derived(pathname === resolve('/'));
 	const itemsActive = $derived(pathname.startsWith(resolve('/items')));
 	const collectionsActive = $derived(pathname.startsWith(resolve('/collections')));
-	const exploreActive = $derived(pathname.startsWith(resolve('/explore')));
 	const newActive = $derived(captureController.open);
+	const searchActive = $derived(searchPaletteController.open);
 	const settingsActive = $derived(pathname.startsWith(resolve('/settings')));
 
 	$effect(() => {
@@ -123,15 +125,14 @@
 	});
 
 	$effect(() => {
-		if (pathname === resolve('/items')) return;
 		return registerShortcut({
-			id: 'global-focus-search',
+			id: 'global-search',
 			keys: '[Shift]+/',
-			description: 'Focus search',
+			description: 'Search items',
 			group: 'Search',
 			handler: (e) => {
 				e.preventDefault();
-				void goto(resolve('/items?search=1'));
+				searchPaletteController.show();
 			}
 		});
 	});
@@ -145,6 +146,7 @@
 
 <Toaster richColors position="top-right" offset={{ top: '76px' }} mobileOffset={{ top: '68px' }} />
 <CaptureSheet />
+<SearchPalette />
 <ShortcutsHelpDialog open={helpOpen} onOpenChange={(v) => (helpOpen = v)} />
 
 <TooltipProvider>
@@ -183,14 +185,6 @@
 						<Library class="size-4" />
 						Collections
 					</Button>
-					<Button
-						variant={exploreActive ? 'secondary' : 'ghost'}
-						size="sm"
-						href={resolve('/explore')}
-					>
-						<Telescope class="size-4" />
-						Explore
-					</Button>
 					<Button size="sm" onclick={() => goto(resolve('/items/new'))}>
 						<CirclePlus class="size-4" />
 						New item
@@ -211,6 +205,15 @@
 						aria-label="Settings"
 					>
 						<Settings class="size-4" />
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon"
+						class="size-11"
+						aria-label="Search items"
+						onclick={() => searchPaletteController.show()}
+					>
+						<Search class="size-4" />
 					</Button>
 					<ThemeToggle />
 				</nav>
@@ -265,16 +268,17 @@
 					>
 				</a>
 
-				<a
-					href={resolve('/explore')}
-					class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {exploreActive
+				<button
+					onclick={() => searchPaletteController.show()}
+					aria-haspopup="dialog"
+					aria-label="Search items"
+					class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {searchActive
 						? 'text-foreground'
 						: 'text-muted-foreground hover:text-foreground'}"
-					aria-current={exploreActive ? 'page' : undefined}
 				>
-					<Telescope class="size-5" />
-					<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">Explore</span>
-				</a>
+					<Search class="size-5" />
+					<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">Search</span>
+				</button>
 
 				<button
 					onclick={() => captureController.show()}

@@ -106,16 +106,31 @@ export function attachShortcuts(
 ): () => void {
 	let cachedFor: ShortcutDefinition[] | undefined;
 	let handler: ((event: KeyboardEvent) => void) | undefined;
+	let matched = false;
 	const listener = (event: KeyboardEvent) => {
 		if (event.defaultPrevented) return;
 		const defs = shortcutRegistry.current;
 		if (!handler || defs !== cachedFor) {
 			cachedFor = defs;
-			handler = createKeybindingsHandler(buildBindings(defs), {
+			const bindings = buildBindings(defs);
+			for (const keys of Object.keys(bindings)) {
+				const inner = bindings[keys];
+				bindings[keys] = (e) => {
+					matched = true;
+					inner(e);
+				};
+			}
+			handler = createKeybindingsHandler(bindings, {
 				ignore: (e) => e.repeat || e.isComposing
 			});
 		}
 		handler(event);
+		// tinykeys stops at the first completed binding and leaves the rest of its pending
+		// sequences half-matched (a stale `g e` swallows the next `g`), so start afresh.
+		if (matched) {
+			matched = false;
+			handler = undefined;
+		}
 	};
 	target.addEventListener('keydown', listener);
 	return () => target.removeEventListener('keydown', listener);

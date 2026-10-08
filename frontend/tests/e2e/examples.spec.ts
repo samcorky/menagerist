@@ -1,5 +1,5 @@
 import { test, expect, type APIRequestContext, type Page } from './fixtures';
-import { createItem, createItemType, ownedData, uniqueName } from './helpers';
+import { createItem, createItemType, ownedData, removeExamplePacks, uniqueName } from './helpers';
 
 /**
  * Example packs: install and remove from Settings > Examples, with the Home line and
@@ -8,8 +8,6 @@ import { createItem, createItemType, ownedData, uniqueName } from './helpers';
  */
 test.describe.configure({ mode: 'serial' });
 
-const PACK_IDS = ['music', 'recipes', 'movies', 'parts', 'games'];
-const PACK_SLUG_PREFIXES = /^(music|recipes|movies|parts|games)-/;
 const MUSIC = /^Music/;
 const MOVIES = /^Movies/;
 const GAMES = /^Board games/;
@@ -38,21 +36,12 @@ let ownNames: string[] = [];
 const ownTypeLabels: string[] = [];
 
 async function cleanUp(request: APIRequestContext) {
-	for (const id of PACK_IDS) {
-		await request.delete(`/api/v1/example/${id}/installation`);
-	}
+	await removeExamplePacks(request);
 	// Collections made here, including a kept example collection that was edited.
 	await cleanUpOwned(request);
-	// Kept example items and item types survive removal and would block the next install.
 	const nodes = await request.get('/api/v1/node?limit=500');
-	for (const node of (await nodes.json()) as { id: string; name: string; type: string | null }[]) {
-		if (ownNames.includes(node.name) || PACK_SLUG_PREFIXES.test(node.type ?? '')) {
-			await request.delete(`/api/v1/node/${node.id}`);
-		}
-	}
-	const types = await request.get('/api/v1/node-type?limit=500');
-	for (const type of (await types.json()) as { id: string; slug: string }[]) {
-		if (PACK_SLUG_PREFIXES.test(type.slug)) await request.delete(`/api/v1/node-type/${type.id}`);
+	for (const node of (await nodes.json()) as { id: string; name: string }[]) {
+		if (ownNames.includes(node.name)) await request.delete(`/api/v1/node/${node.id}`);
 	}
 	ownNames = [];
 }

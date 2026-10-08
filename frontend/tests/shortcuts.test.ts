@@ -255,6 +255,30 @@ describe('attachShortcuts', () => {
 		detach();
 	});
 
+	it('fires back-to-back sequences that share a prefix without the registry changing', () => {
+		const { state, target } = makeTarget();
+		const detach = attachShortcuts(target);
+		const c = vi.fn();
+		const s = vi.fn();
+		const e = vi.fn();
+		const offs = [
+			registerShortcut(def('g c', c)),
+			registerShortcut(def('g s', s)),
+			registerShortcut(def('g e', e))
+		];
+		for (let round = 0; round < 3; round++) {
+			for (const second of ['c', 's', 'e']) {
+				press(state, 'g');
+				press(state, second);
+			}
+		}
+		expect(c).toHaveBeenCalledTimes(3);
+		expect(s).toHaveBeenCalledTimes(3);
+		expect(e).toHaveBeenCalledTimes(3);
+		offs.forEach((off) => off());
+		detach();
+	});
+
 	it('ignores events whose default was prevented', () => {
 		const { state, target } = makeTarget();
 		const detach = attachShortcuts(target);

@@ -106,7 +106,7 @@ export async function connectToItem(
 	await page.getByRole('button', { name: /^Connect items?$/ }).click();
 }
 
-export type NavEntry = 'Home' | 'Items' | 'Collections' | 'Explore' | 'Settings';
+export type NavEntry = 'Home' | 'Items' | 'Collections' | 'Settings';
 
 /**
  * Follows a main navigation link using whichever bar is visible for the current viewport (the
@@ -144,6 +144,7 @@ export async function openQuickCapture(page: Page) {
 export function ownedData() {
 	let collectionIds: string[] = [];
 	let itemIds: string[] = [];
+	let typeIds: string[] = [];
 
 	return {
 		trackCollection(id: string) {
@@ -162,8 +163,17 @@ export function ownedData() {
 			collectionIds.push(created.id);
 			return created;
 		},
-		async makeItem(request: APIRequestContext, name: string) {
-			const res = await request.post('/api/v1/node', { data: { name } });
+		/** Creates an item type through the API; its slug is made unique from the label. */
+		async makeItemType(request: APIRequestContext, label: string) {
+			const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+			const res = await request.post('/api/v1/node-type', { data: { slug, label } });
+			expect(res.status()).toBe(201);
+			const created = (await res.json()) as { id: string; slug: string; label: string };
+			typeIds.push(created.id);
+			return created;
+		},
+		async makeItem(request: APIRequestContext, name: string, type?: string) {
+			const res = await request.post('/api/v1/node', { data: { name, type } });
 			expect(res.status()).toBe(201);
 			const created = (await res.json()) as { id: string; name: string };
 			itemIds.push(created.id);
@@ -178,8 +188,30 @@ export function ownedData() {
 		async cleanUp(request: APIRequestContext) {
 			for (const id of collectionIds) await request.delete(`/api/v1/collection/${id}`);
 			for (const id of itemIds) await request.delete(`/api/v1/node/${id}`);
+			for (const id of typeIds) await request.delete(`/api/v1/node-type/${id}`);
 			collectionIds = [];
 			itemIds = [];
+			typeIds = [];
 		}
 	};
+}
+
+export const EXAMPLE_PACK_IDS = ['music', 'recipes', 'movies', 'parts', 'games'];
+export const EXAMPLE_SLUG_PREFIXES = /^(music|recipes|movies|parts|games)-/;
+
+/**
+ * Uninstalls every example pack, then deletes what removal keeps (items and item types with a
+ * pack slug prefix), so a kept item can't block the next install.
+ */
+export async function removeExamplePacks(request: APIRequestContext) {
+	for (const id of EXAMPLE_PACK_IDS) await request.delete(`/api/v1/example/${id}/installation`);
+	const nodes = await request.get('/api/v1/node?limit=500');
+	for (const node of (await nodes.json()) as { id: string; type: string | null }[]) {
+		if (EXAMPLE_SLUG_PREFIXES.test(node.type ?? ''))
+			await request.delete(`/api/v1/node/${node.id}`);
+	}
+	const types = await request.get('/api/v1/node-type?limit=500');
+	for (const type of (await types.json()) as { id: string; slug: string }[]) {
+		if (EXAMPLE_SLUG_PREFIXES.test(type.slug)) await request.delete(`/api/v1/node-type/${type.id}`);
+	}
 }

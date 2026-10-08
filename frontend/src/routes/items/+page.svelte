@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { beforeNavigate, afterNavigate, goto } from '$app/navigation';
 	import { browser } from '$app/environment';
+	import { untrack } from 'svelte';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { EyeOff, List, Plus, SearchX, LayoutGrid } from '@lucide/svelte';
 	import { captureController } from '$lib/capture.svelte.js';
@@ -32,6 +33,7 @@
 	} from '$lib/examples';
 	import * as NativeSelect from '$lib/components/ui/native-select/index.js';
 	import { matchContext } from '$lib/search-context';
+	import { normaliseQuery } from '$lib/search-palette';
 	import { registerShortcut } from '$lib/shortcuts.svelte';
 
 	const PAGE_SIZE = 50;
@@ -86,6 +88,27 @@
 
 	$effect(() => {
 		if (browser) localStorage.setItem('items-view', viewMode);
+	});
+
+	// Pick up ?q= from the URL (the search popup's "See all results"), then drop it so the same
+	// link works again after the box has been cleared.
+	$effect(() => {
+		const urlQ = normaliseQuery(page.url.searchParams.get('q'));
+		if (!urlQ) return;
+		if (urlQ !== untrack(() => q)) {
+			items = [];
+			hasMore = true;
+			q = urlQ;
+		}
+		searchInput = urlQ;
+		const params = new SvelteURLSearchParams(page.url.searchParams);
+		params.delete('q');
+		const rest = params.toString();
+		void goto(resolve(rest ? `/items?${rest}` : '/items'), {
+			replaceState: true,
+			keepFocus: true,
+			noScroll: true
+		});
 	});
 
 	// Pick up ?type= from URL (from dashboard category chips)
@@ -182,19 +205,6 @@
 	});
 
 	$effect(() => {
-		return registerShortcut({
-			id: 'items-focus-search',
-			keys: '[Shift]+/',
-			description: 'Focus search',
-			group: 'Search',
-			handler: (e) => {
-				e.preventDefault();
-				searchEl?.focus();
-			}
-		});
-	});
-
-	$effect(() => {
 		if (!searchFocused) return;
 		return registerShortcut({
 			id: 'items-clear-search',
@@ -207,20 +217,6 @@
 				searchEl?.blur();
 			}
 		});
-	});
-
-	$effect(() => {
-		if (page.url.searchParams.get('search') === '1') {
-			setTimeout(() => searchEl?.focus(), 50);
-			const params = new SvelteURLSearchParams(page.url.searchParams);
-			params.delete('search');
-			const query = params.toString();
-			void goto(resolve(query ? `/items?${query}` : '/items'), {
-				replaceState: true,
-				keepFocus: true,
-				noScroll: true
-			});
-		}
 	});
 
 	// Scroll preservation: save before navigating into an item, restore on return

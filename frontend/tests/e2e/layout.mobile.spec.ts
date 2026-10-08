@@ -126,7 +126,7 @@ for (const size of SIZES) {
 		test('bottom navigation fits and is tappable', async ({ page }) => {
 			await page.goto('/');
 			const nav = page.locator('nav:visible').last();
-			const labels = ['Home', 'Items', 'Collections', 'Explore', 'New', 'Settings'];
+			const labels = ['Home', 'Items', 'Collections', 'Search', 'New', 'Settings'];
 			const entries = nav.locator('a, button');
 			await expect(entries).toHaveCount(labels.length);
 
@@ -211,6 +211,45 @@ for (const size of SIZES) {
 				'Add to collection',
 				'Close'
 			);
+		});
+
+		test('the search popup opens from the bottom bar and fits the viewport', async ({
+			page,
+			request
+		}) => {
+			const item = await makeItem(request, uniqueName('Phone search item'));
+			await page.goto('/');
+			const button = page.getByRole('button', { name: 'Search items' });
+			const b = await box(button);
+			test.info().annotations.push({
+				type: `search button ${size.width}`,
+				description: `${round(b.width)}x${round(b.height)}`
+			});
+			expect(b.width).toBeGreaterThanOrEqual(44);
+			expect(b.height).toBeGreaterThanOrEqual(44);
+
+			await button.tap();
+			const dialog = page.getByRole('dialog', { name: 'Search items' });
+			const d = await box(dialog);
+			test.info().annotations.push({
+				type: `search popup ${size.width}`,
+				description: `${round(d.x)},${round(d.y)} ${round(d.width)}x${round(d.height)}`
+			});
+			expect(await fits(page, d), 'popup inside viewport').toBe(true);
+			const spill = await dialog.evaluate((el) => el.scrollWidth - el.clientWidth);
+			expect(spill, 'popup horizontal overflow').toBeLessThanOrEqual(0);
+
+			await page.keyboard.press('Escape');
+			await expect(dialog).toBeHidden();
+			await expect(button).toBeFocused();
+
+			await button.tap();
+			await dialog.getByPlaceholder('Search your items…').fill(item.name);
+			const row = dialog.getByRole('option', { name: new RegExp(item.name) });
+			await expect(row).toBeVisible();
+			expect(await fits(page, await box(row)), 'first result inside viewport').toBe(true);
+			await row.tap();
+			await expect(page).toHaveURL(new RegExp(`/items/${item.id}$`));
 		});
 
 		test('remove-from-collection is a reachable touch target', async ({ page, request }) => {

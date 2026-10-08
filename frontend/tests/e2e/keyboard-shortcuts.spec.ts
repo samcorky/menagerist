@@ -8,8 +8,6 @@ test('g c / g s / g e navigate between the main sections', async ({ page }) => {
 	await page.keyboard.press('g');
 	await page.keyboard.press('c');
 	await expect(page).toHaveURL(/\/items$/);
-	// Pages register their own shortcuts as they mount, which rebinds the
-	// listener and drops a half-typed sequence - so let each page settle first.
 	await expect(page.getByRole('heading', { name: 'My items' })).toBeVisible();
 
 	await page.keyboard.press('g');
@@ -23,6 +21,22 @@ test('g c / g s / g e navigate between the main sections', async ({ page }) => {
 	await expect(page.getByRole('heading', { name: 'Explore' })).toBeVisible();
 });
 
+test('g-sequences fire back to back with no waiting between them', async ({ page }) => {
+	await page.goto('/');
+	await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
+	for (let round = 0; round < 5; round++) {
+		for (const [key, path] of [
+			['c', /\/items$/],
+			['s', /\/settings$/],
+			['e', /\/explore$/]
+		] as const) {
+			await page.keyboard.press('g');
+			await page.keyboard.press(key);
+			await expect(page).toHaveURL(path);
+		}
+	}
+});
+
 test('an abandoned g-sequence does not block typing a literal "g"', async ({ page }) => {
 	await page.goto('/items');
 	await page.keyboard.press('g');
@@ -33,17 +47,32 @@ test('an abandoned g-sequence does not block typing a literal "g"', async ({ pag
 	await expect(search).toHaveValue('vintage gramophone');
 });
 
-test('/ focuses search on the items page, and navigates there from elsewhere', async ({ page }) => {
+test('/ opens the search popup on the items and home pages, and Esc returns focus', async ({
+	page
+}) => {
+	const popup = page.getByRole('dialog', { name: 'Search items' });
+
 	await page.goto('/items');
 	await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
+	const itemsSearch = page.getByPlaceholder('Search your items…').first();
+	await itemsSearch.blur();
+	const before = page.getByRole('link', { name: 'Items', exact: true }).first();
+	await before.focus();
 	await page.keyboard.press('/');
-	await expect(page.getByPlaceholder('Search your items…')).toBeFocused();
+	await expect(popup).toBeVisible();
+	await expect(page).toHaveURL(/\/items$/);
+	await page.keyboard.press('Escape');
+	await expect(popup).toBeHidden();
+	await expect(before).toBeFocused();
+	await expect(page).toHaveURL(/\/items$/);
 
-	await page.goto('/settings');
+	await page.goto('/');
 	await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
 	await page.keyboard.press('/');
-	await expect(page).toHaveURL(/\/items(\?search=1)?$/);
-	await expect(page.getByPlaceholder('Search your items…')).toBeFocused();
+	await expect(popup).toBeVisible();
+	await expect(page).toHaveURL(/\/$/);
+	await page.keyboard.press('Escape');
+	await expect(popup).toBeHidden();
 });
 
 test('? opens the shortcuts help overlay', async ({ page }) => {
@@ -53,6 +82,7 @@ test('? opens the shortcuts help overlay', async ({ page }) => {
 	const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
 	await expect(dialog).toBeVisible();
 	await expect(dialog.getByText('Quick capture').first()).toBeVisible();
+	await expect(dialog.getByText('Search items', { exact: true })).toBeVisible();
 	await page.keyboard.press('Escape');
 	await expect(dialog).toBeHidden();
 });
@@ -205,35 +235,39 @@ test('Escape closes an overlay on top of edit mode without cancelling the edit',
 	await expect(page.getByLabel('Name')).toBeVisible();
 });
 
-test('/ also focuses search from an item page', async ({ page }) => {
+test('/ opens the search popup from an item page without leaving it', async ({ page }) => {
 	const name = uniqueName('Shortcut slash item');
-	await createItem(page, { name });
+	const url = await createItem(page, { name });
 	await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
 
+	const edit = page.getByRole('button', { name: 'Edit', exact: true });
+	await edit.focus();
 	await page.keyboard.press('/');
-	await expect(page).toHaveURL(/\/items(\?search=1)?$/);
-	await expect(page.getByPlaceholder('Search your items…')).toBeFocused();
+	const popup = page.getByRole('dialog', { name: 'Search items' });
+	await expect(popup).toBeVisible();
+	await expect(page).toHaveURL(url);
+	await page.keyboard.press('Escape');
+	await expect(popup).toBeHidden();
+	await expect(edit).toBeFocused();
 });
 
-test('Back returns to the previous page after / navigated to the items list', async ({ page }) => {
+test('Back returns to the previous page after the search popup opened an item', async ({
+	page
+}) => {
 	const name = uniqueName('Shortcut back item');
 	await createItem(page, { name });
 	await page.goto('/settings');
 	await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
 	await page.keyboard.press('/');
-	const search = page.getByPlaceholder('Search your items…');
-	await expect(search).toBeFocused();
-	await search.fill(name);
-	await page
-		.getByRole('link', { name: new RegExp(name) })
-		.first()
-		.click();
+	const popup = page.getByRole('dialog', { name: 'Search items' });
+	await popup.getByPlaceholder('Search your items…').fill(name);
+	await popup.getByRole('option', { name: new RegExp(name) }).click();
 	await expect(page).toHaveURL(/\/items\/(?!new$)[^/]+$/);
 
 	await page.goBack();
-	await expect(page).toHaveURL(/\/items$/);
-	await expect(page.getByRole('heading', { name: 'My items' })).toBeVisible();
+	await expect(page).toHaveURL(/\/settings$/);
+	await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 });
 
 test('arrow keys move focus between item cards in list view', async ({ page }) => {

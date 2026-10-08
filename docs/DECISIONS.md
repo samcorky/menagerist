@@ -469,9 +469,15 @@ So a plain private array is the source of truth, `active` is a write-only `$stat
 
 **Cross-page search:** `/` off the items list navigates to `/items?search=1`, which the list page turns into a focus. That page now clears the parameter with `goto(..., { replaceState: true })`; the previous raw `history.replaceState` discarded SvelteKit's history state and broke the Back button.
 
+**Update 2026-10-08:** `/` now opens the global search popup (`lib/components/search-palette.svelte`, opened through `searchPaletteController`) from every page, including the items list, so `?search=1` is gone. The popup's "See all results in Items" row goes to `/items?q=...`; the items page applies `q` (trimmed, capped at 200 characters) to its search box and then removes it from the URL, so the same link works again later. Separately, tinykeys stops at the first completed binding and leaves the other bindings half-matched, so a stale `g e` swallowed the next `g` once nothing rebuilt the handler between navigations (earlier, page-level registrations masked this). `attachShortcuts` now rebuilds the handler after any binding fires; `tests/shortcuts.test.ts` and an e2e test cover back-to-back sequences.
+
 **e2e tooling changes made along the way:** the Playwright suite now starts its own servers on ports 8100/5273 (`E2E_BACKEND_PORT` / `E2E_FRONTEND_PORT`; the Vite proxy target is `MENAGERIST_API_PROXY_TARGET`) instead of 8000/5173. With the old ports Playwright reused, or collided with, any dev or deployed stack already on 8000 - the latter would have written test data into a real database. The default test timeout is 60s because cold Vite starts made the first multi-step spec time out. `poe sync` now downloads Chromium (`install-e2e-browser`); Linux system libraries are a one-off `sudo` step that `poe install-e2e-deps` prints rather than runs (`sudo` cannot prompt from inside `poe`, and resets `PATH` to root's older Node).
 
 **Known gaps, deferred:** number-type table cells report no caret position, so `ArrowLeft` always leaves them and `ArrowRight` never does; an arrow key is swallowed when the destination cell has no `<input>` (choice, date, rating); the save e2e test hard-codes `Control+s`, so it fails on macOS (`ControlOrMeta+s` would fix it); the Vitest config cannot run `$effect`, so the registry's effect behaviour is covered only by the e2e suite.
+
+## Mobile navigation: Search replaces Explore
+
+**Update 2026-10-08:** Explore is only a "Coming soon" placeholder, so Search replaced it as the fifth entry of the mobile bottom bar (a button that opens the search popup, shown active while it is open) and Explore left the desktop top navigation too. The `/explore` route and the `g e` shortcut stay; Explore returns to the navigation when the connections map exists. The desktop header keeps its search icon button.
 
 ## Versioning preset definitions per kind, not the pack envelope
 
