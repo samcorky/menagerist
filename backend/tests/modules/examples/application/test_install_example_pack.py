@@ -30,7 +30,9 @@ _COMMAND = InstallExamplePackCommand(pack_id="demo")
 
 
 def _use_case(world: World) -> InstallExamplePack:
-    return InstallExamplePack(world.uow, world.catalogue, world.presets, world.graph)
+    return InstallExamplePack(
+        world.uow, world.catalogue, world.presets, world.graph, world.collections
+    )
 
 
 async def _active(world: World, pack_id: str = "demo") -> Installation:

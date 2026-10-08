@@ -1,10 +1,12 @@
 import asyncio
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
 from app.entrypoints.api.shared.example_targets import (
+    get_collection_pack_target,
     get_graph_pack_target,
     get_preset_pack_target,
 )
@@ -13,6 +15,7 @@ from app.modules.examples.adapters.api.dependencies import (
     get_example_uow,
     get_pack_catalogue,
 )
+from app.modules.examples.domain.pack import PackCollection
 from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.modules.graph.domain.node_type import NodeType
 
@@ -32,6 +35,7 @@ def _client(world: World, *, raise_server_exceptions: bool = True) -> TestClient
     app.dependency_overrides[get_pack_catalogue] = lambda: world.catalogue
     app.dependency_overrides[get_preset_pack_target] = lambda: world.presets
     app.dependency_overrides[get_graph_pack_target] = lambda: world.graph
+    app.dependency_overrides[get_collection_pack_target] = lambda: world.collections
     return TestClient(app, raise_server_exceptions=raise_server_exceptions)
 
 
@@ -172,6 +176,7 @@ def test_entities_lists_owned_item_and_item_type_ids(make_world: MakeWorld) -> N
     assert client.get("/api/v1/example/entities").json() == {
         "item_ids": [],
         "item_type_ids": [],
+        "collection_ids": [],
     }
 
     assert client.put("/api/v1/example/demo/installation").status_code == 200
@@ -183,4 +188,25 @@ def test_entities_lists_owned_item_and_item_type_ids(make_world: MakeWorld) -> N
     assert client.get("/api/v1/example/entities").json() == {
         "item_ids": [],
         "item_type_ids": [],
+        "collection_ids": [],
     }
+
+
+def test_entities_lists_owned_collection_ids(
+    make_world: MakeWorld, sample_pack: SamplePack
+) -> None:
+    """Installed example collections are listed by id, and gone once removed."""
+    pack = replace(
+        sample_pack(),
+        collections=(PackCollection(ref="all", name="All", item_refs=("blue", "ada")),),
+    )
+    world = make_world(pack)
+    client = _client(world)
+
+    assert client.put("/api/v1/example/demo/installation").status_code == 200
+    body = client.get("/api/v1/example/entities").json()
+    assert body["collection_ids"] == [str(c) for c in world.collections.collections]
+    assert len(body["collection_ids"]) == 1
+
+    assert client.delete("/api/v1/example/demo/installation").status_code == 200
+    assert client.get("/api/v1/example/entities").json()["collection_ids"] == []

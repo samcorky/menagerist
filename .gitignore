@@ -31,3 +31,6 @@ openapi.json
 
 # Worktrees
 .worktrees/
+
+# Python caches
+__pycache__/

@@ -8,6 +8,7 @@ from app.modules.examples.domain.errors import PackNotInstalledError
 from app.modules.examples.domain.installation import EntityKind, Installation, Outcome
 from app.modules.examples.domain.pack import PackCounts
 from app.modules.examples.ports.pack_targets import (  # noqa: TC001
+    CollectionTarget,
     GraphTarget,
     PresetTarget,
 )
@@ -47,11 +48,16 @@ class UninstallExamplePack(
     """
 
     def __init__(
-        self, uow: ExampleUnitOfWork, presets: PresetTarget, graph: GraphTarget
+        self,
+        uow: ExampleUnitOfWork,
+        presets: PresetTarget,
+        graph: GraphTarget,
+        collections: CollectionTarget,
     ) -> None:
         super().__init__(uow)
         self._presets = presets
         self._graph = graph
+        self._collections = collections
 
     async def handle(
         self,
@@ -70,6 +76,7 @@ class UninstallExamplePack(
             installation,
             presets=self._presets,
             graph=self._graph,
+            collections=self._collections,
             persist=self._persist,
         )
         installation.mark_removed()
@@ -101,4 +108,5 @@ def _removed_counts(installation: Installation) -> PackCounts:
         item_types=count(EntityKind.ITEM_TYPE),
         items=count(EntityKind.ITEM),
         connections=count(EntityKind.CONNECTION),
+        collections=count(EntityKind.COLLECTION),
     )

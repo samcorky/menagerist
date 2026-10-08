@@ -78,7 +78,7 @@ async def list_example_entities(
     ],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> ExampleEntitiesResponse:
-    """List the items and item types that added example sets still own."""
+    """List the items, item types and collections that added example sets own."""
     entities = await use_case.handle(ListExampleEntitiesQuery(), actor)
     return ExampleEntitiesResponse.from_domain(entities)
 

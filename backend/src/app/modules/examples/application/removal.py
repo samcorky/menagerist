@@ -11,6 +11,7 @@ from app.modules.examples.domain.installation import (
 )
 from app.modules.examples.domain.removal import KEEP_IN_USE, Action, decide_removal
 from app.modules.examples.ports.pack_targets import (
+    CollectionTarget,
     GraphTarget,
     Inspection,
     PresetTarget,
@@ -36,6 +37,7 @@ async def settle_installation(
     *,
     presets: PresetTarget,
     graph: GraphTarget,
+    collections: CollectionTarget,
     persist: Callable[[Installation], Awaitable[None]],
 ) -> list[KeptEntity]:
     """Remove or keep every owned entity, saving after each one.
@@ -48,7 +50,11 @@ async def settle_installation(
     for kind in REMOVAL_ORDER:
         for record in reversed(installation.owned(kind)):
             reason = await _settle_one(
-                installation, record, presets=presets, graph=graph
+                installation,
+                record,
+                presets=presets,
+                graph=graph,
+                collections=collections,
             )
             await persist(installation)
             if reason is not None:
@@ -64,18 +70,30 @@ async def settle_installation(
 
 
 async def _inspect(
-    record: EntityRecord, *, presets: PresetTarget, graph: GraphTarget
+    record: EntityRecord,
+    *,
+    presets: PresetTarget,
+    graph: GraphTarget,
+    collections: CollectionTarget,
 ) -> Inspection | None:
     if record.kind is EntityKind.PRESET:
         return await presets.inspect(record.entity_id)
+    if record.kind is EntityKind.COLLECTION:
+        return await collections.inspect(record.entity_id)
     return await graph.inspect(record.kind, record.entity_id)
 
 
 async def _remove(
-    record: EntityRecord, *, presets: PresetTarget, graph: GraphTarget
+    record: EntityRecord,
+    *,
+    presets: PresetTarget,
+    graph: GraphTarget,
+    collections: CollectionTarget,
 ) -> RemoveResult:
     if record.kind is EntityKind.PRESET:
         return await presets.remove(record.entity_id)
+    if record.kind is EntityKind.COLLECTION:
+        return await collections.remove(record.entity_id)
     return await graph.remove(record.kind, record.entity_id)
 
 
@@ -85,9 +103,12 @@ async def _settle_one(
     *,
     presets: PresetTarget,
     graph: GraphTarget,
+    collections: CollectionTarget,
 ) -> str | None:
     """Settle one record; return the reason it was kept, or `None`."""
-    inspection = await _inspect(record, presets=presets, graph=graph)
+    inspection = await _inspect(
+        record, presets=presets, graph=graph, collections=collections
+    )
     decision = decide_removal(
         record,
         None if inspection is None else content_hash(inspection.content),
@@ -101,7 +122,9 @@ async def _settle_one(
         installation.settle(record.entity_id, Outcome.KEPT, decision.reason)
         return decision.reason
 
-    result = await _remove(record, presets=presets, graph=graph)
+    result = await _remove(
+        record, presets=presets, graph=graph, collections=collections
+    )
     if result is RemoveResult.REFUSED_IN_USE:
         installation.settle(record.entity_id, Outcome.KEPT, KEEP_IN_USE)
         return KEEP_IN_USE

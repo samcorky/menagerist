@@ -6,6 +6,7 @@ import pytest
 
 from app.modules.examples.domain.errors import InvalidInstallationStateError
 from app.modules.examples.domain.installation import (
+    REMOVAL_ORDER,
     EntityKind,
     Installation,
     InstallationStatus,
@@ -161,3 +162,13 @@ def test_an_installed_installation_cannot_be_failed() -> None:
     installation.mark_installed()
     with pytest.raises(InvalidInstallationStateError):
         installation.mark_failed()
+
+
+def test_collection_is_a_kind_removed_between_connections_and_items() -> None:
+    """Collections are removed after connections and before items."""
+    assert EntityKind.COLLECTION.value == "collection"
+    assert EntityKind("collection") is EntityKind.COLLECTION
+    order = REMOVAL_ORDER
+    assert order.index(EntityKind.CONNECTION) + 1 == order.index(EntityKind.COLLECTION)
+    assert order.index(EntityKind.COLLECTION) + 1 == order.index(EntityKind.ITEM)
+    assert set(order) == set(EntityKind)

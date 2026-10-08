@@ -6,6 +6,7 @@ from typing import Any, Protocol
 
 from app.modules.examples.domain.installation import EntityKind  # noqa: TC001
 from app.modules.examples.domain.pack import (  # noqa: TC001
+    PackCollection,
     PackConnection,
     PackItem,
     PackItemType,
@@ -107,4 +108,29 @@ class GraphTarget(Protocol):
 
     async def remove(self, kind: EntityKind, entity_id: uuid.UUID) -> RemoveResult:
         """Remove the entity, or report that it is gone or still in use."""
+        ...
+
+
+class CollectionTarget(Protocol):
+    """Creates, inspects and removes collections, owned by another module.
+
+    For a collection, `Created.content` and `Inspection.content` are
+    `{"name": ..., "description": ..., "members": [sorted UUID strings]}`, so the
+    hash notices a rename, a description change and any change in membership.
+    `Inspection.has_user_data` and `still_in_use` stay false: a changed membership
+    already counts as an edit.
+    """
+
+    async def create_collection(
+        self, spec: PackCollection, *, item_ids: Sequence[uuid.UUID]
+    ) -> Created:
+        """Create the collection holding the created items `item_ids`, in order."""
+        ...
+
+    async def inspect(self, collection_id: uuid.UUID) -> Inspection | None:
+        """Return the collection as it is now, or `None` if it is gone."""
+        ...
+
+    async def remove(self, collection_id: uuid.UUID) -> RemoveResult:
+        """Remove the collection, or report that it is already gone."""
         ...

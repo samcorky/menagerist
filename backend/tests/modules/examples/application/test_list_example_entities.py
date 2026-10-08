@@ -23,11 +23,11 @@ def _installation(
 
 
 async def _list(repo: InMemoryInstallationRepository) -> tuple[list[uuid.UUID], ...]:
-    """Run the query and return the item ids and item type ids."""
+    """Run the query and return the item, item type and collection ids."""
     result = await ListExampleEntities(ExampleRepos(installations=repo)).handle(
         ListExampleEntitiesQuery(), SYSTEM_ACTOR
     )
-    return result.item_ids, result.item_type_ids
+    return result.item_ids, result.item_type_ids, result.collection_ids
 
 
 async def test_lists_owned_items_and_item_types_across_installations() -> None:
@@ -45,7 +45,7 @@ async def test_lists_owned_items_and_item_types_across_installations() -> None:
     await repo.add(first)
     await repo.add(second)
 
-    item_ids, item_type_ids = await _list(repo)
+    item_ids, item_type_ids, _ = await _list(repo)
 
     assert sorted(item_ids) == sorted([item_a, item_b])
     assert item_type_ids == [type_a]
@@ -68,7 +68,7 @@ async def test_excludes_removed_and_kept_records() -> None:
     installation.mark_installed()
     await repo.add(installation)
 
-    item_ids, item_type_ids = await _list(repo)
+    item_ids, item_type_ids, _ = await _list(repo)
 
     assert item_ids == [owned]
     assert item_type_ids == []
@@ -81,9 +81,29 @@ async def test_excludes_removed_installations() -> None:
     installation.mark_removed()
     await repo.add(installation)
 
-    assert await _list(repo) == ([], [])
+    assert await _list(repo) == ([], [], [])
 
 
 async def test_is_empty_with_no_installations() -> None:
     """No installations means no ids."""
-    assert await _list(InMemoryInstallationRepository()) == ([], [])
+    assert await _list(InMemoryInstallationRepository()) == ([], [], [])
+
+
+async def test_lists_owned_collections_and_skips_kept_ones() -> None:
+    """Owned collections are listed; kept or removed ones are not."""
+    repo = InMemoryInstallationRepository()
+    owned, kept, removed = (uuid.uuid7() for _ in range(3))
+    installation = _installation(
+        "one",
+        (EntityKind.COLLECTION, owned),
+        (EntityKind.COLLECTION, kept),
+        (EntityKind.COLLECTION, removed),
+    )
+    installation.settle(kept, Outcome.KEPT, "edited")
+    installation.settle(removed, Outcome.REMOVED)
+    installation.mark_installed()
+    await repo.add(installation)
+
+    _, _, collection_ids = await _list(repo)
+
+    assert collection_ids == [owned]

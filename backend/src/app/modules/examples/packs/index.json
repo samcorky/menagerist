@@ -21,6 +21,11 @@
       "id": "parts",
       "name": "Electronic parts",
       "description": "A small parts drawer: what is in stock, what is running low, what each build uses and who sells it."
+    },
+    {
+      "id": "games",
+      "name": "Board games",
+      "description": "A shelf of board games with their publishers and designers, the game nights they came out at, and a wishlist of the ones still to get."
     }
   ]
 }

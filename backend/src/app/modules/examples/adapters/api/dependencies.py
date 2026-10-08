@@ -4,8 +4,10 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import Depends
 
 from app.entrypoints.api.shared.example_targets import (
+    CollectionPackTarget,
     GraphPackTarget,
     PresetPackTarget,
+    get_collection_pack_target,
     get_graph_pack_target,
     get_preset_pack_target,
 )
@@ -75,13 +77,15 @@ def get_install_example_pack_use_case(
     catalogue: Annotated[PackCatalogue, Depends(get_pack_catalogue)],
     presets: Annotated[PresetPackTarget, Depends(get_preset_pack_target)],
     graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
+    collections: Annotated[CollectionPackTarget, Depends(get_collection_pack_target)],
 ) -> InstallExamplePack:
-    return InstallExamplePack(uow, catalogue, presets, graph)
+    return InstallExamplePack(uow, catalogue, presets, graph, collections)
 
 
 def get_uninstall_example_pack_use_case(
     uow: Annotated[ExampleUnitOfWork, Depends(get_example_uow)],
     presets: Annotated[PresetPackTarget, Depends(get_preset_pack_target)],
     graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
+    collections: Annotated[CollectionPackTarget, Depends(get_collection_pack_target)],
 ) -> UninstallExamplePack:
-    return UninstallExamplePack(uow, presets, graph)
+    return UninstallExamplePack(uow, presets, graph, collections)

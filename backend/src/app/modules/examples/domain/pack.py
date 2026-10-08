@@ -16,6 +16,8 @@ MAX_CONNECTIONS = 2000
 
 _REF = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _REF_RULE = "must be lowercase letters, digits and hyphens"
+# Mirrors the collections module's name limit; examples must not import it.
+_MAX_COLLECTION_NAME = 120
 
 
 def _is_marker(value: dict[str, Any]) -> bool:
@@ -106,6 +108,16 @@ class PackConnection:
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
+class PackCollection:
+    """A manual collection of pack items."""
+
+    ref: str
+    name: str
+    description: str | None = None
+    item_refs: tuple[str, ...] = ()
+
+
+@dataclass(kw_only=True, frozen=True, eq=False)
 class PackCounts:
     """How many entities of each kind a pack holds, creates, or removed."""
 
@@ -114,6 +126,7 @@ class PackCounts:
     item_types: int = 0
     items: int = 0
     connections: int = 0
+    collections: int = 0
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
@@ -144,6 +157,7 @@ class ExamplePack:
     item_types: tuple[PackItemType, ...] = ()
     items: tuple[PackItem, ...] = ()
     connections: tuple[PackConnection, ...] = ()
+    collections: tuple[PackCollection, ...] = ()
 
     def __post_init__(self) -> None:
         """Reject a pack whose references do not resolve or that is too large."""
@@ -154,8 +168,10 @@ class ExamplePack:
         _check_refs("relationship type", [t.ref for t in self.relationship_types])
         _check_refs("item type", [t.ref for t in self.item_types])
         _check_refs("item", [i.ref for i in self.items])
+        _check_refs("collection", [c.ref for c in self.collections])
         self._check_slugs()
         self._check_links()
+        self._check_collections()
         self._check_presets()
 
     def _check_limits(self) -> None:
@@ -197,6 +213,27 @@ class ExamplePack:
             if c.type_ref not in relationship_refs:
                 raise InvalidPackError(f"connection has unknown type '{c.type_ref}'")
 
+    def _check_collections(self) -> None:
+        item_refs = {i.ref for i in self.items}
+        for collection in self.collections:
+            if not 1 <= len(collection.name.strip()) <= _MAX_COLLECTION_NAME:
+                raise InvalidPackError(
+                    f"collection '{collection.ref}' needs a name of "
+                    + f"1 to {_MAX_COLLECTION_NAME} characters"
+                )
+            refs = collection.item_refs
+            if not refs:
+                raise InvalidPackError(f"collection '{collection.ref}' has no items")
+            if len(set(refs)) != len(refs):
+                raise InvalidPackError(
+                    f"collection '{collection.ref}' lists an item twice"
+                )
+            unknown = [r for r in refs if r not in item_refs]
+            if unknown:
+                raise InvalidPackError(
+                    f"collection '{collection.ref}' has unknown item '{unknown[0]}'"
+                )
+
     def _check_presets(self) -> None:
         used: set[str] = set()
         for schema in (
@@ -217,4 +254,5 @@ class ExamplePack:
             item_types=len(self.item_types),
             items=len(self.items),
             connections=len(self.connections),
+            collections=len(self.collections),
         )

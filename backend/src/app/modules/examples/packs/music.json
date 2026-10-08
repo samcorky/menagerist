@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 1,
+  "version": 2,
   "id": "music",
   "presets": [
     {
@@ -780,6 +780,29 @@
       "from": "paper-lanterns",
       "to": "folk-and-fuzz-night-at-cobbles",
       "type": "signed-at"
+    }
+  ],
+  "collections": [
+    {
+      "ref": "records",
+      "name": "Records",
+      "description": "The records on the shelf.",
+      "items": [
+        "night-drive",
+        "paper-lanterns",
+        "salt-marsh-sessions",
+        "thirteen-bells"
+      ]
+    },
+    {
+      "ref": "the-lamplighter-nights",
+      "name": "The Lamplighter nights",
+      "description": "Gigs at the Lamplighter and the venue itself.",
+      "items": [
+        "the-lamplighter",
+        "the-velvet-static-at-the-lamplighter",
+        "marguerite-odell-at-the-lamplighter"
+      ]
     }
   ]
 }

@@ -1,0 +1,1054 @@
+{
+  "format": "menagerist-example-pack",
+  "version": 2,
+  "id": "games",
+  "relationship_types": [
+    {
+      "ref": "published-by",
+      "slug": "games-published-by",
+      "label": "Published by",
+      "reverse_label": "Published",
+      "description": "Which company published a game.",
+      "directional": true
+    },
+    {
+      "ref": "designed-by",
+      "slug": "games-designed-by",
+      "label": "Designed by",
+      "reverse_label": "Designed",
+      "description": "Who designed a game.",
+      "directional": true
+    },
+    {
+      "ref": "expansion-of",
+      "slug": "games-expansion-of",
+      "label": "Expansion of",
+      "reverse_label": "Expanded by",
+      "description": "An expansion and the game it needs.",
+      "directional": true
+    },
+    {
+      "ref": "played-at",
+      "slug": "games-played-at",
+      "label": "Played at",
+      "reverse_label": "Played",
+      "description": "Which games came out on a game night, and who won.",
+      "directional": true,
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "winner": {
+            "title": "Winner",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "winner"
+            }
+          ],
+          "required": []
+        }
+      }
+    },
+    {
+      "ref": "came-to",
+      "slug": "games-came-to",
+      "label": "Came to",
+      "reverse_label": "Attended by",
+      "description": "Who came to a game night.",
+      "directional": true
+    }
+  ],
+  "item_types": [
+    {
+      "ref": "game",
+      "slug": "games-game",
+      "label": "Game",
+      "description": "A board game on the shelf or on the wishlist, with how it plays and what state it is in.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "min_players": {
+            "title": "Min players",
+            "type": "number",
+            "x-menagerist": {
+              "kind": "number"
+            }
+          },
+          "max_players": {
+            "title": "Max players",
+            "type": "number",
+            "x-menagerist": {
+              "kind": "number"
+            }
+          },
+          "play_time": {
+            "title": "Play time",
+            "type": "number",
+            "minimum": 0,
+            "multipleOf": 1,
+            "x-menagerist": {
+              "kind": "duration",
+              "display": "words"
+            }
+          },
+          "year": {
+            "title": "Year",
+            "type": "string",
+            "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+            "x-menagerist": {
+              "kind": "partialdate"
+            }
+          },
+          "mechanics": {
+            "title": "Mechanics",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Co-operative",
+                "Dice",
+                "Worker placement",
+                "Set collection",
+                "Bluffing",
+                "Deck building"
+              ]
+            },
+            "uniqueItems": true,
+            "x-menagerist": {
+              "kind": "multichoice"
+            }
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "string",
+            "enum": [
+              "Light",
+              "Medium",
+              "Heavy"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "rating": {
+            "title": "Rating",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5,
+            "multipleOf": 1,
+            "x-menagerist": {
+              "kind": "rating"
+            }
+          },
+          "condition": {
+            "title": "Condition",
+            "type": "string",
+            "enum": [
+              "New",
+              "Good",
+              "Worn"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "price_paid": {
+            "title": "Price paid",
+            "type": "object",
+            "properties": {
+              "value": {
+                "title": "Value",
+                "type": "number"
+              },
+              "currency": {
+                "title": "Currency",
+                "type": "string"
+              }
+            },
+            "x-menagerist": {
+              "kind": "money"
+            }
+          },
+          "complete": {
+            "title": "Complete?",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "title": "Text",
+                  "type": "string"
+                },
+                "done": {
+                  "title": "Done",
+                  "type": "boolean"
+                }
+              }
+            },
+            "x-menagerist": {
+              "kind": "checklist"
+            }
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "longtext"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "min_players"
+            },
+            {
+              "key": "max_players"
+            },
+            {
+              "key": "play_time"
+            },
+            {
+              "key": "year"
+            },
+            {
+              "key": "mechanics"
+            },
+            {
+              "key": "weight"
+            },
+            {
+              "key": "rating"
+            },
+            {
+              "key": "condition"
+            },
+            {
+              "key": "price_paid"
+            },
+            {
+              "key": "complete"
+            },
+            {
+              "key": "notes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "rating"
+              },
+              {
+                "key": "year"
+              },
+              {
+                "key": "max_players"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "publisher",
+      "slug": "games-publisher",
+      "label": "Publisher",
+      "description": "A company that publishes board games.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "website": {
+            "title": "Website",
+            "type": "string",
+            "format": "uri",
+            "x-menagerist": {
+              "kind": "url"
+            }
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "website"
+            },
+            {
+              "key": "notes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "website"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "person",
+      "slug": "games-person",
+      "label": "Person",
+      "description": "A game designer, or a friend you play with.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "role": {
+            "title": "Role",
+            "type": "string",
+            "enum": [
+              "Designer",
+              "Friend"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "role"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "role"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "night",
+      "slug": "games-night",
+      "label": "Game night",
+      "description": "An evening of playing games together.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string",
+            "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+            "x-menagerist": {
+              "kind": "partialdate"
+            }
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "date"
+            },
+            {
+              "key": "notes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "date"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "items": [
+    {
+      "ref": "lantern-harbour",
+      "type": "game",
+      "name": "Lantern Harbour",
+      "description": "Everyone guides lantern boats home before the tide turns.",
+      "attributes": {
+        "min_players": 1,
+        "max_players": 4,
+        "play_time": 2700,
+        "year": "2021",
+        "mechanics": [
+          "Co-operative"
+        ],
+        "weight": "Medium",
+        "rating": 5,
+        "condition": "Good",
+        "price_paid": {
+          "value": 34.99,
+          "currency": "GBP"
+        },
+        "complete": [
+          {
+            "text": "Box",
+            "done": true
+          },
+          {
+            "text": "Rulebook",
+            "done": true
+          },
+          {
+            "text": "Tokens",
+            "done": true
+          },
+          {
+            "text": "Cards or dice",
+            "done": true
+          }
+        ],
+        "notes": "Our go-to. Plays well solo on a quiet evening."
+      }
+    },
+    {
+      "ref": "tea-clipper-race",
+      "type": "game",
+      "name": "Tea Clipper Race",
+      "description": "Roll for the wind, collect cargoes and beat the other clippers home.",
+      "attributes": {
+        "min_players": 2,
+        "max_players": 5,
+        "play_time": 3600,
+        "year": "2019",
+        "mechanics": [
+          "Dice",
+          "Set collection"
+        ],
+        "weight": "Medium",
+        "rating": 4,
+        "condition": "Good",
+        "price_paid": {
+          "value": 27.5,
+          "currency": "GBP"
+        },
+        "complete": [
+          {
+            "text": "Box",
+            "done": true
+          },
+          {
+            "text": "Rulebook",
+            "done": true
+          },
+          {
+            "text": "Tokens",
+            "done": true
+          },
+          {
+            "text": "Cards or dice",
+            "done": true
+          }
+        ],
+        "notes": "The dice tray is worth the extra few quid."
+      }
+    },
+    {
+      "ref": "ministry-of-mild-mischief",
+      "type": "game",
+      "name": "Ministry of Mild Mischief",
+      "description": "Bluff your way through a day of minor civil service sabotage.",
+      "attributes": {
+        "min_players": 3,
+        "max_players": 8,
+        "play_time": 1800,
+        "year": "2022",
+        "mechanics": [
+          "Bluffing"
+        ],
+        "weight": "Light",
+        "rating": 4,
+        "condition": "New",
+        "price_paid": {
+          "value": 19.99,
+          "currency": "GBP"
+        },
+        "complete": [
+          {
+            "text": "Box",
+            "done": true
+          },
+          {
+            "text": "Rulebook",
+            "done": true
+          },
+          {
+            "text": "Tokens",
+            "done": true
+          },
+          {
+            "text": "Cards or dice",
+            "done": true
+          }
+        ],
+        "notes": "Best with six or more and a pot of tea."
+      }
+    },
+    {
+      "ref": "cobbled-streets",
+      "type": "game",
+      "name": "Cobbled Streets",
+      "description": "Build a Victorian town one worker at a time.",
+      "attributes": {
+        "min_players": 2,
+        "max_players": 4,
+        "play_time": 5400,
+        "year": "2018",
+        "mechanics": [
+          "Worker placement"
+        ],
+        "weight": "Heavy",
+        "rating": 5,
+        "condition": "Worn",
+        "price_paid": {
+          "value": 42.0,
+          "currency": "GBP"
+        },
+        "complete": [
+          {
+            "text": "Box",
+            "done": true
+          },
+          {
+            "text": "Rulebook",
+            "done": false
+          },
+          {
+            "text": "Tokens",
+            "done": true
+          },
+          {
+            "text": "Cards or dice",
+            "done": true
+          }
+        ],
+        "notes": "Rulebook lost in a house move; we play from the online copy."
+      }
+    },
+    {
+      "ref": "cobbled-streets-the-canal-expansion",
+      "type": "game",
+      "name": "Cobbled Streets: The Canal Expansion",
+      "description": "Adds canals, barges and a few more places to send your workers.",
+      "attributes": {
+        "min_players": 2,
+        "max_players": 4,
+        "play_time": 1800,
+        "year": "2020",
+        "mechanics": [
+          "Worker placement"
+        ],
+        "weight": "Heavy",
+        "condition": "New",
+        "price_paid": {
+          "value": 18.0,
+          "currency": "GBP"
+        },
+        "complete": [
+          {
+            "text": "Box",
+            "done": true
+          },
+          {
+            "text": "Rulebook",
+            "done": true
+          },
+          {
+            "text": "Tokens",
+            "done": true
+          },
+          {
+            "text": "Cards or dice",
+            "done": true
+          }
+        ],
+        "notes": "Still in its shrink-wrap."
+      }
+    },
+    {
+      "ref": "pocket-orchard",
+      "type": "game",
+      "name": "Pocket Orchard",
+      "description": "A quick two-player card game of growing and swapping fruit.",
+      "attributes": {
+        "min_players": 2,
+        "max_players": 2,
+        "play_time": 1200,
+        "year": "2020",
+        "mechanics": [
+          "Set collection"
+        ],
+        "weight": "Light",
+        "rating": 4,
+        "condition": "Good",
+        "price_paid": {
+          "value": 9.99,
+          "currency": "GBP"
+        },
+        "complete": [
+          {
+            "text": "Box",
+            "done": true
+          },
+          {
+            "text": "Rulebook",
+            "done": true
+          },
+          {
+            "text": "Tokens",
+            "done": true
+          },
+          {
+            "text": "Cards or dice",
+            "done": true
+          }
+        ],
+        "notes": "Lives in the coat pocket for trains."
+      }
+    },
+    {
+      "ref": "thornfield-heist",
+      "type": "game",
+      "name": "Thornfield Heist",
+      "description": "A co-operative manor-house robbery with a ticking clock.",
+      "attributes": {
+        "min_players": 2,
+        "max_players": 5,
+        "play_time": 4500,
+        "year": "2023",
+        "mechanics": [
+          "Co-operative"
+        ],
+        "weight": "Medium",
+        "condition": "New",
+        "price_paid": {
+          "value": 39.99,
+          "currency": "GBP"
+        },
+        "complete": [
+          {
+            "text": "Box",
+            "done": true
+          },
+          {
+            "text": "Rulebook",
+            "done": true
+          },
+          {
+            "text": "Tokens",
+            "done": true
+          },
+          {
+            "text": "Cards or dice",
+            "done": true
+          }
+        ],
+        "notes": "Bought myself a Christmas present; one game so far, not sure yet."
+      }
+    },
+    {
+      "ref": "slow-parcel-panic",
+      "type": "game",
+      "name": "Slow Parcel Panic",
+      "description": "Race to deliver parcels before the post office closes, with dice that never go your way.",
+      "attributes": {
+        "min_players": 2,
+        "max_players": 6,
+        "play_time": 900,
+        "year": "2017",
+        "mechanics": [
+          "Dice"
+        ],
+        "weight": "Light",
+        "condition": "Good",
+        "price_paid": {
+          "value": 12.0,
+          "currency": "GBP"
+        },
+        "complete": [
+          {
+            "text": "Box",
+            "done": true
+          },
+          {
+            "text": "Rulebook",
+            "done": true
+          },
+          {
+            "text": "Tokens",
+            "done": true
+          },
+          {
+            "text": "Cards or dice",
+            "done": true
+          }
+        ],
+        "notes": "A charity shop find that hasn't hit the table yet."
+      }
+    },
+    {
+      "ref": "gilded-moth",
+      "type": "game",
+      "name": "Gilded Moth",
+      "description": "A deck-building game about luring rare moths into a lantern-lit garden.",
+      "attributes": {
+        "min_players": 1,
+        "max_players": 4,
+        "play_time": 2400,
+        "year": "2024",
+        "mechanics": [
+          "Deck building"
+        ],
+        "weight": "Medium",
+        "notes": "Wanted: lovely art, and the solo mode gets good reviews."
+      }
+    },
+    {
+      "ref": "saltmarsh-express",
+      "type": "game",
+      "name": "Saltmarsh Express",
+      "description": "Dice and cargo along a seaside railway line.",
+      "attributes": {
+        "min_players": 2,
+        "max_players": 4,
+        "play_time": 3000,
+        "year": "2024",
+        "mechanics": [
+          "Dice",
+          "Set collection"
+        ],
+        "weight": "Light",
+        "notes": "Wanted: it looks like Tea Clipper Race with trains."
+      }
+    },
+    {
+      "ref": "brindle-finch-games",
+      "type": "publisher",
+      "name": "Brindle & Finch Games",
+      "description": "Makes the heavier games on the shelf.",
+      "attributes": {
+        "website": "https://brindleandfinch.example"
+      }
+    },
+    {
+      "ref": "marrow-lane-press",
+      "type": "publisher",
+      "name": "Marrow Lane Press",
+      "description": "Small press with a lovely box style.",
+      "attributes": {
+        "website": "https://marrowlane.example"
+      }
+    },
+    {
+      "ref": "dovetail-tabletop",
+      "type": "publisher",
+      "name": "Dovetail Tabletop",
+      "description": "Short, sharp games for the coat pocket.",
+      "attributes": {
+        "website": "https://dovetailtabletop.example"
+      }
+    },
+    {
+      "ref": "elspeth-marlow",
+      "type": "person",
+      "name": "Elspeth Marlow",
+      "description": "Designs board games.",
+      "attributes": {
+        "role": "Designer"
+      }
+    },
+    {
+      "ref": "tomasz-reeve",
+      "type": "person",
+      "name": "Tomasz Reeve",
+      "description": "Designs board games.",
+      "attributes": {
+        "role": "Designer"
+      }
+    },
+    {
+      "ref": "ottoline-pryce",
+      "type": "person",
+      "name": "Ottoline Pryce",
+      "description": "Designs board games.",
+      "attributes": {
+        "role": "Designer"
+      }
+    },
+    {
+      "ref": "kit-alderman",
+      "type": "person",
+      "name": "Kit Alderman",
+      "description": "Regular at the table.",
+      "attributes": {
+        "role": "Friend"
+      }
+    },
+    {
+      "ref": "nell-brightwater",
+      "type": "person",
+      "name": "Nell Brightwater",
+      "description": "Regular at the table.",
+      "attributes": {
+        "role": "Friend"
+      }
+    },
+    {
+      "ref": "autumn-game-night",
+      "type": "night",
+      "name": "Autumn game night",
+      "attributes": {
+        "date": "2025-10",
+        "notes": "Soup, tea and three games."
+      }
+    },
+    {
+      "ref": "boxing-day-marathon",
+      "type": "night",
+      "name": "Boxing Day marathon",
+      "attributes": {
+        "date": "2025-12",
+        "notes": "Started after lunch and ran until the leftovers were gone."
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "lantern-harbour",
+      "to": "brindle-finch-games",
+      "type": "published-by"
+    },
+    {
+      "from": "tea-clipper-race",
+      "to": "marrow-lane-press",
+      "type": "published-by"
+    },
+    {
+      "from": "ministry-of-mild-mischief",
+      "to": "dovetail-tabletop",
+      "type": "published-by"
+    },
+    {
+      "from": "cobbled-streets",
+      "to": "brindle-finch-games",
+      "type": "published-by"
+    },
+    {
+      "from": "cobbled-streets-the-canal-expansion",
+      "to": "brindle-finch-games",
+      "type": "published-by"
+    },
+    {
+      "from": "pocket-orchard",
+      "to": "dovetail-tabletop",
+      "type": "published-by"
+    },
+    {
+      "from": "thornfield-heist",
+      "to": "marrow-lane-press",
+      "type": "published-by"
+    },
+    {
+      "from": "slow-parcel-panic",
+      "to": "dovetail-tabletop",
+      "type": "published-by"
+    },
+    {
+      "from": "gilded-moth",
+      "to": "marrow-lane-press",
+      "type": "published-by"
+    },
+    {
+      "from": "saltmarsh-express",
+      "to": "brindle-finch-games",
+      "type": "published-by"
+    },
+    {
+      "from": "lantern-harbour",
+      "to": "elspeth-marlow",
+      "type": "designed-by"
+    },
+    {
+      "from": "tea-clipper-race",
+      "to": "tomasz-reeve",
+      "type": "designed-by"
+    },
+    {
+      "from": "ministry-of-mild-mischief",
+      "to": "ottoline-pryce",
+      "type": "designed-by"
+    },
+    {
+      "from": "cobbled-streets",
+      "to": "elspeth-marlow",
+      "type": "designed-by"
+    },
+    {
+      "from": "cobbled-streets-the-canal-expansion",
+      "to": "elspeth-marlow",
+      "type": "designed-by"
+    },
+    {
+      "from": "pocket-orchard",
+      "to": "tomasz-reeve",
+      "type": "designed-by"
+    },
+    {
+      "from": "thornfield-heist",
+      "to": "ottoline-pryce",
+      "type": "designed-by"
+    },
+    {
+      "from": "cobbled-streets-the-canal-expansion",
+      "to": "cobbled-streets",
+      "type": "expansion-of"
+    },
+    {
+      "from": "lantern-harbour",
+      "to": "autumn-game-night",
+      "type": "played-at",
+      "attributes": {
+        "winner": "Everyone"
+      }
+    },
+    {
+      "from": "tea-clipper-race",
+      "to": "autumn-game-night",
+      "type": "played-at",
+      "attributes": {
+        "winner": "Kit"
+      }
+    },
+    {
+      "from": "ministry-of-mild-mischief",
+      "to": "autumn-game-night",
+      "type": "played-at",
+      "attributes": {
+        "winner": "Nell"
+      }
+    },
+    {
+      "from": "cobbled-streets",
+      "to": "boxing-day-marathon",
+      "type": "played-at",
+      "attributes": {
+        "winner": "Kit"
+      }
+    },
+    {
+      "from": "pocket-orchard",
+      "to": "boxing-day-marathon",
+      "type": "played-at",
+      "attributes": {
+        "winner": "Nell"
+      }
+    },
+    {
+      "from": "lantern-harbour",
+      "to": "boxing-day-marathon",
+      "type": "played-at",
+      "attributes": {
+        "winner": "Everyone"
+      }
+    },
+    {
+      "from": "kit-alderman",
+      "to": "autumn-game-night",
+      "type": "came-to"
+    },
+    {
+      "from": "nell-brightwater",
+      "to": "autumn-game-night",
+      "type": "came-to"
+    },
+    {
+      "from": "kit-alderman",
+      "to": "boxing-day-marathon",
+      "type": "came-to"
+    },
+    {
+      "from": "nell-brightwater",
+      "to": "boxing-day-marathon",
+      "type": "came-to"
+    },
+    {
+      "from": "ottoline-pryce",
+      "to": "boxing-day-marathon",
+      "type": "came-to"
+    }
+  ],
+  "collections": [
+    {
+      "ref": "wishlist",
+      "name": "Wishlist",
+      "description": "Games not on the shelf yet.",
+      "items": [
+        "gilded-moth",
+        "saltmarsh-express"
+      ]
+    },
+    {
+      "ref": "games-for-two",
+      "name": "Games for two",
+      "description": "Good with just the pair of us.",
+      "items": [
+        "pocket-orchard",
+        "lantern-harbour"
+      ]
+    },
+    {
+      "ref": "family-game-night",
+      "name": "Family game night",
+      "description": "Easy to teach and quick to set up.",
+      "items": [
+        "slow-parcel-panic",
+        "tea-clipper-race",
+        "ministry-of-mild-mischief",
+        "lantern-harbour"
+      ]
+    },
+    {
+      "ref": "still-to-try",
+      "name": "Still to try",
+      "description": "Owned but not properly played yet.",
+      "items": [
+        "slow-parcel-panic",
+        "cobbled-streets-the-canal-expansion",
+        "thornfield-heist"
+      ]
+    }
+  ]
+}

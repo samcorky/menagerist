@@ -42,6 +42,29 @@ async def test_round_trips_entities_through_jsonb(db_session: AsyncSession) -> N
     )
 
 
+async def test_a_collection_entity_round_trips_through_jsonb(
+    db_session: AsyncSession,
+) -> None:
+    """The `collection` kind is stored and read back."""
+    repo = SqlAlchemyInstallationRepository(db_session)
+    installation = Installation.start("demo")
+    entity_id = uuid.uuid7()
+    installation.record(EntityKind.COLLECTION, "c", "C", entity_id, "h" * 64)
+    await repo.add(installation)
+    db_session.expire_all()
+
+    stored = await repo.get(installation.id)
+
+    assert stored is not None
+    record = stored.entities[0]
+    assert (record.kind, record.ref, record.label, record.entity_id) == (
+        EntityKind.COLLECTION,
+        "c",
+        "C",
+        entity_id,
+    )
+
+
 async def test_get_returns_none_when_missing(db_session: AsyncSession) -> None:
     """An unknown id yields `None`."""
     repo = SqlAlchemyInstallationRepository(db_session)

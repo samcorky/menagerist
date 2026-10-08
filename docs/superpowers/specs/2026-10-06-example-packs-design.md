@@ -177,3 +177,7 @@ Three packs for v1, matching the board's list, each small enough to read in one 
 2. **Images:** deferred. Keep the install code extensible (steps). Placeholders, if used, are generated locally rather than fetched.
 3. **Keep rule:** keep items the user edited, connected to, or attached a file to. Agreed.
 4. **First-run link:** a small text link under the single CTA, worded *Or look around with some examples*, going to Settings, Examples. Not a top-level navigation item.
+
+## Update 2026-10-08: collections in packs
+
+Packs can ship collections (format version 2). See `docs/superpowers/plans/2026-10-08-collections-in-example-packs.md` and the DECISIONS entry "Example packs can ship collections, installed last and removed first". A new Board games pack (`games`) and eight collections across the existing four packs were added.

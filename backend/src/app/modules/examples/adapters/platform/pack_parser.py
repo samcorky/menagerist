@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 from app.modules.examples.domain.errors import InvalidPackError
 from app.modules.examples.domain.pack import (
     ExamplePack,
+    PackCollection,
     PackConnection,
     PackItem,
     PackItemType,
@@ -18,6 +19,8 @@ if TYPE_CHECKING:
 INDEX_FORMAT = "menagerist-examples-index"
 PACK_FORMAT = "menagerist-example-pack"
 FORMAT_VERSION = 1
+# v2 adds the optional `collections` section.
+PACK_VERSIONS = (1, 2)
 
 # Same rule as the domain's pack id; ids become file names, so keep it strict.
 PACK_ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
@@ -25,6 +28,7 @@ PACK_ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _INDEX = "the examples index"
 _PACK = "the pack"
 _SECTIONS = {"presets", "relationship_types", "item_types", "items", "connections"}
+_V2_SECTIONS = {"collections"}
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -87,12 +91,17 @@ def _opt_object(value: object, where: str) -> dict[str, Any] | None:
     return None if value is None else _dict(value, where)
 
 
-def _envelope(data: object, expected: str, where: str) -> Mapping[str, Any]:
+def _envelope(
+    data: object,
+    expected: str,
+    where: str,
+    versions: tuple[int, ...] = (FORMAT_VERSION,),
+) -> Mapping[str, Any]:
     root = _object(data, where)
     if root.get("format") != expected:
         raise InvalidPackError(f"{where} format must be '{expected}'")
     version = root.get("version")
-    if type(version) is not int or version != FORMAT_VERSION:
+    if type(version) is not int or version not in versions:
         raise InvalidPackError(
             f"{where} version {root.get('version')!r} is not supported"
         )
@@ -224,6 +233,21 @@ def _parse_connection(c: Mapping[str, Any]) -> PackConnection:
     )
 
 
+def _parse_collection(c: Mapping[str, Any]) -> PackCollection:
+    _check_keys(
+        c,
+        required={"ref", "name", "items"},
+        optional={"description"},
+        where="a collection",
+    )
+    return PackCollection(
+        ref=_str(c["ref"], "ref"),
+        name=_str(c["name"], "name"),
+        description=_opt_str(c.get("description"), "description"),
+        item_refs=tuple(_str(r, "item") for r in _array(c["items"], "items")),
+    )
+
+
 def _parse_all[T](
     root: Mapping[str, Any], name: str, parse: Callable[[Mapping[str, Any]], T]
 ) -> tuple[T, ...]:
@@ -236,9 +260,10 @@ def parse_pack(data: object) -> ExamplePack:
     Raises:
         InvalidPackError: If the file is malformed or the pack is inconsistent.
     """
-    root = _envelope(data, PACK_FORMAT, _PACK)
+    root = _envelope(data, PACK_FORMAT, _PACK, PACK_VERSIONS)
+    optional = _SECTIONS | (_V2_SECTIONS if root["version"] == 2 else set())
     _check_keys(
-        root, required={"format", "version", "id"}, optional=_SECTIONS, where=_PACK
+        root, required={"format", "version", "id"}, optional=optional, where=_PACK
     )
     return ExamplePack(
         id=_str(root["id"], "id"),
@@ -249,4 +274,5 @@ def parse_pack(data: object) -> ExamplePack:
         item_types=_parse_all(root, "item_types", _parse_item_type),
         items=_parse_all(root, "items", _parse_item),
         connections=_parse_all(root, "connections", _parse_connection),
+        collections=_parse_all(root, "collections", _parse_collection),
     )

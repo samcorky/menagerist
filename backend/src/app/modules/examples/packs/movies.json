@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 1,
+  "version": 2,
   "id": "movies",
   "relationship_types": [
     {
@@ -758,6 +758,26 @@
       "from": "cold-harbour-poster",
       "to": "northern-film-and-comic-fair",
       "type": "signed-at"
+    }
+  ],
+  "collections": [
+    {
+      "ref": "to-rewatch",
+      "name": "To rewatch",
+      "description": "Films worth another look.",
+      "items": [
+        "cold-harbour",
+        "the-night-bus-sessions"
+      ]
+    },
+    {
+      "ref": "poster-wall",
+      "name": "Poster wall",
+      "description": "Framed and unframed.",
+      "items": [
+        "cold-harbour-poster",
+        "quiet-hours-poster"
+      ]
     }
   ]
 }

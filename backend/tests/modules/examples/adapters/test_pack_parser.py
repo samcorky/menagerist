@@ -51,7 +51,7 @@ def _mutated(data: dict[str, Any], path: list[str | int], value: object) -> obje
 
 _BAD: list[tuple[list[str | int], object]] = [
     (["format"], "other"),
-    (["version"], 2),
+    (["version"], 3),
     (["surprise"], 1),
     (["items"], "nope"),
     (["items", 0], "nope"),
@@ -165,3 +165,92 @@ def test_a_version_that_is_not_the_integer_one_is_rejected(
         parse_index({**_INDEX, "version": version})
     with pytest.raises(InvalidPackError):
         parse_pack({**pack_data, "version": version})
+
+
+def _v2_with_collections(pack_data: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **pack_data,
+        "version": 2,
+        "collections": [
+            {
+                "ref": "starters",
+                "name": "Starters",
+                "description": "Where to begin",
+                "items": ["a", "b"],
+            },
+            {"ref": "just-a", "name": "Just A", "items": ["a"]},
+        ],
+    }
+
+
+def test_parses_a_v2_pack_with_collections(pack_data: dict[str, Any]) -> None:
+    """A version 2 pack carries its collections and counts them."""
+    pack = parse_pack(_v2_with_collections(pack_data))
+
+    assert pack.counts.collections == 2
+    assert pack.collections[0].ref == "starters"
+    assert pack.collections[0].description == "Where to begin"
+    assert pack.collections[0].item_refs == ("a", "b")
+    assert pack.collections[1].description is None
+
+
+def test_a_v1_pack_has_no_collections(pack_data: dict[str, Any]) -> None:
+    """A version 1 pack still parses, with an empty collections section."""
+    pack = parse_pack(pack_data)
+
+    assert pack.collections == ()
+    assert pack.counts.collections == 0
+
+
+def test_a_v2_pack_may_omit_collections(pack_data: dict[str, Any]) -> None:
+    """Version 2 allows the section but does not require it."""
+    pack = parse_pack({**pack_data, "version": 2})
+
+    assert pack.collections == ()
+
+
+def test_collections_on_a_v1_pack_are_rejected(pack_data: dict[str, Any]) -> None:
+    """The `collections` section needs version 2."""
+    data = {**_v2_with_collections(pack_data), "version": 1}
+
+    with pytest.raises(InvalidPackError, match="collections"):
+        parse_pack(data)
+
+
+_BAD_COLLECTION: list[tuple[list[str | int], object]] = [
+    (["collections", 0, "colour"], "red"),
+    (["collections", 0, "ref"], 5),
+    (["collections", 0, "ref"], "Bad Ref"),
+    (["collections", 0, "name"], 5),
+    (["collections", 0, "name"], "   "),
+    (["collections", 0, "description"], 3),
+    (["collections", 0, "items"], "a"),
+    (["collections", 0, "items"], [1]),
+    (["collections", 0, "items"], []),
+    (["collections", 0, "items"], ["a", "a"]),
+    (["collections", 0, "items"], ["a", "zz"]),
+    (["collections", 1, "ref"], "starters"),
+    (["collections", 0], "nope"),
+    (["collections"], "nope"),
+]
+
+
+@pytest.mark.parametrize(("path", "value"), _BAD_COLLECTION)
+def test_a_malformed_collection_is_an_invalid_pack_error(
+    pack_data: dict[str, Any], path: list[str | int], value: object
+) -> None:
+    """Bad collection keys, types, names, members and refs are rejected."""
+    with pytest.raises(InvalidPackError):
+        parse_pack(_mutated(_v2_with_collections(pack_data), path, value))
+
+
+@pytest.mark.parametrize("key", ["ref", "name", "items"])
+def test_a_collection_missing_a_key_is_an_invalid_pack_error(
+    pack_data: dict[str, Any], key: str
+) -> None:
+    """`ref`, `name` and `items` are required on a collection."""
+    data = _v2_with_collections(pack_data)
+    del data["collections"][0][key]
+
+    with pytest.raises(InvalidPackError):
+        parse_pack(data)

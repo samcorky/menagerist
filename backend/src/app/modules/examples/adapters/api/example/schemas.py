@@ -21,6 +21,7 @@ _COUNTS_EXAMPLE: dict[str, Any] = {
     "item_types": 3,
     "items": 12,
     "connections": 14,
+    "collections": 2,
 }
 _KEPT_EXAMPLE: dict[str, Any] = {
     "kind": "item",
@@ -39,6 +40,7 @@ class PackCountsResponse(BaseModel):
     item_types: int
     items: int
     connections: int
+    collections: int
 
     @classmethod
     def from_domain(cls, counts: PackCounts) -> PackCountsResponse:
@@ -49,6 +51,7 @@ class PackCountsResponse(BaseModel):
             item_types=counts.item_types,
             items=counts.items,
             connections=counts.connections,
+            collections=counts.collections,
         )
 
 
@@ -186,7 +189,7 @@ class UninstallResultResponse(BaseModel):
 
 
 class ExampleEntitiesResponse(BaseModel):
-    """The items and item types that example sets currently own."""
+    """The items, item types and collections that example sets currently own."""
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -194,6 +197,7 @@ class ExampleEntitiesResponse(BaseModel):
                 {
                     "item_ids": ["0198f1c2-7b1e-7c3a-9d4e-2f6a8b0c1d23"],
                     "item_type_ids": ["0198f1c2-7b1e-7c3a-9d4e-2f6a8b0c1d24"],
+                    "collection_ids": ["0198f1c2-7b1e-7c3a-9d4e-2f6a8b0c1d25"],
                 }
             ]
         }
@@ -201,8 +205,13 @@ class ExampleEntitiesResponse(BaseModel):
 
     item_ids: list[uuid.UUID]
     item_type_ids: list[uuid.UUID]
+    collection_ids: list[uuid.UUID]
 
     @classmethod
     def from_domain(cls, entities: ExampleEntities) -> ExampleEntitiesResponse:
         """Build from the list-entities query result."""
-        return cls(item_ids=entities.item_ids, item_type_ids=entities.item_type_ids)
+        return cls(
+            item_ids=entities.item_ids,
+            item_type_ids=entities.item_type_ids,
+            collection_ids=entities.collection_ids,
+        )

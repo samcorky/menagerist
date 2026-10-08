@@ -11,6 +11,7 @@ from app.modules.examples.domain.pack import (
     MAX_PRESETS,
     MAX_TYPES,
     ExamplePack,
+    PackCollection,
     PackConnection,
     PackItem,
     PackItemType,
@@ -220,3 +221,53 @@ def test_resolve_preset_refs_resolves_markers_inside_lists() -> None:
     """Markers within lists are replaced and other values pass through."""
     resolved = resolve_preset_refs([{"$preset": "grades"}, 1], {"grades": "abc"})
     assert resolved == ["abc", 1]
+
+
+def test_a_pack_counts_its_collections() -> None:
+    """Collections are counted; a pack without them counts zero."""
+    pack = _pack(
+        collections=(PackCollection(ref="both", name="Both", item_refs=("a", "b")),)
+    )
+
+    assert pack.counts.collections == 1
+    assert _pack().counts.collections == 0
+
+
+def _collection(**overrides: object) -> PackCollection:
+    base: dict[str, object] = {"ref": "both", "name": "Both", "item_refs": ("a", "b")}
+    base.update(overrides)
+    return PackCollection(**base)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "collections",
+    [
+        (_collection(ref="Bad Ref"),),
+        (_collection(), _collection(name="Other")),
+        (_collection(name="  "),),
+        (_collection(item_refs=()),),
+        (_collection(item_refs=("a", "a")),),
+        (_collection(item_refs=("a", "zz")),),
+    ],
+)
+def test_an_invalid_collection_is_rejected(
+    collections: tuple[PackCollection, ...],
+) -> None:
+    """A bad ref, duplicate ref, blank name, or bad membership is rejected."""
+    with pytest.raises(InvalidPackError):
+        _pack(collections=collections)
+
+
+def test_a_collection_name_may_be_120_characters_after_stripping() -> None:
+    """Padding does not count towards the 120-character limit."""
+    name = f"  {'n' * 120}  "
+
+    pack = _pack(collections=(_collection(name=name),))
+
+    assert len(pack.collections) == 1
+
+
+def test_a_collection_name_over_120_characters_is_rejected() -> None:
+    """The error names the collection's ref."""
+    with pytest.raises(InvalidPackError, match=r"collection 'both'.*120"):
+        _pack(collections=(_collection(name="n" * 121),))

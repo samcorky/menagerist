@@ -8,6 +8,7 @@ import type {
 const COUNT_PARTS: [keyof PackCountsResponse, string, string][] = [
 	['item_types', 'item type', 'item types'],
 	['items', 'item', 'items'],
+	['collections', 'collection', 'collections'],
 	['connections', 'connection', 'connections'],
 	['relationship_types', 'connection type', 'connection types'],
 	['presets', 'preset', 'presets']
@@ -109,9 +110,14 @@ export function writeExampleFilter(filter: ExampleFilter): void {
 export interface ExampleIds {
 	items: ReadonlySet<string>;
 	itemTypes: ReadonlySet<string>;
+	collections: ReadonlySet<string>;
 }
 
-const NO_EXAMPLES: ExampleIds = { items: new Set(), itemTypes: new Set() };
+const NO_EXAMPLES: ExampleIds = {
+	items: new Set(),
+	itemTypes: new Set(),
+	collections: new Set()
+};
 let cached: Promise<ExampleIds> | null = null;
 
 /** Ids owned by an installed example pack; empty if the lookup fails. Cached until invalidated. */
@@ -119,7 +125,11 @@ export function loadExampleIds(): Promise<ExampleIds> {
 	cached ??= listExampleEntities()
 		.then((result) =>
 			result.data
-				? { items: new Set(result.data.item_ids), itemTypes: new Set(result.data.item_type_ids) }
+				? {
+						items: new Set(result.data.item_ids),
+						itemTypes: new Set(result.data.item_type_ids),
+						collections: new Set(result.data.collection_ids)
+					}
 				: NO_EXAMPLES
 		)
 		.catch(() => NO_EXAMPLES);

@@ -207,12 +207,15 @@ Pass values directly - `uuid.UUID` objects are serialised to strings automatical
 Packs are package data in `modules/examples/packs/`, read with `importlib.resources`. To add one:
 
 1. Create `<id>.json` and add `{id, name, description}` to `index.json`. The id is lowercase letters, digits and hyphens, and prefixes every type slug (`music-person`), so packs never clash with a user's own types.
-2. The file has `format` (`menagerist-example-pack`), `version` (`1`), `id` and five sections: `presets`, `relationship_types`, `item_types`, `items`, `connections`. Parsing is strict: unknown or missing keys are errors.
+2. The file has `format` (`menagerist-example-pack`), `version` (`1`, or `2` if it has collections), `id` and five sections: `presets`, `relationship_types`, `item_types`, `items`, `connections`. Version 2 also allows an optional sixth, `collections`. Parsing is strict: unknown or missing keys are errors, and `collections` in a version 1 file is rejected.
 3. Every entity has a local `ref` (lowercase ASCII letters, digits and hyphens). Items name their type by `type`, connections name their endpoints `from` and `to` and their connection type `type`, all by `ref`. A schema refers to a preset with `{"$preset": "<ref>"}`.
 4. Item and connection values must use keys their type's `attributes_schema` defines. Write schemas the way the editor would (`x-menagerist` carries the field kind and display options, for example `"display": "words"` on a duration).
-5. Content: fictional, British English, small and finished, with a few deliberate blanks so an item looks lived in.
+5. Collections (version 2): each is `{"ref", "name", "description" (optional), "items": [item refs]}`. List at least one item, no duplicates, only items from the same pack; names are 1 to 120 characters (checked at parse time, mirroring the collections module) and should be unique within a pack (the contract test checks that; the parser does not), and should not be "Favourites" (items already have a favourite flag). The collections module derives each slug, so a pack collection can never clash with the user's own. A collection's items can be of different types.
+6. Content: fictional (no real titles, companies or people: check game, film and product names), British English, small and finished, with a few deliberate blanks so an item looks lived in.
 
 `tests/modules/examples/application/test_shipped_packs.py` runs against every pack listed in `index.json`: it installs, removes and reinstalls cleanly, checks slug prefixes, descriptions, British spelling, valid schemas and that all values match their type. `frontend/tests/example-packs.test.ts` checks the same packs from the frontend side. Neither needs editing when a pack is added.
+
+**Reinstalling after keeping things.** Anything kept on removal also keeps the item types it uses, so adding that pack again is refused (409, "You already have an item type called ...") until the user removes what was kept: its items, and then the item types they used (emptying a collection alone leaves the types in place). One edited example item or collection is enough. Removal never deletes what the user changed, and install never merges into existing types.
 
 ## Collections
 

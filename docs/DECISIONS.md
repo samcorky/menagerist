@@ -524,6 +524,8 @@ So a plain private array is the source of truth, `active` is a write-only `$stat
 
 **Rationale:** people explore by editing and connecting examples. Silently deleting something they changed would destroy their work, and keeping everything would defeat "remove them when you're ready". A hash compares what is stored with what the pack wrote without needing an `edited` flag on every entity.
 
+**Consequence:** anything kept also keeps the item types it uses, so reinstalling that pack is refused (409, "You already have an item type called ...") until the user removes what was kept: its items, and then the item types they used (emptying a collection alone leaves the types in place). This applies equally to an edited item or an edited collection (which keeps all its example items).
+
 ## The application owns every constraint; database indexes are backstops
 
 **Decision:** type slugs are unique among live types through a partial unique index (`WHERE deleted_at IS NULL`), and the use cases check the same rule before writing. A soft-deleted type's slug can be reused.
@@ -591,3 +593,11 @@ So a plain private array is the source of truth, `active` is a write-only `$stat
 ## Collection errors: 400 for domain validation, 422 for malformed requests
 
 **Decision:** a blank name, an unknown item id and similar domain failures return 400, the application's existing mapping for domain `ValidationError`. Requests that fail Pydantic validation (a name over 120 characters, more than 500 ids in one request, a malformed id, unknown fields) return 422. The client treats both as "invalid input".
+
+## Example packs can ship collections, installed last and removed first
+
+**Decision:** a version 2 pack has an optional `collections` section: named lists of the pack's own items. `examples` owns a third target port, `CollectionTarget`, and `entrypoints/api/shared/example_targets.py` implements it over the real collections use cases, so `examples` still imports neither `graph` nor `collections`. Install creates collections as the last step, after connections. Removal runs collections before items. A collection's recorded content is its name, description and the sorted ids of its live members, so renaming it, changing the description or adding, removing or deleting any member makes it "edited", and an edited collection is kept.
+
+**Rationale:** collections are the way to show that items can be grouped without being typed or connected differently, and a pack is the right place to demonstrate it. Removing them before their items means an unedited example collection stops counting as a reason to keep its members. An example item that is on any collection that survives (the user's own, or an edited example one) counts as user data and is kept, in the same way an item with your own connection is. The collections module derives the slug, so a pack collection can never clash with the user's own.
+
+**Consequence:** anything kept also keeps the item types it uses, so the pack cannot be reinstalled until the user removes what was kept; see "Removing examples keeps anything the user has touched". Example collections carry the same "Example" badge as example items and types, and `GET /example/entities` lists their ids.

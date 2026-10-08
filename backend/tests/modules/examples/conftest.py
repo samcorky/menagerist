@@ -1,13 +1,15 @@
 """Shared fixtures: a sample pack and an all-in-memory world to install it into."""
 
-from collections.abc import Callable
-from dataclasses import dataclass
+import uuid
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, replace
 from typing import Any
 
 import pytest
 
 from app.entrypoints.api.shared.example_targets import (
     GraphPackTarget,
+    GraphStores,
     PresetPackTarget,
     in_memory_graph_stores,
     in_memory_preset_stores,
@@ -18,14 +20,17 @@ from app.modules.examples.adapters.persistence.in_memory_installation_repository
 from app.modules.examples.adapters.platform.in_memory_pack_catalogue import (
     InMemoryPackCatalogue,
 )
+from app.modules.examples.domain.installation import EntityKind
 from app.modules.examples.domain.pack import (
     ExamplePack,
+    PackCollection,
     PackConnection,
     PackItem,
     PackItemType,
     PackPreset,
     PackRelationshipType,
 )
+from app.modules.examples.ports.pack_targets import Created, Inspection, RemoveResult
 from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
@@ -67,6 +72,102 @@ _RECORD_SCHEMA: dict[str, Any] = {
 
 
 @dataclass(kw_only=True)
+class FakeCollection:
+    """A collection held by the fake target; tests edit it directly."""
+
+    id: uuid.UUID
+    name: str
+    description: str | None
+    members: list[uuid.UUID]
+
+
+class InMemoryCollectionTarget:
+    """Fake `CollectionTarget`: stores collections and records its calls."""
+
+    def __init__(self) -> None:
+        self.collections: dict[uuid.UUID, FakeCollection] = {}
+        self.create_calls: list[tuple[PackCollection, list[uuid.UUID]]] = []
+        self.events: list[str] = []  # removal calls, shared with the graph target
+        self.fail_on_call: int | None = None  # make this create_collection call fail
+
+    def member_ids(self) -> set[uuid.UUID]:
+        """Return every item id that belongs to a live collection."""
+        return {m for c in self.collections.values() for m in c.members}
+
+    def add_users_own(self, name: str, members: Sequence[uuid.UUID]) -> uuid.UUID:
+        """Add a collection the user made, outside any pack."""
+        coll = FakeCollection(
+            id=uuid.uuid7(), name=name, description=None, members=list(members)
+        )
+        self.collections[coll.id] = coll
+        return coll.id
+
+    async def create_collection(
+        self, spec: PackCollection, *, item_ids: Sequence[uuid.UUID]
+    ) -> Created:
+        """Store a collection with `item_ids` as members."""
+        self.create_calls.append((spec, list(item_ids)))
+        if self.fail_on_call == len(self.create_calls):
+            raise RuntimeError("collection boom")
+        coll = FakeCollection(
+            id=uuid.uuid7(),
+            name=spec.name,
+            description=spec.description,
+            members=list(item_ids),
+        )
+        self.collections[coll.id] = coll
+        return Created(entity_id=coll.id, content=_collection_content(coll))
+
+    async def inspect(self, collection_id: uuid.UUID) -> Inspection | None:
+        """Return the collection as it is now, or `None` if gone."""
+        coll = self.collections.get(collection_id)
+        return None if coll is None else Inspection(content=_collection_content(coll))
+
+    async def remove(self, collection_id: uuid.UUID) -> RemoveResult:
+        """Remove the collection, recording the call."""
+        self.events.append("collection")
+        if self.collections.pop(collection_id, None) is None:
+            return RemoveResult.ALREADY_GONE
+        return RemoveResult.REMOVED
+
+
+def _collection_content(coll: FakeCollection) -> dict[str, Any]:
+    return {
+        "name": coll.name,
+        "description": coll.description,
+        "members": sorted(str(m) for m in coll.members),
+    }
+
+
+class WorldGraphTarget(GraphPackTarget):
+    """Graph target modelling the rule: a member of a live collection is user data."""
+
+    def __init__(
+        self, stores: GraphStores, collections: InMemoryCollectionTarget
+    ) -> None:
+        super().__init__(stores)
+        self._collections = collections
+
+    async def inspect(
+        self, kind: EntityKind, entity_id: uuid.UUID
+    ) -> Inspection | None:
+        """Inspect as the real target does, plus collection membership for items."""
+        inspection = await super().inspect(kind, entity_id)
+        if (
+            inspection is not None
+            and kind is EntityKind.ITEM
+            and entity_id in self._collections.member_ids()
+        ):
+            return replace(inspection, has_user_data=True)
+        return inspection
+
+    async def remove(self, kind: EntityKind, entity_id: uuid.UUID) -> RemoveResult:
+        """Remove the entity, recording the call's kind."""
+        self._collections.events.append(kind.value)
+        return await super().remove(kind, entity_id)
+
+
+@dataclass(kw_only=True)
 class World:
     """Everything an application test needs, all in memory."""
 
@@ -77,7 +178,8 @@ class World:
     catalogue: InMemoryPackCatalogue
     uow: InMemoryUnitOfWork[ExampleRepos]
     presets: PresetPackTarget
-    graph: GraphPackTarget
+    graph: WorldGraphTarget
+    collections: InMemoryCollectionTarget
 
 
 SamplePack = Callable[..., ExamplePack]
@@ -146,6 +248,7 @@ def _make_world(*packs: ExamplePack) -> World:
     catalogue = InMemoryPackCatalogue()
     for pack in packs or (_sample_pack(),):
         catalogue.add(pack, name=pack.id.title(), description=f"{pack.id} examples")
+    collections = InMemoryCollectionTarget()
     return World(
         graph_repos=graph_repos,
         preset_repos=preset_repos,
@@ -154,9 +257,11 @@ def _make_world(*packs: ExamplePack) -> World:
         catalogue=catalogue,
         uow=InMemoryUnitOfWork(ExampleRepos(installations=installations)),
         presets=PresetPackTarget(in_memory_preset_stores(preset_repos, graph_repos)),
-        graph=GraphPackTarget(
-            in_memory_graph_stores(graph_repos, media_repos, preset_repos)
+        graph=WorldGraphTarget(
+            in_memory_graph_stores(graph_repos, media_repos, preset_repos),
+            collections,
         ),
+        collections=collections,
     )
 
 

@@ -43,6 +43,7 @@
 	import NodeCard from '$lib/components/node-card.svelte';
 	import NodeGridCard from '$lib/components/node-grid-card.svelte';
 	import NotFound from '$lib/components/not-found.svelte';
+	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Item from '$lib/components/ui/item/index.js';
@@ -82,6 +83,7 @@
 	let searchInput = $state('');
 	let q = $state('');
 	let viewMode = $state<'list' | 'grid'>('list');
+	let exampleCollectionIds = $state<ReadonlySet<string>>(new Set());
 	let exampleItemIds = $state<ReadonlySet<string>>(new Set());
 	let exampleFilter = $state<ExampleFilter>(readExampleFilter());
 	const showExampleFilter = $derived(exampleItemIds.size > 0 || exampleFilter !== 'all');
@@ -121,7 +123,10 @@
 	}
 
 	$effect(() => {
-		void loadExampleIds().then((ids) => (exampleItemIds = ids.items));
+		void loadExampleIds().then((ids) => {
+			exampleItemIds = ids.items;
+			exampleCollectionIds = ids.collections;
+		});
 	});
 
 	$effect(() => {
@@ -410,9 +415,14 @@
 			{#if collection}
 				<div class="flex flex-wrap items-start justify-between gap-3">
 					<div class="min-w-0">
-						<h1 class="font-heading text-3xl font-semibold tracking-tight break-words">
-							{collection.name}
-						</h1>
+						<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+							<h1 class="font-heading text-3xl font-semibold tracking-tight break-words">
+								{collection.name}
+							</h1>
+							{#if exampleCollectionIds.has(collection.id)}
+								<Badge variant="outline" class="shrink-0 text-muted-foreground">Example</Badge>
+							{/if}
+						</div>
 						{#if collection.description}
 							<p class="mt-1 whitespace-pre-line text-muted-foreground">
 								{collection.description}

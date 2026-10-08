@@ -16,6 +16,7 @@ from app.modules.examples.domain.installation import EntityKind, Installation
 from app.modules.examples.domain.pack import ExamplePack, PackCounts
 from app.modules.examples.ports.pack_catalogue import PackCatalogue  # noqa: TC001
 from app.modules.examples.ports.pack_targets import (  # noqa: TC001
+    CollectionTarget,
     GraphTarget,
     PresetTarget,
 )
@@ -74,12 +75,14 @@ class InstallExamplePack(
         catalogue: PackCatalogue,
         presets: PresetTarget,
         graph: GraphTarget,
+        collections: CollectionTarget,
     ) -> None:
-        """Initialise with the unit of work, catalogue and the two targets."""
+        """Initialise with the unit of work, catalogue and the three targets."""
         super().__init__(uow)
         self._catalogue = catalogue
         self._presets = presets
         self._graph = graph
+        self._collections = collections
 
     async def handle(
         self, command: InstallExamplePackCommand, actor: Actor
@@ -138,6 +141,7 @@ class InstallExamplePack(
         await self._install_item_types(run)
         await self._install_items(run)
         await self._install_connections(run)
+        await self._install_collections(run)
 
     async def _record(
         self,
@@ -227,6 +231,26 @@ class InstallExamplePack(
                 created.content,
             )
 
+    async def _install_collections(self, run: _Run) -> None:
+        for spec in run.pack.collections:
+            missing = [ref for ref in spec.item_refs if ref not in run.item_ids]
+            if missing:
+                raise InstallFailedError(
+                    f"Collection '{spec.name}' names items that were not created: "
+                    + ", ".join(missing)
+                )
+            created = await self._collections.create_collection(
+                spec, item_ids=[run.item_ids[ref] for ref in spec.item_refs]
+            )
+            await self._record(
+                run,
+                EntityKind.COLLECTION,
+                spec.ref,
+                spec.name,
+                created.entity_id,
+                created.content,
+            )
+
     async def _roll_back(
         self, installation: Installation, cause: Exception
     ) -> NoReturn:
@@ -236,6 +260,7 @@ class InstallExamplePack(
                 installation,
                 presets=self._presets,
                 graph=self._graph,
+                collections=self._collections,
                 persist=self._persist,
             )
             installation.mark_failed()
@@ -272,4 +297,5 @@ def installation_counts(installation: Installation) -> PackCounts:
         item_types=count(EntityKind.ITEM_TYPE),
         items=count(EntityKind.ITEM),
         connections=count(EntityKind.CONNECTION),
+        collections=count(EntityKind.COLLECTION),
     )

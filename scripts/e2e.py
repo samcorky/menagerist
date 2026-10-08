@@ -1,7 +1,8 @@
-"""Orchestrate the Playwright e2e run: one throwaway Postgres, one database and backend per worker.
+"""Orchestrate the Playwright e2e run.
 
-Invoked by the ``test-e2e*`` poe tasks. The worker count is resolved once here and exported as
-``E2E_WORKERS`` so the migrate script and ``playwright.config.ts`` agree on it.
+Uses one throwaway Postgres, with one database and backend per worker. Invoked by
+the ``test-e2e*`` poe tasks. The worker count is resolved once here and exported
+as ``E2E_WORKERS`` so the migrate script and ``playwright.config.ts`` agree on it.
 """
 
 import os
@@ -21,12 +22,14 @@ def default_workers() -> int:
 
 
 def poe(task: str) -> int:
+    """Run a poe task and return its exit code."""
     return subprocess.call([sys.executable, "-m", "poethepoet", task], cwd=ROOT)
 
 
 def main(
     workers: int | None = None, skip_build: bool = False, mode: str = "run"
 ) -> None:
+    """Run the e2e suite with the requested worker count and mode."""
     n = workers or default_workers()
     if n < 1:
         sys.exit("--workers must be at least 1")

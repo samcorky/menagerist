@@ -12,6 +12,7 @@
 		describeItemCount,
 		validateCollectionName
 	} from '$lib/collections';
+	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -19,6 +20,7 @@
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
+	import { loadExampleIds } from '$lib/examples';
 
 	const PAGE_SIZE = 50;
 
@@ -26,6 +28,7 @@
 	let loading = $state(true);
 	let loadFailed = $state(false);
 	let hasMore = $state(false);
+	let exampleCollectionIds = $state<ReadonlySet<string>>(new Set());
 
 	let dialogOpen = $state(false);
 	let name = $state('');
@@ -65,6 +68,7 @@
 
 	$effect(() => {
 		void fetchPage();
+		void loadExampleIds().then((ids) => (exampleCollectionIds = ids.collections));
 	});
 
 	function sentinel(node: HTMLElement) {
@@ -164,7 +168,13 @@
 						>
 							<Card.Root class="h-full transition-colors hover:bg-muted/50">
 								<Card.Header>
-									<Card.Title class="truncate">{collection.name}</Card.Title>
+									<Card.Title class="flex items-center gap-2">
+										<span class="min-w-0 truncate">{collection.name}</span>
+										{#if exampleCollectionIds.has(collection.id)}
+											<Badge variant="outline" class="shrink-0 text-muted-foreground">Example</Badge
+											>
+										{/if}
+									</Card.Title>
 									{#if collection.description}
 										<Card.Description class="line-clamp-2"
 											>{collection.description}</Card.Description

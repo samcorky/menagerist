@@ -16,7 +16,14 @@ import {
 	reasonLabel
 } from '$lib/examples';
 
-const zero = { presets: 0, relationship_types: 0, item_types: 0, items: 0, connections: 0 };
+const zero = {
+	presets: 0,
+	relationship_types: 0,
+	item_types: 0,
+	items: 0,
+	connections: 0,
+	collections: 0
+};
 
 describe('describeCounts', () => {
 	it('lists non-zero parts and omits zeros', () => {
@@ -27,6 +34,12 @@ describe('describeCounts', () => {
 	});
 	it('is empty for all zeros', () => {
 		expect(describeCounts(zero)).toBe('');
+	});
+	it('lists collections after items and before connections', () => {
+		expect(
+			describeCounts({ ...zero, item_types: 1, items: 2, collections: 1, connections: 3 })
+		).toBe('1 item type, 2 items, 1 collection, 3 connections');
+		expect(describeCounts({ ...zero, collections: 2 })).toBe('2 collections');
 	});
 });
 
@@ -164,11 +177,14 @@ describe('loadExampleIds', () => {
 		listExampleEntities.mockReset();
 	});
 	it('loads once, then serves the cache until invalidated', async () => {
-		listExampleEntities.mockResolvedValue({ data: { item_ids: ['a'], item_type_ids: ['t'] } });
+		listExampleEntities.mockResolvedValue({
+			data: { item_ids: ['a'], item_type_ids: ['t'], collection_ids: ['c'] }
+		});
 		const first = await loadExampleIds();
 		await loadExampleIds();
 		expect(first.items.has('a')).toBe(true);
 		expect(first.itemTypes.has('t')).toBe(true);
+		expect(first.collections.has('c')).toBe(true);
 		expect(listExampleEntities).toHaveBeenCalledTimes(1);
 		invalidateExampleIds();
 		await loadExampleIds();
@@ -176,7 +192,9 @@ describe('loadExampleIds', () => {
 	});
 	it('is empty when the lookup fails', async () => {
 		listExampleEntities.mockRejectedValue(new Error('down'));
-		expect((await loadExampleIds()).items.size).toBe(0);
+		const ids = await loadExampleIds();
+		expect(ids.items.size).toBe(0);
+		expect(ids.collections.size).toBe(0);
 	});
 	it('is empty when the response has no data', async () => {
 		listExampleEntities.mockResolvedValue({ error: { detail: 'x' } });

@@ -9,9 +9,40 @@ from typing import TYPE_CHECKING, Annotated, Any
 from fastapi import Depends
 
 from app.entrypoints.api.shared.choice_list_source import PresetChoiceListSource
+from app.entrypoints.api.shared.collection_items import GraphItemLookup
 from app.entrypoints.api.shared.preset_usage import GraphPresetUsage
+from app.modules.collections.adapters.persistence.in_memory_collection_repository import (  # noqa: E501
+    InMemoryCollectionRepository,
+)
+from app.modules.collections.adapters.persistence.in_memory_membership_repository import (  # noqa: E501
+    InMemoryMembershipRepository,
+)
+from app.modules.collections.adapters.persistence.unit_of_work import (
+    build_collections_repos,
+    create_collections_uow,
+    create_in_memory_collections_uow,
+)
+from app.modules.collections.application.add_items_to_collection import (
+    AddItemsToCollection,
+    AddItemsToCollectionCommand,
+)
+from app.modules.collections.application.create_collection import (
+    CreateCollection,
+    CreateCollectionCommand,
+)
+from app.modules.collections.application.delete_collection import (
+    DeleteCollection,
+    DeleteCollectionCommand,
+)
+from app.modules.collections.domain.errors import CollectionNotFoundError
+from app.modules.collections.ports.item_lookup import ItemLookup
+from app.modules.collections.ports.unit_of_work import (
+    CollectionsRepos,
+    CollectionsUnitOfWork,
+)
 from app.modules.examples.domain.installation import EntityKind
 from app.modules.examples.domain.pack import (
+    PackCollection,
     PackConnection,
     PackItem,
     PackItemType,
@@ -98,6 +129,14 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 _PAGE = 1
+_GRAPH_KINDS = frozenset(
+    {
+        EntityKind.ITEM,
+        EntityKind.ITEM_TYPE,
+        EntityKind.RELATIONSHIP_TYPE,
+        EntityKind.CONNECTION,
+    }
+)
 
 
 # ---- stores: how targets reach storage (sessions in production, memory in tests) ----
@@ -120,6 +159,24 @@ class GraphStores:
     read: Callable[[], AbstractAsyncContextManager[GraphRepos]]
     media: Callable[[], AbstractAsyncContextManager[MediaRepos]]
     choice_lists: Callable[[], AbstractAsyncContextManager[ChoiceListSource]]
+    collections: Callable[[], AbstractAsyncContextManager[CollectionsRepos]]
+
+
+@dataclass(kw_only=True)
+class CollectionStores:
+    """Factories the collection target uses; each call opens fresh storage access."""
+
+    uow: Callable[[], CollectionsUnitOfWork]
+    read: Callable[[], AbstractAsyncContextManager[CollectionsRepos]]
+    items: Callable[[], AbstractAsyncContextManager[ItemLookup]]
+
+
+def build_in_memory_collections_repos() -> CollectionsRepos:
+    """Return empty in-memory collections repositories, for tests."""
+    return CollectionsRepos(
+        collections=InMemoryCollectionRepository(),
+        memberships=InMemoryMembershipRepository(),
+    )
 
 
 def in_memory_preset_stores(
@@ -141,9 +198,13 @@ def in_memory_preset_stores(
 
 
 def in_memory_graph_stores(
-    graph_repos: GraphRepos, media_repos: MediaRepos, preset_repos: PresetRepos
+    graph_repos: GraphRepos,
+    media_repos: MediaRepos,
+    preset_repos: PresetRepos,
+    collection_repos: CollectionsRepos | None = None,
 ) -> GraphStores:
     """Stores over in-memory repositories, for tests."""
+    collection_repos = collection_repos or build_in_memory_collections_repos()
 
     @asynccontextmanager
     async def read() -> AsyncIterator[GraphRepos]:
@@ -157,11 +218,36 @@ def in_memory_graph_stores(
     async def choice_lists() -> AsyncIterator[ChoiceListSource]:
         yield PresetChoiceListSource(preset_repos)
 
+    @asynccontextmanager
+    async def collections() -> AsyncIterator[CollectionsRepos]:
+        yield collection_repos
+
     return GraphStores(
         uow=lambda: create_in_memory_graph_uow(graph_repos),
         read=read,
         media=media,
         choice_lists=choice_lists,
+        collections=collections,
+    )
+
+
+def in_memory_collection_stores(
+    collection_repos: CollectionsRepos, graph_repos: GraphRepos
+) -> CollectionStores:
+    """Stores over in-memory repositories, for tests."""
+
+    @asynccontextmanager
+    async def read() -> AsyncIterator[CollectionsRepos]:
+        yield collection_repos
+
+    @asynccontextmanager
+    async def items() -> AsyncIterator[ItemLookup]:
+        yield GraphItemLookup(graph_repos)
+
+    return CollectionStores(
+        uow=lambda: create_in_memory_collections_uow(collection_repos),
+        read=read,
+        items=items,
     )
 
 
@@ -205,11 +291,39 @@ def build_graph_stores(
         async with session_factory() as session:
             yield PresetChoiceListSource(build_preset_repos(session))
 
+    @asynccontextmanager
+    async def collections() -> AsyncIterator[CollectionsRepos]:
+        async with session_factory() as session:
+            yield build_collections_repos(session)
+
     return GraphStores(
         uow=lambda: create_graph_uow(session_factory),
         read=read,
         media=media,
         choice_lists=choice_lists,
+        collections=collections,
+    )
+
+
+def build_collection_stores(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> CollectionStores:
+    """Stores over Postgres sessions."""
+
+    @asynccontextmanager
+    async def read() -> AsyncIterator[CollectionsRepos]:
+        async with session_factory() as session:
+            yield build_collections_repos(session)
+
+    @asynccontextmanager
+    async def items() -> AsyncIterator[ItemLookup]:
+        async with session_factory() as session:
+            yield GraphItemLookup(build_graph_repos(session))
+
+    return CollectionStores(
+        uow=lambda: create_collections_uow(session_factory),
+        read=read,
+        items=items,
     )
 
 
@@ -263,6 +377,16 @@ def _edge_content(e: Edge) -> dict[str, Any]:
         "target_id": str(e.target_id),
         "type": e.type,
         "attributes": copy.deepcopy(e.attributes),
+    }
+
+
+def _collection_content(
+    name: str, description: str | None, members: Sequence[uuid.UUID]
+) -> dict[str, Any]:
+    return {
+        "name": name,
+        "description": description,
+        "members": sorted(str(m) for m in members),
     }
 
 
@@ -437,8 +561,10 @@ class GraphPackTarget:
                 return await self._inspect_item_type(repos, entity_id)
             if kind is EntityKind.RELATIONSHIP_TYPE:
                 return await self._inspect_relationship_type(repos, entity_id)
-            edge = await repos.edges.get(entity_id)
-            return None if edge is None else Inspection(content=_edge_content(edge))
+            if kind is EntityKind.CONNECTION:
+                edge = await repos.edges.get(entity_id)
+                return None if edge is None else Inspection(content=_edge_content(edge))
+        raise ValueError(f"The graph target does not handle {kind.value} entities")
 
     async def _inspect_item(
         self, repos: GraphRepos, entity_id: uuid.UUID
@@ -451,9 +577,19 @@ class GraphPackTarget:
             files = await media.attachments.list_for_target(
                 AttachmentTarget.NODE, node.id
             )
+        in_collection = await self._on_live_collection(node.id)
         return Inspection(
-            content=_node_content(node), has_user_data=bool(touched or files)
+            content=_node_content(node),
+            has_user_data=bool(touched or files or in_collection),
         )
+
+    async def _on_live_collection(self, item_id: uuid.UUID) -> bool:
+        """Whether any live collection holds the item."""
+        async with self._stores.collections() as repos:
+            for collection_id in await repos.memberships.collection_ids_for(item_id):
+                if await repos.collections.get(collection_id) is not None:
+                    return True
+        return False
 
     @staticmethod
     async def _inspect_item_type(
@@ -481,6 +617,8 @@ class GraphPackTarget:
 
     async def remove(self, kind: EntityKind, entity_id: uuid.UUID) -> RemoveResult:
         """Remove the entity through its delete use case."""
+        if kind not in _GRAPH_KINDS:
+            raise ValueError(f"The graph target does not handle {kind.value} entities")
         uow = self._stores.uow()
         try:
             if kind is EntityKind.ITEM:
@@ -511,6 +649,66 @@ class GraphPackTarget:
         return RemoveResult.REMOVED
 
 
+class CollectionPackTarget:
+    """Implements `CollectionTarget` with the collections use cases."""
+
+    def __init__(self, stores: CollectionStores) -> None:
+        self._stores = stores
+
+    async def create_collection(
+        self, spec: PackCollection, *, item_ids: Sequence[uuid.UUID]
+    ) -> Created:
+        """Create the collection, put the items on it and return what was stored."""
+        collection = await CreateCollection(self._stores.uow()).handle(
+            CreateCollectionCommand(name=spec.name, description=spec.description),
+            SYSTEM_ACTOR,
+        )
+        try:
+            async with self._stores.items() as items:
+                await AddItemsToCollection(self._stores.uow(), items).handle(
+                    AddItemsToCollectionCommand(
+                        collection_id=collection.id, item_ids=list(item_ids)
+                    ),
+                    SYSTEM_ACTOR,
+                )
+            inspection = await self.inspect(collection.id)
+        except Exception:
+            # Not yet recorded by the install, so it would be orphaned.
+            await self.remove(collection.id)
+            raise
+        if inspection is None:  # pragma: no cover - only if deleted concurrently
+            raise RuntimeError(f"Collection {collection.id} vanished after creation")
+        return Created(entity_id=collection.id, content=inspection.content)
+
+    async def inspect(self, collection_id: uuid.UUID) -> Inspection | None:
+        """Return the collection as it is now, or `None` if it is gone.
+
+        Members are the stored memberships whose items are still live, as the
+        collection page shows them, so a deleted item reads as a membership change.
+        """
+        async with self._stores.read() as repos, self._stores.items() as items:
+            collection = await repos.collections.get(collection_id)
+            if collection is None:
+                return None
+            stored = await repos.memberships.item_ids(collection_id)
+            live = await items.live_ids(list(stored))
+        return Inspection(
+            content=_collection_content(
+                collection.name, collection.description, list(live)
+            )
+        )
+
+    async def remove(self, collection_id: uuid.UUID) -> RemoveResult:
+        """Soft-delete the collection through its delete use case."""
+        try:
+            await DeleteCollection(self._stores.uow()).handle(
+                DeleteCollectionCommand(collection_id=collection_id), SYSTEM_ACTOR
+            )
+        except CollectionNotFoundError:
+            return RemoveResult.ALREADY_GONE
+        return RemoveResult.REMOVED
+
+
 # ---- FastAPI providers ----
 
 
@@ -530,3 +728,12 @@ def get_graph_pack_target(
 ) -> GraphPackTarget:
     """Return the graph target over Postgres."""
     return GraphPackTarget(build_graph_stores(session_factory))
+
+
+def get_collection_pack_target(
+    session_factory: Annotated[
+        async_sessionmaker[AsyncSession], Depends(get_session_factory)
+    ],
+) -> CollectionPackTarget:
+    """Return the collection target over Postgres."""
+    return CollectionPackTarget(build_collection_stores(session_factory))

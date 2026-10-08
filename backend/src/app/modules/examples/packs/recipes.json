@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 1,
+  "version": 2,
   "id": "recipes",
   "relationship_types": [
     {
@@ -781,6 +781,28 @@
       "from": "parkin",
       "to": "black-treacle",
       "type": "uses"
+    }
+  ],
+  "collections": [
+    {
+      "ref": "bakes",
+      "name": "Bakes",
+      "description": "Pies, scones and parkin.",
+      "items": [
+        "cheese-and-onion-pie",
+        "leek-and-cheddar-scones",
+        "parkin"
+      ]
+    },
+    {
+      "ref": "cupboard-staples",
+      "name": "Cupboard staples",
+      "description": "The ingredients that are always in.",
+      "items": [
+        "plain-flour",
+        "mature-cheddar",
+        "black-treacle"
+      ]
     }
   ]
 }

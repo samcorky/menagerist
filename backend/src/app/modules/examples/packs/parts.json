@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 1,
+  "version": 2,
   "id": "parts",
   "relationship_types": [
     {
@@ -961,6 +961,31 @@
           "currency": "GBP"
         }
       }
+    }
+  ],
+  "collections": [
+    {
+      "ref": "running-low",
+      "name": "Running low",
+      "description": "Parts to reorder soon.",
+      "items": [
+        "lm317-voltage-regulator",
+        "10-turn-trimmer-potentiometer",
+        "470-uf-electrolytic-capacitor"
+      ]
+    },
+    {
+      "ref": "pico-reaction-game-build",
+      "name": "Pico reaction game build",
+      "description": "The assembly and what it uses.",
+      "items": [
+        "pico-reaction-game",
+        "raspberry-pi-pico-2-w",
+        "red-led-5-mm",
+        "green-led-5-mm",
+        "tactile-push-button-6-mm",
+        "half-size-breadboard"
+      ]
     }
   ]
 }

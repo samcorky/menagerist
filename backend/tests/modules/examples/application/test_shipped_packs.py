@@ -56,14 +56,14 @@ async def _load(pack_id: str) -> ExamplePack:
 
 async def _install(world: World, pack_id: str) -> Any:  # noqa: ANN401
     return await InstallExamplePack(
-        world.uow, world.catalogue, world.presets, world.graph
+        world.uow, world.catalogue, world.presets, world.graph, world.collections
     ).handle(InstallExamplePackCommand(pack_id=pack_id), SYSTEM_ACTOR)
 
 
 async def _uninstall(world: World, pack_id: str) -> Any:  # noqa: ANN401
-    return await UninstallExamplePack(world.uow, world.presets, world.graph).handle(
-        UninstallExamplePackCommand(pack_id=pack_id), SYSTEM_ACTOR
-    )
+    return await UninstallExamplePack(
+        world.uow, world.presets, world.graph, world.collections
+    ).handle(UninstallExamplePackCommand(pack_id=pack_id), SYSTEM_ACTOR)
 
 
 async def _live_counts(world: World) -> list[int]:
@@ -74,7 +74,8 @@ async def _live_counts(world: World) -> list[int]:
         world.graph_repos.edges,
         world.preset_repos.presets,
     )
-    return [len(await repo.list(after=None, limit=_LIMIT)) for repo in repos]
+    counts = [len(await repo.list(after=None, limit=_LIMIT)) for repo in repos]
+    return [*counts, len(world.collections.collections)]
 
 
 def _strings(value: Any) -> Iterator[str]:  # noqa: ANN401
@@ -117,6 +118,11 @@ def _texts(pack: ExamplePack) -> Iterator[tuple[str, str]]:
             f"connection '{c.source_ref}' -> '{c.target_ref}'",
             " ".join(_strings(c.attributes)),
         )
+    for collection in pack.collections:
+        yield (
+            f"collection '{collection.ref}'",
+            " ".join(_strings([collection.name, collection.description])),
+        )
 
 
 @pytest.mark.parametrize("pack_id", _PACK_IDS)
@@ -134,10 +140,13 @@ async def test_pack_installs_and_removes_cleanly(
     )
     removed = await _uninstall(world, pack_id)
     assert removed.kept == (), f"{pack_id}: an untouched install kept {removed.kept}"
-    assert await _live_counts(world) == [0] * 5, f"{pack_id}: entities remain"
+    assert await _live_counts(world) == [0] * 6, f"{pack_id}: entities remain"
     reinstalled = await _install(world, pack_id)
     assert asdict(reinstalled.created) == asdict(pack.counts), (
         f"{pack_id}: reinstall differs"
+    )
+    assert (await _live_counts(world))[-1] == pack.counts.collections, (
+        f"{pack_id}: reinstall left the wrong number of collections"
     )
 
 
@@ -150,6 +159,19 @@ async def test_pack_has_connections_and_items_for_every_type(pack_id: str) -> No
     used = {item.type_ref for item in pack.items}
     for kind in pack.item_types:
         assert kind.ref in used, f"{pack_id}: item type '{kind.ref}' has no items"
+
+
+@pytest.mark.parametrize("pack_id", _PACK_IDS)
+async def test_pack_collections_use_known_items_and_unique_names(pack_id: str) -> None:
+    """Every collection member resolves and collection names are unique."""
+    pack = await _load(pack_id)
+
+    item_refs = {item.ref for item in pack.items}
+    for collection in pack.collections:
+        for ref in collection.item_refs:
+            assert ref in item_refs, f"{pack_id}: '{collection.ref}' names '{ref}'"
+    names = [c.name for c in pack.collections]
+    assert len(set(names)) == len(names), f"{pack_id}: duplicate collection name"
 
 
 @pytest.mark.parametrize("pack_id", _PACK_IDS)
