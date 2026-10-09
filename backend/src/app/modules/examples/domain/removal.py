@@ -5,7 +5,7 @@ from app.modules.examples.domain.errors import InvalidInstallationStateError
 from app.modules.examples.domain.installation import EntityRecord, Outcome
 
 KEEP_EDITED = "edited"
-KEEP_USER_DATA = "has your connections or files"
+KEEP_USER_DATA = "has your connections, files or collections"
 KEEP_IN_USE = "still in use"
 
 

@@ -37,8 +37,8 @@ _PACK: dict[str, Any] = {
 
 
 _DUO_EDITED = ("collection", "Duo", "edited")
-_A_HELD = ("item", "A", "has your connections or files")
-_B_HELD = ("item", "B", "has your connections or files")
+_A_HELD = ("item", "A", "has your connections, files or collections")
+_B_HELD = ("item", "B", "has your connections, files or collections")
 _TYPE_IN_USE = ("item_type", "Thing", "still in use")
 
 

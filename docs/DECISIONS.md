@@ -532,6 +532,8 @@ So a plain private array is the source of truth, `active` is a write-only `$stat
 
 **Consequence:** anything kept also keeps the item types it uses, so reinstalling that pack is refused (409, "You already have an item type called ...") until the user removes what was kept: its items, and then the item types they used (emptying a collection alone leaves the types in place). This applies equally to an edited item or an edited collection (which keeps all its example items).
 
+**Update (2026-10-08):** an item on a live collection is kept for the same "user data" reason, so the reason now reads "has your connections, files or collections". Installs recorded before this keep the old wording, which the frontend still maps.
+
 ## The application owns every constraint; database indexes are backstops
 
 **Decision:** type slugs are unique among live types through a partial unique index (`WHERE deleted_at IS NULL`), and the use cases check the same rule before writing. A soft-deleted type's slug can be reused.

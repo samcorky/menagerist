@@ -27,6 +27,8 @@ export function describeCounts(counts: PackCountsResponse): string {
 
 const REASON_LABELS: Record<string, string> = {
 	edited: 'you edited them',
+	'has your connections, files or collections': 'they have your connections, files or collections',
+	// Recorded by installs made before collections counted as your own data.
 	'has your connections or files': 'they have your connections or files',
 	'still in use': 'they are still in use'
 };

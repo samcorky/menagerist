@@ -46,6 +46,9 @@ describe('describeCounts', () => {
 describe('reasonLabel', () => {
 	it('maps known reasons', () => {
 		expect(reasonLabel('edited')).toBe('you edited them');
+		expect(reasonLabel('has your connections, files or collections')).toBe(
+			'they have your connections, files or collections'
+		);
 		expect(reasonLabel('has your connections or files')).toBe(
 			'they have your connections or files'
 		);

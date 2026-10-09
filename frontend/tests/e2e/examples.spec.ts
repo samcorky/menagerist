@@ -292,7 +292,7 @@ test('keeps an example item that has your own connection', async ({ page }) => {
 
 	await remove(page, MOVIES);
 	await expect(
-		page.getByText('item was kept because they have your connections or files.')
+		page.getByText('item was kept because they have your connections, files or collections.')
 	).toBeVisible();
 
 	await page.goto(`/items/${firstExample!.id}`);
@@ -425,7 +425,9 @@ test('an edited example collection is kept with its items and stops being an exa
 	await installEditAndRemoveGames(page, renamed);
 	const toasts = page.getByRole('region', { name: /Notifications/ });
 	await expect(toasts).toContainText('kept because you edited them');
-	await expect(toasts).toContainText('kept because they have your connections or files');
+	await expect(toasts).toContainText(
+		'kept because they have your connections, files or collections'
+	);
 
 	await page.goto('/collections');
 	const kept = collectionCard(page, renamed);
