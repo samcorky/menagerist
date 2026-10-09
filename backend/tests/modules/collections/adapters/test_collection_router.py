@@ -584,3 +584,13 @@ def test_list_limit_bounds_are_accepted_and_link_is_correct(api: Api) -> None:
     assert f"after={first['id']}" in one.headers["Link"]
     assert [c["id"] for c in hundred.json()] == [first["id"], second["id"]]
     assert "Link" not in hundred.headers
+
+
+def test_list_q_ignores_accents(api: Api) -> None:
+    """?q=cafe finds a collection named Café."""
+    api.create("Café")
+    api.create("Vinyl")
+
+    response = api.client.get(BASE, params={"q": "cafe"})
+
+    assert [c["name"] for c in response.json()] == ["Café"]

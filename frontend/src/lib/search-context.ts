@@ -1,3 +1,4 @@
+import { foldText } from '$lib/fold-text';
 import { descriptorForProp } from '$lib/field-types';
 import { readPropMeta } from '$lib/schema-meta';
 import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
@@ -30,10 +31,10 @@ export function matchContext(
 	schema: AttributesSchema | null | undefined,
 	q: string
 ): MatchContext | null {
-	const needle = q.trim().toLowerCase();
+	const needle = foldText(q.trim());
 	if (!needle) return null;
-	if (item.name.toLowerCase().includes(needle)) return null;
-	if ((item.description ?? '').toLowerCase().includes(needle)) return null;
+	if (foldText(item.name).includes(needle)) return null;
+	if (foldText(item.description ?? '').includes(needle)) return null;
 
 	const attributes = item.attributes ?? {};
 	const properties = schema?.properties ?? {};
@@ -42,7 +43,7 @@ export function matchContext(
 	for (const key of [...known, ...unknown]) {
 		const prop = Object.hasOwn(properties, key) ? properties[key] : undefined;
 		if (prop && !isSearchable(prop)) continue;
-		const text = scalars(attributes[key]).find((s) => s.toLowerCase().includes(needle));
+		const text = scalars(attributes[key]).find((s) => foldText(s).includes(needle));
 		if (text !== undefined) return { label: prop?.title || key, text };
 	}
 	return null;

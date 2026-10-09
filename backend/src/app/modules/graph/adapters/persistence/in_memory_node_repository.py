@@ -1,3 +1,4 @@
+import unicodedata
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -7,6 +8,12 @@ if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping, Sequence
 
     from app.modules.graph.domain.node import Node
+
+
+def _fold(text: str) -> str:
+    """Casefold `text` and strip accents, as Postgres `unaccent` does."""
+    decomposed = unicodedata.normalize("NFD", text)
+    return "".join(c for c in decomposed if not unicodedata.combining(c)).casefold()
 
 
 def _scalar_values(value: Any) -> Iterator[str]:  # noqa: ANN401
@@ -28,12 +35,12 @@ def _matches(
     needle: str,
     exclusions: Mapping[str, Sequence[str]] | None,
 ) -> bool:
-    """Whether `needle` (already casefolded) is found in the node's searchable text."""
-    if needle in node.name.casefold() or needle in (node.description or "").casefold():
+    """Whether `needle` (already folded) is found in the node's searchable text."""
+    if needle in _fold(node.name) or needle in _fold(node.description or ""):
         return True
     skipped = (exclusions or {}).get(node.type, ()) if node.type else ()
     attributes = {k: v for k, v in node.attributes.items() if k not in skipped}
-    return any(needle in text.casefold() for text in _scalar_values(attributes))
+    return any(needle in _fold(text) for text in _scalar_values(attributes))
 
 
 class InMemoryNodeRepository:
@@ -80,7 +87,7 @@ class InMemoryNodeRepository:
         if after is not None:
             ordered = [node for node in ordered if node.id > after]
         if q is not None:
-            needle = q.casefold()
+            needle = _fold(q)
             ordered = [
                 node
                 for node in ordered
@@ -106,7 +113,7 @@ class InMemoryNodeRepository:
         if type is not None:
             nodes = [n for n in nodes if n.type == type]
         if q is not None:
-            needle = q.casefold()
+            needle = _fold(q)
             nodes = [
                 n for n in nodes if _matches(n, needle, attribute_search_exclusions)
             ]
@@ -195,7 +202,7 @@ class InMemoryNodeRepository:
                 continue
             counts[value] = counts.get(value, 0) + 1
         if q is not None:
-            needle = q.casefold()
-            counts = {v: c for v, c in counts.items() if needle in v.casefold()}
+            needle = _fold(q)
+            counts = {v: c for v, c in counts.items() if needle in _fold(v)}
         ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
         return ordered[:limit]

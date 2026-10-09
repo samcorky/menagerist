@@ -25,7 +25,8 @@ export type Results = {
 	pages: PalettePage[];
 };
 
-const ITEM_TYPE_LIMIT = 100;
+const ITEM_TYPE_PAGE = 100;
+export const ITEM_TYPE_CAP = 1000;
 
 let typesPromise: Promise<NodeTypeResponse[]> | null = null;
 
@@ -34,15 +35,25 @@ export function resetItemTypeCache(): void {
 	typesPromise = null;
 }
 
+/** Pages through every item type by cursor, stopping at a short page or {@link ITEM_TYPE_CAP}. */
+async function fetchItemTypes(): Promise<NodeTypeResponse[]> {
+	const all: NodeTypeResponse[] = [];
+	let after: string | undefined;
+	while (all.length < ITEM_TYPE_CAP) {
+		const limit = Math.min(ITEM_TYPE_PAGE, ITEM_TYPE_CAP - all.length);
+		const result = await listNodeTypes({ query: after ? { limit, after } : { limit } });
+		if (result.error || !result.data) throw new Error('item types unavailable');
+		all.push(...result.data);
+		if (result.data.length < limit) break;
+		after = result.data[result.data.length - 1].id;
+	}
+	return all;
+}
+
 // Loaded once (also used for item row labels); a failed load is dropped so the next search retries.
 export function loadItemTypes(): Promise<NodeTypeResponse[]> {
 	if (!typesPromise) {
-		const attempt: Promise<NodeTypeResponse[]> = listNodeTypes({
-			query: { limit: ITEM_TYPE_LIMIT }
-		}).then((result) => {
-			if (result.error || !result.data) throw new Error('item types unavailable');
-			return result.data;
-		});
+		const attempt = fetchItemTypes();
 		typesPromise = attempt;
 		attempt.catch(() => {
 			if (typesPromise === attempt) typesPromise = null;

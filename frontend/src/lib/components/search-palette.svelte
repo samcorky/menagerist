@@ -79,16 +79,15 @@
 			okRows(groups.itemTypes).length +
 			groups.pages.length
 	);
-	const view = $derived(
-		paletteView({
-			query,
-			pending,
-			showSpinner: spinner.show,
-			count,
-			failed: failedKeys.length
-		})
-	);
-	const announcement = $derived(liveMessage(view, query, count, failedKeys.length));
+	const paletteState = $derived({
+		query,
+		pending,
+		showSpinner: spinner.show,
+		count,
+		failed: failedKeys.length
+	});
+	const view = $derived(paletteView(paletteState));
+	const announcement = $derived(liveMessage(paletteState));
 	// Rows from an earlier query stay up until their source answers; they cannot be opened
 	const staleKeys = $derived(debouncing ? [...ASYNC_KEYS, 'pages' as const] : loading);
 	// First row in display order that can be opened

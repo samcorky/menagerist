@@ -1,9 +1,16 @@
+import unicodedata
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import uuid
 
     from app.modules.collections.domain.collection import Collection
+
+
+def _fold(text: str) -> str:
+    """Casefold `text` and strip accents, as Postgres `unaccent` does."""
+    decomposed = unicodedata.normalize("NFD", text)
+    return "".join(c for c in decomposed if not unicodedata.combining(c)).casefold()
 
 
 class InMemoryCollectionRepository:
@@ -42,9 +49,9 @@ class InMemoryCollectionRepository:
         """Return up to `limit` live collections ordered by id, after `after`.
 
         A non-blank `q` keeps collections whose name or description contains it,
-        ignoring case.
+        ignoring case and accents.
         """
-        needle = (q or "").strip().casefold()
+        needle = _fold((q or "").strip())
         live = sorted(
             (
                 c
@@ -53,8 +60,8 @@ class InMemoryCollectionRepository:
                 and (after is None or c.id > after)
                 and (
                     not needle
-                    or needle in c.name.casefold()
-                    or needle in (c.description or "").casefold()
+                    or needle in _fold(c.name)
+                    or needle in _fold(c.description or "")
                 )
             ),
             key=lambda c: c.id,

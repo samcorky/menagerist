@@ -214,3 +214,25 @@ async def test_index_rejects_two_live_rows_with_one_slug(
 
     with pytest.raises(IntegrityError):
         await db_session.flush()
+
+
+async def test_list_q_ignores_accents_both_ways(db_session: AsyncSession) -> None:
+    """Accented stored text matches plain `q`, and plain text matches accented `q`."""
+    repo = SqlAlchemyCollectionRepository(db_session)
+    accented = _collection("Café")
+    described = Collection.create(
+        name="Other", slug=Slug("other"), owner_id=uuid.uuid7(), description="Crème"
+    )
+    plain = _collection("Cafe plain", slug="plain")
+    percent = _collection("50% café", slug="pct")
+    miss = _collection("Vinyl", slug="vinyl")
+    for collection in (accented, described, plain, percent, miss):
+        await repo.add(collection)
+
+    async def ids(q: str) -> set[uuid.UUID]:
+        return {c.id for c in await repo.list(after=None, limit=10, q=q)}
+
+    assert await ids("cafe") == {accented.id, plain.id, percent.id}
+    assert await ids("CAFÉ") == {accented.id, plain.id, percent.id}
+    assert await ids("creme") == {described.id}
+    assert await ids("50% cafe") == {percent.id}

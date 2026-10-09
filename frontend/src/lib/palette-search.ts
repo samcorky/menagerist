@@ -1,4 +1,5 @@
 import type { RouteId } from '$app/types';
+import { foldText } from '$lib/fold-text';
 
 export const GROUP_CAPS = { items: 5, collections: 3, itemTypes: 3, pages: 4 } as const;
 
@@ -21,8 +22,8 @@ export const PAGES: (PalettePage & { keywords: string[] })[] = [
 
 /** 0 exact, 1 name starts with, 2 a word in the name starts with, 3 anything else. */
 export function matchRank(name: string, query: string): 0 | 1 | 2 | 3 {
-	const n = name.toLowerCase();
-	const q = query.trim().toLowerCase();
+	const n = foldText(name);
+	const q = foldText(query.trim());
 	if (n === q) return 0;
 	if (n.startsWith(q)) return 1;
 	if (n.split(/[^\p{L}\p{N}]+/u).some((word) => word.startsWith(q))) return 2;
@@ -37,11 +38,11 @@ export function rankByName<T>(rows: T[], query: string, nameOf: (row: T) => stri
 		.map(({ row }) => row);
 }
 
-const contains = (text: string, needle: string) => text.toLowerCase().includes(needle);
+const contains = (text: string, needle: string) => foldText(text).includes(needle);
 
 /** App pages whose label or keyword contains the query, best first. */
 export function matchPages(query: string): PalettePage[] {
-	const q = query.trim().toLowerCase();
+	const q = foldText(query.trim());
 	if (!q) return [];
 	const hits = PAGES.filter(
 		(page) => contains(page.label, q) || page.keywords.some((k) => contains(k, q))
@@ -56,7 +57,7 @@ export function matchItemTypes<T extends { label: string; slug: string }>(
 	types: T[],
 	query: string
 ): T[] {
-	const q = query.trim().toLowerCase();
+	const q = foldText(query.trim());
 	if (!q) return [];
 	const hits = types.filter((t) => contains(t.label, q) || contains(t.slug, q));
 	return rankByName(hits, q, (t) => t.label).slice(0, GROUP_CAPS.itemTypes);

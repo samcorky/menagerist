@@ -571,3 +571,38 @@ async def test_ids_combines_with_other_filters(db_session: AsyncSession) -> None
     assert [n.id for n in paged] == [nodes[1].id]
     nxt = await repository.list(after=nodes[1].id, limit=5, ids=films)
     assert [n.id for n in nxt] == [nodes[3].id]
+
+
+async def test_search_ignores_accents_both_ways(db_session: AsyncSession) -> None:
+    """Accented text matches plain `q` and vice versa, in name, description, values."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    by_name = Node.create(name="Café", type="film")
+    by_description = Node.create(name="X", description="Crème brûlée")
+    by_value = Node.create(name="Y", type="film", attributes={"director": "Zoë"})
+    plain = Node.create(name="Cafe plain")
+    percent = Node.create(name="50% café")
+    for node in (by_name, by_description, by_value, plain, percent):
+        await repository.add(node)
+
+    async def ids(q: str) -> set[uuid.UUID]:
+        return set(await _search_ids(repository, q))
+
+    assert await ids("cafe") == {by_name.id, plain.id, percent.id}
+    assert await ids("CAFÉ") == {by_name.id, plain.id, percent.id}
+    assert await ids("creme brulee") == {by_description.id}
+    assert await ids("zoe") == {by_value.id}
+    assert await ids("zoë") == {by_value.id}
+    assert await ids("50% cafe") == {percent.id}
+
+
+async def test_list_attribute_values_q_ignores_accents(
+    db_session: AsyncSession,
+) -> None:
+    """Attribute value suggestions fold accents in both directions."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    await repository.add(Node.create(name="a", type="film", attributes={"s": "Zoë"}))
+    await repository.add(Node.create(name="b", type="film", attributes={"s": "Zoe"}))
+
+    expected = [("Zoe", 1), ("Zoë", 1)]
+    assert await repository.list_attribute_values("film", "s", q="zoe") == expected
+    assert await repository.list_attribute_values("film", "s", q="ZOË") == expected

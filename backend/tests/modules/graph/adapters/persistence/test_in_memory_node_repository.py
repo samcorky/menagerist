@@ -410,3 +410,43 @@ async def test_ids_combines_with_other_filters() -> None:
     assert [n.id for n in paged] == [nodes[1].id]
     nxt = await repository.list(after=nodes[1].id, limit=5, ids=films)
     assert [n.id for n in nxt] == [nodes[3].id]
+
+
+async def test_search_ignores_accents_both_ways() -> None:
+    """Accented text matches plain `q` and vice versa, in name, description, values."""
+    repository = InMemoryNodeRepository()
+    by_name = Node.create(name="Café", type="film")
+    by_description = Node.create(name="X", description="Crème brûlée")
+    by_value = Node.create(name="Y", type="film", attributes={"director": "Zoë"})
+    plain = Node.create(name="Cafe plain")
+    percent = Node.create(name="50% café")
+    for node in (by_name, by_description, by_value, plain, percent):
+        await repository.add(node)
+
+    async def ids(q: str) -> set[object]:
+        found = await repository.list(after=None, limit=10, q=q)
+        return {n.id for n in found}
+
+    assert await ids("cafe") == {by_name.id, plain.id, percent.id}
+    assert await ids("CAFÉ") == {by_name.id, plain.id, percent.id}
+    assert await ids("creme brulee") == {by_description.id}
+    assert await ids("zoe") == {by_value.id}
+    assert await ids("zoë") == {by_value.id}
+    assert await ids("50% cafe") == {percent.id}
+    assert await repository.count(q="cafe") == 3
+
+
+async def test_list_attribute_values_q_ignores_accents() -> None:
+    """Attribute value suggestions fold accents in both directions."""
+    repository = InMemoryNodeRepository()
+    await repository.add(Node.create(name="a", type="film", attributes={"s": "Zoë"}))
+    await repository.add(Node.create(name="b", type="film", attributes={"s": "Zoe"}))
+
+    assert await repository.list_attribute_values("film", "s", q="zoe") == [
+        ("Zoe", 1),
+        ("Zoë", 1),
+    ]
+    assert await repository.list_attribute_values("film", "s", q="ZOË") == [
+        ("Zoe", 1),
+        ("Zoë", 1),
+    ]

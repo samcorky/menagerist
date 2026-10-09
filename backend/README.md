@@ -221,7 +221,7 @@ Packs are package data in `modules/examples/packs/`, read with `importlib.resour
 
 `modules/collections/` holds named lists of items. A collection refers to items by id only; it does not import `graph`, and `graph` does not import it. The two meet through ports and bridges in `entrypoints/api/shared/`: `collection_items.py` implements the collections module's `ItemLookup` (which of these ids are live items) from graph's repository, and `collection_members.py` implements graph's `CollectionMembers` (the item ids on a collection) from the collections repositories, for the `?collection=<id>` filter on the item list. Membership changes bump the collection's `updated_at`, and its ETag also covers the live item count (see `docs/DECISIONS.md`). Owner and visibility are stored but not enforced yet; that is a precondition for multi-user.
 
-`GET /collection` takes `q` (up to 200 characters; blank means unfiltered) to keep collections whose name or description contains the text, ignoring case, with LIKE wildcards matched literally; it combines with `item_id` and paging.
+`GET /collection` takes `q` (up to 200 characters; blank means unfiltered) to keep collections whose name or description contains the text, ignoring case and accents (Postgres `unaccent`, enabled by migration), with LIKE wildcards matched literally; it combines with `item_id` and paging.
 
 ## Cross-cutting concerns
 

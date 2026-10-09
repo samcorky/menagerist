@@ -6,7 +6,13 @@ const { listNodes, listCollections, listNodeTypes } = vi.hoisted(() => ({
 	listNodeTypes: vi.fn()
 }));
 vi.mock('$lib/api/client', () => ({ listNodes, listCollections, listNodeTypes }));
-import { resetItemTypeCache, searchEverything, type Results } from '$lib/palette-sources';
+import {
+	ITEM_TYPE_CAP,
+	loadItemTypes,
+	resetItemTypeCache,
+	searchEverything,
+	type Results
+} from '$lib/palette-sources';
 
 const node = (name: string) => ({ id: name, name });
 const coll = (name: string) => ({ id: name, name });
@@ -198,5 +204,59 @@ describe('searchEverything', () => {
 		expect(listNodes).not.toHaveBeenCalled();
 		expect(listNodeTypes).not.toHaveBeenCalled();
 		expect(updates).toEqual([{ collections: { status: 'ok', rows: [coll('Film')] } }]);
+	});
+});
+
+describe('loadItemTypes paging', () => {
+	const many = (from: number, n: number) =>
+		Array.from({ length: n }, (_, i) => ({
+			id: `t${from + i}`,
+			label: `T${from + i}`,
+			slug: `t${from + i}`
+		}));
+
+	it('pages through the after cursor until a short page', async () => {
+		listNodeTypes
+			.mockResolvedValueOnce({ data: many(0, 100) })
+			.mockResolvedValueOnce({ data: many(100, 100) })
+			.mockResolvedValueOnce({ data: many(200, 50) });
+		const all = await loadItemTypes();
+		expect(all).toHaveLength(250);
+		expect(listNodeTypes).toHaveBeenCalledTimes(3);
+		expect(listNodeTypes).toHaveBeenNthCalledWith(1, { query: { limit: 100 } });
+		expect(listNodeTypes).toHaveBeenNthCalledWith(2, { query: { limit: 100, after: 't99' } });
+		expect(listNodeTypes).toHaveBeenNthCalledWith(3, { query: { limit: 100, after: 't199' } });
+		await loadItemTypes();
+		expect(listNodeTypes).toHaveBeenCalledTimes(3);
+	});
+
+	it('fails the source on a page 2 error and retries on the next search', async () => {
+		listNodeTypes
+			.mockResolvedValueOnce({ data: many(0, 100) })
+			.mockResolvedValueOnce({ error: { detail: 'x' } });
+		const first = run('t');
+		await first.done;
+		expect(merged(first.updates).itemTypes).toEqual({ status: 'error' });
+
+		listNodeTypes.mockReset();
+		listNodeTypes
+			.mockResolvedValueOnce({ data: many(0, 100) })
+			.mockResolvedValueOnce({ data: many(100, 5) });
+		const second = run('t');
+		await second.done;
+		expect(merged(second.updates).itemTypes).toMatchObject({ status: 'ok' });
+		expect(listNodeTypes).toHaveBeenCalledTimes(2);
+	});
+
+	it('stops at the safety cap', async () => {
+		let next = 0;
+		listNodeTypes.mockImplementation(async ({ query }: { query: { limit: number } }) => {
+			const data = many(next, query.limit);
+			next += query.limit;
+			return { data };
+		});
+		const all = await loadItemTypes();
+		expect(all).toHaveLength(ITEM_TYPE_CAP);
+		expect(listNodeTypes).toHaveBeenCalledTimes(ITEM_TYPE_CAP / 100);
 	});
 });

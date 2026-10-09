@@ -575,3 +575,14 @@ def test_list_nodes_empty_collection_returns_empty_list() -> None:
     assert response.status_code == 200
     assert response.json() == []
     assert response.headers["Total-Count"] == "0"
+
+
+def test_list_nodes_search_ignores_accents() -> None:
+    """GET /api/v1/node?q=cafe finds a node named Café."""
+    client = TestClient(_app_with_in_memory_graph())
+    client.post("/api/v1/node", json={"name": "Café", "type": "film"})
+    client.post("/api/v1/node", json={"name": "Predator", "type": "film"})
+
+    response = client.get("/api/v1/node?q=cafe")
+
+    assert [n["name"] for n in response.json()] == ["Café"]

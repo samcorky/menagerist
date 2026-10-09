@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.modules.collections.adapters.persistence.models import CollectionModel
@@ -16,7 +16,9 @@ from app.shared_kernel.slug import Slug
 if TYPE_CHECKING:
     import uuid
 
+    from sqlalchemy import ColumnElement
     from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.orm import InstrumentedAttribute
 
 logger = structlog.get_logger()
 
@@ -29,6 +31,14 @@ def _like_pattern(q: str) -> str:
     escaped = q.replace(_LIKE_ESCAPE, _LIKE_ESCAPE * 2)
     escaped = escaped.replace("%", _LIKE_ESCAPE + "%").replace("_", _LIKE_ESCAPE + "_")
     return f"%{escaped}%"
+
+
+def _unaccent_ilike(
+    column_: InstrumentedAttribute[str] | InstrumentedAttribute[str | None],
+    pattern: str,
+) -> ColumnElement[bool]:
+    """Case- and accent-insensitive LIKE of `column_` against an escaped `pattern`."""
+    return func.unaccent(column_).ilike(func.unaccent(pattern), escape=_LIKE_ESCAPE)
 
 
 def _to_domain(model: CollectionModel) -> Collection:
@@ -112,7 +122,7 @@ class SqlAlchemyCollectionRepository:
         """Return up to `limit` live collections ordered by id, after `after`.
 
         A non-blank `q` keeps collections whose name or description contains it,
-        ignoring case.
+        ignoring case and accents.
         """
         stmt = (
             select(CollectionModel)
@@ -126,7 +136,7 @@ class SqlAlchemyCollectionRepository:
         if needle:
             pattern = _like_pattern(needle)
             stmt = stmt.where(
-                CollectionModel.name.ilike(pattern, escape=_LIKE_ESCAPE)
-                | CollectionModel.description.ilike(pattern, escape=_LIKE_ESCAPE)
+                _unaccent_ilike(CollectionModel.name, pattern)
+                | _unaccent_ilike(CollectionModel.description, pattern)
             )
         return [_to_domain(m) for m in (await self._session.execute(stmt)).scalars()]

@@ -616,6 +616,14 @@ So a plain private array is the source of truth, `active` is a write-only `$stat
 
 **Decision (2026-10-09):** the search popup (`/`) shows Items, Collections, Item types and Pages. It fans out on the client behind `searchEverything` (`frontend/src/lib/palette-sources.ts`); a backend search endpoint is deferred. Item types (listed once and cached) and pages (a fixed list) are filtered locally. Collections gained an optional `q` on `GET /collection`. Ranking is per group (exact, then prefix, then word-prefix, then other); there is no ranking across groups, and group order is fixed. A source that fails shows a retry row for its group only, and "Nothing found" appears only when every source answered and all were empty.
 
-**Not decided:** accents are not folded, so "cafe" does not match "Café". That is deliberate for now and would be a change in the backend `q` matching as well as the local filters.
+**Accents:** matching is accent-insensitive on the server (`unaccent`) and in the local filters and match context (`foldText`), so "cafe" matches "Café" and the reverse.
 
 **Consequence:** one keystroke burst costs up to two requests (items, collections); a single endpoint would cut that and allow cross-group ranking.
+
+## Text search ignores accents via the unaccent extension
+
+**Decision (2026-10-09):** "cafe" finds "Café" and "café" finds "Cafe". Postgres matches with `unaccent(column) ILIKE unaccent(pattern)` (LIKE escaping unchanged) for item name, description and attribute values, for attribute-value suggestions, and for `q` on collections. A migration runs `CREATE EXTENSION IF NOT EXISTS unaccent`; its downgrade is a deliberate no-op because the extension may be shared. The in-memory repositories fold the same way (Unicode NFD, drop combining marks, casefold), each module with its own small helper so `graph` and `collections` stay independent. This replaces the earlier "accents are not folded" note in the grouped-search entry.
+
+**Rationale:** `unaccent` is a trusted extension on Postgres 13+, so the application role can create it without superuser rights.
+
+**Consequence:** no index is affected because none exist on these columns; if one is added later it needs an immutable wrapper around `unaccent`. Characters such as "ß" or "ø" follow the extension's rules in Postgres but not the in-memory NFD fold.

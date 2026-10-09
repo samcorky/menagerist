@@ -43,21 +43,36 @@ describe('seeAllSearch', () => {
 });
 
 describe('liveMessage', () => {
-	it('announces counts, empty, loading and errors', () => {
-		expect(liveMessage('results', 'x', 1)).toBe('1 result');
-		expect(liveMessage('results', 'x', 5)).toBe('5 results');
-		expect(liveMessage('empty', ' x ', 0)).toBe('Nothing found for "x"');
-		expect(liveMessage('loading', 'x', 0)).toBe('Searching');
-		expect(liveMessage('partial', 'x', 0, 2)).toBe('Some results could not be loaded');
-		expect(liveMessage('hint', '', 0)).toBe('');
+	const base = { query: 'x', pending: false, showSpinner: false, count: 0, failed: 0 };
+	it('says nothing for a blank query', () => {
+		expect(liveMessage({ ...base, query: '  ', count: 3 })).toBe('');
 	});
-	it('takes the total count across groups', () => {
-		expect(liveMessage('results', 'x', 6)).toBe('6 results');
+	it('says Searching once the spinner shows, whatever has arrived', () => {
+		expect(liveMessage({ ...base, pending: true, showSpinner: true })).toBe('Searching…');
+		expect(liveMessage({ ...base, pending: true, showSpinner: true, count: 4 })).toBe('Searching…');
+		expect(liveMessage({ ...base, pending: true, showSpinner: true, failed: 1 })).toBe(
+			'Searching…'
+		);
+	});
+	it('says nothing while pending before the spinner, even with stale counts', () => {
+		expect(liveMessage({ ...base, pending: true })).toBe('');
+		expect(liveMessage({ ...base, pending: true, count: 5 })).toBe('');
+	});
+	it('announces the final count once everything has answered', () => {
+		expect(liveMessage({ ...base, count: 1 })).toBe('1 result');
+		expect(liveMessage({ ...base, count: 6 })).toBe('6 results');
 	});
 	it('mentions failed groups alongside the count of the others', () => {
-		expect(liveMessage('results', 'x', 3, 1)).toBe('Some results could not be loaded. 3 results');
-		expect(liveMessage('results', 'x', 1, 2)).toBe('Some results could not be loaded. 1 result');
-		expect(liveMessage('results', 'x', 3, 0)).toBe('3 results');
+		expect(liveMessage({ ...base, count: 3, failed: 1 })).toBe(
+			'Some results could not be loaded. 3 results'
+		);
+		expect(liveMessage({ ...base, count: 1, failed: 2 })).toBe(
+			'Some results could not be loaded. 1 result'
+		);
+	});
+	it('reports empty and failed-only outcomes', () => {
+		expect(liveMessage({ ...base, query: ' x ' })).toBe('Nothing found for "x"');
+		expect(liveMessage({ ...base, failed: 2 })).toBe('Some results could not be loaded');
 	});
 });
 

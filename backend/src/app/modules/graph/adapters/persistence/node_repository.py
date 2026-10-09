@@ -76,6 +76,13 @@ def _like_pattern(q: str) -> str:
     return f"%{escaped}%"
 
 
+def _unaccent_ilike(
+    column_: SQLColumnExpression[Any], pattern: str
+) -> ColumnElement[bool]:
+    """Case- and accent-insensitive LIKE of `column_` against an escaped `pattern`."""
+    return func.unaccent(column_).ilike(func.unaccent(pattern), escape=_LIKE_ESCAPE)
+
+
 def _has_matching_row(
     attributes: SQLColumnExpression[Any], key: str, sub_key: str, value: str | None
 ) -> ColumnElement[bool]:
@@ -104,7 +111,7 @@ def _has_matching_value(
     return exists(
         select(literal(1)).where(
             func.jsonb_typeof(value).in_(("string", "number")),
-            text_value.ilike(pattern, escape=_LIKE_ESCAPE),
+            _unaccent_ilike(text_value, pattern),
         )
     )
 
@@ -133,8 +140,8 @@ def _search_clause(
             unrestricted,
         )
     return (
-        NodeModel.name.ilike(pattern, escape=_LIKE_ESCAPE)
-        | NodeModel.description.ilike(pattern, escape=_LIKE_ESCAPE)
+        _unaccent_ilike(NodeModel.name, pattern)
+        | _unaccent_ilike(NodeModel.description, pattern)
         | or_(*scans, unrestricted)
     )
 
@@ -324,7 +331,7 @@ class SqlAlchemyNodeRepository:
             .group_by(value)
         )
         if q is not None:
-            stmt = stmt.where(value.ilike(_like_pattern(q), escape=_LIKE_ESCAPE))
+            stmt = stmt.where(_unaccent_ilike(value, _like_pattern(q)))
         stmt = stmt.order_by(func.count().desc(), value.asc()).limit(limit)
         result = await self._session.execute(stmt)
         return [(row[0], row[1]) for row in result.all()]

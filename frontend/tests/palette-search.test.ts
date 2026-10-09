@@ -7,6 +7,7 @@ import {
 	matchPages,
 	matchItemTypes
 } from '../src/lib/palette-search';
+import { foldText } from '../src/lib/fold-text';
 
 describe('GROUP_CAPS', () => {
 	it('caps each group', () => {
@@ -120,5 +121,31 @@ describe('matchItemTypes', () => {
 		expect(matchItemTypes(types, 'm')).toHaveLength(GROUP_CAPS.itemTypes);
 		expect(matchItemTypes(types, '(')).toEqual([]);
 		expect(matchItemTypes(types, '.*')).toEqual([]);
+	});
+});
+
+describe('accent-insensitive matching', () => {
+	it('folds case and accents', () => {
+		expect(foldText('Café ÉCOLE')).toBe('cafe ecole');
+		expect(foldText('cafe\u0301')).toBe('cafe');
+	});
+	it('ranks across accents at every level', () => {
+		expect(matchRank('Café', 'cafe')).toBe(0);
+		expect(matchRank('Cafe', 'café')).toBe(0);
+		expect(matchRank('Café noir', 'cafe')).toBe(1);
+		expect(matchRank('Le café', 'CAFE')).toBe(2);
+		expect(matchRank('Le café-bar', 'cafe')).toBe(2);
+		expect(matchRank('Bureau', 'cafe')).toBe(3);
+	});
+	it('matches item types by label or slug', () => {
+		const types = [
+			{ label: 'Café', slug: 'cafe-x' },
+			{ label: 'Other', slug: 'other' }
+		];
+		expect(matchItemTypes(types, 'cafe')).toEqual([types[0]]);
+		expect(matchItemTypes([{ label: 'Cafe', slug: 'c' }], 'café')).toHaveLength(1);
+	});
+	it('matches pages by folded query', () => {
+		expect(matchPages('ÎTEMS').map((p) => p.path)).toContain('/items');
 	});
 });

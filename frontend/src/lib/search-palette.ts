@@ -56,20 +56,19 @@ export function paletteView(state: PaletteState): PaletteView {
 	return 'empty';
 }
 
-/** What a screen reader hears for the current body of the popup. `count` is the total across groups. */
-export function liveMessage(view: PaletteView, query: string, count: number, failedGroups = 0) {
-	switch (view) {
-		case 'loading':
-			return 'Searching';
-		case 'empty':
-			return `Nothing found for "${query.trim()}"`;
-		case 'partial':
-			return 'Some results could not be loaded';
-		case 'results': {
-			const total = count === 1 ? '1 result' : `${count} results`;
-			return failedGroups > 0 ? `Some results could not be loaded. ${total}` : total;
-		}
-		default:
-			return '';
+/**
+ * What a screen reader hears. It speaks once per search: "Searching…" once the spinner delay has
+ * passed, then the final count when every source has answered. Nothing while a search is pending
+ * and the spinner is not yet showing, so earlier counts are never read out for a new query.
+ * `count` is the total across groups; `failed` the groups that errored.
+ */
+export function liveMessage(state: PaletteState): string {
+	const query = state.query.trim();
+	if (!query) return '';
+	if (state.pending) return state.showSpinner ? 'Searching…' : '';
+	if (state.count > 0) {
+		const total = state.count === 1 ? '1 result' : `${state.count} results`;
+		return state.failed > 0 ? `Some results could not be loaded. ${total}` : total;
 	}
+	return state.failed > 0 ? 'Some results could not be loaded' : `Nothing found for "${query}"`;
 }

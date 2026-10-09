@@ -98,3 +98,18 @@ describe('matchContext', () => {
 		});
 	});
 });
+
+describe('matchContext accents', () => {
+	it('finds an attribute value across accents in both directions', () => {
+		const item = { name: 'Inception', attributes: { director: 'Café Nolan' } };
+		expect(matchContext(item, schema, 'cafe')).toEqual({ label: 'Director', text: 'Café Nolan' });
+		const plain = { name: 'Inception', attributes: { director: 'Cafe Nolan' } };
+		expect(matchContext(plain, schema, 'CAFÉ')).toEqual({ label: 'Director', text: 'Cafe Nolan' });
+	});
+	it('returns null when the name or description matches across accents', () => {
+		expect(
+			matchContext({ name: 'Café', attributes: { director: 'cafe' } }, schema, 'cafe')
+		).toBeNull();
+		expect(matchContext({ name: 'x', description: 'Un café' }, schema, 'cafe')).toBeNull();
+	});
+});

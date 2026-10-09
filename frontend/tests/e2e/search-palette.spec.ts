@@ -298,3 +298,82 @@ test('Enter right after refining the query falls through to See all', async ({ p
 	await expect(page).toHaveURL(/\/items/);
 	await expect(page.getByPlaceholder('Search your items…')).toHaveValue(`${item.name}z`);
 });
+
+// Accent-insensitive matching, in both directions.
+
+test('the popup finds accented and unaccented items whichever way you type', async ({
+	page,
+	request
+}) => {
+	const token = uniqueName('Accentword');
+	const accented = await makeItem(request, `Café ${token}`);
+	const plain = await makeItem(request, `Naive ${token}`);
+
+	await openWithSlash(page);
+	await input(page).fill(`cafe ${token}`);
+	await expect(row(page, new RegExp(`^Café ${token}`))).toBeVisible();
+
+	await input(page).fill(`Naïve ${token}`);
+	await expect(row(page, new RegExp(`^Naive ${token}`))).toBeVisible();
+	await row(page, new RegExp(`^Naive ${token}`)).click();
+	await expect(page).toHaveURL(new RegExp(`/items/${plain.id}$`));
+	expect(accented.id).not.toBe(plain.id);
+});
+
+test('the popup finds an accented collection with unaccented text', async ({ page, request }) => {
+	const token = uniqueName('Accentset');
+	const collection = await makeCollection(request, `Crème ${token}`);
+
+	await openWithSlash(page);
+	await input(page).fill(`creme ${token}`);
+	const found = row(page, new RegExp(`^Crème ${token}`));
+	await expect(found).toBeVisible();
+	await expect(popup(page).getByText('Collections', { exact: true })).toBeVisible();
+	await found.click();
+	await expect(page).toHaveURL(new RegExp(`/collections/${collection.id}$`));
+});
+
+test('the items page box also finds an accented item with unaccented text', async ({
+	page,
+	request
+}) => {
+	const token = uniqueName('Accentlist');
+	const item = await makeItem(request, `Café ${token}`);
+
+	await page.goto('/items');
+	await page.getByPlaceholder('Search your items…').fill(`cafe ${token}`);
+	await expect(page.getByRole('link', { name: item.name }).first()).toBeVisible();
+});
+
+test('the status region says Searching… then one final count, never a partial one', async ({
+	page,
+	request
+}) => {
+	const token = uniqueName('Livewords');
+	await makeItem(request, `${token} item`);
+	await makeCollection(request, `${token} set`);
+	await makeItemType(request, `${token} kind`);
+
+	await openWithSlash(page);
+	const status = popup(page).getByRole('status');
+	await expect(status).toHaveText('');
+	// Record every distinct text the region shows from here on.
+	await status.evaluate((el) => {
+		const seen: string[] = [];
+		(window as unknown as { __statuses: string[] }).__statuses = seen;
+		new MutationObserver(() => {
+			const text = (el.textContent ?? '').trim();
+			if (text && seen.at(-1) !== text) seen.push(text);
+		}).observe(el, { childList: true, characterData: true, subtree: true });
+	});
+
+	await input(page).fill(token);
+	await expect(status).toHaveText(/^\d+ results?$/);
+
+	const seen = await page.evaluate(
+		() => (window as unknown as { __statuses: string[] }).__statuses
+	);
+	// Any intermediate text is the spinner message; exactly one count, and it is the last.
+	expect(seen.at(-1)).toMatch(/^\d+ results?$/);
+	expect(seen.slice(0, -1).every((text) => text === 'Searching…')).toBe(true);
+});

@@ -138,3 +138,26 @@ async def test_list_q_combines_with_after_limit_and_deletion(
 
     assert first == made[:2]
     assert rest == [made[2]]
+
+
+async def test_list_q_ignores_accents_both_ways(
+    make_collection: MakeCollection,
+) -> None:
+    """Accented stored text matches plain `q`, and plain text matches accented `q`."""
+    repo = InMemoryCollectionRepository()
+    accented = make_collection("Café")
+    described = make_collection("Other")
+    described.description = "Crème"
+    plain = make_collection("Cafe plain")
+    percent = make_collection("50% café")
+    miss = make_collection("Vinyl")
+    for collection in (accented, described, plain, percent, miss):
+        await repo.add(collection)
+
+    async def ids(q: str) -> set[object]:
+        return {c.id for c in await repo.list(after=None, limit=10, q=q)}
+
+    assert await ids("cafe") == {accented.id, plain.id, percent.id}
+    assert await ids("CAFÉ") == {accented.id, plain.id, percent.id}
+    assert await ids("creme") == {described.id}
+    assert await ids("50% cafe") == {percent.id}
