@@ -639,3 +639,11 @@ So a plain private array is the source of truth, `active` is a write-only `$stat
 **Also fixed:** media's `Content-Disposition` now uses RFC 6266 encoding, so non-ASCII file names download correctly.
 
 **Known limit:** the built-in Pillow font draws only ASCII initials; a name starting with another character shows "?". Every shipped item name starts with an ASCII letter. A bundled font would lift this.
+
+## A second cover is a 409, not a server error
+
+**Decision (2026-10-09):** attaching with `attribute_key=cover` to an item that already has a cover (`POST /media/{id}/attachments`, `POST /media/attached`) returns 409 `CoverAlreadySetError` ("This item already has a cover. Set another image as the cover instead, or clear the cover first."). Before, the unique index `uq_media_attachment_cover` rejected the insert and the request failed with a 500. `AttachMedia` and `UploadAndAttachMedia` check first (the upload check runs before anything is staged); the SQL repository's `add()` also translates an `IntegrityError` on that one index into the same error inside a savepoint, so two racing requests get the 409 too. Other integrity errors are not translated. The in-memory repository enforces the same rule.
+
+**Unchanged:** setting a cover with `attachments/cover` still replaces the previous one, and the example-pack cover bridge attaches without a key and then calls that endpoint, so it never hit this.
+
+**Known gap:** a race between two set-cover calls on one item can still trip the index in `update()`; it is not translated.

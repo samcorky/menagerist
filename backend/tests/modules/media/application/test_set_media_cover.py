@@ -172,3 +172,32 @@ async def test_set_cover_raises_when_asset_not_attached_to_target() -> None:
             ),
             SYSTEM_ACTOR,
         )
+
+
+async def test_set_cover_still_replaces_an_existing_cover() -> None:
+    """Moving the cover flag is not blocked by the one-cover rule."""
+    assets = InMemoryMediaAssetRepository()
+    attachments = InMemoryMediaAttachmentRepository()
+    node_id = uuid.uuid4()
+    old, new = _make_image_asset(), _make_image_asset()
+    await assets.add(old)
+    await assets.add(new)
+    old_att = MediaAttachment.for_node(
+        asset_id=old.id, node_id=node_id, attribute_key=AttachmentKey.COVER
+    )
+    new_att = MediaAttachment.for_node(asset_id=new.id, node_id=node_id)
+    await attachments.add(old_att)
+    await attachments.add(new_att)
+    uow = create_in_memory_media_uow(
+        make_in_memory_repos(assets=assets, attachments=attachments)
+    )
+
+    await SetMediaCover(uow).handle(
+        SetMediaCoverCommand(
+            asset_id=new.id, target_type=AttachmentTarget.NODE, target_id=node_id
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    assert old_att.attribute_key is None
+    assert new_att.attribute_key is AttachmentKey.COVER

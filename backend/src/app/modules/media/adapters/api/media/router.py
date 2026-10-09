@@ -69,6 +69,8 @@ from app.modules.media.application.upload_and_attach_media import (
 )
 from app.modules.media.domain.content_type_safety import is_inline_safe
 from app.modules.media.domain.errors import (
+    COVER_ALREADY_SET_MESSAGE,
+    CoverAlreadySetError,
     MediaAssetNotFoundError,
     MediaAttachmentNotFoundError,
     MediaFileTooLargeError,
@@ -135,6 +137,10 @@ async def stage_media(
         **error_response(MediaFileTooLargeError, detail="upload exceeds the limit"),
         **error_response(
             UnsupportedMediaTypeError, detail="content type not permitted"
+        ),
+        **error_response(
+            CoverAlreadySetError,
+            detail=COVER_ALREADY_SET_MESSAGE,
         ),
     },
 )
@@ -348,6 +354,10 @@ async def stream_media_thumbnail(
         ),
         **error_response(
             UnsupportedMediaTypeError, detail="content type not permitted"
+        ),
+        **error_response(
+            CoverAlreadySetError,
+            detail=COVER_ALREADY_SET_MESSAGE,
         ),
     },
 )

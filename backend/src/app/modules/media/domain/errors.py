@@ -1,4 +1,4 @@
-from app.shared_kernel.errors import NotFoundError, ValidationError
+from app.shared_kernel.errors import ConflictError, NotFoundError, ValidationError
 
 
 class MediaAssetNotFoundError(NotFoundError):
@@ -19,3 +19,13 @@ class UnsupportedMediaTypeError(ValidationError):
 
 class ThumbnailNotAvailableError(NotFoundError):
     """Raised when a thumbnail is requested for an asset that has none."""
+
+
+COVER_ALREADY_SET_MESSAGE = "This item already has a cover. Set another image as the cover instead, or clear the cover first."  # noqa: E501
+
+
+class CoverAlreadySetError(ConflictError):
+    """Raised when a cover is attached to an item that already has one."""
+
+    def __init__(self) -> None:
+        super().__init__(COVER_ALREADY_SET_MESSAGE)

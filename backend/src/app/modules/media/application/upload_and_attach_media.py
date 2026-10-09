@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from app.modules.media.application.attach_media import AttachMedia, AttachMediaCommand
+from app.modules.media.application.cover_guard import ensure_cover_free
 from app.modules.media.application.stage_media import StageMedia, StageMediaCommand
 from app.modules.media.domain.media_attachment import (
     AttachmentKey,
@@ -62,6 +63,12 @@ class UploadAndAttachMedia(
     ) -> MediaAttachment:
         """Stage the file then immediately attach it within a single transaction."""
         async with self._uow as repos:
+            await ensure_cover_free(
+                repos.attachments,
+                attribute_key=command.attribute_key,
+                target_type=command.target_type,
+                target_id=command.target_id,
+            )
             joined = JoinedUnitOfWork(repos, owner=self._uow)
 
             stage = StageMedia(joined, self._storage, self._image_processor)

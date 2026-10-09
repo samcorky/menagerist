@@ -32,9 +32,16 @@ from app.modules.media.application.upload_and_attach_media import (
     UploadAndAttachMedia,
     UploadAndAttachMediaCommand,
 )
-from app.modules.media.domain.errors import UnsupportedMediaTypeError
+from app.modules.media.domain.errors import (
+    CoverAlreadySetError,
+    UnsupportedMediaTypeError,
+)
 from app.modules.media.domain.media_asset import MediaStatus
-from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
+from app.modules.media.domain.media_attachment import (
+    AttachmentKey,
+    AttachmentTarget,
+    MediaAttachment,
+)
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -285,3 +292,33 @@ async def test_upload_and_attach_moves_thumbnail_to_attached() -> None:
     assert asset.has_thumbnail is True
     assert (asset.id, "attached") in storage._thumbnails
     assert (asset.id, "staged") not in storage._thumbnails
+
+
+async def test_cover_upload_is_refused_before_staging_when_cover_exists() -> None:
+    """A second cover raises before any file is stored or asset recorded."""
+    node_id = uuid.uuid4()
+    uow, assets, attachments, storage = _make_uow_and_repos()
+    await attachments.add(
+        MediaAttachment.for_node(
+            asset_id=uuid.uuid4(), node_id=node_id, attribute_key=AttachmentKey.COVER
+        )
+    )
+    use_case = UploadAndAttachMedia(
+        uow, storage, _AllowAllPolicy(), InMemoryImageProcessor()
+    )
+
+    with pytest.raises(CoverAlreadySetError):
+        await use_case.handle(
+            UploadAndAttachMediaCommand(
+                filename="c.png",
+                content_type="image/png",
+                stream=_stream(b"px"),
+                target_type=AttachmentTarget.NODE,
+                target_id=node_id,
+                attribute_key=AttachmentKey.COVER,
+            ),
+            SYSTEM_ACTOR,
+        )
+
+    assert assets._assets == {}
+    assert storage._files == {}

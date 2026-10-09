@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from app.modules.media.application.cover_guard import ensure_cover_free
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.domain.media_attachment import (
@@ -57,6 +58,12 @@ class AttachMedia(CommandHandler[MediaUnitOfWork, AttachMediaCommand, MediaAttac
                 )
 
             await self._policy.check(command.target_type, asset)
+            await ensure_cover_free(
+                repos.attachments,
+                attribute_key=command.attribute_key,
+                target_type=command.target_type,
+                target_id=command.target_id,
+            )
 
             if asset.status is MediaStatus.STAGED:
                 asset.promote()

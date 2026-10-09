@@ -1,5 +1,8 @@
 from typing import TYPE_CHECKING
 
+from app.modules.media.domain.errors import CoverAlreadySetError
+from app.modules.media.domain.media_attachment import AttachmentKey
+
 if TYPE_CHECKING:
     import uuid
 
@@ -16,7 +19,18 @@ class InMemoryMediaAttachmentRepository:
         self._store: dict[uuid.UUID, MediaAttachment] = {}
 
     async def add(self, attachment: MediaAttachment) -> None:
-        """Store an attachment."""
+        """Store an attachment.
+
+        Raises:
+            CoverAlreadySetError: If it is a second cover for its target.
+        """
+        if attachment.attribute_key is AttachmentKey.COVER and any(
+            a.attribute_key is AttachmentKey.COVER
+            and a.target_type == attachment.target_type
+            and a.target_id == attachment.target_id
+            for a in self._store.values()
+        ):
+            raise CoverAlreadySetError
         self._store[attachment.id] = attachment
 
     async def get(self, attachment_id: uuid.UUID) -> MediaAttachment | None:

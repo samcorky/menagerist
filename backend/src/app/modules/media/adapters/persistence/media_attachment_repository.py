@@ -2,8 +2,10 @@ from typing import TYPE_CHECKING
 
 import structlog
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 
 from app.modules.media.adapters.persistence.models import MediaAttachmentModel
+from app.modules.media.domain.errors import CoverAlreadySetError
 from app.modules.media.domain.media_attachment import (
     AttachmentKey,
     AttachmentTarget,
@@ -16,6 +18,8 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
+
+_COVER_INDEX = "uq_media_attachment_cover"
 
 
 class SqlAlchemyMediaAttachmentRepository:
@@ -49,14 +53,24 @@ class SqlAlchemyMediaAttachmentRepository:
         )
 
     async def add(self, attachment: MediaAttachment) -> None:
-        """Persist a new attachment row."""
+        """Persist a new attachment row.
+
+        Raises:
+            CoverAlreadySetError: If it is a second cover for its target.
+        """
         logger.debug(
             "adding media attachment",
             attachment_id=attachment.id,
             asset_id=attachment.asset_id,
         )
-        self._session.add(self._to_model(attachment))
-        await self._session.flush()
+        try:
+            # A savepoint keeps the session usable after a rejected insert.
+            async with self._session.begin_nested():
+                self._session.add(self._to_model(attachment))
+        except IntegrityError as exc:
+            if _COVER_INDEX not in str(exc.orig):
+                raise
+            raise CoverAlreadySetError from exc
 
     async def get(self, attachment_id: uuid.UUID) -> MediaAttachment | None:
         """Return an attachment by id, or ``None``."""
