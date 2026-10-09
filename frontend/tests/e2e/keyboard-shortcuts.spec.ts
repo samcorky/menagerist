@@ -50,7 +50,7 @@ test('an abandoned g-sequence does not block typing a literal "g"', async ({ pag
 test('/ opens the search popup on the items and home pages, and Esc returns focus', async ({
 	page
 }) => {
-	const popup = page.getByRole('dialog', { name: 'Search items' });
+	const popup = page.getByRole('dialog', { name: 'Search', exact: true });
 
 	await page.goto('/items');
 	await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
@@ -82,7 +82,8 @@ test('? opens the shortcuts help overlay', async ({ page }) => {
 	const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
 	await expect(dialog).toBeVisible();
 	await expect(dialog.getByText('Quick capture').first()).toBeVisible();
-	await expect(dialog.getByText('Search items', { exact: true })).toBeVisible();
+	// The entry shares its text with the "Search" group heading, so take the first match.
+	await expect(dialog.getByText('Search', { exact: true }).first()).toBeVisible();
 	await page.keyboard.press('Escape');
 	await expect(dialog).toBeHidden();
 });
@@ -243,7 +244,7 @@ test('/ opens the search popup from an item page without leaving it', async ({ p
 	const edit = page.getByRole('button', { name: 'Edit', exact: true });
 	await edit.focus();
 	await page.keyboard.press('/');
-	const popup = page.getByRole('dialog', { name: 'Search items' });
+	const popup = page.getByRole('dialog', { name: 'Search', exact: true });
 	await expect(popup).toBeVisible();
 	await expect(page).toHaveURL(url);
 	await page.keyboard.press('Escape');
@@ -260,8 +261,8 @@ test('Back returns to the previous page after the search popup opened an item', 
 	await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
 	await page.keyboard.press('/');
-	const popup = page.getByRole('dialog', { name: 'Search items' });
-	await popup.getByPlaceholder('Search your items…').fill(name);
+	const popup = page.getByRole('dialog', { name: 'Search', exact: true });
+	await popup.getByPlaceholder('Search everything…').fill(name);
 	await popup.getByRole('option', { name: new RegExp(name) }).click();
 	await expect(page).toHaveURL(/\/items\/(?!new$)[^/]+$/);
 

@@ -6,7 +6,9 @@ import {
 	liveMessage,
 	MAX_QUERY_LENGTH,
 	resultSubtitle,
-	paletteView
+	paletteView,
+	defaultHighlight,
+	firstLiveValue
 } from '../src/lib/search-palette';
 
 describe('normaliseQuery', () => {
@@ -42,12 +44,20 @@ describe('seeAllSearch', () => {
 
 describe('liveMessage', () => {
 	it('announces counts, empty, loading and errors', () => {
-		expect(liveMessage('results', 'x', 1, null)).toBe('1 result');
-		expect(liveMessage('results', 'x', 5, null)).toBe('5 results');
-		expect(liveMessage('empty', ' x ', 0, null)).toBe('No items match "x"');
-		expect(liveMessage('loading', 'x', 0, null)).toBe('Searching');
-		expect(liveMessage('error', 'x', 0, 'Offline')).toBe('Offline');
-		expect(liveMessage('hint', '', 0, null)).toBe('');
+		expect(liveMessage('results', 'x', 1)).toBe('1 result');
+		expect(liveMessage('results', 'x', 5)).toBe('5 results');
+		expect(liveMessage('empty', ' x ', 0)).toBe('Nothing found for "x"');
+		expect(liveMessage('loading', 'x', 0)).toBe('Searching');
+		expect(liveMessage('partial', 'x', 0, 2)).toBe('Some results could not be loaded');
+		expect(liveMessage('hint', '', 0)).toBe('');
+	});
+	it('takes the total count across groups', () => {
+		expect(liveMessage('results', 'x', 6)).toBe('6 results');
+	});
+	it('mentions failed groups alongside the count of the others', () => {
+		expect(liveMessage('results', 'x', 3, 1)).toBe('Some results could not be loaded. 3 results');
+		expect(liveMessage('results', 'x', 1, 2)).toBe('Some results could not be loaded. 1 result');
+		expect(liveMessage('results', 'x', 3, 0)).toBe('3 results');
 	});
 });
 
@@ -69,12 +79,9 @@ describe('resultSubtitle', () => {
 });
 
 describe('paletteView', () => {
-	const base = { query: 'x', error: false, pending: false, showSpinner: false, count: 0 };
+	const base = { query: 'x', pending: false, showSpinner: false, count: 0, failed: 0 };
 	it('shows the hint for a blank query', () => {
 		expect(paletteView({ ...base, query: '   ', count: 3 })).toBe('hint');
-	});
-	it('shows the error state', () => {
-		expect(paletteView({ ...base, error: true })).toBe('error');
 	});
 	it('stays quiet while a fast load is pending with nothing to show', () => {
 		expect(paletteView({ ...base, pending: true })).toBe('idle');
@@ -85,14 +92,55 @@ describe('paletteView', () => {
 	it('keeps earlier results visible while a new load is pending', () => {
 		expect(paletteView({ ...base, pending: true, showSpinner: true, count: 2 })).toBe('results');
 	});
-	it('puts the error ahead of earlier results', () => {
-		expect(paletteView({ ...base, error: true, count: 3 })).toBe('error');
+	it('shows results alongside failed groups', () => {
+		expect(paletteView({ ...base, count: 1, failed: 1 })).toBe('results');
 	});
-	it('shows the empty state once settled with no results', () => {
+	it('shows the retry rows, not Nothing found, when the rest are empty', () => {
+		expect(paletteView({ ...base, failed: 1 })).toBe('partial');
+	});
+	it('waits for pending sources before showing the retry rows', () => {
+		expect(paletteView({ ...base, failed: 1, pending: true })).toBe('idle');
+	});
+	it('shows the empty state only once settled with no results and no failures', () => {
 		expect(paletteView(base)).toBe('empty');
 	});
 	it('shows results once settled', () => {
 		expect(paletteView({ ...base, count: 1 })).toBe('results');
+	});
+});
+
+describe('firstLiveValue', () => {
+	it('takes the first row of the first non-empty group', () => {
+		expect(
+			firstLiveValue([
+				{ values: [], stale: false },
+				{ values: ['c1', 'c2'], stale: false },
+				{ values: ['t1'], stale: false }
+			])
+		).toBe('c1');
+	});
+	it('skips groups still holding rows of an earlier query', () => {
+		expect(
+			firstLiveValue([
+				{ values: ['c-old'], stale: true },
+				{ values: ['t1'], stale: false }
+			])
+		).toBe('t1');
+	});
+	it('is empty when every row is stale or absent', () => {
+		expect(firstLiveValue([{ values: ['c-old'], stale: true }])).toBe('');
+	});
+});
+
+describe('defaultHighlight', () => {
+	it('stays on See all until the items group has answered', () => {
+		expect(defaultHighlight('page:/', false, 'all')).toBe('all');
+	});
+	it('moves to the first row once items have answered', () => {
+		expect(defaultHighlight('item:1', true, 'all')).toBe('item:1');
+	});
+	it('falls back to See all when nothing was found', () => {
+		expect(defaultHighlight('', true, 'all')).toBe('all');
 	});
 });
 

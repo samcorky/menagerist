@@ -203,3 +203,40 @@ async def test_list_limit_zero_is_empty(
 
     assert plain.items == []
     assert filtered.items == []
+
+
+async def test_list_q_filters_by_name(
+    world: World, make_collection: MakeCollection
+) -> None:
+    """`q` keeps only collections whose name or description matches."""
+    tapes = make_collection(name="Tapes")
+    vinyl = make_collection(name="Vinyl")
+    for shelf in (tapes, vinyl):
+        await world.collections.add(shelf)
+
+    result = await _handler(world).handle(ListCollectionsQuery(q="tap"), SYSTEM_ACTOR)
+
+    assert [s.collection for s in result.items] == [tapes]
+
+
+async def test_list_q_with_item_filter_fills_page_across_non_matches(
+    world: World, make_collection: MakeCollection
+) -> None:
+    """`q` and `item_id` combine, and a page stays full across non-matches."""
+    names = ["Tape 0", "Vinyl 1", "Vinyl 2", "Tape 3", "Vinyl 4", "Tape 5"]
+    shelves = []
+    for name in names:
+        shelf = make_collection(name=name)
+        await world.collections.add(shelf)
+        shelves.append(shelf)
+    shelves.sort(key=lambda s: s.id)
+    item_id = uuid.uuid7()
+    for shelf in shelves:
+        if shelf.name != "Tape 5":
+            await _hold(world, shelf, item_id)
+
+    result = await _handler(world).handle(
+        ListCollectionsQuery(item_id=item_id, q="tape", limit=2), SYSTEM_ACTOR
+    )
+
+    assert [s.collection.name for s in result.items] == ["Tape 0", "Tape 3"]

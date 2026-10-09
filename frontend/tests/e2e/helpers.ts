@@ -120,6 +120,19 @@ export async function openNav(page: Page, entry: NavEntry): Promise<void> {
 	await link.click();
 }
 
+/** The visible Search button: the bottom-bar one on a phone, the header one on desktop. */
+export const searchButton = (page: Page) =>
+	page.getByRole('button', { name: 'Search', exact: true });
+
+/** Opens the search popup through that button (a tap on touch devices). */
+export async function openSearch(page: Page): Promise<void> {
+	const button = searchButton(page);
+	await expect(button).toBeVisible();
+	if (await page.evaluate(() => matchMedia('(pointer: coarse)').matches)) await button.tap();
+	else await button.click();
+	await expect(page.getByRole('dialog', { name: 'Search', exact: true })).toBeVisible();
+}
+
 /**
  * Opens the quick capture dialog via its global keyboard shortcut. Waits for
  * the app shell to hydrate first - this is a client-rendered SPA, so the
@@ -214,4 +227,20 @@ export async function removeExamplePacks(request: APIRequestContext) {
 	for (const type of (await types.json()) as { id: string; slug: string }[]) {
 		if (EXAMPLE_SLUG_PREFIXES.test(type.slug)) await request.delete(`/api/v1/node-type/${type.id}`);
 	}
+}
+
+/**
+ * Makes every collections search request (`GET /collection?...`) fail with a 500 until the
+ * returned function is called. Single-collection reads are left alone.
+ */
+export async function failCollectionSearch(page: Page): Promise<() => Promise<void>> {
+	const pattern = /\/api\/v1\/collection\?/;
+	await page.route(pattern, (route) =>
+		route.fulfill({
+			status: 500,
+			contentType: 'application/json',
+			body: JSON.stringify({ detail: 'Forced failure' })
+		})
+	);
+	return () => page.unroute(pattern);
 }

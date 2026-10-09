@@ -36,13 +36,26 @@ class InMemoryCollectionRepository:
             None,
         )
 
-    async def list(self, *, after: uuid.UUID | None, limit: int) -> list[Collection]:
-        """Return up to `limit` live collections ordered by id, after `after`."""
+    async def list(
+        self, *, after: uuid.UUID | None, limit: int, q: str | None = None
+    ) -> list[Collection]:
+        """Return up to `limit` live collections ordered by id, after `after`.
+
+        A non-blank `q` keeps collections whose name or description contains it,
+        ignoring case.
+        """
+        needle = (q or "").strip().casefold()
         live = sorted(
             (
                 c
                 for c in self._collections.values()
-                if not c.is_deleted and (after is None or c.id > after)
+                if not c.is_deleted
+                and (after is None or c.id > after)
+                and (
+                    not needle
+                    or needle in c.name.casefold()
+                    or needle in (c.description or "").casefold()
+                )
             ),
             key=lambda c: c.id,
         )

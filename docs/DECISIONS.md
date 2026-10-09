@@ -611,3 +611,11 @@ So a plain private array is the source of truth, `active` is a write-only `$stat
 **Rationale:** collections are the way to show that items can be grouped without being typed or connected differently, and a pack is the right place to demonstrate it. Removing them before their items means an unedited example collection stops counting as a reason to keep its members. An example item that is on any collection that survives (the user's own, or an edited example one) counts as user data and is kept, in the same way an item with your own connection is. The collections module derives the slug, so a pack collection can never clash with the user's own.
 
 **Consequence:** anything kept also keeps the item types it uses, so reinstalling the pack re-adopts what was kept (see "Removing examples keeps anything the user has touched"). Example collections carry the same "Example" badge as example items and types, and `GET /example/entities` lists their ids.
+
+## Grouped search fans out on the client; ranking is per group
+
+**Decision (2026-10-09):** the search popup (`/`) shows Items, Collections, Item types and Pages. It fans out on the client behind `searchEverything` (`frontend/src/lib/palette-sources.ts`); a backend search endpoint is deferred. Item types (listed once and cached) and pages (a fixed list) are filtered locally. Collections gained an optional `q` on `GET /collection`. Ranking is per group (exact, then prefix, then word-prefix, then other); there is no ranking across groups, and group order is fixed. A source that fails shows a retry row for its group only, and "Nothing found" appears only when every source answered and all were empty.
+
+**Not decided:** accents are not folded, so "cafe" does not match "Café". That is deliberate for now and would be a change in the backend `q` matching as well as the local filters.
+
+**Consequence:** one keystroke burst costs up to two requests (items, collections); a single endpoint would cut that and allow cross-group ranking.

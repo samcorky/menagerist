@@ -99,6 +99,80 @@ async def test_list_is_ordered_by_id_with_keyset_paging(
     assert await repo.list(after=last[-1].id, limit=2) == []
 
 
+async def test_list_q_matches_name_or_description_ignoring_case(
+    db_session: AsyncSession,
+) -> None:
+    """`q` keeps collections whose name or description contains it."""
+    repo = SqlAlchemyCollectionRepository(db_session)
+    by_name = _collection("Tapes")
+    by_description = Collection.create(
+        name="Other",
+        slug=Slug("other"),
+        owner_id=uuid.uuid7(),
+        description="Old TAPE reels",
+    )
+    miss = _collection("Vinyl")
+    for collection in (by_name, by_description, miss):
+        await repo.add(collection)
+
+    found = await repo.list(after=None, limit=10, q="tape")
+
+    assert {c.id for c in found} == {by_name.id, by_description.id}
+
+
+async def test_list_q_treats_wildcards_and_backslash_literally(
+    db_session: AsyncSession,
+) -> None:
+    """Wildcards and backslashes in `q` match only themselves."""
+    repo = SqlAlchemyCollectionRepository(db_session)
+    percent = _collection("50% off")
+    plain = _collection("500 things")
+    underscore = _collection("a_b")
+    other = _collection("axb")
+    backslash = _collection("a\\b", slug="back")
+    for collection in (percent, plain, underscore, other, backslash):
+        await repo.add(collection)
+
+    assert [c.id for c in await repo.list(after=None, limit=10, q="50%")] == [
+        percent.id
+    ]
+    assert [c.id for c in await repo.list(after=None, limit=10, q="a_b")] == [
+        underscore.id
+    ]
+    assert [c.id for c in await repo.list(after=None, limit=10, q="a\\b")] == [
+        backslash.id
+    ]
+
+
+async def test_list_blank_q_returns_everything(db_session: AsyncSession) -> None:
+    """`None`, empty and whitespace-only `q` apply no filter."""
+    repo = SqlAlchemyCollectionRepository(db_session)
+    await repo.add(_collection("A"))
+    await repo.add(_collection("B"))
+
+    for q in (None, "", "   "):
+        assert len(await repo.list(after=None, limit=10, q=q)) == 2
+
+
+async def test_list_q_combines_with_after_limit_and_deletion(
+    db_session: AsyncSession,
+) -> None:
+    """`q` composes with keyset paging and still hides deleted collections."""
+    repo = SqlAlchemyCollectionRepository(db_session)
+    made = [_collection(f"Tape {n}") for n in range(4)]
+    for collection in made:
+        await repo.add(collection)
+    await repo.add(_collection("Vinyl"))
+    made[3].soft_delete()
+    await repo.save(made[3])
+
+    first = await repo.list(after=None, limit=2, q="tape")
+    rest = await repo.list(after=first[-1].id, limit=2, q="tape")
+
+    assert [c.id for c in first] == [c.id for c in made[:2]]
+    assert [c.id for c in rest] == [made[2].id]
+
+
 async def test_slug_reusable_after_soft_delete(db_session: AsyncSession) -> None:
     """The partial index frees a slug once its holder is soft deleted."""
     repo = SqlAlchemyCollectionRepository(db_session)

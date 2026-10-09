@@ -28,6 +28,7 @@ class ListCollectionsQuery:
     after: uuid.UUID | None = None
     limit: int = 50
     item_id: uuid.UUID | None = None
+    q: str | None = None
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -63,13 +64,15 @@ class ListCollections(
         """
         if query.item_id is None:
             return await self._repos.collections.list(
-                after=query.after, limit=query.limit
+                after=query.after, limit=query.limit, q=query.q
             )
         holding = await self._repos.memberships.collection_ids_for(query.item_id)
         found: list[Collection] = []
         after = query.after
         while len(found) < query.limit:
-            batch = await self._repos.collections.list(after=after, limit=query.limit)
+            batch = await self._repos.collections.list(
+                after=after, limit=query.limit, q=query.q
+            )
             found.extend(c for c in batch if c.id in holding)
             if len(batch) < query.limit:
                 break

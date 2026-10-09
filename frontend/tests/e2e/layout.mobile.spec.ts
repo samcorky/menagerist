@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from './fixtures';
-import { ownedData, uniqueName } from './helpers';
+import { failCollectionSearch, openSearch, ownedData, searchButton, uniqueName } from './helpers';
 
 /**
  * Phone-only layout checks, run by the `mobile` project at two widths: the bottom bar, page
@@ -14,7 +14,7 @@ const SIZES = [
 ];
 const GUIDELINE_TARGET = 44;
 
-const { makeCollection, makeItem, addToCollection, cleanUp } = ownedData();
+const { makeCollection, makeItem, makeItemType, addToCollection, cleanUp } = ownedData();
 let installedPacks: string[] = [];
 
 test.afterEach(async ({ request }) => {
@@ -249,7 +249,7 @@ for (const size of SIZES) {
 		}) => {
 			const item = await makeItem(request, uniqueName('Phone search item'));
 			await page.goto('/');
-			const button = page.getByRole('button', { name: 'Search items' });
+			const button = searchButton(page);
 			const b = await box(button);
 			test.info().annotations.push({
 				type: `search button ${size.width}`,
@@ -259,7 +259,7 @@ for (const size of SIZES) {
 			expect(b.height).toBeGreaterThanOrEqual(44);
 
 			await button.tap();
-			const dialog = page.getByRole('dialog', { name: 'Search items' });
+			const dialog = page.getByRole('dialog', { name: 'Search', exact: true });
 			const d = await box(dialog);
 			test.info().annotations.push({
 				type: `search popup ${size.width}`,
@@ -274,12 +274,59 @@ for (const size of SIZES) {
 			await expect(button).toBeFocused();
 
 			await button.tap();
-			await dialog.getByPlaceholder('Search your items…').fill(item.name);
+			await dialog.getByPlaceholder('Search everything…').fill(item.name);
 			const row = dialog.getByRole('option', { name: new RegExp(item.name) });
 			await expect(row).toBeVisible();
 			expect(await fits(page, await box(row)), 'first result inside viewport').toBe(true);
 			await row.tap();
 			await expect(page).toHaveURL(new RegExp(`/items/${item.id}$`));
+		});
+
+		test('grouped search rows and the retry button are tall enough to tap', async ({
+			page,
+			request
+		}) => {
+			const token = uniqueName('Phonegroup');
+			const type = await makeItemType(request, `${token} kind`);
+			const item = await makeItem(request, `${token} item`);
+			const collection = await makeCollection(request, `${token} set`);
+
+			await page.goto('/');
+			await openSearch(page);
+			const dialog = page.getByRole('dialog', { name: 'Search', exact: true });
+			const unfail = await failCollectionSearch(page);
+			await dialog.getByPlaceholder('Search everything…').fill(token);
+
+			await expect(dialog.getByRole('option', { name: new RegExp(item.name) })).toBeVisible();
+			await expect(dialog.getByRole('option', { name: new RegExp(type.label) })).toBeVisible();
+			const retry = dialog.getByRole('button', { name: 'Try searching collections again' });
+			await expect(retry).toBeVisible();
+			const r = await box(retry);
+			test.info().annotations.push({
+				type: `retry button ${size.width}`,
+				description: `${round(r.width)}x${round(r.height)}`
+			});
+			expect(r.height).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
+			expect(r.width).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
+
+			const rows = dialog.getByRole('option');
+			const heights: number[] = [];
+			for (let i = 0; i < (await rows.count()); i++) {
+				heights.push((await box(rows.nth(i))).height);
+			}
+			test.info().annotations.push({
+				type: `search rows ${size.width}`,
+				description: heights.map(round).join(', ')
+			});
+			expect(Math.min(...heights)).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
+
+			await unfail();
+			await retry.tap();
+			await expect(dialog.getByRole('option', { name: new RegExp(collection.name) })).toBeVisible();
+
+			await page.keyboard.press('Escape');
+			await expect(dialog).toBeHidden();
+			await expect(searchButton(page)).toBeFocused();
 		});
 
 		test('remove-from-collection is a reachable touch target', async ({ page, request }) => {

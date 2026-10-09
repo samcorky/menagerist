@@ -128,7 +128,7 @@
 		return registerShortcut({
 			id: 'global-search',
 			keys: '[Shift]+/',
-			description: 'Search items',
+			description: 'Search',
 			group: 'Search',
 			handler: (e) => {
 				e.preventDefault();
@@ -210,7 +210,7 @@
 						variant="ghost"
 						size="icon"
 						class="size-11"
-						aria-label="Search items"
+						aria-label="Search"
 						onclick={() => searchPaletteController.show()}
 					>
 						<Search class="size-4" />
@@ -271,7 +271,7 @@
 				<button
 					onclick={() => searchPaletteController.show()}
 					aria-haspopup="dialog"
-					aria-label="Search items"
+					aria-label="Search"
 					class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {searchActive
 						? 'text-foreground'
 						: 'text-muted-foreground hover:text-foreground'}"

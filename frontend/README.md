@@ -33,6 +33,8 @@ For UX and UI rules, see [DESIGN_GUIDELINES.md](DESIGN_GUIDELINES.md).
 
 **Collections** - `/collections` lists collections and creates them, and `/collections/[id]` shows one: its items (the shared item cards, with search, list and grid views, and the Examples filter), rename and delete, an Add items dialog (`lib/components/add-items-dialog.svelte`) and Remove with Undo. The item page has a Collections card (`lib/components/item-collections.svelte`). Wording and error messages live in `src/lib/collections.ts`. The collection page deliberately does not share its list code with the items page; keep the search debounce and the paging in step if you change either.
 
+**Search popup** - `/` opens `lib/components/search-palette.svelte`, a grouped search over Items, Collections, Item types and Pages (in that order, capped per group). `lib/palette-sources.ts` (`searchEverything`) fans out to the API and filters item types and pages locally; `lib/palette-search.ts` ranks each group and `lib/search-palette.ts` holds the pure view and live-region logic. A failed source shows a retry row for that group only; "Nothing found" appears only when every source answered and all were empty. Accents are not folded.
+
 ## Development
 
 Install dependencies and generate the API client first (run from the repo root):

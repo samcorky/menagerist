@@ -28,6 +28,12 @@ class CollectionRepository(Protocol):
         """Return the live collection with `slug`, or `None`."""
         ...
 
-    async def list(self, *, after: uuid.UUID | None, limit: int) -> list[Collection]:
-        """Return up to `limit` live collections ordered by id, after `after`."""
+    async def list(
+        self, *, after: uuid.UUID | None, limit: int, q: str | None = None
+    ) -> list[Collection]:
+        """Return up to `limit` live collections ordered by id, after `after`.
+
+        A non-blank `q` keeps collections whose name or description contains it,
+        ignoring case.
+        """
         ...

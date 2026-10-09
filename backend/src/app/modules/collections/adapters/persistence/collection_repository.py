@@ -21,6 +21,16 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 
+_LIKE_ESCAPE = "\\"
+
+
+def _like_pattern(q: str) -> str:
+    """Return a contains-pattern for `q` with LIKE wildcards escaped."""
+    escaped = q.replace(_LIKE_ESCAPE, _LIKE_ESCAPE * 2)
+    escaped = escaped.replace("%", _LIKE_ESCAPE + "%").replace("_", _LIKE_ESCAPE + "_")
+    return f"%{escaped}%"
+
+
 def _to_domain(model: CollectionModel) -> Collection:
     """Convert an ORM row into the domain entity."""
     return Collection(
@@ -96,8 +106,14 @@ class SqlAlchemyCollectionRepository:
         model = (await self._session.execute(stmt)).scalar_one_or_none()
         return None if model is None else _to_domain(model)
 
-    async def list(self, *, after: uuid.UUID | None, limit: int) -> list[Collection]:
-        """Return up to `limit` live collections ordered by id, after `after`."""
+    async def list(
+        self, *, after: uuid.UUID | None, limit: int, q: str | None = None
+    ) -> list[Collection]:
+        """Return up to `limit` live collections ordered by id, after `after`.
+
+        A non-blank `q` keeps collections whose name or description contains it,
+        ignoring case.
+        """
         stmt = (
             select(CollectionModel)
             .where(CollectionModel.deleted_at.is_(None))
@@ -106,4 +122,11 @@ class SqlAlchemyCollectionRepository:
         )
         if after is not None:
             stmt = stmt.where(CollectionModel.id > after)
+        needle = (q or "").strip()
+        if needle:
+            pattern = _like_pattern(needle)
+            stmt = stmt.where(
+                CollectionModel.name.ilike(pattern, escape=_LIKE_ESCAPE)
+                | CollectionModel.description.ilike(pattern, escape=_LIKE_ESCAPE)
+            )
         return [_to_domain(m) for m in (await self._session.execute(stmt)).scalars()]

@@ -1,39 +1,28 @@
-<script lang="ts" module>
-	import { listNodeTypes, type NodeTypeResponse } from '$lib/api/client';
-
-	let typesPromise: Promise<NodeTypeResponse[]> | null = null;
-
-	// Item types are loaded once per page lifetime; a failed load is retried on the next open.
-	function loadTypes(): Promise<NodeTypeResponse[]> {
-		typesPromise ??= listNodeTypes({ query: { limit: 100 } })
-			.then((result) => {
-				if (!result.data) typesPromise = null;
-				return result.data ?? [];
-			})
-			.catch(() => {
-				typesPromise = null;
-				return [];
-			});
-		return typesPromise;
-	}
-</script>
-
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { ArrowRight, Search } from '@lucide/svelte';
-	import { listNodes, type NodeResponse } from '$lib/api/client';
-	import { networkAwareError } from '$lib/api/errors';
+	import type { NodeResponse, NodeTypeResponse } from '$lib/api/client';
 	import { delayedLoading } from '$lib/delayed-loading.svelte';
 	import { loadExampleIds } from '$lib/examples';
+	import {
+		loadItemTypes,
+		searchEverything,
+		type AsyncGroupKey,
+		type GroupState,
+		type Results
+	} from '$lib/palette-sources';
+	import type { StaticRoute } from '$lib/palette-search';
 	import { matchContext } from '$lib/search-context';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import {
-		SEARCH_RESULT_LIMIT,
+		defaultHighlight,
+		firstLiveValue,
+		liveMessage,
 		paletteView,
 		resultSubtitle,
-		seeAllSearch,
-		liveMessage
+		seeAllSearch
 	} from '$lib/search-palette';
 	import { searchPaletteController } from '$lib/search-palette.svelte';
 	import * as Command from '$lib/components/ui/command/index.js';
@@ -44,12 +33,31 @@
 
 	const DEBOUNCE_MS = 250;
 	const SEE_ALL_VALUE = 'see-all-results';
+	const ASYNC_KEYS: AsyncGroupKey[] = ['items', 'collections', 'itemTypes'];
+	const GROUP_NOUN: Record<AsyncGroupKey, string> = {
+		items: 'items',
+		collections: 'collections',
+		itemTypes: 'item types'
+	};
+
+	const emptyResults = (): Results => ({
+		items: { status: 'ok', rows: [] },
+		collections: { status: 'ok', rows: [] },
+		itemTypes: { status: 'ok', rows: [] },
+		pages: []
+	});
 
 	let query = $state('');
-	let results = $state<NodeResponse[]>([]);
-	let pending = $state(false);
-	let failure = $state<string | null>(null);
+	let groups = $state<Results>(emptyResults());
+	// Sources still waiting on an answer for the current query
+	let loading = $state<AsyncGroupKey[]>([]);
+	// Sources being re-run from their retry row
+	let retrying = $state<AsyncGroupKey[]>([]);
+	let itemsAnswered = $state(false);
+	let debouncing = $state(false);
 	let highlighted = $state('');
+	// The row the popup chose itself; an arrow key moves the highlight off it
+	let autoHighlight = '';
 	let types = $state<NodeTypeResponse[]>([]);
 	let exampleIds = $state<ReadonlySet<string>>(new Set());
 	let inputEl = $state<HTMLInputElement | null>(null);
@@ -60,16 +68,50 @@
 	// §13a: the 300 ms starts when the request does, not at the keystroke
 	const spinner = delayedLoading();
 
+	const pending = $derived(debouncing || loading.length > 0);
+	const okRows = <T,>(state: GroupState<T>): T[] => (state.status === 'ok' ? state.rows : []);
+	const failedKeys = $derived(
+		ASYNC_KEYS.filter((key) => groups[key].status === 'error' && !loading.includes(key))
+	);
+	const count = $derived(
+		okRows(groups.items).length +
+			okRows(groups.collections).length +
+			okRows(groups.itemTypes).length +
+			groups.pages.length
+	);
 	const view = $derived(
 		paletteView({
 			query,
-			error: failure !== null,
 			pending,
 			showSpinner: spinner.show,
-			count: results.length
+			count,
+			failed: failedKeys.length
 		})
 	);
-	const announcement = $derived(liveMessage(view, query, results.length, failure));
+	const announcement = $derived(liveMessage(view, query, count, failedKeys.length));
+	// Rows from an earlier query stay up until their source answers; they cannot be opened
+	const staleKeys = $derived(debouncing ? [...ASYNC_KEYS, 'pages' as const] : loading);
+	// First row in display order that can be opened
+	const firstValue = $derived(
+		firstLiveValue([
+			{
+				values: okRows(groups.items).map((r) => `item:${r.id}`),
+				stale: staleKeys.includes('items')
+			},
+			{
+				values: okRows(groups.collections).map((r) => `collection:${r.id}`),
+				stale: staleKeys.includes('collections')
+			},
+			{
+				values: okRows(groups.itemTypes).map((r) => `type:${r.slug}`),
+				stale: staleKeys.includes('itemTypes')
+			},
+			{
+				values: groups.pages.map((r) => `page:${r.path}`),
+				stale: staleKeys.includes('pages')
+			}
+		])
+	);
 
 	function typeOf(item: NodeResponse): NodeTypeResponse | undefined {
 		return types.find((t) => t.slug === item.type);
@@ -81,24 +123,56 @@
 		return resultSubtitle(type?.label ?? null, matchContext(item, schema, query));
 	}
 
-	async function search(text: string) {
-		const mine = ++seq;
-		pending = true;
-		failure = null;
+	function countLabel(n: number): string {
+		return n === 1 ? '1 item' : `${n} items`;
+	}
+
+	function settleHighlight() {
+		if (highlighted !== '' && highlighted !== autoHighlight) return;
+		highlighted = defaultHighlight(firstValue, itemsAnswered, SEE_ALL_VALUE);
+		autoHighlight = highlighted;
+	}
+
+	const isStale = (key: AsyncGroupKey | 'pages') => staleKeys.includes(key);
+	const retryBusy = (key: AsyncGroupKey) => debouncing || loading.includes(key);
+	// An errored group shows its retry row; one hidden while a new query reloads it does not
+	const showFailed = (key: AsyncGroupKey) =>
+		groups[key].status === 'error' && (!loading.includes(key) || retrying.includes(key));
+
+	function retry(key: AsyncGroupKey) {
+		if (retryBusy(key)) return;
+		retrying = [...retrying, key];
+		run(query.trim(), [key]);
+	}
+
+	function run(text: string, only?: AsyncGroupKey[]) {
+		const mine = only ? seq : ++seq;
+		debouncing = false;
+		if (!only) itemsAnswered = false;
+		loading = [...new Set([...loading, ...(only ?? ASYNC_KEYS)])];
 		spinner.set(true);
-		const result = await listNodes({ query: { q: text, limit: SEARCH_RESULT_LIMIT } });
-		if (mine !== seq) return;
-		pending = false;
-		spinner.set(false);
-		if (result.error || !result.data) {
-			const { title, description } = networkAwareError(result);
-			failure = description ?? title;
-			results = [];
-			highlighted = '';
-			return;
-		}
-		results = result.data;
-		highlighted = result.data[0]?.id ?? SEE_ALL_VALUE;
+		void searchEverything(
+			text,
+			(partial) => {
+				groups = { ...groups, ...partial };
+				const settled = Object.keys(partial) as (keyof Results)[];
+				loading = loading.filter((key) => !settled.includes(key));
+				if (settled.includes('items')) itemsAnswered = true;
+				if (retrying.some((key) => settled.includes(key))) {
+					retrying = retrying.filter((key) => !settled.includes(key));
+					// The retry row may unmount under the focused button
+					void tick().then(() => {
+						if (!document.activeElement || document.activeElement === document.body) {
+							inputEl?.focus();
+						}
+					});
+				}
+				if (loading.length === 0) spinner.set(false);
+				settleHighlight();
+			},
+			() => mine === seq,
+			only
+		);
 	}
 
 	// Debounced search; a blank query cancels anything in flight.
@@ -107,22 +181,28 @@
 		if (!searchPaletteController.open) return;
 		if (!text) {
 			seq++;
-			pending = false;
+			debouncing = false;
+			loading = [];
+			retrying = [];
 			spinner.set(false);
-			failure = null;
-			results = [];
+			groups = emptyResults();
 			highlighted = '';
+			autoHighlight = '';
 			return;
 		}
-		const timer = setTimeout(() => void search(text), DEBOUNCE_MS);
-		pending = true;
-		highlighted = '';
+		const timer = setTimeout(() => run(text), DEBOUNCE_MS);
+		debouncing = true;
+		retrying = [];
+		highlighted = SEE_ALL_VALUE;
+		autoHighlight = SEE_ALL_VALUE;
 		return () => clearTimeout(timer);
 	});
 
 	$effect(() => {
 		if (!searchPaletteController.open) return;
-		void loadTypes().then((loaded) => (types = loaded));
+		void loadItemTypes()
+			.then((loaded) => (types = loaded))
+			.catch(() => {});
 		void loadExampleIds().then((ids) => (exampleIds = ids.items));
 	});
 
@@ -134,19 +214,32 @@
 		searchPaletteController.hide();
 		seq++;
 		query = '';
-		results = [];
+		groups = emptyResults();
+		loading = [];
+		retrying = [];
 		highlighted = '';
-		pending = false;
+		autoHighlight = '';
+		debouncing = false;
 		spinner.set(false);
-		failure = null;
 	}
 
-	function openItem(item: NodeResponse) {
-		if (pending) return;
+	function choose(key: AsyncGroupKey | 'pages', go: () => void) {
+		if (isStale(key)) return seeAll();
 		navigating = true;
 		onOpenChange(false);
-		void goto(resolve('/items/[id]', { id: item.id }));
+		go();
 	}
+
+	const openItem = (item: NodeResponse) =>
+		choose('items', () => void goto(resolve('/items/[id]', { id: item.id })));
+	const openCollection = (id: string) =>
+		choose('collections', () => void goto(resolve('/collections/[id]', { id })));
+	const openItemType = (slug: string) =>
+		choose(
+			'itemTypes',
+			() => void goto(resolve(`/items?${new URLSearchParams({ type: slug }).toString()}`))
+		);
+	const openPage = (path: StaticRoute) => choose('pages', () => void goto(resolve(path)));
 
 	function seeAll() {
 		const search = seeAllSearch(query);
@@ -156,9 +249,29 @@
 	}
 </script>
 
+{#snippet failedRow(key: AsyncGroupKey)}
+	<div class="flex min-h-11 items-center justify-between gap-2 px-2 text-sm">
+		<span class="text-muted-foreground">Couldn't search {GROUP_NOUN[key]}</span>
+		<!-- aria-disabled, not disabled, so focus stays on the button while it reloads -->
+		<Button
+			variant="outline"
+			class={['min-h-11', retryBusy(key) && 'opacity-50']}
+			aria-label={`Try searching ${GROUP_NOUN[key]} again`}
+			aria-disabled={retryBusy(key)}
+			onclick={() => retry(key)}
+			onkeydown={(e) => {
+				// Command.Root would otherwise treat Enter as selecting the highlighted row
+				if (e.key === 'Enter') e.stopPropagation();
+			}}
+		>
+			{retrying.includes(key) ? 'Retrying…' : 'Try again'}
+		</Button>
+	</div>
+{/snippet}
+
 <ResponsiveDialog.Root open={searchPaletteController.open} {onOpenChange}>
 	<ResponsiveDialog.Content
-		title="Search items"
+		title="Search"
 		size="lg"
 		onOpenAutoFocus={(e) => {
 			e.preventDefault();
@@ -179,49 +292,112 @@
 			<Command.Input
 				bind:ref={inputEl}
 				bind:value={query}
-				placeholder="Search your items…"
-				aria-label="Search your items"
+				placeholder="Search everything…"
+				aria-label="Search"
 				class="h-11"
 			/>
 			<p class="sr-only" role="status" aria-live="polite">{announcement}</p>
 			{#if view === 'hint'}
 				<p class="py-6 text-center text-sm text-muted-foreground" aria-hidden="true">
-					Type to search your items
+					Type to search items, collections, item types and pages
 				</p>
-			{:else if view === 'error'}
-				<div class="flex flex-col items-center gap-2 py-6 text-center text-sm">
-					<p class="text-muted-foreground" aria-hidden="true">{failure}</p>
-					<Button variant="outline" class="min-h-11" onclick={() => void search(query.trim())}>
-						Try again
-					</Button>
-				</div>
 			{:else if view === 'loading'}
 				<div class="flex justify-center py-6" aria-hidden="true">
 					<Spinner class="size-5" />
 				</div>
 			{:else if view === 'empty'}
 				<p class="py-6 text-center text-sm text-muted-foreground" aria-hidden="true">
-					No items match "{query.trim()}"
+					Nothing found for "{query.trim()}"
 				</p>
 			{/if}
-			{#if view !== 'hint' && view !== 'error'}
+			{#if view !== 'hint'}
 				<Command.List class="mt-2 max-h-[50dvh]">
-					{#each results as item (item.id)}
-						{@const sub = subtitle(item)}
-						<Command.Item value={item.id} class="min-h-11" onSelect={() => openItem(item)}>
-							<div class="min-w-0 flex-1">
-								<div class="flex items-center gap-2">
-									<span class="truncate font-medium">{item.name}</span>
-									{#if exampleIds.has(item.id)}
-										<Badge variant="outline" class="shrink-0 text-muted-foreground">Example</Badge>
-									{/if}
-								</div>
-								{#if sub}
-									<p class="truncate text-xs text-muted-foreground">{sub}</p>
-								{/if}
-							</div>
-						</Command.Item>
-					{/each}
+					{#if showFailed('items')}
+						<Command.Group heading="Items">{@render failedRow('items')}</Command.Group>
+					{:else if okRows(groups.items).length > 0}
+						<Command.Group heading="Items">
+							{#each okRows(groups.items) as item (item.id)}
+								{@const sub = subtitle(item)}
+								<Command.Item
+									disabled={isStale('items')}
+									value={`item:${item.id}`}
+									class="min-h-11"
+									onSelect={() => openItem(item)}
+								>
+									<div class="min-w-0 flex-1">
+										<div class="flex items-center gap-2">
+											<span class="truncate font-medium">{item.name}</span>
+											{#if exampleIds.has(item.id)}
+												<Badge variant="outline" class="shrink-0 text-muted-foreground">
+													Example
+												</Badge>
+											{/if}
+										</div>
+										{#if sub}
+											<p class="truncate text-xs text-muted-foreground">{sub}</p>
+										{/if}
+									</div>
+								</Command.Item>
+							{/each}
+						</Command.Group>
+					{/if}
+					{#if showFailed('collections')}
+						<Command.Group heading="Collections">{@render failedRow('collections')}</Command.Group>
+					{:else if okRows(groups.collections).length > 0}
+						<Command.Group heading="Collections">
+							{#each okRows(groups.collections) as collection (collection.id)}
+								<Command.Item
+									disabled={isStale('collections')}
+									value={`collection:${collection.id}`}
+									class="min-h-11"
+									onSelect={() => openCollection(collection.id)}
+								>
+									<div class="min-w-0 flex-1">
+										<span class="block truncate font-medium">{collection.name}</span>
+										<p class="truncate text-xs text-muted-foreground">
+											{countLabel(collection.item_count)}
+										</p>
+									</div>
+								</Command.Item>
+							{/each}
+						</Command.Group>
+					{/if}
+					{#if showFailed('itemTypes')}
+						<Command.Group heading="Item types">{@render failedRow('itemTypes')}</Command.Group>
+					{:else if okRows(groups.itemTypes).length > 0}
+						<Command.Group heading="Item types">
+							{#each okRows(groups.itemTypes) as type (type.slug)}
+								<Command.Item
+									disabled={isStale('itemTypes')}
+									value={`type:${type.slug}`}
+									class="min-h-11"
+									onSelect={() => openItemType(type.slug)}
+								>
+									<div class="min-w-0 flex-1">
+										<span class="block truncate font-medium">{type.label}</span>
+										<p class="truncate text-xs text-muted-foreground">Item type</p>
+									</div>
+								</Command.Item>
+							{/each}
+						</Command.Group>
+					{/if}
+					{#if groups.pages.length > 0}
+						<Command.Group heading="Pages">
+							{#each groups.pages as page (page.path)}
+								<Command.Item
+									disabled={isStale('pages')}
+									value={`page:${page.path}`}
+									class="min-h-11"
+									onSelect={() => openPage(page.path)}
+								>
+									<div class="min-w-0 flex-1">
+										<span class="block truncate font-medium">{page.label}</span>
+										<p class="truncate text-xs text-muted-foreground">Page</p>
+									</div>
+								</Command.Item>
+							{/each}
+						</Command.Group>
+					{/if}
 					<Command.Item value={SEE_ALL_VALUE} class="min-h-11" onSelect={seeAll}>
 						<Search class="size-4" />
 						<span class="flex-1">See all results in Items</span>

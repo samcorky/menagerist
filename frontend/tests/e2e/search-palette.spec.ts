@@ -1,16 +1,22 @@
 import { test, expect, type Page } from './fixtures';
-import { ownedData, removeExamplePacks, uniqueName } from './helpers';
+import {
+	failCollectionSearch,
+	ownedData,
+	removeExamplePacks,
+	searchButton,
+	uniqueName
+} from './helpers';
 
 /** The global search popup: opened by `/` or the header button, driven from the keyboard. */
-const { makeItem, makeItemType, cleanUp } = ownedData();
+const { makeItem, makeItemType, makeCollection, cleanUp } = ownedData();
 
 test.afterEach(async ({ request }) => {
 	await cleanUp(request);
 	await removeExamplePacks(request);
 });
 
-const popup = (page: Page) => page.getByRole('dialog', { name: 'Search items' });
-const input = (page: Page) => popup(page).getByPlaceholder('Search your items…');
+const popup = (page: Page) => page.getByRole('dialog', { name: 'Search', exact: true });
+const input = (page: Page) => popup(page).getByPlaceholder('Search everything…');
 
 async function openWithSlash(page: Page, path = '/') {
 	await page.goto(path);
@@ -22,7 +28,9 @@ async function openWithSlash(page: Page, path = '/') {
 test('/ opens the popup with the input focused and a hint', async ({ page }) => {
 	await openWithSlash(page);
 	await expect(input(page)).toBeFocused();
-	await expect(popup(page).getByText('Type to search your items')).toBeVisible();
+	await expect(
+		popup(page).getByText('Type to search items, collections, item types and pages')
+	).toBeVisible();
 });
 
 test('typing finds an item with its type, and Enter opens it', async ({ page, request }) => {
@@ -56,10 +64,11 @@ test('arrow keys move the highlight and Enter opens the second result', async ({
 	const rowB = popup(page).getByRole('option', { name: new RegExp(`${prefix} B`) });
 	await expect(rowA).toBeVisible();
 	await expect(rowB).toBeVisible();
+	// Pages, collections and types add rows; only compare the two item rows' positions.
 	const rows = await popup(page).getByRole('option').allInnerTexts();
 	const order =
-		rows.findIndex((t) => t.includes(`${prefix} A`)) <
-		rows.findIndex((t) => t.includes(`${prefix} B`));
+		rows.findIndex((t) => t.startsWith(`${prefix} A`)) <
+		rows.findIndex((t) => t.startsWith(`${prefix} B`));
 	const [top, bottom, bottomItem] = order ? [rowA, rowB, second] : [rowB, rowA, first];
 
 	await expect(top).toHaveAttribute('aria-selected', 'true');
@@ -74,7 +83,7 @@ test('a query with no match shows the empty state', async ({ page }) => {
 	await openWithSlash(page);
 	await input(page).fill(query);
 	// The text is also in a screen-reader status region, so target the visible copy.
-	await expect(popup(page).getByRole('status')).toHaveText(`No items match "${query}"`);
+	await expect(popup(page).getByRole('status')).toHaveText(`Nothing found for "${query}"`);
 	await expect(popup(page).locator('[aria-hidden="true"]', { hasText: query })).toBeVisible();
 });
 
@@ -105,9 +114,9 @@ test('Esc closes the popup and returns focus to where it was', async ({ page }) 
 	await expect(before).toBeFocused();
 });
 
-test('the desktop header Search items button opens the popup', async ({ page }) => {
+test('the desktop header Search button opens the popup', async ({ page }) => {
 	await page.goto('/');
-	const button = page.getByRole('button', { name: 'Search items' });
+	const button = searchButton(page);
 	await button.click();
 	await expect(popup(page)).toBeVisible();
 	await expect(input(page)).toBeFocused();
@@ -137,4 +146,155 @@ test('n still opens quick capture, and / typed in the input is a character', asy
 
 	await page.keyboard.press('n');
 	await expect(page.getByRole('dialog', { name: 'Quick capture' })).toBeVisible();
+});
+
+// Grouped results: items, collections, item types and pages.
+
+const row = (page: Page, text: string | RegExp) => popup(page).getByRole('option', { name: text });
+
+test('a shared word shows Items, Collections and Item types in that order', async ({
+	page,
+	request
+}) => {
+	const token = uniqueName('Sharedword');
+	const type = await makeItemType(request, `${token} kind`);
+	const item = await makeItem(request, `${token} item`);
+	const collection = await makeCollection(request, `${token} set`);
+
+	await openWithSlash(page);
+	await input(page).fill(token);
+	await expect(row(page, new RegExp(collection.name))).toBeVisible();
+	await expect(row(page, new RegExp(type.label))).toBeVisible();
+	await expect(row(page, new RegExp(item.name))).toBeVisible();
+
+	for (const heading of ['Items', 'Collections', 'Item types']) {
+		await expect(popup(page).getByText(heading, { exact: true })).toBeVisible();
+	}
+	const texts = await popup(page).getByRole('option').allInnerTexts();
+	const at = (needle: string) => texts.findIndex((t) => t.includes(needle));
+	expect(at(item.name)).toBeGreaterThanOrEqual(0);
+	expect(at(item.name)).toBeLessThan(at(collection.name));
+	expect(at(collection.name)).toBeLessThan(at(type.label));
+});
+
+test('choosing an item, a collection and an item type each lands in the right place', async ({
+	page,
+	request
+}) => {
+	const token = uniqueName('Landword');
+	const type = await makeItemType(request, `${token} kind`);
+	const item = await makeItem(request, `${token} item`);
+	const typed = await makeItem(request, uniqueName('Typed landing'), type.slug);
+	const collection = await makeCollection(request, `${token} set`);
+
+	await openWithSlash(page);
+	await input(page).fill(token);
+	await row(page, new RegExp(item.name)).click();
+	await expect(page).toHaveURL(new RegExp(`/items/${item.id}$`));
+
+	await openWithSlash(page);
+	await input(page).fill(token);
+	await row(page, new RegExp(collection.name)).click();
+	await expect(page).toHaveURL(new RegExp(`/collections/${collection.id}$`));
+	await expect(page.getByRole('heading', { name: collection.name, level: 1 })).toBeVisible();
+
+	await openWithSlash(page);
+	await input(page).fill(token);
+	await row(page, new RegExp(`${type.label}.*Item type`)).click();
+	await expect(page).toHaveURL(new RegExp(`/items\\?type=${type.slug}`));
+	await expect(page.getByRole('link', { name: typed.name }).first()).toBeVisible();
+	await expect(page.getByRole('link', { name: item.name })).toHaveCount(0);
+});
+
+test('searching Settings lists the Pages group and Enter goes there', async ({ page }) => {
+	await openWithSlash(page);
+	await input(page).fill('Settings');
+	await expect(popup(page).getByText('Pages', { exact: true })).toBeVisible();
+	const settings = popup(page).locator('[role="option"][data-value="page:/settings"]');
+	await expect(settings).toBeVisible();
+	await expect(settings).toHaveAttribute('aria-selected', 'true');
+	await page.keyboard.press('Enter');
+	await expect(page).toHaveURL(/\/settings$/);
+});
+
+test('a failing collections source keeps Items usable and recovers on retry', async ({
+	page,
+	request
+}) => {
+	const token = uniqueName('Failword');
+	const item = await makeItem(request, `${token} item`);
+	const collection = await makeCollection(request, `${token} set`);
+
+	await openWithSlash(page);
+	const unfail = await failCollectionSearch(page);
+	await input(page).fill(token);
+
+	const retry = popup(page).getByRole('button', { name: 'Try searching collections again' });
+	await expect(popup(page).getByText("Couldn't search collections")).toBeVisible();
+	await expect(retry).toBeVisible();
+	await expect(row(page, new RegExp(item.name))).toBeVisible();
+	await expect(row(page, new RegExp(item.name))).not.toHaveAttribute('aria-disabled', 'true');
+
+	await unfail();
+	await retry.click();
+	await expect(row(page, new RegExp(collection.name))).toBeVisible();
+	await expect(retry).toHaveCount(0);
+});
+
+test('Enter on Try again retries without opening another row', async ({ page, request }) => {
+	const token = uniqueName('Keyword');
+	await makeItem(request, `${token} item`);
+	const collection = await makeCollection(request, `${token} set`);
+
+	await openWithSlash(page);
+	const unfail = await failCollectionSearch(page);
+	await input(page).fill(token);
+	const retry = popup(page).getByRole('button', { name: 'Try searching collections again' });
+	await expect(retry).toBeVisible();
+
+	await unfail();
+	for (let i = 0; i < 6 && !(await retry.evaluate((el) => el === document.activeElement)); i++) {
+		await page.keyboard.press('Tab');
+	}
+	await expect(retry).toBeFocused();
+	await page.keyboard.press('Enter');
+
+	await expect(row(page, new RegExp(collection.name))).toBeVisible();
+	await expect(popup(page)).toBeVisible();
+	await expect(page).toHaveURL(/\/$/);
+});
+
+test('a failed row is not actionable while the query is being retyped', async ({
+	page,
+	request
+}) => {
+	const token = uniqueName('Busyword');
+	await makeCollection(request, `${token} set`);
+
+	await openWithSlash(page);
+	await failCollectionSearch(page);
+	await input(page).fill(token);
+	const retry = popup(page).getByRole('button', { name: 'Try searching collections again' });
+	await expect(retry).toBeVisible();
+	await expect(retry).toHaveAttribute('aria-disabled', 'false');
+
+	await input(page).pressSequentially('x');
+	await expect(retry).toHaveAttribute('aria-disabled', 'true');
+	await expect(popup(page)).toBeVisible();
+	await expect(page).toHaveURL(/\/$/);
+});
+
+test('Enter right after refining the query falls through to See all', async ({ page, request }) => {
+	const token = uniqueName('Refineword');
+	const item = await makeItem(request, `${token} item`);
+
+	await openWithSlash(page);
+	await input(page).fill(item.name);
+	await expect(row(page, new RegExp(item.name))).toBeVisible();
+
+	// The rows still on screen belong to the old query, so Enter must not open one.
+	await input(page).pressSequentially('z');
+	await page.keyboard.press('Enter');
+	await expect(page).toHaveURL(/\/items/);
+	await expect(page.getByPlaceholder('Search your items…')).toHaveValue(`${item.name}z`);
 });

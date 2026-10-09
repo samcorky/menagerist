@@ -18,36 +18,57 @@ export function resultSubtitle(typeLabel: string | null, match: MatchContext | n
 	return [typeLabel, match ? `${match.label}: ${match.text}` : null].filter(Boolean).join(' · ');
 }
 
-export type PaletteView = 'hint' | 'error' | 'idle' | 'loading' | 'results' | 'empty';
+/** The first row value from the first group that is not stale; '' when there is none. */
+export function firstLiveValue(groups: { values: string[]; stale: boolean }[]): string {
+	return groups.find((g) => !g.stale && g.values.length > 0)?.values[0] ?? '';
+}
+
+/**
+ * The row the popup highlights by itself. It stays on "See all" until the items group has
+ * answered, so a quick Enter never opens a row that is about to be pushed down.
+ */
+export function defaultHighlight(firstValue: string, itemsAnswered: boolean, seeAll: string) {
+	return itemsAnswered && firstValue ? firstValue : seeAll;
+}
+
+export type PaletteView = 'hint' | 'idle' | 'loading' | 'results' | 'partial' | 'empty';
 
 type PaletteState = {
 	query: string;
-	error: boolean;
+	/** A search is waiting on its debounce or on at least one source. */
 	pending: boolean;
 	showSpinner: boolean;
+	/** Rows shown across all groups. */
 	count: number;
+	/** Groups whose source failed and are not being retried. */
+	failed: number;
 };
 
-/** Which body the popup shows. Earlier results stay up while the next load is pending. */
+/**
+ * Which body the popup shows. Earlier results stay up while the next load is pending.
+ * 'partial' means nothing was found but some sources failed, so their retry rows show.
+ */
 export function paletteView(state: PaletteState): PaletteView {
 	if (!state.query.trim()) return 'hint';
-	if (state.error) return 'error';
 	if (state.count > 0) return 'results';
+	if (state.failed > 0 && !state.pending) return 'partial';
 	if (state.pending) return state.showSpinner ? 'loading' : 'idle';
 	return 'empty';
 }
 
-/** What a screen reader hears for the current body of the popup. */
-export function liveMessage(view: PaletteView, query: string, count: number, error: string | null) {
+/** What a screen reader hears for the current body of the popup. `count` is the total across groups. */
+export function liveMessage(view: PaletteView, query: string, count: number, failedGroups = 0) {
 	switch (view) {
-		case 'error':
-			return error ?? 'Search failed';
 		case 'loading':
 			return 'Searching';
 		case 'empty':
-			return `No items match "${query.trim()}"`;
-		case 'results':
-			return count === 1 ? '1 result' : `${count} results`;
+			return `Nothing found for "${query.trim()}"`;
+		case 'partial':
+			return 'Some results could not be loaded';
+		case 'results': {
+			const total = count === 1 ? '1 result' : `${count} results`;
+			return failedGroups > 0 ? `Some results could not be loaded. ${total}` : total;
+		}
 		default:
 			return '';
 	}

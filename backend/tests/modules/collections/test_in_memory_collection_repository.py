@@ -74,3 +74,67 @@ async def test_list_is_ordered_by_id_with_keyset_paging(
     last = await repo.list(after=second[-1].id, limit=2)
     assert last == made[4:]
     assert await repo.list(after=last[-1].id, limit=2) == []
+
+
+async def test_list_q_matches_name_or_description_ignoring_case(
+    make_collection: MakeCollection,
+) -> None:
+    """`q` keeps collections whose name or description contains it."""
+    repo = InMemoryCollectionRepository()
+    by_name = make_collection("Tapes")
+    by_description = make_collection("Other")
+    by_description.description = "Old TAPE reels"
+    miss = make_collection("Vinyl")
+    for collection in (by_name, by_description, miss):
+        await repo.add(collection)
+
+    found = await repo.list(after=None, limit=10, q="tape")
+
+    assert {c.id for c in found} == {by_name.id, by_description.id}
+
+
+async def test_list_q_treats_percent_and_underscore_literally(
+    make_collection: MakeCollection,
+) -> None:
+    """Wildcard characters in `q` match only themselves."""
+    repo = InMemoryCollectionRepository()
+    percent = make_collection("50% off")
+    plain = make_collection("500 things")
+    underscore = make_collection("a_b")
+    other = make_collection("axb")
+    for collection in (percent, plain, underscore, other):
+        await repo.add(collection)
+
+    assert await repo.list(after=None, limit=10, q="50%") == [percent]
+    assert await repo.list(after=None, limit=10, q="a_b") == [underscore]
+
+
+async def test_list_blank_q_returns_everything(
+    make_collection: MakeCollection,
+) -> None:
+    """`None`, empty and whitespace-only `q` apply no filter."""
+    repo = InMemoryCollectionRepository()
+    for name in ("A", "B"):
+        await repo.add(make_collection(name))
+
+    for q in (None, "", "   "):
+        assert len(await repo.list(after=None, limit=10, q=q)) == 2
+
+
+async def test_list_q_combines_with_after_limit_and_deletion(
+    make_collection: MakeCollection,
+) -> None:
+    """`q` composes with keyset paging and still hides deleted collections."""
+    repo = InMemoryCollectionRepository()
+    made = [make_collection(f"Tape {n}") for n in range(4)]
+    for collection in made:
+        await repo.add(collection)
+    await repo.add(make_collection("Vinyl"))
+    made[3].soft_delete()
+    await repo.save(made[3])
+
+    first = await repo.list(after=None, limit=2, q="tape")
+    rest = await repo.list(after=first[-1].id, limit=2, q="tape")
+
+    assert first == made[:2]
+    assert rest == [made[2]]

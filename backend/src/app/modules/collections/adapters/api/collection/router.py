@@ -112,10 +112,19 @@ async def list_collections(
     after: uuid.UUID | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     item_id: uuid.UUID | None = None,
+    q: Annotated[
+        str | None,
+        Query(
+            max_length=200,
+            description=(
+                "Keep collections whose name or description contains this text."
+            ),
+        ),
+    ] = None,
 ) -> list[CollectionResponse]:
     """List collections with item counts, optionally only those holding an item."""
     result = await use_case.handle(
-        ListCollectionsQuery(after=after, limit=limit + 1, item_id=item_id), actor
+        ListCollectionsQuery(after=after, limit=limit + 1, item_id=item_id, q=q), actor
     )
     summaries = result.items
     if len(summaries) > limit:

@@ -299,6 +299,32 @@ def test_list_item_id_filter_returns_only_shelves_holding_it(api: Api) -> None:
     assert response.json()[0]["item_count"] == 1
 
 
+def test_list_q_returns_only_matching_collections(api: Api) -> None:
+    """?q= keeps collections whose name contains the text."""
+    api.create("Tapes")
+    api.create("Vinyl")
+
+    response = api.client.get(BASE, params={"q": "ta"})
+
+    assert [c["name"] for c in response.json()] == ["Tapes"]
+
+
+def test_list_whitespace_q_is_unfiltered(api: Api) -> None:
+    """A whitespace-only ?q= behaves as no filter."""
+    api.create("Tapes")
+    api.create("Vinyl")
+
+    response = api.client.get(BASE, params={"q": "   "})
+
+    assert len(response.json()) == 2
+
+
+def test_list_q_over_200_characters_is_422(api: Api) -> None:
+    """?q= is capped at 200 characters."""
+    assert api.client.get(BASE, params={"q": "a" * 201}).status_code == 422
+    assert api.client.get(BASE, params={"q": "a" * 200}).status_code == 200
+
+
 def test_put_items_adds_and_is_idempotent(api: Api) -> None:
     """PUT adds items and reports how many were new; repeating adds none."""
     created = api.create()
