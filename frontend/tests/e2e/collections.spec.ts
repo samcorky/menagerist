@@ -11,6 +11,7 @@ test.describe.configure({ mode: 'serial' });
 const {
 	makeCollection,
 	makeItem,
+	makeItemType,
 	addToCollection,
 	trackCollection,
 	trackCollectionFromUrl,
@@ -143,6 +144,44 @@ test('searches inside a collection', async ({ page, request }) => {
 
 	await page.getByLabel('Search this collection').fill('zzz-no-match-zzz');
 	await expect(page.getByText('Nothing matched "zzz-no-match-zzz"')).toBeVisible();
+});
+
+test('filters a collection by item type', async ({ page, request }) => {
+	const collection = await makeCollection(request, uniqueName('Typed'));
+	const books = await makeItemType(request, uniqueName('Books'));
+	const films = await makeItemType(request, uniqueName('Films'));
+	const book = await makeItem(request, uniqueName('Dune'), books.slug);
+	const film = await makeItem(request, uniqueName('Alien'), films.slug);
+	await addToCollection(request, collection.id, [book.id, film.id]);
+
+	await page.goto(`/collections/${collection.id}`);
+	const select = page.getByLabel('Item type');
+	await expect(page.getByRole('link', { name: book.name }).first()).toBeVisible();
+	await expect(page.getByRole('link', { name: film.name }).first()).toBeVisible();
+
+	// Phones get a 44px touch target.
+	if ((page.viewportSize()?.width ?? 1024) < 640) {
+		const b = await select.boundingBox();
+		expect(b!.height).toBeGreaterThanOrEqual(44);
+	}
+
+	await select.selectOption({ label: books.label });
+	await expect(page.getByRole('link', { name: film.name })).toHaveCount(0);
+	await expect(page.getByRole('link', { name: book.name }).first()).toBeVisible();
+
+	await select.selectOption({ label: 'All types' });
+	await expect(page.getByRole('link', { name: book.name }).first()).toBeVisible();
+	await expect(page.getByRole('link', { name: film.name }).first()).toBeVisible();
+
+	// A type with no members shows the no-match message, not the empty-collection one.
+	const other = await makeItemType(request, uniqueName('Games'));
+	await page.reload();
+	await page.getByLabel('Item type').selectOption({ label: other.label });
+	await expect(page.getByText('Nothing matched this type')).toBeVisible();
+	await expect(page.getByText('Nothing in this collection yet.')).toHaveCount(0);
+	await page.getByRole('button', { name: 'Show all types' }).click();
+	await expect(page.getByRole('link', { name: film.name }).first()).toBeVisible();
+	await expectNoShelfCopy(page);
 });
 
 test('removes an item from a collection, keeps the item, and undo puts it back', async ({

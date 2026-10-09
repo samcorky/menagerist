@@ -82,6 +82,7 @@
 	let collectionSeq = 0;
 	let searchInput = $state('');
 	let q = $state('');
+	let selectedType = $state('');
 	let viewMode = $state<'list' | 'grid'>('list');
 	let exampleCollectionIds = $state<ReadonlySet<string>>(new Set());
 	let exampleItemIds = $state<ReadonlySet<string>>(new Set());
@@ -102,6 +103,7 @@
 	let addOpen = $state(false);
 	let addTrigger: HTMLElement | null = null;
 	let headerAddButton = $state<HTMLElement | null>(null);
+	const showTypeFilter = $derived(itemTypes.length > 0 || selectedType !== '');
 	const typeLabels = $derived(Object.fromEntries(itemTypes.map((t) => [t.slug, t.label])));
 
 	let confirmDelete = $state(false);
@@ -158,6 +160,13 @@
 		return () => clearTimeout(timer);
 	});
 
+	function selectType(slug: string) {
+		if (slug === selectedType) return;
+		items = [];
+		hasMore = false;
+		selectedType = slug;
+	}
+
 	function schemaOf(slug: string | null | undefined): AttributesSchema | null {
 		const type = itemTypes.find((t) => t.slug === slug);
 		return (type?.attributes_schema as AttributesSchema | null | undefined) ?? null;
@@ -182,12 +191,18 @@
 		headerLoading = false;
 	}
 
-	async function fetchPage(id: string, search: string, after?: string) {
+	async function fetchPage(id: string, search: string, type: string, after?: string) {
 		const seq = ++fetchSeq;
 		loading = true;
 		if (!after) itemsFailed = false;
 		const result = await listNodes({
-			query: { after, limit: PAGE_SIZE, q: search || undefined, collection: id }
+			query: {
+				after,
+				limit: PAGE_SIZE,
+				q: search || undefined,
+				type: type || undefined,
+				collection: id
+			}
 		});
 		if (seq !== fetchSeq) return;
 		if (result.response?.status === 404) {
@@ -217,6 +232,7 @@
 			hasMore = false;
 			q = '';
 			searchInput = '';
+			selectedType = '';
 		});
 		void loadCollection(id);
 	});
@@ -224,15 +240,16 @@
 	$effect(() => {
 		const id = collectionId;
 		const search = q;
+		const type = selectedType;
 		if (!id) return;
-		void fetchPage(id, search);
+		void fetchPage(id, search, type);
 	});
 
 	function sentinel(node: HTMLElement) {
 		const observer = new IntersectionObserver(
 			(entries) => {
 				if (entries[0].isIntersecting && hasMore && !loading)
-					void fetchPage(collectionId, q, items.at(-1)?.id);
+					void fetchPage(collectionId, q, selectedType, items.at(-1)?.id);
 			},
 			{ rootMargin: '200px' }
 		);
@@ -261,7 +278,7 @@
 
 	function refreshAfterChange() {
 		void loadCollection(collectionId);
-		void fetchPage(collectionId, q);
+		void fetchPage(collectionId, q, selectedType);
 	}
 
 	async function handleRemove(item: NodeResponse) {
@@ -269,6 +286,7 @@
 		const id = collectionId;
 		const collectionName = collection?.name ?? 'collection';
 		const searchAtRemoval = q;
+		const typeAtRemoval = selectedType;
 		const index = shownItems.findIndex((i) => i.id === item.id);
 		const neighbour = shownItems[index + 1] ?? shownItems[index - 1];
 		removingId = item.id;
@@ -292,11 +310,19 @@
 		});
 		toast.success(`Removed from ${collectionName}`, {
 			duration: 5000,
-			action: { label: 'Undo', onClick: () => void undoRemove(id, item, searchAtRemoval) }
+			action: {
+				label: 'Undo',
+				onClick: () => void undoRemove(id, item, searchAtRemoval, typeAtRemoval)
+			}
 		});
 	}
 
-	async function undoRemove(id: string, item: NodeResponse, searchAtRemoval: string) {
+	async function undoRemove(
+		id: string,
+		item: NodeResponse,
+		searchAtRemoval: string,
+		typeAtRemoval: string
+	) {
 		const result = await addItemsToCollection({
 			path: { collection_id: id },
 			body: { item_ids: [item.id] }
@@ -310,7 +336,12 @@
 		// Restore in id order, unless it belongs on a page that has not loaded yet
 		const last = items.at(-1);
 		const beyondLoaded = hasMore && last !== undefined && item.id > last.id;
-		if (searchAtRemoval === q && !beyondLoaded && !items.some((i) => i.id === item.id)) {
+		if (
+			searchAtRemoval === q &&
+			typeAtRemoval === selectedType &&
+			!beyondLoaded &&
+			!items.some((i) => i.id === item.id)
+		) {
 			items = [...items, item].sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
 		}
 	}
@@ -460,9 +491,24 @@
 					class="flex h-9 min-w-0 flex-1 basis-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:max-w-sm sm:basis-auto"
 				/>
 				<div class="ml-auto flex items-center gap-2">
+					{#if showTypeFilter}
+						<NativeSelect.Root
+							size="sm"
+							class="max-sm:[&_select[data-size]]:h-11"
+							aria-label="Item type"
+							value={selectedType}
+							onchange={(e) => selectType(e.currentTarget.value)}
+						>
+							<NativeSelect.Option value="">All types</NativeSelect.Option>
+							{#each itemTypes as type (type.slug)}
+								<NativeSelect.Option value={type.slug}>{type.label}</NativeSelect.Option>
+							{/each}
+						</NativeSelect.Root>
+					{/if}
 					{#if showExampleFilter}
 						<NativeSelect.Root
 							size="sm"
+							class="max-sm:[&_select[data-size]]:h-11"
 							aria-label="Examples"
 							value={exampleFilter}
 							onchange={(e) => setExampleFilter(e.currentTarget.value as ExampleFilter)}
@@ -582,7 +628,7 @@
 			{#if itemsFailed}
 				<div class="flex flex-col items-start gap-3 rounded-xl border border-dashed p-5">
 					<p class="text-sm text-muted-foreground">Couldn't load the items in this collection.</p>
-					<Button variant="outline" onclick={() => void fetchPage(collectionId, q)}>
+					<Button variant="outline" onclick={() => void fetchPage(collectionId, q, selectedType)}>
 						Try again
 					</Button>
 				</div>
@@ -611,6 +657,15 @@
 						<Button variant="ghost" size="sm" onclick={() => (searchInput = '')}>
 							Clear search
 						</Button>
+					{:else if selectedType}
+						<SearchX class="size-10 text-muted-foreground/50" />
+						<div>
+							<p class="font-medium">Nothing matched this type</p>
+							<p class="text-sm text-muted-foreground">
+								No {typeLabels[selectedType] ?? selectedType} items in this collection
+							</p>
+						</div>
+						<Button variant="ghost" size="sm" onclick={() => selectType('')}>Show all types</Button>
 					{:else}
 						<Library class="size-10 text-muted-foreground/50" />
 						<div>
