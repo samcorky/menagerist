@@ -18,6 +18,11 @@ class InMemoryMediaAttachmentRepository:
     def __init__(self) -> None:
         self._store: dict[uuid.UUID, MediaAttachment] = {}
 
+    async def lock_target(
+        self, target_type: AttachmentTarget, target_id: uuid.UUID
+    ) -> None:
+        """Do nothing: in-memory calls never interleave inside a use case."""
+
     async def add(self, attachment: MediaAttachment) -> None:
         """Store an attachment.
 

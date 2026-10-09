@@ -1,5 +1,6 @@
 """Tests for SetMediaCover - atomically move the cover flag between attachments."""
 
+import asyncio
 import uuid
 
 import pytest
@@ -201,3 +202,78 @@ async def test_set_cover_still_replaces_an_existing_cover() -> None:
 
     assert old_att.attribute_key is None
     assert new_att.attribute_key is AttachmentKey.COVER
+
+
+class _RecordingAttachments(InMemoryMediaAttachmentRepository):
+    """Records the order of lock and read calls."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls: list[str] = []
+
+    async def lock_target(
+        self, target_type: AttachmentTarget, target_id: uuid.UUID
+    ) -> None:
+        self.calls.append("lock")
+        await super().lock_target(target_type, target_id)
+
+    async def list_for_target(
+        self, target_type: AttachmentTarget, target_id: uuid.UUID
+    ) -> list[MediaAttachment]:
+        self.calls.append("list")
+        return await super().list_for_target(target_type, target_id)
+
+
+async def test_set_cover_locks_the_target_before_reading_its_attachments() -> None:
+    """Calls for one target serialise, so the read must follow the lock."""
+    assets = InMemoryMediaAssetRepository()
+    attachments = _RecordingAttachments()
+    use_case = SetMediaCover(
+        create_in_memory_media_uow(
+            make_in_memory_repos(assets=assets, attachments=attachments)
+        )
+    )
+    node_id = uuid.uuid4()
+    asset = _make_image_asset()
+    await assets.add(asset)
+    await attachments.add(MediaAttachment.for_node(asset_id=asset.id, node_id=node_id))
+
+    await use_case.handle(
+        SetMediaCoverCommand(
+            asset_id=asset.id, target_type=AttachmentTarget.NODE, target_id=node_id
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    assert attachments.calls == ["lock", "list"]
+
+
+async def test_two_set_cover_calls_on_one_item_leave_exactly_one_cover() -> None:
+    """Last write wins and never two covers."""
+    use_case, assets, attachments = _make_use_case()
+    node_id = uuid.uuid4()
+    first, second = _make_image_asset(), _make_image_asset()
+    for asset in (first, second):
+        await assets.add(asset)
+        await attachments.add(
+            MediaAttachment.for_node(asset_id=asset.id, node_id=node_id)
+        )
+
+    await asyncio.gather(
+        *(
+            use_case.handle(
+                SetMediaCoverCommand(
+                    asset_id=asset.id,
+                    target_type=AttachmentTarget.NODE,
+                    target_id=node_id,
+                ),
+                SYSTEM_ACTOR,
+            )
+            for asset in (first, second)
+        )
+    )
+
+    covers = [
+        a for a in attachments._store.values() if a.attribute_key is AttachmentKey.COVER
+    ]
+    assert len(covers) == 1

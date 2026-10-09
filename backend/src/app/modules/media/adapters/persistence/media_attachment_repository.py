@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 import structlog
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.modules.media.adapters.persistence.models import MediaAttachmentModel
@@ -50,6 +50,15 @@ class SqlAlchemyMediaAttachmentRepository:
             attribute_key=attachment.attribute_key,
             created_at=attachment.created_at,
             updated_at=attachment.updated_at,
+        )
+
+    async def lock_target(
+        self, target_type: AttachmentTarget, target_id: uuid.UUID
+    ) -> None:
+        """Take a transaction-scoped advisory lock on the target's cover."""
+        key = f"media-cover:{target_type.value}:{target_id}"
+        await self._session.execute(
+            select(func.pg_advisory_xact_lock(func.hashtextextended(key, 0)))
         )
 
     async def add(self, attachment: MediaAttachment) -> None:

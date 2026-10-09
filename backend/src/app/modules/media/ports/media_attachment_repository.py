@@ -12,6 +12,16 @@ if TYPE_CHECKING:
 class MediaAttachmentRepository(Protocol):
     """Port for persisting and querying `MediaAttachment` records."""
 
+    async def lock_target(
+        self, target_type: AttachmentTarget, target_id: uuid.UUID
+    ) -> None:
+        """Serialise cover changes for a target until the transaction ends.
+
+        A concurrent caller for the same target waits here, then sees what the
+        first committed.
+        """
+        ...
+
     async def add(self, attachment: MediaAttachment) -> None:
         """Persist a new attachment."""
         ...

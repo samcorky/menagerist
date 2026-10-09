@@ -35,7 +35,8 @@ class SetMediaCover(
 
     Only one attachment per target may hold ``attribute_key='cover'`` at a
     time. Any existing cover holder has its flag cleared (not detached) in
-    the same transaction as the new cover is set.
+    the same transaction as the new cover is set. Calls for one target are
+    serialised, so simultaneous calls both succeed and the last one wins.
     """
 
     async def handle(
@@ -52,6 +53,8 @@ class SetMediaCover(
                     f"{asset.content_type!r} cannot be used as a cover"
                 )
 
+            # Serialise per target: a concurrent call waits, then sees our result.
+            await repos.attachments.lock_target(command.target_type, command.target_id)
             candidates = await repos.attachments.list_for_target(
                 command.target_type, command.target_id
             )
