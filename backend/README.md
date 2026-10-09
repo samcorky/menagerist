@@ -215,7 +215,7 @@ Packs are package data in `modules/examples/packs/`, read with `importlib.resour
 
 `tests/modules/examples/application/test_shipped_packs.py` runs against every pack listed in `index.json`: it installs, removes and reinstalls cleanly, checks slug prefixes, descriptions, British spelling, valid schemas and that all values match their type. `frontend/tests/example-packs.test.ts` checks the same packs from the frontend side. Neither needs editing when a pack is added.
 
-**Reinstalling after keeping things.** Anything kept on removal also keeps the item types it uses, so adding that pack again is refused (409, "You already have an item type called ...") until the user removes what was kept: its items, and then the item types they used (emptying a collection alone leaves the types in place). One edited example item or collection is enough. Removal never deletes what the user changed, and install never merges into existing types.
+**Reinstalling after keeping things.** Anything kept on removal also keeps the item types it uses. Installing the pack again re-adopts it rather than refusing: `InstallExamplePack` resolves, from the pack's installations newest first (`InstallationRepository.list_for_pack`, `adoptable_records`), every kept entity that still exists (item and relationship types must also still have the pack's slug) and records it as owned by the new installation with its original content hash, so an edited item is still kept on the next removal. `InstallResult.adopted` counts these beside `created`. A slug taken by something that is not a kept example is still a 409. Known limit: an adopted collection is left as the user has it, so items created afresh are not added to it.
 
 ## Collections
 

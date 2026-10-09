@@ -114,3 +114,25 @@ async def test_the_index_backs_the_one_active_install_rule(
 
     with pytest.raises(IntegrityError):
         await repo.add(Installation.start("demo"))
+
+
+async def test_list_for_pack_returns_every_status_newest_first(
+    db_session: AsyncSession,
+) -> None:
+    """All of a pack's installations come back, newest first, whatever the status."""
+    repo = SqlAlchemyInstallationRepository(db_session)
+    first = Installation.start("demo")
+    first.mark_removed()
+    second = Installation.start("demo")
+    second.mark_failed()
+    third = Installation.start("demo")
+    other = Installation.start("other")
+    for i in (second, other, first, third):
+        await repo.add(i)
+
+    assert [i.id for i in await repo.list_for_pack("demo")] == [
+        third.id,
+        second.id,
+        first.id,
+    ]
+    assert await repo.list_for_pack("none") == []

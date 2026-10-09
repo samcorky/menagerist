@@ -96,8 +96,14 @@ async def install_example_pack(
 ) -> InstallResultResponse:
     """Add an example set: its item types, items, connections and saved lists.
 
+    Anything an earlier removal kept (because you changed it or used it) and that
+    still exists is taken back rather than created again; `adopted` counts those and
+    `created` counts only what is new. A collection taken back is left as you have
+    it, so items created this time are not added to it.
+
     Returns 409 if the set is already added, or if you already have an item type or
-    relationship type with a name it needs (nothing is created in that case).
+    relationship type with a name it needs that is not a kept example (nothing is
+    created in that case).
     """
     result = await use_case.handle(InstallExamplePackCommand(pack_id=pack_id), actor)
     return InstallResultResponse.from_domain(result)

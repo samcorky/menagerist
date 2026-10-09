@@ -4,6 +4,7 @@ const { listExampleEntities } = vi.hoisted(() => ({ listExampleEntities: vi.fn()
 vi.mock('$lib/api/client', () => ({ listExampleEntities }));
 import {
 	describeCounts,
+	describeInstall,
 	describeRemoval,
 	dismissExamplesBanner,
 	groupKept,
@@ -93,6 +94,28 @@ describe('describeRemoval', () => {
 		expect(describeRemoval({ pack_id: 'music', removed: zero, kept: [] })).toBe(
 			'Nothing needed removing.'
 		);
+	});
+});
+
+describe('describeInstall', () => {
+	it('keeps the plain text when nothing was adopted', () => {
+		expect(
+			describeInstall({ pack_id: 'music', created: { ...zero, items: 12 }, adopted: zero })
+		).toBe('Examples added');
+	});
+	it('says plurals were already here', () => {
+		expect(
+			describeInstall({
+				pack_id: 'games',
+				created: { ...zero, items: 12 },
+				adopted: { ...zero, item_types: 1, items: 2 }
+			})
+		).toBe("Examples added. 1 item type, 2 items you'd kept were already here.");
+	});
+	it('says a single one was already here', () => {
+		expect(
+			describeInstall({ pack_id: 'games', created: zero, adopted: { ...zero, collections: 1 } })
+		).toBe("Examples added. 1 collection you'd kept was already here.");
 	});
 });
 

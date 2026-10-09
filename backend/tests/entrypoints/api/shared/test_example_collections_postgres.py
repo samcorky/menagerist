@@ -251,10 +251,10 @@ def test_deleting_an_example_item_makes_its_collection_look_edited(
     assert set(_items(client)) == {"A"}
 
 
-def test_reinstalling_makes_fresh_collections_beside_a_kept_one(
+def test_reinstalling_adopts_a_kept_collection_as_the_user_left_it(
     client: TestClient,
 ) -> None:
-    """A kept collection holding a slug does not stop the reinstall."""
+    """An emptied, kept collection is taken back untouched; the other is created."""
     _install(client)
     duo = _collections(client)["Duo"]
     # Emptied by the user: edited, so kept, but it holds no items (and so no type).
@@ -266,31 +266,40 @@ def test_reinstalling_makes_fresh_collections_beside_a_kept_one(
 
     again = _install(client)
 
-    assert again["created"]["collections"] == 2
+    assert again["adopted"]["collections"] == 1
+    assert again["created"]["collections"] == 1
     listed = client.get("/api/v1/collection").json()
-    assert sorted(c["slug"] for c in listed) == ["duo", "duo-2", "solo"]
-    fresh = next(c for c in listed if c["slug"] == "duo-2")
-    assert fresh["id"] != duo["id"]
-    assert fresh["description"] == "Two things"
-    assert _members(client, fresh["id"]) == {"A", "B"}
+    assert sorted(c["slug"] for c in listed) == ["duo", "solo"]
+    assert next(c for c in listed if c["slug"] == "duo")["id"] == duo["id"]
+    assert _members(client, duo["id"]) == set()
 
 
-def test_reinstalling_after_keeping_an_edited_collection_is_refused(
+def test_reinstalling_after_keeping_an_edited_collection_adopts_it(
     client: TestClient,
 ) -> None:
-    """Kept items keep their item type, so the same pack cannot be added again."""
+    """Kept items, their type and the edited collection are reused, not duplicated."""
     _install(client)
     duo = _collections(client)["Duo"]
-    items_before = _items(client)
     client.patch(f"/api/v1/collection/{duo['id']}", json={"name": "Mine"})
     _uninstall(client)
+    kept_items = _items(client)
 
-    refused = client.put(_INSTALL)
+    again = _install(client)
 
-    assert refused.status_code == 409, refused.text
-    assert "You already have an item type called 'thing'" in refused.json()["detail"]
-    assert set(_collections(client)) == {"Mine"}
-    assert _items(client) == {k: v for k, v in items_before.items() if k != "C"}
+    assert again["adopted"] == {
+        "presets": 0,
+        "relationship_types": 0,
+        "item_types": 1,
+        "items": 2,
+        "connections": 0,
+        "collections": 1,
+    }
+    assert (again["created"]["items"], again["created"]["collections"]) == (1, 1)
+    assert set(_collections(client)) == {"Mine", "Solo"}
+    items = _items(client)
+    assert {k: items[k] for k in ("A", "B")} == kept_items
+    assert set(items) == {"A", "B", "C"}
     assert _members(client, duo["id"]) == {"A", "B"}
     assert len(client.get("/api/v1/node-type").json()) == 1
-    assert client.get("/api/v1/example/entities").json()["collection_ids"] == []
+    # The adopted collection is left as the user has it; Solo is the pack's again.
+    assert len(client.get("/api/v1/example/entities").json()["collection_ids"]) == 2

@@ -1,5 +1,6 @@
 import { listExampleEntities } from '$lib/api/client';
 import type {
+	InstallResultResponse,
 	KeptEntityResponse,
 	PackCountsResponse,
 	UninstallResultResponse
@@ -57,6 +58,14 @@ export function describeRemoval(report: UninstallResultResponse): string {
 		)
 		.join('; ');
 	return `${first} ${kept}.`;
+}
+
+/** The toast text after an install, mentioning anything you'd kept that was taken back in. */
+export function describeInstall(result: InstallResultResponse): string {
+	const adopted = describeCounts(result.adopted);
+	if (!adopted) return 'Examples added';
+	const total = Object.values(result.adopted).reduce((sum, n) => sum + n, 0);
+	return `Examples added. ${adopted} you'd kept ${total === 1 ? 'was' : 'were'} already here.`;
 }
 
 const BANNER_KEY = 'menagerist.examples.bannerDismissed';

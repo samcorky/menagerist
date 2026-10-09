@@ -472,29 +472,24 @@ test('an example item on your own collection is kept when the pack goes', async 
 	await expect(page.getByText('Pocket Orchard', { exact: true }).first()).toBeVisible();
 });
 
-test('reinstalling while kept items hold the item types gives a friendly error', async ({
+test('reinstalling after keeping items adopts them instead of duplicating', async ({
 	page,
 	request
 }) => {
 	const renamed = uniqueName('Edited night');
 	await installEditAndRemoveGames(page, renamed);
-	const before = (await (await request.get('/api/v1/node?limit=500')).json()) as {
-		type: string | null;
-	}[];
-	const keptCount = before.filter((n) => n.type?.startsWith('games-')).length;
-	expect(keptCount).toBeGreaterThan(0);
+	const list = async () =>
+		(await (await request.get('/api/v1/node?limit=500')).json()) as { name: string }[];
+	expect((await list()).filter((n) => n.name === 'Lantern Harbour')).toHaveLength(1);
 
 	await page.goto('/settings/examples');
 	await page.getByRole('button', { name: /^Add Board games/ }).click();
-	await expect(page.getByText("Couldn't add these examples")).toBeVisible();
-	await expect(page.getByText(/You already have an item type called/)).toBeVisible();
-	await expect(page.getByRole('button', { name: /^Add Board games/ })).toBeVisible();
+	await expect(page.getByText('Examples added')).toBeVisible();
+	await expect(page.getByText(/you'd kept (was|were) already here/)).toBeVisible();
 
-	const after = (await (await request.get('/api/v1/node?limit=500')).json()) as {
-		type: string | null;
-	}[];
-	expect(after.filter((n) => n.type?.startsWith('games-'))).toHaveLength(keptCount);
+	for (const item of FAMILY_NIGHT_ITEMS) {
+		expect((await list()).filter((n) => n.name === item)).toHaveLength(1);
+	}
 	await page.goto('/collections');
-	await expect(collectionCard(page, renamed)).toBeVisible();
-	await expect(collectionCard(page, 'Wishlist')).toHaveCount(0);
+	await expect(collectionCard(page, renamed)).toHaveCount(1);
 });

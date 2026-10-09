@@ -110,3 +110,12 @@ class SqlAlchemyInstallationRepository:
             .order_by(ExampleInstallationModel.id)
         )
         return [_to_domain(m) for m in (await self._session.execute(stmt)).scalars()]
+
+    async def list_for_pack(self, pack_id: str) -> list[Installation]:
+        """Return every installation of `pack_id`, whatever its status, newest first."""
+        stmt = (
+            select(ExampleInstallationModel)
+            .where(ExampleInstallationModel.pack_id == pack_id)
+            .order_by(ExampleInstallationModel.id.desc())
+        )
+        return [_to_domain(m) for m in (await self._session.execute(stmt)).scalars()]

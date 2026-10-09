@@ -28,3 +28,7 @@ class InstallationRepository(Protocol):
     async def list_active(self) -> list[Installation]:
         """Return every installing or installed installation."""
         ...
+
+    async def list_for_pack(self, pack_id: str) -> list[Installation]:
+        """Return every installation of `pack_id`, whatever its status, newest first."""
+        ...

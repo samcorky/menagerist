@@ -69,13 +69,14 @@ async def settle_installation(
     return kept
 
 
-async def _inspect(
+async def inspect_record(
     record: EntityRecord,
     *,
     presets: PresetTarget,
     graph: GraphTarget,
     collections: CollectionTarget,
 ) -> Inspection | None:
+    """Return the entity behind `record` as it is now, or `None` if it is gone."""
     if record.kind is EntityKind.PRESET:
         return await presets.inspect(record.entity_id)
     if record.kind is EntityKind.COLLECTION:
@@ -106,7 +107,7 @@ async def _settle_one(
     collections: CollectionTarget,
 ) -> str | None:
     """Settle one record; return the reason it was kept, or `None`."""
-    inspection = await _inspect(
+    inspection = await inspect_record(
         record, presets=presets, graph=graph, collections=collections
     )
     decision = decide_removal(

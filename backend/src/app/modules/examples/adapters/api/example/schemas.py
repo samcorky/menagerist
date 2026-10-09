@@ -23,6 +23,14 @@ _COUNTS_EXAMPLE: dict[str, Any] = {
     "connections": 14,
     "collections": 2,
 }
+_ADOPTED_EXAMPLE: dict[str, Any] = {
+    "presets": 0,
+    "relationship_types": 0,
+    "item_types": 1,
+    "items": 1,
+    "connections": 0,
+    "collections": 0,
+}
 _KEPT_EXAMPLE: dict[str, Any] = {
     "kind": "item",
     "label": "Blue (my copy)",
@@ -124,16 +132,23 @@ class ExamplePackResponse(BaseModel):
 
 
 class InstallResultResponse(BaseModel):
-    """What adding an example set created."""
+    """What adding an example set created, and what it took back."""
 
     model_config = ConfigDict(
         json_schema_extra={
-            "examples": [{"pack_id": "vinyl", "created": _COUNTS_EXAMPLE}]
+            "examples": [
+                {
+                    "pack_id": "vinyl",
+                    "created": _COUNTS_EXAMPLE,
+                    "adopted": _ADOPTED_EXAMPLE,
+                }
+            ]
         }
     )
 
     pack_id: str
     created: PackCountsResponse
+    adopted: PackCountsResponse
 
     @classmethod
     def from_domain(cls, result: InstallResult) -> InstallResultResponse:
@@ -141,6 +156,7 @@ class InstallResultResponse(BaseModel):
         return cls(
             pack_id=result.pack_id,
             created=PackCountsResponse.from_domain(result.created),
+            adopted=PackCountsResponse.from_domain(result.adopted),
         )
 
 

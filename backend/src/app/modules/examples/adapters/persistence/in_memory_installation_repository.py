@@ -41,3 +41,11 @@ class InMemoryInstallationRepository:
             (i for i in self._installations.values() if i.is_active),
             key=lambda i: i.id,
         )
+
+    async def list_for_pack(self, pack_id: str) -> list[Installation]:
+        """Return every installation of `pack_id`, whatever its status, newest first."""
+        return sorted(
+            (i for i in self._installations.values() if i.pack_id == pack_id),
+            key=lambda i: i.id,
+            reverse=True,
+        )

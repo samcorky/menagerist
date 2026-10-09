@@ -2,9 +2,13 @@ import uuid
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from app.modules.examples.domain.errors import InvalidInstallationStateError
 from app.shared_kernel.mixins import Identifiable, Timestamped
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class InstallationStatus(StrEnum):
@@ -164,3 +168,19 @@ class Installation(Identifiable, Timestamped):
     def _require_nothing_owned(self) -> None:
         if self.owned():
             raise InvalidInstallationStateError("the pack still owns entities")
+
+
+def adoptable_records(
+    installations: Sequence[Installation],
+) -> dict[tuple[EntityKind, str], EntityRecord]:
+    """Return the entities a pack left behind and may take back, by (kind, ref).
+
+    `installations` must be newest first. For each (kind, ref) the newest record
+    decides: it is adoptable only if it was kept, so a later removal or a later
+    owned record supersedes older kept ones.
+    """
+    newest: dict[tuple[EntityKind, str], EntityRecord] = {}
+    for installation in installations:
+        for record in installation.entities:
+            newest.setdefault((record.kind, record.ref), record)
+    return {key: r for key, r in newest.items() if r.outcome is Outcome.KEPT}

@@ -12,7 +12,7 @@ from app.modules.examples.application.uninstall_example_pack import (
     UninstallExamplePackCommand,
     UninstallResult,
 )
-from app.modules.examples.domain.errors import PackNotInstalledError, SlugClashError
+from app.modules.examples.domain.errors import PackNotInstalledError
 from app.modules.examples.domain.installation import (
     EntityKind,
     InstallationStatus,
@@ -231,15 +231,17 @@ async def test_a_preset_another_type_uses_is_kept(make_world: MakeWorld) -> None
 
 
 async def test_kept_entities_are_no_longer_the_packs(make_world: MakeWorld) -> None:
-    """A kept type's slug blocks a clean reinstall until the user deals with it."""
+    """Once removed, a kept entity belongs to the user, not the closed installation."""
     world = await _installed(make_world)
     blue = await _node(world, "Blue")
     blue.name = "Mine now"
     await world.graph_repos.nodes.save(blue)
     await _uninstall(world)
 
-    with pytest.raises(SlugClashError):
-        await _install(world)
+    assert await world.installations.get_active_for_pack("demo") is None
+    assert [
+        n.name for n in await world.graph_repos.nodes.list(after=None, limit=10)
+    ] == ["Mine now"]
 
 
 async def test_an_unfinished_installation_is_resumed(make_world: MakeWorld) -> None:

@@ -68,6 +68,32 @@ def test_install_returns_what_was_created(make_world: MakeWorld) -> None:
     body = response.json()
     assert body["pack_id"] == "demo"
     assert body["created"]["item_types"] == 2
+    assert body["adopted"] == {
+        "presets": 0,
+        "relationship_types": 0,
+        "item_types": 0,
+        "items": 0,
+        "connections": 0,
+        "collections": 0,
+    }
+
+
+def test_reinstall_reports_what_it_adopted(make_world: MakeWorld) -> None:
+    """Kept, edited examples are taken back and counted as adopted, not created."""
+    world = make_world()
+    client = _client(world)
+    client.put("/api/v1/example/demo/installation")
+    blue = asyncio.run(_blue(world))
+    blue.name = "Blue (my copy)"
+    asyncio.run(world.graph_repos.nodes.save(blue))
+    client.delete("/api/v1/example/demo/installation")
+
+    response = client.put("/api/v1/example/demo/installation")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["adopted"]["items"], body["adopted"]["item_types"]) == (1, 1)
+    assert (body["created"]["items"], body["created"]["item_types"]) == (1, 1)
 
 
 def test_install_twice_is_a_409_and_unknown_is_a_404(make_world: MakeWorld) -> None:

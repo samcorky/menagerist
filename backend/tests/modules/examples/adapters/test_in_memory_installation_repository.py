@@ -38,3 +38,19 @@ async def test_active_lookup_ignores_removed_and_failed() -> None:
     assert await repo.get_active_for_pack("demo") is live
     assert await repo.get_active_for_pack("other") is None
     assert await repo.list_active() == [live]
+
+
+async def test_list_for_pack_returns_every_status_newest_first() -> None:
+    """Every installation of the pack is listed, newest first, others excluded."""
+    repo = InMemoryInstallationRepository()
+    first = Installation.start("demo")
+    first.mark_removed()
+    second = Installation.start("demo")
+    second.mark_failed()
+    third = Installation.start("demo")
+    other = Installation.start("other")
+    for i in (second, other, first, third):
+        await repo.add(i)
+
+    assert await repo.list_for_pack("demo") == [third, second, first]
+    assert await repo.list_for_pack("none") == []

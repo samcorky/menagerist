@@ -14,6 +14,7 @@
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import {
 		describeCounts,
+		describeInstall,
 		describeRemoval,
 		groupKept,
 		invalidateExampleIds,
@@ -75,7 +76,7 @@
 			invalidateExampleIds();
 			const refreshed = await listExamplePacks();
 			if (refreshed.data) packs = refreshed.data;
-			toast.success('Examples added', {
+			toast.success(describeInstall(result.data), {
 				action: { label: 'View items', onClick: () => void goto(resolve('/items')) }
 			});
 		}

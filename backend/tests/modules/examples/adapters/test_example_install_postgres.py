@@ -69,6 +69,7 @@ def test_install_uninstall_and_reinstall_on_postgres(
     first = client.put("/api/v1/example/demo/installation")
     assert first.status_code == 200, first.text
     assert first.json()["created"]["items"] == 2
+    assert first.json()["adopted"]["items"] == 0
 
     listed = client.get("/api/v1/example").json()
     assert listed[0]["installation"]["status"] == "installed"
@@ -82,3 +83,34 @@ def test_install_uninstall_and_reinstall_on_postgres(
     again = client.put("/api/v1/example/demo/installation")
     assert again.status_code == 200, again.text
     client.delete("/api/v1/example/demo/installation")
+
+
+def test_reinstall_adopts_an_edited_item_on_postgres(client: TestClient) -> None:
+    """A removal keeps an edited item and its type; the next install takes them back."""
+    assert client.put("/api/v1/example/demo/installation").status_code == 200
+    items = {n["name"]: n for n in client.get("/api/v1/node?limit=100").json()}
+    patched = client.patch(
+        f"/api/v1/node/{items['A']['id']}",
+        json={"name": "Mine"},
+    )
+    assert patched.status_code == 200, patched.text
+    removed = client.delete("/api/v1/example/demo/installation").json()
+    assert {(k["kind"], k["reason"]) for k in removed["kept"]} >= {
+        ("item", "edited"),
+        ("item_type", "still in use"),
+    }
+
+    again = client.put("/api/v1/example/demo/installation")
+
+    assert again.status_code == 200, again.text
+    body = again.json()
+    assert (body["adopted"]["items"], body["adopted"]["item_types"]) == (1, 1)
+    assert (body["created"]["items"], body["created"]["item_types"]) == (1, 0)
+    names = sorted(n["name"] for n in client.get("/api/v1/node?limit=100").json())
+    assert names == ["B", "Mine"]
+    assert len(client.get("/api/v1/node-type").json()) == 1
+    # Still protected: another removal keeps the edited item.
+    second = client.delete("/api/v1/example/demo/installation").json()
+    assert ("item", "A", "edited") in {
+        (k["kind"], k["label"], k["reason"]) for k in second["kept"]
+    }

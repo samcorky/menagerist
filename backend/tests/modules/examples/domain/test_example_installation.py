@@ -11,6 +11,7 @@ from app.modules.examples.domain.installation import (
     Installation,
     InstallationStatus,
     Outcome,
+    adoptable_records,
 )
 
 
@@ -172,3 +173,55 @@ def test_collection_is_a_kind_removed_between_connections_and_items() -> None:
     assert order.index(EntityKind.CONNECTION) + 1 == order.index(EntityKind.COLLECTION)
     assert order.index(EntityKind.COLLECTION) + 1 == order.index(EntityKind.ITEM)
     assert set(order) == set(EntityKind)
+
+
+def _closed(*records: tuple[EntityKind, str, Outcome]) -> Installation:
+    """An installation whose entities were all settled as given."""
+    installation = _started()
+    for kind, ref, outcome in records:
+        entity_id = uuid.uuid7()
+        installation.record(kind, ref, ref, entity_id, "hash")
+        if outcome is not Outcome.OWNED:
+            installation.settle(entity_id, outcome)
+    return installation
+
+
+def test_a_kept_record_is_adoptable() -> None:
+    """The only record for a (kind, ref) decides: kept means adoptable."""
+    kept = _closed((EntityKind.ITEM, "a", Outcome.KEPT))
+    removed = _closed((EntityKind.ITEM, "b", Outcome.REMOVED))
+
+    found = adoptable_records([kept, removed])
+
+    assert set(found) == {(EntityKind.ITEM, "a")}
+    assert found[(EntityKind.ITEM, "a")] is kept.entities[0]
+
+
+def test_a_newer_removal_supersedes_an_older_kept_record() -> None:
+    """Newest first: a later removed (or owned) record hides an earlier kept one."""
+    old = _closed(
+        (EntityKind.ITEM, "a", Outcome.KEPT), (EntityKind.ITEM, "b", Outcome.KEPT)
+    )
+    new = _closed(
+        (EntityKind.ITEM, "a", Outcome.REMOVED), (EntityKind.ITEM, "b", Outcome.OWNED)
+    )
+
+    assert adoptable_records([new, old]) == {}
+
+
+def test_the_newest_kept_record_wins_over_older_rounds() -> None:
+    """Two rounds that both kept the same thing resolve to the newer record."""
+    old = _closed((EntityKind.ITEM, "a", Outcome.KEPT))
+    new = _closed((EntityKind.ITEM, "a", Outcome.KEPT))
+
+    found = adoptable_records([new, old])
+
+    assert found[(EntityKind.ITEM, "a")] is new.entities[0]
+
+
+def test_kinds_are_resolved_separately() -> None:
+    """The same ref under another kind is a different entity."""
+    old = _closed((EntityKind.ITEM_TYPE, "a", Outcome.KEPT))
+    new = _closed((EntityKind.ITEM, "a", Outcome.REMOVED))
+
+    assert set(adoptable_records([new, old])) == {(EntityKind.ITEM_TYPE, "a")}
