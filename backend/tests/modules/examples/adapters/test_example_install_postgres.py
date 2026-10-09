@@ -1,18 +1,44 @@
+import io
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 import pytest
 import sqlalchemy
+from fastapi import Depends
+from PIL import Image
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker  # noqa: TC002
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
+from app.entrypoints.api.shared.example_targets import (
+    CoverPackTarget,
+    build_cover_stores,
+    get_cover_pack_target,
+)
 from app.modules.examples.adapters.api.dependencies import get_pack_catalogue
+from app.modules.examples.adapters.covers.pillow_cover_renderer import (
+    PillowCoverRenderer,
+)
 from app.modules.examples.adapters.platform.file_pack_catalogue import FilePackCatalogue
+from app.modules.examples.domain.errors import InstallFailedError
+from app.modules.examples.ports.pack_targets import Created  # noqa: TC001
+from app.modules.media.adapters.api.dependencies import get_media_storage
+from app.modules.media.adapters.imaging.pillow_processor import PillowImageProcessor
+from app.modules.media.adapters.policy.content_type_attachment_policy import (
+    ContentTypeAttachmentPolicy,
+)
+from app.modules.media.adapters.storage.local_filesystem import (
+    LocalFilesystemMediaStorage,
+)
+from app.modules.media.ports.media_storage import MediaStoragePort  # noqa: TC001
 from app.platform.database import get_engine, get_session_factory
 
 if TYPE_CHECKING:
+    import uuid
     from collections.abc import Iterator
     from pathlib import Path
+
+    from fastapi import FastAPI
 
 pytestmark = pytest.mark.integration
 
@@ -21,7 +47,14 @@ def _wipe(sync_url: str) -> None:
     """Remove what the test committed; the database is shared across the session."""
     engine = sqlalchemy.create_engine(sync_url)
     with engine.begin() as connection:
-        for table in ("edges", "nodes", "node_types", "edge_types"):
+        for table in (
+            "media_attachments",
+            "media_assets",
+            "edges",
+            "nodes",
+            "node_types",
+            "edge_types",
+        ):
             connection.execute(sqlalchemy.text(f"DELETE FROM {table}"))
         connection.execute(sqlalchemy.text("DELETE FROM example_installations"))
         connection.execute(sqlalchemy.text("DELETE FROM presets WHERE NOT builtin"))
@@ -29,10 +62,38 @@ def _wipe(sync_url: str) -> None:
 
 
 @pytest.fixture
+def media_dir(tmp_path: Path) -> Path:
+    """Where the real media storage writes in these tests."""
+    return tmp_path / "media"
+
+
+def _own_png() -> bytes:
+    """A real image of the person's own."""
+    buffer = io.BytesIO()
+    Image.new("RGB", (8, 8), (200, 30, 30)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _media_state(sync_url: str, media_dir: Path) -> tuple[int, int, int]:
+    """Return (assets, attachments, stored files incl. thumbnails)."""
+    engine = sqlalchemy.create_engine(sync_url)
+    with engine.connect() as connection:
+        assets = connection.execute(
+            sqlalchemy.text("SELECT count(*) FROM media_assets")
+        ).scalar_one()
+        attachments = connection.execute(
+            sqlalchemy.text("SELECT count(*) FROM media_attachments")
+        ).scalar_one()
+    engine.dispose()
+    return assets, attachments, sum(1 for f in media_dir.rglob("*") if f.is_file())
+
+
+@pytest.fixture
 def client(
     postgres_url: str,
     postgres_sync_url: str,
     tmp_path: Path,
+    media_dir: Path,
     pack_data: dict[str, Any],
 ) -> Iterator[TestClient]:
     """An in-process client on the real app, dependencies and Postgres.
@@ -44,14 +105,31 @@ def client(
     index = {
         "format": "menagerist-examples-index",
         "version": 1,
-        "packs": [{"id": "demo", "name": "Demo", "description": "A tiny pack."}],
+        "packs": [
+            {"id": "demo", "name": "Demo", "description": "A tiny pack."},
+            {"id": "tune", "name": "Tune", "description": "A non-ASCII name."},
+        ],
     }
+    tune = {
+        "format": "menagerist-example-pack",
+        "version": 3,
+        "id": "tune",
+        "item_types": [
+            {"ref": "song", "slug": "song", "label": "Song", "cover": {"style": "card"}}
+        ],
+        "items": [{"ref": "s", "type": "song", "name": "Łódź 🎵"}],
+    }
+    (tmp_path / "tune.json").write_text(json.dumps(tune), encoding="utf-8")
     (tmp_path / "index.json").write_text(json.dumps(index), encoding="utf-8")
+    pack_data["version"] = 3
+    pack_data["item_types"][0]["cover"] = {"style": "sleeve"}
     (tmp_path / "demo.json").write_text(json.dumps(pack_data), encoding="utf-8")
     get_session_factory.cache_clear()
     get_engine.cache_clear()
     app = create_app()
     app.dependency_overrides[get_pack_catalogue] = lambda: FilePackCatalogue(tmp_path)
+    storage = LocalFilesystemMediaStorage(media_dir)
+    app.dependency_overrides[get_media_storage] = lambda: storage
     try:
         with TestClient(app) as c:
             yield c
@@ -114,3 +192,115 @@ def test_reinstall_adopts_an_edited_item_on_postgres(client: TestClient) -> None
     assert ("item", "A", "edited") in {
         (k["kind"], k["label"], k["reason"]) for k in second["kept"]
     }
+
+
+def test_covers_are_attached_then_removed_without_leaving_media_behind(
+    client: TestClient, postgres_sync_url: str, media_dir: Path
+) -> None:
+    """Two covered items: two assets, attachments and files (plus thumbnails)."""
+    assert client.put("/api/v1/example/demo/installation").status_code == 200
+
+    assets, attachments, files = _media_state(postgres_sync_url, media_dir)
+    assert (assets, attachments) == (2, 2)
+    assert files >= 2  # the images, and a thumbnail beside each
+    items = client.get("/api/v1/node?limit=100").json()
+    assert len(items) == 2
+    for item in items:
+        media = client.get(f"/api/v1/media/for-node/{item['id']}").json()
+        assert [m["attribute_key"] for m in media] == ["cover"]
+
+    removed = client.delete("/api/v1/example/demo/installation")
+
+    assert removed.status_code == 200, removed.text
+    assert removed.json()["kept"] == []
+    assert _media_state(postgres_sync_url, media_dir) == (0, 0, 0)
+
+
+def test_a_replaced_cover_survives_removal_with_its_item(
+    client: TestClient, postgres_sync_url: str, media_dir: Path
+) -> None:
+    """Swapping in the person's own image keeps that item, and only that item."""
+    assert client.put("/api/v1/example/demo/installation").status_code == 200
+    items = {n["name"]: n for n in client.get("/api/v1/node?limit=100").json()}
+    target = {"target_type": "node", "target_id": items["A"]["id"]}
+    mine = client.post(
+        "/api/v1/media/attached",
+        data=target,
+        files={"file": ("mine.png", _own_png(), "image/png")},
+    )
+    assert mine.status_code == 201, mine.text
+    set_cover = client.post(
+        f"/api/v1/media/{mine.json()['asset_id']}/attachments/cover", json=target
+    )
+    assert set_cover.status_code == 200, set_cover.text
+
+    removed = client.delete("/api/v1/example/demo/installation").json()
+
+    assert ("item", "A", "has your connections, files or collections") in {
+        (k["kind"], k["label"], k["reason"]) for k in removed["kept"]
+    }
+    assert all(k["kind"] != "cover" for k in removed["kept"])
+    assert [n["name"] for n in client.get("/api/v1/node?limit=100").json()] == ["A"]
+    assets, attachments, _ = _media_state(postgres_sync_url, media_dir)
+    assert (assets, attachments) == (2, 2)  # the pack's image stays beside theirs
+
+    again = client.put("/api/v1/example/demo/installation")
+
+    assert again.status_code == 200, again.text
+    assert again.json()["adopted"]["items"] == 1
+    assert _media_state(postgres_sync_url, media_dir)[:2] == (3, 3)  # only B is new
+
+
+def test_a_cover_for_a_non_latin1_item_name_can_be_fetched(client: TestClient) -> None:
+    """The asset filename carries the name, and its headers must still encode."""
+    assert client.put("/api/v1/example/tune/installation").status_code == 200
+    [item] = client.get("/api/v1/node?limit=100").json()
+    [media] = client.get(f"/api/v1/media/for-node/{item['id']}").json()
+    assert media["filename"] == "Łódź 🎵 (card).png"
+
+    thumbnail = client.get(media["thumbnail_url"])
+    content = client.get(media["content_url"])
+
+    assert thumbnail.status_code == 200
+    assert content.status_code == 200
+    assert "filename*=UTF-8''" in thumbnail.headers["content-disposition"]
+    assert client.delete("/api/v1/example/tune/installation").status_code == 200
+
+
+def test_a_failure_part_way_through_the_covers_leaves_no_media(
+    client: TestClient, postgres_sync_url: str, media_dir: Path
+) -> None:
+    """The second cover fails; the first one's asset, row and files are removed."""
+
+    class FailingSecond(CoverPackTarget):
+        calls = 0
+
+        async def create(self, item_id: uuid.UUID, name: str, style: str) -> Created:
+            type(self).calls += 1
+            if type(self).calls == 2:
+                raise RuntimeError("cover boom")
+            return await super().create(item_id, name, style)
+
+    def failing(
+        session_factory: Annotated[
+            async_sessionmaker[AsyncSession], Depends(get_session_factory)
+        ],
+        storage: Annotated[MediaStoragePort, Depends(get_media_storage)],
+    ) -> CoverPackTarget:
+        return FailingSecond(
+            build_cover_stores(session_factory),
+            renderer=PillowCoverRenderer(),
+            storage=storage,
+            policy=ContentTypeAttachmentPolicy(),
+            image_processor=PillowImageProcessor(),
+        )
+
+    app = cast("FastAPI", client.app)
+    app.dependency_overrides[get_cover_pack_target] = failing
+
+    with pytest.raises(InstallFailedError, match="Nothing was left behind"):
+        client.put("/api/v1/example/demo/installation")
+
+    assert _media_state(postgres_sync_url, media_dir) == (0, 0, 0)
+    assert client.get("/api/v1/node?limit=100").json() == []
+    assert client.get("/api/v1/node-type").json() == []

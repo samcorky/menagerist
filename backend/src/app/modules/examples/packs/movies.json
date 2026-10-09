@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 2,
+  "version": 3,
   "id": "movies",
   "relationship_types": [
     {
@@ -97,6 +97,9 @@
       "slug": "movies-film",
       "label": "Film",
       "description": "A film you have watched or want to remember.",
+      "cover": {
+        "style": "poster"
+      },
       "attributes_schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",

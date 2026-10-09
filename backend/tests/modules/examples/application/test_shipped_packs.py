@@ -56,13 +56,18 @@ async def _load(pack_id: str) -> ExamplePack:
 
 async def _install(world: World, pack_id: str) -> Any:  # noqa: ANN401
     return await InstallExamplePack(
-        world.uow, world.catalogue, world.presets, world.graph, world.collections
+        world.uow,
+        world.catalogue,
+        world.presets,
+        world.graph,
+        world.collections,
+        world.covers,
     ).handle(InstallExamplePackCommand(pack_id=pack_id), SYSTEM_ACTOR)
 
 
 async def _uninstall(world: World, pack_id: str) -> Any:  # noqa: ANN401
     return await UninstallExamplePack(
-        world.uow, world.presets, world.graph, world.collections
+        world.uow, world.presets, world.graph, world.collections, world.covers
     ).handle(UninstallExamplePackCommand(pack_id=pack_id), SYSTEM_ACTOR)
 
 

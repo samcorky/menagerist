@@ -8,11 +8,16 @@ from typing import Any
 import pytest
 
 from app.entrypoints.api.shared.example_targets import (
+    CoverPackTarget,
     GraphPackTarget,
     GraphStores,
     PresetPackTarget,
+    in_memory_cover_stores,
     in_memory_graph_stores,
     in_memory_preset_stores,
+)
+from app.modules.examples.adapters.covers.in_memory_cover_renderer import (
+    InMemoryCoverRenderer,
 )
 from app.modules.examples.adapters.persistence.in_memory_installation_repository import (  # noqa: E501
     InMemoryInstallationRepository,
@@ -45,11 +50,20 @@ from app.modules.graph.adapters.persistence.in_memory_node_type_repository impor
     InMemoryNodeTypeRepository,
 )
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.modules.media.adapters.imaging.in_memory_image_processor import (
+    InMemoryImageProcessor,
+)
 from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
     InMemoryMediaAssetRepository,
 )
 from app.modules.media.adapters.persistence.in_memory_media_attachment_repository import (  # noqa: E501
     InMemoryMediaAttachmentRepository,
+)
+from app.modules.media.adapters.policy.content_type_attachment_policy import (
+    ContentTypeAttachmentPolicy,
+)
+from app.modules.media.adapters.storage.in_memory_media_storage import (
+    InMemoryMediaStorage,
 )
 from app.modules.media.ports.unit_of_work import MediaRepos
 from app.modules.presets.adapters.persistence.in_memory_preset_repository import (
@@ -167,6 +181,41 @@ class WorldGraphTarget(GraphPackTarget):
         return await super().remove(kind, entity_id)
 
 
+class WorldCoverTarget(CoverPackTarget):
+    """Real cover target over in-memory media that records and can fail its calls."""
+
+    def __init__(
+        self,
+        repos: MediaRepos,
+        storage: InMemoryMediaStorage,
+        events: list[str],
+    ) -> None:
+        super().__init__(
+            in_memory_cover_stores(repos),
+            renderer=InMemoryCoverRenderer(),
+            storage=storage,
+            policy=ContentTypeAttachmentPolicy(),
+            image_processor=InMemoryImageProcessor(),
+        )
+        self.events = events  # removal calls, shared with the other targets
+        self.create_calls: list[tuple[uuid.UUID, str, str]] = []
+        self.removed: list[uuid.UUID] = []
+        self.fail_on_call: int | None = None  # make this create call fail
+
+    async def create(self, item_id: uuid.UUID, name: str, style: str) -> Created:
+        """Create the cover, recording the call."""
+        self.create_calls.append((item_id, name, style))
+        if self.fail_on_call == len(self.create_calls):
+            raise RuntimeError("cover boom")
+        return await super().create(item_id, name, style)
+
+    async def remove(self, cover_id: uuid.UUID) -> RemoveResult:
+        """Remove the cover, recording the call."""
+        self.events.append("cover")
+        self.removed.append(cover_id)
+        return await super().remove(cover_id)
+
+
 @dataclass(kw_only=True)
 class World:
     """Everything an application test needs, all in memory."""
@@ -180,6 +229,8 @@ class World:
     presets: PresetPackTarget
     graph: WorldGraphTarget
     collections: InMemoryCollectionTarget
+    covers: WorldCoverTarget
+    storage: InMemoryMediaStorage
 
 
 SamplePack = Callable[..., ExamplePack]
@@ -249,6 +300,7 @@ def _make_world(*packs: ExamplePack) -> World:
     for pack in packs or (_sample_pack(),):
         catalogue.add(pack, name=pack.id.title(), description=f"{pack.id} examples")
     collections = InMemoryCollectionTarget()
+    storage = InMemoryMediaStorage()
     return World(
         graph_repos=graph_repos,
         preset_repos=preset_repos,
@@ -262,6 +314,8 @@ def _make_world(*packs: ExamplePack) -> World:
             collections,
         ),
         collections=collections,
+        covers=WorldCoverTarget(media_repos, storage, collections.events),
+        storage=storage,
     )
 
 

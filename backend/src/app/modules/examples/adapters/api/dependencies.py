@@ -5,9 +5,11 @@ from fastapi import Depends
 
 from app.entrypoints.api.shared.example_targets import (
     CollectionPackTarget,
+    CoverPackTarget,
     GraphPackTarget,
     PresetPackTarget,
     get_collection_pack_target,
+    get_cover_pack_target,
     get_graph_pack_target,
     get_preset_pack_target,
 )
@@ -78,8 +80,9 @@ def get_install_example_pack_use_case(
     presets: Annotated[PresetPackTarget, Depends(get_preset_pack_target)],
     graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
     collections: Annotated[CollectionPackTarget, Depends(get_collection_pack_target)],
+    covers: Annotated[CoverPackTarget, Depends(get_cover_pack_target)],
 ) -> InstallExamplePack:
-    return InstallExamplePack(uow, catalogue, presets, graph, collections)
+    return InstallExamplePack(uow, catalogue, presets, graph, collections, covers)
 
 
 def get_uninstall_example_pack_use_case(
@@ -87,5 +90,6 @@ def get_uninstall_example_pack_use_case(
     presets: Annotated[PresetPackTarget, Depends(get_preset_pack_target)],
     graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
     collections: Annotated[CollectionPackTarget, Depends(get_collection_pack_target)],
+    covers: Annotated[CoverPackTarget, Depends(get_cover_pack_target)],
 ) -> UninstallExamplePack:
-    return UninstallExamplePack(uow, presets, graph, collections)
+    return UninstallExamplePack(uow, presets, graph, collections, covers)

@@ -19,6 +19,8 @@ _REF_RULE = "must be lowercase letters, digits and hyphens"
 # Mirrors the collections module's name limit; examples must not import it.
 _MAX_COLLECTION_NAME = 120
 
+COVER_STYLES = ("sleeve", "poster", "box", "card")
+
 
 def _is_marker(value: dict[str, Any]) -> bool:
     return set(value) == {PRESET_MARKER} and isinstance(value[PRESET_MARKER], str)
@@ -74,6 +76,13 @@ class PackRelationshipType:
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
+class PackCover:
+    """How the covers of a type's items are drawn."""
+
+    style: str
+
+
+@dataclass(kw_only=True, frozen=True, eq=False)
 class PackItemType:
     """An item type (a node type) the pack creates."""
 
@@ -82,6 +91,15 @@ class PackItemType:
     label: str
     description: str | None = None
     attributes_schema: dict[str, Any] | None = None
+    cover: PackCover | None = None
+
+    def __post_init__(self) -> None:
+        """Reject a cover style outside the closed set."""
+        if self.cover is not None and self.cover.style not in COVER_STYLES:
+            raise InvalidPackError(
+                f"item type '{self.ref}' has unknown cover style "
+                + f"'{self.cover.style}'; use one of {', '.join(COVER_STYLES)}"
+            )
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)

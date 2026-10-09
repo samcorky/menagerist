@@ -1,10 +1,12 @@
 import copy
+from dataclasses import asdict
 from typing import Any
 
 import pytest
 
 from app.modules.examples.adapters.platform.pack_parser import parse_index, parse_pack
 from app.modules.examples.domain.errors import InvalidPackError
+from app.modules.examples.domain.pack import PackCover
 
 _INDEX: dict[str, Any] = {
     "format": "menagerist-examples-index",
@@ -51,7 +53,7 @@ def _mutated(data: dict[str, Any], path: list[str | int], value: object) -> obje
 
 _BAD: list[tuple[list[str | int], object]] = [
     (["format"], "other"),
-    (["version"], 3),
+    (["version"], 4),
     (["surprise"], 1),
     (["items"], "nope"),
     (["items", 0], "nope"),
@@ -254,3 +256,88 @@ def test_a_collection_missing_a_key_is_an_invalid_pack_error(
 
     with pytest.raises(InvalidPackError):
         parse_pack(data)
+
+
+def test_a_v3_pack_parses_item_type_covers(pack_data: dict[str, Any]) -> None:
+    """A version 3 item type may carry a cover style."""
+    pack_data["version"] = 3
+    pack_data["item_types"][0]["cover"] = {"style": "poster"}
+
+    pack = parse_pack(pack_data)
+
+    assert isinstance(pack.item_types[0].cover, PackCover)
+    assert pack.item_types[0].cover.style == "poster"
+    assert asdict(pack.counts) == {
+        "presets": 1,
+        "relationship_types": 1,
+        "item_types": 1,
+        "items": 2,
+        "connections": 1,
+        "collections": 0,
+    }
+
+
+def test_a_cover_is_optional(pack_data: dict[str, Any]) -> None:
+    """Item types without a cover parse with `cover` unset, on every version."""
+    for version in (1, 2, 3):
+        pack = parse_pack({**pack_data, "version": version})
+        assert pack.item_types[0].cover is None
+
+
+@pytest.mark.parametrize("version", [1, 2])
+def test_a_cover_is_accepted_on_older_versions(
+    pack_data: dict[str, Any], version: int
+) -> None:
+    """The parser does not gate `cover` by version; it is documented as v3."""
+    pack_data["version"] = version
+    pack_data["item_types"][0]["cover"] = {"style": "box"}
+
+    cover = parse_pack(pack_data).item_types[0].cover
+    assert cover is not None
+    assert cover.style == "box"
+
+
+@pytest.mark.parametrize(
+    "cover",
+    [
+        {"style": "hologram"},
+        {"style": 3},
+        {},
+        {"style": "card", "colour": "red"},
+        "poster",
+        ["card"],
+    ],
+)
+def test_a_malformed_cover_is_an_invalid_pack_error(
+    pack_data: dict[str, Any], cover: object
+) -> None:
+    """Unknown styles, wrong types, missing or extra keys are rejected."""
+    pack_data["version"] = 3
+    pack_data["item_types"][0]["cover"] = cover
+
+    with pytest.raises(InvalidPackError):
+        parse_pack(pack_data)
+
+
+def test_a_null_cover_means_no_cover(pack_data: dict[str, Any]) -> None:
+    """An explicit `cover: null` parses as no cover."""
+    pack_data["item_types"][0]["cover"] = None
+
+    assert parse_pack(pack_data).item_types[0].cover is None
+
+
+def test_a_v3_pack_may_carry_collections(pack_data: dict[str, Any]) -> None:
+    """Version 3 keeps the `collections` section that version 2 introduced."""
+    pack = parse_pack({**_v2_with_collections(pack_data), "version": 3})
+
+    assert pack.counts.collections == 2
+
+
+def test_an_unknown_cover_style_names_its_item_type(
+    pack_data: dict[str, Any],
+) -> None:
+    """The error says which item type has the bad style."""
+    pack_data["item_types"][0]["cover"] = {"style": "hologram"}
+
+    with pytest.raises(InvalidPackError, match="'thing'"):
+        parse_pack(pack_data)

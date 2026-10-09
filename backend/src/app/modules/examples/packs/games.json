@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 2,
+  "version": 3,
   "id": "games",
   "relationship_types": [
     {
@@ -72,6 +72,9 @@
       "slug": "games-game",
       "label": "Game",
       "description": "A board game on the shelf or on the wishlist, with how it plays and what state it is in.",
+      "cover": {
+        "style": "box"
+      },
       "attributes_schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",

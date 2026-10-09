@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 2,
+  "version": 3,
   "id": "music",
   "presets": [
     {
@@ -164,6 +164,9 @@
       "slug": "music-record",
       "label": "Record",
       "description": "A record in the collection, with how it was pressed, how it plays and what it cost.",
+      "cover": {
+        "style": "sleeve"
+      },
       "attributes_schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",

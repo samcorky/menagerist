@@ -22,6 +22,7 @@ from app.modules.examples.domain.pack import ExamplePack, PackCounts
 from app.modules.examples.ports.pack_catalogue import PackCatalogue  # noqa: TC001
 from app.modules.examples.ports.pack_targets import (  # noqa: TC001
     CollectionTarget,
+    CoverTarget,
     GraphTarget,
     PresetTarget,
 )
@@ -103,13 +104,15 @@ class InstallExamplePack(
         presets: PresetTarget,
         graph: GraphTarget,
         collections: CollectionTarget,
+        covers: CoverTarget,
     ) -> None:
-        """Initialise with the unit of work, catalogue and the three targets."""
+        """Initialise with the unit of work, catalogue and the four targets."""
         super().__init__(uow)
         self._catalogue = catalogue
         self._presets = presets
         self._graph = graph
         self._collections = collections
+        self._covers = covers
 
     async def handle(
         self, command: InstallExamplePackCommand, actor: Actor
@@ -172,6 +175,7 @@ class InstallExamplePack(
             for n in range(len(pack.connections))
         }
         slugs |= {(EntityKind.COLLECTION, c.ref): None for c in pack.collections}
+        slugs |= {(EntityKind.COVER, ref): None for ref in _covered(pack)}
 
         adoptions: dict[_Key, _Adoption] = {}
         for key, expected_slug in slugs.items():
@@ -183,6 +187,7 @@ class InstallExamplePack(
                 presets=self._presets,
                 graph=self._graph,
                 collections=self._collections,
+                covers=self._covers,
             )
             if inspection is None:
                 continue
@@ -223,6 +228,7 @@ class InstallExamplePack(
         await self._install_items(run)
         await self._install_connections(run)
         await self._install_collections(run)
+        await self._install_covers(run)
 
     async def _record(
         self,
@@ -372,6 +378,37 @@ class InstallExamplePack(
                 created.content,
             )
 
+    async def _install_covers(self, run: _Run) -> None:
+        """Give every item whose type declares a cover style its cover.
+
+        Last, so a failure in any earlier step happens before any image is
+        written. A kept cover comes back only with its adopted item, and an
+        adopted item that already has a cover of the person's own gets none.
+        """
+        styles = _cover_styles(run.pack)
+        for spec in run.pack.items:
+            style = styles.get(spec.type_ref)
+            if style is None:
+                continue
+            name = run.item_names[spec.ref]
+            was_adopted = (EntityKind.ITEM, spec.ref) in run.adopted
+            adoption = run.adoptions.get((EntityKind.COVER, spec.ref))
+            if adoption is not None and was_adopted:
+                await self._adopt(run, adoption, spec.ref, name)
+                continue
+            # The person's own cover is never replaced.
+            if was_adopted and await self._covers.has_cover(run.item_ids[spec.ref]):
+                continue
+            created = await self._covers.create(run.item_ids[spec.ref], name, style)
+            await self._record(
+                run,
+                EntityKind.COVER,
+                spec.ref,
+                name,
+                created.entity_id,
+                created.content,
+            )
+
     async def _roll_back(
         self, installation: Installation, cause: Exception
     ) -> NoReturn:
@@ -382,6 +419,7 @@ class InstallExamplePack(
                 presets=self._presets,
                 graph=self._graph,
                 collections=self._collections,
+                covers=self._covers,
                 persist=self._persist,
             )
             installation.mark_failed()
@@ -404,6 +442,17 @@ class InstallExamplePack(
         raise InstallFailedError(
             f"Adding '{installation.pack_id}' failed ({cause}). {outcome}"
         ) from cause
+
+
+def _cover_styles(pack: ExamplePack) -> dict[str, str]:
+    """Return the cover style of each item type (by ref) that declares one."""
+    return {t.ref: t.cover.style for t in pack.item_types if t.cover is not None}
+
+
+def _covered(pack: ExamplePack) -> list[str]:
+    """Return the refs of the items that get a cover."""
+    styles = _cover_styles(pack)
+    return [i.ref for i in pack.items if i.type_ref in styles]
 
 
 def installation_counts(installation: Installation) -> PackCounts:

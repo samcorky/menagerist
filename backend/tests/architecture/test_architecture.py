@@ -139,9 +139,9 @@ def test_no_circular_dependencies() -> None:
     assert_passes(rule)
 
 
-def test_examples_module_is_independent_of_graph_presets_and_collections() -> None:
-    """`examples` reaches `graph`, `presets` and `collections` only through ports."""
-    for other in ("graph", "presets", "collections"):
+def test_examples_module_is_independent_of_other_modules() -> None:
+    """`examples` reaches `graph`, `presets`, `collections`, `media` only via ports."""
+    for other in ("graph", "presets", "collections", "media"):
         rule = (
             project_files(SRC_PATH)
             .in_folder("*modules/examples*")

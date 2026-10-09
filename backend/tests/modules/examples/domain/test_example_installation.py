@@ -225,3 +225,10 @@ def test_kinds_are_resolved_separately() -> None:
     new = _closed((EntityKind.ITEM, "a", Outcome.REMOVED))
 
     assert set(adoptable_records([new, old])) == {(EntityKind.ITEM_TYPE, "a")}
+
+
+def test_cover_is_a_kind_removed_first() -> None:
+    """Covers are removed before anything else, items included."""
+    assert EntityKind.COVER.value == "cover"
+    assert EntityKind("cover") is EntityKind.COVER
+    assert REMOVAL_ORDER[0] is EntityKind.COVER

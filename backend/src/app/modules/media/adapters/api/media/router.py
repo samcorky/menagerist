@@ -36,6 +36,7 @@ from app.modules.media.adapters.api.media.content_caching import (
     content_cache_headers,
     thumbnail_cache_headers,
 )
+from app.modules.media.adapters.api.media.content_disposition import content_disposition
 from app.modules.media.adapters.api.media.schemas import (
     AttachMediaRequest,
     CoverRequest,
@@ -278,7 +279,9 @@ async def stream_media_content(
         storage.retrieve(asset.id, asset.status),
         media_type=asset.content_type,
         headers={
-            "Content-Disposition": f'{disposition_type}; filename="{asset.filename}"',
+            "Content-Disposition": content_disposition(
+                disposition_type, asset.filename
+            ),
             "Content-Length": str(asset.size),
             **content_cache_headers(asset),
         },
@@ -322,7 +325,9 @@ async def stream_media_thumbnail(
         storage.retrieve_thumbnail(asset.id, asset.status),
         media_type="image/webp",
         headers={
-            "Content-Disposition": f'inline; filename="{asset.filename}.webp"',
+            "Content-Disposition": content_disposition(
+                "inline", f"{asset.filename}.webp"
+            ),
             **thumbnail_cache_headers(asset),
         },
     )

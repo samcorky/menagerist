@@ -29,6 +29,7 @@ class EntityKind(StrEnum):
     ITEM = "item"
     CONNECTION = "connection"
     COLLECTION = "collection"
+    COVER = "cover"
 
 
 class Outcome(StrEnum):
@@ -41,6 +42,7 @@ class Outcome(StrEnum):
 
 # The reverse of install order: a thing goes before whatever it depends on.
 REMOVAL_ORDER = (
+    EntityKind.COVER,
     EntityKind.CONNECTION,
     EntityKind.COLLECTION,
     EntityKind.ITEM,

@@ -6,6 +6,7 @@ import pytest
 
 from app.modules.examples.domain.errors import InvalidPackError
 from app.modules.examples.domain.pack import (
+    COVER_STYLES,
     MAX_CONNECTIONS,
     MAX_ITEMS,
     MAX_PRESETS,
@@ -13,6 +14,7 @@ from app.modules.examples.domain.pack import (
     ExamplePack,
     PackCollection,
     PackConnection,
+    PackCover,
     PackItem,
     PackItemType,
     PackPreset,
@@ -271,3 +273,17 @@ def test_a_collection_name_over_120_characters_is_rejected() -> None:
     """The error names the collection's ref."""
     with pytest.raises(InvalidPackError, match=r"collection 'both'.*120"):
         _pack(collections=(_collection(name="n" * 121),))
+
+
+def test_cover_styles_are_closed() -> None:
+    """The cover styles are a fixed set, and each builds a cover."""
+    assert COVER_STYLES == ("sleeve", "poster", "box", "card")
+    assert all(PackCover(style=s).style == s for s in COVER_STYLES)
+
+
+def test_an_unknown_cover_style_is_rejected() -> None:
+    """An item type with a cover style outside the closed set cannot be built."""
+    with pytest.raises(InvalidPackError, match=r"'record'.*cover style"):
+        PackItemType(
+            ref="record", slug="record", label="Record", cover=PackCover(style="x")
+        )

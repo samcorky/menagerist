@@ -9,6 +9,7 @@ from app.modules.examples.domain.installation import EntityKind, Installation, O
 from app.modules.examples.domain.pack import PackCounts
 from app.modules.examples.ports.pack_targets import (  # noqa: TC001
     CollectionTarget,
+    CoverTarget,
     GraphTarget,
     PresetTarget,
 )
@@ -53,11 +54,13 @@ class UninstallExamplePack(
         presets: PresetTarget,
         graph: GraphTarget,
         collections: CollectionTarget,
+        covers: CoverTarget,
     ) -> None:
         super().__init__(uow)
         self._presets = presets
         self._graph = graph
         self._collections = collections
+        self._covers = covers
 
     async def handle(
         self,
@@ -77,6 +80,7 @@ class UninstallExamplePack(
             presets=self._presets,
             graph=self._graph,
             collections=self._collections,
+            covers=self._covers,
             persist=self._persist,
         )
         installation.mark_removed()

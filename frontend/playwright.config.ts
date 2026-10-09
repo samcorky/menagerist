@@ -1,4 +1,5 @@
-import { availableParallelism } from 'node:os';
+import { availableParallelism, tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 
@@ -60,7 +61,9 @@ export default defineConfig({
 		cwd: '..',
 		env: {
 			MENAGERIST_DATABASE_URL: `postgresql+asyncpg://menagerist:menagerist@localhost:55433/menagerist_w${i}`,
-			MENAGERIST_FRONTEND_DIST_PATH: FRONTEND_DIST
+			MENAGERIST_FRONTEND_DIST_PATH: FRONTEND_DIST,
+			// Example covers are stored as media, so each backend needs a writable directory.
+			MENAGERIST_MEDIA_STORAGE_PATH: join(tmpdir(), `menagerist-e2e-media-w${i}`)
 		},
 		url: `http://localhost:${BACKEND_PORT + i}/api/health/ready`,
 		reuseExistingServer: !process.env.CI,

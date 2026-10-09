@@ -32,7 +32,12 @@ if TYPE_CHECKING:
 
 async def _install(world: World) -> None:
     await InstallExamplePack(
-        world.uow, world.catalogue, world.presets, world.graph, world.collections
+        world.uow,
+        world.catalogue,
+        world.presets,
+        world.graph,
+        world.collections,
+        world.covers,
     ).handle(InstallExamplePackCommand(pack_id="demo"), SYSTEM_ACTOR)
 
 
@@ -44,7 +49,7 @@ async def _installed(make_world: MakeWorld) -> World:
 
 async def _uninstall(world: World, pack_id: str = "demo") -> UninstallResult:
     return await UninstallExamplePack(
-        world.uow, world.presets, world.graph, world.collections
+        world.uow, world.presets, world.graph, world.collections, world.covers
     ).handle(UninstallExamplePackCommand(pack_id=pack_id), SYSTEM_ACTOR)
 
 

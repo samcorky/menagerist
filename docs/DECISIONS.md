@@ -629,3 +629,13 @@ So a plain private array is the source of truth, `active` is a write-only `$stat
 **Rationale:** `unaccent` is a trusted extension on Postgres 13+, so the application role can create it without superuser rights.
 
 **Consequence:** no index is affected because none exist on these columns; if one is added later it needs an immutable wrapper around `unaccent`. Characters such as "ß" or "ø" follow the extension's rules in Postgres but not the in-memory NFD fold.
+
+## Example packs generate covers as removable PNGs
+
+**Decision (2026-10-09):** pack format version 3 lets an item type declare `cover: {style}`; installing draws a cover per item of that type (records get a sleeve, films a poster, board games a box, recipes a card). Covers are PNG, not SVG, because the media module treats SVG as unsafe and refuses it. Rendering is deterministic from the item name (colour and initial), so a reinstall gives identical bytes. `examples` owns a `CoverTarget` port, bridged to media in `entrypoints/api/shared/`, so it imports neither media nor graph.
+
+**Removal:** a cover is a removable entity settled before items, so a pack's own cover is never counted as the person's file. An untouched cover is deleted; a cover the person replaced is their file, so it is kept and keeps its item. Reinstall re-adopts a kept cover and never takes over a cover the person added to an item that had none.
+
+**Also fixed:** media's `Content-Disposition` now uses RFC 6266 encoding, so non-ASCII file names download correctly.
+
+**Known limit:** the built-in Pillow font draws only ASCII initials; a name starting with another character shows "?". Every shipped item name starts with an ASCII letter. A bundled font would lift this.

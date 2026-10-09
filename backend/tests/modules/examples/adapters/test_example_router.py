@@ -7,6 +7,7 @@ from starlette.testclient import TestClient
 from app.entrypoints.api import create_app
 from app.entrypoints.api.shared.example_targets import (
     get_collection_pack_target,
+    get_cover_pack_target,
     get_graph_pack_target,
     get_preset_pack_target,
 )
@@ -36,6 +37,7 @@ def _client(world: World, *, raise_server_exceptions: bool = True) -> TestClient
     app.dependency_overrides[get_preset_pack_target] = lambda: world.presets
     app.dependency_overrides[get_graph_pack_target] = lambda: world.graph
     app.dependency_overrides[get_collection_pack_target] = lambda: world.collections
+    app.dependency_overrides[get_cover_pack_target] = lambda: world.covers
     return TestClient(app, raise_server_exceptions=raise_server_exceptions)
 
 

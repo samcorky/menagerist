@@ -275,3 +275,24 @@ def test_stream_thumbnail_returns_404_when_no_thumbnail() -> None:
 
     response = client.get(f"/api/v1/media/{stage['id']}/thumbnail")
     assert response.status_code == 404
+
+
+def test_content_and_thumbnail_serve_a_non_latin1_filename() -> None:
+    """A name outside latin-1 gets an ASCII fallback and an RFC 5987 name."""
+    app, _, _ = _app_with_in_memory_media()
+    client = TestClient(app)
+    stage = client.post(
+        "/api/v1/media",
+        files={"file": ("☃ Snow (sleeve).jpg", TINY_JPEG, "image/jpeg")},
+    ).json()
+
+    content = client.get(f"/api/v1/media/{stage['id']}/content")
+    thumbnail = client.get(f"/api/v1/media/{stage['id']}/thumbnail")
+
+    assert content.status_code == 200
+    assert thumbnail.status_code == 200
+    encoded = "%E2%98%83%20Snow%20%28sleeve%29"
+    assert content.headers["content-disposition"] == (
+        f"inline; filename=\"_ Snow (sleeve).jpg\"; filename*=UTF-8''{encoded}.jpg"
+    )
+    assert thumbnail.headers["content-disposition"].endswith(f"{encoded}.jpg.webp")

@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 2,
+  "version": 3,
   "id": "recipes",
   "relationship_types": [
     {
@@ -34,6 +34,9 @@
       "slug": "recipes-recipe",
       "label": "Recipe",
       "description": "A recipe with its timings, ingredients table and full method.",
+      "cover": {
+        "style": "card"
+      },
       "attributes_schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",

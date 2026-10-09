@@ -493,3 +493,141 @@ test('reinstalling after keeping items adopts them instead of duplicating', asyn
 	await page.goto('/collections');
 	await expect(collectionCard(page, renamed)).toHaveCount(1);
 });
+
+// Generated covers on example items.
+
+// A valid 1x1 PNG standing in for a cover the person uploads.
+const OWN_COVER = Buffer.from(
+	'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+	'base64'
+);
+
+type ApiNode = { id: string; name: string; type: string | null };
+type ApiMedia = { id: string; filename: string; attribute_key: string | null };
+
+async function nodesNamed(request: APIRequestContext, name: string): Promise<ApiNode[]> {
+	const nodes = (await (await request.get('/api/v1/node?limit=500')).json()) as ApiNode[];
+	return nodes.filter((n) => n.name === name);
+}
+
+async function nodeNamed(request: APIRequestContext, name: string): Promise<ApiNode> {
+	const found = await nodesNamed(request, name);
+	expect(found).toHaveLength(1);
+	return found[0];
+}
+
+async function mediaOf(request: APIRequestContext, nodeId: string): Promise<ApiMedia[]> {
+	const res = await request.get(`/api/v1/media/for-node/${nodeId}`);
+	return res.ok() ? ((await res.json()) as ApiMedia[]) : [];
+}
+
+const coverOf = async (request: APIRequestContext, nodeId: string) =>
+	(await mediaOf(request, nodeId)).find((m) => m.attribute_key === 'cover');
+
+/** Uploads an image and makes it the node's cover, replacing any current one (as the UI does). */
+async function setOwnCover(request: APIRequestContext, nodeId: string) {
+	const res = await request.post('/api/v1/media/attached', {
+		multipart: {
+			file: { name: 'mine.png', mimeType: 'image/png', buffer: OWN_COVER },
+			target_type: 'node',
+			target_id: nodeId
+		}
+	});
+	expect(res.ok(), await res.text()).toBeTruthy();
+	const asset = (await res.json()) as { media_id?: string; asset_id?: string; id?: string };
+	const assetId = asset.media_id ?? asset.asset_id ?? asset.id;
+	const cover = await request.post(`/api/v1/media/${assetId}/attachments/cover`, {
+		data: { target_type: 'node', target_id: nodeId }
+	});
+	expect(cover.ok(), await cover.text()).toBeTruthy();
+}
+
+async function installViaApi(request: APIRequestContext, pack: string) {
+	const res = await request.put(`/api/v1/example/${pack}/installation`);
+	expect(res.ok()).toBeTruthy();
+}
+
+async function removeViaApi(request: APIRequestContext, pack: string) {
+	const res = await request.delete(`/api/v1/example/${pack}/installation`);
+	expect(res.ok()).toBeTruthy();
+}
+
+test('a film example shows a loaded cover and a person example shows none', async ({
+	page,
+	request
+}) => {
+	await install(page, MOVIES);
+	const film = await nodeNamed(request, 'Cold Harbour');
+	const nodes = (await (await request.get('/api/v1/node?limit=500')).json()) as ApiNode[];
+	const person = nodes.find((n) => n.type === 'movies-person')!;
+
+	await page.goto(`/items/${film.id}`);
+	const image = page.locator('img[src*="/media/"]').first();
+	await expect(image).toBeVisible();
+	await expect
+		.poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth))
+		.toBeGreaterThan(0);
+
+	await page.goto(`/items/${person.id}`);
+	await expect(page.getByText(person.name, { exact: true }).first()).toBeVisible();
+	await expect(page.locator('img[src*="/media/"]')).toHaveCount(0);
+	expect(await mediaOf(request, person.id)).toHaveLength(0);
+});
+
+test('removing a pack removes its items and their covers', async ({ page, request }) => {
+	await install(page, MOVIES);
+	const film = await nodeNamed(request, 'Cold Harbour');
+	const cover = await coverOf(request, film.id);
+	expect(cover).toBeTruthy();
+
+	await remove(page, MOVIES);
+	await expect(page.getByRole('region', { name: /Notifications/ })).toContainText('Removed');
+
+	expect(await nodesNamed(request, 'Cold Harbour')).toHaveLength(0);
+	expect(await mediaOf(request, film.id)).toHaveLength(0);
+	expect((await request.get(`/api/v1/media/${cover!.id}`)).status()).toBe(404);
+});
+
+test('a replaced cover keeps its game through removal and reinstall', async ({ request }) => {
+	await installViaApi(request, 'games');
+	const game = await nodeNamed(request, 'Lantern Harbour');
+	expect(await coverOf(request, game.id)).toBeTruthy();
+
+	await setOwnCover(request, game.id);
+	expect((await coverOf(request, game.id))?.filename).toBe('mine.png');
+
+	await removeViaApi(request, 'games');
+	expect(await nodesNamed(request, 'Tea Clipper Race')).toHaveLength(0);
+	const kept = await nodeNamed(request, 'Lantern Harbour');
+	expect(kept.id).toBe(game.id);
+	expect((await coverOf(request, kept.id))?.filename).toBe('mine.png');
+
+	await installViaApi(request, 'games');
+	expect(await nodesNamed(request, 'Lantern Harbour')).toHaveLength(1);
+	expect((await nodeNamed(request, 'Lantern Harbour')).id).toBe(game.id);
+	expect((await coverOf(request, game.id))?.filename).toBe('mine.png');
+	expect(await nodesNamed(request, 'Tea Clipper Race')).toHaveLength(1);
+});
+
+test('your own cover on an example game survives removal and reinstall', async ({ request }) => {
+	await installViaApi(request, 'games');
+	const game = await nodeNamed(request, 'Pocket Orchard');
+	const packCover = await coverOf(request, game.id);
+	expect(packCover).toBeTruthy();
+
+	// Take the pack's cover off first, so the game's only cover is the person's own.
+	const detach = await request.delete(`/api/v1/media/${packCover!.id}/attachments`, {
+		data: { target_type: 'node', target_id: game.id, attribute_key: 'cover' }
+	});
+	expect(detach.ok(), await detach.text()).toBeTruthy();
+	expect(await coverOf(request, game.id)).toBeUndefined();
+	await setOwnCover(request, game.id);
+
+	await removeViaApi(request, 'games');
+	expect((await nodeNamed(request, 'Pocket Orchard')).id).toBe(game.id);
+	expect((await coverOf(request, game.id))?.filename).toBe('mine.png');
+
+	await installViaApi(request, 'games');
+	expect(await nodesNamed(request, 'Pocket Orchard')).toHaveLength(1);
+	expect((await coverOf(request, game.id))?.filename).toBe('mine.png');
+});
