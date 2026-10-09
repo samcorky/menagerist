@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import { GROUP_CAPS } from '../src/lib/palette-search';
 import {
 	SEARCH_RESULT_LIMIT,
 	seeAllSearch,
+	seeAllCollectionsPath,
+	collectionsAtCap,
 	normaliseQuery,
 	liveMessage,
 	MAX_QUERY_LENGTH,
@@ -19,6 +22,25 @@ describe('normaliseQuery', () => {
 	});
 	it('caps the length', () => {
 		expect(normaliseQuery('a'.repeat(500))).toHaveLength(MAX_QUERY_LENGTH);
+	});
+});
+
+describe('seeAllCollectionsPath', () => {
+	it('opens the collections page with the trimmed, encoded query', () => {
+		expect(seeAllCollectionsPath('  blue sky  ')).toBe('/collections?q=blue+sky');
+		expect(seeAllCollectionsPath('a&b#c')).toBe('/collections?q=a%26b%23c');
+	});
+	it('caps the query like the items row', () => {
+		const q = new URLSearchParams(seeAllCollectionsPath('x'.repeat(1000)).split('?')[1]).get('q');
+		expect(q).toHaveLength(MAX_QUERY_LENGTH);
+	});
+});
+
+describe('collectionsAtCap', () => {
+	it('is true once the group shows its cap of rows', () => {
+		expect(collectionsAtCap(0)).toBe(false);
+		expect(collectionsAtCap(GROUP_CAPS.collections - 1)).toBe(false);
+		expect(collectionsAtCap(GROUP_CAPS.collections)).toBe(true);
 	});
 });
 

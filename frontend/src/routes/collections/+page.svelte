@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { Library, Plus } from '@lucide/svelte';
-	import { tick } from 'svelte';
+	import { page } from '$app/state';
+	import { Library, Plus, SearchX } from '@lucide/svelte';
+	import { tick, untrack } from 'svelte';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 	import { createCollection, listCollections, type CollectionResponse } from '$lib/api/client';
 	import { networkAwareError } from '$lib/api/errors';
@@ -21,6 +23,7 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import { loadExampleIds } from '$lib/examples';
+	import { normaliseQuery } from '$lib/search-palette';
 
 	const PAGE_SIZE = 50;
 
@@ -29,6 +32,9 @@
 	let loadFailed = $state(false);
 	let hasMore = $state(false);
 	let exampleCollectionIds = $state<ReadonlySet<string>>(new Set());
+	let fetchSeq = 0;
+	let searchInput = $state('');
+	let q = $state('');
 
 	let dialogOpen = $state(false);
 	let name = $state('');
@@ -47,10 +53,50 @@
 	const nameHint = $derived(validateCollectionName(name));
 	const showNameHint = $derived(touched && nameHint !== null);
 
+	const showControls = $derived(
+		!loadFailed && (collections.length > 0 || loading || q !== '' || searchInput !== '')
+	);
+
+	// Pick up ?q= from the URL (the search popup's "See all collections"), then drop it so the
+	// same link works again after the box has been cleared.
+	$effect(() => {
+		const urlQ = normaliseQuery(page.url.searchParams.get('q'));
+		if (!urlQ) return;
+		if (urlQ !== untrack(() => q)) {
+			collections = [];
+			hasMore = false;
+			q = urlQ;
+		}
+		searchInput = urlQ;
+		const params = new SvelteURLSearchParams(page.url.searchParams);
+		params.delete('q');
+		const rest = params.toString();
+		void goto(resolve(rest ? `/collections?${rest}` : '/collections'), {
+			replaceState: true,
+			keepFocus: true,
+			noScroll: true
+		});
+	});
+
+	$effect(() => {
+		const value = normaliseQuery(searchInput);
+		const timer = setTimeout(() => {
+			if (value === q) return;
+			collections = [];
+			hasMore = false;
+			q = value;
+		}, 300);
+		return () => clearTimeout(timer);
+	});
+
 	async function fetchPage(after?: string) {
+		const seq = ++fetchSeq;
 		loading = true;
 		if (!after) loadFailed = false;
-		const result = await listCollections({ query: { after, limit: PAGE_SIZE } });
+		const result = await listCollections({
+			query: { after, limit: PAGE_SIZE, q: q || undefined }
+		});
+		if (seq !== fetchSeq) return;
 		if (result.error || !result.data) {
 			if (after) {
 				const { title, description } = networkAwareError(result);
@@ -68,6 +114,9 @@
 
 	$effect(() => {
 		void fetchPage();
+	});
+
+	$effect(() => {
 		void loadExampleIds().then((ids) => (exampleCollectionIds = ids.collections));
 	});
 
@@ -139,13 +188,23 @@
 				<h1 class="font-heading text-3xl font-semibold tracking-tight">Collections</h1>
 				<p class="mt-1 text-muted-foreground">Group your items into named collections.</p>
 			</div>
-			{#if !loadFailed && (collections.length > 0 || loading)}
+			{#if showControls}
 				<Button onclick={openDialog}>
 					<Plus class="size-4" />
 					New collection
 				</Button>
 			{/if}
 		</div>
+
+		{#if showControls}
+			<input
+				bind:value={searchInput}
+				type="search"
+				placeholder="Search your collections…"
+				aria-label="Search your collections"
+				class="flex h-11 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:h-9 sm:max-w-sm sm:text-sm"
+			/>
+		{/if}
 
 		{#if loadingDisplay.show && collections.length === 0}
 			<div class="grid gap-4 sm:grid-cols-2" aria-hidden="true">
@@ -189,6 +248,17 @@
 					</li>
 				{/each}
 			</ul>
+		{:else if !loading && q}
+			<div class="flex flex-col items-center gap-3 py-12 text-center">
+				<SearchX class="size-10 text-muted-foreground/50" aria-hidden="true" />
+				<div>
+					<p class="font-medium">Nothing matched "{q}"</p>
+					<p class="text-sm text-muted-foreground">Try a different search term</p>
+				</div>
+				<Button variant="ghost" class="min-h-11 sm:min-h-8" onclick={() => (searchInput = '')}>
+					Clear search
+				</Button>
+			</div>
 		{:else if !loading}
 			<div
 				class="flex flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-12 text-center"

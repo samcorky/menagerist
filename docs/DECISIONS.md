@@ -620,6 +620,8 @@ So a plain private array is the source of truth, `active` is a write-only `$stat
 
 **Consequence:** one keystroke burst costs up to two requests (items, collections); a single endpoint would cut that and allow cross-group ranking.
 
+**Collections follow-up (2026-10-09):** the collections page gained a search box that uses the collection `q` (same debounce, `?q=` pick-up and "Nothing matched" state as the items page). When the popup's Collections group is full (`GROUP_CAPS.collections` rows, so more may exist) it adds a last "See all collections" row that opens `/collections?q=...`. It is a normal row of that group: it joins arrow-key navigation, is disabled while the group is stale and follows the same focus rules.
+
 ## Text search ignores accents via the unaccent extension
 
 **Decision (2026-10-09):** "cafe" finds "Café" and "café" finds "Cafe". Postgres matches with `unaccent(column) ILIKE unaccent(pattern)` (LIKE escaping unchanged) for item name, description and attribute values, for attribute-value suggestions, and for `q` on collections. A migration runs `CREATE EXTENSION IF NOT EXISTS unaccent`; its downgrade is a deliberate no-op because the extension may be shared. The in-memory repositories fold the same way (Unicode NFD, drop combining marks, casefold), each module with its own small helper so `graph` and `collections` stay independent. This replaces the earlier "accents are not folded" note in the grouped-search entry.

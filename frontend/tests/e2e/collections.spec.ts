@@ -429,3 +429,53 @@ test('the Collections navigation entry opens /collections', async ({ page }) => 
 	await page.waitForURL(/\/collections$/);
 	await expect(page.getByRole('heading', { name: 'Collections', level: 1 })).toBeVisible();
 });
+
+test.describe('collections page search', () => {
+	const box = (page: Page) => page.getByPlaceholder('Search your collections…');
+	const card = (page: Page, name: string) => page.getByRole('link', { name: new RegExp(name) });
+
+	test('filters the list as you type and shows a not-found state', async ({ page, request }) => {
+		const word = uniqueName('Quokka');
+		const match = await makeCollection(request, `${word} trio`);
+		const other = await makeCollection(request, uniqueName('Wombat'));
+
+		await page.goto('/collections');
+		await expect(card(page, other.name)).toBeVisible();
+		await box(page).fill(word);
+		await expect(card(page, match.name)).toBeVisible();
+		await expect(card(page, other.name)).toBeHidden();
+
+		await box(page).fill('zzz-no-match-zzz');
+		await expect(page.getByText('Nothing matched "zzz-no-match-zzz"')).toBeVisible();
+		await expect(page.getByText('No collections yet')).toBeHidden();
+
+		await page.getByRole('button', { name: 'Clear search' }).click();
+		await expect(box(page)).toHaveValue('');
+		await expect(card(page, match.name)).toBeVisible();
+		await expect(card(page, other.name)).toBeVisible();
+	});
+
+	test('?q= pre-fills the box and filters, then leaves the URL clean', async ({
+		page,
+		request
+	}) => {
+		const word = uniqueName('Pangolin');
+		const match = await makeCollection(request, `${word} set`);
+		const other = await makeCollection(request, uniqueName('Ocelot'));
+
+		await page.goto(`/collections?${new URLSearchParams({ q: word })}`);
+		await expect(box(page)).toHaveValue(word);
+		await expect(card(page, match.name)).toBeVisible();
+		await expect(card(page, other.name)).toBeHidden();
+		await expect(page).toHaveURL(/\/collections$/);
+	});
+
+	test('matches accents: "cafe" finds a Café collection', async ({ page, request }) => {
+		const name = uniqueName('Café');
+		const collection = await makeCollection(request, name);
+
+		await page.goto('/collections');
+		await box(page).fill(name.replace('Café', 'cafe'));
+		await expect(card(page, collection.name)).toBeVisible();
+	});
+});

@@ -1,4 +1,5 @@
 import type { MatchContext } from '$lib/search-context';
+import { GROUP_CAPS } from '$lib/palette-search';
 
 export const SEARCH_RESULT_LIMIT = 8;
 export const MAX_QUERY_LENGTH = 200;
@@ -11,6 +12,16 @@ export function normaliseQuery(raw: string | null | undefined): string {
 /** The search string (`q=...`, for `/items?${...}`) that opens the items page with the text searched. */
 export function seeAllSearch(query: string): string {
 	return new URLSearchParams({ q: normaliseQuery(query) }).toString();
+}
+
+/** The path that opens the collections page with the text searched. */
+export function seeAllCollectionsPath(query: string): `/collections?${string}` {
+	return `/collections?${seeAllSearch(query)}`;
+}
+
+/** A full Collections group may be hiding more matches, so it offers "See all collections". */
+export function collectionsAtCap(rowCount: number): boolean {
+	return rowCount >= GROUP_CAPS.collections;
 }
 
 /** "Film · Director: Nolan": the type label and match context that are present. */

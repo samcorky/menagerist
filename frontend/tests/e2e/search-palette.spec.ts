@@ -1,4 +1,5 @@
 import { test, expect, type Page } from './fixtures';
+import { GROUP_CAPS } from '../../src/lib/palette-search';
 import {
 	failCollectionSearch,
 	ownedData,
@@ -376,4 +377,45 @@ test('the status region says Searching… then one final count, never a partial 
 	// Any intermediate text is the spinner message; exactly one count, and it is the last.
 	expect(seen.at(-1)).toMatch(/^\d+ results?$/);
 	expect(seen.slice(0, -1).every((text) => text === 'Searching…')).toBe(true);
+});
+
+test('See all collections appears when the group is full and opens the filtered page', async ({
+	page,
+	request
+}) => {
+	const word = uniqueName('Zebrafinch');
+	for (let i = 0; i <= GROUP_CAPS.collections; i++) {
+		await makeCollection(request, `${word} ${i}`);
+	}
+
+	await openWithSlash(page);
+	await input(page).fill(word);
+	const row = popup(page).getByRole('option', { name: 'See all collections' });
+	await expect(row).toBeVisible();
+	await expect(popup(page).getByRole('option', { name: new RegExp(word) })).toHaveCount(
+		GROUP_CAPS.collections
+	);
+
+	// Last row in the Collections group, reachable by keyboard once the highlight has settled
+	await expect(popup(page).getByRole('option').first()).toHaveAttribute('aria-selected', 'true');
+	for (let i = 0; i < GROUP_CAPS.collections; i++) await page.keyboard.press('ArrowDown');
+	await expect(row).toHaveAttribute('aria-selected', 'true');
+	await page.keyboard.press('Enter');
+	await expect(page).toHaveURL(/\/collections(\?q=|$)/);
+	await expect(popup(page)).toBeHidden();
+	await expect(page.getByPlaceholder('Search your collections…')).toHaveValue(word);
+	await expect(page.getByRole('link', { name: new RegExp(`${word} \\d`) })).toHaveCount(
+		GROUP_CAPS.collections + 1
+	);
+});
+
+test('a group below its cap has no See all collections row', async ({ page, request }) => {
+	const collection = await makeCollection(request, uniqueName('Lonely collection'));
+
+	await openWithSlash(page);
+	await input(page).fill(collection.name);
+	await expect(
+		popup(page).getByRole('option', { name: new RegExp(collection.name) })
+	).toBeVisible();
+	await expect(popup(page).getByRole('option', { name: 'See all collections' })).toHaveCount(0);
 });

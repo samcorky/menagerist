@@ -17,11 +17,13 @@
 	import { matchContext } from '$lib/search-context';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import {
+		collectionsAtCap,
 		defaultHighlight,
 		firstLiveValue,
 		liveMessage,
 		paletteView,
 		resultSubtitle,
+		seeAllCollectionsPath,
 		seeAllSearch
 	} from '$lib/search-palette';
 	import { searchPaletteController } from '$lib/search-palette.svelte';
@@ -33,6 +35,7 @@
 
 	const DEBOUNCE_MS = 250;
 	const SEE_ALL_VALUE = 'see-all-results';
+	const SEE_ALL_COLLECTIONS_VALUE = 'see-all-collections';
 	const ASYNC_KEYS: AsyncGroupKey[] = ['items', 'collections', 'itemTypes'];
 	const GROUP_NOUN: Record<AsyncGroupKey, string> = {
 		items: 'items',
@@ -70,6 +73,7 @@
 
 	const pending = $derived(debouncing || loading.length > 0);
 	const okRows = <T,>(state: GroupState<T>): T[] => (state.status === 'ok' ? state.rows : []);
+	const showSeeAllCollections = $derived(collectionsAtCap(okRows(groups.collections).length));
 	const failedKeys = $derived(
 		ASYNC_KEYS.filter((key) => groups[key].status === 'error' && !loading.includes(key))
 	);
@@ -98,7 +102,10 @@
 				stale: staleKeys.includes('items')
 			},
 			{
-				values: okRows(groups.collections).map((r) => `collection:${r.id}`),
+				values: [
+					...okRows(groups.collections).map((r) => `collection:${r.id}`),
+					...(showSeeAllCollections ? [SEE_ALL_COLLECTIONS_VALUE] : [])
+				],
 				stale: staleKeys.includes('collections')
 			},
 			{
@@ -233,6 +240,11 @@
 		choose('items', () => void goto(resolve('/items/[id]', { id: item.id })));
 	const openCollection = (id: string) =>
 		choose('collections', () => void goto(resolve('/collections/[id]', { id })));
+	// Built before choose() closes the popup, which clears the query
+	const openAllCollections = () => {
+		const path = seeAllCollectionsPath(query);
+		choose('collections', () => void goto(resolve(path)));
+	};
 	const openItemType = (slug: string) =>
 		choose(
 			'itemTypes',
@@ -359,6 +371,18 @@
 									</div>
 								</Command.Item>
 							{/each}
+							{#if showSeeAllCollections}
+								<Command.Item
+									disabled={isStale('collections')}
+									value={SEE_ALL_COLLECTIONS_VALUE}
+									class="min-h-11"
+									onSelect={openAllCollections}
+								>
+									<Search class="size-4" />
+									<span class="flex-1">See all collections</span>
+									<ArrowRight class="size-4" />
+								</Command.Item>
+							{/if}
 						</Command.Group>
 					{/if}
 					{#if showFailed('itemTypes')}
