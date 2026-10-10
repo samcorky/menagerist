@@ -222,19 +222,37 @@ export const EXAMPLE_PACK_IDS = [
 export const EXAMPLE_SLUG_PREFIXES = /^(music|recipes|movies|parts|games|soundtracks)-/;
 
 /**
+ * DELETE that retries up to 3 times when the connection drops (`socket hang up` / `ECONNRESET`,
+ * seen under load). Any HTTP response, including 404 and 409, is returned and never retried.
+ */
+async function deleteTolerantOfReset(request: APIRequestContext, url: string) {
+	for (let attempt = 1; ; attempt++) {
+		try {
+			return await request.delete(url);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			const dropped = message.includes('socket hang up') || message.includes('ECONNRESET');
+			if (!dropped || attempt >= 3) throw error;
+		}
+	}
+}
+
+/**
  * Uninstalls every example pack, then deletes what removal keeps (items and item types with a
  * pack slug prefix), so a kept item can't block the next install.
  */
 export async function removeExamplePacks(request: APIRequestContext) {
-	for (const id of EXAMPLE_PACK_IDS) await request.delete(`/api/v1/example/${id}/installation`);
+	for (const id of EXAMPLE_PACK_IDS)
+		await deleteTolerantOfReset(request, `/api/v1/example/${id}/installation`);
 	const nodes = await request.get('/api/v1/node?limit=500');
 	for (const node of (await nodes.json()) as { id: string; type: string | null }[]) {
 		if (EXAMPLE_SLUG_PREFIXES.test(node.type ?? ''))
-			await request.delete(`/api/v1/node/${node.id}`);
+			await deleteTolerantOfReset(request, `/api/v1/node/${node.id}`);
 	}
 	const types = await request.get('/api/v1/node-type?limit=500');
 	for (const type of (await types.json()) as { id: string; slug: string }[]) {
-		if (EXAMPLE_SLUG_PREFIXES.test(type.slug)) await request.delete(`/api/v1/node-type/${type.id}`);
+		if (EXAMPLE_SLUG_PREFIXES.test(type.slug))
+			await deleteTolerantOfReset(request, `/api/v1/node-type/${type.id}`);
 	}
 }
 
