@@ -304,3 +304,142 @@ def test_a_failure_part_way_through_the_covers_leaves_no_media(
     assert _media_state(postgres_sync_url, media_dir) == (0, 0, 0)
     assert client.get("/api/v1/node?limit=100").json() == []
     assert client.get("/api/v1/node-type").json() == []
+
+
+@pytest.fixture
+def add_on_client(
+    postgres_url: str, postgres_sync_url: str, tmp_path: Path
+) -> Iterator[TestClient]:
+    """Like `client`, over a small base pack and an add-on that needs it."""
+    packs: dict[str, dict[str, Any]] = {
+        "base": {
+            "format": "menagerist-example-pack",
+            "version": 4,
+            "id": "base",
+            "relationship_types": [
+                {"ref": "by", "slug": "by", "label": "By", "reverse_label": "Made"}
+            ],
+            "item_types": [{"ref": "thing", "slug": "thing", "label": "Thing"}],
+            "items": [{"ref": "a", "type": "thing", "name": "Base A"}],
+        },
+        "extra": {
+            "format": "menagerist-example-pack",
+            "version": 4,
+            "id": "extra",
+            "requires": ["base"],
+            "items": [{"ref": "x", "type": "base:thing", "name": "Extra X"}],
+            "connections": [{"from": "x", "to": "base:a", "type": "base:by"}],
+            "collections": [{"ref": "mix", "name": "Mix", "items": ["x", "base:a"]}],
+        },
+    }
+    index = {
+        "format": "menagerist-examples-index",
+        "version": 1,
+        "packs": [
+            {"id": "base", "name": "Base", "description": "The base."},
+            {"id": "extra", "name": "Extra", "description": "Needs the base."},
+        ],
+    }
+    for pack_id, data in packs.items():
+        (tmp_path / f"{pack_id}.json").write_text(json.dumps(data), encoding="utf-8")
+    (tmp_path / "index.json").write_text(json.dumps(index), encoding="utf-8")
+    get_session_factory.cache_clear()
+    get_engine.cache_clear()
+    app = create_app()
+    app.dependency_overrides[get_pack_catalogue] = lambda: FilePackCatalogue(tmp_path)
+    try:
+        with TestClient(app) as c:
+            yield c
+    finally:
+        get_session_factory.cache_clear()
+        get_engine.cache_clear()
+        _wipe(postgres_sync_url)
+
+
+def test_an_add_on_connects_to_its_base_and_blocks_its_removal(
+    add_on_client: TestClient,
+) -> None:
+    """The add-on needs the base, links to its item, and is removed first."""
+    c = add_on_client
+    assert c.put("/api/v1/example/extra/installation").status_code == 409
+    assert c.put("/api/v1/example/base/installation").status_code == 200
+
+    added = c.put("/api/v1/example/extra/installation")
+
+    assert added.status_code == 200, added.text
+    assert added.json()["created"]["items"] == 1
+    assert added.json()["created"]["connections"] == 1
+    items = {n["name"]: n for n in c.get("/api/v1/node?limit=100").json()}
+    assert set(items) == {"Base A", "Extra X"}
+    (edge,) = c.get("/api/v1/edge?limit=100").json()
+    assert (edge["source_id"], edge["target_id"]) == (
+        items["Extra X"]["id"],
+        items["Base A"]["id"],
+    )
+    assert len(c.get("/api/v1/collection").json()) == 1
+
+    blocked = c.delete("/api/v1/example/base/installation")
+    assert blocked.status_code == 409
+    assert "Remove Extra first" in blocked.json()["detail"]
+    assert len(c.get("/api/v1/node?limit=100").json()) == 2
+
+    assert c.delete("/api/v1/example/extra/installation").status_code == 200
+    assert [n["name"] for n in c.get("/api/v1/node?limit=100").json()] == ["Base A"]
+    assert c.get("/api/v1/edge?limit=100").json() == []
+    assert c.delete("/api/v1/example/base/installation").status_code == 200
+    assert c.get("/api/v1/node?limit=100").json() == []
+
+
+@pytest.fixture
+def shipped_client(
+    postgres_url: str, postgres_sync_url: str, media_dir: Path
+) -> Iterator[TestClient]:
+    """Like `client`, over the packs shipped with the app."""
+    get_session_factory.cache_clear()
+    get_engine.cache_clear()
+    app = create_app()
+    storage = LocalFilesystemMediaStorage(media_dir)
+    app.dependency_overrides[get_media_storage] = lambda: storage
+    try:
+        with TestClient(app) as c:
+            yield c
+    finally:
+        get_session_factory.cache_clear()
+        get_engine.cache_clear()
+        _wipe(postgres_sync_url)
+
+
+def test_the_shipped_games_extras_add_on_end_to_end(
+    shipped_client: TestClient, postgres_sync_url: str, media_dir: Path
+) -> None:
+    """Extra board games needs Board games, links to it, and leaves nothing behind."""
+    c = shipped_client
+    assert c.put("/api/v1/example/games-extras/installation").status_code == 409
+    assert c.put("/api/v1/example/games/installation").status_code == 200
+
+    added = c.put("/api/v1/example/games-extras/installation")
+
+    assert added.status_code == 200, added.text
+    assert added.json()["created"]["items"] == 5
+    items = {n["name"]: n["id"] for n in c.get("/api/v1/node?limit=200").json()}
+    edges = {
+        (e["source_id"], e["target_id"]): e["type"]
+        for e in c.get("/api/v1/edge?limit=200").json()
+    }
+    assert (
+        edges[(items["Lantern Harbour: The Night Fair"], items["Lantern Harbour"])]
+        == "games-expansion-of"
+    )
+    assert (
+        edges[(items["Quillfeather Quarry"], items["Marrow Lane Press"])]
+        == "games-published-by"
+    )
+    blocked = c.delete("/api/v1/example/games/installation")
+    assert blocked.status_code == 409
+    assert "Remove Extra board games first" in blocked.json()["detail"]
+
+    assert c.delete("/api/v1/example/games-extras/installation").json()["kept"] == []
+    assert c.delete("/api/v1/example/games/installation").json()["kept"] == []
+    assert c.get("/api/v1/node?limit=200").json() == []
+    assert c.get("/api/v1/edge?limit=200").json() == []
+    assert _media_state(postgres_sync_url, media_dir) == (0, 0, 0)

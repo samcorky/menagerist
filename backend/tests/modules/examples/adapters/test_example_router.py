@@ -16,7 +16,13 @@ from app.modules.examples.adapters.api.dependencies import (
     get_example_uow,
     get_pack_catalogue,
 )
-from app.modules.examples.domain.pack import PackCollection
+from app.modules.examples.domain.installation import Installation
+from app.modules.examples.domain.pack import (
+    ExamplePack,
+    PackCollection,
+    PackItem,
+    PackItemType,
+)
 from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.modules.graph.domain.node_type import NodeType
 
@@ -238,3 +244,108 @@ def test_entities_lists_owned_collection_ids(
 
     assert client.delete("/api/v1/example/demo/installation").status_code == 200
     assert client.get("/api/v1/example/entities").json()["collection_ids"] == []
+
+
+def _add_on_world(make_world: MakeWorld, sample_pack: SamplePack) -> World:
+    """A base ('Base'), and two add-ons that require it."""
+    add_ons = [
+        ExamplePack(
+            id=pack_id,
+            requires=("base",),
+            item_types=(PackItemType(ref="t", slug=f"{pack_id}-t", label="T"),),
+            items=(PackItem(ref="i", type_ref="t", name=f"{pack_id} item"),),
+        )
+        for pack_id in ("extras", "more")
+    ]
+    return make_world(sample_pack("base"), *add_ons)
+
+
+def test_list_shows_requires_and_required_by_with_names(
+    make_world: MakeWorld, sample_pack: SamplePack
+) -> None:
+    """An add-on lists what it requires; the base lists installed dependants."""
+    client = _client(_add_on_world(make_world, sample_pack))
+
+    before = {p["id"]: p for p in client.get("/api/v1/example").json()}
+    assert before["extras"]["requires"] == [{"id": "base", "name": "Base"}]
+    assert before["base"]["requires"] == []
+    assert before["base"]["required_by"] == []
+
+    client.put("/api/v1/example/base/installation")
+    client.put("/api/v1/example/extras/installation")
+    during = {p["id"]: p for p in client.get("/api/v1/example").json()}
+    assert during["base"]["required_by"] == [{"id": "extras", "name": "Extras"}]
+    assert during["extras"]["required_by"] == []
+
+    client.delete("/api/v1/example/extras/installation")
+    after = {p["id"]: p for p in client.get("/api/v1/example").json()}
+    assert after["base"]["required_by"] == []
+
+
+def test_ordinary_packs_have_empty_requirement_lists(
+    make_world: MakeWorld, sample_pack: SamplePack
+) -> None:
+    """A pack with no add-ons around it reports empty lists."""
+    client = _client(make_world(sample_pack("one")))
+
+    pack = client.get("/api/v1/example").json()[0]
+
+    assert (pack["requires"], pack["required_by"]) == ([], [])
+
+
+def test_install_add_on_without_base_is_a_409(
+    make_world: MakeWorld, sample_pack: SamplePack
+) -> None:
+    """Adding an add-on before its base conflicts, in plain words."""
+    client = _client(_add_on_world(make_world, sample_pack))
+
+    response = client.put("/api/v1/example/extras/installation")
+
+    assert response.status_code == 409
+    assert response.json()["title"] == "RequirementsNotMetError"
+    assert response.json()["detail"] == "Add Base first."
+
+
+def test_uninstall_base_with_dependants_is_a_409(
+    make_world: MakeWorld, sample_pack: SamplePack
+) -> None:
+    """Removing a base lists every installed add-on that needs it."""
+    client = _client(_add_on_world(make_world, sample_pack))
+    for pack_id in ("base", "extras", "more"):
+        client.put(f"/api/v1/example/{pack_id}/installation")
+
+    response = client.delete("/api/v1/example/base/installation")
+
+    assert response.status_code == 409
+    assert response.json()["title"] == "RequiredByInstalledPackError"
+    assert response.json()["detail"] == "Remove Extras and More first."
+
+
+def test_half_added_add_on_counts_as_dependant_and_blocks_removal(
+    make_world: MakeWorld, sample_pack: SamplePack
+) -> None:
+    """An installing add-on shows in `required_by` and blocks removing the base."""
+    world = _add_on_world(make_world, sample_pack)
+    client = _client(world)
+    client.put("/api/v1/example/base/installation")
+    asyncio.run(world.installations.add(Installation.start("extras")))
+
+    listed = {p["id"]: p for p in client.get("/api/v1/example").json()}
+    blocked = client.delete("/api/v1/example/base/installation")
+
+    assert listed["base"]["required_by"] == [{"id": "extras", "name": "Extras"}]
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"] == "Remove Extras first."
+
+
+def test_required_by_lists_every_dependant_in_catalogue_order(
+    make_world: MakeWorld, sample_pack: SamplePack
+) -> None:
+    """Two installed add-ons are both listed, in catalogue order."""
+    client = _client(_add_on_world(make_world, sample_pack))
+    for pack_id in ("base", "more", "extras"):
+        client.put(f"/api/v1/example/{pack_id}/installation")
+
+    base = client.get("/api/v1/example").json()[0]
+
+    assert [r["id"] for r in base["required_by"]] == ["extras", "more"]

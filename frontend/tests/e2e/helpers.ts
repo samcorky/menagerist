@@ -209,8 +209,17 @@ export function ownedData() {
 	};
 }
 
-export const EXAMPLE_PACK_IDS = ['music', 'recipes', 'movies', 'parts', 'games'];
-export const EXAMPLE_SLUG_PREFIXES = /^(music|recipes|movies|parts|games)-/;
+// Add-ons first: removing a base pack is refused while an add-on that needs it is installed.
+export const EXAMPLE_PACK_IDS = [
+	'soundtracks',
+	'games-extras',
+	'music',
+	'recipes',
+	'movies',
+	'parts',
+	'games'
+];
+export const EXAMPLE_SLUG_PREFIXES = /^(music|recipes|movies|parts|games|soundtracks)-/;
 
 /**
  * Uninstalls every example pack, then deletes what removal keeps (items and item types with a

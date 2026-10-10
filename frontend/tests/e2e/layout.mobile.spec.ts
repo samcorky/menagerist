@@ -1,5 +1,12 @@
 import { test, expect, type Locator, type Page } from './fixtures';
-import { failCollectionSearch, openSearch, ownedData, searchButton, uniqueName } from './helpers';
+import {
+	failCollectionSearch,
+	openSearch,
+	ownedData,
+	removeExamplePacks,
+	searchButton,
+	uniqueName
+} from './helpers';
 
 /**
  * Phone-only layout checks, run by the `mobile` project at two widths: the bottom bar, page
@@ -15,12 +22,10 @@ const SIZES = [
 const GUIDELINE_TARGET = 44;
 
 const { makeCollection, makeItem, makeItemType, addToCollection, cleanUp } = ownedData();
-let installedPacks: string[] = [];
 
 test.afterEach(async ({ request }) => {
 	await cleanUp(request);
-	for (const id of installedPacks) await request.delete(`/api/v1/example/${id}/installation`);
-	installedPacks = [];
+	await removeExamplePacks(request);
 });
 
 type Box = { x: number; y: number; width: number; height: number };
@@ -365,6 +370,50 @@ for (const size of SIZES) {
 			expect(Math.max(b.height, reach)).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
 		});
 
+		test('add-on reasons are visible and their buttons stay tappable', async ({
+			page,
+			request
+		}) => {
+			await page.goto('/settings/examples');
+			const card = (title: string) =>
+				page.locator('[data-slot="card"]').filter({ has: page.getByText(title, { exact: true }) });
+
+			const extras = card('Extra board games');
+			const add = extras.getByRole('button', { name: /^Add Extra board games/ });
+			await add.scrollIntoViewIfNeeded();
+			await expect(add).toBeDisabled();
+			const reason = extras.getByText('Add Board games first.');
+			await expect(reason).toBeVisible();
+			const a = await box(add);
+			test.info().annotations.push({
+				type: `add-on add button ${size.width}`,
+				description: `${round(a.width)}x${round(a.height)}`
+			});
+			expect(a.height).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
+			expect(await fits(page, a)).toBe(true);
+			expect(await fits(page, await box(reason))).toBe(true);
+
+			for (const id of ['games', 'games-extras']) {
+				const res = await request.put(`/api/v1/example/${id}/installation`);
+				expect(res.ok()).toBeTruthy();
+			}
+			await page.reload();
+			const base = card('Board games');
+			const remove = base.getByRole('button', { name: /^Remove Board games/ });
+			await remove.scrollIntoViewIfNeeded();
+			await expect(remove).toBeDisabled();
+			const blocked = base.getByText('Remove Extra board games first.');
+			await expect(blocked).toBeVisible();
+			const r = await box(remove);
+			test.info().annotations.push({
+				type: `base remove button ${size.width}`,
+				description: `${round(r.width)}x${round(r.height)}`
+			});
+			expect(r.height).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
+			expect(await fits(page, r)).toBe(true);
+			expect(await fits(page, await box(blocked))).toBe(true);
+		});
+
 		test('Examples controls are visible and tappable', async ({ page }) => {
 			await page.goto('/settings/examples');
 			const add = page.getByRole('button', { name: /^Add Music/ });
@@ -376,7 +425,6 @@ for (const size of SIZES) {
 			});
 			expect(await fits(page, a)).toBe(true);
 			expect(a.height).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
-			installedPacks.push('music');
 			await add.tap();
 			const remove = page.getByRole('button', { name: /^Remove Music/ });
 			await expect(remove).toBeVisible();

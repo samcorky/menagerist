@@ -87,9 +87,10 @@ def get_install_example_pack_use_case(
 
 def get_uninstall_example_pack_use_case(
     uow: Annotated[ExampleUnitOfWork, Depends(get_example_uow)],
+    catalogue: Annotated[PackCatalogue, Depends(get_pack_catalogue)],
     presets: Annotated[PresetPackTarget, Depends(get_preset_pack_target)],
     graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
     collections: Annotated[CollectionPackTarget, Depends(get_collection_pack_target)],
     covers: Annotated[CoverPackTarget, Depends(get_cover_pack_target)],
 ) -> UninstallExamplePack:
-    return UninstallExamplePack(uow, presets, graph, collections, covers)
+    return UninstallExamplePack(uow, catalogue, presets, graph, collections, covers)

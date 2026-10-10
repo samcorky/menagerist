@@ -26,6 +26,16 @@
       "id": "games",
       "name": "Board games",
       "description": "A shelf of board games with their publishers and designers, the game nights they came out at, and a wishlist of the ones still to get."
+    },
+    {
+      "id": "games-extras",
+      "name": "Extra board games",
+      "description": "A few more games for the Board games shelf, an expansion, and a weeknight collection that mixes old and new."
+    },
+    {
+      "id": "soundtracks",
+      "name": "Film soundtracks",
+      "description": "Links the records in Music to the films in Movies they are the soundtrack of."
     }
   ]
 }

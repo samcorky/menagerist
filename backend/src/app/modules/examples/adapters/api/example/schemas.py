@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.examples.application.install_example_pack import installation_counts
 from app.modules.examples.domain.installation import InstallationStatus
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from app.modules.examples.application.list_example_packs import ExamplePackStatus
     from app.modules.examples.application.removal import KeptEntity
     from app.modules.examples.application.uninstall_example_pack import UninstallResult
-    from app.modules.examples.domain.pack import PackCounts
+    from app.modules.examples.domain.pack import PackCounts, PackSummary
 
 _COUNTS_EXAMPLE: dict[str, Any] = {
     "presets": 1,
@@ -83,6 +83,22 @@ class InstallationResponse(BaseModel):
     counts: PackCountsResponse
 
 
+class PackRefResponse(BaseModel):
+    """A short reference to another example set."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"id": "games", "name": "Video games"}]}
+    )
+
+    id: str
+    name: str
+
+    @classmethod
+    def from_summary(cls, summary: PackSummary) -> PackRefResponse:
+        """Build from a catalogue summary."""
+        return cls(id=summary.id, name=summary.name)
+
+
 class ExamplePackResponse(BaseModel):
     """A shipped example set and whether it is installed."""
 
@@ -94,6 +110,8 @@ class ExamplePackResponse(BaseModel):
                     "name": "Vinyl and signed items",
                     "description": "Records, artists and signings.",
                     "counts": _COUNTS_EXAMPLE,
+                    "requires": [],
+                    "required_by": [{"id": "vinyl-extras", "name": "Vinyl extras"}],
                     "installation": {
                         "status": "installed",
                         "installed_at": "2026-10-06T10:14:44.465954Z",
@@ -108,6 +126,15 @@ class ExamplePackResponse(BaseModel):
     name: str
     description: str
     counts: PackCountsResponse
+    requires: list[PackRefResponse] = Field(
+        default=[], description="Sets this one needs added first."
+    )
+    required_by: list[PackRefResponse] = Field(
+        default=[],
+        description=(
+            "Added or half-added sets that need this one; they block its removal."
+        ),
+    )
     installation: InstallationResponse | None
 
     @classmethod
@@ -119,6 +146,8 @@ class ExamplePackResponse(BaseModel):
             name=status.summary.name,
             description=status.summary.description,
             counts=PackCountsResponse.from_domain(status.summary.counts),
+            requires=[PackRefResponse.from_summary(r) for r in status.requires],
+            required_by=[PackRefResponse.from_summary(r) for r in status.required_by],
             installation=None
             if installation is None
             else InstallationResponse(

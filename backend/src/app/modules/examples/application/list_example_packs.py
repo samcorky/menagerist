@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from app.modules.examples.application.required_by import dependants_by_pack
 from app.modules.examples.domain.installation import Installation
 from app.modules.examples.domain.pack import PackSummary
 from app.modules.examples.ports.pack_catalogue import PackCatalogue  # noqa: TC001
@@ -18,10 +19,12 @@ class ListExamplePacksQuery:
 
 @dataclass(kw_only=True, frozen=True, eq=False)
 class ExamplePackStatus:
-    """A shipped pack and its active installation, if any."""
+    """A shipped pack, its active installation, and how it relates to other packs."""
 
     summary: PackSummary
     installation: Installation | None
+    requires: tuple[PackSummary, ...] = ()
+    required_by: tuple[PackSummary, ...] = ()
 
 
 class ListExamplePacks(
@@ -39,9 +42,21 @@ class ListExamplePacks(
         query: ListExamplePacksQuery,
         actor: Actor,
     ) -> list[ExamplePackStatus]:
-        """Return one status per shipped pack, in catalogue order."""
+        """Return one status per shipped pack, in catalogue order.
+
+        `required_by` holds the installed add-ons (a half-finished installation
+        counts) that need the pack.
+        """
         active = {i.pack_id: i for i in await self._repos.installations.list_active()}
+        packs = await self._catalogue.list_packs()
+        by_id = {s.id: s for s in packs}
+        dependants = dependants_by_pack(packs, active.keys())
         return [
-            ExamplePackStatus(summary=s, installation=active.get(s.id))
-            for s in await self._catalogue.list_packs()
+            ExamplePackStatus(
+                summary=s,
+                installation=active.get(s.id),
+                requires=tuple(by_id[r] for r in s.requires if r in by_id),
+                required_by=tuple(dependants.get(s.id, [])),
+            )
+            for s in packs
         ]

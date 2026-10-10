@@ -13,6 +13,9 @@
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import {
+		addBlockedReason,
+		addOnNote,
+		removeBlockedReason,
 		describeCounts,
 		describeInstall,
 		describeRemoval,
@@ -58,6 +61,11 @@
 		void load();
 	});
 
+	async function refreshPacks() {
+		const refreshed = await listExamplePacks();
+		if (refreshed.data) packs = refreshed.data;
+	}
+
 	async function install(pack: ExamplePackResponse) {
 		busyId = pack.id;
 		keptNotes = {};
@@ -65,6 +73,7 @@
 		if (result.error || !result.data) {
 			if (result.response?.status === 409) {
 				toast.error("Couldn't add these examples", { description: errorMessage(result.error) });
+				await refreshPacks();
 			} else {
 				const { title, description } = networkAwareError(result);
 				toast.error(title, {
@@ -91,6 +100,12 @@
 		const result = await uninstallExamplePack({ path: { pack_id: pack.id } });
 		busyId = null;
 		if (result.error || !result.data) {
+			if (result.response?.status === 409) {
+				toast.error("Couldn't remove these examples", { description: errorMessage(result.error) });
+				confirmPack = null;
+				await refreshPacks();
+				return;
+			}
 			const { title, description } = networkAwareError(result);
 			toast.error(title, { description });
 			return;
@@ -145,27 +160,32 @@
 				{#each packs as pack (pack.id)}
 					{@const installed = isInstalled(pack)}
 					{@const busy = busyId === pack.id}
+					{@const note = addOnNote(pack)}
+					{@const blocked = installed ? removeBlockedReason(pack) : addBlockedReason(pack, packs)}
 					<Card.Root>
 						<Card.Header>
 							<Card.Title>{pack.name}</Card.Title>
 							<Card.Description>{pack.description}</Card.Description>
 						</Card.Header>
 						<Card.Content class="text-sm text-muted-foreground">
+							{#if note}
+								<p class="mb-1">{note}</p>
+							{/if}
 							{describeCounts(pack.counts)}
 							{#if keptNotes[pack.id]}
 								<ul class="mt-3 list-disc space-y-1 pl-5">
-									{#each keptNotes[pack.id] as note (note.reason)}
+									{#each keptNotes[pack.id] as kept (kept.reason)}
 										<li>
-											{note.count}
-											{note.count === 1 ? 'item was' : 'items were'} kept because {reasonLabel(
-												note.reason
+											{kept.count}
+											{kept.count === 1 ? 'item was' : 'items were'} kept because {reasonLabel(
+												kept.reason
 											)}.
 										</li>
 									{/each}
 								</ul>
 							{/if}
 						</Card.Content>
-						<Card.Footer class="flex items-center gap-3">
+						<Card.Footer class="flex flex-wrap items-center gap-3">
 							{#if installed}
 								<span class="flex items-center gap-1 text-sm text-muted-foreground">
 									<Check class="size-4" />
@@ -173,8 +193,9 @@
 								</span>
 								<Button
 									variant="outline"
-									disabled={busy}
+									disabled={busy || blocked !== null}
 									class="min-h-11"
+									aria-describedby={blocked ? `blocked-${pack.id}` : undefined}
 									aria-label="Remove {pack.name}"
 									bind:ref={() => buttons[pack.id] ?? null, (el) => (buttons[pack.id] = el)}
 									onclick={() => (confirmPack = pack)}
@@ -183,8 +204,9 @@
 								</Button>
 							{:else}
 								<Button
-									disabled={busy}
+									disabled={busy || blocked !== null}
 									class="min-h-11"
+									aria-describedby={blocked ? `blocked-${pack.id}` : undefined}
 									aria-label="Add {pack.name}"
 									bind:ref={() => buttons[pack.id] ?? null, (el) => (buttons[pack.id] = el)}
 									onclick={() => void install(pack)}
@@ -196,6 +218,9 @@
 										Add examples
 									{/if}
 								</Button>
+							{/if}
+							{#if blocked}
+								<p id="blocked-{pack.id}" class="text-sm text-muted-foreground">{blocked}</p>
 							{/if}
 						</Card.Footer>
 					</Card.Root>

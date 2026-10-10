@@ -55,7 +55,12 @@ async def _install(world: World) -> InstallResult:
 
 async def _uninstall(world: World) -> UninstallResult:
     return await UninstallExamplePack(
-        world.uow, world.presets, world.graph, world.collections, world.covers
+        world.uow,
+        world.catalogue,
+        world.presets,
+        world.graph,
+        world.collections,
+        world.covers,
     ).handle(UninstallExamplePackCommand(pack_id="demo"), SYSTEM_ACTOR)
 
 

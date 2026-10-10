@@ -1,4 +1,8 @@
-from app.modules.examples.domain.pack import ExamplePack, PackSummary
+from app.modules.examples.domain.pack import (
+    ExamplePack,
+    PackSummary,
+    validate_catalogue,
+)
 
 
 class InMemoryPackCatalogue:
@@ -8,14 +12,25 @@ class InMemoryPackCatalogue:
         self._entries: dict[str, tuple[str, str, ExamplePack]] = {}
 
     def add(self, pack: ExamplePack, *, name: str, description: str) -> None:
-        """Add a pack under its id."""
+        """Add a pack under its id, after its required packs.
+
+        Raises:
+            InvalidPackError: If the catalogue would no longer validate.
+        """
+        packs = {k: v[2] for k, v in self._entries.items()}
+        packs[pack.id] = pack
+        validate_catalogue(packs)
         self._entries[pack.id] = (name, description, pack)
 
     async def list_packs(self) -> list[PackSummary]:
         """Return every pack's summary, in insertion order."""
         return [
             PackSummary(
-                id=pack.id, name=name, description=description, counts=pack.counts
+                id=pack.id,
+                name=name,
+                description=description,
+                counts=pack.counts,
+                requires=pack.requires,
             )
             for name, description, pack in self._entries.values()
         ]

@@ -612,6 +612,14 @@ So a plain private array is the source of truth, `active` is a write-only `$stat
 
 **Consequence:** anything kept also keeps the item types it uses, so reinstalling the pack re-adopts what was kept (see "Removing examples keeps anything the user has touched"). Example collections carry the same "Example" badge as example items and types, and `GET /example/entities` lists their ids.
 
+## Add-on example packs require other packs and never change them
+
+**Decision (2026-10-09):** a pack format 4 pack may list `requires` (a list, so a bridge add-on can need several packs) and refer to a required pack's types and items as `pack:ref`. An add-on only adds: it never changes a required pack's types or items, and everything it creates is recorded in its own installation. Removal is blocked, not cascaded: a pack cannot be removed while an add-on that requires it is installed (or half installed), and the message names every dependant. An edited add-on connection is kept when the add-on is removed, and then counts as the person's data on the base item, so a later removal of the base pack keeps that item.
+
+An add-on item of a base item type inherits that type's cover style, read through the catalogue, so it gets a generated cover and is removed with the add-on. Two add-ons ship: `games-extras` (Extra board games, needs Board games) and `soundtracks` (Film soundtracks, needs Music and Movies, with its own "Soundtrack of" connection type).
+
+**Note:** the blocking is derived from the current catalogue's `requires`, not recorded at install time. A later pack update that drops a `requires` would lift the block. Nothing the person made is lost by that, because touched base items are kept as user data.
+
 ## Grouped search fans out on the client; ranking is per group
 
 **Decision (2026-10-09):** the search popup (`/`) shows Items, Collections, Item types and Pages. It fans out on the client behind `searchEverything` (`frontend/src/lib/palette-sources.ts`); a backend search endpoint is deferred. Item types (listed once and cached) and pages (a fixed list) are filtered locally. Collections gained an optional `q` on `GET /collection`. Ranking is per group (exact, then prefix, then word-prefix, then other); there is no ranking across groups, and group order is fixed. A source that fails shows a retry row for its group only, and "Nothing found" appears only when every source answered and all were empty.

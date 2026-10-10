@@ -1,10 +1,14 @@
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn, cast
 
 import structlog
 
 from app.modules.examples.application.content_hash import content_hash
+from app.modules.examples.application.external_refs import (
+    ResolvedRefs,
+    resolve_external_refs,
+)
 from app.modules.examples.application.removal import inspect_record, settle_installation
 from app.modules.examples.domain.errors import (
     InstallFailedError,
@@ -73,6 +77,8 @@ class _Run:
     installation: Installation
     preset_ids: dict[str, uuid.UUID] = field(default_factory=dict)
     type_slugs: dict[str, str] = field(default_factory=dict)
+    relationship_slugs: dict[str, str] = field(default_factory=dict)
+    cover_styles: dict[str, str] = field(default_factory=dict)
     item_ids: dict[str, uuid.UUID] = field(default_factory=dict)
     item_names: dict[str, str] = field(default_factory=dict)
     adoptions: dict[_Key, _Adoption] = field(default_factory=dict)
@@ -92,6 +98,8 @@ class InstallExamplePack(
         PackNotFoundError: the catalogue has no such pack.
         PackAlreadyInstalledError: installed already, or an earlier install is
             unfinished.
+        RequirementsNotMetError: an add-on's required pack is not installed, or no
+            longer has something the add-on refers to (nothing is created).
         SlugClashError: a type slug the pack needs is taken by something that is
             not an example the pack kept earlier (nothing is created).
         InstallFailedError: a step failed; what had been created was removed.
@@ -122,12 +130,20 @@ class InstallExamplePack(
         if pack is None:
             raise PackNotFoundError(f"Example pack '{command.pack_id}' not found")
         await self._check_not_installed(pack)
-        adoptions = await self._find_adoptions(pack)
+        external = await self._resolve_external(pack)
+        cover_styles = await self._cover_styles(pack)
+        adoptions = await self._find_adoptions(pack, cover_styles)
         await self._check_slugs(pack, adoptions)
 
         installation = Installation.start(pack.id)
         await self._persist(installation, new=True)
-        run = _Run(pack=pack, installation=installation, adoptions=adoptions)
+        run = _Run(
+            pack=pack,
+            installation=installation,
+            adoptions=adoptions,
+            cover_styles=cover_styles,
+        )
+        _seed_external(run, external)
         try:
             await self._run_steps(run)
         except Exception as exc:
@@ -159,7 +175,29 @@ class InstallExamplePack(
                 + "finish. Remove it first."
             )
 
-    async def _find_adoptions(self, pack: ExamplePack) -> dict[_Key, _Adoption]:
+    async def _resolve_external(self, pack: ExamplePack) -> ResolvedRefs:
+        """Resolve the add-on's references to required packs, before anything exists."""
+        if not pack.requires:
+            return {}
+        async with self._uow as repos:
+            active = await repos.installations.list_active()
+        return await resolve_external_refs(pack, active, self._graph, self._catalogue)
+
+    async def _cover_styles(self, pack: ExamplePack) -> dict[str, str]:
+        """Return cover styles by item type ref, including required packs' types."""
+        styles = _own_cover_styles(pack)
+        for required in pack.requires:
+            # The catalogue validates that every required pack exists.
+            base = cast("ExamplePack", await self._catalogue.get(required))
+            styles |= {
+                f"{required}:{ref}": style
+                for ref, style in _own_cover_styles(base).items()
+            }
+        return styles
+
+    async def _find_adoptions(
+        self, pack: ExamplePack, cover_styles: dict[str, str]
+    ) -> dict[_Key, _Adoption]:
         """Return what earlier installs kept that is still live and still fits."""
         async with self._uow as repos:
             history = await repos.installations.list_for_pack(pack.id)
@@ -175,7 +213,7 @@ class InstallExamplePack(
             for n in range(len(pack.connections))
         }
         slugs |= {(EntityKind.COLLECTION, c.ref): None for c in pack.collections}
-        slugs |= {(EntityKind.COVER, ref): None for ref in _covered(pack)}
+        slugs |= {(EntityKind.COVER, ref): None for ref in _covered(pack, cover_styles)}
 
         adoptions: dict[_Key, _Adoption] = {}
         for key, expected_slug in slugs.items():
@@ -324,7 +362,9 @@ class InstallExamplePack(
             )
 
     async def _install_connections(self, run: _Run) -> None:
-        slugs = {t.ref: t.slug for t in run.pack.relationship_types}
+        slugs = run.relationship_slugs | {
+            t.ref: t.slug for t in run.pack.relationship_types
+        }
         for n, spec in enumerate(run.pack.connections):
             source_id = run.item_ids[spec.source_ref]
             target_id = run.item_ids[spec.target_ref]
@@ -385,7 +425,7 @@ class InstallExamplePack(
         written. A kept cover comes back only with its adopted item, and an
         adopted item that already has a cover of the person's own gets none.
         """
-        styles = _cover_styles(run.pack)
+        styles = run.cover_styles
         for spec in run.pack.items:
             style = styles.get(spec.type_ref)
             if style is None:
@@ -444,14 +484,29 @@ class InstallExamplePack(
         ) from cause
 
 
-def _cover_styles(pack: ExamplePack) -> dict[str, str]:
+def _seed_external(run: _Run, external: ResolvedRefs) -> None:
+    """Make required packs' entities usable by their `pack:ref` strings.
+
+    They are never recorded in the installation, so this install never removes them.
+    """
+    for (kind, pack_id, ref), found in external.items():
+        key = f"{pack_id}:{ref}"
+        if kind is EntityKind.ITEM_TYPE:
+            run.type_slugs[key] = cast("str", found.slug)
+        elif kind is EntityKind.RELATIONSHIP_TYPE:
+            run.relationship_slugs[key] = cast("str", found.slug)
+        else:
+            run.item_ids[key] = found.entity_id
+            run.item_names[key] = cast("str", found.name)
+
+
+def _own_cover_styles(pack: ExamplePack) -> dict[str, str]:
     """Return the cover style of each item type (by ref) that declares one."""
     return {t.ref: t.cover.style for t in pack.item_types if t.cover is not None}
 
 
-def _covered(pack: ExamplePack) -> list[str]:
+def _covered(pack: ExamplePack, styles: dict[str, str]) -> list[str]:
     """Return the refs of the items that get a cover."""
-    styles = _cover_styles(pack)
     return [i.ref for i in pack.items if i.type_ref in styles]
 
 

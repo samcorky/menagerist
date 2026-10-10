@@ -54,6 +54,17 @@ async def _load(pack_id: str) -> ExamplePack:
     return pack
 
 
+async def _required(pack: ExamplePack) -> dict[str, ExamplePack]:
+    """Every pack `pack` requires, by id (add-ons of add-ons included)."""
+    found: dict[str, ExamplePack] = {}
+    for pack_id in pack.requires:
+        if pack_id not in found:
+            base = await _load(pack_id)
+            found[pack_id] = base
+            found |= await _required(base)
+    return found
+
+
 async def _install(world: World, pack_id: str) -> Any:  # noqa: ANN401
     return await InstallExamplePack(
         world.uow,
@@ -67,7 +78,12 @@ async def _install(world: World, pack_id: str) -> Any:  # noqa: ANN401
 
 async def _uninstall(world: World, pack_id: str) -> Any:  # noqa: ANN401
     return await UninstallExamplePack(
-        world.uow, world.presets, world.graph, world.collections, world.covers
+        world.uow,
+        world.catalogue,
+        world.presets,
+        world.graph,
+        world.collections,
+        world.covers,
     ).handle(UninstallExamplePackCommand(pack_id=pack_id), SYSTEM_ACTOR)
 
 
@@ -136,7 +152,10 @@ async def test_pack_installs_and_removes_cleanly(
 ) -> None:
     """A pack installs, uninstalls to nothing, and installs again."""
     pack = await _load(pack_id)
-    world = make_world(pack)
+    required = await _required(pack)
+    world = make_world(*required.values(), pack)
+    for base_id in required:
+        await _install(world, base_id)
 
     installed = await _install(world, pack_id)
 
@@ -145,14 +164,19 @@ async def test_pack_installs_and_removes_cleanly(
     )
     removed = await _uninstall(world, pack_id)
     assert removed.kept == (), f"{pack_id}: an untouched install kept {removed.kept}"
+    for base_id in reversed(required):
+        await _uninstall(world, base_id)
     assert await _live_counts(world) == [0] * 6, f"{pack_id}: entities remain"
+    for base_id in required:
+        await _install(world, base_id)
     reinstalled = await _install(world, pack_id)
     assert asdict(reinstalled.created) == asdict(pack.counts), (
         f"{pack_id}: reinstall differs"
     )
-    assert (await _live_counts(world))[-1] == pack.counts.collections, (
-        f"{pack_id}: reinstall left the wrong number of collections"
-    )
+    base_collections = sum(p.counts.collections for p in required.values())
+    assert (await _live_counts(world))[-1] == (
+        base_collections + pack.counts.collections
+    ), f"{pack_id}: reinstall left the wrong number of collections"
 
 
 @pytest.mark.parametrize("pack_id", _PACK_IDS)
@@ -172,6 +196,8 @@ async def test_pack_collections_use_known_items_and_unique_names(pack_id: str) -
     pack = await _load(pack_id)
 
     item_refs = {item.ref for item in pack.items}
+    for base_id, base in (await _required(pack)).items():
+        item_refs |= {f"{base_id}:{item.ref}" for item in base.items}
     for collection in pack.collections:
         for ref in collection.item_refs:
             assert ref in item_refs, f"{pack_id}: '{collection.ref}' names '{ref}'"
@@ -271,6 +297,13 @@ async def test_pack_attributes_match_their_type_schemas(pack_id: str) -> None:
     pack = await _load(pack_id)
     item_schemas = {t.ref: t.attributes_schema for t in pack.item_types}
     rel_schemas = {t.ref: t.attributes_schema for t in pack.relationship_types}
+    for base_id, base in (await _required(pack)).items():
+        item_schemas |= {
+            f"{base_id}:{t.ref}": t.attributes_schema for t in base.item_types
+        }
+        rel_schemas |= {
+            f"{base_id}:{t.ref}": t.attributes_schema for t in base.relationship_types
+        }
 
     problems: list[str] = []
     for item in pack.items:

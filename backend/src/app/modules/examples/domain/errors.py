@@ -1,4 +1,9 @@
+from typing import TYPE_CHECKING
+
 from app.shared_kernel.errors import ConflictError, NotFoundError, ValidationError
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class PackNotFoundError(NotFoundError):
@@ -22,6 +27,22 @@ class SlugClashError(ConflictError):
         super().__init__(f"You already have {kind} called '{slug}'. {advice}")
         self.kind = kind
         self.slug = slug
+
+
+class RequirementsNotMetError(ConflictError):
+    """Raised when an add-on needs a pack, or something in it, that is not there."""
+
+
+class RequiredByInstalledPackError(ConflictError):
+    """Raised when removing a pack that installed add-ons still need."""
+
+    def __init__(self, *, names: Sequence[str]) -> None:
+        """Build the message from the names of the dependent packs."""
+        listed = (
+            ", ".join(names[:-1]) + " and " + names[-1] if len(names) > 1 else names[0]
+        )
+        super().__init__(f"Remove {listed} first.")
+        self.names = tuple(names)
 
 
 class InvalidPackError(ValidationError):

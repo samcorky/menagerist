@@ -7,6 +7,7 @@ type Schema = { properties?: Record<string, JsonSchemaProperty> } | null | undef
 type Typed = { ref: string; slug: string; attributes_schema?: Schema };
 type Pack = {
 	id: string;
+	requires?: string[];
 	presets?: { ref: string; definition: { options?: string[] } }[];
 	item_types?: Typed[];
 	relationship_types?: Typed[];
@@ -38,6 +39,16 @@ function resolvePresets(value: unknown): unknown {
 
 const index = readJson('index.json') as { packs: { id: string }[] };
 const packs = index.packs.map((p) => readJson(`${p.id}.json`) as Pack);
+const packsById = new Map(packs.map((p) => [p.id, p] as const));
+
+// An add-on names its required packs' types as `pack:ref`; list them beside its own.
+function typesByRef(pack: Pack, pick: (p: Pack) => Typed[] | undefined): Map<string, Typed> {
+	const all = new Map((pick(pack) ?? []).map((t) => [t.ref, t] as const));
+	for (const required of pack.requires ?? []) {
+		for (const t of pick(packsById.get(required) as Pack) ?? []) all.set(`${required}:${t.ref}`, t);
+	}
+	return all;
+}
 
 // The API fills a linked choice's `enum` from its list on read; do the same from the pack's preset.
 function fillLinkedChoices(schema: Schema, pack: Pack): Schema {
@@ -97,20 +108,19 @@ describe('shipped example packs', () => {
 		});
 
 		it('only sets attributes its type defines', () => {
+			const itemTypes = typesByRef(pack, (p) => p.item_types);
+			const relationshipTypes = typesByRef(pack, (p) => p.relationship_types);
 			const keysByItemType = new Map(
-				(pack.item_types ?? []).map((t) => [
-					t.ref,
-					Object.keys(t.attributes_schema?.properties ?? {})
-				])
+				[...itemTypes].map(([ref, t]) => [ref, Object.keys(t.attributes_schema?.properties ?? {})])
 			);
 			const keysByRelationship = new Map(
-				(pack.relationship_types ?? []).map((t) => [
-					t.ref,
+				[...relationshipTypes].map(([ref, t]) => [
+					ref,
 					Object.keys(t.attributes_schema?.properties ?? {})
 				])
 			);
 			const schemaByItemType = new Map(
-				(pack.item_types ?? []).map((t) => [t.ref, t.attributes_schema])
+				[...itemTypes].map(([ref, t]) => [ref, t.attributes_schema])
 			);
 			for (const item of pack.items ?? []) {
 				const known = keysByItemType.get(item.type) ?? [];

@@ -1,0 +1,261 @@
+{
+  "format": "menagerist-example-pack",
+  "version": 4,
+  "id": "games-extras",
+  "requires": [
+    "games"
+  ],
+  "relationship_types": [],
+  "item_types": [],
+  "items": [
+    {
+      "ref": "quillfeather-quarry",
+      "type": "games:game",
+      "name": "Quillfeather Quarry",
+      "description": "Carve stone and trade quills to build the grandest cathedral spire.",
+      "attributes": {
+        "min_players": 2,
+        "max_players": 4,
+        "play_time": 3600,
+        "year": "2022",
+        "mechanics": [
+          "Worker placement"
+        ],
+        "weight": "Medium",
+        "rating": 4,
+        "condition": "Good",
+        "price_paid": {
+          "value": 31.5,
+          "currency": "GBP"
+        },
+        "complete": [
+          {
+            "text": "Box",
+            "done": true
+          },
+          {
+            "text": "Rulebook",
+            "done": true
+          },
+          {
+            "text": "Tokens",
+            "done": true
+          },
+          {
+            "text": "Cards or dice",
+            "done": true
+          }
+        ],
+        "notes": "Takes two plays to click, then it never leaves the table."
+      }
+    },
+    {
+      "ref": "tidewrack-tavern",
+      "type": "games:game",
+      "name": "Tidewrack Tavern",
+      "description": "Serve a rowdy harbour crowd before the lamp oil runs out.",
+      "attributes": {
+        "min_players": 3,
+        "max_players": 6,
+        "play_time": 2400,
+        "year": "2019",
+        "mechanics": [
+          "Bluffing"
+        ],
+        "weight": "Light",
+        "rating": 4,
+        "condition": "Worn",
+        "price_paid": {
+          "value": 22.0,
+          "currency": "GBP"
+        },
+        "complete": [
+          {
+            "text": "Box",
+            "done": true
+          },
+          {
+            "text": "Rulebook",
+            "done": true
+          },
+          {
+            "text": "Tokens",
+            "done": true
+          },
+          {
+            "text": "Cards or dice",
+            "done": true
+          }
+        ],
+        "notes": "The cardboard tankards have gone soft at the edges."
+      }
+    },
+    {
+      "ref": "hollowbell-market",
+      "type": "games:game",
+      "name": "Hollowbell Market",
+      "description": "Haggle for spices at a night market where every bell means a new price.",
+      "attributes": {
+        "min_players": 2,
+        "max_players": 5,
+        "play_time": 3000,
+        "year": "2023",
+        "mechanics": [
+          "Set collection",
+          "Dice"
+        ],
+        "weight": "Medium",
+        "condition": "New",
+        "price_paid": {
+          "value": 36.0,
+          "currency": "GBP"
+        },
+        "complete": [
+          {
+            "text": "Box",
+            "done": true
+          },
+          {
+            "text": "Rulebook",
+            "done": true
+          },
+          {
+            "text": "Tokens",
+            "done": true
+          },
+          {
+            "text": "Cards or dice",
+            "done": true
+          }
+        ],
+        "notes": "Bought on a whim; not played yet."
+      }
+    },
+    {
+      "ref": "marzipan-moors",
+      "type": "games:game",
+      "name": "Marzipan Moors",
+      "description": "A gentle co-operative walk across sugar hills to deliver one very large cake.",
+      "attributes": {
+        "min_players": 1,
+        "max_players": 4,
+        "play_time": 1800,
+        "year": "2021",
+        "mechanics": [
+          "Co-operative"
+        ],
+        "weight": "Light",
+        "rating": 3,
+        "condition": "Good",
+        "price_paid": {
+          "value": 19.99,
+          "currency": "GBP"
+        },
+        "complete": [
+          {
+            "text": "Box",
+            "done": true
+          },
+          {
+            "text": "Rulebook",
+            "done": true
+          },
+          {
+            "text": "Tokens",
+            "done": true
+          },
+          {
+            "text": "Cards or dice",
+            "done": true
+          }
+        ],
+        "notes": "Good with younger players."
+      }
+    },
+    {
+      "ref": "lantern-harbour-the-night-fair",
+      "type": "games:game",
+      "name": "Lantern Harbour: The Night Fair",
+      "description": "Adds fairground boats, new tide cards and a harder final night.",
+      "attributes": {
+        "min_players": 1,
+        "max_players": 4,
+        "play_time": 1200,
+        "year": "2023",
+        "mechanics": [
+          "Co-operative"
+        ],
+        "weight": "Medium",
+        "condition": "New",
+        "price_paid": {
+          "value": 14.0,
+          "currency": "GBP"
+        },
+        "complete": [
+          {
+            "text": "Box",
+            "done": true
+          },
+          {
+            "text": "Rulebook",
+            "done": true
+          },
+          {
+            "text": "Tokens",
+            "done": true
+          },
+          {
+            "text": "Cards or dice",
+            "done": true
+          }
+        ],
+        "notes": "Plays best once the base game feels easy."
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "quillfeather-quarry",
+      "to": "games:marrow-lane-press",
+      "type": "games:published-by"
+    },
+    {
+      "from": "tidewrack-tavern",
+      "to": "games:dovetail-tabletop",
+      "type": "games:published-by"
+    },
+    {
+      "from": "hollowbell-market",
+      "to": "games:brindle-finch-games",
+      "type": "games:published-by"
+    },
+    {
+      "from": "marzipan-moors",
+      "to": "games:dovetail-tabletop",
+      "type": "games:published-by"
+    },
+    {
+      "from": "lantern-harbour-the-night-fair",
+      "to": "games:brindle-finch-games",
+      "type": "games:published-by"
+    },
+    {
+      "from": "lantern-harbour-the-night-fair",
+      "to": "games:lantern-harbour",
+      "type": "games:expansion-of"
+    }
+  ],
+  "collections": [
+    {
+      "ref": "weeknight-picks",
+      "name": "Weeknight picks",
+      "description": "Short enough to finish before bedtime.",
+      "items": [
+        "marzipan-moors",
+        "tidewrack-tavern",
+        "games:pocket-orchard",
+        "games:slow-parcel-panic"
+      ]
+    }
+  ]
+}

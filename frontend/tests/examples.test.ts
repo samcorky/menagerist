@@ -3,6 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const { listExampleEntities } = vi.hoisted(() => ({ listExampleEntities: vi.fn() }));
 vi.mock('$lib/api/client', () => ({ listExampleEntities }));
 import {
+	addBlockedReason,
+	addOnNote,
+	missingRequirements,
+	removeBlockedReason,
 	describeCounts,
 	describeInstall,
 	describeRemoval,
@@ -225,5 +229,72 @@ describe('loadExampleIds', () => {
 	it('is empty when the response has no data', async () => {
 		listExampleEntities.mockResolvedValue({ error: { detail: 'x' } });
 		expect((await loadExampleIds()).items.size).toBe(0);
+	});
+});
+
+describe('add-on helpers', () => {
+	const board = { id: 'board', name: 'Board games' };
+	const music = { id: 'music', name: 'Music' };
+	const movies = { id: 'movies', name: 'Movies' };
+	const inst = { installation: { status: 'installed' } };
+	const packs = [
+		{ id: 'board', ...inst },
+		{ id: 'music', installation: null },
+		{ id: 'movies', installation: { status: 'installing' } }
+	];
+
+	it('has no note, nothing missing and no reasons for an ordinary pack', () => {
+		const pack = { requires: [], required_by: [] };
+		expect(addOnNote(pack)).toBeNull();
+		expect(missingRequirements(pack, packs)).toEqual([]);
+		expect(addBlockedReason(pack, packs)).toBeNull();
+		expect(removeBlockedReason(pack)).toBeNull();
+	});
+
+	it('writes the note for one, two and three requirements', () => {
+		expect(addOnNote({ requires: [board] })).toBe('Needs Board games');
+		expect(addOnNote({ requires: [music, movies] })).toBe('Needs Music and Movies');
+		expect(addOnNote({ requires: [board, music, movies] })).toBe(
+			'Needs Board games, Music and Movies'
+		);
+	});
+
+	it('is not blocked once every requirement is installed', () => {
+		expect(addBlockedReason({ requires: [board] }, packs)).toBeNull();
+	});
+
+	it('names only the missing packs, treating half-installed as missing', () => {
+		const pack = { requires: [board, music, movies] };
+		expect(missingRequirements(pack, packs)).toEqual([music, movies]);
+		expect(addBlockedReason(pack, packs)).toBe('Add Music and Movies first.');
+		expect(addBlockedReason({ requires: [music] }, packs)).toBe('Add Music first.');
+	});
+
+	it('does not mutate its inputs', () => {
+		const pack = { requires: [board, music] };
+		const list = [{ id: 'board', ...inst }];
+		const before = JSON.stringify([pack, list]);
+		missingRequirements(pack, list);
+		expect(JSON.stringify([pack, list])).toBe(before);
+	});
+
+	it('treats a requirement missing from the list as not installed', () => {
+		expect(addBlockedReason({ requires: [board] }, [])).toBe('Add Board games first.');
+	});
+
+	it('names dependants when removal is blocked', () => {
+		expect(removeBlockedReason({ required_by: [{ id: 'x', name: 'Board games extras' }] })).toBe(
+			'Remove Board games extras first.'
+		);
+		expect(removeBlockedReason({ required_by: [music, movies] })).toBe(
+			'Remove Music and Movies first.'
+		);
+	});
+
+	it('falls back to the id when a name is missing', () => {
+		expect(addOnNote({ requires: [{ id: 'ghost', name: '' }] })).toBe('Needs ghost');
+		expect(removeBlockedReason({ required_by: [{ id: 'ghost', name: '' }] })).toBe(
+			'Remove ghost first.'
+		);
 	});
 });

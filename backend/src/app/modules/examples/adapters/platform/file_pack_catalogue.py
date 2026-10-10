@@ -10,7 +10,11 @@ from app.modules.examples.adapters.platform.pack_parser import (
     parse_pack,
 )
 from app.modules.examples.domain.errors import InvalidPackError
-from app.modules.examples.domain.pack import ExamplePack, PackSummary
+from app.modules.examples.domain.pack import (
+    ExamplePack,
+    PackSummary,
+    validate_catalogue,
+)
 
 
 class FilePackCatalogue:
@@ -24,6 +28,7 @@ class FilePackCatalogue:
         self._root = root
         self._index: list[IndexEntry] | None = None
         self._packs: dict[str, ExamplePack] = {}
+        self._valid: set[str] = set()
 
     def _dir(self) -> Path:
         if self._root is not None:
@@ -54,14 +59,32 @@ class FilePackCatalogue:
             self._packs[pack_id] = pack
         return self._packs[pack_id]
 
+    def _validate(self, pack_ids: list[str]) -> None:
+        """Validate `pack_ids` with their transitive requirements, once each."""
+        if all(i in self._valid for i in pack_ids):
+            return
+        indexed = {e.id for e in self._entries()}
+        loaded: dict[str, ExamplePack] = {}
+        pending = list(pack_ids)
+        while pending:
+            pack_id = pending.pop()
+            if pack_id in loaded or pack_id not in indexed:
+                continue
+            loaded[pack_id] = self._load(pack_id)
+            pending.extend(loaded[pack_id].requires)
+        validate_catalogue(dict(sorted(loaded.items())))
+        self._valid.update(loaded)
+
     async def list_packs(self) -> list[PackSummary]:
         """Return a summary of every pack in the index."""
+        self._validate([e.id for e in self._entries()])
         return [
             PackSummary(
                 id=e.id,
                 name=e.name,
                 description=e.description,
-                counts=self._load(e.id).counts,
+                counts=self._packs[e.id].counts,
+                requires=self._packs[e.id].requires,
             )
             for e in self._entries()
         ]
@@ -70,4 +93,5 @@ class FilePackCatalogue:
         """Return the pack, or `None` if the index does not list it."""
         if all(e.id != pack_id for e in self._entries()):
             return None
-        return self._load(pack_id)
+        self._validate([pack_id])
+        return self._packs[pack_id]

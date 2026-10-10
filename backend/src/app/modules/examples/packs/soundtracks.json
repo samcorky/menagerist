@@ -1,0 +1,43 @@
+{
+  "format": "menagerist-example-pack",
+  "version": 4,
+  "id": "soundtracks",
+  "requires": [
+    "music",
+    "movies"
+  ],
+  "relationship_types": [
+    {
+      "ref": "soundtrack-of",
+      "slug": "soundtracks-soundtrack-of",
+      "label": "Soundtrack of",
+      "reverse_label": "Soundtrack",
+      "description": "Which film a record is the soundtrack of.",
+      "directional": true
+    }
+  ],
+  "item_types": [],
+  "items": [],
+  "connections": [
+    {
+      "from": "music:night-drive",
+      "to": "movies:cold-harbour",
+      "type": "soundtrack-of"
+    },
+    {
+      "from": "music:paper-lanterns",
+      "to": "movies:the-night-bus-sessions",
+      "type": "soundtrack-of"
+    },
+    {
+      "from": "music:salt-marsh-sessions",
+      "to": "movies:quiet-hours",
+      "type": "soundtrack-of"
+    },
+    {
+      "from": "music:thirteen-bells",
+      "to": "movies:marmalade",
+      "type": "soundtrack-of"
+    }
+  ]
+}

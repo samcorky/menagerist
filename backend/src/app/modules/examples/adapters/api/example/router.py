@@ -46,7 +46,9 @@ router = APIRouter(
 
 _NOT_FOUND = error_response(PackNotFoundError, detail="Example pack 'vinyl' not found")
 # One 409 entry per route: a response status can only be documented once. The install
-# route's 409 also covers a taken type name (`SlugClashError`); its docstring says so.
+# route's 409 also covers a taken type name (`SlugClashError`) and a missing required
+# set (`RequirementsNotMetError`); the uninstall 409 also covers a dependant add-on
+# (`RequiredByInstalledPackError`). Each docstring says so.
 _ALREADY = error_response(
     PackAlreadyInstalledError, detail="'vinyl' is already installed."
 )
@@ -101,9 +103,9 @@ async def install_example_pack(
     `created` counts only what is new. A collection taken back is left as you have
     it, so items created this time are not added to it.
 
-    Returns 409 if the set is already added, or if you already have an item type or
-    relationship type with a name it needs that is not a kept example (nothing is
-    created in that case).
+    Returns 409 if the set is already added, if you already have an item type or
+    relationship type with a name it needs that is not a kept example, or if it is an
+    add-on and a set it needs is not added yet (nothing is created in any case).
     """
     result = await use_case.handle(InstallExamplePackCommand(pack_id=pack_id), actor)
     return InstallResultResponse.from_domain(result)
@@ -122,6 +124,10 @@ async def uninstall_example_pack(
     ],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> UninstallResultResponse:
-    """Remove an example set. Anything you changed or connected to is kept."""
+    """Remove an example set. Anything you changed or connected to is kept.
+
+    Returns 409 if the set is not added, or if added add-ons still need it (the
+    message names them; nothing is removed).
+    """
     result = await use_case.handle(UninstallExamplePackCommand(pack_id=pack_id), actor)
     return UninstallResultResponse.from_domain(result)

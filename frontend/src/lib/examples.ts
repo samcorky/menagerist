@@ -161,3 +161,45 @@ export function visibleItems<T extends { id: string }>(
 	if (filter === 'all') return items;
 	return items.filter((item) => exampleIds.has(item.id) === (filter === 'only'));
 }
+
+type PackRef = { id: string; name: string };
+type PackLinks = { requires?: PackRef[]; required_by?: PackRef[] };
+
+const refName = (ref: PackRef) => ref.name || ref.id;
+
+function joinNames(names: string[]): string {
+	if (names.length <= 1) return names.join('');
+	return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/** "Needs Music and Movies" for an add-on pack; null for an ordinary one. */
+export function addOnNote(pack: PackLinks): string | null {
+	const requires = pack.requires ?? [];
+	return requires.length === 0 ? null : `Needs ${joinNames(requires.map(refName))}`;
+}
+
+/** The required packs that are not currently installed. */
+export function missingRequirements(
+	pack: PackLinks,
+	packs: { id: string; installation?: { status: string } | null }[]
+): PackRef[] {
+	const installed = new Set(
+		packs.filter((p) => p.installation?.status === 'installed').map((p) => p.id)
+	);
+	return (pack.requires ?? []).filter((ref) => !installed.has(ref.id));
+}
+
+/** Why Add is unavailable, naming only the missing packs; null when it is available. */
+export function addBlockedReason(
+	pack: PackLinks,
+	packs: { id: string; installation?: { status: string } | null }[]
+): string | null {
+	const missing = missingRequirements(pack, packs);
+	return missing.length === 0 ? null : `Add ${joinNames(missing.map(refName))} first.`;
+}
+
+/** Why Remove is unavailable while other packs depend on this one; null when it is available. */
+export function removeBlockedReason(pack: PackLinks): string | null {
+	const dependants = pack.required_by ?? [];
+	return dependants.length === 0 ? null : `Remove ${joinNames(dependants.map(refName))} first.`;
+}

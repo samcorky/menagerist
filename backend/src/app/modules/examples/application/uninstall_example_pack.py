@@ -4,9 +4,14 @@ from typing import TYPE_CHECKING
 import structlog
 
 from app.modules.examples.application.removal import KeptEntity, settle_installation
-from app.modules.examples.domain.errors import PackNotInstalledError
+from app.modules.examples.application.required_by import dependants_by_pack
+from app.modules.examples.domain.errors import (
+    PackNotInstalledError,
+    RequiredByInstalledPackError,
+)
 from app.modules.examples.domain.installation import EntityKind, Installation, Outcome
 from app.modules.examples.domain.pack import PackCounts
+from app.modules.examples.ports.pack_catalogue import PackCatalogue  # noqa: TC001
 from app.modules.examples.ports.pack_targets import (  # noqa: TC001
     CollectionTarget,
     CoverTarget,
@@ -46,17 +51,21 @@ class UninstallExamplePack(
     Also finishes an installation an earlier crash left unfinished.
 
     :raises PackNotInstalledError: there is nothing to remove.
+    :raises RequiredByInstalledPackError: an installed add-on still needs the pack
+        (nothing is touched).
     """
 
     def __init__(
         self,
         uow: ExampleUnitOfWork,
+        catalogue: PackCatalogue,
         presets: PresetTarget,
         graph: GraphTarget,
         collections: CollectionTarget,
         covers: CoverTarget,
     ) -> None:
         super().__init__(uow)
+        self._catalogue = catalogue
         self._presets = presets
         self._graph = graph
         self._collections = collections
@@ -72,8 +81,14 @@ class UninstallExamplePack(
             installation = await repos.installations.get_active_for_pack(
                 command.pack_id
             )
+            active = await repos.installations.list_active()
         if installation is None:
             raise PackNotInstalledError(f"'{command.pack_id}' is not installed")
+        dependants = dependants_by_pack(
+            await self._catalogue.list_packs(), {i.pack_id for i in active}
+        ).get(command.pack_id, [])
+        if dependants:
+            raise RequiredByInstalledPackError(names=[d.name for d in dependants])
 
         kept = await settle_installation(
             installation,

@@ -53,7 +53,7 @@ def _mutated(data: dict[str, Any], path: list[str | int], value: object) -> obje
 
 _BAD: list[tuple[list[str | int], object]] = [
     (["format"], "other"),
-    (["version"], 4),
+    (["version"], 5),
     (["surprise"], 1),
     (["items"], "nope"),
     (["items", 0], "nope"),
@@ -341,3 +341,124 @@ def test_an_unknown_cover_style_names_its_item_type(
 
     with pytest.raises(InvalidPackError, match="'thing'"):
         parse_pack(pack_data)
+
+
+def _v4(pack_data: dict[str, Any], **extra: object) -> dict[str, Any]:
+    return {**pack_data, "version": 4, **extra}
+
+
+def test_a_v4_pack_parses_requires_and_prefixed_refs(
+    pack_data: dict[str, Any],
+) -> None:
+    """Version 4 carries `requires` and cross-pack refs."""
+    data = _v4(
+        pack_data,
+        id="addon",
+        requires=["base"],
+        item_types=[],
+        relationship_types=[],
+        presets=[],
+        items=[{"ref": "n", "type": "base:thing", "name": "N"}],
+        connections=[{"from": "n", "to": "base:a", "type": "base:by"}],
+        collections=[{"ref": "c", "name": "C", "items": ["n", "base:a"]}],
+    )
+    pack = parse_pack(data)
+    assert pack.requires == ("base",)
+    assert pack.items[0].type_ref == "base:thing"
+    assert len(pack.external_refs()) == 3
+
+
+def test_requires_may_be_empty_or_absent_on_v4(pack_data: dict[str, Any]) -> None:
+    """No `requires`, or an empty one, means an ordinary pack."""
+    assert parse_pack(_v4(pack_data)).requires == ()
+    assert parse_pack(_v4(pack_data, requires=[])).requires == ()
+
+
+@pytest.mark.parametrize("version", [1, 2, 3])
+def test_requires_below_v4_is_rejected(pack_data: dict[str, Any], version: int) -> None:
+    """Older versions do not know `requires`."""
+    with pytest.raises(InvalidPackError, match="requires"):
+        parse_pack({**pack_data, "version": version, "requires": ["base"]})
+
+
+@pytest.mark.parametrize(
+    ("requires", "message"),
+    [
+        ("base", "requires must be an array"),
+        (None, "requires must be an array"),
+        ([1], "requires entry must be a string"),
+        (["base", "base"], "'base' more than once"),
+        (["demo"], "'demo' cannot require itself"),
+        (["Bad Id"], "'Bad Id' must be"),
+        (["base\n"], "must be lowercase"),
+    ],
+)
+def test_a_malformed_requires_is_rejected(
+    pack_data: dict[str, Any], requires: object, message: str
+) -> None:
+    """Non-list, non-string, duplicate, self and malformed ids fail."""
+    with pytest.raises(InvalidPackError, match=message):
+        parse_pack(_v4(pack_data, requires=requires))
+
+
+@pytest.mark.parametrize(
+    ("path", "ref"),
+    [
+        (["connections", 0, "from"], "other:a"),
+        (["connections", 0, "to"], "other:a"),
+        (["connections", 0, "type"], "other:by"),
+    ],
+)
+def test_an_unrequired_prefix_in_a_connection_is_rejected(
+    pack_data: dict[str, Any], path: list[str | int], ref: str
+) -> None:
+    """Connection ends and type need their pack in requires."""
+    with pytest.raises(InvalidPackError, match=ref):
+        parse_pack(_mutated(_v4(pack_data), path, ref))
+
+
+def test_an_unrequired_prefix_in_a_collection_is_rejected(
+    pack_data: dict[str, Any],
+) -> None:
+    """A collection item needs its pack in requires."""
+    data = _v4(pack_data, collections=[{"ref": "c", "name": "C", "items": ["other:a"]}])
+    with pytest.raises(InvalidPackError, match="other:a"):
+        parse_pack(data)
+
+
+def test_a_trailing_newline_is_rejected_in_refs_and_pack_ids(
+    pack_data: dict[str, Any],
+) -> None:
+    """`$` would accept a trailing newline; matching must be strict."""
+    with pytest.raises(InvalidPackError):
+        parse_pack({**pack_data, "id": "demo\n"})
+    pack_data["items"][0]["ref"] = "a\n"
+    with pytest.raises(InvalidPackError):
+        parse_pack(pack_data)
+
+
+def test_a_prefix_not_in_requires_names_the_ref(pack_data: dict[str, Any]) -> None:
+    """A cross-pack ref needs its pack in `requires`."""
+    pack_data["items"][0]["type"] = "base:thing"
+    with pytest.raises(InvalidPackError, match="base:thing"):
+        parse_pack(_v4(pack_data))
+
+
+def test_a_prefixed_own_definition_is_rejected(pack_data: dict[str, Any]) -> None:
+    """A colon in a pack's own ref is a parse error."""
+    pack_data["items"][0]["ref"] = "base:a"
+    with pytest.raises(InvalidPackError, match="base:a"):
+        parse_pack(_v4(pack_data, requires=["base"]))
+
+
+def test_a_ref_with_two_colons_is_rejected(pack_data: dict[str, Any]) -> None:
+    """Exactly one colon is allowed."""
+    pack_data["items"][0]["type"] = "base:x:y"
+    with pytest.raises(InvalidPackError, match="exactly one colon"):
+        parse_pack(_v4(pack_data, requires=["base"]))
+
+
+def test_older_packs_still_parse_unchanged(pack_data: dict[str, Any]) -> None:
+    """Versions 1 to 3 have no requires."""
+    for version in (1, 2, 3):
+        assert parse_pack({**pack_data, "version": version}).requires == ()
