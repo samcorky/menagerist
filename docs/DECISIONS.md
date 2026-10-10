@@ -655,3 +655,13 @@ An add-on item of a base item type inherits that type's cover style, read throug
 **Unchanged:** setting a cover with `attachments/cover` still replaces the previous one, and the example-pack cover bridge attaches without a key and then calls that endpoint, so it never hit this.
 
 **Closed (2026-10-09):** two simultaneous set-cover calls on one item no longer reach the index. `SetMediaCover` first takes a transaction-scoped Postgres advisory lock keyed on the target (`MediaAttachmentRepository.lock_target`, `pg_advisory_xact_lock`), so the second call waits for the first to commit, then reads the new state and moves the cover; last write wins and neither call fails. An advisory lock was chosen over `SELECT ... FOR UPDATE` because the target may have no attachment rows to lock yet and the target lives in another module. The in-memory repository's `lock_target` is a no-op because its calls cannot interleave inside a use case. A set-cover racing an attach with `attribute_key=cover` is still settled by the unique index, giving the attach the 409.
+
+## Built-in Countries stays a database row for now (2026-10-10)
+
+**Decision:** "Countries" stays a built-in preset row (`builtin = true`, stable id from `uuid5("builtin:Countries")`), seeded by a migration from `shared/data/iso-data.json`, like "Condition grades" and the built-in fields and field groups. It does not become a separate shared-data source (`builtin:countries`) and there is no Country field type yet.
+
+**Rationale:** every built-in preset is a row, so a virtual source would make Countries the odd one out and add code to the list, copy and in-use guards for one list. Fields reference the list by id and store country names, so nothing is copied around and nothing is broken. Currencies are different: they are not presets, only a list for the money field. Nothing needs more today: no pack or feature is waiting on it.
+
+**Known gap, not fixed:** a seeded list is not refreshed on servers that already ran the migration, so a regenerated ISO file does not reach them. ISO country lists change rarely.
+
+**If it ever matters:** sync the built-in rows from code and the shared file on startup, keyed by their stable ids (idempotent, leaving copies a person made alone), and let example packs reference a built-in preset by its stable id. A real Country field storing ISO 3166-1 alpha-2 codes, which can link, sort and later show flags, is a separate and larger change because existing fields hold names.
