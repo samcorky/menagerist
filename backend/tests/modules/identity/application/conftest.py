@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
 from app.modules.identity.adapters.claim.no_op_existing_data_claim import (
     NoOpExistingDataClaim,
 )
@@ -25,9 +26,12 @@ from app.modules.identity.application.create_user import CreateUser
 from app.modules.identity.application.get_current_user import GetCurrentUser
 from app.modules.identity.application.list_users import ListUsers
 from app.modules.identity.application.reset_password import ResetPassword
+from app.modules.identity.application.set_own_display_name import SetOwnDisplayName
 from app.modules.identity.application.setup_first_admin import SetupFirstAdmin
 from app.modules.identity.application.sign_in import SignIn
+from app.modules.identity.application.sign_in_throttle import SignInThrottle
 from app.modules.identity.application.sign_out import SignOut
+from app.modules.identity.application.unlock_user import UnlockUser
 from app.modules.identity.application.update_user import UpdateUser
 from app.modules.identity.domain.user import Role, User
 from app.modules.identity.ports.existing_data_claim import ClaimReport
@@ -71,27 +75,47 @@ class Cases:
     list_users: ListUsers
     update_user: UpdateUser
     reset_password: ResetPassword
+    unlock_user: UnlockUser
+    set_own_display_name: SetOwnDisplayName
+    throttle: SignInThrottle
 
 
 def build_cases(world: World, claim: ExistingDataClaim | None = None) -> Cases:
     """Wire the use cases over `world` with deterministic tokens and hashing."""
     hasher = InMemoryPasswordHasher()
     tokens = InMemorySessionTokenGenerator()
-    authenticator = PasswordAuthenticator(
-        world.uow, hasher, decoy_hash=hasher.hash("decoy")
+    decoy = hasher.hash("decoy")
+    authenticator = PasswordAuthenticator(world.uow, hasher, decoy_hash=decoy)
+    auth = RoleAuthorizationAdapter()
+    throttle = SignInThrottle()
+    repos = IdentityRepos(
+        users=world.users, sessions=world.sessions, attempts=world.attempts
     )
     return Cases(
         setup=SetupFirstAdmin(
             world.uow, hasher, tokens, claim or NoOpExistingDataClaim(), session_ttl=TTL
         ),
-        sign_in=SignIn(world.uow, authenticator, tokens, session_ttl=TTL),
+        sign_in=SignIn(
+            world.uow,
+            authenticator,
+            tokens,
+            hasher,
+            throttle,
+            decoy_hash=decoy,
+            session_ttl=TTL,
+        ),
         sign_out=SignOut(world.uow, tokens),
         current_user=GetCurrentUser(world.uow, tokens),
-        change_password=ChangePassword(world.uow, hasher, tokens, session_ttl=TTL),
-        create_user=CreateUser(world.uow, hasher),
-        list_users=ListUsers(IdentityRepos(users=world.users, sessions=world.sessions)),
-        update_user=UpdateUser(world.uow),
-        reset_password=ResetPassword(world.uow, hasher),
+        change_password=ChangePassword(
+            world.uow, hasher, tokens, throttle, session_ttl=TTL
+        ),
+        create_user=CreateUser(world.uow, auth, hasher),
+        list_users=ListUsers(repos, auth),
+        update_user=UpdateUser(world.uow, auth),
+        reset_password=ResetPassword(world.uow, auth, hasher),
+        unlock_user=UnlockUser(world.uow, auth),
+        set_own_display_name=SetOwnDisplayName(world.uow),
+        throttle=throttle,
     )
 
 

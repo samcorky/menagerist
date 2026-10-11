@@ -31,6 +31,7 @@ class Authenticator(Protocol):
         """Return the verified identity, or `None` if the credentials are wrong.
 
         Raises:
-            SignInThrottledError: If too many recent attempts were made.
+            AccountDisabledError: If the credentials are right but the account
+                is disabled (never raised for wrong credentials).
         """
         ...

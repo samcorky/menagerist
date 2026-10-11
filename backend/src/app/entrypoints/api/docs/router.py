@@ -22,9 +22,18 @@ _LOGO_PATH = _STATIC_DIR / "favicon.svg"
 
 _STATIC_CACHE = "public, max-age=86400"
 
-# Same pinned assets FastAPI's get_swagger_ui_html uses by default.
-_SWAGGER_JS_URL = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"
-_SWAGGER_CSS_URL = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css"
+# Exact version plus Subresource Integrity (sha384 of the files served by
+# cdn.jsdelivr.net). Update all three together when bumping the version.
+_SWAGGER_VERSION = "5.33.0"
+_SWAGGER_BASE_URL = f"https://cdn.jsdelivr.net/npm/swagger-ui-dist@{_SWAGGER_VERSION}"
+_SWAGGER_JS_URL = f"{_SWAGGER_BASE_URL}/swagger-ui-bundle.js"
+_SWAGGER_CSS_URL = f"{_SWAGGER_BASE_URL}/swagger-ui.css"
+_SWAGGER_JS_INTEGRITY = (
+    "sha384-YDALVcy8kj8yltLBVi1vBiBAUqdxvus673gM8XKwiy6aDUJFXivF/KCufekjYbVf"
+)
+_SWAGGER_CSS_INTEGRITY = (
+    "sha384-Ov4/wv3j2bmct8cDc5X4ngJZohVPzEmc6uDPH8WeljUxO5vtoykvMEfbu9Vh6RaW"
+)
 
 _TEMPLATE_PATH = Path(__file__).parent / "templates" / "swagger.html"
 _INIT_JS_PATH = _STATIC_DIR / "swagger-init.js"
@@ -40,6 +49,8 @@ def render_swagger_page(
     values = {
         "swagger_css_url": _SWAGGER_CSS_URL,
         "swagger_js_url": _SWAGGER_JS_URL,
+        "swagger_css_integrity": _SWAGGER_CSS_INTEGRITY,
+        "swagger_js_integrity": _SWAGGER_JS_INTEGRITY,
         "favicon_url": "/api/docs/favicon.svg",
         "title": title,
         "init_js_url": f"{_INIT_JS_URL}?v={init_js_version}",

@@ -1,5 +1,5 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import pytest
@@ -12,6 +12,7 @@ from app.modules.identity.application.get_current_user import GetCurrentUserQuer
 from app.modules.identity.application.list_users import ListUsersQuery
 from app.modules.identity.application.reset_password import ResetPasswordCommand
 from app.modules.identity.application.sign_in import SignInCommand
+from app.modules.identity.application.sign_in_throttle import username_key
 from app.modules.identity.application.update_user import UpdateUserCommand
 from app.modules.identity.domain.errors import (
     CurrentPasswordIncorrectError,
@@ -107,9 +108,9 @@ async def test_the_system_actor_passes_the_admin_gate(
         ResetPasswordCommand(user_id=target.id, password="another-pass-1"),
         SYSTEM_ACTOR,
     )
-    users = await cases.list_users.handle(ListUsersQuery(), SYSTEM_ACTOR)
+    listings = await cases.list_users.handle(ListUsersQuery(), SYSTEM_ACTOR)
 
-    assert {u.username for u in users} == {"alice", "bob"}
+    assert {item.user.username for item in listings} == {"alice", "bob"}
 
 
 @time_machine.travel(NOW, tick=False)
@@ -131,7 +132,7 @@ async def test_update_user_changes_name_role_and_enabled_state(
         admin_actor,
     )
 
-    assert (updated.display_name, updated.role, updated.disabled) == (
+    assert (updated.user.display_name, updated.user.role, updated.user.disabled) == (
         "Alice B",
         Role.ADMIN,
         True,
@@ -139,7 +140,7 @@ async def test_update_user_changes_name_role_and_enabled_state(
     enabled = await cases.update_user.handle(
         UpdateUserCommand(user_id=user.id, disabled=False), admin_actor
     )
-    assert not enabled.disabled
+    assert not enabled.user.disabled
     still_valid = await cases.current_user.handle(
         GetCurrentUserQuery(token=signed_in.token), ANONYMOUS_ACTOR
     )
@@ -200,7 +201,7 @@ async def test_an_admin_can_be_demoted_while_another_remains(
         UpdateUserCommand(user_id=first.id, role=Role.MEMBER), admin_actor
     )
 
-    assert updated.role is Role.MEMBER
+    assert updated.user.role is Role.MEMBER
 
 
 async def test_disabled_admins_do_not_count_as_a_remaining_admin(
@@ -225,18 +226,21 @@ async def test_reset_password_sets_initial_password_and_ends_sessions(
 ) -> None:
     """The user must change it again, may sign in with it, and loses old sessions."""
     user = make_user("alice")
-    user.record_failure(NOW)
     await world.users.add(user)
     old = await cases.sign_in.handle(
         SignInCommand(username="alice", password="password-123"), ANONYMOUS_ACTOR
     )
+    for _ in range(5):
+        await world.attempts.record_failure(
+            username_key("alice"), limit=5, window=timedelta(minutes=15), now=NOW
+        )
 
     await cases.reset_password.handle(
         ResetPasswordCommand(user_id=user.id, password="brand-new-pass"), admin_actor
     )
 
     assert user.password_expired
-    assert user.failed_attempts == 0
+    assert world.attempts.windows == {}
     old_user = await cases.current_user.handle(
         GetCurrentUserQuery(token=old.token), ANONYMOUS_ACTOR
     )
@@ -311,6 +315,7 @@ async def test_change_password_rejects_wrong_current_and_weak_new_password(
     user = make_user("alice")
     await world.users.add(user)
     actor = actor_for(user)
+    original_hash = user.password_hash
     with pytest.raises(CurrentPasswordIncorrectError):
         await cases.change_password.handle(
             ChangePasswordCommand(
@@ -323,7 +328,7 @@ async def test_change_password_rejects_wrong_current_and_weak_new_password(
             ChangePasswordCommand(current_password="password-123", new_password="no"),
             actor,
         )
-    assert not world.uow.committed
+    assert user.password_hash == original_hash
 
 
 async def test_change_password_for_a_vanished_user_is_not_found(cases: Cases) -> None:

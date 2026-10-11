@@ -1,0 +1,120 @@
+import { expect, request, sessionOptions, signInViaApi, test, type Page } from './fixtures';
+import { asUser, createUserViaApi, type E2EUser } from './helpers';
+
+/**
+ * Sign-in visibility and account upkeep: last sign-in, display name, disabled and locked accounts.
+ * Deliberate sign-in failures are kept to the minimum: the per-address throttle is shared by every
+ * spec, so nothing here loops.
+ */
+test.describe.configure({ mode: 'serial' });
+
+const userRow = (page: Page, user: E2EUser) =>
+	page
+		.getByRole('list', { name: 'Users' })
+		.getByRole('listitem')
+		.filter({ hasText: user.username });
+
+async function signInThroughForm(page: Page, username: string, password: string) {
+	await page.getByLabel('Username').fill(username);
+	await page.getByLabel('Password').fill(password);
+	await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+}
+
+test('an administrator sees when a user last signed in', async ({
+	page,
+	workerBaseURL,
+	workerSession
+}) => {
+	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'seen' });
+	await adminApi.dispose();
+
+	await page.goto('/settings/users');
+	await expect(userRow(page, user)).toContainText('Last sign-in:');
+	await expect(userRow(page, user)).not.toContainText('Last sign-in: Never');
+});
+
+test('a display-name change shows in the user menu at once', async ({
+	browser,
+	workerBaseURL,
+	workerSession
+}) => {
+	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'rename' });
+	await adminApi.dispose();
+
+	const { page, context } = await asUser(browser, user);
+	await page.goto('/settings/account');
+	await page.getByLabel('Name', { exact: true }).fill('   ');
+	await expect(page.getByText('A display name must be 1 to 120 characters.')).toBeVisible();
+
+	const renamed = `Renamed ${Date.now()}`;
+	await page.getByLabel('Name', { exact: true }).fill(renamed);
+	await page.getByRole('button', { name: 'Save name' }).click();
+	await expect(page.getByText('Display name updated')).toBeVisible();
+	await expect(page.getByRole('button', { name: `Account menu for ${renamed}` })).toBeVisible();
+	await context.close();
+});
+
+test('a disabled account sees why, and a wrong password stays generic', async ({
+	browser,
+	workerBaseURL,
+	workerSession
+}) => {
+	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'disabled' });
+	const res = await adminApi.patch(`/api/v1/user/${user.id}`, { data: { disabled: true } });
+	expect(res.ok(), await res.text()).toBeTruthy();
+	await adminApi.dispose();
+
+	const anonymous = await browser.newContext({
+		baseURL: workerBaseURL,
+		storageState: { cookies: [], origins: [] },
+		extraHTTPHeaders: {}
+	});
+	const login = await anonymous.newPage();
+	await login.goto('/login');
+	await signInThroughForm(login, user.username, user.password);
+	await expect(
+		login.getByText('This account has been disabled. Ask an administrator.')
+	).toBeVisible();
+
+	await signInThroughForm(login, user.username, 'definitely-not-it-1');
+	await expect(login.getByText('Incorrect username or password.')).toBeVisible();
+	await expect(login.getByText('has been disabled')).toHaveCount(0);
+	await anonymous.close();
+});
+
+test('an administrator unlocks a locked-out account', async ({
+	page,
+	playwright,
+	workerBaseURL,
+	workerSession
+}) => {
+	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'locked' });
+	await adminApi.dispose();
+
+	const anonymous = await playwright.request.newContext({ baseURL: workerBaseURL });
+	for (let attempt = 0; attempt < 5; attempt++) {
+		const res = await anonymous.post('/api/v1/auth/login', {
+			data: { username: user.username, password: 'definitely-not-it-1' }
+		});
+		expect(res.status()).toBe(401);
+	}
+	const locked = await anonymous.post('/api/v1/auth/login', {
+		data: { username: user.username, password: user.password }
+	});
+	expect(locked.status()).toBe(429);
+	await anonymous.dispose();
+
+	await page.goto('/settings/users');
+	const row = userRow(page, user);
+	await expect(row.getByText(/^Locked until/)).toBeVisible();
+	await row.getByRole('button', { name: 'Unlock' }).click();
+	await expect(page.getByText('Account unlocked')).toBeVisible();
+	await expect(row.getByText(/^Locked until/)).toHaveCount(0);
+	await expect(row.getByRole('button', { name: 'Unlock' })).toHaveCount(0);
+
+	await signInViaApi(workerBaseURL, user.username, user.password);
+});

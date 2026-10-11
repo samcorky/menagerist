@@ -15,6 +15,7 @@ from app.entrypoints.api.shared.request_context_middleware import (
 from app.entrypoints.api.shared.security_headers import SecurityHeadersMiddleware
 from app.entrypoints.api.shared.version_header import VersionHeaderMiddleware
 from app.entrypoints.api.spa import SpaStaticFiles
+from app.entrypoints.api.startup import lifespan
 from app.modules.collections.adapters.api.collection.router import (
     router as collection_router,
 )
@@ -86,6 +87,7 @@ def create_app() -> FastAPI:
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
+        lifespan=lifespan,
     )
     fastapi_app.version = app_info.version
     if app_info.project.description:
@@ -121,4 +123,6 @@ def create_app() -> FastAPI:
     return fastapi_app
 
 
-app = wrap_asgi_with_proxy_headers(create_app(), trusted_hosts="*")
+app = wrap_asgi_with_proxy_headers(
+    create_app(), trusted_hosts=get_api_settings().trusted_proxies
+)

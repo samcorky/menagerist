@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
 	authErrorMessage,
+	ACCOUNT_DISABLED_MESSAGE,
 	describeClaimed,
+	displayNameProblem,
+	isPasswordUnchanged,
 	guardDecision,
 	isUnsafeMethod,
+	problemTitle,
 	problemType,
 	readCookie,
 	safeNext,
@@ -203,5 +207,32 @@ describe('messages', () => {
 			'2 files'
 		]);
 		expect(describeClaimed({ items: 0 })).toEqual([]);
+	});
+});
+
+describe('identity errors', () => {
+	it('shows the fixed disabled-account message for a 403 account_disabled', () => {
+		const response = new Response(null, { status: 403 });
+		expect(authErrorMessage({ error: { type: 'account_disabled', detail: 'x' }, response })).toBe(
+			ACCOUNT_DISABLED_MESSAGE
+		);
+		// Other 403s keep the server detail.
+		expect(authErrorMessage({ error: { type: 'about:blank', detail: 'No.' }, response })).toBe(
+			'No.'
+		);
+	});
+
+	it('reads the problem title and spots an unchanged password', () => {
+		expect(problemTitle({ title: 'PasswordUnchangedError' })).toBe('PasswordUnchangedError');
+		expect(problemTitle({})).toBeNull();
+		expect(isPasswordUnchanged({ title: 'PasswordUnchangedError' })).toBe(true);
+		expect(isPasswordUnchanged({ title: 'CurrentPasswordIncorrectError' })).toBe(false);
+	});
+
+	it('validates display names after trimming', () => {
+		expect(displayNameProblem('   ')).not.toBeNull();
+		expect(displayNameProblem('Sam')).toBeNull();
+		expect(displayNameProblem('a'.repeat(120))).toBeNull();
+		expect(displayNameProblem('a'.repeat(121))).not.toBeNull();
 	});
 });

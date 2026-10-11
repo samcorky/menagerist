@@ -7,6 +7,7 @@ import structlog
 from fastapi import Depends
 from starlette.requests import Request
 
+from app.entrypoints.api.shared.authorization import get_authorization_port
 from app.modules.identity.adapters.claim.unwired_existing_data_claim import (
     UnwiredExistingDataClaim,
 )
@@ -36,16 +37,21 @@ from app.modules.identity.application.get_current_user import (
     ResolvedSession,
 )
 from app.modules.identity.application.get_setup_status import GetSetupStatus
+from app.modules.identity.application.has_administrator import HasAdministrator
 from app.modules.identity.application.list_users import ListUsers
 from app.modules.identity.application.reset_password import ResetPassword
+from app.modules.identity.application.set_own_display_name import SetOwnDisplayName
 from app.modules.identity.application.setup_first_admin import SetupFirstAdmin
 from app.modules.identity.application.sign_in import SignIn
+from app.modules.identity.application.sign_in_throttle import SignInThrottle
 from app.modules.identity.application.sign_out import SignOut
+from app.modules.identity.application.unlock_user import UnlockUser
 from app.modules.identity.application.update_user import UpdateUser
 from app.modules.identity.domain.errors import (
     PasswordExpiredError,
     SessionRequiredError,
 )
+from app.modules.identity.domain.throttle import ThrottlePolicy
 from app.modules.identity.domain.user import User
 from app.modules.identity.ports.existing_data_claim import ExistingDataClaim
 from app.modules.identity.ports.password_hasher import PasswordHasher
@@ -54,6 +60,7 @@ from app.modules.identity.ports.unit_of_work import IdentityRepos, IdentityUnitO
 from app.platform.config import IdentitySettings, get_identity_settings
 from app.platform.database import get_session_factory
 from app.shared_kernel.actor import ANONYMOUS_ACTOR, Actor
+from app.shared_kernel.authorization import AuthorizationPort
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -88,6 +95,29 @@ def get_password_hasher() -> PasswordHasher:
 def get_decoy_hash() -> str:
     """Return the process-wide decoy hash."""
     return _decoy_hash()
+
+
+def get_sign_in_throttle(
+    settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
+) -> SignInThrottle:
+    """Return the failed-attempt limits configured for this process."""
+    return SignInThrottle(
+        ThrottlePolicy(
+            username_limit=settings.sign_in_username_attempts,
+            ip_limit=settings.sign_in_ip_attempts,
+            window=timedelta(minutes=settings.sign_in_window_minutes),
+        )
+    )
+
+
+def get_client_ip(request: Request) -> str | None:
+    """Return the client address as the server sees it.
+
+    The ASGI wrapper in `entrypoints/api/__init__.py` has already applied
+    X-Forwarded-For from `MENAGERIST_TRUSTED_PROXIES` peers only, so this is
+    `request.client.host`.
+    """
+    return None if request.client is None else request.client.host
 
 
 def get_session_token_generator() -> SessionTokenGenerator:
@@ -165,9 +195,20 @@ def get_sign_in_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
     authenticator: Annotated[PasswordAuthenticator, Depends(get_authenticator)],
     tokens: Annotated[SessionTokenGenerator, Depends(get_session_token_generator)],
+    hasher: Annotated[PasswordHasher, Depends(get_password_hasher)],
+    throttle: Annotated[SignInThrottle, Depends(get_sign_in_throttle)],
+    decoy_hash: Annotated[str, Depends(get_decoy_hash)],
     ttl: Annotated[timedelta, Depends(get_session_ttl)],
 ) -> SignIn:
-    return SignIn(uow, authenticator, tokens, session_ttl=ttl)
+    return SignIn(
+        uow,
+        authenticator,
+        tokens,
+        hasher,
+        throttle,
+        decoy_hash=decoy_hash,
+        session_ttl=ttl,
+    )
 
 
 def get_sign_out_use_case(
@@ -194,35 +235,59 @@ def get_change_password_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
     hasher: Annotated[PasswordHasher, Depends(get_password_hasher)],
     tokens: Annotated[SessionTokenGenerator, Depends(get_session_token_generator)],
+    throttle: Annotated[SignInThrottle, Depends(get_sign_in_throttle)],
     ttl: Annotated[timedelta, Depends(get_session_ttl)],
 ) -> ChangePassword:
-    return ChangePassword(uow, hasher, tokens, session_ttl=ttl)
+    return ChangePassword(uow, hasher, tokens, throttle, session_ttl=ttl)
+
+
+def get_set_own_display_name_use_case(
+    uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+) -> SetOwnDisplayName:
+    return SetOwnDisplayName(uow)
 
 
 def get_create_user_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
     hasher: Annotated[PasswordHasher, Depends(get_password_hasher)],
 ) -> CreateUser:
-    return CreateUser(uow, hasher)
+    return CreateUser(uow, authorization, hasher)
 
 
 def get_list_users_use_case(
     repos: Annotated[IdentityRepos, Depends(get_identity_repos)],
+    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
 ) -> ListUsers:
-    return ListUsers(repos)
+    return ListUsers(repos, authorization)
 
 
 def get_update_user_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
 ) -> UpdateUser:
-    return UpdateUser(uow)
+    return UpdateUser(uow, authorization)
 
 
 def get_reset_password_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
     hasher: Annotated[PasswordHasher, Depends(get_password_hasher)],
 ) -> ResetPassword:
-    return ResetPassword(uow, hasher)
+    return ResetPassword(uow, authorization, hasher)
+
+
+def get_unlock_user_use_case(
+    uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+) -> UnlockUser:
+    return UnlockUser(uow, authorization)
+
+
+def get_has_administrator_use_case(
+    repos: Annotated[IdentityRepos, Depends(get_identity_repos)],
+) -> HasAdministrator:
+    return HasAdministrator(repos)
 
 
 def get_session_token(

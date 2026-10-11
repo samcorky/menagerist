@@ -60,3 +60,16 @@ class PasswordExpiredError(ForbiddenError):
     """Raised when the account's password has expired and must be replaced first."""
 
     problem_type = "password_expired"
+
+
+class AccountDisabledError(ForbiddenError):
+    """Raised when correct credentials belong to a disabled account."""
+
+    problem_type = "account_disabled"
+
+    def __init__(self) -> None:
+        super().__init__("This account has been disabled. Ask an administrator.")
+
+
+class PasswordUnchangedError(ValidationError):
+    """Raised when a new password is the same as the current one."""

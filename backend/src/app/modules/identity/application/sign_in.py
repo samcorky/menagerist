@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
@@ -5,8 +6,17 @@ from typing import TYPE_CHECKING
 import structlog
 
 from app.modules.identity.application.session_start import SignedInResult, start_session
-from app.modules.identity.domain.errors import InvalidCredentialsError
+from app.modules.identity.application.sign_in_throttle import (
+    SignInThrottle,
+    ip_key,
+    username_key,
+)
+from app.modules.identity.domain.errors import (
+    AccountDisabledError,
+    InvalidCredentialsError,
+)
 from app.modules.identity.ports.authenticator import Authenticator, PasswordCredentials
+from app.modules.identity.ports.password_hasher import PasswordHasher  # noqa: TC001
 from app.modules.identity.ports.session_token_generator import (  # noqa: TC001
     SessionTokenGenerator,
 )
@@ -27,6 +37,7 @@ class SignInCommand:
 
     username: str
     password: str
+    client_ip: str | None = None
 
     def __repr__(self) -> str:
         """Keep the password out of logs and tracebacks."""
@@ -41,33 +52,64 @@ class SignIn(CommandHandler[IdentityUnitOfWork, SignInCommand, SignedInResult]):
         uow: IdentityUnitOfWork,
         authenticator: Authenticator,
         tokens: SessionTokenGenerator,
+        hasher: PasswordHasher,
+        throttle: SignInThrottle,
         *,
+        decoy_hash: str,
         session_ttl: timedelta,
     ) -> None:
         super().__init__(uow)
         self._authenticator = authenticator
         self._tokens = tokens
+        self._hasher = hasher
+        self._throttle = throttle
+        self._decoy_hash = decoy_hash
         self._ttl = session_ttl
 
     async def handle(self, command: SignInCommand, actor: Actor) -> SignedInResult:
         """Return the signed-in user and the new session token.
 
+        Failures are counted per username and per client address whether or
+        not the account exists, and a locked key is refused before any password
+        is checked.
+
         Raises:
-            InvalidCredentialsError: For an unknown user, wrong password or
-                disabled account alike.
-            SignInThrottledError: If the account is locked after repeated failures.
+            InvalidCredentialsError: For an unknown user or wrong password.
+            AccountDisabledError: If the credentials are right but the account
+                is disabled (not counted as a failure).
+            SignInThrottledError: If the username or address is locked.
         """
+        now = datetime.now(UTC)
+        name_key = username_key(command.username)
+        keys = [name_key]
+        if command.client_ip:
+            keys.append(ip_key(command.client_ip))
+        async with self._uow as repos:
+            locked_until = await self._throttle.locked_until(repos.attempts, keys, now)
+        if locked_until is not None:
+            # Spend one hash's time so a lock is not faster than a real check.
+            await asyncio.to_thread(self._hasher.verify, "decoy", self._decoy_hash)
+            raise self._throttle.throttled(locked_until, now)
+
         identity = await self._authenticator.authenticate(
             PasswordCredentials(username=command.username, password=command.password)
         )
         if identity is None:
+            async with self._uow as repos:
+                await self._throttle.record_failure(repos.attempts, keys, now)
+                await self._uow.commit()
             raise InvalidCredentialsError(_GENERIC_MESSAGE)
         async with self._uow as repos:
-            user = await repos.users.get_by_username(identity.subject)
-            if user is None or user.disabled:
+            user = await repos.users.get_by_username_for_update(identity.subject)
+            if user is None:
                 raise InvalidCredentialsError(_GENERIC_MESSAGE)
+            if user.disabled:
+                raise AccountDisabledError()
+            user.record_sign_in(now)
+            await repos.users.save(user)
+            await repos.attempts.clear(name_key)
             # Sign-in is the only recurring writer here, so it also sweeps old rows.
-            await repos.sessions.delete_expired(datetime.now(UTC))
+            await repos.sessions.delete_expired(now)
             started = await start_session(repos, self._tokens, user, self._ttl)
             await self._uow.commit()
         logger.info("signed in", user_id=user.id, session_id=started.session_id)

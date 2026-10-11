@@ -4,6 +4,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from app.modules.identity.adapters.security.in_memory_password_hasher import (
+    InMemoryPasswordHasher,
+)
 from app.modules.identity.adapters.security.session_token_generator import (
     InMemorySessionTokenGenerator,
 )
@@ -13,8 +16,12 @@ from app.modules.identity.application.get_current_user import GetCurrentUserQuer
 from app.modules.identity.application.reset_password import ResetPasswordCommand
 from app.modules.identity.application.setup_first_admin import SetupFirstAdminCommand
 from app.modules.identity.application.sign_in import SignIn, SignInCommand
+from app.modules.identity.application.sign_in_throttle import SignInThrottle
 from app.modules.identity.application.sign_out import SignOutCommand
-from app.modules.identity.domain.errors import InvalidCredentialsError
+from app.modules.identity.domain.errors import (
+    AccountDisabledError,
+    InvalidCredentialsError,
+)
 from app.modules.identity.ports.authenticator import VerifiedIdentity
 from app.shared_kernel.actor import ANONYMOUS_ACTOR
 
@@ -55,25 +62,36 @@ class _FixedAuthenticator:
         return VerifiedIdentity(subject=self._subject, display_name="x")
 
 
-@pytest.mark.parametrize("state", ["missing", "disabled"])
+@pytest.mark.parametrize(
+    ("state", "refusal"),
+    [("missing", InvalidCredentialsError), ("disabled", AccountDisabledError)],
+)
 async def test_sign_in_rechecks_the_account_after_authentication(
-    state: str, world: World, make_user: MakeUser
+    state: str,
+    refusal: type[Exception],
+    world: World,
+    make_user: MakeUser,
 ) -> None:
-    """An account removed or disabled in between still gets the generic refusal."""
+    """An account removed or disabled in between is refused and nothing is saved."""
     user = make_user("alice")
     if state == "disabled":
         user.disable()
         await world.users.add(user)
+    hasher = InMemoryPasswordHasher()
     use_case = SignIn(
         world.uow,
         _FixedAuthenticator("alice"),
         InMemorySessionTokenGenerator(),
+        hasher,
+        SignInThrottle(),
+        decoy_hash=hasher.hash("decoy"),
         session_ttl=TTL,
     )
 
-    with pytest.raises(InvalidCredentialsError):
+    with pytest.raises(refusal):
         await use_case.handle(
             SignInCommand(username="alice", password="x"), ANONYMOUS_ACTOR
         )
 
     assert not world.uow.committed
+    assert user.last_login_at is None

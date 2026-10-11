@@ -5,15 +5,17 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from app.modules.identity.application.admin_only import require_admin
+from app.modules.identity.application.permissions import IdentityPermission
+from app.modules.identity.application.sign_in_throttle import username_key
 from app.modules.identity.domain.errors import UserNotFoundError
 from app.modules.identity.domain.user import validate_password
 from app.modules.identity.ports.password_hasher import PasswordHasher  # noqa: TC001
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.cqrs import AuthorisedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.authorization import AuthorizationPort
 
 logger = structlog.get_logger()
 
@@ -30,22 +32,32 @@ class ResetPasswordCommand:
         return f"ResetPasswordCommand(user_id={self.user_id!r})"
 
 
-class ResetPassword(CommandHandler[IdentityUnitOfWork, ResetPasswordCommand, None]):
+class ResetPassword(
+    AuthorisedCommandHandler[
+        IdentityUnitOfWork, ResetPasswordCommand, None, IdentityPermission
+    ]
+):
     """Set a new initial password, end the user's sessions and require a change."""
 
-    def __init__(self, uow: IdentityUnitOfWork, hasher: PasswordHasher) -> None:
-        super().__init__(uow)
+    required_permission = IdentityPermission.RESET_USER_PASSWORD
+
+    def __init__(
+        self,
+        uow: IdentityUnitOfWork,
+        authorization: AuthorizationPort,
+        hasher: PasswordHasher,
+    ) -> None:
+        super().__init__(uow, authorization)
         self._hasher = hasher
 
-    async def handle(self, command: ResetPasswordCommand, actor: Actor) -> None:
-        """Replace the password under a row lock.
+    async def _handle(self, command: ResetPasswordCommand, actor: Actor) -> None:
+        """Replace the password under a row lock; this also lifts a sign-in lock.
 
         Raises:
-            ForbiddenError: If `actor` is not an administrator.
+            ForbiddenError: If `actor` lacks `identity:user:reset_password`.
             UserNotFoundError: If the account does not exist.
             InvalidPasswordError: If the password breaks the rules.
         """
-        require_admin(actor)
         async with self._uow as repos:
             user = await repos.users.get_for_update(command.user_id)
             if user is None:
@@ -56,6 +68,7 @@ class ResetPassword(CommandHandler[IdentityUnitOfWork, ResetPasswordCommand, Non
                 expired=True,
             )
             await repos.users.save(user)
+            await repos.attempts.clear(username_key(user.username))
             ended = await repos.sessions.delete_for_user(user.id)
             await self._uow.commit()
         logger.info("sessions ended", user_id=user.id, count=ended)

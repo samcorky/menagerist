@@ -35,11 +35,11 @@ def _dummy_asset(
 
 
 def test_content_cache_headers() -> None:
-    """content_cache_headers produces immutable ETag and Last-Modified headers."""
+    """content_cache_headers gives a private, revalidating ETag and Last-Modified."""
     asset = _dummy_asset()
     headers = content_cache_headers(asset)
     assert headers["ETag"] == '"abcdef1234567890"'
-    assert headers["Cache-Control"] == "private, max-age=31536000, immutable"
+    assert headers["Cache-Control"] == "private, no-cache"
     assert headers["Last-Modified"] == http_date(asset.created_at)
 
 

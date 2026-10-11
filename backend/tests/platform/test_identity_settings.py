@@ -23,3 +23,24 @@ def test_reads_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = IdentitySettings()
     assert settings.cookie_secure is True
     assert settings.session_ttl_hours == 2
+
+
+def test_sign_in_limits_default_and_are_configurable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Five per username and twenty per address in fifteen minutes by default."""
+    defaults = IdentitySettings()
+    assert (
+        defaults.sign_in_username_attempts,
+        defaults.sign_in_ip_attempts,
+        defaults.sign_in_window_minutes,
+    ) == (5, 20, 15)
+    monkeypatch.setenv("MENAGERIST_SIGN_IN_USERNAME_ATTEMPTS", "3")
+    monkeypatch.setenv("MENAGERIST_SIGN_IN_IP_ATTEMPTS", "7")
+    monkeypatch.setenv("MENAGERIST_SIGN_IN_WINDOW_MINUTES", "1")
+    tuned = IdentitySettings()
+    assert (
+        tuned.sign_in_username_attempts,
+        tuned.sign_in_ip_attempts,
+        tuned.sign_in_window_minutes,
+    ) == (3, 7, 1)

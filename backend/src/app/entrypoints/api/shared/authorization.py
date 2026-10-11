@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.authorization import AuthorizationPort
 
 # Granted to every signed-in member; empty today.
 MEMBER_PERMISSIONS: frozenset[Permission] = frozenset()
@@ -49,3 +50,16 @@ class RoleAuthorizationAdapter:
         """Raise `ForbiddenError` unless `action` is in the actor's permissions."""
         if action not in self.effective_permissions(actor):
             raise ForbiddenError("You do not have permission to do that.")
+
+
+_authorization_port = RoleAuthorizationAdapter()
+
+
+def get_role_authorization() -> RoleAuthorizationAdapter:
+    """Return the process-wide role-based authorisation adapter."""
+    return _authorization_port
+
+
+def get_authorization_port() -> AuthorizationPort:
+    """Return the process-wide `AuthorizationPort` adapter."""
+    return _authorization_port

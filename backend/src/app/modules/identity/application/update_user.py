@@ -1,14 +1,17 @@
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import structlog
 
-from app.modules.identity.application.admin_only import require_admin
+from app.modules.identity.application.permissions import IdentityPermission
+from app.modules.identity.application.sign_in_throttle import username_key
+from app.modules.identity.application.user_listing import UserListing
 from app.modules.identity.domain.errors import LastAdministratorError, UserNotFoundError
-from app.modules.identity.domain.user import Role, User
+from app.modules.identity.domain.user import Role
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.cqrs import AuthorisedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -26,19 +29,24 @@ class UpdateUserCommand:
     disabled: bool | None = None
 
 
-class UpdateUser(CommandHandler[IdentityUnitOfWork, UpdateUserCommand, User]):
+class UpdateUser(
+    AuthorisedCommandHandler[
+        IdentityUnitOfWork, UpdateUserCommand, UserListing, IdentityPermission
+    ]
+):
     """Rename, re-role, disable or enable an account."""
 
-    async def handle(self, command: UpdateUserCommand, actor: Actor) -> User:
+    required_permission = IdentityPermission.UPDATE_USER
+
+    async def _handle(self, command: UpdateUserCommand, actor: Actor) -> UserListing:
         """Apply the change under a row lock.
 
         Raises:
-            ForbiddenError: If `actor` is not an administrator.
+            ForbiddenError: If `actor` lacks `identity:user:update`.
             UserNotFoundError: If the account does not exist.
             InvalidUserError: If the display name is unusable.
             LastAdministratorError: If the change would leave no enabled admin.
         """
-        require_admin(actor)
         ended = 0
         async with self._uow as repos:
             # Lock order: admin-changes lock first, then the user row.
@@ -66,8 +74,13 @@ class UpdateUser(CommandHandler[IdentityUnitOfWork, UpdateUserCommand, User]):
             elif command.disabled is False:
                 user.enable()
             await repos.users.save(user)
+            locked = await repos.attempts.locked_keys(
+                [username_key(user.username)], now=datetime.now(UTC)
+            )
             await self._uow.commit()
         if ended:
             logger.info("sessions ended", user_id=user.id, count=ended)
         logger.info("user updated", user_id=user.id, updated_by=actor.id)
-        return user
+        return UserListing(
+            user=user, locked_until=locked.get(username_key(user.username))
+        )

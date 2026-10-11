@@ -107,6 +107,9 @@ from app.modules.identity.adapters.api.dependencies import (
 from app.modules.identity.adapters.persistence.in_memory_session_repository import (
     InMemorySessionRepository,
 )
+from app.modules.identity.adapters.persistence.in_memory_sign_in_attempt_repository import (  # noqa: E501
+    InMemorySignInAttemptRepository,
+)
 from app.modules.identity.adapters.persistence.in_memory_user_repository import (
     InMemoryUserRepository,
 )
@@ -193,6 +196,7 @@ ALLOWED: dict[Route, str] = {
     ("POST", "/api/v1/auth/login"): PUBLIC,
     ("POST", "/api/v1/auth/logout"): OWN_SESSION,
     ("GET", "/api/v1/auth/me"): OWN_SESSION,
+    ("PATCH", "/api/v1/auth/me"): OWN_SESSION,
     ("POST", "/api/v1/auth/password"): OWN_SESSION,
     ("GET", "/api/v1/auth/me/permissions"): OWN_SESSION,
     ("GET", "/api/v1/node-type"): VOCABULARY,
@@ -370,7 +374,9 @@ class World:
         catalogue = InMemoryPackCatalogue()
         catalogue.add(_pack(), name="Demo", description="Demo examples")
         self.identity = IdentityRepos(
-            users=InMemoryUserRepository(), sessions=InMemorySessionRepository()
+            users=InMemoryUserRepository(),
+            sessions=InMemorySessionRepository(),
+            attempts=InMemorySignInAttemptRepository(),
         )
         storage = InMemoryMediaStorage()
         processor = InMemoryImageProcessor()

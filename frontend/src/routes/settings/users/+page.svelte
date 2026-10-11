@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { Copy, Check, KeyRound, Plus, Dices } from '@lucide/svelte';
+	import { Copy, Check, KeyRound, LockOpen, Plus, Dices } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import {
 		createUser,
 		listUsers,
 		resetUserPassword,
+		unlockUser,
 		updateUser,
 		type Role,
 		type UserResponse
@@ -13,6 +14,7 @@
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { auth } from '$lib/auth.svelte.js';
 	import { generatePassword, PASSWORD_MIN_LENGTH } from '$lib/auth';
+	import { isLocked, lastSignIn, lockedLabel } from '$lib/users';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import BackButton from '$lib/components/back-button.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -71,9 +73,15 @@
 	}
 
 	$effect(() => {
-		if (auth.isAdmin) void load();
+		if (canList) void load();
 		else loading = false;
 	});
+
+	const canList = $derived(auth.can('identity:user:list'));
+	const canCreate = $derived(auth.can('identity:user:create'));
+	const canUpdate = $derived(auth.can('identity:user:update'));
+	const canReset = $derived(auth.can('identity:user:reset_password'));
+	const canUnlock = $derived(auth.can('identity:user:unlock'));
 
 	const newPasswordValid = $derived(newPassword.length >= PASSWORD_MIN_LENGTH);
 
@@ -151,9 +159,24 @@
 		}
 		issued = { name: target.display_name, username: target.username, password: resetPassword };
 		copied = false;
-		users = users.map((u) => (u.id === target.id ? { ...u, password_expired: true } : u));
+		users = users.map((u) =>
+			u.id === target.id ? { ...u, password_expired: true, locked_until: null } : u
+		);
 		resetTarget = null;
 		resetPassword = '';
+	}
+
+	async function handleUnlock(user: UserResponse) {
+		rowBusy = user.id;
+		rowError = null;
+		const result = await unlockUser({ path: { user_id: user.id } });
+		rowBusy = null;
+		if (result.error) {
+			rowError = { id: user.id, message: errorMessage(result.error) };
+			return;
+		}
+		users = users.map((u) => (u.id === user.id ? { ...u, locked_until: null } : u));
+		toast.success('Account unlocked');
 	}
 
 	async function copyPassword() {
@@ -179,7 +202,7 @@
 				<h1 class="font-heading text-3xl font-semibold tracking-tight">Users</h1>
 				<p class="mt-1 text-muted-foreground">Everyone who can sign in to this Menagerist.</p>
 			</div>
-			{#if auth.isAdmin && !showCreate}
+			{#if canCreate && !showCreate}
 				<Button class="h-11" onclick={() => (showCreate = true)}>
 					<Plus class="size-4" />
 					Add user
@@ -187,7 +210,7 @@
 			{/if}
 		</div>
 
-		{#if !auth.isAdmin}
+		{#if !canList}
 			<Alert.Root>
 				<Alert.Description>Only administrators can manage users.</Alert.Description>
 			</Alert.Root>
@@ -222,7 +245,7 @@
 				</Alert.Root>
 			{/if}
 
-			{#if showCreate}
+			{#if showCreate && canCreate}
 				<Card.Root>
 					<Card.Header>
 						<Card.Title>Add a user</Card.Title>
@@ -344,6 +367,8 @@
 				<ul class="space-y-3" aria-label="Users">
 					{#each users as user (user.id)}
 						{@const isMe = user.id === auth.user?.id}
+						{@const locked = isLocked(user.locked_until)}
+						{@const signedInAt = lastSignIn(user.last_login_at)}
 						<li>
 							<Card.Root>
 								<Card.Content class="space-y-3">
@@ -351,50 +376,73 @@
 										<p class="font-heading font-semibold">{user.display_name}</p>
 										{#if isMe}<Badge variant="secondary">You</Badge>{/if}
 										{#if user.disabled}<Badge variant="outline">Disabled</Badge>{/if}
+										{#if locked && user.locked_until}
+											<Badge variant="destructive">{lockedLabel(user.locked_until)}</Badge>
+										{/if}
 										{#if user.password_expired}<Badge variant="outline">Must change password</Badge
 											>{/if}
 									</div>
 									<p class="text-sm break-all text-muted-foreground">{user.username}</p>
+									<p class="text-sm text-muted-foreground" title={signedInAt.title}>
+										Last sign-in: {signedInAt.text}
+									</p>
 
-									<div class="flex flex-wrap items-end gap-2">
-										<div class="space-y-1">
-											<Label for="role-{user.id}" class="text-xs">Role</Label>
-											<NativeSelect
-												id="role-{user.id}"
-												class="[&_select]:h-11"
-												disabled={rowBusy === user.id || isMe}
-												value={user.role}
-												onchange={(e) => {
-													const select = e.currentTarget;
-													void patch(user, { role: select.value as Role }, () => {
-														select.value = user.role;
-													});
-												}}
-											>
-												<option value="member">Member</option>
-												<option value="admin">Administrator</option>
-											</NativeSelect>
+									{#if canUpdate || canReset || (canUnlock && locked)}
+										<div class="flex flex-wrap items-end gap-2">
+											{#if canUpdate}
+												<div class="space-y-1">
+													<Label for="role-{user.id}" class="text-xs">Role</Label>
+													<NativeSelect
+														id="role-{user.id}"
+														class="[&_select]:h-11"
+														disabled={rowBusy === user.id || isMe}
+														value={user.role}
+														onchange={(e) => {
+															const select = e.currentTarget;
+															void patch(user, { role: select.value as Role }, () => {
+																select.value = user.role;
+															});
+														}}
+													>
+														<option value="member">Member</option>
+														<option value="admin">Administrator</option>
+													</NativeSelect>
+												</div>
+												<Button
+													variant="outline"
+													class="h-11"
+													disabled={rowBusy === user.id || isMe}
+													onclick={() => patch(user, { disabled: !user.disabled })}
+												>
+													{user.disabled ? 'Enable' : 'Disable'}
+												</Button>
+											{/if}
+											{#if canReset}
+												<Button
+													variant="outline"
+													class="h-11"
+													disabled={rowBusy === user.id}
+													onclick={() => openReset(user)}
+												>
+													<KeyRound class="size-4" />
+													Reset password
+												</Button>
+											{/if}
+											{#if canUnlock && locked}
+												<Button
+													variant="outline"
+													class="h-11"
+													disabled={rowBusy === user.id}
+													onclick={() => handleUnlock(user)}
+												>
+													<LockOpen class="size-4" />
+													Unlock
+												</Button>
+											{/if}
 										</div>
-										<Button
-											variant="outline"
-											class="h-11"
-											disabled={rowBusy === user.id || isMe}
-											onclick={() => patch(user, { disabled: !user.disabled })}
-										>
-											{user.disabled ? 'Enable' : 'Disable'}
-										</Button>
-										<Button
-											variant="outline"
-											class="h-11"
-											disabled={rowBusy === user.id}
-											onclick={() => openReset(user)}
-										>
-											<KeyRound class="size-4" />
-											Reset password
-										</Button>
-									</div>
+									{/if}
 
-									{#if isMe}
+									{#if isMe && canUpdate}
 										<p class="text-xs text-muted-foreground">
 											You can't change your own role or disable yourself.
 										</p>

@@ -35,11 +35,10 @@ def _user(username: str = "alice", role: Role = Role.MEMBER) -> User:
 
 
 async def test_user_round_trips_every_field(db_session: AsyncSession) -> None:
-    """A stored user reads back with all its fields, including lockout state."""
+    """A stored user reads back with all its fields, including last sign-in."""
     repo = SqlAlchemyUserRepository(db_session)
     user = _user("Alice", Role.ADMIN)
-    for _ in range(5):
-        user.record_failure(NOW)
+    user.record_sign_in(NOW)
     user.disable()
     await repo.add(user)
     db_session.expire_all()
@@ -57,9 +56,7 @@ async def test_user_round_trips_every_field(db_session: AsyncSession) -> None:
         True,
         True,
     )
-    assert stored.failed_attempts == 5
-    assert stored.locked_until == user.locked_until
-    assert stored.failure_window_started_at == NOW
+    assert stored.last_login_at == NOW
     assert (stored.created_at, stored.updated_at) == (user.created_at, user.updated_at)
 
 

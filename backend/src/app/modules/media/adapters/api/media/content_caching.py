@@ -15,7 +15,7 @@ def _cache_headers(*, etag_hash: str, last_modified: datetime) -> dict[str, str]
     return {
         "ETag": f'"{etag_hash}"',
         "Last-Modified": http_date(last_modified),
-        "Cache-Control": "private, max-age=31536000, immutable",
+        "Cache-Control": "private, no-cache",
     }
 
 
@@ -41,15 +41,17 @@ def _check_not_modified(
 
 
 def content_cache_headers(asset: MediaAsset) -> dict[str, str]:
-    """Immutable cache headers for content addressed by ``sha256``.
+    """Revalidating cache headers (``private, no-cache``) for content by ``sha256``.
+
+    Never public or long-lived: every response must pass the ownership check,
+    and the ETag only saves the transfer once it has.
 
     Deliberately keyed on ``sha256`` + ``created_at`` rather than the
     shared_kernel ``etag_from_entity()`` pattern (``id`` + ``updated_at``):
     every lifecycle transition (stage -> attach -> orphan) calls ``touch()``
     and bumps ``updated_at`` even though the underlying bytes never change,
     which would false-invalidate the cache on every move. The hash is stable
-    across the entire lifecycle, so this is safe to cache as ``immutable``
-    regardless of the asset's current status.
+    across the entire lifecycle, so revalidation almost always ends in a 304.
 
     Covers only the original file's bytes - see ``thumbnail_cache_headers``
     for the derived thumbnail, which is keyed on its own hash.
@@ -76,16 +78,15 @@ def check_content_not_modified(request: Request, asset: MediaAsset) -> Response 
 
 
 def thumbnail_cache_headers(asset: MediaAsset) -> dict[str, str]:
-    """Immutable cache headers for a generated thumbnail, keyed on its own hash.
+    """Revalidating cache headers for a generated thumbnail, keyed on its own hash.
 
     A thumbnail's bytes can change independently of the original file it was
     derived from - ``RegenerateThumbnails`` re-encodes attached assets after
     a thumbnailing fix (EXIF orientation, encoder quality) without touching
     the original. Keying the thumbnail's ETag on the *original's* `sha256`
     (as content_cache_headers does) made a freshly regenerated thumbnail
-    indistinguishable from the stale one it replaced, so under
-    ``Cache-Control: immutable`` neither the browser cache nor a conditional
-    304 would ever pick up the new bytes. `thumbnail_sha256` is the hash of
+    indistinguishable from the stale one it replaced, so a
+    conditional 304 would keep serving the old bytes. `thumbnail_sha256` is the hash of
     the thumbnail's own bytes, so regenerating it changes the cache key.
 
     Falls back to `asset.sha256` for thumbnails generated before

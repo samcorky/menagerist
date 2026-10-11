@@ -7,6 +7,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.modules.identity.application.change_password import ChangePasswordCommand
 from app.modules.identity.application.create_user import CreateUserCommand
 from app.modules.identity.application.reset_password import ResetPasswordCommand
+from app.modules.identity.application.set_own_display_name import (
+    SetOwnDisplayNameCommand,
+)
 from app.modules.identity.application.setup_first_admin import SetupFirstAdminCommand
 from app.modules.identity.application.sign_in import SignInCommand
 from app.modules.identity.application.update_user import UpdateUserCommand
@@ -19,6 +22,7 @@ from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
     from app.modules.identity.application.setup_first_admin import SetupFirstAdminResult
+    from app.modules.identity.application.user_listing import UserListing
     from app.modules.identity.domain.user import User
 
 # Generous bounds only stop absurd bodies; the domain applies the real password rules.
@@ -31,6 +35,8 @@ _USER_EXAMPLE: dict[str, Any] = {
     "role": "member",
     "password_expired": False,
     "disabled": False,
+    "last_login_at": "2026-10-11T08:30:00.000000Z",
+    "locked_until": None,
     "created_at": "2026-10-10T12:00:00.000000Z",
     "updated_at": "2026-10-10T12:00:00.000000Z",
 }
@@ -76,9 +82,11 @@ class LoginRequest(RequestModel):
     username: str = Field(max_length=MAX_USERNAME_LENGTH)
     password: str = Field(max_length=_MAX_PASSWORD_INPUT)
 
-    def to_command(self) -> SignInCommand:
+    def to_command(self, client_ip: str | None = None) -> SignInCommand:
         """Convert this request into a `SignInCommand`."""
-        return SignInCommand(username=self.username, password=self.password)
+        return SignInCommand(
+            username=self.username, password=self.password, client_ip=client_ip
+        )
 
 
 class ChangePasswordRequest(RequestModel):
@@ -98,11 +106,27 @@ class ChangePasswordRequest(RequestModel):
     current_password: str = Field(max_length=_MAX_PASSWORD_INPUT)
     new_password: str = Field(max_length=_MAX_PASSWORD_INPUT)
 
-    def to_command(self) -> ChangePasswordCommand:
+    def to_command(self, client_ip: str | None = None) -> ChangePasswordCommand:
         """Convert this request into a `ChangePasswordCommand`."""
         return ChangePasswordCommand(
-            current_password=self.current_password, new_password=self.new_password
+            current_password=self.current_password,
+            new_password=self.new_password,
+            client_ip=client_ip,
         )
+
+
+class UpdateMeRequest(RequestModel):
+    """Request body for changing your own display name."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"display_name": "Alice Example"}]}
+    )
+
+    display_name: str = Field(max_length=MAX_DISPLAY_NAME_LENGTH)
+
+    def to_command(self) -> SetOwnDisplayNameCommand:
+        """Convert this request into a `SetOwnDisplayNameCommand`."""
+        return SetOwnDisplayNameCommand(display_name=self.display_name)
 
 
 class CreateUserRequest(RequestModel):
@@ -196,11 +220,28 @@ class UserResponse(BaseModel):
     role: Role
     password_expired: bool
     disabled: bool
+    last_login_at: datetime | None = Field(
+        default=None, description="When the account last signed in; null if never."
+    )
+    locked_until: datetime | None = Field(
+        default=None,
+        description=(
+            "When a sign-in lockout on this username ends; null when not locked."
+            + " Only filled in by the administrator user list and update."
+        ),
+    )
     created_at: datetime
     updated_at: datetime
 
     @classmethod
-    def from_domain(cls, user: User) -> UserResponse:
+    def from_listing(cls, listing: UserListing) -> UserResponse:
+        """Build a response from a user and its lock state."""
+        return cls.from_domain(listing.user, locked_until=listing.locked_until)
+
+    @classmethod
+    def from_domain(
+        cls, user: User, *, locked_until: datetime | None = None
+    ) -> UserResponse:
         """Build a response from a user."""
         return cls(
             id=user.id,
@@ -209,6 +250,8 @@ class UserResponse(BaseModel):
             role=user.role,
             password_expired=user.password_expired,
             disabled=user.disabled,
+            last_login_at=user.last_login_at,
+            locked_until=locked_until,
             created_at=user.created_at,
             updated_at=user.updated_at,
         )

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import pytest
@@ -16,7 +16,7 @@ from app.modules.identity.adapters.security.password_hasher_registry import (
 from app.modules.identity.adapters.security.scrypt_password_hasher import (
     ScryptPasswordHasher,
 )
-from app.modules.identity.domain.errors import SignInThrottledError
+from app.modules.identity.domain.errors import AccountDisabledError
 from app.modules.identity.ports.authenticator import (
     PasswordCredentials,
     VerifiedIdentity,
@@ -69,48 +69,18 @@ async def test_wrong_password_and_unknown_user_return_none(
 
 
 @time_machine.travel(NOW, tick=False)
-async def test_failure_is_recorded_and_success_resets(
+async def test_correct_password_for_a_disabled_user_is_revealed(
     world: World, make_user: MakeUser
 ) -> None:
-    """A failure counts and commits; a later success clears it."""
-    user = make_user("alice")
-    await world.users.add(user)
-    auth = _authenticator(world)
-
-    await auth.authenticate(_creds(password="wrong-password"))
-    assert user.failed_attempts == 1
-    assert world.uow.committed is True
-
-    assert await auth.authenticate(_creds()) is not None
-    assert user.failed_attempts == 0
-
-
-@time_machine.travel(NOW, tick=False)
-async def test_disabled_user_cannot_sign_in(world: World, make_user: MakeUser) -> None:
-    """A disabled account is refused even with the right password."""
+    """Only a verified password learns the account is disabled."""
     user = make_user("alice")
     user.disable()
     await world.users.add(user)
-    assert await _authenticator(world).authenticate(_creds()) is None
-    assert user.failed_attempts == 0
-
-
-async def test_lockout_blocks_until_window_passes(
-    world: World, make_user: MakeUser
-) -> None:
-    """Five failures lock the account, even for the right password, for 15 minutes."""
-    user = make_user("alice")
-    await world.users.add(user)
     auth = _authenticator(world)
-    with time_machine.travel(NOW, tick=False) as clock:
-        for _ in range(5):
-            assert await auth.authenticate(_creds(password="wrong-password")) is None
-        with pytest.raises(SignInThrottledError):
-            await auth.authenticate(_creds())
-        with pytest.raises(SignInThrottledError):
-            await auth.authenticate(_creds(password="wrong-password"))
-        clock.move_to(NOW + timedelta(minutes=15))
-        assert await auth.authenticate(_creds()) is not None
+
+    with pytest.raises(AccountDisabledError):
+        await auth.authenticate(_creds())
+    assert await auth.authenticate(_creds(password="wrong-password")) is None
 
 
 @time_machine.travel(NOW, tick=False)
@@ -127,29 +97,33 @@ async def test_successful_sign_in_rewrites_outdated_hash(
     assert await _authenticator(world, default="scrypt").authenticate(_creds())
 
 
-class _CountingHasher(InMemoryPasswordHasher):
+class _VerifyCountingHasher(InMemoryPasswordHasher):
     def __init__(self) -> None:
-        self.hash_calls = 0
+        self.verified: list[str] = []
 
-    def hash(self, password: str) -> str:
-        self.hash_calls += 1
-        return super().hash(password)
+    def verify(self, password: str, hashed: str) -> bool:
+        self.verified.append(hashed)
+        return super().verify(password, hashed)
 
 
 @time_machine.travel(NOW, tick=False)
-async def test_unknown_and_disabled_paths_never_hash(
+async def test_every_wrong_attempt_costs_one_verify(
     world: World, make_user: MakeUser
 ) -> None:
-    """A fresh authenticator spends one verify, and no hash, on unknown names."""
+    """Unknown, disabled and wrong-password attempts all spend one verify."""
     disabled = make_user("gone")
     disabled.disable()
     await world.users.add(disabled)
-    hasher = _CountingHasher()
+    await world.users.add(make_user("alice"))
+    hasher = _VerifyCountingHasher()
     auth = PasswordAuthenticator(world.uow, hasher, decoy_hash="fake$decoy")
 
     assert await auth.authenticate(_creds("nobody")) is None
-    assert await auth.authenticate(_creds("gone")) is None
-    assert hasher.hash_calls == 0
+    assert await auth.authenticate(_creds("gone", "wrong-password")) is None
+    assert await auth.authenticate(_creds("alice", "wrong-password")) is None
+
+    assert len(hasher.verified) == 3
+    assert hasher.verified[0] == "fake$decoy"
 
 
 class _MutatingHasher(InMemoryPasswordHasher):
@@ -164,10 +138,10 @@ class _MutatingHasher(InMemoryPasswordHasher):
 
 
 @time_machine.travel(NOW, tick=False)
-async def test_outcome_is_recorded_under_the_row_lock(
+async def test_success_is_rechecked_under_the_row_lock(
     world: World, make_user: MakeUser
 ) -> None:
-    """Recording goes through the locking lookup, after the password check."""
+    """A right password is confirmed against the locked row, after the check."""
     await world.users.add(make_user("alice"))
     calls: list[str] = []
     original = world.users.get_by_username_for_update
@@ -181,24 +155,7 @@ async def test_outcome_is_recorded_under_the_row_lock(
 
     assert await auth.authenticate(_creds()) is not None
     assert await auth.authenticate(_creds(password="wrong-password")) is None
-    assert calls == ["alice"] * 2
-
-
-@time_machine.travel(NOW, tick=False)
-async def test_disabled_or_locked_state_is_checked_before_verifying(
-    world: World, make_user: MakeUser
-) -> None:
-    """Disabled accounts and locked accounts never reach the locking lookup."""
-    user = make_user("alice")
-    await world.users.add(user)
-    auth = _authenticator(world)
-    user.disable()
-    assert await auth.authenticate(_creds()) is None
-    user.enable()
-    for _ in range(5):
-        user.record_failure(NOW)
-    with pytest.raises(SignInThrottledError):
-        await auth.authenticate(_creds())
+    assert calls == ["alice"]
 
 
 @time_machine.travel(NOW, tick=False)
@@ -211,15 +168,15 @@ async def test_account_disabled_while_verifying_is_refused(
     auth = PasswordAuthenticator(
         world.uow, _MutatingHasher(user.disable), decoy_hash="fake$decoy"
     )
-    assert await auth.authenticate(_creds()) is None
-    assert user.failed_attempts == 0
+    with pytest.raises(AccountDisabledError):
+        await auth.authenticate(_creds())
 
 
 @time_machine.travel(NOW, tick=False)
 async def test_password_changed_while_verifying_is_refused(
     world: World, make_user: MakeUser
 ) -> None:
-    """A result for an old hash does not sign in or count against a new one."""
+    """A result for an old hash does not sign in against a new one."""
     user = make_user("alice")
     await world.users.add(user)
     new_hash = InMemoryPasswordHasher().hash("another-password")
@@ -229,24 +186,4 @@ async def test_password_changed_while_verifying_is_refused(
         decoy_hash="fake$decoy",
     )
     assert await auth.authenticate(_creds()) is None
-    assert user.failed_attempts == 0
     assert user.password_hash == new_hash
-
-
-@time_machine.travel(NOW, tick=False)
-async def test_account_locked_while_verifying_is_throttled(
-    world: World, make_user: MakeUser
-) -> None:
-    """Failures recorded by others mid-verify lock the attempt out."""
-    user = make_user("alice")
-    await world.users.add(user)
-
-    def lock() -> None:
-        for _ in range(5):
-            user.record_failure(NOW)
-
-    auth = PasswordAuthenticator(
-        world.uow, _MutatingHasher(lock), decoy_hash="fake$decoy"
-    )
-    with pytest.raises(SignInThrottledError):
-        await auth.authenticate(_creds())

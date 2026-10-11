@@ -110,8 +110,21 @@ def test_swagger_page_references_init_script_and_csrf_cookie_name() -> None:
     assert f'data-csrf-cookie="{get_identity_settings().csrf_cookie_name}"' in (
         response.text
     )
-    assert "swagger-ui-dist@5" in response.text
+    assert "swagger-ui-dist@5.33.0/" in response.text
     assert "/api/docs/favicon.svg" in response.text
+
+
+def test_swagger_external_assets_are_pinned_and_have_integrity() -> None:
+    """Every external script or stylesheet has an exact version and SRI hash."""
+    html = TestClient(create_app()).get("/api/docs").text
+    tags = re.findall(r"<(?:script|link)[^>]*>", html)
+    external = [t for t in tags if re.search(r'(?:src|href)="https?://', t)]
+
+    assert len(external) == 2
+    for tag in external:
+        assert re.search(r'(?:src|href)="https://[^"]+@\d+\.\d+\.\d+/', tag), tag
+        assert re.search(r'integrity="sha384-[A-Za-z0-9+/]{64}"', tag), tag
+        assert 'crossorigin="anonymous"' in tag, tag
 
 
 def test_swagger_page_csp_allows_script_without_unsafe_eval() -> None:
@@ -199,6 +212,8 @@ def test_swagger_template_placeholders_match_supplied_values() -> None:
     assert in_template == {
         "swagger_css_url",
         "swagger_js_url",
+        "swagger_css_integrity",
+        "swagger_js_integrity",
         "favicon_url",
         "title",
         "init_js_url",

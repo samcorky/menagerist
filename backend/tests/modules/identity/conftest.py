@@ -9,6 +9,9 @@ import pytest
 from app.modules.identity.adapters.persistence.in_memory_session_repository import (
     InMemorySessionRepository,
 )
+from app.modules.identity.adapters.persistence.in_memory_sign_in_attempt_repository import (  # noqa: E501
+    InMemorySignInAttemptRepository,
+)
 from app.modules.identity.adapters.persistence.in_memory_user_repository import (
     InMemoryUserRepository,
 )
@@ -28,6 +31,7 @@ class World:
 
     users: InMemoryUserRepository
     sessions: InMemorySessionRepository
+    attempts: InMemorySignInAttemptRepository
     uow: InMemoryUnitOfWork[IdentityRepos]
 
 
@@ -39,10 +43,14 @@ def world() -> World:
     """Return a fresh in-memory world."""
     users = InMemoryUserRepository()
     sessions = InMemorySessionRepository()
+    attempts = InMemorySignInAttemptRepository()
     return World(
         users=users,
         sessions=sessions,
-        uow=InMemoryUnitOfWork(IdentityRepos(users=users, sessions=sessions)),
+        attempts=attempts,
+        uow=InMemoryUnitOfWork(
+            IdentityRepos(users=users, sessions=sessions, attempts=attempts)
+        ),
     )
 
 

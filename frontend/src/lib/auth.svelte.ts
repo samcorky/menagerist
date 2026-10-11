@@ -6,13 +6,21 @@ import {
 	setupFirstAdmin,
 	signIn as apiSignIn,
 	signOut as apiSignOut,
+	updateCurrentUser,
 	type UserResponse
 } from '$lib/api/client';
 import { registerAuthHandlers, resetAuthEvents } from '$lib/api/auth-events';
 import { clearAllEtags } from '$lib/api/etagStore';
-import { authErrorMessage, type Permission } from '$lib/auth';
+import {
+	authErrorMessage,
+	DISPLAY_NAME_MESSAGE,
+	isPasswordUnchanged,
+	type Permission
+} from '$lib/auth';
 
 export type AuthResult = { ok: true } | { ok: false; message: string };
+/** A password change refused for a reason that belongs next to the new-password field. */
+export type ChangePasswordResult = AuthResult | { ok: false; message: string; field: 'new' };
 export type SetupResult = { ok: true; claimed: Record<string, number> } | AuthResult;
 
 type SessionOutcome = 'signed-in' | 'signed-out' | 'failed';
@@ -151,15 +159,36 @@ class AuthController {
 		return { ok: false, message: failure };
 	}
 
-	async changePassword(currentPassword: string, newPassword: string): Promise<AuthResult> {
+	async changePassword(
+		currentPassword: string,
+		newPassword: string
+	): Promise<ChangePasswordResult> {
 		try {
 			const result = await apiChangePassword({
 				body: { current_password: currentPassword, new_password: newPassword }
 			});
-			if (result.error || !result.data) return { ok: false, message: authErrorMessage(result) };
+			if (result.error || !result.data) {
+				const message = authErrorMessage(result);
+				return isPasswordUnchanged(result.error)
+					? { ok: false, message, field: 'new' }
+					: { ok: false, message };
+			}
 			clearAllEtags();
 			resetAuthEvents();
 			await this.loadSession();
+			return { ok: true };
+		} catch {
+			return { ok: false, message: OFFLINE };
+		}
+	}
+
+	/** Rename the signed-in account; the menu picks the new name up at once. */
+	async updateDisplayName(displayName: string): Promise<AuthResult> {
+		try {
+			const result = await updateCurrentUser({ body: { display_name: displayName.trim() } });
+			if (result.response?.status === 422) return { ok: false, message: DISPLAY_NAME_MESSAGE };
+			if (result.error || !result.data) return { ok: false, message: authErrorMessage(result) };
+			this.user = result.data;
 			return { ok: true };
 		} catch {
 			return { ok: false, message: OFFLINE };

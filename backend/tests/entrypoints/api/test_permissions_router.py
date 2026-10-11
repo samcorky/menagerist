@@ -16,11 +16,16 @@ ALL = [
     "graph:edge_type:purge_attribute",
     "graph:node_type:delete",
     "graph:node_type:purge_attribute",
+    "identity:user:create",
+    "identity:user:list",
+    "identity:user:reset_password",
+    "identity:user:unlock",
+    "identity:user:update",
 ]
 
 
 def test_an_admin_sees_every_permission_sorted(as_user: Callable[..., None]) -> None:
-    """Admins hold all four, listed in a stable order."""
+    """Admins hold all nine, listed in a stable order."""
     app = create_app()
     as_user(app, uuid.uuid4(), "admin")
     response = TestClient(app).get(URL)

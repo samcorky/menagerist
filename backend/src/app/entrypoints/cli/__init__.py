@@ -7,8 +7,10 @@ from typing import TYPE_CHECKING, Annotated
 import structlog
 from cyclopts import App, Parameter
 
+from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
 from app.modules.identity.adapters.cli.identity_app import (
     identity_app,
+    use_authorization,
     use_existing_data_claim,
 )
 from app.modules.media.adapters.cli.media_app import media_app
@@ -64,6 +66,7 @@ def _claim_existing_data(session: AsyncSession) -> ExistingDataClaim:
 
 
 use_existing_data_claim(_claim_existing_data)
+use_authorization(RoleAuthorizationAdapter())
 app.command(identity_app)
 
 schema_app = App(name="schema", help="Inspect the API schema.")

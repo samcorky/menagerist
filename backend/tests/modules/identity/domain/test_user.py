@@ -3,13 +3,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.modules.identity.domain.errors import InvalidPasswordError, InvalidUserError
-from app.modules.identity.domain.user import (
-    LOCKOUT_ATTEMPTS,
-    LOCKOUT_WINDOW,
-    Role,
-    User,
-    validate_password,
-)
+from app.modules.identity.domain.user import Role, User, validate_password
 
 NOW = datetime(2026, 10, 10, 12, 0, tzinfo=UTC)
 
@@ -31,16 +25,12 @@ def _user(
 
 
 def test_create_normalises_username_and_sets_defaults() -> None:
-    """A new user is a lower-cased, enabled member with no failures."""
+    """A new user is a lower-cased, enabled member who has never signed in."""
     user = _user("Alice.B-1_x")
     assert user.username == "alice.b-1_x"
     assert user.role is Role.MEMBER
-    assert (user.disabled, user.password_expired, user.failed_attempts) == (
-        False,
-        False,
-        0,
-    )
-    assert user.locked_until is None
+    assert (user.disabled, user.password_expired) == (False, False)
+    assert user.last_login_at is None
     assert user.created_at == user.updated_at == NOW
 
 
@@ -92,14 +82,12 @@ def test_validate_password_rules() -> None:
         validate_password("Alice12345", "alice12345")
 
 
-def test_change_password_clears_flag_and_failures() -> None:
-    """Changing the password resets the must-change flag and lockout state."""
+def test_change_password_sets_hash_and_flag() -> None:
+    """Changing the password resets the must-change flag unless asked otherwise."""
     user = _user(password_expired=True)
-    user.record_failure(NOW)
     user.change_password("fake$new")
     assert user.password_hash == "fake$new"
     assert user.password_expired is False
-    assert user.failed_attempts == 0
     user.change_password("fake$newer", expired=True)
     assert user.password_expired is True
 
@@ -121,37 +109,15 @@ def test_disable_and_enable() -> None:
     assert user.disabled is False
 
 
-def test_lockout_after_five_failures_within_window() -> None:
-    """The fifth failure inside 15 minutes locks until the window ends."""
+def test_record_sign_in_stamps_the_time() -> None:
+    """A recorded sign-in sets `last_login_at` and touches the account."""
     user = _user()
-    for i in range(LOCKOUT_ATTEMPTS - 1):
-        user.record_failure(NOW + timedelta(minutes=i))
-        assert user.is_locked(NOW + timedelta(minutes=i)) is False
-    user.record_failure(NOW + timedelta(minutes=4))
-    assert user.failed_attempts == LOCKOUT_ATTEMPTS
-    assert user.locked_until == NOW + LOCKOUT_WINDOW
-    assert user.is_locked(NOW + timedelta(minutes=5)) is True
-    assert user.is_locked(NOW + LOCKOUT_WINDOW) is False
+    later = NOW + timedelta(hours=1)
 
+    user.record_sign_in(later)
 
-def test_failures_outside_window_restart_the_count() -> None:
-    """A failure after the window expires starts a new count."""
-    user = _user()
-    for _ in range(LOCKOUT_ATTEMPTS - 1):
-        user.record_failure(NOW)
-    user.record_failure(NOW + LOCKOUT_WINDOW)
-    assert user.failed_attempts == 1
-    assert user.locked_until is None
-
-
-def test_success_resets_failures() -> None:
-    """A successful sign-in clears the count and any lock."""
-    user = _user()
-    for _ in range(LOCKOUT_ATTEMPTS):
-        user.record_failure(NOW)
-    user.record_success()
-    assert (user.failed_attempts, user.locked_until) == (0, None)
-    assert user.is_locked(NOW) is False
+    assert user.last_login_at == later
+    assert user.updated_at > NOW
 
 
 def test_rename_cleans_and_validates_the_display_name() -> None:

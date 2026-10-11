@@ -12,7 +12,6 @@ import app.entrypoints.cli  # noqa: F401  (wires the real claim into the CLI)
 from app.modules.graph.adapters.persistence.unit_of_work import build_graph_repos
 from app.modules.graph.domain.node import Node
 from app.modules.identity.adapters.cli.identity_app import (
-    PASSWORD_ENV_VAR,
     create_admin,
     list_accounts,
     reset_password,
@@ -23,6 +22,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 pytestmark = pytest.mark.integration
+
+PASSWORD_ENV_VAR = "MENAGERIST_INITIAL_PASSWORD"
 
 PASSWORD = "a very secret passphrase"
 
@@ -98,6 +99,7 @@ def test_create_admin_reset_password_and_list(
     assert bob == [("admin", True)]
     assert _rows(database, "SELECT owner_id FROM nodes") == [(first[0][0],)]
     out = capsys.readouterr().out
-    assert "sam\tsam\tadmin\tactive" in out
-    assert "bob\tbob\tadmin\tactive" in out
+    rows = out.splitlines()
+    assert any("sam" in r and "admin" in r and "active" in r for r in rows)
+    assert any("bob" in r and "admin" in r and "active" in r for r in rows)
     assert "scrypt$" not in out

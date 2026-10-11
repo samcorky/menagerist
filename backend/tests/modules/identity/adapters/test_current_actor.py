@@ -54,7 +54,9 @@ PATH = "/api/v1/_probe"
 
 def _client(world: World) -> TestClient:
     app = create_app()
-    repos = IdentityRepos(users=world.users, sessions=world.sessions)
+    repos = IdentityRepos(
+        users=world.users, sessions=world.sessions, attempts=world.attempts
+    )
     app.dependency_overrides[get_identity_uow] = lambda: world.uow
     app.dependency_overrides[get_identity_repos] = lambda: repos
     hasher = InMemoryPasswordHasher()

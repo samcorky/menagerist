@@ -1,5 +1,11 @@
-from app.entrypoints.api.shared.permissions import ALL_PERMISSIONS, IMPLIES, expand
+from app.entrypoints.api.shared.permissions import (
+    ALL_PERMISSIONS,
+    IMPLIES,
+    Permission,
+    expand,
+)
 from app.modules.graph.application.permissions import GraphPermission
+from app.modules.identity.application.permissions import IdentityPermission
 
 A = GraphPermission.DELETE_NODE_TYPE
 B = GraphPermission.DELETE_EDGE_TYPE
@@ -15,7 +21,10 @@ def test_expand_without_implications_returns_the_grant() -> None:
 
 def test_expand_follows_implications_transitively() -> None:
     """A implies B and B implies C, so A grants all three."""
-    implies = {A: frozenset({B}), B: frozenset({C})}
+    implies: dict[Permission, frozenset[Permission]] = {
+        A: frozenset({B}),
+        B: frozenset({C}),
+    }
     assert expand({A}, implies) == frozenset({A, B, C})
     assert expand({B}, implies) == frozenset({B, C})
     assert D not in expand({A}, implies)
@@ -23,19 +32,36 @@ def test_expand_follows_implications_transitively() -> None:
 
 def test_expand_terminates_on_a_cycle() -> None:
     """A cyclic catalogue still closes without looping."""
-    implies = {A: frozenset({B}), B: frozenset({A})}
+    implies: dict[Permission, frozenset[Permission]] = {
+        A: frozenset({B}),
+        B: frozenset({A}),
+    }
     assert expand({A}, implies) == frozenset({A, B})
 
 
-def test_the_real_catalogue_lists_the_four_graph_permissions() -> None:
+def test_the_real_catalogue_is_the_union_of_every_modules_enum() -> None:
     """The aggregate catalogue is the union of every module's enum."""
-    assert frozenset(GraphPermission) == ALL_PERMISSIONS
+    assert frozenset(GraphPermission) | frozenset(IdentityPermission) == (
+        ALL_PERMISSIONS
+    )
+
+
+def test_managing_users_implies_listing_them() -> None:
+    """Create, update, reset and unlock each grant list as well."""
+    for permission in (
+        IdentityPermission.CREATE_USER,
+        IdentityPermission.UPDATE_USER,
+        IdentityPermission.RESET_USER_PASSWORD,
+        IdentityPermission.UNLOCK_USER,
+    ):
+        assert IdentityPermission.LIST_USERS in expand({permission})
+    assert expand({IdentityPermission.LIST_USERS}) == {IdentityPermission.LIST_USERS}
 
 
 def test_the_real_catalogue_has_no_cycles() -> None:
     """No permission transitively implies itself."""
     for permission in IMPLIES:
-        reached: set[GraphPermission] = set()
+        reached: set[Permission] = set()
         frontier = set(IMPLIES[permission])
         while frontier:
             current = frontier.pop()

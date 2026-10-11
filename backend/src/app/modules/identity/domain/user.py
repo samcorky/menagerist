@@ -1,7 +1,7 @@
 import re
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import StrEnum
 
 from app.modules.identity.domain.errors import InvalidPasswordError, InvalidUserError
@@ -12,8 +12,6 @@ MAX_USERNAME_LENGTH = 64
 MAX_DISPLAY_NAME_LENGTH = 120
 MIN_PASSWORD_LENGTH = 10
 MAX_PASSWORD_LENGTH = 128
-LOCKOUT_ATTEMPTS = 5
-LOCKOUT_WINDOW = timedelta(minutes=15)
 
 _USERNAME = re.compile(r"[A-Za-z0-9._-]+")
 
@@ -72,9 +70,7 @@ class User(Identifiable, Timestamped):
     role: Role = Role.MEMBER
     password_expired: bool = False
     disabled: bool = False
-    failed_attempts: int = 0
-    failure_window_started_at: datetime | None = None
-    locked_until: datetime | None = None
+    last_login_at: datetime | None = None
 
     @classmethod
     def create(
@@ -104,10 +100,10 @@ class User(Identifiable, Timestamped):
         )
 
     def change_password(self, password_hash: str, *, expired: bool = False) -> None:
-        """Replace the password hash and clear any sign-in failures."""
+        """Replace the password hash."""
         self.password_hash = password_hash
         self.password_expired = expired
-        self.record_success()
+        self.touch()
 
     def rename(self, display_name: str) -> None:
         """Change the display name.
@@ -138,26 +134,7 @@ class User(Identifiable, Timestamped):
         self.disabled = False
         self.touch()
 
-    def is_locked(self, now: datetime) -> bool:
-        """Whether sign-in is refused at `now` after too many failures."""
-        return self.locked_until is not None and now < self.locked_until
-
-    def record_failure(self, now: datetime) -> None:
-        """Count a failed sign-in; the fifth in a fixed 15-minute window locks."""
-        started = self.failure_window_started_at
-        if started is None or now - started >= LOCKOUT_WINDOW:
-            started = now
-            self.failure_window_started_at = now
-            self.failed_attempts = 0
-            self.locked_until = None
-        self.failed_attempts += 1
-        if self.failed_attempts >= LOCKOUT_ATTEMPTS:
-            self.locked_until = started + LOCKOUT_WINDOW
-        self.touch()
-
-    def record_success(self) -> None:
-        """Clear the failure count and any lock."""
-        self.failed_attempts = 0
-        self.failure_window_started_at = None
-        self.locked_until = None
+    def record_sign_in(self, now: datetime) -> None:
+        """Note a successful sign-in at `now`."""
+        self.last_login_at = now
         self.touch()

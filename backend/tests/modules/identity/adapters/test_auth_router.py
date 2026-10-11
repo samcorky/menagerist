@@ -57,7 +57,9 @@ class Api:
         self.world = world
         self.app = create_app()
         hasher = InMemoryPasswordHasher()
-        repos = IdentityRepos(users=world.users, sessions=world.sessions)
+        repos = IdentityRepos(
+            users=world.users, sessions=world.sessions, attempts=world.attempts
+        )
         self.app.dependency_overrides[get_identity_uow] = lambda: world.uow
         self.app.dependency_overrides[get_setup_identity_uow] = lambda: world.uow
         self.app.dependency_overrides[get_existing_data_claim] = NoOpExistingDataClaim
@@ -159,6 +161,8 @@ def test_setup_creates_a_signed_in_admin_and_sets_cookies(api: Api) -> None:
         "role",
         "password_expired",
         "disabled",
+        "last_login_at",
+        "locked_until",
         "created_at",
         "updated_at",
     }
@@ -243,7 +247,7 @@ async def test_login_sets_cookies_and_me_returns_the_user(
 async def test_every_login_failure_looks_the_same(
     api: Api, make_user: MakeUser
 ) -> None:
-    """Unknown, wrong-password and disabled give identical 401 problems."""
+    """Unknown, wrong-password and wrong-password-on-disabled are identical 401s."""
     await api.add_user(make_user, "alice")
     disabled = make_user("dora")
     disabled.disable()
@@ -253,7 +257,7 @@ async def test_every_login_failure_looks_the_same(
     for username, password in [
         ("ghost", "password-123"),
         ("alice", "wrong-password"),
-        ("dora", "password-123"),
+        ("dora", "wrong-password"),
     ]:
         _, response = api.sign_in(username, password)
         assert response.status_code == 401
@@ -509,7 +513,7 @@ async def test_admin_creates_lists_updates_and_resets_users(
     assert updated.status_code == 200
     assert updated.json()["display_name"] == "Bobby"
     assert updated.json()["disabled"] is True
-    assert api.sign_in("bob", "initial-pass-1")[1].status_code == 401
+    assert api.sign_in("bob", "initial-pass-1")[1].status_code == 403
 
     api.patch(api.client, f"{USERS}/{bob['id']}", {"disabled": False})
     reset = api.post(
@@ -581,4 +585,244 @@ async def test_members_cannot_use_admin_routes(api: Api, make_user: MakeUser) ->
         ).status_code
         == 403
     )
+    assert api.post(member, f"{USERS}/{target}/unlock").status_code == 403
     assert api.new_client().get(USERS).status_code == 401
+
+
+# --- accounts: last sign-in, disabled, throttling, display name, unlock ----
+
+
+async def test_login_reports_last_sign_in(api: Api, make_user: MakeUser) -> None:
+    """The user body carries `last_login_at`; `/me` shows the same value."""
+    await api.add_user(make_user, "alice")
+
+    client, response = api.sign_in()
+
+    assert response.status_code == 200
+    stamp = response.json()["last_login_at"]
+    assert stamp is not None
+    assert client.get(f"{AUTH}/me").json()["last_login_at"] == stamp
+    assert response.json()["locked_until"] is None
+
+
+async def test_a_failed_login_does_not_set_last_sign_in(
+    api: Api, make_user: MakeUser, world: World
+) -> None:
+    """Only success stamps the time."""
+    await api.add_user(make_user, "alice")
+
+    api.sign_in("alice", "wrong-password")
+
+    user = await world.users.get_by_username("alice")
+    assert user is not None
+    assert user.last_login_at is None
+
+
+async def test_correct_password_on_a_disabled_account_answers_403(
+    api: Api, make_user: MakeUser
+) -> None:
+    """403 `account_disabled`; a wrong password for it is the generic 401."""
+    disabled = make_user("dora")
+    disabled.disable()
+    await api.world.users.add(disabled)
+
+    _, right = api.sign_in("dora", "password-123")
+    _, wrong = api.sign_in("dora", "wrong-password")
+
+    assert right.status_code == 403
+    assert right.headers["content-type"].startswith("application/problem+json")
+    body = right.json()
+    assert body["type"] == "account_disabled"
+    assert body["title"] == "AccountDisabledError"
+    assert body["detail"] == "This account has been disabled. Ask an administrator."
+    assert "set-cookie" not in right.headers
+    assert wrong.status_code == 401
+    assert wrong.json()["title"] == "InvalidCredentialsError"
+
+
+async def test_disabled_account_answers_do_not_count_toward_the_throttle(
+    api: Api, make_user: MakeUser
+) -> None:
+    """Ten right-password refusals never lock the account."""
+    disabled = make_user("dora")
+    disabled.disable()
+    await api.world.users.add(disabled)
+
+    statuses = {api.sign_in("dora", "password-123")[1].status_code for _ in range(10)}
+
+    assert statuses == {403}
+
+
+async def test_unknown_names_throttle_like_known_ones(
+    api: Api, make_user: MakeUser
+) -> None:
+    """The sixth try for a name that does not exist gets the same 429."""
+    await api.add_user(make_user, "alice")
+    for name in ("ghost", "alice"):
+        for _ in range(5):
+            assert api.sign_in(name, "wrong-password")[1].status_code == 401
+    _, ghost = api.sign_in("ghost", "wrong-password")
+    _, alice = api.sign_in("alice", "password-123")
+
+    assert ghost.status_code == alice.status_code == 429
+    assert ghost.headers["retry-after"] == alice.headers["retry-after"]
+    assert ghost.json()["detail"] == alice.json()["detail"]
+
+
+async def test_one_address_is_throttled_across_usernames(api: Api) -> None:
+    """Twenty failures for different names lock the client address."""
+    for i in range(20):
+        assert api.sign_in(f"ghost{i}", "wrong-password")[1].status_code == 401
+
+    _, response = api.sign_in("someone-new", "wrong-password")
+
+    assert response.status_code == 429
+    assert int(response.headers["retry-after"]) > 0
+
+
+async def test_patch_me_changes_the_display_name(api: Api, make_user: MakeUser) -> None:
+    """The name is trimmed and the updated user comes back like `/me`."""
+    await api.add_user(make_user, "alice")
+    client, _ = api.sign_in()
+
+    response = api.patch(client, f"{AUTH}/me", {"display_name": "  Alice B  "})
+
+    assert response.status_code == 200
+    assert response.json()["display_name"] == "Alice B"
+    assert client.get(f"{AUTH}/me").json() == response.json()
+
+
+async def test_patch_me_validates_the_name(api: Api, make_user: MakeUser) -> None:
+    """Blank is a domain 400; over the cap or unknown fields is a 422."""
+    await api.add_user(make_user, "alice")
+    client, _ = api.sign_in()
+
+    blank = api.patch(client, f"{AUTH}/me", {"display_name": "   "})
+    long = api.patch(client, f"{AUTH}/me", {"display_name": "x" * 121})
+    unknown = api.patch(client, f"{AUTH}/me", {"display_name": "A", "role": "admin"})
+
+    assert blank.status_code == 400
+    assert long.status_code == 422
+    assert unknown.status_code == 422
+    assert client.get(f"{AUTH}/me").json()["display_name"] == "Alice"
+
+
+async def test_patch_me_needs_a_session_and_csrf(api: Api, make_user: MakeUser) -> None:
+    """No session is refused; a wrong CSRF header answers 403."""
+    await api.add_user(make_user, "alice")
+    client, _ = api.sign_in()
+
+    anonymous = api.patch(api.new_client(), f"{AUTH}/me", {"display_name": "X"})
+    no_csrf = client.patch(
+        f"{AUTH}/me", json={"display_name": "X"}, headers={"X-CSRF-Token": "wrong"}
+    )
+
+    assert anonymous.status_code in (401, 403)
+    assert no_csrf.status_code == 403
+
+
+async def test_change_password_rejects_the_same_password(
+    api: Api, make_user: MakeUser
+) -> None:
+    """A clear validation problem; the session survives."""
+    await api.add_user(make_user, "alice")
+    client, _ = api.sign_in()
+
+    response = api.post(
+        client,
+        f"{AUTH}/password",
+        {"current_password": "password-123", "new_password": "password-123"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["title"] == "PasswordUnchangedError"
+    assert (
+        response.json()["detail"]
+        == "The new password must differ from the current one."
+    )
+    assert client.get(f"{AUTH}/me").status_code == 200
+
+
+async def test_change_password_wrong_current_is_throttled(
+    api: Api, make_user: MakeUser
+) -> None:
+    """Five wrong current passwords, then 429 with Retry-After."""
+    await api.add_user(make_user, "alice")
+    client, _ = api.sign_in()
+    body = {"current_password": "nope-nope-nope", "new_password": "a-much-better-one"}
+    for _ in range(5):
+        assert api.post(client, f"{AUTH}/password", body).status_code == 400
+
+    response = api.post(client, f"{AUTH}/password", body)
+
+    assert response.status_code == 429
+    assert int(response.headers["retry-after"]) > 0
+
+
+async def test_admin_unlocks_a_locked_user(api: Api, make_user: MakeUser) -> None:
+    """The list shows `locked_until`; unlock clears it, repeatably."""
+    api.setup()
+    await api.add_user(make_user, "alice")
+    for _ in range(5):
+        api.sign_in("alice", "wrong-password")
+    assert api.sign_in("alice", "password-123")[1].status_code == 429
+
+    listed = {u["username"]: u for u in api.client.get(USERS).json()}
+    assert listed["alice"]["locked_until"] is not None
+    assert listed["admin"]["locked_until"] is None
+    assert listed["alice"]["last_login_at"] is None
+    assert listed["admin"]["last_login_at"] is None or listed["admin"]["last_login_at"]
+
+    alice_id = listed["alice"]["id"]
+    first = api.post(api.client, f"{USERS}/{alice_id}/unlock")
+    second = api.post(api.client, f"{USERS}/{alice_id}/unlock")
+
+    assert (first.status_code, second.status_code) == (204, 204)
+    again = {u["username"]: u for u in api.client.get(USERS).json()}
+    assert again["alice"]["locked_until"] is None
+    assert again["alice"]["disabled"] is False
+    assert api.sign_in("alice", "password-123")[1].status_code == 200
+
+
+async def test_unlock_unknown_user_is_not_found(api: Api) -> None:
+    """An unknown id answers 404."""
+    api.setup()
+
+    response = api.post(api.client, f"{USERS}/{uuid.uuid7()}/unlock")
+
+    assert response.status_code == 404
+
+
+async def test_update_response_carries_the_lock_state(
+    api: Api, make_user: MakeUser
+) -> None:
+    """PATCH /user/{id} answers with `locked_until` too."""
+    api.setup()
+    await api.add_user(make_user, "alice")
+    for _ in range(5):
+        api.sign_in("alice", "wrong-password")
+    users = api.client.get(USERS).json()
+    alice_id = next(u["id"] for u in users if u["username"] == "alice")
+
+    response = api.patch(api.client, f"{USERS}/{alice_id}", {"display_name": "Al"})
+
+    assert response.json()["locked_until"] is not None
+
+
+def test_openapi_documents_the_new_responses_and_permissions() -> None:
+    """Login lists 403 and 429; user routes carry `x-required-permission`."""
+    paths = create_app().openapi()["paths"]
+    login = paths["/api/v1/auth/login"]["post"]["responses"]
+
+    assert "403" in login
+    assert "429" in login
+    assert "patch" in paths["/api/v1/auth/me"]
+    expected = {
+        ("/api/v1/user", "get"): "identity:user:list",
+        ("/api/v1/user", "post"): "identity:user:create",
+        ("/api/v1/user/{user_id}", "patch"): "identity:user:update",
+        ("/api/v1/user/{user_id}/password", "post"): "identity:user:reset_password",
+        ("/api/v1/user/{user_id}/unlock", "post"): "identity:user:unlock",
+    }
+    for (path, method), permission in expected.items():
+        assert paths[path][method]["x-required-permission"] == permission

@@ -81,13 +81,13 @@ async def test_sign_in_sweeps_expired_sessions(
 async def test_every_failure_gives_the_same_generic_error(
     case: str, cases: Cases, world: World, make_user: MakeUser
 ) -> None:
-    """Unknown user, wrong password and disabled account are indistinguishable."""
+    """Unknown user and wrong passwords (any account state) are indistinguishable."""
     user = make_user("alice")
     if case == "disabled":
         user.disable()
     await world.users.add(user)
     username = "ghost" if case == "unknown" else "alice"
-    password = "wrong-password" if case == "wrong" else "password-123"
+    password = "wrong-password"
 
     with pytest.raises(InvalidCredentialsError) as caught:
         await _sign_in(cases, username, password)

@@ -10,6 +10,7 @@ from app.modules.identity.adapters.api.dependencies import (
     get_create_user_use_case,
     get_list_users_use_case,
     get_reset_password_use_case,
+    get_unlock_user_use_case,
     get_update_user_use_case,
 )
 from app.modules.identity.adapters.api.schemas import (
@@ -21,6 +22,7 @@ from app.modules.identity.adapters.api.schemas import (
 from app.modules.identity.application.create_user import CreateUser
 from app.modules.identity.application.list_users import ListUsers, ListUsersQuery
 from app.modules.identity.application.reset_password import ResetPassword
+from app.modules.identity.application.unlock_user import UnlockUser, UnlockUserCommand
 from app.modules.identity.application.update_user import UpdateUser
 from app.modules.identity.domain.errors import (
     InvalidPasswordError,
@@ -36,7 +38,7 @@ router = APIRouter(prefix="/user", tags=["Users"], route_class=PermissionAwareRo
 
 _ADMIN_ONLY = {
     **error_response(SessionRequiredError, detail="Sign in to continue."),
-    **error_response(ForbiddenError, detail="Administrator access is required."),
+    **error_response(ForbiddenError, detail="You do not have permission to do that."),
 }
 _NOT_FOUND = error_response(UserNotFoundError, detail="That account does not exist.")
 
@@ -52,8 +54,8 @@ async def list_users(
     actor: Annotated[Actor, Depends(get_active_identity_actor)],
 ) -> list[UserResponse]:
     """List every account. Administrators only."""
-    users = await use_case.handle(ListUsersQuery(), actor)
-    return [UserResponse.from_domain(user) for user in users]
+    listings = await use_case.handle(ListUsersQuery(), actor)
+    return [UserResponse.from_listing(listing) for listing in listings]
 
 
 @router.post(
@@ -99,8 +101,8 @@ async def update_user(
     actor: Annotated[Actor, Depends(get_active_identity_actor)],
 ) -> UserResponse:
     """Rename, change the role of, disable or enable an account."""
-    user = await use_case.handle(payload.to_command(user_id), actor)
-    return UserResponse.from_domain(user)
+    listing = await use_case.handle(payload.to_command(user_id), actor)
+    return UserResponse.from_listing(listing)
 
 
 @router.post(
@@ -123,3 +125,18 @@ async def reset_user_password(
 ) -> None:
     """Set a new initial password, end the account's sessions and require a change."""
     await use_case.handle(payload.to_command(user_id), actor)
+
+
+@router.post(
+    "/{user_id}/unlock",
+    status_code=204,
+    operation_id="unlock_user",
+    responses={**_ADMIN_ONLY, **_NOT_FOUND},
+)
+async def unlock_user(
+    user_id: uuid.UUID,
+    use_case: Annotated[UnlockUser, Depends(get_unlock_user_use_case)],
+    actor: Annotated[Actor, Depends(get_active_identity_actor)],
+) -> None:
+    """Lift an account's sign-in lockout. Safe to repeat; the account stays as it is."""
+    await use_case.handle(UnlockUserCommand(user_id=user_id), actor)

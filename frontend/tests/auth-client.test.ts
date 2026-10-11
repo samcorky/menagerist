@@ -176,6 +176,78 @@ describe('429 on sign-in', () => {
 	});
 });
 
+describe('identity permissions and account calls', () => {
+	it('holds identity permissions beside graph ones', async () => {
+		vi.stubGlobal('fetch', async (request: Request) =>
+			new URL(request.url).pathname.endsWith('/permissions')
+				? json({ permissions: ['identity:user:unlock', 'graph:node_type:delete'] })
+				: json(user)
+		);
+		await auth.refresh();
+		expect(auth.can('identity:user:unlock')).toBe(true);
+		expect(auth.can('identity:user:create')).toBe(false);
+		auth.user = null;
+	});
+
+	it('shows the disabled message on sign-in, and 429 keeps its wait', async () => {
+		vi.stubGlobal('fetch', async () => problem(403, 'account_disabled'));
+		expect(await auth.signIn('sam', 'right')).toEqual({
+			ok: false,
+			message: 'This account has been disabled. Ask an administrator.'
+		});
+	});
+
+	it('updates the signed-in name from the server answer', async () => {
+		auth.user = user as never;
+		vi.stubGlobal('fetch', async () => json({ ...user, display_name: 'Samantha' }));
+		expect(await auth.updateDisplayName('  Samantha ')).toEqual({ ok: true });
+		expect((auth.user as { display_name: string } | null)?.display_name).toBe('Samantha');
+		auth.user = null;
+	});
+
+	it('reports a blank name (400) and a long one (422) without changing the account', async () => {
+		auth.user = user as never;
+		vi.stubGlobal('fetch', async () => problem(400, 'about:blank'));
+		expect(await auth.updateDisplayName(' ')).toEqual({ ok: false, message: 'Plain words.' });
+		vi.stubGlobal('fetch', async () => problem(422, 'about:blank'));
+		expect(await auth.updateDisplayName('x')).toEqual({
+			ok: false,
+			message: 'A display name must be 1 to 120 characters.'
+		});
+		expect((auth.user as { display_name: string } | null)?.display_name).toBe('Sam');
+		auth.user = null;
+	});
+
+	it('flags an unchanged password for the new-password field, and keeps the 429 wait', async () => {
+		vi.stubGlobal(
+			'fetch',
+			async () =>
+				new Response(
+					JSON.stringify({
+						type: 'about:blank',
+						title: 'PasswordUnchangedError',
+						detail: 'Differ.'
+					}),
+					{ status: 400, headers: { 'Content-Type': 'application/problem+json' } }
+				)
+		);
+		expect(await auth.changePassword('a', 'b')).toEqual({
+			ok: false,
+			message: 'Differ.',
+			field: 'new'
+		});
+
+		vi.stubGlobal('fetch', async () => problem(400, 'about:blank'));
+		expect(await auth.changePassword('a', 'b')).toEqual({ ok: false, message: 'Plain words.' });
+
+		vi.stubGlobal('fetch', async () => problem(429, 'about:blank', { 'Retry-After': '120' }));
+		expect(await auth.changePassword('a', 'b')).toEqual({
+			ok: false,
+			message: 'Too many attempts. Try again in 2 minutes.'
+		});
+	});
+});
+
 describe('more auth behaviour', () => {
 	it('clears the cache on a 401-forced sign-out', async () => {
 		auth.user = user as never;

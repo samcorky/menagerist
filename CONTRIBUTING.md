@@ -65,10 +65,17 @@ The `menagerist identity` commands manage accounts without the UI:
 ```sh
 uv run menagerist identity create-admin --username sam   # first admin (claims existing data) or an extra admin
 uv run menagerist identity reset-password --username sam # new initial password, ends the account's sessions
-uv run menagerist identity list                          # username, display name, role, disabled flag
+uv run menagerist identity list                          # table: username, display name, role, status, last sign-in
+uv run menagerist identity list --json                   # the same as JSON, for scripts
+uv run menagerist identity set-display-name --username sam --display-name "Sam C"
+uv run menagerist identity unlock --username sam         # lift a sign-in lockout (does not enable a disabled account)
 ```
 
-Each command that needs a password asks for it (hidden, confirmed twice) or reads `MENAGERIST_INITIAL_PASSWORD`; the password is never printed or logged. It must be 10 to 128 characters and not the username. The account must change it at next sign-in.
+Each command that needs a password reads it from the settings or, if none is set, asks for it (hidden, confirmed twice); the password is never printed or logged. It must be 10 to 128 characters and not the username. The account must change it at next sign-in.
+
+**Preferred: a secret file.** Put the password in a file named `menagerist_initial_password` in `/run/secrets` (Docker and Compose secrets mount there) and the CLI reads it. `MENAGERIST_INITIAL_PASSWORD` also works, but an environment variable shows up in `docker inspect` and in process listings, so use the file where you can. Only the `identity` CLI reads this setting; the server never does.
+
+**Sign-in lockouts.** Failed password checks are counted per username (5 in 15 minutes) and per client address (20 in 15 minutes), whether or not the account exists; `MENAGERIST_SIGN_IN_USERNAME_ATTEMPTS`, `MENAGERIST_SIGN_IN_IP_ATTEMPTS` and `MENAGERIST_SIGN_IN_WINDOW_MINUTES` change them. An administrator lifts a username lock with the Unlock button in Settings > Users, or `identity unlock`. The client address is the socket peer, unless that peer is listed in `MENAGERIST_TRUSTED_PROXIES` (comma-separated addresses, CIDR networks or `*`; default `127.0.0.1`), in which case its `X-Forwarded-For` is used. Behind a reverse proxy in another container, list the proxy's address or network; `*` trusts every peer and is only safe when the proxy is the sole way in and overwrites the header.
 
 **Forgotten administrator password:** run `reset-password` for that username against the same database (`DATABASE_URL`/`MENAGERIST_*` settings as the app), then sign in with the new password and change it. For the Docker stack, run it inside the container: `docker compose exec menagerist menagerist identity reset-password --username sam`.
 
@@ -180,7 +187,7 @@ A complete feature at one bounded context requires: domain entity/value object, 
 
 ## Using the interactive API docs
 
-Swagger UI is at `/api/docs` on the backend (`http://localhost:8000/api/docs` in development). Sign in by running `POST /api/v1/auth/login` with "Try it out": the browser keeps the session cookies, and the banner at the top shows who is signed in. Swagger UI then adds the `X-CSRF-Token` header to POST, PUT, PATCH and DELETE calls itself, so mutating operations work. The Authorize button is hidden because browsers cannot set a `Cookie` header from JavaScript. ReDoc (`/api/redoc`) is read-only. The setup script is `backend/src/app/entrypoints/api/docs/static/swagger-init.js`; the Swagger UI assets load from cdn.jsdelivr.net.
+Swagger UI is at `/api/docs` on the backend (`http://localhost:8000/api/docs` in development). Sign in by running `POST /api/v1/auth/login` with "Try it out": the browser keeps the session cookies, and the banner at the top shows who is signed in. Swagger UI then adds the `X-CSRF-Token` header to POST, PUT, PATCH and DELETE calls itself, so mutating operations work. The Authorize button is hidden because browsers cannot set a `Cookie` header from JavaScript. ReDoc (`/api/redoc`) is read-only. The setup script is `backend/src/app/entrypoints/api/docs/static/swagger-init.js`; the Swagger UI assets load from cdn.jsdelivr.net at an exact version with Subresource Integrity (`integrity="sha384-..."`, `crossorigin="anonymous"`) set in `backend/src/app/entrypoints/api/docs/router.py`. To bump the version, download both files from that URL, recompute the hashes (`openssl dgst -sha384 -binary FILE | openssl base64 -A`), update the three constants together; `test_swagger_external_assets_are_pinned_and_have_integrity` fails on an unpinned or unhashed tag. ReDoc (`/api/redoc`) still loads FastAPI's default unpinned bundle.
 
 ## Pull requests
 

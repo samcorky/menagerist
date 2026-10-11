@@ -1,6 +1,6 @@
 import asyncio
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import pytest
@@ -8,7 +8,13 @@ import pytest_asyncio
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.modules.identity.adapters.persistence.models import UserModel
+from app.modules.identity.adapters.persistence.models import (
+    SignInAttemptModel,
+    UserModel,
+)
+from app.modules.identity.adapters.persistence.sign_in_attempt_repository import (
+    SqlAlchemySignInAttemptRepository,
+)
 from app.modules.identity.adapters.persistence.unit_of_work import create_identity_uow
 from app.modules.identity.adapters.persistence.user_repository import (
     SqlAlchemyUserRepository,
@@ -19,7 +25,7 @@ from app.modules.identity.adapters.security.in_memory_password_hasher import (
 from app.modules.identity.adapters.security.password_authenticator import (
     PasswordAuthenticator,
 )
-from app.modules.identity.domain.errors import SignInThrottledError
+from app.modules.identity.domain.throttle import ThrottleKey, ThrottleKind
 from app.modules.identity.domain.user import User
 from app.modules.identity.ports.authenticator import PasswordCredentials
 
@@ -43,6 +49,7 @@ async def factory(
     finally:
         async with sessions.begin() as session:
             await session.execute(delete(UserModel))
+            await session.execute(delete(SignInAttemptModel))
         await engine.dispose()
 
 
@@ -58,32 +65,34 @@ async def _add_user(sessions: async_sessionmaker[AsyncSession]) -> User:
     return user
 
 
-async def test_parallel_wrong_guesses_cannot_bypass_the_throttle(
+async def test_parallel_failures_are_all_counted_and_lock_once(
     factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    """Eight parallel wrong guesses: exactly five count, the rest are throttled."""
-    await _add_user(factory)
-    hasher = InMemoryPasswordHasher()
+    """Eight parallel failures on one key: none is lost, and the key is locked."""
+    key = ThrottleKey(kind=ThrottleKind.USERNAME, digest="racer-digest")
+    now = datetime.now(UTC)
 
-    async def attempt() -> object:
-        auth = PasswordAuthenticator(
-            create_identity_uow(factory), hasher, decoy_hash="fake$decoy"
-        )
-        try:
-            return await auth.authenticate(
-                PasswordCredentials(username="racer", password="wrong-password")
+    async def fail() -> None:
+        async with factory.begin() as session:
+            await SqlAlchemySignInAttemptRepository(session).record_failure(
+                key, limit=5, window=timedelta(minutes=15), now=now
             )
-        except SignInThrottledError as exc:
-            return exc
 
-    results = await asyncio.gather(*(attempt() for _ in range(8)))
+    await asyncio.gather(*(fail() for _ in range(8)))
 
-    assert sum(r is None for r in results) == 5
-    assert sum(isinstance(r, SignInThrottledError) for r in results) == 3
     async with factory() as session:
-        stored = await SqlAlchemyUserRepository(session).get_by_username("racer")
-    assert stored is not None
-    assert stored.failed_attempts == 5
+        row = (
+            await session.execute(
+                select(SignInAttemptModel).where(
+                    SignInAttemptModel.key_hash == key.digest
+                )
+            )
+        ).scalar_one()
+        locked = await SqlAlchemySignInAttemptRepository(session).locked_keys(
+            [key], now=now
+        )
+    assert row.failure_count == 8
+    assert locked == {key: now + timedelta(minutes=15)}
 
 
 async def test_locked_row_blocks_a_concurrent_locking_read_until_commit(

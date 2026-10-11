@@ -9,9 +9,13 @@ import pytest_asyncio
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
 from app.modules.identity.adapters.persistence.models import SessionModel, UserModel
 from app.modules.identity.adapters.persistence.session_repository import (
     SqlAlchemySessionRepository,
+)
+from app.modules.identity.adapters.persistence.sign_in_attempt_repository import (
+    SqlAlchemySignInAttemptRepository,
 )
 from app.modules.identity.adapters.persistence.unit_of_work import create_identity_uow
 from app.modules.identity.adapters.persistence.user_repository import (
@@ -28,6 +32,7 @@ from app.modules.identity.application.setup_first_admin import (
     SetupFirstAdminCommand,
 )
 from app.modules.identity.application.update_user import UpdateUser, UpdateUserCommand
+from app.modules.identity.application.user_listing import UserListing
 from app.modules.identity.domain.errors import (
     LastAdministratorError,
     SetupAlreadyDoneError,
@@ -135,6 +140,7 @@ def _slow_uow(factory: async_sessionmaker[AsyncSession]) -> IdentityUnitOfWork:
         return IdentityRepos(
             users=SqlAlchemyUserRepository(session),
             sessions=_SlowSessionRepository(session),
+            attempts=SqlAlchemySignInAttemptRepository(session),
         )
 
     return SqlAlchemySessionUnitOfWork(factory, build)
@@ -161,8 +167,8 @@ async def _add_admins(factory: async_sessionmaker[AsyncSession]) -> list[User]:
 
 async def _disable(
     factory: async_sessionmaker[AsyncSession], target: User, by: User
-) -> User:
-    return await UpdateUser(_slow_uow(factory)).handle(
+) -> UserListing:
+    return await UpdateUser(_slow_uow(factory), RoleAuthorizationAdapter()).handle(
         UpdateUserCommand(user_id=target.id, disabled=True),
         Actor(id=by.id, roles=frozenset({"admin"})),
     )
@@ -180,7 +186,7 @@ async def test_two_admins_cannot_disable_each_other_concurrently(
         return_exceptions=True,
     )
 
-    assert sum(isinstance(r, User) for r in results) == 1
+    assert sum(isinstance(r, UserListing) for r in results) == 1
     assert sum(isinstance(r, LastAdministratorError) for r in results) == 1
     async with factory() as session:
         active = (
@@ -208,4 +214,4 @@ async def test_admin_changes_wait_for_the_admin_lock(
     await holder.rollback()
     await holder.close()
     updated = await asyncio.wait_for(task, timeout=5)
-    assert updated.disabled
+    assert updated.user.disabled

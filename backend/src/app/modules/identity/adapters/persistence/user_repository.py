@@ -30,9 +30,7 @@ def _to_domain(model: UserModel) -> User:
         role=Role(model.role),
         password_expired=model.password_expired,
         disabled=model.disabled,
-        failed_attempts=model.failed_attempts,
-        failure_window_started_at=model.failure_window_started_at,
-        locked_until=model.locked_until,
+        last_login_at=model.last_login_at,
         created_at=model.created_at,
         updated_at=model.updated_at,
     )
@@ -48,9 +46,7 @@ def _to_model(user: User) -> UserModel:
         role=user.role.value,
         password_expired=user.password_expired,
         disabled=user.disabled,
-        failed_attempts=user.failed_attempts,
-        failure_window_started_at=user.failure_window_started_at,
-        locked_until=user.locked_until,
+        last_login_at=user.last_login_at,
         created_at=user.created_at,
         updated_at=user.updated_at,
     )

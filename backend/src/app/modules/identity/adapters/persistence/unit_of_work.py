@@ -3,6 +3,9 @@ from typing import TYPE_CHECKING
 from app.modules.identity.adapters.persistence.session_repository import (
     SqlAlchemySessionRepository,
 )
+from app.modules.identity.adapters.persistence.sign_in_attempt_repository import (
+    SqlAlchemySignInAttemptRepository,
+)
 from app.modules.identity.adapters.persistence.user_repository import (
     SqlAlchemyUserRepository,
 )
@@ -24,6 +27,7 @@ def build_identity_repos(session: AsyncSession) -> IdentityRepos:
     return IdentityRepos(
         users=SqlAlchemyUserRepository(session),
         sessions=SqlAlchemySessionRepository(session),
+        attempts=SqlAlchemySignInAttemptRepository(session),
     )
 
 

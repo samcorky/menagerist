@@ -11,11 +11,14 @@ from app.modules.identity.adapters.api.cookies import (
     set_session_cookies,
 )
 from app.modules.identity.adapters.api.dependencies import (
+    get_active_identity_actor,
     get_change_password_use_case,
+    get_client_ip,
     get_get_setup_status_use_case,
     get_identity_actor,
     get_identity_settings_dep,
     get_session_token,
+    get_set_own_display_name_use_case,
     get_setup_first_admin_use_case,
     get_sign_in_use_case,
     get_sign_out_use_case,
@@ -27,6 +30,7 @@ from app.modules.identity.adapters.api.schemas import (
     LoginRequest,
     SetupRequest,
     SetupResponse,
+    UpdateMeRequest,
     UserResponse,
 )
 from app.modules.identity.application.change_password import ChangePassword
@@ -34,13 +38,17 @@ from app.modules.identity.application.get_setup_status import (
     GetSetupStatus,
     GetSetupStatusQuery,
 )
+from app.modules.identity.application.set_own_display_name import SetOwnDisplayName
 from app.modules.identity.application.setup_first_admin import SetupFirstAdmin
 from app.modules.identity.application.sign_in import SignIn
 from app.modules.identity.application.sign_out import SignOut, SignOutCommand
 from app.modules.identity.domain.errors import (
+    AccountDisabledError,
     CurrentPasswordIncorrectError,
     InvalidCredentialsError,
     InvalidPasswordError,
+    InvalidUserError,
+    PasswordUnchangedError,
     SessionRequiredError,
     SetupAlreadyDoneError,
     SignInThrottledError,
@@ -108,6 +116,10 @@ async def setup_first_admin(
             InvalidCredentialsError, detail="Incorrect username or password."
         ),
         **error_response(
+            AccountDisabledError,
+            detail="This account has been disabled. Ask an administrator.",
+        ),
+        **error_response(
             SignInThrottledError, detail="Too many failed attempts. Try again later."
         ),
     },
@@ -118,9 +130,16 @@ async def sign_in(
     response: Response,
     use_case: Annotated[SignIn, Depends(get_sign_in_use_case)],
     settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
+    client_ip: Annotated[str | None, Depends(get_client_ip)],
 ) -> UserResponse:
-    """Sign in, setting the session and CSRF cookies."""
-    result = await use_case.handle(payload.to_command(), ANONYMOUS_ACTOR)
+    """Sign in, setting the session and CSRF cookies.
+
+    The 403 `account_disabled` answer is given only when the password was
+    right; a wrong password for a disabled account gets the same 401 as any
+    other. Failures are throttled per username and per client address (429 with
+    `Retry-After`) whether or not the account exists.
+    """
+    result = await use_case.handle(payload.to_command(client_ip), ANONYMOUS_ACTOR)
     set_session_cookies(request, response, result.token, settings)
     return UserResponse.from_domain(result.user)
 
@@ -175,14 +194,47 @@ async def get_current_user(
     return UserResponse.from_domain(user)
 
 
+@router.patch(
+    "/me",
+    response_model=UserResponse,
+    operation_id="update_current_user",
+    responses={
+        **_UNAUTHENTICATED,
+        **error_response(
+            InvalidUserError, detail="A display name must be 1 to 120 characters."
+        ),
+    },
+)
+async def update_current_user(
+    payload: UpdateMeRequest,
+    use_case: Annotated[SetOwnDisplayName, Depends(get_set_own_display_name_use_case)],
+    actor: Annotated[Actor, Depends(get_active_identity_actor)],
+) -> UserResponse:
+    """Change your own display name."""
+    user = await use_case.handle(payload.to_command(), actor)
+    return UserResponse.from_domain(user)
+
+
+_CHANGE_PASSWORD_400 = error_response(
+    CurrentPasswordIncorrectError, detail="The current password is incorrect."
+)
+_CHANGE_PASSWORD_400[400]["description"] += (
+    " Also used for a new password that breaks the rules"
+    + " (`InvalidPasswordError`) or equals the current one"
+    + f" (`{PasswordUnchangedError.__name__}`: "
+    + '"The new password must differ from the current one.").'
+)
+
+
 @router.post(
     "/password",
     response_model=UserResponse,
     operation_id="change_password",
     responses={
         **_UNAUTHENTICATED,
+        **_CHANGE_PASSWORD_400,
         **error_response(
-            CurrentPasswordIncorrectError, detail="The current password is incorrect."
+            SignInThrottledError, detail="Too many failed attempts. Try again later."
         ),
     },
 )
@@ -193,8 +245,12 @@ async def change_password(
     use_case: Annotated[ChangePassword, Depends(get_change_password_use_case)],
     actor: Annotated[Actor, Depends(get_identity_actor)],
     settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
+    client_ip: Annotated[str | None, Depends(get_client_ip)],
 ) -> UserResponse:
-    """Change your password. Other sessions end and this one gets a new token."""
-    result = await use_case.handle(payload.to_command(), actor)
+    """Change your password. Other sessions end and this one gets a new token.
+
+    Wrong current passwords are throttled per user and per client address.
+    """
+    result = await use_case.handle(payload.to_command(client_ip), actor)
     set_session_cookies(request, response, result.token, settings)
     return UserResponse.from_domain(result.user)

@@ -146,14 +146,12 @@ def test_content_responses_are_private_for_the_owner(world: _World) -> None:
 
     for path in ("content", "thumbnail"):
         response = alice.get(f"{url}/{path}")
-        cache_control = response.headers["Cache-Control"]
-        assert cache_control.split(", ")[0] == "private"
-        assert "immutable" in cache_control
+        assert response.headers["Cache-Control"] == "private, no-cache"
         revalidated = alice.get(
             f"{url}/{path}", headers={"If-None-Match": response.headers["ETag"]}
         )
         assert revalidated.status_code == 304
-        assert revalidated.headers["Cache-Control"].startswith("private")
+        assert revalidated.headers["Cache-Control"] == "private, no-cache"
 
 
 def test_other_user_cannot_attach_a_foreign_asset(world: _World) -> None:

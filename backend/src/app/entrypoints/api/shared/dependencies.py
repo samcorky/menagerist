@@ -4,7 +4,10 @@ from fastapi import Depends
 from starlette.requests import Request
 
 from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
-from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+from app.entrypoints.api.shared.authorization import (
+    get_authorization_port,
+    get_role_authorization,
+)
 from app.modules.identity.adapters.api.dependencies import (
     bind_session_context,
     get_get_current_user_use_case,
@@ -28,9 +31,7 @@ from app.shared_kernel.actor import ANONYMOUS_ACTOR, Actor
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_policy import AccessPolicy
-    from app.shared_kernel.authorization import AuthorizationPort
 
-_authorization_port = RoleAuthorizationAdapter()
 _access_policy = OwnerAccessPolicy()
 
 
@@ -65,16 +66,14 @@ async def get_current_actor(
     return Actor(id=user.id, roles=frozenset({user.role.value}))
 
 
-def get_role_authorization() -> RoleAuthorizationAdapter:
-    """Return the process-wide role-based authorisation adapter."""
-    return _authorization_port
-
-
-def get_authorization_port() -> AuthorizationPort:
-    """Return the process-wide `AuthorizationPort` adapter."""
-    return _authorization_port
-
-
 def get_access_policy() -> AccessPolicy:
     """Return the process-wide `AccessPolicy`."""
     return _access_policy
+
+
+__all__ = [
+    "get_access_policy",
+    "get_authorization_port",
+    "get_current_actor",
+    "get_role_authorization",
+]

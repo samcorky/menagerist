@@ -64,7 +64,9 @@ class Api:
         self.world = world
         self.app = create_app()
         hasher = InMemoryPasswordHasher()
-        repos = IdentityRepos(users=world.users, sessions=world.sessions)
+        repos = IdentityRepos(
+            users=world.users, sessions=world.sessions, attempts=world.attempts
+        )
         self.app.dependency_overrides[get_identity_uow] = lambda: world.uow
         self.app.dependency_overrides[get_setup_identity_uow] = lambda: world.uow
         self.app.dependency_overrides[get_existing_data_claim] = NoOpExistingDataClaim

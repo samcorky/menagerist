@@ -15,7 +15,11 @@ async def test_setup_is_required_only_while_there_are_no_accounts(
     world: World, make_user: MakeUser
 ) -> None:
     """Status flips once the first account exists."""
-    use_case = GetSetupStatus(IdentityRepos(users=world.users, sessions=world.sessions))
+    use_case = GetSetupStatus(
+        IdentityRepos(
+            users=world.users, sessions=world.sessions, attempts=world.attempts
+        )
+    )
 
     assert await use_case.handle(GetSetupStatusQuery(), ANONYMOUS_ACTOR) is True
     await world.users.add(make_user("alice"))

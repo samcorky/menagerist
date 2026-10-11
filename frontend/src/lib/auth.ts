@@ -1,8 +1,8 @@
 import { errorMessage } from '$lib/api/errors';
-import type { GraphPermission } from '$lib/api/generated/types.gen';
+import type { GraphPermission, IdentityPermission } from '$lib/api/generated/types.gen';
 
-/** Every permission the backend can report; today they are all graph permissions. */
-export type Permission = GraphPermission;
+/** Every permission the backend can report. */
+export type Permission = GraphPermission | IdentityPermission;
 
 export const LOGIN_PATH = '/login';
 export const SETUP_PATH = '/setup';
@@ -128,6 +128,15 @@ export function csrfToken(): string | null {
 	return readCookie(document.cookie, CSRF_COOKIE) || null;
 }
 
+/** The RFC 9457 `title` of a failed call, e.g. `PasswordUnchangedError`. */
+export function problemTitle(error: unknown): string | null {
+	if (error && typeof error === 'object' && 'title' in error) {
+		const title = (error as { title: unknown }).title;
+		if (typeof title === 'string') return title;
+	}
+	return null;
+}
+
 /** The RFC 9457 `type` of a failed call, e.g. `password_expired`. */
 export function problemType(error: unknown): string | null {
 	if (error && typeof error === 'object' && 'type' in error) {
@@ -151,11 +160,16 @@ export function throttleMessage(seconds: number | null): string {
 	return `Too many attempts. Try again in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`;
 }
 
+export const ACCOUNT_DISABLED_MESSAGE = 'This account has been disabled. Ask an administrator.';
+
 /** A plain-words message for a failed sign-in, setup or password call. */
 export function authErrorMessage(result: { error?: unknown; response?: Response | null }): string {
 	const { response } = result;
 	if (!response) return 'You appear to be offline. Check your connection and try again.';
 	if (response.status === 429) return throttleMessage(retryAfterSeconds(response));
+	if (response.status === 403 && problemType(result.error) === 'account_disabled') {
+		return ACCOUNT_DISABLED_MESSAGE;
+	}
 	if (response.status >= 500) return 'Something went wrong. Try again in a moment.';
 	return errorMessage(result.error);
 }
@@ -176,6 +190,20 @@ export function describeClaimed(claimed: Record<string, number>): string[] {
 			const [one, many] = CLAIM_WORDS[kind] ?? [kind, kind];
 			return `${count} ${count === 1 ? one : many}`;
 		});
+}
+
+export const DISPLAY_NAME_MAX_LENGTH = 120;
+export const DISPLAY_NAME_MESSAGE = `A display name must be 1 to ${DISPLAY_NAME_MAX_LENGTH} characters.`;
+
+/** Why a display name cannot be saved, or null when it can. */
+export function displayNameProblem(value: string): string | null {
+	const length = value.trim().length;
+	return length < 1 || length > DISPLAY_NAME_MAX_LENGTH ? DISPLAY_NAME_MESSAGE : null;
+}
+
+/** Whether a failed password change was refused because the new password matches the old. */
+export function isPasswordUnchanged(error: unknown): boolean {
+	return problemTitle(error) === 'PasswordUnchangedError';
 }
 
 export const PASSWORD_MIN_LENGTH = 10;

@@ -1,30 +1,52 @@
 import asyncio
 import getpass
-import os
+import json
 import sys
 from collections.abc import Callable, Coroutine
-from datetime import timedelta
-from typing import TYPE_CHECKING, Any, NoReturn
+from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, Annotated, Any, NoReturn
 
 import structlog
-from cyclopts import App
+from cyclopts import App, Parameter
+from rich.console import Console
+from rich.table import Table
 
 from app.modules.identity.adapters.claim.unwired_existing_data_claim import (
     UnwiredExistingDataClaim,
 )
-from app.shared_kernel.errors import DomainError
+from app.platform.config import get_identity_cli_settings
+from app.shared_kernel.errors import DomainError, ForbiddenError
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from app.modules.identity.application.user_listing import UserListing
+    from app.modules.identity.domain.user import User
     from app.modules.identity.ports.existing_data_claim import ExistingDataClaim
     from app.modules.identity.ports.password_hasher import PasswordHasher
+    from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
+    from app.shared_kernel.authorization import AuthorizationPort
 
 logger = structlog.get_logger(__name__)
 
 identity_app = App(name="identity", help="Manage accounts.")
 
-PASSWORD_ENV_VAR = "MENAGERIST_INITIAL_PASSWORD"
+
+class _DenyAll:
+    """Fail-closed default until the entrypoint wires the real authorisation."""
+
+    async def check(self, actor: object, action: str) -> None:
+        raise ForbiddenError("Authorisation is not wired for the CLI.")
+
+
+_authorization: AuthorizationPort = _DenyAll()
+
+
+def use_authorization(authorization: AuthorizationPort) -> None:
+    """Choose the authorisation the commands check the system actor against."""
+    global _authorization
+    _authorization = authorization
+
 
 ClaimBuilder = Callable[["AsyncSession"], "ExistingDataClaim"]
 
@@ -52,10 +74,13 @@ def _fail(message: str) -> NoReturn:
 
 
 def _read_password() -> str:
-    """Read the password from the environment or a hidden, confirmed prompt."""
-    from_env = os.environ.get(PASSWORD_ENV_VAR)
-    if from_env:
-        return from_env
+    """Read the password from settings (env or secret file) or a hidden prompt.
+
+    Never printed or logged.
+    """
+    configured = get_identity_cli_settings().initial_password
+    if configured is not None and configured.get_secret_value():
+        return configured.get_secret_value()
     first = getpass.getpass("Password: ")
     if getpass.getpass("Confirm password: ") != first:
         _fail("The passwords do not match.")
@@ -117,7 +142,7 @@ def create_admin(*, username: str, display_name: str | None = None) -> None:
             async with uow as repos:
                 first_run = await repos.users.count() == 0
             if not first_run:
-                user = await CreateUser(uow, hasher).handle(
+                user = await CreateUser(uow, _authorization, hasher).handle(
                     CreateUserCommand(
                         username=username,
                         display_name=name,
@@ -179,7 +204,7 @@ def reset_password(*, username: str) -> None:
                 user = await repos.users.get_by_username(username)
             if user is None:
                 raise UserNotFoundError("That account does not exist.")
-            await ResetPassword(uow, _hasher()).handle(
+            await ResetPassword(uow, _authorization, _hasher()).handle(
                 ResetPasswordCommand(user_id=user.id, password=password),
                 SYSTEM_ACTOR,
             )
@@ -191,11 +216,98 @@ def reset_password(*, username: str) -> None:
     print(_run(_reset()))
 
 
-@identity_app.command(name="list")
-def list_accounts() -> None:
-    """List every account: username, display name, role and disabled flag."""
+async def _find_user(uow: IdentityUnitOfWork, username: str) -> User:
+    from app.modules.identity.domain.errors import UserNotFoundError
 
-    async def _list() -> list[str]:
+    async with uow as repos:
+        user = await repos.users.get_by_username(username)
+    if user is None:
+        raise UserNotFoundError("That account does not exist.")
+    return user
+
+
+@identity_app.command
+def set_display_name(*, username: str, display_name: str) -> None:
+    """Change the name an account is shown as.
+
+    Args:
+        username: Username of the account.
+        display_name: The new display name.
+    """
+
+    async def _rename() -> str:
+        from app.modules.identity.adapters.persistence.unit_of_work import (
+            create_identity_uow_on_session,
+        )
+        from app.modules.identity.application.update_user import (
+            UpdateUser,
+            UpdateUserCommand,
+        )
+        from app.platform.database import get_session_factory
+        from app.shared_kernel.actor import SYSTEM_ACTOR
+
+        async with get_session_factory()() as session:
+            uow = create_identity_uow_on_session(session)
+            user = await _find_user(uow, username)
+            updated = await UpdateUser(uow, _authorization).handle(
+                UpdateUserCommand(user_id=user.id, display_name=display_name),
+                SYSTEM_ACTOR,
+            )
+            name = updated.user.display_name
+            return f"Display name for '{user.username}' is now '{name}'."
+
+    print(_run(_rename()))
+
+
+@identity_app.command
+def unlock(*, username: str) -> None:
+    """Lift an account's sign-in lockout (it stays enabled or disabled as it was).
+
+    Args:
+        username: Username of the account to unlock.
+    """
+
+    async def _unlock() -> str:
+        from app.modules.identity.adapters.persistence.unit_of_work import (
+            create_identity_uow_on_session,
+        )
+        from app.modules.identity.application.unlock_user import (
+            UnlockUser,
+            UnlockUserCommand,
+        )
+        from app.platform.database import get_session_factory
+        from app.shared_kernel.actor import SYSTEM_ACTOR
+
+        async with get_session_factory()() as session:
+            uow = create_identity_uow_on_session(session)
+            user = await _find_user(uow, username)
+            await UnlockUser(uow, _authorization).handle(
+                UnlockUserCommand(user_id=user.id), SYSTEM_ACTOR
+            )
+            return f"Sign-in lockout cleared for '{user.username}'."
+
+    print(_run(_unlock()))
+
+
+def _local(moment: datetime | None) -> str:
+    return "never" if moment is None else moment.astimezone().strftime("%Y-%m-%d %H:%M")
+
+
+def _iso(moment: datetime | None) -> str | None:
+    return None if moment is None else moment.isoformat()
+
+
+@identity_app.command(name="list")
+def list_accounts(
+    *, json_output: Annotated[bool, Parameter(name="--json", negative="")] = False
+) -> None:
+    """List every account: username, display name, role, status and last sign-in.
+
+    Args:
+        json_output: Print machine-readable JSON instead of a table.
+    """
+
+    async def _list() -> list[UserListing]:
         from app.modules.identity.adapters.persistence.unit_of_work import (
             build_identity_repos,
         )
@@ -207,20 +319,41 @@ def list_accounts() -> None:
         from app.shared_kernel.actor import SYSTEM_ACTOR
 
         async with get_session_factory()() as session:
-            users = await ListUsers(build_identity_repos(session)).handle(
-                ListUsersQuery(), SYSTEM_ACTOR
-            )
-        return [
-            "\t".join(
-                (
-                    user.username,
-                    user.display_name,
-                    user.role.value,
-                    "disabled" if user.disabled else "active",
-                )
-            )
-            for user in users
-        ]
+            return await ListUsers(
+                build_identity_repos(session), _authorization
+            ).handle(ListUsersQuery(), SYSTEM_ACTOR)
 
-    for line in _run(_list()):
-        print(line)
+    listings = _run(_list())
+    if json_output:
+        print(
+            json.dumps(
+                [
+                    {
+                        "id": str(item.user.id),
+                        "username": item.user.username,
+                        "display_name": item.user.display_name,
+                        "role": item.user.role.value,
+                        "status": "disabled" if item.user.disabled else "active",
+                        "last_login_at": _iso(item.user.last_login_at),
+                        "locked_until": _iso(item.locked_until),
+                    }
+                    for item in listings
+                ],
+                indent=2,
+            )
+        )
+        return
+    table = Table("Username", "Display name", "Role", "Status", "Last sign-in")
+    for item in listings:
+        user = item.user
+        status = "disabled" if user.disabled else "active"
+        if item.locked_until is not None:
+            status += " (locked)"
+        table.add_row(
+            user.username,
+            user.display_name,
+            user.role.value,
+            status,
+            _local(user.last_login_at),
+        )
+    Console(soft_wrap=True).print(table)

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey
+from sqlalchemy import DateTime, ForeignKey, Index, PrimaryKeyConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.platform.database import Base
@@ -19,11 +19,7 @@ class UserModel(IdentifiableMixin, TimestampedMixin, Base):
     role: Mapped[str]
     password_expired: Mapped[bool]
     disabled: Mapped[bool]
-    failed_attempts: Mapped[int]
-    failure_window_started_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
-    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class SessionModel(IdentifiableMixin, Base):
@@ -36,3 +32,19 @@ class SessionModel(IdentifiableMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class SignInAttemptModel(Base):
+    """ORM row for a failure counter; the key is a hash, never the raw value."""
+
+    __tablename__ = "sign_in_attempts"
+    __table_args__ = (
+        PrimaryKeyConstraint("key_type", "key_hash"),
+        Index("ix_sign_in_attempts_window_start", "window_start"),
+    )
+
+    key_type: Mapped[str]
+    key_hash: Mapped[str]
+    failure_count: Mapped[int]
+    window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
