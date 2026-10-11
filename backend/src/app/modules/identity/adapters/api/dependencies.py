@@ -3,6 +3,7 @@ from datetime import timedelta
 from functools import cache
 from typing import TYPE_CHECKING, Annotated
 
+import structlog
 from fastapi import Depends
 from starlette.requests import Request
 
@@ -32,6 +33,7 @@ from app.modules.identity.application.create_user import CreateUser
 from app.modules.identity.application.get_current_user import (
     GetCurrentUser,
     GetCurrentUserQuery,
+    ResolvedSession,
 )
 from app.modules.identity.application.get_setup_status import GetSetupStatus
 from app.modules.identity.application.list_users import ListUsers
@@ -231,7 +233,22 @@ def get_session_token(
     return request.cookies.get(settings.cookie_name)
 
 
+def bind_session_context(request: Request, resolved: ResolvedSession) -> None:
+    """Add `user_id` and `session_id` to the log context for the rest of the request.
+
+    Dependencies and the endpoint share a task, and the request's task context is
+    discarded with the request, so nothing carries over to another request. Only
+    the session's row id is bound, never its token.
+    """
+    user_id, session_id = str(resolved.user.id), str(resolved.session_id)
+    structlog.contextvars.bind_contextvars(user_id=user_id, session_id=session_id)
+    # Read back by the access-log line, which is written outside the endpoint task.
+    request.state.user_id = user_id
+    request.state.session_id = session_id
+
+
 async def get_signed_in_user(
+    request: Request,
     token: Annotated[str | None, Depends(get_session_token)],
     use_case: Annotated[GetCurrentUser, Depends(get_get_current_user_use_case)],
 ) -> User:
@@ -240,14 +257,15 @@ async def get_signed_in_user(
     Raises:
         SessionRequiredError: If there is no live session.
     """
-    user = (
+    resolved = (
         None
         if token is None
         else await use_case.handle(GetCurrentUserQuery(token=token), ANONYMOUS_ACTOR)
     )
-    if user is None:
+    if resolved is None:
         raise SessionRequiredError("Sign in to continue.")
-    return user
+    bind_session_context(request, resolved)
+    return resolved.user
 
 
 def get_identity_actor(

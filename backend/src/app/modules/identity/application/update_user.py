@@ -39,6 +39,7 @@ class UpdateUser(CommandHandler[IdentityUnitOfWork, UpdateUserCommand, User]):
             LastAdministratorError: If the change would leave no enabled admin.
         """
         require_admin(actor)
+        ended = 0
         async with self._uow as repos:
             # Lock order: admin-changes lock first, then the user row.
             await repos.users.lock_admin_changes()
@@ -61,10 +62,12 @@ class UpdateUser(CommandHandler[IdentityUnitOfWork, UpdateUserCommand, User]):
                 user.set_role(command.role)
             if command.disabled is True:
                 user.disable()
-                await repos.sessions.delete_for_user(user.id)
+                ended = await repos.sessions.delete_for_user(user.id)
             elif command.disabled is False:
                 user.enable()
             await repos.users.save(user)
             await self._uow.commit()
+        if ended:
+            logger.info("sessions ended", user_id=user.id, count=ended)
         logger.info("user updated", user_id=user.id, updated_by=actor.id)
         return user

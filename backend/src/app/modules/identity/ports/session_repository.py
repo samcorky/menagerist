@@ -26,8 +26,8 @@ class SessionRepository(Protocol):
         """Remove one session; unknown ids are ignored."""
         ...
 
-    async def delete_for_user(self, user_id: uuid.UUID) -> None:
-        """Remove every session belonging to `user_id`."""
+    async def delete_for_user(self, user_id: uuid.UUID) -> int:
+        """Remove every session belonging to `user_id`, returning how many went."""
         ...
 
     async def delete_expired(self, now: datetime) -> int:

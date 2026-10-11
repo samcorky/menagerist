@@ -1,6 +1,11 @@
+from functools import cache
+from pathlib import Path
+from string import Template
 from typing import TYPE_CHECKING, Any
 
 from fastapi.openapi.utils import get_openapi
+
+from app.platform.config import get_identity_settings
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -31,6 +36,22 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "Endpoints for managing presets.",
     },
     {
+        "name": "Examples",
+        "description": "Endpoints for managing example graphs.",
+    },
+    {
+        "name": "Collections",
+        "description": "Endpoints for managing collections of graphs.",
+    },
+    {
+        "name": "Authentication",
+        "description": "Sign in and out, and manage your own account.",
+    },
+    {
+        "name": "Users",
+        "description": "Endpoints for managing user accounts.",
+    },
+    {
         "name": "System",
         "description": "System-level endpoints for health checks and diagnostics.",
     },
@@ -39,6 +60,19 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "Version 1 of the API.",
     },
 ]
+
+
+_DESCRIPTION_PATH = Path(__file__).parent / "docs" / "templates" / "api-description.md"
+
+
+@cache
+def api_description() -> str:
+    """Return the long API description with the configured cookie names filled in."""
+    settings = get_identity_settings()
+    return Template(_DESCRIPTION_PATH.read_text(encoding="utf-8")).substitute(
+        session_cookie_name=settings.cookie_name,
+        csrf_cookie_name=settings.csrf_cookie_name,
+    )
 
 
 def _rewrite_refs(node: object, renamed_refs: dict[str, str]) -> None:
@@ -95,14 +129,14 @@ def configure_openapi(app: FastAPI) -> None:
             title=app.title,
             version=app.version,
             openapi_version=app.openapi_version,
-            description=app.description,
+            description=api_description(),
             routes=app.routes,
             tags=app.openapi_tags,
             servers=app.servers,
             terms_of_service=app.terms_of_service,
             contact=app.contact,
             license_info=app.license_info,
-            summary=app.summary,
+            summary=app.summary or app.description or None,
         )
         openapi_schema["info"]["x-logo"] = {
             "url": "/api/docs/logo.svg",

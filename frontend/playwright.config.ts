@@ -24,10 +24,15 @@ const FRONTEND_DIST = fileURLToPath(new URL('./build', import.meta.url));
 // timeout would otherwise be eaten by the added delay, so it's extended too.
 const slowMo = process.env.PW_SLOWMO ? Number(process.env.PW_SLOWMO) : undefined;
 
-/** A backend on `port` serving the built SPA from the database menagerist_{name}. */
+/**
+ * A backend on `port` serving the built SPA from the database menagerist_{name}.
+ * `--no-sync`: the backends start together, and concurrent syncs fight over
+ * .venv\Scripts\menagerist.exe on Windows. `poe test-e2e` syncs once first; run
+ * `poe sync-backend` before a manual `npx playwright test`.
+ */
 function backend(port: number, name: string) {
 	return {
-		command: `uv run menagerist serve --host 127.0.0.1 --port ${port}`,
+		command: `uv run --no-sync menagerist serve --host 127.0.0.1 --port ${port}`,
 		cwd: '..',
 		env: {
 			MENAGERIST_DATABASE_URL: `postgresql+asyncpg://menagerist:menagerist@localhost:55433/menagerist_${name}`,

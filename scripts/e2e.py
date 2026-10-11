@@ -45,7 +45,12 @@ def main(
 
     code = 1
     try:
-        steps = ["e2e-db-up"] + ([] if skip_build else ["e2e-build"]) + ["e2e-migrate"]
+        # Sync first: the servers run with `uv run --no-sync` (playwright.config.ts).
+        steps = (
+            ["sync-backend", "e2e-db-up"]
+            + ([] if skip_build else ["e2e-build"])
+            + ["e2e-migrate"]
+        )
         for step in steps:
             if (code := poe(step)) != 0:
                 break

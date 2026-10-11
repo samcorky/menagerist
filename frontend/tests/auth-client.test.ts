@@ -229,13 +229,52 @@ describe('more auth behaviour', () => {
 		});
 	});
 
-	it('fails sign-out on a server error and keeps the account', async () => {
+	it('clears local state at once and finishes the request afterwards', async () => {
 		auth.user = user as never;
-		vi.stubGlobal('fetch', async () => problem(500, 'about:blank'));
+		auth.permissions = new Set(['graph:node_type:delete']);
+		setEtag('/api/v1/node', { etag: '"v1"', data: { secret: 1 } });
+		let release!: () => void;
+		const gate = new Promise<void>((r) => (release = r));
+		let keepalive: boolean | undefined;
+		vi.stubGlobal('fetch', async (request: Request) => {
+			keepalive = request.keepalive;
+			await gate;
+			return new Response(null, { status: 204 });
+		});
+		const pending = auth.signOut();
+		// Nothing has been answered yet, but the page already shows a signed-out state.
+		expect(auth.user).toBeNull();
+		expect(auth.can('graph:node_type:delete')).toBe(false);
+		expect(auth.leftOnPurpose).toBe(true);
+		expect(getEtag('/api/v1/node')).toBeUndefined();
+		release();
+		expect((await pending).ok).toBe(true);
+		expect(keepalive).toBe(true);
+	});
+
+	it('restores the true state when the server did not end the session', async () => {
+		auth.user = user as never;
+		vi.stubGlobal('fetch', async (request: Request) => {
+			const path = new URL(request.url).pathname;
+			if (path.endsWith('/auth/logout')) return problem(500, 'about:blank');
+			return path.endsWith('/permissions') ? json({ permissions: [] }) : json(user);
+		});
 		const result = await auth.signOut();
 		expect(result.ok).toBe(false);
-		expect(auth.user).not.toBeNull();
+		expect((auth.user as { username: string } | null)?.username).toBe('sam');
+		expect(auth.leftOnPurpose).toBe(false);
 		auth.user = null;
+	});
+
+	it('fails and stays signed out locally when offline and the state cannot be confirmed', async () => {
+		auth.user = user as never;
+		vi.stubGlobal('fetch', async () => {
+			throw new TypeError('Failed to fetch');
+		});
+		const result = await auth.signOut();
+		expect(result.ok).toBe(false);
+		expect(result.ok === false && result.message).toContain('offline');
+		expect(auth.user).toBeNull();
 	});
 
 	it('treats a 401 on sign-out as already signed out', async () => {

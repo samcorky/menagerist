@@ -155,7 +155,8 @@ async def test_session_delete_for_user_and_expired(db_session: AsyncSession) -> 
 
     assert await repo.delete_expired(NOW + timedelta(minutes=2)) == 1
     assert await repo.get_by_token_hash("stale") is None
-    await repo.delete_for_user(alice.id)
+    assert await repo.delete_for_user(alice.id) == 2
+    assert await repo.delete_for_user(alice.id) == 0
     assert await repo.get_by_token_hash("a1") is None
     assert await repo.get_by_token_hash("a2") is None
     assert await repo.get_by_token_hash("b1") is not None

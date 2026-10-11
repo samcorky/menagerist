@@ -125,9 +125,9 @@ async def test_concurrent_setups_create_exactly_one_admin(
 class _SlowSessionRepository(SqlAlchemySessionRepository):
     """Pauses after the last-admin check so overlapping requests really overlap."""
 
-    async def delete_for_user(self, user_id: uuid.UUID) -> None:
+    async def delete_for_user(self, user_id: uuid.UUID) -> int:
         await asyncio.sleep(0.3)
-        await super().delete_for_user(user_id)
+        return await super().delete_for_user(user_id)
 
 
 def _slow_uow(factory: async_sessionmaker[AsyncSession]) -> IdentityUnitOfWork:

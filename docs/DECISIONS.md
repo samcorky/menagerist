@@ -699,6 +699,7 @@ An add-on item of a base item type inherits that type's cover style, read throug
 - **The first administrator claims existing data in the same transaction as setup.** `POST /auth/setup` (or `menagerist identity create-admin` when no accounts exist) creates the admin and gives them every row with no owner or a legacy owner (`UUID(int=0)` from example installs, `UUID(int=1)` from the old fixed API user). Soft-deleted rows are included. If the claim fails, nothing is created.
 - **Setup is serialised by a Postgres advisory lock** (`lock_for_setup`), so two simultaneous first visits cannot create two administrators; the loser gets 409. Admin-removing changes (demote, disable) take a second advisory lock so two admins cannot remove each other. The last active administrator cannot be demoted or disabled.
 - **Accounts are local only** in Stage 1. A forgotten administrator password is reset with `menagerist identity reset-password`.
+- **The interactive API docs sign in through the API itself** (2026-10-11). `/api/docs` is our own Swagger UI page: `POST /auth/login` with "Try it out" stores the cookies, and a small same-origin script (`swagger-init.js`) adds `X-CSRF-Token` from the CSRF cookie to unsafe `/api/v1` calls. The header is deliberately not in the OpenAPI schema, which keeps the generated frontend client unchanged; the Authorize button is hidden because a Cookie header cannot be set from JavaScript.
 
 **Testing time**
 

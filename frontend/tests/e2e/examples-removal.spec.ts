@@ -60,7 +60,8 @@ test('keeps an edited example item on removal and says why', async ({ page }) =>
 	await expect(page.getByRole('region', { name: /Notifications/ })).toContainText(
 		'kept because you edited them'
 	);
-	await expect(page.getByText('item was kept because you edited them.')).toBeVisible();
+	// The note's count includes edited records left by earlier specs on this worker's database.
+	await expect(page.getByText(/items? w(as|ere) kept because you edited them\./)).toBeVisible();
 
 	await page.goto('/items');
 	await page.getByPlaceholder('Search your items…').fill(edited);

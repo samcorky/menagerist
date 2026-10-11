@@ -89,7 +89,7 @@ def create_app() -> FastAPI:
     )
     fastapi_app.version = app_info.version
     if app_info.project.description:
-        fastapi_app.description = app_info.project.description
+        fastapi_app.summary = app_info.project.description
 
     # noinspection PyTypeChecker
     fastapi_app.add_middleware(SecurityHeadersMiddleware)

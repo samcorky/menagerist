@@ -107,7 +107,7 @@ def serve(
     port: int = 8000,
     workers: int = 1,
     reload: bool = False,
-    access_log: bool = True,
+    access_log: bool = False,
     log_level: ServeLogLevel = ServeLogLevel.info,
     migrate: bool = False,
 ) -> None:
@@ -118,7 +118,9 @@ def serve(
         port: Port to bind the server to.
         workers: Number of worker processes.
         reload: Restart workers when application code changes.
-        access_log: Whether to log access events.
+        access_log: Also write Granian's own access line. Off by default because
+            the API logs one access line per request itself (with the user and
+            session ids); `MENAGERIST_ACCESS_LOG=false` turns that one off.
         log_level: Minimum level for Granian's own server logs.
         migrate: Apply pending database migrations before starting. Meant for
             single-instance deployments; run `migrate upgrade` separately when

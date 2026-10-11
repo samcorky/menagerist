@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
@@ -44,6 +45,7 @@ class SetupFirstAdminResult:
 
     user: User
     token: str = field(repr=False)
+    session_id: uuid.UUID
     claim: ClaimReport
 
 
@@ -95,8 +97,17 @@ class SetupFirstAdmin(
             if await repos.users.count() > 0:
                 raise SetupAlreadyDoneError("Setup has already been completed.")
             await repos.users.add(user)
-            token = await start_session(repos, self._tokens, user, self._ttl)
+            started = await start_session(repos, self._tokens, user, self._ttl)
             report = await self._claim.claim(user.id)
             await self._uow.commit()
-        logger.info("first administrator created", user_id=user.id)
-        return SetupFirstAdminResult(user=user, token=token, claim=report)
+        logger.info(
+            "first administrator created",
+            user_id=user.id,
+            session_id=started.session_id,
+        )
+        return SetupFirstAdminResult(
+            user=user,
+            token=started.token,
+            session_id=started.session_id,
+            claim=report,
+        )

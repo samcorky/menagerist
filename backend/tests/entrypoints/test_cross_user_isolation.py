@@ -183,6 +183,7 @@ ALLOWED: dict[Route, str] = {
     ("GET", "/api/favicon.ico"): PUBLIC,
     ("GET", "/api/docs/favicon.svg"): PUBLIC,
     ("GET", "/api/docs/logo.svg"): PUBLIC,
+    ("GET", "/api/docs/swagger-init.js"): PUBLIC,
     ("GET", "/api/openapi.json"): PUBLIC,
     ("GET", "/api/docs"): PUBLIC,
     ("GET", "/api/docs/oauth2-redirect"): PUBLIC,

@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.modules.identity.ports.session_token_generator import (  # noqa: TC001
     SessionTokenGenerator,
 )
@@ -9,6 +11,8 @@ from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
@@ -38,3 +42,6 @@ class SignOut(CommandHandler[IdentityUnitOfWork, SignOutCommand, None]):
             if session is not None:
                 await repos.sessions.delete(session.id)
                 await self._uow.commit()
+                logger.info(
+                    "signed out", user_id=session.user_id, session_id=session.id
+                )

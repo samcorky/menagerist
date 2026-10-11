@@ -126,7 +126,9 @@ async def test_current_user_resolves_a_live_session(
             GetCurrentUserQuery(token="nope"), ANONYMOUS_ACTOR
         )
 
-    assert found is result.user
+    assert found is not None
+    assert found.user is result.user
+    assert found.session_id == result.session_id
     assert missing is None
 
 

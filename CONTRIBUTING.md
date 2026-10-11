@@ -127,10 +127,12 @@ A third Playwright project, `auth` (`auth.spec.ts`), tests first-run setup, sign
 
 Every worker is a browser plus a backend, so memory and CPU use grow with `--workers`. If tests time out on a small machine, lower the count.
 
+The backends start with `uv run --no-sync`, because several servers syncing at once fight over `.venv\Scripts\menagerist.exe` on Windows. `poe test-e2e` syncs once beforehand; when you run Playwright by hand, run `poe sync-backend` first (and again after backend dependency changes).
+
 To iterate on a single spec without paying the full up/build/migrate/down cycle each time (the build must be current):
 
 ```sh
-poe e2e-db-up && poe e2e-build
+poe sync-backend && poe e2e-db-up && poe e2e-build
 E2E_WORKERS=1 poe e2e-migrate      # once, leave running
 cd frontend && E2E_WORKERS=1 npx playwright test tests/e2e/create-item.spec.ts
 poe e2e-db-down                    # when done: removes the container and its volume
@@ -175,6 +177,10 @@ Enforced by Codecov on every PR and locally via `poe coverage`:
 ### Adding a new bounded context
 
 A complete feature at one bounded context requires: domain entity/value object, use case(s), port Protocol(s), in-memory adapter, SQLAlchemy adapter, and tests at each layer (domain, application, router, persistence).
+
+## Using the interactive API docs
+
+Swagger UI is at `/api/docs` on the backend (`http://localhost:8000/api/docs` in development). Sign in by running `POST /api/v1/auth/login` with "Try it out": the browser keeps the session cookies, and the banner at the top shows who is signed in. Swagger UI then adds the `X-CSRF-Token` header to POST, PUT, PATCH and DELETE calls itself, so mutating operations work. The Authorize button is hidden because browsers cannot set a `Cookie` header from JavaScript. ReDoc (`/api/redoc`) is read-only. The setup script is `backend/src/app/entrypoints/api/docs/static/swagger-init.js`; the Swagger UI assets load from cdn.jsdelivr.net.
 
 ## Pull requests
 

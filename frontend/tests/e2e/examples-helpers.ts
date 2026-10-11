@@ -52,13 +52,25 @@ export async function install(page: Page, pack: RegExp) {
 	).toBeVisible();
 }
 
+/**
+ * Removes a pack through the confirm dialog and waits for the DELETE to finish, so toast
+ * assertions after it measure the UI rather than how long the server took under load.
+ */
 export async function remove(page: Page, pack: RegExp) {
 	await page.goto('/settings/examples');
 	await page.getByRole('button', { name: new RegExp(`^Remove ${pack.source.slice(1)}`) }).click();
+	const done = page.waitForResponse(
+		(res) => res.request().method() === 'DELETE' && /\/api\/v1\/example\//.test(res.url()),
+		{ timeout: 60_000 }
+	);
+	const started = Date.now();
 	await page
 		.getByRole('dialog', { name: 'Remove these examples?' })
 		.getByRole('button', { name: 'Remove', exact: true })
 		.click();
+	const response = await done;
+	expect(response.ok(), `removing ${pack.source} answered ${response.status()}`).toBe(true);
+	if (process.env.E2E_TIMINGS) console.log(`REMOVE ${pack.source} ${Date.now() - started} ms`);
 }
 
 export async function openItem(page: Page, name: string) {

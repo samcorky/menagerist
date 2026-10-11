@@ -82,7 +82,8 @@ async def test_session_delete_for_user_and_expired(world: World) -> None:
 
     assert await world.sessions.delete_expired(NOW + timedelta(minutes=2)) == 1
     assert await world.sessions.get_by_token_hash("s") is None
-    await world.sessions.delete_for_user(user_id)
+    assert await world.sessions.delete_for_user(user_id) == 2
+    assert await world.sessions.delete_for_user(user_id) == 0
     assert await world.sessions.get_by_token_hash("m0") is None
     assert await world.sessions.get_by_token_hash("o") is other
 

@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
@@ -16,6 +17,15 @@ class SignedInResult:
 
     user: User
     token: str = field(repr=False)
+    session_id: uuid.UUID
+
+
+@dataclass(kw_only=True, frozen=True)
+class StartedSession:
+    """A new session's secret token and its row id."""
+
+    token: str = field(repr=False)
+    session_id: uuid.UUID
 
 
 async def start_session(
@@ -23,8 +33,8 @@ async def start_session(
     tokens: SessionTokenGenerator,
     user: User,
     ttl: timedelta,
-) -> str:
-    """Store a new session for `user` and return its secret token."""
+) -> StartedSession:
+    """Store a new session for `user` and return its secret token and id."""
     token = tokens.new_token()
     session = Session.create(
         user_id=user.id,
@@ -33,4 +43,4 @@ async def start_session(
         ttl=ttl,
     )
     await repos.sessions.add(session)
-    return token
+    return StartedSession(token=token, session_id=session.id)

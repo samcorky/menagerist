@@ -68,7 +68,9 @@ class SignIn(CommandHandler[IdentityUnitOfWork, SignInCommand, SignedInResult]):
                 raise InvalidCredentialsError(_GENERIC_MESSAGE)
             # Sign-in is the only recurring writer here, so it also sweeps old rows.
             await repos.sessions.delete_expired(datetime.now(UTC))
-            token = await start_session(repos, self._tokens, user, self._ttl)
+            started = await start_session(repos, self._tokens, user, self._ttl)
             await self._uow.commit()
-        logger.info("user signed in", user_id=user.id)
-        return SignedInResult(user=user, token=token)
+        logger.info("signed in", user_id=user.id, session_id=started.session_id)
+        return SignedInResult(
+            user=user, token=started.token, session_id=started.session_id
+        )

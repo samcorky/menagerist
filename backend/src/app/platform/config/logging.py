@@ -8,6 +8,7 @@ class LoggingSettings(MenageristBaseSettings):
 
     log_level: str = "INFO"
     log_json: bool = False
+    access_log: bool = True
 
 
 @lru_cache(maxsize=1)

@@ -125,21 +125,30 @@ class AuthController {
 		this.setupRequired = false;
 	}
 
+	/**
+	 * Sign out. Local state is cleared first, so the route guard shows the sign-in page at once;
+	 * the returned promise settles when the server has answered. If it did not end the session,
+	 * the true state is reloaded so the page never claims a live session is over.
+	 */
 	async signOut(): Promise<AuthResult> {
+		this.leftOnPurpose = true;
+		this.clearSession();
+		let failure: string | null = null;
 		try {
-			const result = await apiSignOut();
-			if (!result.response) return { ok: false, message: OFFLINE };
+			// keepalive lets the request finish even if the page navigates away meanwhile.
+			const result = await apiSignOut({ keepalive: true });
+			if (!result.response) failure = OFFLINE;
 			// 401 means the session had already ended.
-			if (!result.response.ok && result.response.status !== 401) {
-				return { ok: false, message: authErrorMessage(result) };
+			else if (!result.response.ok && result.response.status !== 401) {
+				failure = authErrorMessage(result);
 			}
 		} catch {
-			return { ok: false, message: OFFLINE };
+			failure = OFFLINE;
 		}
-		this.leftOnPurpose = true;
-		clearAllEtags();
-		this.clearSession();
-		return { ok: true };
+		if (failure === null) return { ok: true };
+		this.leftOnPurpose = false;
+		await this.loadSession();
+		return { ok: false, message: failure };
 	}
 
 	async changePassword(currentPassword: string, newPassword: string): Promise<AuthResult> {

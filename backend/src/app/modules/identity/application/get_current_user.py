@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
@@ -26,8 +27,16 @@ class GetCurrentUserQuery:
         return "GetCurrentUserQuery()"
 
 
+@dataclass(kw_only=True, frozen=True)
+class ResolvedSession:
+    """A live session's user and its row id (not a secret; it cannot authenticate)."""
+
+    user: User
+    session_id: uuid.UUID
+
+
 class GetCurrentUser(
-    CommandHandler[IdentityUnitOfWork, GetCurrentUserQuery, User | None]
+    CommandHandler[IdentityUnitOfWork, GetCurrentUserQuery, ResolvedSession | None]
 ):
     """Resolve a session token to its user.
 
@@ -39,8 +48,13 @@ class GetCurrentUser(
         super().__init__(uow)
         self._tokens = tokens
 
-    async def handle(self, query: GetCurrentUserQuery, actor: Actor) -> User | None:
-        """Return the user, or `None` if the session is unknown, expired or disabled."""
+    async def handle(
+        self, query: GetCurrentUserQuery, actor: Actor
+    ) -> ResolvedSession | None:
+        """Return the user and session id, or `None` if there is no usable session.
+
+        A session is unusable when unknown, expired or owned by a disabled user.
+        """
         now = datetime.now(UTC)
         async with self._uow as repos:
             session = await repos.sessions.get_by_token_hash(
@@ -59,4 +73,4 @@ class GetCurrentUser(
                 session.seen(now)
                 await repos.sessions.save(session)
                 await self._uow.commit()
-            return user
+            return ResolvedSession(user=user, session_id=session.id)

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 import time_machine
+from structlog.testing import capture_logs
 
 from app.modules.identity.application.change_password import ChangePasswordCommand
 from app.modules.identity.application.create_user import CreateUserCommand
@@ -294,7 +295,9 @@ async def test_change_password_ends_other_sessions_and_rotates_the_current(
     current = await cases.current_user.handle(
         GetCurrentUserQuery(token=result.token), ANONYMOUS_ACTOR
     )
-    assert current is user
+    assert current is not None
+    assert current.user is user
+    assert current.session_id == result.session_id
     again = await cases.sign_in.handle(
         SignInCommand(username="alice", password="a-much-better-one"), ANONYMOUS_ACTOR
     )
@@ -332,3 +335,33 @@ async def test_change_password_for_a_vanished_user_is_not_found(cases: Cases) ->
             ),
             Actor(id=uuid.uuid7(), roles=frozenset({"member"})),
         )
+
+
+@time_machine.travel(NOW, tick=False)
+async def test_ending_sessions_logs_a_count_and_no_token(
+    cases: Cases, world: World, make_user: MakeUser, admin_actor: Actor
+) -> None:
+    """Reset, change and disable report how many sessions went, never a token."""
+    user = make_user("alice")
+    await world.users.add(user)
+    spare = make_user("carol")
+    await world.users.add(spare)
+    tokens = []
+    for _ in range(2):
+        signed_in = await cases.sign_in.handle(
+            SignInCommand(username="alice", password="password-123"), ANONYMOUS_ACTOR
+        )
+        tokens.append(signed_in.token)
+
+    with capture_logs() as logs:
+        await cases.reset_password.handle(
+            ResetPasswordCommand(user_id=user.id, password="brand-new-pass"),
+            admin_actor,
+        )
+        await cases.update_user.handle(
+            UpdateUserCommand(user_id=spare.id, disabled=True), admin_actor
+        )
+
+    ended = [log for log in logs if log["event"] == "sessions ended"]
+    assert [(log["user_id"], log["count"]) for log in ended] == [(user.id, 2)]
+    assert not any(token in str(logs) for token in tokens)

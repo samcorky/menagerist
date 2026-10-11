@@ -1,10 +1,12 @@
 from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
+from starlette.requests import Request
 
 from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
 from app.modules.identity.adapters.api.dependencies import (
+    bind_session_context,
     get_get_current_user_use_case,
     get_get_setup_status_use_case,
     get_session_token,
@@ -33,6 +35,7 @@ _access_policy = OwnerAccessPolicy()
 
 
 async def get_current_actor(
+    request: Request,
     token: Annotated[str | None, Depends(get_session_token)],
     current_user: Annotated[GetCurrentUser, Depends(get_get_current_user_use_case)],
     setup_status: Annotated[GetSetupStatus, Depends(get_get_setup_status_use_case)],
@@ -44,17 +47,19 @@ async def get_current_actor(
         SessionRequiredError: If there is no live session for an enabled user.
         PasswordExpiredError: If the account's password has expired.
     """
-    user = (
+    resolved = (
         None
         if token is None
         else await current_user.handle(
             GetCurrentUserQuery(token=token), ANONYMOUS_ACTOR
         )
     )
-    if user is None:
+    if resolved is None:
         if await setup_status.handle(GetSetupStatusQuery(), ANONYMOUS_ACTOR):
             raise SetupRequiredError("Create the first account to continue.")
         raise SessionRequiredError("Sign in to continue.")
+    bind_session_context(request, resolved)
+    user = resolved.user
     if user.password_expired:
         raise PasswordExpiredError("Change your password to continue.")
     return Actor(id=user.id, roles=frozenset({user.role.value}))

@@ -26,10 +26,17 @@ async function signInThroughForm(page: Page, username: string, password: string)
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
-async function signOut(page: Page, name: string) {
-	await accountMenu(page, name).click();
+/** The page goes to /login at once; the server's answer follows, so wait for it too. */
+async function clickSignOut(page: Page) {
+	const answered = page.waitForResponse((r) => r.url().endsWith('/api/v1/auth/logout'));
 	await page.getByRole('menuitem', { name: 'Sign out' }).click();
 	await expect(page).toHaveURL(/\/login/);
+	expect((await answered).status()).toBe(204);
+}
+
+async function signOut(page: Page, name: string) {
+	await accountMenu(page, name).click();
+	await clickSignOut(page);
 }
 
 /** Opens /login and, if a session from an earlier test is still active, signs out of it. */
@@ -39,8 +46,7 @@ async function startSignedOut(page: Page) {
 	await expect(menu.or(page.getByLabel('Username'))).toBeVisible();
 	if (await menu.isVisible()) {
 		await menu.click();
-		await page.getByRole('menuitem', { name: 'Sign out' }).click();
-		await expect(page).toHaveURL(/\/login/);
+		await clickSignOut(page);
 	}
 }
 

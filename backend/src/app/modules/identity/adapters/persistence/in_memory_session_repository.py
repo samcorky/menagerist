@@ -31,11 +31,12 @@ class InMemorySessionRepository:
         """Remove one session; unknown ids are ignored."""
         self._sessions.pop(session_id, None)
 
-    async def delete_for_user(self, user_id: uuid.UUID) -> None:
-        """Remove every session belonging to `user_id`."""
-        self._sessions = {
-            i: s for i, s in self._sessions.items() if s.user_id != user_id
-        }
+    async def delete_for_user(self, user_id: uuid.UUID) -> int:
+        """Remove every session belonging to `user_id`, returning how many went."""
+        kept = {i: s for i, s in self._sessions.items() if s.user_id != user_id}
+        ended = len(self._sessions) - len(kept)
+        self._sessions = kept
+        return ended
 
     async def delete_expired(self, now: datetime) -> int:
         """Remove sessions expired at `now`, returning how many went."""

@@ -79,8 +79,11 @@ class ChangePassword(
                 await asyncio.to_thread(self._hasher.hash, command.new_password)
             )
             await repos.users.save(user)
-            await repos.sessions.delete_for_user(user.id)
-            token = await start_session(repos, self._tokens, user, self._ttl)
+            ended = await repos.sessions.delete_for_user(user.id)
+            started = await start_session(repos, self._tokens, user, self._ttl)
             await self._uow.commit()
-        logger.info("password changed", user_id=user.id)
-        return SignedInResult(user=user, token=token)
+        logger.info("sessions ended", user_id=user.id, count=ended)
+        logger.info("password changed", user_id=user.id, session_id=started.session_id)
+        return SignedInResult(
+            user=user, token=started.token, session_id=started.session_id
+        )
