@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.examples.application.install_example_pack import (
     InstallExamplePack,
     InstallExamplePackCommand,
@@ -21,7 +22,7 @@ from app.modules.examples.domain.pack import PackCollection
 from app.modules.examples.domain.removal import KEEP_EDITED
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.node_type import NodeType
-from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.access_scope import AccessScope
 
 if TYPE_CHECKING:
     from app.modules.graph.domain.node import Node
@@ -31,32 +32,38 @@ if TYPE_CHECKING:
 async def _install(world: World) -> InstallResult:
     return await InstallExamplePack(
         world.uow,
+        OwnerAccessPolicy(),
         world.catalogue,
         world.presets,
         world.graph,
         world.collections,
         world.covers,
-    ).handle(InstallExamplePackCommand(pack_id="demo"), SYSTEM_ACTOR)
+    ).handle(InstallExamplePackCommand(pack_id="demo"), world.actor)
 
 
 async def _uninstall(world: World) -> UninstallResult:
     return await UninstallExamplePack(
         world.uow,
+        OwnerAccessPolicy(),
         world.catalogue,
         world.presets,
         world.graph,
         world.collections,
         world.covers,
-    ).handle(UninstallExamplePackCommand(pack_id="demo"), SYSTEM_ACTOR)
+    ).handle(UninstallExamplePackCommand(pack_id="demo"), world.actor)
 
 
 async def _node(world: World, name: str) -> Node:
-    nodes = await world.graph_repos.nodes.list(after=None, limit=10)
+    nodes = await world.graph_repos.nodes.list(
+        scope=AccessScope.everyone(), after=None, limit=10
+    )
     return next(n for n in nodes if n.name == name)
 
 
 async def _names(world: World) -> list[str]:
-    nodes = await world.graph_repos.nodes.list(after=None, limit=10)
+    nodes = await world.graph_repos.nodes.list(
+        scope=AccessScope.everyone(), after=None, limit=10
+    )
     return sorted(n.name for n in nodes)
 
 
@@ -107,7 +114,9 @@ async def test_adopted_entities_are_recorded_as_owned_by_the_new_install(
 
     await _install(world)
 
-    installation = await world.installations.get_active_for_pack("demo")
+    installation = await world.installations.get_active_for_pack(
+        "demo", scope=AccessScope.everyone()
+    )
     assert installation is not None
     assert blue_id in {r.entity_id for r in installation.owned(EntityKind.ITEM)}
     assert len(installation.owned()) == 6  # preset 0, blue and the type adopted
@@ -190,7 +199,12 @@ async def test_a_clash_with_something_that_is_not_a_kept_example_still_conflicts
     with pytest.raises(SlugClashError, match="demo-person"):
         await _install(world)
 
-    assert await world.installations.get_active_for_pack("demo") is None
+    assert (
+        await world.installations.get_active_for_pack(
+            "demo", scope=AccessScope.everyone()
+        )
+        is None
+    )
 
 
 async def test_a_relationship_type_clash_still_conflicts(
@@ -222,14 +236,23 @@ async def test_a_failed_install_keeps_the_edited_things_it_adopted(
 
     assert await _names(world) == ["Mine now"]
     assert "demo-record" in await _slugs(world)
-    assert await world.installations.get_active_for_pack("demo") is None
+    assert (
+        await world.installations.get_active_for_pack(
+            "demo", scope=AccessScope.everyone()
+        )
+        is None
+    )
 
 
 async def _connection_kept_world(make_world: MakeWorld) -> World:
     """Install, edit the connection, remove: everything is kept."""
     world = make_world()
     await _install(world)
-    edge = (await world.graph_repos.edges.list(after=None, limit=10))[0]
+    edge = (
+        await world.graph_repos.edges.list(
+            after=None, limit=10, scope=AccessScope.everyone()
+        )
+    )[0]
     edge.attributes = {"note": "mine"}
     await world.graph_repos.edges.save(edge)
     kept = await _uninstall(world)
@@ -248,7 +271,14 @@ async def test_connections_are_adopted_when_they_still_join_the_same_items(
     assert (result.adopted.connections, result.adopted.items) == (1, 2)
     assert (result.adopted.item_types, result.adopted.relationship_types) == (2, 1)
     assert result.created.connections == 0
-    assert len(await world.graph_repos.edges.list(after=None, limit=10)) == 1
+    assert (
+        len(
+            await world.graph_repos.edges.list(
+                after=None, limit=10, scope=AccessScope.everyone()
+            )
+        )
+        == 1
+    )
 
 
 async def test_a_connection_to_a_replaced_item_is_created_fresh(

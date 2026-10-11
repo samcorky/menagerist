@@ -6,7 +6,7 @@ import structlog
 
 from app.modules.graph.domain.errors import EdgeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.cqrs import QueryHandler
+from app.shared_kernel.cqrs import ScopedQueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -25,7 +25,7 @@ class CountEdgeTypeAttributeUsageQuery:
 
 
 class CountEdgeTypeAttributeUsage(
-    QueryHandler[GraphRepos, CountEdgeTypeAttributeUsageQuery, int]
+    ScopedQueryHandler[GraphRepos, CountEdgeTypeAttributeUsageQuery, int]
 ):
     """Count the edges of a edge type whose attributes contain a key."""
 
@@ -39,6 +39,7 @@ class CountEdgeTypeAttributeUsage(
         count = await self._repos.edges.count_with_attribute(
             str(edge_type.slug),
             query.key,
+            scope=self._policy.scope_for(actor),
             sub_key=query.sub_key,
             value=query.value,
         )

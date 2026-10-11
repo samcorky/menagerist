@@ -4,6 +4,7 @@ import uuid
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
     InMemoryMediaAssetRepository,
 )
@@ -18,7 +19,10 @@ from app.modules.media.adapters.storage.in_memory_media_storage import (
     InMemoryMediaStorage,
 )
 from app.modules.media.application.detach_media import DetachMedia, DetachMediaCommand
-from app.modules.media.domain.errors import MediaAttachmentNotFoundError
+from app.modules.media.domain.errors import (
+    MediaAssetNotFoundError,
+    MediaAttachmentNotFoundError,
+)
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
 from app.modules.media.domain.media_attachment import AttachmentTarget, MediaAttachment
 from app.shared_kernel.actor import SYSTEM_ACTOR
@@ -26,7 +30,11 @@ from app.shared_kernel.actor import SYSTEM_ACTOR
 
 def _make_attached_asset() -> MediaAsset:
     asset = MediaAsset.create(
-        filename="f.jpg", content_type="image/jpeg", size=1, sha256="x"
+        owner_id=SYSTEM_ACTOR.id,
+        filename="f.jpg",
+        content_type="image/jpeg",
+        size=1,
+        sha256="x",
     )
     asset.promote()
     return asset
@@ -39,11 +47,11 @@ def _make_use_case() -> tuple[
     InMemoryMediaStorage,
 ]:
     assets = InMemoryMediaAssetRepository()
-    attachments = InMemoryMediaAttachmentRepository()
+    attachments = InMemoryMediaAttachmentRepository(assets)
     storage = InMemoryMediaStorage()
     repos = make_in_memory_repos(assets=assets, attachments=attachments)
     uow = create_in_memory_media_uow(repos)
-    return DetachMedia(uow, storage), assets, attachments, storage
+    return DetachMedia(uow, OwnerAccessPolicy(), storage), assets, attachments, storage
 
 
 async def test_detach_removes_attachment_and_orphans_asset() -> None:
@@ -99,35 +107,37 @@ async def test_detach_does_not_orphan_when_other_attachments_remain() -> None:
     assert asset.status is MediaStatus.ATTACHED
 
 
-async def test_detach_skips_orphan_when_asset_missing() -> None:
-    """Detach completes without error when the asset row has already been deleted."""
+async def test_detach_raises_when_asset_missing() -> None:
+    """Detach is a 404 when the asset row is absent or not visible."""
     use_case, _, attachments, _ = _make_use_case()
-
     node_id = uuid.uuid4()
     asset_id = uuid.uuid4()
     attachment = MediaAttachment.for_node(asset_id=asset_id, node_id=node_id)
     await attachments.add(attachment)
 
-    await use_case.handle(
-        DetachMediaCommand(
-            asset_id=asset_id,
-            target_type=AttachmentTarget.NODE,
-            target_id=node_id,
-        ),
-        SYSTEM_ACTOR,
-    )
+    with pytest.raises(MediaAssetNotFoundError):
+        await use_case.handle(
+            DetachMediaCommand(
+                asset_id=asset_id,
+                target_type=AttachmentTarget.NODE,
+                target_id=node_id,
+            ),
+            SYSTEM_ACTOR,
+        )
 
-    assert attachment.id not in attachments._store
+    assert attachment.id in attachments._store
 
 
 async def test_detach_raises_when_attachment_not_found() -> None:
     """DetachMedia raises MediaAttachmentNotFoundError when the attachment is absent."""
-    use_case, _, _, _ = _make_use_case()
+    use_case, assets, _, _ = _make_use_case()
+    asset = _make_attached_asset()
+    await assets.add(asset)
 
     with pytest.raises(MediaAttachmentNotFoundError):
         await use_case.handle(
             DetachMediaCommand(
-                asset_id=uuid.uuid4(),
+                asset_id=asset.id,
                 target_type=AttachmentTarget.NODE,
                 target_id=uuid.uuid4(),
             ),

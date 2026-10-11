@@ -11,7 +11,7 @@ from app.modules.media.domain.errors import (
 )
 from app.modules.media.domain.media_attachment import AttachmentTarget, MediaAttachment
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.cqrs import ScopedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -29,7 +29,7 @@ class SetMediaCoverCommand:
 
 
 class SetMediaCover(
-    CommandHandler[MediaUnitOfWork, SetMediaCoverCommand, MediaAttachment]
+    ScopedCommandHandler[MediaUnitOfWork, SetMediaCoverCommand, MediaAttachment]
 ):
     """Atomically move the cover flag to a different attachment of the same target.
 
@@ -44,10 +44,12 @@ class SetMediaCover(
     ) -> MediaAttachment:
         """Set `asset_id`'s attachment as cover, clearing any previous cover."""
         async with self._uow as repos:
-            asset = await repos.assets.get(command.asset_id)
+            scope = self._policy.scope_for(actor)
+            asset = await repos.assets.get(command.asset_id, scope=scope)
             if asset is None:
                 msg = f"Media asset {command.asset_id} not found"
                 raise MediaAssetNotFoundError(msg)
+            self._policy.assert_can_modify(actor, asset.owner_id)
             if not asset.content_type.startswith("image/"):
                 raise UnsupportedMediaTypeError(
                     f"{asset.content_type!r} cannot be used as a cover"
@@ -56,7 +58,7 @@ class SetMediaCover(
             # Serialise per target: a concurrent call waits, then sees our result.
             await repos.attachments.lock_target(command.target_type, command.target_id)
             candidates = await repos.attachments.list_for_target(
-                command.target_type, command.target_id
+                command.target_type, command.target_id, scope=scope
             )
 
             target_attachment: MediaAttachment | None = None

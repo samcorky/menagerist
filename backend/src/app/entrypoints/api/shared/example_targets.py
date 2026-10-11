@@ -10,8 +10,12 @@ from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import Depends
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
+from app.entrypoints.api.shared.attach_target_access import GraphAttachTargetAccess
+from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
 from app.entrypoints.api.shared.choice_list_source import PresetChoiceListSource
 from app.entrypoints.api.shared.collection_items import GraphItemLookup
+from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.entrypoints.api.shared.preset_usage import GraphPresetUsage
 from app.modules.collections.adapters.persistence.in_memory_collection_repository import (  # noqa: E501
     InMemoryCollectionRepository,
@@ -121,6 +125,7 @@ from app.modules.media.application.upload_and_attach_media import (
 )
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
+from app.modules.media.ports.attach_target_access import AttachTargetAccess
 from app.modules.media.ports.attachment_policy import (
     AttachmentPolicyPort,  # noqa: TC001
 )
@@ -150,7 +155,8 @@ from app.modules.presets.domain.preset import Preset  # noqa: TC001
 from app.modules.presets.ports.preset_usage import PresetUsage
 from app.modules.presets.ports.unit_of_work import PresetRepos, PresetUnitOfWork
 from app.platform.database import get_session_factory
-from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
@@ -161,6 +167,7 @@ if TYPE_CHECKING:
     from app.modules.examples.ports.cover_renderer import CoverRenderer
 
 _PAGE = 1
+_POLICY = OwnerAccessPolicy()
 _GRAPH_KINDS = frozenset(
     {
         EntityKind.ITEM,
@@ -209,13 +216,15 @@ class CoverStores:
 
     uow: Callable[[], MediaUnitOfWork]
     read: Callable[[], AbstractAsyncContextManager[MediaRepos]]
+    targets: Callable[[], AbstractAsyncContextManager[AttachTargetAccess]]
 
 
 def build_in_memory_collections_repos() -> CollectionsRepos:
     """Return empty in-memory collections repositories, for tests."""
+    collections = InMemoryCollectionRepository()
     return CollectionsRepos(
-        collections=InMemoryCollectionRepository(),
-        memberships=InMemoryMembershipRepository(),
+        collections=collections,
+        memberships=InMemoryMembershipRepository(collections),
     )
 
 
@@ -291,14 +300,24 @@ def in_memory_collection_stores(
     )
 
 
-def in_memory_cover_stores(media_repos: MediaRepos) -> CoverStores:
+def in_memory_cover_stores(
+    media_repos: MediaRepos, graph_repos: GraphRepos
+) -> CoverStores:
     """Stores over in-memory repositories, for tests."""
 
     @asynccontextmanager
     async def read() -> AsyncIterator[MediaRepos]:
         yield media_repos
 
-    return CoverStores(uow=lambda: create_in_memory_media_uow(media_repos), read=read)
+    @asynccontextmanager
+    async def targets() -> AsyncIterator[AttachTargetAccess]:
+        yield GraphAttachTargetAccess(graph_repos)
+
+    return CoverStores(
+        uow=lambda: create_in_memory_media_uow(media_repos),
+        read=read,
+        targets=targets,
+    )
 
 
 def build_preset_stores(
@@ -387,7 +406,14 @@ def build_cover_stores(
         async with session_factory() as session:
             yield build_media_repos(session)
 
-    return CoverStores(uow=lambda: create_media_uow(session_factory), read=read)
+    @asynccontextmanager
+    async def targets() -> AsyncIterator[AttachTargetAccess]:
+        async with session_factory() as session:
+            yield GraphAttachTargetAccess(build_graph_repos(session))
+
+    return CoverStores(
+        uow=lambda: create_media_uow(session_factory), read=read, targets=targets
+    )
 
 
 # ---- content: what the pack defines, read back from what was stored ----
@@ -487,7 +513,10 @@ def _resolved(
 
 
 class PresetPackTarget:
-    """Implements `PresetTarget` with the presets use cases."""
+    """Implements `PresetTarget` with the presets use cases.
+
+    Presets are shared structure with no owner, so they run as the system actor.
+    """
 
     def __init__(self, stores: PresetStores) -> None:
         self._stores = stores
@@ -548,10 +577,17 @@ class PresetPackTarget:
 
 
 class GraphPackTarget:
-    """Implements `GraphTarget` with the graph use cases."""
+    """Implements `GraphTarget` with the graph use cases, run as `actor`.
 
-    def __init__(self, stores: GraphStores) -> None:
+    Items and connections are the actor's own. Types are shared structure, created
+    by any member; removing one is administrator-only, so that (after the in-use
+    check) runs as the system actor.
+    """
+
+    def __init__(self, stores: GraphStores, actor: Actor) -> None:
         self._stores = stores
+        self._actor = actor
+        self._scope = _POLICY.scope_for(actor)
 
     async def slug_taken(self, kind: EntityKind, slug: str) -> bool:
         """Whether a live type of `kind` already has `slug`."""
@@ -575,7 +611,7 @@ class GraphPackTarget:
         )
         async with self._stores.choice_lists() as source:
             edge_type = await CreateEdgeType(self._stores.uow(), source).handle(
-                command, SYSTEM_ACTOR
+                command, self._actor
             )
         return Created(entity_id=edge_type.id, content=_edge_type_content(edge_type))
 
@@ -591,7 +627,7 @@ class GraphPackTarget:
         )
         async with self._stores.choice_lists() as source:
             node_type = await CreateNodeType(self._stores.uow(), source).handle(
-                command, SYSTEM_ACTOR
+                command, self._actor
             )
         return Created(entity_id=node_type.id, content=_node_type_content(node_type))
 
@@ -606,8 +642,8 @@ class GraphPackTarget:
             extra_schema=spec.extra_schema,
         )
         async with self._stores.choice_lists() as source:
-            node = await CreateNode(self._stores.uow(), source).handle(
-                command, SYSTEM_ACTOR
+            node = await CreateNode(self._stores.uow(), _POLICY, source).handle(
+                command, self._actor
             )
         return Created(entity_id=node.id, content=_node_content(node))
 
@@ -627,8 +663,8 @@ class GraphPackTarget:
             attributes=spec.attributes,
         )
         async with self._stores.choice_lists() as source:
-            edge = await CreateEdge(self._stores.uow(), source).handle(
-                command, SYSTEM_ACTOR
+            edge = await CreateEdge(self._stores.uow(), _POLICY, source).handle(
+                command, self._actor
             )
         return Created(entity_id=edge.id, content=_edge_content(edge))
 
@@ -644,20 +680,22 @@ class GraphPackTarget:
             if kind is EntityKind.RELATIONSHIP_TYPE:
                 return await self._inspect_relationship_type(repos, entity_id)
             if kind is EntityKind.CONNECTION:
-                edge = await repos.edges.get(entity_id)
+                edge = await repos.edges.get(entity_id, scope=self._scope)
                 return None if edge is None else Inspection(content=_edge_content(edge))
         raise ValueError(f"The graph target does not handle {kind.value} entities")
 
     async def _inspect_item(
         self, repos: GraphRepos, entity_id: uuid.UUID
     ) -> Inspection | None:
-        node = await repos.nodes.get(entity_id)
+        node = await repos.nodes.get(entity_id, scope=self._scope)
         if node is None:
             return None
-        touched = await repos.edges.list_for_node(node.id, after=None, limit=_PAGE)
+        touched = await repos.edges.list_for_node(
+            node.id, scope=self._scope, after=None, limit=_PAGE
+        )
         async with self._stores.media() as media:
             files = await media.attachments.list_for_target(
-                AttachmentTarget.NODE, node.id
+                AttachmentTarget.NODE, node.id, scope=self._scope
             )
         in_collection = await self._on_live_collection(node.id)
         return Inspection(
@@ -668,8 +706,10 @@ class GraphPackTarget:
     async def _on_live_collection(self, item_id: uuid.UUID) -> bool:
         """Whether any live collection holds the item."""
         async with self._stores.collections() as repos:
-            for collection_id in await repos.memberships.collection_ids_for(item_id):
-                if await repos.collections.get(collection_id) is not None:
+            for collection_id in await repos.memberships.collection_ids_for(
+                item_id, scope=self._scope
+            ):
+                if await repos.collections.get(collection_id, scope=self._scope):
                     return True
         return False
 
@@ -681,7 +721,11 @@ class GraphPackTarget:
         if node_type is None:
             return None
         items = await repos.nodes.list(
-            after=None, limit=_PAGE, type=str(node_type.slug)
+            # all-users check: shared structure
+            scope=AccessScope.everyone(),
+            after=None,
+            limit=_PAGE,
+            type=str(node_type.slug),
         )
         return Inspection(
             content=_node_type_content(node_type), still_in_use=bool(items)
@@ -694,7 +738,10 @@ class GraphPackTarget:
         edge_type = await repos.edge_types.get(entity_id)
         if edge_type is None:
             return None
-        in_use = await repos.edges.has_edges_of_type(str(edge_type.slug))
+        # all-users check: shared structure
+        in_use = await repos.edges.has_edges_of_type(
+            str(edge_type.slug), scope=AccessScope.everyone()
+        )
         return Inspection(content=_edge_type_content(edge_type), still_in_use=in_use)
 
     async def remove(self, kind: EntityKind, entity_id: uuid.UUID) -> RemoveResult:
@@ -704,20 +751,20 @@ class GraphPackTarget:
         uow = self._stores.uow()
         try:
             if kind is EntityKind.ITEM:
-                await DeleteNode(uow).handle(
-                    DeleteNodeCommand(node_id=entity_id), SYSTEM_ACTOR
+                await DeleteNode(uow, _POLICY).handle(
+                    DeleteNodeCommand(node_id=entity_id), self._actor
                 )
             elif kind is EntityKind.ITEM_TYPE:
-                await DeleteNodeType(uow).handle(
+                await DeleteNodeType(uow, RoleAuthorizationAdapter()).handle(
                     DeleteNodeTypeCommand(node_type_id=entity_id), SYSTEM_ACTOR
                 )
             elif kind is EntityKind.RELATIONSHIP_TYPE:
-                await DeleteEdgeType(uow).handle(
+                await DeleteEdgeType(uow, RoleAuthorizationAdapter()).handle(
                     DeleteEdgeTypeCommand(edge_type_id=entity_id), SYSTEM_ACTOR
                 )
             else:
-                await DeleteEdge(uow).handle(
-                    DeleteEdgeCommand(edge_id=entity_id), SYSTEM_ACTOR
+                await DeleteEdge(uow, _POLICY).handle(
+                    DeleteEdgeCommand(edge_id=entity_id), self._actor
                 )
         except (
             NodeNotFoundError,
@@ -732,26 +779,28 @@ class GraphPackTarget:
 
 
 class CollectionPackTarget:
-    """Implements `CollectionTarget` with the collections use cases."""
+    """Implements `CollectionTarget` with the collections use cases, run as `actor`."""
 
-    def __init__(self, stores: CollectionStores) -> None:
+    def __init__(self, stores: CollectionStores, actor: Actor) -> None:
         self._stores = stores
+        self._actor = actor
+        self._scope = _POLICY.scope_for(actor)
 
     async def create_collection(
         self, spec: PackCollection, *, item_ids: Sequence[uuid.UUID]
     ) -> Created:
         """Create the collection, put the items on it and return what was stored."""
-        collection = await CreateCollection(self._stores.uow()).handle(
+        collection = await CreateCollection(self._stores.uow(), _POLICY).handle(
             CreateCollectionCommand(name=spec.name, description=spec.description),
-            SYSTEM_ACTOR,
+            self._actor,
         )
         try:
             async with self._stores.items() as items:
-                await AddItemsToCollection(self._stores.uow(), items).handle(
+                await AddItemsToCollection(self._stores.uow(), _POLICY, items).handle(
                     AddItemsToCollectionCommand(
                         collection_id=collection.id, item_ids=list(item_ids)
                     ),
-                    SYSTEM_ACTOR,
+                    self._actor,
                 )
             inspection = await self.inspect(collection.id)
         except Exception:
@@ -769,11 +818,11 @@ class CollectionPackTarget:
         collection page shows them, so a deleted item reads as a membership change.
         """
         async with self._stores.read() as repos, self._stores.items() as items:
-            collection = await repos.collections.get(collection_id)
+            collection = await repos.collections.get(collection_id, scope=self._scope)
             if collection is None:
                 return None
-            stored = await repos.memberships.item_ids(collection_id)
-            live = await items.live_ids(list(stored))
+            stored = await repos.memberships.item_ids(collection_id, scope=self._scope)
+            live = await items.live_ids(list(stored), self._scope)
         return Inspection(
             content=_collection_content(
                 collection.name, collection.description, list(live)
@@ -783,8 +832,8 @@ class CollectionPackTarget:
     async def remove(self, collection_id: uuid.UUID) -> RemoveResult:
         """Soft-delete the collection through its delete use case."""
         try:
-            await DeleteCollection(self._stores.uow()).handle(
-                DeleteCollectionCommand(collection_id=collection_id), SYSTEM_ACTOR
+            await DeleteCollection(self._stores.uow(), _POLICY).handle(
+                DeleteCollectionCommand(collection_id=collection_id), self._actor
             )
         except CollectionNotFoundError:
             return RemoveResult.ALREADY_GONE
@@ -792,7 +841,7 @@ class CollectionPackTarget:
 
 
 class CoverPackTarget:
-    """Implements `CoverTarget` with the media use cases.
+    """Implements `CoverTarget` with the media use cases, run as `actor`.
 
     The cover's id is its attachment's id. Its content hash covers the stored
     asset's checksum only while the attachment is still the item's cover, so an
@@ -802,6 +851,7 @@ class CoverPackTarget:
     def __init__(
         self,
         stores: CoverStores,
+        actor: Actor,
         *,
         renderer: CoverRenderer,
         storage: MediaStoragePort,
@@ -809,6 +859,8 @@ class CoverPackTarget:
         image_processor: ImageProcessorPort,
     ) -> None:
         self._stores = stores
+        self._actor = actor
+        self._scope = _POLICY.scope_for(actor)
         self._renderer = renderer
         self._storage = storage
         self._policy = policy
@@ -817,27 +869,33 @@ class CoverPackTarget:
     async def create(self, item_id: uuid.UUID, name: str, style: str) -> Created:
         """Draw the cover, attach it to the item and set it as the item's cover."""
         png = self._renderer.render(name, style)
-        attachment = await UploadAndAttachMedia(
-            self._stores.uow(), self._storage, self._policy, self._image_processor
-        ).handle(
-            UploadAndAttachMediaCommand(
-                filename=_cover_filename(name, style),
-                content_type="image/png",
-                sniffed_content_type="image/png",
-                stream=_single_chunk(png),
-                target_type=AttachmentTarget.NODE,
-                target_id=item_id,
-            ),
-            SYSTEM_ACTOR,
-        )
+        async with self._stores.targets() as targets:
+            attachment = await UploadAndAttachMedia(
+                self._stores.uow(),
+                _POLICY,
+                self._storage,
+                self._policy,
+                self._image_processor,
+                targets,
+            ).handle(
+                UploadAndAttachMediaCommand(
+                    filename=_cover_filename(name, style),
+                    content_type="image/png",
+                    sniffed_content_type="image/png",
+                    stream=_single_chunk(png),
+                    target_type=AttachmentTarget.NODE,
+                    target_id=item_id,
+                ),
+                self._actor,
+            )
         try:
-            await SetMediaCover(self._stores.uow()).handle(
+            await SetMediaCover(self._stores.uow(), _POLICY).handle(
                 SetMediaCoverCommand(
                     asset_id=attachment.asset_id,
                     target_type=AttachmentTarget.NODE,
                     target_id=item_id,
                 ),
-                SYSTEM_ACTOR,
+                self._actor,
             )
         except Exception:
             # Not yet recorded by the install, so it would be orphaned.
@@ -852,17 +910,17 @@ class CoverPackTarget:
         """Whether any image is flagged as the item's cover."""
         async with self._stores.read() as repos:
             attached = await repos.attachments.list_for_target(
-                AttachmentTarget.NODE, item_id
+                AttachmentTarget.NODE, item_id, scope=self._scope
             )
         return any(a.attribute_key is AttachmentKey.COVER for a in attached)
 
     async def inspect(self, cover_id: uuid.UUID) -> Inspection | None:
         """Return the cover as it is now, or `None` if it is gone."""
         async with self._stores.read() as repos:
-            attachment = await repos.attachments.get(cover_id)
+            attachment = await repos.attachments.get(cover_id, scope=self._scope)
             if attachment is None:
                 return None
-            asset = await repos.assets.get(attachment.asset_id)
+            asset = await repos.assets.get(attachment.asset_id, scope=self._scope)
         if asset is None:
             return None
         parsed = _COVER_FILENAME.fullmatch(asset.filename)
@@ -878,24 +936,24 @@ class CoverPackTarget:
     async def remove(self, cover_id: uuid.UUID) -> RemoveResult:
         """Detach the cover, then delete its asset, file and thumbnail."""
         async with self._stores.read() as repos:
-            attachment = await repos.attachments.get(cover_id)
+            attachment = await repos.attachments.get(cover_id, scope=self._scope)
         if attachment is None:
             return RemoveResult.ALREADY_GONE
-        await DetachMedia(self._stores.uow(), self._storage).handle(
+        await DetachMedia(self._stores.uow(), _POLICY, self._storage).handle(
             DetachMediaCommand(
                 asset_id=attachment.asset_id,
                 target_type=attachment.target_type,
                 target_id=attachment.target_id,
                 attribute_key=attachment.attribute_key,
             ),
-            SYSTEM_ACTOR,
+            self._actor,
         )
         async with self._stores.read() as repos:
-            asset = await repos.assets.get(attachment.asset_id)
+            asset = await repos.assets.get(attachment.asset_id, scope=self._scope)
         # Detaching orphans the asset only when nothing else uses it.
         if asset is not None and asset.status is MediaStatus.ORPHANED:
-            await DeleteMedia(self._stores.uow(), self._storage).handle(
-                DeleteMediaCommand(asset_id=asset.id), SYSTEM_ACTOR
+            await DeleteMedia(self._stores.uow(), _POLICY, self._storage).handle(
+                DeleteMediaCommand(asset_id=asset.id), self._actor
             )
         return RemoveResult.REMOVED
 
@@ -916,18 +974,20 @@ def get_graph_pack_target(
     session_factory: Annotated[
         async_sessionmaker[AsyncSession], Depends(get_session_factory)
     ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> GraphPackTarget:
-    """Return the graph target over Postgres."""
-    return GraphPackTarget(build_graph_stores(session_factory))
+    """Return the graph target over Postgres, acting as the signed-in person."""
+    return GraphPackTarget(build_graph_stores(session_factory), actor)
 
 
 def get_collection_pack_target(
     session_factory: Annotated[
         async_sessionmaker[AsyncSession], Depends(get_session_factory)
     ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> CollectionPackTarget:
-    """Return the collection target over Postgres."""
-    return CollectionPackTarget(build_collection_stores(session_factory))
+    """Return the collection target over Postgres, acting as the signed-in person."""
+    return CollectionPackTarget(build_collection_stores(session_factory), actor)
 
 
 def get_cover_pack_target(
@@ -937,10 +997,12 @@ def get_cover_pack_target(
     storage: Annotated[MediaStoragePort, Depends(get_media_storage)],
     policy: Annotated[AttachmentPolicyPort, Depends(get_attachment_policy)],
     image_processor: Annotated[ImageProcessorPort, Depends(get_image_processor)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> CoverPackTarget:
-    """Return the cover target over Postgres and the configured media storage."""
+    """Return the cover target over Postgres, acting as the signed-in person."""
     return CoverPackTarget(
         build_cover_stores(session_factory),
+        actor,
         renderer=PillowCoverRenderer(),
         storage=storage,
         policy=policy,

@@ -11,6 +11,17 @@ class Identifiable:
 
 
 @dataclass(kw_only=True, eq=False)
+class Owned:
+    """An entity owned by one user.
+
+    `None` only occurs on legacy rows that predate the first-admin claim;
+    factories still require a real UUID.
+    """
+
+    owner_id: uuid.UUID | None
+
+
+@dataclass(kw_only=True, eq=False)
 class Timestamped:
     """An entity that tracks its own creation and last-modified times."""
 

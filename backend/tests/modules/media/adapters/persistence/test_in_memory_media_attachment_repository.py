@@ -2,6 +2,9 @@ import uuid
 
 import pytest
 
+from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
+    InMemoryMediaAssetRepository,
+)
 from app.modules.media.adapters.persistence.in_memory_media_attachment_repository import (  # noqa: E501
     InMemoryMediaAttachmentRepository,
 )
@@ -17,7 +20,7 @@ def _cover(node_id: uuid.UUID) -> MediaAttachment:
 
 async def test_add_rejects_a_second_cover_for_one_target() -> None:
     """The in-memory repository mirrors the one-cover-per-target constraint."""
-    repo = InMemoryMediaAttachmentRepository()
+    repo = InMemoryMediaAttachmentRepository(InMemoryMediaAssetRepository())
     node_id = uuid.uuid4()
     await repo.add(_cover(node_id))
 
@@ -27,7 +30,7 @@ async def test_add_rejects_a_second_cover_for_one_target() -> None:
 
 async def test_add_allows_covers_on_different_targets_and_plain_extras() -> None:
     """Other targets and key-less attachments are unaffected."""
-    repo = InMemoryMediaAttachmentRepository()
+    repo = InMemoryMediaAttachmentRepository(InMemoryMediaAssetRepository())
     node_id = uuid.uuid4()
     await repo.add(_cover(node_id))
     await repo.add(_cover(uuid.uuid4()))

@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.imaging.in_memory_image_processor import (
     InMemoryImageProcessor,
 )
@@ -42,6 +43,7 @@ from app.modules.media.domain.media_attachment import (
     AttachmentTarget,
     MediaAttachment,
 )
+from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -55,6 +57,13 @@ if TYPE_CHECKING:
 async def _stream(*chunks: bytes) -> AsyncIterator[bytes]:
     for chunk in chunks:
         yield chunk
+
+
+class _AllowAllTargets:
+    async def can_attach(
+        self, target_type: AttachmentTarget, target_id: uuid.UUID, scope: AccessScope
+    ) -> bool:
+        return True
 
 
 class _AllowAllPolicy:
@@ -74,7 +83,7 @@ def _make_uow_and_repos() -> tuple[
     InMemoryMediaStorage,
 ]:
     assets = InMemoryMediaAssetRepository()
-    attachments = InMemoryMediaAttachmentRepository()
+    attachments = InMemoryMediaAttachmentRepository(assets)
     storage = InMemoryMediaStorage()
     repos = make_in_memory_repos(assets=assets, attachments=attachments)
     uow = create_in_memory_media_uow(repos)
@@ -90,9 +99,11 @@ async def test_upload_and_attach_stores_file_and_persists_records() -> None:
     uow, assets, _, storage = _make_uow_and_repos()
     use_case = UploadAndAttachMedia(
         uow,
+        OwnerAccessPolicy(),
         storage,
         _AllowAllPolicy(),
         InMemoryImageProcessor(),
+        _AllowAllTargets(),
     )
 
     attachment = await use_case.handle(
@@ -109,7 +120,7 @@ async def test_upload_and_attach_stores_file_and_persists_records() -> None:
     assert attachment.target_type is AttachmentTarget.NODE
     assert attachment.target_id == node_id
 
-    asset = await assets.get(attachment.asset_id)
+    asset = await assets.get(attachment.asset_id, scope=AccessScope.everyone())
     assert asset is not None
     assert asset.status is MediaStatus.ATTACHED
     assert asset.filename == "photo.jpg"
@@ -136,9 +147,11 @@ async def test_upload_and_attach_single_transaction() -> None:
 
     use_case = UploadAndAttachMedia(
         uow,
+        OwnerAccessPolicy(),
         storage,
         _AllowAllPolicy(),
         InMemoryImageProcessor(),
+        _AllowAllTargets(),
     )
     await use_case.handle(
         UploadAndAttachMediaCommand(
@@ -180,9 +193,11 @@ async def test_storage_move_fires_after_commit_not_before() -> None:
 
     use_case = UploadAndAttachMedia(
         uow,
+        OwnerAccessPolicy(),
         storage,
         _AllowAllPolicy(),
         InMemoryImageProcessor(),
+        _AllowAllTargets(),
     )
     await use_case.handle(
         UploadAndAttachMediaCommand(
@@ -212,9 +227,11 @@ async def test_policy_violation_propagates_and_no_storage_move() -> None:
     uow, _, _, storage = _make_uow_and_repos()
     use_case = UploadAndAttachMedia(
         uow,
+        OwnerAccessPolicy(),
         storage,
         _RejectAllPolicy(),
         InMemoryImageProcessor(),
+        _AllowAllTargets(),
     )
 
     with pytest.raises(UnsupportedMediaTypeError):
@@ -244,9 +261,11 @@ async def test_attribute_key_forwarded_to_attachment() -> None:
     uow, _, _, storage = _make_uow_and_repos()
     use_case = UploadAndAttachMedia(
         uow,
+        OwnerAccessPolicy(),
         storage,
         _AllowAllPolicy(),
         InMemoryImageProcessor(),
+        _AllowAllTargets(),
     )
 
     attachment = await use_case.handle(
@@ -270,9 +289,11 @@ async def test_upload_and_attach_moves_thumbnail_to_attached() -> None:
     uow, assets, _, storage = _make_uow_and_repos()
     use_case = UploadAndAttachMedia(
         uow,
+        OwnerAccessPolicy(),
         storage,
         _AllowAllPolicy(),
         InMemoryImageProcessor(),
+        _AllowAllTargets(),
     )
 
     attachment = await use_case.handle(
@@ -287,7 +308,7 @@ async def test_upload_and_attach_moves_thumbnail_to_attached() -> None:
         SYSTEM_ACTOR,
     )
 
-    asset = await assets.get(attachment.asset_id)
+    asset = await assets.get(attachment.asset_id, scope=AccessScope.everyone())
     assert asset is not None
     assert asset.has_thumbnail is True
     assert (asset.id, "attached") in storage._thumbnails
@@ -304,7 +325,12 @@ async def test_cover_upload_is_refused_before_staging_when_cover_exists() -> Non
         )
     )
     use_case = UploadAndAttachMedia(
-        uow, storage, _AllowAllPolicy(), InMemoryImageProcessor()
+        uow,
+        OwnerAccessPolicy(),
+        storage,
+        _AllowAllPolicy(),
+        InMemoryImageProcessor(),
+        _AllowAllTargets(),
     )
 
     with pytest.raises(CoverAlreadySetError):

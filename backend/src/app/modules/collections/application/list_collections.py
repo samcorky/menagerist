@@ -12,10 +12,12 @@ from app.modules.collections.application.get_collection import (
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.collections.ports.item_lookup import ItemLookup  # noqa: TC001
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
-from app.shared_kernel.cqrs import QueryHandler
+from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
+from app.shared_kernel.cqrs import ScopedQueryHandler
 
 if TYPE_CHECKING:
     from app.modules.collections.domain.collection import Collection
+    from app.shared_kernel.access_scope import AccessScope
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -39,24 +41,31 @@ class ListCollectionsResult:
 
 
 class ListCollections(
-    QueryHandler[CollectionsRepos, ListCollectionsQuery, ListCollectionsResult]
+    ScopedQueryHandler[CollectionsRepos, ListCollectionsQuery, ListCollectionsResult]
 ):
     """List collections with keyset pagination and live item counts."""
 
-    def __init__(self, repos: CollectionsRepos, items: ItemLookup) -> None:
-        super().__init__(repos)
+    def __init__(
+        self, repos: CollectionsRepos, policy: AccessPolicy, items: ItemLookup
+    ) -> None:
+        super().__init__(repos, policy)
         self._items = items
 
     async def handle(
         self, query: ListCollectionsQuery, actor: Actor
     ) -> ListCollectionsResult:
         """Return a page of collections after `query.after`, up to `query.limit`."""
-        collections = await self._page(query)
-        summaries = [await summarise(self._repos, self._items, c) for c in collections]
+        scope = self._policy.scope_for(actor)
+        collections = await self._page(query, scope)
+        summaries = [
+            await summarise(self._repos, self._items, c, scope) for c in collections
+        ]
         logger.debug("collections listed", count=len(summaries))
         return ListCollectionsResult(items=summaries)
 
-    async def _page(self, query: ListCollectionsQuery) -> list[Collection]:
+    async def _page(
+        self, query: ListCollectionsQuery, scope: AccessScope
+    ) -> list[Collection]:
         """Return up to `query.limit` collections, keeping only those holding the item.
 
         Filtering happens while paging so a page is never short just because
@@ -64,14 +73,16 @@ class ListCollections(
         """
         if query.item_id is None:
             return await self._repos.collections.list(
-                after=query.after, limit=query.limit, q=query.q
+                scope=scope, after=query.after, limit=query.limit, q=query.q
             )
-        holding = await self._repos.memberships.collection_ids_for(query.item_id)
+        holding = await self._repos.memberships.collection_ids_for(
+            query.item_id, scope=scope
+        )
         found: list[Collection] = []
         after = query.after
         while len(found) < query.limit:
             batch = await self._repos.collections.list(
-                after=after, limit=query.limit, q=query.q
+                scope=scope, after=after, limit=query.limit, q=query.q
             )
             found.extend(c for c in batch if c.id in holding)
             if len(batch) < query.limit:

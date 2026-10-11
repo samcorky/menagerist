@@ -12,9 +12,12 @@ from app.modules.examples.domain.installation import (
     InstallationStatus,
     Outcome,
 )
+from app.platform.orm_mixins import claim_rows, owned_by
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
+
+    from app.shared_kernel.access_scope import AccessScope
 
 logger = structlog.get_logger()
 _ACTIVE = (InstallationStatus.INSTALLING.value, InstallationStatus.INSTALLED.value)
@@ -47,6 +50,7 @@ def _record_from_json(data: dict[str, Any]) -> EntityRecord:
 def _to_domain(model: ExampleInstallationModel) -> Installation:
     return Installation(
         id=model.id,
+        owner_id=model.owner_id,
         pack_id=model.pack_id,
         status=InstallationStatus(model.status),
         entities=[_record_from_json(d) for d in model.entities],
@@ -60,6 +64,7 @@ def _to_domain(model: ExampleInstallationModel) -> Installation:
 def _to_model(installation: Installation) -> ExampleInstallationModel:
     return ExampleInstallationModel(
         id=installation.id,
+        owner_id=installation.owner_id,
         pack_id=installation.pack_id,
         status=installation.status.value,
         entities=[_record_to_json(r) for r in installation.entities],
@@ -88,34 +93,61 @@ class SqlAlchemyInstallationRepository:
         await self._session.merge(_to_model(installation))
         await self._session.flush()
 
-    async def get(self, installation_id: uuid.UUID) -> Installation | None:
-        """Return the installation with `installation_id`, or `None`."""
-        model = await self._session.get(ExampleInstallationModel, installation_id)
-        return None if model is None else _to_domain(model)
-
-    async def get_active_for_pack(self, pack_id: str) -> Installation | None:
-        """Return the installing or installed installation of `pack_id`, if any."""
+    async def get(
+        self, installation_id: uuid.UUID, *, scope: AccessScope
+    ) -> Installation | None:
+        """Return the installation with `installation_id` in `scope`, or `None`."""
         stmt = select(ExampleInstallationModel).where(
-            ExampleInstallationModel.pack_id == pack_id,
-            ExampleInstallationModel.status.in_(_ACTIVE),
+            ExampleInstallationModel.id == installation_id,
+            owned_by(ExampleInstallationModel, scope.user_id),
         )
         model = (await self._session.execute(stmt)).scalar_one_or_none()
         return None if model is None else _to_domain(model)
 
-    async def list_active(self) -> list[Installation]:
+    async def get_active_for_pack(
+        self, pack_id: str, *, scope: AccessScope
+    ) -> Installation | None:
+        """Return the installing or installed installation of `pack_id`, if any."""
+        stmt = select(ExampleInstallationModel).where(
+            ExampleInstallationModel.pack_id == pack_id,
+            ExampleInstallationModel.status.in_(_ACTIVE),
+            owned_by(ExampleInstallationModel, scope.user_id),
+        )
+        # Several people may hold the pack when the scope is everyone: take the newest.
+        stmt = stmt.order_by(ExampleInstallationModel.id.desc()).limit(1)
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return None if model is None else _to_domain(model)
+
+    async def list_active(self, *, scope: AccessScope) -> list[Installation]:
         """Return every installing or installed installation, oldest first."""
         stmt = (
             select(ExampleInstallationModel)
-            .where(ExampleInstallationModel.status.in_(_ACTIVE))
+            .where(
+                ExampleInstallationModel.status.in_(_ACTIVE),
+                owned_by(ExampleInstallationModel, scope.user_id),
+            )
             .order_by(ExampleInstallationModel.id)
         )
         return [_to_domain(m) for m in (await self._session.execute(stmt)).scalars()]
 
-    async def list_for_pack(self, pack_id: str) -> list[Installation]:
+    async def list_for_pack(
+        self, pack_id: str, *, scope: AccessScope
+    ) -> list[Installation]:
         """Return every installation of `pack_id`, whatever its status, newest first."""
         stmt = (
             select(ExampleInstallationModel)
-            .where(ExampleInstallationModel.pack_id == pack_id)
+            .where(
+                ExampleInstallationModel.pack_id == pack_id,
+                owned_by(ExampleInstallationModel, scope.user_id),
+            )
             .order_by(ExampleInstallationModel.id.desc())
         )
         return [_to_domain(m) for m in (await self._session.execute(stmt)).scalars()]
+
+    async def claim_orphaned(
+        self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
+    ) -> int:
+        """Give `owner_id` every installation with no owner or a legacy owner."""
+        return await claim_rows(
+            self._session, ExampleInstallationModel, owner_id, legacy_owner_ids
+        )

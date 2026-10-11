@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from jsonschema import Draft202012Validator
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.examples.adapters.platform.file_pack_catalogue import FilePackCatalogue
 from app.modules.examples.adapters.platform.pack_parser import parse_index
 from app.modules.examples.application.install_example_pack import (
@@ -24,7 +25,7 @@ from app.modules.examples.application.uninstall_example_pack import (
     UninstallExamplePackCommand,
 )
 from app.modules.examples.domain.pack import ExamplePack, preset_refs
-from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.access_scope import AccessScope
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -68,34 +69,48 @@ async def _required(pack: ExamplePack) -> dict[str, ExamplePack]:
 async def _install(world: World, pack_id: str) -> Any:  # noqa: ANN401
     return await InstallExamplePack(
         world.uow,
+        OwnerAccessPolicy(),
         world.catalogue,
         world.presets,
         world.graph,
         world.collections,
         world.covers,
-    ).handle(InstallExamplePackCommand(pack_id=pack_id), SYSTEM_ACTOR)
+    ).handle(InstallExamplePackCommand(pack_id=pack_id), world.actor)
 
 
 async def _uninstall(world: World, pack_id: str) -> Any:  # noqa: ANN401
     return await UninstallExamplePack(
         world.uow,
+        OwnerAccessPolicy(),
         world.catalogue,
         world.presets,
         world.graph,
         world.collections,
         world.covers,
-    ).handle(UninstallExamplePackCommand(pack_id=pack_id), SYSTEM_ACTOR)
+    ).handle(UninstallExamplePackCommand(pack_id=pack_id), world.actor)
 
 
 async def _live_counts(world: World) -> list[int]:
     repos = (
         world.graph_repos.node_types,
-        world.graph_repos.nodes,
         world.graph_repos.edge_types,
-        world.graph_repos.edges,
         world.preset_repos.presets,
     )
     counts = [len(await repo.list(after=None, limit=_LIMIT)) for repo in repos]
+    counts.append(
+        len(
+            await world.graph_repos.edges.list(
+                scope=AccessScope.everyone(), after=None, limit=_LIMIT
+            )
+        )
+    )
+    counts.append(
+        len(
+            await world.graph_repos.nodes.list(
+                scope=AccessScope.everyone(), after=None, limit=_LIMIT
+            )
+        )
+    )
     return [*counts, len(world.collections.collections)]
 
 

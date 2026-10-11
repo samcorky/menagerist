@@ -16,6 +16,7 @@ from app.modules.media.adapters.storage.in_memory_media_storage import (
 from app.modules.media.application.stage_media import StageMedia, StageMediaCommand
 from app.modules.media.domain.errors import MediaFileTooLargeError
 from app.modules.media.domain.media_asset import MediaStatus
+from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 if TYPE_CHECKING:
@@ -53,7 +54,7 @@ async def test_stage_persists_asset_and_commits() -> None:
     assert asset.status is MediaStatus.STAGED
     assert asset.filename == "cover.jpg"
     assert asset.size == 5
-    assert await repo.get(asset.id) is asset
+    assert await repo.get(asset.id, scope=AccessScope.everyone()) is asset
     assert storage._files[(asset.id, "staged")] == b"hello"
 
 

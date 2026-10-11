@@ -1,10 +1,12 @@
 """A second cover on one item is a 409 problem response, not a server error."""
 
 import uuid
+from typing import TYPE_CHECKING
 
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
+from app.entrypoints.api.shared.attach_target_access import get_attach_target_access
 from app.modules.media.adapters.api.dependencies import (
     get_image_processor,
     get_media_repos,
@@ -23,9 +25,20 @@ from app.modules.media.adapters.storage.in_memory_media_storage import (
 )
 from app.modules.media.domain.errors import COVER_ALREADY_SET_MESSAGE
 
+if TYPE_CHECKING:
+    from app.modules.media.domain.media_attachment import AttachmentTarget
+    from app.shared_kernel.access_scope import AccessScope
+
 TINY_JPEG = bytes.fromhex(
     "ffd8ffe000104a46494600010101004800480000ffdb004300080606070605080707070909080a0c140d0c0b0b0c1912130f141d1a1f1e1d1a1c1c20242e2720222c231c1c28372930313434341f27393d38323c2e333432ffc0000b080001000101011100ffc4001f0000010501010101010100000000000000000102030405060708090a0bffda0008010100003f00bf00ffd9"
 )
+
+
+class _AllowAllTargets:
+    async def can_attach(
+        self, target_type: AttachmentTarget, target_id: uuid.UUID, scope: AccessScope
+    ) -> bool:
+        return True
 
 
 def _client() -> TestClient:
@@ -36,6 +49,7 @@ def _client() -> TestClient:
     app.dependency_overrides[get_media_repos] = lambda: repos
     storage = InMemoryMediaStorage()
     app.dependency_overrides[get_media_storage] = lambda: storage
+    app.dependency_overrides[get_attach_target_access] = lambda: _AllowAllTargets()
     app.dependency_overrides[get_image_processor] = lambda: InMemoryImageProcessor()
     return TestClient(app)
 

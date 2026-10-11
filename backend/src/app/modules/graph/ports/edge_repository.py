@@ -5,6 +5,7 @@ if TYPE_CHECKING:
     import uuid
 
     from app.modules.graph.domain.edge import Edge
+    from app.shared_kernel.access_scope import AccessScope
 
 
 class EdgeRepository(Protocol):
@@ -18,21 +19,28 @@ class EdgeRepository(Protocol):
         """Persist changes to an existing edge."""
         ...
 
-    async def get(self, edge_id: uuid.UUID) -> Edge | None:
-        """Return the edge with `edge_id`, or `None` if missing or deleted."""
+    async def get(self, edge_id: uuid.UUID, *, scope: AccessScope) -> Edge | None:
+        """Return the edge with `edge_id`, or `None` if missing, deleted or unseen."""
         ...
 
     async def list_for_node(
-        self, node_id: uuid.UUID, *, after: uuid.UUID | None, limit: int
+        self,
+        node_id: uuid.UUID,
+        *,
+        scope: AccessScope,
+        after: uuid.UUID | None,
+        limit: int,
     ) -> list[Edge]:
         """List non-deleted edge where `node_id` is the source or target."""
         ...
 
-    async def list(self, *, after: uuid.UUID | None, limit: int) -> list[Edge]:
+    async def list(
+        self, *, scope: AccessScope, after: uuid.UUID | None, limit: int
+    ) -> list[Edge]:
         """List non-deleted edge ordered by id, starting after `after` if given."""
         ...
 
-    async def has_edges_of_type(self, type_slug: str) -> bool:
+    async def has_edges_of_type(self, type_slug: str, *, scope: AccessScope) -> bool:
         """Return True if any non-deleted edges reference `type_slug`."""
         ...
 
@@ -41,6 +49,7 @@ class EdgeRepository(Protocol):
         type_slug: str,
         key: str,
         *,
+        scope: AccessScope,
         sub_key: str | None = None,
         value: str | None = None,
     ) -> int:
@@ -58,6 +67,7 @@ class EdgeRepository(Protocol):
         type_slug: str,
         key: str,
         *,
+        scope: AccessScope,
         sub_key: str | None = None,
         after: uuid.UUID | None,
         limit: int,
@@ -66,5 +76,14 @@ class EdgeRepository(Protocol):
 
         With `sub_key`, `key` names a group property and this lists edges
         where any row of that array holds `sub_key`.
+        """
+        ...
+
+    async def claim_orphaned(
+        self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
+    ) -> int:
+        """Give `owner_id` every connection with no owner or a legacy owner.
+
+        System-level and unscoped, deleted rows included. Returns the count.
         """
         ...

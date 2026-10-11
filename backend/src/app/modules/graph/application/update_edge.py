@@ -12,7 +12,10 @@ from app.modules.graph.domain.errors import EdgeNotFoundError
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
+from app.shared_kernel.cqrs import ScopedCommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
@@ -33,21 +36,27 @@ class UpdateEdgeCommand:
     attributes: dict[str, Any] | None = field(default=None)
 
 
-class UpdateEdge(CommandHandler[GraphUnitOfWork, UpdateEdgeCommand, Edge]):
+class UpdateEdge(ScopedCommandHandler[GraphUnitOfWork, UpdateEdgeCommand, Edge]):
     """Update an existing edge's editable fields."""
 
     def __init__(
-        self, uow: GraphUnitOfWork, choice_lists: ChoiceListSource | None = None
+        self,
+        uow: GraphUnitOfWork,
+        policy: AccessPolicy,
+        choice_lists: ChoiceListSource | None = None,
     ) -> None:
-        super().__init__(uow)
+        super().__init__(uow, policy)
         self._choice_lists = choice_lists
 
     async def handle(self, command: UpdateEdgeCommand, actor: Actor) -> Edge:
         """Apply `command`'s changes to the edge and commit."""
         async with self._uow as repos:
-            edge = await repos.edges.get(command.edge_id)
+            edge = await repos.edges.get(
+                command.edge_id, scope=self._policy.scope_for(actor)
+            )
             if edge is None:
                 raise EdgeNotFoundError(f"Edge {command.edge_id} not found")
+            self._policy.assert_can_modify(actor, edge.owner_id)
 
             if command.attributes is not None:
                 edge_type = await repos.edge_types.get_by_slug(slugify(edge.type))

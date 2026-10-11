@@ -4,6 +4,7 @@ import uuid
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
     InMemoryMediaAssetRepository,
 )
@@ -28,7 +29,15 @@ from app.modules.media.domain.media_attachment import (
     AttachmentTarget,
     MediaAttachment,
 )
+from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+
+
+class _AllowAllTargets:
+    async def can_attach(
+        self, target_type: AttachmentTarget, target_id: uuid.UUID, scope: AccessScope
+    ) -> bool:
+        return True
 
 
 class _AllowAll:
@@ -43,11 +52,16 @@ def _make_use_case() -> tuple[
     InMemoryMediaStorage,
 ]:
     assets = InMemoryMediaAssetRepository()
-    attachments = InMemoryMediaAttachmentRepository()
+    attachments = InMemoryMediaAttachmentRepository(assets)
     storage = InMemoryMediaStorage()
     repos = make_in_memory_repos(assets=assets, attachments=attachments)
     uow = create_in_memory_media_uow(repos)
-    return AttachMedia(uow, storage, _AllowAll()), assets, attachments, storage
+    return (
+        AttachMedia(uow, OwnerAccessPolicy(), storage, _AllowAll(), _AllowAllTargets()),
+        assets,
+        attachments,
+        storage,
+    )
 
 
 async def test_attach_raises_when_asset_not_found() -> None:
@@ -70,7 +84,11 @@ async def test_attach_already_attached_asset_skips_storage_move() -> None:
     use_case, assets, _, storage = _make_use_case()
 
     asset = MediaAsset.create(
-        filename="photo.jpg", content_type="image/jpeg", size=10, sha256="a"
+        owner_id=SYSTEM_ACTOR.id,
+        filename="photo.jpg",
+        content_type="image/jpeg",
+        size=10,
+        sha256="a",
     )
     asset.promote()
     await assets.add(asset)
@@ -95,7 +113,11 @@ async def _staged_image(
     assets: InMemoryMediaAssetRepository, storage: InMemoryMediaStorage
 ) -> MediaAsset:
     asset = MediaAsset.create(
-        filename="c.png", content_type="image/png", size=1, sha256="c"
+        owner_id=SYSTEM_ACTOR.id,
+        filename="c.png",
+        content_type="image/png",
+        size=1,
+        sha256="c",
     )
     await assets.add(asset)
     storage._files[(asset.id, "staged")] = b"px"
@@ -142,7 +164,14 @@ async def test_attach_as_cover_raises_when_target_already_has_cover() -> None:
         )
 
     assert asset.status is MediaStatus.STAGED
-    assert len(await attachments.list_for_target(AttachmentTarget.NODE, node_id)) == 1
+    assert (
+        len(
+            await attachments.list_for_target(
+                AttachmentTarget.NODE, node_id, scope=AccessScope.everyone()
+            )
+        )
+        == 1
+    )
     assert (asset.id, "attached") not in storage._files
 
 
@@ -164,4 +193,11 @@ async def test_attach_without_key_is_allowed_when_target_has_cover() -> None:
         SYSTEM_ACTOR,
     )
 
-    assert len(await attachments.list_for_target(AttachmentTarget.NODE, node_id)) == 2
+    assert (
+        len(
+            await attachments.list_for_target(
+                AttachmentTarget.NODE, node_id, scope=AccessScope.everyone()
+            )
+        )
+        == 2
+    )

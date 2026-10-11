@@ -1,4 +1,14 @@
-import { expect, type APIRequestContext, type Page } from './fixtures';
+import {
+	expect,
+	openSession,
+	changePasswordViaApi,
+	signInViaApi,
+	type APIRequestContext,
+	type Browser,
+	type Page,
+	type Session,
+	type SignedInUser
+} from './fixtures';
 
 /**
  * Reusable flows shared across e2e specs. Each helper drives the real UI (no
@@ -270,4 +280,57 @@ export async function failCollectionSearch(page: Page): Promise<() => Promise<vo
 		})
 	);
 	return () => page.unroute(pattern);
+}
+
+export type E2EUser = {
+	id: string;
+	username: string;
+	displayName: string;
+	password: string;
+	role: 'admin' | 'member';
+	session: Session;
+	baseURL: string;
+};
+
+/**
+ * Creates an account through the API as `admin` (an API context signed in as an administrator),
+ * then signs in as it and changes the starting password so the account is ready to use. Pass
+ * `keepStartingPassword` to leave it needing a password change (the forced-change flow).
+ */
+export async function createUserViaApi(
+	admin: APIRequestContext,
+	baseURL: string,
+	options: { prefix?: string; role?: 'admin' | 'member'; keepStartingPassword?: boolean } = {}
+): Promise<E2EUser> {
+	const username = uniqueName(options.prefix ?? 'user')
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-');
+	const startingPassword = `start-${username}-pw`;
+	const role = options.role ?? 'member';
+	const res = await admin.post('/api/v1/user', {
+		data: { username, display_name: `Name ${username}`, password: startingPassword, role }
+	});
+	expect(res.status(), await res.text()).toBe(201);
+	const created = (await res.json()) as { id: string };
+
+	let password = startingPassword;
+	let session = await signInViaApi(baseURL, username, startingPassword);
+	if (!options.keepStartingPassword) {
+		password = `final-${username}-pw`;
+		session = await changePasswordViaApi(baseURL, session, startingPassword, password);
+	}
+	return {
+		id: created.id,
+		username,
+		displayName: `Name ${username}`,
+		password,
+		role,
+		session,
+		baseURL
+	};
+}
+
+/** A browser context, page and API context signed in as `user`. Close `context` when done. */
+export function asUser(browser: Browser, user: E2EUser): Promise<SignedInUser> {
+	return openSession(browser, user.baseURL, user.session);
 }

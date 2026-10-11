@@ -2,6 +2,8 @@ import uuid
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
+from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -37,6 +39,7 @@ from app.modules.graph.domain.errors import EdgeTypeNotFoundError, NodeTypeNotFo
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -55,12 +58,25 @@ async def _node_setup() -> tuple[GraphRepos, NodeType, list[Node]]:
     node_type = NodeType.create(slug="film", label="Film")
     await repos.node_types.add(node_type)
     nodes = [
-        Node.create(name="A", type="film", attributes={"old": 1, "keep": "a"}),
-        Node.create(name="B", type="film", attributes={"keep": "b"}),
-        Node.create(name="C", type="film", attributes={"old": 3}),
-        Node.create(name="D", type="book", attributes={"old": 4}),
+        Node.create(
+            owner_id=uuid.UUID(int=1),
+            name="A",
+            type="film",
+            attributes={"old": 1, "keep": "a"},
+        ),
+        Node.create(
+            owner_id=uuid.UUID(int=1), name="B", type="film", attributes={"keep": "b"}
+        ),
+        Node.create(
+            owner_id=uuid.UUID(int=1), name="C", type="film", attributes={"old": 3}
+        ),
+        Node.create(
+            owner_id=uuid.UUID(int=1), name="D", type="book", attributes={"old": 4}
+        ),
     ]
-    deleted = Node.create(name="E", type="film", attributes={"old": 5})
+    deleted = Node.create(
+        owner_id=uuid.UUID(int=1), name="E", type="film", attributes={"old": 5}
+    )
     deleted.soft_delete()
     for node in [*nodes, deleted]:
         await repos.nodes.add(node)
@@ -74,11 +90,25 @@ async def _edge_setup() -> tuple[GraphRepos, EdgeType, list[Edge]]:
     source, target = uuid.uuid4(), uuid.uuid4()
     edges = [
         Edge.create(
-            source_id=source, target_id=target, type="owns", attributes={"old": 1}
+            owner_id=uuid.UUID(int=1),
+            source_id=source,
+            target_id=target,
+            type="owns",
+            attributes={"old": 1},
         ),
-        Edge.create(source_id=source, target_id=target, type="owns", attributes={}),
         Edge.create(
-            source_id=source, target_id=target, type="likes", attributes={"old": 3}
+            owner_id=uuid.UUID(int=1),
+            source_id=source,
+            target_id=target,
+            type="owns",
+            attributes={},
+        ),
+        Edge.create(
+            owner_id=uuid.UUID(int=1),
+            source_id=source,
+            target_id=target,
+            type="likes",
+            attributes={"old": 3},
         ),
     ]
     for edge in edges:
@@ -90,7 +120,7 @@ async def test_count_node_type_attribute_usage_counts_only_that_type() -> None:
     """Only live nodes of the type that hold the key are counted."""
     repos, node_type, _ = await _node_setup()
 
-    count = await CountNodeTypeAttributeUsage(repos).handle(
+    count = await CountNodeTypeAttributeUsage(repos, OwnerAccessPolicy()).handle(
         CountNodeTypeAttributeUsageQuery(node_type_id=node_type.id, key="old"),
         SYSTEM_ACTOR,
     )
@@ -102,7 +132,7 @@ async def test_count_node_type_attribute_usage_can_match_a_value() -> None:
     """With `value`, only nodes holding that exact value are counted."""
     repos, node_type, _ = await _node_setup()
 
-    count = await CountNodeTypeAttributeUsage(repos).handle(
+    count = await CountNodeTypeAttributeUsage(repos, OwnerAccessPolicy()).handle(
         CountNodeTypeAttributeUsageQuery(
             node_type_id=node_type.id, key="keep", value="a"
         ),
@@ -116,7 +146,7 @@ async def test_count_edge_type_attribute_usage_can_match_a_value() -> None:
     """With `value`, only edges holding that exact value are counted."""
     repos, edge_type, _ = await _edge_setup()
 
-    count = await CountEdgeTypeAttributeUsage(repos).handle(
+    count = await CountEdgeTypeAttributeUsage(repos, OwnerAccessPolicy()).handle(
         CountEdgeTypeAttributeUsageQuery(
             edge_type_id=edge_type.id, key="old", value="x"
         ),
@@ -129,7 +159,7 @@ async def test_count_edge_type_attribute_usage_can_match_a_value() -> None:
 async def test_count_node_type_attribute_usage_raises_for_missing_type() -> None:
     """An unknown node type id is a not-found error."""
     with pytest.raises(NodeTypeNotFoundError):
-        await CountNodeTypeAttributeUsage(_repos()).handle(
+        await CountNodeTypeAttributeUsage(_repos(), OwnerAccessPolicy()).handle(
             CountNodeTypeAttributeUsageQuery(node_type_id=uuid.uuid4(), key="old"),
             SYSTEM_ACTOR,
         )
@@ -139,7 +169,7 @@ async def test_count_edge_type_attribute_usage_counts_only_that_type() -> None:
     """Only live edges of the type that hold the key are counted."""
     repos, edge_type, _ = await _edge_setup()
 
-    count = await CountEdgeTypeAttributeUsage(repos).handle(
+    count = await CountEdgeTypeAttributeUsage(repos, OwnerAccessPolicy()).handle(
         CountEdgeTypeAttributeUsageQuery(edge_type_id=edge_type.id, key="old"),
         SYSTEM_ACTOR,
     )
@@ -150,7 +180,7 @@ async def test_count_edge_type_attribute_usage_counts_only_that_type() -> None:
 async def test_count_edge_type_attribute_usage_raises_for_missing_type() -> None:
     """An unknown edge type id is a not-found error."""
     with pytest.raises(EdgeTypeNotFoundError):
-        await CountEdgeTypeAttributeUsage(_repos()).handle(
+        await CountEdgeTypeAttributeUsage(_repos(), OwnerAccessPolicy()).handle(
             CountEdgeTypeAttributeUsageQuery(edge_type_id=uuid.uuid4(), key="old"),
             SYSTEM_ACTOR,
         )
@@ -162,7 +192,7 @@ async def test_purge_node_type_attribute_removes_key_and_touches_nodes() -> None
     before = {node.id: node.updated_at for node in nodes}
     uow = InMemoryUnitOfWork(repos)
 
-    purged = await PurgeNodeTypeAttribute(uow).handle(
+    purged = await PurgeNodeTypeAttribute(uow, RoleAuthorizationAdapter()).handle(
         PurgeNodeTypeAttributeCommand(node_type_id=node_type.id, key="old"),
         SYSTEM_ACTOR,
     )
@@ -186,22 +216,36 @@ async def test_purge_node_type_attribute_pages_through_all_nodes(
     repos, node_type, _ = await _node_setup()
     for i in range(3):
         await repos.nodes.add(
-            Node.create(name=f"X{i}", type="film", attributes={"old": i})
+            Node.create(
+                owner_id=uuid.UUID(int=1),
+                name=f"X{i}",
+                type="film",
+                attributes={"old": i},
+            )
         )
 
-    purged = await PurgeNodeTypeAttribute(InMemoryUnitOfWork(repos)).handle(
+    purged = await PurgeNodeTypeAttribute(
+        InMemoryUnitOfWork(repos), RoleAuthorizationAdapter()
+    ).handle(
         PurgeNodeTypeAttributeCommand(node_type_id=node_type.id, key="old"),
         SYSTEM_ACTOR,
     )
 
     assert purged == 5
-    assert await repos.nodes.count_with_attribute("film", "old") == 0
+    assert (
+        await repos.nodes.count_with_attribute(
+            "film", "old", scope=AccessScope.everyone()
+        )
+        == 0
+    )
 
 
 async def test_purge_node_type_attribute_raises_for_missing_type() -> None:
     """An unknown node type id is a not-found error."""
     with pytest.raises(NodeTypeNotFoundError):
-        await PurgeNodeTypeAttribute(InMemoryUnitOfWork(_repos())).handle(
+        await PurgeNodeTypeAttribute(
+            InMemoryUnitOfWork(_repos()), RoleAuthorizationAdapter()
+        ).handle(
             PurgeNodeTypeAttributeCommand(node_type_id=uuid.uuid4(), key="old"),
             SYSTEM_ACTOR,
         )
@@ -212,7 +256,7 @@ async def test_purge_edge_type_attribute_removes_key() -> None:
     repos, edge_type, edges = await _edge_setup()
     uow = InMemoryUnitOfWork(repos)
 
-    purged = await PurgeEdgeTypeAttribute(uow).handle(
+    purged = await PurgeEdgeTypeAttribute(uow, RoleAuthorizationAdapter()).handle(
         PurgeEdgeTypeAttributeCommand(edge_type_id=edge_type.id, key="old"),
         SYSTEM_ACTOR,
     )
@@ -226,7 +270,9 @@ async def test_purge_edge_type_attribute_removes_key() -> None:
 async def test_purge_edge_type_attribute_raises_for_missing_type() -> None:
     """An unknown edge type id is a not-found error."""
     with pytest.raises(EdgeTypeNotFoundError):
-        await PurgeEdgeTypeAttribute(InMemoryUnitOfWork(_repos())).handle(
+        await PurgeEdgeTypeAttribute(
+            InMemoryUnitOfWork(_repos()), RoleAuthorizationAdapter()
+        ).handle(
             PurgeEdgeTypeAttributeCommand(edge_type_id=uuid.uuid4(), key="old"),
             SYSTEM_ACTOR,
         )
@@ -239,6 +285,7 @@ async def test_count_node_type_attribute_usage_can_match_a_group_sub_key() -> No
     await repos.node_types.add(node_type)
     await repos.nodes.add(
         Node.create(
+            owner_id=uuid.UUID(int=1),
             name="A",
             type="recipe",
             attributes={"ingredients": [{"name": "Flour", "unit": "g"}]},
@@ -246,11 +293,14 @@ async def test_count_node_type_attribute_usage_can_match_a_group_sub_key() -> No
     )
     await repos.nodes.add(
         Node.create(
-            name="B", type="recipe", attributes={"ingredients": [{"name": "Salt"}]}
+            owner_id=uuid.UUID(int=1),
+            name="B",
+            type="recipe",
+            attributes={"ingredients": [{"name": "Salt"}]},
         )
     )
 
-    count = await CountNodeTypeAttributeUsage(repos).handle(
+    count = await CountNodeTypeAttributeUsage(repos, OwnerAccessPolicy()).handle(
         CountNodeTypeAttributeUsageQuery(
             node_type_id=node_type.id, key="ingredients", sub_key="unit"
         ),
@@ -268,6 +318,7 @@ async def test_purge_node_type_attribute_strips_a_group_sub_key_from_every_row()
     node_type = NodeType.create(slug="recipe", label="Recipe")
     await repos.node_types.add(node_type)
     node = Node.create(
+        owner_id=uuid.UUID(int=1),
         name="A",
         type="recipe",
         attributes={
@@ -281,7 +332,9 @@ async def test_purge_node_type_attribute_strips_a_group_sub_key_from_every_row()
     )
     await repos.nodes.add(node)
 
-    purged = await PurgeNodeTypeAttribute(InMemoryUnitOfWork(repos)).handle(
+    purged = await PurgeNodeTypeAttribute(
+        InMemoryUnitOfWork(repos), RoleAuthorizationAdapter()
+    ).handle(
         PurgeNodeTypeAttributeCommand(
             node_type_id=node_type.id, key="ingredients", sub_key="unit"
         ),
@@ -303,6 +356,7 @@ async def test_count_edge_type_attribute_usage_can_match_a_group_sub_key() -> No
     source, target = uuid.uuid4(), uuid.uuid4()
     await repos.edges.add(
         Edge.create(
+            owner_id=uuid.UUID(int=1),
             source_id=source,
             target_id=target,
             type="loaned-to",
@@ -311,6 +365,7 @@ async def test_count_edge_type_attribute_usage_can_match_a_group_sub_key() -> No
     )
     await repos.edges.add(
         Edge.create(
+            owner_id=uuid.UUID(int=1),
             source_id=source,
             target_id=target,
             type="loaned-to",
@@ -318,7 +373,7 @@ async def test_count_edge_type_attribute_usage_can_match_a_group_sub_key() -> No
         )
     )
 
-    count = await CountEdgeTypeAttributeUsage(repos).handle(
+    count = await CountEdgeTypeAttributeUsage(repos, OwnerAccessPolicy()).handle(
         CountEdgeTypeAttributeUsageQuery(
             edge_type_id=edge_type.id, key="terms", sub_key="duration"
         ),
@@ -337,6 +392,7 @@ async def test_purge_edge_type_attribute_strips_a_group_sub_key_from_every_row()
     await repos.edge_types.add(edge_type)
     source, target = uuid.uuid4(), uuid.uuid4()
     edge = Edge.create(
+        owner_id=uuid.UUID(int=1),
         source_id=source,
         target_id=target,
         type="loaned-to",
@@ -344,7 +400,9 @@ async def test_purge_edge_type_attribute_strips_a_group_sub_key_from_every_row()
     )
     await repos.edges.add(edge)
 
-    purged = await PurgeEdgeTypeAttribute(InMemoryUnitOfWork(repos)).handle(
+    purged = await PurgeEdgeTypeAttribute(
+        InMemoryUnitOfWork(repos), RoleAuthorizationAdapter()
+    ).handle(
         PurgeEdgeTypeAttributeCommand(
             edge_type_id=edge_type.id, key="terms", sub_key="duration"
         ),

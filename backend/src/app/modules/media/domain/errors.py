@@ -29,3 +29,7 @@ class CoverAlreadySetError(ConflictError):
 
     def __init__(self) -> None:
         super().__init__(COVER_ALREADY_SET_MESSAGE)
+
+
+class AttachTargetNotFoundError(NotFoundError):
+    """Raised when the entity to attach media to is missing or not visible."""

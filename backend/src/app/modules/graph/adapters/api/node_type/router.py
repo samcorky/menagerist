@@ -63,6 +63,7 @@ from app.modules.graph.domain.errors import (
     NodeTypeSlugConflictError,
 )
 from app.shared_kernel.actor import Actor
+from app.shared_kernel.errors import ForbiddenError
 
 router = APIRouter(
     prefix="/node-type", tags=["Node Types"], route_class=PermissionAwareRoute
@@ -176,10 +177,13 @@ async def update_node_type(
     "/{node_type_id}",
     status_code=204,
     operation_id="delete_node_type",
-    responses=error_response(
-        NodeTypeNotFoundError,
-        detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
-    ),
+    responses={
+        **error_response(
+            NodeTypeNotFoundError,
+            detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+        ),
+        **error_response(ForbiddenError, detail="Administrator access is required."),
+    },
 )
 async def delete_node_type(
     node_type_id: uuid.UUID,
@@ -259,10 +263,13 @@ async def list_attribute_values(
     "/{node_type_id}/attribute/{key}",
     response_model=AttributePurgeResponse,
     operation_id="purge_node_type_attribute",
-    responses=error_response(
-        NodeTypeNotFoundError,
-        detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
-    ),
+    responses={
+        **error_response(
+            NodeTypeNotFoundError,
+            detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+        ),
+        **error_response(ForbiddenError, detail="Administrator access is required."),
+    },
 )
 async def purge_node_type_attribute(
     node_type_id: uuid.UUID,

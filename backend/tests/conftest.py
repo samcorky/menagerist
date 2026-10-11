@@ -1,15 +1,21 @@
-from typing import TYPE_CHECKING
+import uuid
+from typing import TYPE_CHECKING, Any
 
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from starlette.testclient import TestClient
 from testcontainers.community.postgres import PostgresContainer
 
+from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.platform import alembic_runner
-from app.platform.config import get_database_settings
+from app.platform.config import get_database_settings, get_identity_settings
+from app.shared_kernel.actor import Actor
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Iterator
+    from collections.abc import AsyncIterator, Callable, Iterator
+
+    from fastapi import FastAPI
 
 
 @pytest.fixture(scope="session")
@@ -74,3 +80,70 @@ async def db_session(postgres_url: str) -> AsyncIterator[AsyncSession]:
             await session.close()
             await transaction.rollback()
     await engine.dispose()
+
+
+TEST_CSRF_TOKEN = "test-csrf-token"
+DEFAULT_MEMBER_ID = uuid.UUID(int=1)
+
+
+def actor_for(user_id: uuid.UUID, role: str = "member") -> Actor:
+    """Build the actor a signed-in user with `role` would produce."""
+    return Actor(id=user_id, roles=frozenset({role}))
+
+
+def as_user(app: FastAPI, user_id: uuid.UUID, role: str = "member") -> None:
+    """Make every request to `app` run as the given user."""
+    actor = actor_for(user_id, role)
+    app.dependency_overrides[get_current_actor] = lambda: actor
+
+
+@pytest.fixture(autouse=True)
+def _csrf_for_test_clients(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Give every TestClient a matching CSRF cookie and header.
+
+    The production rule is unchanged: the CSRF tests remove both to prove it.
+    """
+    original_init = TestClient.__init__
+    settings = get_identity_settings()
+
+    def init(self: TestClient, *args: Any, **kwargs: Any) -> None:  # noqa: ANN401
+        original_init(self, *args, **kwargs)
+        host = self.base_url.host
+        self.cookies.set(
+            settings.csrf_cookie_name,
+            TEST_CSRF_TOKEN,
+            # The cookie jar files dotless hosts under "<host>.local".
+            domain=host if "." in host else f"{host}.local",
+            path="/",
+        )
+        self.headers["X-CSRF-Token"] = TEST_CSRF_TOKEN
+
+    monkeypatch.setattr(TestClient, "__init__", init)
+
+
+@pytest.fixture(autouse=True)
+def _default_actor_for_test_clients(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Run every TestClient's app as a member, unless a test overrides it.
+
+    Tests that exercise the real session lookup are marked `real_actor`; tests
+    needing other people use `as_user`.
+    """
+    if request.node.get_closest_marker("real_actor"):
+        return
+    original_init = TestClient.__init__
+    actor = actor_for(DEFAULT_MEMBER_ID)
+
+    def init(self: TestClient, app: Any, *args: Any, **kwargs: Any) -> None:  # noqa: ANN401
+        original_init(self, app, *args, **kwargs)
+        if hasattr(app, "dependency_overrides"):
+            app.dependency_overrides.setdefault(get_current_actor, lambda: actor)
+
+    monkeypatch.setattr(TestClient, "__init__", init)
+
+
+@pytest.fixture(name="as_user")
+def _as_user_fixture() -> Callable[..., None]:
+    """Return `as_user(app, user_id, role="member")` for multi-user router tests."""
+    return as_user

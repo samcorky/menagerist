@@ -50,3 +50,43 @@ class SqlAlchemySessionUnitOfWork[TRepos]:
     def on_commit(self, callback: Callable[[], Awaitable[None]]) -> None:
         """Enqueue a side-effect callback to run after the next successful commit."""
         self._callbacks.append(callback)
+
+
+class SessionBoundUnitOfWork[TRepos]:
+    """UnitOfWork over a session someone else opened and will close.
+
+    Lets several units of work and repository bundles share one transaction:
+    this one commits it, rolls it back on error and leaves it open on exit.
+    """
+
+    def __init__(
+        self, session: AsyncSession, build_repos: Callable[[AsyncSession], TRepos]
+    ) -> None:
+        self._session = session
+        self._build_repos = build_repos
+        self._callbacks: list[Callable[[], Awaitable[None]]] = []
+
+    async def __aenter__(self) -> TRepos:
+        """Return the module's repository bundle over the shared session."""
+        return self._build_repos(self._session)
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        """Roll the shared transaction back on exception; never close the session."""
+        if exc_type is not None:
+            await self._session.rollback()
+
+    async def commit(self) -> None:
+        """Commit the shared session, then run any registered on_commit callbacks."""
+        await self._session.commit()
+        callbacks, self._callbacks = self._callbacks, []
+        for callback in callbacks:
+            await callback()
+
+    def on_commit(self, callback: Callable[[], Awaitable[None]]) -> None:
+        """Enqueue a side-effect callback to run after the next successful commit."""
+        self._callbacks.append(callback)

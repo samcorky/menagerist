@@ -14,24 +14,30 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from app.modules.graph.ports.unit_of_work import GraphRepos
+    from app.shared_kernel.access_scope import AccessScope
 
 _CHUNK = 1000
 
 
 class GraphItemLookup:
-    """Reports which item ids are live (non-deleted) in the graph module."""
+    """Reports which item ids are live (non-deleted) and visible in the graph module."""
 
     def __init__(self, repos: GraphRepos) -> None:
         self._repos = repos
 
-    async def live_ids(self, ids: Sequence[uuid.UUID]) -> set[uuid.UUID]:
-        """Return the subset of `ids` that are live items."""
+    async def live_ids(
+        self, ids: Sequence[uuid.UUID], scope: AccessScope
+    ) -> set[uuid.UUID]:
+        """Return the subset of `ids` that are live items inside `scope`."""
         unique = list(dict.fromkeys(ids))
         live: set[uuid.UUID] = set()
         for start in range(0, len(unique), _CHUNK):
             chunk = unique[start : start + _CHUNK]
             nodes = await self._repos.nodes.list(
-                after=None, limit=len(chunk), ids=chunk
+                scope=scope,
+                after=None,
+                limit=len(chunk),
+                ids=chunk,
             )
             live.update(node.id for node in nodes)
         return live

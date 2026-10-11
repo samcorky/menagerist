@@ -70,6 +70,7 @@ from app.modules.media.application.upload_and_attach_media import (
 from app.modules.media.domain.content_type_safety import is_inline_safe
 from app.modules.media.domain.errors import (
     COVER_ALREADY_SET_MESSAGE,
+    AttachTargetNotFoundError,
     CoverAlreadySetError,
     MediaAssetNotFoundError,
     MediaAttachmentNotFoundError,
@@ -137,6 +138,10 @@ async def stage_media(
         **error_response(MediaFileTooLargeError, detail="upload exceeds the limit"),
         **error_response(
             UnsupportedMediaTypeError, detail="content type not permitted"
+        ),
+        **error_response(
+            AttachTargetNotFoundError,
+            detail="node 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
         ),
         **error_response(
             CoverAlreadySetError,

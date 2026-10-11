@@ -2,9 +2,12 @@ from abc import ABC, abstractmethod
 from enum import StrEnum
 from typing import TYPE_CHECKING, final
 
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
+from app.shared_kernel.authorization import AuthorizationPort  # noqa: TC001
+
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
-    from app.shared_kernel.authorization import AuthorizationPort
 
 
 class UseCase[TRequest, TResult](ABC):
@@ -34,24 +37,55 @@ class QueryHandler[TRepos, TQuery, TResult](UseCase[TQuery, TResult], ABC):
         self._repos = repos
 
 
-# TPermission defaults to StrEnum itself; pin it per-module (see §4) to
+class _PolicyHolder:
+    """Mixin: keeps the `AccessPolicy` a scoped use case consults."""
+
+    _policy: AccessPolicy
+
+    # A method, not __init__: a mixin __init__ would disturb the cooperative
+    # super().__init__ chain.
+    def _set_policy(self, policy: AccessPolicy) -> None:
+        self._policy = policy
+
+
+class ScopedCommandHandler[TUoW, TCommand, TResult](
+    _PolicyHolder, CommandHandler[TUoW, TCommand, TResult], ABC
+):
+    """State-mutating use case over content that an `AccessPolicy` scopes."""
+
+    def __init__(self, uow: TUoW, policy: AccessPolicy) -> None:
+        super().__init__(uow)
+        self._set_policy(policy)
+
+
+class ScopedQueryHandler[TRepos, TQuery, TResult](
+    _PolicyHolder, QueryHandler[TRepos, TQuery, TResult], ABC
+):
+    """Read-only use case over content that an `AccessPolicy` scopes."""
+
+    def __init__(self, repos: TRepos, policy: AccessPolicy) -> None:
+        super().__init__(repos)
+        self._set_policy(policy)
+
+
+# TPermission defaults to StrEnum itself; pin it per-module to
 # catch cross-module permission mixups at type-check time. Requires
 # Python 3.13+ syntax (PEP 696 default generic params).
 
 
-class AuthorisedUseCase[TRequest, TResult, TPermission: StrEnum = StrEnum](
-    UseCase[TRequest, TResult]
-):
-    """Authorised use case with no persistence dependency at all."""
+class _PermissionGate[TRequest, TResult, TPermission: StrEnum = StrEnum](ABC):
+    """Mixin: the permission check shared by every Authorised* use case.
+
+    Must precede the `UseCase` base in the MRO so its final `handle` wins.
+    """
+
+    _authorization: AuthorizationPort
 
     @property
     @abstractmethod
     def required_permission(self) -> TPermission:
         """Permission the actor must hold to invoke this use case."""
         ...
-
-    def __init__(self, authorization: AuthorizationPort) -> None:
-        self._authorization = authorization
 
     @final
     async def handle(self, request: TRequest, actor: Actor) -> TResult:
@@ -65,55 +99,32 @@ class AuthorisedUseCase[TRequest, TResult, TPermission: StrEnum = StrEnum](
         ...
 
 
+class AuthorisedUseCase[TRequest, TResult, TPermission: StrEnum = StrEnum](
+    _PermissionGate[TRequest, TResult, TPermission], UseCase[TRequest, TResult]
+):
+    """Authorised use case with no persistence dependency at all."""
+
+    def __init__(self, authorization: AuthorizationPort) -> None:
+        self._authorization = authorization
+
+
 class AuthorisedCommandHandler[TUoW, TCommand, TResult, TPermission: StrEnum = StrEnum](
-    CommandHandler[TUoW, TCommand, TResult]
+    _PermissionGate[TCommand, TResult, TPermission],
+    CommandHandler[TUoW, TCommand, TResult],
 ):
     """State-mutating use case with a UoW AND a mandatory permission check."""
-
-    @property
-    @abstractmethod
-    def required_permission(self) -> TPermission:
-        """Permission the actor must hold to invoke this command."""
-        ...
 
     def __init__(self, uow: TUoW, authorization: AuthorizationPort) -> None:
         super().__init__(uow)
         self._authorization = authorization
 
-    @final
-    async def handle(self, request: TCommand, actor: Actor) -> TResult:
-        """Check `actor` holds `required_permission`, then execute `request`."""
-        await self._authorization.check(actor, self.required_permission)
-        return await self._handle(request, actor)
-
-    @abstractmethod
-    async def _handle(self, command: TCommand, actor: Actor) -> TResult:
-        """Execute `command` on behalf of `actor`, after authorisation."""
-        ...
-
 
 class AuthorisedQueryHandler[TRepos, TQuery, TResult, TPermission: StrEnum = StrEnum](
-    QueryHandler[TRepos, TQuery, TResult]
+    _PermissionGate[TQuery, TResult, TPermission],
+    QueryHandler[TRepos, TQuery, TResult],
 ):
     """Read-only use case with repos AND a mandatory permission check."""
-
-    @property
-    @abstractmethod
-    def required_permission(self) -> TPermission:
-        """Permission the actor must hold to invoke this query."""
-        ...
 
     def __init__(self, repos: TRepos, authorization: AuthorizationPort) -> None:
         super().__init__(repos)
         self._authorization = authorization
-
-    @final
-    async def handle(self, request: TQuery, actor: Actor) -> TResult:
-        """Check `actor` holds `required_permission`, then execute `request`."""
-        await self._authorization.check(actor, self.required_permission)
-        return await self._handle(request, actor)
-
-    @abstractmethod
-    async def _handle(self, query: TQuery, actor: Actor) -> TResult:
-        """Execute `query` on behalf of `actor`, after authorisation."""
-        ...

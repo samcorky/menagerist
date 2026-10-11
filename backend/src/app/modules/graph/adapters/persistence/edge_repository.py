@@ -1,11 +1,12 @@
 from typing import TYPE_CHECKING, Any
 
 import structlog
-from sqlalchemy import column, exists, func, literal, or_, select
+from sqlalchemy import and_, column, exists, func, literal, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.modules.graph.adapters.persistence.models import EdgeModel
 from app.modules.graph.domain.edge import Edge
+from app.platform.orm_mixins import claim_rows, owned_by
 
 if TYPE_CHECKING:
     import builtins
@@ -13,6 +14,8 @@ if TYPE_CHECKING:
 
     from sqlalchemy import ColumnElement, SQLColumnExpression
     from sqlalchemy.ext.asyncio import AsyncSession
+
+    from app.shared_kernel.access_scope import AccessScope
 
 logger = structlog.get_logger()
 
@@ -35,6 +38,7 @@ def _to_domain(model: EdgeModel) -> Edge:
     """Convert an ORM row into the domain entity."""
     return Edge(
         id=model.id,
+        owner_id=model.owner_id,
         source_id=model.source_id,
         target_id=model.target_id,
         type=model.type,
@@ -49,6 +53,7 @@ def _to_model(edge: Edge) -> EdgeModel:
     """Convert a domain entity into its ORM row."""
     return EdgeModel(
         id=edge.id,
+        owner_id=edge.owner_id,
         source_id=edge.source_id,
         target_id=edge.target_id,
         type=edge.type,
@@ -57,6 +62,14 @@ def _to_model(edge: Edge) -> EdgeModel:
         updated_at=edge.updated_at,
         deleted_at=edge.deleted_at,
     )
+
+
+def _in_scope(scope: AccessScope) -> ColumnElement[bool]:
+    """The one visibility predicate: live edges the `scope` covers.
+
+    Edges with no owner are visible only under `everyone()`.
+    """
+    return and_(EdgeModel.deleted_at.is_(None), owned_by(EdgeModel, scope.user_id))
 
 
 class SqlAlchemyEdgeRepository:
@@ -81,23 +94,29 @@ class SqlAlchemyEdgeRepository:
         await self._session.merge(_to_model(edge))
         await self._session.flush()
 
-    async def get(self, edge_id: uuid.UUID) -> Edge | None:
-        """Return the edge with `edge_id`, or `None` if missing or deleted."""
+    async def get(self, edge_id: uuid.UUID, *, scope: AccessScope) -> Edge | None:
+        """Return the edge with `edge_id`, or `None` if missing, deleted or unseen."""
         logger.debug("fetching edge", edge_id=edge_id)
-        model = await self._session.get(EdgeModel, edge_id)
-        if model is None or model.deleted_at is not None:
-            return None
-        return _to_domain(model)
+        result = await self._session.execute(
+            select(EdgeModel).where(_in_scope(scope), EdgeModel.id == edge_id)
+        )
+        model = result.scalar_one_or_none()
+        return None if model is None else _to_domain(model)
 
     async def list_for_node(
-        self, node_id: uuid.UUID, *, after: uuid.UUID | None, limit: int
+        self,
+        node_id: uuid.UUID,
+        *,
+        scope: AccessScope,
+        after: uuid.UUID | None,
+        limit: int,
     ) -> list[Edge]:
         """List non-deleted edge where `node_id` is the source or target."""
         logger.debug("listing edges for node", node_id=node_id)
         stmt = (
             select(EdgeModel)
             .where(
-                EdgeModel.deleted_at.is_(None),
+                _in_scope(scope),
                 or_(EdgeModel.source_id == node_id, EdgeModel.target_id == node_id),
             )
             .order_by(EdgeModel.id)
@@ -108,12 +127,14 @@ class SqlAlchemyEdgeRepository:
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
 
-    async def list(self, *, after: uuid.UUID | None, limit: int) -> list[Edge]:
+    async def list(
+        self, *, scope: AccessScope, after: uuid.UUID | None, limit: int
+    ) -> list[Edge]:
         """List non-deleted edge ordered by id, starting after `after` if given."""
         logger.debug("listing edges", after=after, limit=limit)
         stmt = (
             select(EdgeModel)
-            .where(EdgeModel.deleted_at.is_(None))
+            .where(_in_scope(scope))
             .order_by(EdgeModel.id)
             .limit(limit)
         )
@@ -122,12 +143,10 @@ class SqlAlchemyEdgeRepository:
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
 
-    async def has_edges_of_type(self, type_slug: str) -> bool:
+    async def has_edges_of_type(self, type_slug: str, *, scope: AccessScope) -> bool:
         """Return True if any non-deleted edges reference `type_slug`."""
         logger.debug("checking edges of type", type_slug=type_slug)
-        stmt = select(
-            exists().where(EdgeModel.deleted_at.is_(None), EdgeModel.type == type_slug)
-        )
+        stmt = select(exists().where(_in_scope(scope), EdgeModel.type == type_slug))
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
@@ -136,6 +155,7 @@ class SqlAlchemyEdgeRepository:
         type_slug: str,
         key: str,
         *,
+        scope: AccessScope,
         sub_key: str | None = None,
         value: str | None = None,
     ) -> int:
@@ -144,7 +164,7 @@ class SqlAlchemyEdgeRepository:
         stmt = (
             select(func.count())
             .select_from(EdgeModel)
-            .where(EdgeModel.deleted_at.is_(None), EdgeModel.type == type_slug)
+            .where(_in_scope(scope), EdgeModel.type == type_slug)
         )
         if sub_key is None:
             stmt = stmt.where(EdgeModel.attributes.has_key(key))
@@ -168,15 +188,14 @@ class SqlAlchemyEdgeRepository:
         type_slug: str,
         key: str,
         *,
+        scope: AccessScope,
         sub_key: str | None = None,
         after: uuid.UUID | None,
         limit: int,
     ) -> builtins.list[Edge]:
         """List non-deleted edges of `type_slug` holding `key`, ordered by id."""
         logger.debug("listing edges with attribute", type_slug=type_slug, key=key)
-        stmt = select(EdgeModel).where(
-            EdgeModel.deleted_at.is_(None), EdgeModel.type == type_slug
-        )
+        stmt = select(EdgeModel).where(_in_scope(scope), EdgeModel.type == type_slug)
         if sub_key is None:
             stmt = stmt.where(EdgeModel.attributes.has_key(key))
         else:
@@ -188,3 +207,9 @@ class SqlAlchemyEdgeRepository:
             stmt = stmt.where(EdgeModel.id > after)
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
+
+    async def claim_orphaned(
+        self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
+    ) -> int:
+        """Give `owner_id` every connection with no owner or a legacy owner."""
+        return await claim_rows(self._session, EdgeModel, owner_id, legacy_owner_ids)

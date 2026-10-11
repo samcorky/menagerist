@@ -7,7 +7,7 @@ import structlog
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.errors import EdgeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.cqrs import QueryHandler
+from app.shared_kernel.cqrs import ScopedQueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -22,13 +22,16 @@ class GetEdgeQuery:
     edge_id: uuid.UUID
 
 
-class GetEdge(QueryHandler[GraphRepos, GetEdgeQuery, Edge]):
+class GetEdge(ScopedQueryHandler[GraphRepos, GetEdgeQuery, Edge]):
     """Fetch a single edge by id."""
 
     async def handle(self, query: GetEdgeQuery, actor: Actor) -> Edge:
         """Return the requested edge, raising `EdgeNotFoundError` if it's missing."""
-        edge = await self._repos.edges.get(query.edge_id)
+        edge = await self._repos.edges.get(
+            query.edge_id, scope=self._policy.scope_for(actor)
+        )
         if edge is None:
             raise EdgeNotFoundError(f"Edge {query.edge_id} not found")
+        self._policy.assert_can_view(actor, edge.owner_id)
         logger.debug("edge fetched", edge_id=query.edge_id)
         return edge

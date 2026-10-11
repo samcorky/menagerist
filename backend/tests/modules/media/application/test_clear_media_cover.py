@@ -4,6 +4,7 @@ import uuid
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
     InMemoryMediaAssetRepository,
 )
@@ -30,7 +31,11 @@ from app.shared_kernel.actor import SYSTEM_ACTOR
 
 def _make_attached_asset() -> MediaAsset:
     asset = MediaAsset.create(
-        filename="f.jpg", content_type="image/jpeg", size=1, sha256="x"
+        owner_id=SYSTEM_ACTOR.id,
+        filename="f.jpg",
+        content_type="image/jpeg",
+        size=1,
+        sha256="x",
     )
     asset.promote()
     return asset
@@ -40,10 +45,10 @@ def _make_use_case() -> tuple[
     ClearMediaCover, InMemoryMediaAssetRepository, InMemoryMediaAttachmentRepository
 ]:
     assets = InMemoryMediaAssetRepository()
-    attachments = InMemoryMediaAttachmentRepository()
+    attachments = InMemoryMediaAttachmentRepository(assets)
     repos = make_in_memory_repos(assets=assets, attachments=attachments)
     uow = create_in_memory_media_uow(repos)
-    return ClearMediaCover(uow), assets, attachments
+    return ClearMediaCover(uow, OwnerAccessPolicy()), assets, attachments
 
 
 async def test_clear_cover_keeps_asset_attached() -> None:

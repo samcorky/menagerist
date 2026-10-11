@@ -7,6 +7,7 @@ from app.modules.graph.adapters.persistence.node_repository import (
     SqlAlchemyNodeRepository,
 )
 from app.modules.graph.domain.node import Node
+from app.shared_kernel.access_scope import AccessScope
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +18,7 @@ pytestmark = pytest.mark.integration
 def _fields(node: Node) -> tuple[object, ...]:
     return (
         node.id,
+        node.owner_id,
         node.name,
         node.type,
         node.description,
@@ -33,10 +35,10 @@ def _fields(node: Node) -> tuple[object, ...]:
 async def test_add_and_get_round_trips(db_session: AsyncSession) -> None:
     """A node added to the repository can be retrieved by id."""
     repository = SqlAlchemyNodeRepository(db_session)
-    node = Node.create(name="Alien", type="film")
+    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
 
     await repository.add(node)
-    result = await repository.get(node.id)
+    result = await repository.get(node.id, scope=AccessScope.everyone())
 
     assert result is not None
     assert _fields(result) == _fields(node)
@@ -47,10 +49,10 @@ async def test_add_and_get_round_trips_a_null_extra_schema(
 ) -> None:
     """A node with no overlay stores and returns `extra_schema` as None."""
     repository = SqlAlchemyNodeRepository(db_session)
-    node = Node.create(name="Alien", type="film")
+    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
 
     await repository.add(node)
-    result = await repository.get(node.id)
+    result = await repository.get(node.id, scope=AccessScope.everyone())
 
     assert result is not None
     assert result.extra_schema is None
@@ -65,10 +67,12 @@ async def test_add_and_get_round_trips_an_extra_schema(
         "type": "object",
         "properties": {"signed": {"type": "boolean", "x-menagerist": {}}},
     }
-    node = Node.create(name="Alien", type="film", extra_schema=schema)
+    node = Node.create(
+        owner_id=uuid.UUID(int=1), name="Alien", type="film", extra_schema=schema
+    )
 
     await repository.add(node)
-    result = await repository.get(node.id)
+    result = await repository.get(node.id, scope=AccessScope.everyone())
 
     assert result is not None
     assert result.extra_schema == schema
@@ -77,12 +81,12 @@ async def test_add_and_get_round_trips_an_extra_schema(
 async def test_save_persists_a_changed_extra_schema(db_session: AsyncSession) -> None:
     """Updating extra_schema on an existing node and saving it persists the change."""
     repository = SqlAlchemyNodeRepository(db_session)
-    node = Node.create(name="Alien", type="film")
+    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
     await repository.add(node)
 
     node.update(extra_schema={"type": "object", "properties": {}})
     await repository.save(node)
-    result = await repository.get(node.id)
+    result = await repository.get(node.id, scope=AccessScope.everyone())
 
     assert result is not None
     assert result.extra_schema == {"type": "object", "properties": {}}
@@ -92,17 +96,20 @@ async def test_get_returns_none_for_missing_node(db_session: AsyncSession) -> No
     """get() returns None for an id that was never added."""
     repository = SqlAlchemyNodeRepository(db_session)
 
-    assert await repository.get(uuid.uuid4()) is None
+    assert await repository.get(uuid.uuid4(), scope=AccessScope.everyone()) is None
 
 
 async def test_list_orders_by_id_ascending(db_session: AsyncSession) -> None:
     """list() returns node ordered by id ascending, regardless of insert order."""
     repository = SqlAlchemyNodeRepository(db_session)
-    nodes = [Node.create(name="Alien", type="film") for _ in range(3)]
+    nodes = [
+        Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
+        for _ in range(3)
+    ]
     for node in reversed(nodes):
         await repository.add(node)
 
-    result = await repository.list(after=None, limit=10)
+    result = await repository.list(scope=AccessScope.everyone(), after=None, limit=10)
 
     assert [n.id for n in result] == sorted(n.id for n in nodes)
 
@@ -111,12 +118,18 @@ async def test_list_respects_after_and_limit(db_session: AsyncSession) -> None:
     """list() paginates using after/limit."""
     repository = SqlAlchemyNodeRepository(db_session)
     nodes = sorted(
-        (Node.create(name="Alien", type="film") for _ in range(4)), key=lambda n: n.id
+        (
+            Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
+            for _ in range(4)
+        ),
+        key=lambda n: n.id,
     )
     for node in nodes:
         await repository.add(node)
 
-    page = await repository.list(after=nodes[0].id, limit=2)
+    page = await repository.list(
+        scope=AccessScope.everyone(), after=nodes[0].id, limit=2
+    )
 
     assert [n.id for n in page] == [n.id for n in nodes[1:3]]
 
@@ -126,13 +139,13 @@ async def test_save_persists_changes_to_an_existing_node(
 ) -> None:
     """save() overwrites the stored node with the given instance."""
     repository = SqlAlchemyNodeRepository(db_session)
-    node = Node.create(name="Alien", type="film")
+    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
     await repository.add(node)
 
     node.update(name="Alien (1979)")
     await repository.save(node)
 
-    result = await repository.get(node.id)
+    result = await repository.get(node.id, scope=AccessScope.everyone())
     assert result is not None
     assert result.name == "Alien (1979)"
 
@@ -142,22 +155,22 @@ async def test_get_returns_none_for_a_soft_deleted_node(
 ) -> None:
     """get() treats a soft-deleted node as if it doesn't exist."""
     repository = SqlAlchemyNodeRepository(db_session)
-    node = Node.create(name="Alien", type="film")
+    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
     await repository.add(node)
 
     node.soft_delete()
     await repository.save(node)
 
-    assert await repository.get(node.id) is None
+    assert await repository.get(node.id, scope=AccessScope.everyone()) is None
 
 
 async def test_favourite_field_round_trips(db_session: AsyncSession) -> None:
     """A node created with favourite=True stores and retrieves the value correctly."""
     repository = SqlAlchemyNodeRepository(db_session)
-    node = Node.create(name="Alien", favourite=True)
+    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", favourite=True)
 
     await repository.add(node)
-    result = await repository.get(node.id)
+    result = await repository.get(node.id, scope=AccessScope.everyone())
 
     assert result is not None
     assert result.favourite is True
@@ -167,13 +180,13 @@ async def test_favourite_field_round_trips(db_session: AsyncSession) -> None:
 async def test_save_persists_favourite_change(db_session: AsyncSession) -> None:
     """save() persists a change to the favourite field."""
     repository = SqlAlchemyNodeRepository(db_session)
-    node = Node.create(name="Alien")
+    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien")
     await repository.add(node)
 
     node.update(favourite=True)
     await repository.save(node)
 
-    result = await repository.get(node.id)
+    result = await repository.get(node.id, scope=AccessScope.everyone())
     assert result is not None
     assert result.favourite is True
 
@@ -181,12 +194,14 @@ async def test_save_persists_favourite_change(db_session: AsyncSession) -> None:
 async def test_list_filters_by_favourite(db_session: AsyncSession) -> None:
     """list(favourite=True) returns only favourited nodes."""
     repository = SqlAlchemyNodeRepository(db_session)
-    starred = Node.create(name="Alien", favourite=True)
-    plain = Node.create(name="Predator")
+    starred = Node.create(owner_id=uuid.UUID(int=1), name="Alien", favourite=True)
+    plain = Node.create(owner_id=uuid.UUID(int=1), name="Predator")
     await repository.add(starred)
     await repository.add(plain)
 
-    result = await repository.list(after=None, limit=10, favourite=True)
+    result = await repository.list(
+        scope=AccessScope.everyone(), after=None, limit=10, favourite=True
+    )
 
     assert [n.id for n in result] == [starred.id]
 
@@ -195,26 +210,28 @@ async def test_count_filters_by_favourite(db_session: AsyncSession) -> None:
     """count(favourite=True) counts only favourited nodes."""
     repository = SqlAlchemyNodeRepository(db_session)
     for _ in range(3):
-        await repository.add(Node.create(name="Alien", favourite=True))
+        await repository.add(
+            Node.create(owner_id=uuid.UUID(int=1), name="Alien", favourite=True)
+        )
     for _ in range(2):
-        await repository.add(Node.create(name="Predator"))
+        await repository.add(Node.create(owner_id=uuid.UUID(int=1), name="Predator"))
 
-    assert await repository.count(favourite=True) == 3
-    assert await repository.count(favourite=False) == 2
+    assert await repository.count(scope=AccessScope.everyone(), favourite=True) == 3
+    assert await repository.count(scope=AccessScope.everyone(), favourite=False) == 2
 
 
 async def test_list_excludes_soft_deleted_nodes(db_session: AsyncSession) -> None:
     """list() omits soft-deleted node."""
     repository = SqlAlchemyNodeRepository(db_session)
-    kept = Node.create(name="Alien", type="film")
-    deleted = Node.create(name="Predator", type="film")
+    kept = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
+    deleted = Node.create(owner_id=uuid.UUID(int=1), name="Predator", type="film")
     await repository.add(kept)
     await repository.add(deleted)
 
     deleted.soft_delete()
     await repository.save(deleted)
 
-    result = await repository.list(after=None, limit=10)
+    result = await repository.list(scope=AccessScope.everyone(), after=None, limit=10)
 
     assert [n.id for n in result] == [kept.id]
 
@@ -222,17 +239,19 @@ async def test_list_excludes_soft_deleted_nodes(db_session: AsyncSession) -> Non
 async def test_tags_round_trip(db_session: AsyncSession) -> None:
     """Tags are stored as JSONB and come back as the same list, and updates persist."""
     repository = SqlAlchemyNodeRepository(db_session)
-    node = Node.create(name="Alien", tags=["Sci-Fi", "horror"])
+    node = Node.create(
+        owner_id=uuid.UUID(int=1), name="Alien", tags=["Sci-Fi", "horror"]
+    )
     await repository.add(node)
 
-    result = await repository.get(node.id)
+    result = await repository.get(node.id, scope=AccessScope.everyone())
 
     assert result is not None
     assert result.tags == ["sci-fi", "horror"]
 
     node.update(tags=["classic"])
     await repository.save(node)
-    updated = await repository.get(node.id)
+    updated = await repository.get(node.id, scope=AccessScope.everyone())
 
     assert updated is not None
     assert updated.tags == ["classic"]
@@ -244,29 +263,52 @@ async def test_count_and_list_with_attribute_use_jsonb_key_lookup(
     """Only live nodes of the type whose JSONB attributes hold the key match."""
     repository = SqlAlchemyNodeRepository(db_session)
     nodes = [
-        Node.create(name=f"n{i}", type="film", attributes={"k": i, "keep": 1})
+        Node.create(
+            owner_id=uuid.UUID(int=1),
+            name=f"n{i}",
+            type="film",
+            attributes={"k": i, "keep": 1},
+        )
         for i in range(3)
     ]
-    gone = Node.create(name="gone", type="film", attributes={"k": 9})
+    gone = Node.create(
+        owner_id=uuid.UUID(int=1), name="gone", type="film", attributes={"k": 9}
+    )
     gone.soft_delete()
     for node in [
         *nodes,
-        Node.create(name="book", type="book", attributes={"k": 1}),
-        Node.create(name="bare", type="film", attributes={"keep": 1}),
-        Node.create(name="null", type="film", attributes={"k": None}),
+        Node.create(
+            owner_id=uuid.UUID(int=1), name="book", type="book", attributes={"k": 1}
+        ),
+        Node.create(
+            owner_id=uuid.UUID(int=1), name="bare", type="film", attributes={"keep": 1}
+        ),
+        Node.create(
+            owner_id=uuid.UUID(int=1), name="null", type="film", attributes={"k": None}
+        ),
         gone,
     ]:
         await repository.add(node)
 
-    assert await repository.count_with_attribute("film", "k") == 4
-    page = await repository.list_with_attribute("film", "k", after=None, limit=2)
+    assert (
+        await repository.count_with_attribute("film", "k", scope=AccessScope.everyone())
+        == 4
+    )
+    page = await repository.list_with_attribute(
+        "film", "k", after=None, limit=2, scope=AccessScope.everyone()
+    )
     assert len(page) == 2
     rest = await repository.list_with_attribute(
-        "film", "k", after=page[-1].id, limit=10
+        "film", "k", after=page[-1].id, limit=10, scope=AccessScope.everyone()
     )
     assert len(rest) == 2
     assert {n.name for n in [*page, *rest]} == {"n0", "n1", "n2", "null"}
-    assert await repository.count_with_attribute("film", "missing") == 0
+    assert (
+        await repository.count_with_attribute(
+            "film", "missing", scope=AccessScope.everyone()
+        )
+        == 0
+    )
 
 
 async def test_count_with_attribute_matches_an_exact_string_value(
@@ -282,11 +324,28 @@ async def test_count_with_attribute_matches_an_exact_string_value(
         ("e", {"x": "Draft"}),
     ]
     for name, attrs in cases:
-        await repository.add(Node.create(name=name, type="film", attributes=attrs))
+        await repository.add(
+            Node.create(
+                owner_id=uuid.UUID(int=1), name=name, type="film", attributes=attrs
+            )
+        )
 
-    assert await repository.count_with_attribute("film", "s", value="Draft") == 2
-    assert await repository.count_with_attribute("film", "s", value="1") == 0
-    assert await repository.count_with_attribute("film", "s") == 4
+    assert (
+        await repository.count_with_attribute(
+            "film", "s", value="Draft", scope=AccessScope.everyone()
+        )
+        == 2
+    )
+    assert (
+        await repository.count_with_attribute(
+            "film", "s", value="1", scope=AccessScope.everyone()
+        )
+        == 0
+    )
+    assert (
+        await repository.count_with_attribute("film", "s", scope=AccessScope.everyone())
+        == 4
+    )
 
 
 async def test_count_with_attribute_value_matches_array_membership(
@@ -296,11 +355,26 @@ async def test_count_with_attribute_value_matches_array_membership(
     repository = SqlAlchemyNodeRepository(db_session)
     for name, held in [("a", ["CD", "Tape"]), ("b", ["Vinyl"]), ("c", "CD")]:
         await repository.add(
-            Node.create(name=name, type="film", attributes={"f": held})
+            Node.create(
+                owner_id=uuid.UUID(int=1),
+                name=name,
+                type="film",
+                attributes={"f": held},
+            )
         )
 
-    assert await repository.count_with_attribute("film", "f", value="CD") == 2
-    assert await repository.count_with_attribute("film", "f", value="C") == 0
+    assert (
+        await repository.count_with_attribute(
+            "film", "f", value="CD", scope=AccessScope.everyone()
+        )
+        == 2
+    )
+    assert (
+        await repository.count_with_attribute(
+            "film", "f", value="C", scope=AccessScope.everyone()
+        )
+        == 0
+    )
 
 
 async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
@@ -309,38 +383,62 @@ async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
     """With `sub_key`, `key` names a group array and its rows are matched instead."""
     repository = SqlAlchemyNodeRepository(db_session)
     has_ingredient = Node.create(
+        owner_id=uuid.UUID(int=1),
         name="a",
         type="recipe",
         attributes={"ingredients": [{"name": "Flour", "unit": "g"}]},
     )
     other_row_shape = Node.create(
-        name="b", type="recipe", attributes={"ingredients": [{"name": "Salt"}]}
+        owner_id=uuid.UUID(int=1),
+        name="b",
+        type="recipe",
+        attributes={"ingredients": [{"name": "Salt"}]},
     )
     for node in [
         has_ingredient,
         other_row_shape,
-        Node.create(name="c", type="recipe", attributes={"ingredients": []}),
-        Node.create(name="d", type="recipe", attributes={}),
+        Node.create(
+            owner_id=uuid.UUID(int=1),
+            name="c",
+            type="recipe",
+            attributes={"ingredients": []},
+        ),
+        Node.create(owner_id=uuid.UUID(int=1), name="d", type="recipe", attributes={}),
     ]:
         await repository.add(node)
 
     assert (
-        await repository.count_with_attribute("recipe", "ingredients", sub_key="unit")
+        await repository.count_with_attribute(
+            "recipe", "ingredients", sub_key="unit", scope=AccessScope.everyone()
+        )
         == 1
     )
     page = await repository.list_with_attribute(
-        "recipe", "ingredients", sub_key="unit", after=None, limit=10
+        "recipe",
+        "ingredients",
+        sub_key="unit",
+        after=None,
+        limit=10,
+        scope=AccessScope.everyone(),
     )
     assert [n.id for n in page] == [has_ingredient.id]
     assert (
         await repository.count_with_attribute(
-            "recipe", "ingredients", sub_key="unit", value="g"
+            "recipe",
+            "ingredients",
+            sub_key="unit",
+            value="g",
+            scope=AccessScope.everyone(),
         )
         == 1
     )
     assert (
         await repository.count_with_attribute(
-            "recipe", "ingredients", sub_key="unit", value="kg"
+            "recipe",
+            "ingredients",
+            sub_key="unit",
+            value="kg",
+            scope=AccessScope.everyone(),
         )
         == 0
     )
@@ -351,22 +449,58 @@ async def test_list_attribute_values_counts_distinct_strings_most_used_first(
 ) -> None:
     """Only string-typed JSONB values count; ordered by count desc then value asc."""
     repository = SqlAlchemyNodeRepository(db_session)
-    deleted = Node.create(name="y", type="film", attributes={"status": "Draft"})
+    deleted = Node.create(
+        owner_id=uuid.UUID(int=1), name="y", type="film", attributes={"status": "Draft"}
+    )
     deleted.soft_delete()
     for node in [
-        Node.create(name="a", type="film", attributes={"status": "Draft"}),
-        Node.create(name="b", type="film", attributes={"status": "Draft"}),
-        Node.create(name="c", type="film", attributes={"status": "Live"}),
-        Node.create(name="d", type="film", attributes={"status": 1}),
-        Node.create(name="e", type="film", attributes={"status": True}),
-        Node.create(name="f", type="film", attributes={"status": None}),
-        Node.create(name="g", type="film", attributes={}),
-        Node.create(name="h", type="book", attributes={"status": "Draft"}),
+        Node.create(
+            owner_id=uuid.UUID(int=1),
+            name="a",
+            type="film",
+            attributes={"status": "Draft"},
+        ),
+        Node.create(
+            owner_id=uuid.UUID(int=1),
+            name="b",
+            type="film",
+            attributes={"status": "Draft"},
+        ),
+        Node.create(
+            owner_id=uuid.UUID(int=1),
+            name="c",
+            type="film",
+            attributes={"status": "Live"},
+        ),
+        Node.create(
+            owner_id=uuid.UUID(int=1), name="d", type="film", attributes={"status": 1}
+        ),
+        Node.create(
+            owner_id=uuid.UUID(int=1),
+            name="e",
+            type="film",
+            attributes={"status": True},
+        ),
+        Node.create(
+            owner_id=uuid.UUID(int=1),
+            name="f",
+            type="film",
+            attributes={"status": None},
+        ),
+        Node.create(owner_id=uuid.UUID(int=1), name="g", type="film", attributes={}),
+        Node.create(
+            owner_id=uuid.UUID(int=1),
+            name="h",
+            type="book",
+            attributes={"status": "Draft"},
+        ),
         deleted,
     ]:
         await repository.add(node)
 
-    values = await repository.list_attribute_values("film", "status")
+    values = await repository.list_attribute_values(
+        "film", "status", scope=AccessScope.everyone()
+    )
 
     assert values == [("Draft", 2), ("Live", 1)]
 
@@ -378,15 +512,20 @@ async def test_list_attribute_values_filters_by_q_and_limit(
     repository = SqlAlchemyNodeRepository(db_session)
     for name, status in [("a", "Draft"), ("b", "Draft"), ("c", "Live")]:
         await repository.add(
-            Node.create(name=name, type="film", attributes={"status": status})
+            Node.create(
+                owner_id=uuid.UUID(int=1),
+                name=name,
+                type="film",
+                attributes={"status": status},
+            )
         )
 
-    assert await repository.list_attribute_values("film", "status", q="live") == [
-        ("Live", 1)
-    ]
-    assert await repository.list_attribute_values("film", "status", limit=1) == [
-        ("Draft", 2)
-    ]
+    assert await repository.list_attribute_values(
+        "film", "status", q="live", scope=AccessScope.everyone()
+    ) == [("Live", 1)]
+    assert await repository.list_attribute_values(
+        "film", "status", limit=1, scope=AccessScope.everyone()
+    ) == [("Draft", 2)]
 
 
 _BACKSLASH = chr(92)
@@ -399,9 +538,15 @@ async def _search_ids(
     exclusions: dict[str, list[str]] | None = None,
 ) -> list[uuid.UUID]:
     listed = await repository.list(
-        after=None, limit=50, q=q, attribute_search_exclusions=exclusions
+        scope=AccessScope.everyone(),
+        after=None,
+        limit=50,
+        q=q,
+        attribute_search_exclusions=exclusions,
     )
-    counted = await repository.count(q=q, attribute_search_exclusions=exclusions)
+    counted = await repository.count(
+        scope=AccessScope.everyone(), q=q, attribute_search_exclusions=exclusions
+    )
     assert counted == len(listed), q
     return [node.id for node in listed]
 
@@ -412,6 +557,7 @@ async def test_search_matches_attribute_values_but_not_keys(
     """Strings, numbers and group cells match; key names, booleans and nulls do not."""
     repository = SqlAlchemyNodeRepository(db_session)
     film = Node.create(
+        owner_id=uuid.UUID(int=1),
         name="Alien",
         type="film",
         attributes={
@@ -436,12 +582,20 @@ async def test_search_exclusions_apply_only_to_their_type(
     """Excluded keys are skipped for that type; the same key elsewhere still matches."""
     repository = SqlAlchemyNodeRepository(db_session)
     film = Node.create(
+        owner_id=uuid.UUID(int=1),
         name="Alien",
         type="film",
         attributes={"old_note": "gooey", "internal": "secret", "stars": 5},
     )
-    person = Node.create(name="Ripley", type="person", attributes={"old_note": "gooey"})
-    untyped = Node.create(name="Loose", attributes={"internal": "secret"})
+    person = Node.create(
+        owner_id=uuid.UUID(int=1),
+        name="Ripley",
+        type="person",
+        attributes={"old_note": "gooey"},
+    )
+    untyped = Node.create(
+        owner_id=uuid.UUID(int=1), name="Loose", attributes={"internal": "secret"}
+    )
     for node in (film, person, untyped):
         await repository.add(node)
 
@@ -458,7 +612,9 @@ async def test_search_still_matches_name_and_description(
 ) -> None:
     """A type with exclusions can still be found by name and description."""
     repository = SqlAlchemyNodeRepository(db_session)
-    film = Node.create(name="Alien", type="film", description="a xenomorph")
+    film = Node.create(
+        owner_id=uuid.UUID(int=1), name="Alien", type="film", description="a xenomorph"
+    )
     await repository.add(film)
 
     assert await _search_ids(repository, "alien", _EXCLUSIONS) == [film.id]
@@ -470,10 +626,14 @@ async def test_search_treats_like_wildcards_and_backslash_literally(
 ) -> None:
     """`%`, `_` and the escape character in the query match only themselves."""
     repository = SqlAlchemyNodeRepository(db_session)
-    pct = Node.create(name="100% sure")
-    under = Node.create(name="a_b")
-    slash = Node.create(name="x", attributes={"path": "c:" + _BACKSLASH + "temp"})
-    plain = Node.create(name="Plain")
+    pct = Node.create(owner_id=uuid.UUID(int=1), name="100% sure")
+    under = Node.create(owner_id=uuid.UUID(int=1), name="a_b")
+    slash = Node.create(
+        owner_id=uuid.UUID(int=1),
+        name="x",
+        attributes={"path": "c:" + _BACKSLASH + "temp"},
+    )
+    plain = Node.create(owner_id=uuid.UUID(int=1), name="Plain")
     for node in (pct, under, slash, plain):
         await repository.add(node)
 
@@ -486,7 +646,9 @@ async def test_search_treats_like_wildcards_and_backslash_literally(
 async def test_search_ignores_deleted_nodes(db_session: AsyncSession) -> None:
     """Soft-deleted nodes never match."""
     repository = SqlAlchemyNodeRepository(db_session)
-    node = Node.create(name="Gone", attributes={"note": "findme"})
+    node = Node.create(
+        owner_id=uuid.UUID(int=1), name="Gone", attributes={"note": "findme"}
+    )
     node.deleted_at = node.created_at
     await repository.add(node)
 
@@ -499,10 +661,12 @@ async def _seed_for_ids(
     """Add four nodes (film, film, film favourite, book) and return them by id order."""
     repository = SqlAlchemyNodeRepository(db_session)
     nodes = [
-        Node.create(name="Alien", type="film"),
-        Node.create(name="Aliens", type="film"),
-        Node.create(name="Blade Runner", type="film", favourite=True),
-        Node.create(name="Dune", type="book"),
+        Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film"),
+        Node.create(owner_id=uuid.UUID(int=1), name="Aliens", type="film"),
+        Node.create(
+            owner_id=uuid.UUID(int=1), name="Blade Runner", type="film", favourite=True
+        ),
+        Node.create(owner_id=uuid.UUID(int=1), name="Dune", type="book"),
     ]
     for node in nodes:
         await repository.add(node)
@@ -514,26 +678,37 @@ async def test_ids_restricts_list_and_count(db_session: AsyncSession) -> None:
     repository, nodes = await _seed_for_ids(db_session)
     wanted = {nodes[3].id, nodes[1].id}
 
-    result = await repository.list(after=None, limit=10, ids=wanted)
+    result = await repository.list(
+        scope=AccessScope.everyone(), after=None, limit=10, ids=wanted
+    )
 
     assert [n.id for n in result] == [nodes[1].id, nodes[3].id]
-    assert await repository.count(ids=wanted) == 2
+    assert await repository.count(scope=AccessScope.everyone(), ids=wanted) == 2
 
 
 async def test_ids_none_means_no_restriction(db_session: AsyncSession) -> None:
     """`ids=None` applies no id restriction."""
     repository, nodes = await _seed_for_ids(db_session)
 
-    assert len(await repository.list(after=None, limit=10, ids=None)) == len(nodes)
-    assert await repository.count(ids=None) == len(nodes)
+    assert len(
+        await repository.list(
+            scope=AccessScope.everyone(), after=None, limit=10, ids=None
+        )
+    ) == len(nodes)
+    assert await repository.count(scope=AccessScope.everyone(), ids=None) == len(nodes)
 
 
 async def test_empty_ids_returns_nothing(db_session: AsyncSession) -> None:
     """An empty `ids` collection yields no results and a zero count."""
     repository, _ = await _seed_for_ids(db_session)
 
-    assert await repository.list(after=None, limit=10, ids=set()) == []
-    assert await repository.count(ids=set()) == 0
+    assert (
+        await repository.list(
+            scope=AccessScope.everyone(), after=None, limit=10, ids=set()
+        )
+        == []
+    )
+    assert await repository.count(scope=AccessScope.everyone(), ids=set()) == 0
 
 
 async def test_ids_ignores_unknown_and_deleted_nodes(db_session: AsyncSession) -> None:
@@ -543,10 +718,12 @@ async def test_ids_ignores_unknown_and_deleted_nodes(db_session: AsyncSession) -
     await repository.save(nodes[0])
     wanted = [nodes[0].id, nodes[1].id, uuid.uuid4()]
 
-    result = await repository.list(after=None, limit=10, ids=wanted)
+    result = await repository.list(
+        scope=AccessScope.everyone(), after=None, limit=10, ids=wanted
+    )
 
     assert [n.id for n in result] == [nodes[1].id]
-    assert await repository.count(ids=wanted) == 1
+    assert await repository.count(scope=AccessScope.everyone(), ids=wanted) == 1
 
 
 async def test_ids_combines_with_other_filters(db_session: AsyncSession) -> None:
@@ -555,32 +732,56 @@ async def test_ids_combines_with_other_filters(db_session: AsyncSession) -> None
     everything = {n.id for n in nodes}
     films = {nodes[0].id, nodes[1].id, nodes[3].id}
 
-    by_type = await repository.list(after=None, limit=10, ids=films, type="film")
+    by_type = await repository.list(
+        scope=AccessScope.everyone(), after=None, limit=10, ids=films, type="film"
+    )
     assert [n.id for n in by_type] == [nodes[0].id, nodes[1].id]
-    assert await repository.count(ids=films, type="film") == 2
+    assert (
+        await repository.count(scope=AccessScope.everyone(), ids=films, type="film")
+        == 2
+    )
 
-    by_q = await repository.list(after=None, limit=10, ids=films, q="alien")
+    by_q = await repository.list(
+        scope=AccessScope.everyone(), after=None, limit=10, ids=films, q="alien"
+    )
     assert [n.id for n in by_q] == [nodes[0].id, nodes[1].id]
-    assert await repository.count(ids=films, q="alien") == 2
+    assert (
+        await repository.count(scope=AccessScope.everyone(), ids=films, q="alien") == 2
+    )
 
-    by_fav = await repository.list(after=None, limit=10, ids=films, favourite=True)
+    by_fav = await repository.list(
+        scope=AccessScope.everyone(), after=None, limit=10, ids=films, favourite=True
+    )
     assert by_fav == []
-    assert await repository.count(ids=everything, favourite=True) == 1
+    assert (
+        await repository.count(
+            scope=AccessScope.everyone(), ids=everything, favourite=True
+        )
+        == 1
+    )
 
-    paged = await repository.list(after=nodes[0].id, limit=1, ids=films)
+    paged = await repository.list(
+        scope=AccessScope.everyone(), after=nodes[0].id, limit=1, ids=films
+    )
     assert [n.id for n in paged] == [nodes[1].id]
-    nxt = await repository.list(after=nodes[1].id, limit=5, ids=films)
+    nxt = await repository.list(
+        scope=AccessScope.everyone(), after=nodes[1].id, limit=5, ids=films
+    )
     assert [n.id for n in nxt] == [nodes[3].id]
 
 
 async def test_search_ignores_accents_both_ways(db_session: AsyncSession) -> None:
     """Accented text matches plain `q` and vice versa, in name, description, values."""
     repository = SqlAlchemyNodeRepository(db_session)
-    by_name = Node.create(name="Café", type="film")
-    by_description = Node.create(name="X", description="Crème brûlée")
-    by_value = Node.create(name="Y", type="film", attributes={"director": "Zoë"})
-    plain = Node.create(name="Cafe plain")
-    percent = Node.create(name="50% café")
+    by_name = Node.create(owner_id=uuid.UUID(int=1), name="Café", type="film")
+    by_description = Node.create(
+        owner_id=uuid.UUID(int=1), name="X", description="Crème brûlée"
+    )
+    by_value = Node.create(
+        owner_id=uuid.UUID(int=1), name="Y", type="film", attributes={"director": "Zoë"}
+    )
+    plain = Node.create(owner_id=uuid.UUID(int=1), name="Cafe plain")
+    percent = Node.create(owner_id=uuid.UUID(int=1), name="50% café")
     for node in (by_name, by_description, by_value, plain, percent):
         await repository.add(node)
 
@@ -600,9 +801,27 @@ async def test_list_attribute_values_q_ignores_accents(
 ) -> None:
     """Attribute value suggestions fold accents in both directions."""
     repository = SqlAlchemyNodeRepository(db_session)
-    await repository.add(Node.create(name="a", type="film", attributes={"s": "Zoë"}))
-    await repository.add(Node.create(name="b", type="film", attributes={"s": "Zoe"}))
+    await repository.add(
+        Node.create(
+            owner_id=uuid.UUID(int=1), name="a", type="film", attributes={"s": "Zoë"}
+        )
+    )
+    await repository.add(
+        Node.create(
+            owner_id=uuid.UUID(int=1), name="b", type="film", attributes={"s": "Zoe"}
+        )
+    )
 
     expected = [("Zoe", 1), ("Zoë", 1)]
-    assert await repository.list_attribute_values("film", "s", q="zoe") == expected
-    assert await repository.list_attribute_values("film", "s", q="ZOË") == expected
+    assert (
+        await repository.list_attribute_values(
+            "film", "s", q="zoe", scope=AccessScope.everyone()
+        )
+        == expected
+    )
+    assert (
+        await repository.list_attribute_values(
+            "film", "s", q="ZOË", scope=AccessScope.everyone()
+        )
+        == expected
+    )

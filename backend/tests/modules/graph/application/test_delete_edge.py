@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -21,13 +22,19 @@ from app.modules.graph.application.delete_edge import DeleteEdge, DeleteEdgeComm
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.errors import EdgeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
 async def test_delete_edge_soft_deletes_and_commits() -> None:
     """DeleteEdge soft-deletes the edge and commits the unit of work."""
     repository = InMemoryEdgeRepository()
-    edge = Edge.create(source_id=uuid.uuid4(), target_id=uuid.uuid4(), type="owns")
+    edge = Edge.create(
+        owner_id=uuid.UUID(int=1),
+        source_id=uuid.uuid4(),
+        target_id=uuid.uuid4(),
+        type="owns",
+    )
     await repository.add(edge)
     repos = GraphRepos(
         nodes=InMemoryNodeRepository(),
@@ -36,11 +43,11 @@ async def test_delete_edge_soft_deletes_and_commits() -> None:
         edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = create_in_memory_graph_uow(repos)
-    use_case = DeleteEdge(uow)
+    use_case = DeleteEdge(uow, OwnerAccessPolicy())
 
     await use_case.handle(DeleteEdgeCommand(edge_id=edge.id), SYSTEM_ACTOR)
 
-    assert await repos.edges.get(edge.id) is None
+    assert await repos.edges.get(edge.id, scope=AccessScope.everyone()) is None
 
 
 async def test_delete_edge_raises_when_missing() -> None:
@@ -52,7 +59,7 @@ async def test_delete_edge_raises_when_missing() -> None:
         edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = create_in_memory_graph_uow(repos)
-    use_case = DeleteEdge(uow)
+    use_case = DeleteEdge(uow, OwnerAccessPolicy())
 
     with pytest.raises(EdgeNotFoundError):
         await use_case.handle(DeleteEdgeCommand(edge_id=uuid.uuid4()), SYSTEM_ACTOR)

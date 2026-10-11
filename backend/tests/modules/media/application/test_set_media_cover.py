@@ -2,9 +2,11 @@
 
 import asyncio
 import uuid
+from typing import TYPE_CHECKING
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
     InMemoryMediaAssetRepository,
 )
@@ -32,10 +34,17 @@ from app.modules.media.domain.media_attachment import (
 )
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
+if TYPE_CHECKING:
+    from app.shared_kernel.access_scope import AccessScope
+
 
 def _make_image_asset() -> MediaAsset:
     asset = MediaAsset.create(
-        filename="f.jpg", content_type="image/jpeg", size=1, sha256="x"
+        owner_id=SYSTEM_ACTOR.id,
+        filename="f.jpg",
+        content_type="image/jpeg",
+        size=1,
+        sha256="x",
     )
     asset.promote()
     return asset
@@ -45,10 +54,10 @@ def _make_use_case() -> tuple[
     SetMediaCover, InMemoryMediaAssetRepository, InMemoryMediaAttachmentRepository
 ]:
     assets = InMemoryMediaAssetRepository()
-    attachments = InMemoryMediaAttachmentRepository()
+    attachments = InMemoryMediaAttachmentRepository(assets)
     repos = make_in_memory_repos(assets=assets, attachments=attachments)
     uow = create_in_memory_media_uow(repos)
-    return SetMediaCover(uow), assets, attachments
+    return SetMediaCover(uow, OwnerAccessPolicy()), assets, attachments
 
 
 async def test_set_cover_atomically_unsets_previous_cover() -> None:
@@ -140,7 +149,11 @@ async def test_set_cover_rejects_non_image_asset() -> None:
 
     node_id = uuid.uuid4()
     asset = MediaAsset.create(
-        filename="f.pdf", content_type="application/pdf", size=1, sha256="x"
+        owner_id=SYSTEM_ACTOR.id,
+        filename="f.pdf",
+        content_type="application/pdf",
+        size=1,
+        sha256="x",
     )
     asset.promote()
     await assets.add(asset)
@@ -178,7 +191,7 @@ async def test_set_cover_raises_when_asset_not_attached_to_target() -> None:
 async def test_set_cover_still_replaces_an_existing_cover() -> None:
     """Moving the cover flag is not blocked by the one-cover rule."""
     assets = InMemoryMediaAssetRepository()
-    attachments = InMemoryMediaAttachmentRepository()
+    attachments = InMemoryMediaAttachmentRepository(assets)
     node_id = uuid.uuid4()
     old, new = _make_image_asset(), _make_image_asset()
     await assets.add(old)
@@ -193,7 +206,7 @@ async def test_set_cover_still_replaces_an_existing_cover() -> None:
         make_in_memory_repos(assets=assets, attachments=attachments)
     )
 
-    await SetMediaCover(uow).handle(
+    await SetMediaCover(uow, OwnerAccessPolicy()).handle(
         SetMediaCoverCommand(
             asset_id=new.id, target_type=AttachmentTarget.NODE, target_id=node_id
         ),
@@ -207,8 +220,8 @@ async def test_set_cover_still_replaces_an_existing_cover() -> None:
 class _RecordingAttachments(InMemoryMediaAttachmentRepository):
     """Records the order of lock and read calls."""
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, assets: InMemoryMediaAssetRepository) -> None:
+        super().__init__(assets)
         self.calls: list[str] = []
 
     async def lock_target(
@@ -218,20 +231,25 @@ class _RecordingAttachments(InMemoryMediaAttachmentRepository):
         await super().lock_target(target_type, target_id)
 
     async def list_for_target(
-        self, target_type: AttachmentTarget, target_id: uuid.UUID
+        self,
+        target_type: AttachmentTarget,
+        target_id: uuid.UUID,
+        *,
+        scope: AccessScope,
     ) -> list[MediaAttachment]:
         self.calls.append("list")
-        return await super().list_for_target(target_type, target_id)
+        return await super().list_for_target(target_type, target_id, scope=scope)
 
 
 async def test_set_cover_locks_the_target_before_reading_its_attachments() -> None:
     """Calls for one target serialise, so the read must follow the lock."""
     assets = InMemoryMediaAssetRepository()
-    attachments = _RecordingAttachments()
+    attachments = _RecordingAttachments(assets)
     use_case = SetMediaCover(
         create_in_memory_media_uow(
             make_in_memory_repos(assets=assets, attachments=attachments)
-        )
+        ),
+        OwnerAccessPolicy(),
     )
     node_id = uuid.uuid4()
     asset = _make_image_asset()

@@ -1,5 +1,5 @@
 import { client } from './generated/client.gen';
-import { getEtag, setEtag, clearEtag } from './etagStore';
+import { getEtag, setEtag, clearEtag, stampRequest, isCurrent } from './etagStore';
 
 const cacheKey = (url: string): string => {
 	const parsed = new URL(url, 'http://x');
@@ -9,7 +9,7 @@ const cacheKey = (url: string): string => {
 client.interceptors.request.use((request) => {
 	const key = cacheKey(request.url);
 	const rec = getEtag(key);
-	if (!rec) return request;
+	if (!rec) return stampRequest(request);
 
 	const headers = new Headers(request.headers);
 	if (request.method === 'GET' || request.method === 'HEAD') {
@@ -22,13 +22,15 @@ client.interceptors.request.use((request) => {
 	) {
 		if (rec.etag) headers.set('If-Match', rec.etag);
 	}
-	return new Request(request, { headers });
+	return stampRequest(new Request(request, { headers }));
 });
 
 client.interceptors.response.use(async (response, request) => {
 	const key = cacheKey(request.url);
 
 	if (response.status === 200) {
+		// The cache was cleared (sign-in or sign-out) while this was in flight.
+		if (!isCurrent(request)) return response;
 		const contentType = response.headers.get('Content-Type') ?? '';
 		let data: unknown;
 		if (contentType.includes('application/json')) {

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from app.modules.examples.domain.installation import EntityKind
 from app.modules.examples.ports.unit_of_work import ExampleRepos
-from app.shared_kernel.cqrs import QueryHandler
+from app.shared_kernel.cqrs import ScopedQueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -25,9 +25,9 @@ class ExampleEntities:
 
 
 class ListExampleEntities(
-    QueryHandler[ExampleRepos, ListExampleEntitiesQuery, ExampleEntities]
+    ScopedQueryHandler[ExampleRepos, ListExampleEntitiesQuery, ExampleEntities]
 ):
-    """List the items, item types and collections owned by active example sets."""
+    """List what the viewer's own active example sets own."""
 
     async def handle(
         self,
@@ -35,7 +35,9 @@ class ListExampleEntities(
         actor: Actor,
     ) -> ExampleEntities:
         """Return the owned item, item type and collection ids across installations."""
-        active = await self._repos.installations.list_active()
+        active = await self._repos.installations.list_active(
+            scope=self._policy.scope_for(actor)
+        )
         return ExampleEntities(
             item_ids=[r.entity_id for i in active for r in i.owned(EntityKind.ITEM)],
             item_type_ids=[

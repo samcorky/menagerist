@@ -236,3 +236,24 @@ def test_schema_dump_writes_the_openapi_schema(
     cli.dump(output=output)
 
     assert json.loads(output.read_text()) == schema
+
+
+def test_identity_commands_are_registered_with_the_real_claim_wired() -> None:
+    """`identity` is a command group and first-run setup claims across modules."""
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from app.entrypoints.api.shared.claim_existing_data import ClaimExistingData
+    from app.modules.identity.adapters.cli import identity_app
+
+    assert "identity" in cli.app
+    assert isinstance(
+        identity_app._claim_builder(AsyncSession()),  # no connection is opened
+        ClaimExistingData,
+    )
+
+
+def test_cli_wires_the_real_claim_bridge() -> None:
+    """The identity commands must not fall back to the fail-closed default."""
+    from app.modules.identity.adapters.cli import identity_app
+
+    assert identity_app._claim_builder is cli._claim_existing_data

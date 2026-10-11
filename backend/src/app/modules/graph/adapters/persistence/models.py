@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.platform.database import Base
-from app.platform.orm_mixins import IdentifiableMixin, SoftDeletableMixin
+from app.platform.orm_mixins import IdentifiableMixin, OwnedMixin, SoftDeletableMixin
 
 
 class NodeTypeModel(IdentifiableMixin, SoftDeletableMixin, Base):
@@ -34,10 +34,11 @@ class NodeTypeModel(IdentifiableMixin, SoftDeletableMixin, Base):
     )
 
 
-class NodeModel(IdentifiableMixin, SoftDeletableMixin, Base):
+class NodeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):
     """ORM row for a node - the storage shape, kept separate from `domain.Node`."""
 
     __tablename__ = "nodes"
+    __table_args__ = (Index("ix_nodes_owner_id_id", "owner_id", "id"),)
 
     name: Mapped[str]
     type: Mapped[str | None] = mapped_column(index=True, nullable=True)
@@ -48,10 +49,11 @@ class NodeModel(IdentifiableMixin, SoftDeletableMixin, Base):
     extra_schema: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
 
-class EdgeModel(IdentifiableMixin, SoftDeletableMixin, Base):
+class EdgeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):
     """ORM row for an edge - the storage shape, kept separate from `domain.Edge`."""
 
     __tablename__ = "edges"
+    __table_args__ = (Index("ix_edges_owner_id_id", "owner_id", "id"),)
 
     source_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("nodes.id"), index=True)
     target_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("nodes.id"), index=True)

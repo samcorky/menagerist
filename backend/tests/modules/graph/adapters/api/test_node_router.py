@@ -520,7 +520,7 @@ def _app_with_collection(
 ) -> FastAPI:
     app = _app_with_in_memory_graph()
     members = InMemoryCollectionMembers()
-    members.add_collection(collection_id, item_ids)
+    members.add_collection(collection_id, item_ids, owner_id=uuid.UUID(int=1))
     app.dependency_overrides[get_collection_members] = lambda: members
     return app
 
@@ -538,7 +538,9 @@ def test_list_nodes_collection_restricts_and_combines_with_filters_and_paging() 
     client.post("/api/v1/node", json={"name": "Outside", "type": "film"})
     collection_id = uuid.uuid4()
     members = InMemoryCollectionMembers()
-    members.add_collection(collection_id, [uuid.UUID(i) for i in ids])
+    members.add_collection(
+        collection_id, [uuid.UUID(i) for i in ids], owner_id=uuid.UUID(int=1)
+    )
     plain.dependency_overrides[get_collection_members] = lambda: members
 
     page = client.get(f"/api/v1/node?collection={collection_id}&limit=3")

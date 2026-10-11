@@ -1,6 +1,7 @@
 import importlib
 import inspect
 import pkgutil
+from enum import StrEnum
 
 import pytest
 
@@ -10,6 +11,8 @@ from app.shared_kernel.cqrs import (
     AuthorisedUseCase,
     CommandHandler,
     QueryHandler,
+    ScopedCommandHandler,
+    ScopedQueryHandler,
 )
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -90,6 +93,37 @@ async def test_query_handler_concrete_subclass_is_instantiable() -> None:
 
     result = await MyUseCase(repo).handle(MyQuery(), object())
     assert result == "ok"
+
+
+# ---------------------------------------------------------------------------
+# Scoped* contract
+# ---------------------------------------------------------------------------
+
+
+async def test_scoped_command_handler_stores_uow_and_policy() -> None:
+    """A ScopedCommandHandler keeps both the UoW and the access policy."""
+    uow, policy = object(), object()
+
+    class MyUseCase(ScopedCommandHandler[object, object, None]):
+        async def handle(self, request: object, actor: object) -> None:
+            pass
+
+    use_case = MyUseCase(uow, policy)  # type: ignore[arg-type]
+    assert use_case._uow is uow
+    assert use_case._policy is policy
+
+
+async def test_scoped_query_handler_stores_repos_and_policy() -> None:
+    """A ScopedQueryHandler keeps both the repos and the access policy."""
+    repos, policy = object(), object()
+
+    class MyUseCase(ScopedQueryHandler[object, object, None]):
+        async def handle(self, request: object, actor: object) -> None:
+            pass
+
+    use_case = MyUseCase(repos, policy)  # type: ignore[arg-type]
+    assert use_case._repos is repos
+    assert use_case._policy is policy
 
 
 # ---------------------------------------------------------------------------
@@ -194,7 +228,7 @@ def _application_use_case_classes() -> list[type]:
         module = importlib.import_module(module_name)
         for _name, obj in inspect.getmembers(module, inspect.isclass):
             if obj.__module__ == module_name and not _name.endswith(
-                ("Command", "Query", "Result")
+                ("Command", "Query", "Result", "Permission")
             ):
                 classes.append(obj)
     return classes
@@ -233,3 +267,28 @@ def test_command_handlers_store_uow_not_repository() -> None:
         "CommandHandler subclasses must take a UnitOfWork, not a repository:\n"
         + "\n".join(f"  {v}" for v in violations)
     )
+
+
+class _Perm(StrEnum):
+    X = "x"
+
+
+async def test_denied_permission_stops_before_handle_runs() -> None:
+    """A failing authorisation check raises before `_handle` is reached."""
+    ran: list[bool] = []
+
+    class _Denying:
+        async def check(self, actor: object, action: object) -> None:
+            msg = "denied"
+            raise PermissionError(msg)
+
+    class MyUseCase(AuthorisedUseCase[object, None]):
+        required_permission = _Perm.X
+
+        async def _handle(self, request: object, actor: object) -> None:
+            ran.append(True)
+
+    with pytest.raises(PermissionError):
+        await MyUseCase(_Denying()).handle(object(), object())  # type: ignore[arg-type]
+    assert ran == []
+    assert MyUseCase.required_permission == "x"

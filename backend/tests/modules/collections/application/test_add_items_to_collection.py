@@ -7,12 +7,14 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.collections.application.add_items_to_collection import (
     MAX_ITEMS_PER_REQUEST,
     AddItemsToCollection,
     AddItemsToCollectionCommand,
 )
 from app.modules.collections.domain.errors import CollectionNotFoundError
+from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.errors import ValidationError
 
@@ -22,7 +24,7 @@ if TYPE_CHECKING:
 
 def _handler(world: World) -> AddItemsToCollection:
     """Build the use case over `world`."""
-    return AddItemsToCollection(world.uow, world.items)
+    return AddItemsToCollection(world.uow, OwnerAccessPolicy(), world.items)
 
 
 async def test_add_several_returns_count(
@@ -42,7 +44,9 @@ async def test_add_several_returns_count(
 
     assert count == 3
     assert add.await_count == 3
-    assert await world.memberships.item_ids(shelf.id) == set(ids)
+    assert await world.memberships.item_ids(
+        shelf.id, scope=AccessScope.everyone()
+    ) == set(ids)
     assert world.uow.committed is True
 
 
@@ -70,7 +74,10 @@ async def test_add_skips_duplicates_and_present_items(
     assert add.await_count == 1
     assert add.await_args is not None
     assert add.await_args.args[0].item_id == second
-    assert await world.memberships.item_ids(shelf.id) == {first, second}
+    assert await world.memberships.item_ids(shelf.id, scope=AccessScope.everyone()) == {
+        first,
+        second,
+    }
 
 
 async def test_add_non_live_ids_raise_naming_them_and_add_nothing(
@@ -97,7 +104,10 @@ async def test_add_non_live_ids_raise_naming_them_and_add_nothing(
     assert str(excinfo.value) == f"Unknown or deleted items: {first}, {second}"
     assert str(good) not in str(excinfo.value)
     add.assert_not_awaited()
-    assert await world.memberships.item_ids(shelf.id) == set()
+    assert (
+        await world.memberships.item_ids(shelf.id, scope=AccessScope.everyone())
+        == set()
+    )
     assert world.uow.committed is False
 
 
@@ -147,7 +157,10 @@ async def test_add_to_deleted_collection_raises_not_found(
             SYSTEM_ACTOR,
         )
 
-    assert await world.memberships.item_ids(shelf.id) == set()
+    assert (
+        await world.memberships.item_ids(shelf.id, scope=AccessScope.everyone())
+        == set()
+    )
     assert world.uow.committed is False
 
 

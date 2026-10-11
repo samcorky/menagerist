@@ -7,7 +7,7 @@ import structlog
 from app.modules.collections.domain.collection import Collection
 from app.modules.collections.domain.errors import CollectionNotFoundError
 from app.modules.collections.ports.unit_of_work import CollectionsUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.cqrs import ScopedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -25,7 +25,7 @@ class UpdateCollectionCommand:
 
 
 class UpdateCollection(
-    CommandHandler[CollectionsUnitOfWork, UpdateCollectionCommand, Collection]
+    ScopedCommandHandler[CollectionsUnitOfWork, UpdateCollectionCommand, Collection]
 ):
     """Update an existing collection's editable fields."""
 
@@ -41,11 +41,14 @@ class UpdateCollection(
             InvalidCollectionError: If the new name is not 1 to 120 characters.
         """
         async with self._uow as repos:
-            collection = await repos.collections.get(command.collection_id)
+            collection = await repos.collections.get(
+                command.collection_id, scope=self._policy.scope_for(actor)
+            )
             if collection is None:
                 raise CollectionNotFoundError(
                     f"Collection {command.collection_id} not found"
                 )
+            self._policy.assert_can_modify(actor, collection.owner_id)
             if command.name is not None:
                 collection.rename(command.name)
             if command.description is not None:

@@ -6,7 +6,7 @@ import structlog
 
 from app.modules.collections.domain.errors import CollectionNotFoundError
 from app.modules.collections.ports.unit_of_work import CollectionsUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.cqrs import ScopedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -23,7 +23,7 @@ class RemoveItemFromCollectionCommand:
 
 
 class RemoveItemFromCollection(
-    CommandHandler[CollectionsUnitOfWork, RemoveItemFromCollectionCommand, None]
+    ScopedCommandHandler[CollectionsUnitOfWork, RemoveItemFromCollectionCommand, None]
 ):
     """Take an item off a collection; removing an absent item is a no-op."""
 
@@ -36,11 +36,14 @@ class RemoveItemFromCollection(
             CollectionNotFoundError: If the collection is missing or deleted.
         """
         async with self._uow as repos:
-            collection = await repos.collections.get(command.collection_id)
+            collection = await repos.collections.get(
+                command.collection_id, scope=self._policy.scope_for(actor)
+            )
             if collection is None:
                 raise CollectionNotFoundError(
                     f"Collection {command.collection_id} not found"
                 )
+            self._policy.assert_can_modify(actor, collection.owner_id)
             await repos.memberships.remove(collection.id, command.item_id)
             collection.touch()
             await repos.collections.save(collection)

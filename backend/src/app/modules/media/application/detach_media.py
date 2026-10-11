@@ -4,14 +4,18 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from app.modules.media.domain.errors import MediaAttachmentNotFoundError
+from app.modules.media.domain.errors import (
+    MediaAssetNotFoundError,
+    MediaAttachmentNotFoundError,
+)
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.cqrs import ScopedCommandHandler
 
 if TYPE_CHECKING:
     from app.modules.media.ports.media_storage import MediaStoragePort
+    from app.shared_kernel.access_policy import AccessPolicy
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -27,7 +31,7 @@ class DetachMediaCommand:
     attribute_key: AttachmentKey | None = field(default=None)
 
 
-class DetachMedia(CommandHandler[MediaUnitOfWork, DetachMediaCommand, None]):
+class DetachMedia(ScopedCommandHandler[MediaUnitOfWork, DetachMediaCommand, None]):
     """Remove a media-entity attachment; orphan the asset if now unreferenced.
 
     After the attachment row is deleted we check whether the asset is still
@@ -35,15 +39,23 @@ class DetachMedia(CommandHandler[MediaUnitOfWork, DetachMediaCommand, None]):
     ``on_commit``) so the cleanup job can reap it.
     """
 
-    def __init__(self, uow: MediaUnitOfWork, storage: MediaStoragePort) -> None:
-        super().__init__(uow)
+    def __init__(
+        self, uow: MediaUnitOfWork, policy: AccessPolicy, storage: MediaStoragePort
+    ) -> None:
+        super().__init__(uow, policy)
         self._storage = storage
 
     async def handle(self, command: DetachMediaCommand, actor: Actor) -> None:
         """Delete the attachment; orphan the asset if it becomes unreferenced."""
         async with self._uow as repos:
+            scope = self._policy.scope_for(actor)
+            asset = await repos.assets.get(command.asset_id, scope=scope)
+            if asset is None:
+                msg = f"Media asset {command.asset_id} not found"
+                raise MediaAssetNotFoundError(msg)
+            self._policy.assert_can_modify(actor, asset.owner_id)
             candidates = await repos.attachments.list_for_target(
-                command.target_type, command.target_id
+                command.target_type, command.target_id, scope=scope
             )
             attachment = next(
                 (
@@ -60,21 +72,21 @@ class DetachMedia(CommandHandler[MediaUnitOfWork, DetachMediaCommand, None]):
 
             await repos.attachments.delete(attachment.id)
 
-            remaining = await repos.attachments.list_for_asset(command.asset_id)
+            remaining = await repos.attachments.list_for_asset(
+                command.asset_id, scope=scope
+            )
             # Filter out the row we just deleted (in-memory flush may not have run).
             remaining = [r for r in remaining if r.id != attachment.id]
 
-            if not remaining:
-                asset = await repos.assets.get(command.asset_id)
-                if asset is not None and asset.status is MediaStatus.ATTACHED:
-                    asset.orphan()
-                    await repos.assets.save(asset)
-                    asset_id = command.asset_id
-                    self._uow.on_commit(
-                        lambda: self._storage.move(
-                            asset_id, MediaStatus.ATTACHED, MediaStatus.ORPHANED
-                        )
+            if not remaining and asset.status is MediaStatus.ATTACHED:
+                asset.orphan()
+                await repos.assets.save(asset)
+                asset_id = command.asset_id
+                self._uow.on_commit(
+                    lambda: self._storage.move(
+                        asset_id, MediaStatus.ATTACHED, MediaStatus.ORPHANED
                     )
+                )
 
             await self._uow.commit()
         logger.info(

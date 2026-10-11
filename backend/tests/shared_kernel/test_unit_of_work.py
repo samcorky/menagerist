@@ -2,7 +2,11 @@ from typing import TypeVar
 
 import pytest
 
-from app.shared_kernel.unit_of_work import InMemoryUnitOfWork, JoinedUnitOfWork
+from app.shared_kernel.unit_of_work import (
+    AmbientUnitOfWork,
+    InMemoryUnitOfWork,
+    JoinedUnitOfWork,
+)
 
 _T = TypeVar("_T")
 
@@ -199,3 +203,33 @@ async def test_joined_uow_on_commit_not_fired_if_owner_rolls_back() -> None:
 async def _append[T](lst: list[T], value: T) -> None:
     """Async helper that appends a value - usable as an on_commit callback."""
     lst.append(value)
+
+
+# ── AmbientUnitOfWork ─────────────────────────────────────────────────────────
+
+
+async def test_ambient_uow_yields_the_repos_and_never_commits() -> None:
+    """The owner of the transaction commits; this unit only lends the repos."""
+    repos = object()
+    ambient = AmbientUnitOfWork(repos)
+
+    async with ambient as entered:
+        assert entered is repos
+        await ambient.commit()
+
+
+async def test_ambient_uow_lets_errors_through() -> None:
+    """Leaving with an error changes nothing here; the owner rolls back."""
+    ambient = AmbientUnitOfWork(object())
+
+    with pytest.raises(ValueError, match="boom"):
+        async with ambient:
+            raise ValueError("boom")
+
+
+async def test_ambient_uow_refuses_on_commit_callbacks() -> None:
+    """A callback would silently never run, so registering one is an error."""
+    ambient = AmbientUnitOfWork(object())
+
+    with pytest.raises(NotImplementedError):
+        ambient.on_commit(lambda: _append([], "x"))

@@ -6,17 +6,29 @@ from app.modules.media.domain.media_attachment import AttachmentKey
 if TYPE_CHECKING:
     import uuid
 
+    from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (  # noqa: E501
+        InMemoryMediaAssetRepository,
+    )
     from app.modules.media.domain.media_attachment import (
         AttachmentTarget,
         MediaAttachment,
     )
+    from app.shared_kernel.access_scope import AccessScope
 
 
 class InMemoryMediaAttachmentRepository:
-    """Dict-backed `MediaAttachmentRepository` for tests - no database required."""
+    """Dict-backed `MediaAttachmentRepository` for tests - no database required.
 
-    def __init__(self) -> None:
+    Reads the asset twin's owners to apply a scope, as the SQL twin joins them.
+    """
+
+    def __init__(self, assets: InMemoryMediaAssetRepository) -> None:
+        self._assets = assets
         self._store: dict[uuid.UUID, MediaAttachment] = {}
+
+    def _visible(self, attachment: MediaAttachment, scope: AccessScope) -> bool:
+        """Whether the attachment's asset is inside `scope`."""
+        return scope.covers(self._assets.owner_of(attachment.asset_id))
 
     async def lock_target(
         self, target_type: AttachmentTarget, target_id: uuid.UUID
@@ -38,25 +50,38 @@ class InMemoryMediaAttachmentRepository:
             raise CoverAlreadySetError
         self._store[attachment.id] = attachment
 
-    async def get(self, attachment_id: uuid.UUID) -> MediaAttachment | None:
-        """Return an attachment by id, or ``None``."""
-        return self._store.get(attachment_id)
+    async def get(
+        self, attachment_id: uuid.UUID, *, scope: AccessScope
+    ) -> MediaAttachment | None:
+        """Return an attachment by id, or ``None`` if missing or unseen."""
+        found = self._store.get(attachment_id)
+        return found if found is not None and self._visible(found, scope) else None
 
     async def list_for_target(
         self,
         target_type: AttachmentTarget,
         target_id: uuid.UUID,
+        *,
+        scope: AccessScope,
     ) -> list[MediaAttachment]:
-        """Return all attachments for the given target entity."""
+        """Return the attachments on the target whose asset is inside `scope`."""
         return [
             a
             for a in self._store.values()
-            if a.target_type == target_type and a.target_id == target_id
+            if a.target_type == target_type
+            and a.target_id == target_id
+            and self._visible(a, scope)
         ]
 
-    async def list_for_asset(self, asset_id: uuid.UUID) -> list[MediaAttachment]:
-        """Return all attachments for the given asset."""
-        return [a for a in self._store.values() if a.asset_id == asset_id]
+    async def list_for_asset(
+        self, asset_id: uuid.UUID, *, scope: AccessScope
+    ) -> list[MediaAttachment]:
+        """Return the attachments of the asset, if the asset is inside `scope`."""
+        return [
+            a
+            for a in self._store.values()
+            if a.asset_id == asset_id and self._visible(a, scope)
+        ]
 
     async def update(self, attachment: MediaAttachment) -> None:
         """Persist changes to an existing attachment (no-op if absent)."""

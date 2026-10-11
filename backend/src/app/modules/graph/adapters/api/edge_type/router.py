@@ -58,6 +58,7 @@ from app.modules.graph.domain.errors import (
     EdgeTypeSlugConflictError,
 )
 from app.shared_kernel.actor import Actor
+from app.shared_kernel.errors import ForbiddenError
 
 router = APIRouter(
     prefix="/edge-type", tags=["Edge Types"], route_class=PermissionAwareRoute
@@ -181,6 +182,7 @@ async def update_edge_type(
             EdgeTypeInUseError,
             detail="Edge type 'directed-by' is still used by one or more connections",
         ),
+        **error_response(ForbiddenError, detail="Administrator access is required."),
     },
 )
 async def delete_edge_type(
@@ -230,10 +232,13 @@ async def count_edge_type_attribute_usage(
     "/{edge_type_id}/attribute/{key}",
     response_model=AttributePurgeResponse,
     operation_id="purge_edge_type_attribute",
-    responses=error_response(
-        EdgeTypeNotFoundError,
-        detail="EdgeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
-    ),
+    responses={
+        **error_response(
+            EdgeTypeNotFoundError,
+            detail="EdgeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+        ),
+        **error_response(ForbiddenError, detail="Administrator access is required."),
+    },
 )
 async def purge_edge_type_attribute(
     edge_type_id: uuid.UUID,

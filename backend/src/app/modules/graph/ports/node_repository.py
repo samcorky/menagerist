@@ -7,10 +7,15 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from app.modules.graph.domain.node import Node
+    from app.shared_kernel.access_scope import AccessScope
 
 
 class NodeRepository(Protocol):
-    """Access to node, independent of storage backend."""
+    """Access to node, independent of storage backend.
+
+    Every method that returns or counts content takes a required `scope`: only
+    nodes the scope covers are visible (ownerless nodes only to `everyone()`).
+    """
 
     async def add(self, node: Node) -> None:
         """Add a new node."""
@@ -20,13 +25,14 @@ class NodeRepository(Protocol):
         """Persist changes to an existing node."""
         ...
 
-    async def get(self, node_id: uuid.UUID) -> Node | None:
-        """Return the node with `node_id`, or `None` if missing or deleted."""
+    async def get(self, node_id: uuid.UUID, *, scope: AccessScope) -> Node | None:
+        """Return the node with `node_id`, or `None` if missing, deleted or unseen."""
         ...
 
     async def list(
         self,
         *,
+        scope: AccessScope,
         after: uuid.UUID | None,
         limit: int,
         type: str | None = None,
@@ -48,6 +54,7 @@ class NodeRepository(Protocol):
     async def count(
         self,
         *,
+        scope: AccessScope,
         type: str | None = None,
         q: str | None = None,
         favourite: bool | None = None,
@@ -57,7 +64,7 @@ class NodeRepository(Protocol):
         """Return the total number of non-deleted nodes matching the given filters."""
         ...
 
-    async def clear_type(self, type_slug: str) -> None:
+    async def clear_type(self, type_slug: str, *, scope: AccessScope) -> None:
         """Null out `type` on all non-deleted nodes that reference `type_slug`."""
         ...
 
@@ -66,6 +73,7 @@ class NodeRepository(Protocol):
         type_slug: str,
         key: str,
         *,
+        scope: AccessScope,
         sub_key: str | None = None,
         value: str | None = None,
     ) -> int:
@@ -83,6 +91,7 @@ class NodeRepository(Protocol):
         type_slug: str,
         key: str,
         *,
+        scope: AccessScope,
         sub_key: str | None = None,
         after: uuid.UUID | None,
         limit: int,
@@ -99,6 +108,7 @@ class NodeRepository(Protocol):
         type_slug: str,
         key: str,
         *,
+        scope: AccessScope,
         q: str | None = None,
         limit: int = 20,
     ) -> builtins.list[tuple[str, int]]:
@@ -109,5 +119,14 @@ class NodeRepository(Protocol):
         value grouping (exact string match), but `q` if given filters
         case-insensitively by substring. Ordered by count descending, then
         value ascending. At most `limit` rows.
+        """
+        ...
+
+    async def claim_orphaned(
+        self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
+    ) -> int:
+        """Give `owner_id` every node with no owner or a legacy owner.
+
+        System-level and unscoped, deleted rows included. Returns the count.
         """
         ...

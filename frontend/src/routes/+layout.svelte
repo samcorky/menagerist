@@ -12,10 +12,15 @@
 		Library,
 		Search
 	} from '@lucide/svelte';
+	import { onMount } from 'svelte';
 	import { Toaster } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { TooltipProvider } from '$lib/components/ui/tooltip/index.js';
 	import ThemeToggle from '$lib/components/theme-toggle.svelte';
+	import UserMenu from '$lib/components/user-menu.svelte';
+	import { Spinner } from '$lib/components/ui/spinner/index.js';
+	import { auth } from '$lib/auth.svelte.js';
+	import { guardDecision } from '$lib/auth';
 	import { themeController } from '$lib/theme.svelte.js';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { searchPaletteController } from '$lib/search-palette.svelte.js';
@@ -53,7 +58,34 @@
 		});
 	});
 
+	onMount(() => {
+		void auth.init();
+	});
+
 	const pathname = $derived(page.url.pathname);
+	const decision = $derived(
+		guardDecision({
+			pathname,
+			search: page.url.search,
+			hash: page.url.hash,
+			setupRequired: auth.setupRequired,
+			signedIn: auth.signedIn,
+			passwordExpired: auth.passwordExpired,
+			rememberPath: !auth.leftOnPurpose
+		})
+	);
+	const showPage = $derived(auth.ready && decision.action === 'allow');
+	// Navigation is only useful once signed in and free to use it.
+	const showNav = $derived(auth.signedIn && !auth.passwordExpired);
+
+	$effect(() => {
+		if (auth.ready && decision.action === 'redirect') {
+			// The guard builds same-origin paths; the app has no base path.
+			// eslint-disable-next-line svelte/no-navigation-without-resolve
+			void goto(decision.to, { replaceState: true });
+		}
+	});
+
 	const homeActive = $derived(pathname === resolve('/'));
 	const itemsActive = $derived(pathname.startsWith(resolve('/items')));
 	const collectionsActive = $derived(pathname.startsWith(resolve('/collections')));
@@ -68,6 +100,7 @@
 			description: 'Quick capture',
 			group: 'Add item',
 			handler: (e) => {
+				if (!showNav) return;
 				e.preventDefault();
 				captureController.show();
 			}
@@ -80,7 +113,7 @@
 			keys: 'n',
 			description: 'Quick capture',
 			group: 'Add item',
-			handler: () => captureController.show()
+			handler: () => showNav && captureController.show()
 		});
 	});
 
@@ -131,6 +164,7 @@
 			description: 'Search',
 			group: 'Search',
 			handler: (e) => {
+				if (!showNav) return;
 				e.preventDefault();
 				searchPaletteController.show();
 			}
@@ -169,138 +203,162 @@
 				</a>
 
 				<nav class="hidden items-center gap-1 md:flex">
-					<Button variant={homeActive ? 'secondary' : 'ghost'} size="sm" href={resolve('/')}>
-						<House class="size-4" />
-						Home
-					</Button>
-					<Button variant={itemsActive ? 'secondary' : 'ghost'} size="sm" href={resolve('/items')}>
-						<LayoutGrid class="size-4" />
-						Items
-					</Button>
-					<Button
-						variant={collectionsActive ? 'secondary' : 'ghost'}
-						size="sm"
-						href={resolve('/collections')}
-					>
-						<Library class="size-4" />
-						Collections
-					</Button>
-					<Button size="sm" onclick={() => goto(resolve('/items/new'))}>
-						<CirclePlus class="size-4" />
-						New item
-					</Button>
-					<Button
-						variant="ghost"
-						size="icon"
-						href="/api/docs"
-						target="_blank"
-						aria-label="API docs"
-					>
-						<BookOpen class="size-4" />
-					</Button>
-					<Button
-						variant={settingsActive ? 'secondary' : 'ghost'}
-						size="icon"
-						href={resolve('/settings')}
-						aria-label="Settings"
-					>
-						<Settings class="size-4" />
-					</Button>
-					<Button
-						variant="ghost"
-						size="icon"
-						class="size-11"
-						aria-label="Search"
-						onclick={() => searchPaletteController.show()}
-					>
-						<Search class="size-4" />
-					</Button>
+					{#if showNav}
+						<Button variant={homeActive ? 'secondary' : 'ghost'} size="sm" href={resolve('/')}>
+							<House class="size-4" />
+							Home
+						</Button>
+						<Button
+							variant={itemsActive ? 'secondary' : 'ghost'}
+							size="sm"
+							href={resolve('/items')}
+						>
+							<LayoutGrid class="size-4" />
+							Items
+						</Button>
+						<Button
+							variant={collectionsActive ? 'secondary' : 'ghost'}
+							size="sm"
+							href={resolve('/collections')}
+						>
+							<Library class="size-4" />
+							Collections
+						</Button>
+						<Button size="sm" onclick={() => goto(resolve('/items/new'))}>
+							<CirclePlus class="size-4" />
+							New item
+						</Button>
+						<Button
+							variant="ghost"
+							size="icon"
+							href="/api/docs"
+							target="_blank"
+							aria-label="API docs"
+						>
+							<BookOpen class="size-4" />
+						</Button>
+						<Button
+							variant={settingsActive ? 'secondary' : 'ghost'}
+							size="icon"
+							href={resolve('/settings')}
+							aria-label="Settings"
+						>
+							<Settings class="size-4" />
+						</Button>
+						<Button
+							variant="ghost"
+							size="icon"
+							class="size-11"
+							aria-label="Search"
+							onclick={() => searchPaletteController.show()}
+						>
+							<Search class="size-4" />
+						</Button>
+					{/if}
 					<ThemeToggle />
+					<UserMenu />
 				</nav>
 
 				<div class="flex items-center gap-1 md:hidden">
 					<ThemeToggle />
+					<UserMenu />
 				</div>
 			</div>
 		</header>
 
 		<div id="main-scroll" class="flex-1 overflow-y-auto">
-			{@render children()}
+			{#if showPage}
+				{@render children()}
+			{:else if auth.loadFailed}
+				<main class="flex flex-1 flex-col items-center gap-3 px-4 py-16 text-center">
+					<h1 class="font-heading text-xl font-semibold">Can't reach Menagerist</h1>
+					<p class="text-muted-foreground">Check your connection, then try again.</p>
+					<Button class="h-11" onclick={() => auth.init()}>Try again</Button>
+				</main>
+			{:else}
+				<div class="flex justify-center py-16">
+					<Spinner class="size-6" />
+				</div>
+			{/if}
 		</div>
 
-		<nav
-			style="view-transition-name: site-nav; padding-bottom: env(safe-area-inset-bottom)"
-			class="shrink-0 border-t bg-background/95 backdrop-blur md:hidden"
-		>
-			<div class="flex items-center px-0 py-1">
-				<a
-					href={resolve('/')}
-					class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {homeActive
-						? 'text-foreground'
-						: 'text-muted-foreground hover:text-foreground'}"
-					aria-current={homeActive ? 'page' : undefined}
-				>
-					<House class="size-5" />
-					<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">Home</span>
-				</a>
-
-				<a
-					href={resolve('/items')}
-					class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {itemsActive
-						? 'text-foreground'
-						: 'text-muted-foreground hover:text-foreground'}"
-					aria-current={itemsActive ? 'page' : undefined}
-				>
-					<LayoutGrid class="size-5" />
-					<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">Items</span>
-				</a>
-
-				<a
-					href={resolve('/collections')}
-					class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {collectionsActive
-						? 'text-foreground'
-						: 'text-muted-foreground hover:text-foreground'}"
-					aria-current={collectionsActive ? 'page' : undefined}
-				>
-					<Library class="size-5" />
-					<span class="max-w-full truncate text-[10px] font-medium tracking-tighter"
-						>Collections</span
+		{#if showNav}
+			<nav
+				style="view-transition-name: site-nav; padding-bottom: env(safe-area-inset-bottom)"
+				class="shrink-0 border-t bg-background/95 backdrop-blur md:hidden"
+			>
+				<div class="flex items-center px-0 py-1">
+					<a
+						href={resolve('/')}
+						class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {homeActive
+							? 'text-foreground'
+							: 'text-muted-foreground hover:text-foreground'}"
+						aria-current={homeActive ? 'page' : undefined}
 					>
-				</a>
+						<House class="size-5" />
+						<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">Home</span>
+					</a>
 
-				<button
-					onclick={() => searchPaletteController.show()}
-					aria-haspopup="dialog"
-					aria-label="Search"
-					class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {searchActive
-						? 'text-foreground'
-						: 'text-muted-foreground hover:text-foreground'}"
-				>
-					<Search class="size-5" />
-					<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">Search</span>
-				</button>
+					<a
+						href={resolve('/items')}
+						class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {itemsActive
+							? 'text-foreground'
+							: 'text-muted-foreground hover:text-foreground'}"
+						aria-current={itemsActive ? 'page' : undefined}
+					>
+						<LayoutGrid class="size-5" />
+						<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">Items</span>
+					</a>
 
-				<button
-					onclick={() => captureController.show()}
-					class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {newActive
-						? 'text-primary'
-						: 'text-muted-foreground hover:text-foreground'}"
-				>
-					<CirclePlus class="size-6" />
-					<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">New</span>
-				</button>
+					<a
+						href={resolve('/collections')}
+						class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {collectionsActive
+							? 'text-foreground'
+							: 'text-muted-foreground hover:text-foreground'}"
+						aria-current={collectionsActive ? 'page' : undefined}
+					>
+						<Library class="size-5" />
+						<span class="max-w-full truncate text-[10px] font-medium tracking-tighter"
+							>Collections</span
+						>
+					</a>
 
-				<a
-					href={resolve('/settings')}
-					class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {settingsActive
-						? 'text-foreground'
-						: 'text-muted-foreground hover:text-foreground'}"
-					aria-current={settingsActive ? 'page' : undefined}
-				>
-					<Settings class="size-5" />
-					<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">Settings</span>
-				</a>
-			</div>
-		</nav>
+					<button
+						onclick={() => searchPaletteController.show()}
+						aria-haspopup="dialog"
+						aria-label="Search"
+						class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {searchActive
+							? 'text-foreground'
+							: 'text-muted-foreground hover:text-foreground'}"
+					>
+						<Search class="size-5" />
+						<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">Search</span>
+					</button>
+
+					<button
+						onclick={() => captureController.show()}
+						class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {newActive
+							? 'text-primary'
+							: 'text-muted-foreground hover:text-foreground'}"
+					>
+						<CirclePlus class="size-6" />
+						<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">New</span>
+					</button>
+
+					<a
+						href={resolve('/settings')}
+						class="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0 py-1.5 transition-colors {settingsActive
+							? 'text-foreground'
+							: 'text-muted-foreground hover:text-foreground'}"
+						aria-current={settingsActive ? 'page' : undefined}
+					>
+						<Settings class="size-5" />
+						<span class="max-w-full truncate text-[10px] font-medium tracking-tighter"
+							>Settings</span
+						>
+					</a>
+				</div>
+			</nav>
+		{/if}
 	</div>
 </TooltipProvider>

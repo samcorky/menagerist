@@ -13,10 +13,13 @@ from app.modules.examples.domain.installation import (
     Outcome,
     adoptable_records,
 )
+from app.modules.examples.domain.removal import holds_shared_type
+
+OWNER = uuid.UUID(int=0xA1)
 
 
 def _started() -> Installation:
-    return Installation.start("demo")
+    return Installation.start("demo", OWNER)
 
 
 def _record(installation: Installation, ref: str = "a") -> uuid.UUID:
@@ -232,3 +235,19 @@ def test_cover_is_a_kind_removed_first() -> None:
     assert EntityKind.COVER.value == "cover"
     assert EntityKind("cover") is EntityKind.COVER
     assert REMOVAL_ORDER[0] is EntityKind.COVER
+
+
+def test_settling_a_kept_entity_that_is_not_kept_is_refused() -> None:
+    """Only a kept record can be closed by someone else's cleanup."""
+    installation = Installation.start("demo", uuid.UUID(int=1))
+
+    with pytest.raises(InvalidInstallationStateError):
+        installation.settle_kept_as_removed(uuid.uuid7())
+
+
+def test_only_types_can_be_held_as_shared() -> None:
+    """An item record is never shared structure."""
+    installation = Installation.start("demo", uuid.UUID(int=1))
+    installation.record(EntityKind.ITEM, "a", "A", uuid.uuid7(), "h" * 64)
+
+    assert holds_shared_type(installation, installation.entities[0]) is False

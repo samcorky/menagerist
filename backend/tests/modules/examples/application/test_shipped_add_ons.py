@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.examples.adapters.platform.file_pack_catalogue import FilePackCatalogue
 from app.modules.examples.application.install_example_pack import (
     InstallExamplePack,
@@ -19,7 +20,7 @@ from app.modules.examples.domain.errors import (
     RequiredByInstalledPackError,
     RequirementsNotMetError,
 )
-from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.access_scope import AccessScope
 
 if TYPE_CHECKING:
     from tests.modules.examples.conftest import MakeWorld, World
@@ -35,46 +36,56 @@ def _world(make_world: MakeWorld) -> World:
 async def _install(world: World, pack_id: str) -> InstallResult:
     return await InstallExamplePack(
         world.uow,
+        OwnerAccessPolicy(),
         _CATALOGUE,
         world.presets,
         world.graph,
         world.collections,
         world.covers,
-    ).handle(InstallExamplePackCommand(pack_id=pack_id), SYSTEM_ACTOR)
+    ).handle(InstallExamplePackCommand(pack_id=pack_id), world.actor)
 
 
 async def _uninstall(world: World, pack_id: str) -> UninstallResult:
     return await UninstallExamplePack(
         world.uow,
+        OwnerAccessPolicy(),
         _CATALOGUE,
         world.presets,
         world.graph,
         world.collections,
         world.covers,
-    ).handle(UninstallExamplePackCommand(pack_id=pack_id), SYSTEM_ACTOR)
+    ).handle(UninstallExamplePackCommand(pack_id=pack_id), world.actor)
 
 
 async def _edges(world: World) -> set[tuple[str, str, str]]:
     nodes = {
-        n.id: n.name for n in await world.graph_repos.nodes.list(after=None, limit=500)
+        n.id: n.name
+        for n in await world.graph_repos.nodes.list(
+            scope=AccessScope.everyone(), after=None, limit=500
+        )
     }
     return {
         (nodes[e.source_id], nodes[e.target_id], e.type)
-        for e in await world.graph_repos.edges.list(after=None, limit=500)
+        for e in await world.graph_repos.edges.list(
+            after=None, limit=500, scope=AccessScope.everyone()
+        )
     }
 
 
 async def _live(world: World) -> int:
     repos = (
         world.graph_repos.node_types,
-        world.graph_repos.nodes,
         world.graph_repos.edge_types,
-        world.graph_repos.edges,
         world.preset_repos.presets,
     )
-    return sum([len(await r.list(after=None, limit=500)) for r in repos]) + len(
-        world.collections.collections
+    others = sum([len(await r.list(after=None, limit=500)) for r in repos])
+    items = await world.graph_repos.nodes.list(
+        scope=AccessScope.everyone(), after=None, limit=500
     )
+    edges = await world.graph_repos.edges.list(
+        scope=AccessScope.everyone(), after=None, limit=500
+    )
+    return others + len(items) + len(edges) + len(world.collections.collections)
 
 
 async def test_both_add_ons_are_listed_after_the_base_packs() -> None:

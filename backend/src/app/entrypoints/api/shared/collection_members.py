@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from app.modules.collections.ports.unit_of_work import CollectionsRepos
+    from app.shared_kernel.access_scope import AccessScope
 
 
 class CollectionsMembers:
@@ -24,14 +25,18 @@ class CollectionsMembers:
     def __init__(self, repos: CollectionsRepos) -> None:
         self._repos = repos
 
-    async def item_ids(self, collection_id: uuid.UUID) -> set[uuid.UUID] | None:
-        """Return the item ids on the collection, or `None` if missing or deleted.
+    async def item_ids(
+        self, collection_id: uuid.UUID, scope: AccessScope
+    ) -> set[uuid.UUID] | None:
+        """Return the item ids on the collection, or `None` if not visible in `scope`.
+
+        A collection that is missing, deleted or owned by someone else is `None`.
 
         Membership rows outlive deleted items; filtering them is the item side's job.
         """
-        if await self._repos.collections.get(collection_id) is None:
+        if await self._repos.collections.get(collection_id, scope=scope) is None:
             return None
-        return await self._repos.memberships.item_ids(collection_id)
+        return await self._repos.memberships.item_ids(collection_id, scope=scope)
 
 
 async def get_collection_members(

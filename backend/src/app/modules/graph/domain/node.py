@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.shared_kernel.errors import ValidationError
-from app.shared_kernel.mixins import Identifiable, SoftDeletable
+from app.shared_kernel.mixins import Identifiable, Owned, SoftDeletable
 from app.shared_kernel.slug import slugify
 
 
@@ -14,7 +14,7 @@ def _normalise_tags(tags: list[str]) -> list[str]:
 
 
 @dataclass(kw_only=True, eq=False)
-class Node(Identifiable, SoftDeletable):
+class Node(Identifiable, Owned, SoftDeletable):
     """A single item in the collection graph - a collectible, person, event, etc."""
 
     name: str
@@ -42,6 +42,7 @@ class Node(Identifiable, SoftDeletable):
     def create(
         cls,
         *,
+        owner_id: uuid.UUID,
         name: str,
         type: str | None = None,
         description: str | None = None,
@@ -54,6 +55,7 @@ class Node(Identifiable, SoftDeletable):
         now = datetime.now(UTC)
         return cls(
             id=uuid.uuid7(),
+            owner_id=owner_id,
             name=name,
             type=type,
             description=description,

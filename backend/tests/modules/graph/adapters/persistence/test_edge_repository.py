@@ -11,6 +11,7 @@ from app.modules.graph.adapters.persistence.node_repository import (
 )
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.node import Node
+from app.shared_kernel.access_scope import AccessScope
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +20,7 @@ pytestmark = pytest.mark.integration
 
 
 async def _make_node(db_session: AsyncSession) -> Node:
-    node = Node.create(name="Alien", type="film")
+    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
     await SqlAlchemyNodeRepository(db_session).add(node)
     return node
 
@@ -27,7 +28,12 @@ async def _make_node(db_session: AsyncSession) -> Node:
 async def _make_edge(db_session: AsyncSession) -> Edge:
     source = await _make_node(db_session)
     target = await _make_node(db_session)
-    edge = Edge.create(source_id=source.id, target_id=target.id, type="related-to")
+    edge = Edge.create(
+        owner_id=uuid.UUID(int=1),
+        source_id=source.id,
+        target_id=target.id,
+        type="related-to",
+    )
     await SqlAlchemyEdgeRepository(db_session).add(edge)
     return edge
 
@@ -37,7 +43,7 @@ async def test_add_and_get_round_trips(db_session: AsyncSession) -> None:
     repository = SqlAlchemyEdgeRepository(db_session)
     edge = await _make_edge(db_session)
 
-    result = await repository.get(edge.id)
+    result = await repository.get(edge.id, scope=AccessScope.everyone())
 
     assert result is not None
     assert result.id == edge.id
@@ -51,7 +57,7 @@ async def test_get_returns_none_for_missing_edge(db_session: AsyncSession) -> No
     """get() returns None for an id that was never added."""
     repository = SqlAlchemyEdgeRepository(db_session)
 
-    assert await repository.get(uuid.uuid4()) is None
+    assert await repository.get(uuid.uuid4(), scope=AccessScope.everyone()) is None
 
 
 async def test_get_returns_none_for_a_soft_deleted_edge(
@@ -64,7 +70,7 @@ async def test_get_returns_none_for_a_soft_deleted_edge(
     edge.soft_delete()
     await repository.save(edge)
 
-    assert await repository.get(edge.id) is None
+    assert await repository.get(edge.id, scope=AccessScope.everyone()) is None
 
 
 async def test_save_persists_changes_to_an_existing_edge(
@@ -77,7 +83,7 @@ async def test_save_persists_changes_to_an_existing_edge(
     edge.update(attributes={"since": "1979"})
     await repository.save(edge)
 
-    result = await repository.get(edge.id)
+    result = await repository.get(edge.id, scope=AccessScope.everyone())
     assert result is not None
     assert result.attributes == {"since": "1979"}
 
@@ -87,7 +93,7 @@ async def test_list_orders_by_id_ascending(db_session: AsyncSession) -> None:
     repository = SqlAlchemyEdgeRepository(db_session)
     edges = [await _make_edge(db_session) for _ in range(3)]
 
-    result = await repository.list(after=None, limit=10)
+    result = await repository.list(after=None, limit=10, scope=AccessScope.everyone())
 
     assert [e.id for e in result] == sorted(e.id for e in edges)
 
@@ -101,7 +107,7 @@ async def test_list_excludes_soft_deleted_edges(db_session: AsyncSession) -> Non
     deleted.soft_delete()
     await repository.save(deleted)
 
-    result = await repository.list(after=None, limit=10)
+    result = await repository.list(after=None, limit=10, scope=AccessScope.everyone())
 
     assert [e.id for e in result] == [kept.id]
 
@@ -114,13 +120,22 @@ async def test_list_for_node_returns_edges_touching_the_node_either_direction(
     node = await _make_node(db_session)
     other_a = await _make_node(db_session)
     other_b = await _make_node(db_session)
-    outgoing = Edge.create(source_id=node.id, target_id=other_a.id, type="owns")
-    incoming = Edge.create(source_id=other_b.id, target_id=node.id, type="owned-by")
+    outgoing = Edge.create(
+        owner_id=uuid.UUID(int=1), source_id=node.id, target_id=other_a.id, type="owns"
+    )
+    incoming = Edge.create(
+        owner_id=uuid.UUID(int=1),
+        source_id=other_b.id,
+        target_id=node.id,
+        type="owned-by",
+    )
     await repository.add(outgoing)
     await repository.add(incoming)
     unrelated = await _make_edge(db_session)
 
-    result = await repository.list_for_node(node.id, after=None, limit=10)
+    result = await repository.list_for_node(
+        node.id, after=None, limit=10, scope=AccessScope.everyone()
+    )
 
     assert {e.id for e in result} == {outgoing.id, incoming.id}
     assert unrelated.id not in {e.id for e in result}
@@ -135,12 +150,19 @@ async def test_list_for_node_respects_after_and_limit(
     edges = []
     for _ in range(4):
         target = await _make_node(db_session)
-        edge = Edge.create(source_id=node.id, target_id=target.id, type="owns")
+        edge = Edge.create(
+            owner_id=uuid.UUID(int=1),
+            source_id=node.id,
+            target_id=target.id,
+            type="owns",
+        )
         await repository.add(edge)
         edges.append(edge)
     edges.sort(key=lambda e: e.id)
 
-    page = await repository.list_for_node(node.id, after=edges[0].id, limit=2)
+    page = await repository.list_for_node(
+        node.id, after=edges[0].id, limit=2, scope=AccessScope.everyone()
+    )
 
     assert [e.id for e in page] == [e.id for e in edges[1:3]]
 
@@ -155,7 +177,11 @@ async def test_count_and_list_with_attribute_use_jsonb_key_lookup(
 
     def make(type_: str, attributes: dict[str, int]) -> Edge:
         return Edge.create(
-            source_id=source.id, target_id=target.id, type=type_, attributes=attributes
+            owner_id=uuid.UUID(int=1),
+            source_id=source.id,
+            target_id=target.id,
+            type=type_,
+            attributes=attributes,
         )
 
     edges = [make("owns", {"k": i}) for i in range(3)]
@@ -164,13 +190,23 @@ async def test_count_and_list_with_attribute_use_jsonb_key_lookup(
     for edge in [*edges, make("likes", {"k": 1}), make("owns", {}), gone]:
         await repository.add(edge)
 
-    assert await repository.count_with_attribute("owns", "k") == 3
-    page = await repository.list_with_attribute("owns", "k", after=None, limit=2)
+    assert (
+        await repository.count_with_attribute("owns", "k", scope=AccessScope.everyone())
+        == 3
+    )
+    page = await repository.list_with_attribute(
+        "owns", "k", after=None, limit=2, scope=AccessScope.everyone()
+    )
     rest = await repository.list_with_attribute(
-        "owns", "k", after=page[-1].id, limit=10
+        "owns", "k", after=page[-1].id, limit=10, scope=AccessScope.everyone()
     )
     assert [e.id for e in [*page, *rest]] == sorted(e.id for e in edges)
-    assert await repository.count_with_attribute("owns", "missing") == 0
+    assert (
+        await repository.count_with_attribute(
+            "owns", "missing", scope=AccessScope.everyone()
+        )
+        == 0
+    )
 
 
 async def test_count_with_attribute_matches_an_exact_string_value(
@@ -183,6 +219,7 @@ async def test_count_with_attribute_matches_an_exact_string_value(
     for attrs in [{"s": "Draft"}, {"s": "Draft"}, {"s": "Live"}, {"x": "Draft"}]:
         await repository.add(
             Edge.create(
+                owner_id=uuid.UUID(int=1),
                 source_id=source.id,
                 target_id=target.id,
                 type="owns",
@@ -190,8 +227,18 @@ async def test_count_with_attribute_matches_an_exact_string_value(
             )
         )
 
-    assert await repository.count_with_attribute("owns", "s", value="Draft") == 2
-    assert await repository.count_with_attribute("owns", "s", value="Gone") == 0
+    assert (
+        await repository.count_with_attribute(
+            "owns", "s", value="Draft", scope=AccessScope.everyone()
+        )
+        == 2
+    )
+    assert (
+        await repository.count_with_attribute(
+            "owns", "s", value="Gone", scope=AccessScope.everyone()
+        )
+        == 0
+    )
 
 
 async def test_count_with_attribute_value_matches_array_membership(
@@ -204,6 +251,7 @@ async def test_count_with_attribute_value_matches_array_membership(
     for held in [["CD", "Tape"], ["Vinyl"], "CD"]:
         await repository.add(
             Edge.create(
+                owner_id=uuid.UUID(int=1),
                 source_id=source.id,
                 target_id=target.id,
                 type="owns",
@@ -211,8 +259,18 @@ async def test_count_with_attribute_value_matches_array_membership(
             )
         )
 
-    assert await repository.count_with_attribute("owns", "f", value="CD") == 2
-    assert await repository.count_with_attribute("owns", "f", value="C") == 0
+    assert (
+        await repository.count_with_attribute(
+            "owns", "f", value="CD", scope=AccessScope.everyone()
+        )
+        == 2
+    )
+    assert (
+        await repository.count_with_attribute(
+            "owns", "f", value="C", scope=AccessScope.everyone()
+        )
+        == 0
+    )
 
 
 async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
@@ -225,6 +283,7 @@ async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
 
     def make(attributes: dict[str, object]) -> Edge:
         return Edge.create(
+            owner_id=uuid.UUID(int=1),
             source_id=source.id,
             target_id=target.id,
             type="loaned-to",
@@ -237,22 +296,37 @@ async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
         await repository.add(edge)
 
     assert (
-        await repository.count_with_attribute("loaned-to", "terms", sub_key="duration")
+        await repository.count_with_attribute(
+            "loaned-to", "terms", sub_key="duration", scope=AccessScope.everyone()
+        )
         == 1
     )
     page = await repository.list_with_attribute(
-        "loaned-to", "terms", sub_key="duration", after=None, limit=10
+        "loaned-to",
+        "terms",
+        sub_key="duration",
+        after=None,
+        limit=10,
+        scope=AccessScope.everyone(),
     )
     assert [e.id for e in page] == [has_terms.id]
     assert (
         await repository.count_with_attribute(
-            "loaned-to", "terms", sub_key="duration", value="2w"
+            "loaned-to",
+            "terms",
+            sub_key="duration",
+            value="2w",
+            scope=AccessScope.everyone(),
         )
         == 1
     )
     assert (
         await repository.count_with_attribute(
-            "loaned-to", "terms", sub_key="duration", value="1w"
+            "loaned-to",
+            "terms",
+            sub_key="duration",
+            value="1w",
+            scope=AccessScope.everyone(),
         )
         == 0
     )

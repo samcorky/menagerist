@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -40,14 +41,38 @@ async def _setup() -> tuple[GraphRepos, NodeType]:
     node_type = NodeType.create(slug="film", label="Film")
     await repos.node_types.add(node_type)
     nodes = [
-        Node.create(name="A", type="film", attributes={"status": "Draft"}),
-        Node.create(name="B", type="film", attributes={"status": "Draft"}),
-        Node.create(name="C", type="film", attributes={"status": "Live"}),
-        Node.create(name="D", type="film", attributes={"status": 1}),
-        Node.create(name="E", type="film", attributes={}),
-        Node.create(name="F", type="book", attributes={"status": "Draft"}),
+        Node.create(
+            owner_id=uuid.UUID(int=1),
+            name="A",
+            type="film",
+            attributes={"status": "Draft"},
+        ),
+        Node.create(
+            owner_id=uuid.UUID(int=1),
+            name="B",
+            type="film",
+            attributes={"status": "Draft"},
+        ),
+        Node.create(
+            owner_id=uuid.UUID(int=1),
+            name="C",
+            type="film",
+            attributes={"status": "Live"},
+        ),
+        Node.create(
+            owner_id=uuid.UUID(int=1), name="D", type="film", attributes={"status": 1}
+        ),
+        Node.create(owner_id=uuid.UUID(int=1), name="E", type="film", attributes={}),
+        Node.create(
+            owner_id=uuid.UUID(int=1),
+            name="F",
+            type="book",
+            attributes={"status": "Draft"},
+        ),
     ]
-    deleted = Node.create(name="G", type="film", attributes={"status": "Draft"})
+    deleted = Node.create(
+        owner_id=uuid.UUID(int=1), name="G", type="film", attributes={"status": "Draft"}
+    )
     deleted.soft_delete()
     for node in [*nodes, deleted]:
         await repos.nodes.add(node)
@@ -58,7 +83,7 @@ async def test_list_attribute_values_orders_by_count_then_value() -> None:
     """Values are most-used first, ties broken alphabetically; non-strings ignored."""
     repos, node_type = await _setup()
 
-    values = await ListAttributeValues(repos).handle(
+    values = await ListAttributeValues(repos, OwnerAccessPolicy()).handle(
         ListAttributeValuesQuery(node_type_id=node_type.id, key="status"),
         SYSTEM_ACTOR,
     )
@@ -73,7 +98,7 @@ async def test_list_attribute_values_filters_by_q_case_insensitively() -> None:
     """`q` filters values by case-insensitive substring."""
     repos, node_type = await _setup()
 
-    values = await ListAttributeValues(repos).handle(
+    values = await ListAttributeValues(repos, OwnerAccessPolicy()).handle(
         ListAttributeValuesQuery(node_type_id=node_type.id, key="status", q="live"),
         SYSTEM_ACTOR,
     )
@@ -85,7 +110,7 @@ async def test_list_attribute_values_respects_limit() -> None:
     """At most `limit` values are returned."""
     repos, node_type = await _setup()
 
-    values = await ListAttributeValues(repos).handle(
+    values = await ListAttributeValues(repos, OwnerAccessPolicy()).handle(
         ListAttributeValuesQuery(node_type_id=node_type.id, key="status", limit=1),
         SYSTEM_ACTOR,
     )
@@ -96,7 +121,7 @@ async def test_list_attribute_values_respects_limit() -> None:
 async def test_list_attribute_values_raises_for_missing_type() -> None:
     """An unknown node type id is a not-found error."""
     with pytest.raises(NodeTypeNotFoundError):
-        await ListAttributeValues(_repos()).handle(
+        await ListAttributeValues(_repos(), OwnerAccessPolicy()).handle(
             ListAttributeValuesQuery(node_type_id=uuid.uuid4(), key="status"),
             SYSTEM_ACTOR,
         )

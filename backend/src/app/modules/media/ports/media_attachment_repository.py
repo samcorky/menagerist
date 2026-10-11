@@ -7,10 +7,14 @@ if TYPE_CHECKING:
         AttachmentTarget,
         MediaAttachment,
     )
+    from app.shared_kernel.access_scope import AccessScope
 
 
 class MediaAttachmentRepository(Protocol):
-    """Port for persisting and querying `MediaAttachment` records."""
+    """Port for persisting and querying `MediaAttachment` records.
+
+    An attachment is seen when its asset is inside the scope.
+    """
 
     async def lock_target(
         self, target_type: AttachmentTarget, target_id: uuid.UUID
@@ -26,20 +30,26 @@ class MediaAttachmentRepository(Protocol):
         """Persist a new attachment."""
         ...
 
-    async def get(self, attachment_id: uuid.UUID) -> MediaAttachment | None:
-        """Return an attachment by id, or ``None``."""
+    async def get(
+        self, attachment_id: uuid.UUID, *, scope: AccessScope
+    ) -> MediaAttachment | None:
+        """Return an attachment by id, or ``None`` if missing or unseen."""
         ...
 
     async def list_for_target(
         self,
         target_type: AttachmentTarget,
         target_id: uuid.UUID,
+        *,
+        scope: AccessScope,
     ) -> list[MediaAttachment]:
-        """Return all attachments for the given target entity."""
+        """Return the attachments on the target whose asset is inside `scope`."""
         ...
 
-    async def list_for_asset(self, asset_id: uuid.UUID) -> list[MediaAttachment]:
-        """Return all attachments for the given asset."""
+    async def list_for_asset(
+        self, asset_id: uuid.UUID, *, scope: AccessScope
+    ) -> list[MediaAttachment]:
+        """Return the attachments of the asset, if the asset is inside `scope`."""
         ...
 
     async def update(self, attachment: MediaAttachment) -> None:

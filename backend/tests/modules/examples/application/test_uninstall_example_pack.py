@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.examples.application.install_example_pack import (
     InstallExamplePack,
     InstallExamplePackCommand,
@@ -22,8 +23,9 @@ from app.modules.examples.domain.removal import KEEP_EDITED, KEEP_IN_USE, KEEP_U
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
+from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.media.domain.media_attachment import AttachmentTarget, MediaAttachment
-from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.access_scope import AccessScope
 
 if TYPE_CHECKING:
     from app.modules.examples.ports.pack_targets import RemoveResult
@@ -33,12 +35,13 @@ if TYPE_CHECKING:
 async def _install(world: World) -> None:
     await InstallExamplePack(
         world.uow,
+        OwnerAccessPolicy(),
         world.catalogue,
         world.presets,
         world.graph,
         world.collections,
         world.covers,
-    ).handle(InstallExamplePackCommand(pack_id="demo"), SYSTEM_ACTOR)
+    ).handle(InstallExamplePackCommand(pack_id="demo"), world.actor)
 
 
 async def _installed(make_world: MakeWorld) -> World:
@@ -50,24 +53,37 @@ async def _installed(make_world: MakeWorld) -> World:
 async def _uninstall(world: World, pack_id: str = "demo") -> UninstallResult:
     return await UninstallExamplePack(
         world.uow,
+        OwnerAccessPolicy(),
         world.catalogue,
         world.presets,
         world.graph,
         world.collections,
         world.covers,
-    ).handle(UninstallExamplePackCommand(pack_id=pack_id), SYSTEM_ACTOR)
+    ).handle(UninstallExamplePackCommand(pack_id=pack_id), world.actor)
 
 
 async def _node(world: World, name: str) -> Node:
-    nodes = await world.graph_repos.nodes.list(after=None, limit=10)
+    nodes = await world.graph_repos.nodes.list(
+        scope=AccessScope.everyone(), after=None, limit=10
+    )
     return next(n for n in nodes if n.name == name)
 
 
 async def _assert_empty(world: World) -> None:
-    assert await world.graph_repos.nodes.list(after=None, limit=10) == []
+    assert (
+        await world.graph_repos.nodes.list(
+            scope=AccessScope.everyone(), after=None, limit=10
+        )
+        == []
+    )
     assert await world.graph_repos.node_types.list(after=None, limit=10) == []
     assert await world.graph_repos.edge_types.list(after=None, limit=10) == []
-    assert await world.graph_repos.edges.list(after=None, limit=10) == []
+    assert (
+        await world.graph_repos.edges.list(
+            after=None, limit=10, scope=AccessScope.everyone()
+        )
+        == []
+    )
     assert await world.preset_repos.presets.list(after=None, limit=10) == []
 
 
@@ -85,7 +101,12 @@ async def test_removes_everything_that_is_untouched(make_world: MakeWorld) -> No
         result.removed.relationship_types,
         result.removed.presets,
     ) == (2, 1, 1)
-    assert await world.installations.get_active_for_pack("demo") is None
+    assert (
+        await world.installations.get_active_for_pack(
+            "demo", scope=AccessScope.everyone()
+        )
+        is None
+    )
 
 
 async def test_unknown_or_not_installed_pack_errors(make_world: MakeWorld) -> None:
@@ -114,7 +135,9 @@ async def test_reinstalling_after_removal_succeeds(make_world: MakeWorld) -> Non
 
     await _install(world)
 
-    installation = await world.installations.get_active_for_pack("demo")
+    installation = await world.installations.get_active_for_pack(
+        "demo", scope=AccessScope.everyone()
+    )
     assert installation is not None
     assert installation.status is InstallationStatus.INSTALLED
     assert len(await world.graph_repos.node_types.list(after=None, limit=10)) == 2
@@ -135,7 +158,12 @@ async def test_an_edited_item_is_kept_and_so_are_the_types_it_needs(
     assert (EntityKind.ITEM, KEEP_EDITED) in reasons
     assert (EntityKind.ITEM_TYPE, KEEP_IN_USE) in reasons
     assert (EntityKind.PRESET, KEEP_IN_USE) in reasons
-    names = [n.name for n in await world.graph_repos.nodes.list(after=None, limit=10)]
+    names = [
+        n.name
+        for n in await world.graph_repos.nodes.list(
+            scope=AccessScope.everyone(), after=None, limit=10
+        )
+    ]
     assert names == ["Blue (my copy)"]
 
 
@@ -149,7 +177,12 @@ async def test_no_pack_connection_is_left_dangling(make_world: MakeWorld) -> Non
     result = await _uninstall(world)
 
     assert not any(k.kind is EntityKind.CONNECTION for k in result.kept)
-    assert await world.graph_repos.edges.list(after=None, limit=10) == []
+    assert (
+        await world.graph_repos.edges.list(
+            after=None, limit=10, scope=AccessScope.everyone()
+        )
+        == []
+    )
 
 
 async def test_an_item_with_a_users_own_connection_is_kept(
@@ -158,7 +191,9 @@ async def test_an_item_with_a_users_own_connection_is_kept(
     """A connection the user made to a pack item keeps that item."""
     world = await _installed(make_world)
     ada = await _node(world, "Ada")
-    mine = Edge.create(source_id=ada.id, target_id=uuid.uuid7(), type="mine")
+    mine = Edge.create(
+        owner_id=world.actor.id, source_id=ada.id, target_id=uuid.uuid7(), type="mine"
+    )
     await world.graph_repos.edges.add(mine)
 
     result = await _uninstall(world)
@@ -167,9 +202,15 @@ async def test_an_item_with_a_users_own_connection_is_kept(
     assert any(
         k.kind is EntityKind.ITEM_TYPE and k.reason == KEEP_IN_USE for k in result.kept
     )
-    assert await world.graph_repos.edges.get(mine.id) is not None
+    assert (
+        await world.graph_repos.edges.get(mine.id, scope=AccessScope.everyone())
+        is not None
+    )
     assert [
-        n.name for n in await world.graph_repos.nodes.list(after=None, limit=10)
+        n.name
+        for n in await world.graph_repos.nodes.list(
+            scope=AccessScope.everyone(), after=None, limit=10
+        )
     ] == ["Ada"]
 
 
@@ -177,24 +218,37 @@ async def test_an_item_with_an_attached_file_is_kept(make_world: MakeWorld) -> N
     """A file attached to a pack item keeps that item."""
     world = await _installed(make_world)
     ada = await _node(world, "Ada")
-    attachment = MediaAttachment.for_node(asset_id=uuid.uuid7(), node_id=ada.id)
+    asset = MediaAsset.create(
+        owner_id=world.actor.id,
+        filename="a.png",
+        content_type="image/png",
+        size=3,
+        sha256="0" * 64,
+    )
+    await world.media_repos.assets.add(asset)
+    attachment = MediaAttachment.for_node(asset_id=asset.id, node_id=ada.id)
     await world.media_repos.attachments.add(attachment)
 
     result = await _uninstall(world)
 
     assert any(k.label == "Ada" and k.reason == KEEP_USER_DATA for k in result.kept)
     assert await world.media_repos.attachments.list_for_target(
-        AttachmentTarget.NODE, ada.id
+        AttachmentTarget.NODE, ada.id, scope=AccessScope.everyone()
     ) == [attachment]
     assert [
-        n.name for n in await world.graph_repos.nodes.list(after=None, limit=10)
+        n.name
+        for n in await world.graph_repos.nodes.list(
+            scope=AccessScope.everyone(), after=None, limit=10
+        )
     ] == ["Ada"]
 
 
 async def test_a_favourited_item_is_still_removed(make_world: MakeWorld) -> None:
     """Favouriting alone does not count as an edit."""
     world = await _installed(make_world)
-    for node in await world.graph_repos.nodes.list(after=None, limit=10):
+    for node in await world.graph_repos.nodes.list(
+        scope=AccessScope.everyone(), after=None, limit=10
+    ):
         node.favourite = True
         await world.graph_repos.nodes.save(node)
 
@@ -217,7 +271,12 @@ async def test_something_the_user_already_deleted_is_not_an_error(
 
     assert result.kept == ()
     assert result.removed.items == 2
-    assert await world.installations.get_active_for_pack("demo") is None
+    assert (
+        await world.installations.get_active_for_pack(
+            "demo", scope=AccessScope.everyone()
+        )
+        is None
+    )
 
 
 async def test_a_preset_another_type_uses_is_kept(make_world: MakeWorld) -> None:
@@ -248,16 +307,26 @@ async def test_kept_entities_are_no_longer_the_packs(make_world: MakeWorld) -> N
     await world.graph_repos.nodes.save(blue)
     await _uninstall(world)
 
-    assert await world.installations.get_active_for_pack("demo") is None
+    assert (
+        await world.installations.get_active_for_pack(
+            "demo", scope=AccessScope.everyone()
+        )
+        is None
+    )
     assert [
-        n.name for n in await world.graph_repos.nodes.list(after=None, limit=10)
+        n.name
+        for n in await world.graph_repos.nodes.list(
+            scope=AccessScope.everyone(), after=None, limit=10
+        )
     ] == ["Mine now"]
 
 
 async def test_an_unfinished_installation_is_resumed(make_world: MakeWorld) -> None:
     """An installation stuck in INSTALLING is still removed cleanly."""
     world = await _installed(make_world)
-    installation = await world.installations.get_active_for_pack("demo")
+    installation = await world.installations.get_active_for_pack(
+        "demo", scope=AccessScope.everyone()
+    )
     assert installation is not None
     installation.status = InstallationStatus.INSTALLING
 
@@ -265,7 +334,12 @@ async def test_an_unfinished_installation_is_resumed(make_world: MakeWorld) -> N
 
     assert result.kept == ()
     await _assert_empty(world)
-    assert await world.installations.get_active_for_pack("demo") is None
+    assert (
+        await world.installations.get_active_for_pack(
+            "demo", scope=AccessScope.everyone()
+        )
+        is None
+    )
 
 
 async def test_a_failure_during_removal_leaves_the_installation_resumable(
@@ -285,7 +359,9 @@ async def test_a_failure_during_removal_leaves_the_installation_resumable(
     with pytest.raises(RuntimeError, match="boom"):
         await _uninstall(world)
 
-    installation = await world.installations.get_active_for_pack("demo")
+    installation = await world.installations.get_active_for_pack(
+        "demo", scope=AccessScope.everyone()
+    )
     assert installation is not None
     assert installation.status is not InstallationStatus.REMOVED
     assert {r.kind for r in installation.owned()} >= {
@@ -318,7 +394,7 @@ async def test_a_users_own_item_of_a_pack_type_keeps_that_type(
 ) -> None:
     """A type the user's own item uses stays, and so does the item."""
     world = await _installed(make_world)
-    mine = Node.create(name="My record", type="demo-record")
+    mine = Node.create(owner_id=world.actor.id, name="My record", type="demo-record")
     await world.graph_repos.nodes.add(mine)
 
     result = await _uninstall(world)
@@ -329,7 +405,9 @@ async def test_a_users_own_item_of_a_pack_type_keeps_that_type(
         and k.reason == KEEP_IN_USE
         for k in result.kept
     )
-    remaining = await world.graph_repos.nodes.list(after=None, limit=10)
+    remaining = await world.graph_repos.nodes.list(
+        scope=AccessScope.everyone(), after=None, limit=10
+    )
     assert [n.name for n in remaining] == ["My record"]
     assert remaining[0].type == "demo-record"
 
@@ -340,7 +418,10 @@ async def test_a_users_connection_of_the_pack_relationship_type_keeps_it(
     """A relationship type the user's own connection uses stays."""
     world = await _installed(make_world)
     mine = Edge.create(
-        source_id=uuid.uuid7(), target_id=uuid.uuid7(), type="demo-signed-by"
+        owner_id=world.actor.id,
+        source_id=uuid.uuid7(),
+        target_id=uuid.uuid7(),
+        type="demo-signed-by",
     )
     await world.graph_repos.edges.add(mine)
 
@@ -350,6 +431,9 @@ async def test_a_users_connection_of_the_pack_relationship_type_keeps_it(
         k.kind is EntityKind.RELATIONSHIP_TYPE and k.reason == KEEP_IN_USE
         for k in result.kept
     )
-    assert await world.graph_repos.edges.get(mine.id) is not None
+    assert (
+        await world.graph_repos.edges.get(mine.id, scope=AccessScope.everyone())
+        is not None
+    )
     kept_types = await world.graph_repos.edge_types.list(after=None, limit=10)
     assert [str(t.slug) for t in kept_types] == ["demo-signed-by"]

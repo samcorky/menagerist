@@ -6,15 +6,17 @@ from fastapi import Security
 from fastapi.routing import APIRoute
 from fastapi.security import APIKeyCookie
 
+from app.platform.config import get_identity_settings
 from app.shared_kernel.cqrs import CommandHandler, UseCase
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-# Represents the session cookie identity issued after the OIDC dance completes.
-# auto_error=False deliberately: this exists for OpenAPI documentation only.
-# Real enforcement remains in AuthorisedUseCase.handle() via AuthorizationPort.check().
-cookie_scheme = APIKeyCookie(name="session_id", auto_error=False)
+# The session cookie identity issues at sign-in. auto_error=False deliberately:
+# this exists for OpenAPI documentation only; `get_current_actor` rejects the
+# request and `AuthorizationPort.check()` enforces permissions.
+# The name is read once at import; the runtime lookup always uses live settings.
+cookie_scheme = APIKeyCookie(name=get_identity_settings().cookie_name, auto_error=False)
 
 
 def _find_use_case_type(endpoint: Callable[..., Any]) -> type[UseCase[Any, Any]] | None:

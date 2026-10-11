@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
     InMemoryMediaAssetRepository,
 )
@@ -12,20 +13,25 @@ from app.modules.media.adapters.persistence.unit_of_work import (
 from app.modules.media.application.update_media import UpdateMedia, UpdateMediaCommand
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset
+from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
 def _make_use_case() -> tuple[UpdateMedia, InMemoryMediaAssetRepository]:
     repo = InMemoryMediaAssetRepository()
     uow = create_in_memory_media_uow(make_in_memory_repos(assets=repo))
-    return UpdateMedia(uow), repo
+    return UpdateMedia(uow, OwnerAccessPolicy()), repo
 
 
 async def test_update_renames_and_persists_asset() -> None:
     """UpdateMedia renames the asset and saves it via the repository."""
     use_case, repo = _make_use_case()
     asset = MediaAsset.create(
-        filename="cover.jpg", content_type="image/jpeg", size=1, sha256="x"
+        owner_id=SYSTEM_ACTOR.id,
+        filename="cover.jpg",
+        content_type="image/jpeg",
+        size=1,
+        sha256="x",
     )
     await repo.add(asset)
 
@@ -34,7 +40,7 @@ async def test_update_renames_and_persists_asset() -> None:
     )
 
     assert result.filename == "front page.jpg"
-    stored = await repo.get(asset.id)
+    stored = await repo.get(asset.id, scope=AccessScope.everyone())
     assert stored is not None
     assert stored.filename == "front page.jpg"
 

@@ -5,6 +5,7 @@ if TYPE_CHECKING:
     import uuid
 
     from app.modules.collections.domain.collection import Collection
+    from app.shared_kernel.access_scope import AccessScope
 
 
 def _fold(text: str) -> str:
@@ -27,26 +28,43 @@ class InMemoryCollectionRepository:
         """Persist changes to an existing collection, including soft deletion."""
         self._collections[collection.id] = collection
 
-    async def get(self, collection_id: uuid.UUID) -> Collection | None:
-        """Return the live collection with `collection_id`, or `None`."""
+    def owner_of(self, collection_id: uuid.UUID) -> uuid.UUID | None:
+        """Return the owner of the stored collection, deleted or not, or `None`."""
         found = self._collections.get(collection_id)
-        return found if found is not None and not found.is_deleted else None
+        return None if found is None else found.owner_id
 
-    async def get_by_slug(self, slug: str) -> Collection | None:
-        """Return the live collection with `slug`, or `None`."""
+    @staticmethod
+    def _visible(collection: Collection, scope: AccessScope) -> bool:
+        """Whether `collection` is live and its owner is inside `scope`."""
+        return not collection.is_deleted and scope.covers(collection.owner_id)
+
+    async def get(
+        self, collection_id: uuid.UUID, *, scope: AccessScope
+    ) -> Collection | None:
+        """Return the live collection with `collection_id` in `scope`, or `None`."""
+        found = self._collections.get(collection_id)
+        return found if found is not None and self._visible(found, scope) else None
+
+    async def get_by_slug(self, slug: str, *, scope: AccessScope) -> Collection | None:
+        """Return the live collection with `slug` in `scope`, or `None`."""
         return next(
             (
                 c
-                for c in self._collections.values()
-                if not c.is_deleted and c.slug.value == slug
+                for c in sorted(self._collections.values(), key=lambda c: c.id)
+                if self._visible(c, scope) and c.slug.value == slug
             ),
             None,
         )
 
     async def list(
-        self, *, after: uuid.UUID | None, limit: int, q: str | None = None
+        self,
+        *,
+        scope: AccessScope,
+        after: uuid.UUID | None,
+        limit: int,
+        q: str | None = None,
     ) -> list[Collection]:
-        """Return up to `limit` live collections ordered by id, after `after`.
+        """Return up to `limit` live collections in `scope`, ordered by id.
 
         A non-blank `q` keeps collections whose name or description contains it,
         ignoring case and accents.
@@ -56,7 +74,7 @@ class InMemoryCollectionRepository:
             (
                 c
                 for c in self._collections.values()
-                if not c.is_deleted
+                if self._visible(c, scope)
                 and (after is None or c.id > after)
                 and (
                     not needle
@@ -67,3 +85,16 @@ class InMemoryCollectionRepository:
             key=lambda c: c.id,
         )
         return live[:limit]
+
+    async def claim_orphaned(
+        self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
+    ) -> int:
+        """Give `owner_id` every collection with no owner or a legacy owner."""
+        claimed = [
+            row
+            for row in self._collections.values()
+            if row.owner_id is None or row.owner_id in legacy_owner_ids
+        ]
+        for row in claimed:
+            row.owner_id = owner_id
+        return len(claimed)

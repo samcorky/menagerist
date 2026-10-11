@@ -9,7 +9,12 @@ from app.modules.examples.domain.installation import (
     Installation,
     Outcome,
 )
-from app.modules.examples.domain.removal import KEEP_IN_USE, Action, decide_removal
+from app.modules.examples.domain.removal import (
+    KEEP_IN_USE,
+    KEEP_SHARED,
+    Action,
+    decide_removal,
+)
 from app.modules.examples.ports.pack_targets import (
     CollectionTarget,
     CoverTarget,
@@ -21,6 +26,10 @@ from app.modules.examples.ports.pack_targets import (
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
+
+
+# Types are shared structure: several people's installs of one pack reuse them.
+REMOVAL_ORDER_SHARED = (EntityKind.ITEM_TYPE, EntityKind.RELATIONSHIP_TYPE)
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
@@ -41,12 +50,16 @@ async def settle_installation(
     collections: CollectionTarget,
     covers: CoverTarget,
     persist: Callable[[Installation], Awaitable[None]],
+    types_shared: bool = False,
 ) -> list[KeptEntity]:
     """Remove or keep every owned entity, saving after each one.
 
     Entities are handled in `REMOVAL_ORDER`, so by the time something is inspected
     everything that depended on it has already gone or been kept. Safe to call again
     on a half-finished installation: it only touches entities still owned.
+
+    With `types_shared`, item and relationship types that could be removed are kept
+    instead: another person's installation of the pack still relies on them.
 
     A kept cover is settled and recorded but not reported: the person sees the item
     that holds it, and covers are not something the pack lists or counts.
@@ -61,6 +74,7 @@ async def settle_installation(
                 graph=graph,
                 collections=collections,
                 covers=covers,
+                types_shared=types_shared,
             )
             await persist(installation)
             if reason is not None and record.kind is not EntityKind.COVER:
@@ -118,6 +132,7 @@ async def _settle_one(
     graph: GraphTarget,
     collections: CollectionTarget,
     covers: CoverTarget,
+    types_shared: bool,
 ) -> str | None:
     """Settle one record; return the reason it was kept, or `None`."""
     inspection = await inspect_record(
@@ -135,6 +150,9 @@ async def _settle_one(
     if decision.action is Action.KEEP:
         installation.settle(record.entity_id, Outcome.KEPT, decision.reason)
         return decision.reason
+    if types_shared and record.kind in REMOVAL_ORDER_SHARED:
+        installation.settle(record.entity_id, Outcome.KEPT, KEEP_SHARED)
+        return KEEP_SHARED
 
     result = await _remove(
         record, presets=presets, graph=graph, collections=collections, covers=covers

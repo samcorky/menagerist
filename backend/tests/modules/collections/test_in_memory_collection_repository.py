@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from app.modules.collections.adapters.persistence.in_memory_collection_repository import (  # noqa: E501
     InMemoryCollectionRepository,
 )
+from app.shared_kernel.access_scope import AccessScope
 
 if TYPE_CHECKING:
     from tests.modules.collections.conftest import MakeCollection
@@ -14,11 +15,11 @@ async def test_add_get_and_save_round_trip(make_collection: MakeCollection) -> N
     repo = InMemoryCollectionRepository()
     collection = make_collection("Jazz")
     await repo.add(collection)
-    assert await repo.get(collection.id) is collection
-    assert await repo.get_by_slug("jazz") is collection
+    assert await repo.get(collection.id, scope=AccessScope.everyone()) is collection
+    assert await repo.get_by_slug("jazz", scope=AccessScope.everyone()) is collection
     collection.rename("Blues")
     await repo.save(collection)
-    stored = await repo.get(collection.id)
+    stored = await repo.get(collection.id, scope=AccessScope.everyone())
     assert stored is not None
     assert stored.name == "Blues"
 
@@ -26,8 +27,8 @@ async def test_add_get_and_save_round_trip(make_collection: MakeCollection) -> N
 async def test_unknown_lookups_return_none() -> None:
     """Unknown ids and slugs yield `None`."""
     repo = InMemoryCollectionRepository()
-    assert await repo.get(uuid.uuid7()) is None
-    assert await repo.get_by_slug("nope") is None
+    assert await repo.get(uuid.uuid7(), scope=AccessScope.everyone()) is None
+    assert await repo.get_by_slug("nope", scope=AccessScope.everyone()) is None
 
 
 async def test_soft_deleted_collection_is_hidden(
@@ -39,9 +40,9 @@ async def test_soft_deleted_collection_is_hidden(
     await repo.add(collection)
     collection.soft_delete()
     await repo.save(collection)
-    assert await repo.get(collection.id) is None
-    assert await repo.get_by_slug("jazz") is None
-    assert await repo.list(after=None, limit=10) == []
+    assert await repo.get(collection.id, scope=AccessScope.everyone()) is None
+    assert await repo.get_by_slug("jazz", scope=AccessScope.everyone()) is None
+    assert await repo.list(scope=AccessScope.everyone(), after=None, limit=10) == []
 
 
 async def test_slug_of_a_deleted_collection_does_not_shadow_a_live_one(
@@ -55,7 +56,7 @@ async def test_slug_of_a_deleted_collection_does_not_shadow_a_live_one(
     await repo.save(old)
     new = make_collection("Jazz")
     await repo.add(new)
-    assert await repo.get_by_slug("jazz") is new
+    assert await repo.get_by_slug("jazz", scope=AccessScope.everyone()) is new
 
 
 async def test_list_is_ordered_by_id_with_keyset_paging(
@@ -67,13 +68,15 @@ async def test_list_is_ordered_by_id_with_keyset_paging(
     for collection in reversed(made):
         await repo.add(collection)
 
-    first = await repo.list(after=None, limit=2)
+    first = await repo.list(scope=AccessScope.everyone(), after=None, limit=2)
     assert first == made[:2]
-    second = await repo.list(after=first[-1].id, limit=2)
+    second = await repo.list(scope=AccessScope.everyone(), after=first[-1].id, limit=2)
     assert second == made[2:4]
-    last = await repo.list(after=second[-1].id, limit=2)
+    last = await repo.list(scope=AccessScope.everyone(), after=second[-1].id, limit=2)
     assert last == made[4:]
-    assert await repo.list(after=last[-1].id, limit=2) == []
+    assert (
+        await repo.list(scope=AccessScope.everyone(), after=last[-1].id, limit=2) == []
+    )
 
 
 async def test_list_q_matches_name_or_description_ignoring_case(
@@ -88,7 +91,9 @@ async def test_list_q_matches_name_or_description_ignoring_case(
     for collection in (by_name, by_description, miss):
         await repo.add(collection)
 
-    found = await repo.list(after=None, limit=10, q="tape")
+    found = await repo.list(
+        scope=AccessScope.everyone(), after=None, limit=10, q="tape"
+    )
 
     assert {c.id for c in found} == {by_name.id, by_description.id}
 
@@ -105,8 +110,12 @@ async def test_list_q_treats_percent_and_underscore_literally(
     for collection in (percent, plain, underscore, other):
         await repo.add(collection)
 
-    assert await repo.list(after=None, limit=10, q="50%") == [percent]
-    assert await repo.list(after=None, limit=10, q="a_b") == [underscore]
+    assert await repo.list(
+        scope=AccessScope.everyone(), after=None, limit=10, q="50%"
+    ) == [percent]
+    assert await repo.list(
+        scope=AccessScope.everyone(), after=None, limit=10, q="a_b"
+    ) == [underscore]
 
 
 async def test_list_blank_q_returns_everything(
@@ -118,7 +127,12 @@ async def test_list_blank_q_returns_everything(
         await repo.add(make_collection(name))
 
     for q in (None, "", "   "):
-        assert len(await repo.list(after=None, limit=10, q=q)) == 2
+        assert (
+            len(
+                await repo.list(scope=AccessScope.everyone(), after=None, limit=10, q=q)
+            )
+            == 2
+        )
 
 
 async def test_list_q_combines_with_after_limit_and_deletion(
@@ -133,8 +147,10 @@ async def test_list_q_combines_with_after_limit_and_deletion(
     made[3].soft_delete()
     await repo.save(made[3])
 
-    first = await repo.list(after=None, limit=2, q="tape")
-    rest = await repo.list(after=first[-1].id, limit=2, q="tape")
+    first = await repo.list(scope=AccessScope.everyone(), after=None, limit=2, q="tape")
+    rest = await repo.list(
+        scope=AccessScope.everyone(), after=first[-1].id, limit=2, q="tape"
+    )
 
     assert first == made[:2]
     assert rest == [made[2]]
@@ -155,7 +171,12 @@ async def test_list_q_ignores_accents_both_ways(
         await repo.add(collection)
 
     async def ids(q: str) -> set[object]:
-        return {c.id for c in await repo.list(after=None, limit=10, q=q)}
+        return {
+            c.id
+            for c in await repo.list(
+                scope=AccessScope.everyone(), after=None, limit=10, q=q
+            )
+        }
 
     assert await ids("cafe") == {accented.id, plain.id, percent.id}
     assert await ids("CAFÉ") == {accented.id, plain.id, percent.id}

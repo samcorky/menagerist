@@ -13,6 +13,7 @@
 	import { errorMessage } from '$lib/api/errors';
 	import { slugify } from '$lib/utils.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { auth } from '$lib/auth.svelte.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -290,15 +291,17 @@
 								>
 									<Pencil class="size-4" />
 								</Button>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon"
-									onclick={() => handleDelete(et)}
-									aria-label="Delete relationship type"
-								>
-									<Trash2 class="size-4" />
-								</Button>
+								{#if auth.can('graph:edge_type:delete')}
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon"
+										onclick={() => handleDelete(et)}
+										aria-label="Delete relationship type"
+									>
+										<Trash2 class="size-4" />
+									</Button>
+								{/if}
 							</div>
 						</Card.Header>
 

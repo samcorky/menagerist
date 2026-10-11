@@ -175,3 +175,29 @@ def test_graph_module_is_independent_of_collections() -> None:
         .in_folder("*modules/collections*")
     )
     assert_passes(rule)
+
+
+def test_no_content_module_imports_identity() -> None:
+    """Only the entrypoints (bridges, composition root, CLI) may use `identity`."""
+    for other in ("graph", "presets", "examples", "collections", "media", "system"):
+        rule = (
+            project_files(SRC_PATH)
+            .in_folder(f"*modules/{other}*")
+            .should_not()
+            .depend_on_files()
+            .in_folder("*modules/identity*")
+        )
+        assert_passes(rule)
+
+
+def test_identity_module_is_independent_of_other_modules() -> None:
+    """`identity` imports no other module; bridges live in `entrypoints/api/shared`."""
+    for other in ("graph", "presets", "examples", "collections", "media"):
+        rule = (
+            project_files(SRC_PATH)
+            .in_folder("*modules/identity*")
+            .should_not()
+            .depend_on_files()
+            .in_folder(f"*modules/{other}*")
+        )
+        assert_passes(rule)

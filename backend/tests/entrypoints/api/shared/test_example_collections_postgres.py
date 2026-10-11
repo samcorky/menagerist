@@ -1,6 +1,7 @@
 """Example packs with collections, end to end through the real app on Postgres."""
 
 import json
+import uuid
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -8,9 +9,11 @@ import sqlalchemy
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
+from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.examples.adapters.api.dependencies import get_pack_catalogue
 from app.modules.examples.adapters.platform.file_pack_catalogue import FilePackCatalogue
 from app.platform.database import get_engine, get_session_factory
+from app.shared_kernel.actor import Actor
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -34,6 +37,8 @@ _PACK: dict[str, Any] = {
         {"ref": "solo", "name": "Solo", "items": ["c"]},
     ],
 }
+
+MEMBER = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
 
 
 _DUO_EDITED = ("collection", "Duo", "edited")
@@ -74,6 +79,7 @@ def client(
     get_session_factory.cache_clear()
     get_engine.cache_clear()
     app = create_app()
+    app.dependency_overrides[get_current_actor] = lambda: MEMBER
     app.dependency_overrides[get_pack_catalogue] = lambda: FilePackCatalogue(tmp_path)
     try:
         with TestClient(app) as c:

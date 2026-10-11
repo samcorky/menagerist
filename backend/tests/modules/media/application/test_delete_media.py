@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
     InMemoryMediaAssetRepository,
 )
@@ -15,6 +16,7 @@ from app.modules.media.adapters.storage.in_memory_media_storage import (
 from app.modules.media.application.delete_media import DeleteMedia, DeleteMediaCommand
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset
+from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
@@ -24,21 +26,25 @@ def _make_use_case() -> tuple[
     repo = InMemoryMediaAssetRepository()
     storage = InMemoryMediaStorage()
     uow = create_in_memory_media_uow(make_in_memory_repos(assets=repo))
-    return DeleteMedia(uow, storage), repo, storage
+    return DeleteMedia(uow, OwnerAccessPolicy(), storage), repo, storage
 
 
 async def test_delete_removes_asset_from_db_and_storage() -> None:
     """DeleteMedia hard-deletes the DB record and the stored file."""
     use_case, repo, storage = _make_use_case()
     asset = MediaAsset.create(
-        filename="f.jpg", content_type="image/jpeg", size=1, sha256="x"
+        owner_id=SYSTEM_ACTOR.id,
+        filename="f.jpg",
+        content_type="image/jpeg",
+        size=1,
+        sha256="x",
     )
     await repo.add(asset)
     storage._files[(asset.id, "staged")] = b"data"
 
     await use_case.handle(DeleteMediaCommand(asset_id=asset.id), SYSTEM_ACTOR)
 
-    assert await repo.get(asset.id) is None
+    assert await repo.get(asset.id, scope=AccessScope.everyone()) is None
     assert (asset.id, "staged") not in storage._files
 
 

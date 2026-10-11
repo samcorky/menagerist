@@ -41,6 +41,7 @@ dev = [
     "pywin32>=312; sys_platform == 'win32'",
     "ruff>=0.16.3",
     "testcontainers[postgres]>=4.15.0",
+    "time-machine>=3.5.1",
     "types-aiofiles>=25.1.0.20260518",
     "types-docker>=7.2.0.20260923",
     "types-jsonschema>=4.26.0.20260518",
@@ -217,6 +218,7 @@ asyncio_mode = "auto"
 addopts = "--cov=app --cov-branch --cov-report=xml --cov-report=term-missing"
 markers = [
     "integration: exercises a real adapter (database, network) instead of an in-memory fake",
+    "real_actor: keep the real get_current_actor instead of the default member override",
 ]
 
 [tool.coverage.run]

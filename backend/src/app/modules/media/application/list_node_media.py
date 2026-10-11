@@ -7,7 +7,7 @@ import structlog
 from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
 from app.modules.media.ports.unit_of_work import MediaRepos
-from app.shared_kernel.cqrs import QueryHandler
+from app.shared_kernel.cqrs import ScopedQueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -30,19 +30,22 @@ class NodeMediaItem:
     attribute_key: AttachmentKey | None
 
 
-class ListNodeMedia(QueryHandler[MediaRepos, ListNodeMediaQuery, list[NodeMediaItem]]):
+class ListNodeMedia(
+    ScopedQueryHandler[MediaRepos, ListNodeMediaQuery, list[NodeMediaItem]]
+):
     """Return all media assets currently attached to a node, with their slot labels."""
 
     async def handle(
         self, query: ListNodeMediaQuery, actor: Actor
     ) -> list[NodeMediaItem]:
         """Fetch attachments for the node then resolve each asset."""
+        scope = self._policy.scope_for(actor)
         attachments = await self._repos.attachments.list_for_target(
-            AttachmentTarget.NODE, query.node_id
+            AttachmentTarget.NODE, query.node_id, scope=scope
         )
         results: list[NodeMediaItem] = []
         for att in attachments:
-            asset = await self._repos.assets.get(att.asset_id)
+            asset = await self._repos.assets.get(att.asset_id, scope=scope)
             if asset is not None:
                 results.append(
                     NodeMediaItem(asset=asset, attribute_key=att.attribute_key)

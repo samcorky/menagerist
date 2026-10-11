@@ -58,9 +58,10 @@ class Api:
 def api() -> Api:
     """Return an app wired to in-memory repositories and a settable item lookup."""
     app = create_app()
+    collections = InMemoryCollectionRepository()
     repos = CollectionsRepos(
-        collections=InMemoryCollectionRepository(),
-        memberships=InMemoryMembershipRepository(),
+        collections=collections,
+        memberships=InMemoryMembershipRepository(collections),
     )
     items = InMemoryItemLookup()
     app.dependency_overrides[get_collections_uow] = lambda: (

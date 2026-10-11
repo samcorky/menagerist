@@ -4,13 +4,14 @@ from sqlalchemy import ForeignKey, Index, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.platform.database import Base
-from app.platform.orm_mixins import IdentifiableMixin, TimestampedMixin
+from app.platform.orm_mixins import IdentifiableMixin, OwnedMixin, TimestampedMixin
 
 
-class MediaAssetModel(IdentifiableMixin, TimestampedMixin, Base):
+class MediaAssetModel(IdentifiableMixin, OwnedMixin, TimestampedMixin, Base):
     """ORM row for a media asset - the storage shape, kept separate from the domain."""
 
     __tablename__ = "media_assets"
+    __table_args__ = (Index("ix_media_assets_owner_id_id", "owner_id", "id"),)
 
     filename: Mapped[str]
     content_type: Mapped[str]

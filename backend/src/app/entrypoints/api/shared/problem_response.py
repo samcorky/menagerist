@@ -8,6 +8,8 @@ from app.shared_kernel.errors import (
     DomainError,
     ForbiddenError,
     NotFoundError,
+    TooManyRequestsError,
+    UnauthenticatedError,
     ValidationError,
 )
 
@@ -19,6 +21,8 @@ _STATUS_BY_DOMAIN_ERROR: dict[type[DomainError], int] = {
     ConflictError: 409,
     ValidationError: 400,
     ForbiddenError: 403,
+    UnauthenticatedError: 401,
+    TooManyRequestsError: 429,
 }
 
 
@@ -106,7 +110,7 @@ def _problem_response(request: Request, exc: Exception) -> JSONResponse:
         if isinstance(exc, error_type)
     )
     content: dict[str, Any] = {
-        "type": "about:blank",
+        "type": exc.problem_type,
         "title": type(exc).__name__,
         "status": status_code,
         "detail": str(exc),
@@ -114,10 +118,14 @@ def _problem_response(request: Request, exc: Exception) -> JSONResponse:
     }
     if hasattr(exc, "validation_errors") and exc.validation_errors:
         content["errors"] = exc.validation_errors
+    headers: dict[str, str] = {}
+    if isinstance(exc, TooManyRequestsError) and exc.retry_after is not None:
+        headers["Retry-After"] = str(exc.retry_after)
     return JSONResponse(
         status_code=status_code,
         media_type="application/problem+json",
         content=content,
+        headers=headers,
     )
 
 

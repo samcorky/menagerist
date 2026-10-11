@@ -13,7 +13,11 @@ from app.modules.graph.domain.errors import NodeNotFoundError
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos, GraphUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
+from app.shared_kernel.access_scope import AccessScope  # noqa: TC001
+from app.shared_kernel.cqrs import ScopedCommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
@@ -47,13 +51,13 @@ class CreateEdgesResult:
 
 
 async def _existing_targets(
-    repos: GraphRepos, source_id: uuid.UUID, type_: str
+    repos: GraphRepos, source_id: uuid.UUID, type_: str, scope: AccessScope
 ) -> set[uuid.UUID]:
     """Ids connected to `source_id` by an edge of `type_`, either direction."""
     targets: set[uuid.UUID] = set()
     after: uuid.UUID | None = None
     while page := await repos.edges.list_for_node(
-        source_id, after=after, limit=_PAGE_SIZE
+        source_id, scope=scope, after=after, limit=_PAGE_SIZE
     ):
         for edge in page:
             if edge.type == type_:
@@ -65,23 +69,39 @@ async def _existing_targets(
 
 
 class CreateEdges(
-    CommandHandler[GraphUnitOfWork, CreateEdgesCommand, CreateEdgesResult]
+    ScopedCommandHandler[GraphUnitOfWork, CreateEdgesCommand, CreateEdgesResult]
 ):
     """Create edges from one source to several targets in a single transaction."""
 
     def __init__(
-        self, uow: GraphUnitOfWork, choice_lists: ChoiceListSource | None = None
+        self,
+        uow: GraphUnitOfWork,
+        policy: AccessPolicy,
+        choice_lists: ChoiceListSource | None = None,
     ) -> None:
-        super().__init__(uow)
+        super().__init__(uow, policy)
         self._choice_lists = choice_lists
 
     async def handle(
         self, command: CreateEdgesCommand, actor: Actor
     ) -> CreateEdgesResult:
         """Create the edges in `command`, skipping targets already connected."""
+        scope = self._policy.scope_for(actor)
         async with self._uow as repos:
-            if await repos.nodes.get(command.source_id) is None:
+            if await repos.nodes.get(command.source_id, scope=scope) is None:
                 raise NodeNotFoundError(f"Node {command.source_id} not found")
+
+            existing = await _existing_targets(
+                repos, command.source_id, command.type, scope
+            )
+
+            # Check every endpoint before writing, so a bad one creates nothing.
+            for target_id in command.target_ids:
+                if (
+                    target_id not in existing
+                    and await repos.nodes.get(target_id, scope=scope) is None
+                ):
+                    raise NodeNotFoundError(f"Node {target_id} not found")
 
             slug = slugify(command.type)
             edge_type = await repos.edge_types.get_by_slug(slug)
@@ -97,17 +117,14 @@ class CreateEdges(
                 )
                 validate_attributes(schema, command.attributes)
 
-            existing = await _existing_targets(repos, command.source_id, command.type)
-
             created: list[Edge] = []
             skipped: list[uuid.UUID] = []
             for target_id in command.target_ids:
                 if target_id in existing:
                     skipped.append(target_id)
                     continue
-                if await repos.nodes.get(target_id) is None:
-                    raise NodeNotFoundError(f"Node {target_id} not found")
                 edge = Edge.create(
+                    owner_id=actor.id,
                     source_id=command.source_id,
                     target_id=target_id,
                     type=command.type,

@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import Depends
 
 from app.entrypoints.api.shared.collection_items import GraphItemLookup, get_item_lookup
+from app.entrypoints.api.shared.dependencies import get_access_policy
 from app.modules.collections.adapters.persistence.unit_of_work import (
     build_collections_repos,
     create_collections_uow,
@@ -23,6 +24,7 @@ from app.modules.collections.ports.unit_of_work import (
     CollectionsUnitOfWork,
 )
 from app.platform.database import get_session_factory
+from app.shared_kernel.access_policy import AccessPolicy
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -51,44 +53,51 @@ async def get_collections_repos(
 
 def get_create_collection_use_case(
     uow: Annotated[CollectionsUnitOfWork, Depends(get_collections_uow)],
+    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
 ) -> CreateCollection:
-    return CreateCollection(uow)
+    return CreateCollection(uow, policy)
 
 
 def get_get_collection_use_case(
     repos: Annotated[CollectionsRepos, Depends(get_collections_repos)],
+    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
     items: Annotated[GraphItemLookup, Depends(get_item_lookup)],
 ) -> GetCollection:
-    return GetCollection(repos, items)
+    return GetCollection(repos, policy, items)
 
 
 def get_list_collections_use_case(
     repos: Annotated[CollectionsRepos, Depends(get_collections_repos)],
+    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
     items: Annotated[GraphItemLookup, Depends(get_item_lookup)],
 ) -> ListCollections:
-    return ListCollections(repos, items)
+    return ListCollections(repos, policy, items)
 
 
 def get_update_collection_use_case(
     uow: Annotated[CollectionsUnitOfWork, Depends(get_collections_uow)],
+    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
 ) -> UpdateCollection:
-    return UpdateCollection(uow)
+    return UpdateCollection(uow, policy)
 
 
 def get_delete_collection_use_case(
     uow: Annotated[CollectionsUnitOfWork, Depends(get_collections_uow)],
+    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
 ) -> DeleteCollection:
-    return DeleteCollection(uow)
+    return DeleteCollection(uow, policy)
 
 
 def get_add_items_to_collection_use_case(
     uow: Annotated[CollectionsUnitOfWork, Depends(get_collections_uow)],
+    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
     items: Annotated[GraphItemLookup, Depends(get_item_lookup)],
 ) -> AddItemsToCollection:
-    return AddItemsToCollection(uow, items)
+    return AddItemsToCollection(uow, policy, items)
 
 
 def get_remove_item_from_collection_use_case(
     uow: Annotated[CollectionsUnitOfWork, Depends(get_collections_uow)],
+    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
 ) -> RemoveItemFromCollection:
-    return RemoveItemFromCollection(uow)
+    return RemoveItemFromCollection(uow, policy)

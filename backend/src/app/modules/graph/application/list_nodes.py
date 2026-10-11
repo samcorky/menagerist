@@ -9,9 +9,13 @@ from app.modules.graph.domain.errors import CollectionNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.collection_members import CollectionMembers  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.cqrs import QueryHandler
+
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
+from app.shared_kernel.cqrs import ScopedQueryHandler
 
 if TYPE_CHECKING:
+    from app.shared_kernel.access_scope import AccessScope
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -39,27 +43,31 @@ class ListNodesResult:
     total: int
 
 
-class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
+class ListNodes(ScopedQueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
     """List node with keyset pagination."""
 
     def __init__(
         self,
         repos: GraphRepos,
+        policy: AccessPolicy,
         collection_members: CollectionMembers | None = None,
     ) -> None:
-        super().__init__(repos)
+        super().__init__(repos, policy)
         self._collection_members = collection_members
 
     async def _collection_item_ids(
-        self, collection_id: uuid.UUID | None
+        self, collection_id: uuid.UUID | None, scope: AccessScope
     ) -> set[uuid.UUID] | None:
-        """Resolve a collection to its item ids, or None when unrestricted."""
+        """Resolve a collection to its item ids, or None when unrestricted.
+
+        A collection outside `scope` is not found, like a missing one.
+        """
         if collection_id is None:
             return None
         if self._collection_members is None:
             msg = "ListNodes needs collection members to filter by collection"
             raise RuntimeError(msg)
-        ids = await self._collection_members.item_ids(collection_id)
+        ids = await self._collection_members.item_ids(collection_id, scope)
         if ids is None:
             msg = f"Collection {collection_id} not found"
             raise CollectionNotFoundError(msg)
@@ -82,8 +90,10 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
     async def handle(self, query: ListNodesQuery, actor: Actor) -> ListNodesResult:
         """Return a page of nodes and total count matching the query."""
         exclusions = await self._search_exclusions() if query.q is not None else None
-        ids = await self._collection_item_ids(query.collection)
+        scope = self._policy.scope_for(actor)
+        ids = await self._collection_item_ids(query.collection, scope)
         items = await self._repos.nodes.list(
+            scope=scope,
             after=query.after,
             limit=query.limit,
             type=query.type,
@@ -93,6 +103,7 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
             ids=ids,
         )
         total = await self._repos.nodes.count(
+            scope=scope,
             type=query.type,
             q=query.q,
             favourite=query.favourite,

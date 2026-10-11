@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.collections.application.update_collection import (
     UpdateCollection,
     UpdateCollectionCommand,
@@ -31,7 +32,7 @@ async def test_update_changes_name_and_description_not_slug(
     save = AsyncMock(wraps=world.collections.save)
     monkeypatch.setattr(world.collections, "save", save)
 
-    result = await UpdateCollection(world.uow).handle(
+    result = await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
         UpdateCollectionCommand(collection_id=shelf.id, name=" New ", description="d"),
         SYSTEM_ACTOR,
     )
@@ -51,7 +52,7 @@ async def test_update_description_set_clear_and_unchanged(
     await world.collections.add(shelf)
 
     async def update(description: str | None) -> str | None:
-        result = await UpdateCollection(world.uow).handle(
+        result = await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
             UpdateCollectionCommand(collection_id=shelf.id, description=description),
             SYSTEM_ACTOR,
         )
@@ -72,7 +73,7 @@ async def test_update_leaves_unset_fields_alone(
     shelf.description = "keep me"
     await world.collections.add(shelf)
 
-    result = await UpdateCollection(world.uow).handle(
+    result = await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
         UpdateCollectionCommand(collection_id=shelf.id), SYSTEM_ACTOR
     )
 
@@ -87,7 +88,7 @@ async def test_update_invalid_name_raises(
     await world.collections.add(shelf)
 
     with pytest.raises(InvalidCollectionError):
-        await UpdateCollection(world.uow).handle(
+        await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
             UpdateCollectionCommand(collection_id=shelf.id, name="  "), SYSTEM_ACTOR
         )
 
@@ -97,7 +98,7 @@ async def test_update_invalid_name_raises(
 async def test_update_unknown_raises_not_found(world: World) -> None:
     """An unknown id raises CollectionNotFoundError."""
     with pytest.raises(CollectionNotFoundError):
-        await UpdateCollection(world.uow).handle(
+        await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
             UpdateCollectionCommand(collection_id=uuid.uuid7(), name="x"),
             SYSTEM_ACTOR,
         )
@@ -114,6 +115,6 @@ async def test_update_deleted_raises_not_found(
     await world.collections.add(shelf)
 
     with pytest.raises(CollectionNotFoundError):
-        await UpdateCollection(world.uow).handle(
+        await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
             UpdateCollectionCommand(collection_id=shelf.id, name="x"), SYSTEM_ACTOR
         )

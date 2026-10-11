@@ -11,7 +11,8 @@ from app.modules.collections.domain.errors import CollectionNotFoundError
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.collections.ports.item_lookup import ItemLookup  # noqa: TC001
 from app.modules.collections.ports.unit_of_work import CollectionsUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
+from app.shared_kernel.cqrs import ScopedCommandHandler
 from app.shared_kernel.errors import ValidationError
 
 if TYPE_CHECKING:
@@ -31,12 +32,14 @@ class AddItemsToCollectionCommand:
 
 
 class AddItemsToCollection(
-    CommandHandler[CollectionsUnitOfWork, AddItemsToCollectionCommand, int]
+    ScopedCommandHandler[CollectionsUnitOfWork, AddItemsToCollectionCommand, int]
 ):
     """Put live items on a collection, skipping those already on it."""
 
-    def __init__(self, uow: CollectionsUnitOfWork, items: ItemLookup) -> None:
-        super().__init__(uow)
+    def __init__(
+        self, uow: CollectionsUnitOfWork, policy: AccessPolicy, items: ItemLookup
+    ) -> None:
+        super().__init__(uow, policy)
         self._items = items
 
     async def handle(self, command: AddItemsToCollectionCommand, actor: Actor) -> int:
@@ -44,27 +47,30 @@ class AddItemsToCollection(
 
         Raises:
             ValidationError: If more than `MAX_ITEMS_PER_REQUEST` ids are given,
-                or any id is not a live item; nothing is added.
-            CollectionNotFoundError: If the collection is missing or deleted.
+                or any id is not a live item the actor can see; nothing is added.
+            CollectionNotFoundError: If the collection is missing, deleted or not
+                the actor's.
         """
         if len(command.item_ids) > MAX_ITEMS_PER_REQUEST:
             raise ValidationError(
                 f"At most {MAX_ITEMS_PER_REQUEST} items can be added at once"
             )
         requested = list(dict.fromkeys(command.item_ids))
+        scope = self._policy.scope_for(actor)
         async with self._uow as repos:
-            collection = await repos.collections.get(command.collection_id)
+            collection = await repos.collections.get(command.collection_id, scope=scope)
             if collection is None:
                 raise CollectionNotFoundError(
                     f"Collection {command.collection_id} not found"
                 )
+            self._policy.assert_can_modify(actor, collection.owner_id)
             if not requested:
                 return 0
-            live = await self._items.live_ids(requested)
+            live = await self._items.live_ids(requested, scope)
             missing = sorted(str(i) for i in set(requested) - live)
             if missing:
                 raise ValidationError(f"Unknown or deleted items: {', '.join(missing)}")
-            present = await repos.memberships.item_ids(collection.id)
+            present = await repos.memberships.item_ids(collection.id, scope=scope)
             added_at = datetime.now(UTC)
             new_ids = [i for i in requested if i not in present]
             for item_id in new_ids:

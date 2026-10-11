@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_collection_members import (
     InMemoryCollectionMembers,
 )
@@ -36,11 +37,11 @@ def _make_repos(nodes: InMemoryNodeRepository) -> GraphRepos:
 async def test_list_nodes_filters_by_type() -> None:
     """ListNodes returns only nodes matching the requested type."""
     nodes = InMemoryNodeRepository()
-    film = Node.create(name="Alien", type="film")
-    person = Node.create(name="Ridley Scott", type="person")
+    film = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
+    person = Node.create(owner_id=uuid.UUID(int=1), name="Ridley Scott", type="person")
     await nodes.add(film)
     await nodes.add(person)
-    use_case = ListNodes(_make_repos(nodes))
+    use_case = ListNodes(_make_repos(nodes), OwnerAccessPolicy())
 
     result = await use_case.handle(ListNodesQuery(type="film"), SYSTEM_ACTOR)
 
@@ -51,11 +52,11 @@ async def test_list_nodes_filters_by_type() -> None:
 async def test_list_nodes_filters_by_search_query() -> None:
     """ListNodes passes q to the repository and returns only matching nodes."""
     nodes = InMemoryNodeRepository()
-    alien = Node.create(name="Alien", type="film")
-    predator = Node.create(name="Predator", type="film")
+    alien = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
+    predator = Node.create(owner_id=uuid.UUID(int=1), name="Predator", type="film")
     await nodes.add(alien)
     await nodes.add(predator)
-    use_case = ListNodes(_make_repos(nodes))
+    use_case = ListNodes(_make_repos(nodes), OwnerAccessPolicy())
 
     result = await use_case.handle(ListNodesQuery(q="alien"), SYSTEM_ACTOR)
 
@@ -66,12 +67,15 @@ async def test_list_nodes_filters_by_search_query() -> None:
 async def test_list_nodes_orders_by_id_and_paginates() -> None:
     """ListNodes returns node ordered by id, respecting after/limit."""
     nodes = InMemoryNodeRepository()
-    node_list = [Node.create(name="Alien", type="film") for _ in range(3)]
+    node_list = [
+        Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
+        for _ in range(3)
+    ]
     for node in node_list:
         await nodes.add(node)
     expected_order = sorted(node_list, key=lambda n: n.id)
     repos = _make_repos(nodes)
-    use_case = ListNodes(repos)
+    use_case = ListNodes(repos, OwnerAccessPolicy())
 
     first_page = await use_case.handle(
         ListNodesQuery(after=None, limit=2), SYSTEM_ACTOR
@@ -90,8 +94,10 @@ async def test_list_nodes_total_reflects_all_matching_nodes() -> None:
     """ListNodes.total counts all matches regardless of pagination limit."""
     nodes = InMemoryNodeRepository()
     for _ in range(5):
-        await nodes.add(Node.create(name="Alien", type="film"))
-    use_case = ListNodes(_make_repos(nodes))
+        await nodes.add(
+            Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
+        )
+    use_case = ListNodes(_make_repos(nodes), OwnerAccessPolicy())
 
     result = await use_case.handle(ListNodesQuery(limit=2), SYSTEM_ACTOR)
 
@@ -105,22 +111,28 @@ async def _shelf_setup() -> tuple[
     nodes = InMemoryNodeRepository()
     members = InMemoryCollectionMembers()
     on_shelf = [
-        Node.create(name="Alien", type="film", favourite=True),
-        Node.create(name="Aliens", type="film"),
-        Node.create(name="Ridley Scott", type="person"),
+        Node.create(
+            owner_id=uuid.UUID(int=1), name="Alien", type="film", favourite=True
+        ),
+        Node.create(owner_id=uuid.UUID(int=1), name="Aliens", type="film"),
+        Node.create(owner_id=uuid.UUID(int=1), name="Ridley Scott", type="person"),
     ]
-    off_shelf = Node.create(name="Alien Nation", type="film", favourite=True)
+    off_shelf = Node.create(
+        owner_id=uuid.UUID(int=1), name="Alien Nation", type="film", favourite=True
+    )
     for node in [*on_shelf, off_shelf]:
         await nodes.add(node)
     collection_id = uuid.uuid4()
-    members.add_collection(collection_id, [n.id for n in on_shelf])
+    members.add_collection(
+        collection_id, [n.id for n in on_shelf], owner_id=uuid.UUID(int=1)
+    )
     return nodes, members, collection_id, on_shelf
 
 
 async def test_list_nodes_collection_restricts_to_members() -> None:
     """ListNodes with a collection returns only its items, and totals match."""
     nodes, members, collection_id, on_shelf = await _shelf_setup()
-    use_case = ListNodes(_make_repos(nodes), members)
+    use_case = ListNodes(_make_repos(nodes), OwnerAccessPolicy(), members)
 
     result = await use_case.handle(
         ListNodesQuery(collection=collection_id), SYSTEM_ACTOR
@@ -133,7 +145,7 @@ async def test_list_nodes_collection_restricts_to_members() -> None:
 async def test_list_nodes_collection_combines_with_other_filters() -> None:
     """The collection restriction combines with q, type and favourite."""
     nodes, members, collection_id, _ = await _shelf_setup()
-    use_case = ListNodes(_make_repos(nodes), members)
+    use_case = ListNodes(_make_repos(nodes), OwnerAccessPolicy(), members)
 
     by_q = await use_case.handle(
         ListNodesQuery(collection=collection_id, q="alien"), SYSTEM_ACTOR
@@ -156,7 +168,7 @@ async def test_list_nodes_collection_combines_with_other_filters() -> None:
 async def test_list_nodes_collection_paginates_with_restricted_total() -> None:
     """Paging walks the collection's items and total stays the restricted count."""
     nodes, members, collection_id, on_shelf = await _shelf_setup()
-    use_case = ListNodes(_make_repos(nodes), members)
+    use_case = ListNodes(_make_repos(nodes), OwnerAccessPolicy(), members)
     ordered = sorted(on_shelf, key=lambda n: n.id)
 
     first = await use_case.handle(
@@ -175,7 +187,7 @@ async def test_list_nodes_collection_paginates_with_restricted_total() -> None:
 async def test_list_nodes_unknown_collection_raises_not_found() -> None:
     """A collection the source does not know raises CollectionNotFoundError."""
     nodes, members, _, _ = await _shelf_setup()
-    use_case = ListNodes(_make_repos(nodes), members)
+    use_case = ListNodes(_make_repos(nodes), OwnerAccessPolicy(), members)
 
     with pytest.raises(CollectionNotFoundError):
         await use_case.handle(ListNodesQuery(collection=uuid.uuid4()), SYSTEM_ACTOR)
@@ -185,8 +197,8 @@ async def test_list_nodes_empty_collection_returns_nothing() -> None:
     """A collection with no items yields an empty list and total 0."""
     nodes, members, _, _ = await _shelf_setup()
     empty_id = uuid.uuid4()
-    members.add_collection(empty_id, [])
-    use_case = ListNodes(_make_repos(nodes), members)
+    members.add_collection(empty_id, [], owner_id=uuid.UUID(int=1))
+    use_case = ListNodes(_make_repos(nodes), OwnerAccessPolicy(), members)
 
     result = await use_case.handle(ListNodesQuery(collection=empty_id), SYSTEM_ACTOR)
 
@@ -198,7 +210,7 @@ async def test_list_nodes_collection_ignores_deleted_items() -> None:
     """A deleted item on the shelf is not listed or counted."""
     nodes, members, collection_id, on_shelf = await _shelf_setup()
     on_shelf[0].soft_delete()
-    use_case = ListNodes(_make_repos(nodes), members)
+    use_case = ListNodes(_make_repos(nodes), OwnerAccessPolicy(), members)
 
     result = await use_case.handle(
         ListNodesQuery(collection=collection_id), SYSTEM_ACTOR
@@ -211,7 +223,7 @@ async def test_list_nodes_collection_ignores_deleted_items() -> None:
 async def test_list_nodes_without_collection_is_unrestricted() -> None:
     """Without a collection the members source is not consulted."""
     nodes, members, _, _ = await _shelf_setup()
-    use_case = ListNodes(_make_repos(nodes), members)
+    use_case = ListNodes(_make_repos(nodes), OwnerAccessPolicy(), members)
 
     result = await use_case.handle(ListNodesQuery(), SYSTEM_ACTOR)
 
@@ -220,7 +232,7 @@ async def test_list_nodes_without_collection_is_unrestricted() -> None:
 
 async def test_list_nodes_collection_without_source_is_a_misconfiguration() -> None:
     """Filtering by collection without a members source fails loudly."""
-    use_case = ListNodes(_make_repos(InMemoryNodeRepository()))
+    use_case = ListNodes(_make_repos(InMemoryNodeRepository()), OwnerAccessPolicy())
 
     with pytest.raises(RuntimeError, match="collection members"):
         await use_case.handle(ListNodesQuery(collection=uuid.uuid4()), SYSTEM_ACTOR)

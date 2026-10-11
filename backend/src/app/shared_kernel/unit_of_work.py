@@ -57,6 +57,36 @@ class JoinedUnitOfWork[TRepos]:
         self._owner.on_commit(callback)
 
 
+class AmbientUnitOfWork[TRepos]:
+    """Hands a use case the repositories of a transaction another unit owns.
+
+    `commit()` does nothing: whoever opened the transaction commits it once, so
+    several use cases succeed or fail together. Rollback is theirs as well.
+    """
+
+    def __init__(self, repos: TRepos) -> None:
+        self._repos = repos
+
+    async def __aenter__(self) -> TRepos:
+        """Return the already-open repositories."""
+        return self._repos
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        """No-op: the owner handles rollback and cleanup."""
+
+    async def commit(self) -> None:
+        """No-op: the owner controls the commit."""
+
+    def on_commit(self, callback: Callable[[], Awaitable[None]]) -> None:
+        """Refuse: nothing here knows when the owner commits."""
+        raise NotImplementedError("Register on_commit callbacks on the owning unit.")
+
+
 class InMemoryUnitOfWork[TRepos]:
     """In-memory transaction boundary wrapping a repository bundle for tests."""
 

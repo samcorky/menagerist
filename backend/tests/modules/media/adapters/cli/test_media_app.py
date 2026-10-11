@@ -21,6 +21,8 @@ from app.modules.media.adapters.storage.in_memory_media_storage import (
 )
 from app.modules.media.domain.media_asset import MediaAsset
 from app.platform.config.media import MediaSettings
+from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
 def test_cleanup_wires_the_use_case_and_deletes_expired_assets(
@@ -33,7 +35,11 @@ def test_cleanup_wires_the_use_case_and_deletes_expired_assets(
     settings = MediaSettings(staged_ttl_hours=24, orphaned_ttl_hours=72)
 
     expired = MediaAsset.create(
-        filename="old.jpg", content_type="image/jpeg", size=1, sha256="x"
+        owner_id=SYSTEM_ACTOR.id,
+        filename="old.jpg",
+        content_type="image/jpeg",
+        size=1,
+        sha256="x",
     )
     expired.updated_at = datetime.now(UTC) - timedelta(hours=48)
     asyncio.run(repo.add(expired))
@@ -58,7 +64,7 @@ def test_cleanup_wires_the_use_case_and_deletes_expired_assets(
 
     cleanup()
 
-    assert asyncio.run(repo.get(expired.id)) is None
+    assert asyncio.run(repo.get(expired.id, scope=AccessScope.everyone())) is None
 
 
 def test_regenerate_thumbnails_wires_the_use_case_and_regenerates(
@@ -71,7 +77,11 @@ def test_regenerate_thumbnails_wires_the_use_case_and_regenerates(
     processor = InMemoryImageProcessor()
 
     asset = MediaAsset.create(
-        filename="cover.jpg", content_type="image/jpeg", size=1, sha256="x"
+        owner_id=SYSTEM_ACTOR.id,
+        filename="cover.jpg",
+        content_type="image/jpeg",
+        size=1,
+        sha256="x",
     )
     asset.promote()
     asyncio.run(repo.add(asset))

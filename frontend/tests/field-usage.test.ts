@@ -14,8 +14,10 @@ describe('usageLabel', () => {
 describe('purgeWarning', () => {
 	it('repeats the count and says it cannot be undone', () => {
 		expect(purgeWarning('Director', 3, 'node')).toBe(
-			'This permanently deletes “Director” from 3 items. It cannot be undone.'
+			"This permanently deletes “Director” from 3 of your items, and from any other person's items that use it. It cannot be undone."
 		);
-		expect(purgeWarning('Since', 1, 'edge')).toContain('1 connection.');
+		expect(purgeWarning('Since', 1, 'edge')).toContain(
+			"from 1 of your connections, and from any other person's connections that use it."
+		);
 	});
 });

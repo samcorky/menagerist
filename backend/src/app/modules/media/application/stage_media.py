@@ -87,6 +87,7 @@ class StageMedia(CommandHandler[MediaUnitOfWork, StageMediaCommand, MediaAsset])
 
         asset = MediaAsset.create(
             asset_id=asset_id,
+            owner_id=actor.id,
             filename=command.filename,
             content_type=trusted_content_type,
             size=size,

@@ -5,7 +5,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from app.modules.examples.domain.errors import InvalidInstallationStateError
-from app.shared_kernel.mixins import Identifiable, Timestamped
+from app.shared_kernel.mixins import Identifiable, Owned, Timestamped
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -66,7 +66,7 @@ class EntityRecord:
 
 
 @dataclass(kw_only=True, eq=False)
-class Installation(Identifiable, Timestamped):
+class Installation(Identifiable, Owned, Timestamped):
     """The record of one pack being installed, and what became of its entities."""
 
     pack_id: str
@@ -76,11 +76,12 @@ class Installation(Identifiable, Timestamped):
     removed_at: datetime | None = None
 
     @classmethod
-    def start(cls, pack_id: str) -> Installation:
-        """Begin an installation, generating its id and timestamps."""
+    def start(cls, pack_id: str, owner_id: uuid.UUID) -> Installation:
+        """Begin `owner_id`'s installation, generating its id and timestamps."""
         now = datetime.now(UTC)
         return cls(
             id=uuid.uuid7(),
+            owner_id=owner_id,
             pack_id=pack_id,
             status=InstallationStatus.INSTALLING,
             created_at=now,
@@ -138,6 +139,15 @@ class Installation(Identifiable, Timestamped):
                 self.touch()
                 return
         raise InvalidInstallationStateError(f"no owned entity {entity_id} to settle")
+
+    def settle_kept_as_removed(self, entity_id: uuid.UUID) -> None:
+        """Mark a kept entity as removed after someone else's cleanup took it."""
+        for index, record in enumerate(self.entities):
+            if record.entity_id == entity_id and record.outcome is Outcome.KEPT:
+                self.entities[index] = replace(record, outcome=Outcome.REMOVED)
+                self.touch()
+                return
+        raise InvalidInstallationStateError(f"no kept entity {entity_id} to settle")
 
     def mark_installed(self) -> None:
         """The install finished."""

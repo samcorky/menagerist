@@ -1,9 +1,13 @@
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, Depends, FastAPI, Security
 from granian.utils.proxies import wrap_asgi_with_proxy_headers
 from starlette.middleware.cors import CORSMiddleware
 
 from app.entrypoints.api.docs.router import router as docs_router
 from app.entrypoints.api.openapi import configure_openapi
+from app.entrypoints.api.permissions_router import router as permissions_router
+from app.entrypoints.api.shared.claim_existing_data import get_claim_existing_data
+from app.entrypoints.api.shared.csrf import verify_csrf
+from app.entrypoints.api.shared.permission_aware_route import cookie_scheme
 from app.entrypoints.api.shared.problem_response import register_exception_handlers
 from app.entrypoints.api.shared.request_context_middleware import (
     RequestContextMiddleware,
@@ -19,6 +23,12 @@ from app.modules.graph.adapters.api.edge.router import router as edge_router
 from app.modules.graph.adapters.api.edge_type.router import router as edge_type_router
 from app.modules.graph.adapters.api.node.router import router as graph_router
 from app.modules.graph.adapters.api.node_type.router import router as node_type_router
+from app.modules.identity.adapters.api.auth_router import (
+    public_router as public_auth_router,
+    router as auth_router,
+)
+from app.modules.identity.adapters.api.dependencies import get_existing_data_claim
+from app.modules.identity.adapters.api.user_router import router as user_router
 from app.modules.media.adapters.api.media.router import router as media_router
 from app.modules.presets.adapters.api.preset.router import router as preset_router
 from app.modules.system.adapters.api.router import router as system_router
@@ -35,7 +45,15 @@ api_router = APIRouter(prefix="/api")
 api_router.include_router(system_router)
 api_router.include_router(docs_router)
 
-api_v1_router = APIRouter(prefix="/v1", tags=["v1"])
+# Every unsafe method here needs a matching CSRF header and cookie; sign-in and
+# first-run setup live on the public router below because no cookie exists yet.
+api_v1_router = APIRouter(
+    prefix="/v1",
+    tags=["v1"],
+    dependencies=[Depends(verify_csrf), Security(cookie_scheme)],
+)
+public_v1_router = APIRouter(prefix="/v1", tags=["v1"])
+public_v1_router.include_router(public_auth_router)
 api_v1_router.include_router(graph_router)
 api_v1_router.include_router(edge_router)
 api_v1_router.include_router(node_type_router)
@@ -44,8 +62,12 @@ api_v1_router.include_router(media_router)
 api_v1_router.include_router(preset_router)
 api_v1_router.include_router(example_router)
 api_v1_router.include_router(collection_router)
+api_v1_router.include_router(auth_router)
+api_v1_router.include_router(permissions_router)
+api_v1_router.include_router(user_router)
 
 api_router.include_router(api_v1_router)
+api_router.include_router(public_v1_router)
 
 
 def create_app() -> FastAPI:
@@ -77,6 +99,7 @@ def create_app() -> FastAPI:
     fastapi_app.add_middleware(
         CORSMiddleware,
         allow_origins=get_api_settings().cors_origins,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=["App-Version", "Total-Count", "Link"],
@@ -85,6 +108,8 @@ def create_app() -> FastAPI:
         RequestContextMiddleware,
     )
 
+    # Identity cannot import the other modules; this bridge supplies the claim.
+    fastapi_app.dependency_overrides[get_existing_data_claim] = get_claim_existing_data
     fastapi_app.include_router(api_router)
     register_exception_handlers(fastapi_app)
     configure_openapi(fastapi_app)

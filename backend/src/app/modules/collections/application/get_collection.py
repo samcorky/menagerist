@@ -10,7 +10,9 @@ from app.modules.collections.domain.errors import CollectionNotFoundError
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.collections.ports.item_lookup import ItemLookup  # noqa: TC001
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
-from app.shared_kernel.cqrs import QueryHandler
+from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
+from app.shared_kernel.access_scope import AccessScope  # noqa: TC001
+from app.shared_kernel.cqrs import ScopedQueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -27,11 +29,14 @@ class CollectionSummary:
 
 
 async def summarise(
-    repos: CollectionsRepos, items: ItemLookup, collection: Collection
+    repos: CollectionsRepos,
+    items: ItemLookup,
+    collection: Collection,
+    scope: AccessScope,
 ) -> CollectionSummary:
-    """Count `collection`'s members that are still live items."""
-    member_ids = await repos.memberships.item_ids(collection.id)
-    live = await items.live_ids(list(member_ids))
+    """Count `collection`'s members that are live items visible in `scope`."""
+    member_ids = await repos.memberships.item_ids(collection.id, scope=scope)
+    live = await items.live_ids(list(member_ids), scope)
     return CollectionSummary(collection=collection, item_count=len(live))
 
 
@@ -43,20 +48,24 @@ class GetCollectionQuery:
 
 
 class GetCollection(
-    QueryHandler[CollectionsRepos, GetCollectionQuery, CollectionSummary]
+    ScopedQueryHandler[CollectionsRepos, GetCollectionQuery, CollectionSummary]
 ):
     """Fetch a single collection with its live item count."""
 
-    def __init__(self, repos: CollectionsRepos, items: ItemLookup) -> None:
-        super().__init__(repos)
+    def __init__(
+        self, repos: CollectionsRepos, policy: AccessPolicy, items: ItemLookup
+    ) -> None:
+        super().__init__(repos, policy)
         self._items = items
 
     async def handle(
         self, query: GetCollectionQuery, actor: Actor
     ) -> CollectionSummary:
         """Return the collection, or raise `CollectionNotFoundError` if missing."""
-        collection = await self._repos.collections.get(query.collection_id)
+        scope = self._policy.scope_for(actor)
+        collection = await self._repos.collections.get(query.collection_id, scope=scope)
         if collection is None:
             raise CollectionNotFoundError(f"Collection {query.collection_id} not found")
+        self._policy.assert_can_view(actor, collection.owner_id)
         logger.debug("collection fetched", collection_id=collection.id)
-        return await summarise(self._repos, self._items, collection)
+        return await summarise(self._repos, self._items, collection, scope)

@@ -8,6 +8,7 @@ from app.modules.media.adapters.storage.local_filesystem import (
 )
 from app.modules.media.domain.errors import MediaFileTooLargeError
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
+from app.shared_kernel.actor import SYSTEM_ACTOR
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -25,7 +26,11 @@ def _storage(tmp_path: Path) -> LocalFilesystemMediaStorage:
 
 def _asset() -> MediaAsset:
     return MediaAsset.create(
-        filename="f.bin", content_type="application/octet-stream", size=0, sha256=""
+        owner_id=SYSTEM_ACTOR.id,
+        filename="f.bin",
+        content_type="application/octet-stream",
+        size=0,
+        sha256="",
     )
 
 

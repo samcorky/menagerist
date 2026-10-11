@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 
 from app.shared_kernel.errors import ValidationError
-from app.shared_kernel.mixins import Identifiable, Timestamped
+from app.shared_kernel.mixins import Identifiable, Owned, Timestamped
 
 
 class MediaStatus(StrEnum):
@@ -16,7 +16,7 @@ class MediaStatus(StrEnum):
 
 
 @dataclass(kw_only=True, eq=False)
-class MediaAsset(Identifiable, Timestamped):
+class MediaAsset(Identifiable, Owned, Timestamped):
     """Binary media asset attached to a target entity."""
 
     filename: str
@@ -37,6 +37,7 @@ class MediaAsset(Identifiable, Timestamped):
         cls,
         *,
         asset_id: uuid.UUID | None = None,
+        owner_id: uuid.UUID,
         filename: str,
         content_type: str,
         size: int,
@@ -46,6 +47,7 @@ class MediaAsset(Identifiable, Timestamped):
         now = datetime.now(UTC)
         return cls(
             id=asset_id if asset_id is not None else uuid.uuid7(),
+            owner_id=owner_id,
             filename=filename,
             content_type=content_type,
             size=size,

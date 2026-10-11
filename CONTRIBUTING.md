@@ -54,6 +54,24 @@ uv run menagerist serve --host 0.0.0.0 --reload   # backend at :8000
 cd frontend && npm run dev -- --host 0.0.0.0       # frontend at :5173, in a second shell
 ```
 
+### First run and accounts
+
+The first visit to the app (or any `/api/v1` call) answers "set up required" and the browser lands on `/setup`: choose a username and password and that account becomes the administrator. Any items, collections, files and example installations that already exist (from before accounts) are adopted by that first administrator in the same step; the page shows what was claimed. Accounts are local to the instance. Administrators add other people under Settings > Users, giving each an initial password that the person must change at first sign-in.
+
+After pulling changes that touch the database, run `poe migrate` (the container does it on start with `--migrate`) before opening the app.
+
+The `menagerist identity` commands manage accounts without the UI:
+
+```sh
+uv run menagerist identity create-admin --username sam   # first admin (claims existing data) or an extra admin
+uv run menagerist identity reset-password --username sam # new initial password, ends the account's sessions
+uv run menagerist identity list                          # username, display name, role, disabled flag
+```
+
+Each command that needs a password asks for it (hidden, confirmed twice) or reads `MENAGERIST_INITIAL_PASSWORD`; the password is never printed or logged. It must be 10 to 128 characters and not the username. The account must change it at next sign-in.
+
+**Forgotten administrator password:** run `reset-password` for that username against the same database (`DATABASE_URL`/`MENAGERIST_*` settings as the app), then sign in with the new password and change it. For the Docker stack, run it inside the container: `docker compose exec menagerist menagerist identity reset-password --username sam`.
+
 ## Common tasks
 
 ```sh
@@ -103,6 +121,10 @@ poe test-e2e --skip-build         # reuse frontend/build - only when it is curre
 
 Each worker has its own database (`menagerist_w0`, `menagerist_w1`, ... in the one Postgres container on port 55433) and its own backend on port **8100 + worker index**. Each backend serves the built SPA from `frontend/build`, so there is no Vite dev server. Files run in parallel across workers; tests inside a file stay ordered. The ports are deliberately not the dev defaults (8000/5173), so the suite can run alongside `poe serve` or a deployed `docker compose up` and can never reuse a server that points at your real data. Override the base port with `E2E_BACKEND_PORT`. Locally, servers already running on those ports are reused, which makes the single-spec workflow below fast.
 
+**Authentication.** Every route except the auth routes needs a session, so `frontend/tests/e2e/fixtures.ts` signs each worker in once: it calls `GET /auth/status`, runs `POST /auth/setup` on a fresh worker database (the migrate script leaves it without users) or `POST /auth/login` if the stable admin `e2e-admin` already exists, and keeps the session in memory. The test-scoped `storageState` and `X-CSRF-Token` header come from that session, so `page`, `context` and `request` are all signed in and existing specs need no change. Worker databases keep the `e2e-admin` account between runs; if sign-in fails, run `poe e2e-db-down` (it drops the volume) and migrate again. `helpers.ts` has `createUserViaApi(admin, baseURL, ...)` and `asUser(browser, user)` for specs that need other accounts. `browser.newContext()` starts as the worker admin, so contexts for other people must pass an explicit `storageState` (`asUser` does).
+
+A third Playwright project, `auth` (`auth.spec.ts`), tests first-run setup, sign-in and the password rules against its own backend on port **8190** (`E2E_AUTH_BACKEND_PORT`) and database `menagerist_auth`. `poe e2e-migrate` drops and recreates that database on every run so it is always empty; the file skips itself with a message if it finds users. Because Playwright starts this backend on every run, `menagerist_auth` must exist even when you run a single other spec: migrate after any `poe e2e-db-down`.
+
 Every worker is a browser plus a backend, so memory and CPU use grow with `--workers`. If tests time out on a small machine, lower the count.
 
 To iterate on a single spec without paying the full up/build/migrate/down cycle each time (the build must be current):
@@ -111,8 +133,10 @@ To iterate on a single spec without paying the full up/build/migrate/down cycle 
 poe e2e-db-up && poe e2e-build
 E2E_WORKERS=1 poe e2e-migrate      # once, leave running
 cd frontend && E2E_WORKERS=1 npx playwright test tests/e2e/create-item.spec.ts
-poe e2e-db-down                    # when done
+poe e2e-db-down                    # when done: removes the container and its volume
 ```
+
+To rerun only the auth project: `E2E_WORKERS=1 poe e2e-migrate`, then `cd frontend && E2E_WORKERS=1 npx playwright test tests/e2e/auth.spec.ts --project=auth`.
 
 ### Backend test structure
 

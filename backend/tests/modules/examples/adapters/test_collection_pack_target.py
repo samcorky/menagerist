@@ -15,6 +15,7 @@ from app.entrypoints.api.shared.example_targets import (
 from app.modules.examples.domain.installation import EntityKind
 from app.modules.examples.domain.pack import PackCollection
 from app.modules.examples.ports.pack_targets import RemoveResult
+from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.errors import ValidationError
 
 if TYPE_CHECKING:
@@ -59,12 +60,13 @@ async def _rig(make_world: MakeWorld, sample_pack: SamplePack) -> Rig:
         world=world,
         repos=repos,
         target=CollectionPackTarget(
-            in_memory_collection_stores(repos, world.graph_repos)
+            in_memory_collection_stores(repos, world.graph_repos), world.actor
         ),
         graph=GraphPackTarget(
             in_memory_graph_stores(
                 world.graph_repos, world.media_repos, world.preset_repos, repos
-            )
+            ),
+            world.actor,
         ),
         blue=blue.entity_id,
         ada=ada.entity_id,
@@ -101,7 +103,9 @@ async def test_slugs_are_derived_and_never_clash(
 
     slugs = []
     for created in (first, second):
-        stored = await rig.repos.collections.get(created.entity_id)
+        stored = await rig.repos.collections.get(
+            created.entity_id, scope=AccessScope.everyone()
+        )
         assert stored is not None
         slugs.append(stored.slug.value)
     assert slugs == ["both", "both-2"]
@@ -144,7 +148,12 @@ async def test_a_failed_item_add_leaves_no_collection_behind(
     with pytest.raises(ValidationError):
         await rig.target.create_collection(_SPEC, item_ids=[rig.blue, uuid.uuid7()])
 
-    assert await rig.repos.collections.list(after=None, limit=10) == []
+    assert (
+        await rig.repos.collections.list(
+            scope=AccessScope.everyone(), after=None, limit=10
+        )
+        == []
+    )
 
 
 async def test_an_item_on_a_live_collection_is_user_data(

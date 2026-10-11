@@ -4,22 +4,38 @@ import structlog
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
-from app.modules.media.adapters.persistence.models import MediaAttachmentModel
+from app.modules.media.adapters.persistence.models import (
+    MediaAssetModel,
+    MediaAttachmentModel,
+)
 from app.modules.media.domain.errors import CoverAlreadySetError
 from app.modules.media.domain.media_attachment import (
     AttachmentKey,
     AttachmentTarget,
     MediaAttachment,
 )
+from app.platform.orm_mixins import owned_by
 
 if TYPE_CHECKING:
     import uuid
 
+    from sqlalchemy import Select
     from sqlalchemy.ext.asyncio import AsyncSession
+
+    from app.shared_kernel.access_scope import AccessScope
 
 logger = structlog.get_logger()
 
 _COVER_INDEX = "uq_media_attachment_cover"
+
+
+def _visible(scope: AccessScope) -> Select[tuple[MediaAttachmentModel]]:
+    """Select attachments whose asset is inside `scope`."""
+    return (
+        select(MediaAttachmentModel)
+        .join(MediaAssetModel, MediaAssetModel.id == MediaAttachmentModel.asset_id)
+        .where(owned_by(MediaAssetModel, scope.user_id))
+    )
 
 
 class SqlAlchemyMediaAttachmentRepository:
@@ -81,36 +97,41 @@ class SqlAlchemyMediaAttachmentRepository:
                 raise
             raise CoverAlreadySetError from exc
 
-    async def get(self, attachment_id: uuid.UUID) -> MediaAttachment | None:
-        """Return an attachment by id, or ``None``."""
+    async def get(
+        self, attachment_id: uuid.UUID, *, scope: AccessScope
+    ) -> MediaAttachment | None:
+        """Return an attachment by id, or ``None`` if missing or unseen."""
         logger.debug("fetching media attachment", attachment_id=attachment_id)
-        row = await self._session.get(MediaAttachmentModel, attachment_id)
+        stmt = _visible(scope).where(MediaAttachmentModel.id == attachment_id)
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
         return self._to_domain(row) if row is not None else None
 
     async def list_for_target(
         self,
         target_type: AttachmentTarget,
         target_id: uuid.UUID,
+        *,
+        scope: AccessScope,
     ) -> list[MediaAttachment]:
-        """Return all attachments for the given target entity."""
+        """Return the attachments on the target whose asset is inside `scope`."""
         logger.debug(
             "listing attachments for target",
             target_type=target_type.value,
             target_id=target_id,
         )
-        stmt = select(MediaAttachmentModel).where(
+        stmt = _visible(scope).where(
             MediaAttachmentModel.target_type == target_type.value,
             MediaAttachmentModel.target_id == target_id,
         )
         result = await self._session.execute(stmt)
         return [self._to_domain(r) for r in result.scalars()]
 
-    async def list_for_asset(self, asset_id: uuid.UUID) -> list[MediaAttachment]:
-        """Return all attachments for the given asset."""
+    async def list_for_asset(
+        self, asset_id: uuid.UUID, *, scope: AccessScope
+    ) -> list[MediaAttachment]:
+        """Return the attachments of the asset, if the asset is inside `scope`."""
         logger.debug("listing attachments for asset", asset_id=asset_id)
-        stmt = select(MediaAttachmentModel).where(
-            MediaAttachmentModel.asset_id == asset_id
-        )
+        stmt = _visible(scope).where(MediaAttachmentModel.asset_id == asset_id)
         result = await self._session.execute(stmt)
         return [self._to_domain(r) for r in result.scalars()]
 

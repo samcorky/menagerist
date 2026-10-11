@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
     InMemoryMediaAssetRepository,
 )
@@ -18,6 +19,7 @@ from app.modules.media.application.promote_media import (
 )
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
+from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.errors import ValidationError
 
@@ -28,14 +30,18 @@ def _make_use_case() -> tuple[
     repo = InMemoryMediaAssetRepository()
     storage = InMemoryMediaStorage()
     uow = create_in_memory_media_uow(make_in_memory_repos(assets=repo))
-    return PromoteMedia(uow, storage), repo, storage
+    return PromoteMedia(uow, OwnerAccessPolicy(), storage), repo, storage
 
 
 async def _add_staged(
     repo: InMemoryMediaAssetRepository, storage: InMemoryMediaStorage
 ) -> MediaAsset:
     asset = MediaAsset.create(
-        filename="f.jpg", content_type="image/jpeg", size=1, sha256="x"
+        owner_id=SYSTEM_ACTOR.id,
+        filename="f.jpg",
+        content_type="image/jpeg",
+        size=1,
+        sha256="x",
     )
     await repo.add(asset)
     storage._files[(asset.id, "staged")] = b"data"
@@ -50,7 +56,9 @@ async def test_promote_transitions_asset_to_attached() -> None:
     result = await use_case.handle(PromoteMediaCommand(asset_id=asset.id), SYSTEM_ACTOR)
 
     assert result.status is MediaStatus.ATTACHED
-    assert (await repo.get(asset.id)).status is MediaStatus.ATTACHED  # type: ignore[union-attr]
+    assert (
+        await repo.get(asset.id, scope=AccessScope.everyone())
+    ).status is MediaStatus.ATTACHED  # type: ignore[union-attr]
     assert storage._files.get((asset.id, "attached")) == b"data"
     assert (asset.id, "staged") not in storage._files
 

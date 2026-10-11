@@ -70,7 +70,11 @@ from app.modules.presets.adapters.persistence.in_memory_preset_repository import
     InMemoryPresetRepository,
 )
 from app.modules.presets.ports.unit_of_work import PresetRepos
+from app.shared_kernel.actor import Actor
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
+
+USER_A = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
+USER_B = Actor(id=uuid.UUID(int=0xB2), roles=frozenset({"member"}))
 
 _RECORD_SCHEMA: dict[str, Any] = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -157,9 +161,12 @@ class WorldGraphTarget(GraphPackTarget):
     """Graph target modelling the rule: a member of a live collection is user data."""
 
     def __init__(
-        self, stores: GraphStores, collections: InMemoryCollectionTarget
+        self,
+        stores: GraphStores,
+        collections: InMemoryCollectionTarget,
+        actor: Actor,
     ) -> None:
-        super().__init__(stores)
+        super().__init__(stores, actor)
         self._collections = collections
 
     async def inspect(
@@ -187,11 +194,14 @@ class WorldCoverTarget(CoverPackTarget):
     def __init__(
         self,
         repos: MediaRepos,
+        graph_repos: GraphRepos,
         storage: InMemoryMediaStorage,
         events: list[str],
+        actor: Actor,
     ) -> None:
         super().__init__(
-            in_memory_cover_stores(repos),
+            in_memory_cover_stores(repos, graph_repos),
+            actor,
             renderer=InMemoryCoverRenderer(),
             storage=storage,
             policy=ContentTypeAttachmentPolicy(),
@@ -231,6 +241,28 @@ class World:
     collections: InMemoryCollectionTarget
     covers: WorldCoverTarget
     storage: InMemoryMediaStorage
+    actor: Actor = USER_A
+
+    def as_actor(self, actor: Actor) -> World:
+        """Return the same world seen by `actor`: shared storage, own targets."""
+        return replace(
+            self,
+            actor=actor,
+            graph=WorldGraphTarget(
+                in_memory_graph_stores(
+                    self.graph_repos, self.media_repos, self.preset_repos
+                ),
+                self.collections,
+                actor,
+            ),
+            covers=WorldCoverTarget(
+                self.media_repos,
+                self.graph_repos,
+                self.storage,
+                self.collections.events,
+                actor,
+            ),
+        )
 
 
 SamplePack = Callable[..., ExamplePack]
@@ -282,7 +314,7 @@ def _sample_pack(pack_id: str = "demo") -> ExamplePack:
     )
 
 
-def _make_world(*packs: ExamplePack) -> World:
+def _make_world(*packs: ExamplePack, actor: Actor = USER_A) -> World:
     """Build a world with `packs` in the catalogue (the demo pack by default)."""
     graph_repos = GraphRepos(
         nodes=InMemoryNodeRepository(),
@@ -291,9 +323,10 @@ def _make_world(*packs: ExamplePack) -> World:
         edge_types=InMemoryEdgeTypeRepository(),
     )
     preset_repos = PresetRepos(presets=InMemoryPresetRepository())
+    media_assets = InMemoryMediaAssetRepository()
     media_repos = MediaRepos(
-        assets=InMemoryMediaAssetRepository(),
-        attachments=InMemoryMediaAttachmentRepository(),
+        assets=media_assets,
+        attachments=InMemoryMediaAttachmentRepository(media_assets),
     )
     installations = InMemoryInstallationRepository()
     catalogue = InMemoryPackCatalogue()
@@ -312,10 +345,14 @@ def _make_world(*packs: ExamplePack) -> World:
         graph=WorldGraphTarget(
             in_memory_graph_stores(graph_repos, media_repos, preset_repos),
             collections,
+            actor,
         ),
         collections=collections,
-        covers=WorldCoverTarget(media_repos, storage, collections.events),
+        covers=WorldCoverTarget(
+            media_repos, graph_repos, storage, collections.events, actor
+        ),
         storage=storage,
+        actor=actor,
     )
 
 

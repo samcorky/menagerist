@@ -6,7 +6,7 @@ import structlog
 
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.cqrs import QueryHandler
+from app.shared_kernel.cqrs import ScopedQueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -25,7 +25,7 @@ class CountNodeTypeAttributeUsageQuery:
 
 
 class CountNodeTypeAttributeUsage(
-    QueryHandler[GraphRepos, CountNodeTypeAttributeUsageQuery, int]
+    ScopedQueryHandler[GraphRepos, CountNodeTypeAttributeUsageQuery, int]
 ):
     """Count the nodes of a node type whose attributes contain a key."""
 
@@ -39,6 +39,7 @@ class CountNodeTypeAttributeUsage(
         count = await self._repos.nodes.count_with_attribute(
             str(node_type.slug),
             query.key,
+            scope=self._policy.scope_for(actor),
             sub_key=query.sub_key,
             value=query.value,
         )

@@ -2,14 +2,23 @@ import json
 import logging
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import structlog
 from cyclopts import App, Parameter
 
+from app.modules.identity.adapters.cli.identity_app import (
+    identity_app,
+    use_existing_data_claim,
+)
 from app.modules.media.adapters.cli.media_app import media_app
 from app.platform.app_info import load_app_info
 from app.platform.logging_config import configure_logging
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from app.modules.identity.ports.existing_data_claim import ExistingDataClaim
 
 configure_logging()
 app_info = load_app_info()
@@ -43,6 +52,19 @@ migrate_app = App(name="migrate", help="Manage database migrations.")
 app.command(migrate_app)
 
 app.command(media_app)
+
+
+def _claim_existing_data(session: AsyncSession) -> ExistingDataClaim:
+    """Build the claim identity cannot build itself: it spans the other modules."""
+    from app.entrypoints.api.shared.claim_existing_data import (
+        build_sql_claim_existing_data,
+    )
+
+    return build_sql_claim_existing_data(session)
+
+
+use_existing_data_claim(_claim_existing_data)
+app.command(identity_app)
 
 schema_app = App(name="schema", help="Inspect the API schema.")
 app.command(schema_app)

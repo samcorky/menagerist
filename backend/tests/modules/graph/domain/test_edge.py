@@ -12,6 +12,7 @@ def test_create_sets_fields_and_matching_timestamps() -> None:
     target_id = uuid.uuid4()
 
     edge = Edge.create(
+        owner_id=uuid.UUID(int=1),
         source_id=source_id,
         target_id=target_id,
         type="signed-by",
@@ -29,7 +30,10 @@ def test_create_sets_fields_and_matching_timestamps() -> None:
 def test_create_defaults_attributes_to_empty_dict() -> None:
     """Edge.create without attributes defaults to an empty dict."""
     edge = Edge.create(
-        source_id=uuid.uuid4(), target_id=uuid.uuid4(), type="related-to"
+        owner_id=uuid.UUID(int=1),
+        source_id=uuid.uuid4(),
+        target_id=uuid.uuid4(),
+        type="related-to",
     )
 
     assert edge.attributes == {}
@@ -39,13 +43,23 @@ def test_create_defaults_attributes_to_empty_dict() -> None:
 def test_create_rejects_empty_or_blank_type(type_: str) -> None:
     """Edge.create raises ValidationError for an empty or whitespace-only type."""
     with pytest.raises(ValidationError, match="type must be provided"):
-        Edge.create(source_id=uuid.uuid4(), target_id=uuid.uuid4(), type=type_)
+        Edge.create(
+            owner_id=uuid.UUID(int=1),
+            source_id=uuid.uuid4(),
+            target_id=uuid.uuid4(),
+            type=type_,
+        )
 
 
 def test_create_rejects_type_that_slugifies_to_empty() -> None:
     """Edge.create raises ValidationError when the type slugifies to an empty string."""
     with pytest.raises(ValidationError, match="type must be provided"):
-        Edge.create(source_id=uuid.uuid4(), target_id=uuid.uuid4(), type="!!!!")
+        Edge.create(
+            owner_id=uuid.UUID(int=1),
+            source_id=uuid.uuid4(),
+            target_id=uuid.uuid4(),
+            type="!!!!",
+        )
 
 
 @pytest.mark.parametrize(
@@ -58,7 +72,12 @@ def test_create_rejects_type_that_slugifies_to_empty() -> None:
 )
 def test_create_slugifies_type(input_type: str, expected_type: str) -> None:
     """Edge.create slugifies the type."""
-    edge = Edge.create(source_id=uuid.uuid4(), target_id=uuid.uuid4(), type=input_type)
+    edge = Edge.create(
+        owner_id=uuid.UUID(int=1),
+        source_id=uuid.uuid4(),
+        target_id=uuid.uuid4(),
+        type=input_type,
+    )
 
     assert edge.type == expected_type
 
@@ -68,12 +87,22 @@ def test_create_rejects_self_loop() -> None:
     node_id = uuid.uuid4()
 
     with pytest.raises(ValidationError, match="cannot connect a node to itself"):
-        Edge.create(source_id=node_id, target_id=node_id, type="related-to")
+        Edge.create(
+            owner_id=uuid.UUID(int=1),
+            source_id=node_id,
+            target_id=node_id,
+            type="related-to",
+        )
 
 
 def test_update_applies_attributes_and_touches_updated_at() -> None:
     """update() overwrites attributes and bumps updated_at."""
-    edge = Edge.create(source_id=uuid.uuid4(), target_id=uuid.uuid4(), type="owns")
+    edge = Edge.create(
+        owner_id=uuid.UUID(int=1),
+        source_id=uuid.uuid4(),
+        target_id=uuid.uuid4(),
+        type="owns",
+    )
     original_updated_at = edge.updated_at
 
     edge.update(attributes={"since": "1979"})
@@ -85,6 +114,7 @@ def test_update_applies_attributes_and_touches_updated_at() -> None:
 def test_update_leaves_attributes_unchanged_when_not_given() -> None:
     """update() with no arguments leaves attributes untouched."""
     edge = Edge.create(
+        owner_id=uuid.UUID(int=1),
         source_id=uuid.uuid4(),
         target_id=uuid.uuid4(),
         type="owns",

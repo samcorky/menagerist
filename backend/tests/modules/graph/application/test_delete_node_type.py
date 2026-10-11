@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 
+from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -41,7 +42,7 @@ async def test_delete_node_type_soft_deletes_and_commits() -> None:
     uow, repos = _make_uow()
     nt = NodeType.create(slug="film", label="Film")
     await repos.node_types.add(nt)
-    use_case = DeleteNodeType(uow)
+    use_case = DeleteNodeType(uow, RoleAuthorizationAdapter())
 
     await use_case.handle(DeleteNodeTypeCommand(node_type_id=nt.id), SYSTEM_ACTOR)
 
@@ -52,7 +53,7 @@ async def test_delete_node_type_soft_deletes_and_commits() -> None:
 async def test_delete_node_type_raises_when_missing() -> None:
     """DeleteNodeType raises NodeTypeNotFoundError when the node type doesn't exist."""
     uow, _ = _make_uow()
-    use_case = DeleteNodeType(uow)
+    use_case = DeleteNodeType(uow, RoleAuthorizationAdapter())
 
     with pytest.raises(NodeTypeNotFoundError):
         await use_case.handle(
@@ -65,12 +66,14 @@ async def test_delete_node_type_clears_type_on_referencing_nodes() -> None:
     uow, repos = _make_uow()
     nt = NodeType.create(slug="film", label="Film")
     await repos.node_types.add(nt)
-    node_a = Node.create(name="Alien", type="film")
-    node_b = Node.create(name="Aliens", type="film")
-    node_other = Node.create(name="Ridley Scott", type="person")
+    node_a = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
+    node_b = Node.create(owner_id=uuid.UUID(int=1), name="Aliens", type="film")
+    node_other = Node.create(
+        owner_id=uuid.UUID(int=1), name="Ridley Scott", type="person"
+    )
     for node in (node_a, node_b, node_other):
         await repos.nodes.add(node)
-    use_case = DeleteNodeType(uow)
+    use_case = DeleteNodeType(uow, RoleAuthorizationAdapter())
 
     await use_case.handle(DeleteNodeTypeCommand(node_type_id=nt.id), SYSTEM_ACTOR)
 

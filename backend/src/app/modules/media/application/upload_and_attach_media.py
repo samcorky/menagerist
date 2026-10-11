@@ -7,21 +7,24 @@ import structlog
 from app.modules.media.application.attach_media import AttachMedia, AttachMediaCommand
 from app.modules.media.application.cover_guard import ensure_cover_free
 from app.modules.media.application.stage_media import StageMedia, StageMediaCommand
+from app.modules.media.domain.errors import AttachTargetNotFoundError
 from app.modules.media.domain.media_attachment import (
     AttachmentKey,
     AttachmentTarget,
     MediaAttachment,
 )
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.cqrs import ScopedCommandHandler
 from app.shared_kernel.unit_of_work import JoinedUnitOfWork
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
+    from app.modules.media.ports.attach_target_access import AttachTargetAccess
     from app.modules.media.ports.attachment_policy import AttachmentPolicyPort
     from app.modules.media.ports.image_processor import ImageProcessorPort
     from app.modules.media.ports.media_storage import MediaStoragePort
+    from app.shared_kernel.access_policy import AccessPolicy
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -42,32 +45,44 @@ class UploadAndAttachMediaCommand:
 
 
 class UploadAndAttachMedia(
-    CommandHandler[MediaUnitOfWork, UploadAndAttachMediaCommand, MediaAttachment]
+    ScopedCommandHandler[MediaUnitOfWork, UploadAndAttachMediaCommand, MediaAttachment]
 ):
     """Stream a file to storage and attach it within a single transaction."""
 
     def __init__(
         self,
         uow: MediaUnitOfWork,
+        policy: AccessPolicy,
         storage: MediaStoragePort,
-        policy: AttachmentPolicyPort,
+        attachment_policy: AttachmentPolicyPort,
         image_processor: ImageProcessorPort,
+        targets: AttachTargetAccess,
     ) -> None:
-        super().__init__(uow)
+        super().__init__(uow, policy)
         self._storage = storage
-        self._policy = policy
+        self._attachment_policy = attachment_policy
         self._image_processor = image_processor
+        self._targets = targets
 
     async def handle(
         self, command: UploadAndAttachMediaCommand, actor: Actor
     ) -> MediaAttachment:
         """Stage the file then immediately attach it within a single transaction."""
+        scope = self._policy.scope_for(actor)
+        # Checked before streaming so a refused upload leaves no file behind.
+        if not await self._targets.can_attach(
+            command.target_type, command.target_id, scope
+        ):
+            raise AttachTargetNotFoundError(
+                f"{command.target_type} {command.target_id} not found"
+            )
         async with self._uow as repos:
             await ensure_cover_free(
                 repos.attachments,
                 attribute_key=command.attribute_key,
                 target_type=command.target_type,
                 target_id=command.target_id,
+                scope=scope,
             )
             joined = JoinedUnitOfWork(repos, owner=self._uow)
 
@@ -83,7 +98,13 @@ class UploadAndAttachMedia(
                 actor,
             )
 
-            attach = AttachMedia(joined, self._storage, self._policy)
+            attach = AttachMedia(
+                joined,
+                self._policy,
+                self._storage,
+                self._attachment_policy,
+                self._targets,
+            )
             attachment = await attach.handle(
                 AttachMediaCommand(
                     asset_id=asset.id,

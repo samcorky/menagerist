@@ -1,5 +1,6 @@
 import pytest
 
+from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -99,7 +100,7 @@ async def test_create_edge_type_succeeds_after_delete_of_same_slug() -> None:
     first = await CreateEdgeType(uow).handle(
         CreateEdgeTypeCommand(slug="directed-by", label="Directed By"), SYSTEM_ACTOR
     )
-    await DeleteEdgeType(uow).handle(
+    await DeleteEdgeType(uow, RoleAuthorizationAdapter()).handle(
         DeleteEdgeTypeCommand(edge_type_id=first.id), SYSTEM_ACTOR
     )
 

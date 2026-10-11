@@ -7,6 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.persistence.media_asset_repository import (
     SqlAlchemyMediaAssetRepository,
 )
@@ -29,6 +30,7 @@ from app.modules.media.domain.media_attachment import (
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 pytestmark = pytest.mark.integration
@@ -38,7 +40,11 @@ _RACE_ROUNDS = 20
 
 async def _asset(session: AsyncSession) -> MediaAsset:
     asset = MediaAsset.create(
-        filename="c.png", content_type="image/png", size=1, sha256="c"
+        owner_id=SYSTEM_ACTOR.id,
+        filename="c.png",
+        content_type="image/png",
+        size=1,
+        sha256="c",
     )
     await SqlAlchemyMediaAssetRepository(session).add(asset)
     return asset
@@ -65,7 +71,9 @@ async def test_second_cover_for_one_target_raises_cover_already_set(
         )
 
     # The savepoint leaves the session usable and the first cover intact.
-    stored = await repo.list_for_target(AttachmentTarget.NODE, node_id)
+    stored = await repo.list_for_target(
+        AttachmentTarget.NODE, node_id, scope=AccessScope.everyone()
+    )
     assert [a.asset_id for a in stored] == [first.id]
 
 
@@ -121,7 +129,9 @@ async def test_concurrent_set_cover_calls_serialise_to_one_cover(
             async def set_cover(
                 asset_id: uuid.UUID, node_id: uuid.UUID = node_id
             ) -> None:
-                await SetMediaCover(create_media_uow(factory)).handle(
+                await SetMediaCover(
+                    create_media_uow(factory), OwnerAccessPolicy()
+                ).handle(
                     SetMediaCoverCommand(
                         asset_id=asset_id,
                         target_type=AttachmentTarget.NODE,
@@ -135,7 +145,9 @@ async def test_concurrent_set_cover_calls_serialise_to_one_cover(
             async with factory() as session:
                 stored = await SqlAlchemyMediaAttachmentRepository(
                     session
-                ).list_for_target(AttachmentTarget.NODE, node_id)
+                ).list_for_target(
+                    AttachmentTarget.NODE, node_id, scope=AccessScope.everyone()
+                )
             covers = [a for a in stored if a.attribute_key is AttachmentKey.COVER]
             assert len(stored) == 2
             assert len(covers) == 1

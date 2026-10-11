@@ -23,6 +23,7 @@ from app.modules.examples.domain.installation import (
     adoptable_records,
 )
 from app.modules.examples.domain.pack import ExamplePack, PackCounts
+from app.modules.examples.domain.removal import holds_shared_type
 from app.modules.examples.ports.pack_catalogue import PackCatalogue  # noqa: TC001
 from app.modules.examples.ports.pack_targets import (  # noqa: TC001
     CollectionTarget,
@@ -31,12 +32,14 @@ from app.modules.examples.ports.pack_targets import (  # noqa: TC001
     PresetTarget,
 )
 from app.modules.examples.ports.unit_of_work import ExampleUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.cqrs import ScopedCommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from app.shared_kernel.access_policy import AccessPolicy
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -83,16 +86,21 @@ class _Run:
     item_names: dict[str, str] = field(default_factory=dict)
     adoptions: dict[_Key, _Adoption] = field(default_factory=dict)
     adopted: set[_Key] = field(default_factory=set)
+    reused: set[_Key] = field(default_factory=set)
 
 
 class InstallExamplePack(
-    CommandHandler[ExampleUnitOfWork, InstallExamplePackCommand, InstallResult]
+    ScopedCommandHandler[ExampleUnitOfWork, InstallExamplePackCommand, InstallResult]
 ):
     """Install a pack as ordered steps, recording every entity as it is made.
 
     Entities an earlier removal kept (edited, in use, or holding the user's data)
     and that are still live are adopted rather than created again. They are
     recorded with their original content hash, so an edit still counts as an edit.
+
+    Installs are per person. Item and relationship types are shared structure: one
+    that another person's installation of the same pack created is reused, never
+    recorded here and so never removed by this person's uninstall.
 
     Raises:
         PackNotFoundError: the catalogue has no such pack.
@@ -108,14 +116,15 @@ class InstallExamplePack(
     def __init__(
         self,
         uow: ExampleUnitOfWork,
+        policy: AccessPolicy,
         catalogue: PackCatalogue,
         presets: PresetTarget,
         graph: GraphTarget,
         collections: CollectionTarget,
         covers: CoverTarget,
     ) -> None:
-        """Initialise with the unit of work, catalogue and the four targets."""
-        super().__init__(uow)
+        """Initialise with the unit of work, policy, catalogue and four targets."""
+        super().__init__(uow, policy)
         self._catalogue = catalogue
         self._presets = presets
         self._graph = graph
@@ -129,18 +138,20 @@ class InstallExamplePack(
         pack = await self._catalogue.get(command.pack_id)
         if pack is None:
             raise PackNotFoundError(f"Example pack '{command.pack_id}' not found")
-        await self._check_not_installed(pack)
-        external = await self._resolve_external(pack)
+        scope = self._policy.scope_for(actor)
+        await self._check_not_installed(pack, scope)
+        external = await self._resolve_external(pack, scope, actor.id)
         cover_styles = await self._cover_styles(pack)
-        adoptions = await self._find_adoptions(pack, cover_styles)
-        await self._check_slugs(pack, adoptions)
+        adoptions = await self._find_adoptions(pack, cover_styles, scope)
+        reused = await self._check_slugs(pack, adoptions, actor)
 
-        installation = Installation.start(pack.id)
+        installation = Installation.start(pack.id, actor.id)
         await self._persist(installation, new=True)
         run = _Run(
             pack=pack,
             installation=installation,
             adoptions=adoptions,
+            reused=reused,
             cover_styles=cover_styles,
         )
         _seed_external(run, external)
@@ -166,22 +177,38 @@ class InstallExamplePack(
             adopted=_counts(kind for kind, _ in run.adopted),
         )
 
-    async def _check_not_installed(self, pack: ExamplePack) -> None:
+    async def _check_not_installed(self, pack: ExamplePack, scope: AccessScope) -> None:
         async with self._uow as repos:
-            active = await repos.installations.get_active_for_pack(pack.id)
+            active = await repos.installations.get_active_for_pack(pack.id, scope=scope)
         if active is not None:
             raise PackAlreadyInstalledError(
                 f"'{pack.id}' is already installed, or an earlier install did not "
                 + "finish. Remove it first."
             )
 
-    async def _resolve_external(self, pack: ExamplePack) -> ResolvedRefs:
-        """Resolve the add-on's references to required packs, before anything exists."""
+    async def _resolve_external(
+        self, pack: ExamplePack, scope: AccessScope, actor_id: uuid.UUID
+    ) -> ResolvedRefs:
+        """Resolve the add-on's references to required packs, before anything exists.
+
+        Only the installer's own installations count.
+        """
         if not pack.requires:
             return {}
         async with self._uow as repos:
-            active = await repos.installations.list_active()
-        return await resolve_external_refs(pack, active, self._graph, self._catalogue)
+            active = await repos.installations.list_active(scope=scope)
+            others = [
+                i
+                for pack_id in pack.requires
+                # all-users check: shared structure
+                for i in await repos.installations.list_for_pack(
+                    pack_id, scope=AccessScope.everyone()
+                )
+                if i.owner_id != actor_id
+            ]
+        return await resolve_external_refs(
+            pack, active, self._graph, self._catalogue, others
+        )
 
     async def _cover_styles(self, pack: ExamplePack) -> dict[str, str]:
         """Return cover styles by item type ref, including required packs' types."""
@@ -196,11 +223,11 @@ class InstallExamplePack(
         return styles
 
     async def _find_adoptions(
-        self, pack: ExamplePack, cover_styles: dict[str, str]
+        self, pack: ExamplePack, cover_styles: dict[str, str], scope: AccessScope
     ) -> dict[_Key, _Adoption]:
-        """Return what earlier installs kept that is still live and still fits."""
+        """Return what the installer's earlier installs kept that still fits."""
         async with self._uow as repos:
-            history = await repos.installations.list_for_pack(pack.id)
+            history = await repos.installations.list_for_pack(pack.id, scope=scope)
         kept = adoptable_records(history)
         slugs: dict[_Key, str | None] = {
             (EntityKind.RELATIONSHIP_TYPE, r.ref): slugify(r.slug)
@@ -238,18 +265,63 @@ class InstallExamplePack(
         return adoptions
 
     async def _check_slugs(
-        self, pack: ExamplePack, adoptions: dict[_Key, _Adoption]
-    ) -> None:
-        for spec in pack.item_types:
-            if (EntityKind.ITEM_TYPE, spec.ref) in adoptions:
+        self, pack: ExamplePack, adoptions: dict[_Key, _Adoption], actor: Actor
+    ) -> set[_Key]:
+        """Refuse a taken type slug unless another person's install created it.
+
+        Returns the keys of the shared types to reuse.
+        """
+        reused: set[_Key] = set()
+        types = [
+            (EntityKind.ITEM_TYPE, spec.ref, spec.slug, "an item type")
+            for spec in pack.item_types
+        ] + [
+            (EntityKind.RELATIONSHIP_TYPE, rel.ref, rel.slug, "a relationship type")
+            for rel in pack.relationship_types
+        ]
+        others: list[Installation] | None = None
+        for kind, ref, slug, noun in types:
+            if (kind, ref) in adoptions:
                 continue
-            if await self._graph.slug_taken(EntityKind.ITEM_TYPE, spec.slug):
-                raise SlugClashError(kind="an item type", slug=spec.slug)
-        for rel in pack.relationship_types:
-            if (EntityKind.RELATIONSHIP_TYPE, rel.ref) in adoptions:
+            if not await self._graph.slug_taken(kind, slug):
                 continue
-            if await self._graph.slug_taken(EntityKind.RELATIONSHIP_TYPE, rel.slug):
-                raise SlugClashError(kind="a relationship type", slug=rel.slug)
+            if others is None:
+                others = await self._others_installations(pack.id, actor)
+            expected = slug if kind is EntityKind.ITEM_TYPE else slugify(slug)
+            if await self._shared_by(others, kind, ref, expected):
+                reused.add((kind, ref))
+                continue
+            raise SlugClashError(kind=noun, slug=slug)
+        return reused
+
+    async def _others_installations(
+        self, pack_id: str, actor: Actor
+    ) -> list[Installation]:
+        async with self._uow as repos:
+            # all-users check: shared structure
+            everyone = await repos.installations.list_for_pack(
+                pack_id, scope=AccessScope.everyone()
+            )
+        return [i for i in everyone if i.owner_id != actor.id]
+
+    async def _shared_by(
+        self, others: list[Installation], kind: EntityKind, ref: str, slug: str
+    ) -> bool:
+        """Whether another person's install of this pack holds a live type `slug`.
+
+        Held means owned by an active install, or kept (shared or in use) by one
+        that has since been removed.
+        """
+        for installation in others:
+            for record in installation.entities:
+                if (record.kind, record.ref) != (kind, ref):
+                    continue
+                if not holds_shared_type(installation, record):
+                    continue
+                found = await self._graph.inspect(kind, record.entity_id)
+                if found is not None and found.content["slug"] == slug:
+                    return True
+        return False
 
     async def _persist(self, installation: Installation, *, new: bool = False) -> None:
         async with self._uow as repos:
@@ -308,6 +380,8 @@ class InstallExamplePack(
 
     async def _install_relationship_types(self, run: _Run) -> None:
         for spec in run.pack.relationship_types:
+            if (EntityKind.RELATIONSHIP_TYPE, spec.ref) in run.reused:
+                continue
             adoption = run.adoptions.get((EntityKind.RELATIONSHIP_TYPE, spec.ref))
             if adoption is not None:
                 await self._adopt(run, adoption, spec.ref, spec.label)
@@ -325,6 +399,8 @@ class InstallExamplePack(
     async def _install_item_types(self, run: _Run) -> None:
         for spec in run.pack.item_types:
             run.type_slugs[spec.ref] = spec.slug
+            if (EntityKind.ITEM_TYPE, spec.ref) in run.reused:
+                continue
             adoption = run.adoptions.get((EntityKind.ITEM_TYPE, spec.ref))
             if adoption is not None:
                 await self._adopt(run, adoption, spec.ref, spec.label)

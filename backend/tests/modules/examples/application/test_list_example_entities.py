@@ -1,5 +1,6 @@
 import uuid
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.examples.adapters.persistence.in_memory_installation_repository import (  # noqa: E501
     InMemoryInstallationRepository,
 )
@@ -9,14 +10,16 @@ from app.modules.examples.application.list_example_entities import (
 )
 from app.modules.examples.domain.installation import EntityKind, Installation, Outcome
 from app.modules.examples.ports.unit_of_work import ExampleRepos
-from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.actor import Actor
+
+USER_A = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
 
 
 def _installation(
     pack_id: str, *entities: tuple[EntityKind, uuid.UUID]
 ) -> Installation:
     """Build an installing installation recording the given entities."""
-    installation = Installation.start(pack_id)
+    installation = Installation.start(pack_id, USER_A.id)
     for kind, entity_id in entities:
         installation.record(kind, str(entity_id), "label", entity_id, "hash")
     return installation
@@ -24,9 +27,9 @@ def _installation(
 
 async def _list(repo: InMemoryInstallationRepository) -> tuple[list[uuid.UUID], ...]:
     """Run the query and return the item, item type and collection ids."""
-    result = await ListExampleEntities(ExampleRepos(installations=repo)).handle(
-        ListExampleEntitiesQuery(), SYSTEM_ACTOR
-    )
+    result = await ListExampleEntities(
+        ExampleRepos(installations=repo), OwnerAccessPolicy()
+    ).handle(ListExampleEntitiesQuery(), USER_A)
     return result.item_ids, result.item_type_ids, result.collection_ids
 
 
@@ -77,7 +80,7 @@ async def test_excludes_removed_and_kept_records() -> None:
 async def test_excludes_removed_installations() -> None:
     """A removed installation contributes nothing."""
     repo = InMemoryInstallationRepository()
-    installation = Installation.start("one")
+    installation = Installation.start("one", USER_A.id)
     installation.mark_removed()
     await repo.add(installation)
 

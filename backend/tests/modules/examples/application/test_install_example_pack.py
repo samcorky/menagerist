@@ -1,8 +1,10 @@
+import uuid
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.examples.application.install_example_pack import (
     InstallExamplePack,
     InstallExamplePackCommand,
@@ -21,10 +23,14 @@ from app.modules.examples.domain.installation import (
 from app.modules.examples.domain.pack import PackPreset
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.node_type import NodeType
-from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 
 if TYPE_CHECKING:
     from tests.modules.examples.conftest import MakeWorld, SamplePack, World
+
+USER_A = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
+
 
 _COMMAND = InstallExamplePackCommand(pack_id="demo")
 
@@ -32,6 +38,7 @@ _COMMAND = InstallExamplePackCommand(pack_id="demo")
 def _use_case(world: World) -> InstallExamplePack:
     return InstallExamplePack(
         world.uow,
+        OwnerAccessPolicy(),
         world.catalogue,
         world.presets,
         world.graph,
@@ -41,7 +48,9 @@ def _use_case(world: World) -> InstallExamplePack:
 
 
 async def _active(world: World, pack_id: str = "demo") -> Installation:
-    installation = await world.installations.get_active_for_pack(pack_id)
+    installation = await world.installations.get_active_for_pack(
+        pack_id, scope=AccessScope.everyone()
+    )
     assert installation is not None
     return installation
 
@@ -60,10 +69,25 @@ def _capture_installations(world: World) -> list[Installation]:
 
 
 async def _assert_nothing_left(world: World) -> None:
-    assert await world.installations.get_active_for_pack("demo") is None
+    assert (
+        await world.installations.get_active_for_pack(
+            "demo", scope=AccessScope.everyone()
+        )
+        is None
+    )
     assert await world.graph_repos.node_types.list(after=None, limit=10) == []
-    assert await world.graph_repos.nodes.list(after=None, limit=10) == []
-    assert await world.graph_repos.edges.list(after=None, limit=10) == []
+    assert (
+        await world.graph_repos.nodes.list(
+            scope=AccessScope.everyone(), after=None, limit=10
+        )
+        == []
+    )
+    assert (
+        await world.graph_repos.edges.list(
+            after=None, limit=10, scope=AccessScope.everyone()
+        )
+        == []
+    )
     assert await world.graph_repos.edge_types.list(after=None, limit=10) == []
     assert await world.preset_repos.presets.list(after=None, limit=10) == []
 
@@ -74,7 +98,7 @@ async def test_install_creates_everything_and_records_it(
     """An install creates every entity, records each, and commits."""
     world = make_world()
 
-    result = await _use_case(world).handle(_COMMAND, SYSTEM_ACTOR)
+    result = await _use_case(world).handle(_COMMAND, world.actor)
 
     counts = result.created
     assert (counts.presets, counts.relationship_types, counts.item_types) == (1, 1, 2)
@@ -82,7 +106,9 @@ async def test_install_creates_everything_and_records_it(
     installation = await _active(world)
     assert installation.status is InstallationStatus.INSTALLED
     assert len(installation.owned()) == 7
-    assert await world.graph_repos.nodes.list(after=None, limit=10)
+    assert await world.graph_repos.nodes.list(
+        scope=AccessScope.everyone(), after=None, limit=10
+    )
     assert len(await world.graph_repos.node_types.list(after=None, limit=10)) == 2
     assert world.uow.committed is True
 
@@ -92,7 +118,7 @@ async def test_every_created_entity_is_hashed_for_later_comparison(
 ) -> None:
     """Each record carries a SHA-256 of what was created."""
     world = make_world()
-    await _use_case(world).handle(_COMMAND, SYSTEM_ACTOR)
+    await _use_case(world).handle(_COMMAND, world.actor)
     assert all(len(r.content_hash) == 64 for r in (await _active(world)).owned())
 
 
@@ -107,9 +133,9 @@ async def test_unknown_pack_is_not_found(make_world: MakeWorld) -> None:
 async def test_installing_twice_is_a_conflict(make_world: MakeWorld) -> None:
     """A second install of an installed pack conflicts."""
     world = make_world()
-    await _use_case(world).handle(_COMMAND, SYSTEM_ACTOR)
+    await _use_case(world).handle(_COMMAND, world.actor)
     with pytest.raises(PackAlreadyInstalledError):
-        await _use_case(world).handle(_COMMAND, SYSTEM_ACTOR)
+        await _use_case(world).handle(_COMMAND, world.actor)
 
 
 @pytest.mark.parametrize(
@@ -130,13 +156,23 @@ async def test_a_slug_clash_creates_nothing_and_names_the_slug(
         await world.graph_repos.edge_types.add(EdgeType.create(slug=slug, label="Mine"))
 
     with pytest.raises(SlugClashError) as excinfo:
-        await _use_case(world).handle(_COMMAND, SYSTEM_ACTOR)
+        await _use_case(world).handle(_COMMAND, world.actor)
 
     assert excinfo.value.slug == slug
     assert kind_phrase in str(excinfo.value)
-    assert await world.installations.get_active_for_pack("demo") is None
+    assert (
+        await world.installations.get_active_for_pack(
+            "demo", scope=AccessScope.everyone()
+        )
+        is None
+    )
     assert await world.preset_repos.presets.list(after=None, limit=10) == []
-    assert await world.graph_repos.nodes.list(after=None, limit=10) == []
+    assert (
+        await world.graph_repos.nodes.list(
+            scope=AccessScope.everyone(), after=None, limit=10
+        )
+        == []
+    )
 
 
 async def test_an_identical_existing_preset_is_used_but_not_owned(
@@ -146,7 +182,7 @@ async def test_an_identical_existing_preset_is_used_but_not_owned(
     world = make_world()
     existing = await world.presets.ensure(sample_pack().presets)
 
-    await _use_case(world).handle(_COMMAND, SYSTEM_ACTOR)
+    await _use_case(world).handle(_COMMAND, world.actor)
 
     installation = await _active(world)
     assert installation.owned(EntityKind.PRESET) == []
@@ -187,11 +223,11 @@ async def test_a_failure_rolls_everything_back(
     recorded = _capture_installations(world)
 
     with pytest.raises(InstallFailedError, match="boom") as excinfo:
-        await _use_case(world).handle(_COMMAND, SYSTEM_ACTOR)
+        await _use_case(world).handle(_COMMAND, world.actor)
 
     assert calls == fail_on_call  # the injected failure really happened
     assert isinstance(excinfo.value.__cause__, RuntimeError)
-    assert await world.installations.list_active() == []
+    assert await world.installations.list_active(scope=AccessScope.everyone()) == []
     assert recorded[0].status is InstallationStatus.FAILED
     await _assert_nothing_left(world)
 
@@ -212,7 +248,7 @@ async def test_a_rollback_that_cannot_finish_leaves_the_install_resumable(
     world.graph.remove = broken_remove  # type: ignore[method-assign]
 
     with pytest.raises(InstallFailedError, match="Remove the examples") as excinfo:
-        await _use_case(world).handle(_COMMAND, SYSTEM_ACTOR)
+        await _use_case(world).handle(_COMMAND, world.actor)
 
     assert isinstance(excinfo.value.__cause__, RuntimeError)
     installation = await _active(world)
@@ -235,7 +271,7 @@ async def test_a_rollback_keeps_what_the_user_changed_and_says_so(
     world.graph.create_connection = edit_then_fail  # type: ignore[method-assign]
 
     with pytest.raises(InstallFailedError, match="you had changed were kept"):
-        await _use_case(world).handle(_COMMAND, SYSTEM_ACTOR)
+        await _use_case(world).handle(_COMMAND, world.actor)
 
     remaining = await world.graph_repos.node_types.list(after=None, limit=10)
     assert [t.label for t in remaining] == ["Renamed by me"]
@@ -246,9 +282,9 @@ async def test_an_unfinished_installation_blocks_a_second_install(
 ) -> None:
     """A crash-orphaned INSTALLING record blocks another install."""
     world = make_world()
-    await world.installations.add(Installation.start("demo"))
+    await world.installations.add(Installation.start("demo", USER_A.id))
     with pytest.raises(PackAlreadyInstalledError):
-        await _use_case(world).handle(_COMMAND, SYSTEM_ACTOR)
+        await _use_case(world).handle(_COMMAND, world.actor)
 
 
 async def test_a_crash_between_create_and_record_is_named_by_the_next_install(
@@ -258,7 +294,7 @@ async def test_a_crash_between_create_and_record_is_named_by_the_next_install(
     world = make_world()
     await world.graph.create_item_type(sample_pack().item_types[1], {})
     with pytest.raises(SlugClashError, match="demo-person"):
-        await _use_case(world).handle(_COMMAND, SYSTEM_ACTOR)
+        await _use_case(world).handle(_COMMAND, world.actor)
 
 
 async def test_every_preset_is_recorded_before_the_first_save_and_rolled_back(
@@ -279,7 +315,7 @@ async def test_every_preset_is_recorded_before_the_first_save_and_rolled_back(
         ),
     )
     world = make_world(pack)
-    await _use_case(world).handle(_COMMAND, SYSTEM_ACTOR)
+    await _use_case(world).handle(_COMMAND, world.actor)
     assert len((await _active(world)).owned(EntityKind.PRESET)) == 2
 
     failing = make_world(pack)
@@ -289,7 +325,7 @@ async def test_every_preset_is_recorded_before_the_first_save_and_rolled_back(
 
     failing.graph.create_item = fail_first_item  # type: ignore[method-assign]
     with pytest.raises(InstallFailedError, match="boom"):
-        await _use_case(failing).handle(_COMMAND, SYSTEM_ACTOR)
+        await _use_case(failing).handle(_COMMAND, world.actor)
     await _assert_nothing_left(failing)
 
 
@@ -311,7 +347,7 @@ async def test_a_persist_failure_right_after_ensure_is_rolled_back(
     world.installations.save = fail_first_save  # type: ignore[method-assign]
 
     with pytest.raises(InstallFailedError, match="save failed"):
-        await _use_case(world).handle(_COMMAND, SYSTEM_ACTOR)
+        await _use_case(world).handle(_COMMAND, world.actor)
 
     assert calls >= 1
     await _assert_nothing_left(world)

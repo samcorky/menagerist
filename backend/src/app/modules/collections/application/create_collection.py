@@ -6,12 +6,13 @@ import structlog
 from app.modules.collections.domain.collection import Collection
 from app.modules.collections.domain.errors import InvalidCollectionError
 from app.modules.collections.ports.unit_of_work import CollectionsUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.cqrs import ScopedCommandHandler
 from app.shared_kernel.errors import ConflictError
 from app.shared_kernel.slug import Slug, slugify
 
 if TYPE_CHECKING:
     from app.modules.collections.ports.collection_repository import CollectionRepository
+    from app.shared_kernel.access_scope import AccessScope
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -29,7 +30,7 @@ class CreateCollectionCommand:
 
 
 class CreateCollection(
-    CommandHandler[CollectionsUnitOfWork, CreateCollectionCommand, Collection]
+    ScopedCommandHandler[CollectionsUnitOfWork, CreateCollectionCommand, Collection]
 ):
     """Create and persist a new collection owned by the acting user."""
 
@@ -40,14 +41,20 @@ class CreateCollection(
 
         Raises:
             InvalidCollectionError: If the name or an explicit slug is unusable.
-            ConflictError: If an explicit slug belongs to a live collection.
+            ConflictError: If an explicit slug belongs to a live collection of the
+                actor.
         """
+        # Slugs are unique per owner: only collections the actor can see count.
+        scope = self._policy.scope_for(actor)
         async with self._uow as repos:
             if command.slug is None:
-                slug = await _free_slug(repos.collections, command.name)
+                slug = await _free_slug(repos.collections, command.name, scope)
             else:
                 slug = _explicit_slug(command.slug)
-                if await repos.collections.get_by_slug(slug.value) is not None:
+                if (
+                    await repos.collections.get_by_slug(slug.value, scope=scope)
+                    is not None
+                ):
                     raise ConflictError(
                         f"A collection with slug '{slug}' already exists"
                     )
@@ -73,12 +80,14 @@ def _explicit_slug(value: str) -> Slug:
         ) from exc
 
 
-async def _free_slug(collections: CollectionRepository, name: str) -> Slug:
+async def _free_slug(
+    collections: CollectionRepository, name: str, scope: AccessScope
+) -> Slug:
     """Derive a slug from `name`, suffixing `-2`, `-3`... until it is unused."""
     base = slugify(name) or _FALLBACK_SLUG
     candidate = base
     number = 2
-    while await collections.get_by_slug(candidate) is not None:
+    while await collections.get_by_slug(candidate, scope=scope) is not None:
         candidate = f"{base}-{number}"
         number += 1
     return Slug(candidate)

@@ -4,11 +4,15 @@ from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
 from app.modules.graph.domain.edge import Edge
+from app.shared_kernel.access_scope import AccessScope
 
 
 def _make_edge() -> Edge:
     return Edge.create(
-        source_id=uuid.uuid4(), target_id=uuid.uuid4(), type="related-to"
+        owner_id=uuid.UUID(int=1),
+        source_id=uuid.uuid4(),
+        target_id=uuid.uuid4(),
+        type="related-to",
     )
 
 
@@ -19,14 +23,14 @@ async def test_add_and_get_round_trips() -> None:
 
     await repository.add(edge)
 
-    assert await repository.get(edge.id) is edge
+    assert await repository.get(edge.id, scope=AccessScope.everyone()) is edge
 
 
 async def test_get_returns_none_for_missing_edge() -> None:
     """get() returns None for an id that was never added."""
     repository = InMemoryEdgeRepository()
 
-    assert await repository.get(uuid.uuid4()) is None
+    assert await repository.get(uuid.uuid4(), scope=AccessScope.everyone()) is None
 
 
 async def test_get_returns_none_for_a_soft_deleted_edge() -> None:
@@ -38,7 +42,7 @@ async def test_get_returns_none_for_a_soft_deleted_edge() -> None:
     edge.soft_delete()
     await repository.save(edge)
 
-    assert await repository.get(edge.id) is None
+    assert await repository.get(edge.id, scope=AccessScope.everyone()) is None
 
 
 async def test_save_persists_changes_to_an_existing_edge() -> None:
@@ -50,7 +54,7 @@ async def test_save_persists_changes_to_an_existing_edge() -> None:
     edge.attributes = {"since": "1979"}
     await repository.save(edge)
 
-    result = await repository.get(edge.id)
+    result = await repository.get(edge.id, scope=AccessScope.everyone())
     assert result is not None
     assert result.attributes == {"since": "1979"}
 
@@ -62,7 +66,7 @@ async def test_list_orders_by_id_ascending() -> None:
     for edge in reversed(edges):
         await repository.add(edge)
 
-    result = await repository.list(after=None, limit=10)
+    result = await repository.list(after=None, limit=10, scope=AccessScope.everyone())
 
     assert result == sorted(edges, key=lambda edge: edge.id)
 
@@ -78,7 +82,7 @@ async def test_list_excludes_soft_deleted_edges() -> None:
     deleted.soft_delete()
     await repository.save(deleted)
 
-    result = await repository.list(after=None, limit=10)
+    result = await repository.list(after=None, limit=10, scope=AccessScope.everyone())
 
     assert result == [kept]
 
@@ -87,13 +91,25 @@ async def test_list_for_node_returns_edges_touching_the_node_either_direction() 
     """list_for_node() returns edge where the node is either source or target."""
     repository = InMemoryEdgeRepository()
     node_id = uuid.uuid4()
-    outgoing = Edge.create(source_id=node_id, target_id=uuid.uuid4(), type="owns")
-    incoming = Edge.create(source_id=uuid.uuid4(), target_id=node_id, type="owned-by")
+    outgoing = Edge.create(
+        owner_id=uuid.UUID(int=1),
+        source_id=node_id,
+        target_id=uuid.uuid4(),
+        type="owns",
+    )
+    incoming = Edge.create(
+        owner_id=uuid.UUID(int=1),
+        source_id=uuid.uuid4(),
+        target_id=node_id,
+        type="owned-by",
+    )
     unrelated = _make_edge()
     for edge in (outgoing, incoming, unrelated):
         await repository.add(edge)
 
-    result = await repository.list_for_node(node_id, after=None, limit=10)
+    result = await repository.list_for_node(
+        node_id, after=None, limit=10, scope=AccessScope.everyone()
+    )
 
     assert set(result) == {outgoing, incoming}
 
@@ -104,7 +120,12 @@ async def test_list_for_node_respects_after_and_limit() -> None:
     node_id = uuid.uuid4()
     edges = sorted(
         (
-            Edge.create(source_id=node_id, target_id=uuid.uuid4(), type="owns")
+            Edge.create(
+                owner_id=uuid.UUID(int=1),
+                source_id=node_id,
+                target_id=uuid.uuid4(),
+                type="owns",
+            )
             for _ in range(4)
         ),
         key=lambda edge: edge.id,
@@ -112,7 +133,9 @@ async def test_list_for_node_respects_after_and_limit() -> None:
     for edge in edges:
         await repository.add(edge)
 
-    page = await repository.list_for_node(node_id, after=edges[0].id, limit=2)
+    page = await repository.list_for_node(
+        node_id, after=edges[0].id, limit=2, scope=AccessScope.everyone()
+    )
 
     assert page == edges[1:3]
 
@@ -121,33 +144,53 @@ async def test_has_edges_of_type_returns_true_when_matching_edge_exists() -> Non
     """has_edges_of_type() returns True when a non-deleted edge uses that type."""
     repository = InMemoryEdgeRepository()
     edge = Edge.create(
-        source_id=uuid.uuid4(), target_id=uuid.uuid4(), type="directed-by"
+        owner_id=uuid.UUID(int=1),
+        source_id=uuid.uuid4(),
+        target_id=uuid.uuid4(),
+        type="directed-by",
     )
     await repository.add(edge)
 
-    assert await repository.has_edges_of_type("directed-by") is True
+    assert (
+        await repository.has_edges_of_type("directed-by", scope=AccessScope.everyone())
+        is True
+    )
 
 
 async def test_has_edges_of_type_returns_false_when_no_match() -> None:
     """has_edges_of_type() returns False when no edges use that type."""
     repository = InMemoryEdgeRepository()
-    edge = Edge.create(source_id=uuid.uuid4(), target_id=uuid.uuid4(), type="owns")
+    edge = Edge.create(
+        owner_id=uuid.UUID(int=1),
+        source_id=uuid.uuid4(),
+        target_id=uuid.uuid4(),
+        type="owns",
+    )
     await repository.add(edge)
 
-    assert await repository.has_edges_of_type("directed-by") is False
+    assert (
+        await repository.has_edges_of_type("directed-by", scope=AccessScope.everyone())
+        is False
+    )
 
 
 async def test_has_edges_of_type_ignores_soft_deleted_edges() -> None:
     """has_edges_of_type() does not count soft-deleted edges."""
     repository = InMemoryEdgeRepository()
     edge = Edge.create(
-        source_id=uuid.uuid4(), target_id=uuid.uuid4(), type="directed-by"
+        owner_id=uuid.UUID(int=1),
+        source_id=uuid.uuid4(),
+        target_id=uuid.uuid4(),
+        type="directed-by",
     )
     await repository.add(edge)
     edge.soft_delete()
     await repository.save(edge)
 
-    assert await repository.has_edges_of_type("directed-by") is False
+    assert (
+        await repository.has_edges_of_type("directed-by", scope=AccessScope.everyone())
+        is False
+    )
 
 
 async def test_count_and_list_with_attribute_filter_by_type_key_and_deletion() -> None:
@@ -157,7 +200,11 @@ async def test_count_and_list_with_attribute_filter_by_type_key_and_deletion() -
 
     def make(type_: str, attributes: dict[str, int]) -> Edge:
         return Edge.create(
-            source_id=source, target_id=target, type=type_, attributes=attributes
+            owner_id=uuid.UUID(int=1),
+            source_id=source,
+            target_id=target,
+            type=type_,
+            attributes=attributes,
         )
 
     edges = [make("owns", {"k": i}) for i in range(3)]
@@ -166,11 +213,16 @@ async def test_count_and_list_with_attribute_filter_by_type_key_and_deletion() -
     for edge in [*edges, make("likes", {"k": 1}), make("owns", {}), gone]:
         await repository.add(edge)
 
-    assert await repository.count_with_attribute("owns", "k") == 3
-    page = await repository.list_with_attribute("owns", "k", after=None, limit=2)
+    assert (
+        await repository.count_with_attribute("owns", "k", scope=AccessScope.everyone())
+        == 3
+    )
+    page = await repository.list_with_attribute(
+        "owns", "k", after=None, limit=2, scope=AccessScope.everyone()
+    )
     assert [e.id for e in page] == sorted(e.id for e in edges)[:2]
     rest = await repository.list_with_attribute(
-        "owns", "k", after=page[-1].id, limit=10
+        "owns", "k", after=page[-1].id, limit=10, scope=AccessScope.everyone()
     )
     assert [e.id for e in rest] == sorted(e.id for e in edges)[2:]
 
@@ -182,6 +234,7 @@ async def test_count_with_attribute_can_match_a_value() -> None:
     for status in ["Draft", "Draft", "Live"]:
         await repository.add(
             Edge.create(
+                owner_id=uuid.UUID(int=1),
                 source_id=source,
                 target_id=target,
                 type="owns",
@@ -189,8 +242,18 @@ async def test_count_with_attribute_can_match_a_value() -> None:
             )
         )
 
-    assert await repository.count_with_attribute("owns", "s", value="Draft") == 2
-    assert await repository.count_with_attribute("owns", "s", value="Gone") == 0
+    assert (
+        await repository.count_with_attribute(
+            "owns", "s", value="Draft", scope=AccessScope.everyone()
+        )
+        == 2
+    )
+    assert (
+        await repository.count_with_attribute(
+            "owns", "s", value="Gone", scope=AccessScope.everyone()
+        )
+        == 0
+    )
 
 
 async def test_count_with_attribute_value_matches_array_membership() -> None:
@@ -200,6 +263,7 @@ async def test_count_with_attribute_value_matches_array_membership() -> None:
     for held in [["CD", "Tape"], ["Vinyl"], "CD"]:
         await repository.add(
             Edge.create(
+                owner_id=uuid.UUID(int=1),
                 source_id=source,
                 target_id=target,
                 type="owns",
@@ -207,8 +271,18 @@ async def test_count_with_attribute_value_matches_array_membership() -> None:
             )
         )
 
-    assert await repository.count_with_attribute("owns", "f", value="CD") == 2
-    assert await repository.count_with_attribute("owns", "f", value="C") == 0
+    assert (
+        await repository.count_with_attribute(
+            "owns", "f", value="CD", scope=AccessScope.everyone()
+        )
+        == 2
+    )
+    assert (
+        await repository.count_with_attribute(
+            "owns", "f", value="C", scope=AccessScope.everyone()
+        )
+        == 0
+    )
 
 
 async def test_count_and_list_with_attribute_can_match_a_group_sub_key() -> None:
@@ -216,38 +290,57 @@ async def test_count_and_list_with_attribute_can_match_a_group_sub_key() -> None
     repository = InMemoryEdgeRepository()
     source, target = uuid.uuid4(), uuid.uuid4()
     has_terms = Edge.create(
+        owner_id=uuid.UUID(int=1),
         source_id=source,
         target_id=target,
         type="loaned-to",
         attributes={"terms": [{"note": "handle with care", "duration": "2w"}]},
     )
     other_row_shape = Edge.create(
+        owner_id=uuid.UUID(int=1),
         source_id=source,
         target_id=target,
         type="loaned-to",
         attributes={"terms": [{"note": "fragile"}]},
     )
-    no_key = Edge.create(source_id=source, target_id=target, type="loaned-to")
+    no_key = Edge.create(
+        owner_id=uuid.UUID(int=1), source_id=source, target_id=target, type="loaned-to"
+    )
     for edge in [has_terms, other_row_shape, no_key]:
         await repository.add(edge)
 
     assert (
-        await repository.count_with_attribute("loaned-to", "terms", sub_key="duration")
+        await repository.count_with_attribute(
+            "loaned-to", "terms", sub_key="duration", scope=AccessScope.everyone()
+        )
         == 1
     )
     page = await repository.list_with_attribute(
-        "loaned-to", "terms", sub_key="duration", after=None, limit=10
+        "loaned-to",
+        "terms",
+        sub_key="duration",
+        after=None,
+        limit=10,
+        scope=AccessScope.everyone(),
     )
     assert [e.id for e in page] == [has_terms.id]
     assert (
         await repository.count_with_attribute(
-            "loaned-to", "terms", sub_key="duration", value="2w"
+            "loaned-to",
+            "terms",
+            sub_key="duration",
+            value="2w",
+            scope=AccessScope.everyone(),
         )
         == 1
     )
     assert (
         await repository.count_with_attribute(
-            "loaned-to", "terms", sub_key="duration", value="1w"
+            "loaned-to",
+            "terms",
+            sub_key="duration",
+            value="1w",
+            scope=AccessScope.everyone(),
         )
         == 0
     )

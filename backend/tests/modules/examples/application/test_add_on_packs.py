@@ -1,9 +1,11 @@
 """Add-on packs: installing against a required pack, and removal order."""
 
+import uuid
 from typing import TYPE_CHECKING
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.examples.application.external_refs import resolve_external_refs
 from app.modules.examples.application.install_example_pack import (
     InstallExamplePack,
@@ -44,11 +46,15 @@ from app.modules.media.domain.media_attachment import (
     AttachmentTarget,
     MediaAttachment,
 )
-from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.actor import Actor
 
 if TYPE_CHECKING:
     from app.modules.graph.domain.node import Node
     from tests.modules.examples.conftest import MakeWorld, World
+
+
+USER_A = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
 
 
 def _base(pack_id: str, *, cover: str | None = None) -> ExamplePack:
@@ -123,39 +129,50 @@ def _world(make_world: MakeWorld, *extra: ExamplePack) -> World:
 async def _install(world: World, pack_id: str) -> InstallResult:
     return await InstallExamplePack(
         world.uow,
+        OwnerAccessPolicy(),
         world.catalogue,
         world.presets,
         world.graph,
         world.collections,
         world.covers,
-    ).handle(InstallExamplePackCommand(pack_id=pack_id), SYSTEM_ACTOR)
+    ).handle(InstallExamplePackCommand(pack_id=pack_id), world.actor)
 
 
 async def _uninstall(world: World, pack_id: str) -> UninstallResult:
     return await UninstallExamplePack(
         world.uow,
+        OwnerAccessPolicy(),
         world.catalogue,
         world.presets,
         world.graph,
         world.collections,
         world.covers,
-    ).handle(UninstallExamplePackCommand(pack_id=pack_id), SYSTEM_ACTOR)
+    ).handle(UninstallExamplePackCommand(pack_id=pack_id), world.actor)
 
 
 async def _node(world: World, name: str) -> Node:
-    nodes = await world.graph_repos.nodes.list(after=None, limit=50)
+    nodes = await world.graph_repos.nodes.list(
+        scope=AccessScope.everyone(), after=None, limit=50
+    )
     return next(n for n in nodes if n.name == name)
 
 
 async def _names(world: World) -> list[str]:
-    nodes = await world.graph_repos.nodes.list(after=None, limit=50)
+    nodes = await world.graph_repos.nodes.list(
+        scope=AccessScope.everyone(), after=None, limit=50
+    )
     return sorted(n.name for n in nodes)
 
 
 async def _edge_pairs(world: World) -> set[tuple[str, str]]:
-    edges = await world.graph_repos.edges.list(after=None, limit=50)
+    edges = await world.graph_repos.edges.list(
+        after=None, limit=50, scope=AccessScope.everyone()
+    )
     by_id = {
-        n.id: n.name for n in await world.graph_repos.nodes.list(after=None, limit=50)
+        n.id: n.name
+        for n in await world.graph_repos.nodes.list(
+            scope=AccessScope.everyone(), after=None, limit=50
+        )
     }
     return {(by_id[e.source_id], by_id[e.target_id]) for e in edges}
 
@@ -165,13 +182,19 @@ async def _snapshot(world: World) -> tuple[list[str], int, int, int]:
     return (
         await _names(world),
         len(await world.graph_repos.node_types.list(after=None, limit=50)),
-        len(await world.graph_repos.edges.list(after=None, limit=50)),
+        len(
+            await world.graph_repos.edges.list(
+                after=None, limit=50, scope=AccessScope.everyone()
+            )
+        ),
         len(world.collections.collections),
     )
 
 
 async def _installation(world: World, pack_id: str) -> Installation:
-    installation = await world.installations.get_active_for_pack(pack_id)
+    installation = await world.installations.get_active_for_pack(
+        pack_id, scope=AccessScope.everyone()
+    )
     assert installation is not None
     return installation
 
@@ -184,7 +207,10 @@ async def test_add_on_is_refused_without_its_base(make_world: MakeWorld) -> None
         await _install(world, "extras")
 
     assert await _snapshot(world) == ([], 0, 0, 0)
-    assert await world.installations.list_for_pack("extras") == []
+    assert (
+        await world.installations.list_for_pack("extras", scope=AccessScope.everyone())
+        == []
+    )
 
 
 async def test_add_on_is_refused_while_its_base_is_half_installed(
@@ -192,12 +218,15 @@ async def test_add_on_is_refused_while_its_base_is_half_installed(
 ) -> None:
     """An unfinished installation of the base does not count."""
     world = _world(make_world)
-    await world.installations.add(Installation.start("games"))
+    await world.installations.add(Installation.start("games", USER_A.id))
 
     with pytest.raises(RequirementsNotMetError, match=r"Add Games first\."):
         await _install(world, "extras")
 
-    assert await world.installations.list_for_pack("extras") == []
+    assert (
+        await world.installations.list_for_pack("extras", scope=AccessScope.everyone())
+        == []
+    )
 
 
 async def test_add_on_installs_against_its_base(make_world: MakeWorld) -> None:
@@ -278,7 +307,10 @@ async def test_a_deleted_base_item_is_named_and_nothing_is_created(
 
     assert await _snapshot(world) == before
     assert world.collections.create_calls == []
-    assert await world.installations.list_for_pack("extras") == []
+    assert (
+        await world.installations.list_for_pack("extras", scope=AccessScope.everyone())
+        == []
+    )
 
 
 async def test_a_replaced_base_item_is_refused(make_world: MakeWorld) -> None:
@@ -295,7 +327,10 @@ async def test_a_replaced_base_item_is_refused(make_world: MakeWorld) -> None:
     with pytest.raises(RequirementsNotMetError, match=r"Games no longer has Games A\."):
         await _install(world, "extras")
 
-    assert await world.installations.list_for_pack("extras") == []
+    assert (
+        await world.installations.list_for_pack("extras", scope=AccessScope.everyone())
+        == []
+    )
 
 
 async def test_an_edited_base_item_still_resolves(make_world: MakeWorld) -> None:
@@ -323,7 +358,9 @@ async def test_a_deleted_base_type_is_named(make_world: MakeWorld) -> None:
     )
     world = _world(make_world, typed)
     await _install(world, "games")
-    for node in await world.graph_repos.nodes.list(after=None, limit=50):
+    for node in await world.graph_repos.nodes.list(
+        scope=AccessScope.everyone(), after=None, limit=50
+    ):
         await world.graph.remove(EntityKind.ITEM, node.id)
     games = await _installation(world, "games")
     (record,) = games.owned(EntityKind.ITEM_TYPE)
@@ -369,7 +406,7 @@ async def test_a_half_installed_add_on_also_blocks_removal(
     """An unfinished installation of a dependant still needs the base."""
     world = _world(make_world)
     await _install(world, "games")
-    await world.installations.add(Installation.start("extras"))
+    await world.installations.add(Installation.start("extras", USER_A.id))
 
     with pytest.raises(RequiredByInstalledPackError, match=r"Remove Extras first\."):
         await _uninstall(world, "games")
@@ -403,7 +440,9 @@ async def test_a_kept_add_on_connection_keeps_the_base_item(
     await _install(world, "games")
     await _install(world, "extras")
     a = await _node(world, "Games A")
-    edges = await world.graph_repos.edges.list(after=None, limit=50)
+    edges = await world.graph_repos.edges.list(
+        after=None, limit=50, scope=AccessScope.everyone()
+    )
     edge = next(e for e in edges if e.target_id == a.id)
     edge.attributes = {"note": "mine"}
     await world.graph_repos.edges.save(edge)
@@ -438,7 +477,9 @@ async def test_a_failed_add_on_install_leaves_the_base_intact(
     games = await _installation(world, "games")
     assert games.status is InstallationStatus.INSTALLED
     assert list(games.entities) == base_entities
-    (failed,) = await world.installations.list_for_pack("extras")
+    (failed,) = await world.installations.list_for_pack(
+        "extras", scope=AccessScope.everyone()
+    )
     assert failed.status is InstallationStatus.FAILED
     assert (await _uninstall(world, "games")).kept == ()
 
@@ -454,7 +495,9 @@ async def test_an_add_ons_kept_entities_are_adopted_on_reinstall(
     x.name = "Mine"
     await world.graph_repos.nodes.save(x)
     a = await _node(world, "Games A")
-    edges = await world.graph_repos.edges.list(after=None, limit=50)
+    edges = await world.graph_repos.edges.list(
+        after=None, limit=50, scope=AccessScope.everyone()
+    )
     edge = next(e for e in edges if e.target_id == a.id)
     edge.attributes = {"note": "mine"}
     await world.graph_repos.edges.save(edge)
@@ -467,7 +510,14 @@ async def test_an_add_ons_kept_entities_are_adopted_on_reinstall(
     assert again.adopted.item_types == 1
     assert (again.created.items, again.created.connections) == (1, 1)
     assert await _names(world) == ["Extra Y", "Games A", "Games B", "Mine"]
-    assert len(await world.graph_repos.edges.list(after=None, limit=50)) == 3
+    assert (
+        len(
+            await world.graph_repos.edges.list(
+                after=None, limit=50, scope=AccessScope.everyone()
+            )
+        )
+        == 3
+    )
 
 
 async def test_ordinary_packs_are_unaffected(make_world: MakeWorld) -> None:
@@ -484,7 +534,7 @@ async def test_ordinary_packs_are_unaffected(make_world: MakeWorld) -> None:
 async def test_a_missing_record_is_named_by_its_ref(make_world: MakeWorld) -> None:
     """If the required pack's record never existed, the ref stands in for the label."""
     world = _world(make_world)
-    finished = Installation.start("games")
+    finished = Installation.start("games", USER_A.id)
     finished.mark_installed()
 
     with pytest.raises(RequirementsNotMetError, match=r"Games no longer has a\."):
@@ -512,10 +562,10 @@ async def test_a_failed_dependant_does_not_block_removal(
     """Only active installations count; failed and removed ones are history."""
     world = _world(make_world)
     await _install(world, "games")
-    failed = Installation.start("extras")
+    failed = Installation.start("extras", USER_A.id)
     failed.mark_failed()
     await world.installations.add(failed)
-    removed = Installation.start("tie")
+    removed = Installation.start("tie", USER_A.id)
     removed.mark_removed()
     await world.installations.add(removed)
 
@@ -542,7 +592,7 @@ async def test_removal_is_blocked_along_a_chain_of_add_ons(
     for pack_id in ("a-pack", "b-pack", "c-pack"):
         await _uninstall(world, pack_id)
 
-    assert await world.installations.list_active() == []
+    assert await world.installations.list_active(scope=AccessScope.everyone()) == []
 
 
 def _covered_world(make_world: MakeWorld) -> World:
@@ -553,7 +603,7 @@ async def _cover_count(world: World, name: str) -> int:
     node = await _node(world, name)
     return len(
         await world.media_repos.attachments.list_for_target(
-            AttachmentTarget.NODE, node.id
+            AttachmentTarget.NODE, node.id, scope=AccessScope.everyone()
         )
     )
 
@@ -599,12 +649,16 @@ async def test_a_replaced_add_on_cover_is_readopted(make_world: MakeWorld) -> No
     await _install(world, "extras")
     y = await _node(world, "Extra Y")
     for existing in await world.media_repos.attachments.list_for_target(
-        AttachmentTarget.NODE, y.id
+        AttachmentTarget.NODE, y.id, scope=AccessScope.everyone()
     ):
         existing.clear_attribute_key()
         await world.media_repos.attachments.update(existing)
     asset = MediaAsset.create(
-        filename="mine.png", content_type="image/png", size=3, sha256="0" * 64
+        owner_id=world.actor.id,
+        filename="mine.png",
+        content_type="image/png",
+        size=3,
+        sha256="0" * 64,
     )
     asset.promote()
     await world.media_repos.assets.add(asset)

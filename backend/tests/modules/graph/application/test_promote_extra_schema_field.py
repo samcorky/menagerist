@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -57,6 +58,7 @@ async def test_moves_the_property_and_keeps_the_value() -> None:
     await node_types.add(node_type)
 
     node = Node.create(
+        owner_id=uuid.UUID(int=1),
         name="Alien",
         type="film",
         attributes={"title": "Alien", "condition": "Mint"},
@@ -74,7 +76,9 @@ async def test_moves_the_property_and_keeps_the_value() -> None:
         node_id=node.id, node_type_id=node_type.id, key="condition"
     )
 
-    updated = await PromoteExtraSchemaField(uow).handle(command, SYSTEM_ACTOR)
+    updated = await PromoteExtraSchemaField(uow, OwnerAccessPolicy()).handle(
+        command, SYSTEM_ACTOR
+    )
 
     assert updated.attributes["condition"] == "Mint"
     # Node.update()'s extra_schema convention treats None as "unchanged" (there
@@ -96,6 +100,7 @@ async def test_moves_one_property_and_keeps_the_others_in_the_overlay() -> None:
     await node_types.add(node_type)
 
     node = Node.create(
+        owner_id=uuid.UUID(int=1),
         name="Alien",
         type="film",
         attributes={"condition": "Mint", "signed": True},
@@ -116,7 +121,9 @@ async def test_moves_one_property_and_keeps_the_others_in_the_overlay() -> None:
         node_id=node.id, node_type_id=node_type.id, key="condition"
     )
 
-    updated = await PromoteExtraSchemaField(uow).handle(command, SYSTEM_ACTOR)
+    updated = await PromoteExtraSchemaField(uow, OwnerAccessPolicy()).handle(
+        command, SYSTEM_ACTOR
+    )
 
     assert updated.extra_schema is not None
     assert "condition" not in updated.extra_schema["properties"]
@@ -132,13 +139,13 @@ async def test_key_not_in_the_overlay_raises() -> None:
     node_type = NodeType.create(slug="film", label="Film")
     node_types = InMemoryNodeTypeRepository()
     await node_types.add(node_type)
-    node = Node.create(name="Alien", type="film")
+    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
     nodes = InMemoryNodeRepository()
     await nodes.add(node)
     uow = InMemoryUnitOfWork(_repos(nodes=nodes, node_types=node_types))
 
     with pytest.raises(InvalidSchemaError):
-        await PromoteExtraSchemaField(uow).handle(
+        await PromoteExtraSchemaField(uow, OwnerAccessPolicy()).handle(
             PromoteExtraSchemaFieldCommand(
                 node_id=node.id, node_type_id=node_type.id, key="condition"
             ),
@@ -159,6 +166,7 @@ async def test_key_already_on_the_type_raises() -> None:
     node_types = InMemoryNodeTypeRepository()
     await node_types.add(node_type)
     node = Node.create(
+        owner_id=uuid.UUID(int=1),
         name="Alien",
         type="film",
         attributes={"condition": "Mint"},
@@ -172,7 +180,7 @@ async def test_key_already_on_the_type_raises() -> None:
     uow = InMemoryUnitOfWork(_repos(nodes=nodes, node_types=node_types))
 
     with pytest.raises(InvalidSchemaError):
-        await PromoteExtraSchemaField(uow).handle(
+        await PromoteExtraSchemaField(uow, OwnerAccessPolicy()).handle(
             PromoteExtraSchemaFieldCommand(
                 node_id=node.id, node_type_id=node_type.id, key="condition"
             ),
@@ -188,7 +196,7 @@ async def test_node_not_found_raises() -> None:
     uow = InMemoryUnitOfWork(_repos(node_types=node_types))
 
     with pytest.raises(NodeNotFoundError):
-        await PromoteExtraSchemaField(uow).handle(
+        await PromoteExtraSchemaField(uow, OwnerAccessPolicy()).handle(
             PromoteExtraSchemaFieldCommand(
                 node_id=uuid.uuid7(), node_type_id=node_type.id, key="condition"
             ),
@@ -199,6 +207,7 @@ async def test_node_not_found_raises() -> None:
 async def test_node_type_not_found_raises() -> None:
     """Promoting a field onto a missing item type raises."""
     node = Node.create(
+        owner_id=uuid.UUID(int=1),
         name="Alien",
         type="film",
         extra_schema={
@@ -211,7 +220,7 @@ async def test_node_type_not_found_raises() -> None:
     uow = InMemoryUnitOfWork(_repos(nodes=nodes))
 
     with pytest.raises(NodeTypeNotFoundError):
-        await PromoteExtraSchemaField(uow).handle(
+        await PromoteExtraSchemaField(uow, OwnerAccessPolicy()).handle(
             PromoteExtraSchemaFieldCommand(
                 node_id=node.id, node_type_id=uuid.uuid7(), key="condition"
             ),

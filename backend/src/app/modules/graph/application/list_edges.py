@@ -6,7 +6,7 @@ import structlog
 
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.cqrs import QueryHandler
+from app.shared_kernel.cqrs import ScopedQueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -23,16 +23,19 @@ class ListEdgesQuery:
     node_id: uuid.UUID | None = None
 
 
-class ListEdges(QueryHandler[GraphRepos, ListEdgesQuery, list[Edge]]):
+class ListEdges(ScopedQueryHandler[GraphRepos, ListEdgesQuery, list[Edge]]):
     """List edge with keyset pagination, optionally scoped to a single node."""
 
     async def handle(self, query: ListEdgesQuery, actor: Actor) -> list[Edge]:
         """Return a page of edge after `query.after`, up to `query.limit`."""
+        scope = self._policy.scope_for(actor)
         if query.node_id is not None:
             edges = await self._repos.edges.list_for_node(
-                query.node_id, after=query.after, limit=query.limit
+                query.node_id, scope=scope, after=query.after, limit=query.limit
             )
         else:
-            edges = await self._repos.edges.list(after=query.after, limit=query.limit)
+            edges = await self._repos.edges.list(
+                scope=scope, after=query.after, limit=query.limit
+            )
         logger.debug("edges listed", count=len(edges))
         return edges

@@ -16,7 +16,10 @@ from app.modules.graph.domain.node_type import NodeType
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
+from app.shared_kernel.cqrs import ScopedCommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
@@ -38,13 +41,16 @@ class CreateNodeCommand:
     extra_schema: dict[str, Any] | None = field(default=None)
 
 
-class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
+class CreateNode(ScopedCommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
     """Create and persist a new node, auto-creating its NodeType if not yet known."""
 
     def __init__(
-        self, uow: GraphUnitOfWork, choice_lists: ChoiceListSource | None = None
+        self,
+        uow: GraphUnitOfWork,
+        policy: AccessPolicy,
+        choice_lists: ChoiceListSource | None = None,
     ) -> None:
-        super().__init__(uow)
+        super().__init__(uow, policy)
         self._choice_lists = choice_lists
 
     async def handle(self, command: CreateNodeCommand, actor: Actor) -> Node:
@@ -57,6 +63,7 @@ class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
             check_schema_definition(command.extra_schema)
         check_extra_schema_limits(command.extra_schema)
         node = Node.create(
+            owner_id=actor.id,
             name=command.name,
             type=command.type,
             description=command.description,

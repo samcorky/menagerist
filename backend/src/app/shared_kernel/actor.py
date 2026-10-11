@@ -9,6 +9,22 @@ class Actor:
     id: uuid.UUID
     roles: frozenset[str] = field(default_factory=frozenset)
 
+    @property
+    def is_admin(self) -> bool:
+        """Whether the actor holds the administrator role."""
+        return "admin" in self.roles
+
+    @property
+    def is_system(self) -> bool:
+        """Whether this is the system actor."""
+        return "system" in self.roles
+
 
 SYSTEM_ACTOR = Actor(id=uuid.UUID(int=0), roles=frozenset({"system"}))
 """Sentinel actor for background jobs and internal callers."""
+
+ANONYMOUS_ACTOR = Actor(id=uuid.UUID(int=2), roles=frozenset({"anonymous"}))
+"""Stand-in actor for flows that run before anyone is signed in.
+
+Its id differs from every other sentinel so it can never match their content.
+"""

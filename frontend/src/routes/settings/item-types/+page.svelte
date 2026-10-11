@@ -20,6 +20,7 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
+	import { auth } from '$lib/auth.svelte.js';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import SchemaEditor from '$lib/components/schema-editor.svelte';
@@ -281,16 +282,18 @@
 								>
 									<Pencil class="size-4" />
 								</Button>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon"
-									disabled={deletingId === cat.id}
-									onclick={() => handleDelete(cat)}
-									aria-label="Delete item type"
-								>
-									<Trash2 class="size-4" />
-								</Button>
+								{#if auth.can('graph:node_type:delete')}
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon"
+										disabled={deletingId === cat.id}
+										onclick={() => handleDelete(cat)}
+										aria-label="Delete item type"
+									>
+										<Trash2 class="size-4" />
+									</Button>
+								{/if}
 							</div>
 						</Card.Header>
 

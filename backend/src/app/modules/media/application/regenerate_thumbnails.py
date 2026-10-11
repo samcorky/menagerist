@@ -7,11 +7,12 @@ import structlog
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.domain.thumbnail_eligibility import is_thumbnailable_image
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.cqrs import ScopedCommandHandler
 
 if TYPE_CHECKING:
     from app.modules.media.ports.image_processor import ImageProcessorPort
     from app.modules.media.ports.media_storage import MediaStoragePort
+    from app.shared_kernel.access_policy import AccessPolicy
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -27,7 +28,7 @@ class RegenerateThumbnailsCommand:
 
 
 class RegenerateThumbnails(
-    CommandHandler[MediaUnitOfWork, RegenerateThumbnailsCommand, int]
+    ScopedCommandHandler[MediaUnitOfWork, RegenerateThumbnailsCommand, int]
 ):
     """Re-generate and re-store thumbnails for already-attached media assets.
 
@@ -39,17 +40,20 @@ class RegenerateThumbnails(
     def __init__(
         self,
         uow: MediaUnitOfWork,
+        policy: AccessPolicy,
         storage: MediaStoragePort,
         image_processor: ImageProcessorPort,
     ) -> None:
-        super().__init__(uow)
+        super().__init__(uow, policy)
         self._storage = storage
         self._image_processor = image_processor
 
     async def handle(self, command: RegenerateThumbnailsCommand, actor: Actor) -> int:
         """Regenerate thumbnails for eligible attached assets; return the count done."""
         async with self._uow as repos:
-            assets = await repos.assets.list_by_status(status=MediaStatus.ATTACHED)
+            assets = await repos.assets.list_by_status(
+                status=MediaStatus.ATTACHED, scope=self._policy.scope_for(actor)
+            )
 
         count = 0
         for asset in assets:

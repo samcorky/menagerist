@@ -1,3 +1,6 @@
+import uuid
+
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.imaging.in_memory_image_processor import (
     InMemoryImageProcessor,
 )
@@ -16,7 +19,8 @@ from app.modules.media.application.regenerate_thumbnails import (
     RegenerateThumbnailsCommand,
 )
 from app.modules.media.domain.media_asset import MediaAsset
-from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 
 
 def _make_use_case(
@@ -26,7 +30,11 @@ def _make_use_case(
     storage = InMemoryMediaStorage()
     uow = create_in_memory_media_uow(make_in_memory_repos(assets=repo))
     processor = image_processor or InMemoryImageProcessor()
-    return RegenerateThumbnails(uow, storage, processor), repo, storage
+    return (
+        RegenerateThumbnails(uow, OwnerAccessPolicy(), storage, processor),
+        repo,
+        storage,
+    )
 
 
 async def _add_attached(
@@ -36,7 +44,11 @@ async def _add_attached(
     content_type: str = "image/jpeg",
 ) -> MediaAsset:
     asset = MediaAsset.create(
-        filename="cover.jpg", content_type=content_type, size=1, sha256="x"
+        owner_id=SYSTEM_ACTOR.id,
+        filename="cover.jpg",
+        content_type=content_type,
+        size=1,
+        sha256="x",
     )
     asset.promote()
     await repo.add(asset)
@@ -53,7 +65,7 @@ async def test_regenerates_thumbnail_for_attached_image() -> None:
 
     assert count == 1
     assert storage._thumbnails[(asset.id, "attached")] == b"fake-webp-thumbnail"
-    updated = await repo.get(asset.id)
+    updated = await repo.get(asset.id, scope=AccessScope.everyone())
     assert updated is not None
     assert updated.has_thumbnail is True
 
@@ -85,7 +97,11 @@ async def test_ignores_staged_and_orphaned_assets() -> None:
     """RegenerateThumbnails only considers attached assets, not staged/orphaned ones."""
     use_case, repo, storage = _make_use_case()
     staged = MediaAsset.create(
-        filename="new.jpg", content_type="image/jpeg", size=1, sha256="x"
+        owner_id=SYSTEM_ACTOR.id,
+        filename="new.jpg",
+        content_type="image/jpeg",
+        size=1,
+        sha256="x",
     )
     await repo.add(staged)
     storage._files[(staged.id, "staged")] = b"original-bytes"
@@ -116,3 +132,35 @@ async def test_returns_total_regenerated_count() -> None:
     count = await use_case.handle(RegenerateThumbnailsCommand(), SYSTEM_ACTOR)
 
     assert count == 2
+
+
+async def test_regenerates_for_every_owner_and_legacy_rows() -> None:
+    """The backfill ignores ownership, including rows with no owner."""
+    use_case, repo, storage = _make_use_case()
+    alice = await _add_attached(repo, storage)
+    bob = await _add_attached(repo, storage)
+    legacy = await _add_attached(repo, storage)
+    alice.owner_id = uuid.UUID(int=101)
+    bob.owner_id = uuid.UUID(int=102)
+    legacy.owner_id = None
+
+    count = await use_case.handle(RegenerateThumbnailsCommand(), SYSTEM_ACTOR)
+
+    assert count == 3
+
+
+async def test_follows_the_policy_scope_for_the_actor() -> None:
+    """A non-system actor only regenerates its own assets."""
+    use_case, repo, storage = _make_use_case()
+    theirs = await _add_attached(repo, storage)
+    theirs.owner_id = uuid.uuid7()
+    mine = await _add_attached(repo, storage)
+    mine.owner_id = uuid.uuid7()
+
+    count = await use_case.handle(
+        RegenerateThumbnailsCommand(), Actor(id=mine.owner_id, roles=frozenset())
+    )
+
+    assert count == 1
+    assert (mine.id, "attached") in storage._thumbnails
+    assert (theirs.id, "attached") not in storage._thumbnails

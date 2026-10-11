@@ -13,7 +13,10 @@ from app.modules.graph.domain.errors import NodeNotFoundError
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
+from app.shared_kernel.cqrs import ScopedCommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
@@ -32,13 +35,16 @@ class CreateEdgeCommand:
     attributes: dict[str, Any] = field(default_factory=dict)
 
 
-class CreateEdge(CommandHandler[GraphUnitOfWork, CreateEdgeCommand, Edge]):
+class CreateEdge(ScopedCommandHandler[GraphUnitOfWork, CreateEdgeCommand, Edge]):
     """Create and persist a new edge, auto-creating its EdgeType if not yet known."""
 
     def __init__(
-        self, uow: GraphUnitOfWork, choice_lists: ChoiceListSource | None = None
+        self,
+        uow: GraphUnitOfWork,
+        policy: AccessPolicy,
+        choice_lists: ChoiceListSource | None = None,
     ) -> None:
-        super().__init__(uow)
+        super().__init__(uow, policy)
         self._choice_lists = choice_lists
 
     async def handle(self, command: CreateEdgeCommand, actor: Actor) -> Edge:
@@ -47,10 +53,11 @@ class CreateEdge(CommandHandler[GraphUnitOfWork, CreateEdgeCommand, Edge]):
         If no EdgeType exists for the given type slug, one is created automatically
         so the vocabulary builds itself as edges are added.
         """
+        scope = self._policy.scope_for(actor)
         async with self._uow as repos:
-            if await repos.nodes.get(command.source_id) is None:
+            if await repos.nodes.get(command.source_id, scope=scope) is None:
                 raise NodeNotFoundError(f"Node {command.source_id} not found")
-            if await repos.nodes.get(command.target_id) is None:
+            if await repos.nodes.get(command.target_id, scope=scope) is None:
                 raise NodeNotFoundError(f"Node {command.target_id} not found")
 
             slug = slugify(command.type)
@@ -69,6 +76,7 @@ class CreateEdge(CommandHandler[GraphUnitOfWork, CreateEdgeCommand, Edge]):
                 validate_attributes(schema, command.attributes)
 
             edge = Edge.create(
+                owner_id=actor.id,
                 source_id=command.source_id,
                 target_id=command.target_id,
                 type=command.type,

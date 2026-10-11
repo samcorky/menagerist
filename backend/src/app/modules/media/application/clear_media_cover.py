@@ -4,10 +4,13 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from app.modules.media.domain.errors import MediaAttachmentNotFoundError
+from app.modules.media.domain.errors import (
+    MediaAssetNotFoundError,
+    MediaAttachmentNotFoundError,
+)
 from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.cqrs import ScopedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -24,14 +27,22 @@ class ClearMediaCoverCommand:
     target_id: uuid.UUID
 
 
-class ClearMediaCover(CommandHandler[MediaUnitOfWork, ClearMediaCoverCommand, None]):
+class ClearMediaCover(
+    ScopedCommandHandler[MediaUnitOfWork, ClearMediaCoverCommand, None]
+):
     """Clear the cover flag on an attachment, leaving the asset attached."""
 
     async def handle(self, command: ClearMediaCoverCommand, actor: Actor) -> None:
         """Clear `asset_id`'s cover flag on the given target."""
         async with self._uow as repos:
+            scope = self._policy.scope_for(actor)
+            asset = await repos.assets.get(command.asset_id, scope=scope)
+            if asset is None:
+                msg = f"Media asset {command.asset_id} not found"
+                raise MediaAssetNotFoundError(msg)
+            self._policy.assert_can_modify(actor, asset.owner_id)
             candidates = await repos.attachments.list_for_target(
-                command.target_type, command.target_id
+                command.target_type, command.target_id, scope=scope
             )
             attachment = next(
                 (

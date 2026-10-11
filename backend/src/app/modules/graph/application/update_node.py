@@ -18,7 +18,10 @@ from app.modules.graph.domain.node_type import NodeType
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos, GraphUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
+from app.shared_kernel.cqrs import ScopedCommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
@@ -45,13 +48,16 @@ class UpdateNodeCommand:
     extra_schema: dict[str, Any] | None = field(default=None)
 
 
-class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
+class UpdateNode(ScopedCommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
     """Update an existing node's editable fields."""
 
     def __init__(
-        self, uow: GraphUnitOfWork, choice_lists: ChoiceListSource | None = None
+        self,
+        uow: GraphUnitOfWork,
+        policy: AccessPolicy,
+        choice_lists: ChoiceListSource | None = None,
     ) -> None:
-        super().__init__(uow)
+        super().__init__(uow, policy)
         self._choice_lists = choice_lists
 
     async def handle(self, command: UpdateNodeCommand, actor: Actor) -> Node:
@@ -59,9 +65,12 @@ class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
         if command.extra_schema is not None:
             check_schema_definition(command.extra_schema)
         async with self._uow as repos:
-            node = await repos.nodes.get(command.node_id)
+            node = await repos.nodes.get(
+                command.node_id, scope=self._policy.scope_for(actor)
+            )
             if node is None:
                 raise NodeNotFoundError(f"Node {command.node_id} not found")
+            self._policy.assert_can_modify(actor, node.owner_id)
 
             if command.extra_schema is not None:
                 check_extra_schema_limits(

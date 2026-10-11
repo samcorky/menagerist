@@ -27,6 +27,7 @@
 		purgeEdgeTypeAttribute
 	} from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
+	import { auth } from '$lib/auth.svelte.js';
 	import { usageLabel, purgeWarning } from '$lib/field-usage';
 	import { getDescriptor } from '$lib/field-types';
 	import { SCHEMA_TYPE_CONTEXT, type SchemaTypeContext } from '$lib/schema-type-context';
@@ -688,7 +689,7 @@
 							>
 								Restore
 							</Button>
-							{#if typeId}
+							{#if typeId && auth.can(typeKind === 'node' ? 'graph:node_type:purge_attribute' : 'graph:edge_type:purge_attribute')}
 								<Button
 									type="button"
 									variant="ghost"

@@ -5,12 +5,13 @@ import structlog
 
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.cqrs import ScopedCommandHandler
 
 if TYPE_CHECKING:
     from datetime import datetime
 
     from app.modules.media.ports.media_storage import MediaStoragePort
+    from app.shared_kernel.access_policy import AccessPolicy
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -25,12 +26,14 @@ class CleanupExpiredMediaCommand:
 
 
 class CleanupExpiredMedia(
-    CommandHandler[MediaUnitOfWork, CleanupExpiredMediaCommand, int]
+    ScopedCommandHandler[MediaUnitOfWork, CleanupExpiredMediaCommand, int]
 ):
     """Hard-delete staged and orphaned assets that have passed their TTL."""
 
-    def __init__(self, uow: MediaUnitOfWork, storage: MediaStoragePort) -> None:
-        super().__init__(uow)
+    def __init__(
+        self, uow: MediaUnitOfWork, policy: AccessPolicy, storage: MediaStoragePort
+    ) -> None:
+        super().__init__(uow, policy)
         self._storage = storage
 
     async def handle(self, command: CleanupExpiredMediaCommand, actor: Actor) -> int:
@@ -39,11 +42,14 @@ class CleanupExpiredMedia(
             (MediaStatus.STAGED, command.staged_before),
             (MediaStatus.ORPHANED, command.orphaned_before),
         )
+        scope = self._policy.scope_for(actor)
         expired = []
         for status, before in pairs:
             async with self._uow as repos:
                 expired.extend(
-                    await repos.assets.list_expired(status=status, before=before)
+                    await repos.assets.list_expired(
+                        status=status, before=before, scope=scope
+                    )
                 )
 
         count = 0

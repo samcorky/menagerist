@@ -1,5 +1,7 @@
+import uuid
 from typing import Any
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -43,7 +45,9 @@ def _repos() -> GraphRepos:
 
 
 async def _search(repos: GraphRepos, q: str) -> list[Node]:
-    result = await ListNodes(repos).handle(ListNodesQuery(q=q), SYSTEM_ACTOR)
+    result = await ListNodes(repos, OwnerAccessPolicy()).handle(
+        ListNodesQuery(q=q), SYSTEM_ACTOR
+    )
     return result.items
 
 
@@ -53,6 +57,7 @@ async def _film_repos() -> tuple[GraphRepos, Node]:
         NodeType.create(slug="film", label="Film", attributes_schema=_FILM_SCHEMA)
     )
     film = Node.create(
+        owner_id=uuid.UUID(int=1),
         name="Alien",
         type="film",
         attributes={
@@ -89,8 +94,15 @@ async def test_search_ignores_keys_booleans_and_ratings() -> None:
 async def test_search_skips_archived_and_opted_out_fields() -> None:
     """Archived and `search: false` values no longer match, and only for that type."""
     repos, _ = await _film_repos()
-    other = Node.create(name="Other", type="person", attributes={"old_note": "gooey"})
-    untyped = Node.create(name="Loose", attributes={"internal": "secret"})
+    other = Node.create(
+        owner_id=uuid.UUID(int=1),
+        name="Other",
+        type="person",
+        attributes={"old_note": "gooey"},
+    )
+    untyped = Node.create(
+        owner_id=uuid.UUID(int=1), name="Loose", attributes={"internal": "secret"}
+    )
     await repos.nodes.add(other)
     await repos.nodes.add(untyped)
 
@@ -101,7 +113,11 @@ async def test_search_skips_archived_and_opted_out_fields() -> None:
 async def test_search_scans_untyped_nodes_in_full() -> None:
     """A node without a type is searched in every attribute."""
     repos = _repos()
-    node = Node.create(name="Loose", attributes={"stars": 5, "note": "hello"})
+    node = Node.create(
+        owner_id=uuid.UUID(int=1),
+        name="Loose",
+        attributes={"stars": 5, "note": "hello"},
+    )
     await repos.nodes.add(node)
 
     assert await _search(repos, "hello") == [node]
@@ -111,7 +127,7 @@ async def test_search_scans_untyped_nodes_in_full() -> None:
 async def test_search_still_matches_name_and_description() -> None:
     """Name and description matching is unchanged."""
     repos = _repos()
-    a = Node.create(name="Alien", description="a xenomorph")
+    a = Node.create(owner_id=uuid.UUID(int=1), name="Alien", description="a xenomorph")
     await repos.nodes.add(a)
 
     assert await _search(repos, "alien") == [a]
@@ -121,8 +137,8 @@ async def test_search_still_matches_name_and_description() -> None:
 async def test_search_treats_percent_and_underscore_literally() -> None:
     """Wildcard characters in the query match only themselves."""
     repos = _repos()
-    pct = Node.create(name="100% sure")
-    plain = Node.create(name="Plain")
+    pct = Node.create(owner_id=uuid.UUID(int=1), name="100% sure")
+    plain = Node.create(owner_id=uuid.UUID(int=1), name="Plain")
     await repos.nodes.add(pct)
     await repos.nodes.add(plain)
 
@@ -133,9 +149,11 @@ async def test_search_treats_percent_and_underscore_literally() -> None:
 async def test_search_total_agrees_with_items() -> None:
     """The total counts the same nodes the list returns."""
     repos, film = await _film_repos()
-    await repos.nodes.add(Node.create(name="Unrelated"))
+    await repos.nodes.add(Node.create(owner_id=uuid.UUID(int=1), name="Unrelated"))
 
-    result = await ListNodes(repos).handle(ListNodesQuery(q="scott"), SYSTEM_ACTOR)
+    result = await ListNodes(repos, OwnerAccessPolicy()).handle(
+        ListNodesQuery(q="scott"), SYSTEM_ACTOR
+    )
 
     assert result.items == [film]
     assert result.total == 1
@@ -152,7 +170,12 @@ async def test_search_loads_every_page_of_node_types() -> None:
             )
         )
     nodes = [
-        Node.create(name=f"n{i}", type=f"type-{i:03d}", attributes={"hidden": "zzz"})
+        Node.create(
+            owner_id=uuid.UUID(int=1),
+            name=f"n{i}",
+            type=f"type-{i:03d}",
+            attributes={"hidden": "zzz"},
+        )
         for i in (0, 100)
     ]
     for node in nodes:
@@ -164,10 +187,12 @@ async def test_search_loads_every_page_of_node_types() -> None:
 async def test_list_without_search_does_not_load_node_types() -> None:
     """A plain listing needs no node types."""
     repos = _repos()
-    node = Node.create(name="Alien")
+    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien")
     await repos.nodes.add(node)
 
-    result = await ListNodes(repos).handle(ListNodesQuery(), SYSTEM_ACTOR)
+    result = await ListNodes(repos, OwnerAccessPolicy()).handle(
+        ListNodesQuery(), SYSTEM_ACTOR
+    )
 
     assert result.items == [node]
 

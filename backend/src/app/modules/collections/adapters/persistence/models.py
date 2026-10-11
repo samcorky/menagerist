@@ -12,14 +12,17 @@ class CollectionModel(IdentifiableMixin, SoftDeletableMixin, Base):
     """ORM row for a collection."""
 
     __tablename__ = "collections"
-    # Only live rows reserve a slug; the use cases check this too, the index backs them.
+    # Only live rows reserve a slug, per owner; the use cases check this too, the
+    # index backs them.
     __table_args__ = (
         Index(
             "uq_collections_slug_live",
+            "owner_id",
             "slug",
             unique=True,
             postgresql_where=text("deleted_at IS NULL"),
         ),
+        Index("ix_collections_owner_id", "owner_id"),
     )
 
     name: Mapped[str]

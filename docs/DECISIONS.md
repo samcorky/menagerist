@@ -82,6 +82,8 @@ Significant architectural choices and their rationale. Entries are added when a 
 
 ## AllowAll authorization adapter in v1
 
+**Superseded (2026-10-10)** by [Accounts and private ownership (multi-user Stage 1)](#accounts-and-private-ownership-multi-user-stage-1): `RoleAuthorizationAdapter` and a real `get_current_actor` replaced it. Kept for history.
+
 **Decision:** The v1 `AuthorizationPort` implementation always permits every action. Routes depend on `get_current_actor` and use cases take `actor` in `handle()`, but no checks are enforced.
 
 **Rationale:** The wiring exists so that when the `identity` module lands, only the composition root changes - no route or use case signatures need updating. The app is single-user and self-hosted in v1; multi-user support is a later roadmap item. Building real authorization before identity exists would require faking it in ways that add coupling.
@@ -590,9 +592,11 @@ So a plain private array is the source of truth, `active` is a write-only `$stat
 
 **Decision:** each collection has a slug for pretty links. It is derived from the name (`slugify`, falling back to `collection`, then `-2`, `-3` until free) or given explicitly, and it never changes on rename, so a saved link never breaks. It is unique among collections that have not been deleted (a partial unique index backs the check), so a deleted collection's slug can be reused. Slugs are global for now.
 
-**Not decided:** per-owner uniqueness when multi-user arrives; that is an index and use-case change in one place.
+**Not decided:** per-owner uniqueness when multi-user arrives; that is an index and use-case change in one place. (Decided 2026-10-10: unique per owner; see the accounts entry.)
 
 ## Collection ownership is stored but not enforced: a precondition for multi-user
+
+**Superseded (2026-10-10)** by [Accounts and private ownership (multi-user Stage 1)](#accounts-and-private-ownership-multi-user-stage-1): every collection path is now scoped to its owner. Kept for history.
 
 **Decision:** every collection records an `owner_id` and a `visibility` (private), and use cases take the acting user, but nothing is checked yet because there is one fixed user. Enforcement through `AuthorizationPort` is a hard precondition for shipping multi-user, on every path that touches a collection: get, list, update, delete, adding and removing items, and the read path behind `GET /node?collection=`, where the `CollectionMembers` bridge and `ListNodes` will need to take the requesting user (a port-signature change, not a one-line check).
 
@@ -665,3 +669,64 @@ An add-on item of a base item type inherits that type's cover style, read throug
 **Known gap, not fixed:** a seeded list is not refreshed on servers that already ran the migration, so a regenerated ISO file does not reach them. ISO country lists change rarely.
 
 **If it ever matters:** sync the built-in rows from code and the shared file on startup, keyed by their stable ids (idempotent, leaving copies a person made alone), and let example packs reference a built-in preset by its stable id. A real Country field storing ISO 3166-1 alpha-2 codes, which can link, sort and later show flags, is a separate and larger change because existing fields hold names.
+
+## Accounts and private ownership (multi-user Stage 1)
+
+**Decision (2026-10-10):** Menagerist has local accounts, and everything a person creates (items, connections, collections, files, example installations) is visible to that person alone. This replaces "AllowAll authorization adapter in v1" and "Collection ownership is stored but not enforced". Sharing between people is Stage 2. The choices that matter long term:
+
+**Passwords and sign-in**
+
+- **Hashing is stdlib `hashlib.scrypt`, behind a hasher registry, not argon2.** No new dependency or image weight, and scrypt is an OWASP-recommended KDF. Every stored hash carries its scheme prefix (`scrypt$...`) and its parameters (N=2^15, r=8, p=1). `MENAGERIST_PASSWORD_HASHER` names the scheme for new hashes, any known scheme still verifies, and an older hash is rewritten on the next successful sign-in. Parsing rejects out-of-bounds parameters so a tampered hash cannot force large memory use. Moving to argon2 later is one adapter.
+- **The admin creates accounts with an initial password**, not invitation links. No email infrastructure exists, and links add expiry and token handling for no Stage 1 benefit. The user must change the password at first sign-in: `password_expired` is set on the account, and until it is cleared every content route answers 403 with problem type `password_expired` (the account routes still work). An admin password reset sets it again.
+- **Sign-in goes through an `Authenticator` port.** Stage 1 has one adapter (local username and password) that returns a verified identity. OIDC and trusted-proxy-header sign-in (for people running Authentik or Authelia in front) become later adapters that reuse sessions, roles and the access policy unchanged.
+- **Throttling is stored on the user row.** Five failed attempts within a fixed 15-minute window lock the account for the rest of the window (429 with `Retry-After`). The state needs no extra service, and the user row is read `FOR UPDATE` so concurrent guesses are serialised. Known cost: the 429 reveals that the username exists. Otherwise a wrong password, an unknown user and a disabled user give the same 401, and the unknown and disabled paths verify a decoy hash, so the expensive scrypt step takes the same time as for a wrong password. A small difference remains: a wrong password for a real user also writes the failure count and commits. The scrypt step runs with no database transaction open (the user is read, the password checked, then the row is locked and re-checked to record the outcome), so a flood of attempts cannot hold every pooled connection.
+- **Sessions** are random tokens stored as hashes and sent in an HttpOnly cookie (`menagerist_session`). CSRF uses the double-submit pattern: a readable `menagerist_csrf` cookie that the client copies into an `X-CSRF-Token` header on every unsafe `/api/v1` call (sign-in, setup and status are exempt). CORS allows no credentials. Logout answers with `Clear-Site-Data: "cache"` so a shared browser keeps nothing of the previous person (browsers ignore it on non-secure origins other than localhost; the frontend also clears its own cache on sign-in and sign-out).
+- **Before setup (no users)** every `/api/v1` route except the auth routes answers 401 with problem type `setup_required`, and the frontend redirects to `/setup`. After setup a missing session answers 401 `unauthenticated`. Health, version, docs and the SPA shell stay public.
+
+**Access model**
+
+- **Authorisation lives in an `AccessPolicy`, not in repositories.** `AccessPolicy` is a `shared_kernel` port; the Stage 1 implementation is `OwnerAccessPolicy` (`entrypoints/api/shared/access_policy.py`). It is the only place that knows who may see or change what: `scope_for(actor)`, `assert_can_view/modify/delete(actor, owner_id)` (all raise `NotFoundError`, so existence never leaks) and `require_admin(actor)` (403). Administrators get no special view of other people's content.
+- **Repositories take a required `AccessScope` criterion** (`AccessScope.of(user_id)` or `AccessScope.everyone()`) on every method that returns or counts content, so lists, searches, counts, keyset paging and ETags are filtered in SQL; filtering afterwards would break `Total-Count` and paging. Repositories contain no rules. A missing scope is a type error, and architecture tests plus a generated cross-user isolation test (every route, as a second user) enforce it. Stage 2 replaces `OwnerAccessPolicy` with a sharing policy and widens what a scope means in SQL; use cases do not change.
+- **Connections and files have their own `owner_id`.** A connection is owned by its creator, and creating one needs both endpoints visible to that person. A media asset is owned by its uploader and attachments follow their asset; attaching needs an owned asset and a visible target (a media port, bridged to graph).
+- **Owner columns stay nullable in the database in Stage 1** (items, connections, files, example installations; collections are NOT NULL already). A row with no owner is visible to nobody, and the domain requires an owner on construction. Making the columns NOT NULL is a follow-up migration once every deployment has claimed its data.
+- **Collection slugs are unique per owner** (`(owner_id, slug)` among live collections), and `get_by_slug` is scoped.
+- **Destructive structure operations are admin-only.** Deleting an item type or connection type (it clears the type on everyone's content) and purging an attribute run through `AuthorisedCommandHandler` with a permission. Usage counts and attribute-value suggestions are scoped to the viewer. Creating and editing structure stays open to every member.
+- **Permission strings read `<module>:<resource>:<action>`** (for example `graph:node_type:delete`), declared as a `StrEnum` per module. `RoleAuthorizationAdapter` gives admins and the system actor every permission and members `MEMBER_PERMISSIONS` (empty today). `GET /api/v1/auth/me/permissions` returns the signed-in account's effective permissions as a typed list, and the frontend hides controls with `auth.can(...)`; the server still enforces them.
+- **Example packs install per user.** `example_installations.owner_id` is added, the active-pack uniqueness becomes `(pack_id, owner_id)`, and pack targets run as the installing person, not the system actor. Shared types a pack needs that exist because another person installed the same pack are reused (never recorded as owned by this person, never removed by them); removal of a shared type keeps it while any person's content still uses it, using an all-scope in-use check. A clash with a type from anywhere else is still a 409.
+
+**First run**
+
+- **The first administrator claims existing data in the same transaction as setup.** `POST /auth/setup` (or `menagerist identity create-admin` when no accounts exist) creates the admin and gives them every row with no owner or a legacy owner (`UUID(int=0)` from example installs, `UUID(int=1)` from the old fixed API user). Soft-deleted rows are included. If the claim fails, nothing is created.
+- **Setup is serialised by a Postgres advisory lock** (`lock_for_setup`), so two simultaneous first visits cannot create two administrators; the loser gets 409. Admin-removing changes (demote, disable) take a second advisory lock so two admins cannot remove each other. The last active administrator cannot be demoted or disabled.
+- **Accounts are local only** in Stage 1. A forgotten administrator password is reset with `menagerist identity reset-password`.
+
+**Testing time**
+
+- **There is no `Clock` port.** Entities set timestamps with `datetime.now(UTC)` as before, and tests freeze time with `time-machine` (a dev dependency; it works on Python 3.14).
+
+**Consequence:** until the follow-ups below land, `owner_id` is nullable on four tables, the `Permission` type is a single-module alias, and members hold no permissions beyond using the app.
+
+---
+
+## Direction: roles as data, implied permissions
+
+**Direction (2026-10-10), not built:**
+
+- Permissions stay fixed in code, per module, as enums. Each module declares an `IMPLIES` catalogue (holding one permission also grants others) and the grant is expanded to its transitive closure when an actor's permissions are loaded. Grants only; there are no denies.
+- Roles become data later: a roles table where admin means everything, member means a default set, and people can define their own roles. That replaces the `Role` enum and `MEMBER_PERMISSIONS`.
+- Resource-specific access (sharing grants on a particular item or collection) is not a role permission. It is deferred to Stage 2 and goes through `AccessPolicy`.
+
+---
+
+## Follow-ups: accounts and ownership
+
+Open items from Stage 1; none is scheduled.
+
+- **A universal `handle`/`_handle` template for all use cases**, with an `_authorise` hook, a `Scoped._scope(actor)` helper and a single place for a future activity log. Today only the `Authorised*` bases split `handle` from `_handle`; `Scoped*` handlers implement `handle` directly.
+- **Combined Authorised and Scoped handlers** when one use case needs both. Example: Stage 3 public-link creation needs a permission gate and an owner scope.
+- **Per-person favourites** once sharing exists (an existing follow-up: the favourite flag is on the item, so it would be shared).
+- **Make the owner columns NOT NULL** (items, connections, files, example installations) after every deployment has claimed its data.
+- **`Permission` must become a real union** (or equivalent) when a second module adds permissions; today it is an alias of `GraphPermission` in `entrypoints/api/shared/permissions.py`.
+- **Open idea, not decided:** a readiness `warn` for "setup not completed".
+- **Stage 2:** sharing, through a sharing `AccessPolicy` and a wider SQL scope.
+- **OIDC and trusted-proxy sign-in** as further `Authenticator` adapters.

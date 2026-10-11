@@ -1,5 +1,6 @@
 import io
 import json
+import uuid
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
 import pytest
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker  # noqa: TC0
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
+from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.entrypoints.api.shared.example_targets import (
     CoverPackTarget,
     build_cover_stores,
@@ -32,15 +34,17 @@ from app.modules.media.adapters.storage.local_filesystem import (
 )
 from app.modules.media.ports.media_storage import MediaStoragePort  # noqa: TC001
 from app.platform.database import get_engine, get_session_factory
+from app.shared_kernel.actor import Actor
 
 if TYPE_CHECKING:
-    import uuid
     from collections.abc import Iterator
     from pathlib import Path
 
     from fastapi import FastAPI
 
 pytestmark = pytest.mark.integration
+
+MEMBER = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
 
 
 def _wipe(sync_url: str) -> None:
@@ -127,6 +131,7 @@ def client(
     get_session_factory.cache_clear()
     get_engine.cache_clear()
     app = create_app()
+    app.dependency_overrides[get_current_actor] = lambda: MEMBER
     app.dependency_overrides[get_pack_catalogue] = lambda: FilePackCatalogue(tmp_path)
     storage = LocalFilesystemMediaStorage(media_dir)
     app.dependency_overrides[get_media_storage] = lambda: storage
@@ -286,9 +291,11 @@ def test_a_failure_part_way_through_the_covers_leaves_no_media(
             async_sessionmaker[AsyncSession], Depends(get_session_factory)
         ],
         storage: Annotated[MediaStoragePort, Depends(get_media_storage)],
+        actor: Annotated[Actor, Depends(get_current_actor)],
     ) -> CoverPackTarget:
         return FailingSecond(
             build_cover_stores(session_factory),
+            actor,
             renderer=PillowCoverRenderer(),
             storage=storage,
             policy=ContentTypeAttachmentPolicy(),
@@ -346,6 +353,7 @@ def add_on_client(
     get_session_factory.cache_clear()
     get_engine.cache_clear()
     app = create_app()
+    app.dependency_overrides[get_current_actor] = lambda: MEMBER
     app.dependency_overrides[get_pack_catalogue] = lambda: FilePackCatalogue(tmp_path)
     try:
         with TestClient(app) as c:
@@ -398,6 +406,7 @@ def shipped_client(
     get_session_factory.cache_clear()
     get_engine.cache_clear()
     app = create_app()
+    app.dependency_overrides[get_current_actor] = lambda: MEMBER
     storage = LocalFilesystemMediaStorage(media_dir)
     app.dependency_overrides[get_media_storage] = lambda: storage
     try:

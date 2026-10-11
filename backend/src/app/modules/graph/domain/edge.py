@@ -4,12 +4,12 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.shared_kernel.errors import ValidationError
-from app.shared_kernel.mixins import Identifiable, SoftDeletable
+from app.shared_kernel.mixins import Identifiable, Owned, SoftDeletable
 from app.shared_kernel.slug import slugify
 
 
 @dataclass(kw_only=True, eq=False)
-class Edge(Identifiable, SoftDeletable):
+class Edge(Identifiable, Owned, SoftDeletable):
     """Typed relationship connecting two nodes in the collection graph."""
 
     source_id: uuid.UUID
@@ -35,6 +35,7 @@ class Edge(Identifiable, SoftDeletable):
     def create(
         cls,
         *,
+        owner_id: uuid.UUID,
         source_id: uuid.UUID,
         target_id: uuid.UUID,
         type: str,
@@ -44,6 +45,7 @@ class Edge(Identifiable, SoftDeletable):
         now = datetime.now(UTC)
         return cls(
             id=uuid.uuid7(),
+            owner_id=owner_id,
             source_id=source_id,
             target_id=target_id,
             type=type,

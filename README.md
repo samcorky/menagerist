@@ -36,6 +36,7 @@ The core is working end-to-end:
 - **Infinite scroll** - lists load more as you scroll
 - **Quick capture** - global `Cmd/Ctrl+K` sheet to add records without leaving the current page
 - **Dark mode** - system-aware theme with manual toggle
+- **Accounts** - local sign-in; each person's items, collections and files are private to them
 - **Self-hosted** - single `docker compose up` to run the full stack
 
 ---
@@ -74,6 +75,8 @@ uv run poe docker-up
 ```
 
 The app is available at [http://localhost:8080](http://localhost:8080).
+
+**First visit:** Menagerist asks you to create the administrator account (a username and a password of at least 10 characters). Anything already in the database is adopted by that account. The administrator can then add other people under Settings > Users, and each person sees only their own items. Accounts are local to your instance; there is no email or external sign-in yet. If you forget the administrator password, reset it from the command line: `docker compose exec menagerist menagerist identity reset-password --username <name>` (see [CONTRIBUTING.md](CONTRIBUTING.md#first-run-and-accounts)).
 
 ### The same thing, one `poe` task at a time
 

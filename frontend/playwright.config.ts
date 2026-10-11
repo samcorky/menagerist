@@ -9,6 +9,10 @@ import { defineConfig, devices } from '@playwright/test';
 // BACKEND_PORT + i and the database menagerist_w{i} (see scripts/e2e_migrate.py).
 const BACKEND_PORT = Number(process.env.E2E_BACKEND_PORT ?? 8100);
 
+// The `auth` project has its own backend and an always-empty database (menagerist_auth),
+// because auth.spec.ts drives first-run setup. See scripts/e2e_migrate.py.
+const AUTH_BACKEND_PORT = Number(process.env.E2E_AUTH_BACKEND_PORT ?? 8190);
+
 // `poe test-e2e --workers N` exports E2E_WORKERS; a bare `npx playwright test` falls back to the core count.
 const WORKERS = Number(process.env.E2E_WORKERS) || availableParallelism();
 
@@ -19,6 +23,23 @@ const FRONTEND_DIST = fileURLToPath(new URL('./build', import.meta.url));
 // every Playwright action by this many milliseconds. The default test
 // timeout would otherwise be eaten by the added delay, so it's extended too.
 const slowMo = process.env.PW_SLOWMO ? Number(process.env.PW_SLOWMO) : undefined;
+
+/** A backend on `port` serving the built SPA from the database menagerist_{name}. */
+function backend(port: number, name: string) {
+	return {
+		command: `uv run menagerist serve --host 127.0.0.1 --port ${port}`,
+		cwd: '..',
+		env: {
+			MENAGERIST_DATABASE_URL: `postgresql+asyncpg://menagerist:menagerist@localhost:55433/menagerist_${name}`,
+			MENAGERIST_FRONTEND_DIST_PATH: FRONTEND_DIST,
+			// Example covers are stored as media, so each backend needs a writable directory.
+			MENAGERIST_MEDIA_STORAGE_PATH: join(tmpdir(), `menagerist-e2e-media-${name}`)
+		},
+		url: `http://localhost:${port}/api/health/ready`,
+		reuseExistingServer: !process.env.CI,
+		timeout: 60_000
+	};
+}
 
 export default defineConfig({
 	testDir: './tests/e2e',
@@ -41,7 +62,7 @@ export default defineConfig({
 		{
 			name: 'chromium',
 			use: { ...devices['Desktop Chrome'] },
-			testIgnore: '**/*.mobile.spec.ts'
+			testIgnore: ['**/*.mobile.spec.ts', '**/auth.spec.ts']
 		},
 		// Phone-sized run of the viewport-agnostic specs plus the *.mobile.spec.ts layout checks.
 		{
@@ -54,19 +75,16 @@ export default defineConfig({
 				'**/quick-capture.spec.ts',
 				'**/*.mobile.spec.ts'
 			]
+		},
+		// First-run setup and sign-in flows against the dedicated empty database; runs serially.
+		{
+			name: 'auth',
+			use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${AUTH_BACKEND_PORT}` },
+			testMatch: '**/auth.spec.ts'
 		}
 	],
-	webServer: Array.from({ length: WORKERS }, (_, i) => ({
-		command: `uv run menagerist serve --host 127.0.0.1 --port ${BACKEND_PORT + i}`,
-		cwd: '..',
-		env: {
-			MENAGERIST_DATABASE_URL: `postgresql+asyncpg://menagerist:menagerist@localhost:55433/menagerist_w${i}`,
-			MENAGERIST_FRONTEND_DIST_PATH: FRONTEND_DIST,
-			// Example covers are stored as media, so each backend needs a writable directory.
-			MENAGERIST_MEDIA_STORAGE_PATH: join(tmpdir(), `menagerist-e2e-media-w${i}`)
-		},
-		url: `http://localhost:${BACKEND_PORT + i}/api/health/ready`,
-		reuseExistingServer: !process.env.CI,
-		timeout: 60_000
-	}))
+	webServer: [
+		...Array.from({ length: WORKERS }, (_, i) => backend(BACKEND_PORT + i, `w${i}`)),
+		backend(AUTH_BACKEND_PORT, 'auth')
+	]
 });

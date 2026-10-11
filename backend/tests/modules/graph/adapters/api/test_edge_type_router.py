@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
+from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.graph.adapters.api.dependencies import get_graph_repos, get_graph_uow
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
@@ -21,6 +22,7 @@ from app.modules.graph.adapters.persistence.unit_of_work import (
     create_in_memory_graph_uow,
 )
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.actor import Actor
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -37,6 +39,14 @@ def _app_with_in_memory_graph() -> FastAPI:
     app.dependency_overrides[get_graph_uow] = lambda: create_in_memory_graph_uow(repos)
     app.dependency_overrides[get_graph_repos] = lambda: repos
     return app
+
+
+def _admin_client() -> TestClient:
+    """A client acting as an administrator (structure deletes are admin-only)."""
+    app = _app_with_in_memory_graph()
+    actor = Actor(id=uuid.UUID(int=1), roles=frozenset({"admin"}))
+    app.dependency_overrides[get_current_actor] = lambda: actor
+    return TestClient(app)
 
 
 def test_create_get_list_and_404_round_trip() -> None:
@@ -118,7 +128,7 @@ def test_update_edge_type_returns_404_when_missing() -> None:
 
 def test_delete_edge_type_then_get_returns_404() -> None:
     """DELETE soft-deletes the edge type; subsequent GET returns 404."""
-    client = TestClient(_app_with_in_memory_graph())
+    client = _admin_client()
     et = client.post(
         "/api/v1/edge-type", json={"slug": "directed-by", "label": "Directed By"}
     ).json()
@@ -132,7 +142,7 @@ def test_delete_edge_type_then_get_returns_404() -> None:
 
 def test_delete_edge_type_returns_404_when_missing() -> None:
     """DELETE on a nonexistent edge type returns 404."""
-    client = TestClient(_app_with_in_memory_graph())
+    client = _admin_client()
 
     response = client.delete(f"/api/v1/edge-type/{uuid.uuid4()}")
 
@@ -141,7 +151,7 @@ def test_delete_edge_type_returns_404_when_missing() -> None:
 
 def test_delete_edge_type_returns_409_when_edges_still_use_it() -> None:
     """DELETE returns 409 when active edges reference the edge type."""
-    client = TestClient(_app_with_in_memory_graph())
+    client = _admin_client()
     et = client.post(
         "/api/v1/edge-type", json={"slug": "directed-by", "label": "Directed By"}
     ).json()
@@ -164,7 +174,7 @@ def test_delete_edge_type_returns_409_when_edges_still_use_it() -> None:
 
 def test_delete_edge_type_succeeds_when_no_active_edges_use_it() -> None:
     """DELETE succeeds when no active edges reference the edge type."""
-    client = TestClient(_app_with_in_memory_graph())
+    client = _admin_client()
     et = client.post(
         "/api/v1/edge-type", json={"slug": "directed-by", "label": "Directed By"}
     ).json()
@@ -214,7 +224,7 @@ def test_attributes_schema_round_trips_through_create_and_update() -> None:
 
 def test_attribute_usage_and_purge_round_trip() -> None:
     """Usage counts edges holding a key; purge removes it and reports the count."""
-    client = TestClient(_app_with_in_memory_graph())
+    client = _admin_client()
     et = client.post(
         "/api/v1/edge-type", json={"slug": "directed-by", "label": "Directed by"}
     ).json()
@@ -241,7 +251,7 @@ def test_attribute_usage_and_purge_round_trip() -> None:
 
 def test_attribute_usage_and_purge_return_404_for_missing_type() -> None:
     """Both endpoints report a missing edge type as 404."""
-    client = TestClient(_app_with_in_memory_graph())
+    client = _admin_client()
     base = f"/api/v1/edge-type/{uuid.uuid4()}/attribute/old"
 
     assert client.get(f"{base}/usage").status_code == 404
@@ -273,7 +283,7 @@ def test_attribute_usage_can_filter_by_value() -> None:
 
 def test_attribute_usage_and_purge_can_target_a_group_sub_key() -> None:
     """`?sub_key=` counts and purges rows of a group array, not the whole key."""
-    client = TestClient(_app_with_in_memory_graph())
+    client = _admin_client()
     et = client.post(
         "/api/v1/edge-type", json={"slug": "loaned-to", "label": "Loaned to"}
     ).json()

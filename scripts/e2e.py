@@ -3,9 +3,14 @@
 Uses one throwaway Postgres, with one database and backend per worker. Invoked by
 the ``test-e2e*`` poe tasks. The worker count is resolved once here and exported
 as ``E2E_WORKERS`` so the migrate script and ``playwright.config.ts`` agree on it.
+
+Besides the per-worker backends, the ``auth`` Playwright project uses one extra backend
+(port 8190) on an always-empty database, ``menagerist_auth``, which the migrate step
+recreates on every run.
 """
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -15,10 +20,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def default_workers() -> int:
     """CPU cores available to this process."""
-    try:
-        return len(os.sched_getaffinity(0))
-    except AttributeError:
-        return os.cpu_count() or 1
+    affinity = getattr(os, "sched_getaffinity", None)  # Linux only
+    return len(affinity(0)) if affinity else os.cpu_count() or 1
 
 
 def poe(task: str) -> int:
@@ -34,7 +37,7 @@ def main(
     if n < 1:
         sys.exit("--workers must be at least 1")
     os.environ["E2E_WORKERS"] = str(n)
-    args = ["npx", "playwright", "test"]
+    args = [shutil.which("npx") or "npx", "playwright", "test"]  # npx.cmd on Windows
     if mode in ("headed", "slow"):
         args.append("--headed")
     if mode == "slow":

@@ -52,7 +52,8 @@ def make_in_memory_repos(
         InMemoryMediaAssetRepository,
     )
 
+    assets = assets or InMemoryMediaAssetRepository()
     return MediaRepos(
-        assets=assets or InMemoryMediaAssetRepository(),
-        attachments=attachments or InMemoryMediaAttachmentRepository(),
+        assets=assets,
+        attachments=attachments or InMemoryMediaAttachmentRepository(assets),
     )

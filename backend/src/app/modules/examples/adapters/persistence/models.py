@@ -6,21 +6,24 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.platform.database import Base
-from app.platform.orm_mixins import IdentifiableMixin, TimestampedMixin
+from app.platform.orm_mixins import IdentifiableMixin, OwnedMixin, TimestampedMixin
 
 
-class ExampleInstallationModel(IdentifiableMixin, TimestampedMixin, Base):
+class ExampleInstallationModel(IdentifiableMixin, OwnedMixin, TimestampedMixin, Base):
     """ORM row for an example pack installation."""
 
     __tablename__ = "example_installations"
-    # A backstop only: `InstallExamplePack` already refuses a second active install.
+    # The unique index is a backstop only: `InstallExamplePack` already refuses a
+    # second active install of a pack by the same person.
     __table_args__ = (
         Index(
             "uq_example_installations_active_pack",
             "pack_id",
+            "owner_id",
             unique=True,
             postgresql_where=text("status IN ('installing', 'installed')"),
         ),
+        Index("ix_example_installations_owner_id_id", "owner_id", "id"),
     )
 
     pack_id: Mapped[str] = mapped_column(index=True)

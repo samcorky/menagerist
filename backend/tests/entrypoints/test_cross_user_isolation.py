@@ -1,0 +1,931 @@
+"""Generated cross-user check: user B cannot reach user A's content on any route.
+
+The real app is built over in-memory repositories for every module, user A is
+seeded through the API with one of every kind of content, and then EVERY route in
+the app's route table is called as user B with A's ids filled in by parameter
+name. A route is either on the small explicit allow-list below (with a reason)
+or it is generated here; one that is in neither fails the test, so a new route
+cannot ship without isolation coverage. An allow-list entry for a route that no
+longer exists fails too.
+"""
+
+import asyncio
+import hashlib
+import re
+import uuid
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Annotated, Any
+
+import pytest
+from fastapi import Depends
+from starlette.testclient import TestClient
+
+from app.entrypoints.api import create_app
+from app.entrypoints.api.shared.attach_target_access import (
+    GraphAttachTargetAccess,
+    get_attach_target_access,
+)
+from app.entrypoints.api.shared.choice_list_source import (
+    PresetChoiceListSource,
+    get_choice_list_source,
+)
+from app.entrypoints.api.shared.collection_items import GraphItemLookup, get_item_lookup
+from app.entrypoints.api.shared.collection_members import (
+    CollectionsMembers,
+    get_collection_members,
+)
+from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.entrypoints.api.shared.example_targets import (
+    CollectionPackTarget,
+    CoverPackTarget,
+    GraphPackTarget,
+    PresetPackTarget,
+    build_in_memory_collections_repos,
+    get_collection_pack_target,
+    get_cover_pack_target,
+    get_graph_pack_target,
+    get_preset_pack_target,
+    in_memory_collection_stores,
+    in_memory_cover_stores,
+    in_memory_graph_stores,
+    in_memory_preset_stores,
+)
+from app.modules.collections.adapters.api.dependencies import (
+    get_collections_repos,
+    get_collections_uow,
+)
+from app.modules.collections.adapters.persistence.unit_of_work import (
+    create_in_memory_collections_uow,
+)
+from app.modules.examples.adapters.api.dependencies import (
+    get_example_repos,
+    get_example_uow,
+    get_pack_catalogue,
+)
+from app.modules.examples.adapters.covers.in_memory_cover_renderer import (
+    InMemoryCoverRenderer,
+)
+from app.modules.examples.adapters.persistence.in_memory_installation_repository import (  # noqa: E501
+    InMemoryInstallationRepository,
+)
+from app.modules.examples.adapters.platform.in_memory_pack_catalogue import (
+    InMemoryPackCatalogue,
+)
+from app.modules.examples.domain.pack import (
+    ExamplePack,
+    PackConnection,
+    PackItem,
+    PackItemType,
+    PackRelationshipType,
+)
+from app.modules.examples.ports.unit_of_work import ExampleRepos
+from app.modules.graph.adapters.api.dependencies import get_graph_repos, get_graph_uow
+from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
+    InMemoryEdgeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_edge_type_repository import (
+    InMemoryEdgeTypeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_node_repository import (
+    InMemoryNodeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
+    InMemoryNodeTypeRepository,
+)
+from app.modules.graph.adapters.persistence.unit_of_work import (
+    create_in_memory_graph_uow,
+)
+from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.modules.identity.adapters.api.dependencies import (
+    get_active_identity_actor,
+    get_identity_actor,
+    get_identity_repos,
+    get_identity_uow,
+    get_signed_in_user,
+)
+from app.modules.identity.adapters.persistence.in_memory_session_repository import (
+    InMemorySessionRepository,
+)
+from app.modules.identity.adapters.persistence.in_memory_user_repository import (
+    InMemoryUserRepository,
+)
+from app.modules.identity.adapters.persistence.unit_of_work import (
+    create_in_memory_identity_uow,
+)
+from app.modules.identity.domain.user import User
+from app.modules.identity.ports.unit_of_work import IdentityRepos
+from app.modules.media.adapters.api.dependencies import (
+    get_image_processor,
+    get_media_repos,
+    get_media_storage,
+    get_media_uow,
+)
+from app.modules.media.adapters.imaging.in_memory_image_processor import (
+    InMemoryImageProcessor,
+)
+from app.modules.media.adapters.persistence.unit_of_work import (
+    create_in_memory_media_uow,
+    make_in_memory_repos,
+)
+from app.modules.media.adapters.policy.content_type_attachment_policy import (
+    ContentTypeAttachmentPolicy,
+)
+from app.modules.media.adapters.storage.in_memory_media_storage import (
+    InMemoryMediaStorage,
+)
+from app.modules.presets.adapters.api.dependencies import (
+    get_preset_repos,
+    get_preset_uow,
+)
+from app.modules.presets.adapters.persistence.in_memory_preset_repository import (
+    InMemoryPresetRepository,
+)
+from app.modules.presets.adapters.persistence.unit_of_work import (
+    create_in_memory_preset_uow,
+)
+from app.modules.presets.ports.unit_of_work import PresetRepos
+from app.shared_kernel.actor import Actor
+from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from fastapi import FastAPI
+    from httpx2 import Response
+
+Route = tuple[str, str]
+
+ADMIN = uuid.UUID(int=100)
+ALICE = uuid.UUID(int=101)
+BOB = uuid.UUID(int=102)
+PACK_ID = "demo"
+PASSWORD = "a-long-enough-password"
+TINY_JPEG = bytes.fromhex(
+    "ffd8ffe000104a46494600010101004800480000ffdb004300080606070605080707070909080a0c140d0c0b0b0c1912130f141d1a1f1e1d1a1c1c20242e2720222c231c1c28372930313434341f27393d38323c2e333432ffc0000b080001000101011100ffc4001f0000010501010101010100000000000000000102030405060708090a0bffda0008010100003f00bf00ffd9"
+)
+# Strings only A's content contains: none may ever appear in a response to B.
+CANARIES = ("Xenomorph Alpha", "Ripley Beta", "Alpha Collection", "poster-alpha.jpg")
+
+
+# ---- the explicit allow-list: routes that are not per-person content ----
+
+PUBLIC = "public: no content, no session"
+OWN_SESSION = "acts on the caller's own session or account"
+VOCABULARY = "shared vocabulary: every member reads and edits item/relationship types"
+PRESETS = "shared presets: not owned content (decision 6)"
+CREATES_OWN = "references no existing content; creates content owned by the caller"
+
+ALLOWED: dict[Route, str] = {
+    ("GET", "/api/health"): PUBLIC,
+    ("GET", "/api/health/ready"): PUBLIC,
+    ("GET", "/api/version"): PUBLIC,
+    ("GET", "/api/favicon.ico"): PUBLIC,
+    ("GET", "/api/docs/favicon.svg"): PUBLIC,
+    ("GET", "/api/docs/logo.svg"): PUBLIC,
+    ("GET", "/api/openapi.json"): PUBLIC,
+    ("GET", "/api/docs"): PUBLIC,
+    ("GET", "/api/docs/oauth2-redirect"): PUBLIC,
+    ("GET", "/api/redoc"): PUBLIC,
+    ("GET", "/api/v1/auth/status"): PUBLIC,
+    ("POST", "/api/v1/auth/setup"): PUBLIC,
+    ("POST", "/api/v1/auth/login"): PUBLIC,
+    ("POST", "/api/v1/auth/logout"): OWN_SESSION,
+    ("GET", "/api/v1/auth/me"): OWN_SESSION,
+    ("POST", "/api/v1/auth/password"): OWN_SESSION,
+    ("GET", "/api/v1/auth/me/permissions"): OWN_SESSION,
+    ("GET", "/api/v1/node-type"): VOCABULARY,
+    ("GET", "/api/v1/node-type/{node_type_id}"): VOCABULARY,
+    ("POST", "/api/v1/node-type"): VOCABULARY,
+    ("PATCH", "/api/v1/node-type/{node_type_id}"): VOCABULARY,
+    ("GET", "/api/v1/edge-type"): VOCABULARY,
+    ("GET", "/api/v1/edge-type/{edge_type_id}"): VOCABULARY,
+    ("POST", "/api/v1/edge-type"): VOCABULARY,
+    ("PATCH", "/api/v1/edge-type/{edge_type_id}"): VOCABULARY,
+    ("POST", "/api/v1/preset"): PRESETS,
+    ("GET", "/api/v1/preset"): PRESETS,
+    ("GET", "/api/v1/preset/export"): PRESETS,
+    ("POST", "/api/v1/preset/import"): PRESETS,
+    ("GET", "/api/v1/preset/{preset_id}"): PRESETS,
+    ("PATCH", "/api/v1/preset/{preset_id}"): PRESETS,
+    ("DELETE", "/api/v1/preset/{preset_id}"): PRESETS,
+    ("POST", "/api/v1/node"): CREATES_OWN,
+    ("POST", "/api/v1/collection"): CREATES_OWN,
+    ("POST", "/api/v1/media"): CREATES_OWN,
+}
+
+
+# ---- seeded ids and the parameter-name tables ----
+
+
+@dataclass(frozen=True)
+class Seed:
+    """The ids of everything user A owns."""
+
+    item: str
+    item2: str
+    edge: str
+    film: str
+    edge_type: str
+    collection: str
+    asset: str
+    staged: str
+    user: str
+
+
+PATH_PARAMS: dict[str, Callable[[Seed], str]] = {
+    "node_id": lambda s: s.item,
+    "item_id": lambda s: s.item,
+    "edge_id": lambda s: s.edge,
+    "node_type_id": lambda s: s.film,
+    "edge_type_id": lambda s: s.edge_type,
+    "collection_id": lambda s: s.collection,
+    "asset_id": lambda s: s.asset,
+    "user_id": lambda s: s.user,
+    "pack_id": lambda _: PACK_ID,
+    "key": lambda _: "rating",
+}
+QUERY_PARAMS: dict[str, Callable[[Seed], str]] = {
+    "q": lambda _: "xenomorph",
+    "type": lambda _: "film",
+    "favourite": lambda _: "true",
+    "collection": lambda s: s.collection,
+    "node_id": lambda s: s.item,
+    "item_id": lambda s: s.item,
+    "after": lambda s: s.item,
+    "limit": lambda _: "50",
+    "value": lambda _: "R",
+    "sub_key": lambda _: "x",
+}
+# Request-body recipes by OpenAPI schema name: kwargs for `client.request`.
+BODIES: dict[str, Callable[[Seed], dict[str, Any]]] = {
+    "UpdateNodeRequest": lambda s: {"json": {"name": "Stolen"}},
+    "PromoteExtraSchemaFieldRequest": lambda s: {"json": {"node_type_id": s.film}},
+    "CreateEdgeRequest": lambda s: {
+        "json": {"source_id": s.item, "target_id": s.item2, "type": "owns"}
+    },
+    "CreateEdgesRequest": lambda s: {
+        "json": {"source_id": s.item, "target_ids": [s.item2], "type": "owns"}
+    },
+    "UpdateEdgeRequest": lambda s: {"json": {"attributes": {"k": "v"}}},
+    "UpdateMediaRequest": lambda s: {"json": {"filename": "mine.jpg"}},
+    "AttachMediaRequest": lambda s: {
+        "json": {"target_type": "node", "target_id": s.item2}
+    },
+    "DetachMediaRequest": lambda s: {
+        "json": {
+            "target_type": "node",
+            "target_id": s.item,
+            "attribute_key": "cover",
+        }
+    },
+    "CoverRequest": lambda s: {"json": {"target_type": "node", "target_id": s.item}},
+    "UploadAndAttachMediaBody": lambda s: {
+        "files": {"file": ("c.jpg", TINY_JPEG, "image/jpeg")},
+        "data": {"target_type": "node", "target_id": s.item},
+    },
+    "UpdateCollectionRequest": lambda s: {"json": {"name": "Mine"}},
+    "AddItemsRequest": lambda s: {"json": {"item_ids": [s.item2]}},
+    "CreateUserRequest": lambda s: {
+        "json": {"username": "mallory", "display_name": "M", "password": PASSWORD}
+    },
+    "UpdateUserRequest": lambda s: {"json": {"display_name": "Renamed"}},
+    "ResetPasswordRequest": lambda s: {"json": {"password": PASSWORD}},
+}
+# Routes whose B-side answer is legitimately a success (B acts on B's own data).
+# Each check returns an error message or None; A's data is checked unchanged too.
+SPECIAL: dict[Route, Callable[[Response], str | None]] = {}
+
+
+def _installed_for_b(response: Response) -> str | None:
+    if response.status_code != 200:
+        return f"B installing the pack for B should work, got {response.status_code}"
+    return None
+
+
+def _no_installation(response: Response) -> str | None:
+    if response.status_code != 200:
+        return f"expected 200, got {response.status_code}"
+    shown = [p["id"] for p in response.json() if p["installation"] is not None]
+    return f"B sees installations of {shown}" if shown else None
+
+
+SPECIAL[("PUT", "/api/v1/example/{pack_id}/installation")] = _installed_for_b
+
+
+def _not_installed_for_b(response: Response) -> str | None:
+    if (
+        response.status_code == 409
+        and response.json()["title"] == "PackNotInstalledError"
+    ):
+        return None
+    return f"expected 409 PackNotInstalledError, got {response.status_code}"
+
+
+SPECIAL[("GET", "/api/v1/example")] = _no_installation
+SPECIAL[("DELETE", "/api/v1/example/{pack_id}/installation")] = _not_installed_for_b
+ADMIN_PREFIXES = ("/api/v1/user",)
+# Setup the positive control needs because the seed already did the thing.
+POSITIVE_PREP: dict[Route, Callable[[World], None]] = {
+    ("PUT", "/api/v1/example/{pack_id}/installation"): lambda w: w.uninstall_pack(),
+}
+
+
+# ---- the world ----
+
+
+def _pack() -> ExamplePack:
+    return ExamplePack(
+        id=PACK_ID,
+        relationship_types=(
+            PackRelationshipType(ref="by", slug="demo-by", label="By"),
+        ),
+        item_types=(PackItemType(ref="thing", slug="demo-thing", label="Thing"),),
+        items=(
+            PackItem(ref="a", type_ref="thing", name="Pack A"),
+            PackItem(ref="b", type_ref="thing", name="Pack B"),
+        ),
+        connections=(PackConnection(source_ref="a", target_ref="b", type_ref="by"),),
+    )
+
+
+class World:
+    """The real app over in-memory repositories for every module."""
+
+    def __init__(self, as_user: Callable[..., None]) -> None:
+        self._as_user = as_user
+        self.app: FastAPI = create_app()
+        graph = GraphRepos(
+            nodes=InMemoryNodeRepository(),
+            edges=InMemoryEdgeRepository(),
+            node_types=InMemoryNodeTypeRepository(),
+            edge_types=InMemoryEdgeTypeRepository(),
+        )
+        presets = PresetRepos(presets=InMemoryPresetRepository())
+        collections = build_in_memory_collections_repos()
+        media = make_in_memory_repos()
+        installations = InMemoryInstallationRepository()
+        examples = ExampleRepos(installations=installations)
+        catalogue = InMemoryPackCatalogue()
+        catalogue.add(_pack(), name="Demo", description="Demo examples")
+        self.identity = IdentityRepos(
+            users=InMemoryUserRepository(), sessions=InMemorySessionRepository()
+        )
+        storage = InMemoryMediaStorage()
+        processor = InMemoryImageProcessor()
+
+        def graph_target(
+            actor: Annotated[Actor, Depends(get_current_actor)],
+        ) -> GraphPackTarget:
+            return GraphPackTarget(
+                in_memory_graph_stores(graph, media, presets, collections), actor
+            )
+
+        def collection_target(
+            actor: Annotated[Actor, Depends(get_current_actor)],
+        ) -> CollectionPackTarget:
+            return CollectionPackTarget(
+                in_memory_collection_stores(collections, graph), actor
+            )
+
+        def cover_target(
+            actor: Annotated[Actor, Depends(get_current_actor)],
+        ) -> CoverPackTarget:
+            return CoverPackTarget(
+                in_memory_cover_stores(media, graph),
+                actor,
+                renderer=InMemoryCoverRenderer(),
+                storage=storage,
+                policy=ContentTypeAttachmentPolicy(),
+                image_processor=processor,
+            )
+
+        o = self.app.dependency_overrides
+        o[get_graph_uow] = lambda: create_in_memory_graph_uow(graph)
+        o[get_graph_repos] = lambda: graph
+        o[get_collections_uow] = lambda: create_in_memory_collections_uow(collections)
+        o[get_collections_repos] = lambda: collections
+        o[get_media_uow] = lambda: create_in_memory_media_uow(media)
+        o[get_media_repos] = lambda: media
+        o[get_media_storage] = lambda: storage
+        o[get_image_processor] = lambda: processor
+        o[get_preset_uow] = lambda: create_in_memory_preset_uow(presets)
+        o[get_preset_repos] = lambda: presets
+        o[get_example_uow] = lambda: InMemoryUnitOfWork(examples)
+        o[get_example_repos] = lambda: examples
+        o[get_pack_catalogue] = lambda: catalogue
+        o[get_identity_uow] = lambda: create_in_memory_identity_uow(self.identity)
+        o[get_identity_repos] = lambda: self.identity
+        # The bridges run over the same in-memory repositories.
+        o[get_attach_target_access] = lambda: GraphAttachTargetAccess(graph)
+        o[get_choice_list_source] = lambda: PresetChoiceListSource(presets)
+        o[get_item_lookup] = lambda: GraphItemLookup(graph)
+        o[get_collection_members] = lambda: CollectionsMembers(collections)
+        o[get_preset_pack_target] = lambda: PresetPackTarget(
+            in_memory_preset_stores(presets, graph)
+        )
+        o[get_graph_pack_target] = graph_target
+        o[get_collection_pack_target] = collection_target
+        o[get_cover_pack_target] = cover_target
+        self.client = TestClient(self.app)
+
+    def act_as(self, user_id: uuid.UUID, role: str = "member") -> TestClient:
+        """Make every following request run as `user_id`."""
+        self._as_user(self.app, user_id, role)
+        actor = Actor(id=user_id, roles=frozenset({role}))
+        self.app.dependency_overrides[get_identity_actor] = lambda: actor
+        self.app.dependency_overrides[get_active_identity_actor] = lambda: actor
+        self.app.dependency_overrides[get_signed_in_user] = lambda: pytest.fail(
+            "identity routes must use get_identity_actor"
+        )
+        return self.client
+
+    def seed(self) -> Seed:
+        """Give A one of every kind of content, through the API."""
+        user = User.create(
+            username="alice",
+            display_name="Alice",
+            password_hash="not-a-real-hash",
+            now=datetime.now(UTC),
+        )
+        asyncio.run(self.identity.users.add(user))
+        a = self.act_as(ALICE)
+        film = _created(
+            a.post("/api/v1/node-type", json={"slug": "film", "label": "F"})
+        )
+        item = _created(
+            a.post(
+                "/api/v1/node",
+                json={
+                    "name": "Xenomorph Alpha",
+                    "type": "film",
+                    "description": "xenomorph",
+                    "attributes": {"rating": "R"},
+                    "extra_schema": {
+                        "type": "object",
+                        "properties": {"rating": {"type": "string"}},
+                    },
+                    "favourite": True,
+                },
+            )
+        )
+        item2 = _created(a.post("/api/v1/node", json={"name": "Ripley Beta"}))
+        edge = _created(
+            a.post(
+                "/api/v1/edge",
+                json={
+                    "source_id": item["id"],
+                    "target_id": item2["id"],
+                    "type": "owns",
+                },
+            )
+        )
+        # Unused, so the admin-only delete has something it may remove.
+        edge_type = _created(
+            a.post("/api/v1/edge-type", json={"slug": "spare", "label": "Spare"})
+        )
+        collection = _created(
+            a.post("/api/v1/collection", json={"name": "Alpha Collection"})
+        )
+        assert (
+            a.put(
+                f"/api/v1/collection/{collection['id']}/item",
+                json={"item_ids": [item["id"]]},
+            ).status_code
+            == 200
+        )
+        asset = _created(
+            a.post(
+                "/api/v1/media/attached",
+                files={"file": ("poster-alpha.jpg", TINY_JPEG, "image/jpeg")},
+                data={"target_type": "node", "target_id": item["id"]},
+            )
+        )
+        cover = a.post(
+            f"/api/v1/media/{asset['asset_id']}/attachments/cover",
+            json={"target_type": "node", "target_id": item["id"]},
+        )
+        assert cover.status_code == 200, cover.text
+        staged = _created(
+            a.post(
+                "/api/v1/media", files={"file": ("staged.jpg", TINY_JPEG, "image/jpeg")}
+            )
+        )
+        installed = a.put(f"/api/v1/example/{PACK_ID}/installation")
+        assert installed.status_code == 200, installed.text
+        return Seed(
+            item=item["id"],
+            item2=item2["id"],
+            edge=edge["id"],
+            film=film["id"],
+            edge_type=edge_type["id"],
+            collection=collection["id"],
+            asset=asset["asset_id"],
+            staged=staged["id"],
+            user=str(user.id),
+        )
+
+    def uninstall_pack(self) -> None:
+        """Let A install the pack again."""
+        removed = self.act_as(ALICE).delete(f"/api/v1/example/{PACK_ID}/installation")
+        assert removed.status_code == 200, removed.text
+
+    def snapshot(self, seed: Seed) -> dict[str, object]:
+        """A's own view of all its content, to prove B's call changed nothing."""
+        a = self.act_as(ALICE)
+        urls = [
+            "/api/v1/node",
+            f"/api/v1/node/{seed.item}",
+            "/api/v1/edge",
+            f"/api/v1/edge/{seed.edge}",
+            "/api/v1/collection",
+            f"/api/v1/collection/{seed.collection}",
+            f"/api/v1/media/for-node/{seed.item}",
+            f"/api/v1/media/{seed.asset}",
+            f"/api/v1/media/{seed.staged}",
+            "/api/v1/example/entities",
+        ]
+        view: dict[str, object] = {}
+        for url in urls:
+            response = a.get(url)
+            view[url] = (response.status_code, response.text)
+        content = a.get(f"/api/v1/media/{seed.asset}/content")
+        view["content"] = hashlib.sha256(content.content).hexdigest()
+        return view
+
+
+def _created(response: Response) -> dict[str, Any]:
+    assert response.status_code in (200, 201), response.text
+    body: dict[str, Any] = response.json()
+    return body
+
+
+# ---- route table and case generation ----
+
+
+def route_table(app: FastAPI) -> set[Route]:
+    """Every (method, path) the app serves, mounted routers and mounts included."""
+    found: set[Route] = set()
+
+    def visit(routes: Any) -> None:  # noqa: ANN401
+        for route in routes:
+            if hasattr(route, "effective_candidates"):
+                visit(route.effective_candidates())
+                continue
+            path = getattr(route, "path_format", None) or getattr(route, "path", None)
+            assert path is not None, f"unreadable route {route!r}"
+            methods = getattr(route, "methods", None)
+            if methods is None:
+                if getattr(route, "name", None) != "spa":
+                    found.add(("MOUNT", path))
+                continue
+            found.update((m, path) for m in methods if m not in {"HEAD", "OPTIONS"})
+
+    visit(app.routes)
+    return found
+
+
+@dataclass(frozen=True)
+class Case:
+    """One call to make as B (and, as a positive control, as A)."""
+
+    method: str
+    template: str
+    variant: str
+
+    @property
+    def id(self) -> str:
+        """The test id: method, route template and variant."""
+        return f"{self.method} {self.template} [{self.variant}]"
+
+
+def _operations(app: FastAPI) -> dict[Route, dict[str, Any]]:
+    paths: dict[str, dict[str, Any]] = app.openapi()["paths"]
+    return {(m.upper(), p): op for p, item in paths.items() for m, op in item.items()}
+
+
+# Routes that also run against a staged (unattached) asset.
+STAGED_TOO: set[Route] = {
+    ("GET", "/api/v1/media/{asset_id}"),
+    ("GET", "/api/v1/media/{asset_id}/content"),
+    ("GET", "/api/v1/media/{asset_id}/thumbnail"),
+    ("PATCH", "/api/v1/media/{asset_id}"),
+    ("DELETE", "/api/v1/media/{asset_id}"),
+}
+STREAMS = ("/content", "/thumbnail")  # file streams send an ETag too
+# Routes that only make sense on a staged (not yet attached) asset.
+STAGED_ONLY: set[Route] = {("POST", "/api/v1/media/{asset_id}/promote")}
+
+
+def _sends_etag(op: dict[str, Any]) -> bool:
+    return "ETag" in op.get("responses", {}).get("200", {}).get("headers", {})
+
+
+def generate_cases(app: FastAPI) -> list[Case]:
+    """The calls for every route that is not on the allow-list."""
+    table = route_table(app)
+    operations = _operations(app)
+    cases: list[Case] = []
+    for method, template in sorted(table - ALLOWED.keys()):
+        op = operations.get((method, template), {})
+        queries = [p["name"] for p in op.get("parameters", []) if p["in"] == "query"]
+        cases.append(Case(method, template, "bare"))
+        cases.extend(Case(method, template, f"query:{name}") for name in queries)
+        if len(queries) > 1:
+            cases.append(Case(method, template, "query:all"))
+        if (method, template) in STAGED_TOO:
+            cases.append(Case(method, template, "staged"))
+        if method == "GET" and (_sends_etag(op) or template.endswith(STREAMS)):
+            cases.append(Case(method, template, "if-none-match"))
+        elif method != "GET" and _sends_etag(operations.get(("GET", template), {})):
+            cases.append(Case(method, template, "if-match"))
+    return cases
+
+
+def _fill(
+    case: Case,
+    table: dict[str, Callable[[Seed], str]],
+    names: list[str],
+    seed: Seed,
+    kind: str,
+) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for name in names:
+        if name not in table:
+            pytest.fail(
+                f"{case.method} {case.template}: no value for {kind} parameter "
+                + f"{name!r}; add it to the {kind.upper()}_PARAMS table"
+            )
+        values[name] = table[name](seed)
+    return values
+
+
+# Where the generic value would match nothing of A's even for A.
+QUERY_OVERRIDES: dict[tuple[str, str], str] = {
+    ("/api/v1/collection", "q"): "alpha",  # collections match on their name
+    ("/api/v1/node-type/{node_type_id}/attribute/{key}/values", "q"): "R",
+}
+
+
+def build_request(
+    case: Case, op: dict[str, Any], seed: Seed
+) -> tuple[str, dict[str, Any]]:
+    """Return the URL and `client.request` kwargs for a case, filled with A's ids."""
+    path_names = re.findall(r"{(\w+)}", case.template)
+    values = _fill(case, PATH_PARAMS, path_names, seed, "path")
+    if case.variant == "staged" or (case.method, case.template) in STAGED_ONLY:
+        values["asset_id"] = seed.staged
+    url = case.template.format(**values)
+    kwargs: dict[str, Any] = {}
+    query_names = [p["name"] for p in op.get("parameters", []) if p["in"] == "query"]
+    if case.variant.startswith("query:"):
+        # `after` would skip A's first item, so the combined call leaves it out.
+        chosen = (
+            [n for n in query_names if n != "after"]
+            if case.variant == "query:all"
+            else [case.variant[6:]]
+        )
+        kwargs["params"] = _fill(case, QUERY_PARAMS, chosen, seed, "query")
+        for (template, name), value in QUERY_OVERRIDES.items():
+            if case.template == template and name in kwargs["params"]:
+                kwargs["params"][name] = value
+    content = op.get("requestBody", {}).get("content", {})
+    if content:
+        ref = next(iter(content.values()))["schema"]["$ref"]
+        schema = ref.rsplit("/", 1)[-1]
+        if schema not in BODIES:
+            pytest.fail(
+                f"{case.method} {case.template}: no body recipe for {schema!r}; "
+                + "add it to BODIES"
+            )
+        kwargs.update(BODIES[schema](seed))
+    return url, kwargs
+
+
+def is_denied(response: Response, *, admin_only: bool = False) -> bool:
+    """404 (403 only on admin-only routes), or a 200 with nothing in it."""
+    if response.status_code == 404 or (admin_only and response.status_code == 403):
+        return True
+    if response.status_code != 200:
+        return False
+    if response.headers.get("Total-Count", "0") != "0" or "Link" in response.headers:
+        return False
+    if "application/json" not in response.headers.get("content-type", ""):
+        return False
+    return _empty(response.json())
+
+
+def _with_unknown_ids(
+    url: str, kwargs: dict[str, Any], seed: Seed
+) -> tuple[str, dict[str, Any]]:
+    """The same request with every one of A's ids swapped for a random uuid."""
+    # Item and relationship types are shared vocabulary every member can list.
+    shared = {seed.film, seed.edge_type}
+    swaps = {v: str(uuid.uuid7()) for v in vars(seed).values() if v not in shared}
+
+    def swap(value: Any) -> Any:  # noqa: ANN401
+        if isinstance(value, str):
+            for old, new in swaps.items():
+                value = value.replace(old, new)
+            return value
+        if isinstance(value, list):
+            return [swap(v) for v in value]
+        if isinstance(value, dict):
+            return {k: swap(v) for k, v in value.items()}
+        return value
+
+    return swap(url), {k: (v if k == "files" else swap(v)) for k, v in kwargs.items()}
+
+
+def _shape(response: Response) -> tuple[object, ...]:
+    """Status plus problem type/title (or list length): what a caller can observe."""
+    body = (
+        response.json() if "json" in response.headers.get("content-type", "") else None
+    )
+    if isinstance(body, dict):
+        return (response.status_code, body.get("type"), body.get("title"))
+    return (response.status_code, len(body) if isinstance(body, list) else None)
+
+
+# Variants whose value cannot match anything of A's even for A, and why.
+EMPTY_FOR_A: dict[tuple[str, str], str] = {
+    (
+        "/api/v1/node-type/{node_type_id}/attribute/{key}/usage",
+        "query:sub_key",
+    ): "'rating' is a plain value, so no sub-key 'x' exists",
+    (
+        "/api/v1/edge-type/{edge_type_id}/attribute/{key}/usage",
+        "query:sub_key",
+    ): "the unused edge type has no attributes",
+    (
+        "/api/v1/edge-type/{edge_type_id}/attribute/{key}/usage",
+        "query:value",
+    ): "the unused edge type has no attributes",
+    (
+        "/api/v1/node-type/{node_type_id}/attribute/{key}/usage",
+        "query:all",
+    ): "value 'R' with sub-key 'x' matches no item",
+    (
+        "/api/v1/edge-type/{edge_type_id}/attribute/{key}/usage",
+        "query:all",
+    ): "the unused edge type has no attributes",
+    (
+        "/api/v1/edge-type/{edge_type_id}/attribute/{key}/usage",
+        "bare",
+    ): "the unused edge type has no attributes",
+}
+
+
+def _empty(body: object) -> bool:
+    if isinstance(body, list):
+        return not body
+    if isinstance(body, dict):
+        return all(_empty(v) for v in body.values())
+    return body in (0, None, "", False)
+
+
+_APP = create_app()
+CASES = generate_cases(_APP)
+OPERATIONS = _operations(_APP)
+ADMIN_ROUTES = {
+    route
+    for route, op in OPERATIONS.items()
+    if "x-required-permission" in op or route[1].startswith(ADMIN_PREFIXES)
+}
+
+
+def _etag_headers(world: World, case: Case, seed: Seed) -> dict[str, str]:
+    """The conditional header carrying A's current ETag for this resource."""
+    if case.variant not in ("if-none-match", "if-match"):
+        return {}
+    url, _ = build_request(Case("GET", case.template, "bare"), {}, seed)
+    etag = world.act_as(ALICE).get(url).headers.get("ETag")
+    assert etag is not None, f"{case.id}: A's {url} sends no ETag"
+    name = "If-None-Match" if case.variant == "if-none-match" else "If-Match"
+    return {name: etag}
+
+
+# ---- the tests ----
+
+
+def test_every_route_is_allow_listed_or_generated() -> None:
+    """A new route is generated (and so checked); a stale allow-list entry fails."""
+    table = route_table(_APP)
+    generated = {(c.method, c.template) for c in CASES}
+
+    assert sorted(ALLOWED.keys() - table) == [], "stale allow-list entries"
+    assert sorted(table - ALLOWED.keys() - generated) == []
+    assert not generated & ALLOWED.keys()
+    # The walk sees routes mounted straight on the app as well as the v1 router.
+    assert len(table) >= 70, f"the route walk found only {len(table)} routes"
+    assert ("GET", "/api/health") in table
+    assert ("GET", "/api/v1/node/{node_id}") in table
+
+
+def test_empty_and_query_override_entries_match_generated_cases() -> None:
+    """An exemption or override that no generated case uses any more fails."""
+    variants = {(c.template, c.variant) for c in CASES}
+    stale_empty = sorted(str(key) for key in EMPTY_FOR_A if key not in variants)
+    stale_queries = sorted(
+        str(key)
+        for key in QUERY_OVERRIDES
+        if (key[0], f"query:{key[1]}") not in variants
+        and (key[0], "query:all") not in variants
+    )
+
+    assert stale_empty == [], "stale EMPTY_FOR_A entries"
+    assert stale_queries == [], "stale QUERY_OVERRIDES entries"
+
+
+def test_generated_cases_cover_the_content_routes() -> None:
+    """Sanity: lists, search, filters, ETags and media streams are all generated."""
+    ids = {c.id for c in CASES}
+    for expected in (
+        "GET /api/v1/node [query:q]",
+        "GET /api/v1/node [query:collection]",
+        "GET /api/v1/node/{node_id} [if-none-match]",
+        "PATCH /api/v1/node/{node_id} [if-match]",
+        "GET /api/v1/media/{asset_id}/content [if-none-match]",
+        "GET /api/v1/media/{asset_id}/thumbnail [bare]",
+        "GET /api/v1/example/entities [bare]",
+    ):
+        assert expected in ids
+
+
+@pytest.mark.parametrize("case", CASES, ids=lambda c: c.id)
+def test_user_b_cannot_reach_user_a_content(
+    case: Case, as_user: Callable[..., None]
+) -> None:
+    """B gets 404/403 or nothing at all; A's own view is untouched afterwards."""
+    world = World(as_user)
+    seed = world.seed()
+    op = OPERATIONS.get((case.method, case.template), {})
+    url, kwargs = build_request(case, op, seed)
+    headers = _etag_headers(world, case, seed)
+    # Reads cannot change anything, so only writes pay for the before/after view.
+    writes = case.method != "GET"
+    before = world.snapshot(seed) if writes else None
+
+    admin_route = (case.method, case.template) in ADMIN_ROUTES
+    bob = world.act_as(BOB)
+    response = bob.request(case.method, url, headers=headers, **kwargs)
+
+    special = SPECIAL.get((case.method, case.template))
+    problem = (
+        special(response)
+        if special
+        else (
+            None
+            if is_denied(response, admin_only=admin_route)
+            else "expected 404 (403 only if admin-only) or an empty result"
+        )
+    )
+    assert problem is None, (
+        f"{case.id}: {problem}; got {response.status_code} {response.text[:300]}"
+    )
+    for canary in CANARIES:
+        assert canary not in response.text, f"{case.id}: leaked {canary!r}"
+    # A's ids must be indistinguishable from ids that never existed.
+    ghost_url, ghost_kwargs = _with_unknown_ids(url, kwargs, seed)
+    if (ghost_url, ghost_kwargs) != (url, kwargs):
+        ghost = bob.request(case.method, ghost_url, headers=headers, **ghost_kwargs)
+        assert _shape(ghost) == _shape(response), (
+            f"{case.id}: existence leaks: A's id gives {_shape(response)}, "
+            + f"an unknown id gives {_shape(ghost)}"
+        )
+    if before is not None:
+        assert world.snapshot(seed) == before, f"{case.id}: changed A's content"
+
+
+@pytest.mark.parametrize("case", CASES, ids=lambda c: c.id)
+def test_user_a_succeeds_on_the_same_call(
+    case: Case, as_user: Callable[..., None]
+) -> None:
+    """Positive control: the same call as the owner works, so refusals are real."""
+    world = World(as_user)
+    seed = world.seed()
+    op = OPERATIONS.get((case.method, case.template), {})
+    url, kwargs = build_request(case, op, seed)
+    headers = _etag_headers(world, case, seed)
+    admin_only = (case.method, case.template) in ADMIN_ROUTES
+    if prep := POSITIVE_PREP.get((case.method, case.template)):
+        prep(world)
+    caller = world.act_as(ADMIN, "admin") if admin_only else world.act_as(ALICE)
+
+    response = caller.request(case.method, url, headers=headers, **kwargs)
+
+    expected = 304 if case.variant == "if-none-match" else None
+    if expected is not None:
+        assert response.status_code == expected, f"{case.id}: {response.text[:300]}"
+    else:
+        assert 200 <= response.status_code < 300, (
+            f"{case.id}: A got {response.status_code} {response.text[:300]}"
+        )
+    # A must really see something, or B's empty answer would prove nothing.
+    reads_json = (
+        case.method == "GET"
+        and response.status_code == 200
+        and "json" in response.headers.get("content-type", "")
+    )
+    if reads_json and (case.template, case.variant) not in EMPTY_FOR_A:
+        assert not _empty(response.json()), f"{case.id}: A's own answer is empty"

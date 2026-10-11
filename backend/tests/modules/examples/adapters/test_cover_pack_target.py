@@ -8,20 +8,28 @@ import pytest
 
 from app.modules.examples.application.content_hash import content_hash
 from app.modules.examples.ports.pack_targets import RemoveResult
+from app.modules.graph.domain.node import Node
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
 from app.modules.media.domain.media_attachment import (
     AttachmentKey,
     AttachmentTarget,
     MediaAttachment,
 )
+from app.shared_kernel.access_scope import AccessScope
 
 if TYPE_CHECKING:
     from tests.modules.examples.conftest import MakeWorld, World
 
 
+async def _item(world: World) -> uuid.UUID:
+    node = Node.create(owner_id=world.actor.id, name="Item")
+    await world.graph_repos.nodes.add(node)
+    return node.id
+
+
 async def _attachments(world: World, item_id: uuid.UUID) -> list[MediaAttachment]:
     return await world.media_repos.attachments.list_for_target(
-        AttachmentTarget.NODE, item_id
+        AttachmentTarget.NODE, item_id, scope=AccessScope.everyone()
     )
 
 
@@ -30,14 +38,16 @@ async def test_create_attaches_the_drawn_image_as_the_items_cover(
 ) -> None:
     """One attachment flagged as cover; content describes the bytes drawn."""
     world = make_world()
-    item_id = uuid.uuid7()
+    item_id = await _item(world)
 
     created = await world.covers.create(item_id, "Blue", "sleeve")
 
     [attachment] = await _attachments(world, item_id)
     assert created.entity_id == attachment.id
     assert attachment.attribute_key is AttachmentKey.COVER
-    asset = await world.media_repos.assets.get(attachment.asset_id)
+    asset = await world.media_repos.assets.get(
+        attachment.asset_id, scope=AccessScope.everyone()
+    )
     assert asset is not None
     assert (asset.content_type, asset.status) == ("image/png", MediaStatus.ATTACHED)
     png = world.covers._renderer.render("Blue", "sleeve")
@@ -53,9 +63,9 @@ async def test_create_is_deterministic_for_the_same_name(make_world: MakeWorld) 
     """A reinstall draws byte-identical covers."""
     world = make_world()
 
-    first = await world.covers.create(uuid.uuid7(), "Blue", "poster")
-    second = await world.covers.create(uuid.uuid7(), "Blue", "poster")
-    other = await world.covers.create(uuid.uuid7(), "Red", "poster")
+    first = await world.covers.create(await _item(world), "Blue", "poster")
+    second = await world.covers.create(await _item(world), "Blue", "poster")
+    other = await world.covers.create(await _item(world), "Red", "poster")
 
     assert first.content == second.content
     assert first.content["sha256"] != other.content["sha256"]
@@ -64,7 +74,7 @@ async def test_create_is_deterministic_for_the_same_name(make_world: MakeWorld) 
 async def test_inspect_matches_what_was_created(make_world: MakeWorld) -> None:
     """Nothing changed, so the hashes agree and nothing counts as user data."""
     world = make_world()
-    created = await world.covers.create(uuid.uuid7(), "Ünï", "card")
+    created = await world.covers.create(await _item(world), "Ünï", "card")
 
     inspection = await world.covers.inspect(created.entity_id)
 
@@ -76,7 +86,7 @@ async def test_inspect_matches_what_was_created(make_world: MakeWorld) -> None:
 async def test_inspect_reads_a_demoted_cover_as_changed(make_world: MakeWorld) -> None:
     """Once another image is the cover, the pack's is no longer what it made."""
     world = make_world()
-    item_id = uuid.uuid7()
+    item_id = await _item(world)
     created = await world.covers.create(item_id, "Blue", "box")
     [attachment] = await _attachments(world, item_id)
     attachment.clear_attribute_key()
@@ -91,10 +101,12 @@ async def test_inspect_reads_a_demoted_cover_as_changed(make_world: MakeWorld) -
 async def test_inspect_reads_a_renamed_file_as_changed(make_world: MakeWorld) -> None:
     """A filename that no longer says name and style cannot match."""
     world = make_world()
-    item_id = uuid.uuid7()
+    item_id = await _item(world)
     created = await world.covers.create(item_id, "Blue", "box")
     [attachment] = await _attachments(world, item_id)
-    asset = await world.media_repos.assets.get(attachment.asset_id)
+    asset = await world.media_repos.assets.get(
+        attachment.asset_id, scope=AccessScope.everyone()
+    )
     assert asset is not None
     asset.filename = "holiday.png"
     await world.media_repos.assets.save(asset)
@@ -110,7 +122,7 @@ async def test_inspect_is_none_when_the_attachment_or_asset_is_gone(
 ) -> None:
     """No attachment, or an attachment without its asset, is a cover that is gone."""
     world = make_world()
-    item_id = uuid.uuid7()
+    item_id = await _item(world)
     created = await world.covers.create(item_id, "Blue", "box")
     [attachment] = await _attachments(world, item_id)
 
@@ -125,7 +137,7 @@ async def test_remove_deletes_attachment_asset_and_stored_files(
 ) -> None:
     """Nothing is left behind, thumbnail included."""
     world = make_world()
-    item_id = uuid.uuid7()
+    item_id = await _item(world)
     created = await world.covers.create(item_id, "Blue", "sleeve")
     assert len(world.storage._thumbnails) == 1
 
@@ -134,7 +146,12 @@ async def test_remove_deletes_attachment_asset_and_stored_files(
     assert result is RemoveResult.REMOVED
     assert await _attachments(world, item_id) == []
     for status in MediaStatus:
-        assert await world.media_repos.assets.list_by_status(status=status) == []
+        assert (
+            await world.media_repos.assets.list_by_status(
+                status=status, scope=AccessScope.everyone()
+            )
+            == []
+        )
     assert world.storage._files == {}
     assert world.storage._thumbnails == {}
 
@@ -151,7 +168,7 @@ async def test_remove_keeps_an_asset_that_is_attached_elsewhere(
 ) -> None:
     """Only the cover's own attachment goes if the asset is shared."""
     world = make_world()
-    item_id = uuid.uuid7()
+    item_id = await _item(world)
     created = await world.covers.create(item_id, "Blue", "sleeve")
     [attachment] = await _attachments(world, item_id)
     await world.media_repos.attachments.add(
@@ -161,7 +178,9 @@ async def test_remove_keeps_an_asset_that_is_attached_elsewhere(
     result = await world.covers.remove(created.entity_id)
 
     assert result is RemoveResult.REMOVED
-    asset = await world.media_repos.assets.get(attachment.asset_id)
+    asset = await world.media_repos.assets.get(
+        attachment.asset_id, scope=AccessScope.everyone()
+    )
     assert isinstance(asset, MediaAsset)
     assert asset.status is MediaStatus.ATTACHED
 
@@ -178,10 +197,15 @@ async def test_a_failure_setting_the_cover_leaves_nothing_behind(
     monkeypatch.setattr(world.media_repos.attachments, "update", boom)
 
     with pytest.raises(RuntimeError, match="cover flag boom"):
-        await world.covers.create(uuid.uuid7(), "Blue", "sleeve")
+        await world.covers.create(await _item(world), "Blue", "sleeve")
 
     for status in MediaStatus:
-        assert await world.media_repos.assets.list_by_status(status=status) == []
+        assert (
+            await world.media_repos.assets.list_by_status(
+                status=status, scope=AccessScope.everyone()
+            )
+            == []
+        )
     assert world.storage._files == {}
 
 
@@ -190,7 +214,7 @@ async def test_has_cover_is_true_only_for_an_item_with_a_flagged_cover(
 ) -> None:
     """Any image flagged as cover counts; an unflagged attachment does not."""
     world = make_world()
-    item_id = uuid.uuid7()
+    item_id = await _item(world)
     assert await world.covers.has_cover(item_id) is False
 
     await world.covers.create(item_id, "Blue", "box")

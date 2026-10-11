@@ -2,6 +2,7 @@
 
 import uuid
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
     InMemoryMediaAssetRepository,
 )
@@ -20,7 +21,11 @@ from app.shared_kernel.actor import SYSTEM_ACTOR
 
 def _make_asset(filename: str = "f.jpg") -> MediaAsset:
     return MediaAsset.create(
-        filename=filename, content_type="image/jpeg", size=1, sha256="x"
+        owner_id=SYSTEM_ACTOR.id,
+        filename=filename,
+        content_type="image/jpeg",
+        size=1,
+        sha256="x",
     )
 
 
@@ -28,9 +33,9 @@ def _make_use_case() -> tuple[
     ListNodeMedia, InMemoryMediaAssetRepository, InMemoryMediaAttachmentRepository
 ]:
     assets = InMemoryMediaAssetRepository()
-    attachments = InMemoryMediaAttachmentRepository()
+    attachments = InMemoryMediaAttachmentRepository(assets)
     repos = make_in_memory_repos(assets=assets, attachments=attachments)
-    return ListNodeMedia(repos), assets, attachments
+    return ListNodeMedia(repos, OwnerAccessPolicy()), assets, attachments
 
 
 async def test_list_node_media_returns_attached_assets() -> None:

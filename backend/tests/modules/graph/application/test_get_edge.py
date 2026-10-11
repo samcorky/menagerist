@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -33,9 +34,14 @@ def _make_repos(edges: InMemoryEdgeRepository) -> GraphRepos:
 async def test_get_edge_returns_existing_edge() -> None:
     """GetEdge returns the edge when it exists."""
     edges = InMemoryEdgeRepository()
-    edge = Edge.create(source_id=uuid.uuid4(), target_id=uuid.uuid4(), type="owns")
+    edge = Edge.create(
+        owner_id=uuid.UUID(int=1),
+        source_id=uuid.uuid4(),
+        target_id=uuid.uuid4(),
+        type="owns",
+    )
     await edges.add(edge)
-    use_case = GetEdge(_make_repos(edges))
+    use_case = GetEdge(_make_repos(edges), OwnerAccessPolicy())
 
     result = await use_case.handle(GetEdgeQuery(edge_id=edge.id), SYSTEM_ACTOR)
 
@@ -44,7 +50,7 @@ async def test_get_edge_returns_existing_edge() -> None:
 
 async def test_get_edge_raises_when_missing() -> None:
     """GetEdge raises EdgeNotFoundError when the edge doesn't exist."""
-    use_case = GetEdge(_make_repos(InMemoryEdgeRepository()))
+    use_case = GetEdge(_make_repos(InMemoryEdgeRepository()), OwnerAccessPolicy())
 
     with pytest.raises(EdgeNotFoundError):
         await use_case.handle(GetEdgeQuery(edge_id=uuid.uuid4()), SYSTEM_ACTOR)

@@ -96,9 +96,11 @@ test('See all results opens the items page with the search pre-filled', async ({
 
 	await openWithSlash(page);
 	await input(page).fill(item.name);
+	// The items page drops ?q= again as soon as it has read it, so watch for it before clicking
+	// rather than polling a URL that is only briefly there.
+	const withQuery = page.waitForURL(/\/items\?q=/);
 	await popup(page).getByRole('option', { name: 'See all results in Items' }).click();
-
-	await expect(page).toHaveURL(/\/items\?q=/);
+	await withQuery;
 	await expect(page.getByPlaceholder('Search your items…')).toHaveValue(item.name);
 	await expect(page.getByRole('link', { name: item.name }).first()).toBeVisible();
 });

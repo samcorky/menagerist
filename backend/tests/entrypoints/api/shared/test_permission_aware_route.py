@@ -134,7 +134,7 @@ def test_openapi_documents_required_permission() -> None:
     assert schema["components"]["securitySchemes"]["APIKeyCookie"] == {
         "type": "apiKey",
         "in": "cookie",
-        "name": "session_id",
+        "name": "menagerist_session",
     }
 
 

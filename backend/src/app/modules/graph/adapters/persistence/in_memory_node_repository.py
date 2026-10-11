@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping, Sequence
 
     from app.modules.graph.domain.node import Node
+    from app.shared_kernel.access_scope import AccessScope
 
 
 def _fold(text: str) -> str:
@@ -49,6 +50,17 @@ class InMemoryNodeRepository:
     def __init__(self) -> None:
         self._nodes: dict[uuid.UUID, Node] = {}
 
+    def _visible(self, scope: AccessScope) -> builtins.list[Node]:
+        """The one visibility rule: live nodes the `scope` covers.
+
+        Nodes with no owner are visible only under `everyone()`.
+        """
+        return [
+            node
+            for node in self._nodes.values()
+            if not node.is_deleted and scope.covers(node.owner_id)
+        ]
+
     async def add(self, node: Node) -> None:
         """Add a new node."""
         self._nodes[node.id] = node
@@ -57,16 +69,14 @@ class InMemoryNodeRepository:
         """Persist changes to an existing node."""
         self._nodes[node.id] = node
 
-    async def get(self, node_id: uuid.UUID) -> Node | None:
-        """Return the node with `node_id`, or `None` if missing or deleted."""
-        node = self._nodes.get(node_id)
-        if node is None or node.is_deleted:
-            return None
-        return node
+    async def get(self, node_id: uuid.UUID, *, scope: AccessScope) -> Node | None:
+        """Return the node with `node_id`, or `None` if missing, deleted or unseen."""
+        return next((n for n in self._visible(scope) if n.id == node_id), None)
 
     async def list(
         self,
         *,
+        scope: AccessScope,
         after: uuid.UUID | None,
         limit: int,
         type: str | None = None,
@@ -77,7 +87,7 @@ class InMemoryNodeRepository:
     ) -> list[Node]:
         """List non-deleted node ordered by id, starting after `after` if given."""
         ordered = sorted(
-            (node for node in self._nodes.values() if not node.is_deleted),
+            self._visible(scope),
             key=lambda node: node.id,
         )
         if ids is not None:
@@ -100,6 +110,7 @@ class InMemoryNodeRepository:
     async def count(
         self,
         *,
+        scope: AccessScope,
         type: str | None = None,
         q: str | None = None,
         favourite: bool | None = None,
@@ -107,7 +118,7 @@ class InMemoryNodeRepository:
         attribute_search_exclusions: Mapping[str, Sequence[str]] | None = None,
     ) -> int:
         """Return the total number of non-deleted nodes matching the given filters."""
-        nodes = [n for n in self._nodes.values() if not n.is_deleted]
+        nodes = self._visible(scope)
         if ids is not None:
             nodes = [n for n in nodes if n.id in ids]
         if type is not None:
@@ -121,10 +132,10 @@ class InMemoryNodeRepository:
             nodes = [n for n in nodes if n.favourite == favourite]
         return len(nodes)
 
-    async def clear_type(self, type_slug: str) -> None:
+    async def clear_type(self, type_slug: str, *, scope: AccessScope) -> None:
         """Set `type` to None on all non-deleted nodes if type matches `type_slug`."""
-        for node in self._nodes.values():
-            if not node.is_deleted and node.type == type_slug:
+        for node in self._visible(scope):
+            if node.type == type_slug:
                 node.type = None
 
     def _with_attribute(
@@ -132,11 +143,12 @@ class InMemoryNodeRepository:
         type_slug: str,
         key: str,
         *,
+        scope: AccessScope,
         sub_key: str | None = None,
         value: str | None = None,
     ) -> builtins.list[Node]:
         def matches(node: Node) -> bool:
-            if node.is_deleted or node.type != type_slug or key not in node.attributes:
+            if node.type != type_slug or key not in node.attributes:
                 return False
             if sub_key is None:
                 held = node.attributes[key]
@@ -154,7 +166,7 @@ class InMemoryNodeRepository:
             )
 
         return sorted(
-            (node for node in self._nodes.values() if matches(node)),
+            (node for node in self._visible(scope) if matches(node)),
             key=lambda node: node.id,
         )
 
@@ -163,23 +175,29 @@ class InMemoryNodeRepository:
         type_slug: str,
         key: str,
         *,
+        scope: AccessScope,
         sub_key: str | None = None,
         value: str | None = None,
     ) -> int:
         """Count non-deleted nodes of `type_slug` whose attributes contain `key`."""
-        return len(self._with_attribute(type_slug, key, sub_key=sub_key, value=value))
+        return len(
+            self._with_attribute(
+                type_slug, key, scope=scope, sub_key=sub_key, value=value
+            )
+        )
 
     async def list_with_attribute(
         self,
         type_slug: str,
         key: str,
         *,
+        scope: AccessScope,
         sub_key: str | None = None,
         after: uuid.UUID | None,
         limit: int,
     ) -> builtins.list[Node]:
         """List non-deleted nodes of `type_slug` holding `key`, ordered by id."""
-        nodes = self._with_attribute(type_slug, key, sub_key=sub_key)
+        nodes = self._with_attribute(type_slug, key, scope=scope, sub_key=sub_key)
         if after is not None:
             nodes = [node for node in nodes if node.id > after]
         return nodes[:limit]
@@ -189,13 +207,14 @@ class InMemoryNodeRepository:
         type_slug: str,
         key: str,
         *,
+        scope: AccessScope,
         q: str | None = None,
         limit: int = 20,
     ) -> builtins.list[tuple[str, int]]:
         """Distinct string values of `key` on non-deleted nodes of `type_slug`."""
         counts: dict[str, int] = {}
-        for node in self._nodes.values():
-            if node.is_deleted or node.type != type_slug:
+        for node in self._visible(scope):
+            if node.type != type_slug:
                 continue
             value = node.attributes.get(key)
             if not isinstance(value, str):
@@ -206,3 +225,16 @@ class InMemoryNodeRepository:
             counts = {v: c for v, c in counts.items() if needle in _fold(v)}
         ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
         return ordered[:limit]
+
+    async def claim_orphaned(
+        self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
+    ) -> int:
+        """Give `owner_id` every node with no owner or a legacy owner."""
+        claimed = [
+            row
+            for row in self._nodes.values()
+            if row.owner_id is None or row.owner_id in legacy_owner_ids
+        ]
+        for row in claimed:
+            row.owner_id = owner_id
+        return len(claimed)

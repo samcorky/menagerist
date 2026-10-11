@@ -10,6 +10,7 @@ from app.modules.collections.domain.collection import (
     CollectionKind,
     Visibility,
 )
+from app.platform.orm_mixins import claim_rows, owned_by
 from app.shared_kernel.errors import ConflictError
 from app.shared_kernel.slug import Slug
 
@@ -19,6 +20,8 @@ if TYPE_CHECKING:
     from sqlalchemy import ColumnElement
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm import InstrumentedAttribute
+
+    from app.shared_kernel.access_scope import AccessScope
 
 logger = structlog.get_logger()
 
@@ -39,6 +42,13 @@ def _unaccent_ilike(
 ) -> ColumnElement[bool]:
     """Case- and accent-insensitive LIKE of `column_` against an escaped `pattern`."""
     return func.unaccent(column_).ilike(func.unaccent(pattern), escape=_LIKE_ESCAPE)
+
+
+def _in_scope(scope: AccessScope) -> ColumnElement[bool]:
+    """Live collections whose owner is inside `scope`."""
+    return CollectionModel.deleted_at.is_(None) & owned_by(
+        CollectionModel, scope.user_id
+    )
 
 
 def _to_domain(model: CollectionModel) -> Collection:
@@ -83,7 +93,7 @@ class SqlAlchemyCollectionRepository:
         """Add a new collection.
 
         Raises:
-            ConflictError: If a live collection already uses the slug.
+            ConflictError: If a live collection of the same owner uses the slug.
         """
         logger.debug("adding collection", collection_id=collection.id)
         try:
@@ -101,32 +111,46 @@ class SqlAlchemyCollectionRepository:
         await self._session.merge(_to_model(collection))
         await self._session.flush()
 
-    async def get(self, collection_id: uuid.UUID) -> Collection | None:
-        """Return the live collection with `collection_id`, or `None`."""
-        model = await self._session.get(CollectionModel, collection_id)
-        if model is None or model.deleted_at is not None:
-            return None
-        return _to_domain(model)
-
-    async def get_by_slug(self, slug: str) -> Collection | None:
-        """Return the live collection with `slug`, or `None`."""
+    async def get(
+        self, collection_id: uuid.UUID, *, scope: AccessScope
+    ) -> Collection | None:
+        """Return the live collection with `collection_id` in `scope`, or `None`."""
         stmt = select(CollectionModel).where(
-            CollectionModel.slug == slug, CollectionModel.deleted_at.is_(None)
+            _in_scope(scope), CollectionModel.id == collection_id
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return None if model is None else _to_domain(model)
+
+    async def get_by_slug(self, slug: str, *, scope: AccessScope) -> Collection | None:
+        """Return the live collection with `slug` in `scope`, or `None`.
+
+        Slugs are unique per owner, so under `everyone()` the lowest id wins.
+        """
+        stmt = (
+            select(CollectionModel)
+            .where(_in_scope(scope), CollectionModel.slug == slug)
+            .order_by(CollectionModel.id)
+            .limit(1)
         )
         model = (await self._session.execute(stmt)).scalar_one_or_none()
         return None if model is None else _to_domain(model)
 
     async def list(
-        self, *, after: uuid.UUID | None, limit: int, q: str | None = None
+        self,
+        *,
+        scope: AccessScope,
+        after: uuid.UUID | None,
+        limit: int,
+        q: str | None = None,
     ) -> list[Collection]:
-        """Return up to `limit` live collections ordered by id, after `after`.
+        """Return up to `limit` live collections in `scope`, ordered by id.
 
         A non-blank `q` keeps collections whose name or description contains it,
         ignoring case and accents.
         """
         stmt = (
             select(CollectionModel)
-            .where(CollectionModel.deleted_at.is_(None))
+            .where(_in_scope(scope))
             .order_by(CollectionModel.id)
             .limit(limit)
         )
@@ -140,3 +164,11 @@ class SqlAlchemyCollectionRepository:
                 | _unaccent_ilike(CollectionModel.description, pattern)
             )
         return [_to_domain(m) for m in (await self._session.execute(stmt)).scalars()]
+
+    async def claim_orphaned(
+        self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
+    ) -> int:
+        """Give `owner_id` every collection with no owner or a legacy owner."""
+        return await claim_rows(
+            self._session, CollectionModel, owner_id, legacy_owner_ids
+        )

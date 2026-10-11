@@ -2,11 +2,17 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from app.modules.examples.domain.errors import InvalidInstallationStateError
-from app.modules.examples.domain.installation import EntityRecord, Outcome
+from app.modules.examples.domain.installation import (
+    EntityKind,
+    EntityRecord,
+    Installation,
+    Outcome,
+)
 
 KEEP_EDITED = "edited"
 KEEP_USER_DATA = "has your connections, files or collections"
 KEEP_IN_USE = "still in use"
+KEEP_SHARED = "still used by other people's examples"
 
 
 class Action(StrEnum):
@@ -23,6 +29,27 @@ class RemovalDecision:
 
     action: Action
     reason: str | None = None
+
+
+SHARED_TYPE_KINDS = frozenset({EntityKind.ITEM_TYPE, EntityKind.RELATIONSHIP_TYPE})
+
+
+def holds_shared_type(installation: Installation, record: EntityRecord) -> bool:
+    """Whether `installation` still stands behind the type `record` describes.
+
+    True for a type an active installation owns, and for one a removed installation
+    left for other people's content (kept as shared or in use). Item and
+    relationship types are shared structure, so other people's installs of the
+    same pack may reuse these.
+    """
+    if record.kind not in SHARED_TYPE_KINDS:
+        return False
+    if record.outcome is Outcome.OWNED:
+        return installation.is_active
+    return record.outcome is Outcome.KEPT and record.reason in (
+        KEEP_SHARED,
+        KEEP_IN_USE,
+    )
 
 
 def decide_removal(

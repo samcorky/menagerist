@@ -19,6 +19,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from app.modules.graph.adapters.persistence.models import NodeModel
 from app.modules.graph.domain.node import Node
+from app.platform.orm_mixins import claim_rows, owned_by
 
 if TYPE_CHECKING:
     import builtins
@@ -29,6 +30,8 @@ if TYPE_CHECKING:
     from sqlalchemy import ColumnElement, SQLColumnExpression
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from app.shared_kernel.access_scope import AccessScope
+
 logger = structlog.get_logger()
 
 
@@ -36,6 +39,7 @@ def _to_domain(model: NodeModel) -> Node:
     """Convert an ORM row into the domain entity."""
     return Node(
         id=model.id,
+        owner_id=model.owner_id,
         name=model.name,
         type=model.type,
         description=model.description,
@@ -53,6 +57,7 @@ def _to_model(node: Node) -> NodeModel:
     """Convert a domain entity into its ORM row."""
     return NodeModel(
         id=node.id,
+        owner_id=node.owner_id,
         name=node.name,
         type=node.type,
         description=node.description,
@@ -146,6 +151,14 @@ def _search_clause(
     )
 
 
+def _in_scope(scope: AccessScope) -> ColumnElement[bool]:
+    """The one visibility predicate: live rows the `scope` covers.
+
+    Rows with no owner are visible only under `everyone()`.
+    """
+    return and_(NodeModel.deleted_at.is_(None), owned_by(NodeModel, scope.user_id))
+
+
 class SqlAlchemyNodeRepository:
     """Postgres-backed `NodeRepository`, scoped to a single session/transaction."""
 
@@ -169,17 +182,19 @@ class SqlAlchemyNodeRepository:
         await self._session.merge(_to_model(node))
         await self._session.flush()
 
-    async def get(self, node_id: uuid.UUID) -> Node | None:
-        """Return the node with `node_id`, or `None` if missing or deleted."""
+    async def get(self, node_id: uuid.UUID, *, scope: AccessScope) -> Node | None:
+        """Return the node with `node_id`, or `None` if missing, deleted or unseen."""
         logger.debug("fetching node", node_id=node_id)
-        model = await self._session.get(NodeModel, node_id)
-        if model is None or model.deleted_at is not None:
-            return None
-        return _to_domain(model)
+        result = await self._session.execute(
+            select(NodeModel).where(_in_scope(scope), NodeModel.id == node_id)
+        )
+        model = result.scalar_one_or_none()
+        return None if model is None else _to_domain(model)
 
     async def list(
         self,
         *,
+        scope: AccessScope,
         after: uuid.UUID | None,
         limit: int,
         type: str | None = None,
@@ -194,7 +209,7 @@ class SqlAlchemyNodeRepository:
             return []
         stmt = (
             select(NodeModel)
-            .where(NodeModel.deleted_at.is_(None))
+            .where(_in_scope(scope))
             .order_by(NodeModel.id)
             .limit(limit)
         )
@@ -214,6 +229,7 @@ class SqlAlchemyNodeRepository:
     async def count(
         self,
         *,
+        scope: AccessScope,
         type: str | None = None,
         q: str | None = None,
         favourite: bool | None = None,
@@ -224,11 +240,7 @@ class SqlAlchemyNodeRepository:
         logger.debug("counting nodes", type=type)
         if ids is not None and not ids:
             return 0
-        stmt = (
-            select(func.count())
-            .select_from(NodeModel)
-            .where(NodeModel.deleted_at.is_(None))
-        )
+        stmt = select(func.count()).select_from(NodeModel).where(_in_scope(scope))
         if ids is not None:
             stmt = stmt.where(NodeModel.id.in_(ids))
         if type is not None:
@@ -240,12 +252,12 @@ class SqlAlchemyNodeRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
-    async def clear_type(self, type_slug: str) -> None:
+    async def clear_type(self, type_slug: str, *, scope: AccessScope) -> None:
         """Set `type` to NULL on all non-deleted nodes if type matches `type_slug`."""
         logger.debug("clearing node type", type_slug=type_slug)
         stmt = (
             update(NodeModel)
-            .where(NodeModel.deleted_at.is_(None), NodeModel.type == type_slug)
+            .where(_in_scope(scope), NodeModel.type == type_slug)
             .values(type=None)
         )
         await self._session.execute(stmt)
@@ -256,6 +268,7 @@ class SqlAlchemyNodeRepository:
         type_slug: str,
         key: str,
         *,
+        scope: AccessScope,
         sub_key: str | None = None,
         value: str | None = None,
     ) -> int:
@@ -264,7 +277,7 @@ class SqlAlchemyNodeRepository:
         stmt = (
             select(func.count())
             .select_from(NodeModel)
-            .where(NodeModel.deleted_at.is_(None), NodeModel.type == type_slug)
+            .where(_in_scope(scope), NodeModel.type == type_slug)
         )
         if sub_key is None:
             stmt = stmt.where(NodeModel.attributes.has_key(key))
@@ -288,15 +301,14 @@ class SqlAlchemyNodeRepository:
         type_slug: str,
         key: str,
         *,
+        scope: AccessScope,
         sub_key: str | None = None,
         after: uuid.UUID | None,
         limit: int,
     ) -> builtins.list[Node]:
         """List non-deleted nodes of `type_slug` holding `key`, ordered by id."""
         logger.debug("listing nodes with attribute", type_slug=type_slug, key=key)
-        stmt = select(NodeModel).where(
-            NodeModel.deleted_at.is_(None), NodeModel.type == type_slug
-        )
+        stmt = select(NodeModel).where(_in_scope(scope), NodeModel.type == type_slug)
         if sub_key is None:
             stmt = stmt.where(NodeModel.attributes.has_key(key))
         else:
@@ -314,6 +326,7 @@ class SqlAlchemyNodeRepository:
         type_slug: str,
         key: str,
         *,
+        scope: AccessScope,
         q: str | None = None,
         limit: int = 20,
     ) -> builtins.list[tuple[str, int]]:
@@ -324,7 +337,7 @@ class SqlAlchemyNodeRepository:
         stmt = (
             select(value, func.count())
             .where(
-                NodeModel.deleted_at.is_(None),
+                _in_scope(scope),
                 NodeModel.type == type_slug,
                 func.jsonb_typeof(raw_value) == "string",
             )
@@ -335,3 +348,9 @@ class SqlAlchemyNodeRepository:
         stmt = stmt.order_by(func.count().desc(), value.asc()).limit(limit)
         result = await self._session.execute(stmt)
         return [(row[0], row[1]) for row in result.all()]
+
+    async def claim_orphaned(
+        self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
+    ) -> int:
+        """Give `owner_id` every node with no owner or a legacy owner."""
+        return await claim_rows(self._session, NodeModel, owner_id, legacy_owner_ids)

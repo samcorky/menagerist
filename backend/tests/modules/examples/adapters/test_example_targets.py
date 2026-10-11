@@ -9,6 +9,7 @@ from app.modules.examples.ports.pack_targets import Created, RemoveResult
 from app.modules.graph.domain.edge import Edge
 from app.modules.media.domain.media_attachment import MediaAttachment
 from app.modules.presets.domain.preset import Preset
+from app.shared_kernel.access_scope import AccessScope
 
 if TYPE_CHECKING:
     from tests.modules.examples.conftest import MakeWorld, SamplePack, World
@@ -81,7 +82,9 @@ async def test_item_content_ignores_favourite_but_not_edits(
     """Starring an item leaves its content alone; renaming it changes it."""
     world = make_world()
     _, _, _, blue, *_ = await _install_all(world, sample_pack)
-    node = await world.graph_repos.nodes.get(blue.entity_id)
+    node = await world.graph_repos.nodes.get(
+        blue.entity_id, scope=AccessScope.everyone()
+    )
     assert node is not None
 
     node.favourite = True
@@ -109,7 +112,12 @@ async def test_a_user_connection_counts_as_user_data(
     assert clean.has_user_data is False
 
     await world.graph_repos.edges.add(
-        Edge.create(source_id=blue.entity_id, target_id=uuid.uuid7(), type="mine")
+        Edge.create(
+            owner_id=world.actor.id,
+            source_id=blue.entity_id,
+            target_id=uuid.uuid7(),
+            type="mine",
+        )
     )
     touched = await world.graph.inspect(EntityKind.ITEM, blue.entity_id)
     assert touched is not None
@@ -372,7 +380,9 @@ async def test_content_does_not_alias_the_stored_entity(
     """Editing a stored item in place does not change content captured earlier."""
     world = make_world()
     _, _, _, blue, *_ = await _install_all(world, sample_pack)
-    node = await world.graph_repos.nodes.get(blue.entity_id)
+    node = await world.graph_repos.nodes.get(
+        blue.entity_id, scope=AccessScope.everyone()
+    )
     assert node is not None
 
     node.attributes["condition"] = "Good"

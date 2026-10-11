@@ -1,5 +1,6 @@
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -16,6 +17,7 @@ from app.modules.graph.application.create_node import CreateNode, CreateNodeComm
 from app.modules.graph.domain.errors import InvalidAttributesError, InvalidSchemaError
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -33,14 +35,14 @@ def _make_uow() -> tuple[InMemoryUnitOfWork[GraphRepos], GraphRepos]:
 async def test_create_node_persists_and_commits() -> None:
     """CreateNode adds the node to the repository and commits the unit of work."""
     uow, repos = _make_uow()
-    use_case = CreateNode(uow)
+    use_case = CreateNode(uow, OwnerAccessPolicy())
 
     node = await use_case.handle(
         CreateNodeCommand(name="Alien", type="film", attributes={"title": "Alien"}),
         SYSTEM_ACTOR,
     )
 
-    assert await repos.nodes.get(node.id) is node
+    assert await repos.nodes.get(node.id, scope=AccessScope.everyone()) is node
     assert uow.committed is True
 
 
@@ -56,7 +58,7 @@ async def test_create_node_validates_attributes_against_schema() -> None:
     await repos.node_types.add(
         NodeType.create(slug="film", label="Film", attributes_schema=schema)
     )
-    use_case = CreateNode(uow)
+    use_case = CreateNode(uow, OwnerAccessPolicy())
 
     with pytest.raises(InvalidAttributesError):
         await use_case.handle(
@@ -79,7 +81,7 @@ async def test_create_node_passes_valid_attributes() -> None:
     await repos.node_types.add(
         NodeType.create(slug="film", label="Film", attributes_schema=schema)
     )
-    use_case = CreateNode(uow)
+    use_case = CreateNode(uow, OwnerAccessPolicy())
 
     node = await use_case.handle(
         CreateNodeCommand(name="Alien", type="film", attributes={"year": 1979}),
@@ -102,7 +104,7 @@ async def test_create_node_ignores_required_in_schema() -> None:
     await repos.node_types.add(
         NodeType.create(slug="film", label="Film", attributes_schema=schema)
     )
-    use_case = CreateNode(uow)
+    use_case = CreateNode(uow, OwnerAccessPolicy())
 
     node = await use_case.handle(
         CreateNodeCommand(name="Alien", type="film", attributes={}),
@@ -115,7 +117,7 @@ async def test_create_node_ignores_required_in_schema() -> None:
 async def test_create_node_validates_attributes_against_an_extra_schema() -> None:
     """A per-item overlay field is validated even without a node type schema."""
     uow, _ = _make_uow()
-    use_case = CreateNode(uow)
+    use_case = CreateNode(uow, OwnerAccessPolicy())
 
     with pytest.raises(InvalidAttributesError):
         await use_case.handle(
@@ -144,7 +146,7 @@ async def test_create_node_merges_type_schema_and_extra_schema() -> None:
             },
         )
     )
-    use_case = CreateNode(uow)
+    use_case = CreateNode(uow, OwnerAccessPolicy())
 
     node = await use_case.handle(
         CreateNodeCommand(
@@ -179,7 +181,7 @@ async def test_create_node_rejects_extra_schema_redefining_a_type_field() -> Non
             },
         )
     )
-    use_case = CreateNode(uow)
+    use_case = CreateNode(uow, OwnerAccessPolicy())
 
     with pytest.raises(InvalidSchemaError):
         await use_case.handle(
@@ -199,7 +201,7 @@ async def test_create_node_rejects_extra_schema_redefining_a_type_field() -> Non
 async def test_create_node_rejects_a_malformed_extra_schema() -> None:
     """An invalid JSON Schema in `extra_schema` is rejected before anything is saved."""
     uow, repos = _make_uow()
-    use_case = CreateNode(uow)
+    use_case = CreateNode(uow, OwnerAccessPolicy())
 
     with pytest.raises(InvalidSchemaError):
         await use_case.handle(
@@ -211,4 +213,9 @@ async def test_create_node_rejects_a_malformed_extra_schema() -> None:
             SYSTEM_ACTOR,
         )
 
-    assert await repos.nodes.count() == 0
+    assert (
+        await repos.nodes.count(
+            scope=AccessScope.everyone(),
+        )
+        == 0
+    )

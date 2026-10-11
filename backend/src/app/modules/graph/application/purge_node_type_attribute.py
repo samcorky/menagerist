@@ -4,9 +4,11 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.cqrs import AuthorisedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -42,9 +44,13 @@ def _purged_attributes(
 
 
 class PurgeNodeTypeAttribute(
-    CommandHandler[GraphUnitOfWork, PurgeNodeTypeAttributeCommand, int]
+    AuthorisedCommandHandler[
+        GraphUnitOfWork, PurgeNodeTypeAttributeCommand, int, GraphPermission
+    ]
 ):
-    """Remove an attribute key from every node of a node type.
+    """Remove an attribute key from every node of a node type (administrators only).
+
+    The purge spans every person's items.
 
     With `sub_key`, `key` names a group (array-of-objects) property and only
     `sub_key` is removed from each row, leaving the rest of the row and the
@@ -55,7 +61,11 @@ class PurgeNodeTypeAttribute(
     save instead of writing the purged value back.
     """
 
-    async def handle(self, command: PurgeNodeTypeAttributeCommand, actor: Actor) -> int:
+    required_permission = GraphPermission.PURGE_NODE_TYPE_ATTRIBUTE
+
+    async def _handle(
+        self, command: PurgeNodeTypeAttributeCommand, actor: Actor
+    ) -> int:
         """Purge the key and return how many nodes held it."""
         purged = 0
         async with self._uow as repos:
@@ -66,9 +76,11 @@ class PurgeNodeTypeAttribute(
                 )
             slug = str(node_type.slug)
             after: uuid.UUID | None = None
+            # admin-wide: affects every user's content
             while page := await repos.nodes.list_with_attribute(
                 slug,
                 command.key,
+                scope=AccessScope.everyone(),
                 sub_key=command.sub_key,
                 after=after,
                 limit=_PAGE_SIZE,

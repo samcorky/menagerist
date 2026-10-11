@@ -5,6 +5,8 @@ from app.modules.media.adapters.persistence.in_memory_media_asset_repository imp
     InMemoryMediaAssetRepository,
 )
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
+from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
 def _make_asset(**kwargs: object) -> MediaAsset:
@@ -15,7 +17,7 @@ def _make_asset(**kwargs: object) -> MediaAsset:
         "sha256": "abc",
     }
     defaults.update(kwargs)
-    return MediaAsset.create(**defaults)  # type: ignore[arg-type]
+    return MediaAsset.create(owner_id=SYSTEM_ACTOR.id, **defaults)  # type: ignore[arg-type]
 
 
 async def test_add_and_get_round_trips() -> None:
@@ -25,14 +27,14 @@ async def test_add_and_get_round_trips() -> None:
 
     await repo.add(asset)
 
-    assert await repo.get(asset.id) is asset
+    assert await repo.get(asset.id, scope=AccessScope.everyone()) is asset
 
 
 async def test_get_returns_none_for_missing_id() -> None:
     """get() returns None for an id that was never added."""
     repo = InMemoryMediaAssetRepository()
 
-    assert await repo.get(uuid.uuid4()) is None
+    assert await repo.get(uuid.uuid4(), scope=AccessScope.everyone()) is None
 
 
 async def test_save_overwrites_existing_record() -> None:
@@ -44,7 +46,7 @@ async def test_save_overwrites_existing_record() -> None:
     asset.promote()
     await repo.save(asset)
 
-    result = await repo.get(asset.id)
+    result = await repo.get(asset.id, scope=AccessScope.everyone())
     assert result is not None
     assert result.status is MediaStatus.ATTACHED
 
@@ -57,7 +59,7 @@ async def test_delete_removes_the_record() -> None:
 
     await repo.delete(asset.id)
 
-    assert await repo.get(asset.id) is None
+    assert await repo.get(asset.id, scope=AccessScope.everyone()) is None
 
 
 async def test_delete_is_idempotent() -> None:
@@ -78,7 +80,9 @@ async def test_list_expired_returns_assets_with_matching_status_before_cutoff() 
     await repo.add(fresh_asset)
 
     cutoff = datetime.now(UTC) - timedelta(hours=24)
-    result = await repo.list_expired(status=MediaStatus.STAGED, before=cutoff)
+    result = await repo.list_expired(
+        status=MediaStatus.STAGED, before=cutoff, scope=AccessScope.everyone()
+    )
 
     assert old_asset in result
     assert fresh_asset not in result
@@ -94,7 +98,9 @@ async def test_list_by_status_returns_only_matching_assets() -> None:
     attached.promote()
     await repo.add(attached)
 
-    result = await repo.list_by_status(status=MediaStatus.ATTACHED)
+    result = await repo.list_by_status(
+        status=MediaStatus.ATTACHED, scope=AccessScope.everyone()
+    )
 
     assert attached in result
     assert staged not in result
@@ -113,7 +119,9 @@ async def test_list_expired_filters_by_status() -> None:
     await repo.add(attached)
 
     cutoff = datetime.now(UTC)
-    result = await repo.list_expired(status=MediaStatus.STAGED, before=cutoff)
+    result = await repo.list_expired(
+        status=MediaStatus.STAGED, before=cutoff, scope=AccessScope.everyone()
+    )
 
     assert staged in result
     assert attached not in result

@@ -1,10 +1,12 @@
 import asyncio
+import uuid
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
+from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.entrypoints.api.shared.example_targets import (
     get_collection_pack_target,
     get_cover_pack_target,
@@ -25,12 +27,17 @@ from app.modules.examples.domain.pack import (
 )
 from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.modules.graph.domain.node_type import NodeType
+from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.actor import Actor
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
 
     from app.modules.graph.domain.node import Node
     from tests.modules.examples.conftest import MakeWorld, SamplePack, World
+
+
+USER_A = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
 
 
 def _client(world: World, *, raise_server_exceptions: bool = True) -> TestClient:
@@ -44,6 +51,7 @@ def _client(world: World, *, raise_server_exceptions: bool = True) -> TestClient
     app.dependency_overrides[get_graph_pack_target] = lambda: world.graph
     app.dependency_overrides[get_collection_pack_target] = lambda: world.collections
     app.dependency_overrides[get_cover_pack_target] = lambda: world.covers
+    app.dependency_overrides[get_current_actor] = lambda: world.actor
     return TestClient(app, raise_server_exceptions=raise_server_exceptions)
 
 
@@ -146,7 +154,9 @@ def test_uninstall_reports_kept_entities(make_world: MakeWorld) -> None:
 
 
 async def _blue(world: World) -> Node:
-    nodes = await world.graph_repos.nodes.list(after=None, limit=10)
+    nodes = await world.graph_repos.nodes.list(
+        scope=AccessScope.everyone(), after=None, limit=10
+    )
     return next(n for n in nodes if n.name == "Blue")
 
 
@@ -328,7 +338,7 @@ def test_half_added_add_on_counts_as_dependant_and_blocks_removal(
     world = _add_on_world(make_world, sample_pack)
     client = _client(world)
     client.put("/api/v1/example/base/installation")
-    asyncio.run(world.installations.add(Installation.start("extras")))
+    asyncio.run(world.installations.add(Installation.start("extras", USER_A.id)))
 
     listed = {p["id"]: p for p in client.get("/api/v1/example").json()}
     blocked = client.delete("/api/v1/example/base/installation")

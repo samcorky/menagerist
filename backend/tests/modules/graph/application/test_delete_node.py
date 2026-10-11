@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -21,13 +22,14 @@ from app.modules.graph.application.delete_node import DeleteNode, DeleteNodeComm
 from app.modules.graph.domain.errors import NodeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
 async def test_delete_node_soft_deletes_and_commits() -> None:
     """DeleteNode soft-deletes the node and commits the unit of work."""
     repository = InMemoryNodeRepository()
-    node = Node.create(name="Alien", type="film")
+    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
     await repository.add(node)
     repos = GraphRepos(
         nodes=repository,
@@ -36,11 +38,11 @@ async def test_delete_node_soft_deletes_and_commits() -> None:
         edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = create_in_memory_graph_uow(repos)
-    use_case = DeleteNode(uow)
+    use_case = DeleteNode(uow, OwnerAccessPolicy())
 
     await use_case.handle(DeleteNodeCommand(node_id=node.id), SYSTEM_ACTOR)
 
-    assert await repos.nodes.get(node.id) is None
+    assert await repos.nodes.get(node.id, scope=AccessScope.everyone()) is None
 
 
 async def test_delete_node_raises_when_missing() -> None:
@@ -52,7 +54,7 @@ async def test_delete_node_raises_when_missing() -> None:
         edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = create_in_memory_graph_uow(repos)
-    use_case = DeleteNode(uow)
+    use_case = DeleteNode(uow, OwnerAccessPolicy())
 
     with pytest.raises(NodeNotFoundError):
         await use_case.handle(DeleteNodeCommand(node_id=uuid.uuid4()), SYSTEM_ACTOR)

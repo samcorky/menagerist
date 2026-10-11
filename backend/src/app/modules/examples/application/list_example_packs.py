@@ -6,9 +6,10 @@ from app.modules.examples.domain.installation import Installation
 from app.modules.examples.domain.pack import PackSummary
 from app.modules.examples.ports.pack_catalogue import PackCatalogue  # noqa: TC001
 from app.modules.examples.ports.unit_of_work import ExampleRepos
-from app.shared_kernel.cqrs import QueryHandler
+from app.shared_kernel.cqrs import ScopedQueryHandler
 
 if TYPE_CHECKING:
+    from app.shared_kernel.access_policy import AccessPolicy
     from app.shared_kernel.actor import Actor
 
 
@@ -28,13 +29,15 @@ class ExamplePackStatus:
 
 
 class ListExamplePacks(
-    QueryHandler[ExampleRepos, ListExamplePacksQuery, list[ExamplePackStatus]]
+    ScopedQueryHandler[ExampleRepos, ListExamplePacksQuery, list[ExamplePackStatus]]
 ):
     """List the shipped packs and which of them are installed."""
 
-    def __init__(self, repos: ExampleRepos, catalogue: PackCatalogue) -> None:
-        """Initialise with the example repositories and the pack catalogue."""
-        super().__init__(repos)
+    def __init__(
+        self, repos: ExampleRepos, policy: AccessPolicy, catalogue: PackCatalogue
+    ) -> None:
+        """Initialise with the repositories, access policy and pack catalogue."""
+        super().__init__(repos, policy)
         self._catalogue = catalogue
 
     async def handle(
@@ -44,10 +47,13 @@ class ListExamplePacks(
     ) -> list[ExamplePackStatus]:
         """Return one status per shipped pack, in catalogue order.
 
-        `required_by` holds the installed add-ons (a half-finished installation
-        counts) that need the pack.
+        Only the actor's own installations count. `required_by` holds the installed
+        add-ons (a half-finished installation counts) that need the pack.
         """
-        active = {i.pack_id: i for i in await self._repos.installations.list_active()}
+        installations = await self._repos.installations.list_active(
+            scope=self._policy.scope_for(actor)
+        )
+        active = {i.pack_id: i for i in installations}
         packs = await self._catalogue.list_packs()
         by_id = {s.id: s for s in packs}
         dependants = dependants_by_pack(packs, active.keys())

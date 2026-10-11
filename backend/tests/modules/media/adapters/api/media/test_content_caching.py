@@ -21,6 +21,7 @@ def _dummy_asset(
     dt = created_at or datetime(2026, 9, 10, 12, 0, 0, tzinfo=UTC)
     return MediaAsset(
         id=uuid.uuid4(),
+        owner_id=uuid.uuid4(),
         filename="test.jpg",
         content_type="image/jpeg",
         size=1024,

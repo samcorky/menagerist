@@ -6,11 +6,12 @@ import structlog
 
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.cqrs import ScopedCommandHandler
 
 if TYPE_CHECKING:
     from app.modules.media.domain.media_asset import MediaAsset
     from app.modules.media.ports.media_storage import MediaStoragePort
+    from app.shared_kernel.access_policy import AccessPolicy
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -23,11 +24,13 @@ class DeleteMediaCommand:
     asset_id: uuid.UUID
 
 
-class DeleteMedia(CommandHandler[MediaUnitOfWork, DeleteMediaCommand, None]):
+class DeleteMedia(ScopedCommandHandler[MediaUnitOfWork, DeleteMediaCommand, None]):
     """Hard-delete a media asset from both the database and storage."""
 
-    def __init__(self, uow: MediaUnitOfWork, storage: MediaStoragePort) -> None:
-        super().__init__(uow)
+    def __init__(
+        self, uow: MediaUnitOfWork, policy: AccessPolicy, storage: MediaStoragePort
+    ) -> None:
+        super().__init__(uow, policy)
         self._storage = storage
 
     async def handle(self, command: DeleteMediaCommand, actor: Actor) -> None:
@@ -38,12 +41,15 @@ class DeleteMedia(CommandHandler[MediaUnitOfWork, DeleteMediaCommand, None]):
         record) and will not be picked up by the cleanup job.
         """
         async with self._uow as repos:
-            maybe = await repos.assets.get(command.asset_id)
+            maybe = await repos.assets.get(
+                command.asset_id, scope=self._policy.scope_for(actor)
+            )
             if maybe is None:
                 raise MediaAssetNotFoundError(
                     f"Media asset {command.asset_id} not found"
                 )
             asset: MediaAsset = maybe
+            self._policy.assert_can_delete(actor, asset.owner_id)
             await repos.assets.delete(asset.id)
             await self._uow.commit()
         await self._storage.delete(asset.id, asset.status)

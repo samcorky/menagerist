@@ -38,7 +38,7 @@ MakeCollection = Callable[..., Collection]
 def _make_world() -> World:
     """Build a world with empty repositories and no live items."""
     collections = InMemoryCollectionRepository()
-    memberships = InMemoryMembershipRepository()
+    memberships = InMemoryMembershipRepository(collections)
     return World(
         collections=collections,
         memberships=memberships,

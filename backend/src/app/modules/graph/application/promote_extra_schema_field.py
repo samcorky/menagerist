@@ -16,7 +16,7 @@ from app.modules.graph.domain.errors import (
     NodeTypeNotFoundError,
 )
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.cqrs import ScopedCommandHandler
 from app.shared_kernel.unit_of_work import JoinedUnitOfWork
 
 if TYPE_CHECKING:
@@ -42,7 +42,7 @@ class PromoteExtraSchemaFieldCommand:
 
 
 class PromoteExtraSchemaField(
-    CommandHandler[GraphUnitOfWork, PromoteExtraSchemaFieldCommand, "Node"]
+    ScopedCommandHandler[GraphUnitOfWork, PromoteExtraSchemaFieldCommand, "Node"]
 ):
     """Move an overlay field definition onto the item type; its value is untouched.
 
@@ -60,9 +60,12 @@ class PromoteExtraSchemaField(
         async with self._uow as repos:
             joined = JoinedUnitOfWork(repos, owner=self._uow)
 
-            node = await repos.nodes.get(command.node_id)
+            node = await repos.nodes.get(
+                command.node_id, scope=self._policy.scope_for(actor)
+            )
             if node is None:
                 raise NodeNotFoundError(f"Node {command.node_id} not found")
+            self._policy.assert_can_modify(actor, node.owner_id)
             extra_properties: dict[str, Any] = (node.extra_schema or {}).get(
                 "properties"
             ) or {}
@@ -104,7 +107,7 @@ class PromoteExtraSchemaField(
 
             remaining = {k: v for k, v in extra_properties.items() if k != command.key}
             new_extra_schema = {**(node.extra_schema or {}), "properties": remaining}
-            updated_node = await UpdateNode(joined).handle(
+            updated_node = await UpdateNode(joined, self._policy).handle(
                 UpdateNodeCommand(
                     node_id=command.node_id, extra_schema=new_extra_schema
                 ),
