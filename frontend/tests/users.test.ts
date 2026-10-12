@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { isLocked, lastSignIn, lockedLabel } from '../src/lib/users';
+import { isLocked, lastSignIn, lockedLabel, renameDecision } from '../src/lib/users';
+import { DISPLAY_NAME_MAX_LENGTH, DISPLAY_NAME_MESSAGE } from '../src/lib/auth';
 
 const now = new Date('2026-10-11T12:00:00Z');
 
@@ -32,5 +33,25 @@ describe('lastSignIn', () => {
 		expect(result.text).toBe('about 3 hours ago');
 		expect(result.title).toBeTruthy();
 		expect(lastSignIn('2026-10-11T11:59:50Z', now).text).toBe('just now');
+	});
+});
+
+describe('renameDecision', () => {
+	it('does nothing when the trimmed name is unchanged', () => {
+		expect(renameDecision('Ada', '  Ada ')).toEqual({ kind: 'unchanged' });
+	});
+
+	it('rejects a blank or over-long name', () => {
+		expect(renameDecision('Ada', '   ')).toEqual({
+			kind: 'problem',
+			message: DISPLAY_NAME_MESSAGE
+		});
+		expect(renameDecision('Ada', 'x'.repeat(DISPLAY_NAME_MAX_LENGTH + 1))).toMatchObject({
+			kind: 'problem'
+		});
+	});
+
+	it('returns the trimmed name to save', () => {
+		expect(renameDecision('Ada', '  Grace ')).toEqual({ kind: 'save', name: 'Grace' });
 	});
 });

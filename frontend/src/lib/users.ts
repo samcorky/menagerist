@@ -1,4 +1,5 @@
 import { formatDateTime, formatRelativeTime } from '$lib/format-date';
+import { displayNameProblem } from '$lib/auth';
 
 /** Whether a sign-in lockout is still running at `now`. */
 export function isLocked(lockedUntil: string | null | undefined, now: Date = new Date()): boolean {
@@ -22,4 +23,15 @@ export function lastSignIn(
 	if (!value) return { text: 'Never' };
 	if (isNaN(new Date(value).getTime())) return { text: 'Never' };
 	return { text: formatRelativeTime(value, now), title: formatDateTime(value).local };
+}
+
+/** What saving an edited display name should do: nothing, show a problem, or send the trimmed name. */
+export function renameDecision(
+	current: string,
+	draft: string
+): { kind: 'unchanged' } | { kind: 'problem'; message: string } | { kind: 'save'; name: string } {
+	const name = draft.trim();
+	if (name === current) return { kind: 'unchanged' };
+	const message = displayNameProblem(name);
+	return message ? { kind: 'problem', message } : { kind: 'save', name };
 }

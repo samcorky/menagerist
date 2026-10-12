@@ -56,6 +56,70 @@ test('a display-name change shows in the user menu at once', async ({
 	await context.close();
 });
 
+test('an administrator renames another user from the users page', async ({
+	page,
+	workerBaseURL,
+	workerSession
+}) => {
+	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'renamed-by-admin' });
+	await adminApi.dispose();
+
+	await page.goto('/settings/users');
+	const row = userRow(page, user);
+	await row.getByRole('button', { name: `Edit display name for ${user.username}` }).click();
+	const field = row.getByRole('textbox', { name: `Display name for ${user.username}` });
+	await expect(field).toBeFocused();
+
+	const renamed = `Renamed by admin ${Date.now()}`;
+	await field.fill(renamed);
+	await field.press('Enter');
+	await expect(page.getByText('Name updated')).toBeVisible();
+	await expect(row.getByText(renamed, { exact: true })).toBeVisible();
+	await expect(
+		row.getByRole('button', { name: `Edit display name for ${user.username}` })
+	).toBeFocused();
+
+	await page.reload();
+	await expect(userRow(page, user).getByText(renamed, { exact: true })).toBeVisible();
+});
+
+test('Escape cancels a rename without saving', async ({ page, workerBaseURL, workerSession }) => {
+	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'rename-escape' });
+	await adminApi.dispose();
+
+	await page.goto('/settings/users');
+	const row = userRow(page, user);
+	await row.getByRole('button', { name: `Edit display name for ${user.username}` }).click();
+	const field = row.getByRole('textbox', { name: `Display name for ${user.username}` });
+	await field.fill('Should not be saved');
+	await field.press('Escape');
+	await expect(field).toHaveCount(0);
+	await expect(row.getByText(user.displayName, { exact: true })).toBeVisible();
+	await page.reload();
+	await expect(userRow(page, user).getByText(user.displayName, { exact: true })).toBeVisible();
+});
+
+test('a blank name shows a message and keeps the editor open', async ({
+	page,
+	workerBaseURL,
+	workerSession
+}) => {
+	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'rename-blank' });
+	await adminApi.dispose();
+
+	await page.goto('/settings/users');
+	const row = userRow(page, user);
+	await row.getByRole('button', { name: `Edit display name for ${user.username}` }).click();
+	const field = row.getByRole('textbox', { name: `Display name for ${user.username}` });
+	await field.fill('   ');
+	await field.press('Enter');
+	await expect(row.getByRole('alert')).toContainText('A display name must be 1 to 120 characters.');
+	await expect(field).toBeVisible();
+});
+
 test('a disabled account sees why, and a wrong password stays generic', async ({
 	browser,
 	workerBaseURL,

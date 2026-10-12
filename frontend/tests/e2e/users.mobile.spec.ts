@@ -41,6 +41,30 @@ test('row actions are at least 44px tall', async ({ page, workerBaseURL, workerS
 	expect(select?.height ?? 0).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
 });
 
+test('the edit-name pencil is a full-size tap target and editing does not scroll sideways', async ({
+	page,
+	workerBaseURL,
+	workerSession
+}) => {
+	const user = await newUser(workerBaseURL, workerSession);
+	await page.goto('/settings/users');
+	const row = userRow(page, user);
+	const pencil = row.getByRole('button', { name: `Edit display name for ${user.username}` });
+	const box = await pencil.boundingBox();
+	expect(box?.width ?? 0).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
+	expect(box?.height ?? 0).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
+
+	await pencil.click();
+	const save = await row
+		.getByRole('button', { name: `Save display name for ${user.username}` })
+		.boundingBox();
+	expect(save?.height ?? 0).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
+	const overflow = await page.evaluate(
+		() => document.documentElement.scrollWidth - document.documentElement.clientWidth
+	);
+	expect(overflow).toBeLessThanOrEqual(0);
+});
+
 test('disabling asks first, and Cancel leaves the account alone', async ({
 	page,
 	workerBaseURL,

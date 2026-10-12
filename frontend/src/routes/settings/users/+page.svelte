@@ -1,7 +1,8 @@
 <script lang="ts">
 	import PasswordInput from '$lib/components/password-input.svelte';
 	import { resolve } from '$app/paths';
-	import { Copy, Check, KeyRound, LockOpen, Plus, Dices } from '@lucide/svelte';
+	import { Copy, Check, KeyRound, LockOpen, Plus, Dices, Pencil, X } from '@lucide/svelte';
+	import { tick } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import {
 		createUser,
@@ -14,8 +15,13 @@
 	} from '$lib/api/client';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { auth } from '$lib/auth.svelte.js';
-	import { generatePassword, PASSWORD_MIN_LENGTH } from '$lib/auth';
-	import { isLocked, lastSignIn, lockedLabel } from '$lib/users';
+	import {
+		DISPLAY_NAME_MAX_LENGTH,
+		DISPLAY_NAME_MESSAGE,
+		generatePassword,
+		PASSWORD_MIN_LENGTH
+	} from '$lib/auth';
+	import { isLocked, lastSignIn, lockedLabel, renameDecision } from '$lib/users';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
@@ -138,6 +144,48 @@
 		const updated = result.data;
 		users = users.map((u) => (u.id === updated.id ? updated : u));
 		if (updated.id === auth.user?.id) await auth.refresh();
+	}
+
+	let editing = $state<{ id: string; draft: string; busy: boolean; error: string | null } | null>(
+		null
+	);
+
+	function startEdit(user: UserResponse) {
+		editing = { id: user.id, draft: user.display_name, busy: false, error: null };
+	}
+
+	async function stopEdit(id: string) {
+		editing = null;
+		await tick();
+		document.getElementById(`edit-name-${id}`)?.focus();
+	}
+
+	async function saveName(user: UserResponse) {
+		if (!editing || editing.id !== user.id || editing.busy) return;
+		const decision = renameDecision(user.display_name, editing.draft);
+		if (decision.kind === 'unchanged') return stopEdit(user.id);
+		if (decision.kind === 'problem') {
+			editing.error = decision.message;
+			return;
+		}
+		editing.busy = true;
+		editing.error = null;
+		const result = await updateUser({
+			path: { user_id: user.id },
+			body: { display_name: decision.name }
+		});
+		if (result.error || !result.data) {
+			if (!editing) return;
+			editing.busy = false;
+			editing.error =
+				result.response?.status === 422 ? DISPLAY_NAME_MESSAGE : errorMessage(result.error);
+			return;
+		}
+		const updated = result.data;
+		users = users.map((u) => (u.id === updated.id ? updated : u));
+		if (updated.id === auth.user?.id) await auth.refresh();
+		toast.success('Name updated');
+		await stopEdit(user.id);
 	}
 
 	async function confirmDisable() {
@@ -387,8 +435,78 @@
 						<li>
 							<Card.Root>
 								<Card.Content class="space-y-3">
+									{#if editing?.id === user.id}
+										<form
+											class="space-y-2"
+											onsubmit={(e) => {
+												e.preventDefault();
+												void saveName(user);
+											}}
+										>
+											<div class="flex items-center gap-2">
+												<Input
+													class="h-11 min-w-0 flex-1"
+													aria-label="Display name for {user.username}"
+													aria-invalid={editing.error ? true : undefined}
+													autocomplete="off"
+													maxlength={DISPLAY_NAME_MAX_LENGTH}
+													disabled={editing.busy}
+													bind:value={editing.draft}
+													onkeydown={(e) => {
+														if (e.key === 'Escape') {
+															e.preventDefault();
+															void stopEdit(user.id);
+														}
+													}}
+													{@attach (el: HTMLInputElement) => {
+														el.focus();
+														el.select();
+													}}
+												/>
+												<Button
+													type="submit"
+													size="icon"
+													class="size-11 shrink-0"
+													aria-label="Save display name for {user.username}"
+													disabled={editing.busy}
+												>
+													{#if editing.busy}<Spinner class="size-4" />{:else}<Check
+															class="size-4"
+														/>{/if}
+												</Button>
+												<Button
+													type="button"
+													variant="outline"
+													size="icon"
+													class="size-11 shrink-0"
+													aria-label="Cancel editing display name for {user.username}"
+													disabled={editing.busy}
+													onclick={() => void stopEdit(user.id)}
+												>
+													<X class="size-4" />
+												</Button>
+											</div>
+											{#if editing.error}
+												<p class="text-sm text-destructive" role="alert">{editing.error}</p>
+											{/if}
+										</form>
+									{/if}
 									<div class="flex flex-wrap items-center gap-2">
-										<p class="font-heading font-semibold">{user.display_name}</p>
+										{#if editing?.id !== user.id}
+											<p class="font-heading font-semibold">{user.display_name}</p>
+											{#if canUpdate}
+												<Button
+													id="edit-name-{user.id}"
+													variant="ghost"
+													size="icon"
+													class="size-11 shrink-0"
+													aria-label="Edit display name for {user.username}"
+													onclick={() => startEdit(user)}
+												>
+													<Pencil class="size-4" />
+												</Button>
+											{/if}
+										{/if}
 										{#if isMe}<Badge variant="secondary">You</Badge>{/if}
 										{#if user.disabled}<Badge variant="outline">Disabled</Badge>{/if}
 										{#if locked && user.locked_until}
