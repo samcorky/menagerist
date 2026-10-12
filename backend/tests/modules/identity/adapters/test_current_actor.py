@@ -213,6 +213,26 @@ def test_public_routes_need_no_session(world: World) -> None:
     assert client.get("/api/version").status_code == 200
 
 
+@pytest.mark.parametrize("path", ["/api/version/detail", "/api/health/ready/detail"])
+async def test_diagnostic_detail_needs_a_session_then_the_permission(
+    world: World, make_user: MakeUser, path: str
+) -> None:
+    """Anonymous: 401. Member: 403. Administrator: 200 or 503 with detail."""
+    member = make_user("alice")
+    admin = make_user("bob", role=Role.ADMIN)
+    await world.users.add(member)
+    await world.users.add(admin)
+    anonymous = _client(world)
+    as_member = _client(world)
+    as_member.cookies.set(COOKIE, await _session_for(world, member.id))
+    as_admin = _client(world)
+    as_admin.cookies.set(COOKIE, await _session_for(world, admin.id))
+
+    assert anonymous.get(path).status_code == 401
+    assert as_member.get(path).status_code == 403
+    assert as_admin.get(path).status_code in {200, 503}
+
+
 REAL_ROUTE = "/api/v1/node-type"
 
 

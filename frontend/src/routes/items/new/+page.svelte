@@ -11,7 +11,7 @@
 		uploadAndAttachMedia,
 		type NodeTypeResponse
 	} from '$lib/api/client';
-	import { networkAwareError } from '$lib/api/errors';
+	import { networkAwareError, uploadErrorMessage } from '$lib/api/errors';
 	import { captureController, type StagedPhoto } from '$lib/capture.svelte.js';
 	import { rowsToAttributes, type AttributeRow } from '$lib/attribute-rows';
 	import AttributesEditor from '$lib/components/attributes-editor.svelte';
@@ -117,7 +117,7 @@
 				body: { target_type: 'node', target_id: result.data.id, attribute_key: 'cover' }
 			});
 		} else if (photo) {
-			await uploadAndAttachMedia({
+			const upload = await uploadAndAttachMedia({
 				body: {
 					file: photo,
 					target_type: 'node',
@@ -125,6 +125,9 @@
 					attribute_key: 'cover'
 				}
 			});
+			if (upload.error) {
+				toast.error("Couldn't add the photo", { description: uploadErrorMessage(upload) });
+			}
 		}
 		await goto(resolve('/items/[id]', { id: result.data.id }));
 	}

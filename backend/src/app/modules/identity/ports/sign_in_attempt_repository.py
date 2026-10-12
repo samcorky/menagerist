@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
     from datetime import datetime, timedelta
 
-    from app.modules.identity.domain.throttle import ThrottleKey
+    from app.modules.identity.domain.throttle import AttemptWindow, ThrottleKey
 
 
 class SignInAttemptRepository(Protocol):
@@ -18,8 +18,21 @@ class SignInAttemptRepository(Protocol):
 
     async def record_failure(
         self, key: ThrottleKey, *, limit: int, window: timedelta, now: datetime
+    ) -> AttemptWindow:
+        """Count one attempt atomically and return the counter after it.
+
+        Callers count before checking a password and release on success (see
+        `domain.throttle.after_failure`).
+        """
+        ...
+
+    async def release_attempt(
+        self, key: ThrottleKey, *, window_start: datetime, limit: int
     ) -> None:
-        """Count one failure atomically (see `domain.throttle.after_failure`)."""
+        """Give back one attempt counted in the window `window_start`.
+
+        A no-op if the key has none or its window has changed since.
+        """
         ...
 
     async def clear(self, key: ThrottleKey) -> None:

@@ -38,3 +38,15 @@ export function networkAwareError(result: { error?: unknown; response?: Response
 	}
 	return { title: "Couldn't complete this action", description: errorMessage(result.error) };
 }
+
+export const FILE_TOO_LARGE_MESSAGE = 'That file is too large.';
+
+/** A message for a failed upload: a plain size message for 413, otherwise the server's detail. */
+export function uploadErrorMessage(result: {
+	error?: unknown;
+	response?: Response | null;
+}): string {
+	if (!result.response) return 'You appear to be offline. Check your connection and try again.';
+	if (result.response.status === 413) return FILE_TOO_LARGE_MESSAGE;
+	return errorMessage(result.error);
+}

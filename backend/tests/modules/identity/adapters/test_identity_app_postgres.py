@@ -88,7 +88,7 @@ def test_create_admin_reset_password_and_list(
     _fresh_engine()
     create_admin(username="bob")
     _fresh_engine()
-    reset_password(username="bob")
+    reset_password(username="bob", from_settings=True)
     _fresh_engine()
     list_accounts()
 

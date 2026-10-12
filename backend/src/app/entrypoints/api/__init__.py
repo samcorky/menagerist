@@ -13,6 +13,7 @@ from app.entrypoints.api.shared.request_context_middleware import (
     RequestContextMiddleware,
 )
 from app.entrypoints.api.shared.security_headers import SecurityHeadersMiddleware
+from app.entrypoints.api.shared.upload_limit_middleware import UploadLimitMiddleware
 from app.entrypoints.api.shared.version_header import VersionHeaderMiddleware
 from app.entrypoints.api.spa import SpaStaticFiles
 from app.entrypoints.api.startup import lifespan
@@ -93,6 +94,8 @@ def create_app() -> FastAPI:
     if app_info.project.description:
         fastapi_app.summary = app_info.project.description
 
+    # Innermost, so a 413 still gets the security, version and CORS headers.
+    fastapi_app.add_middleware(UploadLimitMiddleware)
     # noinspection PyTypeChecker
     fastapi_app.add_middleware(SecurityHeadersMiddleware)
     # noinspection PyTypeChecker

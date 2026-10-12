@@ -20,7 +20,7 @@
 		updateMedia,
 		type NodeMediaItemResponse
 	} from '$lib/api/client';
-	import { errorMessage } from '$lib/api/errors';
+	import { errorMessage, uploadErrorMessage } from '$lib/api/errors';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Attachment from '$lib/components/ui/attachment/index.js';
@@ -148,7 +148,7 @@
 
 			if (result.error || !result.data) {
 				uploading = uploading.map((u) => (u.id === entry.id ? { ...u, progress: 'error' } : u));
-				toast.error(`Failed to upload ${file.name}`, { description: errorMessage(result.error) });
+				toast.error(`Failed to upload ${file.name}`, { description: uploadErrorMessage(result) });
 			} else {
 				uploading = uploading.filter((u) => u.id !== entry.id);
 				if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl);

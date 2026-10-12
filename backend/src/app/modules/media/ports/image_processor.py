@@ -17,5 +17,9 @@ class ImageProcessorPort(Protocol):
     def generate_thumbnail(
         self, data: bytes, *, max_dimension: int = 320
     ) -> ThumbnailResult | None:
-        """Return a downscaled WEBP thumbnail, or None if undecodable."""
+        """Return a downscaled WEBP thumbnail, or None if undecodable.
+
+        Raises:
+            ImageTooLargeError: If the image has too many pixels to decode safely.
+        """
         ...

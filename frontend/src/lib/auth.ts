@@ -1,16 +1,24 @@
 import { errorMessage } from '$lib/api/errors';
-import type { GraphPermission, IdentityPermission } from '$lib/api/generated/types.gen';
+import type {
+	GraphPermission,
+	IdentityPermission,
+	SystemPermission
+} from '$lib/api/generated/types.gen';
 
 /** Every permission the backend can report. */
-export type Permission = GraphPermission | IdentityPermission;
+export type Permission = GraphPermission | IdentityPermission | SystemPermission;
 
 export const LOGIN_PATH = '/login';
 export const SETUP_PATH = '/setup';
+export const STATUS_PATH = '/status';
 export const ACCOUNT_PATH = '/settings/account';
 export const CSRF_COOKIE = 'menagerist_csrf';
 export const CSRF_HEADER = 'X-CSRF-Token';
 
+// Sign-in pages: a signed-in person is sent away from these.
 const PUBLIC_PATHS = [LOGIN_PATH, SETUP_PATH];
+// Pages anyone may open, signed in or not.
+const OPEN_PATHS = [STATUS_PATH];
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 export const isUnsafeMethod = (method: string): boolean => UNSAFE_METHODS.has(method.toUpperCase());
@@ -21,6 +29,9 @@ function normalisePath(pathname: string): string {
 
 export const isPublicPath = (pathname: string): boolean =>
 	PUBLIC_PATHS.includes(normalisePath(pathname));
+
+export const isOpenPath = (pathname: string): boolean =>
+	OPEN_PATHS.includes(normalisePath(pathname));
 
 function hasUnsafeCharacters(value: string): boolean {
 	for (const char of value) {
@@ -94,6 +105,7 @@ export function guardDecision(input: GuardInput): GuardDecision {
 	if (!input.signedIn) {
 		if (path === LOGIN_PATH) return allow;
 		if (path === SETUP_PATH) return go(LOGIN_PATH);
+		if (isOpenPath(path)) return allow;
 		const here = path + search + (input.hash ?? '');
 		return input.rememberPath !== false && here !== '/'
 			? go(`${LOGIN_PATH}?next=${encodeURIComponent(here)}`)

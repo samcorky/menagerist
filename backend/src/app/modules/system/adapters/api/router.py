@@ -6,10 +6,14 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
+from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
+from app.entrypoints.api.shared.problem_response import error_response
 from app.modules.system.adapters.api.dependencies import (
+    get_get_health_ready_detail_use_case,
     get_get_health_ready_use_case,
     get_get_health_use_case,
+    get_get_version_detail_use_case,
     get_get_version_use_case,
 )
 from app.modules.system.application.get_health import GetHealth, GetHealthQuery
@@ -17,13 +21,22 @@ from app.modules.system.application.get_health_ready import (
     GetHealthReady,
     GetHealthReadyQuery,
 )
+from app.modules.system.application.get_health_ready_detail import (
+    GetHealthReadyDetail,
+    GetHealthReadyDetailQuery,
+)
 from app.modules.system.application.get_version import GetVersion, GetVersionQuery
+from app.modules.system.application.get_version_detail import (
+    GetVersionDetail,
+    GetVersionDetailQuery,
+)
 from app.modules.system.domain.readiness import (
     CheckObservation as DomainCheckObservation,
     CheckStatus,
     ReadinessReport,
 )
-from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
+from app.shared_kernel.errors import ForbiddenError
 
 router = APIRouter(tags=["System"], route_class=PermissionAwareRoute)
 
@@ -106,7 +119,7 @@ class CheckObservation(BaseModel):
         Field(
             default=None,
             description="Human-readable error detail, set only when status is fail.",
-            examples=["connection refused"],
+            examples=["check failed"],
         ),
     ] = None
 
@@ -124,7 +137,26 @@ class CheckObservation(BaseModel):
 
 
 class ReadyResponse(BaseModel):
-    """Readiness status (IETF draft-inadarei-api-health-check-06)."""
+    """Readiness status: nothing but pass or fail."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [{"status": "pass"}]})
+
+    status: Annotated[
+        Literal["pass", "fail"],
+        Field(
+            description="Whether every required dependency is ready.",
+            examples=["pass"],
+        ),
+    ]
+
+    @classmethod
+    def from_domain(cls, report: ReadinessReport) -> ReadyResponse:
+        """Collapse the report to pass or fail (a warning is still ready)."""
+        return cls(status="fail" if report.status is CheckStatus.FAIL else "pass")
+
+
+class ReadyDetailResponse(BaseModel):
+    """Full readiness report (IETF draft-inadarei-api-health-check-06)."""
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -160,7 +192,7 @@ class ReadyResponse(BaseModel):
     ]
 
     @classmethod
-    def from_domain(cls, report: ReadinessReport) -> ReadyResponse:
+    def from_domain(cls, report: ReadinessReport) -> ReadyDetailResponse:
         """Build the API schema from the domain readiness report."""
         return cls(
             status=report.status.value,
@@ -172,7 +204,26 @@ class ReadyResponse(BaseModel):
 
 
 class VersionResponse(BaseModel):
-    """Build and version metadata."""
+    """Public application name and version."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [{"name": "menagerist", "current_version": "1.2.3"}]
+        }
+    )
+
+    name: Annotated[
+        str,
+        Field(description="Distribution package name.", examples=["menagerist"]),
+    ]
+    current_version: Annotated[
+        str,
+        Field(description="Current version of the application.", examples=["1.2.3"]),
+    ]
+
+
+class VersionDetailResponse(VersionResponse):
+    """Build and version metadata, for administrators."""
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -191,14 +242,6 @@ class VersionResponse(BaseModel):
         }
     )
 
-    name: Annotated[
-        str,
-        Field(description="Distribution package name.", examples=["menagerist"]),
-    ]
-    current_version: Annotated[
-        str,
-        Field(description="Current version of the application.", examples=["1.2.3"]),
-    ]
     commit_sha: Annotated[
         str | None,
         Field(
@@ -267,9 +310,10 @@ def _check_ex(
     return result
 
 
-_ERR = "connection refused"
+_ERR = "check failed"
+_FORBIDDEN = "You do not have permission to do that."
 
-_RESPONSE_200: dict[str, object] = {
+_DETAIL_200: dict[str, object] = {
     "content": {
         "application/health+json": {
             "example": {
@@ -289,7 +333,7 @@ _RESPONSE_200: dict[str, object] = {
     },
 }
 
-_RESPONSE_503: dict[str, object] = {
+_DETAIL_503: dict[str, object] = {
     "description": "One or more dependency checks failed.",
     "content": {
         "application/health+json": {
@@ -323,20 +367,33 @@ async def get_health(
     return HealthResponse()
 
 
+_PUBLIC_200: dict[str, object] = {
+    "content": {"application/health+json": {"example": {"status": "pass"}}},
+}
+
+_PUBLIC_503: dict[str, object] = {
+    "description": "A required dependency is not ready.",
+    "content": {"application/health+json": {"example": {"status": "fail"}}},
+}
+
+
 @router.get(
     "/health/ready",
     summary="Readiness check",
     operation_id="get_health_ready",
     response_model=ReadyResponse,
     response_class=HealthJSONResponse,
-    response_model_exclude_none=True,
-    responses={200: _RESPONSE_200, 503: _RESPONSE_503},
+    responses={200: _PUBLIC_200, 503: _PUBLIC_503},
 )
 async def get_health_ready(
     response: Response,
     use_case: Annotated[GetHealthReady, Depends(get_get_health_ready_use_case)],
 ) -> ReadyResponse:
-    """Report readiness by verifying all required dependencies are reachable."""
+    """Report whether the required dependencies are reachable.
+
+    The answer is only pass (200) or fail (503); `/health/ready/detail` has the
+    measurements.
+    """
     response.headers["Cache-Control"] = "max-age=10"
     report = await use_case.handle(GetHealthReadyQuery(), SYSTEM_ACTOR)
     if report.status is CheckStatus.FAIL:
@@ -345,17 +402,59 @@ async def get_health_ready(
 
 
 @router.get(
+    "/health/ready/detail",
+    summary="Readiness check with detail",
+    operation_id="get_health_ready_detail",
+    response_model=ReadyDetailResponse,
+    response_class=HealthJSONResponse,
+    response_model_exclude_none=True,
+    responses={
+        200: _DETAIL_200,
+        503: _DETAIL_503,
+        **error_response(ForbiddenError, detail=_FORBIDDEN),
+    },
+)
+async def get_health_ready_detail(
+    response: Response,
+    use_case: Annotated[
+        GetHealthReadyDetail, Depends(get_get_health_ready_detail_use_case)
+    ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> ReadyDetailResponse:
+    """Report every readiness check with its observed values (administrators)."""
+    report = await use_case.handle(GetHealthReadyDetailQuery(), actor)
+    if report.status is CheckStatus.FAIL:
+        response.status_code = 503
+    return ReadyDetailResponse.from_domain(report)
+
+
+@router.get(
     "/version",
     summary="Application version",
     operation_id="get_version",
-    response_model_exclude_none=True,
 )
 async def get_version(
     use_case: Annotated[GetVersion, Depends(get_get_version_use_case)],
 ) -> VersionResponse:
-    """Report the project version and build provenance of the running instance."""
+    """Report the name and version of the running instance."""
     app_info = await use_case.handle(GetVersionQuery(), SYSTEM_ACTOR)
-    return VersionResponse(
+    return VersionResponse(name=app_info.name, current_version=app_info.version)
+
+
+@router.get(
+    "/version/detail",
+    summary="Application version with build provenance",
+    operation_id="get_version_detail",
+    response_model_exclude_none=True,
+    responses=error_response(ForbiddenError, detail=_FORBIDDEN),
+)
+async def get_version_detail(
+    use_case: Annotated[GetVersionDetail, Depends(get_get_version_detail_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> VersionDetailResponse:
+    """Report version and build provenance (administrators)."""
+    app_info = await use_case.handle(GetVersionDetailQuery(), actor)
+    return VersionDetailResponse(
         name=app_info.name,
         current_version=app_info.version,
         commit_sha=app_info.commit_sha,

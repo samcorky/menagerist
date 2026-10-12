@@ -33,7 +33,7 @@ backend/src/app/
 │   ├── graph/       # nodes, edges, node types, edge types
 │   ├── identity/    # accounts, sessions, sign-in, first-run setup, identity CLI
 │   ├── media/       # attachments and images
-│   └── system/      # health, readiness, and version endpoints
+│   └── system/      # health, readiness, version (public: minimal; detail needs system:diagnostics:read)
 ├── shared_kernel/   # Actor, AccessScope/AccessPolicy, error base types, UoW protocol, CQRS protocols
 ├── platform/        # database engine, session factory, logging (one plausible implementation each)
 └── alembic/         # migrations - one environment for all modules

@@ -9,20 +9,24 @@ from app.modules.identity.application.permissions import (
     IMPLIES as IDENTITY_IMPLIES,
     IdentityPermission,
 )
+from app.modules.system.application.permissions import (
+    IMPLIES as SYSTEM_IMPLIES,
+    SystemPermission,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
 
 # Adding a module's permissions is one line here: `| MediaPermission`.
-Permission = GraphPermission | IdentityPermission
+Permission = GraphPermission | IdentityPermission | SystemPermission
 
 ALL_PERMISSIONS: frozenset[Permission] = frozenset(
-    chain(GraphPermission, IdentityPermission)
+    chain(GraphPermission, IdentityPermission, SystemPermission)
 )
 
 IMPLIES: Mapping[Permission, frozenset[Permission]] = {
     key: frozenset(implied)
-    for catalogue in (GRAPH_IMPLIES, IDENTITY_IMPLIES)
+    for catalogue in (GRAPH_IMPLIES, IDENTITY_IMPLIES, SYSTEM_IMPLIES)
     for key, implied in catalogue.items()
 }
 

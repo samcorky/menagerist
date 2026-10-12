@@ -13,6 +13,7 @@ from app.modules.identity.application.sign_in_throttle import (
 )
 from app.modules.identity.domain.errors import (
     CurrentPasswordIncorrectError,
+    InvalidPasswordError,
     PasswordUnchangedError,
     UserNotFoundError,
 )
@@ -63,6 +64,21 @@ class ChangePassword(
         self._tokens = tokens
         self._ttl = session_ttl
 
+    @staticmethod
+    def _refusal(
+        command: ChangePasswordCommand, username: str
+    ) -> InvalidPasswordError | PasswordUnchangedError | None:
+        """Return why the new password is refused, or `None` if it is fine."""
+        try:
+            validate_password(command.new_password, username)
+        except InvalidPasswordError as error:
+            return error
+        if command.new_password == command.current_password:
+            return PasswordUnchangedError(
+                "The new password must differ from the current one."
+            )
+        return None
+
     async def handle(
         self, command: ChangePasswordCommand, actor: Actor
     ) -> SignedInResult:
@@ -76,30 +92,32 @@ class ChangePassword(
             PasswordUnchangedError: If the new password is the current one.
         """
         now = datetime.now(UTC)
-        account_key = user_id_key(actor.id)
-        keys = [account_key]
+        keys = [user_id_key(actor.id)]
         if command.client_ip:
             keys.append(ip_key(command.client_ip))
+        # Count the attempt before checking the password (see `SignIn`).
         async with self._uow as repos:
-            await self._throttle.ensure_open(repos.attempts, keys, now)
+            reservation = await self._throttle.reserve(repos.attempts, keys, now)
+            await self._uow.commit()
+        if reservation.locked_until is not None:
+            raise self._throttle.throttled(reservation.locked_until, now)
+        async with self._uow as repos:
             user = await repos.users.get_for_update(actor.id)
             if user is None:
                 raise UserNotFoundError("That account does not exist.")
             if not await asyncio.to_thread(
                 self._hasher.verify, command.current_password, user.password_hash
             ):
-                await self._throttle.record_failure(repos.attempts, keys, now)
-                await self._uow.commit()
                 raise CurrentPasswordIncorrectError(
                     "The current password is incorrect."
                 )
-            validate_password(command.new_password, user.username)
-            # The current password just verified, so equality is the same test.
-            if command.new_password == command.current_password:
-                raise PasswordUnchangedError(
-                    "The new password must differ from the current one."
-                )
-            await repos.attempts.clear(account_key)
+            # The current password verified, so a refused new one is no failure.
+            refusal = self._refusal(command, user.username)
+            if refusal is not None:
+                await self._throttle.settle_refund(repos.attempts, reservation)
+                await self._uow.commit()
+                raise refusal
+            await self._throttle.settle_success(repos.attempts, reservation)
             user.change_password(
                 await asyncio.to_thread(self._hasher.hash, command.new_password)
             )

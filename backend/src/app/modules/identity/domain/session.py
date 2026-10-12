@@ -36,3 +36,10 @@ class Session(Identifiable):
     def is_expired(self, now: datetime) -> bool:
         """Whether `now` is at or past the expiry instant."""
         return now >= self.expires_at
+
+    def is_idle(self, now: datetime, limit: timedelta | None) -> bool:
+        """Whether more than `limit` has passed since the session was last seen.
+
+        `None` means no idle limit.
+        """
+        return limit is not None and now - self.last_seen_at > limit

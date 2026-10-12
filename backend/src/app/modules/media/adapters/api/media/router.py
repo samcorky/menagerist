@@ -15,6 +15,9 @@ from app.entrypoints.api.shared.http_headers import (
 )
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.entrypoints.api.shared.problem_response import error_response
+from app.entrypoints.api.shared.upload_limit_middleware import (
+    PAYLOAD_TOO_LARGE_RESPONSE,
+)
 from app.modules.media.adapters.api.dependencies import (
     get_attach_media_use_case,
     get_clear_media_cover_use_case,
@@ -103,7 +106,10 @@ async def _chunks(upload: UploadFile) -> AsyncGenerator[bytes]:
     response_model=MediaAssetResponse,
     status_code=201,
     operation_id="stage_media",
-    responses=error_response(MediaFileTooLargeError, detail="upload exceeds the limit"),
+    responses={
+        **error_response(MediaFileTooLargeError, detail="upload exceeds the limit"),
+        **PAYLOAD_TOO_LARGE_RESPONSE,
+    },
 )
 async def stage_media(
     file: UploadFile,
@@ -136,6 +142,7 @@ async def stage_media(
     operation_id="upload_and_attach_media",
     responses={
         **error_response(MediaFileTooLargeError, detail="upload exceeds the limit"),
+        **PAYLOAD_TOO_LARGE_RESPONSE,
         **error_response(
             UnsupportedMediaTypeError, detail="content type not permitted"
         ),

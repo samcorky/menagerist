@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from fastapi.routing import APIRoute
 
 from app.entrypoints.api import api_v1_router, public_v1_router
+from app.entrypoints.api.shared.cross_site import refuse_cross_site
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.identity.adapters.api.dependencies import (
     get_active_identity_actor,
@@ -24,6 +25,8 @@ PUBLIC_ROUTES = {
     ("POST", "/v1/auth/setup"),
     ("POST", "/v1/auth/login"),
 }
+# Unauthenticated POSTs have no CSRF token to check, so they refuse cross-site calls.
+CROSS_SITE_GUARDED_ROUTES = {("POST", "/v1/auth/setup"), ("POST", "/v1/auth/login")}
 # On the CSRF-protected router but deliberately tolerant of a missing session.
 NO_ACTOR_ROUTES = {("POST", "/v1/auth/logout")}
 # Identity routes resolve the session through the identity dependencies.
@@ -85,3 +88,14 @@ def test_every_other_v1_route_resolves_a_session_actor() -> None:
         if not ok:
             missing.append(f"{method} {path}")
     assert missing == []
+
+
+def test_unauthenticated_posts_refuse_cross_site_requests() -> None:
+    """Every public POST carries the cross-site guard, and nothing else needs it."""
+    guarded = {
+        (method, path)
+        for method, path, route in _all(public_v1_router)
+        if refuse_cross_site in _calls(route.dependant)
+    }
+    public_posts = {(m, p) for m, p in PUBLIC_ROUTES if m == "POST"}
+    assert guarded == CROSS_SITE_GUARDED_ROUTES == public_posts

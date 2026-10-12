@@ -21,11 +21,12 @@ ALL = [
     "identity:user:reset_password",
     "identity:user:unlock",
     "identity:user:update",
+    "system:diagnostics:read",
 ]
 
 
 def test_an_admin_sees_every_permission_sorted(as_user: Callable[..., None]) -> None:
-    """Admins hold all nine, listed in a stable order."""
+    """Admins hold all ten, listed in a stable order."""
     app = create_app()
     as_user(app, uuid.uuid4(), "admin")
     response = TestClient(app).get(URL)

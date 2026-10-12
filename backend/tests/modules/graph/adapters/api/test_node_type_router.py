@@ -163,7 +163,7 @@ def test_attributes_schema_round_trips_through_create_and_update() -> None:
 
 
 def test_attribute_usage_and_purge_round_trip() -> None:
-    """Usage counts nodes holding a key; purge removes it and reports the count."""
+    """Usage counts nodes holding a key; purge removes it and answers 204."""
     client = _admin_client()
     nt = client.post("/api/v1/node-type", json={"slug": "film", "label": "Film"}).json()
     for name, attrs in [("A", {"old": 1}), ("B", {"old": 2}), ("C", {})]:
@@ -174,8 +174,8 @@ def test_attribute_usage_and_purge_round_trip() -> None:
 
     assert client.get(f"{base}/usage").json() == {"count": 2}
     purge = client.delete(base)
-    assert purge.status_code == 200
-    assert purge.json() == {"purged": 2}
+    assert purge.status_code == 204
+    assert purge.content == b""
     assert client.get(f"{base}/usage").json() == {"count": 0}
 
 
@@ -223,8 +223,8 @@ def test_attribute_usage_and_purge_can_target_a_group_sub_key() -> None:
         "count": 1
     }
     purge = client.delete(base, params={"sub_key": "unit"})
-    assert purge.status_code == 200
-    assert purge.json() == {"purged": 1}
+    assert purge.status_code == 204
+    assert purge.content == b""
     assert client.get(f"{base}/usage", params={"sub_key": "unit"}).json() == {
         "count": 0
     }

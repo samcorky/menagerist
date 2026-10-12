@@ -1,6 +1,7 @@
 import uuid
 
 import pytest
+from structlog.testing import capture_logs
 
 from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
@@ -192,12 +193,10 @@ async def test_purge_node_type_attribute_removes_key_and_touches_nodes() -> None
     before = {node.id: node.updated_at for node in nodes}
     uow = InMemoryUnitOfWork(repos)
 
-    purged = await PurgeNodeTypeAttribute(uow, RoleAuthorizationAdapter()).handle(
+    await PurgeNodeTypeAttribute(uow, RoleAuthorizationAdapter()).handle(
         PurgeNodeTypeAttributeCommand(node_type_id=node_type.id, key="old"),
         SYSTEM_ACTOR,
     )
-
-    assert purged == 2
     assert uow.committed is True
     a, b, c, d = nodes
     assert a.attributes == {"keep": "a"}
@@ -224,14 +223,12 @@ async def test_purge_node_type_attribute_pages_through_all_nodes(
             )
         )
 
-    purged = await PurgeNodeTypeAttribute(
+    await PurgeNodeTypeAttribute(
         InMemoryUnitOfWork(repos), RoleAuthorizationAdapter()
     ).handle(
         PurgeNodeTypeAttributeCommand(node_type_id=node_type.id, key="old"),
         SYSTEM_ACTOR,
     )
-
-    assert purged == 5
     assert (
         await repos.nodes.count_with_attribute(
             "film", "old", scope=AccessScope.everyone()
@@ -256,12 +253,10 @@ async def test_purge_edge_type_attribute_removes_key() -> None:
     repos, edge_type, edges = await _edge_setup()
     uow = InMemoryUnitOfWork(repos)
 
-    purged = await PurgeEdgeTypeAttribute(uow, RoleAuthorizationAdapter()).handle(
+    await PurgeEdgeTypeAttribute(uow, RoleAuthorizationAdapter()).handle(
         PurgeEdgeTypeAttributeCommand(edge_type_id=edge_type.id, key="old"),
         SYSTEM_ACTOR,
     )
-
-    assert purged == 1
     assert uow.committed is True
     assert edges[0].attributes == {}
     assert edges[2].attributes == {"old": 3}
@@ -332,7 +327,7 @@ async def test_purge_node_type_attribute_strips_a_group_sub_key_from_every_row()
     )
     await repos.nodes.add(node)
 
-    purged = await PurgeNodeTypeAttribute(
+    await PurgeNodeTypeAttribute(
         InMemoryUnitOfWork(repos), RoleAuthorizationAdapter()
     ).handle(
         PurgeNodeTypeAttributeCommand(
@@ -340,8 +335,6 @@ async def test_purge_node_type_attribute_strips_a_group_sub_key_from_every_row()
         ),
         SYSTEM_ACTOR,
     )
-
-    assert purged == 1
     assert node.attributes == {
         "ingredients": [{"name": "Flour"}, {"name": "Salt"}, "not-a-row"],
         "keep": 1,
@@ -400,7 +393,7 @@ async def test_purge_edge_type_attribute_strips_a_group_sub_key_from_every_row()
     )
     await repos.edges.add(edge)
 
-    purged = await PurgeEdgeTypeAttribute(
+    await PurgeEdgeTypeAttribute(
         InMemoryUnitOfWork(repos), RoleAuthorizationAdapter()
     ).handle(
         PurgeEdgeTypeAttributeCommand(
@@ -408,6 +401,34 @@ async def test_purge_edge_type_attribute_strips_a_group_sub_key_from_every_row()
         ),
         SYSTEM_ACTOR,
     )
-
-    assert purged == 1
     assert edge.attributes == {"terms": [{"note": "care"}]}
+
+
+async def test_purge_node_type_attribute_logs_the_count_it_does_not_return() -> None:
+    """The all-users count goes to the log only."""
+    repos, node_type, _ = await _node_setup()
+
+    with capture_logs() as logs:
+        await PurgeNodeTypeAttribute(
+            InMemoryUnitOfWork(repos), RoleAuthorizationAdapter()
+        ).handle(
+            PurgeNodeTypeAttributeCommand(node_type_id=node_type.id, key="old"),
+            SYSTEM_ACTOR,
+        )
+    (entry,) = [e for e in logs if e["event"] == "node type attribute purged"]
+    assert entry["purged"] == 2
+
+
+async def test_purge_edge_type_attribute_logs_the_count_it_does_not_return() -> None:
+    """The all-users count goes to the log only."""
+    repos, edge_type, _ = await _edge_setup()
+
+    with capture_logs() as logs:
+        await PurgeEdgeTypeAttribute(
+            InMemoryUnitOfWork(repos), RoleAuthorizationAdapter()
+        ).handle(
+            PurgeEdgeTypeAttributeCommand(edge_type_id=edge_type.id, key="old"),
+            SYSTEM_ACTOR,
+        )
+    (entry,) = [e for e in logs if e["event"] == "edge type attribute purged"]
+    assert entry["purged"] >= 1

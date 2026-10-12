@@ -51,10 +51,13 @@ def _creds(
 async def test_valid_credentials_return_identity(
     world: World, make_user: MakeUser
 ) -> None:
-    """The verified identity carries the username and display name."""
-    await world.users.add(make_user("alice"))
+    """The verified identity carries the username, display name and matched hash."""
+    user = make_user("alice")
+    await world.users.add(user)
     identity = await _authenticator(world).authenticate(_creds("ALICE"))
-    assert identity == VerifiedIdentity(subject="alice", display_name="Alice")
+    assert identity == VerifiedIdentity(
+        subject="alice", display_name="Alice", credential_hash=user.password_hash
+    )
 
 
 @time_machine.travel(NOW, tick=False)

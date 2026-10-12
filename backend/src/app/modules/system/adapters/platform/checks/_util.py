@@ -1,9 +1,13 @@
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.modules.system.domain.readiness import CheckObservation, CheckStatus
 
 if TYPE_CHECKING:
     from datetime import datetime
+
+logger = structlog.get_logger()
 
 
 def observation(
@@ -26,7 +30,8 @@ def observation(
 
 
 def failed_observation(unit: str, *, now: datetime, exc: Exception) -> CheckObservation:
-    """Build a failed observation from a caught exception."""
+    """Build a failed observation; the real error is logged, never returned."""
+    logger.error("readiness check failed", unit=unit, exc_info=exc)
     return observation(
-        "unknown", unit, now=now, status=CheckStatus.FAIL, output=str(exc)
+        "unknown", unit, now=now, status=CheckStatus.FAIL, output="check failed"
     )

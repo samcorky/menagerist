@@ -86,9 +86,9 @@ from app.modules.graph.application.delete_edge_type import (
     DeleteEdgeTypeCommand,
 )
 from app.modules.graph.application.delete_node import DeleteNode, DeleteNodeCommand
-from app.modules.graph.application.delete_node_type import (
-    DeleteNodeType,
-    DeleteNodeTypeCommand,
+from app.modules.graph.application.delete_unused_node_type import (
+    DeleteUnusedNodeType,
+    DeleteUnusedNodeTypeCommand,
 )
 from app.modules.graph.domain.edge import Edge  # noqa: TC001
 from app.modules.graph.domain.edge_type import EdgeType  # noqa: TC001
@@ -97,6 +97,7 @@ from app.modules.graph.domain.errors import (
     EdgeTypeInUseError,
     EdgeTypeNotFoundError,
     NodeNotFoundError,
+    NodeTypeInUseError,
     NodeTypeNotFoundError,
 )
 from app.modules.graph.domain.node import Node  # noqa: TC001
@@ -758,8 +759,10 @@ class GraphPackTarget:
                     DeleteNodeCommand(node_id=entity_id), self._actor
                 )
             elif kind is EntityKind.ITEM_TYPE:
-                await DeleteNodeType(uow, RoleAuthorizationAdapter()).handle(
-                    DeleteNodeTypeCommand(node_type_id=entity_id), SYSTEM_ACTOR
+                # Check and delete in one locked transaction: an item added
+                # meanwhile keeps the type instead of losing it.
+                await DeleteUnusedNodeType(uow, RoleAuthorizationAdapter()).handle(
+                    DeleteUnusedNodeTypeCommand(node_type_id=entity_id), SYSTEM_ACTOR
                 )
             elif kind is EntityKind.RELATIONSHIP_TYPE:
                 await DeleteEdgeType(uow, RoleAuthorizationAdapter()).handle(
@@ -776,7 +779,7 @@ class GraphPackTarget:
             EdgeNotFoundError,
         ):
             return RemoveResult.ALREADY_GONE
-        except EdgeTypeInUseError:
+        except EdgeTypeInUseError, NodeTypeInUseError:
             return RemoveResult.REFUSED_IN_USE
         return RemoveResult.REMOVED
 

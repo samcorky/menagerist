@@ -70,5 +70,7 @@ class PasswordAuthenticator:
                 await repos.users.save(locked)
                 await self._uow.commit()
             return VerifiedIdentity(
-                subject=locked.username, display_name=locked.display_name
+                subject=locked.username,
+                display_name=locked.display_name,
+                credential_hash=locked.password_hash,
             )

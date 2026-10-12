@@ -76,7 +76,9 @@ class CreateNode(ScopedCommandHandler[GraphUnitOfWork, CreateNodeCommand, Node])
             type_schema: dict[str, Any] | None = None
             if command.type is not None:
                 slug = slugify(command.type)
-                node_type = await repos.node_types.get_by_slug(slug)
+                node_type = await repos.node_types.get_by_slug(
+                    slug, guard_item_write=True
+                )
                 if node_type is None:
                     await repos.node_types.add(
                         NodeType.create(slug=slug, label=command.type)

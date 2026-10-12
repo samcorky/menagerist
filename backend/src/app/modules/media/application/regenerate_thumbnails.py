@@ -1,9 +1,11 @@
+import asyncio
 import hashlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import structlog
 
+from app.modules.media.domain.errors import ImageTooLargeError
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.domain.thumbnail_eligibility import is_thumbnailable_image
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
@@ -68,9 +70,15 @@ class RegenerateThumbnails(
                     async for chunk in self._storage.retrieve(asset.id, asset.status)
                 ]
             )
-            result = self._image_processor.generate_thumbnail(
-                data, max_dimension=command.max_dimension
-            )
+            try:
+                result = await asyncio.to_thread(
+                    self._image_processor.generate_thumbnail,
+                    data,
+                    max_dimension=command.max_dimension,
+                )
+            except ImageTooLargeError:
+                logger.warning("image too large to thumbnail", asset_id=asset.id)
+                continue
             if result is None:
                 continue
 

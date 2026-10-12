@@ -52,14 +52,17 @@ def test_commands_never_show_secrets_in_their_repr() -> None:
 class _FixedAuthenticator:
     """Vouches for a username whatever the credentials are."""
 
-    def __init__(self, subject: str) -> None:
+    def __init__(self, subject: str, credential_hash: str) -> None:
         self._subject = subject
+        self._hash = credential_hash
 
     async def authenticate(
         self, credentials: PasswordCredentials
     ) -> VerifiedIdentity | None:
         """Return the fixed identity."""
-        return VerifiedIdentity(subject=self._subject, display_name="x")
+        return VerifiedIdentity(
+            subject=self._subject, display_name="x", credential_hash=self._hash
+        )
 
 
 @pytest.mark.parametrize(
@@ -80,7 +83,7 @@ async def test_sign_in_rechecks_the_account_after_authentication(
     hasher = InMemoryPasswordHasher()
     use_case = SignIn(
         world.uow,
-        _FixedAuthenticator("alice"),
+        _FixedAuthenticator("alice", user.password_hash),
         InMemorySessionTokenGenerator(),
         hasher,
         SignInThrottle(),
@@ -93,5 +96,5 @@ async def test_sign_in_rechecks_the_account_after_authentication(
             SignInCommand(username="alice", password="x"), ANONYMOUS_ACTOR
         )
 
-    assert not world.uow.committed
+    assert await world.sessions.delete_for_user(user.id) == 0
     assert user.last_login_at is None

@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import uuid
 from dataclasses import dataclass, field
@@ -9,10 +10,12 @@ from app.modules.media.domain.content_type_safety import (
     guessed_type_matches,
     resolve_trusted_content_type,
 )
+from app.modules.media.domain.errors import ImageTooLargeError
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
 from app.modules.media.domain.thumbnail_eligibility import is_thumbnailable_image
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.log_safe import loggable
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -62,7 +65,7 @@ class StageMedia(CommandHandler[MediaUnitOfWork, StageMediaCommand, MediaAsset])
             logger.warning(
                 "media content-type does not match filename extension",
                 asset_id=str(asset_id),
-                filename=command.filename,
+                filename=loggable(command.filename),
                 declared_content_type=command.content_type,
             )
 
@@ -73,7 +76,7 @@ class StageMedia(CommandHandler[MediaUnitOfWork, StageMediaCommand, MediaAsset])
             logger.warning(
                 "media content-type downgraded: unconfirmed by signature",
                 asset_id=str(asset_id),
-                filename=command.filename,
+                filename=loggable(command.filename),
                 declared_content_type=command.content_type,
                 sniffed_content_type=command.sniffed_content_type,
             )
@@ -106,7 +109,14 @@ class StageMedia(CommandHandler[MediaUnitOfWork, StageMediaCommand, MediaAsset])
                     )
                 ]
             )
-            if result := self._image_processor.generate_thumbnail(thumbnail_data):
+            try:
+                result = await asyncio.to_thread(
+                    self._image_processor.generate_thumbnail, thumbnail_data
+                )
+            except ImageTooLargeError:
+                await self._storage.delete(asset_id, MediaStatus.STAGED)
+                raise
+            if result:
                 await self._storage.store_thumbnail(
                     asset_id, MediaStatus.STAGED, result.data
                 )
@@ -117,5 +127,7 @@ class StageMedia(CommandHandler[MediaUnitOfWork, StageMediaCommand, MediaAsset])
         async with self._uow as repos:
             await repos.assets.add(asset)
             await self._uow.commit()
-        logger.info("media staged", asset_id=asset.id, filename=command.filename)
+        logger.info(
+            "media staged", asset_id=asset.id, filename=loggable(command.filename)
+        )
         return asset

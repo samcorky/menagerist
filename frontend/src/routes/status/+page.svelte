@@ -1,8 +1,22 @@
 <script lang="ts">
 	import type { Component } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
-	import { getVersion } from '$lib/api/client';
-	import type { CheckObservation, ReadyResponse, VersionResponse } from '$lib/api/client';
+	import { resolve } from '$app/paths';
+	import {
+		getHealthReady,
+		getHealthReadyDetail,
+		getVersion,
+		getVersionDetail
+	} from '$lib/api/client';
+	import type {
+		CheckObservation,
+		ReadyDetailResponse,
+		VersionDetailResponse,
+		VersionResponse
+	} from '$lib/api/client';
+	import { auth } from '$lib/auth.svelte.js';
+	import { LOGIN_PATH, STATUS_PATH } from '$lib/auth';
+	import { readinessOf, readyDetailOf, type Readiness } from '$lib/status';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -14,6 +28,7 @@
 		Database,
 		Gauge,
 		GitBranch,
+		LogIn,
 		PackageCheck,
 		RefreshCw,
 		Server,
@@ -76,7 +91,7 @@
 		return Wrench;
 	}
 
-	function latestObservationTime(report: ReadyResponse): Date | null {
+	function latestObservationTime(report: ReadyDetailResponse): Date | null {
 		let latest = Number.NEGATIVE_INFINITY;
 		for (const observation of Object.values(report.checks).flat()) {
 			const timestamp = Date.parse(observation.time);
@@ -85,8 +100,12 @@
 		return Number.isFinite(latest) ? new Date(latest) : null;
 	}
 
-	let ready = $state<ReadyResponse | null>(null);
+	let readiness = $state<Readiness | null>(null);
+	let detail = $state<ReadyDetailResponse | null>(null);
 	let version = $state<VersionResponse | null>(null);
+	let buildInfo = $state<VersionDetailResponse | null>(null);
+	const showDetail = $derived(auth.signedIn && auth.can('system:diagnostics:read'));
+	const signInHref = $derived(`${resolve(LOGIN_PATH)}?next=${encodeURIComponent(STATUS_PATH)}`);
 	let loading = $state(true);
 	let loadError = $state<string | null>(null);
 	let lastCheckTime = $state<Date | null>(null);
@@ -97,8 +116,8 @@
 	const groups = $derived.by(
 		(): SvelteMap<string, Array<{ label: string; obs: CheckObservation }>> => {
 			const map = new SvelteMap<string, Array<{ label: string; obs: CheckObservation }>>();
-			if (!ready?.checks) return map;
-			for (const [key, observations] of Object.entries(ready.checks)) {
+			if (!detail?.checks) return map;
+			for (const [key, observations] of Object.entries(detail.checks)) {
 				const [groupKey, metricName] = key.includes(':') ? key.split(':', 2) : ['other', key];
 				if (!map.has(groupKey)) map.set(groupKey, []);
 				for (const [index, obs] of observations.entries()) {
@@ -112,40 +131,26 @@
 
 	const versionRows = $derived.by((): Array<{ label: string; value: string }> => {
 		const rows: Array<{ label: string; value: string }> = [];
-		if (!version) return rows;
+		const info = buildInfo;
+		if (!info) return rows;
 
-		rows.push({
-			label: 'Application',
-			value: `menagerist v${version.current_version}`
-		});
-
-		if (version.branch != null) {
-			rows.push({ label: 'Branch', value: version.branch });
+		rows.push({ label: 'Application', value: `${info.name} v${info.current_version}` });
+		if (info.branch != null) rows.push({ label: 'Branch', value: info.branch });
+		if (info.short_sha != null) {
+			const dirty = info.dirty === true ? ' (dirty)' : '';
+			rows.push({ label: 'Commit', value: `${info.short_sha}${dirty}` });
 		}
-
-		if (version.short_sha != null) {
-			const dirty = version.dirty === true ? ' (dirty)' : '';
-			rows.push({ label: 'Commit', value: `${version.short_sha}${dirty}` });
+		if (info.build_timestamp != null) {
+			rows.push({ label: 'Built', value: new Date(info.build_timestamp).toLocaleString() });
 		}
-
-		if (version.build_timestamp != null) {
-			rows.push({
-				label: 'Built',
-				value: new Date(version.build_timestamp).toLocaleString()
-			});
-		}
-
-		rows.push({
-			label: 'Migration',
-			value: version.migration_head.join(', ') || 'none'
-		});
+		rows.push({ label: 'Migration', value: info.migration_head.join(', ') || 'none' });
 
 		return rows;
 	});
 
 	const healthSummary = $derived.by(() => {
-		if (!ready?.checks) return { total: 0, pass: 0, fail: 0 };
-		const checks = Object.values(ready.checks).flat();
+		if (!detail?.checks) return { total: 0, pass: 0, fail: 0 };
+		const checks = Object.values(detail.checks).flat();
 		return {
 			total: checks.length,
 			pass: checks.filter((check) => check.status === 'pass').length,
@@ -162,14 +167,23 @@
 		loadError = null;
 
 		try {
-			const [readyRes, versionRes] = await Promise.all([
-				fetch('/api/health/ready'),
-				getVersion({ throwOnError: true })
+			const withDetail = showDetail;
+			const [readyRes, versionRes, detailRes, buildRes] = await Promise.all([
+				getHealthReady(),
+				getVersion(),
+				withDetail ? getHealthReadyDetail() : null,
+				withDetail ? getVersionDetail() : null
 			]);
 
-			ready = (await readyRes.json()) as ReadyResponse;
-			lastCheckTime = latestObservationTime(ready);
-			version = versionRes.data as VersionResponse;
+			const state = readinessOf(readyRes);
+			if (state === null || !versionRes.data) {
+				throw new Error('The server gave an unexpected answer.');
+			}
+			readiness = state;
+			version = versionRes.data;
+			detail = detailRes ? readyDetailOf(detailRes) : null;
+			buildInfo = buildRes?.data ?? null;
+			lastCheckTime = (detail && latestObservationTime(detail)) || new Date();
 		} catch (err) {
 			loadError = err instanceof Error ? err.message : 'Unknown error';
 		} finally {
@@ -203,7 +217,7 @@
 </script>
 
 <svelte:head>
-	<title>System Status - Menagerist</title>
+	<title>System status - Menagerist</title>
 </svelte:head>
 
 <main class="flex-1 px-4 py-8 sm:px-6">
@@ -215,10 +229,15 @@
 				<p class="mb-2 text-xs font-medium tracking-[0.18em] text-muted-foreground uppercase">
 					Operations
 				</p>
-				<h1 class="font-heading text-3xl font-semibold tracking-tight">System Status</h1>
+				<h1 class="font-heading text-3xl font-semibold tracking-tight">System status</h1>
 				{#if lastCheckTime}
 					<p class="mt-1 text-sm text-muted-foreground">
-						Health checks last ran at {formatTime(lastCheckTime)}
+						Last checked at {formatTime(lastCheckTime)}
+					</p>
+				{/if}
+				{#if version}
+					<p class="mt-1 text-sm text-muted-foreground">
+						{version.name} v{version.current_version}
 					</p>
 				{/if}
 				<p class="mt-1 text-xs text-muted-foreground">
@@ -226,9 +245,16 @@
 				</p>
 			</div>
 			<div class="flex items-center gap-2">
+				{#if !auth.signedIn}
+					<Button variant="outline" class="h-11" href={signInHref}>
+						<LogIn class="size-4" />
+						Sign in
+					</Button>
+				{/if}
 				<Button
 					variant="outline"
 					size="icon"
+					class="size-11"
 					onclick={() => load(true)}
 					disabled={refreshing || loading}
 					aria-label="Refresh status"
@@ -242,7 +268,7 @@
 					onclick={() => (autoRefreshEnabled = !autoRefreshEnabled)}
 					aria-label={autoRefreshEnabled ? 'Pause auto refresh' : 'Resume auto refresh'}
 					title={autoRefreshEnabled ? 'Pause auto refresh' : 'Resume auto refresh'}
-					class="gap-2 rounded-full"
+					class="min-h-11 gap-2 rounded-full"
 				>
 					<Activity class="size-4" />
 					<span class="inline-flex items-center gap-1.5">
@@ -273,9 +299,9 @@
 					<p class="mt-2 text-sm text-muted-foreground">{loadError}</p>
 				</Card.Content>
 			</Card.Root>
-		{:else if ready}
-			{@const isPass = ready.status === 'pass'}
-			{@const StatusIcon = statusIcon(ready.status)}
+		{:else if readiness}
+			{@const isPass = readiness === 'pass'}
+			{@const StatusIcon = statusIcon(readiness)}
 			<Card.Root
 				class={isPass
 					? 'border-emerald-500/30 bg-emerald-500/5 shadow-sm'
@@ -294,43 +320,45 @@
 							<p class="font-medium">{isPass ? 'All systems operational' : 'Service degraded'}</p>
 							<p class="text-xs text-muted-foreground">
 								{isPass
-									? 'No checks are failing right now.'
-									: 'At least one health check is failing.'}
+									? 'Everything Menagerist needs is working.'
+									: 'Something Menagerist needs is not working.'}
 							</p>
 						</div>
 					</div>
-					<Badge class={statusTone(ready.status)}>
+					<Badge class={statusTone(readiness)}>
 						<StatusIcon class="size-3" />
-						{statusLabel(ready.status)}
+						{statusLabel(readiness)}
 					</Badge>
 				</Card.Content>
 			</Card.Root>
 
-			<div class="grid gap-3 sm:grid-cols-3">
-				<div class="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-					<p class="text-xs tracking-[0.18em] text-muted-foreground uppercase">Checks</p>
-					<div class="mt-2 flex items-baseline gap-2">
-						<span class="font-heading text-2xl font-semibold">{healthSummary.total}</span>
-						<span class="text-sm text-muted-foreground">total</span>
+			{#if detail}
+				<div class="grid gap-3 sm:grid-cols-3">
+					<div class="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+						<p class="text-xs tracking-[0.18em] text-muted-foreground uppercase">Checks</p>
+						<div class="mt-2 flex items-baseline gap-2">
+							<span class="font-heading text-2xl font-semibold">{healthSummary.total}</span>
+							<span class="text-sm text-muted-foreground">total</span>
+						</div>
+					</div>
+					<div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 shadow-sm">
+						<p class="text-xs tracking-[0.18em] text-emerald-700 uppercase dark:text-emerald-400">
+							Healthy
+						</p>
+						<div class="mt-2 flex items-baseline gap-2 text-emerald-600 dark:text-emerald-400">
+							<span class="font-heading text-2xl font-semibold">{healthSummary.pass}</span>
+							<span class="text-sm">operational</span>
+						</div>
+					</div>
+					<div class="rounded-2xl border border-destructive/20 bg-destructive/5 p-4 shadow-sm">
+						<p class="text-xs tracking-[0.18em] text-destructive uppercase">Alerts</p>
+						<div class="mt-2 flex items-baseline gap-2 text-destructive">
+							<span class="font-heading text-2xl font-semibold">{healthSummary.fail}</span>
+							<span class="text-sm">failing</span>
+						</div>
 					</div>
 				</div>
-				<div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 shadow-sm">
-					<p class="text-xs tracking-[0.18em] text-emerald-700 uppercase dark:text-emerald-400">
-						Healthy
-					</p>
-					<div class="mt-2 flex items-baseline gap-2 text-emerald-600 dark:text-emerald-400">
-						<span class="font-heading text-2xl font-semibold">{healthSummary.pass}</span>
-						<span class="text-sm">operational</span>
-					</div>
-				</div>
-				<div class="rounded-2xl border border-destructive/20 bg-destructive/5 p-4 shadow-sm">
-					<p class="text-xs tracking-[0.18em] text-destructive uppercase">Alerts</p>
-					<div class="mt-2 flex items-baseline gap-2 text-destructive">
-						<span class="font-heading text-2xl font-semibold">{healthSummary.fail}</span>
-						<span class="text-sm">failing</span>
-					</div>
-				</div>
-			</div>
+			{/if}
 
 			{#each groups as [groupKey, checks] (groupKey)}
 				{@const GroupIcon = groupIcon(groupKey)}
@@ -394,7 +422,7 @@
 				</Card.Root>
 			{/each}
 
-			{#if version}
+			{#if buildInfo}
 				<Card.Root class="overflow-hidden border-border/70 bg-card shadow-sm">
 					<Card.Header class="px-5 pt-5 pb-0">
 						<div class="flex items-center gap-2.5">

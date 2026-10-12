@@ -239,8 +239,8 @@ def test_admin_purge_and_delete_span_all_users_content(world: _World) -> None:
 
     admin = world.act_as(ADMIN, "admin")
     purge = admin.delete(f"/api/v1/edge-type/{edge_type['id']}/attribute/note")
-    assert purge.status_code == 200
-    assert purge.json()["purged"] == 2
+    assert purge.status_code == 204
+    assert purge.content == b""
     blocked = admin.delete(f"/api/v1/edge-type/{edge_type['id']}")
     assert blocked.status_code == 409
     assert admin.delete(f"/api/v1/node-type/{node_type['id']}").status_code == 204

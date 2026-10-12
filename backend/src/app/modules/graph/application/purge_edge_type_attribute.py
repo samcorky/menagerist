@@ -45,7 +45,7 @@ def _purged_attributes(
 
 class PurgeEdgeTypeAttribute(
     AuthorisedCommandHandler[
-        GraphUnitOfWork, PurgeEdgeTypeAttributeCommand, int, GraphPermission
+        GraphUnitOfWork, PurgeEdgeTypeAttributeCommand, None, GraphPermission
     ]
 ):
     """Remove an attribute key from every edge of a edge type (administrators only).
@@ -65,8 +65,8 @@ class PurgeEdgeTypeAttribute(
 
     async def _handle(
         self, command: PurgeEdgeTypeAttributeCommand, actor: Actor
-    ) -> int:
-        """Purge the key and return how many edges held it."""
+    ) -> None:
+        """Purge the key; the count is logged, not returned (it spans every person)."""
         purged = 0
         async with self._uow as repos:
             edge_type = await repos.edge_types.get(command.edge_type_id)
@@ -102,4 +102,3 @@ class PurgeEdgeTypeAttribute(
             sub_key=command.sub_key,
             purged=purged,
         )
-        return purged

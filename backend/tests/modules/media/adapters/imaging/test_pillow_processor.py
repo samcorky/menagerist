@@ -1,8 +1,11 @@
 import io
 
+import pytest
 from PIL import Image
 
+from app.modules.media.adapters.imaging import pillow_processor
 from app.modules.media.adapters.imaging.pillow_processor import PillowImageProcessor
+from app.modules.media.domain.errors import ImageTooLargeError
 
 
 def test_pillow_image_processor_generates_webp_thumbnail() -> None:
@@ -69,3 +72,31 @@ def test_pillow_image_processor_returns_none_for_corrupt_data() -> None:
     processor = PillowImageProcessor()
     result = processor.generate_thumbnail(b"corrupt non-image data", max_dimension=320)
     assert result is None
+
+
+def _png(width: int, height: int) -> bytes:
+    buffer = io.BytesIO()
+    Image.new("L", (width, height)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+@pytest.mark.parametrize("size", [(15, 10), (30, 30)])
+def test_pillow_image_processor_refuses_a_decompression_bomb(
+    monkeypatch: pytest.MonkeyPatch, size: tuple[int, int]
+) -> None:
+    """Both Pillow's warning band and its error band become ImageTooLargeError."""
+    monkeypatch.setattr(pillow_processor, "MAX_IMAGE_PIXELS", 100)
+
+    with pytest.raises(ImageTooLargeError):
+        PillowImageProcessor().generate_thumbnail(_png(*size))
+
+
+def test_pillow_image_processor_accepts_an_image_within_the_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An image at the limit still gets a thumbnail."""
+    monkeypatch.setattr(pillow_processor, "MAX_IMAGE_PIXELS", 100)
+
+    result = PillowImageProcessor().generate_thumbnail(_png(10, 10))
+
+    assert result is not None

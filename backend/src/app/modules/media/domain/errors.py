@@ -9,6 +9,10 @@ class MediaFileTooLargeError(ValidationError):
     """Raised when an upload exceeds the configured maximum file size."""
 
 
+class ImageTooLargeError(ValidationError):
+    """Raised when an image has more pixels than can be safely decoded."""
+
+
 class MediaAttachmentNotFoundError(NotFoundError):
     """Raised when a requested media attachment record does not exist."""
 

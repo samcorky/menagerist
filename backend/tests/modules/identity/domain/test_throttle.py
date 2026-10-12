@@ -4,6 +4,7 @@ from app.modules.identity.domain.throttle import (
     AttemptWindow,
     ThrottlePolicy,
     after_failure,
+    after_release,
 )
 
 NOW = datetime(2026, 10, 10, 12, 0, tzinfo=UTC)
@@ -46,3 +47,29 @@ def test_a_limit_of_one_locks_at_once() -> None:
     """Limits are read from the call, so one failure can lock."""
     state = after_failure(None, now=NOW, limit=1, window=WINDOW)
     assert state.locked_until == NOW + WINDOW
+
+
+def test_exceeds_is_true_only_past_the_limit() -> None:
+    """The attempt that reaches the limit may still be checked; the next may not."""
+    at_limit = AttemptWindow(count=5, window_start=NOW)
+    assert not at_limit.exceeds(5)
+    assert AttemptWindow(count=6, window_start=NOW).exceeds(5)
+
+
+def test_release_gives_one_attempt_back_and_lifts_a_lock_below_the_limit() -> None:
+    """Dropping under the limit unlocks; staying at or over it keeps the lock."""
+    until = NOW + WINDOW
+    locked = AttemptWindow(count=6, window_start=NOW, locked_until=until)
+    still = after_release(locked, window_start=NOW, limit=5)
+    assert still == AttemptWindow(count=5, window_start=NOW, locked_until=until)
+    below = after_release(still, window_start=NOW, limit=5)
+    assert below == AttemptWindow(count=4, window_start=NOW)
+
+
+def test_release_ignores_a_missing_other_window_or_empty_counter() -> None:
+    """A late release never touches a newer window or goes below zero."""
+    assert after_release(None, window_start=NOW, limit=5) is None
+    newer = AttemptWindow(count=3, window_start=NOW + WINDOW)
+    assert after_release(newer, window_start=NOW, limit=5) is newer
+    empty = AttemptWindow(count=0, window_start=NOW)
+    assert after_release(empty, window_start=NOW, limit=5) is empty

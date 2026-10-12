@@ -223,7 +223,7 @@ def test_attributes_schema_round_trips_through_create_and_update() -> None:
 
 
 def test_attribute_usage_and_purge_round_trip() -> None:
-    """Usage counts edges holding a key; purge removes it and reports the count."""
+    """Usage counts edges holding a key; purge removes it and answers 204."""
     client = _admin_client()
     et = client.post(
         "/api/v1/edge-type", json={"slug": "directed-by", "label": "Directed by"}
@@ -244,8 +244,8 @@ def test_attribute_usage_and_purge_round_trip() -> None:
 
     assert client.get(f"{base}/usage").json() == {"count": 2}
     purge = client.delete(base)
-    assert purge.status_code == 200
-    assert purge.json() == {"purged": 2}
+    assert purge.status_code == 204
+    assert purge.content == b""
     assert client.get(f"{base}/usage").json() == {"count": 0}
 
 
@@ -304,8 +304,8 @@ def test_attribute_usage_and_purge_can_target_a_group_sub_key() -> None:
         "count": 1
     }
     purge = client.delete(base, params={"sub_key": "duration"})
-    assert purge.status_code == 200
-    assert purge.json() == {"purged": 1}
+    assert purge.status_code == 204
+    assert purge.content == b""
     assert client.get(f"{base}/usage", params={"sub_key": "duration"}).json() == {
         "count": 0
     }

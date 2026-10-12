@@ -270,11 +270,46 @@ def test_reset_password_sets_an_expired_password_and_ends_sessions(
     assert PASSWORD not in out.out + out.err
 
 
+def test_reset_password_prompts_even_when_a_bootstrap_password_is_configured(
+    world: World, make_user: MakeUser, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A password left in the environment is never applied silently."""
+    alice = make_user("alice")
+    world.users._users[alice.id] = alice
+    monkeypatch.setenv(PASSWORD_ENV_VAR, "bootstrap-password-1")
+    asked = _prompts(monkeypatch, PASSWORD, PASSWORD)
+
+    reset_password(username="alice")
+
+    assert asked == ["Password: ", "Confirm password: "]
+
+
+def test_reset_password_reads_settings_only_with_the_explicit_flag(
+    world: World,
+    make_user: MakeUser,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """`--from-settings` uses the configured password and does not prompt."""
+    alice = make_user("alice")
+    old_hash = alice.password_hash
+    world.users._users[alice.id] = alice
+    monkeypatch.setenv(PASSWORD_ENV_VAR, PASSWORD)
+    monkeypatch.setattr(getpass, "getpass", lambda _p="": pytest.fail("prompted"))
+
+    reset_password(username="alice", from_settings=True)
+
+    assert alice.password_hash != old_hash
+    assert alice.password_expired is True
+    out = capsys.readouterr()
+    assert PASSWORD not in out.out + out.err
+
+
 def test_reset_password_for_an_unknown_account_fails(
     world: World, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """A missing account is reported and nothing is written."""
-    monkeypatch.setenv(PASSWORD_ENV_VAR, PASSWORD)
+    _prompts(monkeypatch, PASSWORD, PASSWORD)
 
     with pytest.raises(SystemExit) as stop:
         reset_password(username="nobody")

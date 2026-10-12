@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from app.modules.identity.application.permissions import IdentityPermission
-from app.modules.identity.application.sign_in_throttle import username_key
+from app.modules.identity.application.sign_in_throttle import user_id_key, username_key
 from app.modules.identity.domain.errors import UserNotFoundError
 from app.modules.identity.domain.user import validate_password
 from app.modules.identity.ports.password_hasher import PasswordHasher  # noqa: TC001
@@ -51,7 +51,7 @@ class ResetPassword(
         self._hasher = hasher
 
     async def _handle(self, command: ResetPasswordCommand, actor: Actor) -> None:
-        """Replace the password under a row lock; this also lifts a sign-in lock.
+        """Replace the password under a row lock, lifting its sign-in locks.
 
         Raises:
             ForbiddenError: If `actor` lacks `identity:user:reset_password`.
@@ -69,6 +69,7 @@ class ResetPassword(
             )
             await repos.users.save(user)
             await repos.attempts.clear(username_key(user.username))
+            await repos.attempts.clear(user_id_key(user.id))
             ended = await repos.sessions.delete_for_user(user.id)
             await self._uow.commit()
         logger.info("sessions ended", user_id=user.id, count=ended)

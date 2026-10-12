@@ -77,6 +77,12 @@ services:
     restart: unless-stopped
     environment:
       MENAGERIST_DATABASE_URL: postgresql+asyncpg://menagerist:menagerist@postgres:5432/menagerist
+      # Behind a reverse proxy, uncomment and set these (see CONTRIBUTING.md).
+      # Without TRUSTED_PROXIES every client shares the proxy's address, so 20
+      # failed sign-ins from anyone lock sign-in for everyone for 15 minutes.
+      # MENAGERIST_TRUSTED_PROXIES: 172.18.0.0/16
+      # COOKIE_SECURE=true marks the session cookie Secure when a proxy ends TLS.
+      # MENAGERIST_COOKIE_SECURE: "true"
     volumes:
       - media-data:/data/media
     ports:

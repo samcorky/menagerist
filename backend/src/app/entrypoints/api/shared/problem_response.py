@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
+import structlog
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 
@@ -15,6 +17,8 @@ from app.shared_kernel.errors import (
 
 if TYPE_CHECKING:
     from fastapi import FastAPI, Request
+
+logger = structlog.get_logger()
 
 _STATUS_BY_DOMAIN_ERROR: dict[type[DomainError], int] = {
     NotFoundError: 404,
@@ -90,16 +94,22 @@ def _problem_response(request: Request, exc: Exception) -> JSONResponse:
     handler doesn't trigger an assertion when a framework or other error
     occurs.
     """
-    # If not a DomainError, return a 500 problem+json response instead of asserting.
+    # Anything else is a 500; its text may hold secrets, so it is logged, not sent.
     if not isinstance(exc, DomainError):
+        logger.error(
+            "unhandled exception",
+            exc_info=exc,
+            method=request.method,
+            path=request.url.path,
+        )
         return JSONResponse(
             status_code=500,
             media_type="application/problem+json",
             content={
                 "type": "about:blank",
-                "title": type(exc).__name__,
+                "title": "Internal Server Error",
                 "status": 500,
-                "detail": str(exc),
+                "detail": "An unexpected error occurred.",
                 "instance": str(request.url),
             },
         )
@@ -129,8 +139,33 @@ def _problem_response(request: Request, exc: Exception) -> JSONResponse:
     )
 
 
+def _validation_response(request: Request, exc: Exception) -> JSONResponse:
+    """Answer a malformed request with 422, without echoing what was submitted.
+
+    Keeps FastAPI's `detail: [{type, loc, msg}]` shape (the web client reads
+    `msg`) but drops each error's `input` and `ctx`, which hold the submitted
+    values (passwords included).
+    """
+    assert isinstance(exc, RequestValidationError)
+    return JSONResponse(
+        status_code=422,
+        media_type="application/problem+json",
+        content={
+            "type": "about:blank",
+            "title": "Unprocessable Content",
+            "status": 422,
+            "detail": [
+                {"type": e["type"], "loc": list(e["loc"]), "msg": e["msg"]}
+                for e in exc.errors()
+            ],
+            "instance": str(request.url),
+        },
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Map domain errors to RFC 9457 problem responses."""
+    app.add_exception_handler(RequestValidationError, _validation_response)
     for error_type in _STATUS_BY_DOMAIN_ERROR:
         app.add_exception_handler(error_type, _problem_response)
 

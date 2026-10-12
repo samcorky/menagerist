@@ -8,6 +8,7 @@ from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.log_safe import loggable
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -42,5 +43,7 @@ class UpdateMedia(
             asset.rename(command.filename)
             await repos.assets.save(asset)
             await self._uow.commit()
-        logger.info("media updated", asset_id=asset.id, filename=command.filename)
+        logger.info(
+            "media updated", asset_id=asset.id, filename=loggable(command.filename)
+        )
         return asset

@@ -69,14 +69,33 @@ class SqlAlchemyNodeTypeRepository:
             return None
         return _to_domain(model)
 
-    async def get_by_slug(self, slug: str) -> NodeType | None:
-        """Return the node type with `slug`, or `None` if missing or deleted."""
+    async def get_for_removal(self, node_type_id: uuid.UUID) -> NodeType | None:
+        """Like `get`, but take an exclusive row lock until the transaction ends."""
+        stmt = (
+            select(NodeTypeModel)
+            .where(NodeTypeModel.id == node_type_id)
+            .where(NodeTypeModel.deleted_at.is_(None))
+            .with_for_update()
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _to_domain(model) if model else None
+
+    async def get_by_slug(
+        self, slug: str, *, guard_item_write: bool = False
+    ) -> NodeType | None:
+        """Return the node type with `slug`, or `None` if missing or deleted.
+
+        `guard_item_write` takes a key-share row lock: it conflicts only with the
+        exclusive lock in `get_for_removal`, never with ordinary type edits.
+        """
         logger.debug("fetching node type by slug", slug=slug)
         stmt = (
             select(NodeTypeModel)
             .where(NodeTypeModel.slug == slug)
             .where(NodeTypeModel.deleted_at.is_(None))
         )
+        if guard_item_write:
+            stmt = stmt.with_for_update(key_share=True)
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
         return _to_domain(model) if model else None

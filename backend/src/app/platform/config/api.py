@@ -14,7 +14,9 @@ from app.platform.config._types import (  # noqa: TC001 - pydantic resolves thes
 class ApiSettings(MenageristBaseSettings):
     """API entrypoint settings."""
 
-    cors_origins: StarOrCSV[Origin] = Field(default=["*"])
+    # Empty means same-origin only: the API serves the SPA and Vite proxies
+    # /api. List the frontend's origin for a split deployment.
+    cors_origins: StarOrCSV[Origin] = Field(default=[])
 
     # When set, the API process also serves the built web UI from this
     # directory; when unset it is API-only (development, split deployments).

@@ -45,7 +45,7 @@ def _purged_attributes(
 
 class PurgeNodeTypeAttribute(
     AuthorisedCommandHandler[
-        GraphUnitOfWork, PurgeNodeTypeAttributeCommand, int, GraphPermission
+        GraphUnitOfWork, PurgeNodeTypeAttributeCommand, None, GraphPermission
     ]
 ):
     """Remove an attribute key from every node of a node type (administrators only).
@@ -65,8 +65,8 @@ class PurgeNodeTypeAttribute(
 
     async def _handle(
         self, command: PurgeNodeTypeAttributeCommand, actor: Actor
-    ) -> int:
-        """Purge the key and return how many nodes held it."""
+    ) -> None:
+        """Purge the key; the count is logged, not returned (it spans every person)."""
         purged = 0
         async with self._uow as repos:
             node_type = await repos.node_types.get(command.node_type_id)
@@ -102,4 +102,3 @@ class PurgeNodeTypeAttribute(
             sub_key=command.sub_key,
             purged=purged,
         )
-        return purged

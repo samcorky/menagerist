@@ -5,7 +5,7 @@
 	import { toast } from 'svelte-sonner';
 	import { captureController, type StagedPhoto } from '$lib/capture.svelte.js';
 	import { createNode, stageMedia, attachMedia } from '$lib/api/client';
-	import { errorMessage } from '$lib/api/errors';
+	import { errorMessage, uploadErrorMessage } from '$lib/api/errors';
 	import CategorySelect from '$lib/components/category-select.svelte';
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -26,7 +26,7 @@
 		const result = await stageMedia({ body: { file } });
 		if (result.error || !result.data) {
 			URL.revokeObjectURL(previewUrl);
-			toast.error("Couldn't add photo", { description: errorMessage(result.error) });
+			toast.error("Couldn't add photo", { description: uploadErrorMessage(result) });
 			staging = false;
 			return;
 		}

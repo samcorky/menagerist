@@ -27,7 +27,13 @@ class InMemoryNodeTypeRepository:
             return None
         return nt
 
-    async def get_by_slug(self, slug: str) -> NodeType | None:
+    async def get_for_removal(self, node_type_id: uuid.UUID) -> NodeType | None:
+        """Like `get`; the in-memory store has no concurrent writers to lock out."""
+        return await self.get(node_type_id)
+
+    async def get_by_slug(
+        self, slug: str, *, guard_item_write: bool = False
+    ) -> NodeType | None:
         """Return the node type with `slug`, or `None` if missing or deleted."""
         return next(
             (

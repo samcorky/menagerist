@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from app.modules.identity.application.permissions import IdentityPermission
-from app.modules.identity.application.sign_in_throttle import username_key
+from app.modules.identity.application.sign_in_throttle import user_id_key, username_key
 from app.modules.identity.domain.errors import UserNotFoundError
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
 from app.shared_kernel.cqrs import AuthorisedCommandHandler
@@ -28,9 +28,10 @@ class UnlockUser(
         IdentityUnitOfWork, UnlockUserCommand, None, IdentityPermission
     ]
 ):
-    """Clear the failed-attempt counter for an account's username.
+    """Clear the failed-attempt counters for an account.
 
-    Only the username counter: a locked client address stays locked, and the
+    The username counter (sign-in) and the user-id counter (password change),
+    not the client-address counters: a locked address stays locked, and the
     account's disabled flag is untouched. Unlocking an unlocked account is a no-op.
     """
 
@@ -48,5 +49,6 @@ class UnlockUser(
             if user is None:
                 raise UserNotFoundError("That account does not exist.")
             await repos.attempts.clear(username_key(user.username))
+            await repos.attempts.clear(user_id_key(user.id))
             await self._uow.commit()
         logger.info("user unlocked", user_id=user.id, unlocked_by=actor.id)

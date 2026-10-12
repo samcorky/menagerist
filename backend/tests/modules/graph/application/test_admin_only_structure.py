@@ -154,11 +154,9 @@ async def test_admin_purging_a_node_type_attribute_spans_everyones_items() -> No
     node_type, nodes = await _items_of_two_people(repos)
     uow = InMemoryUnitOfWork(repos)
 
-    purged = await PurgeNodeTypeAttribute(uow, RoleAuthorizationAdapter()).handle(
+    await PurgeNodeTypeAttribute(uow, RoleAuthorizationAdapter()).handle(
         PurgeNodeTypeAttributeCommand(node_type_id=node_type.id, key="rating"), ADMIN
     )
-
-    assert purged == 2
     assert [n.attributes for n in nodes] == [{"keep": "me"}, {"keep": "me"}]
 
 
@@ -240,9 +238,7 @@ async def test_admin_purging_an_edge_type_attribute_spans_everyones_connections(
     edge_type, edges = await _connections_of_two_people(repos, attributes={"n": "1"})
     uow = InMemoryUnitOfWork(repos)
 
-    purged = await PurgeEdgeTypeAttribute(uow, RoleAuthorizationAdapter()).handle(
+    await PurgeEdgeTypeAttribute(uow, RoleAuthorizationAdapter()).handle(
         PurgeEdgeTypeAttributeCommand(edge_type_id=edge_type.id, key="n"), ADMIN
     )
-
-    assert purged == 2
     assert [e.attributes for e in edges] == [{}, {}]

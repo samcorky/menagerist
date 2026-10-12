@@ -164,3 +164,16 @@ async def test_follows_the_policy_scope_for_the_actor() -> None:
     assert count == 1
     assert (mine.id, "attached") in storage._thumbnails
     assert (theirs.id, "attached") not in storage._thumbnails
+
+
+async def test_skips_an_image_that_is_too_large_to_decode() -> None:
+    """An oversize image is skipped, not fatal for the whole run."""
+    use_case, repo, storage = _make_use_case(
+        image_processor=InMemoryImageProcessor(too_large=True)
+    )
+    asset = await _add_attached(repo, storage)
+
+    count = await use_case.handle(RegenerateThumbnailsCommand(), SYSTEM_ACTOR)
+
+    assert count == 0
+    assert (asset.id, "attached") not in storage._thumbnails

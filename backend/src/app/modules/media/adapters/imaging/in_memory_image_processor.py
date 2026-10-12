@@ -1,3 +1,4 @@
+from app.modules.media.domain.errors import ImageTooLargeError
 from app.modules.media.ports.image_processor import ImageProcessorPort, ThumbnailResult
 
 
@@ -9,14 +10,18 @@ class InMemoryImageProcessor:
         *,
         generate_result: bool = True,
         fake_thumbnail_bytes: bytes = b"fake-webp-thumbnail",
+        too_large: bool = False,
     ) -> None:
         self._generate_result = generate_result
+        self._too_large = too_large
         self._fake_thumbnail_bytes = fake_thumbnail_bytes
 
     def generate_thumbnail(
         self, data: bytes, *, max_dimension: int = 320
     ) -> ThumbnailResult | None:
-        """Return a synthetic thumbnail or None if decoding should simulate failure."""
+        """Return a synthetic thumbnail, None for failure, or raise if too large."""
+        if self._too_large:
+            raise ImageTooLargeError("That image has too many pixels.")
         if not self._generate_result or not data:
             return None
         return ThumbnailResult(

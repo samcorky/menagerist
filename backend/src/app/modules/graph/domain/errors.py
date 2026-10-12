@@ -43,5 +43,9 @@ class EdgeTypeSlugConflictError(ConflictError):
     """Raised when an edge type with the given slug already exists."""
 
 
+class NodeTypeInUseError(ConflictError):
+    """Raised when removing an item type that items still use."""
+
+
 class EdgeTypeInUseError(ConflictError):
     """Raised when deleting an edge type still referenced by existing edges."""

@@ -6,6 +6,7 @@ from app.entrypoints.api.shared.permissions import (
 )
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.identity.application.permissions import IdentityPermission
+from app.modules.system.application.permissions import SystemPermission
 
 A = GraphPermission.DELETE_NODE_TYPE
 B = GraphPermission.DELETE_EDGE_TYPE
@@ -41,9 +42,11 @@ def test_expand_terminates_on_a_cycle() -> None:
 
 def test_the_real_catalogue_is_the_union_of_every_modules_enum() -> None:
     """The aggregate catalogue is the union of every module's enum."""
-    assert frozenset(GraphPermission) | frozenset(IdentityPermission) == (
-        ALL_PERMISSIONS
-    )
+    assert (
+        frozenset(GraphPermission)
+        | frozenset(IdentityPermission)
+        | frozenset(SystemPermission)
+    ) == ALL_PERMISSIONS
 
 
 def test_managing_users_implies_listing_them() -> None:

@@ -4,6 +4,10 @@ from fastapi import APIRouter, Depends
 from starlette.requests import Request
 from starlette.responses import Response
 
+from app.entrypoints.api.shared.cross_site import (
+    CrossSiteRequestError,
+    refuse_cross_site,
+)
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.entrypoints.api.shared.problem_response import error_response
 from app.modules.identity.adapters.api.cookies import (
@@ -66,6 +70,20 @@ router = APIRouter(
     prefix="/auth", tags=["Authentication"], route_class=PermissionAwareRoute
 )
 
+_CROSS_SITE = error_response(
+    CrossSiteRequestError, detail="This request was sent from another site."
+)
+
+_LOGIN_403 = error_response(
+    AccountDisabledError,
+    detail="This account has been disabled. Ask an administrator.",
+)
+_LOGIN_403[403]["description"] += (
+    " Also used for a request sent from another site"
+    + f" (`{CrossSiteRequestError.__name__}`:"
+    + ' "This request was sent from another site.").'
+)
+
 _UNAUTHENTICATED = error_response(SessionRequiredError, detail="Sign in to continue.")
 
 _THROTTLED = error_response(
@@ -95,7 +113,9 @@ async def get_auth_status(
     response_model=SetupResponse,
     status_code=201,
     operation_id="setup_first_admin",
+    dependencies=[Depends(refuse_cross_site)],
     responses={
+        **_CROSS_SITE,
         **error_response(
             SetupAlreadyDoneError, detail="Setup has already been completed."
         ),
@@ -111,7 +131,10 @@ async def setup_first_admin(
     use_case: Annotated[SetupFirstAdmin, Depends(get_setup_first_admin_use_case)],
     settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
 ) -> SetupResponse:
-    """Create the first administrator and sign them in. Only works once."""
+    """Create the first administrator and sign them in. Only works once.
+
+    Refused with 403 `cross_site_refused` when a page on another site sent it.
+    """
     result = await use_case.handle(payload.to_command(), ANONYMOUS_ACTOR)
     set_session_cookies(request, response, result.token, settings)
     return SetupResponse.from_result(result)
@@ -121,14 +144,12 @@ async def setup_first_admin(
     "/login",
     response_model=UserResponse,
     operation_id="sign_in",
+    dependencies=[Depends(refuse_cross_site)],
     responses={
         **error_response(
             InvalidCredentialsError, detail="Incorrect username or password."
         ),
-        **error_response(
-            AccountDisabledError,
-            detail="This account has been disabled. Ask an administrator.",
-        ),
+        **_LOGIN_403,
         **_THROTTLED,
     },
 )
@@ -141,6 +162,8 @@ async def sign_in(
     client_ip: Annotated[str | None, Depends(get_client_ip)],
 ) -> UserResponse:
     """Sign in, setting the session and CSRF cookies.
+
+    Refused with 403 `cross_site_refused` when a page on another site sent it.
 
     The 403 `account_disabled` answer is given only when the password was
     right; a wrong password for a disabled account gets the same 401 as any

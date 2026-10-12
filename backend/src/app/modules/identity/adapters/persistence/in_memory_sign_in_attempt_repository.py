@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from app.modules.identity.domain.throttle import after_failure
+from app.modules.identity.domain.throttle import after_failure, after_release
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -32,11 +32,22 @@ class InMemorySignInAttemptRepository:
 
     async def record_failure(
         self, key: ThrottleKey, *, limit: int, window: timedelta, now: datetime
-    ) -> None:
-        """Count one failure."""
-        self.windows[key] = after_failure(
+    ) -> AttemptWindow:
+        """Count one attempt."""
+        updated = after_failure(
             self.windows.get(key), now=now, limit=limit, window=window
         )
+        self.windows[key] = updated
+        return updated
+
+    async def release_attempt(
+        self, key: ThrottleKey, *, window_start: datetime, limit: int
+    ) -> None:
+        """Give back one attempt of the window `window_start`."""
+        current = self.windows.get(key)
+        updated = after_release(current, window_start=window_start, limit=limit)
+        if updated is not None:
+            self.windows[key] = updated
 
     async def clear(self, key: ThrottleKey) -> None:
         """Forget `key`'s failures and lock."""

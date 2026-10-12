@@ -344,13 +344,33 @@ async def test_removing_an_item_type_twice_reports_already_gone(
 ) -> None:
     """A second item type removal reports it gone."""
     world = make_world()
-    _, _, types, *_ = await _install_all(world, sample_pack)
+    _, _, types, _blue, ada, edge = await _install_all(world, sample_pack)
+    await world.graph.remove(EntityKind.CONNECTION, edge.entity_id)
+    await world.graph.remove(EntityKind.ITEM, ada.entity_id)
 
     first = await world.graph.remove(EntityKind.ITEM_TYPE, types[1].entity_id)
     second = await world.graph.remove(EntityKind.ITEM_TYPE, types[1].entity_id)
 
     assert first is RemoveResult.REMOVED
     assert second is RemoveResult.ALREADY_GONE
+
+
+async def test_an_item_type_still_used_by_an_item_is_kept(
+    make_world: MakeWorld, sample_pack: SamplePack
+) -> None:
+    """Removal re-checks use inside its own transaction and clears nothing."""
+    world = make_world()
+    _, _, types, _blue, ada, _edge = await _install_all(world, sample_pack)
+
+    result = await world.graph.remove(EntityKind.ITEM_TYPE, types[1].entity_id)
+
+    assert result is RemoveResult.REFUSED_IN_USE
+    item = await world.graph_repos.nodes.get(
+        ada.entity_id, scope=AccessScope.everyone()
+    )
+    assert item is not None
+    assert item.type == "demo-person"
+    assert await world.graph_repos.node_types.get(types[1].entity_id) is not None
 
 
 async def test_a_builtin_preset_cannot_be_removed(make_world: MakeWorld) -> None:

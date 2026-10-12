@@ -26,6 +26,7 @@ from app.modules.media.adapters.storage.in_memory_media_storage import (
 )
 
 if TYPE_CHECKING:
+    import pytest
     from fastapi import FastAPI
 
     from app.modules.media.domain.media_attachment import AttachmentTarget
@@ -308,3 +309,30 @@ def test_content_and_thumbnail_serve_a_non_latin1_filename() -> None:
         f"inline; filename=\"_ Snow (sleeve).jpg\"; filename*=UTF-8''{encoded}.jpg"
     )
     assert thumbnail.headers["content-disposition"].endswith(f"{encoded}.jpg.webp")
+
+
+def test_stage_refuses_a_decompression_bomb_with_400(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An image over the pixel limit is a 400, not a 500, and nothing is kept."""
+    import io
+
+    from PIL import Image
+
+    from app.modules.media.adapters.imaging import pillow_processor
+    from app.modules.media.adapters.imaging.pillow_processor import PillowImageProcessor
+
+    monkeypatch.setattr(pillow_processor, "MAX_IMAGE_PIXELS", 100)
+    app, _, storage = _app_with_in_memory_media()
+    app.dependency_overrides[get_image_processor] = PillowImageProcessor
+    buffer = io.BytesIO()
+    Image.new("L", (40, 40)).save(buffer, format="PNG")
+
+    response = TestClient(app).post(
+        "/api/v1/media",
+        files={"file": ("bomb.png", buffer.getvalue(), "image/png")},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["title"] == "ImageTooLargeError"
+    assert storage._files == {}

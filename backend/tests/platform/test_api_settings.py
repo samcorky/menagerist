@@ -38,6 +38,12 @@ def test_invalid_entries_are_rejected(
         _settings(monkeypatch, bad)
 
 
+def test_cors_is_same_origin_only_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No origin is allowed unless one is listed."""
+    monkeypatch.delenv("MENAGERIST_CORS_ORIGINS", raising=False)
+    assert ApiSettings().cors_origins == []
+
+
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [

@@ -149,6 +149,18 @@ describe('guardDecision', () => {
 		expect(guardDecision({ ...input, pathname: '/settings/account/' })).toEqual(allow);
 	});
 
+	it('lets anyone open the status page, signed in or not', () => {
+		const signedOut = { ...base, signedIn: false, pathname: '/status' };
+		expect(guardDecision(signedOut)).toEqual(allow);
+		expect(guardDecision({ ...signedOut, pathname: '/status/' })).toEqual(allow);
+		expect(guardDecision({ ...base, pathname: '/status' })).toEqual(allow);
+		expect(guardDecision({ ...signedOut, setupRequired: true })).toEqual(redirect('/setup'));
+		expect(guardDecision({ ...base, pathname: '/status', passwordExpired: true })).toEqual(
+			redirect('/settings/account')
+		);
+		expect(safeNext('/status')).toBe('/status');
+	});
+
 	it('lets a signed-in user see ordinary pages', () => {
 		expect(guardDecision(base)).toEqual(allow);
 		expect(guardDecision({ ...base, pathname: '/settings/users' })).toEqual(allow);

@@ -15,10 +15,7 @@ from app.entrypoints.api.shared.http_headers import (
 )
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.entrypoints.api.shared.problem_response import error_response
-from app.modules.graph.adapters.api.attribute_schemas import (
-    AttributePurgeResponse,
-    AttributeUsageResponse,
-)
+from app.modules.graph.adapters.api.attribute_schemas import AttributeUsageResponse
 from app.modules.graph.adapters.api.dependencies import (
     get_count_node_type_attribute_usage_use_case,
     get_create_node_type_use_case,
@@ -261,7 +258,7 @@ async def list_attribute_values(
 
 @router.delete(
     "/{node_type_id}/attribute/{key}",
-    response_model=AttributePurgeResponse,
+    status_code=204,
     operation_id="purge_node_type_attribute",
     responses={
         **error_response(
@@ -279,16 +276,15 @@ async def purge_node_type_attribute(
     ],
     actor: Annotated[Actor, Depends(get_current_actor)],
     sub_key: str | None = None,
-) -> AttributePurgeResponse:
+) -> None:
     """Permanently remove `key` from every node of this type (cannot be undone).
 
     With `sub_key`, `key` names a group (table) property and only `sub_key` is
     removed from each row of it, leaving the rest of the row in place.
     """
-    purged = await use_case.handle(
+    await use_case.handle(
         PurgeNodeTypeAttributeCommand(
             node_type_id=node_type_id, key=key, sub_key=sub_key
         ),
         actor,
     )
-    return AttributePurgeResponse(purged=purged)

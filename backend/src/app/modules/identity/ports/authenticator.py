@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 
@@ -20,6 +20,8 @@ class VerifiedIdentity:
 
     subject: str
     display_name: str
+    # The stored hash the password matched; a later step refuses if it changed.
+    credential_hash: str = field(repr=False)
 
 
 class Authenticator(Protocol):

@@ -6,6 +6,11 @@ import pytest
 
 from app.modules.identity.domain.errors import UsernameTakenError
 from app.modules.identity.domain.session import Session
+from app.modules.identity.domain.throttle import (
+    AttemptWindow,
+    ThrottleKey,
+    ThrottleKind,
+)
 from app.modules.identity.domain.user import Role
 
 if TYPE_CHECKING:
@@ -130,3 +135,22 @@ async def test_setup_lock_and_locking_admin_count(
     await world.users.add(make_user("member"))
     await world.users.lock_admin_changes()
     assert await world.users.count_admins() == 1
+
+
+async def test_attempt_release_gives_one_back_and_ignores_unknown_keys(
+    world: World,
+) -> None:
+    """A release lowers the count of its own window and does nothing otherwise."""
+    key = ThrottleKey(kind=ThrottleKind.USERNAME, digest="k" * 64)
+    window = timedelta(minutes=15)
+    for _ in range(3):
+        await world.attempts.record_failure(key, limit=2, window=window, now=NOW)
+
+    await world.attempts.release_attempt(key, window_start=NOW, limit=2)
+    await world.attempts.release_attempt(key, window_start=NOW, limit=2)
+    await world.attempts.release_attempt(
+        ThrottleKey(kind=ThrottleKind.IP, digest="x" * 64), window_start=NOW, limit=2
+    )
+
+    assert world.attempts.windows[key] == AttemptWindow(count=1, window_start=NOW)
+    assert list(world.attempts.windows) == [key]

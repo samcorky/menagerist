@@ -9,6 +9,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.modules.identity.adapters.persistence.models import (
+    SessionModel,
     SignInAttemptModel,
     UserModel,
 )
@@ -25,14 +26,30 @@ from app.modules.identity.adapters.security.in_memory_password_hasher import (
 from app.modules.identity.adapters.security.password_authenticator import (
     PasswordAuthenticator,
 )
+from app.modules.identity.adapters.security.session_token_generator import (
+    SecretsSessionTokenGenerator,
+)
+from app.modules.identity.application.change_password import (
+    ChangePassword,
+    ChangePasswordCommand,
+)
+from app.modules.identity.application.sign_in import SignIn, SignInCommand
+from app.modules.identity.application.sign_in_throttle import SignInThrottle
+from app.modules.identity.domain.errors import (
+    InvalidCredentialsError,
+    SignInThrottledError,
+)
 from app.modules.identity.domain.throttle import ThrottleKey, ThrottleKind
 from app.modules.identity.domain.user import User
 from app.modules.identity.ports.authenticator import PasswordCredentials
+from app.shared_kernel.actor import ANONYMOUS_ACTOR, Actor
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from sqlalchemy.ext.asyncio import AsyncSession
+
+    from app.modules.identity.ports.authenticator import VerifiedIdentity
 
 pytestmark = pytest.mark.integration
 
@@ -48,6 +65,7 @@ async def factory(
         yield sessions
     finally:
         async with sessions.begin() as session:
+            await session.execute(delete(SessionModel))
             await session.execute(delete(UserModel))
             await session.execute(delete(SignInAttemptModel))
         await engine.dispose()
@@ -154,3 +172,106 @@ async def test_slow_verify_does_not_hold_a_connection(postgres_url: str) -> None
     assert results == [None] * 6
     assert query_ms < 400
     assert elapsed < 3
+
+
+class _CountingHasher(InMemoryPasswordHasher):
+    def __init__(self) -> None:
+        self.guesses = 0
+
+    def verify(self, password: str, hashed: str) -> bool:
+        if password != "decoy":
+            self.guesses += 1
+        return super().verify(password, hashed)
+
+
+async def test_parallel_guesses_never_verify_more_than_the_limit(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Thirty parallel wrong guesses from distinct addresses: five are checked."""
+    await _add_user(factory)
+    hasher = _CountingHasher()
+
+    def new_sign_in() -> SignIn:
+        # One unit of work per request, as in the app.
+        return SignIn(
+            create_identity_uow(factory),
+            PasswordAuthenticator(
+                create_identity_uow(factory), hasher, decoy_hash="fake$decoy"
+            ),
+            SecretsSessionTokenGenerator(),
+            hasher,
+            SignInThrottle(),
+            decoy_hash=hasher.hash("decoy"),
+            session_ttl=timedelta(hours=1),
+        )
+
+    async def guess(i: int) -> str:
+        try:
+            await new_sign_in().handle(
+                SignInCommand(
+                    username="racer", password=f"wrong-{i}", client_ip=f"10.0.0.{i}"
+                ),
+                ANONYMOUS_ACTOR,
+            )
+        except (InvalidCredentialsError, SignInThrottledError) as error:
+            return type(error).__name__
+        raise AssertionError("a wrong password signed in")
+
+    outcomes = await asyncio.gather(*(guess(i) for i in range(30)))
+
+    assert hasher.guesses == 5
+    assert outcomes.count("InvalidCredentialsError") == 5
+    assert outcomes.count("SignInThrottledError") == 25
+
+
+async def test_a_password_change_between_check_and_session_voids_the_sign_in(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """On Postgres the old password cannot mint a session after a change."""
+    user = await _add_user(factory)
+    hasher = InMemoryPasswordHasher()
+    tokens = SecretsSessionTokenGenerator()
+    throttle = SignInThrottle()
+    change = ChangePassword(
+        create_identity_uow(factory),
+        hasher,
+        tokens,
+        throttle,
+        session_ttl=timedelta(hours=1),
+    )
+
+    class _Racing:
+        def __init__(self) -> None:
+            self.inner = PasswordAuthenticator(
+                create_identity_uow(factory), hasher, decoy_hash="fake$decoy"
+            )
+
+        async def authenticate(self, credentials: object) -> VerifiedIdentity | None:
+            identity = await self.inner.authenticate(credentials)  # type: ignore[arg-type]
+            await change.handle(
+                ChangePasswordCommand(
+                    current_password="password-123",
+                    new_password="a-much-better-one",
+                ),
+                Actor(id=user.id, roles=frozenset({"member"})),
+            )
+            return identity
+
+    sign_in = SignIn(
+        create_identity_uow(factory),
+        _Racing(),
+        tokens,
+        hasher,
+        throttle,
+        decoy_hash="fake$decoy",
+        session_ttl=timedelta(hours=1),
+    )
+
+    with pytest.raises(InvalidCredentialsError):
+        await sign_in.handle(
+            SignInCommand(username="racer", password="password-123"), ANONYMOUS_ACTOR
+        )
+
+    async with factory() as session:
+        count = len((await session.execute(select(SessionModel.id))).scalars().all())
+    assert count == 1  # only the one ChangePassword started

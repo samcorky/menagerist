@@ -78,6 +78,10 @@ The app is available at [http://localhost:8080](http://localhost:8080).
 
 **First visit:** Menagerist asks you to create the administrator account (a username and a password of at least 10 characters). Anything already in the database is adopted by that account. The administrator can then add other people under Settings > Users, and each person sees only their own items. Accounts are local to your instance; there is no email or external sign-in yet. If you forget the administrator password, reset it from the command line: `docker compose exec menagerist menagerist identity reset-password --username <name>` (see [CONTRIBUTING.md](CONTRIBUTING.md#first-run-and-accounts)).
 
+**Behind a reverse proxy.** Set `MENAGERIST_TRUSTED_PROXIES` to the proxy's address or network, and `MENAGERIST_COOKIE_SECURE=true` if the proxy terminates TLS. Without the first, every visitor shares the proxy's address and 20 failed sign-ins from anyone lock sign-in for everyone for 15 minutes; without the second, the session cookie may be sent without `Secure`. Details are in [CONTRIBUTING.md](CONTRIBUTING.md#first-run-and-accounts).
+
+**Deployment notes.** No other website may call the API unless you list its origin in `MENAGERIST_CORS_ORIGINS` (only needed if the frontend is hosted separately). Menagerist does not send `Strict-Transport-Security`; set it at the TLS-terminating proxy, for example Caddy `header Strict-Transport-Security "max-age=15552000"` or nginx `add_header Strict-Transport-Security "max-age=15552000" always;`. The public `/api/health/ready` answers only pass or fail; measurements are for administrators at `/api/health/ready/detail`.
+
 ### The same thing, one `poe` task at a time
 
 ```sh

@@ -153,7 +153,7 @@ async def test_a_correct_password_on_a_disabled_account_is_not_a_failure(
             await _attempt_ok(cases, ip="198.51.100.1")
 
     assert world.attempts.windows[username_key("alice")].count == 1
-    assert ip_key("198.51.100.1") not in world.attempts.windows
+    assert world.attempts.windows[ip_key("198.51.100.1")].count == 0
 
 
 # --- throttling -----------------------------------------------------------
@@ -383,9 +383,10 @@ async def test_change_password_is_throttled_by_address(
     """An address that has failed too often is refused for any user."""
     user = make_user("alice")
     await world.users.add(user)
-    await world.attempts.record_failure(
-        ip_key("203.0.113.7"), limit=1, window=WINDOW, now=NOW
-    )
+    for _ in range(20):
+        await world.attempts.record_failure(
+            ip_key("203.0.113.7"), limit=20, window=WINDOW, now=NOW
+        )
 
     with pytest.raises(SignInThrottledError):
         await cases.change_password.handle(
@@ -416,7 +417,9 @@ async def test_change_password_rejects_the_same_password(
 
     assert str(caught.value) == "The new password must differ from the current one."
     assert user.password_hash == original
-    assert not world.uow.committed
+    assert await world.sessions.delete_for_user(user.id) == 0
+    # A correct current password is not a failure, whatever the new one is.
+    assert world.attempts.windows[user_id_key(user.id)].count == 0
 
 
 # --- unlock ---------------------------------------------------------------

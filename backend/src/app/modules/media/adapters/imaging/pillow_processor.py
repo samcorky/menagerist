@@ -1,11 +1,17 @@
 import io
+import warnings
 
 import structlog
 from PIL import Image, ImageOps, UnidentifiedImageError
 
+from app.modules.media.domain.errors import ImageTooLargeError
 from app.modules.media.ports.image_processor import ThumbnailResult
 
 logger = structlog.get_logger()
+
+# Decoding needs several bytes per pixel and a few copies, so cap the raster.
+# Pillow warns above this and raises above twice it; both are refused here.
+MAX_IMAGE_PIXELS = 40_000_000
 
 
 class PillowImageProcessor:
@@ -21,12 +27,20 @@ class PillowImageProcessor:
     def generate_thumbnail(
         data: bytes, *, max_dimension: int = 320
     ) -> ThumbnailResult | None:
-        """Return downscaled WEBP thumbnail or None if data is undecodable."""
+        """Return downscaled WEBP thumbnail or None if data is undecodable.
+
+        Raises:
+            ImageTooLargeError: If the image exceeds `MAX_IMAGE_PIXELS` (a
+                decompression bomb).
+        """
         logger.debug(
             "generating thumbnail", max_dimension=max_dimension, input_bytes=len(data)
         )
+        Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
         try:
-            loaded = Image.open(io.BytesIO(data))
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", Image.DecompressionBombWarning)
+                loaded = Image.open(io.BytesIO(data))
             image: Image.Image = ImageOps.exif_transpose(loaded)
             image.thumbnail((max_dimension, max_dimension))
             buffer = io.BytesIO()
@@ -37,6 +51,8 @@ class PillowImageProcessor:
             else:
                 save_image = image.convert("RGB")
             save_image.save(buffer, format="WEBP", quality=85, method=6)
+        except (Image.DecompressionBombError, Image.DecompressionBombWarning) as error:
+            raise ImageTooLargeError("That image has too many pixels.") from error
         except UnidentifiedImageError, OSError, ValueError:
             return None
         result = ThumbnailResult(

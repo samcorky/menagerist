@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING
 
+import pytest
+
 from app.modules.media.adapters.imaging.in_memory_image_processor import (
     InMemoryImageProcessor,
 )
@@ -14,7 +16,7 @@ from app.modules.media.adapters.storage.in_memory_media_storage import (
     InMemoryMediaStorage,
 )
 from app.modules.media.application.stage_media import StageMedia, StageMediaCommand
-from app.modules.media.domain.errors import MediaFileTooLargeError
+from app.modules.media.domain.errors import ImageTooLargeError, MediaFileTooLargeError
 from app.modules.media.domain.media_asset import MediaStatus
 from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
@@ -148,3 +150,49 @@ async def test_stage_raises_when_file_too_large() -> None:
             ),
             SYSTEM_ACTOR,
         )
+
+
+async def test_stage_logs_a_sanitised_filename() -> None:
+    """A client filename with escape codes or great length is neutralised in logs."""
+    from structlog.testing import capture_logs
+
+    use_case, _, _ = _make_use_case()
+    hostile = "\x1b[2Jevil\r\n" + "a" * 500 + ".jpg"
+
+    with capture_logs() as logs:
+        await use_case.handle(
+            StageMediaCommand(
+                filename=hostile, content_type="image/jpeg", stream=_stream(b"x")
+            ),
+            SYSTEM_ACTOR,
+        )
+
+    (entry,) = [e for e in logs if e["event"] == "media staged"]
+    assert "\x1b" not in entry["filename"]
+    assert "\r" not in entry["filename"]
+    assert entry["filename"].startswith("\\x1b[2Jevil\\x0d\\x0a")
+    assert len(entry["filename"]) <= 103
+
+
+async def test_stage_refuses_an_image_too_large_to_decode_and_cleans_up() -> None:
+    """A decompression bomb is a validation error; nothing stays staged."""
+    use_case, repo, storage = _make_use_case(InMemoryImageProcessor(too_large=True))
+
+    with pytest.raises(ImageTooLargeError):
+        await use_case.handle(
+            StageMediaCommand(
+                filename="bomb.png",
+                content_type="image/png",
+                sniffed_content_type="image/png",
+                stream=_stream(b"data"),
+            ),
+            SYSTEM_ACTOR,
+        )
+
+    assert storage._files == {}
+    assert (
+        await repo.list_by_status(
+            status=MediaStatus.STAGED, scope=AccessScope.everyone()
+        )
+        == []
+    )

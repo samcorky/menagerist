@@ -16,6 +16,9 @@ from app.modules.identity.adapters.persistence.unit_of_work import (
     create_identity_uow,
     create_identity_uow_on_session,
 )
+from app.modules.identity.adapters.security.bounded_password_hasher import (
+    BoundedPasswordHasher,
+)
 from app.modules.identity.adapters.security.password_authenticator import (
     PasswordAuthenticator,
 )
@@ -70,9 +73,12 @@ if TYPE_CHECKING:
 
 @cache
 def _hasher() -> PasswordHasher:
-    return PasswordHasherRegistry(
-        {SCRYPT_SCHEME: ScryptPasswordHasher()},
-        default=get_identity_settings().password_hasher,
+    settings = get_identity_settings()
+    return BoundedPasswordHasher(
+        PasswordHasherRegistry(
+            {SCRYPT_SCHEME: ScryptPasswordHasher()}, default=settings.password_hasher
+        ),
+        concurrency=settings.password_hash_concurrency,
     )
 
 
@@ -221,8 +227,12 @@ def get_sign_out_use_case(
 def get_get_current_user_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
     tokens: Annotated[SessionTokenGenerator, Depends(get_session_token_generator)],
+    settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
 ) -> GetCurrentUser:
-    return GetCurrentUser(uow, tokens)
+    idle = settings.session_idle_hours
+    return GetCurrentUser(
+        uow, tokens, idle_timeout=timedelta(hours=idle) if idle else None
+    )
 
 
 def get_get_setup_status_use_case(

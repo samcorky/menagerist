@@ -73,12 +73,12 @@ def _fail(message: str) -> NoReturn:
     raise SystemExit(1)
 
 
-def _read_password() -> str:
+def _read_password(*, use_settings: bool = True) -> str:
     """Read the password from settings (env or secret file) or a hidden prompt.
 
-    Never printed or logged.
+    With `use_settings` false it always prompts. Never printed or logged.
     """
-    configured = get_identity_cli_settings().initial_password
+    configured = get_identity_cli_settings().initial_password if use_settings else None
     if configured is not None and configured.get_secret_value():
         return configured.get_secret_value()
     first = getpass.getpass("Password: ")
@@ -178,13 +178,25 @@ def create_admin(*, username: str, display_name: str | None = None) -> None:
 
 
 @identity_app.command
-def reset_password(*, username: str) -> None:
+def reset_password(
+    *,
+    username: str,
+    from_settings: Annotated[
+        bool, Parameter(name="--from-settings", negative="")
+    ] = False,
+) -> None:
     """Give an account a new initial password and end its sessions.
+
+    Always asks for the password (hidden, confirmed) unless `--from-settings`
+    is given, so a bootstrap password left in the environment or a secret file
+    is never applied to an account by accident.
 
     Args:
         username: Username of the account to reset.
+        from_settings: Read the password from MENAGERIST_INITIAL_PASSWORD or the
+            secret file instead of prompting.
     """
-    password = _read_password()
+    password = _read_password(use_settings=from_settings)
 
     async def _reset() -> str:
         from app.modules.identity.adapters.persistence.unit_of_work import (

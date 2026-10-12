@@ -1,9 +1,11 @@
 """Router tests for /api/v1/auth and /api/v1/user over in-memory adapters."""
 
 import uuid
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import pytest
+import time_machine
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
@@ -205,6 +207,24 @@ def test_cookie_secure_setting_overrides_the_scheme(world: World, secure: bool) 
     cookies = _cookie_headers(api.setup())
 
     assert ("secure" in cookies[SESSION_COOKIE].lower()) is secure
+
+
+def test_idle_session_is_a_401_like_an_expired_one(world: World) -> None:
+    """With an idle limit, a session unused for longer is refused; use keeps it."""
+    api = Api(world, settings=IdentitySettings(session_idle_hours=1))
+    api.setup()
+    now = datetime.now(UTC)
+
+    with time_machine.travel(now + timedelta(minutes=50), tick=False):
+        assert api.client.get(f"{AUTH}/me").status_code == 200
+    with time_machine.travel(now + timedelta(minutes=100), tick=False):
+        assert api.client.get(f"{AUTH}/me").status_code == 200
+    with time_machine.travel(now + timedelta(minutes=170), tick=False):
+        idle = api.client.get(f"{AUTH}/me")
+
+    assert idle.status_code == 401
+    assert idle.json()["type"] == "unauthenticated"
+    assert world.sessions._sessions == {}
 
 
 def test_setup_twice_is_a_conflict(api: Api) -> None:
@@ -420,6 +440,25 @@ def test_cors_never_allows_credentials(api: Api) -> None:
     )
 
     assert "access-control-allow-credentials" not in response.headers
+
+
+def test_cors_is_same_origin_only_by_default(api: Api) -> None:
+    """With no origins listed, another site gets no CORS permission at all."""
+    simple = api.client.get(
+        f"{AUTH}/status", headers={"Origin": "https://evil.example"}
+    )
+    preflight = api.client.options(
+        f"{AUTH}/login",
+        headers={
+            "Origin": "https://evil.example",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+
+    assert simple.status_code == 200
+    assert "access-control-allow-origin" not in simple.headers
+    assert preflight.status_code == 400
+    assert "access-control-allow-origin" not in preflight.headers
 
 
 # --- change password -------------------------------------------------------
@@ -826,3 +865,48 @@ def test_openapi_documents_the_new_responses_and_permissions() -> None:
     }
     for (path, method), permission in expected.items():
         assert paths[path][method]["x-required-permission"] == permission
+
+
+# --- cross-site guard --------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("url", "body"),
+    [
+        (f"{AUTH}/setup", SETUP_BODY),
+        (f"{AUTH}/login", {"username": "alice", "password": "password-123"}),
+    ],
+)
+async def test_public_posts_refuse_cross_site_requests(
+    api: Api, url: str, body: dict[str, str]
+) -> None:
+    """A page on another site cannot reach setup or login, even with CORS `*`."""
+    for headers in (
+        {"Origin": "https://evil.example"},
+        {"Sec-Fetch-Site": "cross-site"},
+    ):
+        response = api.client.post(url, json=body, headers=headers)
+        assert response.status_code == 403
+        assert response.json()["type"] == "cross_site_refused"
+    assert await api.world.users.count() == 0
+    assert not api.client.cookies.get(SESSION_COOKIE)
+
+
+def test_same_origin_setup_and_login_still_work(api: Api) -> None:
+    """The SPA's own requests carry its origin and pass."""
+    origin = {"Origin": "http://testserver", "Sec-Fetch-Site": "same-origin"}
+    response = api.client.post(f"{AUTH}/setup", json=SETUP_BODY, headers=origin)
+    assert response.status_code == 201
+    login = {"username": "admin", "password": "password-123"}
+    client = api.new_client()
+    assert client.post(f"{AUTH}/login", json=login, headers=origin).status_code == 200
+
+
+def test_the_openapi_documents_the_cross_site_refusal(api: Api) -> None:
+    """Both public POSTs list a 403 for it."""
+    paths = api.app.openapi()["paths"]
+    setup = paths[f"{AUTH}/setup"]["post"]["responses"]
+    login = paths[f"{AUTH}/login"]["post"]["responses"]
+    assert "another site" in setup["403"]["description"]
+    assert "CrossSiteRequestError" in login["403"]["description"]
+    assert "disabled account" in login["403"]["description"]

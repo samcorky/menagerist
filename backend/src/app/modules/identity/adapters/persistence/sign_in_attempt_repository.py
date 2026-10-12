@@ -1,10 +1,14 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import case, delete, null, select, tuple_
+from sqlalchemy import case, delete, null, select, tuple_, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.modules.identity.adapters.persistence.models import SignInAttemptModel
-from app.modules.identity.domain.throttle import ThrottleKey, ThrottleKind
+from app.modules.identity.domain.throttle import (
+    AttemptWindow,
+    ThrottleKey,
+    ThrottleKind,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -16,7 +20,7 @@ if TYPE_CHECKING:
 class SqlAlchemySignInAttemptRepository:
     """Postgres-backed `SignInAttemptRepository`, scoped to one session.
 
-    A failure is one `INSERT ... ON CONFLICT DO UPDATE`, so concurrent failures
+    An attempt is one `INSERT ... ON CONFLICT DO UPDATE`, so concurrent attempts
     on a key serialise on its row and none is lost.
     """
 
@@ -43,8 +47,8 @@ class SqlAlchemySignInAttemptRepository:
 
     async def record_failure(
         self, key: ThrottleKey, *, limit: int, window: timedelta, now: datetime
-    ) -> None:
-        """Count one failure atomically (a fixed window, locking at `limit`)."""
+    ) -> AttemptWindow:
+        """Count one attempt atomically (a fixed window, locking at `limit`)."""
         table = SignInAttemptModel
         first_lock = now + window if limit <= 1 else None
         expired = table.window_start <= now - window
@@ -70,7 +74,37 @@ class SqlAlchemySignInAttemptRepository:
                 ),
             },
         )
-        await self._session.execute(stmt)
+        returning = stmt.returning(
+            table.failure_count, table.window_start, table.locked_until
+        )
+        count, window_start, locked_until = (
+            await self._session.execute(returning)
+        ).one()
+        return AttemptWindow(
+            count=count, window_start=window_start, locked_until=locked_until
+        )
+
+    async def release_attempt(
+        self, key: ThrottleKey, *, window_start: datetime, limit: int
+    ) -> None:
+        """Give back one attempt of the window `window_start`."""
+        table = SignInAttemptModel
+        await self._session.execute(
+            update(table)
+            .where(
+                table.key_type == key.kind.value,
+                table.key_hash == key.digest,
+                table.window_start == window_start,
+                table.failure_count > 0,
+            )
+            .values(
+                failure_count=table.failure_count - 1,
+                locked_until=case(
+                    (table.failure_count - 1 >= limit, table.locked_until),
+                    else_=null(),
+                ),
+            )
+        )
 
     async def clear(self, key: ThrottleKey) -> None:
         """Forget `key`'s failures and lock; a no-op if it has none."""

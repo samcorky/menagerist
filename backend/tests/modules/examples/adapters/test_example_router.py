@@ -4,6 +4,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from starlette.testclient import TestClient
+from structlog.testing import capture_logs
 
 from app.entrypoints.api import create_app
 from app.entrypoints.api.shared.dependencies import get_current_actor
@@ -167,10 +168,10 @@ def test_uninstall_when_not_installed_is_a_409(make_world: MakeWorld) -> None:
     assert client.delete("/api/v1/example/demo/installation").status_code == 409
 
 
-def test_a_failed_install_is_a_500_problem_with_the_cause(
+def test_a_failed_install_is_a_500_problem_without_the_cause(
     make_world: MakeWorld,
 ) -> None:
-    """An unexpected failure surfaces as a problem response naming the cause."""
+    """An unexpected failure is a fixed 500 problem; the cause goes to the log."""
     world = make_world()
 
     async def boom(*_args: object, **_kwargs: object) -> None:
@@ -179,11 +180,15 @@ def test_a_failed_install_is_a_500_problem_with_the_cause(
     world.graph.create_item = boom  # type: ignore[assignment,method-assign]
     client = _client(world, raise_server_exceptions=False)
 
-    response = client.put("/api/v1/example/demo/installation")
+    with capture_logs() as logs:
+        response = client.put("/api/v1/example/demo/installation")
 
     assert response.status_code == 500
     assert response.headers["content-type"].startswith("application/problem+json")
-    assert "boom" in response.json()["detail"]
+    assert response.json()["detail"] == "An unexpected error occurred."
+    assert "boom" not in response.text
+    (entry,) = [e for e in logs if e["event"] == "unhandled exception"]
+    assert "boom" in str(entry["exc_info"])
 
 
 def test_slug_clash_is_a_409_naming_the_slug(make_world: MakeWorld) -> None:

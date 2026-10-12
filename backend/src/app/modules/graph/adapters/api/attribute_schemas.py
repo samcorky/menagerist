@@ -7,11 +7,3 @@ class AttributeUsageResponse(BaseModel):
     model_config = ConfigDict(json_schema_extra={"examples": [{"count": 12}]})
 
     count: int
-
-
-class AttributePurgeResponse(BaseModel):
-    """How many items (or connections) had an attribute key permanently removed."""
-
-    model_config = ConfigDict(json_schema_extra={"examples": [{"purged": 12}]})
-
-    purged: int

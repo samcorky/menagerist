@@ -5,7 +5,13 @@ from typing import TYPE_CHECKING
 import pytest
 import time_machine
 
-from app.modules.identity.application.get_current_user import GetCurrentUserQuery
+from app.modules.identity.adapters.security.session_token_generator import (
+    InMemorySessionTokenGenerator,
+)
+from app.modules.identity.application.get_current_user import (
+    GetCurrentUser,
+    GetCurrentUserQuery,
+)
 from app.modules.identity.application.sign_in import SignInCommand
 from app.modules.identity.application.sign_out import SignOutCommand
 from app.modules.identity.domain.errors import (
@@ -208,3 +214,79 @@ async def test_sign_out_removes_the_session_and_ignores_unknown_tokens(
     )
     assert first_user is None
     assert second_user is not None
+
+
+IDLE = timedelta(minutes=30)
+
+
+def _idle_aware(cases: Cases, world: World) -> GetCurrentUser:
+    return GetCurrentUser(world.uow, InMemorySessionTokenGenerator(), idle_timeout=IDLE)
+
+
+async def test_idle_limit_is_off_by_default(
+    cases: Cases, world: World, make_user: MakeUser
+) -> None:
+    """Without an idle timeout a session unused until its expiry still works."""
+    await world.users.add(make_user("alice"))
+    with time_machine.travel(NOW, tick=False):
+        result = await _sign_in(cases)
+    with time_machine.travel(NOW + TTL - timedelta(seconds=1), tick=False):
+        found = await cases.current_user.handle(
+            GetCurrentUserQuery(token=result.token), ANONYMOUS_ACTOR
+        )
+
+    assert found is not None
+
+
+async def test_an_idle_session_is_rejected_and_removed_like_an_expired_one(
+    cases: Cases, world: World, make_user: MakeUser
+) -> None:
+    """Unused for longer than the limit (but inside the TTL): nobody, row gone."""
+    await world.users.add(make_user("alice"))
+    with time_machine.travel(NOW, tick=False):
+        result = await _sign_in(cases)
+    idle_aware = _idle_aware(cases, world)
+    with time_machine.travel(NOW + IDLE + timedelta(seconds=1), tick=False):
+        found = await idle_aware.handle(
+            GetCurrentUserQuery(token=result.token), ANONYMOUS_ACTOR
+        )
+
+    assert found is None
+    assert await world.sessions.get_by_token_hash(_hash(result.token)) is None
+    assert world.uow.committed is True
+
+
+async def test_the_idle_boundary_is_still_active(
+    cases: Cases, world: World, make_user: MakeUser
+) -> None:
+    """Exactly at the limit the session is kept."""
+    await world.users.add(make_user("alice"))
+    with time_machine.travel(NOW, tick=False):
+        result = await _sign_in(cases)
+    with time_machine.travel(NOW + IDLE, tick=False):
+        found = await _idle_aware(cases, world).handle(
+            GetCurrentUserQuery(token=result.token), ANONYMOUS_ACTOR
+        )
+
+    assert found is not None
+
+
+async def test_activity_keeps_a_session_alive_until_the_hard_cap(
+    cases: Cases, world: World, make_user: MakeUser
+) -> None:
+    """Regular use never goes idle, but the TTL still ends the session."""
+    await world.users.add(make_user("alice"))
+    idle_aware = _idle_aware(cases, world)
+    query = GetCurrentUserQuery
+    with time_machine.travel(NOW, tick=False):
+        result = await _sign_in(cases)
+    for minutes in (25, 50):
+        with time_machine.travel(NOW + timedelta(minutes=minutes), tick=False):
+            assert (
+                await idle_aware.handle(query(token=result.token), ANONYMOUS_ACTOR)
+                is not None
+            )
+    with time_machine.travel(NOW + TTL + timedelta(seconds=1), tick=False):
+        capped = await idle_aware.handle(query(token=result.token), ANONYMOUS_ACTOR)
+
+    assert capped is None

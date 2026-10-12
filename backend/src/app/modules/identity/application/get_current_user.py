@@ -44,16 +44,25 @@ class GetCurrentUser(
     once a minute, so most calls write nothing.
     """
 
-    def __init__(self, uow: IdentityUnitOfWork, tokens: SessionTokenGenerator) -> None:
+    def __init__(
+        self,
+        uow: IdentityUnitOfWork,
+        tokens: SessionTokenGenerator,
+        *,
+        idle_timeout: timedelta | None = None,
+    ) -> None:
         super().__init__(uow)
         self._tokens = tokens
+        self._idle_timeout = idle_timeout
 
     async def handle(
         self, query: GetCurrentUserQuery, actor: Actor
     ) -> ResolvedSession | None:
         """Return the user and session id, or `None` if there is no usable session.
 
-        A session is unusable when unknown, expired or owned by a disabled user.
+        A session is unusable when unknown, expired, idle for longer than the
+        idle timeout (checked against `last_seen_at`, which moves at most once a
+        minute) or owned by a disabled user. Expired and idle sessions are removed.
         """
         now = datetime.now(UTC)
         async with self._uow as repos:
@@ -62,7 +71,7 @@ class GetCurrentUser(
             )
             if session is None:
                 return None
-            if session.is_expired(now):
+            if session.is_expired(now) or session.is_idle(now, self._idle_timeout):
                 await repos.sessions.delete(session.id)
                 await self._uow.commit()
                 return None
