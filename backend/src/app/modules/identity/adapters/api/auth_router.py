@@ -68,6 +68,16 @@ router = APIRouter(
 
 _UNAUTHENTICATED = error_response(SessionRequiredError, detail="Sign in to continue.")
 
+_THROTTLED = error_response(
+    SignInThrottledError, detail="Too many failed attempts. Try again later."
+)
+_THROTTLED[429]["headers"] = {
+    "Retry-After": {
+        "description": "Seconds to wait before trying again.",
+        "schema": {"type": "integer"},
+    }
+}
+
 
 @public_router.get(
     "/status", response_model=AuthStatusResponse, operation_id="get_auth_status"
@@ -119,9 +129,7 @@ async def setup_first_admin(
             AccountDisabledError,
             detail="This account has been disabled. Ask an administrator.",
         ),
-        **error_response(
-            SignInThrottledError, detail="Too many failed attempts. Try again later."
-        ),
+        **_THROTTLED,
     },
 )
 async def sign_in(
@@ -233,9 +241,7 @@ _CHANGE_PASSWORD_400[400]["description"] += (
     responses={
         **_UNAUTHENTICATED,
         **_CHANGE_PASSWORD_400,
-        **error_response(
-            SignInThrottledError, detail="Too many failed attempts. Try again later."
-        ),
+        **_THROTTLED,
     },
 )
 async def change_password(

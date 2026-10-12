@@ -84,10 +84,6 @@ class _RecordingPolicy:
         self.calls.append("delete")
         self._inner.assert_can_delete(actor, owner_id)
 
-    def require_admin(self, actor: Actor) -> None:
-        self.calls.append("admin")
-        self._inner.require_admin(actor)
-
 
 async def _alices_item(repos: GraphRepos, **kwargs: Any) -> Node:  # noqa: ANN401
     node = Node.create(owner_id=ALICE.id, name="Alien", **kwargs)

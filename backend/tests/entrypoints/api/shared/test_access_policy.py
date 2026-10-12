@@ -5,7 +5,7 @@ import pytest
 from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
-from app.shared_kernel.errors import ForbiddenError, NotFoundError
+from app.shared_kernel.errors import NotFoundError
 
 ALICE = Actor(id=uuid.uuid4(), roles=frozenset({"member"}))
 BOB = Actor(id=uuid.uuid4(), roles=frozenset({"member"}))
@@ -55,11 +55,3 @@ def test_content_with_no_owner_is_visible_to_nobody() -> None:
     """Content with no owner is visible to nobody."""
     with pytest.raises(NotFoundError):
         policy.assert_can_view(ALICE, None)
-
-
-def test_require_admin() -> None:
-    """Require admin."""
-    policy.require_admin(ADMIN)
-    policy.require_admin(SYSTEM_ACTOR)
-    with pytest.raises(ForbiddenError):
-        policy.require_admin(ALICE)

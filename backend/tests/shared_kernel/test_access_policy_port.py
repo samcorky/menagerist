@@ -5,7 +5,6 @@ EXPECTED = {
     "assert_can_view",
     "assert_can_modify",
     "assert_can_delete",
-    "require_admin",
 }
 
 

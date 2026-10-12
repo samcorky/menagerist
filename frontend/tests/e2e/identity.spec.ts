@@ -16,7 +16,7 @@ const userRow = (page: Page, user: E2EUser) =>
 
 async function signInThroughForm(page: Page, username: string, password: string) {
 	await page.getByLabel('Username').fill(username);
-	await page.getByLabel('Password').fill(password);
+	await page.getByLabel('Password', { exact: true }).fill(password);
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
@@ -117,4 +117,45 @@ test('an administrator unlocks a locked-out account', async ({
 	await expect(row.getByRole('button', { name: 'Unlock' })).toHaveCount(0);
 
 	await signInViaApi(workerBaseURL, user.username, user.password);
+});
+
+test('the password toggle shows and hides the typed text without submitting', async ({
+	browser,
+	workerBaseURL
+}) => {
+	const anonymous = await browser.newContext({
+		baseURL: workerBaseURL,
+		storageState: { cookies: [], origins: [] },
+		extraHTTPHeaders: {}
+	});
+	const login = await anonymous.newPage();
+	let submitted = false;
+	await login.route('**/api/v1/auth/login', (route) => {
+		submitted = true;
+		return route.abort();
+	});
+	await login.goto('/login');
+
+	const field = login.getByLabel('Password', { exact: true });
+	await field.fill('not-a-real-one');
+	await expect(field).toHaveAttribute('type', 'password');
+
+	const show = login.getByRole('button', { name: 'Show password' });
+	await expect(show).toHaveAttribute('aria-pressed', 'false');
+	await show.click();
+	const hide = login.getByRole('button', { name: 'Hide password' });
+	await expect(hide).toHaveAttribute('aria-pressed', 'true');
+	await expect(field).toHaveAttribute('type', 'text');
+	await expect(field).toHaveValue('not-a-real-one');
+
+	// Keyboard: the toggle follows the field in tab order and Space flips it back.
+	await field.focus();
+	await login.keyboard.press('Tab');
+	await expect(hide).toBeFocused();
+	await login.keyboard.press('Space');
+	await expect(field).toHaveAttribute('type', 'password');
+	await expect(login.getByRole('button', { name: 'Show password' })).toBeVisible();
+	expect(submitted).toBe(false);
+	await expect(login).toHaveURL(/\/login/);
+	await anonymous.close();
 });

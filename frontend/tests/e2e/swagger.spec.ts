@@ -70,7 +70,7 @@ test('signs in through the app, uses the API and signs out from the banner', asy
 	await banner(page).getByRole('link', { name: 'Sign in' }).click();
 	await expect(page).toHaveURL(/\/login\?next=%2Fapi%2Fdocs/);
 	await page.getByLabel('Username').fill(E2E_ADMIN.username);
-	await page.getByLabel('Password').fill(E2E_ADMIN.password);
+	await page.getByLabel('Password', { exact: true }).fill(E2E_ADMIN.password);
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 	await expect(page).toHaveURL(/\/api\/docs$/);
 	await expectChrome(page, `Signed in as ${E2E_ADMIN.displayName}`);
@@ -180,7 +180,7 @@ test('locks follow the real session without changing requests', async ({ browser
 
 	await banner(page).getByRole('link', { name: 'Sign in' }).click();
 	await page.getByLabel('Username').fill(E2E_ADMIN.username);
-	await page.getByLabel('Password').fill(E2E_ADMIN.password);
+	await page.getByLabel('Password', { exact: true }).fill(E2E_ADMIN.password);
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 	await expectChrome(page, 'Signed in as');
 	await openOperation(page, 'Nodes', 'Nodes-list_nodes');

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PasswordInput from '$lib/components/password-input.svelte';
 	import { resolve } from '$app/paths';
 	import { Copy, Check, KeyRound, LockOpen, Plus, Dices } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
@@ -17,6 +18,7 @@
 	import { isLocked, lastSignIn, lockedLabel } from '$lib/users';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import BackButton from '$lib/components/back-button.svelte';
+	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -42,6 +44,8 @@
 	let creating = $state(false);
 	let createError = $state<string | null>(null);
 
+	let disableTarget = $state<UserResponse | null>(null);
+	let confirmResetTarget = $state<UserResponse | null>(null);
 	let resetTarget = $state<UserResponse | null>(null);
 	let resetPassword = $state('');
 	let resetting = $state(false);
@@ -134,6 +138,18 @@
 		const updated = result.data;
 		users = users.map((u) => (u.id === updated.id ? updated : u));
 		if (updated.id === auth.user?.id) await auth.refresh();
+	}
+
+	async function confirmDisable() {
+		const target = disableTarget;
+		if (!target) return;
+		await patch(target, { disabled: true });
+		disableTarget = null;
+	}
+
+	function confirmReset() {
+		if (confirmResetTarget) openReset(confirmResetTarget);
+		confirmResetTarget = null;
 	}
 
 	function openReset(user: UserResponse) {
@@ -287,9 +303,8 @@
 							<div class="space-y-1.5">
 								<Label for="new-user-password">Starting password</Label>
 								<div class="flex gap-2">
-									<Input
+									<PasswordInput
 										id="new-user-password"
-										class="h-11"
 										autocomplete="off"
 										autocapitalize="none"
 										spellcheck={false}
@@ -412,7 +427,10 @@
 													variant="outline"
 													class="h-11"
 													disabled={rowBusy === user.id || isMe}
-													onclick={() => patch(user, { disabled: !user.disabled })}
+													onclick={() =>
+														user.disabled
+															? patch(user, { disabled: false })
+															: (disableTarget = user)}
 												>
 													{user.disabled ? 'Enable' : 'Disable'}
 												</Button>
@@ -422,7 +440,7 @@
 													variant="outline"
 													class="h-11"
 													disabled={rowBusy === user.id}
-													onclick={() => openReset(user)}
+													onclick={() => (confirmResetTarget = user)}
 												>
 													<KeyRound class="size-4" />
 													Reset password
@@ -461,6 +479,31 @@
 	</div>
 </main>
 
+<ConfirmDialog
+	open={disableTarget !== null}
+	title="Disable {disableTarget?.display_name}?"
+	description="They are signed out and cannot sign in until re-enabled."
+	confirmLabel="Disable"
+	busyLabel="Disabling…"
+	busy={rowBusy !== null && rowBusy === disableTarget?.id}
+	onOpenChange={(open) => {
+		if (!open) disableTarget = null;
+	}}
+	onConfirm={() => void confirmDisable()}
+/>
+
+<ConfirmDialog
+	open={confirmResetTarget !== null}
+	title="Reset password for {confirmResetTarget?.display_name}?"
+	description="Their sessions end and they must choose a new password at next sign-in."
+	confirmLabel="Continue"
+	destructive={false}
+	onOpenChange={(open) => {
+		if (!open) confirmResetTarget = null;
+	}}
+	onConfirm={confirmReset}
+/>
+
 <ResponsiveDialog.Root
 	open={resetTarget !== null}
 	onOpenChange={(open) => {
@@ -481,9 +524,8 @@
 			<div class="space-y-1.5">
 				<Label for="reset-password">New starting password</Label>
 				<div class="flex gap-2">
-					<Input
+					<PasswordInput
 						id="reset-password"
-						class="h-11"
 						autocomplete="off"
 						autocapitalize="none"
 						spellcheck={false}

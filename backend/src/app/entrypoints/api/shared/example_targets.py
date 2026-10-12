@@ -165,9 +165,9 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from app.modules.examples.ports.cover_renderer import CoverRenderer
+    from app.shared_kernel.access_policy import AccessPolicy
 
 _PAGE = 1
-_POLICY = OwnerAccessPolicy()
 _GRAPH_KINDS = frozenset(
     {
         EntityKind.ITEM,
@@ -584,10 +584,13 @@ class GraphPackTarget:
     check) runs as the system actor.
     """
 
-    def __init__(self, stores: GraphStores, actor: Actor) -> None:
+    def __init__(
+        self, stores: GraphStores, actor: Actor, *, access: AccessPolicy | None = None
+    ) -> None:
         self._stores = stores
         self._actor = actor
-        self._scope = _POLICY.scope_for(actor)
+        self._access = access or OwnerAccessPolicy()
+        self._scope = self._access.scope_for(actor)
 
     async def slug_taken(self, kind: EntityKind, slug: str) -> bool:
         """Whether a live type of `kind` already has `slug`."""
@@ -642,7 +645,7 @@ class GraphPackTarget:
             extra_schema=spec.extra_schema,
         )
         async with self._stores.choice_lists() as source:
-            node = await CreateNode(self._stores.uow(), _POLICY, source).handle(
+            node = await CreateNode(self._stores.uow(), self._access, source).handle(
                 command, self._actor
             )
         return Created(entity_id=node.id, content=_node_content(node))
@@ -663,7 +666,7 @@ class GraphPackTarget:
             attributes=spec.attributes,
         )
         async with self._stores.choice_lists() as source:
-            edge = await CreateEdge(self._stores.uow(), _POLICY, source).handle(
+            edge = await CreateEdge(self._stores.uow(), self._access, source).handle(
                 command, self._actor
             )
         return Created(entity_id=edge.id, content=_edge_content(edge))
@@ -751,7 +754,7 @@ class GraphPackTarget:
         uow = self._stores.uow()
         try:
             if kind is EntityKind.ITEM:
-                await DeleteNode(uow, _POLICY).handle(
+                await DeleteNode(uow, self._access).handle(
                     DeleteNodeCommand(node_id=entity_id), self._actor
                 )
             elif kind is EntityKind.ITEM_TYPE:
@@ -763,7 +766,7 @@ class GraphPackTarget:
                     DeleteEdgeTypeCommand(edge_type_id=entity_id), SYSTEM_ACTOR
                 )
             else:
-                await DeleteEdge(uow, _POLICY).handle(
+                await DeleteEdge(uow, self._access).handle(
                     DeleteEdgeCommand(edge_id=entity_id), self._actor
                 )
         except (
@@ -781,22 +784,31 @@ class GraphPackTarget:
 class CollectionPackTarget:
     """Implements `CollectionTarget` with the collections use cases, run as `actor`."""
 
-    def __init__(self, stores: CollectionStores, actor: Actor) -> None:
+    def __init__(
+        self,
+        stores: CollectionStores,
+        actor: Actor,
+        *,
+        access: AccessPolicy | None = None,
+    ) -> None:
         self._stores = stores
         self._actor = actor
-        self._scope = _POLICY.scope_for(actor)
+        self._access = access or OwnerAccessPolicy()
+        self._scope = self._access.scope_for(actor)
 
     async def create_collection(
         self, spec: PackCollection, *, item_ids: Sequence[uuid.UUID]
     ) -> Created:
         """Create the collection, put the items on it and return what was stored."""
-        collection = await CreateCollection(self._stores.uow(), _POLICY).handle(
+        collection = await CreateCollection(self._stores.uow(), self._access).handle(
             CreateCollectionCommand(name=spec.name, description=spec.description),
             self._actor,
         )
         try:
             async with self._stores.items() as items:
-                await AddItemsToCollection(self._stores.uow(), _POLICY, items).handle(
+                await AddItemsToCollection(
+                    self._stores.uow(), self._access, items
+                ).handle(
                     AddItemsToCollectionCommand(
                         collection_id=collection.id, item_ids=list(item_ids)
                     ),
@@ -832,7 +844,7 @@ class CollectionPackTarget:
     async def remove(self, collection_id: uuid.UUID) -> RemoveResult:
         """Soft-delete the collection through its delete use case."""
         try:
-            await DeleteCollection(self._stores.uow(), _POLICY).handle(
+            await DeleteCollection(self._stores.uow(), self._access).handle(
                 DeleteCollectionCommand(collection_id=collection_id), self._actor
             )
         except CollectionNotFoundError:
@@ -857,10 +869,12 @@ class CoverPackTarget:
         storage: MediaStoragePort,
         policy: AttachmentPolicyPort,
         image_processor: ImageProcessorPort,
+        access: AccessPolicy | None = None,
     ) -> None:
         self._stores = stores
         self._actor = actor
-        self._scope = _POLICY.scope_for(actor)
+        self._access = access or OwnerAccessPolicy()
+        self._scope = self._access.scope_for(actor)
         self._renderer = renderer
         self._storage = storage
         self._policy = policy
@@ -872,7 +886,7 @@ class CoverPackTarget:
         async with self._stores.targets() as targets:
             attachment = await UploadAndAttachMedia(
                 self._stores.uow(),
-                _POLICY,
+                self._access,
                 self._storage,
                 self._policy,
                 self._image_processor,
@@ -889,7 +903,7 @@ class CoverPackTarget:
                 self._actor,
             )
         try:
-            await SetMediaCover(self._stores.uow(), _POLICY).handle(
+            await SetMediaCover(self._stores.uow(), self._access).handle(
                 SetMediaCoverCommand(
                     asset_id=attachment.asset_id,
                     target_type=AttachmentTarget.NODE,
@@ -939,7 +953,7 @@ class CoverPackTarget:
             attachment = await repos.attachments.get(cover_id, scope=self._scope)
         if attachment is None:
             return RemoveResult.ALREADY_GONE
-        await DetachMedia(self._stores.uow(), _POLICY, self._storage).handle(
+        await DetachMedia(self._stores.uow(), self._access, self._storage).handle(
             DetachMediaCommand(
                 asset_id=attachment.asset_id,
                 target_type=attachment.target_type,
@@ -952,7 +966,7 @@ class CoverPackTarget:
             asset = await repos.assets.get(attachment.asset_id, scope=self._scope)
         # Detaching orphans the asset only when nothing else uses it.
         if asset is not None and asset.status is MediaStatus.ORPHANED:
-            await DeleteMedia(self._stores.uow(), _POLICY, self._storage).handle(
+            await DeleteMedia(self._stores.uow(), self._access, self._storage).handle(
                 DeleteMediaCommand(asset_id=asset.id), self._actor
             )
         return RemoveResult.REMOVED

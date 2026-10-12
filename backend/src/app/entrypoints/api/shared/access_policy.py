@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from app.shared_kernel.access_scope import AccessScope
-from app.shared_kernel.errors import ForbiddenError, NotFoundError
+from app.shared_kernel.errors import NotFoundError
 
 if TYPE_CHECKING:
     import uuid
@@ -35,8 +35,3 @@ class OwnerAccessPolicy:
     def assert_can_delete(self, actor: Actor, owner_id: uuid.UUID | None) -> None:
         """Raise `NotFoundError` unless the content is the actor's own."""
         self.assert_can_view(actor, owner_id)
-
-    def require_admin(self, actor: Actor) -> None:
-        """Raise `ForbiddenError` unless the actor is an administrator."""
-        if not (actor.is_admin or actor.is_system):
-            raise ForbiddenError("Administrator access is required.")

@@ -3,17 +3,14 @@ import inspect
 import json
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING
 
+import pytest
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
 from app.entrypoints.api.docs.router import etag_matches, render_swagger_page
 from app.entrypoints.api.openapi import _DESCRIPTION_PATH, api_description
 from app.platform.config import get_identity_settings
-
-if TYPE_CHECKING:
-    import pytest
 
 
 def test_swagger_documentation_endpoint() -> None:
@@ -114,13 +111,16 @@ def test_swagger_page_references_init_script_and_csrf_cookie_name() -> None:
     assert "/api/docs/favicon.svg" in response.text
 
 
-def test_swagger_external_assets_are_pinned_and_have_integrity() -> None:
+@pytest.mark.parametrize(("path", "expected"), [("/api/docs", 2), ("/api/redoc", 1)])
+def test_docs_external_assets_are_pinned_and_have_integrity(
+    path: str, expected: int
+) -> None:
     """Every external script or stylesheet has an exact version and SRI hash."""
-    html = TestClient(create_app()).get("/api/docs").text
+    html = TestClient(create_app()).get(path).text
     tags = re.findall(r"<(?:script|link)[^>]*>", html)
     external = [t for t in tags if re.search(r'(?:src|href)="https?://', t)]
 
-    assert len(external) == 2
+    assert len(external) == expected
     for tag in external:
         assert re.search(r'(?:src|href)="https://[^"]+@\d+\.\d+\.\d+/', tag), tag
         assert re.search(r'integrity="sha384-[A-Za-z0-9+/]{64}"', tag), tag
@@ -330,3 +330,33 @@ def test_api_description_placeholders_match_supplied_values() -> None:
 
     assert in_file == {"session_cookie_name", "csrf_cookie_name"}
     assert "$" not in api_description()
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "statuses"),
+    [
+        ("post", "/api/v1/auth/login", {"401", "403", "429"}),
+        ("post", "/api/v1/auth/password", {"400", "401", "429"}),
+        ("patch", "/api/v1/auth/me", {"400", "401", "422"}),
+        ("post", "/api/v1/user/{user_id}/unlock", {"404"}),
+    ],
+)
+def test_openapi_documents_auth_error_responses(
+    method: str, path: str, statuses: set[str]
+) -> None:
+    """Sign-in, password, profile and unlock errors appear in the schema."""
+    schema = TestClient(create_app()).get("/api/openapi.json").json()
+    responses = schema["paths"][path][method]["responses"]
+
+    assert statuses <= set(responses)
+    for status in statuses - {"422"}:
+        assert "application/problem+json" in responses[status]["content"]
+
+
+@pytest.mark.parametrize("path", ["/api/v1/auth/login", "/api/v1/auth/password"])
+def test_openapi_throttled_response_documents_retry_after(path: str) -> None:
+    """The 429 answer lists the `Retry-After` header."""
+    schema = TestClient(create_app()).get("/api/openapi.json").json()
+    headers = schema["paths"][path]["post"]["responses"]["429"]["headers"]
+
+    assert headers["Retry-After"]["schema"] == {"type": "integer"}

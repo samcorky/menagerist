@@ -3,6 +3,14 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
+from app.entrypoints.api.shared.example_targets import (
+    CollectionPackTarget,
+    GraphPackTarget,
+    build_in_memory_collections_repos,
+    in_memory_collection_stores,
+    in_memory_graph_stores,
+)
 from app.modules.examples.domain.errors import InvalidPackError
 from app.modules.examples.domain.installation import EntityKind
 from app.modules.examples.ports.pack_targets import Created, RemoveResult
@@ -427,3 +435,27 @@ async def test_ensure_content_equals_what_inspect_returns_later(
         inspection = await world.presets.inspect(outcome.entity_id)
         assert inspection is not None
         assert outcome.content == inspection.content
+
+
+async def test_targets_default_to_their_own_owner_policy_and_accept_another(
+    make_world: MakeWorld,
+) -> None:
+    """Each target builds its own `OwnerAccessPolicy` unless one is supplied."""
+    world = make_world()
+    stores = in_memory_graph_stores(
+        world.graph_repos, world.media_repos, world.preset_repos
+    )
+    default = GraphPackTarget(stores, world.actor)
+    assert isinstance(default._access, OwnerAccessPolicy)
+    assert default._access is not GraphPackTarget(stores, world.actor)._access
+
+    custom = OwnerAccessPolicy()
+    assert GraphPackTarget(stores, world.actor, access=custom)._access is custom
+    collections = CollectionPackTarget(
+        in_memory_collection_stores(
+            build_in_memory_collections_repos(), world.graph_repos
+        ),
+        world.actor,
+        access=custom,
+    )
+    assert collections._access is custom

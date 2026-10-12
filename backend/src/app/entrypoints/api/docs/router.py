@@ -7,7 +7,7 @@ from string import Template
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, FastAPI, Request
-from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_oauth2_redirect_html
+from fastapi.openapi.docs import get_swagger_ui_oauth2_redirect_html
 from fastapi.responses import FileResponse, HTMLResponse, Response
 
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
@@ -35,7 +35,17 @@ _SWAGGER_CSS_INTEGRITY = (
     "sha384-Ov4/wv3j2bmct8cDc5X4ngJZohVPzEmc6uDPH8WeljUxO5vtoykvMEfbu9Vh6RaW"
 )
 
+# ReDoc is pinned the same way (sha384 of the file at the URL below).
+_REDOC_VERSION = "2.5.4"
+_REDOC_JS_URL = (
+    f"https://cdn.jsdelivr.net/npm/redoc@{_REDOC_VERSION}/bundles/redoc.standalone.js"
+)
+_REDOC_JS_INTEGRITY = (
+    "sha384-w447zOpYfw/1Tv/5AK9NfHTlQIqE3RVR6KY62jCyy9zNDgO64cMwGGP1Fj0zJVf5"
+)
+
 _TEMPLATE_PATH = Path(__file__).parent / "templates" / "swagger.html"
+_REDOC_TEMPLATE_PATH = Path(__file__).parent / "templates" / "redoc.html"
 _INIT_JS_PATH = _STATIC_DIR / "swagger-init.js"
 _INIT_JS_URL = "/api/docs/swagger-init.js"
 _REVALIDATE = "no-cache"
@@ -59,6 +69,19 @@ def render_swagger_page(
         "oauth2_redirect_url": "/api/docs/oauth2-redirect",
     }
     template = Template(_TEMPLATE_PATH.read_text(encoding="utf-8"))
+    return template.substitute({k: escape(v, quote=True) for k, v in values.items()})
+
+
+def render_redoc_page(*, title: str) -> str:
+    """Fill the ReDoc template; every value is HTML-escaped."""
+    values = {
+        "favicon_url": "/api/docs/favicon.svg",
+        "title": title,
+        "openapi_url": "/api/openapi.json",
+        "redoc_js_url": _REDOC_JS_URL,
+        "redoc_js_integrity": _REDOC_JS_INTEGRITY,
+    }
+    template = Template(_REDOC_TEMPLATE_PATH.read_text(encoding="utf-8"))
     return template.substitute({k: escape(v, quote=True) for k, v in values.items()})
 
 
@@ -164,8 +187,4 @@ def get_redoc_documentation(
     app_info: Annotated[AppInfo, Depends(load_app_info)],
 ) -> HTMLResponse:
     """Serve the custom ReDoc documentation page."""
-    return get_redoc_html(
-        openapi_url="/api/openapi.json",
-        title=f"{app_info.name} - ReDoc",
-        redoc_favicon_url="/api/docs/favicon.svg",
-    )
+    return HTMLResponse(render_redoc_page(title=f"{app_info.name} - ReDoc"))

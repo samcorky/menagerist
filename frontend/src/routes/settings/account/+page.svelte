@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PasswordInput from '$lib/components/password-input.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { toast } from 'svelte-sonner';
@@ -155,11 +156,9 @@
 
 			<div class="space-y-1.5">
 				<Label for="account-current">Current password</Label>
-				<Input
+				<PasswordInput
 					id="account-current"
 					name="current_password"
-					type="password"
-					class="h-11"
 					autocomplete="current-password"
 					required
 					disabled={busy}
@@ -169,11 +168,9 @@
 
 			<div class="space-y-1.5">
 				<Label for="account-new">New password</Label>
-				<Input
+				<PasswordInput
 					id="account-new"
 					name="new_password"
-					type="password"
-					class="h-11"
 					autocomplete="new-password"
 					required
 					aria-invalid={tooShort || newError !== null}
@@ -191,11 +188,9 @@
 
 			<div class="space-y-1.5">
 				<Label for="account-confirm">Confirm new password</Label>
-				<Input
+				<PasswordInput
 					id="account-confirm"
 					name="confirm_password"
-					type="password"
-					class="h-11"
 					autocomplete="new-password"
 					required
 					aria-invalid={mismatch}

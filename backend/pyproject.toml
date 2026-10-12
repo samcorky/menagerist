@@ -195,6 +195,7 @@ split-on-trailing-comma = false
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+line-ending = "lf"
 
 [tool.mypy]
 plugins = ["pydantic.mypy"]

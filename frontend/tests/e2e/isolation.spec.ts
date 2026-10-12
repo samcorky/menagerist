@@ -175,7 +175,7 @@ test('an administrator can add a member who then has to choose a password at fir
 	const memberPage = await member.newPage();
 	await memberPage.goto('/login');
 	await memberPage.getByLabel('Username').fill(username);
-	await memberPage.getByLabel('Password').fill(startingPassword);
+	await memberPage.getByLabel('Password', { exact: true }).fill(startingPassword);
 	await memberPage.getByRole('button', { name: 'Sign in', exact: true }).click();
 	await expect(memberPage).toHaveURL(/\/settings\/account$/);
 	await member.close();

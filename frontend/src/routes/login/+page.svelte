@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PasswordInput from '$lib/components/password-input.svelte';
 	import { tick } from 'svelte';
 	import { auth } from '$lib/auth.svelte.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -67,12 +68,10 @@
 
 			<div class="space-y-1.5">
 				<Label for="login-password">Password</Label>
-				<Input
+				<PasswordInput
 					id="login-password"
 					bind:ref={passwordInput}
 					name="password"
-					type="password"
-					class="h-11"
 					autocomplete="current-password"
 					required
 					disabled={busy}

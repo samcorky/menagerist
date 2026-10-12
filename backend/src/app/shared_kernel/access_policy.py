@@ -25,7 +25,3 @@ class AccessPolicy(Protocol):
     def assert_can_delete(self, actor: Actor, owner_id: uuid.UUID | None) -> None:
         """Raise `NotFoundError` unless `actor` may delete that content."""
         ...
-
-    def require_admin(self, actor: Actor) -> None:
-        """Raise `ForbiddenError` unless `actor` is an administrator."""
-        ...

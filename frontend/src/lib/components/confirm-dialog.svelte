@@ -40,11 +40,18 @@
 			</ResponsiveDialog.Description>
 		{/if}
 		<div class="mt-4 flex justify-end gap-2">
-			<Button type="button" variant="outline" disabled={busy} onclick={() => onOpenChange(false)}>
+			<Button
+				type="button"
+				variant="outline"
+				class="h-11"
+				disabled={busy}
+				onclick={() => onOpenChange(false)}
+			>
 				{cancelLabel}
 			</Button>
 			<Button
 				type="button"
+				class="h-11"
 				variant={destructive ? 'destructive' : 'default'}
 				disabled={busy}
 				onclick={onConfirm}

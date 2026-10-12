@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PasswordInput from '$lib/components/password-input.svelte';
 	import { tick } from 'svelte';
 	import { auth } from '$lib/auth.svelte.js';
 	import { describeClaimed, PASSWORD_MIN_LENGTH } from '$lib/auth';
@@ -128,11 +129,9 @@
 
 				<div class="space-y-1.5">
 					<Label for="setup-password">Password</Label>
-					<Input
+					<PasswordInput
 						id="setup-password"
 						name="password"
-						type="password"
-						class="h-11"
 						autocomplete="new-password"
 						required
 						aria-invalid={tooShort}
@@ -147,11 +146,9 @@
 
 				<div class="space-y-1.5">
 					<Label for="setup-confirm">Confirm password</Label>
-					<Input
+					<PasswordInput
 						id="setup-confirm"
 						name="confirm_password"
-						type="password"
-						class="h-11"
 						autocomplete="new-password"
 						required
 						aria-invalid={mismatch}
