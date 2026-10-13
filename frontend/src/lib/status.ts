@@ -28,3 +28,30 @@ export function readyDetailOf(result: CallResult): ReadyDetailResponse | null {
 	}
 	return null;
 }
+
+export interface StatusCounts {
+	total: number;
+	pass: number;
+	warn: number;
+	fail: number;
+}
+
+/** Tallies observations by status; unknown statuses count towards the total only. */
+export function countStatuses(observations: ReadonlyArray<{ status: string }>): StatusCounts {
+	const counts: StatusCounts = { total: observations.length, pass: 0, warn: 0, fail: 0 };
+	for (const { status } of observations) {
+		if (status === 'pass' || status === 'warn' || status === 'fail') counts[status] += 1;
+	}
+	return counts;
+}
+
+/** Renders an observed value with its unit. */
+export function formatObservedValue(value: unknown, unit: string | null | undefined): string {
+	if (unit === 'percent') return `${value}%`;
+	if (unit === 'ms') return `${value} ms`;
+	if (unit === 'flagged requests') {
+		if (value === 0) return 'Nothing unusual in the last hour';
+		return `${value} flagged ${value === 1 ? 'request' : 'requests'} in the last hour`;
+	}
+	return String(value);
+}

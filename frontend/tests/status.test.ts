@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readinessOf, readyDetailOf } from '../src/lib/status';
+import { countStatuses, formatObservedValue, readinessOf, readyDetailOf } from '../src/lib/status';
 import { FILE_TOO_LARGE_MESSAGE, uploadErrorMessage } from '../src/lib/api/errors';
 
 const res = (status: number) => new Response(null, { status });
@@ -30,6 +30,52 @@ describe('readyDetailOf', () => {
 
 	it('ignores a problem body', () => {
 		expect(readyDetailOf({ error: { detail: 'Forbidden' } })).toBeNull();
+	});
+});
+
+describe('countStatuses', () => {
+	it('counts each status and the total', () => {
+		const counts = countStatuses([
+			{ status: 'pass' },
+			{ status: 'pass' },
+			{ status: 'warn' },
+			{ status: 'fail' }
+		]);
+		expect(counts).toEqual({ total: 4, pass: 2, warn: 1, fail: 1 });
+	});
+
+	it('keeps the parts adding up to the total for known statuses', () => {
+		const counts = countStatuses([{ status: 'warn' }, { status: 'warn' }]);
+		expect(counts.pass + counts.warn + counts.fail).toBe(counts.total);
+	});
+
+	it('counts an unknown status in the total only', () => {
+		expect(countStatuses([{ status: 'odd' }])).toEqual({ total: 1, pass: 0, warn: 0, fail: 0 });
+	});
+
+	it('handles no observations', () => {
+		expect(countStatuses([])).toEqual({ total: 0, pass: 0, warn: 0, fail: 0 });
+	});
+});
+
+describe('formatObservedValue', () => {
+	it('appends the unit', () => {
+		expect(formatObservedValue(42, 'percent')).toBe('42%');
+		expect(formatObservedValue(12, 'ms')).toBe('12 ms');
+	});
+
+	it('says nothing unusual rather than zero when no request was flagged', () => {
+		expect(formatObservedValue(0, 'flagged requests')).toBe('Nothing unusual in the last hour');
+	});
+
+	it('counts flagged requests, singular for one', () => {
+		expect(formatObservedValue(3, 'flagged requests')).toBe('3 flagged requests in the last hour');
+		expect(formatObservedValue(1, 'flagged requests')).toBe('1 flagged request in the last hour');
+	});
+
+	it('prints a bare value for other units', () => {
+		expect(formatObservedValue(7, undefined)).toBe('7');
+		expect(formatObservedValue('ok', 'other')).toBe('ok');
 	});
 });
 

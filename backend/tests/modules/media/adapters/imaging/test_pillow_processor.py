@@ -100,3 +100,33 @@ def test_pillow_image_processor_accepts_an_image_within_the_limit(
     result = PillowImageProcessor().generate_thumbnail(_png(10, 10))
 
     assert result is not None
+
+
+def _jpeg(width: int, height: int) -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (width, height)).save(buffer, format="JPEG")
+    return buffer.getvalue()
+
+
+def test_pillow_image_processor_thumbnails_a_jpeg_above_the_general_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A JPEG over the raster limit is decoded at reduced size, not refused."""
+    monkeypatch.setattr(pillow_processor, "MAX_IMAGE_PIXELS", 100)
+
+    result = PillowImageProcessor().generate_thumbnail(
+        _jpeg(400, 300), max_dimension=50
+    )
+
+    assert result is not None
+    assert max(result.width, result.height) <= 50
+
+
+def test_pillow_image_processor_refuses_a_jpeg_above_its_own_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The JPEG allowance is bounded too."""
+    monkeypatch.setattr(pillow_processor, "MAX_JPEG_PIXELS", 1000)
+
+    with pytest.raises(ImageTooLargeError):
+        PillowImageProcessor().generate_thumbnail(_jpeg(100, 100))

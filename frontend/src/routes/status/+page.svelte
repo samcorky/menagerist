@@ -16,7 +16,13 @@
 	} from '$lib/api/client';
 	import { auth } from '$lib/auth.svelte.js';
 	import { LOGIN_PATH, STATUS_PATH } from '$lib/auth';
-	import { readinessOf, readyDetailOf, type Readiness } from '$lib/status';
+	import {
+		countStatuses,
+		formatObservedValue,
+		readinessOf,
+		readyDetailOf,
+		type Readiness
+	} from '$lib/status';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -29,6 +35,7 @@
 		Gauge,
 		GitBranch,
 		LogIn,
+		Network,
 		PackageCheck,
 		RefreshCw,
 		Server,
@@ -46,9 +53,7 @@
 	}
 
 	function formatValue(obs: CheckObservation): string {
-		if (obs.observedUnit === 'percent') return `${obs.observedValue}%`;
-		if (obs.observedUnit === 'ms') return `${obs.observedValue} ms`;
-		return String(obs.observedValue);
+		return formatObservedValue(obs.observedValue, obs.observedUnit);
 	}
 
 	function statusLabel(status: string): string {
@@ -78,6 +83,7 @@
 		if (key === 'system') return Activity;
 		if (key === 'pool') return Gauge;
 		if (key === 'migration') return GitBranch;
+		if (key === 'proxy') return Network;
 		return Server;
 	}
 
@@ -149,13 +155,8 @@
 	});
 
 	const healthSummary = $derived.by(() => {
-		if (!detail?.checks) return { total: 0, pass: 0, fail: 0 };
-		const checks = Object.values(detail.checks).flat();
-		return {
-			total: checks.length,
-			pass: checks.filter((check) => check.status === 'pass').length,
-			fail: checks.filter((check) => check.status === 'fail').length
-		};
+		if (!detail?.checks) return countStatuses([]);
+		return countStatuses(Object.values(detail.checks).flat());
 	});
 
 	async function load(refresh = false): Promise<void> {
@@ -333,7 +334,7 @@
 			</Card.Root>
 
 			{#if detail}
-				<div class="grid gap-3 sm:grid-cols-3">
+				<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
 					<div class="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
 						<p class="text-xs tracking-[0.18em] text-muted-foreground uppercase">Checks</p>
 						<div class="mt-2 flex items-baseline gap-2">
@@ -348,6 +349,15 @@
 						<div class="mt-2 flex items-baseline gap-2 text-emerald-600 dark:text-emerald-400">
 							<span class="font-heading text-2xl font-semibold">{healthSummary.pass}</span>
 							<span class="text-sm">operational</span>
+						</div>
+					</div>
+					<div class="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 shadow-sm">
+						<p class="text-xs tracking-[0.18em] text-amber-700 uppercase dark:text-amber-400">
+							Warnings
+						</p>
+						<div class="mt-2 flex items-baseline gap-2 text-amber-600 dark:text-amber-400">
+							<span class="font-heading text-2xl font-semibold">{healthSummary.warn}</span>
+							<span class="text-sm">warning</span>
 						</div>
 					</div>
 					<div class="rounded-2xl border border-destructive/20 bg-destructive/5 p-4 shadow-sm">
@@ -390,9 +400,8 @@
 					</div>
 					<Card.Content class="space-y-3 p-4">
 						{#each checks as { label, obs } (label)}
-							{@const checkPass = obs.status === 'pass'}
 							{@const MetricIcon = metricIcon(label)}
-							{@const MetricStatusIcon = statusIcon(checkPass ? 'pass' : 'fail')}
+							{@const MetricStatusIcon = statusIcon(obs.status)}
 							<div
 								class="flex items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-3 py-3"
 							>
@@ -404,15 +413,19 @@
 								<div class="min-w-0 flex-1">
 									<div class="flex items-center justify-between gap-3">
 										<span class="text-sm font-medium">{formatLabel(label)}</span>
-										<Badge class={statusTone(checkPass ? 'pass' : 'fail')}>
+										<Badge class={statusTone(obs.status)}>
 											<MetricStatusIcon class="size-3" />
-											{checkPass ? 'Operational' : 'Degraded'}
+											{statusLabel(obs.status)}
 										</Badge>
 									</div>
 									<div class="mt-1 flex items-center gap-2 font-mono text-xs text-muted-foreground">
 										<span>{formatValue(obs)}</span>
 										{#if obs.output}
-											<span class="text-destructive">• {obs.output}</span>
+											<span
+												class={obs.status === 'warn'
+													? 'text-amber-700 dark:text-amber-400'
+													: 'text-destructive'}>• {obs.output}</span
+											>
 										{/if}
 									</div>
 								</div>

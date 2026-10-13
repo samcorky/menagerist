@@ -13,6 +13,9 @@ from app.modules.system.adapters.platform.checks.database_migration_check import
 from app.modules.system.adapters.platform.checks.database_pool_utilization_check import (  # noqa: E501
     DatabasePoolUtilizationCheck,
 )
+from app.modules.system.adapters.platform.checks.proxy_configuration_check import (
+    ProxyConfigurationCheck,
+)
 from app.modules.system.adapters.platform.readiness_check_registry import (
     ReadinessCheckRegistry,
 )
@@ -41,6 +44,7 @@ def _readiness_registry(
             DatabaseConnectivityCheck(session_factory),
             DatabaseMigrationCheck(session_factory),
             DatabasePoolUtilizationCheck(),
+            ProxyConfigurationCheck(),
         ]
     )
 

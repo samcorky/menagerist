@@ -9,6 +9,7 @@ from app.entrypoints.api.shared.claim_existing_data import get_claim_existing_da
 from app.entrypoints.api.shared.csrf import verify_csrf
 from app.entrypoints.api.shared.permission_aware_route import cookie_scheme
 from app.entrypoints.api.shared.problem_response import register_exception_handlers
+from app.entrypoints.api.shared.proxy_header_observer import ProxyHeaderObserver
 from app.entrypoints.api.shared.request_context_middleware import (
     RequestContextMiddleware,
 )
@@ -126,6 +127,9 @@ def create_app() -> FastAPI:
     return fastapi_app
 
 
-app = wrap_asgi_with_proxy_headers(
-    create_app(), trusted_hosts=get_api_settings().trusted_proxies
+app = ProxyHeaderObserver(
+    wrap_asgi_with_proxy_headers(
+        create_app(), trusted_hosts=get_api_settings().trusted_proxies
+    ),
+    trusted=get_api_settings().trusted_proxies,
 )

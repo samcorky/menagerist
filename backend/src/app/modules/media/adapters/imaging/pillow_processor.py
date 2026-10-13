@@ -10,8 +10,10 @@ from app.modules.media.ports.image_processor import ThumbnailResult
 logger = structlog.get_logger()
 
 # Decoding needs several bytes per pixel and a few copies, so cap the raster.
-# Pillow warns above this and raises above twice it; both are refused here.
 MAX_IMAGE_PIXELS = 40_000_000
+# A JPEG is decoded at a fraction of its size for a thumbnail (`Image.draft`), so
+# it can be far larger: phone and camera photos stay well under this.
+MAX_JPEG_PIXELS = 300_000_000
 
 
 class PillowImageProcessor:
@@ -30,17 +32,26 @@ class PillowImageProcessor:
         """Return downscaled WEBP thumbnail or None if data is undecodable.
 
         Raises:
-            ImageTooLargeError: If the image exceeds `MAX_IMAGE_PIXELS` (a
-                decompression bomb).
+            ImageTooLargeError: If the image exceeds `MAX_IMAGE_PIXELS`, or
+                `MAX_JPEG_PIXELS` for a JPEG (a decompression bomb).
         """
         logger.debug(
             "generating thumbnail", max_dimension=max_dimension, input_bytes=len(data)
         )
-        Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
+        # Pillow's own check, at open time, uses the larger limit; the per-format
+        # limit is applied below. It warns above this and raises above twice it.
+        Image.MAX_IMAGE_PIXELS = max(MAX_IMAGE_PIXELS, MAX_JPEG_PIXELS)
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("error", Image.DecompressionBombWarning)
                 loaded = Image.open(io.BytesIO(data))
+            is_jpeg = loaded.format == "JPEG"
+            if loaded.width * loaded.height > (
+                MAX_JPEG_PIXELS if is_jpeg else MAX_IMAGE_PIXELS
+            ):
+                raise ImageTooLargeError("That image has too many pixels.")
+            if is_jpeg:
+                loaded.draft(loaded.mode, (max_dimension, max_dimension))
             image: Image.Image = ImageOps.exif_transpose(loaded)
             image.thumbnail((max_dimension, max_dimension))
             buffer = io.BytesIO()

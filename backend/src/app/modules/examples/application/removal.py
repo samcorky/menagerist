@@ -52,11 +52,12 @@ async def settle_installation(
     persist: Callable[[Installation], Awaitable[None]],
     types_shared: bool = False,
 ) -> list[KeptEntity]:
-    """Remove or keep every owned entity, saving after each one.
+    """Remove or keep every owned entity, saving after each kind.
 
     Entities are handled in `REMOVAL_ORDER`, so by the time something is inspected
     everything that depended on it has already gone or been kept. Safe to call again
-    on a half-finished installation: it only touches entities still owned.
+    on a half-finished installation: it only touches entities still owned, and an
+    entity removed but not yet saved reads as already gone.
 
     With `types_shared`, item and relationship types that could be removed are kept
     instead: another person's installation of the pack still relies on them.
@@ -76,7 +77,6 @@ async def settle_installation(
                 covers=covers,
                 types_shared=types_shared,
             )
-            await persist(installation)
             if reason is not None and record.kind is not EntityKind.COVER:
                 kept.append(
                     KeptEntity(
@@ -86,6 +86,7 @@ async def settle_installation(
                         reason=reason,
                     )
                 )
+        await persist(installation)
     return kept
 
 

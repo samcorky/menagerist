@@ -80,6 +80,8 @@ services:
       # Behind a reverse proxy, uncomment and set these (see CONTRIBUTING.md).
       # Without TRUSTED_PROXIES every client shares the proxy's address, so 20
       # failed sign-ins from anyone lock sign-in for everyone for 15 minutes.
+      # Use your proxy network's subnet (docker network inspect <network>); without
+      # it HTTPS sign-in is refused as cross-site.
       # MENAGERIST_TRUSTED_PROXIES: 172.18.0.0/16
       # COOKIE_SECURE=true marks the session cookie Secure when a proxy ends TLS.
       # MENAGERIST_COOKIE_SECURE: "true"

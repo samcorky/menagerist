@@ -26,6 +26,7 @@ from app.entrypoints.api.shared.attach_target_access import (
     GraphAttachTargetAccess,
     get_attach_target_access,
 )
+from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
 from app.entrypoints.api.shared.choice_list_source import (
     PresetChoiceListSource,
     get_choice_list_source,
@@ -148,6 +149,20 @@ from app.modules.presets.adapters.persistence.unit_of_work import (
     create_in_memory_preset_uow,
 )
 from app.modules.presets.ports.unit_of_work import PresetRepos
+from app.modules.system.adapters.api.dependencies import (
+    get_get_health_ready_detail_use_case,
+    get_get_health_ready_use_case,
+)
+from app.modules.system.adapters.platform.in_memory_health_check_adapter import (
+    InMemoryHealthCheckAdapter,
+)
+from app.modules.system.application.get_health_ready import GetHealthReady
+from app.modules.system.application.get_health_ready_detail import GetHealthReadyDetail
+from app.modules.system.domain.readiness import (
+    CheckObservation,
+    CheckStatus,
+    ReadinessReport,
+)
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -354,6 +369,22 @@ def _pack() -> ExamplePack:
     )
 
 
+_PASSING_READINESS = ReadinessReport(
+    status=CheckStatus.PASS,
+    checks={
+        "database:responseTime": [
+            CheckObservation(
+                component_type="datastore",
+                observed_value=1,
+                observed_unit="ms",
+                status=CheckStatus.PASS,
+                time=datetime.now(UTC),
+            )
+        ]
+    },
+)
+
+
 class World:
     """The real app over in-memory repositories for every module."""
 
@@ -428,6 +459,12 @@ class World:
         o[get_choice_list_source] = lambda: PresetChoiceListSource(presets)
         o[get_item_lookup] = lambda: GraphItemLookup(graph)
         o[get_collection_members] = lambda: CollectionsMembers(collections)
+        # Readiness would otherwise open a real database connection.
+        ready = InMemoryHealthCheckAdapter(_PASSING_READINESS)
+        o[get_get_health_ready_use_case] = lambda: GetHealthReady(ready)
+        o[get_get_health_ready_detail_use_case] = lambda: GetHealthReadyDetail(
+            ready, RoleAuthorizationAdapter()
+        )
         o[get_preset_pack_target] = lambda: PresetPackTarget(
             in_memory_preset_stores(presets, graph)
         )

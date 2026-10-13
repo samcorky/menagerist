@@ -757,7 +757,7 @@ Fixes for the leak and isolation reviews (`review-security-leaks.md`, `review-se
 **Leaks**
 
 - **Upload bodies are bounded before they are parsed.** FastAPI reads and spools the whole multipart form before any dependency runs, so an anonymous client could fill `/tmp`. `UploadLimitMiddleware` (pure ASGI, innermost) guards `POST /api/v1/media` and `/api/v1/media/attached`: a `Content-Length` over `MENAGERIST_MAX_UPLOAD_SIZE` plus 64 KiB of multipart overhead is answered 413 problem+json without reading the body, and a body with no length is counted as it arrives and cut off past the limit. FastAPI turns any error raised while reading the form into a 400, so after the cut-off the app is told the client disconnected and its answer is replaced by the 413. The check runs before authentication on purpose. The limit still applies to the file itself in `storage.store`.
-- **Decompression bombs are refused.** `PillowImageProcessor` sets a 40 megapixel limit (`MAX_IMAGE_PIXELS`); Pillow's warning band and error band both raise the new `ImageTooLargeError` (a validation error, 400). `StageMedia` deletes the staged file before re-raising, `RegenerateThumbnails` skips such an asset, and both run the decode in `asyncio.to_thread` so it does not block the event loop. Not a configurable setting. Phone photos above 40 megapixels are therefore refused rather than stored without a thumbnail.
+- **Decompression bombs are refused.** `PillowImageProcessor` sets a 40 megapixel limit (`MAX_IMAGE_PIXELS`); Pillow's warning band and error band both raise the new `ImageTooLargeError` (a validation error, 400). `StageMedia` deletes the staged file before re-raising, `RegenerateThumbnails` skips such an asset, and both run the decode in `asyncio.to_thread` so it does not block the event loop. Not a configurable setting. Other formats above 40 megapixels are refused rather than stored without a thumbnail. A JPEG is allowed up to 300 megapixels (`MAX_JPEG_PIXELS`) because its thumbnail is decoded at 1/2 to 1/8 scale with `Image.draft`, so phone photos above 40 megapixels are accepted; the original is stored untouched.
 - **500 and 422 bodies no longer echo.** A non-domain exception answers a fixed `Internal Server Error` / `An unexpected error occurred.` and is logged with its traceback and the request id. A failed example install therefore no longer names its cause in the response (the log has it). `RequestValidationError` has its own handler: problem+json with the same `detail: [{type, loc, msg}]` list the web client already reads, minus FastAPI's `input` and `ctx`, so a rejected password is never sent back.
 - **Client file names are neutralised in logs** (`shared_kernel/log_safe.loggable`: control characters escaped, 100 characters at most) in `StageMedia` and `UpdateMedia`.
 
@@ -771,6 +771,18 @@ Fixes for the leak and isolation reviews (`review-security-leaks.md`, `review-se
 - The example-pack "still in use" and "shared" answers can reveal that other people use a shared type. This follows from the all-people in-use check and is accepted.
 
 ---
+
+## Cross-site guard trusts `Sec-Fetch-Site`, and proxy problems are visible (2026-10-13)
+
+Behind a TLS-terminating proxy that was not in `MENAGERIST_TRUSTED_PROXIES`, every sign-in was refused: the app rebuilt its own origin as `http://host` while the browser sent `Origin: https://host`.
+
+- **`Sec-Fetch-Site` decides first.** `cross-site` is refused, `same-origin` is accepted. Page script cannot set the header and every current browser sends it, so this does not depend on the proxy. The same approach is used by Go's `net/http` cross-origin protection. The header's specification is still a W3C working draft.
+- **The `Origin` comparison stays as the fallback** (header missing, `same-site`, `none`, or any other value), with the full origin including the scheme, not only the host: stricter than Go's host-only fallback. An old browser behind an untrusted proxy still needs the proxy configured. A configured CORS origin is still accepted there; `*` is not.
+- **A malformed `Origin` is refused** (it used to raise in `urlsplit` and answer 500).
+- **Refusals are logged** with the claimed and seen origins and `Sec-Fetch-Site` (client text goes through `loggable`).
+- **Misconfiguration is surfaced, never enforced.** `app.platform.proxy_signals` keeps only times (bounded, one hour) for two signals: forwarding headers from a peer outside the trusted list (noted by `ProxyHeaderObserver`, outside Granian's wrapper, so it sees the real peer) and a same-origin request whose `Origin` differs from the one the app saw. The first sighting of each per hour is logged as a warning with the fix, and `ProxyConfigurationCheck` reports a `warn` for `proxy:configuration` on the admin-only `/health/ready/detail`. It never fails readiness: a configuration problem must not take the instance out of rotation, and a warning still counts as ready. The counts are per process.
+- **Not chosen:** an explicit public-URL setting (stricter, but every proxied install would have to set it), a host-only fallback, and trusting every proxy by default (it would let anyone reaching the container spoof the address the sign-in throttle uses).
+- **HSTS** stays at the proxy; the README now asks for it, because the guard now relies on the browser's own headers.
 
 ## Direction: roles as data, implied permissions
 
