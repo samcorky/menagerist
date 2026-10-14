@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from app.modules.graph.application.schema_meta import search_excluded_keys
+from app.modules.graph.application.type_catalogue import load_node_types
 from app.modules.graph.domain.errors import CollectionNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.collection_members import CollectionMembers  # noqa: TC001
@@ -19,8 +20,6 @@ if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
-
-_TYPE_PAGE_SIZE = 100
 
 
 @dataclass(kw_only=True)
@@ -76,16 +75,11 @@ class ListNodes(ScopedQueryHandler[GraphRepos, ListNodesQuery, ListNodesResult])
     async def _search_exclusions(self) -> dict[str, list[str]]:
         """Map each node type slug to the attribute keys a search must skip."""
         exclusions: dict[str, list[str]] = {}
-        after: uuid.UUID | None = None
-        while True:
-            page = await self._repos.node_types.list(after=after, limit=_TYPE_PAGE_SIZE)
-            for node_type in page:
-                keys = search_excluded_keys(node_type.attributes_schema or {})
-                if keys:
-                    exclusions[str(node_type.slug)] = keys
-            if len(page) < _TYPE_PAGE_SIZE:
-                return exclusions
-            after = page[-1].id
+        for node_type in await load_node_types(self._repos):
+            keys = search_excluded_keys(node_type.attributes_schema or {})
+            if keys:
+                exclusions[str(node_type.slug)] = keys
+        return exclusions
 
     async def handle(self, query: ListNodesQuery, actor: Actor) -> ListNodesResult:
         """Return a page of nodes and total count matching the query."""
