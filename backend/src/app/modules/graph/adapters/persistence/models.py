@@ -38,7 +38,33 @@ class NodeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):
     """ORM row for a node - the storage shape, kept separate from `domain.Node`."""
 
     __tablename__ = "nodes"
-    __table_args__ = (Index("ix_nodes_owner_id_id", "owner_id", "id"),)
+    __table_args__ = (
+        Index("ix_nodes_owner_id_id", "owner_id", "id"),
+        Index(
+            "ix_nodes_attributes_gin",
+            "attributes",
+            postgresql_using="gin",
+            postgresql_ops={"attributes": "jsonb_path_ops"},
+        ),
+        Index(
+            "ix_nodes_tags_gin",
+            "tags",
+            postgresql_using="gin",
+            postgresql_ops={"tags": "jsonb_path_ops"},
+        ),
+        Index(
+            "ix_nodes_name_trgm",
+            text("immutable_unaccent(name)"),
+            postgresql_using="gin",
+            postgresql_ops={"immutable_unaccent(name)": "gin_trgm_ops"},
+        ),
+        Index(
+            "ix_nodes_description_trgm",
+            text("immutable_unaccent(description)"),
+            postgresql_using="gin",
+            postgresql_ops={"immutable_unaccent(description)": "gin_trgm_ops"},
+        ),
+    )
 
     name: Mapped[str]
     type: Mapped[str | None] = mapped_column(index=True, nullable=True)
