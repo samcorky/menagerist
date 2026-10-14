@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from app.modules.graph.domain.node import Node
+    from app.modules.graph.domain.query import Cursor, ResolvedQuery, SearchHit
     from app.shared_kernel.access_scope import AccessScope
 
 
@@ -62,6 +63,27 @@ class NodeRepository(Protocol):
         attribute_search_exclusions: Mapping[str, Sequence[str]] | None = None,
     ) -> int:
         """Return the total number of non-deleted nodes matching the given filters."""
+        ...
+
+    async def search(
+        self,
+        *,
+        scope: AccessScope,
+        resolved: ResolvedQuery,
+        after: Cursor | None,
+        limit: int,
+    ) -> builtins.list[SearchHit]:
+        """Return live nodes matching the query, in its order, one page.
+
+        Order is the query's sort keys (nulls last) then id. `after` keeps only
+        rows strictly later in that order. A field condition whose key is not in
+        `resolved.field_kinds` matches nothing. Stored values of the wrong JSON
+        type never match and never raise.
+        """
+        ...
+
+    async def search_count(self, *, scope: AccessScope, resolved: ResolvedQuery) -> int:
+        """Return how many live nodes in `scope` match the query."""
         ...
 
     async def clear_type(self, type_slug: str, *, scope: AccessScope) -> None:

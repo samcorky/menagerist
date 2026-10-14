@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from sqlalchemy import ColumnElement, SQLColumnExpression
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from app.modules.graph.domain.query import Cursor, ResolvedQuery, SearchHit
     from app.shared_kernel.access_scope import AccessScope
 
 logger = structlog.get_logger()
@@ -225,6 +226,21 @@ class SqlAlchemyNodeRepository:
             stmt = stmt.where(NodeModel.favourite == favourite)
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
+
+    async def search(
+        self,
+        *,
+        scope: AccessScope,
+        resolved: ResolvedQuery,
+        after: Cursor | None,
+        limit: int,
+    ) -> builtins.list[SearchHit]:
+        """Placeholder until the SQL compiler lands."""
+        raise NotImplementedError  # pragma: no cover
+
+    async def search_count(self, *, scope: AccessScope, resolved: ResolvedQuery) -> int:
+        """Placeholder until the SQL compiler lands."""
+        raise NotImplementedError  # pragma: no cover
 
     async def count(
         self,

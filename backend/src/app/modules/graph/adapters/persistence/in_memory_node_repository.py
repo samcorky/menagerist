@@ -1,47 +1,28 @@
-import unicodedata
-from typing import TYPE_CHECKING, Any
+from functools import partial
+from typing import TYPE_CHECKING, cast
+
+from app.modules.graph.adapters.persistence.query_eval import (
+    is_after,
+    matches,
+    sort_values,
+)
+from app.modules.graph.adapters.persistence.text_match import fold, text_matches
+from app.modules.graph.domain.query import SearchHit
 
 if TYPE_CHECKING:
     import builtins
     import collections.abc
     import uuid
-    from collections.abc import Iterator, Mapping, Sequence
+    from collections.abc import Mapping, Sequence
 
     from app.modules.graph.domain.node import Node
+    from app.modules.graph.domain.query import Cursor, ResolvedQuery
     from app.shared_kernel.access_scope import AccessScope
 
 
-def _fold(text: str) -> str:
-    """Casefold `text` and strip accents, as Postgres `unaccent` does."""
-    decomposed = unicodedata.normalize("NFD", text)
-    return "".join(c for c in decomposed if not unicodedata.combining(c)).casefold()
-
-
-def _scalar_values(value: Any) -> Iterator[str]:  # noqa: ANN401
-    """Yield every string and number inside `value`; never keys, booleans or nulls."""
-    if isinstance(value, dict):
-        for inner in value.values():
-            yield from _scalar_values(inner)
-    elif isinstance(value, list):
-        for inner in value:
-            yield from _scalar_values(inner)
-    elif isinstance(value, str):
-        yield value
-    elif isinstance(value, (int, float)) and not isinstance(value, bool):
-        yield str(value)
-
-
-def _matches(
-    node: Node,
-    needle: str,
-    exclusions: Mapping[str, Sequence[str]] | None,
-) -> bool:
-    """Whether `needle` (already folded) is found in the node's searchable text."""
-    if needle in _fold(node.name) or needle in _fold(node.description or ""):
-        return True
-    skipped = (exclusions or {}).get(node.type, ()) if node.type else ()
-    attributes = {k: v for k, v in node.attributes.items() if k not in skipped}
-    return any(needle in _fold(text) for text in _scalar_values(attributes))
+def _sort_at(hit: SearchHit, *, index: int) -> str | float:
+    """The non-null sort value at `index`."""
+    return cast("str | float", hit.sort_values[index])
 
 
 class InMemoryNodeRepository:
@@ -97,11 +78,11 @@ class InMemoryNodeRepository:
         if after is not None:
             ordered = [node for node in ordered if node.id > after]
         if q is not None:
-            needle = _fold(q)
+            needle = fold(q)
             ordered = [
                 node
                 for node in ordered
-                if _matches(node, needle, attribute_search_exclusions)
+                if text_matches(node, needle, attribute_search_exclusions)
             ]
         if favourite is not None:
             ordered = [node for node in ordered if node.favourite == favourite]
@@ -124,13 +105,50 @@ class InMemoryNodeRepository:
         if type is not None:
             nodes = [n for n in nodes if n.type == type]
         if q is not None:
-            needle = _fold(q)
+            needle = fold(q)
             nodes = [
-                n for n in nodes if _matches(n, needle, attribute_search_exclusions)
+                n for n in nodes if text_matches(n, needle, attribute_search_exclusions)
             ]
         if favourite is not None:
             nodes = [n for n in nodes if n.favourite == favourite]
         return len(nodes)
+
+    def _matching(
+        self, scope: AccessScope, resolved: ResolvedQuery
+    ) -> builtins.list[SearchHit]:
+        """Every matching node in the query's order (nulls last, then id)."""
+        where = resolved.query.where
+        hits = [
+            SearchHit(node=node, sort_values=sort_values(node, resolved))
+            for node in sorted(self._visible(scope), key=lambda n: n.id)
+            if where is None or matches(node, where, resolved)
+        ]
+        # Stable passes from the last key to the first give the multi-key order.
+        for index in reversed(range(len(resolved.query.sort))):
+            desc = resolved.query.sort[index].dir == "desc"
+            present = [h for h in hits if h.sort_values[index] is not None]
+            absent = [h for h in hits if h.sort_values[index] is None]
+            present.sort(key=partial(_sort_at, index=index), reverse=desc)
+            hits = present + absent
+        return hits
+
+    async def search(
+        self,
+        *,
+        scope: AccessScope,
+        resolved: ResolvedQuery,
+        after: Cursor | None,
+        limit: int,
+    ) -> builtins.list[SearchHit]:
+        """Return live nodes matching the query, in its order, one page."""
+        hits = self._matching(scope, resolved)
+        if after is not None:
+            hits = [h for h in hits if is_after(h, after, resolved.query.sort)]
+        return hits[:limit]
+
+    async def search_count(self, *, scope: AccessScope, resolved: ResolvedQuery) -> int:
+        """Return how many live nodes in `scope` match the query."""
+        return len(self._matching(scope, resolved))
 
     async def clear_type(self, type_slug: str, *, scope: AccessScope) -> None:
         """Set `type` to None on all non-deleted nodes if type matches `type_slug`."""
@@ -221,8 +239,8 @@ class InMemoryNodeRepository:
                 continue
             counts[value] = counts.get(value, 0) + 1
         if q is not None:
-            needle = _fold(q)
-            counts = {v: c for v, c in counts.items() if needle in _fold(v)}
+            needle = fold(q)
+            counts = {v: c for v, c in counts.items() if needle in fold(v)}
         ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
         return ordered[:limit]
 

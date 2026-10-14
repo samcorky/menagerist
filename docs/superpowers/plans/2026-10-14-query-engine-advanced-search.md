@@ -1887,6 +1887,13 @@ Expected: PASS for `test_upgrade`, `test_up_down_consistency`, `test_single_head
 
 ### Task 6: SQL compiler and repository search
 
+> **Rulings that bind this task (made during Task 4; the Python evaluator `query_eval.py` is the reference).**
+> - **R4:** wrap every leaf produced by `_condition` in `COALESCE(..., false)` centrally (type IN on a NULL type, NULL description in text search, the field type check). Add a separate small test, own seed, both adapters: `NOT(type in [film])` includes an untyped item and `NOT(text)` includes an item with a NULL description.
+> - **R5:** `!=` is **type-scoped**: `field(type=T, key, !=, v)` is true only when `node.type = T` AND NOT(`=`). So `_field` must return `and_(coalesce(type == T, false), not_(coalesce(inner, false)))`, not `not_(<whole eq including the type test>)`. For a table column it is type-scoped NOT(any row equals). A stale key is always false.
+> - **R6:** for a table column (`sub_key`), `not_empty` = some row has a non-empty value in that column (not NULL, `""`, `[]`); `empty` = type-scoped NOT(`not_empty`), true for an item with no table, a non-array value, an empty array, or only blank cells. Top-level `empty`/`not_empty` are complements within the type.
+> - Task 4 left placeholder `search` / `search_count` stubs raising `NotImplementedError` (`# pragma: no cover`) in `SqlAlchemyNodeRepository`; replace them.
+> - The scenario table in `test_node_search.py` (including the un-scoped `!=` and `bom` column scenarios added in Task 4) is the contract: make SQL pass it; do not edit expectations.
+
 **Files:**
 - Create: `adapters/persistence/search_sql.py` (text-search helpers moved), `adapters/persistence/query_sql.py`
 - Modify: `adapters/persistence/node_repository.py`
@@ -2425,6 +2432,8 @@ Then rewrite `ListNodes._search_exclusions` to loop over `await load_node_types(
 ---
 
 ### Task 8: `SearchNodes` use case
+
+> **Ruling R7 (from the Task 4 review):** `decode_cursor` (Task 7) only checks that each sort value is `None`, a string or a number. `SearchNodes` must also check each cursor value's type against its sort key before querying: `name` is a string; `created` / `updated` are numbers; a field key is a number for number, duration, rating and money kinds and a string for the rest; `None` is always allowed. A mismatch is `InvalidQueryError(path="cursor")`, never a `TypeError` in the evaluator or a database error. Add a test for each mismatch direction.
 
 **Files:**
 - Create: `application/search_nodes.py`, `backend/tests/modules/graph/application/test_search_nodes.py`
