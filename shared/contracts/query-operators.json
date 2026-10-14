@@ -1,0 +1,127 @@
+{
+  "text": [
+    "=",
+    "!=",
+    "~",
+    "in",
+    "empty",
+    "not_empty"
+  ],
+  "url": [
+    "=",
+    "!=",
+    "~",
+    "in",
+    "empty",
+    "not_empty"
+  ],
+  "email": [
+    "=",
+    "!=",
+    "~",
+    "in",
+    "empty",
+    "not_empty"
+  ],
+  "phone": [
+    "=",
+    "!=",
+    "~",
+    "in",
+    "empty",
+    "not_empty"
+  ],
+  "longtext": [
+    "~",
+    "empty",
+    "not_empty"
+  ],
+  "number": [
+    "=",
+    "!=",
+    ">",
+    ">=",
+    "<",
+    "<=",
+    "between",
+    "empty",
+    "not_empty"
+  ],
+  "duration": [
+    "=",
+    "!=",
+    ">",
+    ">=",
+    "<",
+    "<=",
+    "between",
+    "empty",
+    "not_empty"
+  ],
+  "rating": [
+    "=",
+    "!=",
+    ">",
+    ">=",
+    "<",
+    "<=",
+    "between",
+    "empty",
+    "not_empty"
+  ],
+  "money": [
+    "=",
+    "!=",
+    ">",
+    ">=",
+    "<",
+    "<=",
+    "between",
+    "empty",
+    "not_empty"
+  ],
+  "date": [
+    "=",
+    "!=",
+    ">",
+    ">=",
+    "<",
+    "<=",
+    "between",
+    "empty",
+    "not_empty"
+  ],
+  "partialdate": [
+    "=",
+    "!=",
+    ">",
+    ">=",
+    "<",
+    "<=",
+    "between",
+    "empty",
+    "not_empty"
+  ],
+  "boolean": [
+    "=",
+    "!="
+  ],
+  "choice": [
+    "=",
+    "!=",
+    "in",
+    "empty",
+    "not_empty"
+  ],
+  "multichoice": [
+    "has",
+    "empty",
+    "not_empty"
+  ],
+  "checklist": [
+    "incomplete",
+    "complete",
+    "empty",
+    "not_empty"
+  ]
+}

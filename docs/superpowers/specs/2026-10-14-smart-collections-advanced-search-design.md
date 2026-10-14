@@ -1,0 +1,136 @@
+# Smart collections and advanced search
+
+Status: draft for review (2026-10-14). Not implemented.
+
+## Goal
+
+Let people ask precise questions of their items ("games for two under 45 minutes", "parts running low", "films rated 4+ I haven't watched in a year"), save a question as a **smart collection** whose members are always current, and build these questions in a visual filter builder. A JQL-style text syntax is a planned later addition (not a copy of JQL); the design must not need migrating to add it.
+
+## Decisions taken in brainstorming
+
+| Topic | Decision |
+|---|---|
+| Expressiveness | Full: AND / OR / NOT groups and connection conditions, built in phases |
+| Engine | A typed condition tree compiled to SQL (no external search engine, no query-string params) |
+| UI | Visual builder first; typed syntax later, as a parser/printer over the same tree |
+| Sorting | By name, created, updated or any field of a type, stored with the query |
+| Field scope | A field condition always names its item type (`Film → Rating ≥ 4`); OR groups may mix types |
+| Naming | "Smart collection" in the UI |
+| Stale conditions | A condition on an archived or deleted field matches nothing and is reported in `warnings`; it is never silently dropped |
+
+## Query model
+
+The tree is the only stored form. It is versioned JSON.
+
+```json
+{
+  "v": 1,
+  "where": { "op": "and", "children": [ ... ] },
+  "sort": [{ "by": "field", "type": "games-game", "key": "play_time", "dir": "asc" }]
+}
+```
+
+A **group** is `{op: "and" | "or" | "not", children: [...]}`. A child is a group or a condition. `not` has exactly one child.
+
+Conditions (leaf nodes):
+
+| Kind | Shape | Notes |
+|---|---|---|
+| `text` | `{q}` | Today's `q` behaviour: name, description and searchable attribute values |
+| `type` | `{in: [slug]}` | |
+| `favourite` | `{value}` | |
+| `tag` | `{mode: any \| all \| none, tags: []}` | |
+| `date` | `{on: created \| updated, op, value}` | Value may be relative (see below) |
+| `field` | `{type, key, sub_key?, op, value}` | Operators come from the field type |
+| `connection` | `{mode: exists \| none \| to, relationship?, direction?, item?, where?}` | One hop; `where` is a nested group applied to the item at the far end |
+
+Operators are named in the JQL spirit: `=`, `!=`, `~` (contains), `>`, `>=`, `<`, `<=`, `between`, `in`, `is empty`, `is not empty`, and `has` (multi-choice, checklist). Each field type declares which it supports.
+
+### Values
+
+A condition value is one of:
+
+- **Literal**: typed to the field kind (number, duration in seconds, money amount and currency, ISO partial date, choice value, boolean).
+- **Relative date**: `{"rel": "-30d"}`, `-1y` and so on, evaluated at read time so a saved query does not go stale.
+- **Field reference**: `{"ref": "reorder_at"}`, another field of the **same kind on the same item type**. This is what lets "Running low" be written as `in_stock <= ref(reorder_at)`.
+
+### Semantics worth fixing now
+
+- **Partial dates** compare at the precision stored: `year = 1984` matches `1984` and any `1984-xx`; `year between 1980 and 1989` is inclusive on the year.
+- **Repeating field groups**: `{key, sub_key}` matches when any row satisfies the condition (the repository already supports this for counts and listing).
+- **Missing values**: an item without the field fails every operator except `is empty` and `!=`.
+- **Stale conditions**: evaluated as false; the response lists them under `warnings` with the condition path so the UI can mark them. Under `not` this inverts to true, which is flagged the same way.
+- **Money** compares amounts only when the currencies match; a differing currency does not match (a currency-aware comparison is future work).
+- **Limits**: depth ≤ 4, ≤ 50 conditions, nested connection `where` one level deep, value length capped.
+
+## Architecture
+
+Dependency direction is unchanged (`entrypoints → adapters → application → domain`).
+
+- `graph/domain/query.py`: the tree types and structural validation (no framework imports). Validation against the live item types (does this field exist, is the operator allowed, does the `ref` kind match) is an application service in `graph/application/`.
+- `graph/ports/node_repository.py`: `list` and `count` gain `query: Query | None` and a `cursor`. The existing `q`, `type`, `favourite` and `ids` parameters stay; the application layer builds a `Query` from them, so `GET /node` is unchanged. `attribute_search_exclusions` keeps its current meaning for `text` conditions.
+- `graph/adapters/persistence/node_repository.py` compiles the tree to a SQLAlchemy `WHERE` and `ORDER BY`. `in_memory_node_repository.py` evaluates the same tree in Python.
+- `collections` stays independent of `graph`. A dynamic collection stores `definition` (opaque JSON). Validation and member resolution go through a new `collections` port, implemented in `entrypoints/api/shared/` over the graph use cases, the same bridge pattern as `ItemLookup` and `CollectionMembers`. `GET /node?collection=<id>` resolves a smart collection by passing its query to `ListNodes` instead of an `ids` list.
+- The access scope is always combined with the query last, so a saved query cannot reach another person's items.
+
+### Field-type operator contract
+
+The backend `FieldTypeDescriptor` declares each type's operators and value shape; the frontend registry declares the matching operators and a filter-input widget. A fixture in `shared/` (operator table per kind) is read by both test suites so the two cannot drift, like the existing `searchable` contract.
+
+## Performance
+
+- Migration: GIN (`jsonb_path_ops`) indexes on `nodes.attributes` and `nodes.tags`; an immutable `unaccent` wrapper plus a `pg_trgm` GIN index for name and description; edges already index `source_id`, `target_id` and `type`.
+- Field comparisons are guarded by `jsonb_typeof` before any cast, so a bad value never errors a whole query.
+- Connection conditions compile to `EXISTS` / `NOT EXISTS` subqueries.
+- **Keyset paging** moves from `id` to `(sort value, id)`, nulls last. The cursor is opaque and encodes both. Sorting on an arbitrary field cannot be indexed generally; measure it with realistic data and add expression indexes per hot field only if needed.
+- A smart collection's count is a `count` query. Its ETag uses `updated_at` and that count.
+- Dynamic collections no longer pass `IN (ids)`, which removes the 32 767-parameter ceiling noted in DECISIONS.md for manual collections.
+
+## API
+
+- `POST /node/search`: body `{query, limit, cursor}`; response `{items, total, next_cursor, warnings}`. POST because the body is a tree.
+- Collections: `kind` may be `dynamic` with a `definition`; create and update validate it. Adding or removing items on a smart collection returns 409. `item_count` is computed.
+- Errors follow the existing RFC 9457 mapping: an invalid tree is a 400 naming the path of the first bad condition; a malformed body is 422.
+
+## Frontend
+
+- Items page: a **Filters** control opens the builder (a sheet on mobile). Rows are `field / operator / value`, with **Add condition** and **Add group (all / any)**; active filters show as chips. Operators and value inputs adapt to the field type, reusing the field-type registry.
+- The tree is carried in the URL (compressed, base64url) so a search can be shared and survives reload.
+- **Save as smart collection** from a search; a smart collection's page shows its conditions and an **Edit conditions** action. Existing collection UI (cards, grid and list, search box, Examples filter) is reused.
+- UI copy follows the design guidelines: "smart collection", "condition", "match all / any". Node, edge and graph never appear.
+
+## Testing
+
+- Domain and application stay at 100%: tree validation, each operator, relative-date resolution, stale-condition warnings.
+- A **contract test** runs one table of cases against both the in-memory and the SQLAlchemy repositories (integration-marked for the latter), so the Python evaluator and the SQL compiler cannot disagree.
+- Router tests for `/node/search` and smart-collection CRUD; architecture tests unchanged and must still pass.
+- Frontend unit tests for the builder state and operator contract; e2e for build, save, open, edit and the stale-condition warning.
+
+## Phases
+
+1. **Query engine and advanced search.** Domain tree, validation, SQL compiler and in-memory evaluator, migration (indexes), `POST /node/search`, sorting and cursors, builder UI. Includes field references, relative dates and repeating-group rows. No connection conditions yet.
+2. **Smart collections.** `kind=dynamic`, definition validation port, resolution through `GET /node?collection=`, save-as, edit, and the collection page changes.
+3. **Connection conditions.** `exists`, `none`, `to`, and the nested far-end `where`, in the engine, both repositories and the builder.
+4. **Example packs.** Pack format bump so a pack can ship smart collections. Convert *Running low*, *Games for two* and *Still to try* from hand-built lists, and add one or two connection-based ones (*Films to rewatch*).
+
+Each phase gets its own implementation plan; this spec is the shared model.
+
+## Out of scope
+
+**Future (planned or likely, and the design leaves room):**
+
+- The JQL-style text syntax (see below).
+- Aggregates (totals, averages), e.g. "total spent on records".
+- Counting connections, e.g. "used in 2 or more assemblies".
+- Multi-hop connection chains, e.g. "records by artists whose gigs I attended".
+- Relevance ranking, and an external search engine behind the same repository port if scanning ever proves too slow.
+- Currency-aware money comparison.
+- An "in collection" condition, and bulk actions on results.
+
+**Rejected for now:**
+
+- GraphQL. It does not provide the filter semantics (operators, relative dates, field references, stale conditions, SQL compilation), its input types cannot express a mixed recursive condition tree without a JSON scalar, and it would add a second API style and a runtime dependency beside the OpenAPI client, RFC 9457 errors and ETag handling. It could be revisited for connection-heavy reads; the query tree and repository port do not depend on the transport.
+
+## Future: the text syntax
+
+A parser and printer converting text such as `type = games-game AND play_time <= 45m AND weight IN (light, medium)` to and from the tree. Because operators and structure already mirror that grammar and the tree is the only stored form, it adds no migration, and saved collections would show their text form for free.
