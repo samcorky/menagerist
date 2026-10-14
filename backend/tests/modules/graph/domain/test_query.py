@@ -1,0 +1,261 @@
+from datetime import date
+from typing import Any
+
+import pytest
+
+from app.modules.graph.domain.query import (
+    MAX_CONDITIONS,
+    MAX_DEPTH,
+    FieldCondition,
+    FieldReference,
+    Group,
+    InvalidQueryError,
+    Money,
+    RelativeDate,
+    SortKey,
+    TagCondition,
+    parse_query,
+    walk_conditions,
+)
+
+
+def _query(where: dict[str, Any] | None, **extra: Any) -> dict[str, Any]:  # noqa: ANN401
+    return {"v": 1, "where": where, **extra}
+
+
+def _field(**kwargs: Any) -> dict[str, Any]:  # noqa: ANN401
+    return {
+        "kind": "field",
+        "type": "film",
+        "key": "rating",
+        "op": ">=",
+        "value": 4,
+        **kwargs,
+    }
+
+
+def test_parses_a_nested_tree() -> None:
+    """A nested tree parses with sort keys and ordered condition paths."""
+    query = parse_query(
+        _query(
+            {
+                "op": "and",
+                "children": [
+                    {"kind": "favourite", "value": True},
+                    {
+                        "op": "or",
+                        "children": [
+                            _field(),
+                            {"kind": "tag", "mode": "any", "tags": ["noir"]},
+                        ],
+                    },
+                ],
+            },
+            sort=[{"by": "field", "type": "film", "key": "rating", "dir": "desc"}],
+        )
+    )
+    assert isinstance(query.where, Group)
+    assert query.sort == (SortKey(by="field", dir="desc", type="film", key="rating"),)
+    paths = [path for path, _ in walk_conditions(query.where)]
+    assert paths == [
+        "where.children[0]",
+        "where.children[1].children[0]",
+        "where.children[1].children[1]",
+    ]
+
+
+def test_no_where_means_everything() -> None:
+    """A missing where clause means no filter."""
+    assert parse_query(_query(None)).where is None
+
+
+def _and(*children: dict[str, Any]) -> dict[str, Any]:
+    return {"op": "and", "children": list(children)}
+
+
+def test_operand_forms_parse() -> None:
+    """Relative, reference and money operands parse."""
+    cases = [
+        ({"rel": "-30d"}, RelativeDate(amount=-30, unit="d")),
+        ({"ref": "reorder_at"}, FieldReference(key="reorder_at")),
+        ({"value": 3.5, "currency": "GBP"}, Money(value=3.5, currency="GBP")),
+    ]
+    for raw, expected in cases:
+        query = parse_query(_query(_and(_field(op="=", value=raw))))
+        assert isinstance(query.where, Group)
+        condition = query.where.children[0]
+        assert isinstance(condition, FieldCondition)
+        assert condition.value == expected
+
+
+def test_between_and_in_and_has_take_lists() -> None:
+    """List operators produce tuples; has accepts a scalar."""
+    query = parse_query(
+        _query(
+            _and(
+                _field(op="between", value=[1, 5]),
+                _field(key="g", op="has", value="scifi"),
+                _field(key="c", op="in", value=["a", "b"]),
+            )
+        )
+    )
+    assert isinstance(query.where, Group)
+    between, has, in_ = query.where.children
+    assert isinstance(between, FieldCondition)
+    assert between.value == (1, 5)
+    assert isinstance(has, FieldCondition)
+    assert has.value == ("scifi",)
+    assert isinstance(in_, FieldCondition)
+    assert in_.value == ("a", "b")
+
+
+def test_no_value_operators_reject_a_value() -> None:
+    """Operators that take no value reject one, naming the path."""
+    with pytest.raises(InvalidQueryError, match=r"where\.children\[0\]"):
+        parse_query(_query(_and(_field(op="empty", value=1))))
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "not an object",
+        {"v": 2, "where": None},
+        {"v": 1, "where": {"op": "xor", "children": [_field()]}},
+        {"v": 1, "where": {"op": "and", "children": []}},
+        {"v": 1, "where": {"op": "not", "children": [_field(), _field()]}},
+        {"v": 1, "where": _and({"kind": "nope"})},
+        {"v": 1, "where": _and(_field(op="between", value=[1]))},
+        {"v": 1, "where": _and(_field(op="~~"))},
+        {"v": 1, "where": _and({"kind": "tag", "mode": "some", "tags": ["a"]})},
+        {"v": 1, "where": _and(_field(value={"rel": "soon"}))},
+        {"v": 1, "where": _and(_field(value=[1, 2]))},
+        {"v": 1, "where": _and(_field(value=None))},
+        {"v": 1, "where": None, "sort": [{"by": "field"}]},
+        {"v": 1, "where": None, "sort": [{"by": "name"}] * 4},
+        {"v": 1, "where": None, "sort": "name"},
+        {"v": 1, "where": _and(_field(value={"value": True, "currency": "GBP"}))},
+        {"v": 1, "where": _and({"kind": "tag", "mode": [], "tags": ["a"]})},
+        {"v": 1, "where": _and({"kind": "date", "on": {}, "op": ">", "value": 1})},
+        {"v": 1, "where": None, "sort": [{"by": []}]},
+        {"v": 1, "where": None, "sort": [{"by": "name", "dir": []}]},
+        {"v": 1, "where": {"op": [], "children": [_field()]}},
+        {"v": 1, "where": _and({"kind": []})},
+        {"v": 1, "where": None, "sort": [{"by": "name", "dir": "up"}]},
+        {"v": 1, "where": None, "sort": ["name"]},
+        {"v": 1, "where": "everything"},
+        {"v": 1, "where": {"op": "and", "children": "x"}},
+        {"v": 1, "where": {"op": "and", "children": ["not a condition"]}},
+        {"v": 1, "where": _and({"kind": "type", "in": []})},
+        {"v": 1, "where": _and({"kind": "favourite", "value": "yes"})},
+        {
+            "v": 1,
+            "where": _and({"kind": "date", "on": "deleted", "op": ">", "value": 1}),
+        },
+        {
+            "v": 1,
+            "where": _and({"kind": "date", "on": "created", "op": "in", "value": [1]}),
+        },
+        {"v": 1, "where": _and(_field(op="empty") | {"value": None})},
+        {"v": 1, "where": _and({k: v for k, v in _field().items() if k != "value"})},
+        {"v": 1, "where": _and(_field(op="in", value=[]))},
+        {"v": 1, "where": _and(_field(op="in", value="a"))},
+        {"v": 1, "where": _and(_field(op="between", value="ab"))},
+        {"v": 1, "where": _and(_field(value="x" * 201))},
+        {"v": 1, "where": _and(_field(value={"value": "n", "currency": "GBP"}))},
+        {"v": 1, "where": _and(_field(sub_key=""))},
+    ],
+)
+def test_rejects_malformed_queries(bad: object) -> None:
+    """Malformed queries are rejected."""
+    with pytest.raises(InvalidQueryError):
+        parse_query(bad)
+
+
+def test_depth_limit() -> None:
+    """Nesting beyond the depth limit is rejected."""
+    where: dict[str, Any] = _and(_field())
+    for _ in range(MAX_DEPTH):
+        where = _and(where)
+    with pytest.raises(InvalidQueryError, match="nested"):
+        parse_query(_query(where))
+
+
+def test_condition_limit() -> None:
+    """More conditions than the limit are rejected."""
+    where = _and(*[_field() for _ in range(MAX_CONDITIONS + 1)])
+    with pytest.raises(InvalidQueryError, match=str(MAX_CONDITIONS)):
+        parse_query(_query(where))
+
+
+def test_overlong_text_is_rejected() -> None:
+    """Over-long text is rejected."""
+    with pytest.raises(InvalidQueryError):
+        parse_query(_query(_and({"kind": "text", "q": "x" * 201})))
+
+
+def test_tag_condition_shape() -> None:
+    """Tag conditions keep mode and tags."""
+    query = parse_query(
+        _query(_and({"kind": "tag", "mode": "none", "tags": ["a", "b"]}))
+    )
+    assert isinstance(query.where, Group)
+    assert query.where.children[0] == TagCondition(mode="none", tags=("a", "b"))
+
+
+@pytest.mark.parametrize(
+    ("today", "rel", "expected"),
+    [
+        (date(2026, 10, 14), RelativeDate(amount=-30, unit="d"), date(2026, 9, 14)),
+        (date(2026, 10, 14), RelativeDate(amount=1, unit="w"), date(2026, 10, 21)),
+        (date(2026, 3, 31), RelativeDate(amount=-1, unit="m"), date(2026, 2, 28)),
+        (date(2024, 3, 31), RelativeDate(amount=-1, unit="m"), date(2024, 2, 29)),
+        (date(2024, 2, 29), RelativeDate(amount=-1, unit="y"), date(2023, 2, 28)),
+    ],
+)
+def test_relative_dates_resolve_and_clamp(
+    today: date, rel: RelativeDate, expected: date
+) -> None:
+    """Relative dates resolve and clamp to month ends."""
+    assert rel.resolve(today) == expected
+
+
+def test_walking_no_tree_yields_nothing() -> None:
+    """An absent tree has no conditions."""
+    assert list(walk_conditions(None)) == []
+
+
+def test_remaining_condition_kinds_parse() -> None:
+    """Text, type, favourite, date, sub-key and plain sort forms parse."""
+    query = parse_query(
+        _query(
+            _and(
+                {"kind": "text", "q": "noir"},
+                {"kind": "type", "in": ["film"]},
+                {"kind": "date", "on": "created", "op": ">=", "value": {"rel": "-1w"}},
+                _field(sub_key="price"),
+            ),
+            sort=[{"by": "name"}, {"by": "created", "dir": "desc"}],
+        )
+    )
+    assert isinstance(query.where, Group)
+    kinds = [type(child).__name__ for child in query.where.children]
+    assert kinds == [
+        "TextCondition",
+        "TypeCondition",
+        "DateCondition",
+        "FieldCondition",
+    ]
+    field = query.where.children[3]
+    assert isinstance(field, FieldCondition)
+    assert field.sub_key == "price"
+    assert query.sort == (SortKey(by="name"), SortKey(by="created", dir="desc"))
+
+
+def test_no_value_operator_parses_without_a_value() -> None:
+    """An operator such as empty takes no value."""
+    field = {"kind": "field", "type": "film", "key": "rating", "op": "empty"}
+    query = parse_query(_query(_and(field)))
+    assert isinstance(query.where, Group)
+    condition = query.where.children[0]
+    assert isinstance(condition, FieldCondition)
+    assert condition.value is None
