@@ -1,13 +1,20 @@
-"""Branches of the Python query evaluator the shared scenarios do not reach."""
+"""Branches of the Python query evaluator the shared scenarios do not reach.
+
+The repository-level cases also run against Postgres, so the SQL compiler is
+held to the same answers.
+"""
 
 import uuid
 from datetime import date
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from app.modules.graph.adapters.persistence.in_memory_node_repository import (
     InMemoryNodeRepository,
+)
+from app.modules.graph.adapters.persistence.node_repository import (
+    SqlAlchemyNodeRepository,
 )
 from app.modules.graph.adapters.persistence.query_eval import is_after, sort_values
 from app.modules.graph.application.query_resolution import resolve_fields
@@ -21,6 +28,9 @@ from app.modules.graph.domain.query import (
     parse_query,
 )
 from app.shared_kernel.access_scope import AccessScope
+
+if TYPE_CHECKING:
+    from app.modules.graph.ports.node_repository import NodeRepository
 
 OWNER = uuid.UUID(int=301)
 TODAY = date(2026, 10, 14)
@@ -78,12 +88,23 @@ def _f(key: str, op: str, value: Any = None, **extra: Any) -> dict[str, Any]:  #
     return cond
 
 
+@pytest.fixture(
+    params=["in_memory", pytest.param("postgres", marks=pytest.mark.integration)]
+)
+def repository(request: pytest.FixtureRequest) -> NodeRepository:
+    """An empty repository of each adapter."""
+    if request.param == "in_memory":
+        return InMemoryNodeRepository()
+    return SqlAlchemyNodeRepository(request.getfixturevalue("db_session"))
+
+
 async def _run(
-    nodes: list[Node], *children: dict[str, Any], op: str = "and"
+    repo: NodeRepository, nodes: list[Node], *children: dict[str, Any], op: str = "and"
 ) -> set[str]:
-    repo = InMemoryNodeRepository()
+    """Add any of `nodes` not yet stored, then search with the given children."""
     for node in nodes:
-        await repo.add(node)
+        if await repo.get(node.id, scope=AccessScope.of(OWNER)) is None:
+            await repo.add(node)
     raw = {"v": 1, "where": {"op": op, "children": list(children)}}
     hits = await repo.search(
         scope=AccessScope.of(OWNER), resolved=_resolve(raw), after=None, limit=100
@@ -91,13 +112,17 @@ async def _run(
     return {hit.node.name for hit in hits}
 
 
-async def test_numeric_between_and_bool_is_not_a_number() -> None:
+async def test_numeric_between_and_bool_is_not_a_number(
+    repository: NodeRepository,
+) -> None:
     """Numeric between and bool is not a number."""
     nodes = [_node("a", count=5), _node("b", count=12), _node("c", count=True)]
-    assert await _run(nodes, _f("count", "between", [1, 10])) == {"a"}
+    assert await _run(repository, nodes, _f("count", "between", [1, 10])) == {"a"}
 
 
-async def test_money_between_needs_the_same_currency() -> None:
+async def test_money_between_needs_the_same_currency(
+    repository: NodeRepository,
+) -> None:
     """Money between needs the same currency."""
     nodes = [
         _node("gbp", price={"value": 5, "currency": "GBP"}),
@@ -108,10 +133,12 @@ async def test_money_between_needs_the_same_currency() -> None:
     ]
     low = {"value": 1, "currency": "GBP"}
     high = {"value": 10, "currency": "GBP"}
-    assert await _run(nodes, _f("price", "between", [low, high])) == {"gbp"}
+    assert await _run(repository, nodes, _f("price", "between", [low, high])) == {"gbp"}
 
 
-async def test_money_field_reference_uses_the_other_amount() -> None:
+async def test_money_field_reference_uses_the_other_amount(
+    repository: NodeRepository,
+) -> None:
     """Money field reference uses the other amount."""
     nodes = [
         _node(
@@ -126,10 +153,10 @@ async def test_money_field_reference_uses_the_other_amount() -> None:
         ),
         _node("no cap", price={"value": 1, "currency": "GBP"}),
     ]
-    assert await _run(nodes, _f("price", "<=", {"ref": "cap"})) == {"under"}
+    assert await _run(repository, nodes, _f("price", "<=", {"ref": "cap"})) == {"under"}
 
 
-async def test_date_field_reference_and_between() -> None:
+async def test_date_field_reference_and_between(repository: NodeRepository) -> None:
     """Date field reference and between."""
     nodes = [
         _node("early", bought="2020-01-01", due="2021-01-01"),
@@ -137,20 +164,26 @@ async def test_date_field_reference_and_between() -> None:
         _node("no due", bought="2020-01-01"),
         _node("wrong", bought=5, due="2021-01-01"),
     ]
-    assert await _run(nodes, _f("bought", "<", {"ref": "due"})) == {"early"}
-    assert await _run(nodes, _f("bought", "between", ["2019-01-01", "2020-12-31"])) == {
+    assert await _run(repository, nodes, _f("bought", "<", {"ref": "due"})) == {"early"}
+    assert await _run(
+        repository, nodes, _f("bought", "between", ["2019-01-01", "2020-12-31"])
+    ) == {
         "early",
         "no due",
     }
 
 
-async def test_field_reference_to_a_wrong_typed_target_never_matches() -> None:
+async def test_field_reference_to_a_wrong_typed_target_never_matches(
+    repository: NodeRepository,
+) -> None:
     """Field reference to a wrong typed target never matches."""
     nodes = [_node("a", count=1, limit="many")]
-    assert await _run(nodes, _f("count", "<", {"ref": "limit"})) == set()
+    assert await _run(repository, nodes, _f("count", "<", {"ref": "limit"})) == set()
 
 
-async def test_partial_date_between_compares_to_each_bound_precision() -> None:
+async def test_partial_date_between_compares_to_each_bound_precision(
+    repository: NodeRepository,
+) -> None:
     """Partial date between compares to each bound precision."""
     nodes = [
         _node("a", year="1985-03-02"),
@@ -158,26 +191,31 @@ async def test_partial_date_between_compares_to_each_bound_precision() -> None:
         _node("c", year="1979"),
         _node("d", year=1985),
     ]
-    assert await _run(nodes, _f("year", "between", ["1980", "1989-12"])) == {"a"}
+    assert await _run(
+        repository, nodes, _f("year", "between", ["1980", "1989-12"])
+    ) == {"a"}
 
 
-async def test_choice_is_exact_and_text_folds() -> None:
+async def test_choice_is_exact_and_text_folds(repository: NodeRepository) -> None:
     """Choice is exact and text folds."""
     nodes = [
         _node("red", colour="Red", label="Café"),
         _node("blue", colour="Blue", label="cafe au lait"),
         _node("num", colour=3, label=3),
     ]
-    assert await _run(nodes, _f("colour", "=", "Red")) == {"red"}
-    assert await _run(nodes, _f("colour", "=", "red")) == set()
-    assert await _run(nodes, _f("colour", "in", ["Red", "Blue"])) == {"red", "blue"}
-    assert await _run(nodes, _f("colour", "in", ["red"])) == set()
-    assert await _run(nodes, _f("label", "~", "CAFE")) == {"red", "blue"}
-    assert await _run(nodes, _f("label", "=", "cafe")) == {"red"}
-    assert await _run(nodes, _f("label", "in", ["CAFÉ", "x"])) == {"red"}
+    assert await _run(repository, nodes, _f("colour", "=", "Red")) == {"red"}
+    assert await _run(repository, nodes, _f("colour", "=", "red")) == set()
+    assert await _run(repository, nodes, _f("colour", "in", ["Red", "Blue"])) == {
+        "red",
+        "blue",
+    }
+    assert await _run(repository, nodes, _f("colour", "in", ["red"])) == set()
+    assert await _run(repository, nodes, _f("label", "~", "CAFE")) == {"red", "blue"}
+    assert await _run(repository, nodes, _f("label", "=", "cafe")) == {"red"}
+    assert await _run(repository, nodes, _f("label", "in", ["CAFÉ", "x"])) == {"red"}
 
 
-async def test_table_columns_match_any_row() -> None:
+async def test_table_columns_match_any_row(repository: NodeRepository) -> None:
     """Table columns match any row."""
     nodes = [
         _node("a", parts=[{"sku": "x1", "qty": 1}, {"sku": "y2", "qty": 9}]),
@@ -185,33 +223,47 @@ async def test_table_columns_match_any_row() -> None:
         _node("c", parts="not a list"),
         _node("d"),
     ]
-    assert await _run(nodes, _f("parts", "=", "y2", sub_key="sku")) == {"a"}
-    assert await _run(nodes, _f("parts", ">", 5, sub_key="qty")) == {"a"}
-    assert await _run(nodes, _f("parts", "empty", sub_key="qty")) == {"b", "c", "d"}
-    assert await _run(nodes, _f("parts", "not_empty", sub_key="qty")) == {"a"}
+    assert await _run(repository, nodes, _f("parts", "=", "y2", sub_key="sku")) == {"a"}
+    assert await _run(repository, nodes, _f("parts", ">", 5, sub_key="qty")) == {"a"}
+    assert await _run(repository, nodes, _f("parts", "empty", sub_key="qty")) == {
+        "b",
+        "c",
+        "d",
+    }
+    assert await _run(repository, nodes, _f("parts", "not_empty", sub_key="qty")) == {
+        "a"
+    }
     # != is the negation of =, so rows without a match (or no table) qualify
-    assert await _run(nodes, _f("parts", "!=", "y2", sub_key="sku")) == {"b", "c", "d"}
+    assert await _run(repository, nodes, _f("parts", "!=", "y2", sub_key="sku")) == {
+        "b",
+        "c",
+        "d",
+    }
 
 
-async def test_tag_all_and_updated_date_and_not_group() -> None:
+async def test_tag_all_and_updated_date_and_not_group(
+    repository: NodeRepository,
+) -> None:
     """Tag all and updated date and not group."""
     both = _node("both")
     both.tags = ["a", "b"]
     one = _node("one")
     one.tags = ["a"]
     assert await _run(
-        [both, one], {"kind": "tag", "mode": "all", "tags": ["a", "b"]}
+        repository, [both, one], {"kind": "tag", "mode": "all", "tags": ["a", "b"]}
     ) == {"both"}
     today = {"kind": "date", "on": "updated", "op": ">=", "value": {"rel": "-1d"}}
-    assert await _run([both, one], today) == {"both", "one"}
+    assert await _run(repository, [both, one], today) == {"both", "one"}
     window = {
         "kind": "date",
         "on": "updated",
         "op": "between",
         "value": ["2000-01-01", "2000-12-31"],
     }
-    assert await _run([both], window) == set()
-    assert await _run([both, one], {"op": "not", "children": [today]}) == set()
+    assert await _run(repository, [both], window) == set()
+    assert (
+        await _run(repository, [both, one], {"op": "not", "children": [today]}) == set()
+    )
 
 
 def _sort_ctx(*keys: dict[str, Any]) -> ResolvedQuery:
@@ -314,9 +366,11 @@ def test_is_after_breaks_ties_by_next_key_then_id() -> None:
     )
 
 
-async def test_multi_key_sort_with_nulls_and_descending_ties() -> None:
+async def test_multi_key_sort_with_nulls_and_descending_ties(
+    repository: NodeRepository,
+) -> None:
     """Multi key sort with nulls and descending ties."""
-    repo = InMemoryNodeRepository()
+    repo = repository
     for name, count in [("b", 1), ("a", 1), ("c", None), ("d", 2)]:
         await repo.add(_node(name, **({} if count is None else {"count": count})))
     raw = {
@@ -333,12 +387,19 @@ async def test_multi_key_sort_with_nulls_and_descending_ties() -> None:
     assert [h.node.name for h in hits] == ["d", "a", "b", "c"]
 
 
-async def test_table_column_empty_and_not_empty_are_complements() -> None:
+async def test_table_column_empty_and_not_empty_are_complements(
+    repository: NodeRepository,
+) -> None:
     """An empty table or a non-list value is empty, never not_empty."""
     nodes = [
         _node("none", parts=[]),
         _node("oops", parts="oops"),
         _node("full", parts=[{"sku": "x"}]),
     ]
-    assert await _run(nodes, _f("parts", "empty", sub_key="sku")) == {"none", "oops"}
-    assert await _run(nodes, _f("parts", "not_empty", sub_key="sku")) == {"full"}
+    assert await _run(repository, nodes, _f("parts", "empty", sub_key="sku")) == {
+        "none",
+        "oops",
+    }
+    assert await _run(repository, nodes, _f("parts", "not_empty", sub_key="sku")) == {
+        "full"
+    }

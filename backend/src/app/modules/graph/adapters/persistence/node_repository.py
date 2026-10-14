@@ -1,24 +1,23 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import structlog
-from sqlalchemy import (
-    ARRAY,
-    Text,
-    and_,
-    bindparam,
-    column,
-    exists,
-    func,
-    literal,
-    literal_column,
-    or_,
-    select,
-    update,
-)
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import and_, func, or_, select, update
 
 from app.modules.graph.adapters.persistence.models import NodeModel
+from app.modules.graph.adapters.persistence.query_sql import (
+    after_clause,
+    compile_where,
+    order_by,
+    sort_expressions,
+)
+from app.modules.graph.adapters.persistence.search_sql import (
+    has_matching_row,
+    like_pattern,
+    search_clause,
+    unaccent_ilike,
+)
 from app.modules.graph.domain.node import Node
+from app.modules.graph.domain.query import SearchHit
 from app.platform.orm_mixins import claim_rows, owned_by
 
 if TYPE_CHECKING:
@@ -27,10 +26,10 @@ if TYPE_CHECKING:
     import uuid
     from collections.abc import Mapping, Sequence
 
-    from sqlalchemy import ColumnElement, SQLColumnExpression
+    from sqlalchemy import ColumnElement
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from app.modules.graph.domain.query import Cursor, ResolvedQuery, SearchHit
+    from app.modules.graph.domain.query import Cursor, ResolvedQuery
     from app.shared_kernel.access_scope import AccessScope
 
 logger = structlog.get_logger()
@@ -69,86 +68,6 @@ def _to_model(node: Node) -> NodeModel:
         created_at=node.created_at,
         updated_at=node.updated_at,
         deleted_at=node.deleted_at,
-    )
-
-
-_LIKE_ESCAPE = "\\"
-
-
-def _like_pattern(q: str) -> str:
-    """Return a contains-pattern for `q` with LIKE wildcards escaped."""
-    escaped = q.replace(_LIKE_ESCAPE, _LIKE_ESCAPE * 2)
-    escaped = escaped.replace("%", _LIKE_ESCAPE + "%").replace("_", _LIKE_ESCAPE + "_")
-    return f"%{escaped}%"
-
-
-def _unaccent_ilike(
-    column_: SQLColumnExpression[Any], pattern: str
-) -> ColumnElement[bool]:
-    """Case- and accent-insensitive LIKE of `column_` against an escaped `pattern`."""
-    return func.unaccent(column_).ilike(func.unaccent(pattern), escape=_LIKE_ESCAPE)
-
-
-def _has_matching_row(
-    attributes: SQLColumnExpression[Any], key: str, sub_key: str, value: str | None
-) -> ColumnElement[bool]:
-    """Whether any row of group array `key` holds `sub_key`, optionally == `value`."""
-    elements = func.jsonb_array_elements(attributes[key]).table_valued(
-        column("value", JSONB), name="elem"
-    )
-    row = elements.c.value
-    conditions = [row.has_key(sub_key)]
-    if value is not None:
-        conditions.append(row.contains({sub_key: value}))
-    return exists(select(literal(1)).select_from(elements).where(*conditions))
-
-
-def _has_matching_value(
-    attributes: SQLColumnExpression[Any], pattern: str
-) -> ColumnElement[bool]:
-    """Whether any string or number anywhere inside `attributes` matches `pattern`.
-
-    Walks every nested value; key names, booleans and nulls never match.
-    """
-    value = func.jsonb_path_query(
-        attributes, literal_column("'strict $.**'")
-    ).column_valued("v")
-    text_value = value.op("#>>")(literal_column("'{}'"))
-    return exists(
-        select(literal(1)).where(
-            func.jsonb_typeof(value).in_(("string", "number")),
-            _unaccent_ilike(text_value, pattern),
-        )
-    )
-
-
-def _search_clause(
-    q: str, exclusions: Mapping[str, Sequence[str]] | None
-) -> ColumnElement[bool]:
-    """Match `q` against name, description and attribute values, per type exclusions."""
-    pattern = _like_pattern(q)
-    attributes = NodeModel.attributes
-    excluded = {slug: list(keys) for slug, keys in (exclusions or {}).items() if keys}
-    scans = [
-        and_(
-            NodeModel.type == slug,
-            _has_matching_value(
-                attributes.op("-")(bindparam(f"excl_{i}", keys, type_=ARRAY(Text))),
-                pattern,
-            ),
-        )
-        for i, (slug, keys) in enumerate(excluded.items())
-    ]
-    unrestricted = _has_matching_value(attributes, pattern)
-    if excluded:
-        unrestricted = and_(
-            or_(NodeModel.type.is_(None), NodeModel.type.not_in(list(excluded))),
-            unrestricted,
-        )
-    return (
-        _unaccent_ilike(NodeModel.name, pattern)
-        | _unaccent_ilike(NodeModel.description, pattern)
-        | or_(*scans, unrestricted)
     )
 
 
@@ -221,7 +140,7 @@ class SqlAlchemyNodeRepository:
         if after is not None:
             stmt = stmt.where(NodeModel.id > after)
         if q is not None:
-            stmt = stmt.where(_search_clause(q, attribute_search_exclusions))
+            stmt = stmt.where(search_clause(q, attribute_search_exclusions))
         if favourite is not None:
             stmt = stmt.where(NodeModel.favourite == favourite)
         result = await self._session.execute(stmt)
@@ -235,12 +154,34 @@ class SqlAlchemyNodeRepository:
         after: Cursor | None,
         limit: int,
     ) -> builtins.list[SearchHit]:
-        """Placeholder until the SQL compiler lands."""
-        raise NotImplementedError  # pragma: no cover
+        """Return one page of live nodes matching the query, in its order.
+
+        The scope is its own WHERE term, so an `or` in the query cannot widen it.
+        """
+        logger.debug("searching nodes", after=after, limit=limit)
+        exprs = sort_expressions(resolved)
+        stmt = select(NodeModel, *exprs).where(_in_scope(scope))
+        where = compile_where(resolved)
+        if where is not None:
+            stmt = stmt.where(where)
+        if after is not None:
+            stmt = stmt.where(after_clause(resolved, exprs, after))
+        stmt = stmt.order_by(*order_by(resolved, exprs)).limit(limit)
+        rows = (await self._session.execute(stmt)).all()
+        return [
+            SearchHit(node=_to_domain(row[0]), sort_values=tuple(row[1:]))
+            for row in rows
+        ]
 
     async def search_count(self, *, scope: AccessScope, resolved: ResolvedQuery) -> int:
-        """Placeholder until the SQL compiler lands."""
-        raise NotImplementedError  # pragma: no cover
+        """Return how many live nodes in `scope` match the query."""
+        logger.debug("counting search results")
+        stmt = select(func.count()).select_from(NodeModel).where(_in_scope(scope))
+        where = compile_where(resolved)
+        if where is not None:
+            stmt = stmt.where(where)
+        result = await self._session.execute(stmt)
+        return result.scalar_one()
 
     async def count(
         self,
@@ -262,7 +203,7 @@ class SqlAlchemyNodeRepository:
         if type is not None:
             stmt = stmt.where(NodeModel.type == type)
         if q is not None:
-            stmt = stmt.where(_search_clause(q, attribute_search_exclusions))
+            stmt = stmt.where(search_clause(q, attribute_search_exclusions))
         if favourite is not None:
             stmt = stmt.where(NodeModel.favourite == favourite)
         result = await self._session.execute(stmt)
@@ -307,7 +248,7 @@ class SqlAlchemyNodeRepository:
                 )
         else:
             stmt = stmt.where(
-                _has_matching_row(NodeModel.attributes, key, sub_key, value)
+                has_matching_row(NodeModel.attributes, key, sub_key, value)
             )
         result = await self._session.execute(stmt)
         return result.scalar_one()
@@ -329,7 +270,7 @@ class SqlAlchemyNodeRepository:
             stmt = stmt.where(NodeModel.attributes.has_key(key))
         else:
             stmt = stmt.where(
-                _has_matching_row(NodeModel.attributes, key, sub_key, None)
+                has_matching_row(NodeModel.attributes, key, sub_key, None)
             )
         stmt = stmt.order_by(NodeModel.id).limit(limit)
         if after is not None:
@@ -360,7 +301,7 @@ class SqlAlchemyNodeRepository:
             .group_by(value)
         )
         if q is not None:
-            stmt = stmt.where(_unaccent_ilike(value, _like_pattern(q)))
+            stmt = stmt.where(unaccent_ilike(value, like_pattern(q)))
         stmt = stmt.order_by(func.count().desc(), value.asc()).limit(limit)
         result = await self._session.execute(stmt)
         return [(row[0], row[1]) for row in result.all()]

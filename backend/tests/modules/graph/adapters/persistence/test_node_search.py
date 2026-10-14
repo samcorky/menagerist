@@ -450,3 +450,18 @@ async def test_paging_continues_after_the_cursor_row_is_deleted(
         "Café Society",
         "Casablanca",
     ]
+
+
+async def test_not_includes_items_whose_values_are_null(
+    repository: NodeRepository,
+) -> None:
+    """NOT keeps an untyped item and an item with no description (SQL NULLs)."""
+    await repository.add(Node.create(owner_id=ALICE, name="Loose"))
+    await repository.add(Node.create(owner_id=ALICE, name="Heat", type="film"))
+    not_film = {"op": "not", "children": [_FILM]}
+    not_text = {"op": "not", "children": [{"kind": "text", "q": "zzz"}]}
+    assert await _names(repository, {"v": 1, "where": not_film}) == ["Loose"]
+    assert set(await _names(repository, {"v": 1, "where": not_text})) == {
+        "Loose",
+        "Heat",
+    }
