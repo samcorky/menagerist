@@ -109,6 +109,7 @@ The backend `FieldTypeDescriptor` declares each type's operators and value shape
 ## Phases
 
 1. **Query engine and advanced search.** Domain tree, validation, SQL compiler and in-memory evaluator, migration (indexes), `POST /node/search`, sorting and cursors, builder UI. Includes field references, relative dates and repeating-group rows. No connection conditions yet.
+1b. **Per-item field conditions.** Items can carry their own typed fields (the `extra_schema` overlay). Phase 1 resolves field conditions against the item type's schema only, so per-item fields are reachable by text search but not by field conditions. Phase 1b adds a field condition addressed by key and kind rather than by type (an additive change to the query format, no version bump), a backend read that lists the per-item fields in use with their kinds and counts, and a "Per-item fields" group in the builder. A per-item key can never clash with a type key, so `attributes[key]` is unambiguous. Until then, "Promote to type" makes a per-item field filterable.
 2. **Smart collections.** `kind=dynamic`, definition validation port, resolution through `GET /node?collection=`, save-as, edit, and the collection page changes.
 3. **Connection conditions.** `exists`, `none`, `to`, and the nested far-end `where`, in the engine, both repositories and the builder.
 4. **Example packs.** Pack format bump so a pack can ship smart collections. Convert *Running low*, *Games for two* and *Still to try* from hand-built lists, and add one or two connection-based ones (*Films to rewatch*).

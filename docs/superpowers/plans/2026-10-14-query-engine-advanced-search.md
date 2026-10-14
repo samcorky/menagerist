@@ -44,7 +44,7 @@ The five failure modes the spec implies but a straight reading would miss. Each 
 |---|---|
 | `domain/query.py` | Tree dataclasses, limits, `parse_query`, `walk_conditions`, `Cursor`, `ResolvedQuery`, `SearchHit`, `InvalidQueryError` |
 | `application/field_kinds.py` | `KIND_OPERATORS`, `REF_KINDS`, `kind_of(prop)` |
-| `application/query_resolution.py` | `resolve_fields(query, schemas)` → kinds map + `QueryWarning`s; value and operator validation |
+| `application/query_resolution.py` | `resolve_fields(query, schemas)` → `FieldResolution` (kinds map + `QueryWarning`s); value and operator validation. `QueryWarning` and `FieldResolution` live in `domain/query.py`: the CQRS architecture test allows only handlers and `*Command/*Query/*Result/*Permission` classes in `application/` |
 | `application/query_cursor.py` | `encode_cursor` / `decode_cursor` |
 | `application/search_nodes.py` | `SearchNodes` use case |
 | `application/type_catalogue.py` | `load_node_types(repos)` (paged read of all types, shared with `ListNodes`) |
@@ -973,6 +973,7 @@ def test_sort_keys_resolve_and_must_be_sortable() -> None:
     sort_genres = {"v": 1, "where": None, "sort": [{"by": "field", "type": "film", "key": "genres"}]}
     with pytest.raises(InvalidQueryError, match=r"sort\[0\]"):
         resolve_fields(parse_query(sort_genres), SCHEMAS)
+```
 
 - [ ] **Step 2: Run to verify failure**
 
@@ -2554,6 +2555,7 @@ async def test_other_users_items_are_invisible() -> None:
     for actor, expected in ((alice, "Alice's film"), (bob, "Bob's film")):
         result = await use_case.handle(SearchNodesQuery(query=_body()), actor)
         assert [n.name for n in result.items] == [expected]
+```
 
 - [ ] **Step 2: Run, expect failure** (`ModuleNotFoundError`).
 
@@ -2571,13 +2573,14 @@ from typing import Any
 import structlog
 
 from app.modules.graph.application.query_cursor import decode_cursor, encode_cursor
-from app.modules.graph.application.query_resolution import QueryWarning, resolve_fields
+from app.modules.graph.application.query_resolution import resolve_fields
 from app.modules.graph.application.schema_meta import search_excluded_keys
 from app.modules.graph.application.type_catalogue import load_node_types
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.query import (
     Cursor,
     InvalidQueryError,
+    QueryWarning,
     ResolvedQuery,
     parse_query,
 )

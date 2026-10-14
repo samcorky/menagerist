@@ -186,6 +186,24 @@ class Query:
 
 
 type FieldKey = tuple[str, str, str | None]
+
+
+@dataclass(frozen=True)
+class QueryWarning:
+    """A part of a query that no longer applies."""
+
+    path: str
+    message: str
+
+
+@dataclass(frozen=True)
+class FieldResolution:
+    """Kinds of the fields that still exist, and what went stale."""
+
+    kinds: dict[FieldKey, str]
+    warnings: list[QueryWarning]
+
+
 type SortValue = str | float | None
 
 
