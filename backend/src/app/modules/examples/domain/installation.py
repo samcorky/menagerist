@@ -114,6 +114,37 @@ class Installation(Identifiable, Owned, Timestamped):
     ) -> None:
         """Record an entity the pack just created."""
         self._require(InstallationStatus.INSTALLING)
+        self._append(kind, ref, label, entity_id, content_hash)
+
+    def record_late(
+        self,
+        kind: EntityKind,
+        ref: str,
+        label: str,
+        entity_id: uuid.UUID,
+        content_hash: str,
+    ) -> None:
+        """Record an entity created after the install finished (a link).
+
+        A settled record of the same `ref` (the link was removed or kept earlier) is
+        replaced, so one logical link never counts twice.
+        """
+        self._require(InstallationStatus.INSTALLING, InstallationStatus.INSTALLED)
+        self.entities = [
+            r
+            for r in self.entities
+            if not (r.kind is kind and r.ref == ref and r.outcome is not Outcome.OWNED)
+        ]
+        self._append(kind, ref, label, entity_id, content_hash)
+
+    def _append(
+        self,
+        kind: EntityKind,
+        ref: str,
+        label: str,
+        entity_id: uuid.UUID,
+        content_hash: str,
+    ) -> None:
         self.entities.append(
             EntityRecord(
                 kind=kind,

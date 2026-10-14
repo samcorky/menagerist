@@ -66,6 +66,16 @@ async def _required(pack: ExamplePack) -> dict[str, ExamplePack]:
     return found
 
 
+async def _linked(pack: ExamplePack) -> dict[str, ExamplePack]:
+    """Packs `pack` links with, and what they require: catalogue only, not installed."""
+    found: dict[str, ExamplePack] = {}
+    for pack_id in pack.link_targets:
+        other = await _load(pack_id)
+        found |= await _required(other)
+        found[pack_id] = other
+    return found
+
+
 async def _install(world: World, pack_id: str) -> Any:  # noqa: ANN401
     return await InstallExamplePack(
         world.uow,
@@ -168,7 +178,8 @@ async def test_pack_installs_and_removes_cleanly(
     """A pack installs, uninstalls to nothing, and installs again."""
     pack = await _load(pack_id)
     required = await _required(pack)
-    world = make_world(*required.values(), pack)
+    linked = {k: v for k, v in (await _linked(pack)).items() if k not in required}
+    world = make_world(*required.values(), *linked.values(), pack)
     for base_id in required:
         await _install(world, base_id)
 

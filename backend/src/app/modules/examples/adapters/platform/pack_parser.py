@@ -10,6 +10,7 @@ from app.modules.examples.domain.pack import (
     PackCover,
     PackItem,
     PackItemType,
+    PackLink,
     PackPreset,
     PackRelationshipType,
 )
@@ -21,8 +22,8 @@ INDEX_FORMAT = "menagerist-examples-index"
 PACK_FORMAT = "menagerist-example-pack"
 FORMAT_VERSION = 1
 # v2 adds the optional `collections` section; v3 adds an item type's `cover`;
-# v4 adds `requires` and `pack:ref` references.
-PACK_VERSIONS = (1, 2, 3, 4)
+# v4 adds `requires` and `pack:ref` references; v5 adds top-level `links`.
+PACK_VERSIONS = (1, 2, 3, 4, 5)
 
 # Same rule as the domain's pack id; ids become file names, so keep it strict.
 PACK_ID = re.compile(r"^[a-z0-9][a-z0-9-]*\Z")
@@ -32,6 +33,7 @@ _PACK = "the pack"
 _SECTIONS = {"presets", "relationship_types", "item_types", "items", "connections"}
 _V2_SECTIONS = {"collections"}
 _V4_KEYS = {"requires"}
+_V5_KEYS = {"links"}
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -243,6 +245,22 @@ def _parse_connection(c: Mapping[str, Any]) -> PackConnection:
     )
 
 
+def _parse_link(c: Mapping[str, Any]) -> PackLink:
+    _check_keys(
+        c,
+        required={"with", "from", "to", "type"},
+        optional={"attributes"},
+        where="a link",
+    )
+    return PackLink(
+        with_pack=_str(c["with"], "with"),
+        source_ref=_str(c["from"], "from"),
+        target_ref=_str(c["to"], "to"),
+        type_ref=_str(c["type"], "type"),
+        attributes=_dict(c.get("attributes", {}), "attributes"),
+    )
+
+
 def _parse_collection(c: Mapping[str, Any]) -> PackCollection:
     _check_keys(
         c,
@@ -275,6 +293,7 @@ def parse_pack(data: object) -> ExamplePack:
         _SECTIONS
         | (_V2_SECTIONS if root["version"] >= 2 else set())
         | (_V4_KEYS if root["version"] >= 4 else set())
+        | (_V5_KEYS if root["version"] >= 5 else set())
     )
     _check_keys(
         root, required={"format", "version", "id"}, optional=optional, where=_PACK
@@ -289,6 +308,7 @@ def parse_pack(data: object) -> ExamplePack:
         items=_parse_all(root, "items", _parse_item),
         connections=_parse_all(root, "connections", _parse_connection),
         collections=_parse_all(root, "collections", _parse_collection),
+        links=_parse_all(root, "links", _parse_link),
         requires=tuple(
             _str(r, "requires entry")
             for r in _array(root.get("requires", []), "requires")

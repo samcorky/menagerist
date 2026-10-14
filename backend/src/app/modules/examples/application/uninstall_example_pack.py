@@ -8,6 +8,7 @@ from app.modules.examples.application.removal import (
     REMOVAL_ORDER_SHARED,
     KeptEntity,
     settle_installation,
+    settle_records,
 )
 from app.modules.examples.application.required_by import dependants_by_pack
 from app.modules.examples.domain.errors import (
@@ -113,6 +114,9 @@ class UninstallExamplePack(
         if dependants:
             raise RequiredByInstalledPackError(names=[d.name for d in dependants])
 
+        link_kept = await self._settle_incoming_links(
+            command.pack_id, installation, active
+        )
         history = await self._pack_history(command.pack_id)
         kept = await settle_installation(
             installation,
@@ -125,6 +129,7 @@ class UninstallExamplePack(
                 i.is_active and i.owner_id != installation.owner_id for i in history
             ),
         )
+        kept = [*link_kept, *kept]
         installation.mark_removed()
         await self._persist(installation)
         await self._release_shared_types(installation, history)
@@ -134,6 +139,32 @@ class UninstallExamplePack(
             removed=_removed_counts(installation),
             kept=tuple(kept),
         )
+
+    async def _settle_incoming_links(
+        self, pack_id: str, removing: Installation, active: list[Installation]
+    ) -> list[KeptEntity]:
+        """Settle links other packs hold with `pack_id`, before its items go."""
+        prefix = f"link:{pack_id}:"
+        kept: list[KeptEntity] = []
+        for other in active:
+            if other.id == removing.id:
+                continue
+            records = [
+                r
+                for r in other.owned(EntityKind.CONNECTION)
+                if r.ref.startswith(prefix)
+            ]
+            if records:
+                kept += await settle_records(
+                    other,
+                    records,
+                    presets=self._presets,
+                    graph=self._graph,
+                    collections=self._collections,
+                    covers=self._covers,
+                    persist=self._persist,
+                )
+        return kept
 
     async def _pack_history(self, pack_id: str) -> list[Installation]:
         async with self._uow as repos:

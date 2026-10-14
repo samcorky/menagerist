@@ -100,6 +100,12 @@ class GraphTarget(Protocol):
         """Create the connection between two created items."""
         ...
 
+    async def connection_exists(
+        self, source_id: uuid.UUID, target_id: uuid.UUID, type_slug: str
+    ) -> bool:
+        """Whether a live connection of `type_slug` already runs source to target."""
+        ...
+
     async def inspect(
         self, kind: EntityKind, entity_id: uuid.UUID
     ) -> Inspection | None:

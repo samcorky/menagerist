@@ -146,6 +146,22 @@ class PackConnection:
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
+class PackLink:
+    """A connection between one of this pack's items and an item of another pack.
+
+    It exists only while both packs are installed. `source_ref` and `target_ref`
+    are this pack's own refs, or `<with_pack>:<ref>` for the other pack's items.
+    `type_ref` is one of this pack's own relationship types.
+    """
+
+    with_pack: str
+    source_ref: str
+    target_ref: str
+    type_ref: str
+    attributes: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(kw_only=True, frozen=True, eq=False)
 class PackCollection:
     """A manual collection of pack items."""
 
@@ -176,6 +192,7 @@ class PackSummary:
     description: str
     counts: PackCounts
     requires: tuple[str, ...] = ()
+    links_with: tuple[str, ...] = ()
 
 
 def _check_refs(section: str, refs: list[str]) -> None:
@@ -198,6 +215,7 @@ class ExamplePack:
     connections: tuple[PackConnection, ...] = ()
     collections: tuple[PackCollection, ...] = ()
     requires: tuple[str, ...] = ()
+    links: tuple[PackLink, ...] = ()
 
     def __post_init__(self) -> None:
         """Reject a pack whose references do not resolve or that is too large."""
@@ -212,6 +230,7 @@ class ExamplePack:
         _check_refs("collection", [c.ref for c in self.collections])
         self._check_slugs()
         self._check_links()
+        self._check_pack_links()
         self._check_collections()
         self._check_presets()
 
@@ -256,6 +275,63 @@ class ExamplePack:
                 add(EntityKind.ITEM, ref)
         return frozenset(found)
 
+    @property
+    def link_targets(self) -> tuple[str, ...]:
+        """The distinct packs this pack links with, in first-seen order."""
+        return tuple(dict.fromkeys(link.with_pack for link in self.links))
+
+    def link_item_refs(self) -> frozenset[tuple[str, str]]:
+        """Return (pack id, local ref) for every item of another pack a link names."""
+        found: set[tuple[str, str]] = set()
+        for link in self.links:
+            for ref in (link.source_ref, link.target_ref):
+                pack_id, local = split_ref(ref)
+                if pack_id is not None:
+                    found.add((pack_id, local))
+        return frozenset(found)
+
+    def _check_pack_links(self) -> None:
+        item_refs = {i.ref for i in self.items}
+        relationship_refs = {t.ref for t in self.relationship_types}
+        for link in self.links:
+            self._check_link_pack(link)
+            ends = (link.source_ref, link.target_ref)
+            prefixed = sum(self._link_end(link, ref, item_refs) for ref in ends)
+            if prefixed == 0:
+                raise InvalidPackError("a link must join an item of another pack")
+            if link.source_ref == link.target_ref:
+                raise InvalidPackError("a link cannot join an item to itself")
+            if link.type_ref not in relationship_refs:
+                raise InvalidPackError(
+                    f"link has unknown type '{link.type_ref}'; use one of this "
+                    + "pack's own relationship types"
+                )
+
+    def _check_link_pack(self, link: PackLink) -> None:
+        if not _REF.match(link.with_pack):
+            raise InvalidPackError(f"link pack id '{link.with_pack}' {_REF_RULE}")
+        if link.with_pack == self.id:
+            raise InvalidPackError(f"pack '{self.id}' cannot link with itself")
+        if link.with_pack in self.requires:
+            raise InvalidPackError(
+                f"pack '{self.id}' links with '{link.with_pack}', which it "
+                + "requires; use a normal connection instead"
+            )
+
+    @staticmethod
+    def _link_end(link: PackLink, ref: str, item_refs: set[str]) -> bool:
+        """Check one end of a link; return whether it is the other pack's."""
+        pack_id, local = split_ref(ref)
+        if pack_id is None:
+            if local not in item_refs:
+                raise InvalidPackError(f"link has unknown item '{local}'")
+            return False
+        if pack_id != link.with_pack:
+            raise InvalidPackError(
+                f"link ref '{ref}' names pack '{pack_id}', not '{link.with_pack}'"
+            )
+        return True
+
     def _check_limits(self) -> None:
         limits = (
             ("presets", len(self.presets), MAX_PRESETS),
@@ -263,6 +339,7 @@ class ExamplePack:
             ("item types", len(self.item_types), MAX_TYPES),
             ("items", len(self.items), MAX_ITEMS),
             ("connections", len(self.connections), MAX_CONNECTIONS),
+            ("links", len(self.links), MAX_CONNECTIONS),
         )
         for name, count, limit in limits:
             if count > limit:
@@ -374,11 +451,29 @@ def _check_cycles(packs: Mapping[str, ExamplePack]) -> None:
         visit(pack_id, [])
 
 
+def _check_links(
+    packs: Mapping[str, ExamplePack], defined: Mapping[str, dict[EntityKind, set[str]]]
+) -> None:
+    for pack in packs.values():
+        for target in pack.link_targets:
+            if target not in packs:
+                raise InvalidPackError(
+                    f"pack {pack.id} links with {target}, which is not available"
+                )
+        for pack_id, ref in sorted(pack.link_item_refs()):
+            if ref not in defined[pack_id][EntityKind.ITEM]:
+                raise InvalidPackError(
+                    f"pack {pack.id} links to {pack_id}:{ref}, which {pack_id} "
+                    + "does not define as an item"
+                )
+
+
 def validate_catalogue(packs: Mapping[str, ExamplePack]) -> None:
     """Check the references between packs.
 
     Every required pack must be present, requirements must not form a cycle, and
     every cross-pack reference must name something that pack defines, of that kind.
+    Linked packs must be present too, and every item a link names must exist.
 
     Raises:
         InvalidPackError: If any check fails.
@@ -391,6 +486,7 @@ def validate_catalogue(packs: Mapping[str, ExamplePack]) -> None:
                 )
     _check_cycles(packs)
     defined = {pack_id: _defined_refs(pack) for pack_id, pack in packs.items()}
+    _check_links(packs, defined)
     for pack in packs.values():
         for kind, pack_id, ref in sorted(pack.external_refs()):
             if ref not in defined[pack_id][kind]:

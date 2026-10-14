@@ -31,6 +31,7 @@ class InMemoryPackCatalogue:
                 description=description,
                 counts=pack.counts,
                 requires=pack.requires,
+                links_with=pack.link_targets,
             )
             for name, description, pack in self._entries.values()
         ]

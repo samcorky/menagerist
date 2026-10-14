@@ -53,7 +53,7 @@ def _mutated(data: dict[str, Any], path: list[str | int], value: object) -> obje
 
 _BAD: list[tuple[list[str | int], object]] = [
     (["format"], "other"),
-    (["version"], 5),
+    (["version"], 6),
     (["surprise"], 1),
     (["items"], "nope"),
     (["items", 0], "nope"),

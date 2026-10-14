@@ -112,6 +112,7 @@ class ExamplePackResponse(BaseModel):
                     "counts": _COUNTS_EXAMPLE,
                     "requires": [],
                     "required_by": [{"id": "vinyl-extras", "name": "Vinyl extras"}],
+                    "links_with": [],
                     "installation": {
                         "status": "installed",
                         "installed_at": "2026-10-06T10:14:44.465954Z",
@@ -135,6 +136,13 @@ class ExamplePackResponse(BaseModel):
             "Added or half-added sets that need this one; they block its removal."
         ),
     )
+    links_with: list[PackRefResponse] = Field(
+        default=[],
+        description=(
+            "Sets this one connects to automatically when both are added. "
+            + "They never block adding or removing."
+        ),
+    )
     installation: InstallationResponse | None
 
     @classmethod
@@ -148,6 +156,7 @@ class ExamplePackResponse(BaseModel):
             counts=PackCountsResponse.from_domain(status.summary.counts),
             requires=[PackRefResponse.from_summary(r) for r in status.requires],
             required_by=[PackRefResponse.from_summary(r) for r in status.required_by],
+            links_with=[PackRefResponse.from_summary(r) for r in status.links_with],
             installation=None
             if installation is None
             else InstallationResponse(
@@ -170,6 +179,7 @@ class InstallResultResponse(BaseModel):
                     "pack_id": "vinyl",
                     "created": _COUNTS_EXAMPLE,
                     "adopted": _ADOPTED_EXAMPLE,
+                    "linked": 0,
                 }
             ]
         }
@@ -178,6 +188,13 @@ class InstallResultResponse(BaseModel):
     pack_id: str
     created: PackCountsResponse
     adopted: PackCountsResponse
+    linked: int = Field(
+        default=0,
+        description=(
+            "Connections to other added sets that were made because of this "
+            + "install, in either set."
+        ),
+    )
 
     @classmethod
     def from_domain(cls, result: InstallResult) -> InstallResultResponse:
@@ -186,6 +203,7 @@ class InstallResultResponse(BaseModel):
             pack_id=result.pack_id,
             created=PackCountsResponse.from_domain(result.created),
             adopted=PackCountsResponse.from_domain(result.adopted),
+            linked=result.linked,
         )
 
 

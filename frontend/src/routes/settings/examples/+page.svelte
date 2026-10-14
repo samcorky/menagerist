@@ -15,6 +15,7 @@
 	import {
 		addBlockedReason,
 		addOnNote,
+		linksNote,
 		removeBlockedReason,
 		describeCounts,
 		describeInstall,
@@ -161,6 +162,7 @@
 					{@const installed = isInstalled(pack)}
 					{@const busy = busyId === pack.id}
 					{@const note = addOnNote(pack)}
+					{@const linksLine = linksNote(pack)}
 					{@const blocked = installed ? removeBlockedReason(pack) : addBlockedReason(pack, packs)}
 					<Card.Root>
 						<Card.Header>
@@ -170,6 +172,9 @@
 						<Card.Content class="text-sm text-muted-foreground">
 							{#if note}
 								<p class="mb-1">{note}</p>
+							{/if}
+							{#if linksLine}
+								<p class="mb-1">{linksLine}</p>
 							{/if}
 							{describeCounts(pack.counts)}
 							{#if keptNotes[pack.id]}

@@ -14,6 +14,7 @@ import {
 	groupKept,
 	invalidateExampleIds,
 	isExamplesBannerDismissed,
+	linksNote,
 	loadExampleIds,
 	readExampleFilter,
 	visibleItems,
@@ -120,6 +121,51 @@ describe('describeInstall', () => {
 		expect(
 			describeInstall({ pack_id: 'games', created: zero, adopted: { ...zero, collections: 1 } })
 		).toBe("Examples added. 1 collection you'd kept was already here.");
+	});
+});
+
+describe('describeInstall with links', () => {
+	it('mentions connections made to other examples', () => {
+		expect(describeInstall({ pack_id: 'movies', created: zero, adopted: zero, linked: 4 })).toBe(
+			'Examples added. 4 connections to your other examples were made.'
+		);
+		expect(describeInstall({ pack_id: 'movies', created: zero, adopted: zero, linked: 1 })).toBe(
+			'Examples added. 1 connection to your other examples was made.'
+		);
+	});
+	it('adds the links after the kept-items sentence', () => {
+		expect(
+			describeInstall({
+				pack_id: 'movies',
+				created: zero,
+				adopted: { ...zero, items: 2 },
+				linked: 3
+			})
+		).toBe(
+			"Examples added. 2 items you'd kept were already here. 3 connections to your other examples were made."
+		);
+	});
+	it('keeps the plain text when nothing was linked', () => {
+		expect(describeInstall({ pack_id: 'music', created: zero, adopted: zero, linked: 0 })).toBe(
+			'Examples added'
+		);
+	});
+});
+
+describe('linksNote', () => {
+	const movies = { id: 'movies', name: 'Movies' };
+	const music = { id: 'music', name: 'Music' };
+
+	it('is null for a pack with no links', () => {
+		expect(linksNote({})).toBeNull();
+		expect(linksNote({ links_with: [] })).toBeNull();
+	});
+
+	it('names the packs it connects to', () => {
+		expect(linksNote({ links_with: [movies] })).toBe('Also connects to Movies when both are added');
+		expect(linksNote({ links_with: [movies, music] })).toBe(
+			'Also connects to Movies and Music when both are added'
+		);
 	});
 });
 

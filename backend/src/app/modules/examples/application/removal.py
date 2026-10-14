@@ -25,7 +25,7 @@ from app.modules.examples.ports.pack_targets import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import Awaitable, Callable, Sequence
 
 
 # Types are shared structure: several people's installs of one pack reuse them.
@@ -87,6 +87,38 @@ async def settle_installation(
                     )
                 )
         await persist(installation)
+    return kept
+
+
+async def settle_records(
+    installation: Installation,
+    records: Sequence[EntityRecord],
+    *,
+    presets: PresetTarget,
+    graph: GraphTarget,
+    collections: CollectionTarget,
+    covers: CoverTarget,
+    persist: Callable[[Installation], Awaitable[None]],
+) -> list[KeptEntity]:
+    """Remove or keep just `records` of `installation`, then save it once."""
+    kept: list[KeptEntity] = []
+    for record in records:
+        reason = await _settle_one(
+            installation,
+            record,
+            presets=presets,
+            graph=graph,
+            collections=collections,
+            covers=covers,
+            types_shared=False,
+        )
+        if reason is not None:
+            kept.append(
+                KeptEntity(
+                    kind=record.kind, ref=record.ref, label=record.label, reason=reason
+                )
+            )
+    await persist(installation)
     return kept
 
 

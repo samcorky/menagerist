@@ -1,4 +1,4 @@
-"""The shipped add-on packs, `games-extras` and `soundtracks`, in the real catalogue."""
+"""The shipped add-on pack `games-extras`, and Music's links to Movies."""
 
 from typing import TYPE_CHECKING
 
@@ -88,21 +88,23 @@ async def _live(world: World) -> int:
     return others + len(items) + len(edges) + len(world.collections.collections)
 
 
-async def test_both_add_ons_are_listed_after_the_base_packs() -> None:
-    """They parse and validate in the real catalogue, in index order."""
+async def test_the_add_on_is_listed_after_the_base_packs() -> None:
+    """It parses and validates in the real catalogue, in index order."""
     packs = await _CATALOGUE.list_packs()
 
     ids = [p.id for p in packs]
-    assert ids[-2:] == ["games-extras", "soundtracks"]
+    assert ids[-1] == "games-extras"
+    assert "soundtracks" not in ids
     by_id = {p.id: p for p in packs}
     assert by_id["games-extras"].requires == ("games",)
-    assert by_id["soundtracks"].requires == ("music", "movies")
+    assert by_id["music"].links_with == ("movies",)
+    assert by_id["movies"].links_with == ()
     names = [p.name for p in packs]
     assert "Extra board games" in names
-    assert "Film soundtracks" in names
-    for add_on in ("games-extras", "soundtracks"):
-        for other in packs:
-            assert other.id == add_on or not by_id[add_on].name.startswith(other.name)
+    for other in packs:
+        assert other.id == "games-extras" or not by_id["games-extras"].name.startswith(
+            other.name
+        )
 
 
 async def test_games_extras_defines_no_types_of_its_own() -> None:
@@ -162,42 +164,23 @@ async def test_games_extras_connects_to_the_base_and_comes_out_cleanly(
     assert await _live(world) == 0
 
 
-async def test_soundtracks_needs_both_music_and_movies(make_world: MakeWorld) -> None:
-    """With only one of the two installed it is refused, naming the other."""
-    world = _world(make_world)
-    await _install(world, "music")
-    music_only = await _live(world)
-
-    with pytest.raises(RequirementsNotMetError, match=r"Add Movies first\."):
-        await _install(world, "soundtracks")
-
-    assert await _live(world) == music_only
-
-
-async def test_soundtracks_links_records_to_films_and_comes_out_cleanly(
-    make_world: MakeWorld,
+@pytest.mark.parametrize(
+    ("first", "second"), [("music", "movies"), ("movies", "music")]
+)
+async def test_music_and_movies_link_their_soundtracks(
+    make_world: MakeWorld, first: str, second: str
 ) -> None:
-    """Four records are the soundtracks of four films; removal leaves nothing."""
+    """Four records are the soundtracks of four films, whichever pack came first."""
     world = _world(make_world)
-    await _install(world, "music")
-    await _install(world, "movies")
-    base = await _live(world)
+    await _install(world, first)
+    result = await _install(world, second)
 
-    result = await _install(world, "soundtracks")
-
-    assert (result.created.items, result.created.connections) == (0, 4)
-    assert result.created.relationship_types == 1
+    assert result.linked == 4
     edges = await _edges(world)
-    assert ("Night Drive", "Cold Harbour", "soundtracks-soundtrack-of") in edges
-    assert ("Thirteen Bells", "Marmalade", "soundtracks-soundtrack-of") in edges
-    for base_id in ("music", "movies"):
-        with pytest.raises(
-            RequiredByInstalledPackError, match=r"Remove Film soundtracks first\."
-        ):
-            await _uninstall(world, base_id)
+    assert ("Night Drive", "Cold Harbour", "music-soundtrack-of") in edges
+    assert ("Thirteen Bells", "Marmalade", "music-soundtrack-of") in edges
 
-    assert (await _uninstall(world, "soundtracks")).kept == ()
-    assert await _live(world) == base
-    for base_id in ("music", "movies"):
-        assert (await _uninstall(world, base_id)).kept == ()
+    await _uninstall(world, "movies")
+    assert not [e for e in await _edges(world) if e[2] == "music-soundtrack-of"]
+    assert (await _uninstall(world, "music")).kept == ()
     assert await _live(world) == 0

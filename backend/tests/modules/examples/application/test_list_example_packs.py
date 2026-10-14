@@ -13,6 +13,13 @@ from app.modules.examples.application.list_example_packs import (
     ListExamplePacksQuery,
 )
 from app.modules.examples.domain.installation import Installation
+from app.modules.examples.domain.pack import (
+    ExamplePack,
+    PackItem,
+    PackItemType,
+    PackLink,
+    PackRelationshipType,
+)
 from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.shared_kernel.actor import Actor
 
@@ -45,6 +52,43 @@ async def test_lists_each_pack_with_its_active_installation(
     assert by_id["one"].installation is None
     assert by_id["two"].installation is installed
     assert [s.summary.id for s in result] == ["one", "two"]
+
+
+def _linking_packs() -> tuple[ExamplePack, ExamplePack]:
+    """`movies` first, then `music`, which links with it."""
+
+    def side(pack_id: str, *links: PackLink) -> ExamplePack:
+        return ExamplePack(
+            id=pack_id,
+            relationship_types=(
+                PackRelationshipType(ref="tie", slug=f"{pack_id}-tie", label="Tie"),
+            ),
+            item_types=(
+                PackItemType(ref="thing", slug=f"{pack_id}-thing", label="Thing"),
+            ),
+            items=(PackItem(ref="a", type_ref="thing", name=f"{pack_id} A"),),
+            links=links,
+        )
+
+    link = PackLink(
+        with_pack="movies", source_ref="a", target_ref="movies:a", type_ref="tie"
+    )
+    return side("movies"), side("music", link)
+
+
+async def test_a_pack_lists_the_packs_it_links_with(make_world: MakeWorld) -> None:
+    """`links_with` carries the other packs' names, not only their ids."""
+    world = make_world(*_linking_packs())
+
+    result = await ListExamplePacks(
+        ExampleRepos(installations=world.installations),
+        OwnerAccessPolicy(),
+        world.catalogue,
+    ).handle(ListExamplePacksQuery(), world.actor)
+
+    by_id = {s.summary.id: s for s in result}
+    assert [p.id for p in by_id["music"].links_with] == ["movies"]
+    assert by_id["movies"].links_with == ()
 
 
 async def test_lists_nothing_for_an_empty_catalogue() -> None:

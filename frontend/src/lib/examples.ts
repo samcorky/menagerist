@@ -62,10 +62,13 @@ export function describeRemoval(report: UninstallResultResponse): string {
 
 /** The toast text after an install, mentioning anything you'd kept that was taken back in. */
 export function describeInstall(result: InstallResultResponse): string {
+	const linked = result.linked
+		? ` ${plural(result.linked, 'connection', 'connections')} to your other examples ${result.linked === 1 ? 'was' : 'were'} made.`
+		: '';
 	const adopted = describeCounts(result.adopted);
-	if (!adopted) return 'Examples added';
+	if (!adopted) return linked ? `Examples added.${linked}` : 'Examples added';
 	const total = Object.values(result.adopted).reduce((sum, n) => sum + n, 0);
-	return `Examples added. ${adopted} you'd kept ${total === 1 ? 'was' : 'were'} already here.`;
+	return `Examples added. ${adopted} you'd kept ${total === 1 ? 'was' : 'were'} already here.${linked}`;
 }
 
 const BANNER_KEY = 'menagerist.examples.bannerDismissed';
@@ -163,7 +166,7 @@ export function visibleItems<T extends { id: string }>(
 }
 
 type PackRef = { id: string; name: string };
-type PackLinks = { requires?: PackRef[]; required_by?: PackRef[] };
+type PackLinks = { requires?: PackRef[]; required_by?: PackRef[]; links_with?: PackRef[] };
 
 const refName = (ref: PackRef) => ref.name || ref.id;
 
@@ -176,6 +179,14 @@ function joinNames(names: string[]): string {
 export function addOnNote(pack: PackLinks): string | null {
 	const requires = pack.requires ?? [];
 	return requires.length === 0 ? null : `Needs ${joinNames(requires.map(refName))}`;
+}
+
+/** "Also connects to Movies when both are added"; null for a pack with no links. */
+export function linksNote(pack: PackLinks): string | null {
+	const links = pack.links_with ?? [];
+	return links.length === 0
+		? null
+		: `Also connects to ${joinNames(links.map(refName))} when both are added`;
 }
 
 /** The required packs that are not currently installed. */

@@ -26,6 +26,7 @@ class ExamplePackStatus:
     installation: Installation | None
     requires: tuple[PackSummary, ...] = ()
     required_by: tuple[PackSummary, ...] = ()
+    links_with: tuple[PackSummary, ...] = ()
 
 
 class ListExamplePacks(
@@ -63,6 +64,7 @@ class ListExamplePacks(
                 installation=active.get(s.id),
                 requires=tuple(by_id[r] for r in s.requires if r in by_id),
                 required_by=tuple(dependants.get(s.id, [])),
+                links_with=tuple(by_id[r] for r in s.links_with if r in by_id),
             )
             for s in packs
         ]

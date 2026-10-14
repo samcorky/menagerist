@@ -25,6 +25,8 @@ from app.modules.examples.domain.pack import (
     PackCollection,
     PackItem,
     PackItemType,
+    PackLink,
+    PackRelationshipType,
 )
 from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.modules.graph.domain.node_type import NodeType
@@ -261,6 +263,28 @@ def test_entities_lists_owned_collection_ids(
     assert client.get("/api/v1/example/entities").json()["collection_ids"] == []
 
 
+def _linking_packs() -> tuple[ExamplePack, ExamplePack]:
+    """`movies` first, then `music`, which links with it."""
+
+    def side(pack_id: str, *links: PackLink) -> ExamplePack:
+        return ExamplePack(
+            id=pack_id,
+            relationship_types=(
+                PackRelationshipType(ref="tie", slug=f"{pack_id}-tie", label="Tie"),
+            ),
+            item_types=(
+                PackItemType(ref="thing", slug=f"{pack_id}-thing", label="Thing"),
+            ),
+            items=(PackItem(ref="a", type_ref="thing", name=f"{pack_id} A"),),
+            links=links,
+        )
+
+    link = PackLink(
+        with_pack="movies", source_ref="a", target_ref="movies:a", type_ref="tie"
+    )
+    return side("movies"), side("music", link)
+
+
 def _add_on_world(make_world: MakeWorld, sample_pack: SamplePack) -> World:
     """A base ('Base'), and two add-ons that require it."""
     add_ons = [
@@ -295,6 +319,19 @@ def test_list_shows_requires_and_required_by_with_names(
     client.delete("/api/v1/example/extras/installation")
     after = {p["id"]: p for p in client.get("/api/v1/example").json()}
     assert after["base"]["required_by"] == []
+
+
+def test_links_show_in_the_list_and_the_install_result(make_world: MakeWorld) -> None:
+    """`links_with` names the partner; `linked` counts the connections made."""
+    client = _client(make_world(*_linking_packs()))
+
+    listed = {p["id"]: p for p in client.get("/api/v1/example").json()}
+    assert listed["music"]["links_with"] == [{"id": "movies", "name": "Movies"}]
+    assert listed["movies"]["links_with"] == []
+
+    first = client.put("/api/v1/example/movies/installation").json()
+    second = client.put("/api/v1/example/music/installation").json()
+    assert (first["linked"], second["linked"]) == (0, 1)
 
 
 def test_ordinary_packs_have_empty_requirement_lists(

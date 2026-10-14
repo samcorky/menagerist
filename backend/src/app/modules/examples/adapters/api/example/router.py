@@ -101,7 +101,8 @@ async def install_example_pack(
     Anything an earlier removal kept (because you changed it or used it) and that
     still exists is taken back rather than created again; `adopted` counts those and
     `created` counts only what is new. A collection taken back is left as you have
-    it, so items created this time are not added to it.
+    it, so items created this time are not added to it. `linked` counts connections
+    to other added sets that were made because of this install.
 
     Returns 409 if the set is already added, if you already have an item type or
     relationship type with a name it needs that is not a kept example, or if it is an

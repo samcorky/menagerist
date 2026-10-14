@@ -9,6 +9,7 @@ from app.modules.examples.application.external_refs import (
     ResolvedRefs,
     resolve_external_refs,
 )
+from app.modules.examples.application.pack_links import apply_links
 from app.modules.examples.application.removal import inspect_record, settle_installation
 from app.modules.examples.domain.errors import (
     InstallFailedError,
@@ -20,6 +21,7 @@ from app.modules.examples.domain.installation import (
     EntityKind,
     EntityRecord,
     Installation,
+    InstallationStatus,
     adoptable_records,
 )
 from app.modules.examples.domain.pack import ExamplePack, PackCounts
@@ -59,6 +61,7 @@ class InstallResult:
     pack_id: str
     created: PackCounts
     adopted: PackCounts
+    linked: int = 0
 
 
 _Key = tuple[EntityKind, str]
@@ -162,20 +165,55 @@ class InstallExamplePack(
 
         installation.mark_installed()
         await self._persist(installation)
+        created = _counts(
+            r.kind for r in installation.entities if (r.kind, r.ref) not in run.adopted
+        )
+        linked = await self._apply_links(pack, installation, scope)
         logger.info(
             "example pack installed",
             pack_id=pack.id,
             entities=len(installation.entities),
+            linked=linked,
         )
         return InstallResult(
             pack_id=pack.id,
-            created=_counts(
-                r.kind
-                for r in installation.entities
-                if (r.kind, r.ref) not in run.adopted
-            ),
+            created=created,
             adopted=_counts(kind for kind, _ in run.adopted),
+            linked=linked,
         )
+
+    async def _apply_links(
+        self, pack: ExamplePack, installation: Installation, scope: AccessScope
+    ) -> int:
+        """Apply this pack's links and other packs' links that point at it."""
+        async with self._uow as repos:
+            active = await repos.installations.list_active(scope=scope)
+        finished = {
+            i.pack_id: i for i in active if i.status is InstallationStatus.INSTALLED
+        }
+        linked = 0
+        for target in pack.link_targets:
+            if target in finished:
+                linked += await apply_links(
+                    declaring_pack=pack,
+                    declaring=installation,
+                    other=finished[target],
+                    graph=self._graph,
+                    persist=self._persist,
+                )
+        for other in finished.values():
+            if other.id == installation.id:
+                continue
+            declaring_pack = await self._catalogue.get(other.pack_id)
+            if declaring_pack is not None and pack.id in declaring_pack.link_targets:
+                linked += await apply_links(
+                    declaring_pack=declaring_pack,
+                    declaring=other,
+                    other=installation,
+                    graph=self._graph,
+                    persist=self._persist,
+                )
+        return linked
 
     async def _check_not_installed(self, pack: ExamplePack, scope: AccessScope) -> None:
         async with self._uow as repos:

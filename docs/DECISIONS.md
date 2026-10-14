@@ -620,7 +620,7 @@ So a plain private array is the source of truth, `active` is a write-only `$stat
 
 **Decision (2026-10-09):** a pack format 4 pack may list `requires` (a list, so a bridge add-on can need several packs) and refer to a required pack's types and items as `pack:ref`. An add-on only adds: it never changes a required pack's types or items, and everything it creates is recorded in its own installation. Removal is blocked, not cascaded: a pack cannot be removed while an add-on that requires it is installed (or half installed), and the message names every dependant. An edited add-on connection is kept when the add-on is removed, and then counts as the person's data on the base item, so a later removal of the base pack keeps that item.
 
-An add-on item of a base item type inherits that type's cover style, read through the catalogue, so it gets a generated cover and is removed with the add-on. Two add-ons ship: `games-extras` (Extra board games, needs Board games) and `soundtracks` (Film soundtracks, needs Music and Movies, with its own "Soundtrack of" connection type).
+An add-on item of a base item type inherits that type's cover style, read through the catalogue, so it gets a generated cover and is removed with the add-on. One add-on ships: `games-extras` (Extra board games, needs Board games). The Film soundtracks add-on was converted to links declared by Music (2026-10-14, see "Optional links between example packs").
 
 **Note:** the blocking is derived from the current catalogue's `requires`, not recorded at install time. A later pack update that drops a `requires` would lift the block. Nothing the person made is lost by that, because touched base items are kept as user data.
 
@@ -783,6 +783,24 @@ Behind a TLS-terminating proxy that was not in `MENAGERIST_TRUSTED_PROXIES`, eve
 - **Misconfiguration is surfaced, never enforced.** `app.platform.proxy_signals` keeps only times (bounded, one hour) for two signals: forwarding headers from a peer outside the trusted list (noted by `ProxyHeaderObserver`, outside Granian's wrapper, so it sees the real peer) and a same-origin request whose `Origin` differs from the one the app saw. The first sighting of each per hour is logged as a warning with the fix, and `ProxyConfigurationCheck` reports a `warn` for `proxy:configuration` on the admin-only `/health/ready/detail`. It never fails readiness: a configuration problem must not take the instance out of rotation, and a warning still counts as ready. The counts are per process.
 - **Not chosen:** an explicit public-URL setting (stricter, but every proxied install would have to set it), a host-only fallback, and trusting every proxy by default (it would let anyone reaching the container spoof the address the sign-in throttle uses).
 - **HSTS** stays at the proxy; the README now asks for it, because the guard now relies on the browser's own headers.
+
+## Optional links between example packs (2026-10-14)
+
+**Decision:** pack format version 5 lets a pack declare `links` to another pack (`with`, `from`, `to`, `type`). A link is an ordinary connection that is made once both packs are installed, whichever was added second, and removed when either goes. Removal is never blocked; this is the difference from an add-on (`requires`), which cannot exist without its base and blocks the base's removal. Authors choose: `requires` for content that cannot exist without the other pack, `links` for connections that are only nice to have.
+
+**Shape:** the relationship type of a link is one the declaring pack defines (it exists whether or not the link ever applies); at least one end is `<with>:<ref>`. The catalogue checks at load that the `with` pack exists and defines every item a link names. Links take no part in the dependency cycle check.
+
+**Recording:** a link is a `connection` record in the declaring pack's installation with ref `link:<with>:<n>` (`n` is its index in `links`). `Installation.record_late` records after the install finished, which `record` refuses. No new table or migration.
+
+**Applying:** after a pack finishes installing, `apply_links` runs for that person's own installations only, for the pack's own links whose partner is installed and for other installed packs' links that point at it. A link is skipped, quietly, when an end is gone or no longer owned by its pack, when it was already applied, or when a connection of that type already joins the two items (so a kept link, or one the person made, is never duplicated). A target error is logged and skipped; it never fails or rolls back a pack that is already installed. `InstallResult.linked` and the API's `linked` count what an install made, in either installation, and the pack's own `created` counts stay about its own content.
+
+**Removal:** removing a pack first settles the links other installations of the same person recorded `with` it (removed, or kept if edited), then removes the pack as before. Its own links are ordinary owned connections and go with it. A kept link keeps the item it touches under the existing "has your connections" rule.
+
+**Content:** Music declares the four "Soundtrack of" links to Movies, with the relationship type `music-soundtrack-of`; the `soundtracks` add-on is gone (nothing had been released, so no migration). Ids in an existing development database's `soundtracks` installation just stop being listed, and its connections stay as the person's own.
+
+**Known limit:** two installs running at the same instant could both try the same link. The skip-if-exists check makes a duplicate unlikely but does not rule it out; accepted.
+
+**Not chosen:** a separate link-set record per pack pair (a new table and a second place for the UI to look) and a hidden generated add-on per pair (add-ons block removal of their base, the opposite of what links are for).
 
 ## Direction: roles as data, implied permissions
 

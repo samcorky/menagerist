@@ -2,8 +2,6 @@ import { test, expect } from './fixtures';
 import {
 	GAMES,
 	GAMES_EXTRAS,
-	MOVIES,
-	SOUNDTRACKS,
 	collectionCard,
 	coverOf,
 	exampleData,
@@ -92,38 +90,6 @@ test('a base pack cannot be removed while its add-on is installed, then both go'
 		name: string;
 	}[];
 	expect(collections.some((c) => c.name === 'Weeknight picks')).toBe(false);
-});
-
-test('a bridge add-on needs both packs and shows its connection, then blocks both', async ({
-	page,
-	request
-}) => {
-	await installViaApiMany(request, ['music']);
-	await page.goto('/settings/examples');
-	const bridge = packCard(page, 'Film soundtracks');
-	await expect(bridge).toContainText('Needs Music');
-	await expect(bridge.getByRole('button', { name: /^Add Film soundtracks/ })).toBeDisabled();
-	await expect(bridge.getByText('Add Movies first.')).toBeVisible();
-
-	await install(page, MOVIES);
-	await page.reload();
-	await expect(bridge.getByRole('button', { name: /^Add Film soundtracks/ })).toBeEnabled();
-	await install(page, SOUNDTRACKS);
-
-	const film = await nodeNamed(request, 'Cold Harbour');
-	await page.goto(`/items/${film.id}`);
-	// The film sees the connection from its side, with the reverse label.
-	await expect(page.getByText('Soundtrack', { exact: true }).first()).toBeVisible();
-	await page.getByRole('link', { name: 'Night Drive' }).first().click();
-	await expect(page.getByText('Soundtrack of', { exact: true }).first()).toBeVisible();
-	await expect(page.getByRole('link', { name: 'Cold Harbour' }).first()).toBeVisible();
-
-	await page.goto('/settings/examples');
-	for (const base of ['Music', 'Movies']) {
-		const card = packCard(page, base === 'Music' ? 'Music: records, gigs and friends' : 'Movies');
-		await expect(card.getByRole('button', { name: new RegExp(`^Remove ${base}`) })).toBeDisabled();
-		await expect(card.getByText('Remove Film soundtracks first.')).toBeVisible();
-	}
 });
 
 test('a stale page shows the server message when a prerequisite is gone', async ({

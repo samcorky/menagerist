@@ -169,6 +169,7 @@ if TYPE_CHECKING:
     from app.shared_kernel.access_policy import AccessPolicy
 
 _PAGE = 1
+_EDGE_PAGE = 200
 _GRAPH_KINDS = frozenset(
     {
         EntityKind.ITEM,
@@ -671,6 +672,27 @@ class GraphPackTarget:
                 command, self._actor
             )
         return Created(entity_id=edge.id, content=_edge_content(edge))
+
+    async def connection_exists(
+        self, source_id: uuid.UUID, target_id: uuid.UUID, type_slug: str
+    ) -> bool:
+        """Whether a live connection of `type_slug` already runs source to target."""
+        async with self._stores.read() as repos:
+            after: uuid.UUID | None = None
+            while True:
+                page = await repos.edges.list_for_node(
+                    source_id, scope=self._scope, after=after, limit=_EDGE_PAGE
+                )
+                if any(
+                    e.source_id == source_id
+                    and e.target_id == target_id
+                    and e.type == type_slug
+                    for e in page
+                ):
+                    return True
+                if len(page) < _EDGE_PAGE:
+                    return False
+                after = page[-1].id
 
     async def inspect(
         self, kind: EntityKind, entity_id: uuid.UUID

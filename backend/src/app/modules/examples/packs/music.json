@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 3,
+  "version": 5,
   "id": "music",
   "presets": [
     {
@@ -155,6 +155,14 @@
       "label": "Signed at",
       "reverse_label": "Signings",
       "description": "The gig where a record was signed.",
+      "directional": true
+    },
+    {
+      "ref": "soundtrack-of",
+      "slug": "music-soundtrack-of",
+      "label": "Soundtrack of",
+      "reverse_label": "Soundtrack",
+      "description": "Which film a record is the soundtrack of.",
       "directional": true
     }
   ],
@@ -806,6 +814,32 @@
         "the-velvet-static-at-the-lamplighter",
         "marguerite-odell-at-the-lamplighter"
       ]
+    }
+  ],
+  "links": [
+    {
+      "with": "movies",
+      "from": "night-drive",
+      "to": "movies:cold-harbour",
+      "type": "soundtrack-of"
+    },
+    {
+      "with": "movies",
+      "from": "paper-lanterns",
+      "to": "movies:the-night-bus-sessions",
+      "type": "soundtrack-of"
+    },
+    {
+      "with": "movies",
+      "from": "salt-marsh-sessions",
+      "to": "movies:quiet-hours",
+      "type": "soundtrack-of"
+    },
+    {
+      "with": "movies",
+      "from": "thirteen-bells",
+      "to": "movies:marmalade",
+      "type": "soundtrack-of"
     }
   ]
 }

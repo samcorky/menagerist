@@ -71,7 +71,7 @@ class FilePackCatalogue:
             if pack_id in loaded or pack_id not in indexed:
                 continue
             loaded[pack_id] = self._load(pack_id)
-            pending.extend(loaded[pack_id].requires)
+            pending.extend([*loaded[pack_id].requires, *loaded[pack_id].link_targets])
         validate_catalogue(dict(sorted(loaded.items())))
         self._valid.update(loaded)
 
@@ -85,6 +85,7 @@ class FilePackCatalogue:
                 description=e.description,
                 counts=self._packs[e.id].counts,
                 requires=self._packs[e.id].requires,
+                links_with=self._packs[e.id].link_targets,
             )
             for e in self._entries()
         ]

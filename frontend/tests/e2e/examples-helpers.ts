@@ -5,7 +5,6 @@ export const MUSIC = /^Music/;
 export const MOVIES = /^Movies/;
 export const GAMES = /^Board games/;
 export const GAMES_EXTRAS = /^Extra board games/;
-export const SOUNDTRACKS = /^Film soundtracks/;
 export const GAME_COLLECTIONS = [
 	{ name: 'Wishlist', count: '2 items' },
 	{ name: 'Games for two', count: '2 items' },
