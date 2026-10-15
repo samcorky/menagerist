@@ -325,7 +325,7 @@ def _tag(condition: TagCondition) -> _Bool:
 def _condition(condition: Condition, ctx: ResolvedQuery) -> _Bool:
     """One leaf; never NULL."""
     if isinstance(condition, TextCondition):
-        return _never_null(search_clause(condition.q, ctx.search_exclusions))
+        return search_clause(condition.q, ctx.search_exclusions)
     if isinstance(condition, TypeCondition):
         return _never_null(NodeModel.type.in_(condition.slugs))
     if isinstance(condition, FavouriteCondition):

@@ -99,6 +99,12 @@ class NodeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):
             postgresql_using="gin",
             postgresql_ops={"immutable_unaccent(description)": "gin_trgm_ops"},
         ),
+        Index(
+            "ix_nodes_attributes_text_trgm",
+            text("immutable_unaccent(attributes::text)"),
+            postgresql_using="gin",
+            postgresql_ops={"immutable_unaccent(attributes::text)": "gin_trgm_ops"},
+        ),
     )
 
     name: Mapped[str]

@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 import structlog
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import and_, func, or_, select, text, update
 
 from app.modules.graph.adapters.persistence.models import NodeModel
 from app.modules.graph.adapters.persistence.query_sql import (
@@ -17,7 +17,7 @@ from app.modules.graph.adapters.persistence.search_sql import (
     unaccent_ilike,
 )
 from app.modules.graph.domain.node import Node
-from app.modules.graph.domain.query import SearchHit
+from app.modules.graph.domain.query import SearchHit, TextCondition, walk_conditions
 from app.platform.orm_mixins import claim_rows, owned_by
 
 if TYPE_CHECKING:
@@ -77,6 +77,22 @@ def _in_scope(scope: AccessScope) -> ColumnElement[bool]:
     Rows with no owner are visible only under `everyone()`.
     """
     return and_(NodeModel.deleted_at.is_(None), owned_by(NodeModel, scope.user_id))
+
+
+def _has_text(resolved: ResolvedQuery) -> bool:
+    return any(
+        isinstance(c, TextCondition) for _, c in walk_conditions(resolved.query.where)
+    )
+
+
+async def _jit_off_for_text(session: AsyncSession, *, has_text: bool) -> None:
+    """Turn JIT off for the rest of the transaction when a text search runs.
+
+    JIT over-compiles plans holding the `jsonb_path_query` subplan: about 0.8 s
+    extra at 100k items, while the query itself runs in 60 to 130 ms.
+    """
+    if has_text:
+        await session.execute(text("SET LOCAL jit = off"))
 
 
 class SqlAlchemyNodeRepository:
@@ -143,6 +159,7 @@ class SqlAlchemyNodeRepository:
             stmt = stmt.where(search_clause(q, attribute_search_exclusions))
         if favourite is not None:
             stmt = stmt.where(NodeModel.favourite == favourite)
+        await _jit_off_for_text(self._session, has_text=q is not None)
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
 
@@ -167,6 +184,7 @@ class SqlAlchemyNodeRepository:
         if after is not None:
             stmt = stmt.where(after_clause(resolved, exprs, after))
         stmt = stmt.order_by(*order_by(resolved, exprs)).limit(limit)
+        await _jit_off_for_text(self._session, has_text=_has_text(resolved))
         rows = (await self._session.execute(stmt)).all()
         return [
             SearchHit(node=_to_domain(row[0]), sort_values=tuple(row[1:]))
@@ -188,6 +206,7 @@ class SqlAlchemyNodeRepository:
         if limit is not None:
             matches = matches.limit(limit)
         stmt = select(func.count()).select_from(matches.subquery())
+        await _jit_off_for_text(self._session, has_text=_has_text(resolved))
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
@@ -214,6 +233,7 @@ class SqlAlchemyNodeRepository:
             stmt = stmt.where(search_clause(q, attribute_search_exclusions))
         if favourite is not None:
             stmt = stmt.where(NodeModel.favourite == favourite)
+        await _jit_off_for_text(self._session, has_text=q is not None)
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
