@@ -132,6 +132,18 @@ Each phase gets its own implementation plan; this spec is the shared model.
 
 - GraphQL. It does not provide the filter semantics (operators, relative dates, field references, stale conditions, SQL compilation), its input types cannot express a mixed recursive condition tree without a JSON scalar, and it would add a second API style and a runtime dependency beside the OpenAPI client, RFC 9457 errors and ETag handling. It could be revisited for connection-heavy reads; the query tree and repository port do not depend on the transport.
 
+## Future: the current user as an operand (`currentUser()`)
+
+Idea (requested 2026-10-15): link a user account to an item, typically of a person-like type, so a query can say "Pictures of me" or "Films I have watched" without naming the item. In the planned text syntax this reads like `currentUser()`.
+
+- **Link:** an account may point at one item ("this is me"), stored by id with no foreign key and checked when read, the way collection membership is (`graph` and `identity` never import each other). A small bridge in `entrypoints/api/shared/` resolves actor to item id. A profile screen would offer a "This is me" item picker.
+- **Operand:** a new operand form (for example `{"me": true}`, printed as `currentUser()`) resolved at execution time for the acting user, beside the literal, relative-date and field-reference operands. It belongs in the query format as an additive change, so no version bump.
+- **Where it applies:** connection conditions (phase 3), such as "connected to currentUser() via *Photographed*", which gives "Pictures of me". It could also drive an "added by me" condition on the item owner, which is a separate and simpler addition for shared households.
+- **Smart collections:** a saved query containing `currentUser()` is evaluated per viewer, so the same smart collection shows each person their own results. Anything cached or ETag-tagged for such a collection must vary by user (reads are already scoped by owner).
+- **Unlinked accounts and deleted items:** if the account has no link, or the linked item was deleted, the condition matches nothing and returns a warning ("Link your account to an item to use this"), consistent with stale-field behaviour; it never silently matches everything.
+- **Open questions:** one linked item per account, or one per item type (the same person as both a *Person* and a *Reader*)? Who may see which account is linked to which item once sharing exists (multi-user stage 2)? Does an administrator link accounts on other people's behalf?
+- **Depends on:** phase 3 (connection conditions) for the main use, and the account and sharing model in the multi-user work.
+
 ## Future: the text syntax
 
 A parser and printer converting text such as `type = games-game AND play_time <= 45m AND weight IN (light, medium)` to and from the tree. Because operators and structure already mirror that grammar and the tree is the only stored form, it adds no migration, and saved collections would show their text form for free.

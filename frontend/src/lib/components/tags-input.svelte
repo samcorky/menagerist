@@ -5,7 +5,11 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { normaliseTags } from '$lib/tags';
 
-	let { tags = $bindable([]) }: { tags?: string[] } = $props();
+	let {
+		tags = $bindable([]),
+		label = 'Tags',
+		labelClass = ''
+	}: { tags?: string[]; label?: string; labelClass?: string } = $props();
 
 	const inputId = $props.id();
 	let draft = $state('');
@@ -34,7 +38,7 @@
 </script>
 
 <div class="space-y-2">
-	<Label for={inputId}>Tags</Label>
+	<Label for={inputId} class={labelClass}>{label}</Label>
 	{#if tags.length > 0}
 		<ul class="flex flex-wrap gap-1.5">
 			{#each tags as tag (tag)}

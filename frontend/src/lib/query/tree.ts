@@ -114,16 +114,26 @@ export function isFilterEmpty(query: Query): boolean {
  * truncated); the caller should send it another way. An `and` filter is merged
  * flat so combining never adds a nesting level.
  */
-export function combine(
-	query: Query,
-	basics: { type?: string | null; q?: string; favourite?: boolean }
-): Query {
+export type PageBasics = { type?: string | null; q?: string; favourite?: boolean };
+
+/** The conditions `combine` adds for the page's own controls (the one inclusion rule). */
+export function pageConditions(basics: PageBasics): Condition[] {
 	const extra: Condition[] = [];
 	if (basics.type && basics.type.length <= MAX_TEXT_LENGTH)
 		extra.push({ kind: 'type', in: [basics.type] });
 	const q = basics.q?.trim();
 	if (q && q.length <= MAX_TEXT_LENGTH) extra.push({ kind: 'text', q });
 	if (basics.favourite) extra.push({ kind: 'favourite', value: true });
+	return extra;
+}
+
+/** True when the search text is too long to add to a filter, so `combine` leaves it out. */
+export function searchTextTooLong(q: string | undefined): boolean {
+	return (q?.trim().length ?? 0) > MAX_TEXT_LENGTH;
+}
+
+export function combine(query: Query, basics: PageBasics): Query {
+	const extra = pageConditions(basics);
 	const filter = prune(rootOf(query));
 	if (extra.length === 0) return { ...query, where: filter };
 	const head: Node[] = !filter ? [] : filter.op === 'and' ? filter.children : [filter];

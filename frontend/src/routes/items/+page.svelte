@@ -5,18 +5,48 @@
 	import { browser } from '$app/environment';
 	import { untrack } from 'svelte';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
-	import { EyeOff, List, Plus, SearchX, LayoutGrid } from '@lucide/svelte';
+	import {
+		EyeOff,
+		List,
+		Plus,
+		SearchX,
+		LayoutGrid,
+		SlidersHorizontal,
+		TriangleAlert
+	} from '@lucide/svelte';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import { toast } from 'svelte-sonner';
+	import { listNodeTypes, type NodeResponse, type NodeTypeResponse } from '$lib/api/client';
+	import * as Alert from '$lib/components/ui/alert/index.js';
+	import QueryBuilder from '$lib/components/query-builder.svelte';
+	import QueryChips from '$lib/components/query-chips.svelte';
+	import { conditionNumbers, queryKey, type BuilderError } from '$lib/query/builder';
+	import { buildCatalogue, summaryLookup } from '$lib/query/fields';
 	import {
-		listNodes,
-		listNodeTypes,
-		type NodeResponse,
-		type NodeTypeResponse
-	} from '$lib/api/client';
-	import { networkAwareError } from '$lib/api/errors';
+		combinePrefix,
+		createFilterWriter,
+		totalLine,
+		INVALID_LINK_MESSAGE,
+		loadItemsPage,
+		readFilter,
+		SEARCH_TOO_LONG_MESSAGE,
+		searchTextIgnored,
+		TOO_MANY_MESSAGE,
+		usesSearch,
+		withFilter,
+		FILTER_PARAM
+	} from '$lib/query/items-page';
+	import { countConditions, emptyQuery, removeAt } from '$lib/query/tree';
+	import {
+		mapWarnings,
+		pathKey,
+		splitDetail,
+		toFilterPath,
+		type WarningMarks
+	} from '$lib/query/warnings';
+	import type { Path, Query } from '$lib/query/types';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Item from '$lib/components/ui/item/index.js';
@@ -36,7 +66,6 @@
 	import { normaliseQuery } from '$lib/search-palette';
 	import { registerShortcut } from '$lib/shortcuts.svelte';
 
-	const PAGE_SIZE = 50;
 	const loadingSkeletons = [1, 2, 3, 4, 5];
 
 	// Persisted outside component so scroll position survives navigation
@@ -48,6 +77,16 @@
 	let hasMore = $state(true);
 	let selectedType = $state<string | null>(null);
 	let fetchSeq = 0;
+	// Search paging: the next cursor, and the count the server reported.
+	let cursor = $state<string | null>(null);
+	let total = $state<number | null>(null);
+	let totalCapped = $state(false);
+	let marks = $state<WarningMarks>({ conditions: new Set(), sort: false });
+	let filterError = $state<BuilderError | null>(null);
+	let tooMany = $state(false);
+	let filtersOpen = $state(false);
+	let filtersFocus = $state<Path | null>(null);
+	let filterAnnouncement = $state('');
 	let searchInput = $state('');
 	let q = $state('');
 	let searchEl = $state<HTMLInputElement | null>(null);
@@ -72,6 +111,87 @@
 	const loadingDisplay = delayedLoading();
 	$effect(() => {
 		loadingDisplay.set(loading);
+	});
+
+	// The advanced filter lives in the URL (`?f=`).
+	const filterParam = $derived(page.url.searchParams.get(FILTER_PARAM));
+	const filterState = $derived(readFilter(filterParam));
+	const filter = $derived(filterState.query);
+	const filterKey = $derived(queryKey(filter));
+	const searching = $derived(usesSearch(filter));
+	const conditionCount = $derived(countConditions(filter));
+	let categoriesLoaded = $state(false);
+	const countLine = $derived(
+		totalLine(total, totalCapped, { loading, appending: loading && items.length > 0 })
+	);
+	const catalogue = $derived(buildCatalogue(allCategories, categoriesLoaded));
+	const lookup = $derived(summaryLookup(catalogue));
+	const filterErrorText = $derived.by(() => {
+		if (!filterError) return '';
+		const n = filterError.path
+			? conditionNumbers(filter).get(pathKey(filterError.path))
+			: undefined;
+		return n ? `Condition ${n}: ${filterError.message}` : filterError.message;
+	});
+
+	const writer = createFilterWriter((next: Query, replace: boolean) => {
+		const search = withFilter(page.url.searchParams, next).toString();
+		void goto(resolve(search ? `/items?${search}` : '/items'), {
+			replaceState: replace,
+			keepFocus: true,
+			noScroll: true
+		});
+	});
+	$effect(() => () => writer.cancel());
+
+	$effect(() => {
+		if (!filterState.invalid) return;
+		untrack(() => {
+			toast.error(INVALID_LINK_MESSAGE);
+			const params = new SvelteURLSearchParams(page.url.searchParams);
+			params.delete(FILTER_PARAM);
+			const rest = params.toString();
+			void goto(resolve(rest ? `/items?${rest}` : '/items'), {
+				replaceState: true,
+				keepFocus: true,
+				noScroll: true
+			});
+		});
+	});
+
+	function openFilters(focus: Path | null) {
+		filtersFocus = focus;
+		writer.startSession();
+		filtersOpen = true;
+	}
+
+	$effect(() => {
+		if (!filtersOpen) writer.flush();
+	});
+
+	function removeFilter(path: Path, text: string) {
+		writer.startSession();
+		writer.write(removeAt(filter, path));
+		filterAnnouncement = `Filter removed: ${text}.`;
+	}
+
+	function clearFilters() {
+		writer.startSession();
+		writer.write(emptyQuery());
+		filterAnnouncement = 'Filters cleared.';
+	}
+
+	$effect(() => {
+		return registerShortcut({
+			id: 'items-filters',
+			keys: 'f',
+			description: 'Open filters',
+			group: 'Search',
+			handler: (event) => {
+				event.preventDefault();
+				openFilters(null);
+			}
+		});
 	});
 
 	let selectedTypeLabel = $derived(
@@ -130,20 +250,41 @@
 		return () => clearTimeout(timer);
 	});
 
-	async function fetchPage(after?: string) {
+	async function fetchPage(more = false) {
 		const seq = ++fetchSeq;
 		loading = true;
-		const result = await listNodes({
-			query: { after, limit: PAGE_SIZE, type: selectedType ?? undefined, q: q || undefined }
+		const basics = { type: selectedType, q };
+		const result = await loadItemsPage({
+			filter,
+			basics,
+			after: more && !searching ? items.at(-1)?.id : undefined,
+			cursor: more && searching ? cursor : null
 		});
 		if (seq !== fetchSeq) return;
-		if (result.error || !result.data) {
-			const { title, description } = networkAwareError(result);
-			toast.error(title, { description });
-			hasMore = false;
+		if (result.status === 'ok') {
+			items = more ? [...items, ...result.items] : result.items;
+			hasMore = result.hasMore;
+			cursor = result.cursor;
+			total = result.total;
+			totalCapped = result.totalCapped;
+			marks = mapWarnings(result.warnings, result.prefix);
+			filterError = null;
+			tooMany = false;
 		} else {
-			items = after ? [...items, ...result.data] : result.data;
-			hasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
+			hasMore = false;
+			if (!more) items = [];
+			tooMany = result.status === 'too-many';
+			if (result.status === 'rejected') {
+				const { target, message } = splitDetail(result.detail);
+				const path =
+					target && 'where' in target
+						? toFilterPath(target.where, combinePrefix(filter, basics))
+						: null;
+				filterError = { message, path };
+			} else filterError = null;
+			if (result.status === 'failed') {
+				toast.error(result.title, { description: result.description });
+			}
 		}
 		loading = false;
 	}
@@ -151,6 +292,7 @@
 	async function fetchCategories() {
 		const result = await listNodeTypes({ query: { limit: 100 } });
 		if (result.data) allCategories = result.data;
+		categoriesLoaded = true;
 	}
 
 	function schemaOf(slug: string | null | undefined): AttributesSchema | null {
@@ -168,7 +310,7 @@
 	function sentinel(node: HTMLElement) {
 		const observer = new IntersectionObserver(
 			(entries) => {
-				if (entries[0].isIntersecting && hasMore && !loading) void fetchPage(items.at(-1)?.id);
+				if (entries[0].isIntersecting && hasMore && !loading) void fetchPage(true);
 			},
 			{ rootMargin: '200px' }
 		);
@@ -191,13 +333,23 @@
 
 	$effect(() => {
 		if (captureController.nodeCreationCount === 0) return;
-		items = [];
-		hasMore = true;
-		void fetchPage();
+		untrack(() => {
+			items = [];
+			hasMore = true;
+			cursor = null;
+			void fetchPage();
+		});
 	});
 
+	// Reload from the start whenever the type, the search box or the filter changes.
 	$effect(() => {
-		void fetchPage();
+		void [selectedType, q, filterKey];
+		untrack(() => {
+			items = [];
+			hasMore = true;
+			cursor = null;
+			void fetchPage();
+		});
 	});
 
 	$effect(() => {
@@ -259,6 +411,22 @@
 				class="flex h-9 min-w-0 flex-1 basis-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:max-w-sm sm:basis-auto"
 			/>
 			<div class="ml-auto flex items-center gap-2">
+				<Button
+					variant="outline"
+					class="max-sm:h-11"
+					aria-haspopup="dialog"
+					onclick={() => openFilters(null)}
+				>
+					<SlidersHorizontal />
+					Filters
+					{#if conditionCount > 0}
+						<Badge class="ml-0.5 h-5 min-w-5 px-1.5 tabular-nums">
+							{conditionCount}<span class="sr-only">
+								{conditionCount === 1 ? 'condition' : 'conditions'}</span
+							>
+						</Badge>
+					{/if}
+				</Button>
 				{#if showExampleFilter}
 					<NativeSelect.Root
 						size="sm"
@@ -321,6 +489,44 @@
 				{/each}
 			</div>
 		{/if}
+
+		{#if conditionCount > 0 || searching}
+			<div class="flex flex-col gap-3">
+				<QueryChips
+					query={filter}
+					{lookup}
+					warned={marks.conditions}
+					onopen={(path) => openFilters(path)}
+					onremove={removeFilter}
+					onclear={clearFilters}
+				/>
+				{#if filterError}
+					<Alert.Root variant="destructive">
+						<TriangleAlert />
+						<Alert.Title>This filter can't be used</Alert.Title>
+						<Alert.Description>
+							{filterErrorText}
+							<Button
+								variant="link"
+								class="h-auto p-0"
+								onclick={() => openFilters(filterError?.path ?? null)}>Edit filters</Button
+							>
+						</Alert.Description>
+					</Alert.Root>
+				{:else if tooMany}
+					<Alert.Root>
+						<TriangleAlert />
+						<Alert.Description>{TOO_MANY_MESSAGE}</Alert.Description>
+					</Alert.Root>
+				{:else if countLine}
+					<p class="text-sm text-muted-foreground">{countLine}</p>
+				{/if}
+				{#if searchTextIgnored(filter, q)}
+					<p class="text-sm text-muted-foreground">{SEARCH_TOO_LONG_MESSAGE}</p>
+				{/if}
+			</div>
+		{/if}
+		<p class="sr-only" role="status" aria-live="polite">{filterAnnouncement}</p>
 
 		{#if loadingDisplay.show && shownItems.length === 0}
 			<Shimmer loading={true}>
@@ -391,9 +597,18 @@
 					Show all items
 				</Button>
 			</div>
-		{:else if items.length === 0 && !loading}
+		{:else if items.length === 0 && !loading && !filterError && !tooMany}
 			<div class="flex flex-col items-center gap-3 py-12 text-center">
-				{#if q}
+				{#if searching && conditionCount > 0}
+					<SearchX class="size-10 text-muted-foreground/50" />
+					<div>
+						<p class="font-medium">No items match these filters</p>
+						<p class="text-sm text-muted-foreground">
+							Change a condition, or clear the filters to see everything.
+						</p>
+					</div>
+					<Button variant="ghost" size="sm" onclick={clearFilters}>Clear filters</Button>
+				{:else if q}
 					<SearchX class="size-10 text-muted-foreground/50" />
 					<div>
 						<p class="font-medium">Nothing matched "{q}"</p>
@@ -440,3 +655,15 @@
 		{/if}
 	</div>
 </main>
+
+<QueryBuilder
+	bind:open={filtersOpen}
+	query={filter}
+	{catalogue}
+	warned={marks.conditions}
+	sortWarned={marks.sort}
+	error={filterError}
+	notice={tooMany ? TOO_MANY_MESSAGE : null}
+	focus={filtersFocus}
+	onchange={(next, { debounce }) => writer.write(next, { debounce })}
+/>
