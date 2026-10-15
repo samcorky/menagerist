@@ -9,6 +9,7 @@ from app.modules.graph.application.update_node import UpdateNodeCommand
 from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
+    from app.modules.graph.application.search_nodes import SearchNodesResult
     from app.modules.graph.domain.node import Node
 
 _NODE_EXAMPLE: dict[str, Any] = {
@@ -179,4 +180,95 @@ class NodeResponse(BaseModel):
             extra_schema=node.extra_schema,
             created_at=node.created_at,
             updated_at=node.updated_at,
+        )
+
+
+class NodeSearchRequest(RequestModel):
+    """Request body for searching items with a condition tree."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "query": {
+                        "v": 1,
+                        "where": {
+                            "op": "and",
+                            "children": [
+                                {
+                                    "kind": "field",
+                                    "type": "film",
+                                    "key": "rating",
+                                    "op": ">=",
+                                    "value": 4,
+                                }
+                            ],
+                        },
+                        "sort": [{"by": "name"}],
+                    },
+                    "limit": 50,
+                }
+            ]
+        }
+    )
+
+    query: dict[str, Any] = Field(
+        description="The condition tree: `v`, an optional `where` group and `sort`."
+    )
+    limit: int = Field(default=50, ge=1, le=200)
+    cursor: str | None = Field(
+        default=None, description="The `next_cursor` of the previous page."
+    )
+
+
+class QueryWarningResponse(BaseModel):
+    """A part of the query that no longer applies."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "path": "where.children[0]",
+                    "message": "The field 'rating' no longer exists on film.",
+                }
+            ]
+        }
+    )
+
+    path: str
+    message: str
+
+
+class NodeSearchResponse(BaseModel):
+    """One page of search results."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "items": [_NODE_EXAMPLE],
+                    "total": 1,
+                    "next_cursor": None,
+                    "warnings": [],
+                }
+            ]
+        }
+    )
+
+    items: list[NodeResponse]
+    total: int
+    next_cursor: str | None = Field(default=None)
+    warnings: list[QueryWarningResponse]
+
+    @classmethod
+    def from_result(cls, result: SearchNodesResult) -> NodeSearchResponse:
+        """Build a response from a `SearchNodesResult`."""
+        return cls(
+            items=[NodeResponse.from_domain(node) for node in result.items],
+            total=result.total,
+            next_cursor=result.next_cursor,
+            warnings=[
+                QueryWarningResponse(path=w.path, message=w.message)
+                for w in result.warnings
+            ],
         )

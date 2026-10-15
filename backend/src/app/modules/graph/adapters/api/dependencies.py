@@ -51,6 +51,7 @@ from app.modules.graph.application.purge_edge_type_attribute import (
 from app.modules.graph.application.purge_node_type_attribute import (
     PurgeNodeTypeAttribute,
 )
+from app.modules.graph.application.search_nodes import SearchNodes
 from app.modules.graph.application.update_edge import UpdateEdge
 from app.modules.graph.application.update_edge_type import UpdateEdgeType
 from app.modules.graph.application.update_node import UpdateNode
@@ -106,6 +107,13 @@ def get_list_nodes_use_case(
     policy: Annotated[AccessPolicy, Depends(get_access_policy)],
 ) -> ListNodes:
     return ListNodes(repos, policy, collection_members)
+
+
+def get_search_nodes_use_case(
+    repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+) -> SearchNodes:
+    return SearchNodes(repos, policy)
 
 
 def get_update_node_use_case(

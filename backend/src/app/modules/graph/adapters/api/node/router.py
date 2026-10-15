@@ -21,11 +21,14 @@ from app.modules.graph.adapters.api.dependencies import (
     get_get_node_use_case,
     get_list_nodes_use_case,
     get_promote_extra_schema_field_use_case,
+    get_search_nodes_use_case,
     get_update_node_use_case,
 )
 from app.modules.graph.adapters.api.node.schemas import (
     CreateNodeRequest,
     NodeResponse,
+    NodeSearchRequest,
+    NodeSearchResponse,
     PromoteExtraSchemaFieldRequest,
     UpdateNodeRequest,
 )
@@ -37,6 +40,7 @@ from app.modules.graph.application.promote_extra_schema_field import (
     PromoteExtraSchemaField,
     PromoteExtraSchemaFieldCommand,
 )
+from app.modules.graph.application.search_nodes import SearchNodes, SearchNodesQuery
 from app.modules.graph.application.update_node import UpdateNode
 from app.modules.graph.domain.errors import (
     CollectionNotFoundError,
@@ -44,6 +48,7 @@ from app.modules.graph.domain.errors import (
     NodeNotFoundError,
     NodeTypeNotFoundError,
 )
+from app.modules.graph.domain.query import InvalidQueryError
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ValidationError
 
@@ -70,6 +75,33 @@ async def create_node(
     """Create a new node."""
     node = await use_case.handle(payload.to_command(), actor)
     return NodeResponse.from_domain(node)
+
+
+@router.post(
+    "/search",
+    response_model=NodeSearchResponse,
+    operation_id="search_nodes",
+    responses=error_response(
+        InvalidQueryError, detail="where.children[0]: Unknown condition kind."
+    ),
+)
+async def search_nodes(
+    body: NodeSearchRequest,
+    use_case: Annotated[SearchNodes, Depends(get_search_nodes_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> NodeSearchResponse:
+    """Search items with a condition tree, paged by cursor.
+
+    `query` is `{"v": 1, "where": <group>, "sort": [...]}`. A group is
+    `{"op": "and" | "or" | "not", "children": [...]}` of conditions and groups.
+    A condition that refers to a removed field is skipped and reported in
+    `warnings`. A malformed query is a 400 whose `detail` names the JSON path.
+    """
+    result = await use_case.handle(
+        SearchNodesQuery(query=body.query, limit=body.limit, cursor=body.cursor),
+        actor,
+    )
+    return NodeSearchResponse.from_result(result)
 
 
 @router.get(

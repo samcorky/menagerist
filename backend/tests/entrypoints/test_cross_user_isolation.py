@@ -281,6 +281,17 @@ QUERY_PARAMS: dict[str, Callable[[Seed], str]] = {
 BODIES: dict[str, Callable[[Seed], dict[str, Any]]] = {
     "UpdateNodeRequest": lambda s: {"json": {"name": "Stolen"}},
     "PromoteExtraSchemaFieldRequest": lambda s: {"json": {"node_type_id": s.film}},
+    "NodeSearchRequest": lambda s: {
+        "json": {
+            "query": {
+                "v": 1,
+                "where": {
+                    "op": "or",
+                    "children": [{"kind": "text", "q": "xenomorph"}],
+                },
+            }
+        }
+    },
     "CreateEdgeRequest": lambda s: {
         "json": {"source_id": s.item, "target_id": s.item2, "type": "owns"}
     },
