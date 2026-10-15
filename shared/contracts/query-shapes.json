@@ -1,0 +1,5142 @@
+{
+  "valid": [
+    {
+      "name": "empty query",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": []
+      }
+    },
+    {
+      "name": "empty query with sort",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": []
+      }
+    },
+    {
+      "name": "where absent",
+      "query": {
+        "v": 1
+      }
+    },
+    {
+      "name": "where absent with sort",
+      "query": {
+        "v": 1,
+        "sort": [
+          {
+            "by": "name"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unknown keys are ignored",
+      "query": {
+        "v": 1,
+        "extra": 1,
+        "where": {
+          "op": "and",
+          "extra": 2,
+          "children": [
+            {
+              "kind": "favourite",
+              "value": true,
+              "junk": 3
+            }
+          ]
+        },
+        "sort": [
+          {
+            "by": "name",
+            "junk": 4
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort by name",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "name"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort by created desc",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "created",
+            "dir": "desc"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort by updated asc",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "updated",
+            "dir": "asc"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort by field",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "field",
+            "type": "film",
+            "key": "year",
+            "dir": "desc"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort by field without dir",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "field",
+            "type": "film",
+            "key": "year"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort with three keys",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "name"
+          },
+          {
+            "by": "created"
+          },
+          {
+            "by": "updated"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort by name ignores type and key",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "name",
+            "type": 5,
+            "key": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "and group with one child",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "favourite",
+              "value": true
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "or group with one child",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "or",
+          "children": [
+            {
+              "kind": "favourite",
+              "value": true
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "or group with two children",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "or",
+          "children": [
+            {
+              "kind": "favourite",
+              "value": true
+            },
+            {
+              "kind": "favourite",
+              "value": true
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "not group with one child",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "not",
+          "children": [
+            {
+              "kind": "favourite",
+              "value": true
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "groups nested to depth 1",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "favourite",
+              "value": true
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "groups nested to depth 4",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "favourite",
+              "value": true
+            },
+            {
+              "op": "and",
+              "children": [
+                {
+                  "kind": "favourite",
+                  "value": true
+                },
+                {
+                  "op": "and",
+                  "children": [
+                    {
+                      "kind": "favourite",
+                      "value": true
+                    },
+                    {
+                      "op": "and",
+                      "children": [
+                        {
+                          "kind": "favourite",
+                          "value": true
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "not nested to depth 4",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "not",
+          "children": [
+            {
+              "op": "not",
+              "children": [
+                {
+                  "op": "not",
+                  "children": [
+                    {
+                      "op": "not",
+                      "children": [
+                        {
+                          "kind": "favourite",
+                          "value": true
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "mixed conditions and groups",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "favourite",
+              "value": true
+            },
+            {
+              "op": "or",
+              "children": [
+                {
+                  "kind": "favourite",
+                  "value": true
+                },
+                {
+                  "kind": "text",
+                  "q": "x"
+                }
+              ]
+            },
+            {
+              "op": "not",
+              "children": [
+                {
+                  "kind": "favourite",
+                  "value": true
+                }
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "text of one character",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "text",
+              "q": "a"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "text with non-ASCII characters",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "text",
+              "q": "caf\u00e9 \u2713"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "type with one slug",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "type",
+              "in": [
+                "film"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "type with two slugs",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "type",
+              "in": [
+                "film",
+                "book"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "favourite true",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "favourite",
+              "value": true
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "favourite false",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "favourite",
+              "value": false
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "tag mode any",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "tag",
+              "mode": "any",
+              "tags": [
+                "a"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "tag mode all",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "tag",
+              "mode": "all",
+              "tags": [
+                "a"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "tag mode none",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "tag",
+              "mode": "none",
+              "tags": [
+                "a"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date on created",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "=",
+              "value": "2020-01-01"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date on updated",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "updated",
+              "op": "=",
+              "value": "2020-01-01"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date operator =",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "=",
+              "value": "2020-01-01"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date operator >",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": ">",
+              "value": "2020-01-01"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date operator >=",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": ">=",
+              "value": "2020-01-01"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date operator <",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "<",
+              "value": "2020-01-01"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date operator <=",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "<=",
+              "value": "2020-01-01"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date between",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "between",
+              "value": [
+                "2020-01-01",
+                "2020-12-31"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date between relative",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "between",
+              "value": [
+                {
+                  "rel": "-30d"
+                },
+                {
+                  "rel": "+1w"
+                }
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date with relative value",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": ">=",
+              "value": {
+                "rel": "-30d"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date with empty string value",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "=",
+              "value": ""
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field operator = with a scalar",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field operator != with a scalar",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "!=",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field operator ~ with a scalar",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "~",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field operator > with a scalar",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field operator >= with a scalar",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">=",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field operator < with a scalar",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "<",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field operator <= with a scalar",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "<=",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field between with two operands",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "between",
+              "value": [
+                1980,
+                1990
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field in with one operand",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "in",
+              "value": [
+                "a"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field in with two operands",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "in",
+              "value": [
+                "a",
+                "b"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field has with a scalar",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "has",
+              "value": "a"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field has with a list",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "has",
+              "value": [
+                "a",
+                "b"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field empty without a value",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "empty"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field not_empty without a value",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "not_empty"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field incomplete without a value",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "incomplete"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field complete without a value",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "complete"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field with a sub_key",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "sub_key": "col",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field with a null sub_key",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "sub_key": null,
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "no-value field with a null sub_key",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "empty",
+              "sub_key": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "operand string",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": "a"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "operand empty string",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": ""
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "operand integer",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": 3
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "operand negative integer",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": -3
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "operand float",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": 3.5
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "operand true",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": true
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "operand false",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": false
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date -30d",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "rel": "-30d"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date +30d",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "rel": "+30d"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date 30d",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "rel": "30d"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date 0d",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "rel": "0d"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date -1w",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "rel": "-1w"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date -6m",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "rel": "-6m"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date -1y",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "rel": "-1y"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date -999d",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "rel": "-999d"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date 5w",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "rel": "5w"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "reference",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "ref": "budget"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "money",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "value": 3.5,
+                "currency": "GBP"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "money with an integer amount",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "value": 3,
+                "currency": "GBP"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "money with a negative amount",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "value": -3,
+                "currency": "GBP"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "money in a list",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "in",
+              "value": [
+                {
+                  "value": 1,
+                  "currency": "GBP"
+                },
+                {
+                  "value": 2,
+                  "currency": "USD"
+                }
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "mixed operands in a list",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "in",
+              "value": [
+                "a",
+                1,
+                true,
+                {
+                  "rel": "-1d"
+                },
+                {
+                  "ref": "k"
+                }
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "query is an array",
+      "path": "",
+      "query": []
+    },
+    {
+      "name": "query is null",
+      "path": "",
+      "query": null
+    },
+    {
+      "name": "query is a string",
+      "path": "",
+      "query": "x"
+    },
+    {
+      "name": "version missing",
+      "path": "v",
+      "query": {
+        "where": null,
+        "sort": []
+      }
+    },
+    {
+      "name": "version 2",
+      "path": "v",
+      "query": {
+        "v": 2,
+        "where": null,
+        "sort": []
+      }
+    },
+    {
+      "name": "version as text",
+      "path": "v",
+      "query": {
+        "v": "1",
+        "where": null,
+        "sort": []
+      }
+    },
+    {
+      "name": "version null",
+      "path": "v",
+      "query": {
+        "v": null,
+        "where": null,
+        "sort": []
+      }
+    },
+    {
+      "name": "where is text",
+      "path": "where",
+      "query": {
+        "v": 1,
+        "where": "x",
+        "sort": []
+      }
+    },
+    {
+      "name": "where is an array",
+      "path": "where",
+      "query": {
+        "v": 1,
+        "where": [],
+        "sort": []
+      }
+    },
+    {
+      "name": "where is a condition",
+      "path": "where",
+      "query": {
+        "v": 1,
+        "where": {
+          "kind": "favourite",
+          "value": true
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "where is an empty object",
+      "path": "where",
+      "query": {
+        "v": 1,
+        "where": {},
+        "sort": []
+      }
+    },
+    {
+      "name": "sort with four keys",
+      "path": "sort",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "name"
+          },
+          {
+            "by": "name"
+          },
+          {
+            "by": "name"
+          },
+          {
+            "by": "name"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort is an object",
+      "path": "sort",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": {}
+      }
+    },
+    {
+      "name": "sort is null",
+      "path": "sort",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": null
+      }
+    },
+    {
+      "name": "sort is text",
+      "path": "sort",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": "name"
+      }
+    },
+    {
+      "name": "sort key is text",
+      "path": "sort[0]",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          "name"
+        ]
+      }
+    },
+    {
+      "name": "sort key is null",
+      "path": "sort[0]",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "sort key without by",
+      "path": "sort[0]",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "dir": "asc"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort by unknown",
+      "path": "sort[0]",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "size"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort by is not text",
+      "path": "sort[0]",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": 5
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort dir unknown",
+      "path": "sort[0]",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "name",
+            "dir": "up"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort dir null",
+      "path": "sort[0]",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "name",
+            "dir": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort dir is not text",
+      "path": "sort[0]",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "name",
+            "dir": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "second sort key is bad",
+      "path": "sort[1]",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "name"
+          },
+          {
+            "by": "size"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort by field without type",
+      "path": "sort[0]",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "field",
+            "key": "year"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort by field without key",
+      "path": "sort[0]",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "field",
+            "type": "film"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort by field with empty type",
+      "path": "sort[0]",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "field",
+            "type": "",
+            "key": "year"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort by field with empty key",
+      "path": "sort[0]",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "field",
+            "type": "film",
+            "key": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort by field with non-text type",
+      "path": "sort[0]",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "field",
+            "type": 1,
+            "key": "year"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sort by field with non-text key",
+      "path": "sort[0]",
+      "query": {
+        "v": 1,
+        "where": null,
+        "sort": [
+          {
+            "by": "field",
+            "type": "film",
+            "key": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "bad where is reported before bad sort",
+      "path": "where",
+      "query": {
+        "v": 1,
+        "where": "x",
+        "sort": "y"
+      }
+    },
+    {
+      "name": "unknown group op",
+      "path": "where",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "xor",
+          "children": [
+            {
+              "kind": "favourite",
+              "value": true
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "group op missing",
+      "path": "where",
+      "query": {
+        "v": 1,
+        "where": {
+          "children": [
+            {
+              "kind": "favourite",
+              "value": true
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "group op is not text",
+      "path": "where",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": 5,
+          "children": [
+            {
+              "kind": "favourite",
+              "value": true
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "group op is a list",
+      "path": "where",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": [
+            "and"
+          ],
+          "children": [
+            {
+              "kind": "favourite",
+              "value": true
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "group without children",
+      "path": "where",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and"
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "group with empty children",
+      "path": "where",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": []
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "children is not a list",
+      "path": "where",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": "x"
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "children is an object",
+      "path": "where",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": {}
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "not group with no children",
+      "path": "where",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "not",
+          "children": []
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "not group with two children",
+      "path": "where",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "not",
+          "children": [
+            {
+              "kind": "favourite",
+              "value": true
+            },
+            {
+              "kind": "favourite",
+              "value": true
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "nested group is empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "op": "and",
+              "children": []
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "nested not group has two children",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "op": "not",
+              "children": [
+                {
+                  "kind": "favourite",
+                  "value": true
+                },
+                {
+                  "kind": "favourite",
+                  "value": true
+                }
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "nested group with unknown op",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "op": "xor",
+              "children": [
+                {
+                  "kind": "favourite",
+                  "value": true
+                }
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "child is text",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            "x"
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "child is null",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            null
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "child is a number",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            5
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "child is an array",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            []
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "child is an empty object",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {}
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "second child is bad",
+      "path": "where.children[1]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "favourite",
+              "value": true
+            },
+            "x"
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "child kind is unknown",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "colour"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "child kind is not text",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": 5
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "child kind is null",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "groups nested to depth 5",
+      "path": "where.children[1].children[1].children[1].children[1]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "favourite",
+              "value": true
+            },
+            {
+              "op": "and",
+              "children": [
+                {
+                  "kind": "favourite",
+                  "value": true
+                },
+                {
+                  "op": "and",
+                  "children": [
+                    {
+                      "kind": "favourite",
+                      "value": true
+                    },
+                    {
+                      "op": "and",
+                      "children": [
+                        {
+                          "kind": "favourite",
+                          "value": true
+                        },
+                        {
+                          "op": "and",
+                          "children": [
+                            {
+                              "kind": "favourite",
+                              "value": true
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "not nested to depth 5",
+      "path": "where.children[0].children[0].children[0].children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "not",
+          "children": [
+            {
+              "op": "not",
+              "children": [
+                {
+                  "op": "not",
+                  "children": [
+                    {
+                      "op": "not",
+                      "children": [
+                        {
+                          "op": "not",
+                          "children": [
+                            {
+                              "kind": "favourite",
+                              "value": true
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "depth limit applies before a bad group is read",
+      "path": "where.children[0].children[0].children[0].children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "op": "and",
+              "children": [
+                {
+                  "op": "and",
+                  "children": [
+                    {
+                      "op": "and",
+                      "children": [
+                        {
+                          "op": "and",
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "text empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "text",
+              "q": ""
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "text missing",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "text"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "text is a number",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "text",
+              "q": 5
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "text is null",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "text",
+              "q": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "text is a list",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "text",
+              "q": [
+                "a"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "type empty list",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "type",
+              "in": []
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "type missing in",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "type"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "type in is text",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "type",
+              "in": "film"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "type in is null",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "type",
+              "in": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "type item is a number",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "type",
+              "in": [
+                1
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "type item is empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "type",
+              "in": [
+                ""
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "type item is null",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "type",
+              "in": [
+                "film",
+                null
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "favourite missing value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "favourite"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "favourite value is text",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "favourite",
+              "value": "yes"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "favourite value is 1",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "favourite",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "favourite value is 0",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "favourite",
+              "value": 0
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "favourite value is null",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "favourite",
+              "value": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "tag mode unknown",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "tag",
+              "mode": "some",
+              "tags": [
+                "a"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "tag mode missing",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "tag",
+              "tags": [
+                "a"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "tag mode is not text",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "tag",
+              "mode": 1,
+              "tags": [
+                "a"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "tag tags empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "tag",
+              "mode": "any",
+              "tags": []
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "tag tags missing",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "tag",
+              "mode": "any"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "tag tags is text",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "tag",
+              "mode": "any",
+              "tags": "a"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "tag item is a number",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "tag",
+              "mode": "any",
+              "tags": [
+                1
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "tag item is empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "tag",
+              "mode": "any",
+              "tags": [
+                ""
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date on missing",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "op": "=",
+              "value": "2020-01-01"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date on unknown",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "deleted",
+              "op": "=",
+              "value": "2020-01-01"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date on is not text",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": 1,
+              "op": "=",
+              "value": "2020-01-01"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date op missing",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "value": "2020-01-01"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date op empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "empty"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date op not_empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "not_empty"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date op tilde",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "~",
+              "value": "2020"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date op not equal",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "!=",
+              "value": "2020-01-01"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date op in",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "in",
+              "value": [
+                "2020-01-01"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date op has",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "has",
+              "value": [
+                "2020-01-01"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date op unknown",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "around",
+              "value": "2020-01-01"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date op is not text",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": 5,
+              "value": "2020-01-01"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date value missing",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "="
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date value null",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "=",
+              "value": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date between with one operand",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "between",
+              "value": [
+                "2020-01-01"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date between with three operands",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "between",
+              "value": [
+                "a",
+                "b",
+                "c"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date between with a scalar",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "between",
+              "value": "2020-01-01"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "date equals a list",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "=",
+              "value": [
+                "2020-01-01"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field empty with a value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "empty",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field empty with a null value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "empty",
+              "value": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field not_empty with a value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "not_empty",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field not_empty with a null value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "not_empty",
+              "value": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field incomplete with a value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "incomplete",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field incomplete with a null value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "incomplete",
+              "value": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field complete with a value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "complete",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field complete with a null value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "complete",
+              "value": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field operator unknown",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "like",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field operator missing",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field operator is not text",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": 5,
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field operator is a list",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": [
+                "="
+              ],
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field operator is empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field = without a value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "="
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field != without a value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "!="
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field ~ without a value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "~"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field > without a value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field >= without a value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">="
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field < without a value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "<"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field <= without a value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "<="
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field between without a value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "between"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field in without a value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "in"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field has without a value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "has"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field = with a null value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field = with a list",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": [
+                1
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field != with a null value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "!=",
+              "value": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field != with a list",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "!=",
+              "value": [
+                1
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field ~ with a null value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "~",
+              "value": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field ~ with a list",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "~",
+              "value": [
+                1
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field > with a null value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field > with a list",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": [
+                1
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field >= with a null value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">=",
+              "value": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field >= with a list",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">=",
+              "value": [
+                1
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field < with a null value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "<",
+              "value": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field < with a list",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "<",
+              "value": [
+                1
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field <= with a null value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "<=",
+              "value": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field <= with a list",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "<=",
+              "value": [
+                1
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field between with no operands",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "between",
+              "value": []
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field between with one operand",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "between",
+              "value": [
+                1980
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field between with three operands",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "between",
+              "value": [
+                1,
+                2,
+                3
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field between with a scalar",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "between",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field between with a null operand",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "between",
+              "value": [
+                1,
+                null
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field between with a nested list",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "between",
+              "value": [
+                1,
+                [
+                  2
+                ]
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field in with a scalar",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "in",
+              "value": "a"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field in with no operands",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "in",
+              "value": []
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field in with a null operand",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "in",
+              "value": [
+                "a",
+                null
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field in with a nested list",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "in",
+              "value": [
+                [
+                  "a"
+                ]
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field has with no operands",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "has",
+              "value": []
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field has with a null value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "has",
+              "value": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field has with a nested list",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "has",
+              "value": [
+                [
+                  "a"
+                ]
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field sub_key empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "sub_key": "",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field sub_key is a number",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "sub_key": 3,
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field type missing",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "key": "year",
+              "op": "=",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field type empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "",
+              "key": "year",
+              "op": "=",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field type is a number",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": 1,
+              "key": "year",
+              "op": "=",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field type is null",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": null,
+              "key": "year",
+              "op": "=",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field key missing",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "op": "=",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field key empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "",
+              "op": "=",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field key is a number",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": 1,
+              "op": "=",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field key is null",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": null,
+              "op": "=",
+              "value": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date without a unit",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "rel": "30"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date without a number",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "rel": "d"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date too large",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "rel": "-1000d"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date with unknown unit",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "rel": "-30x"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date with upper-case unit",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "rel": "-30D"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date with leading space",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "rel": " -30d"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date with trailing space",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "rel": "-30d "
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date with a double sign",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "rel": "--30d"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date with a fraction",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "rel": "1.5d"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date with two units",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "rel": "-30dd"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "rel": ""
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date is a number",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "rel": 30
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date is null",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "rel": null
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date inside between",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "between",
+              "value": [
+                {
+                  "rel": "-30d"
+                },
+                {
+                  "rel": "30"
+                }
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "reference empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "ref": ""
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "reference is a number",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "ref": 5
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "reference is null",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "ref": null
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "money without currency",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "value": 3.5
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "money without value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "currency": "GBP"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "money with empty currency",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "value": 3.5,
+                "currency": ""
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "money with numeric currency",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "value": 3.5,
+                "currency": 5
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "money with boolean amount",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "value": true,
+                "currency": "GBP"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "money with text amount",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "value": "3.5",
+                "currency": "GBP"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "money with null amount",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "value": null,
+                "currency": "GBP"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "money with an extra key",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": ">",
+              "value": {
+                "value": 3,
+                "currency": "GBP",
+                "x": 1
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "money inside between with a bad amount",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "between",
+              "value": [
+                {
+                  "value": 1,
+                  "currency": "GBP"
+                },
+                {
+                  "value": true,
+                  "currency": "GBP"
+                }
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "empty object operand",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {}
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "unknown object operand",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "x": 1
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date with an extra key",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "rel": "-1d",
+                "ref": "k"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "reference with an extra key",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "ref": "k",
+                "x": 1
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "nested list in a scalar slot",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": [
+                [
+                  1
+                ]
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "nested list in a has list",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "has",
+              "value": [
+                1,
+                [
+                  2
+                ]
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    }
+  ]
+}

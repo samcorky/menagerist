@@ -3602,6 +3602,48 @@ Expected: PASS.
 
 ---
 
+### Task 10b: A shared fixture for query shapes (backend parser and frontend decoder agree)
+
+User-requested follow-up to the Task 10 review. `shared/contracts/query-operators.json` pins which operators each field kind allows, but nothing pins what a *valid query tree* looks like. The frontend decoder (`decodeQuery`, Task 10) is looser than the server's `parse_query`: it accepts any date operator string, any field operator, `between` with other than two operands, no-value operators carrying a value, malformed relative dates and empty strings or lists, and it rejects `"sub_key": null` and a missing `sort`, which the server accepts. A hand-edited link can therefore decode in the browser and still be rejected by the server. This task makes one fixture the arbiter and brings the decoder to parity with the server's *structural* rules.
+
+**Scope:** structure only, i.e. what `parse_query` (`backend/src/app/modules/graph/domain/query.py`) accepts or rejects. Whether an operator suits a particular field kind or a value fits a field is resolved against item-type schemas on the server (`resolve_fields`) and is out of scope.
+
+**Files:**
+- Create: `shared/contracts/query-shapes.json`
+- Create: `backend/tests/modules/graph/domain/test_query_shapes_contract.py`
+- Modify: `frontend/src/lib/query/codec.ts` (decoder parity), `frontend/tests/query-codec.test.ts` (existing expectations that assert the old looseness are updated deliberately, with a note), create `frontend/tests/query-shapes-contract.test.ts`
+- Modify: `shared/README.md` (new contracts row; fix the operators row, whose frontend test now exists rather than being "added in a later task")
+
+**Fixture format** (`shared/contracts/query-shapes.json`):
+
+```json
+{
+  "valid": [
+    { "name": "empty query", "query": { "v": 1, "where": null } }
+  ],
+  "invalid": [
+    { "name": "between with one operand", "path": "where.children[0]",
+      "query": { "v": 1, "where": { "op": "and", "children": [
+        { "kind": "field", "type": "film", "key": "year", "op": "between", "value": [1980] } ] } } }
+  ]
+}
+```
+
+`path` is the JSON path the server reports for the first problem (`InvalidQueryError.path`); the backend test asserts it, the frontend test ignores it (the decoder only returns null). Extra unknown keys on a node are ignored by the server and dropped by the decoder: include a valid case.
+
+- [ ] **Step 1: Write the fixture.** Cover every structural rule in `parse_query`, each as its own named case, both sides of every boundary:
+  - Version: `v` missing, `v` wrong, `where` absent vs null; `sort` absent (valid), `sort: []`, non-list sort, 3 keys (valid) vs 4, unknown `by`, bad `dir`, `by: field` without `type` or `key`, `type`/`key` over 200 characters or empty.
+  - Groups: unknown `op`, empty `children`, `not` with 0, 1 (valid) and 2 children, nested to depth 4 (valid) and 5, a non-object child, a child that is neither group nor condition.
+  - Conditions by kind: `text` (`q` empty, 1 and 200 characters valid, 201 invalid, non-string); `type` (`in` empty, 1..50 valid, 51, non-list, non-string items); `favourite` (`value` true/false valid, missing, non-bool); `tag` (bad `mode`, empty `tags`, 1..50 valid, 51); `date` (`on` created/updated valid, other invalid; `op` each of `= > >= < <= between` valid, `empty`/`~`/unknown invalid; `between` needs exactly two; value missing); `field` (`type`/`key` empty/201 chars, `sub_key` string valid, **null valid**, empty string invalid; every operator in the server's list valid, unknown invalid).
+  - Operands: literal string/int/float/bool valid; null invalid; nested list in a scalar slot invalid; `{rel:"-30d"}` valid, `{rel:"30"}`, `{rel:"-1000d"}`, `{rel:"-30x"}`, `{rel:"-30d\n"}` invalid (server regex is fully anchored); `{ref:"k"}` valid, `{ref:""}`, `{ref:5}` invalid; money `{value: 3.5, currency: "GBP"}` valid, `{value:true,currency:"GBP"}` (bool is not a number) invalid, missing currency invalid; an object with other keys invalid.
+  - Arity by operator: `between` exactly 2 (1 and 3 invalid); `in` list 1..50 (scalar invalid, empty invalid, 51 invalid); `has` scalar or list 1..50; no-value operators `empty`, `not_empty`, `incomplete`, `complete` with and without a `value` key (with it: invalid); every other operator needs a scalar `value` (missing invalid, list invalid).
+  - Totals that need generation (51 conditions, strings of 201 characters) may be written inline in the tests instead of the file; say which in the test.
+  Read `parse_query` closely; the fixture must be derived from the server's code, not from the frontend's, and every `invalid` case must really fail on the server and every `valid` one really parse.
+- [ ] **Step 2: Backend contract test (RED first, then fix any fixture case the server disagrees with).** `test_query_shapes_contract.py` loads the fixture through `shared_data_path("contracts/query-shapes.json")`; parametrised over `valid` (must parse without error) and `invalid` (must raise `InvalidQueryError` whose `.path` equals the fixture's `path`). A fixture case the server disagrees with is a fixture bug, fix the case, never the server.
+- [ ] **Step 3: Frontend contract test (RED).** `frontend/tests/query-shapes-contract.test.ts` imports the fixture through `$shared/contracts/query-shapes.json` and, for each case, runs `decodeQuery(encodeQuery(query as Query))` (encode accepts any object; use a cast): `valid` must return a non-null query, `invalid` must return null. Many `invalid` cases will fail on the current decoder: that is the point.
+- [ ] **Step 4: Bring `decodeQuery` to parity.** Tighten the decoder in `codec.ts` so every fixture case agrees: lower bounds as well as upper bounds (strings 1..200, lists 1..50), the date operator set, the global operator set for fields, exact arity per operator, the no-value operators, the anchored relative-date regex `^[+-]?\d{1,3}[dwmy]$`, money shape (number that is not a boolean, non-empty currency), `{ref}` non-empty, `sub_key: null` accepted and normalised to absent, missing `sort` accepted as `[]`. Keep the sanitising rebuild, depth and condition limits, and the never-throws guarantee. Update the existing `query-codec.test.ts` expectations that asserted the old looseness (for example the test that a missing `sort` is rejected), explaining each change in the report.
+- [ ] **Step 5: Gates.** Backend: the new test, `cd backend && uv run pytest tests/modules/graph/domain tests/architecture -q`, `uv run poe lint-backend`, `uv run poe typecheck-backend` (and the full unit suite `uv run poe test-backend`, since it runs in the user's pre-commit). Frontend: the three query test files plus the new one, `uv run poe lint-frontend`, `uv run poe typecheck-frontend`, `uv run poe test-frontend`.
+
 ### Task 11: Filter builder UI and items-page integration
 
 All `.svelte` and `.svelte.ts` files in this task are written by the **`svelte-file-editor` subagent**. Give it this task text, the spec's Frontend section, `frontend/README.md` and `frontend/DESIGN_GUIDELINES.md`.

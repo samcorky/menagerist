@@ -93,12 +93,18 @@ describe('decodeQuery', () => {
 		expect(decodeQuery(token({ where: null, sort: [] }))).toBeNull();
 	});
 
+	it('accepts a missing where or sort, as the server does', () => {
+		const empty: Query = { v: 1, where: null, sort: [] };
+		expect(decodeQuery(token({ v: 1, sort: [] }))).toEqual(empty);
+		expect(decodeQuery(token({ v: 1, where: null }))).toEqual(empty);
+		expect(decodeQuery(token({ v: 1 }))).toEqual(empty);
+	});
+
 	it('rejects a malformed where or sort', () => {
-		expect(decodeQuery(token({ v: 1, sort: [] }))).toBeNull();
 		expect(decodeQuery(token({ v: 1, where: 'x', sort: [] }))).toBeNull();
 		expect(decodeQuery(token({ v: 1, where: fav, sort: [] }))).toBeNull();
-		expect(decodeQuery(token({ v: 1, where: null }))).toBeNull();
 		expect(decodeQuery(token({ v: 1, where: null, sort: {} }))).toBeNull();
+		expect(decodeQuery(token({ v: 1, where: null, sort: null }))).toBeNull();
 	});
 
 	it('rejects bad sort keys and too many of them', () => {
@@ -199,6 +205,12 @@ describe('decodeQuery', () => {
 			wrap(group('and', [{ kind: 'type', in: Array.from({ length: n }, () => 't') }]));
 		expect(decodeQuery(types(50))).not.toBeNull();
 		expect(decodeQuery(types(51))).toBeNull();
+	});
+
+	it('drops a null sub_key, as the server treats it as none', () => {
+		const field = { kind: 'field', type: 't', key: 'k', op: 'empty' };
+		const decoded = decodeQuery(wrap(group('and', [{ ...field, sub_key: null }])));
+		expect(decoded).toEqual({ v: 1, where: group('and', [field]), sort: [] });
 	});
 
 	it('drops unknown properties from the result', () => {

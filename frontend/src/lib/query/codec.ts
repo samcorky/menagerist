@@ -12,6 +12,7 @@ import {
 	type SortKey,
 	type Value
 } from './types';
+import { operatorTakesValue } from './operators';
 
 function toBase64Url(text: string): string {
 	let binary = '';
@@ -39,12 +40,43 @@ function isRec(value: unknown): value is Rec {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** Operators the server accepts structurally (backend graph/domain/query.py). */
+const OPERATORS = new Set([
+	'=',
+	'!=',
+	'~',
+	'>',
+	'>=',
+	'<',
+	'<=',
+	'between',
+	'in',
+	'empty',
+	'not_empty',
+	'has',
+	'incomplete',
+	'complete'
+]);
+const DATE_OPERATORS = new Set(['=', '>', '>=', '<', '<=', 'between']);
+const BETWEEN_LENGTH = 2;
+const RELATIVE = /^[+-]?\d{1,3}[dwmy]$/;
+
+/** Length in characters, as Python counts it, not in UTF-16 units. */
+function withinLength(value: string, min: number): boolean {
+	// Characters never outnumber UTF-16 units, so long input is rejected without a scan.
+	if (value.length > 2 * MAX_TEXT_LENGTH) return false;
+	let count = 0;
+	for (const _ of value) count++;
+	return count >= min && count <= MAX_TEXT_LENGTH;
+}
+
+/** A required text: 1 to 200 characters. */
 function str(value: unknown): string | null {
-	return typeof value === 'string' && value.length <= MAX_TEXT_LENGTH ? value : null;
+	return typeof value === 'string' && withinLength(value, 1) ? value : null;
 }
 
 function strList(value: unknown): string[] | null {
-	if (!Array.isArray(value) || value.length > MAX_LIST_LENGTH) return null;
+	if (!Array.isArray(value) || value.length < 1 || value.length > MAX_LIST_LENGTH) return null;
 	const out: string[] = [];
 	for (const item of value) {
 		const s = str(item);
@@ -56,12 +88,12 @@ function strList(value: unknown): string[] | null {
 
 function operand(value: unknown): Operand | null {
 	if (typeof value === 'boolean' || typeof value === 'number') return value;
-	if (typeof value === 'string') return str(value);
+	// A literal string may be empty; only the upper bound applies.
+	if (typeof value === 'string') return withinLength(value, 0) ? value : null;
 	if (!isRec(value)) return null;
 	const keys = Object.keys(value).sort().join(',');
 	if (keys === 'rel') {
-		const rel = str(value.rel);
-		return rel === null ? null : { rel };
+		return typeof value.rel === 'string' && RELATIVE.test(value.rel) ? { rel: value.rel } : null;
 	}
 	if (keys === 'ref') {
 		const ref = str(value.ref);
@@ -74,9 +106,8 @@ function operand(value: unknown): Operand | null {
 	return null;
 }
 
-function operandValue(value: unknown): Value | null {
-	if (!Array.isArray(value)) return operand(value);
-	if (value.length > MAX_LIST_LENGTH) return null;
+function operands(value: unknown, min: number, max: number): Operand[] | null {
+	if (!Array.isArray(value) || value.length < min || value.length > max) return null;
 	const out: Operand[] = [];
 	for (const item of value) {
 		const o = operand(item);
@@ -84,6 +115,20 @@ function operandValue(value: unknown): Value | null {
 		out.push(o);
 	}
 	return out;
+}
+
+/**
+ * The value a comparison needs, shaped by its operator. `undefined` means none
+ * (a no-value operator); `null` means the data is malformed.
+ */
+function comparisonValue(op: string, data: Rec): Value | null | undefined {
+	if (!operatorTakesValue(op)) return 'value' in data ? null : undefined;
+	if (!('value' in data)) return null;
+	const raw = data.value;
+	if (op === 'between') return operands(raw, BETWEEN_LENGTH, BETWEEN_LENGTH);
+	if (op === 'in') return operands(raw, 1, MAX_LIST_LENGTH);
+	if (op === 'has' && Array.isArray(raw)) return operands(raw, 1, MAX_LIST_LENGTH);
+	return operand(raw);
 }
 
 function condition(data: Rec): Condition | null {
@@ -105,28 +150,30 @@ function condition(data: Rec): Condition | null {
 			return { kind: 'tag', mode, tags };
 		}
 		case 'date': {
-			const op = str(data.op);
-			const value = operandValue(data.value);
+			const op = data.op;
 			const on = data.on;
-			if (op === null || value === null || (on !== 'created' && on !== 'updated')) return null;
-			return { kind: 'date', on, op, value };
+			if (typeof op !== 'string' || !DATE_OPERATORS.has(op)) return null;
+			if (on !== 'created' && on !== 'updated') return null;
+			const value = comparisonValue(op, data);
+			return value === null || value === undefined ? null : { kind: 'date', on, op, value };
 		}
 		case 'field': {
 			const type = str(data.type);
 			const key = str(data.key);
-			const op = str(data.op);
-			if (type === null || key === null || op === null) return null;
+			const op = data.op;
+			if (type === null || key === null || typeof op !== 'string' || !OPERATORS.has(op)) {
+				return null;
+			}
 			const out: Condition = { kind: 'field', type, key, op };
-			if (data.sub_key !== undefined) {
+			// A null sub_key means none, as on the server.
+			if (data.sub_key !== undefined && data.sub_key !== null) {
 				const sub = str(data.sub_key);
 				if (sub === null) return null;
 				out.sub_key = sub;
 			}
-			if (data.value !== undefined) {
-				const value = operandValue(data.value);
-				if (value === null) return null;
-				out.value = value;
-			}
+			const value = comparisonValue(op, data);
+			if (value === null) return null;
+			if (value !== undefined) out.value = value;
 			return out;
 		}
 		default:
@@ -183,15 +230,17 @@ function group(data: unknown, depth: number, budget: { conditions: number }): Gr
 export function decodeQuery(token: string): Query | null {
 	try {
 		const data: unknown = JSON.parse(fromBase64Url(token));
-		if (!isRec(data) || data.v !== 1 || !Array.isArray(data.sort)) return null;
-		if (data.sort.length > MAX_SORT_KEYS) return null;
+		if (!isRec(data) || data.v !== 1) return null;
+		// A missing sort means creation order.
+		const rawSort = data.sort === undefined ? [] : data.sort;
+		if (!Array.isArray(rawSort) || rawSort.length > MAX_SORT_KEYS) return null;
 		const sort: SortKey[] = [];
-		for (const item of data.sort) {
+		for (const item of rawSort) {
 			const key = sortKey(item);
 			if (key === null) return null;
 			sort.push(key);
 		}
-		if (data.where === null) return { v: 1, where: null, sort };
+		if (data.where === null || data.where === undefined) return { v: 1, where: null, sort };
 		const where = group(data.where, 1, { conditions: 0 });
 		return where === null ? null : { v: 1, where, sort };
 	} catch {
