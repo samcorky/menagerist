@@ -173,13 +173,21 @@ class SqlAlchemyNodeRepository:
             for row in rows
         ]
 
-    async def search_count(self, *, scope: AccessScope, resolved: ResolvedQuery) -> int:
-        """Return how many live nodes in `scope` match the query."""
-        logger.debug("counting search results")
-        stmt = select(func.count()).select_from(NodeModel).where(_in_scope(scope))
+    async def search_count(
+        self, *, scope: AccessScope, resolved: ResolvedQuery, limit: int | None = None
+    ) -> int:
+        """Return how many live nodes in `scope` match the query.
+
+        With `limit`, counting stops at that many matches.
+        """
+        logger.debug("counting search results", limit=limit)
+        matches = select(NodeModel.id).where(_in_scope(scope))
         where = compile_where(resolved)
         if where is not None:
-            stmt = stmt.where(where)
+            matches = matches.where(where)
+        if limit is not None:
+            matches = matches.limit(limit)
+        stmt = select(func.count()).select_from(matches.subquery())
         result = await self._session.execute(stmt)
         return result.scalar_one()
 

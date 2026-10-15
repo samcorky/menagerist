@@ -248,6 +248,7 @@ class NodeSearchResponse(BaseModel):
                 {
                     "items": [_NODE_EXAMPLE],
                     "total": 1,
+                    "total_capped": False,
                     "next_cursor": None,
                     "warnings": [],
                 }
@@ -257,6 +258,9 @@ class NodeSearchResponse(BaseModel):
 
     items: list[NodeResponse]
     total: int
+    total_capped: bool = Field(
+        description="True when `total` is a lower bound, not the exact count."
+    )
     next_cursor: str | None = Field(default=None)
     warnings: list[QueryWarningResponse]
 
@@ -266,6 +270,7 @@ class NodeSearchResponse(BaseModel):
         return cls(
             items=[NodeResponse.from_domain(node) for node in result.items],
             total=result.total,
+            total_capped=result.total_capped,
             next_cursor=result.next_cursor,
             warnings=[
                 QueryWarningResponse(path=w.path, message=w.message)

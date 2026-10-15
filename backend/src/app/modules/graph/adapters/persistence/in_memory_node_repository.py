@@ -146,9 +146,12 @@ class InMemoryNodeRepository:
             hits = [h for h in hits if is_after(h, after, resolved.query.sort)]
         return hits[:limit]
 
-    async def search_count(self, *, scope: AccessScope, resolved: ResolvedQuery) -> int:
-        """Return how many live nodes in `scope` match the query."""
-        return len(self._matching(scope, resolved))
+    async def search_count(
+        self, *, scope: AccessScope, resolved: ResolvedQuery, limit: int | None = None
+    ) -> int:
+        """Return how many live nodes in `scope` match the query, up to `limit`."""
+        count = len(self._matching(scope, resolved))
+        return count if limit is None else min(count, limit)
 
     async def clear_type(self, type_slug: str, *, scope: AccessScope) -> None:
         """Set `type` to None on all non-deleted nodes if type matches `type_slug`."""

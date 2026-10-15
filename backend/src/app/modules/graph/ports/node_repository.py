@@ -82,8 +82,14 @@ class NodeRepository(Protocol):
         """
         ...
 
-    async def search_count(self, *, scope: AccessScope, resolved: ResolvedQuery) -> int:
-        """Return how many live nodes in `scope` match the query."""
+    async def search_count(
+        self, *, scope: AccessScope, resolved: ResolvedQuery, limit: int | None = None
+    ) -> int:
+        """Return how many live nodes in `scope` match the query.
+
+        With `limit`, the result never exceeds it and the database stops
+        counting once it has found that many.
+        """
         ...
 
     async def clear_type(self, type_slug: str, *, scope: AccessScope) -> None:

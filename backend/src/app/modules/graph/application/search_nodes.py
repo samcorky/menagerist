@@ -31,6 +31,7 @@ from app.shared_kernel.cqrs import ScopedQueryHandler
 logger = structlog.get_logger()
 
 MAX_LIMIT = 200
+TOTAL_CAP = 1000
 _NUMERIC_KINDS = frozenset({"number", "duration", "rating", "money"})
 
 
@@ -76,10 +77,14 @@ class SearchNodesQuery:
 
 @dataclass(frozen=True)
 class SearchNodesResult:
-    """One page of matches, the total, where to resume, and stale conditions."""
+    """One page of matches, the total, where to resume, and stale conditions.
+
+    `total` is exact up to the cap; when `total_capped` it is a lower bound.
+    """
 
     items: list[Node]
     total: int
+    total_capped: bool
     next_cursor: str | None
     warnings: list[QueryWarning]
 
@@ -92,9 +97,11 @@ class SearchNodes(ScopedQueryHandler[GraphRepos, SearchNodesQuery, SearchNodesRe
         repos: GraphRepos,
         policy: AccessPolicy,
         today: Callable[[], date] = _utc_today,
+        total_cap: int = TOTAL_CAP,
     ) -> None:
         super().__init__(repos, policy)
         self._today = today
+        self._total_cap = total_cap
 
     async def handle(self, query: SearchNodesQuery, actor: Actor) -> SearchNodesResult:
         """Return a page of matching items.
@@ -129,7 +136,11 @@ class SearchNodes(ScopedQueryHandler[GraphRepos, SearchNodesQuery, SearchNodesRe
         hits = await self._repos.nodes.search(
             scope=scope, resolved=resolved, after=after, limit=query.limit + 1
         )
-        total = await self._repos.nodes.search_count(scope=scope, resolved=resolved)
+        # One past the cap tells "exactly the cap" from "more than the cap".
+        counted = await self._repos.nodes.search_count(
+            scope=scope, resolved=resolved, limit=self._total_cap + 1
+        )
+        total = min(counted, self._total_cap)
         page = hits[: query.limit]
         next_cursor = None
         if len(hits) > query.limit:
@@ -141,6 +152,7 @@ class SearchNodes(ScopedQueryHandler[GraphRepos, SearchNodesQuery, SearchNodesRe
         return SearchNodesResult(
             items=[hit.node for hit in page],
             total=total,
+            total_capped=counted > self._total_cap,
             next_cursor=next_cursor,
             warnings=resolution.warnings,
         )

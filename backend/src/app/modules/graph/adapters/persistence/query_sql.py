@@ -368,13 +368,18 @@ def _field_sort_expression(key: SortKey, ctx: ResolvedQuery) -> _Expr:
     return case((NodeModel.type == key.type, text), else_=null()).collate(_C)
 
 
+def _epoch(stamp: SQLColumnExpression[Any]) -> _Expr:
+    """Seconds since the epoch; `timezone` makes it IMMUTABLE, so indexable."""
+    return cast(func.extract("epoch", func.timezone("UTC", stamp)), Float)
+
+
 def _sort_expression(key: SortKey, ctx: ResolvedQuery) -> _Expr:
     if key.by == "name":
         return _folded(NodeModel.name).collate(_C)
     if key.by == "created":
-        return cast(func.extract("epoch", NodeModel.created_at), Float)
+        return _epoch(NodeModel.created_at)
     if key.by == "updated":
-        return cast(func.extract("epoch", NodeModel.updated_at), Float)
+        return _epoch(NodeModel.updated_at)
     return _field_sort_expression(key, ctx)
 
 
@@ -384,11 +389,15 @@ def sort_expressions(ctx: ResolvedQuery) -> list[_Expr]:
 
 
 def order_by(ctx: ResolvedQuery, exprs: list[_Expr]) -> list[_Expr]:
-    """ORDER BY terms: each key with nulls last, then id."""
-    terms = [
-        (expr.desc() if key.dir == "desc" else expr.asc()).nulls_last()
-        for expr, key in zip(exprs, ctx.query.sort, strict=True)
-    ]
+    """ORDER BY terms: each key, then id.
+
+    Field keys sort nulls last. Name and the timestamps cannot be NULL, so they
+    omit it, which lets an index on them (or a backward scan) serve the order.
+    """
+    terms = []
+    for expr, key in zip(exprs, ctx.query.sort, strict=True):
+        term = expr.desc() if key.dir == "desc" else expr.asc()
+        terms.append(term if key.by != "field" else term.nulls_last())
     return [*terms, NodeModel.id.asc()]
 
 
@@ -411,4 +420,12 @@ def after_clause(ctx: ResolvedQuery, exprs: list[_Expr], cursor: Cursor) -> _Boo
         branches.append(and_(*equal, later))
         equal.append(same)
     branches.append(and_(*equal, NodeModel.id > cursor.id))
-    return or_(*branches)
+    after = or_(*branches)
+    if not ctx.query.sort:
+        return after
+    first, value = ctx.query.sort[0], cursor.sort_values[0]
+    if first.by == "field" or value is None:
+        return after
+    # Implied by `after`; as a plain range it lets an index start at the cursor.
+    bound = exprs[0] <= value if first.dir == "desc" else exprs[0] >= value
+    return and_(bound, after)

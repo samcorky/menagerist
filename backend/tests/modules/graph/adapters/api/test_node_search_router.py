@@ -106,6 +106,7 @@ def test_search_returns_matches_and_total(world: _World) -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["total"] == 2
+    assert data["total_capped"] is False
     assert {item["name"] for item in data["items"]} == {"Film 0", "Film 1"}
     assert data["warnings"] == []
     assert data["next_cursor"] is None

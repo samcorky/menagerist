@@ -9,6 +9,11 @@ from app.platform.database import Base
 from app.platform.orm_mixins import IdentifiableMixin, OwnedMixin, SoftDeletableMixin
 
 
+def _epoch(column: str) -> str:
+    """The epoch-seconds index expression as Postgres reflects it."""
+    return f"(EXTRACT(epoch FROM timezone('UTC'::text, {column}))::double precision)"
+
+
 class NodeTypeModel(IdentifiableMixin, SoftDeletableMixin, Base):
     """ORM row for a node type.
 
@@ -51,6 +56,36 @@ class NodeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):
             "tags",
             postgresql_using="gin",
             postgresql_ops={"tags": "jsonb_path_ops"},
+        ),
+        # The migration adds COLLATE "C" to both name-sort indexes; Alembic's
+        # reflection drops it, so it is left out here to keep the models in sync.
+        Index(
+            "ix_nodes_owner_name_sort",
+            "owner_id",
+            text("lower(immutable_unaccent(name))"),
+            "id",
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+        Index(
+            "ix_nodes_owner_name_sort_desc",
+            "owner_id",
+            text("lower(immutable_unaccent(name)) DESC"),
+            "id",
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+        Index(
+            "ix_nodes_owner_created_sort",
+            "owner_id",
+            text(_epoch("created_at")),
+            "id",
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+        Index(
+            "ix_nodes_owner_updated_sort",
+            "owner_id",
+            text(_epoch("updated_at")),
+            "id",
+            postgresql_where=text("deleted_at IS NULL"),
         ),
         Index(
             "ix_nodes_name_trgm",

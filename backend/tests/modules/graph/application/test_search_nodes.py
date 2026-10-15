@@ -18,7 +18,11 @@ from app.modules.graph.adapters.persistence.in_memory_node_type_repository impor
     InMemoryNodeTypeRepository,
 )
 from app.modules.graph.application.query_cursor import encode_cursor
-from app.modules.graph.application.search_nodes import SearchNodes, SearchNodesQuery
+from app.modules.graph.application.search_nodes import (
+    TOTAL_CAP,
+    SearchNodes,
+    SearchNodesQuery,
+)
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.domain.query import Cursor, InvalidQueryError, SortValue
@@ -36,7 +40,7 @@ SCHEMA: dict[str, Any] = {
 }
 
 
-async def _setup(count: int = 5) -> SearchNodes:
+async def _setup(count: int = 5, **options: Any) -> SearchNodes:  # noqa: ANN401
     repos = GraphRepos(
         nodes=InMemoryNodeRepository(),
         edges=InMemoryEdgeRepository(),
@@ -55,7 +59,9 @@ async def _setup(count: int = 5) -> SearchNodes:
                 attributes={"rating": index % 3},
             )
         )
-    return SearchNodes(repos, OwnerAccessPolicy(), today=lambda: date(2026, 10, 14))
+    return SearchNodes(
+        repos, OwnerAccessPolicy(), today=lambda: date(2026, 10, 14), **options
+    )
 
 
 def _body(*children: dict[str, Any], **extra: Any) -> dict[str, Any]:  # noqa: ANN401
@@ -263,3 +269,30 @@ async def test_or_group_never_returns_other_users_items() -> None:
     result = await use_case.handle(SearchNodesQuery(query=body), alice)
     assert [n.name for n in result.items] == ["A"]
     assert result.total == 1
+
+
+def test_default_total_cap_is_one_thousand() -> None:
+    """SearchNodes: the cap constant is 1,000."""
+    assert TOTAL_CAP == 1000
+
+
+async def test_default_cap_applies_when_none_is_given() -> None:
+    """SearchNodes: a default-constructed use case caps at TOTAL_CAP."""
+    use_case = await _setup(TOTAL_CAP + 1)
+    result = await use_case.handle(SearchNodesQuery(query=_body()), SYSTEM_ACTOR)
+    assert result.total == TOTAL_CAP
+    assert result.total_capped is True
+
+
+@pytest.mark.parametrize(
+    ("count", "total", "capped"), [(5, 3, True), (3, 3, False), (2, 2, False)]
+)
+async def test_total_is_capped(count: int, total: int, capped: bool) -> None:
+    """SearchNodes: total stops at the cap and says so; the page is unaffected."""
+    use_case = await _setup(count, total_cap=3)
+    result = await use_case.handle(
+        SearchNodesQuery(query=_body(), limit=4), SYSTEM_ACTOR
+    )
+    assert result.total == total
+    assert result.total_capped is capped
+    assert len(result.items) == min(count, 4)

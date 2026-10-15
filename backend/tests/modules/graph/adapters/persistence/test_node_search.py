@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -465,3 +465,79 @@ async def test_not_includes_items_whose_values_are_null(
         "Loose",
         "Heat",
     }
+
+
+@pytest.mark.parametrize(
+    ("raw", "limit", "expected"),
+    [
+        (_where(_f("film", "rating", ">=", 4)), 2, 2),
+        (_where(_f("film", "rating", ">=", 4)), 3, 3),
+        (_where(_f("film", "rating", ">=", 4)), 4, 3),
+        (_where(_f("film", "rating", ">=", 4)), None, 3),
+        ({"v": 1, "where": None}, 5, 5),
+        ({"v": 1, "where": None}, None, 7),
+    ],
+    ids=["below", "exact", "above", "unlimited", "capped-all", "uncapped-all"],
+)
+async def test_search_count_limit_caps_the_count(
+    repository: NodeRepository, raw: dict[str, Any], limit: int | None, expected: int
+) -> None:
+    """A count limit bounds the result without changing smaller counts."""
+    await _seed(repository)
+    count = await repository.search_count(
+        scope=AccessScope.of(ALICE), resolved=_resolve(raw), limit=limit
+    )
+    assert count == expected
+
+
+@pytest.mark.parametrize("by", ["name", "created"])
+@pytest.mark.parametrize("direction", ["asc", "desc"])
+async def test_paging_by_name_or_time_visits_every_item_once(
+    repository: NodeRepository, by: str, direction: str
+) -> None:
+    """Paging by a never-null key continues exactly where the cursor left off."""
+    await _seed(repository)
+    resolved = _resolve({"v": 1, "where": None, "sort": [{"by": by, "dir": direction}]})
+    seen: list[str] = []
+    after: Cursor | None = None
+    while True:
+        hits = await repository.search(
+            scope=AccessScope.of(ALICE), resolved=resolved, after=after, limit=2
+        )
+        seen += [hit.node.name for hit in hits]
+        if len(hits) < 2:
+            break
+        after = Cursor(sort_values=hits[-1].sort_values, id=hits[-1].node.id)
+    assert sorted(seen) == sorted(n for n, *_ in _DATA)
+
+
+@pytest.mark.parametrize("by", ["name", "created", "updated"])
+@pytest.mark.parametrize("direction", ["asc", "desc"])
+async def test_paging_through_ties_in_the_first_key_matches_the_unpaged_order(
+    repository: NodeRepository, by: str, direction: str
+) -> None:
+    """Pages over tied first-key values lose and repeat nothing, in order."""
+    names = ["alpha", "Alpha", "ALPHA", "Álpha", "beta", "Beta", "BETA", "gamma"]
+    for index, name in enumerate(names):
+        node = Node.create(owner_id=ALICE, name=name, type="film")
+        stamp = datetime(2026, 10, 1 + index // 3, tzinfo=UTC)
+        node.created_at = stamp
+        node.updated_at = stamp
+        await repository.add(node)
+    resolved = _resolve({"v": 1, "where": None, "sort": [{"by": by, "dir": direction}]})
+    scope = AccessScope.of(ALICE)
+    unpaged = await repository.search(
+        scope=scope, resolved=resolved, after=None, limit=100
+    )
+    paged: list[uuid.UUID] = []
+    after: Cursor | None = None
+    while True:
+        hits = await repository.search(
+            scope=scope, resolved=resolved, after=after, limit=2
+        )
+        paged += [hit.node.id for hit in hits]
+        if len(hits) < 2:
+            break
+        after = Cursor(sort_values=hits[-1].sort_values, id=hits[-1].node.id)
+    assert paged == [hit.node.id for hit in unpaged]
+    assert len(paged) == len(names)

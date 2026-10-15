@@ -197,9 +197,7 @@ KIND_OPERATORS: Final[Mapping[str, frozenset[str]]] = {
 
 # Kinds whose conditions may compare with another field of the same kind.
 REF_KINDS: Final = frozenset({"number", "duration", "rating", "money", "date"})
-NO_VALUE_OPERATORS: Final = frozenset(
-    {"empty", "not_empty", "incomplete", "complete"}
-)
+NO_VALUE_OPERATORS: Final = frozenset({"empty", "not_empty", "incomplete", "complete"})
 
 
 def kind_of(prop: Mapping[str, Any]) -> str | None:
@@ -212,7 +210,12 @@ def kind_of(prop: Mapping[str, Any]) -> str | None:
     explicit = meta.get("kind") if isinstance(meta, Mapping) else None
     if isinstance(explicit, str) and explicit in KIND_OPERATORS:
         return explicit
-    if isinstance(explicit, str) and explicit in {"opaque", "group", "list", "quantity"}:
+    if isinstance(explicit, str) and explicit in {
+        "opaque",
+        "group",
+        "list",
+        "quantity",
+    }:
         return None
     declared = prop.get("type")
     if declared == "string":
@@ -294,7 +297,14 @@ def _query(where: dict[str, Any] | None, **extra: Any) -> dict[str, Any]:  # noq
 
 
 def _field(**kwargs: Any) -> dict[str, Any]:  # noqa: ANN401
-    return {"kind": "field", "type": "film", "key": "rating", "op": ">=", "value": 4, **kwargs}
+    return {
+        "kind": "field",
+        "type": "film",
+        "key": "rating",
+        "op": ">=",
+        "value": 4,
+        **kwargs,
+    }
 
 
 def test_parses_a_nested_tree() -> None:
@@ -319,7 +329,11 @@ def test_parses_a_nested_tree() -> None:
     assert isinstance(query.where, Group)
     assert query.sort == (SortKey(by="field", dir="desc", type="film", key="rating"),)
     paths = [path for path, _ in walk_conditions(query.where)]
-    assert paths == ["where.children[0]", "where.children[1].children[0]", "where.children[1].children[1]"]
+    assert paths == [
+        "where.children[0]",
+        "where.children[1].children[0]",
+        "where.children[1].children[1]",
+    ]
 
 
 def test_no_where_means_everything() -> None:
@@ -410,7 +424,9 @@ def test_overlong_text_is_rejected() -> None:
 
 
 def test_tag_condition_shape() -> None:
-    query = parse_query(_query(_and({"kind": "tag", "mode": "none", "tags": ["a", "b"]})))
+    query = parse_query(
+        _query(_and({"kind": "tag", "mode": "none", "tags": ["a", "b"]}))
+    )
     assert isinstance(query.where, Group)
     assert query.where.children[0] == TagCondition(mode="none", tags=("a", "b"))
 
@@ -469,8 +485,22 @@ MAX_LIST_LENGTH: Final = 50
 MAX_SORT_KEYS: Final = 3
 
 _OPERATORS: Final = frozenset(
-    {"=", "!=", "~", ">", ">=", "<", "<=", "between", "in", "empty", "not_empty",
-     "has", "incomplete", "complete"}
+    {
+        "=",
+        "!=",
+        "~",
+        ">",
+        ">=",
+        "<",
+        "<=",
+        "between",
+        "in",
+        "empty",
+        "not_empty",
+        "has",
+        "incomplete",
+        "complete",
+    }
 )
 _NO_VALUE: Final = frozenset({"empty", "not_empty", "incomplete", "complete"})
 _DATE_OPERATORS: Final = frozenset({"=", ">", ">=", "<", "<=", "between"})
@@ -771,22 +801,31 @@ class _Parser:
             case "text":
                 return TextCondition(q=_string(data.get("q"), path, name="q"))
             case "type":
-                return TypeCondition(slugs=_string_list(data.get("in"), path, name="in"))
+                return TypeCondition(
+                    slugs=_string_list(data.get("in"), path, name="in")
+                )
             case "favourite":
                 if not isinstance(data.get("value"), bool):
                     raise InvalidQueryError("'value' must be true or false.", path=path)
                 return FavouriteCondition(value=data["value"])
             case "tag":
                 if data.get("mode") not in {"any", "all", "none"}:
-                    raise InvalidQueryError("'mode' must be any, all or none.", path=path)
+                    raise InvalidQueryError(
+                        "'mode' must be any, all or none.", path=path
+                    )
                 return TagCondition(
                     mode=data["mode"],
                     tags=_string_list(data.get("tags"), path, name="tags"),
                 )
             case "date":
                 op = data.get("op")
-                if data.get("on") not in {"created", "updated"} or op not in _DATE_OPERATORS:
-                    raise InvalidQueryError("Use on: created or updated with a comparison.", path=path)
+                if (
+                    data.get("on") not in {"created", "updated"}
+                    or op not in _DATE_OPERATORS
+                ):
+                    raise InvalidQueryError(
+                        "Use on: created or updated with a comparison.", path=path
+                    )
                 return DateCondition(on=data["on"], op=op, value=_value(op, data, path))  # type: ignore[arg-type]
             case "field":
                 op = data.get("op")
@@ -796,7 +835,9 @@ class _Parser:
                 return FieldCondition(
                     type=_string(data.get("type"), path, name="type"),
                     key=_string(data.get("key"), path, name="key"),
-                    sub_key=None if sub_key is None else _string(sub_key, path, name="sub_key"),
+                    sub_key=None
+                    if sub_key is None
+                    else _string(sub_key, path, name="sub_key"),
                     op=op,
                     value=_value(op, data, path),
                 )
@@ -804,16 +845,19 @@ class _Parser:
 
     def sort(self, raw: object) -> tuple[SortKey, ...]:
         if not isinstance(raw, list) or len(raw) > MAX_SORT_KEYS:
-            raise InvalidQueryError(
-                f"Sort by up to {MAX_SORT_KEYS} keys.", path="sort"
-            )
+            raise InvalidQueryError(f"Sort by up to {MAX_SORT_KEYS} keys.", path="sort")
         keys: list[SortKey] = []
         for index, item in enumerate(raw):
             path = f"sort[{index}]"
             if not isinstance(item, Mapping) or item.get("by") not in {
-                "name", "created", "updated", "field",
+                "name",
+                "created",
+                "updated",
+                "field",
             }:
-                raise InvalidQueryError("Sort by name, created, updated or field.", path=path)
+                raise InvalidQueryError(
+                    "Sort by name, created, updated or field.", path=path
+                )
             if item.get("dir", "asc") not in {"asc", "desc"}:
                 raise InvalidQueryError("'dir' must be asc or desc.", path=path)
             type_ = key = None
@@ -916,8 +960,13 @@ def _f(key: str, op: str, value: Any = None, **extra: Any) -> dict[str, Any]:  #
 
 
 def test_resolves_known_fields() -> None:
-    result = resolve_fields(_where(_f("rating", ">=", 4), _f("cast", "~", "x", sub_key="role")), SCHEMAS)
-    assert result.kinds == {("film", "rating", None): "rating", ("film", "cast", "role"): "text"}
+    result = resolve_fields(
+        _where(_f("rating", ">=", 4), _f("cast", "~", "x", sub_key="role")), SCHEMAS
+    )
+    assert result.kinds == {
+        ("film", "rating", None): "rating",
+        ("film", "cast", "role"): "text",
+    }
     assert result.warnings == []
 
 
@@ -926,11 +975,16 @@ def test_resolves_known_fields() -> None:
     [
         (_f("old", "=", "x"), "no longer exists"),
         (_f("missing", "=", "x"), "no longer exists"),
-        ({"kind": "field", "type": "gone", "key": "rating", "op": ">=", "value": 1}, "no longer exists"),
+        (
+            {"kind": "field", "type": "gone", "key": "rating", "op": ">=", "value": 1},
+            "no longer exists",
+        ),
         (_f("cast", "=", "x", sub_key="gone"), "no longer exists"),
     ],
 )
-def test_stale_fields_warn_instead_of_failing(condition: dict[str, Any], fragment: str) -> None:
+def test_stale_fields_warn_instead_of_failing(
+    condition: dict[str, Any], fragment: str
+) -> None:
     result = resolve_fields(_where(condition), SCHEMAS)
     assert result.kinds == {}
     assert [w.path for w in result.warnings] == ["where.children[0]"]
@@ -966,11 +1020,19 @@ def test_field_reference_of_the_same_kind_resolves() -> None:
 
 
 def test_sort_keys_resolve_and_must_be_sortable() -> None:
-    sort_rating = {"v": 1, "where": None, "sort": [{"by": "field", "type": "film", "key": "rating"}]}
+    sort_rating = {
+        "v": 1,
+        "where": None,
+        "sort": [{"by": "field", "type": "film", "key": "rating"}],
+    }
     assert resolve_fields(parse_query(sort_rating), SCHEMAS).kinds == {
         ("film", "rating", None): "rating"
     }
-    sort_genres = {"v": 1, "where": None, "sort": [{"by": "field", "type": "film", "key": "genres"}]}
+    sort_genres = {
+        "v": 1,
+        "where": None,
+        "sort": [{"by": "field", "type": "film", "key": "genres"}],
+    }
     with pytest.raises(InvalidQueryError, match=r"sort\[0\]"):
         resolve_fields(parse_query(sort_genres), SCHEMAS)
 ```
@@ -1017,8 +1079,19 @@ from app.modules.graph.domain.query import (
 )
 
 SORTABLE_KINDS: Final = frozenset(
-    {"text", "url", "email", "phone", "number", "duration", "rating", "money",
-     "date", "partialdate", "choice"}
+    {
+        "text",
+        "url",
+        "email",
+        "phone",
+        "number",
+        "duration",
+        "rating",
+        "money",
+        "date",
+        "partialdate",
+        "choice",
+    }
 )
 _PARTIAL_DATE: Final = re.compile(r"^\d{4}(-\d{2}(-\d{2})?)?$")
 _TEXT_KINDS: Final = frozenset(
@@ -1211,8 +1284,12 @@ Expected: PASS. Application layer is 100%, so add tests for any uncovered branch
 
 ```python
 async def search(
-    self, *, scope: AccessScope, resolved: ResolvedQuery,
-    after: Cursor | None, limit: int,
+    self,
+    *,
+    scope: AccessScope,
+    resolved: ResolvedQuery,
+    after: Cursor | None,
+    limit: int,
 ) -> builtins.list[SearchHit]: ...
 async def search_count(self, *, scope: AccessScope, resolved: ResolvedQuery) -> int: ...
 ```
@@ -1270,7 +1347,10 @@ SCHEMAS: dict[str, dict[str, Any]] = {
             "runtime": {"type": "number", "x-menagerist": {"kind": "duration"}},
             "rating": {"type": "number", "x-menagerist": {"kind": "rating"}},
             "seen": {"type": "boolean"},
-            "genres": {"type": "array", "items": {"type": "string", "enum": ["scifi", "horror", "drama"]}},
+            "genres": {
+                "type": "array",
+                "items": {"type": "string", "enum": ["scifi", "horror", "drama"]},
+            },
             "director": {"type": "string"},
             "notes": {"type": "string"},
         },
@@ -1287,13 +1367,71 @@ SCHEMAS: dict[str, dict[str, Any]] = {
 }
 
 _DATA: list[tuple[str, str, dict[str, Any], dict[str, Any]]] = [
-    ("Alien", "film", {"year": "1979", "runtime": 7020, "rating": 5, "seen": True, "genres": ["scifi", "horror"]}, {"tags": ["classic"], "favourite": True}),
-    ("Blade Runner", "film", {"year": "1982-06", "runtime": 7020, "rating": 4, "seen": False, "genres": ["scifi"]}, {}),
-    ("Casablanca", "film", {"year": "1942", "runtime": 6120, "rating": 5, "seen": True, "genres": ["drama"]}, {"tags": ["classic"]}),
-    ("Café Society", "film", {"year": "2016-05-13", "director": "Woody Allen", "notes": "50% off_day"}, {}),
+    (
+        "Alien",
+        "film",
+        {
+            "year": "1979",
+            "runtime": 7020,
+            "rating": 5,
+            "seen": True,
+            "genres": ["scifi", "horror"],
+        },
+        {"tags": ["classic"], "favourite": True},
+    ),
+    (
+        "Blade Runner",
+        "film",
+        {
+            "year": "1982-06",
+            "runtime": 7020,
+            "rating": 4,
+            "seen": False,
+            "genres": ["scifi"],
+        },
+        {},
+    ),
+    (
+        "Casablanca",
+        "film",
+        {
+            "year": "1942",
+            "runtime": 6120,
+            "rating": 5,
+            "seen": True,
+            "genres": ["drama"],
+        },
+        {"tags": ["classic"]},
+    ),
+    (
+        "Café Society",
+        "film",
+        {"year": "2016-05-13", "director": "Woody Allen", "notes": "50% off_day"},
+        {},
+    ),
     ("Bad data", "film", {"year": 1999, "rating": "abc", "runtime": "long"}, {}),
-    ("Resistor", "part", {"stock": 3, "reorder_at": 10, "price": {"value": 0.1, "currency": "GBP"}, "steps": [{"text": "a", "done": True}]}, {}),
-    ("Capacitor", "part", {"stock": 50, "reorder_at": 10, "price": {"value": 0.3, "currency": "USD"}, "steps": [{"text": "a", "done": True}, {"text": "b", "done": False}]}, {}),
+    (
+        "Resistor",
+        "part",
+        {
+            "stock": 3,
+            "reorder_at": 10,
+            "price": {"value": 0.1, "currency": "GBP"},
+            "steps": [{"text": "a", "done": True}],
+        },
+        {},
+    ),
+    (
+        "Capacitor",
+        "part",
+        {
+            "stock": 50,
+            "reorder_at": 10,
+            "price": {"value": 0.3, "currency": "USD"},
+            "steps": [{"text": "a", "done": True}, {"text": "b", "done": False}],
+        },
+        {},
+    ),
 ]
 
 
@@ -1308,123 +1446,270 @@ async def repository(request: pytest.FixtureRequest) -> NodeRepository:
     else:
         repo = SqlAlchemyNodeRepository(request.getfixturevalue("db_session"))
     for name, type_slug, attributes, extra in _DATA:
-        node = Node.create(owner_id=ALICE, name=name, type=type_slug, attributes=attributes)
+        node = Node.create(
+            owner_id=ALICE, name=name, type=type_slug, attributes=attributes
+        )
         node.tags = extra.get("tags", [])
         node.favourite = extra.get("favourite", False)
         await repo.add(node)
-    await repo.add(Node.create(owner_id=BOB, name="Secret", type="film", attributes={"rating": 5}))
+    await repo.add(
+        Node.create(owner_id=BOB, name="Secret", type="film", attributes={"rating": 5})
+    )
     return repo
 
 
 def _resolve(raw: dict[str, Any]) -> ResolvedQuery:
     query = parse_query(raw)
     resolution = resolve_fields(query, SCHEMAS)
-    return ResolvedQuery(query=query, field_kinds=resolution.kinds, search_exclusions={}, today=TODAY)
+    return ResolvedQuery(
+        query=query, field_kinds=resolution.kinds, search_exclusions={}, today=TODAY
+    )
 
 
 def _where(*children: dict[str, Any], op: str = "and", **extra: Any) -> dict[str, Any]:  # noqa: ANN401
     return {"v": 1, "where": {"op": op, "children": list(children)}, **extra}
 
 
-def _f(type_: str, key: str, op: str, value: Any = None, **extra: Any) -> dict[str, Any]:  # noqa: ANN401
-    cond: dict[str, Any] = {"kind": "field", "type": type_, "key": key, "op": op, **extra}
+def _f(
+    type_: str, key: str, op: str, value: Any = None, **extra: Any
+) -> dict[str, Any]:  # noqa: ANN401
+    cond: dict[str, Any] = {
+        "kind": "field",
+        "type": type_,
+        "key": key,
+        "op": op,
+        **extra,
+    }
     if value is not None:
         cond["value"] = value
     return cond
 
 
-async def _names(repo: NodeRepository, raw: dict[str, Any], scope: AccessScope | None = None) -> list[str]:
-    hits = await repo.search(scope=scope or AccessScope.of(ALICE), resolved=_resolve(raw), after=None, limit=100)
+async def _names(
+    repo: NodeRepository, raw: dict[str, Any], scope: AccessScope | None = None
+) -> list[str]:
+    hits = await repo.search(
+        scope=scope or AccessScope.of(ALICE),
+        resolved=_resolve(raw),
+        after=None,
+        limit=100,
+    )
     return [hit.node.name for hit in hits]
 
 
 _FILM = {"kind": "type", "in": ["film"]}
 
 CASES: list[tuple[str, dict[str, Any], set[str]]] = [
-    ("rating at least 4", _where(_f("film", "rating", ">=", 4)), {"Alien", "Blade Runner", "Casablanca"}),
-    ("not rating 4+ among films includes missing and wrong-typed", _where(_FILM, {"op": "not", "children": [_f("film", "rating", ">=", 4)]}), {"Café Society", "Bad data"}),
-    ("partial date year equals", _where(_f("film", "year", "=", "1982")), {"Blade Runner"}),
-    ("partial date between decades", _where(_f("film", "year", "between", ["1980", "1989"])), {"Blade Runner"}),
-    ("partial date at or after a month", _where(_f("film", "year", ">=", "2016-05")), {"Café Society"}),
-    ("field reference", _where(_f("part", "stock", "<=", {"ref": "reorder_at"})), {"Resistor"}),
-    ("multichoice has one", _where(_f("film", "genres", "has", "scifi")), {"Alien", "Blade Runner"}),
-    ("multichoice has all", _where(_f("film", "genres", "has", ["scifi", "horror"])), {"Alien"}),
-    ("money matches only its currency", _where(_f("part", "price", ">=", {"value": 0.05, "currency": "GBP"})), {"Resistor"}),
-    ("text is accent-insensitive", _where({"kind": "text", "q": "cafe"}), {"Café Society"}),
-    ("text treats % and _ literally", _where({"kind": "text", "q": "50% off_day"}), {"Café Society"}),
-    ("text does not treat _ as a wildcard", _where({"kind": "text", "q": "off_d_y"}), set()),
-    ("tag any", _where({"kind": "tag", "mode": "any", "tags": ["classic"]}), {"Alien", "Casablanca"}),
-    ("tag none", _where(_FILM, {"kind": "tag", "mode": "none", "tags": ["classic"]}), {"Blade Runner", "Café Society", "Bad data"}),
+    (
+        "rating at least 4",
+        _where(_f("film", "rating", ">=", 4)),
+        {"Alien", "Blade Runner", "Casablanca"},
+    ),
+    (
+        "not rating 4+ among films includes missing and wrong-typed",
+        _where(_FILM, {"op": "not", "children": [_f("film", "rating", ">=", 4)]}),
+        {"Café Society", "Bad data"},
+    ),
+    (
+        "partial date year equals",
+        _where(_f("film", "year", "=", "1982")),
+        {"Blade Runner"},
+    ),
+    (
+        "partial date between decades",
+        _where(_f("film", "year", "between", ["1980", "1989"])),
+        {"Blade Runner"},
+    ),
+    (
+        "partial date at or after a month",
+        _where(_f("film", "year", ">=", "2016-05")),
+        {"Café Society"},
+    ),
+    (
+        "field reference",
+        _where(_f("part", "stock", "<=", {"ref": "reorder_at"})),
+        {"Resistor"},
+    ),
+    (
+        "multichoice has one",
+        _where(_f("film", "genres", "has", "scifi")),
+        {"Alien", "Blade Runner"},
+    ),
+    (
+        "multichoice has all",
+        _where(_f("film", "genres", "has", ["scifi", "horror"])),
+        {"Alien"},
+    ),
+    (
+        "money matches only its currency",
+        _where(_f("part", "price", ">=", {"value": 0.05, "currency": "GBP"})),
+        {"Resistor"},
+    ),
+    (
+        "text is accent-insensitive",
+        _where({"kind": "text", "q": "cafe"}),
+        {"Café Society"},
+    ),
+    (
+        "text treats % and _ literally",
+        _where({"kind": "text", "q": "50% off_day"}),
+        {"Café Society"},
+    ),
+    (
+        "text does not treat _ as a wildcard",
+        _where({"kind": "text", "q": "off_d_y"}),
+        set(),
+    ),
+    (
+        "tag any",
+        _where({"kind": "tag", "mode": "any", "tags": ["classic"]}),
+        {"Alien", "Casablanca"},
+    ),
+    (
+        "tag none",
+        _where(_FILM, {"kind": "tag", "mode": "none", "tags": ["classic"]}),
+        {"Blade Runner", "Café Society", "Bad data"},
+    ),
     ("favourite", _where({"kind": "favourite", "value": True}), {"Alien"}),
-    ("or across types", _where(_f("film", "rating", "=", 5), _f("part", "stock", "<", 5), op="or"), {"Alien", "Casablanca", "Resistor"}),
+    (
+        "or across types",
+        _where(_f("film", "rating", "=", 5), _f("part", "stock", "<", 5), op="or"),
+        {"Alien", "Casablanca", "Resistor"},
+    ),
     ("empty means missing", _where(_f("film", "rating", "empty")), {"Café Society"}),
     ("not empty", _where(_f("film", "director", "not_empty")), {"Café Society"}),
     ("boolean", _where(_f("film", "seen", "=", True)), {"Alien", "Casablanca"}),
-    ("boolean not equal includes missing", _where(_FILM, _f("film", "seen", "!=", True)), {"Blade Runner", "Café Society", "Bad data"}),
+    (
+        "boolean not equal includes missing",
+        _where(_FILM, _f("film", "seen", "!=", True)),
+        {"Blade Runner", "Café Society", "Bad data"},
+    ),
     ("duration at most", _where(_f("film", "runtime", "<=", 6500)), {"Casablanca"}),
-    ("wrong-typed value never matches or errors", _where(_f("film", "runtime", ">", 0)), {"Alien", "Blade Runner", "Casablanca"}),
+    (
+        "wrong-typed value never matches or errors",
+        _where(_f("film", "runtime", ">", 0)),
+        {"Alien", "Blade Runner", "Casablanca"},
+    ),
     ("checklist incomplete", _where(_f("part", "steps", "incomplete")), {"Capacitor"}),
     ("checklist complete", _where(_f("part", "steps", "complete")), {"Resistor"}),
-    ("created within the last day", _where({"kind": "date", "on": "created", "op": ">=", "value": {"rel": "-1d"}}), {"Alien", "Blade Runner", "Casablanca", "Café Society", "Bad data", "Resistor", "Capacitor"}),
-    ("created before yesterday", _where({"kind": "date", "on": "created", "op": "<", "value": {"rel": "-1d"}}), set()),
-    ("or group cannot reach another user's items", _where(_FILM, {"kind": "text", "q": "secret"}, op="or"), {"Alien", "Blade Runner", "Casablanca", "Café Society", "Bad data"}),
+    (
+        "created within the last day",
+        _where({"kind": "date", "on": "created", "op": ">=", "value": {"rel": "-1d"}}),
+        {
+            "Alien",
+            "Blade Runner",
+            "Casablanca",
+            "Café Society",
+            "Bad data",
+            "Resistor",
+            "Capacitor",
+        },
+    ),
+    (
+        "created before yesterday",
+        _where({"kind": "date", "on": "created", "op": "<", "value": {"rel": "-1d"}}),
+        set(),
+    ),
+    (
+        "or group cannot reach another user's items",
+        _where(_FILM, {"kind": "text", "q": "secret"}, op="or"),
+        {"Alien", "Blade Runner", "Casablanca", "Café Society", "Bad data"},
+    ),
     ("stale field matches nothing", _where(_f("film", "gone", "=", "x")), set()),
-    ("not of a stale field matches everything", {"v": 1, "where": {"op": "not", "children": [_f("film", "gone", "=", "x")]}}, {n for n, *_ in _DATA}),
+    (
+        "not of a stale field matches everything",
+        {"v": 1, "where": {"op": "not", "children": [_f("film", "gone", "=", "x")]}},
+        {n for n, *_ in _DATA},
+    ),
 ]
 
 
 @pytest.mark.parametrize(("label", "raw", "expected"), CASES, ids=[c[0] for c in CASES])
-async def test_scenario(repository: NodeRepository, label: str, raw: dict[str, Any], expected: set[str]) -> None:
+async def test_scenario(
+    repository: NodeRepository, label: str, raw: dict[str, Any], expected: set[str]
+) -> None:
     del label
     assert set(await _names(repository, raw)) == expected
     resolved = _resolve(raw)
-    assert await repository.search_count(scope=AccessScope.of(ALICE), resolved=resolved) == len(expected)
+    assert await repository.search_count(
+        scope=AccessScope.of(ALICE), resolved=resolved
+    ) == len(expected)
 
 
-async def test_no_where_returns_everything_in_creation_order(repository: NodeRepository) -> None:
+async def test_no_where_returns_everything_in_creation_order(
+    repository: NodeRepository,
+) -> None:
     assert await _names(repository, {"v": 1, "where": None}) == [n for n, *_ in _DATA]
 
 
 async def test_everyone_scope_sees_every_owner(repository: NodeRepository) -> None:
-    assert "Secret" in await _names(repository, {"v": 1, "where": None}, AccessScope.everyone())
+    assert "Secret" in await _names(
+        repository, {"v": 1, "where": None}, AccessScope.everyone()
+    )
 
 
-async def test_sort_by_field_puts_nulls_last_and_breaks_ties_by_creation(repository: NodeRepository) -> None:
-    raw = _where(_FILM, sort=[{"by": "field", "type": "film", "key": "rating", "dir": "desc"}])
-    assert await _names(repository, raw) == ["Alien", "Casablanca", "Blade Runner", "Café Society", "Bad data"]
+async def test_sort_by_field_puts_nulls_last_and_breaks_ties_by_creation(
+    repository: NodeRepository,
+) -> None:
+    raw = _where(
+        _FILM, sort=[{"by": "field", "type": "film", "key": "rating", "dir": "desc"}]
+    )
+    assert await _names(repository, raw) == [
+        "Alien",
+        "Casablanca",
+        "Blade Runner",
+        "Café Society",
+        "Bad data",
+    ]
 
 
-async def test_sort_by_name_ignores_case_and_accents(repository: NodeRepository) -> None:
+async def test_sort_by_name_ignores_case_and_accents(
+    repository: NodeRepository,
+) -> None:
     names = await _names(repository, _where(_FILM, sort=[{"by": "name"}]))
     assert names == ["Alien", "Bad data", "Blade Runner", "Café Society", "Casablanca"]
 
 
 @pytest.mark.parametrize("direction", ["asc", "desc"])
-async def test_paging_visits_every_item_once(repository: NodeRepository, direction: str) -> None:
-    raw = _where(_FILM, sort=[{"by": "field", "type": "film", "key": "rating", "dir": direction}])
+async def test_paging_visits_every_item_once(
+    repository: NodeRepository, direction: str
+) -> None:
+    raw = _where(
+        _FILM, sort=[{"by": "field", "type": "film", "key": "rating", "dir": direction}]
+    )
     resolved = _resolve(raw)
     seen: list[str] = []
     after: Cursor | None = None
     while True:
-        hits = await repository.search(scope=AccessScope.of(ALICE), resolved=resolved, after=after, limit=2)
+        hits = await repository.search(
+            scope=AccessScope.of(ALICE), resolved=resolved, after=after, limit=2
+        )
         seen += [hit.node.name for hit in hits]
         if len(hits) < 2:
             break
         last = hits[-1]
         after = Cursor(sort_values=last.sort_values, id=last.node.id)
-    assert sorted(seen) == sorted(["Alien", "Blade Runner", "Casablanca", "Café Society", "Bad data"])
+    assert sorted(seen) == sorted(
+        ["Alien", "Blade Runner", "Casablanca", "Café Society", "Bad data"]
+    )
     assert len(seen) == len(set(seen))
 
 
-async def test_paging_continues_after_the_cursor_row_is_deleted(repository: NodeRepository) -> None:
+async def test_paging_continues_after_the_cursor_row_is_deleted(
+    repository: NodeRepository,
+) -> None:
     raw = _where(_FILM, sort=[{"by": "name"}])
     resolved = _resolve(raw)
-    first = await repository.search(scope=AccessScope.of(ALICE), resolved=resolved, after=None, limit=2)
+    first = await repository.search(
+        scope=AccessScope.of(ALICE), resolved=resolved, after=None, limit=2
+    )
     victim = first[-1].node
     victim.deleted_at = datetime.now(UTC)
     await repository.save(victim)
     cursor = Cursor(sort_values=first[-1].sort_values, id=victim.id)
-    rest = await repository.search(scope=AccessScope.of(ALICE), resolved=resolved, after=cursor, limit=10)
+    rest = await repository.search(
+        scope=AccessScope.of(ALICE), resolved=resolved, after=cursor, limit=10
+    )
     assert [hit.node.name for hit in rest] == ["Café Society", "Casablanca"]
 ```
 
@@ -1440,28 +1725,27 @@ Expected: FAIL, `AttributeError: 'InMemoryNodeRepository' object has no attribut
 In `ports/node_repository.py` add (under TYPE_CHECKING imports `Cursor`, `ResolvedQuery`, `SearchHit`):
 
 ```python
-    async def search(
-        self,
-        *,
-        scope: AccessScope,
-        resolved: ResolvedQuery,
-        after: Cursor | None,
-        limit: int,
-    ) -> builtins.list[SearchHit]:
-        """Return live nodes matching the query, in its order, one page.
+async def search(
+    self,
+    *,
+    scope: AccessScope,
+    resolved: ResolvedQuery,
+    after: Cursor | None,
+    limit: int,
+) -> builtins.list[SearchHit]:
+    """Return live nodes matching the query, in its order, one page.
 
-        Order is the query's sort keys (nulls last) then id. `after` keeps only
-        rows strictly later in that order. A field condition whose key is not in
-        `resolved.field_kinds` matches nothing. Stored values of the wrong JSON
-        type never match and never raise.
-        """
-        ...
+    Order is the query's sort keys (nulls last) then id. `after` keeps only
+    rows strictly later in that order. A field condition whose key is not in
+    `resolved.field_kinds` matches nothing. Stored values of the wrong JSON
+    type never match and never raise.
+    """
+    ...
 
-    async def search_count(
-        self, *, scope: AccessScope, resolved: ResolvedQuery
-    ) -> int:
-        """Return how many live nodes in `scope` match the query."""
-        ...
+
+async def search_count(self, *, scope: AccessScope, resolved: ResolvedQuery) -> int:
+    """Return how many live nodes in `scope` match the query."""
+    ...
 ```
 
 - [ ] **Step 5: Write the evaluator**
@@ -1758,29 +2042,31 @@ Fix any `ruff` / `mypy` complaints by simplifying (for example split `_test` int
 In `in_memory_node_repository.py`:
 
 ```python
-    def _matching(self, scope: AccessScope, resolved: ResolvedQuery) -> list[SearchHit]:
-        where = resolved.query.where
-        hits = [
-            SearchHit(node=node, sort_values=sort_values(node, resolved))
-            for node in sorted(self._visible(scope), key=lambda n: n.id)
-            if where is None or matches(node, where, resolved)
-        ]
-        for index in reversed(range(len(resolved.query.sort))):
-            desc = resolved.query.sort[index].dir == "desc"
-            present = [h for h in hits if h.sort_values[index] is not None]
-            absent = [h for h in hits if h.sort_values[index] is None]
-            present.sort(key=lambda h, i=index: h.sort_values[i], reverse=desc)  # type: ignore[arg-type, return-value]
-            hits = present + absent
-        return hits
+def _matching(self, scope: AccessScope, resolved: ResolvedQuery) -> list[SearchHit]:
+    where = resolved.query.where
+    hits = [
+        SearchHit(node=node, sort_values=sort_values(node, resolved))
+        for node in sorted(self._visible(scope), key=lambda n: n.id)
+        if where is None or matches(node, where, resolved)
+    ]
+    for index in reversed(range(len(resolved.query.sort))):
+        desc = resolved.query.sort[index].dir == "desc"
+        present = [h for h in hits if h.sort_values[index] is not None]
+        absent = [h for h in hits if h.sort_values[index] is None]
+        present.sort(key=lambda h, i=index: h.sort_values[i], reverse=desc)  # type: ignore[arg-type, return-value]
+        hits = present + absent
+    return hits
 
-    async def search(self, *, scope, resolved, after, limit):
-        hits = self._matching(scope, resolved)
-        if after is not None:
-            hits = [h for h in hits if is_after(h, after, resolved.query.sort)]
-        return hits[:limit]
 
-    async def search_count(self, *, scope, resolved):
-        return len(self._matching(scope, resolved))
+async def search(self, *, scope, resolved, after, limit):
+    hits = self._matching(scope, resolved)
+    if after is not None:
+        hits = [h for h in hits if is_after(h, after, resolved.query.sort)]
+    return hits[:limit]
+
+
+async def search_count(self, *, scope, resolved):
+    return len(self._matching(scope, resolved))
 ```
 
 (Write full signatures with annotations matching the port. Python's sort is stable even with `reverse=True`, which is what makes the multi-pass sort correct.)
@@ -1868,10 +2154,38 @@ def downgrade() -> None:
 In `models.py`, extend `NodeModel.__table_args__` (it currently holds `Index("ix_nodes_owner_id_id", "owner_id", "id")`):
 
 ```python
-Index("ix_nodes_attributes_gin", "attributes", postgresql_using="gin", postgresql_ops={"attributes": "jsonb_path_ops"}),
-Index("ix_nodes_tags_gin", "tags", postgresql_using="gin", postgresql_ops={"tags": "jsonb_path_ops"}),
-Index("ix_nodes_name_trgm", text("immutable_unaccent(name)"), postgresql_using="gin", postgresql_ops={"immutable_unaccent(name)": "gin_trgm_ops"}),
-Index("ix_nodes_description_trgm", text("immutable_unaccent(description)"), postgresql_using="gin", postgresql_ops={"immutable_unaccent(description)": "gin_trgm_ops"}),
+(
+    Index(
+        "ix_nodes_attributes_gin",
+        "attributes",
+        postgresql_using="gin",
+        postgresql_ops={"attributes": "jsonb_path_ops"},
+    ),
+)
+(
+    Index(
+        "ix_nodes_tags_gin",
+        "tags",
+        postgresql_using="gin",
+        postgresql_ops={"tags": "jsonb_path_ops"},
+    ),
+)
+(
+    Index(
+        "ix_nodes_name_trgm",
+        text("immutable_unaccent(name)"),
+        postgresql_using="gin",
+        postgresql_ops={"immutable_unaccent(name)": "gin_trgm_ops"},
+    ),
+)
+(
+    Index(
+        "ix_nodes_description_trgm",
+        text("immutable_unaccent(description)"),
+        postgresql_using="gin",
+        postgresql_ops={"immutable_unaccent(description)": "gin_trgm_ops"},
+    ),
+)
 ```
 
 (`text` is already imported there. Wrap long lines with the formatter.)
@@ -1979,7 +2293,9 @@ _TEXTUAL = frozenset({"text", "url", "email", "phone", "longtext"})
 _C = "C"  # byte-wise collation: matches Python's code-point string order
 
 
-def _typed(j: ColumnElement[Any], json_type: str, value: ColumnElement[Any]) -> ColumnElement[Any]:
+def _typed(
+    j: ColumnElement[Any], json_type: str, value: ColumnElement[Any]
+) -> ColumnElement[Any]:
     return case((func.jsonb_typeof(j) == json_type, value), else_=None)
 
 
@@ -2037,7 +2353,10 @@ def _operand(operand: Operand, kind: str, ctx: ResolvedQuery) -> Any:  # noqa: A
 
 
 def _scalar_predicate(  # noqa: C901, PLR0911, PLR0912
-    kind: str, op: str, j: ColumnElement[Any], operand: Any  # noqa: ANN401
+    kind: str,
+    op: str,
+    j: ColumnElement[Any],
+    operand: Any,  # noqa: ANN401
 ) -> ColumnElement[bool]:
     if kind in _NUMERIC:
         value = _num(j)
@@ -2099,7 +2418,9 @@ def _checklist_predicate(op: str, j: ColumnElement[Any]) -> ColumnElement[bool]:
         column("value", JSONB), name="step"
     )
     open_row = exists(
-        select(literal(1)).select_from(rows).where(not_(rows.c.value.contains({"done": True})))
+        select(literal(1))
+        .select_from(rows)
+        .where(not_(rows.c.value.contains({"done": True})))
     )
     any_row = exists(select(literal(1)).select_from(rows))
     return open_row if op == "incomplete" else and_(any_row, not_(open_row))
@@ -2118,9 +2439,7 @@ def _field_eq(  # noqa: C901
     condition: FieldCondition, kind: str, ctx: ResolvedQuery
 ) -> ColumnElement[bool]:
     op = "=" if condition.op == "!=" else condition.op
-    operand = (
-        None if condition.value is None else _operand(condition.value, kind, ctx)
-    )
+    operand = None if condition.value is None else _operand(condition.value, kind, ctx)
     top = NodeModel.attributes[condition.key]
 
     def predicate(j: ColumnElement[Any]) -> ColumnElement[bool]:
@@ -2135,7 +2454,11 @@ def _field_eq(  # noqa: C901
     if condition.sub_key is None:
         inner: ColumnElement[bool] = predicate(top)
         # Equality-shaped tests use containment so the GIN index can serve them.
-        if kind in {"choice", "boolean"} and op == "=" and not isinstance(operand, ColumnElement):
+        if (
+            kind in {"choice", "boolean"}
+            and op == "="
+            and not isinstance(operand, ColumnElement)
+        ):
             inner = NodeModel.attributes.contains({condition.key: operand})
         elif kind == "multichoice" and op == "has":
             inner = NodeModel.attributes.contains({condition.key: list(operand)})
@@ -2253,7 +2576,6 @@ def after_clause(
         equal.append(same)
     branches.append(and_(*equal, NodeModel.id > cursor.id))
     return or_(*branches)
-
 ```
 
 - [ ] **Step 4: Add the repository methods**
@@ -2261,39 +2583,37 @@ def after_clause(
 In `node_repository.py`:
 
 ```python
-    async def search(
-        self,
-        *,
-        scope: AccessScope,
-        resolved: ResolvedQuery,
-        after: Cursor | None,
-        limit: int,
-    ) -> builtins.list[SearchHit]:
-        """Return one page of nodes matching the query, in its order."""
-        logger.debug("searching nodes", limit=limit)
-        exprs = sort_expressions(resolved)
-        stmt = select(NodeModel, *exprs).where(_in_scope(scope))
-        where = compile_where(resolved)
-        if where is not None:
-            stmt = stmt.where(where)
-        if after is not None:
-            stmt = stmt.where(after_clause(resolved, exprs, after))
-        stmt = stmt.order_by(*order_by(resolved, exprs)).limit(limit)
-        rows = (await self._session.execute(stmt)).all()
-        return [
-            SearchHit(node=_to_domain(row[0]), sort_values=tuple(row[1:]))
-            for row in rows
-        ]
+async def search(
+    self,
+    *,
+    scope: AccessScope,
+    resolved: ResolvedQuery,
+    after: Cursor | None,
+    limit: int,
+) -> builtins.list[SearchHit]:
+    """Return one page of nodes matching the query, in its order."""
+    logger.debug("searching nodes", limit=limit)
+    exprs = sort_expressions(resolved)
+    stmt = select(NodeModel, *exprs).where(_in_scope(scope))
+    where = compile_where(resolved)
+    if where is not None:
+        stmt = stmt.where(where)
+    if after is not None:
+        stmt = stmt.where(after_clause(resolved, exprs, after))
+    stmt = stmt.order_by(*order_by(resolved, exprs)).limit(limit)
+    rows = (await self._session.execute(stmt)).all()
+    return [
+        SearchHit(node=_to_domain(row[0]), sort_values=tuple(row[1:])) for row in rows
+    ]
 
-    async def search_count(
-        self, *, scope: AccessScope, resolved: ResolvedQuery
-    ) -> int:
-        """Return how many live nodes in `scope` match the query."""
-        stmt = select(func.count()).select_from(NodeModel).where(_in_scope(scope))
-        where = compile_where(resolved)
-        if where is not None:
-            stmt = stmt.where(where)
-        return (await self._session.execute(stmt)).scalar_one()
+
+async def search_count(self, *, scope: AccessScope, resolved: ResolvedQuery) -> int:
+    """Return how many live nodes in `scope` match the query."""
+    stmt = select(func.count()).select_from(NodeModel).where(_in_scope(scope))
+    where = compile_where(resolved)
+    if where is not None:
+        stmt = stmt.where(where)
+    return (await self._session.execute(stmt)).scalar_one()
 ```
 
 `scope` and the compiled `where` are separate `.where()` calls, so SQLAlchemy ANDs them as two parenthesised terms; an `OR` group stays inside its own parentheses.
@@ -2449,6 +2769,7 @@ class SearchNodesQuery:
     limit: int = 50
     cursor: str | None = None
 
+
 @dataclass(frozen=True)
 class SearchNodesResult:
     items: list[Node]
@@ -2456,9 +2777,14 @@ class SearchNodesResult:
     next_cursor: str | None
     warnings: list[QueryWarning]
 
+
 class SearchNodes(ScopedQueryHandler[GraphRepos, SearchNodesQuery, SearchNodesResult]):
-    def __init__(self, repos: GraphRepos, policy: AccessPolicy,
-                 today: Callable[[], date] | None = None) -> None: ...
+    def __init__(
+        self,
+        repos: GraphRepos,
+        policy: AccessPolicy,
+        today: Callable[[], date] | None = None,
+    ) -> None: ...
 ```
 
 - [ ] **Step 1: Write the failing tests**
@@ -2471,10 +2797,18 @@ from typing import Any
 import pytest
 
 from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
-from app.modules.graph.adapters.persistence.in_memory_edge_repository import InMemoryEdgeRepository
-from app.modules.graph.adapters.persistence.in_memory_edge_type_repository import InMemoryEdgeTypeRepository
-from app.modules.graph.adapters.persistence.in_memory_node_repository import InMemoryNodeRepository
-from app.modules.graph.adapters.persistence.in_memory_node_type_repository import InMemoryNodeTypeRepository
+from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
+    InMemoryEdgeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_edge_type_repository import (
+    InMemoryEdgeTypeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_node_repository import (
+    InMemoryNodeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
+    InMemoryNodeTypeRepository,
+)
 from app.modules.graph.application.search_nodes import SearchNodes, SearchNodesQuery
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
@@ -2495,10 +2829,17 @@ async def _setup(count: int = 5) -> SearchNodes:
         node_types=InMemoryNodeTypeRepository(),
         edge_types=InMemoryEdgeTypeRepository(),
     )
-    await repos.node_types.add(NodeType.create(slug="film", label="Film", attributes_schema=SCHEMA))
+    await repos.node_types.add(
+        NodeType.create(slug="film", label="Film", attributes_schema=SCHEMA)
+    )
     for index in range(count):
         await repos.nodes.add(
-            Node.create(owner_id=uuid.UUID(int=1), name=f"Film {index}", type="film", attributes={"rating": index % 3})
+            Node.create(
+                owner_id=uuid.UUID(int=1),
+                name=f"Film {index}",
+                type="film",
+                attributes={"rating": index % 3},
+            )
         )
     return SearchNodes(repos, OwnerAccessPolicy(), today=lambda: date(2026, 10, 14))
 
@@ -2514,7 +2855,9 @@ def _rating(op: str, value: int) -> dict[str, Any]:
 
 async def test_returns_matches_and_total() -> None:
     use_case = await _setup()
-    result = await use_case.handle(SearchNodesQuery(query=_body(_rating(">=", 1))), SYSTEM_ACTOR)
+    result = await use_case.handle(
+        SearchNodesQuery(query=_body(_rating(">=", 1))), SYSTEM_ACTOR
+    )
     assert [n.name for n in result.items] == ["Film 1", "Film 2", "Film 4"]
     assert result.total == 3
     assert result.next_cursor is None
@@ -2528,9 +2871,13 @@ async def test_pages_with_a_cursor() -> None:
     assert [n.name for n in first.items] == ["Film 0", "Film 1"]
     assert first.total == 5
     assert first.next_cursor is not None
-    second = await use_case.handle(SearchNodesQuery(query=body, limit=2, cursor=first.next_cursor), SYSTEM_ACTOR)
+    second = await use_case.handle(
+        SearchNodesQuery(query=body, limit=2, cursor=first.next_cursor), SYSTEM_ACTOR
+    )
     assert [n.name for n in second.items] == ["Film 2", "Film 3"]
-    last = await use_case.handle(SearchNodesQuery(query=body, limit=2, cursor=second.next_cursor), SYSTEM_ACTOR)
+    last = await use_case.handle(
+        SearchNodesQuery(query=body, limit=2, cursor=second.next_cursor), SYSTEM_ACTOR
+    )
     assert [n.name for n in last.items] == ["Film 4"]
     assert last.next_cursor is None
 
@@ -2550,7 +2897,9 @@ async def test_invalid_queries_are_rejected() -> None:
     with pytest.raises(InvalidQueryError, match="limit"):
         await use_case.handle(SearchNodesQuery(query=_body(), limit=0), SYSTEM_ACTOR)
     with pytest.raises(InvalidQueryError, match="cursor"):
-        await use_case.handle(SearchNodesQuery(query=_body(), cursor="nope"), SYSTEM_ACTOR)
+        await use_case.handle(
+            SearchNodesQuery(query=_body(), cursor="nope"), SYSTEM_ACTOR
+        )
 
 
 async def test_other_users_items_are_invisible() -> None:
@@ -2648,7 +2997,9 @@ class SearchNodes(ScopedQueryHandler[GraphRepos, SearchNodesQuery, SearchNodesRe
                 operator or value that does not fit a field.
         """
         if not 1 <= query.limit <= MAX_LIMIT:
-            raise InvalidQueryError(f"The limit must be 1 to {MAX_LIMIT}.", path="limit")
+            raise InvalidQueryError(
+                f"The limit must be 1 to {MAX_LIMIT}.", path="limit"
+            )
         parsed = parse_query(query.query)
         node_types = await load_node_types(self._repos)
         schemas = {str(t.slug): t.attributes_schema or {} for t in node_types}
@@ -2714,8 +3065,21 @@ Follow `test_node_router.py` (`_app_with_in_memory_graph()`, `TestClient`) and `
 def test_search_returns_matches_total_and_warnings() -> None:
     client, repos = _client_with_films()  # helper built like the existing router tests
     body = {
-        "query": {"v": 1, "where": {"op": "and", "children": [
-            {"kind": "field", "type": "film", "key": "rating", "op": ">=", "value": 4}]}},
+        "query": {
+            "v": 1,
+            "where": {
+                "op": "and",
+                "children": [
+                    {
+                        "kind": "field",
+                        "type": "film",
+                        "key": "rating",
+                        "op": ">=",
+                        "value": 4,
+                    }
+                ],
+            },
+        },
         "limit": 10,
     }
     response = client.post("/api/node/search", json=body)
@@ -2797,6 +3161,98 @@ Expected: PASS.
 **Checkpoint:** user may commit.
 
 ---
+
+### Task 9b: Search performance: capped totals and sort indexes (name, created, updated)
+
+Added after benchmarking Tasks 1-9 on a throwaway Postgres (100,000 items, page of 51, median of 7 warm runs; the script is `/home/sam/.claude/jobs/706d1499/tmp/bench_search.py`, run with `cd backend && uv run python <script> 10000 100000`, it starts its own container and never touches the dev stack). Baseline ("before") figures at 100,000 items: page 10-25 ms for every field filter; **sort by name 2,190 ms, deep page sorted by name 2,250 ms**; sort by rating desc 450 ms; **total count 60-500 ms for field filters, 13,949 ms for free text**; free-text page 824 ms.
+
+**Files:**
+- Modify: `backend/src/app/modules/graph/ports/node_repository.py`, `adapters/persistence/node_repository.py`, `adapters/persistence/in_memory_node_repository.py` (`search_count` gains `limit`)
+- Modify: `backend/src/app/modules/graph/adapters/persistence/query_sql.py` (`order_by`: no `NULLS LAST` on keys that cannot be NULL)
+- Modify: `backend/src/app/modules/graph/application/search_nodes.py` (`TOTAL_CAP`, `total_capped`)
+- Modify: `backend/src/app/modules/graph/adapters/api/node/schemas.py` (`total_capped`, examples), regenerate the frontend client
+- Create: `backend/src/app/alembic/versions/r9a0b1c2d3e4_sort_indexes.py` (confirm the head with `alembic heads`; it should be `q8f9a0b1c2d3`)
+- Modify: `backend/src/app/modules/graph/adapters/persistence/models.py` (declare the index)
+- Tests: `test_node_search.py`, `test_search_nodes.py`, `test_node_search_router.py`, `backend/tests/platform/test_query_indexes_migration.py` (or a sibling)
+
+**Interfaces:**
+- Consumes: Tasks 4, 6, 8, 9.
+- Produces:
+  - Port: `async def search_count(self, *, scope: AccessScope, resolved: ResolvedQuery, limit: int | None = None) -> int`. With `limit`, the result is the number of matches but never more than `limit`, and the database stops counting once it has found that many.
+  - `search_nodes.py`: module constant `TOTAL_CAP = 1000`; `SearchNodes.__init__(self, repos, policy, today=..., total_cap: int = TOTAL_CAP)`; `SearchNodesResult` gains `total_capped: bool`. `total` is the exact count up to the cap; when more than `total_cap` items match, `total == total_cap` and `total_capped` is True ("1,000+").
+  - API: `NodeSearchResponse.total_capped: bool` with a description saying `total` is a lower bound when True.
+
+**Part A: capped total**
+- [ ] **Step 1: Tests first (RED).**
+  - Repository scenarios in `test_node_search.py` (both adapters): `search_count(..., limit=3)` over a query with 5 matches returns 3; over a query with exactly 3 matches returns 3; with 2 matches returns 2; `limit=None` is unchanged. Reuse the file's seed (for example the "rating at least 4" scenario has 3 matches and "created within the last day" has 7).
+  - `test_search_nodes.py`: with `total_cap=3` and 5 matching items, `total == 3` and `total_capped` is True while the page still returns up to `limit` items; with exactly 3 matches `total_capped` is False; with 2 matches `total == 2`, not capped; default cap is 1000.
+  - `test_node_search_router.py`: the response has `total_capped` (False for the small seeds).
+- [ ] **Step 2: Implement.** SQL: count over a limited subquery, for example `select(func.count()).select_from(select(NodeModel.id).where(scope, filter).limit(limit).subquery())`; keep the unlimited path as it is. In-memory: `min(len(matches), limit)`. In the use case ask for `TOTAL_CAP + 1` (that is, `total_cap + 1`), then `total_capped = counted > total_cap` and `total = min(counted, total_cap)`. Update the port docstring, the response model, its OpenAPI examples (the schema test requires examples) and regenerate the client with `uv run poe generate-frontend-client`.
+
+**Part B: name-sort index**
+- [ ] **Step 3: Migration.** New revision with `down_revision` = the confirmed head:
+
+```python
+def upgrade() -> None:
+    op.execute(
+        """
+        CREATE INDEX ix_nodes_owner_name_sort ON nodes
+        (owner_id, (lower(immutable_unaccent(name)) COLLATE "C"), id)
+        WHERE deleted_at IS NULL
+        """
+    )
+
+
+def downgrade() -> None:
+    op.execute("DROP INDEX IF EXISTS ix_nodes_owner_name_sort")
+```
+
+  Declare it on `NodeModel.__table_args__` the way the other expression indexes are declared (`text(...)`, `postgresql_where=text("deleted_at IS NULL")`), and keep `test_model_definitions_match_ddl` green (adjust only the model declaration if it objects, with a short comment).
+- [ ] **Step 3b: Created and updated.** (User request, added after the first benchmark.) The same migration also creates `ix_nodes_owner_created_sort` and `ix_nodes_owner_updated_sort`: partial indexes on `(owner_id, (CAST(EXTRACT(epoch FROM <column>) AS DOUBLE PRECISION)), id) WHERE deleted_at IS NULL`, matching exactly what `_sort_expression` renders for those keys, declared on `NodeModel` and dropped in `downgrade`. Baseline: sorting by created or updated takes about 69 ms at 10,000 items.
+- [ ] **Step 4: Make the planner able to use it.** The index orders by `lower(immutable_unaccent(name)) COLLATE "C"` then `id`, nulls last (name cannot be NULL). In `query_sql.order_by`, do not add `NULLS LAST` for the sort keys `name`, `created` and `updated` (they cannot be NULL), so an ascending key matches the index order and a descending key can use a backward scan. Keep `NULLS LAST` for field keys. `after_clause` already treats those values as non-NULL; confirm the paging scenarios still pass unchanged.
+- [ ] **Step 5: Verify with EXPLAIN, not assumption.** Add an integration test (marked `integration`, same fixtures as `test_query_indexes_migration.py`) that inserts 20,000 nodes for one owner with `generate_series`, runs `ANALYZE nodes`, then asserts via `EXPLAIN` on the statement `SqlAlchemyNodeRepository.search` builds for `sort: [{"by":"name"}]` (ascending, descending, and with a mid-list cursor) that the plan mentions `ix_nodes_owner_name_sort` and contains no separate `Sort` node. If the planner will not use the index for the descending case, report it and propose the smallest change; do not weaken the assertion.
+- [ ] **Step 6: Re-run the benchmark and record before/after.** Run the script at the top of this task for 10,000 and 100,000 items. Put the new numbers beside the baseline figures in the report. Expected: name sort and the mid-list name page drop from seconds to tens of milliseconds, and counts for broad filters are bounded by the cap (note that the benchmark script calls `search_count` without a limit, so also time `search_count(..., limit=1001)` for the broad queries by editing a copy of the script in the session temp directory, not the repo). Also report timings for sorting by `created` and `updated` (no index is required for them; report only).
+- [ ] **Step 7: Limits to record, not fix.** The capped count helps broad filters but not selective ones, because a count that finds fewer matches than the cap still has to visit every row: a free-text query matching about 1,000 of 100,000 items still takes seconds. Sorting on a field (for example rating) is not indexable in general. Both go into the Task 12 DECISIONS entry as known limits with the numbers.
+- [ ] **Step 8: Gates.** New and changed tests; `cd backend && uv run pytest tests/platform -q -m integration`; `uv run pytest tests/modules/graph -q -m integration`; architecture and CQRS tests; the full unit suite `uv run poe test-backend`; `uv run poe lint-backend`; `uv run poe typecheck-backend`; `uv run poe lint-frontend`, `typecheck-frontend`, `test-frontend` (the generated client changed).
+
+### Task 9c: Faster free text: a trigram prefilter on the stored attributes
+
+User-requested follow-up to the Task 9b benchmark. Baseline at 100,000 items (page of 51 / exact count): free text "alien" **824 ms / 13,949 ms**; "director 42" + type film **433 ms / 10,472 ms**; at 10,000 items 760 ms / 2,325 ms. Cause: the text condition walks every nested value of every item's `attributes` (`jsonb_path_query`) and runs the accent-stripping function on each, so nothing can use an index.
+
+**Idea (semantics unchanged):** keep the exact check, but put a cheap, index-assisted *superset* test in front of it: `immutable_unaccent(attributes::text) ILIKE '%q%'`, backed by a trigram GIN index on that expression. Rows that fail the prefilter cannot contain the text in any value, so only a handful of candidates reach the exact walk, which still applies per-type exclusions (ratings, archived, `search: false`), so results are identical to today's. The in-memory evaluator is the reference and does not change.
+
+**Files:**
+- Create: `backend/src/app/alembic/versions/s0b1c2d3e4f5_attributes_text_trgm.py` (confirm the head with `alembic heads`; it should be `r9a0b1c2d3e4`)
+- Modify: `backend/src/app/modules/graph/adapters/persistence/search_sql.py` (`search_clause`), `models.py` (declare the index)
+- Tests: `backend/tests/modules/graph/adapters/persistence/test_node_search.py` (new scenarios, both adapters), `backend/tests/platform/test_text_search_index.py` (new, integration EXPLAIN test)
+
+**Interfaces:**
+- Consumes: `search_sql.search_clause(q, exclusions)` (used by both `GET /node?q=` through `list`/`count` and by the `text` condition of `/node/search`); `immutable_unaccent` and `pg_trgm` from the Task 5 migration; `like_pattern`.
+- Produces: no signature changes. New index `ix_nodes_attributes_text_trgm` on `nodes USING gin (immutable_unaccent((attributes)::text) gin_trgm_ops)`.
+
+- [ ] **Step 1: Write the new scenarios first (RED where they can be).** Add to `test_node_search.py`'s scenario table (both adapters; existing scenarios untouched): a text query containing a double quote that matches a value containing a double quote (seed an item with `notes: 'say "hi" twice'`; JSON stores it escaped, so a naive prefilter would miss it); a query containing a backslash against a value containing one; a 1-character and a 2-character query (below trigram size, so the prefilter is skipped); an accented and a differently cased query against stored values; a number query (`1.5`) matching a stored number; a `ß` query against `strasse`/`Straße` data if the in-memory fold and `unaccent` agree (otherwise leave `ß` out and say so). Add any new seed rows additively and verify no existing expected set changes. These should already pass on the current code (they pin behaviour the prefilter must preserve).
+- [ ] **Step 2: Migration.**
+
+```python
+def upgrade() -> None:
+    op.execute(
+        """
+        CREATE INDEX ix_nodes_attributes_text_trgm ON nodes
+        USING gin (immutable_unaccent((attributes)::text) gin_trgm_ops)
+        """
+    )
+
+
+def downgrade() -> None:
+    op.execute("DROP INDEX IF EXISTS ix_nodes_attributes_text_trgm")
+```
+
+  Declare it on `NodeModel.__table_args__` the way the name/description trigram indexes are (reflected spelling so `test_model_definitions_match_ddl` stays green).
+- [ ] **Step 3: Change `search_clause`.** The clause becomes `unaccent_ilike(name) OR unaccent_ilike(description) OR (attrs_prefilter AND attrs_exact_scan)` where `attrs_prefilter` is `immutable_unaccent(attributes::text) ILIKE <pattern> ESCAPE ...` and `attrs_exact_scan` is today's per-type-exclusion scan, unchanged. Skip the prefilter (use only the exact scan, as today) when the query could be missed by it: it contains `"` or `\` (JSON escapes these inside `attributes::text`), contains a control character (code point below 0x20, which JSON escapes), or is shorter than 3 characters (below trigram size, the index cannot help). Put that decision in one small, documented, unit-testable function (`_prefilter_is_safe(q)`), with direct tests for each skip rule. The pattern must be the same escaped pattern as the exact scan. Every user value stays a bind parameter.
+- [ ] **Step 4: Prove it is a superset.** Add a randomised/parametrised test (Postgres, integration) that for a table of tricky values (quotes, backslashes, newlines/tabs in strings, unicode, accents, numbers, booleans, nested objects/arrays, empty strings) and a list of queries, the new clause returns exactly the rows the previous exact-only clause returns (compare against the in-memory evaluator's answer, which is the reference). Key names must still never match and booleans/nulls never match, as before.
+- [ ] **Step 5: EXPLAIN test (integration).** Seed 20,000 nodes with `generate_series` (some with a rare word in `attributes`), `ANALYZE`, and assert the plan for a selective text query (via the statement `SqlAlchemyNodeRepository.search`/`list` builds) mentions `ix_nodes_attributes_text_trgm` (a `BitmapOr` over the name, description and attributes trigram indexes is expected), without an `enable_seqscan=off` crutch. If the planner will not combine the arms, report it and propose the smallest change (for example a UNION of the three arms) rather than weakening the assertion.
+- [ ] **Step 6: Benchmark before/after.** Run `cd backend && uv run python /home/sam/.claude/jobs/706d1499/tmp/bench_search.py 10000 100000` (it starts its own container; filter log lines with `grep -v "\[debug"`). Report the text rows (page and count) beside the baseline above, plus the size of the new index versus the table (`pg_relation_size`) at 100,000 items and the time to build it. Also time the capped count (`search_count(..., limit=1001)`) for the text queries.
+- [ ] **Step 7: Gates.** New tests; `cd backend && uv run pytest tests/platform tests/modules/graph -q -m integration`; architecture and CQRS tests; the full unit suite `uv run poe test-backend`; `uv run poe lint-backend`; `uv run poe typecheck-backend`.
 
 ### Task 10: Frontend query model (pure TypeScript)
 
@@ -3158,7 +3614,7 @@ All `.svelte` and `.svelte.ts` files in this task are written by the **`svelte-f
 
 **Interfaces:**
 - Consumes: Task 10 modules; `searchNodes` from `$lib/api/client`; `getDescriptor` / `descriptorForProp` and each descriptor's `InputWidget` and `formatSummary`; the item-type list the page already loads (`NodeTypeResponse[]` with `attributes_schema`); `readPropMeta` for archived and kind.
-- Produces: `describeCondition(c: Condition, lookup: { typeLabel(slug: string): string; fieldLabel(type: string, key: string): string }): string`.
+- Produces: `runSearch` returns `{ items, total, totalCapped, nextCursor, warnings }` (mapping the response's `total_capped`); `describeCondition(c: Condition, lookup: { typeLabel(slug: string): string; fieldLabel(type: string, key: string): string }): string`.
 
 - [ ] **Step 1: Pure parts first (TDD, written directly, not by the agent)**
 
@@ -3198,7 +3654,7 @@ Expected: PASS.
 
 Behaviour the subagent must deliver (acceptance list; each point gets a component test or an e2e assertion):
 
-1. **Items page.** A "Filters" button beside the search box, showing the number of conditions as a badge. State lives in the URL: `?f=<encodeQuery(query)>`. An unparsable `f` is ignored with a toast "That filter link isn't valid." When `f` holds at least one condition, the list is loaded with `runSearch` (cursor paging replaces `after`); otherwise the existing `listNodes` path is untouched. The page's type select, search box and favourite state are folded in with `combine(...)`, so they keep working together with the filter. The "Matched in …" context still shows for text.
+1. **Items page.** A "Filters" button beside the search box, showing the number of conditions as a badge. State lives in the URL: `?f=<encodeQuery(query)>`. The result count shows the exact total, or "1,000+ items" when the response has `total_capped` (never imply an exact number then). An unparsable `f` is ignored with a toast "That filter link isn't valid." When `f` holds at least one condition, the list is loaded with `runSearch` (cursor paging replaces `after`); otherwise the existing `listNodes` path is untouched. The page's type select, search box and favourite state are folded in with `combine(...)`, so they keep working together with the filter. The "Matched in …" context still shows for text.
 2. **Builder panel.** A dialog on desktop and full-height on mobile (follow `responsive-dialog`). Contents: the root group as "Match **all** / **any** of these" (a segmented control mapping to `and` / `or`); rows `field / operator / value`; "Add condition" and "Add group" buttons per group; per-row remove; a sort control (name, added, changed, or a field of a chosen type) with direction; "Clear all" and "Done". Edits apply live to the URL (debounce 250 ms).
 3. **Row.** First choose what the condition is about, from one grouped list: "Type", "Favourite", "Tags", "Added / Changed", then each item type's non-archived, filterable fields as "Film › Rating". The operator list is `operatorsForKind(kind)` with `OPERATOR_LABELS`. The value input is `query-value-input.svelte`: it reuses the field type's `InputWidget` for single values (number, duration, rating, date, partial date, money, choice, yes/no), a two-input range for `between`, a multi-select for `in` / `has` over the field's options, a chip input for tags, a text box for `~`, and a "compare with another field" toggle (offered only for kinds in `REF_KINDS`: number, duration, rating, money, date) that shows a select of same-kind fields on that type. Dates offer "a date" or "N days / weeks / months / years ago".
 4. **Chips.** Active conditions render as removable chips using `describeCondition`; clicking a chip opens the panel scrolled to that row. A condition the server reported in `warnings` (match by `path`) shows a warning icon and the text "This field no longer exists, so nothing matches."
@@ -3267,7 +3723,7 @@ Expected: the new spec passes; the existing 149 e2e still pass.
 Add three entries in the file's existing style (Decision / Rationale / Consequence), British English:
 
 1. **The condition tree is the only stored form of a search.** JSON, versioned (`v`), parsed into frozen domain types; text syntax later is a parser and printer over it. Limits: depth 4, 50 conditions. Stale fields warn and match nothing; wrong operators are 400s with a JSON path.
-2. **Search is separate from the list, and pages by keyset on the sort values.** `NodeRepository.search` / `search_count` beside `list` / `count`; cursor is opaque base64url JSON; nulls last; ties by id. The Python evaluator is the reference and the SQL compiler must agree (scenario table in `test_node_search.py`, run against both). Records the `EXPLAIN` findings from Task 6: containment forms (choice, yes/no, multi-choice, tags) and name/description trigram searches use the GIN indexes; numeric, date and partial-date comparisons and sorting on a field scan, which is acceptable at the sizes expected and is the first thing to measure if search feels slow.
+2. **Search is separate from the list, and pages by keyset on the sort values.** `NodeRepository.search` / `search_count` beside `list` / `count`; cursor is opaque base64url JSON; nulls last; ties by id. The Python evaluator is the reference and the SQL compiler must agree (scenario table in `test_node_search.py`, run against both). Also records the Task 9b benchmark (before/after figures at 10,000 and 100,000 items), the capped total (`TOTAL_CAP = 1000`, `total_capped`) and the known limits: selective free-text queries and field sorts still scan. Records the `EXPLAIN` findings from Task 6: containment forms (choice, yes/no, multi-choice, tags) and name/description trigram searches use the GIN indexes; numeric, date and partial-date comparisons and sorting on a field scan, which is acceptable at the sizes expected and is the first thing to measure if search feels slow.
 3. **Operators per field kind are one shared table.** `shared/contracts/query-operators.json`, read by backend and frontend tests, because the backend has no field-type descriptors of its own.
 
 - [ ] **Step 4: Reconcile the spec**
