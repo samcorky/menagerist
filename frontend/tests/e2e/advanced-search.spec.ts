@@ -76,6 +76,17 @@ async function openFilters(page: Page) {
 	return dialog;
 }
 
+/** Picks a field in a row's searchable picker: types the type and field name, then clicks the one match. */
+async function pickField(page: Page, n: number, field: string) {
+	const [group, label] = field.includes(' › ') ? field.split(' › ') : [undefined, field];
+	await filtersDialog(page)
+		.getByRole('combobox', { name: `Condition ${n}, field` })
+		.click();
+	await page.getByPlaceholder('Search fields…').fill(group ? `${group} ${label}` : label);
+	await page.getByRole('option', { name: label, exact: true }).click();
+	await expect(page.getByRole('listbox')).toHaveCount(0);
+}
+
 /** Fills a condition row: the field, the operator and a value typed into a plain input. */
 async function fillRow(
 	page: Page,
@@ -83,7 +94,7 @@ async function fillRow(
 	row: { field: string; operator: string; value?: string }
 ) {
 	const dialog = filtersDialog(page);
-	await dialog.getByLabel(`Condition ${n}, field`).selectOption({ label: row.field });
+	await pickField(page, n, row.field);
 	await dialog.getByLabel(`Condition ${n}, operator`).selectOption({ label: row.operator });
 	if (row.value !== undefined) await dialog.getByLabel(`Condition ${n}, value`).fill(row.value);
 }
@@ -217,15 +228,54 @@ test('the builder works by keyboard alone', async ({ page, request }) => {
 	const dialog = filtersDialog(page);
 	await expect(dialog).toBeVisible();
 
-	// With no conditions yet, focus lands on the first row's field.
-	const field = dialog.getByLabel('Condition 1, field');
+	// With no conditions yet, focus lands on the first row's field picker.
+	const field = dialog.getByRole('combobox', { name: 'Condition 1, field' });
 	await expect(field).toBeFocused();
-	await expect(field.locator('option', { hasText: `${tool.label} › Weight` })).toHaveCount(1);
-	// Type-ahead lands on the type's first field (Grade); one arrow key moves to Weight.
-	await page.keyboard.type(`${tool.label} › `);
-	await expect(field).toHaveValue(/grade/);
+	await expect(field).toHaveText(/Choose what to filter on/);
+	await expect(field).toHaveAttribute('aria-expanded', 'false');
+
+	// Escape closes the list and returns focus to the picker.
 	await page.keyboard.press('ArrowDown');
-	await expect(field).toHaveValue(/weight/);
+	await expect(field).toHaveAttribute('aria-expanded', 'true');
+	await expect(page.getByPlaceholder('Search fields…')).toBeFocused();
+	await page.keyboard.press('Escape');
+	await expect(field).toHaveAttribute('aria-expanded', 'false');
+	await expect(field).toBeFocused();
+	await expect(dialog).toBeVisible();
+
+	// Enter opens it, typing searches (also by type name), arrows move and Enter selects.
+	await page.keyboard.press('Enter');
+	await expect(page.getByPlaceholder('Search fields…')).toBeFocused();
+	await expect(page.getByRole('option', { name: 'Weight', exact: true })).toBeVisible();
+	await page.keyboard.type(`${tool.label} we`);
+	await expect(page.getByRole('listbox').getByRole('option')).toHaveCount(1);
+	await page.keyboard.press('ArrowDown');
+	await page.keyboard.press('Enter');
+	await expect(field).toHaveText(`${tool.label} › Weight`);
+	await expect(field).toBeFocused();
+
+	// Space opens it again with the current choice ticked. Typing highlights the first match, so
+	// Enter takes it (Grade comes before Weight).
+	await page.keyboard.press('Space');
+	await expect(page.getByPlaceholder('Search fields…')).toBeFocused();
+	await expect(page.getByRole('option', { name: 'Weight', exact: true })).toHaveAttribute(
+		'data-checked',
+		'true'
+	);
+	await page.keyboard.type(tool.label);
+	const options = page.getByRole('listbox').getByRole('option');
+	await expect(options).toHaveText(['Grade', 'Weight']);
+	await page.keyboard.press('Enter');
+	await expect(field).toHaveText(`${tool.label} › Grade`);
+
+	// An arrow key moves the highlight to the next match.
+	await page.keyboard.press('Enter');
+	await expect(page.getByPlaceholder('Search fields…')).toBeFocused();
+	await page.keyboard.type(tool.label);
+	await expect(options).toHaveCount(2);
+	await page.keyboard.press('ArrowDown');
+	await page.keyboard.press('Enter');
+	await expect(field).toHaveText(`${tool.label} › Weight`);
 
 	await page.keyboard.press('Tab');
 	const operator = dialog.getByLabel('Condition 1, operator');

@@ -3,6 +3,8 @@
 	import { TriangleAlert } from '@lucide/svelte';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import * as Combobox from '$lib/components/ui/combobox/index.js';
+	import type { ComboboxItem } from '$lib/components/ui/combobox/index.js';
 	import * as NativeSelect from '$lib/components/ui/native-select/index.js';
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
 	import QueryGroup from '$lib/components/query-group.svelte';
@@ -104,8 +106,8 @@
 	async function focusRow(key: string | null) {
 		await tick();
 		const target =
-			(key && contentEl?.querySelector<HTMLElement>(`[data-row-key="${key}"] select`)) ||
-			contentEl?.querySelector<HTMLElement>('[data-row-key] select') ||
+			(key && contentEl?.querySelector<HTMLElement>(`[data-row-key="${key}"] [role="combobox"]`)) ||
+			contentEl?.querySelector<HTMLElement>('[data-row-key] [role="combobox"]') ||
 			contentEl?.querySelector<HTMLElement>('[data-add-condition]');
 		target?.focus();
 		target?.scrollIntoView({ block: 'nearest' });
@@ -158,6 +160,34 @@
 			sortGroups.some((g) => g.fields.some((f) => fieldSubject(f.type, f.key) === sortChoice))
 	);
 	const staleSort = $derived(sortIsKnown ? null : parseFieldSubject(sortChoice));
+	const sortItems = $derived.by((): ComboboxItem[] => {
+		const items: ComboboxItem[] = [
+			{ value: 'default', label: 'Order added (default)' },
+			{ value: 'name', label: 'Name' },
+			{ value: 'created', label: 'Date added' },
+			{ value: 'updated', label: 'Date changed' }
+		];
+		if (staleSort) {
+			const archived = findField(catalogue, staleSort.type, staleSort.key)?.archived;
+			items.push({
+				value: sortChoice,
+				label: `${fieldReferenceLabel(catalogue, staleSort.type, staleSort.key)}${
+					archived ? ' (archived)' : ' (no longer exists)'
+				}`
+			});
+		}
+		for (const group of sortGroups) {
+			for (const f of group.fields) {
+				items.push({
+					value: fieldSubject(f.type, f.key),
+					label: f.label,
+					group: group.label,
+					selectedLabel: `${group.label} › ${f.label}`
+				});
+			}
+		}
+		return items;
+	});
 
 	function onOpenAutoFocus(event: Event) {
 		const appliedKey = focus ? pathKey(focus) : null;
@@ -203,37 +233,15 @@
 			<div class="flex flex-col gap-2 border-t pt-4">
 				<span class="text-sm font-medium" id={sortLabelId}>Sort by</span>
 				<div class="flex flex-wrap gap-2" role="group" aria-labelledby={sortLabelId}>
-					<NativeSelect.Root
-						class="min-w-0 flex-1 basis-48 [&_select]:h-9"
+					<Combobox.Root
+						class="h-9 min-w-0 flex-1 basis-48"
 						aria-label="Sort by"
+						items={sortItems}
 						value={sortChoice}
-						onchange={(e) => builder.setSort(sortFromValue(e.currentTarget.value, sortDir))}
-					>
-						<NativeSelect.Option value="default">Order added (default)</NativeSelect.Option>
-						<NativeSelect.Option value="name">Name</NativeSelect.Option>
-						<NativeSelect.Option value="created">Date added</NativeSelect.Option>
-						<NativeSelect.Option value="updated">Date changed</NativeSelect.Option>
-						{#if staleSort}
-							<NativeSelect.Option value={sortChoice}>
-								{fieldReferenceLabel(catalogue, staleSort.type, staleSort.key)}{findField(
-									catalogue,
-									staleSort.type,
-									staleSort.key
-								)?.archived
-									? ' (archived)'
-									: ' (no longer exists)'}
-							</NativeSelect.Option>
-						{/if}
-						{#each sortGroups as group (group.slug)}
-							<NativeSelect.OptGroup label={group.label}>
-								{#each group.fields as f (f.key)}
-									<NativeSelect.Option value={fieldSubject(f.type, f.key)}>
-										{group.label} › {f.label}
-									</NativeSelect.Option>
-								{/each}
-							</NativeSelect.OptGroup>
-						{/each}
-					</NativeSelect.Root>
+						searchPlaceholder="Search fields…"
+						emptyText="No matching fields"
+						onValueChange={(next) => builder.setSort(sortFromValue(next, sortDir))}
+					/>
 					<NativeSelect.Root
 						class="min-w-0 basis-36 [&_select]:h-9"
 						aria-label="Sort direction"

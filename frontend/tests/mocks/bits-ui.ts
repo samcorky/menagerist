@@ -14,3 +14,5 @@ export const Dialog = proxy;
 export const Label = proxy;
 export const Separator = proxy;
 export const Toggle = proxy;
+export const Popover = proxy;
+export const Command = proxy;

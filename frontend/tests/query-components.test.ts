@@ -76,6 +76,20 @@ describe('query-value-input', () => {
 		});
 		expect(html).toContain('aria-label="Condition 1, value, other field"');
 		expect(html).toContain('Reorder at');
+		expect(html).toMatch(
+			/<button[^>]*role="combobox"[^>]*aria-label="Condition 1, value, other field"/
+		);
+	});
+
+	it('keeps a vanished other field selected and flagged', () => {
+		const html = valueInput({
+			kind: 'field',
+			type: 'film',
+			key: 'stock',
+			op: '<=',
+			value: { ref: 'gone' }
+		});
+		expect(html).toContain('gone (no longer exists)');
 	});
 
 	it.each<Condition>([
@@ -149,6 +163,17 @@ describe('query-condition-row', () => {
 		expect(html).toContain('aria-label="Condition 2, operator"');
 		expect(html).toContain('aria-label="Condition 2, value"');
 		expect(html).toContain('aria-label="Remove condition 2"');
+	});
+
+	it('labels a sub-field with its full path on the picker', () => {
+		const html = row({
+			kind: 'field',
+			type: 'film',
+			key: 'cast',
+			sub_key: 'role',
+			op: '=',
+			value: 'x'
+		} as Condition);
 		expect(html).toContain('Film › Cast › Role');
 	});
 
@@ -254,6 +279,13 @@ describe('query-builder', () => {
 		expect(html).toContain('Too many conditions to add the page filters.');
 	});
 
+	it('uses a searchable picker for the sort field, keeping the direction native', () => {
+		const html = panel({ query: { v: 1, where: null, sort: [] } });
+		expect(html).toMatch(/<button[^>]*role="combobox"[^>]*aria-label="Sort by"/);
+		expect(html).toMatch(/<select[^>]*aria-label="Sort direction"/);
+		expect(html).toContain('Order added (default)');
+	});
+
 	it('starts an empty filter with one row to fill in', () => {
 		const html = panel({ query: { v: 1, where: null, sort: [] } });
 		expect(html).toContain('Choose what to filter on');
@@ -269,14 +301,17 @@ describe('review fixes', () => {
 				view: stubView({ numbers: new Map([['0', 1]]), ...overrides })
 			}
 		}).body;
+	const triggerText = (html: string, label: string) =>
+		html.match(new RegExp(`<button[^>]*aria-label="${label}"[^>]*>([\\s\\S]*?)</button>`))?.[1] ??
+		'';
 	const selectedOption = (html: string, label: string) =>
 		html.match(new RegExp(`<select[^>]*aria-label="${label}"[^>]*>([\\s\\S]*?)</select>`))?.[1] ??
 		'';
 
 	it('shows an archived field as selected and flagged, keeping the row editable', () => {
 		const html = rowHtml({ kind: 'field', type: 'film', key: 'old', op: '>', value: 3 });
-		const options = selectedOption(html, 'Condition 1, field');
-		expect(options).toMatch(/<option[^>]*selected=""[^>]*>(?:<!---->)?\s*Film › Old \(archived\)/);
+		expect(html).toMatch(/<button[^>]*role="combobox"[^>]*aria-label="Condition 1, field"/);
+		expect(triggerText(html, 'Condition 1, field')).toContain('Film › Old (archived)');
 		expect(html).toContain(ARCHIVED_FIELD_MESSAGE);
 		expect(html).toContain('aria-label="Condition 1, value"');
 		expect(html).toContain('aria-label="Remove condition 1"');
@@ -284,10 +319,7 @@ describe('review fixes', () => {
 
 	it('shows a missing field as selected and flagged', () => {
 		const html = rowHtml({ kind: 'field', type: 'film', key: 'gone', op: '>', value: 3 });
-		const options = selectedOption(html, 'Condition 1, field');
-		expect(options).toMatch(
-			/<option[^>]*selected=""[^>]*>(?:<!---->)?\s*Film › gone \(no longer exists\)/
-		);
+		expect(triggerText(html, 'Condition 1, field')).toContain('Film › gone (no longer exists)');
 		expect(html).toContain(STALE_FIELD_MESSAGE);
 	});
 

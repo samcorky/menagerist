@@ -3,6 +3,8 @@
 	import { descriptorForProp } from '$lib/field-types';
 	import DateInput from '$lib/field-types/date/DateInput.svelte';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import * as Combobox from '$lib/components/ui/combobox/index.js';
+	import type { ComboboxItem } from '$lib/components/ui/combobox/index.js';
 	import * as NativeSelect from '$lib/components/ui/native-select/index.js';
 	import TagsInput from '$lib/components/tags-input.svelte';
 	import type { JsonSchemaProperty } from '$lib/schema-types';
@@ -49,6 +51,13 @@
 		condition.kind === 'field' && field ? valueShape(field.kind, condition.op) : 'none'
 	);
 	const candidates = $derived(field ? refCandidates(view.catalogue, field) : []);
+
+	function refItems(current: string): ComboboxItem[] {
+		const items = candidates.map((c) => ({ value: c.key, label: c.label }));
+		return items.some((i) => i.value === current)
+			? items
+			: [{ value: current, label: `${current} (no longer exists)` }, ...items];
+	}
 	const canRef = $derived(shape === 'single' && canCompareWithField(view.catalogue, field));
 
 	function setValue(value: Value | undefined, debounce: boolean) {
@@ -316,21 +325,15 @@
 			{@render yesNo(condition.value, label, (value) => setValue(value, false))}
 		{:else if shape === 'single'}
 			{#if isRef(condition.value)}
-				<NativeSelect.Root
-					class="w-full [&_select]:h-9"
+				<Combobox.Root
+					class="h-9"
 					aria-label="{label}, other field"
+					items={refItems(condition.value.ref)}
 					value={condition.value.ref}
-					onchange={(e) => setValue({ ref: e.currentTarget.value }, false)}
-				>
-					{#if !candidates.some((c) => isRef(condition.value) && c.key === condition.value.ref)}
-						<NativeSelect.Option value={condition.value.ref}>
-							{condition.value.ref} (no longer exists)
-						</NativeSelect.Option>
-					{/if}
-					{#each candidates as candidate (candidate.key)}
-						<NativeSelect.Option value={candidate.key}>{candidate.label}</NativeSelect.Option>
-					{/each}
-				</NativeSelect.Root>
+					searchPlaceholder="Search fields…"
+					emptyText="No matching fields"
+					onValueChange={(ref) => setValue({ ref }, false)}
+				/>
 			{:else}
 				{@render operandInput(field, condition.value, label, (o, d) => setValue(o, d))}
 			{/if}

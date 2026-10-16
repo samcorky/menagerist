@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { TriangleAlert, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import * as Combobox from '$lib/components/ui/combobox/index.js';
 	import * as NativeSelect from '$lib/components/ui/native-select/index.js';
 	import QueryValueInput from '$lib/components/query-value-input.svelte';
 	import {
@@ -24,6 +25,7 @@
 	import { fieldReferenceLabel, filterableFields, groupByType } from '$lib/query/fields';
 	import { operatorsForKind } from '$lib/query/operators';
 	import { pathKey } from '$lib/query/warnings';
+	import type { ComboboxItem } from '$lib/components/ui/combobox/index.js';
 	import type { Condition, Path } from '$lib/query/types';
 
 	let { condition, path, view }: { condition: Condition; path: Path; view: BuilderView } = $props();
@@ -42,6 +44,32 @@
 	const field = $derived(fieldOf(condition, view.catalogue));
 	const fieldGroups = $derived(groupByType(view.catalogue, filterableFields(view.catalogue)));
 	const status = $derived(fieldStatus(condition, view.catalogue));
+	const subjectItems = $derived.by((): ComboboxItem[] => {
+		const items: ComboboxItem[] = [];
+		if (status !== 'ok' && condition.kind === 'field') {
+			const label = fieldReferenceLabel(
+				view.catalogue,
+				condition.type,
+				condition.key,
+				condition.sub_key
+			);
+			items.push({ value: subject, label: `${label}${STATUS_SUFFIX[status]}` });
+		}
+		for (const general of GENERAL_SUBJECTS) {
+			items.push({ value: general.value, label: general.label, group: 'Any item' });
+		}
+		for (const group of fieldGroups) {
+			for (const f of group.fields) {
+				items.push({
+					value: fieldSubject(f.type, f.key, f.subKey),
+					label: f.label,
+					group: group.label,
+					selectedLabel: `${group.label} › ${f.label}`
+				});
+			}
+		}
+		return items;
+	});
 	const warned = $derived(view.warned.has(key) || status === 'missing' || status === 'archived');
 	const warning = $derived(status === 'archived' ? ARCHIVED_FIELD_MESSAGE : STALE_FIELD_MESSAGE);
 	const problem = $derived(
@@ -105,41 +133,17 @@
 			class="w-6 shrink-0 text-xs font-medium text-muted-foreground tabular-nums"
 			aria-hidden="true">{number}</span
 		>
-		<NativeSelect.Root
-			class="min-w-0 flex-1 basis-48 [&_select]:h-9"
+		<Combobox.Root
+			class="h-9 min-w-0 flex-1 basis-48"
 			aria-label="{name}, field"
 			data-row-subject={key}
+			items={subjectItems}
 			value={subject}
-			onchange={(e) => onSubject(e.currentTarget.value)}
-		>
-			{#if subject === 'blank'}
-				<NativeSelect.Option value="blank" disabled>Choose what to filter on</NativeSelect.Option>
-			{/if}
-			{#if status !== 'ok' && condition.kind === 'field'}
-				<NativeSelect.Option value={subject}>
-					{fieldReferenceLabel(
-						view.catalogue,
-						condition.type,
-						condition.key,
-						condition.sub_key
-					)}{STATUS_SUFFIX[status]}
-				</NativeSelect.Option>
-			{/if}
-			<NativeSelect.OptGroup label="Any item">
-				{#each GENERAL_SUBJECTS as general (general.value)}
-					<NativeSelect.Option value={general.value}>{general.label}</NativeSelect.Option>
-				{/each}
-			</NativeSelect.OptGroup>
-			{#each fieldGroups as group (group.slug)}
-				<NativeSelect.OptGroup label={group.label}>
-					{#each group.fields as f (fieldSubject(f.type, f.key, f.subKey))}
-						<NativeSelect.Option value={fieldSubject(f.type, f.key, f.subKey)}>
-							{group.label} › {f.label}
-						</NativeSelect.Option>
-					{/each}
-				</NativeSelect.OptGroup>
-			{/each}
-		</NativeSelect.Root>
+			placeholder="Choose what to filter on"
+			searchPlaceholder="Search fields…"
+			emptyText="No matching fields"
+			onValueChange={onSubject}
+		/>
 		{#if operators.length > 0}
 			<NativeSelect.Root
 				class="min-w-0 flex-1 basis-36 [&_select]:h-9"
