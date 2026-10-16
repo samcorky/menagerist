@@ -87,6 +87,14 @@ class NodeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):
             "id",
             postgresql_where=text("deleted_at IS NULL"),
         ),
+        # Backs per-item field conditions (query_sql._declares).
+        Index(
+            "ix_nodes_extra_schema_gin",
+            "extra_schema",
+            postgresql_using="gin",
+            postgresql_ops={"extra_schema": "jsonb_path_ops"},
+            postgresql_where=text("extra_schema IS NOT NULL"),
+        ),
         Index(
             "ix_nodes_name_trgm",
             text("immutable_unaccent(name)"),

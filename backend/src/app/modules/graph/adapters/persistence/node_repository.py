@@ -1,7 +1,21 @@
 from typing import TYPE_CHECKING
 
 import structlog
-from sqlalchemy import and_, func, or_, select, text, update
+from sqlalchemy import (
+    Text,
+    and_,
+    case,
+    cast,
+    column,
+    func,
+    literal,
+    or_,
+    select,
+    text,
+    true,
+    update,
+)
+from sqlalchemy.dialects.postgresql import JSONB, aggregate_order_by
 
 from app.modules.graph.adapters.persistence.models import NodeModel
 from app.modules.graph.adapters.persistence.query_sql import (
@@ -16,8 +30,15 @@ from app.modules.graph.adapters.persistence.search_sql import (
     search_clause,
     unaccent_ilike,
 )
+from app.modules.graph.application.field_kinds import KIND_OPERATORS
+from app.modules.graph.application.schema_meta import NAMESPACE
 from app.modules.graph.domain.node import Node
-from app.modules.graph.domain.query import SearchHit, TextCondition, walk_conditions
+from app.modules.graph.domain.query import (
+    ItemFieldUse,
+    SearchHit,
+    TextCondition,
+    walk_conditions,
+)
 from app.platform.orm_mixins import claim_rows, owned_by
 
 if TYPE_CHECKING:
@@ -333,6 +354,67 @@ class SqlAlchemyNodeRepository:
         stmt = stmt.order_by(func.count().desc(), value.asc()).limit(limit)
         result = await self._session.execute(stmt)
         return [(row[0], row[1]) for row in result.all()]
+
+    async def item_fields(
+        self, *, scope: AccessScope, limit: int
+    ) -> builtins.list[ItemFieldUse]:
+        """List the per-item fields declared in the overlays of live nodes."""
+        logger.debug("listing item fields")
+        properties = NodeModel.extra_schema["properties"]
+        # jsonb_each raises on a non-object, so feed it `{}` instead.
+        as_object = case(
+            (func.jsonb_typeof(properties) == "object", properties),
+            else_=cast(literal("{}"), JSONB),
+        )
+        fields = (
+            func.jsonb_each(as_object)
+            .table_valued(column("key", Text), column("value", JSONB), name="field")
+            .lateral()
+        )
+        meta = fields.c.value[NAMESPACE]
+        kind = meta["kind"].astext
+        raw_title = fields.c.value["title"]
+        title = func.nullif(
+            case(
+                (func.jsonb_typeof(raw_title) == "string", raw_title.astext),
+                else_=None,
+            ),
+            "",
+        )
+        per_title = (
+            select(
+                fields.c.key.label("key"),
+                kind.label("kind"),
+                title.label("title"),
+                func.count().label("n"),
+            )
+            .select_from(NodeModel)
+            .join(fields, true())
+            .where(
+                _in_scope(scope),
+                kind.in_(list(KIND_OPERATORS)),
+                meta["archived"].is_distinct_from(cast(literal("true"), JSONB)),
+            )
+            .group_by(fields.c.key, kind, title)
+            .subquery()
+        )
+        total = func.sum(per_title.c.n)
+        label = func.array_agg(
+            aggregate_order_by(
+                per_title.c.title, per_title.c.n.desc(), per_title.c.title
+            )
+        ).filter(per_title.c.title.is_not(None))
+        stmt = (
+            select(per_title.c.key, per_title.c.kind, total, label[1])
+            .group_by(per_title.c.key, per_title.c.kind)
+            .order_by(total.desc(), per_title.c.key, per_title.c.kind)
+            .limit(limit)
+        )
+        result = await self._session.execute(stmt)
+        return [
+            ItemFieldUse(key=key, kind=kind_, label=name or key, count=int(count))
+            for key, kind_, count, name in result.all()
+        ]
 
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]

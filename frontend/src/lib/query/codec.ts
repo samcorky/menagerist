@@ -12,7 +12,7 @@ import {
 	type SortKey,
 	type Value
 } from './types';
-import { LIST_OPERATORS, operatorTakesValue } from './operators';
+import { LIST_OPERATORS, operatorsForKind, operatorTakesValue } from './operators';
 
 function toBase64Url(text: string): string {
 	let binary = '';
@@ -137,6 +137,42 @@ function comparisonValue(op: string, data: Rec): Value | null | undefined {
 	return operand(raw);
 }
 
+/** True when an operand, or any of a list, is a reference to another field. */
+function hasReference(value: Value | undefined): boolean {
+	const items = Array.isArray(value) ? value : [value];
+	return items.some((item) => isRec(item) && 'ref' in item);
+}
+
+/** A field condition names an item type or a field kind, never both (as on the server). */
+function fieldCondition(data: Rec): Condition | null {
+	const key = str(data.key);
+	const op = data.op;
+	if (key === null || typeof op !== 'string' || !OPERATORS.has(op)) return null;
+	// A null type or sub_key means none, as on the server.
+	const hasType = data.type !== undefined && data.type !== null;
+	const hasKind = data.field_kind !== undefined && data.field_kind !== null;
+	if (hasType === hasKind) return null;
+	const out: Extract<Condition, { kind: 'field' }> = { kind: 'field', key, op };
+	if (hasType) {
+		const type = str(data.type);
+		if (type === null) return null;
+		out.type = type;
+	} else {
+		const kind = str(data.field_kind);
+		if (kind === null || operatorsForKind(kind).length === 0) return null;
+		out.field_kind = kind;
+	}
+	if (data.sub_key !== undefined && data.sub_key !== null) {
+		const sub = str(data.sub_key);
+		if (sub === null || hasKind) return null;
+		out.sub_key = sub;
+	}
+	const value = comparisonValue(op, data);
+	if (value === null || (hasKind && hasReference(value))) return null;
+	if (value !== undefined) out.value = value;
+	return out;
+}
+
 function condition(data: Rec): Condition | null {
 	switch (data.kind) {
 		case 'text': {
@@ -163,25 +199,8 @@ function condition(data: Rec): Condition | null {
 			const value = comparisonValue(op, data);
 			return value === null || value === undefined ? null : { kind: 'date', on, op, value };
 		}
-		case 'field': {
-			const type = str(data.type);
-			const key = str(data.key);
-			const op = data.op;
-			if (type === null || key === null || typeof op !== 'string' || !OPERATORS.has(op)) {
-				return null;
-			}
-			const out: Condition = { kind: 'field', type, key, op };
-			// A null sub_key means none, as on the server.
-			if (data.sub_key !== undefined && data.sub_key !== null) {
-				const sub = str(data.sub_key);
-				if (sub === null) return null;
-				out.sub_key = sub;
-			}
-			const value = comparisonValue(op, data);
-			if (value === null) return null;
-			if (value !== undefined) out.value = value;
-			return out;
-		}
+		case 'field':
+			return fieldCondition(data);
 		default:
 			return null;
 	}

@@ -303,19 +303,40 @@ def _field_test(condition: FieldCondition, kind: str, ctx: ResolvedQuery) -> _Bo
     return _never_null(_test_value(kind, op, j, operand))
 
 
+def _declares(key: str, kind: str) -> _Bool:
+    """The item's own overlay declares `key` with `kind` and keeps it live.
+
+    `IS NOT NULL AND ...` is never NULL; both containments are served by the
+    `extra_schema` GIN index.
+    """
+    overlay = NodeModel.extra_schema
+    declared = overlay.contains({"properties": {key: {"x-menagerist": {"kind": kind}}}})
+    archived = overlay.contains(
+        {"properties": {key: {"x-menagerist": {"archived": True}}}}
+    )
+    return and_(overlay.isnot(None), declared, not_(archived))
+
+
 def _field(condition: FieldCondition, ctx: ResolvedQuery) -> _Bool:
-    """Only items of the named type can match, complements included; stale is false."""
-    if condition in ctx.stale or condition.type is None:
-        # TODO(task 2): per-item conditions (type is None) match nothing until
-        # compiled against the item's own overlay.
+    """Only items in scope can match, complements included; stale is false.
+
+    In scope: the named type, or an item whose own overlay declares the field.
+    """
+    if condition in ctx.stale:
         return false()
-    kind = ctx.field_kinds.get((condition.type, condition.key, condition.sub_key))
+    if condition.field_kind is not None:
+        kind: str | None = condition.field_kind
+        in_scope = _declares(condition.key, condition.field_kind)
+    else:
+        kind = ctx.field_kinds.get(
+            (condition.type or "", condition.key, condition.sub_key)
+        )
+        in_scope = _never_null(NodeModel.type == condition.type)
     if kind is None:
         return false()
-    of_type = _never_null(NodeModel.type == condition.type)
     test = _field_test(condition, kind, ctx)
     complement = condition.op in COMPLEMENT_OPERATORS
-    return and_(of_type, not_(test) if complement else test)
+    return and_(in_scope, not_(test) if complement else test)
 
 
 def _date(condition: DateCondition, ctx: ResolvedQuery) -> _Bool:

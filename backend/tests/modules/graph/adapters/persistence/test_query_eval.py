@@ -422,14 +422,47 @@ async def test_table_column_empty_and_not_empty_are_complements(
     }
 
 
-async def test_per_item_conditions_match_nothing_until_task_two(
+@pytest.mark.parametrize(
+    "overlay",
+    [
+        {},
+        {"properties": None},
+        {"properties": {"label": "text"}},
+        {"properties": {"label": {"x-menagerist": "text"}}},
+        {"properties": {"label": {"x-menagerist": {"kind": "number"}}}},
+        {"properties": {"label": {"x-menagerist": {"kind": "text", "archived": True}}}},
+    ],
+    ids=[
+        "no-properties",
+        "properties-not-an-object",
+        "field-not-an-object",
+        "metadata-not-an-object",
+        "other-kind",
+        "archived",
+    ],
+)
+async def test_malformed_or_foreign_overlays_never_match(
+    repository: NodeRepository, overlay: dict[str, Any]
+) -> None:
+    """An overlay not declaring the field live with that kind is out of scope."""
+    node = _node("a", label="x")
+    node.extra_schema = overlay
+    per_item = {"kind": "field", "key": "label", "field_kind": "text"}
+    for op, value in [("=", "x"), ("!=", "y"), ("not_empty", None)]:
+        cond = per_item | {"op": op} | ({} if value is None else {"value": value})
+        assert await _run(repository, [node], cond) == set()
+
+
+async def test_per_item_condition_reads_the_declared_kind_not_the_type(
     repository: NodeRepository,
 ) -> None:
-    """Placeholder: a per-item condition matches nothing, complements included.
-
-    Task 2 of the per-item field plan replaces this with real evaluation.
-    """
-    nodes = [_node("a", label="x")]
-    per_item = {"kind": "field", "key": "label", "field_kind": "text"}
-    assert await _run(repository, nodes, per_item | {"op": "=", "value": "x"}) == set()
-    assert await _run(repository, nodes, per_item | {"op": "!=", "value": "y"}) == set()
+    """The overlay's kind rules, whatever kind the item's type gives the key."""
+    node = _node("a", count="five")
+    node.extra_schema = {
+        "properties": {"count": {"x-menagerist": {"kind": "text"}}},
+    }
+    per_item = {"kind": "field", "key": "count", "field_kind": "text"}
+    assert await _run(repository, [node], per_item | {"op": "=", "value": "FIVE"}) == {
+        "a"
+    }
+    assert await _run(repository, [node], _f("count", "=", 5)) == set()

@@ -1,5 +1,13 @@
 import { decodeQuery, encodeQuery } from './codec';
-import { findField, type Catalogue, type FieldInfo } from './fields';
+import {
+	findField,
+	findItemField,
+	itemFieldInfo,
+	itemFieldSubject,
+	parseItemFieldSubject,
+	type Catalogue,
+	type FieldInfo
+} from './fields';
 import { LIST_OPERATORS, OPERATOR_LABELS, operatorsForKind, operatorTakesValue } from './operators';
 import { describeCondition, type SummaryLookup } from './summary';
 import { pathKey } from './warnings';
@@ -23,6 +31,8 @@ import {
  */
 
 type FieldCondition = Extract<Condition, { kind: 'field' }>;
+
+export { itemFieldSubject, parseItemFieldSubject };
 type DateCondition = Extract<Condition, { kind: 'date' }>;
 
 export type Subject = 'blank' | 'text' | 'type' | 'favourite' | 'tag' | 'created' | 'updated';
@@ -72,7 +82,10 @@ export function isBlank(c: Condition): boolean {
 export function subjectOf(c: Condition): string {
 	switch (c.kind) {
 		case 'field':
-			return isBlank(c) ? 'blank' : fieldSubject(c.type, c.key, c.sub_key);
+			if (isBlank(c)) return 'blank';
+			return c.field_kind !== undefined
+				? itemFieldSubject(c.field_kind, c.key)
+				: fieldSubject(c.type ?? '', c.key, c.sub_key);
 		case 'date':
 			return c.on === 'updated' ? 'updated' : 'created';
 		default:
@@ -80,10 +93,11 @@ export function subjectOf(c: Condition): string {
 	}
 }
 
+/** The field a row is about. A per-item field is read from the row's own kind. */
 export function fieldOf(c: Condition, catalogue: Catalogue): FieldInfo | undefined {
-	return c.kind === 'field' && !isBlank(c)
-		? findField(catalogue, c.type, c.key, c.sub_key)
-		: undefined;
+	if (c.kind !== 'field' || isBlank(c)) return undefined;
+	if (c.field_kind !== undefined) return itemFieldInfo(catalogue, c.field_kind, c.key);
+	return findField(catalogue, c.type ?? '', c.key, c.sub_key);
 }
 
 const LAST_30_DAYS = { rel: '-30d' };
@@ -102,6 +116,12 @@ export function conditionFor(subject: string, catalogue: Catalogue): Condition {
 		case 'created':
 		case 'updated':
 			return { kind: 'date', on: subject, op: '>=', value: LAST_30_DAYS };
+	}
+	const item = parseItemFieldSubject(subject);
+	if (item) {
+		return operatorsForKind(item.kind).length > 0
+			? { kind: 'field', field_kind: item.kind, key: item.key, op: operatorsForKind(item.kind)[0] }
+			: blankCondition();
 	}
 	const ref = parseFieldSubject(subject);
 	const field = ref ? findField(catalogue, ref.type, ref.key, ref.subKey) : undefined;
@@ -550,6 +570,14 @@ export function stringList(value: unknown): string[] {
 }
 
 export const STALE_FIELD_MESSAGE = 'This field no longer exists, so nothing matches.';
+export const NO_ITEM_FIELD_MESSAGE = 'No item has this field.';
+
+/** What to say about a field row that cannot be matched. */
+export function missingFieldMessage(c: Condition): string {
+	return c.kind === 'field' && c.field_kind !== undefined
+		? NO_ITEM_FIELD_MESSAGE
+		: STALE_FIELD_MESSAGE;
+}
 
 /** The group at `path`, or null when the path does not lead to one. */
 export function groupAt(query: Query, path: Path): Group | null {
@@ -592,6 +620,11 @@ export type FieldStatus = 'ok' | 'loading' | 'missing' | 'archived';
 export function fieldStatus(c: Condition, catalogue: Catalogue): FieldStatus {
 	if (c.kind !== 'field' || isBlank(c)) return 'ok';
 	if (!catalogue.loaded) return 'loading';
+	if (c.field_kind !== undefined) {
+		// An unread listing says nothing either way.
+		const listed = catalogue.itemFields === null || findItemField(catalogue, c.field_kind, c.key);
+		return listed ? 'ok' : 'missing';
+	}
 	const field = fieldOf(c, catalogue);
 	if (!field) return 'missing';
 	return field.archived ? 'archived' : 'ok';

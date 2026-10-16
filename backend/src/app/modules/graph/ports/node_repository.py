@@ -7,7 +7,12 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from app.modules.graph.domain.node import Node
-    from app.modules.graph.domain.query import Cursor, ResolvedQuery, SearchHit
+    from app.modules.graph.domain.query import (
+        Cursor,
+        ItemFieldUse,
+        ResolvedQuery,
+        SearchHit,
+    )
     from app.shared_kernel.access_scope import AccessScope
 
 
@@ -89,6 +94,18 @@ class NodeRepository(Protocol):
 
         With `limit`, the result never exceeds it and the database stops
         counting once it has found that many.
+        """
+        ...
+
+    async def item_fields(
+        self, *, scope: AccessScope, limit: int
+    ) -> builtins.list[ItemFieldUse]:
+        """List the per-item fields declared in the overlays of live nodes in `scope`.
+
+        Only properties with an explicit, filterable `x-menagerist.kind` that are
+        not archived count. Rows group by (key, kind); `label` is the most common
+        non-empty `title` in the group (ties by title), else the key. Ordered by
+        count descending then key then kind; at most `limit` rows.
         """
         ...
 

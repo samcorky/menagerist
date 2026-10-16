@@ -518,7 +518,12 @@ class World:
                     "attributes": {"rating": "R"},
                     "extra_schema": {
                         "type": "object",
-                        "properties": {"rating": {"type": "string"}},
+                        "properties": {
+                            "rating": {
+                                "type": "string",
+                                "x-menagerist": {"kind": "text"},
+                            }
+                        },
                     },
                     "favourite": True,
                 },

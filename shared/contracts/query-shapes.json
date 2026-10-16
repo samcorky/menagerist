@@ -1598,6 +1598,148 @@
         },
         "sort": []
       }
+    },
+    {
+      "name": "per-item field",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "key": "signed",
+              "field_kind": "boolean",
+              "op": "=",
+              "value": true
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "per-item field with a null type",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "key": "signed",
+              "field_kind": "boolean",
+              "op": "=",
+              "value": true,
+              "type": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "per-item field with a null sub_key",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "key": "signed",
+              "field_kind": "boolean",
+              "op": "=",
+              "value": true,
+              "sub_key": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "per-item field without a value",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "key": "signed",
+              "field_kind": "number",
+              "op": "empty"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "per-item field between",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "key": "signed",
+              "field_kind": "number",
+              "op": "between",
+              "value": [
+                1,
+                5
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "per-item field in a list",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "key": "signed",
+              "field_kind": "text",
+              "op": "in",
+              "value": [
+                "a",
+                "b"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "per-item field with a relative date",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "key": "signed",
+              "field_kind": "date",
+              "op": ">=",
+              "value": {
+                "rel": "-30d"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
     }
   ],
   "invalid": [
@@ -5449,6 +5591,213 @@
                 "a",
                 "a"
               ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "per-item field with a type as well",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "key": "signed",
+              "field_kind": "boolean",
+              "op": "=",
+              "value": true,
+              "type": "film"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "per-item field_kind that is not text",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "key": "signed",
+              "field_kind": 3,
+              "op": "=",
+              "value": true
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "per-item field_kind that is empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "key": "signed",
+              "field_kind": "",
+              "op": "=",
+              "value": true
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "per-item field_kind of 201 characters",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "key": "signed",
+              "field_kind": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "op": "=",
+              "value": true
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "per-item field with a sub_key",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "key": "signed",
+              "field_kind": "boolean",
+              "op": "=",
+              "value": true,
+              "sub_key": "role"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "per-item field with a reference",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "key": "signed",
+              "field_kind": "boolean",
+              "op": "=",
+              "value": {
+                "ref": "other"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "per-item field with a reference in a list",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "key": "signed",
+              "field_kind": "boolean",
+              "op": "in",
+              "value": [
+                "a",
+                {
+                  "ref": "other"
+                }
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field with neither type nor field_kind",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "key": "signed",
+              "op": "=",
+              "value": true
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field with a null type and no field_kind",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "key": "signed",
+              "op": "=",
+              "value": true,
+              "type": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "per-item field with a missing key",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "field_kind": "boolean",
+              "op": "=",
+              "value": true
             }
           ]
         },

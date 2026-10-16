@@ -208,13 +208,32 @@ def _column_filled(node: Node, condition: FieldCondition) -> bool:
     return any(not _is_empty(value) for value in _candidates(node, condition))
 
 
+def _declares(extra_schema: Mapping[str, Any] | None, key: str, kind: str) -> bool:
+    """Whether the item's own overlay declares `key` with `kind` and keeps it live."""
+    props = (extra_schema or {}).get("properties")
+    prop = props.get(key) if isinstance(props, Mapping) else None
+    meta = prop.get("x-menagerist") if isinstance(prop, Mapping) else None
+    return (
+        isinstance(meta, Mapping)
+        and meta.get("kind") == kind
+        and meta.get("archived") is not True
+    )
+
+
+def _scope(node: Node, condition: FieldCondition, ctx: ResolvedQuery) -> str | None:
+    """The field's kind if `node` is in the condition's scope, else None."""
+    if condition.field_kind is not None:
+        declared = _declares(node.extra_schema, condition.key, condition.field_kind)
+        return condition.field_kind if declared else None
+    kind = ctx.field_kinds.get((condition.type or "", condition.key, condition.sub_key))
+    return kind if node.type == condition.type else None
+
+
 def _field_matches(node: Node, condition: FieldCondition, ctx: ResolvedQuery) -> bool:
-    if condition in ctx.stale or condition.type is None:
-        # TODO(task 2): per-item conditions (type is None) match nothing until
-        # evaluated against the item's own overlay.
+    if condition in ctx.stale:
         return False
-    kind = ctx.field_kinds.get((condition.type, condition.key, condition.sub_key))
-    if kind is None or node.type != condition.type:
+    kind = _scope(node, condition, ctx)
+    if kind is None:
         return False
     positive = COMPLEMENT_OPERATORS.get(condition.op)
     if positive is not None:

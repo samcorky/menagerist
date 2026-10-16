@@ -4,6 +4,10 @@ import type { Condition, Operand, Value } from './types';
 export type SummaryLookup = {
 	typeLabel(slug: string): string;
 	fieldLabel(type: string, key: string): string;
+	/** A per-item field's label; when absent the key is used. */
+	itemFieldLabel?(kind: string, key: string): string | null;
+	/** Formats a plain value of a per-item field; null leaves the default text. */
+	formatItemValue?(kind: string, key: string, value: unknown): string | null;
 	/** A table column's label ("Cast › Role"); when absent the raw column key is used. */
 	subFieldLabel?(type: string, key: string, subKey: string): string | null;
 	/** The field's kind, so date fields read like the Added / Changed conditions. */
@@ -82,11 +86,14 @@ function valueText(op: string, value: Value | undefined, format: Format = operan
 function fieldFormat(c: Extract<Condition, { kind: 'field' }>, lookup: SummaryLookup): Format {
 	return (operand) => {
 		if (isRec(operand) && typeof operand.ref === 'string')
-			return lookup.fieldLabel(c.type, operand.ref);
+			return lookup.fieldLabel(c.type ?? '', operand.ref);
 		const plain = !(isRec(operand) && ('ref' in operand || 'rel' in operand));
-		if (plain && lookup.formatValue) {
+		if (plain) {
 			try {
-				const text = lookup.formatValue(c.type, c.key, c.sub_key, operand);
+				const text =
+					c.field_kind !== undefined
+						? lookup.formatItemValue?.(c.field_kind, c.key, operand)
+						: lookup.formatValue?.(c.type ?? '', c.key, c.sub_key, operand);
 				if (typeof text === 'string') return text;
 			} catch {
 				// fall back to the default text
@@ -107,17 +114,28 @@ function safe<T>(read: () => T): T | null {
 const DATE_KINDS = new Set(['date', 'partialdate']);
 
 function describeField(c: Extract<Condition, { kind: 'field' }>, lookup: SummaryLookup): string {
-	const type = lookup.typeLabel(c.type);
-	const label = lookup.fieldLabel(c.type, c.key);
+	const itemKind = c.field_kind;
 	const subKey = c.sub_key;
-	const sub = subKey ? safe(() => lookup.subFieldLabel?.(c.type, c.key, subKey)) : null;
-	const field = subKey ? (sub ?? `${label} › ${subKey}`) : label;
-	const kind = safe(() => lookup.fieldKind?.(c.type, c.key, c.sub_key));
+	let field: string;
+	let kind: string | null | undefined;
+	if (itemKind !== undefined) {
+		field = safe(() => lookup.itemFieldLabel?.(itemKind, c.key)) || c.key;
+		kind = itemKind;
+	} else {
+		const label = lookup.fieldLabel(c.type ?? '', c.key);
+		const sub = subKey ? safe(() => lookup.subFieldLabel?.(c.type ?? '', c.key, subKey)) : null;
+		field = subKey ? (sub ?? `${label} › ${subKey}`) : label;
+		kind = safe(() => lookup.fieldKind?.(c.type ?? '', c.key, c.sub_key));
+	}
+	const head =
+		itemKind === undefined
+			? `${lookup.typeLabel(c.type ?? '')}: ${field}`
+			: `Item field › ${field}:`;
 	if (kind && DATE_KINDS.has(kind) && operatorTakesValue(c.op) && c.value !== undefined)
-		return `${type}: ${field} ${datePhrase(c.op, c.value, fieldFormat(c, lookup))}`;
+		return `${head} ${datePhrase(c.op, c.value, fieldFormat(c, lookup))}`;
 	const op = OPERATOR_LABELS[c.op] ?? c.op;
 	const value = operatorTakesValue(c.op) ? valueText(c.op, c.value, fieldFormat(c, lookup)) : '';
-	return `${type}: ${field} ${op}${value ? ` ${value}` : ''}`;
+	return `${head} ${op}${value ? ` ${value}` : ''}`;
 }
 
 function relOf(operand: unknown): ReturnType<typeof parseRel> {

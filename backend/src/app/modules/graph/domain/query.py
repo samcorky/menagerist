@@ -565,3 +565,13 @@ def parse_query(data: object) -> Query:
     raw_where = data.get("where")
     where = None if raw_where is None else parser.group(raw_where, "where", 1)
     return Query(where=where, sort=_sort(data.get("sort", [])))
+
+
+@dataclass(frozen=True, kw_only=True)
+class ItemFieldUse:
+    """A per-item field in use: its key and kind, a label and how many items."""
+
+    key: str
+    kind: str
+    label: str
+    count: int

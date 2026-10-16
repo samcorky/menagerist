@@ -19,6 +19,7 @@ from app.modules.graph.adapters.api.dependencies import (
     get_create_node_use_case,
     get_delete_node_use_case,
     get_get_node_use_case,
+    get_list_item_fields_use_case,
     get_list_nodes_use_case,
     get_promote_extra_schema_field_use_case,
     get_search_nodes_use_case,
@@ -26,6 +27,7 @@ from app.modules.graph.adapters.api.dependencies import (
 )
 from app.modules.graph.adapters.api.node.schemas import (
     CreateNodeRequest,
+    ItemFieldResponse,
     NodeResponse,
     NodeSearchRequest,
     NodeSearchResponse,
@@ -35,6 +37,10 @@ from app.modules.graph.adapters.api.node.schemas import (
 from app.modules.graph.application.create_node import CreateNode
 from app.modules.graph.application.delete_node import DeleteNode, DeleteNodeCommand
 from app.modules.graph.application.get_node import GetNode, GetNodeQuery
+from app.modules.graph.application.list_item_fields import (
+    ListItemFields,
+    ListItemFieldsQuery,
+)
 from app.modules.graph.application.list_nodes import ListNodes, ListNodesQuery
 from app.modules.graph.application.promote_extra_schema_field import (
     PromoteExtraSchemaField,
@@ -105,6 +111,25 @@ async def search_nodes(
         actor,
     )
     return NodeSearchResponse.from_result(result)
+
+
+@router.get(
+    "/item-fields",
+    response_model=list[ItemFieldResponse],
+    operation_id="list_item_fields",
+)
+async def list_item_fields(
+    use_case: Annotated[ListItemFields, Depends(get_list_item_fields_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> list[ItemFieldResponse]:
+    """List the fields your items carry themselves, most used first.
+
+    These are the per-item fields a search can filter on. A field appears once
+    per name and kind, with how many of your items declare it. Removed fields
+    and fields without a recorded kind are left out. At most 200 are returned.
+    """
+    fields = await use_case.handle(ListItemFieldsQuery(), actor)
+    return [ItemFieldResponse.from_domain(field) for field in fields]
 
 
 @router.get(

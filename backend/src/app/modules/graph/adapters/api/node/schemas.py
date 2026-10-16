@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.modules.graph.application.create_node import CreateNodeCommand
 from app.modules.graph.application.update_node import UpdateNodeCommand
+from app.modules.graph.domain.query import ItemFieldUse  # noqa: TC001
 from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
@@ -277,3 +278,25 @@ class NodeSearchResponse(BaseModel):
                 for w in result.warnings
             ],
         )
+
+
+class ItemFieldResponse(BaseModel):
+    """A field individual items carry in their own overlay."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"key": "signed", "kind": "boolean", "label": "Signed copy", "count": 3}
+            ]
+        }
+    )
+
+    key: str
+    kind: str = Field(description="The field kind, such as `text` or `number`.")
+    label: str = Field(description="The most common label, or the key if none.")
+    count: int = Field(description="How many of your items declare the field.")
+
+    @classmethod
+    def from_domain(cls, use: ItemFieldUse) -> ItemFieldResponse:
+        """Build a response from an `ItemFieldUse`."""
+        return cls(key=use.key, kind=use.kind, label=use.label, count=use.count)

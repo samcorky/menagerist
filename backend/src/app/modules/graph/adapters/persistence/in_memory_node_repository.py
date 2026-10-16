@@ -7,7 +7,9 @@ from app.modules.graph.adapters.persistence.query_eval import (
     sort_values,
 )
 from app.modules.graph.adapters.persistence.text_match import fold, text_matches
-from app.modules.graph.domain.query import SearchHit
+from app.modules.graph.application.field_kinds import KIND_OPERATORS
+from app.modules.graph.application.schema_meta import NAMESPACE
+from app.modules.graph.domain.query import ItemFieldUse, SearchHit
 
 if TYPE_CHECKING:
     import builtins
@@ -23,6 +25,12 @@ if TYPE_CHECKING:
 def _sort_at(hit: SearchHit, *, index: int) -> str | float:
     """The non-null sort value at `index`."""
     return cast("str | float", hit.sort_values[index])
+
+
+def _label(key: str, titles: Mapping[str, int]) -> str:
+    """The most common non-empty title (ties by title), else `key`."""
+    named = sorted((-n, title) for title, n in titles.items() if title)
+    return named[0][1] if named else key
 
 
 class InMemoryNodeRepository:
@@ -246,6 +254,41 @@ class InMemoryNodeRepository:
             counts = {v: c for v, c in counts.items() if needle in fold(v)}
         ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
         return ordered[:limit]
+
+    async def item_fields(
+        self, *, scope: AccessScope, limit: int
+    ) -> builtins.list[ItemFieldUse]:
+        """List the per-item fields declared in the overlays of live nodes."""
+        titles: dict[tuple[str, str], dict[str, int]] = {}
+        for node in self._visible(scope):
+            properties = (node.extra_schema or {}).get("properties")
+            if not isinstance(properties, dict):
+                continue
+            for key, prop in properties.items():
+                meta = prop.get(NAMESPACE) if isinstance(prop, dict) else None
+                if not isinstance(meta, dict) or meta.get("archived") is True:
+                    continue
+                kind = meta.get("kind")
+                if not isinstance(kind, str) or kind not in KIND_OPERATORS:
+                    continue
+                group = titles.setdefault((key, kind), {})
+                title = prop.get("title")
+                if isinstance(title, str) and title:
+                    group[title] = group.get(title, 0) + 1
+                else:
+                    group.setdefault("", 0)
+                    group[""] += 1
+        rows = [
+            ItemFieldUse(
+                key=key,
+                kind=kind,
+                label=_label(key, group),
+                count=sum(group.values()),
+            )
+            for (key, kind), group in titles.items()
+        ]
+        rows.sort(key=lambda row: (-row.count, row.key, row.kind))
+        return rows[:limit]
 
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]

@@ -1,6 +1,7 @@
 import { descriptorForProp } from '$lib/field-types';
-import { readPropMeta } from '$lib/schema-meta';
+import { readPropMeta, withPropMeta } from '$lib/schema-meta';
 import type { JsonSchemaProperty } from '$lib/schema-types';
+import type { ItemField } from '$lib/item-fields';
 import { operatorsForKind } from './operators';
 import type { SummaryLookup } from './summary';
 
@@ -52,7 +53,12 @@ export type Catalogue = {
 	fields: FieldInfo[];
 	/** False until the item types have loaded; rows must not be called stale before then. */
 	loaded: boolean;
+	/** The per-item fields in use; null until read, or when the read failed. */
+	itemFields: readonly ItemField[] | null;
 };
+
+/** The field picker's heading for fields an individual item carries. */
+export const ITEM_FIELDS_LABEL = 'Per-item fields';
 
 function isRec(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -77,7 +83,11 @@ function title(prop: JsonSchemaProperty, key: string): string {
 }
 
 /** Every field of every item type, archived ones included (for labelling old conditions). */
-export function buildCatalogue(itemTypes: readonly ItemTypeLike[], loaded = true): Catalogue {
+export function buildCatalogue(
+	itemTypes: readonly ItemTypeLike[],
+	loaded = true,
+	itemFields: readonly ItemField[] | null = null
+): Catalogue {
 	const fields: FieldInfo[] = [];
 	for (const t of itemTypes) {
 		for (const [key, prop] of propertiesOf(t.attributes_schema)) {
@@ -102,7 +112,12 @@ export function buildCatalogue(itemTypes: readonly ItemTypeLike[], loaded = true
 			}
 		}
 	}
-	return { types: itemTypes.map((t) => ({ slug: t.slug, label: t.label })), fields, loaded };
+	return {
+		types: itemTypes.map((t) => ({ slug: t.slug, label: t.label })),
+		fields,
+		loaded,
+		itemFields
+	};
 }
 
 export function typeLabel(catalogue: Catalogue, slug: string): string {
@@ -112,13 +127,64 @@ export function typeLabel(catalogue: Catalogue, slug: string): string {
 /** "Film › Rating" for a field reference, from the catalogue when it is known. */
 export function fieldReferenceLabel(
 	catalogue: Catalogue,
-	type: string,
+	type: string | undefined,
 	key: string,
 	subKey?: string
 ): string {
-	const field = findField(catalogue, type, key, subKey);
+	const field = type === undefined ? undefined : findField(catalogue, type, key, subKey);
 	const name = field?.label ?? (subKey ? `${key} › ${subKey}` : key);
-	return `${typeLabel(catalogue, type)} › ${name}`;
+	return `${type === undefined ? ITEM_FIELDS_LABEL : typeLabel(catalogue, type)} › ${name}`;
+}
+
+/** The listing's row for a per-item field, matched on both kind and key. */
+export function findItemField(
+	catalogue: Catalogue,
+	kind: string,
+	key: string
+): ItemField | undefined {
+	return catalogue.itemFields?.find((f) => f.kind === kind && f.key === key);
+}
+
+/** A per-item field as a `FieldInfo`; the kind comes from the condition, the label from the listing. */
+export function itemFieldInfo(catalogue: Catalogue, kind: string, key: string): FieldInfo {
+	const label = findItemField(catalogue, kind, key)?.label ?? key;
+	return {
+		type: '',
+		typeLabel: ITEM_FIELDS_LABEL,
+		key,
+		label,
+		kind,
+		prop: withPropMeta({ title: label, type: 'string' }, { kind }),
+		archived: false
+	};
+}
+
+export type ItemFieldOption = { value: string; label: string; kind: string; count: number };
+
+/** The "Per-item fields" group for the field picker; null when there is nothing to offer. */
+export function itemFieldGroup(
+	catalogue: Catalogue
+): { label: string; options: ItemFieldOption[] } | null {
+	const options = (catalogue.itemFields ?? [])
+		.filter((f) => operatorsForKind(f.kind).length > 0)
+		.map((f) => ({
+			value: itemFieldSubject(f.kind, f.key),
+			label: f.label,
+			kind: f.kind,
+			count: f.count
+		}));
+	return options.length > 0 ? { label: ITEM_FIELDS_LABEL, options } : null;
+}
+
+/** The picker value for a per-item field: `item:<kind>:<key>`. */
+export function itemFieldSubject(kind: string, key: string): string {
+	return `item:${kind}:${key}`;
+}
+
+/** Inverse of `itemFieldSubject`; null for anything else. Keys may contain colons, kinds do not. */
+export function parseItemFieldSubject(subject: string): { kind: string; key: string } | null {
+	const match = /^item:([^:]+):(.+)$/s.exec(subject);
+	return match ? { kind: match[1], key: match[2] } : null;
 }
 
 export function findField(
@@ -183,11 +249,14 @@ export function summaryLookup(catalogue: Catalogue): SummaryLookup {
 	return {
 		typeLabel: (slug) => typeLabel(catalogue, slug),
 		fieldLabel: (type, key) => findField(catalogue, type, key)?.label ?? key,
+		itemFieldLabel: (kind, key) => findItemField(catalogue, kind, key)?.label ?? key,
 		subFieldLabel: (type, key, subKey) => findField(catalogue, type, key, subKey)?.label ?? null,
 		fieldKind: (type, key, subKey) => findField(catalogue, type, key, subKey)?.kind ?? null,
 		formatValue: (type, key, subKey, value) => {
 			const field = findField(catalogue, type, key, subKey);
 			return field ? formatFieldValue(field, value) : null;
-		}
+		},
+		formatItemValue: (kind, key, value) =>
+			formatFieldValue(itemFieldInfo(catalogue, kind, key), value)
 	};
 }

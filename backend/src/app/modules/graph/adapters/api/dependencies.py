@@ -40,6 +40,7 @@ from app.modules.graph.application.get_node_type import GetNodeType
 from app.modules.graph.application.list_attribute_values import ListAttributeValues
 from app.modules.graph.application.list_edge_types import ListEdgeTypes
 from app.modules.graph.application.list_edges import ListEdges
+from app.modules.graph.application.list_item_fields import ListItemFields
 from app.modules.graph.application.list_node_types import ListNodeTypes
 from app.modules.graph.application.list_nodes import ListNodes
 from app.modules.graph.application.promote_extra_schema_field import (
@@ -114,6 +115,13 @@ def get_search_nodes_use_case(
     policy: Annotated[AccessPolicy, Depends(get_access_policy)],
 ) -> SearchNodes:
     return SearchNodes(repos, policy)
+
+
+def get_list_item_fields_use_case(
+    repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+) -> ListItemFields:
+    return ListItemFields(repos, policy)
 
 
 def get_update_node_use_case(

@@ -60,9 +60,26 @@ SCHEMAS: dict[str, dict[str, Any]] = {
             },
         },
     },
+    "game": {
+        "type": "object",
+        "properties": {
+            "weight": {"type": "number", "x-menagerist": {"kind": "number"}},
+        },
+    },
 }
 
-_DATA: list[tuple[str, str, dict[str, Any], dict[str, Any]]] = [
+
+def _overlay(**fields: dict[str, Any]) -> dict[str, Any]:
+    """A per-item overlay: each field is its `x-menagerist` metadata."""
+    return {
+        "type": "object",
+        "properties": {key: {"x-menagerist": meta} for key, meta in fields.items()},
+    }
+
+
+_SIGNED = {"extra_schema": _overlay(signed={"kind": "boolean"})}
+
+_DATA: list[tuple[str, str | None, dict[str, Any], dict[str, Any]]] = [
     (
         "Alien",
         "film",
@@ -138,6 +155,42 @@ _DATA: list[tuple[str, str, dict[str, Any], dict[str, Any]]] = [
         },
         {},
     ),
+    ("Signed copy", None, {"signed": True}, _SIGNED),
+    ("Unsigned copy", None, {"signed": False}, _SIGNED),
+    ("Undecided", None, {}, _SIGNED),
+    ("Rogue", None, {"signed": True, "size": 20}, {}),
+    (
+        "Notes only",
+        None,
+        {"signed": "yes"},
+        {"extra_schema": _overlay(signed={"kind": "text"})},
+    ),
+    (
+        "Big box",
+        None,
+        {"size": 12},
+        {"extra_schema": _overlay(size={"kind": "number"})},
+    ),
+    (
+        "Small label",
+        None,
+        {"size": "large"},
+        {"extra_schema": _overlay(size={"kind": "text"})},
+    ),
+    ("Blank label", None, {}, {"extra_schema": _overlay(size={"kind": "text"})}),
+    (
+        "Worn",
+        None,
+        {"condition": "poor"},
+        {"extra_schema": _overlay(condition={"kind": "text", "archived": True})},
+    ),
+    ("Chess", "game", {"weight": 5}, {}),
+    (
+        "Reel",
+        "tape",
+        {"weight": 5},
+        {"extra_schema": _overlay(weight={"kind": "number"})},
+    ),
 ]
 
 
@@ -155,7 +208,11 @@ async def _seed(repo: NodeRepository) -> NodeRepository:
     """Add the shared items: five films and two parts for Alice, one film for Bob."""
     for name, type_slug, attributes, extra in _DATA:
         node = Node.create(
-            owner_id=ALICE, name=name, type=type_slug, attributes=attributes
+            owner_id=ALICE,
+            name=name,
+            type=type_slug,
+            attributes=attributes,
+            extra_schema=extra.get("extra_schema"),
         )
         node.tags = extra.get("tags", [])
         node.favourite = extra.get("favourite", False)
@@ -176,6 +233,24 @@ def _resolve(raw: dict[str, Any]) -> ResolvedQuery:
         today=TODAY,
         stale=resolution.stale,
     )
+
+
+def _p(
+    field_kind: str,
+    key: str,
+    op: str,
+    value: Any = None,  # noqa: ANN401
+) -> dict[str, Any]:
+    """A per-item field condition."""
+    cond: dict[str, Any] = {
+        "kind": "field",
+        "field_kind": field_kind,
+        "key": key,
+        "op": op,
+    }
+    if value is not None:
+        cond["value"] = value
+    return cond
 
 
 def _where(*children: dict[str, Any], op: str = "and", **extra: Any) -> dict[str, Any]:  # noqa: ANN401
@@ -215,6 +290,19 @@ async def _names(
 
 _FILM = {"kind": "type", "in": ["film"]}
 _FILMS = {"Alien", "Blade Runner", "Casablanca", "Café Society", "Bad data"}
+_ITEMS = {
+    "Signed copy",
+    "Unsigned copy",
+    "Undecided",
+    "Rogue",
+    "Notes only",
+    "Big box",
+    "Small label",
+    "Blank label",
+    "Worn",
+    "Chess",
+    "Reel",
+}
 
 CASES: list[tuple[str, dict[str, Any], set[str]]] = [
     (
@@ -342,7 +430,7 @@ CASES: list[tuple[str, dict[str, Any], set[str]]] = [
                 "children": [_f("film", "director", "not_in", ["woody allen"])],
             },
         },
-        {"Café Society", "Resistor", "Capacitor"},
+        {"Café Society", "Resistor", "Capacitor"} | _ITEMS,
     ),
     (
         "not of not in within the type equals in",
@@ -397,7 +485,8 @@ CASES: list[tuple[str, dict[str, Any], set[str]]] = [
             "Bad data",
             "Resistor",
             "Capacitor",
-        },
+        }
+        | _ITEMS,
     ),
     (
         "created before yesterday",
@@ -429,6 +518,91 @@ CASES: list[tuple[str, dict[str, Any], set[str]]] = [
             _f("part", "stock", "<=", {"ref": "old_reorder"}),
             _f("part", "stock", "not_empty"),
         ),
+        set(),
+    ),
+    (
+        "per-item boolean equals, ignoring items without that overlay",
+        _where(_p("boolean", "signed", "=", True)),
+        {"Signed copy"},
+    ),
+    (
+        "per-item not equal is scoped to items declaring the field",
+        _where(_p("boolean", "signed", "!=", True)),
+        {"Unsigned copy", "Undecided"},
+    ),
+    (
+        "not of a per-item condition is plain negation",
+        {
+            "v": 1,
+            "where": {"op": "not", "children": [_p("boolean", "signed", "=", True)]},
+        },
+        {n for n, *_ in _DATA} - {"Signed copy"},
+    ),
+    (
+        "per-item number matches only the number item",
+        _where(_p("number", "size", ">=", 10)),
+        {"Big box"},
+    ),
+    (
+        "per-item text matches only the text item",
+        _where(_p("text", "size", "=", "LARGE")),
+        {"Small label"},
+    ),
+    (
+        "per-item empty is scoped to items declaring the field",
+        _where(_p("text", "size", "empty")),
+        {"Blank label"},
+    ),
+    (
+        "per-item not empty is scoped to items declaring the field",
+        _where(_p("text", "size", "not_empty")),
+        {"Small label"},
+    ),
+    (
+        "per-item not in is scoped and includes missing values",
+        _where(_p("text", "size", "not_in", ["x"])),
+        {"Small label", "Blank label"},
+    ),
+    (
+        "per-item not in excludes the listed value",
+        _where(_p("text", "size", "not_in", ["large"])),
+        {"Blank label"},
+    ),
+    (
+        "archived per-item field matches nothing",
+        _where(_p("text", "condition", "=", "poor")),
+        set(),
+    ),
+    (
+        "archived per-item field matches nothing under not equal",
+        _where(_p("text", "condition", "!=", "good")),
+        set(),
+    ),
+    (
+        "per-item key equal to a type key matches only the item's own field",
+        _where(_p("number", "weight", "=", 5)),
+        {"Reel"},
+    ),
+    (
+        "type field still matches only its type",
+        _where(_f("game", "weight", "=", 5)),
+        {"Chess"},
+    ),
+    (
+        "per-item not equal ignores the type's field of the same name",
+        _where(_p("number", "weight", "!=", 9)),
+        {"Reel"},
+    ),
+    (
+        "per-item inside or beside a type condition",
+        _where(
+            _p("boolean", "signed", "=", True), _f("film", "rating", "=", 5), op="or"
+        ),
+        {"Signed copy", "Alien", "Casablanca"},
+    ),
+    (
+        "per-item kind that nobody declares matches nothing",
+        _where(_p("money", "signed", "not_empty")),
         set(),
     ),
     (
@@ -569,7 +743,7 @@ async def test_not_includes_items_whose_values_are_null(
         (_where(_f("film", "rating", ">=", 4)), 4, 3),
         (_where(_f("film", "rating", ">=", 4)), None, 3),
         ({"v": 1, "where": None}, 5, 5),
-        ({"v": 1, "where": None}, None, 7),
+        ({"v": 1, "where": None}, None, len(_DATA)),
     ],
     ids=["below", "exact", "above", "unlimited", "capped-all", "uncapped-all"],
 )

@@ -14,7 +14,21 @@ export type Condition =
 	| { kind: 'favourite'; value: boolean }
 	| { kind: 'tag'; mode: 'any' | 'all' | 'none'; tags: string[] }
 	| { kind: 'date'; on: 'created' | 'updated'; op: string; value: Value }
-	| { kind: 'field'; type: string; key: string; sub_key?: string; op: string; value?: Value };
+	| FieldCondition;
+
+/**
+ * Names an item type (`type`) or, for a field an individual item carries, its kind
+ * (`field_kind`): exactly one of the two. A per-item condition has no `sub_key` or `ref`.
+ */
+export type FieldCondition = {
+	kind: 'field';
+	type?: string;
+	field_kind?: string;
+	key: string;
+	sub_key?: string;
+	op: string;
+	value?: Value;
+};
 
 export type GroupOp = 'and' | 'or' | 'not';
 export type Group = { op: GroupOp; children: (Group | Condition)[] };
