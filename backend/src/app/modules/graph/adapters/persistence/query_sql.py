@@ -305,7 +305,9 @@ def _field_test(condition: FieldCondition, kind: str, ctx: ResolvedQuery) -> _Bo
 
 def _field(condition: FieldCondition, ctx: ResolvedQuery) -> _Bool:
     """Only items of the named type can match, complements included; stale is false."""
-    if condition in ctx.stale:
+    if condition in ctx.stale or condition.type is None:
+        # TODO(task 2): per-item conditions (type is None) match nothing until
+        # compiled against the item's own overlay.
         return false()
     kind = ctx.field_kinds.get((condition.type, condition.key, condition.sub_key))
     if kind is None:

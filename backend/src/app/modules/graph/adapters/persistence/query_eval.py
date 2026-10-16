@@ -209,7 +209,9 @@ def _column_filled(node: Node, condition: FieldCondition) -> bool:
 
 
 def _field_matches(node: Node, condition: FieldCondition, ctx: ResolvedQuery) -> bool:
-    if condition in ctx.stale:
+    if condition in ctx.stale or condition.type is None:
+        # TODO(task 2): per-item conditions (type is None) match nothing until
+        # evaluated against the item's own overlay.
         return False
     kind = ctx.field_kinds.get((condition.type, condition.key, condition.sub_key))
     if kind is None or node.type != condition.type:

@@ -360,3 +360,53 @@ def test_partial_dates_of_each_precision_are_accepted(value: str) -> None:
     """Year, month and day precision all resolve."""
     result = resolve_fields(_where(_f("year", "=", value)), _DATE_SCHEMAS)
     assert result.kinds == {("film", "year", None): "partialdate"}
+
+
+def _per_item(op: str, value: Any = None, kind: str = "boolean") -> dict[str, Any]:  # noqa: ANN401
+    cond: dict[str, Any] = {
+        "kind": "field",
+        "key": "signed",
+        "field_kind": kind,
+        "op": op,
+    }
+    if value is not None:
+        cond["value"] = value
+    return cond
+
+
+def test_valid_per_item_condition_resolves_without_kinds_or_warnings() -> None:
+    """A per-item condition needs no schema: no kinds, warnings or staleness."""
+    result = resolve_fields(_where(_per_item("=", True)), SCHEMAS)
+    assert result.kinds == {}
+    assert result.warnings == []
+    assert result.stale == frozenset()
+
+
+@pytest.mark.parametrize(
+    ("condition", "fragment"),
+    [
+        (_per_item(">", True), "not available for boolean"),
+        (_per_item("=", "yes"), "does not fit a boolean"),
+        (_per_item("=", True, kind="nonsense"), "Unknown field kind"),
+    ],
+)
+def test_bad_per_item_conditions_are_errors(
+    condition: dict[str, Any], fragment: str
+) -> None:
+    """A per-item condition is checked against its named kind."""
+    with pytest.raises(InvalidQueryError, match=fragment) as caught:
+        resolve_fields(_where(condition), SCHEMAS)
+    assert caught.value.path == "where.children[0]"
+
+
+def test_per_item_condition_cannot_hold_a_reference() -> None:
+    """The parser rejects references; the resolver refuses one built by hand."""
+    condition = FieldCondition(
+        key="stock",
+        field_kind="number",
+        op="=",
+        value=FieldReference(key="other"),
+    )
+    query = Query(where=Group(op="and", children=(condition,)))
+    with pytest.raises(InvalidQueryError, match="cannot be compared"):
+        resolve_fields(query, SCHEMAS)

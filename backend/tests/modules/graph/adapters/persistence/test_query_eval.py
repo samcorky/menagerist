@@ -420,3 +420,16 @@ async def test_table_column_empty_and_not_empty_are_complements(
     assert await _run(repository, nodes, _f("parts", "not_empty", sub_key="sku")) == {
         "full"
     }
+
+
+async def test_per_item_conditions_match_nothing_until_task_two(
+    repository: NodeRepository,
+) -> None:
+    """Placeholder: a per-item condition matches nothing, complements included.
+
+    Task 2 of the per-item field plan replaces this with real evaluation.
+    """
+    nodes = [_node("a", label="x")]
+    per_item = {"kind": "field", "key": "label", "field_kind": "text"}
+    assert await _run(repository, nodes, per_item | {"op": "=", "value": "x"}) == set()
+    assert await _run(repository, nodes, per_item | {"op": "!=", "value": "y"}) == set()

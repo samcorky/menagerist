@@ -140,7 +140,7 @@ def _check_reference(
     path: str,
 ) -> bool:
     """Check a field reference; return True when its target is gone."""
-    if kind not in REF_KINDS or condition.sub_key is not None:
+    if kind not in REF_KINDS or condition.sub_key is not None or condition.type is None:
         raise InvalidQueryError(
             f"A {kind} field cannot be compared with another field.", path=path
         )
@@ -185,21 +185,30 @@ def _resolve_field(
     path: str,
 ) -> bool:
     """Record the field's kind; return True when the condition is stale."""
-    prop, gone = _find(schemas, condition.type, condition.key, condition.sub_key)
-    if prop is None:
-        warnings.append(QueryWarning(path, gone or ""))
-        return True
-    kind = kind_of(prop)
-    if kind is None:
-        raise InvalidQueryError(
-            f"The field '{condition.key}' cannot be filtered.", path=path
-        )
+    if condition.type is None:
+        # Per-item: the condition names its kind, so no schema is consulted.
+        kind = condition.field_kind or ""
+        if kind not in KIND_OPERATORS:
+            raise InvalidQueryError("Unknown field kind.", path=path)
+    else:
+        prop, gone = _find(schemas, condition.type, condition.key, condition.sub_key)
+        if prop is None:
+            warnings.append(QueryWarning(path, gone or ""))
+            return True
+        found = kind_of(prop)
+        if found is None:
+            raise InvalidQueryError(
+                f"The field '{condition.key}' cannot be filtered.", path=path
+            )
+        kind = found
     if condition.op not in KIND_OPERATORS[kind]:
         raise InvalidQueryError(
             f"'{condition.op}' is not available for {kind} fields.", path=path
         )
     if _check_value(schemas, warnings, condition, kind, path):
         return True
+    if condition.type is None:
+        return False
     kinds[(condition.type, condition.key, condition.sub_key)] = kind
     return False
 

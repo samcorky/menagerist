@@ -144,11 +144,17 @@ class DateCondition:
 
 @dataclass(frozen=True, kw_only=True)
 class FieldCondition:
-    """Compare a field of one item type; `sub_key` addresses a table column."""
+    """Compare a field of one item type, or a per-item field by its kind.
 
-    type: str
+    `type` addresses a field of an item type; `field_kind` addresses a field an
+    item declares in its own overlay. Exactly one is set. `sub_key` addresses a
+    table column and is only valid with `type`.
+    """
+
     key: str
     op: str
+    type: str | None = None
+    field_kind: str | None = None
     value: Operand | None = None
     sub_key: str | None = None
 
@@ -418,18 +424,39 @@ def _date(data: Mapping[str, object], path: str) -> DateCondition:
     )
 
 
+def _has_reference(value: Operand | None) -> bool:
+    items = value if isinstance(value, tuple) else (value,)
+    return any(isinstance(item, FieldReference) for item in items)
+
+
 def _field(data: Mapping[str, object], path: str) -> FieldCondition:
     op = data.get("op")
     if not isinstance(op, str) or op not in _OPERATORS:
         msg = "Unknown operator."
         raise InvalidQueryError(msg, path=path)
+    raw_type = data.get("type")
+    raw_kind = data.get("field_kind")
+    if raw_type is not None and raw_kind is not None:
+        msg = "Name an item type or a field kind, not both."
+        raise InvalidQueryError(msg, path=path)
+    if raw_kind is None:
+        field_type: str | None = _string(raw_type, path, name="type")
+        field_kind = None
+    else:
+        field_type = None
+        field_kind = _string(raw_kind, path, name="field_kind")
     sub_key = data.get("sub_key")
+    value = _value(op, data, path)
+    if field_kind is not None and (sub_key is not None or _has_reference(value)):
+        msg = "A per-item field has no column and cannot be compared with a field."
+        raise InvalidQueryError(msg, path=path)
     return FieldCondition(
-        type=_string(data.get("type"), path, name="type"),
+        type=field_type,
+        field_kind=field_kind,
         key=_string(data.get("key"), path, name="key"),
         sub_key=None if sub_key is None else _string(sub_key, path, name="sub_key"),
         op=op,
-        value=_value(op, data, path),
+        value=value,
     )
 
 

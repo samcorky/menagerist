@@ -430,3 +430,49 @@ def test_version_must_be_exactly_one(version: object) -> None:
     with pytest.raises(InvalidQueryError) as caught:
         parse_query({"v": version, "where": None})
     assert caught.value.path == "v"
+
+
+def _per_item(**kwargs: Any) -> dict[str, Any]:  # noqa: ANN401
+    base = {
+        "kind": "field",
+        "key": "signed",
+        "field_kind": "boolean",
+        "op": "=",
+        "value": True,
+    }
+    return base | kwargs
+
+
+def test_per_item_condition_parses() -> None:
+    """A per-item condition names a field kind instead of an item type."""
+    query = parse_query(_query(_and(_per_item())))
+    ((_, condition),) = list(walk_conditions(query.where))
+    assert condition == FieldCondition(
+        key="signed", field_kind="boolean", op="=", value=True
+    )
+    assert condition.type is None
+
+
+@pytest.mark.parametrize(
+    ("condition", "path"),
+    [
+        (_per_item(type="film"), "where.children[0]"),
+        (
+            {k: v for k, v in _per_item().items() if k != "field_kind"},
+            "where.children[0]",
+        ),
+        (_per_item(field_kind=3), "where.children[0]"),
+        (_per_item(field_kind=""), "where.children[0]"),
+        (_per_item(field_kind="x" * 201), "where.children[0]"),
+        (_per_item(sub_key="role"), "where.children[0]"),
+        (_per_item(value={"ref": "other"}), "where.children[0]"),
+        (_per_item(op="in", value=[1, {"ref": "other"}]), "where.children[0]"),
+    ],
+)
+def test_per_item_condition_rejections_carry_a_path(
+    condition: dict[str, Any], path: str
+) -> None:
+    """Hostile per-item conditions are rejected with the condition's path."""
+    with pytest.raises(InvalidQueryError) as caught:
+        parse_query(_query(_and(condition)))
+    assert caught.value.path == path
