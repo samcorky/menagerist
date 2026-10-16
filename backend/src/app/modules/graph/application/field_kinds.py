@@ -6,7 +6,7 @@ from typing import Any, Final
 from app.modules.graph.application.schema_meta import NAMESPACE
 
 _ORDERED = frozenset({"=", "!=", ">", ">=", "<", "<=", "between", "empty", "not_empty"})
-_TEXT = frozenset({"=", "!=", "~", "in", "empty", "not_empty"})
+_TEXT = frozenset({"=", "!=", "~", "in", "not_in", "empty", "not_empty"})
 
 KIND_OPERATORS: Final[Mapping[str, frozenset[str]]] = {
     "text": _TEXT,
@@ -21,7 +21,7 @@ KIND_OPERATORS: Final[Mapping[str, frozenset[str]]] = {
     "date": _ORDERED,
     "partialdate": _ORDERED,
     "boolean": frozenset({"=", "!="}),
-    "choice": frozenset({"=", "!=", "in", "empty", "not_empty"}),
+    "choice": frozenset({"=", "!=", "in", "not_in", "empty", "not_empty"}),
     "multichoice": frozenset({"has", "empty", "not_empty"}),
     "checklist": frozenset({"incomplete", "complete", "empty", "not_empty"}),
 }

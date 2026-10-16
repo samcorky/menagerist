@@ -10,7 +10,11 @@ if TYPE_CHECKING:
 
 
 def fold(text: str) -> str:
-    """Casefold `text` and strip accents, as Postgres `unaccent` does."""
+    """Casefold `text` and strip combining accents.
+
+    Close to Postgres `lower(unaccent(...))` but not equal: letters `unaccent`
+    transliterates without a combining mark (Æ, Ø, Ł, Đ, Þ and others) differ.
+    """
     decomposed = unicodedata.normalize("NFD", text)
     return "".join(c for c in decomposed if not unicodedata.combining(c)).casefold()
 

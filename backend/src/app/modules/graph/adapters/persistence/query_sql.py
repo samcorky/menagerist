@@ -12,10 +12,13 @@ give the same answer here. Three rules keep it honest:
 
 import json
 import operator
+import sys
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Final
 
 from sqlalchemy import (
     Float,
+    Numeric,
     Text,
     and_,
     case,
@@ -41,6 +44,7 @@ from app.modules.graph.adapters.persistence.search_sql import (
     unaccent_ilike,
 )
 from app.modules.graph.domain.query import (
+    COMPLEMENT_OPERATORS,
     Condition,
     Cursor,
     DateCondition,
@@ -70,6 +74,7 @@ type _Bool = ColumnElement[bool]
 _NUMERIC: Final = frozenset({"number", "duration", "rating"})
 _TEXTUAL: Final = frozenset({"text", "url", "email", "phone", "longtext"})
 _C: Final = "C"  # byte-wise collation: Python's code-point string order
+_FLOAT_MAX: Final = Decimal(int(sys.float_info.max))
 
 
 def _never_null(expression: _Bool) -> _Bool:
@@ -82,7 +87,10 @@ def _typed(j: _Expr, json_type: str, value: _Expr) -> _Expr:
 
 
 def _num(j: _Expr) -> _Expr:
-    return _typed(j, "number", cast(j, Float))
+    """A JSON number as float8, or NULL when it is not one or too large for one."""
+    in_range = func.abs(cast(j, Numeric)) <= literal(_FLOAT_MAX, Numeric)
+    # Nested CASEs: the numeric cast must only see JSON numbers.
+    return _typed(j, "number", case((in_range, cast(j, Float)), else_=null()))
 
 
 def _str(j: _Expr) -> _Expr:
@@ -283,8 +291,8 @@ def _column_test(
 
 
 def _field_test(condition: FieldCondition, kind: str, ctx: ResolvedQuery) -> _Bool:
-    """The condition's test with `!=` read as `=`; never NULL."""
-    op = "=" if condition.op == "!=" else condition.op
+    """The condition's test with a complement read as its positive; never NULL."""
+    op = COMPLEMENT_OPERATORS.get(condition.op, condition.op)
     operand = None if condition.value is None else _operand(condition.value, kind, ctx)
     if condition.sub_key is not None:
         return _column_test(condition, kind, op, operand)
@@ -296,13 +304,16 @@ def _field_test(condition: FieldCondition, kind: str, ctx: ResolvedQuery) -> _Bo
 
 
 def _field(condition: FieldCondition, ctx: ResolvedQuery) -> _Bool:
-    """Only items of the named type can match, `!=` included; stale is false."""
+    """Only items of the named type can match, complements included; stale is false."""
+    if condition in ctx.stale:
+        return false()
     kind = ctx.field_kinds.get((condition.type, condition.key, condition.sub_key))
     if kind is None:
         return false()
     of_type = _never_null(NodeModel.type == condition.type)
     test = _field_test(condition, kind, ctx)
-    return and_(of_type, not_(test) if condition.op == "!=" else test)
+    complement = condition.op in COMPLEMENT_OPERATORS
+    return and_(of_type, not_(test) if complement else test)
 
 
 def _date(condition: DateCondition, ctx: ResolvedQuery) -> _Bool:

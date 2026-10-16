@@ -36,6 +36,7 @@ SCHEMA: dict[str, Any] = {
         "title": {"type": "string", "x-menagerist": {"kind": "text"}},
         "price": {"type": "object", "x-menagerist": {"kind": "money"}},
         "released": {"type": "string", "format": "date"},
+        "old_rating": {"type": "number", "x-menagerist": {"archived": True}},
     },
 }
 
@@ -56,7 +57,7 @@ async def _setup(count: int = 5, **options: Any) -> SearchNodes:  # noqa: ANN401
                 owner_id=uuid.UUID(int=1),
                 name=f"Film {index}",
                 type="film",
-                attributes={"rating": index % 3},
+                attributes={"rating": index % 3, "old_rating": 2},
             )
         )
     return SearchNodes(
@@ -109,6 +110,18 @@ async def test_stale_fields_are_reported() -> None:
     use_case = await _setup()
     stale = {"kind": "field", "type": "film", "key": "gone", "op": "=", "value": "x"}
     result = await use_case.handle(SearchNodesQuery(query=_body(stale)), SYSTEM_ACTOR)
+    assert result.items == []
+    assert [w.path for w in result.warnings] == ["where.children[0]"]
+
+
+async def test_stale_reference_matches_nothing_beside_a_live_condition() -> None:
+    """SearchNodes: a stale reference is not revived by a live condition."""
+    use_case = await _setup()
+    stale = _rating("<=", 0) | {"value": {"ref": "old_rating"}}
+    live = {"kind": "field", "type": "film", "key": "rating", "op": "not_empty"}
+    result = await use_case.handle(
+        SearchNodesQuery(query=_body(stale, live)), SYSTEM_ACTOR
+    )
     assert result.items == []
     assert [w.path for w in result.warnings] == ["where.children[0]"]
 

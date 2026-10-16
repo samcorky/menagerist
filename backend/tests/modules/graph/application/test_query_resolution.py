@@ -5,6 +5,7 @@ import pytest
 from app.modules.graph.application.query_resolution import resolve_fields
 from app.modules.graph.domain.query import (
     FieldCondition,
+    FieldReference,
     Group,
     InvalidQueryError,
     Query,
@@ -87,6 +88,10 @@ def test_stale_fields_warn_instead_of_failing(
         _f("genres", "has", 3),
         _f("rating", "=", {"ref": "title_en"}),  # reference of a different kind
         _f("year", "=", {"ref": "year"}),  # kind that cannot take references
+        _f("rating", "not_in", [1]),  # not_in is not offered for numbers
+        _f("genres", "not_in", ["a"]),  # nor for multi-choice
+        _f("title_en", "not_in", ["a", 3]),  # every operand must fit the kind
+        _f("title_en", "not_in", [{"ref": "title_en"}]),  # text takes no references
     ],
 )
 def test_wrong_operator_or_value_is_an_error(condition: dict[str, Any]) -> None:
@@ -100,6 +105,23 @@ def test_field_reference_to_a_stale_field_warns() -> None:
     result = resolve_fields(_where(_f("stock", "<=", {"ref": "gone"})), SCHEMAS)
     assert result.kinds == {}
     assert len(result.warnings) == 1
+
+
+def test_stale_conditions_are_listed_even_when_their_field_is_live() -> None:
+    """A stale reference stays stale beside a live condition on the same field."""
+    query = _where(
+        _f("stock", "<=", {"ref": "gone"}),
+        _f("stock", "not_empty"),
+        _f("gone", "empty"),
+    )
+    result = resolve_fields(query, SCHEMAS)
+    assert result.kinds == {("film", "stock", None): "number"}
+    assert result.stale == {
+        FieldCondition(
+            type="film", key="stock", op="<=", value=FieldReference(key="gone")
+        ),
+        FieldCondition(type="film", key="gone", op="empty"),
+    }
 
 
 def test_field_reference_of_the_same_kind_resolves() -> None:
@@ -173,6 +195,8 @@ def test_unfilterable_field_is_an_error() -> None:
         _f("year", ">", "1984-05"),
         _f("genres", "has", "a"),
         _f("title_en", "in", ["a", "b"]),
+        _f("title_en", "not_in", ["a", "b"]),
+        _f("cast", "not_in", ["lead"], sub_key="role"),
     ],
 )
 def test_valid_conditions_resolve(condition: dict[str, Any]) -> None:
@@ -284,3 +308,55 @@ def test_condition_built_without_a_value_has_nothing_to_check() -> None:
     condition = FieldCondition(type="film", key="rating", op="=")
     query = Query(where=Group(op="and", children=(condition,)))
     assert resolve_fields(query, SCHEMAS).kinds == {("film", "rating", None): "rating"}
+
+
+_DATE_SCHEMAS: dict[str, dict[str, Any]] = {
+    "film": {
+        "properties": {
+            "released": {"type": "string", "format": "date"},
+            "year": {"type": "string", "x-menagerist": {"kind": "partialdate"}},
+        }
+    }
+}
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "20240101",
+        "2024-W01-1",
+        "2024W011",
+        "2024-001",
+        "2024-01-01\n",
+        "2024-01-01".translate({ord(str(d)): 0x660 + d for d in range(10)}),
+        "2024-01-01T00:00",
+    ],
+)
+def test_dates_must_be_extended_iso_calendar_dates(value: str) -> None:
+    """Basic, week and ordinal forms would compare wrongly as text: a 400."""
+    with pytest.raises(InvalidQueryError, match=r"where\.children\[0\]"):
+        resolve_fields(_where(_f("released", ">", value)), _DATE_SCHEMAS)
+    with pytest.raises(InvalidQueryError, match=r"where\.children\[0\]"):
+        resolve_fields(_date_query(">", value), _DATE_SCHEMAS)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "1984\n",
+        "1984".translate({ord(str(d)): 0x660 + d for d in range(10)}),
+        "1984-06\n",
+        "1984-6",
+    ],
+)
+def test_partial_dates_must_be_plain_ascii(value: str) -> None:
+    """A trailing newline or non-ASCII digits are rejected, as in the browser."""
+    with pytest.raises(InvalidQueryError, match=r"where\.children\[0\]"):
+        resolve_fields(_where(_f("year", "=", value)), _DATE_SCHEMAS)
+
+
+@pytest.mark.parametrize("value", ["1984", "1984-06", "1984-06-01"])
+def test_partial_dates_of_each_precision_are_accepted(value: str) -> None:
+    """Year, month and day precision all resolve."""
+    result = resolve_fields(_where(_f("year", "=", value)), _DATE_SCHEMAS)
+    assert result.kinds == {("film", "year", None): "partialdate"}

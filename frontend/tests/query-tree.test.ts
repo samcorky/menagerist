@@ -6,8 +6,10 @@ import {
 	countConditions,
 	emptyQuery,
 	isFilterEmpty,
+	pageConditions,
 	removeAt,
-	replaceAt
+	replaceAt,
+	searchTextTooLong
 } from '$lib/query/tree';
 import { isGroup, type Condition, type Group, type Query } from '$lib/query/types';
 
@@ -228,5 +230,28 @@ describe('query tree', () => {
 			const combined = combine(deep, { type: 'film' });
 			expect(depth(combined.where!)).toBeLessThanOrEqual(4);
 		});
+	});
+});
+
+describe('search text length', () => {
+	// The server counts characters (code points), not UTF-16 units; each emoji is two units.
+	const emoji = (n: number) => '🎬'.repeat(n);
+
+	it('counts emoji as one character each', () => {
+		expect(searchTextTooLong(emoji(200))).toBe(false);
+		expect(searchTextTooLong(emoji(201))).toBe(true);
+		expect(pageConditions({ q: emoji(200) })).toEqual([{ kind: 'text', q: emoji(200) }]);
+		expect(pageConditions({ q: emoji(201) })).toEqual([]);
+	});
+
+	it('keeps the 200-character limit for plain text', () => {
+		expect(searchTextTooLong('a'.repeat(200))).toBe(false);
+		expect(searchTextTooLong('a'.repeat(201))).toBe(true);
+		expect(pageConditions({ q: 'a'.repeat(201) })).toEqual([]);
+	});
+
+	it('counts a type slug in characters too', () => {
+		expect(pageConditions({ type: emoji(200) })).toEqual([{ kind: 'type', in: [emoji(200)] }]);
+		expect(pageConditions({ type: emoji(201) })).toEqual([]);
 	});
 });

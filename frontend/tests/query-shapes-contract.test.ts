@@ -71,6 +71,26 @@ function bulk(): [string, unknown, boolean][] {
 		cases.push([`currency of ${size}`, where(field('=', { value: money })), ok]);
 		const sort = [{ by: 'field', type: text, key: 'k' }];
 		cases.push([`sort type of ${size}`, { v: 1, where: null, sort }, ok]);
+		const sortKey = [{ by: 'field', type: 't', key: text }];
+		cases.push([`sort key of ${size}`, { v: 1, where: null, sort: sortKey }, ok]);
+		cases.push([`in item of ${size}`, where(field('in', { value: ['a', text] })), ok]);
+		cases.push([`between item of ${size}`, where(field('between', { value: ['a', text] })), ok]);
+		const astral = '🎬'.repeat(size);
+		cases.push([
+			`tag of ${size} astral characters`,
+			where({ kind: 'tag', mode: 'any', tags: [astral] }),
+			ok
+		]);
+		cases.push([
+			`field key of ${size} astral characters`,
+			where(field('=', { key: astral, value: 1 })),
+			ok
+		]);
+		cases.push([
+			`string operand of ${size} astral characters`,
+			where(field('=', { value: astral })),
+			ok
+		]);
 	}
 	for (const size of [50, 51]) {
 		const ok = size === 50;
@@ -95,6 +115,11 @@ function bulk(): [string, unknown, boolean][] {
 		]);
 	}
 	const many = (n: number) => Array.from({ length: n }, () => fav);
+	cases.push([
+		'50 conditions across groups',
+		where({ op: 'or', children: many(30) }, { op: 'or', children: many(20) }),
+		true
+	]);
 	cases.push([
 		'conditions counted across groups',
 		where({ op: 'or', children: many(30) }, { op: 'or', children: many(21) }),

@@ -6,6 +6,8 @@ import pytest
 from app.modules.graph.domain.query import (
     MAX_CONDITIONS,
     MAX_DEPTH,
+    MAX_LIST_LENGTH,
+    MAX_TEXT_LENGTH,
     FieldCondition,
     FieldReference,
     Group,
@@ -107,6 +109,63 @@ def test_between_and_in_and_has_take_lists() -> None:
     assert has.value == ("scifi",)
     assert isinstance(in_, FieldCondition)
     assert in_.value == ("a", "b")
+
+
+def test_not_in_takes_a_list_like_in() -> None:
+    """`not_in` parses to a tuple of operands, exactly as `in` does."""
+    query = parse_query(
+        _query(_and(_field(key="c", op="not_in", value=["a", 1, {"ref": "k"}])))
+    )
+    assert isinstance(query.where, Group)
+    (condition,) = query.where.children
+    assert isinstance(condition, FieldCondition)
+    assert condition.op == "not_in"
+    assert condition.value == ("a", 1, FieldReference(key="k"))
+
+
+@pytest.mark.parametrize("size", [1, MAX_LIST_LENGTH])
+def test_not_in_accepts_one_to_fifty_values(size: int) -> None:
+    """The list limits of `in` apply to `not_in`."""
+    items = ["a"] * (size - 1) + ["x" * MAX_TEXT_LENGTH]
+    query = parse_query(_query(_and(_field(op="not_in", value=items))))
+    assert isinstance(query.where, Group)
+    condition = query.where.children[0]
+    assert isinstance(condition, FieldCondition)
+    assert condition.value == tuple(items)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        [],
+        "a",
+        ["a"] * (MAX_LIST_LENGTH + 1),
+        ["a", None],
+        [["a"]],
+        ["x" * (MAX_TEXT_LENGTH + 1)],
+        [float("nan")],
+    ],
+    ids=["empty", "scalar", "51", "null", "nested", "too long", "nan"],
+)
+def test_not_in_rejects_what_in_rejects(value: object) -> None:
+    """`not_in` needs a list of 1 to 50 valid operands, as `in` does."""
+    for op in ("in", "not_in"):
+        with pytest.raises(InvalidQueryError, match=r"where\.children\[0\]"):
+            parse_query(_query(_and(_field(op=op, value=value))))
+
+
+def test_not_in_without_a_value_is_rejected() -> None:
+    """`not_in` needs a value."""
+    condition = {k: v for k, v in _field(op="not_in").items() if k != "value"}
+    with pytest.raises(InvalidQueryError, match="'not_in' needs a value"):
+        parse_query(_query(_and(condition)))
+
+
+def test_not_in_is_not_a_date_operator() -> None:
+    """Created and updated dates do not take `not_in`."""
+    date_condition = {"kind": "date", "on": "created", "op": "not_in", "value": [1]}
+    with pytest.raises(InvalidQueryError, match=r"where\.children\[0\]"):
+        parse_query(_query(_and(date_condition)))
 
 
 def test_no_value_operators_reject_a_value() -> None:
@@ -259,3 +318,115 @@ def test_no_value_operator_parses_without_a_value() -> None:
     condition = query.where.children[0]
     assert isinstance(condition, FieldCondition)
     assert condition.value is None
+
+
+# Backend-only: JSON fixtures cannot carry NaN or lone surrogates portably, and
+# huge integers would round-trip differently through JavaScript.
+_HUGE = 10**400
+_SURROGATE = "\ud800"
+
+
+@pytest.mark.parametrize(
+    "operand",
+    [
+        _HUGE,
+        -_HUGE,
+        10**309,
+        float("nan"),
+        float("inf"),
+        float("-inf"),
+        {"value": _HUGE, "currency": "GBP"},
+        {"value": float("nan"), "currency": "GBP"},
+        {"value": float("inf"), "currency": "GBP"},
+        _SURROGATE,
+        f"ok{_SURROGATE}",
+        {"ref": _SURROGATE},
+        {"value": 1, "currency": _SURROGATE},
+    ],
+    ids=[
+        "huge integer",
+        "huge negative integer",
+        "integer just past float range",
+        "NaN",
+        "Infinity",
+        "-Infinity",
+        "huge money",
+        "NaN money",
+        "Infinity money",
+        "lone surrogate",
+        "text with a lone surrogate",
+        "reference with a lone surrogate",
+        "currency with a lone surrogate",
+    ],
+)
+def test_hostile_operands_are_rejected(operand: object) -> None:
+    """Values the database cannot take, or compares differently, are a 400."""
+    for op, value in (("=", operand), ("in", [1, operand]), ("between", [operand, 1])):
+        with pytest.raises(InvalidQueryError) as caught:
+            parse_query(_query(_and(_field(op=op, value=value))))
+        assert caught.value.path == "where.children[0]"
+
+
+def test_largest_finite_numbers_are_accepted() -> None:
+    """Numbers up to the float range still parse."""
+    query = parse_query(
+        _query(
+            _and(
+                _field(value=10**308),
+                _field(value=-1.7e308),
+                _field(value={"value": 10**308, "currency": "GBP"}),
+            )
+        )
+    )
+    assert query.where is not None
+    assert len(query.where.children) == 3
+
+
+@pytest.mark.parametrize(
+    "condition",
+    [
+        {"kind": "text", "q": _SURROGATE},
+        {"kind": "type", "in": [_SURROGATE]},
+        {"kind": "tag", "mode": "any", "tags": [_SURROGATE]},
+        _field(key=_SURROGATE),
+        _field(type=_SURROGATE),
+        _field(sub_key=_SURROGATE),
+    ],
+    ids=["q", "type slug", "tag", "key", "type", "sub_key"],
+)
+def test_lone_surrogates_in_names_are_rejected(condition: dict[str, Any]) -> None:
+    """Text that cannot be encoded as UTF-8 is a 400, not a database error."""
+    with pytest.raises(InvalidQueryError) as caught:
+        parse_query(_query(_and(condition)))
+    assert caught.value.path == "where.children[0]"
+
+
+def test_lone_surrogate_in_a_sort_key_is_rejected() -> None:
+    """Sort keys are held to the same text rule."""
+    sort = [{"by": "field", "type": "film", "key": _SURROGATE}]
+    with pytest.raises(InvalidQueryError) as caught:
+        parse_query(_query(None, sort=sort))
+    assert caught.value.path == "sort[0]"
+
+
+def _digits(text: str, zero: int) -> str:
+    """`text` with its ASCII digits swapped for another script's."""
+    return text.translate({ord(str(d)): zero + d for d in range(10)})
+
+
+@pytest.mark.parametrize(
+    "rel",
+    ["-30d\n", _digits("-30d", 0x660), _digits("10d", 0xFF10), "-30d ", "--3d"],
+)
+def test_relative_dates_must_be_plain_ascii(rel: str) -> None:
+    """A trailing newline or non-ASCII digits are rejected, as in the browser."""
+    with pytest.raises(InvalidQueryError):
+        parse_query(_query(_and(_field(value={"rel": rel}))))
+
+
+@pytest.mark.parametrize("version", [True, 1.5, "1", None])
+def test_version_must_be_exactly_one(version: object) -> None:
+    """`true` equals 1 in Python but is not version 1."""
+    with pytest.raises(InvalidQueryError) as caught:
+        parse_query({"v": version, "where": None})
+    assert caught.value.path == "v"

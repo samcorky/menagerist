@@ -35,6 +35,7 @@ SCHEMAS: dict[str, dict[str, Any]] = {
                 "items": {"type": "string", "enum": ["scifi", "horror", "drama"]},
             },
             "director": {"type": "string"},
+            "format": {"type": "string", "enum": ["VHS", "DVD", "vhs"]},
             "notes": {"type": "string"},
         },
     },
@@ -43,6 +44,7 @@ SCHEMAS: dict[str, dict[str, Any]] = {
         "properties": {
             "stock": {"type": "number"},
             "reorder_at": {"type": "number"},
+            "old_reorder": {"type": "number", "x-menagerist": {"archived": True}},
             "price": {"type": "object", "x-menagerist": {"kind": "money"}},
             "steps": {"type": "array", "x-menagerist": {"kind": "checklist"}},
             "bom": {
@@ -70,6 +72,7 @@ _DATA: list[tuple[str, str, dict[str, Any], dict[str, Any]]] = [
             "rating": 5,
             "seen": True,
             "genres": ["scifi", "horror"],
+            "format": "VHS",
         },
         {"tags": ["classic"], "favourite": True},
     ),
@@ -82,6 +85,7 @@ _DATA: list[tuple[str, str, dict[str, Any], dict[str, Any]]] = [
             "rating": 4,
             "seen": False,
             "genres": ["scifi"],
+            "format": "DVD",
         },
         {},
     ),
@@ -94,6 +98,7 @@ _DATA: list[tuple[str, str, dict[str, Any], dict[str, Any]]] = [
             "rating": 5,
             "seen": True,
             "genres": ["drama"],
+            "format": "vhs",
         },
         {"tags": ["classic"]},
     ),
@@ -103,13 +108,19 @@ _DATA: list[tuple[str, str, dict[str, Any], dict[str, Any]]] = [
         {"year": "2016-05-13", "director": "Woody Allen", "notes": "50% off_day"},
         {},
     ),
-    ("Bad data", "film", {"year": 1999, "rating": "abc", "runtime": "long"}, {}),
+    (
+        "Bad data",
+        "film",
+        {"year": 1999, "rating": "abc", "runtime": "long", "format": 7},
+        {},
+    ),
     (
         "Resistor",
         "part",
         {
             "stock": 3,
             "reorder_at": 10,
+            "old_reorder": 10,
             "price": {"value": 0.1, "currency": "GBP"},
             "steps": [{"text": "a", "done": True}],
             "bom": [{"ref": "R1", "qty": 2}, {"ref": ""}],
@@ -159,7 +170,11 @@ def _resolve(raw: dict[str, Any]) -> ResolvedQuery:
     query = parse_query(raw)
     resolution = resolve_fields(query, SCHEMAS)
     return ResolvedQuery(
-        query=query, field_kinds=resolution.kinds, search_exclusions={}, today=TODAY
+        query=query,
+        field_kinds=resolution.kinds,
+        search_exclusions={},
+        today=TODAY,
+        stale=resolution.stale,
     )
 
 
@@ -199,6 +214,7 @@ async def _names(
 
 
 _FILM = {"kind": "type", "in": ["film"]}
+_FILMS = {"Alien", "Blade Runner", "Casablanca", "Café Society", "Bad data"}
 
 CASES: list[tuple[str, dict[str, Any], set[str]]] = [
     (
@@ -297,6 +313,63 @@ CASES: list[tuple[str, dict[str, Any], set[str]]] = [
         _where(_f("part", "bom", "!=", "R1", sub_key="ref")),
         {"Capacitor"},
     ),
+    (
+        "not in is scoped to the named type and includes missing values",
+        _where(_f("film", "director", "not_in", ["Ridley Scott"])),
+        _FILMS,
+    ),
+    (
+        "not in folds case and accents for text",
+        _where(_f("film", "director", "not_in", ["WOODY ÁLLEN", "x"])),
+        _FILMS - {"Café Society"},
+    ),
+    (
+        "not in compares a choice exactly and keeps wrong-typed values",
+        _where(_f("film", "format", "not_in", ["VHS"])),
+        {"Blade Runner", "Casablanca", "Café Society", "Bad data"},
+    ),
+    (
+        "not in with every value listed leaves only the missing and wrong-typed",
+        _where(_f("film", "format", "not_in", ["VHS", "DVD", "vhs"])),
+        {"Café Society", "Bad data"},
+    ),
+    (
+        "not of not in is in, or any other type",
+        {
+            "v": 1,
+            "where": {
+                "op": "not",
+                "children": [_f("film", "director", "not_in", ["woody allen"])],
+            },
+        },
+        {"Café Society", "Resistor", "Capacitor"},
+    ),
+    (
+        "not of not in within the type equals in",
+        _where(
+            _FILM,
+            {"op": "not", "children": [_f("film", "format", "not_in", ["VHS", "DVD"])]},
+        ),
+        {"Alien", "Blade Runner"},
+    ),
+    (
+        "not in beside its complement matches nothing",
+        _where(
+            _f("film", "format", "in", ["VHS"]),
+            _f("film", "format", "not_in", ["VHS"]),
+        ),
+        set(),
+    ),
+    (
+        "table column not in is no row in the list",
+        _where(_f("part", "bom", "not_in", ["r1", "x"], sub_key="ref")),
+        {"Capacitor"},
+    ),
+    (
+        "table column not in keeps items whose rows hold other values",
+        _where(_f("part", "bom", "not_in", ["x"], sub_key="ref")),
+        {"Resistor", "Capacitor"},
+    ),
     ("empty means missing", _where(_f("film", "rating", "empty")), {"Café Society"}),
     ("not empty", _where(_f("film", "director", "not_empty")), {"Café Society"}),
     ("boolean", _where(_f("film", "seen", "=", True)), {"Alien", "Casablanca"}),
@@ -337,6 +410,27 @@ CASES: list[tuple[str, dict[str, Any], set[str]]] = [
         {"Alien", "Blade Runner", "Casablanca", "Café Society", "Bad data"},
     ),
     ("stale field matches nothing", _where(_f("film", "gone", "=", "x")), set()),
+    (
+        "stale field matches nothing under not in",
+        _where(_f("film", "gone", "not_in", ["x"])),
+        set(),
+    ),
+    (
+        "not of a stale not in matches everything",
+        {
+            "v": 1,
+            "where": {"op": "not", "children": [_f("film", "gone", "not_in", ["x"])]},
+        },
+        {n for n, *_ in _DATA},
+    ),
+    (
+        "stale reference matches nothing beside a live condition on its field",
+        _where(
+            _f("part", "stock", "<=", {"ref": "old_reorder"}),
+            _f("part", "stock", "not_empty"),
+        ),
+        set(),
+    ),
     (
         "not of a stale field matches everything",
         {"v": 1, "where": {"op": "not", "children": [_f("film", "gone", "=", "x")]}},
@@ -541,3 +635,105 @@ async def test_paging_through_ties_in_the_first_key_matches_the_unpaged_order(
         after = Cursor(sort_values=hits[-1].sort_values, id=hits[-1].node.id)
     assert paged == [hit.node.id for hit in unpaged]
     assert len(paged) == len(names)
+
+
+_HUGE = 10**400
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (_where(_f("part", "stock", "<", 5)), ["Resistor"]),
+        (_where(_f("part", "stock", ">=", 0)), ["Resistor", "Capacitor"]),
+        (_where(_f("part", "stock", "between", [0, 100])), ["Resistor", "Capacitor"]),
+        (
+            _where(
+                {"kind": "type", "in": ["part"]},
+                {"op": "not", "children": [_f("part", "stock", ">=", 0)]},
+            ),
+            ["Overflow"],
+        ),
+        (
+            _where(_f("part", "stock", ">=", {"ref": "reorder_at"})),
+            ["Capacitor"],
+        ),
+        (
+            _where(_f("part", "price", ">=", {"value": 0, "currency": "GBP"})),
+            ["Resistor"],
+        ),
+        (
+            _where(
+                {"kind": "type", "in": ["part"]},
+                sort=[{"by": "field", "type": "part", "key": "stock", "dir": "desc"}],
+            ),
+            ["Capacitor", "Resistor", "Overflow"],
+        ),
+        (
+            _where(
+                {"kind": "type", "in": ["part"]},
+                sort=[{"by": "field", "type": "part", "key": "price"}],
+            ),
+            ["Resistor", "Capacitor", "Overflow"],
+        ),
+    ],
+    ids=[
+        "less than",
+        "at least",
+        "between",
+        "not",
+        "reference",
+        "money",
+        "number sort",
+        "money sort",
+    ],
+)
+async def test_number_beyond_float_range_is_treated_as_the_wrong_type(
+    repository: NodeRepository, raw: dict[str, Any], expected: list[str]
+) -> None:
+    """One stored number too large for a float neither matches nor errors."""
+    await _seed(repository)
+    await repository.add(
+        Node.create(
+            owner_id=ALICE,
+            name="Overflow",
+            type="part",
+            attributes={
+                "stock": _HUGE,
+                "reorder_at": -_HUGE,
+                "price": {"value": _HUGE, "currency": "GBP"},
+            },
+        )
+    )
+    assert await _names(repository, raw) == expected
+
+
+@pytest.mark.parametrize("direction", ["asc", "desc"])
+async def test_not_in_leaves_sorting_and_paging_alone(
+    repository: NodeRepository, direction: str
+) -> None:
+    """A not-in filter pages through the same order as the unpaged search."""
+    await _seed(repository)
+    raw = _where(
+        _f("film", "format", "not_in", ["DVD"]),
+        sort=[{"by": "field", "type": "film", "key": "rating", "dir": direction}],
+    )
+    resolved = _resolve(raw)
+    scope = AccessScope.of(ALICE)
+    unpaged = await repository.search(
+        scope=scope, resolved=resolved, after=None, limit=100
+    )
+    names = [hit.node.name for hit in unpaged]
+    rated = ["Alien", "Casablanca"]
+    assert names == [*rated, "Café Society", "Bad data"]
+    paged: list[str] = []
+    after: Cursor | None = None
+    while True:
+        hits = await repository.search(
+            scope=scope, resolved=resolved, after=after, limit=1
+        )
+        paged += [hit.node.name for hit in hits]
+        if not hits:
+            break
+        after = Cursor(sort_values=hits[-1].sort_values, id=hits[-1].node.id)
+    assert paged == names
+    assert await repository.search_count(scope=scope, resolved=resolved) == 4

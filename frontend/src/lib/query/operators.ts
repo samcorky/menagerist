@@ -1,5 +1,5 @@
 const ordered = ['=', '!=', '>', '>=', '<', '<=', 'between', 'empty', 'not_empty'] as const;
-const text = ['=', '!=', '~', 'in', 'empty', 'not_empty'] as const;
+const text = ['=', '!=', '~', 'in', 'not_in', 'empty', 'not_empty'] as const;
 
 /** Keep in step with shared/contracts/query-operators.json (a test enforces it). */
 export const KIND_OPERATORS: Record<string, readonly string[]> = {
@@ -15,7 +15,7 @@ export const KIND_OPERATORS: Record<string, readonly string[]> = {
 	date: ordered,
 	partialdate: ordered,
 	boolean: ['=', '!='],
-	choice: ['=', '!=', 'in', 'empty', 'not_empty'],
+	choice: ['=', '!=', 'in', 'not_in', 'empty', 'not_empty'],
 	multichoice: ['has', 'empty', 'not_empty'],
 	checklist: ['incomplete', 'complete', 'empty', 'not_empty']
 };
@@ -30,6 +30,7 @@ export const OPERATOR_LABELS: Record<string, string> = {
 	'<=': 'is at most',
 	between: 'is between',
 	in: 'is one of',
+	not_in: 'is not one of',
 	empty: 'is empty',
 	not_empty: 'is not empty',
 	has: 'includes',
@@ -38,6 +39,9 @@ export const OPERATOR_LABELS: Record<string, string> = {
 };
 
 const NO_VALUE = new Set(['empty', 'not_empty', 'incomplete', 'complete']);
+
+/** Operators whose value is a list of options. */
+export const LIST_OPERATORS: ReadonlySet<string> = new Set(['in', 'not_in']);
 
 export function operatorTakesValue(op: string): boolean {
 	return !NO_VALUE.has(op);

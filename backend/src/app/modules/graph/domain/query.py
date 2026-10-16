@@ -33,6 +33,7 @@ _OPERATORS: Final = frozenset(
         "<=",
         "between",
         "in",
+        "not_in",
         "empty",
         "not_empty",
         "has",
@@ -41,11 +42,14 @@ _OPERATORS: Final = frozenset(
     }
 )
 _NO_VALUE: Final = frozenset({"empty", "not_empty", "incomplete", "complete"})
+# Each matches items of the named type for which its positive form does not.
+COMPLEMENT_OPERATORS: Final[Mapping[str, str]] = {"!=": "=", "not_in": "in"}
 _DATE_OPERATORS: Final = frozenset({"=", ">", ">=", "<", "<=", "between"})
 _GROUP_OPS: Final = ("and", "or", "not")
 _SORT_BYS: Final = frozenset({"name", "created", "updated", "field"})
 _BETWEEN_LENGTH: Final = 2
-_REL: Final = re.compile(r"^([+-]?\d{1,3})([dwmy])$")
+_REL: Final = re.compile(r"([+-]?[0-9]{1,3})([dwmy])")
+_INF: Final = float("inf")
 
 
 class InvalidQueryError(ValidationError):
@@ -202,6 +206,7 @@ class FieldResolution:
 
     kinds: dict[FieldKey, str]
     warnings: list[QueryWarning]
+    stale: frozenset[FieldCondition] = frozenset()
 
 
 type SortValue = str | float | None
@@ -227,14 +232,16 @@ class SearchHit:
 class ResolvedQuery:
     """A query plus everything adapters need to evaluate it.
 
-    `field_kinds` holds only fields that still exist; a field condition whose
-    key is absent is stale and matches nothing.
+    `field_kinds` holds only fields that still exist. A field condition whose
+    key is absent, or that is in `stale` (its field or a field it references
+    is gone), matches nothing.
     """
 
     query: Query
     field_kinds: Mapping[FieldKey, str]
     search_exclusions: Mapping[str, Sequence[str]]
     today: date
+    stale: frozenset[FieldCondition] = frozenset()
 
 
 def walk_conditions(
@@ -251,8 +258,30 @@ def walk_conditions(
             yield child_path, child
 
 
+def _encodable(raw: str) -> bool:
+    """Whether `raw` is valid UTF-8 text (no lone surrogates)."""
+    try:
+        raw.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
+def _finite(value: float) -> bool:
+    """Whether `value` fits a float8: not NaN, infinite or out of range."""
+    try:
+        number = float(value)
+    except OverflowError:
+        return False
+    return -_INF < number < _INF
+
+
 def _string(raw: object, path: str, *, name: str) -> str:
-    if not isinstance(raw, str) or not 1 <= len(raw) <= MAX_TEXT_LENGTH:
+    if (
+        not isinstance(raw, str)
+        or not 1 <= len(raw) <= MAX_TEXT_LENGTH
+        or not _encodable(raw)
+    ):
         msg = f"'{name}' must be text of 1 to {MAX_TEXT_LENGTH} characters."
         raise InvalidQueryError(msg, path=path)
     return raw
@@ -266,7 +295,7 @@ def _string_list(raw: object, path: str, *, name: str) -> tuple[str, ...]:
 
 
 def _relative(raw: object, path: str) -> RelativeDate:
-    match = _REL.match(str(raw))
+    match = _REL.fullmatch(raw) if isinstance(raw, str) else None
     if match is None:
         msg = "Use a relative date like -30d."
         raise InvalidQueryError(msg, path=path)
@@ -287,6 +316,7 @@ def _mapping_operand(raw: Mapping[object, object], path: str) -> Operand:
         keys == {"value", "currency"}
         and isinstance(value, int | float)
         and not isinstance(value, bool)
+        and _finite(value)
     ):
         return Money(
             value=float(value),
@@ -297,11 +327,14 @@ def _mapping_operand(raw: Mapping[object, object], path: str) -> Operand:
 
 
 def _operand(raw: object, path: str) -> Operand:
-    if isinstance(raw, bool | int | float):
+    if isinstance(raw, bool) or (isinstance(raw, int | float) and _finite(raw)):
         return raw
     if isinstance(raw, str):
         if len(raw) > MAX_TEXT_LENGTH:
             msg = "That value is too long."
+            raise InvalidQueryError(msg, path=path)
+        if not _encodable(raw):
+            msg = "That is not a valid value."
             raise InvalidQueryError(msg, path=path)
         return raw
     if isinstance(raw, Mapping):
@@ -334,7 +367,7 @@ def _value(op: str, data: Mapping[str, object], path: str) -> Operand | None:
         return tuple(_operand(item, path) for item in raw)
     if op == "has" and not isinstance(raw, list):
         return (_operand(raw, path),)
-    if op in {"in", "has"}:
+    if op in {"in", "not_in", "has"}:
         return _operand_list(raw, path, op=op)
     return _operand(raw, path)
 
@@ -449,7 +482,7 @@ class _Parser:
             msg = f"Groups can be nested up to {MAX_DEPTH} deep."
             raise InvalidQueryError(msg, path=path)
         if not isinstance(data, Mapping) or data.get("op") not in _GROUP_OPS:
-            msg = "Expected a group: and, or or not."
+            msg = "Expected a group (and, or, not)."
             raise InvalidQueryError(msg, path=path)
         children = data.get("children")
         if not isinstance(children, list) or not children:
@@ -497,7 +530,8 @@ def parse_query(data: object) -> Query:
     if not isinstance(data, Mapping):
         msg = "The query must be an object."
         raise InvalidQueryError(msg)
-    if data.get("v") != QUERY_VERSION:
+    version = data.get("v")
+    if isinstance(version, bool) or version != QUERY_VERSION:
         msg = f"Unsupported query version; expected {QUERY_VERSION}."
         raise InvalidQueryError(msg, path="v")
     parser = _Parser()

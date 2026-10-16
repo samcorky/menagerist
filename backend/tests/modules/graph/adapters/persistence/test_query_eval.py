@@ -213,6 +213,19 @@ async def test_choice_is_exact_and_text_folds(repository: NodeRepository) -> Non
     assert await _run(repository, nodes, _f("label", "~", "CAFE")) == {"red", "blue"}
     assert await _run(repository, nodes, _f("label", "=", "cafe")) == {"red"}
     assert await _run(repository, nodes, _f("label", "in", ["CAFÉ", "x"])) == {"red"}
+    assert await _run(repository, nodes, _f("colour", "not_in", ["red"])) == {
+        "red",
+        "blue",
+        "num",
+    }
+    assert await _run(repository, nodes, _f("colour", "not_in", ["Red"])) == {
+        "blue",
+        "num",
+    }
+    assert await _run(repository, nodes, _f("label", "not_in", ["CAFÉ", "x"])) == {
+        "blue",
+        "num",
+    }
 
 
 async def test_table_columns_match_any_row(repository: NodeRepository) -> None:
@@ -239,6 +252,10 @@ async def test_table_columns_match_any_row(repository: NodeRepository) -> None:
         "c",
         "d",
     }
+    # not_in follows the same rule: no row holds a listed value
+    assert await _run(
+        repository, nodes, _f("parts", "not_in", ["Y2", "z"], sub_key="sku")
+    ) == {"b", "c", "d"}
 
 
 async def test_tag_all_and_updated_date_and_not_group(

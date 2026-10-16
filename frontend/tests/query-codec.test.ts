@@ -88,6 +88,28 @@ describe('decodeQuery', () => {
 		expect(decodeQuery(input)).toBeNull();
 	});
 
+	it('accepts not_in with a list like in, and rejects a scalar', () => {
+		const q = (value: unknown) =>
+			token({
+				v: 1,
+				where: {
+					op: 'and',
+					children: [{ kind: 'field', type: 't', key: 'k', op: 'not_in', value }]
+				},
+				sort: []
+			});
+		expect(decodeQuery(q(['a', 'b']))?.where?.children[0]).toEqual({
+			kind: 'field',
+			type: 't',
+			key: 'k',
+			op: 'not_in',
+			value: ['a', 'b']
+		});
+		expect(decodeQuery(q('a'))).toBeNull();
+		expect(decodeQuery(q([]))).toBeNull();
+		expect(decodeQuery(q(Array.from({ length: 51 }, (_, i) => `v${i}`)))).toBeNull();
+	});
+
 	it('rejects the wrong version', () => {
 		expect(decodeQuery(token({ v: 2, where: null, sort: [] }))).toBeNull();
 		expect(decodeQuery(token({ where: null, sort: [] }))).toBeNull();
@@ -218,5 +240,31 @@ describe('decodeQuery', () => {
 			token({ v: 1, extra: 1, where: group('and', [{ ...fav, junk: 1 }]), sort: [] })
 		);
 		expect(decoded).toEqual({ v: 1, where: group('and', [fav]), sort: [] });
+	});
+
+	describe('non-finite numbers', () => {
+		// JSON.stringify cannot write Infinity, so these tokens are built from raw JSON text.
+		const raw = (where: string) => b64(`{"v":1,"where":${where},"sort":[]}`);
+		const cond = (value: string, op = '=') =>
+			raw(
+				`{"op":"and","children":[{"kind":"field","type":"t","key":"k","op":"${op}","value":${value}}]}`
+			);
+
+		it.each([
+			['a plain operand', cond('1e999')],
+			['a negative operand', cond('-1e999')],
+			['a between bound', cond('[1, 1e999]', 'between')],
+			['an in member', cond('[1e999]', 'in')],
+			['a not_in member', cond('[1e999]', 'not_in')],
+			['a money amount', cond('{"value": 1e999, "currency": "GBP"}')]
+		])('rejects %s that overflows to infinity', (_, t) => {
+			expect(() => decodeQuery(t)).not.toThrow();
+			expect(decodeQuery(t)).toBeNull();
+		});
+
+		it('still accepts large finite numbers', () => {
+			expect(decodeQuery(cond('1e308'))).not.toBeNull();
+			expect(decodeQuery(cond('{"value": 1e308, "currency": "GBP"}'))).not.toBeNull();
+		});
 	});
 });

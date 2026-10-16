@@ -46,7 +46,9 @@ SORTABLE_KINDS: Final = frozenset(
         "choice",
     }
 )
-_PARTIAL_DATE: Final = re.compile(r"^\d{4}(-\d{2}(-\d{2})?)?$")
+_PARTIAL_DATE: Final = re.compile(r"[0-9]{4}(-[0-9]{2}(-[0-9]{2})?)?")
+# Only YYYY-MM-DD: stored dates are compared with it as text.
+_DATE: Final = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 _TEXT_KINDS: Final = frozenset(
     {"text", "url", "email", "phone", "longtext", "choice", "multichoice"}
 )
@@ -86,7 +88,7 @@ def _is_number(operand: Operand) -> bool:
 
 
 def _is_date(operand: Operand) -> bool:
-    if not isinstance(operand, str):
+    if not isinstance(operand, str) or _DATE.fullmatch(operand) is None:
         return False
     try:
         date.fromisoformat(operand)
@@ -96,7 +98,7 @@ def _is_date(operand: Operand) -> bool:
 
 
 def _is_partial_date(operand: Operand) -> bool:
-    return isinstance(operand, str) and _PARTIAL_DATE.match(operand) is not None
+    return isinstance(operand, str) and _PARTIAL_DATE.fullmatch(operand) is not None
 
 
 def _is_text(operand: Operand) -> bool:
@@ -181,11 +183,12 @@ def _resolve_field(
     warnings: list[QueryWarning],
     condition: FieldCondition,
     path: str,
-) -> None:
+) -> bool:
+    """Record the field's kind; return True when the condition is stale."""
     prop, gone = _find(schemas, condition.type, condition.key, condition.sub_key)
     if prop is None:
         warnings.append(QueryWarning(path, gone or ""))
-        return
+        return True
     kind = kind_of(prop)
     if kind is None:
         raise InvalidQueryError(
@@ -195,8 +198,10 @@ def _resolve_field(
         raise InvalidQueryError(
             f"'{condition.op}' is not available for {kind} fields.", path=path
         )
-    if not _check_value(schemas, warnings, condition, kind, path):
-        kinds[(condition.type, condition.key, condition.sub_key)] = kind
+    if _check_value(schemas, warnings, condition, kind, path):
+        return True
+    kinds[(condition.type, condition.key, condition.sub_key)] = kind
+    return False
 
 
 def _check_date_condition(condition: DateCondition, path: str) -> None:
@@ -233,12 +238,14 @@ def resolve_fields(query: Query, schemas: _Schemas) -> FieldResolution:
     """
     kinds: dict[FieldKey, str] = {}
     warnings: list[QueryWarning] = []
+    stale: set[FieldCondition] = set()
     for path, condition in walk_conditions(query.where):
         if isinstance(condition, FieldCondition):
-            _resolve_field(schemas, kinds, warnings, condition, path)
+            if _resolve_field(schemas, kinds, warnings, condition, path):
+                stale.add(condition)
         elif isinstance(condition, DateCondition):
             _check_date_condition(condition, path)
     for index, key in enumerate(query.sort):
         if key.by == "field" and key.type and key.key:
             _resolve_sort(schemas, kinds, warnings, index, key.type, key.key)
-    return FieldResolution(kinds=kinds, warnings=warnings)
+    return FieldResolution(kinds=kinds, warnings=warnings, stale=frozenset(stale))

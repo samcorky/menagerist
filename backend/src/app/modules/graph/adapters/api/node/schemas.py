@@ -215,7 +215,7 @@ class NodeSearchRequest(RequestModel):
     query: dict[str, Any] = Field(
         description="The condition tree: `v`, an optional `where` group and `sort`."
     )
-    limit: int = Field(default=50, ge=1, le=200)
+    limit: int = Field(default=50, ge=1, le=200, strict=True)
     cursor: str | None = Field(
         default=None, description="The `next_cursor` of the previous page."
     )
@@ -229,7 +229,7 @@ class QueryWarningResponse(BaseModel):
             "examples": [
                 {
                     "path": "where.children[0]",
-                    "message": "The field 'rating' no longer exists on film.",
+                    "message": "The field 'rating' no longer exists on 'film'.",
                 }
             ]
         }

@@ -108,6 +108,29 @@ describe('query-value-input', () => {
 		expect(html).toContain('Blu-ray');
 		expect(html).toMatch(/aria-pressed="true"[^>]*>\s*DVD/);
 	});
+
+	it('offers the field options for "is not one of"', () => {
+		const html = valueInput({
+			kind: 'field',
+			type: 'film',
+			key: 'format',
+			op: 'not_in',
+			value: ['DVD']
+		});
+		expect(html).toContain('Blu-ray');
+		expect(html).toMatch(/aria-pressed="true"[^>]*>\s*DVD/);
+	});
+
+	it('takes a typed list for "is not one of" on text', () => {
+		const html = valueInput({
+			kind: 'field',
+			type: 'film',
+			key: 'note',
+			op: 'not_in',
+			value: ['a', 'b']
+		});
+		expect(html).toContain('value="a, b"');
+	});
 });
 
 describe('query-condition-row', () => {
@@ -294,6 +317,19 @@ describe('review fixes', () => {
 		expect(html).toMatch(/aria-pressed="true"[^>]*>\s*Film/);
 		expect(html).toMatch(/aria-pressed="false"[^>]*>\s*Book/);
 		expect(html).not.toMatch(/>\s*film\s*</);
+	});
+
+	it('offers "is not one of" for a choice field', () => {
+		const html = rowHtml({
+			kind: 'field',
+			type: 'film',
+			key: 'format',
+			op: 'not_in',
+			value: ['DVD']
+		});
+		expect(selectedOption(html, 'Condition 1, operator')).toMatch(
+			/<option[^>]*selected=""[^>]*>(?:<!---->)?\s*is not one of\s*</
+		);
 	});
 
 	it('flags an operator the condition cannot use instead of showing another', () => {

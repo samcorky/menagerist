@@ -61,6 +61,37 @@ def _bulk() -> list[tuple[str, dict[str, Any], str | None]]:
             },
             None if path is None else "sort[0]",
         )
+        add(
+            f"sort key of {size}",
+            {
+                "v": 1,
+                "where": None,
+                "sort": [{"by": "field", "type": "t", "key": text}],
+            },
+            None if path is None else "sort[0]",
+        )
+        add(f"in item of {size}", _where(_field("in", value=["a", text])), path)
+        add(
+            f"between item of {size}",
+            _where(_field("between", value=["a", text])),
+            path,
+        )
+        astral = "\U0001f3ac" * size
+        add(
+            f"tag of {size} astral characters",
+            _where({"kind": "tag", "mode": "any", "tags": [astral]}),
+            path,
+        )
+        add(
+            f"field key of {size} astral characters",
+            _where(_field("=", key=astral, value=1)),
+            path,
+        )
+        add(
+            f"string operand of {size} astral characters",
+            _where(_field("=", value=astral)),
+            path,
+        )
     for size, path in ((50, None), (51, _C)):
         items = ["a"] * size
         add(f"type list of {size}", _where({"kind": "type", "in": items}), path)
@@ -84,6 +115,20 @@ def _bulk() -> list[tuple[str, dict[str, Any], str | None]]:
     )
     for count, path in ((50, None), (51, "where.children[50]")):
         add(f"{count} conditions", _where(*[_FAV] * count), path)
+    add(
+        "50 conditions across groups",
+        {
+            "v": 1,
+            "where": {
+                "op": "and",
+                "children": [
+                    {"op": "or", "children": [_FAV] * 30},
+                    {"op": "or", "children": [_FAV] * 20},
+                ],
+            },
+        },
+        None,
+    )
     add(
         "conditions counted across groups",
         {

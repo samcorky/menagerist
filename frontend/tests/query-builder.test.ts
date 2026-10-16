@@ -115,6 +115,21 @@ describe('editing rows', () => {
 		});
 	});
 
+	it('keeps the chosen values when switching between in and not_in', () => {
+		const choice: Condition = {
+			kind: 'field',
+			type: 'film',
+			key: 'format',
+			op: 'in',
+			value: ['DVD', 'Blu-ray']
+		};
+		const flipped = withOperator(choice, 'not_in', catalogue);
+		expect(flipped).toEqual({ ...choice, op: 'not_in' });
+		expect(withOperator(flipped, 'in', catalogue)).toEqual(choice);
+		const text: Condition = { kind: 'field', type: 'film', key: 'note', op: 'in', value: ['a'] };
+		expect(withOperator(text, 'not_in', catalogue)).toEqual({ ...text, op: 'not_in' });
+	});
+
 	it('starts general subjects with sensible defaults', () => {
 		expect(conditionFor('created', catalogue)).toEqual({
 			kind: 'date',
@@ -137,6 +152,9 @@ describe('editing rows', () => {
 		expect(valueShape('number', 'between')).toBe('range');
 		expect(valueShape('choice', 'in')).toBe('multi');
 		expect(valueShape('text', 'in')).toBe('list');
+		expect(valueShape('choice', 'not_in')).toBe('multi');
+		expect(valueShape('text', 'not_in')).toBe('list');
+		expect(valueShape('url', 'not_in')).toBe('list');
 		expect(valueShape('multichoice', 'has')).toBe('multi');
 		expect(valueShape('boolean', '=')).toBe('boolean');
 		expect(valueShape('number', 'empty')).toBe('none');
@@ -203,6 +221,11 @@ describe('conditionProblem', () => {
 			{ kind: 'field', type: 'film', key: 'format', op: 'in', value: [] },
 			'Choose at least one value.'
 		],
+		[
+			{ kind: 'field', type: 'film', key: 'format', op: 'not_in', value: [] },
+			'Choose at least one value.'
+		],
+		[{ kind: 'field', type: 'film', key: 'format', op: 'not_in', value: ['DVD'] }, null],
 		[{ kind: 'field', type: 'film', key: 'gone', op: '>', value: 'x' }, null],
 		[
 			{ kind: 'date', on: 'created', op: '>=', value: { rel: '-xd' } },

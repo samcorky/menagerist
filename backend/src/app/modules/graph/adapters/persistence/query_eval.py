@@ -4,6 +4,7 @@ The reference semantics: `query_sql.py` must agree with this module on every
 scenario in `test_node_search.py`.
 """
 
+import sys
 from collections.abc import Mapping
 from dataclasses import replace
 from datetime import UTC, date
@@ -15,6 +16,7 @@ from app.modules.graph.adapters.persistence.text_match import (
     text_matches,
 )
 from app.modules.graph.domain.query import (
+    COMPLEMENT_OPERATORS,
     Condition,
     Cursor,
     DateCondition,
@@ -43,7 +45,11 @@ _MISSING = object()
 
 
 def _number(value: object) -> float | None:
+    """The value as a float, or None if it is not a number a float can hold."""
     if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    # Exact for ints; also rejects NaN and infinity. Matches `_num` in SQL.
+    if not abs(value) <= sys.float_info.max:
         return None
     return float(value)
 
@@ -203,11 +209,14 @@ def _column_filled(node: Node, condition: FieldCondition) -> bool:
 
 
 def _field_matches(node: Node, condition: FieldCondition, ctx: ResolvedQuery) -> bool:
+    if condition in ctx.stale:
+        return False
     kind = ctx.field_kinds.get((condition.type, condition.key, condition.sub_key))
     if kind is None or node.type != condition.type:
         return False
-    if condition.op == "!=":
-        return not _field_matches(node, replace(condition, op="="), ctx)
+    positive = COMPLEMENT_OPERATORS.get(condition.op)
+    if positive is not None:
+        return not _field_matches(node, replace(condition, op=positive), ctx)
     if condition.sub_key is not None and condition.op in {"empty", "not_empty"}:
         return _column_filled(node, condition) == (condition.op == "not_empty")
     operand: Any = None

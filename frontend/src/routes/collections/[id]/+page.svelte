@@ -22,7 +22,6 @@
 		deleteCollection,
 		getCollection,
 		listNodes,
-		listNodeTypes,
 		removeItemFromCollection,
 		updateCollection,
 		type CollectionResponse,
@@ -30,6 +29,7 @@
 		type NodeTypeResponse
 	} from '$lib/api/client';
 	import { networkAwareError } from '$lib/api/errors';
+	import { fetchAllNodeTypes } from '$lib/node-types';
 	import {
 		MAX_COLLECTION_NAME_LENGTH,
 		addItemsErrorMessage,
@@ -132,8 +132,8 @@
 	});
 
 	$effect(() => {
-		void listNodeTypes({ query: { limit: 100 } }).then((result) => {
-			if (result.data) itemTypes = result.data;
+		void fetchAllNodeTypes().then((types) => {
+			if (types) itemTypes = types;
 		});
 	});
 

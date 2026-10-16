@@ -55,6 +55,12 @@ describe('describeCondition', () => {
 		expect(describeCondition(field('has', ['x']), lookup)).toBe('Film: Rating includes x');
 	});
 
+	it('lists values for not_in', () => {
+		expect(describeCondition(field('not_in', ['Horror', 'Comedy']), lookup)).toBe(
+			'Film: Rating is not one of Horror, Comedy'
+		);
+	});
+
 	it('words booleans and money', () => {
 		expect(describeCondition(field('=', true), lookup)).toBe('Film: Rating is yes');
 		expect(describeCondition(field('=', false), lookup)).toBe('Film: Rating is no');

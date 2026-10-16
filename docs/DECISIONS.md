@@ -822,7 +822,7 @@ Behind a TLS-terminating proxy that was not in `MENAGERIST_TRUSTED_PROXIES`, eve
 
 **Indexes.** Migrations add GIN indexes on `attributes` (`jsonb_path_ops`) and `tags`, trigram indexes on name, description and `attributes::text`, and four sort indexes on the owner plus the sort key: name ascending, name descending, created and updated. The descending timestamp indexes were left out: ties are rare and Postgres reads the ascending index backwards with a small incremental sort. Each extra btree costs a little on every write, and every update touches the `updated_at` index (it can never be a heap-only update). That is the price of 12 ms pages instead of seconds.
 
-**Free text.** A text condition first narrows candidates with a trigram prefilter on name, description and `attributes::text`, then applies the exact check. The prefilter is a superset of the exact match (a table of 66 queries against 32 values pins that), and is skipped for queries it cannot serve safely: under three characters, or containing a backslash or control character. `unaccent` maps eleven other characters (U+02BA, U+201C, U+201D, U+201F, U+2033, U+301D, U+301E, U+FF02 to a double quote; U+2216, U+FE68, U+FF3C to a backslash), which JSON escaping would hide from the prefilter, so they skip it too. A test scans every Unicode code point against the real `unaccent` and fails with the code point if Postgres ever maps another character to a quote, a backslash or a control character. `SET LOCAL jit = off` is issued for text queries only (not app-wide): JIT compilation added about 0.8 s to a 70 ms query and helps nothing else we run.
+**Free text.** A text condition first narrows candidates with a trigram prefilter on name, description and `attributes::text`, then applies the exact check. The prefilter is a superset of the exact match (a table of 66 queries against 32 values pins that), and is skipped for queries it cannot serve safely: under three characters, or containing a double quote, a backslash or a control character. `unaccent` maps eleven other characters (U+02BA, U+201C, U+201D, U+201F, U+2033, U+301D, U+301E, U+FF02 to a double quote; U+2216, U+FE68, U+FF3C to a backslash), which JSON escaping would hide from the prefilter, so they skip it too. A test scans every Unicode code point against the real `unaccent` and fails with the code point if Postgres ever maps another character to a quote, a backslash or a control character. `SET LOCAL jit = off` is issued for text queries only (not app-wide): JIT compilation added about 0.8 s to a 70 ms query and helps nothing else we run.
 
 **Measured** (100,000 items, one local Postgres, 51-item pages, eight timed runs each):
 
@@ -841,7 +841,16 @@ The "after" counts above are the uncapped counts; the API now stops counting at 
 
 Other pages (id order, type, containment filters, tags) were already 10 to 25 ms. At 10,000 items every page was under 60 ms except sort by name (217 ms before) and text (759 ms before).
 
-**Known limits:** sorting on a field (rating) still scans. A free-text query with many candidates still pays for the exact check ("director 42" within a type, about 500 ms at 100,000 items). Postgres `unaccent` expands Æ and œ, and the Python fold does not, so those two letters can differ between the in-memory and SQL adapters (the same difference existed before search).
+**Known limits:** sorting on a field (rating) still scans. A free-text query with many candidates still pays for the exact check ("director 42" within a type, about 500 ms at 100,000 items). The Python fold (`text_match.fold`) and Postgres `lower(unaccent(...))` disagree on 878 characters of the Basic Multilingual Plane: letters `unaccent` transliterates without a combining mark (Æ, Œ, Ø, Ł, Đ, Þ, Ð, ı, Ħ, Ŧ, Ŋ, ĳ and their lower-case forms) and symbols such as ©, ½, « and ». Only the in-memory adapter, and so only tests, see the difference; `sort_key` also uses `lower` rather than `casefold`, so ß sorts differently there (the same difference existed before search).
+
+Further known limits, left as they are for now:
+
+- LIKE wildcards are escaped before `unaccent` folds the pattern, so fullwidth `％`, `﹪` and `＿` become wildcards and `＼`, `﹨` and `∖` become escapes in the text condition, field `~` and `GET /node?q=`. False positives only; the fix is to escape after folding, in SQL.
+- The search cursor appears in a DEBUG log line (`searching nodes`); at DEBUG the SQL echo logs the same bound values anyway.
+- `postgresql_ops` on the three trigram expression indexes in `models.py` is ignored when the models compile; the migrations are authoritative, and nothing builds the schema from the models.
+- For a schema property without an explicit `x-menagerist.kind`, the backend infers fewer kinds (text, choice, date, number, boolean, multichoice) than the frontend, so a hand-made type can offer an operator the server rejects with a 400. Every schema the editor or a pack writes carries an explicit kind.
+
+**Values the database cannot hold.** The parser rejects NaN, infinities, numbers outside the float8 range and text with lone surrogates with a 400 (`InvalidQueryError`), and reads only plain ASCII digits in relative and partial dates. A date operand must be `YYYY-MM-DD`, because stored dates are compared with it as text. A stored number outside the float8 range is treated as the wrong type (no match, sorts last) by both adapters, so one bad value never errors a whole query. A condition whose field, or a field it references, is gone is listed in `ResolvedQuery.stale` and matches nothing, whatever other conditions name the same field.
 
 **`EXPLAIN` findings:** containment forms (choice, yes/no, multi-choice, tags) and name or description trigram searches use the GIN indexes, though at 20,000 items the planner prefers the owner index until a condition is selective. Number, date and partial-date comparisons, and sorting on a field, scan. That is acceptable at the sizes expected and is the first thing to measure if search feels slow; an expression index per hot field is the next step.
 
@@ -849,9 +858,19 @@ Other pages (id order, type, containment filters, tags) were already 10 to 25 ms
 
 **Decision:** which filter operators each field kind supports lives in `shared/contracts/query-operators.json`. The backend table (`KIND_OPERATORS` in `field_kinds.py`) and the frontend table both have to equal it, and both test suites read the file.
 
-**Why:** the backend has no field-type descriptors of its own (those exist only in the frontend registry), so there is nowhere on the server to declare operators per type. A shared fixture is the same device as the existing regex conformance file: it fails whichever side changes alone. The query shapes fixture (`query-shapes.json`) does the same for the structure of a tree.
+**Why:** the backend has no field-type descriptors of its own (those exist only in the frontend registry), so there is nowhere on the server to declare operators per type. A shared fixture is the same device as the existing regex conformance file: it fails whichever side changes alone. The query shapes fixture (`query-shapes.json`) does the same for the structure of a tree, and `query-kinds.json` for the kinds that can compare with another field or be sorted on, and the operators that take no value.
 
 **Not chosen:** a backend `FieldTypeDescriptor` (a second registry to keep in step with the frontend one) and generating one side's table from the other at build time (it hides the drift until the build).
+
+## `not_in` is the type-scoped complement of `in` (2026-10-16)
+
+**Decision:** a field condition can use `not_in` ("is not one of") wherever `in` is offered: text, link, email, phone and choice. It takes the same value as `in` (a list of 1 to 50 operands, each text up to 200 characters) and is parsed by the same code. It matches items of the condition's type for which `in` would not: the value is missing, of the wrong JSON type, or not in the list. Items of other types never match, exactly as for `!=`. Text kinds fold case and accents and a choice compares exactly, as `in` does.
+
+**How:** `COMPLEMENT_OPERATORS` in `graph/domain/query.py` maps each complement to its positive form (`!=` to `=`, `not_in` to `in`). Both adapters evaluate the positive form and negate it inside the type check, so the two operators share one rule.
+
+**Consequences:** a stale field still matches nothing under `not_in`, and so everything under a `not` group. On a table column, `not_in` means no row holds a listed value (as `!=` means no row equals), so an item with no rows matches. `not` over `not_in` within the type is `in`.
+
+**Not chosen:** reading `not_in` as "every row is outside the list" for table columns (it would differ from `!=`) and an item-wide complement that also matched other types (it would differ from `!=` and make `or` across types surprising).
 
 ## Direction: roles as data, implied permissions
 

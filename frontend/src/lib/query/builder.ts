@@ -1,6 +1,6 @@
 import { decodeQuery, encodeQuery } from './codec';
 import { findField, type Catalogue, type FieldInfo } from './fields';
-import { OPERATOR_LABELS, operatorsForKind, operatorTakesValue } from './operators';
+import { LIST_OPERATORS, OPERATOR_LABELS, operatorsForKind, operatorTakesValue } from './operators';
 import { describeCondition, type SummaryLookup } from './summary';
 import { pathKey } from './warnings';
 import {
@@ -130,7 +130,7 @@ const TEXT_KINDS = new Set(['text', 'url', 'email', 'phone', 'longtext']);
 export function valueShape(kind: string, op: string): ValueShape {
 	if (!operatorTakesValue(op)) return 'none';
 	if (op === 'between') return 'range';
-	if (op === 'in') return TEXT_KINDS.has(kind) ? 'list' : 'multi';
+	if (LIST_OPERATORS.has(op)) return TEXT_KINDS.has(kind) ? 'list' : 'multi';
 	if (op === 'has') return 'multi';
 	if (kind === 'boolean') return 'boolean';
 	return 'single';

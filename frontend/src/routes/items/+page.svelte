@@ -18,7 +18,8 @@
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import { toast } from 'svelte-sonner';
-	import { listNodeTypes, type NodeResponse, type NodeTypeResponse } from '$lib/api/client';
+	import type { NodeResponse, NodeTypeResponse } from '$lib/api/client';
+	import { fetchAllNodeTypes } from '$lib/node-types';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import QueryBuilder from '$lib/components/query-builder.svelte';
 	import QueryChips from '$lib/components/query-chips.svelte';
@@ -290,8 +291,8 @@
 	}
 
 	async function fetchCategories() {
-		const result = await listNodeTypes({ query: { limit: 100 } });
-		if (result.data) allCategories = result.data;
+		const types = await fetchAllNodeTypes();
+		if (types) allCategories = types;
 		categoriesLoaded = true;
 	}
 

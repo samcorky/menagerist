@@ -919,6 +919,49 @@
       }
     },
     {
+      "name": "field not_in with one operand",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "not_in",
+              "value": [
+                "a"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field not_in with two operands",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "not_in",
+              "value": [
+                "a",
+                "b"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
       "name": "field has with a scalar",
       "query": {
         "v": 1,
@@ -5131,6 +5174,280 @@
                 [
                   2
                 ]
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date with a trailing newline",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "rel": "-30d\n"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date with Arabic-Indic digits",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "rel": "-\u0663\u0660d"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "relative date with fullwidth digits",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "=",
+              "value": {
+                "rel": "-\uff13\uff10d"
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "version true",
+      "path": "v",
+      "query": {
+        "v": true,
+        "where": null,
+        "sort": []
+      }
+    },
+    {
+      "name": "date op not_in",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "date",
+              "on": "created",
+              "op": "not_in",
+              "value": [
+                "2020-01-01"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field not_in without a value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "not_in"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field not_in with a scalar",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "not_in",
+              "value": "a"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field not_in with no operands",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "not_in",
+              "value": []
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field not_in with a null operand",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "not_in",
+              "value": [
+                "a",
+                null
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field not_in with a nested list",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "not_in",
+              "value": [
+                [
+                  "a"
+                ]
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "field not_in with 51 operands",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "film",
+              "key": "year",
+              "op": "not_in",
+              "value": [
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a",
+                "a"
               ]
             }
           ]

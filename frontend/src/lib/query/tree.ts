@@ -116,20 +116,24 @@ export function isFilterEmpty(query: Query): boolean {
  */
 export type PageBasics = { type?: string | null; q?: string; favourite?: boolean };
 
+/** Counted in characters (code points), as the server counts them, not UTF-16 units. */
+function fitsTextLimit(text: string): boolean {
+	return [...text].length <= MAX_TEXT_LENGTH;
+}
+
 /** The conditions `combine` adds for the page's own controls (the one inclusion rule). */
 export function pageConditions(basics: PageBasics): Condition[] {
 	const extra: Condition[] = [];
-	if (basics.type && basics.type.length <= MAX_TEXT_LENGTH)
-		extra.push({ kind: 'type', in: [basics.type] });
+	if (basics.type && fitsTextLimit(basics.type)) extra.push({ kind: 'type', in: [basics.type] });
 	const q = basics.q?.trim();
-	if (q && q.length <= MAX_TEXT_LENGTH) extra.push({ kind: 'text', q });
+	if (q && fitsTextLimit(q)) extra.push({ kind: 'text', q });
 	if (basics.favourite) extra.push({ kind: 'favourite', value: true });
 	return extra;
 }
 
 /** True when the search text is too long to add to a filter, so `combine` leaves it out. */
 export function searchTextTooLong(q: string | undefined): boolean {
-	return (q?.trim().length ?? 0) > MAX_TEXT_LENGTH;
+	return !fitsTextLimit(q?.trim() ?? '');
 }
 
 export function combine(query: Query, basics: PageBasics): Query {

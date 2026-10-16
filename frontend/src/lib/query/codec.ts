@@ -12,7 +12,7 @@ import {
 	type SortKey,
 	type Value
 } from './types';
-import { operatorTakesValue } from './operators';
+import { LIST_OPERATORS, operatorTakesValue } from './operators';
 
 function toBase64Url(text: string): string {
 	let binary = '';
@@ -51,6 +51,7 @@ const OPERATORS = new Set([
 	'<=',
 	'between',
 	'in',
+	'not_in',
 	'empty',
 	'not_empty',
 	'has',
@@ -86,8 +87,13 @@ function strList(value: unknown): string[] | null {
 	return out;
 }
 
+/** `1e999` parses as Infinity, which JSON cannot send back. */
+function isFiniteNumber(value: unknown): value is number {
+	return typeof value === 'number' && Number.isFinite(value);
+}
+
 function operand(value: unknown): Operand | null {
-	if (typeof value === 'boolean' || typeof value === 'number') return value;
+	if (typeof value === 'boolean' || isFiniteNumber(value)) return value;
 	// A literal string may be empty; only the upper bound applies.
 	if (typeof value === 'string') return withinLength(value, 0) ? value : null;
 	if (!isRec(value)) return null;
@@ -99,7 +105,7 @@ function operand(value: unknown): Operand | null {
 		const ref = str(value.ref);
 		return ref === null ? null : { ref };
 	}
-	if (keys === 'currency,value' && typeof value.value === 'number') {
+	if (keys === 'currency,value' && isFiniteNumber(value.value)) {
 		const currency = str(value.currency);
 		return currency === null ? null : { value: value.value, currency };
 	}
@@ -126,7 +132,7 @@ function comparisonValue(op: string, data: Rec): Value | null | undefined {
 	if (!('value' in data)) return null;
 	const raw = data.value;
 	if (op === 'between') return operands(raw, BETWEEN_LENGTH, BETWEEN_LENGTH);
-	if (op === 'in') return operands(raw, 1, MAX_LIST_LENGTH);
+	if (LIST_OPERATORS.has(op)) return operands(raw, 1, MAX_LIST_LENGTH);
 	if (op === 'has' && Array.isArray(raw)) return operands(raw, 1, MAX_LIST_LENGTH);
 	return operand(raw);
 }

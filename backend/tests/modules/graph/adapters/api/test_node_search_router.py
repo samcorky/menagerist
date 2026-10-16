@@ -168,6 +168,19 @@ def test_stale_field_is_a_200_with_a_warning(world: _World) -> None:
     assert warnings[0]["message"]
 
 
+def test_not_in_on_a_kind_without_it_is_a_400(world: _World) -> None:
+    """`not_in` is offered only where `in` is; a rating field has neither."""
+    client = world.act_as(ALICE)
+    condition = {**_rating("not_in", 0), "value": [4, 5]}
+
+    response = client.post(URL, json={"query": _query(condition)})
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "where.children[0]" in detail
+    assert "'not_in' is not available for rating fields" in detail
+
+
 def test_malformed_tree_is_a_400_naming_the_path(world: _World) -> None:
     """The problem detail carries the JSON path of the bad condition."""
     client = world.act_as(ALICE)
@@ -186,6 +199,46 @@ def test_limit_out_of_range_is_a_422(world: _World, limit: int) -> None:
     response = client.post(URL, json={"query": _query(), "limit": limit})
 
     assert response.status_code == 422
+
+
+def test_limit_of_true_is_a_422(world: _World) -> None:
+    """`true` is not read as a page size of 1."""
+    client = world.act_as(ALICE)
+
+    response = client.post(URL, json={"query": _query(), "limit": True})
+
+    assert response.status_code == 422
+
+
+_HUGE = "9" * 401
+_RATING = '{"kind": "field", "type": "film", "key": "rating", "op": ">", "value": %s}'
+
+
+@pytest.mark.parametrize(
+    "condition",
+    [
+        _RATING % _HUGE,
+        _RATING % f'{{"value": {_HUGE}, "currency": "GBP"}}',
+        _RATING % "NaN",
+        _RATING % "Infinity",
+        _RATING % '"\\ud800"',
+        '{"kind": "text", "q": "\\ud800"}',
+    ],
+    ids=["huge number", "huge money", "NaN", "Infinity", "surrogate", "text"],
+)
+def test_hostile_values_are_a_400_not_a_500(world: _World, condition: str) -> None:
+    """Values the database cannot take are rejected before they reach it."""
+    client = world.act_as(ALICE)
+    _film(client, "Alien", 5)
+    where = f'{{"op": "and", "children": [{condition}]}}'
+    body = f'{{"query": {{"v": 1, "where": {where}}}}}'
+
+    response = client.post(
+        URL, content=body, headers={"content-type": "application/json"}
+    )
+
+    assert response.status_code == 400
+    assert "where.children[0]" in response.json()["detail"]
 
 
 def test_unknown_body_field_is_a_422(world: _World) -> None:

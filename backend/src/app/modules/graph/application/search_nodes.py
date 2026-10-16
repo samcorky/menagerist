@@ -127,6 +127,7 @@ class SearchNodes(ScopedQueryHandler[GraphRepos, SearchNodesQuery, SearchNodesRe
                 if (keys := search_excluded_keys(schema))
             },
             today=self._today(),
+            stale=resolution.stale,
         )
         after: Cursor | None = None
         if query.cursor is not None:

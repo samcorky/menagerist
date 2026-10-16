@@ -94,8 +94,11 @@ async def search_nodes(
 
     `query` is `{"v": 1, "where": <group>, "sort": [...]}`. A group is
     `{"op": "and" | "or" | "not", "children": [...]}` of conditions and groups.
-    A condition that refers to a removed field is skipped and reported in
-    `warnings`. A malformed query is a 400 whose `detail` names the JSON path.
+    A field condition's `!=` and `not_in` (a list, like `in`) match only items
+    of its `type`, including those where the field is missing. A condition
+    that refers to a removed field matches nothing (so under
+    `not` it matches everything) and is reported in `warnings`. A malformed
+    query is a 400 whose `detail` names the JSON path.
     """
     result = await use_case.handle(
         SearchNodesQuery(query=body.query, limit=body.limit, cursor=body.cursor),
