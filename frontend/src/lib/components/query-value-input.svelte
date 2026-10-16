@@ -47,9 +47,17 @@
 	const DATE_PROP: JsonSchemaProperty = { title: 'Date', type: 'string', format: 'date' };
 
 	const field = $derived(fieldOf(condition, view.catalogue));
-	const shape = $derived(
-		condition.kind === 'field' && field ? valueShape(field.kind, condition.op) : 'none'
+	// A per-item choice field has no option list to pick from, so its values are typed.
+	const typedChoice = $derived(
+		condition.kind === 'field' &&
+			condition.field_kind !== undefined &&
+			(field?.kind === 'choice' || field?.kind === 'multichoice')
 	);
+	const shape = $derived.by(() => {
+		if (condition.kind !== 'field' || !field) return 'none';
+		const base = valueShape(field.kind, condition.op);
+		return typedChoice && base === 'multi' ? 'list' : base;
+	});
 	const candidates = $derived(field ? refCandidates(view.catalogue, field) : []);
 
 	function refItems(current: string): ComboboxItem[] {
@@ -333,6 +341,14 @@
 					searchPlaceholder="Search fields…"
 					emptyText="No matching fields"
 					onValueChange={(ref) => setValue({ ref }, false)}
+				/>
+			{:else if typedChoice}
+				<Input
+					class="h-9"
+					aria-label={label}
+					placeholder="Type a value"
+					value={typeof condition.value === 'string' ? condition.value : ''}
+					oninput={(e) => setValue(e.currentTarget.value, true)}
 				/>
 			{:else}
 				{@render operandInput(field, condition.value, label, (o, d) => setValue(o, d))}

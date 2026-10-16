@@ -2,12 +2,14 @@ import { decodeQuery, encodeQuery } from './codec';
 import {
 	findField,
 	findItemField,
+	itemFieldGroup,
 	itemFieldInfo,
 	itemFieldSubject,
 	parseItemFieldSubject,
 	type Catalogue,
 	type FieldInfo
 } from './fields';
+import type { ComboboxItem } from '$lib/components/ui/combobox/combobox';
 import { LIST_OPERATORS, OPERATOR_LABELS, operatorsForKind, operatorTakesValue } from './operators';
 import { describeCondition, type SummaryLookup } from './summary';
 import { pathKey } from './warnings';
@@ -473,6 +475,8 @@ export type Chip = {
 	focus: Path;
 	text: string;
 	warning: boolean;
+	/** What to say about the warning; null when the chip has none. */
+	message: string | null;
 };
 
 const GROUP_WORDS = { and: 'All of', or: 'Any of', not: 'Not' } as const;
@@ -493,12 +497,20 @@ export function chipModels(
 	const chips = root.children.map((child, i): Chip => {
 		const path = [i];
 		const inside = conditionsIn(child, path);
-		const warning = inside.some((c) => warned.has(pathKey(c.path)));
+		const flagged = inside.find((c) => warned.has(pathKey(c.path)));
+		const warning = flagged !== undefined;
 		const texts = inside.map((c) => describeCondition(c.condition, lookup));
 		const text = isGroup(child)
 			? `${GROUP_WORDS[child.op] ?? 'Any of'}: ${texts.join('; ')}`
 			: texts[0];
-		return { key: pathKey(path), path, focus: firstConditionPath(child, path), text, warning };
+		return {
+			key: pathKey(path),
+			path,
+			focus: firstConditionPath(child, path),
+			text,
+			warning,
+			message: flagged ? missingFieldMessage(flagged.condition) : null
+		};
 	});
 	const lead =
 		root.op === 'or' && chips.length > 1
@@ -628,4 +640,31 @@ export function fieldStatus(c: Condition, catalogue: Catalogue): FieldStatus {
 	const field = fieldOf(c, catalogue);
 	if (!field) return 'missing';
 	return field.archived ? 'archived' : 'ok';
+}
+
+/** The "Per-item fields" options for the field picker; searchable by group name and label. */
+export function itemFieldPickerItems(catalogue: Catalogue): ComboboxItem[] {
+	const group = itemFieldGroup(catalogue);
+	if (!group) return [];
+	return group.options.map((o) => ({
+		value: o.value,
+		label: o.label,
+		group: group.label,
+		selectedLabel: `${group.label} › ${o.label}`
+	}));
+}
+
+/** Path keys of per-item rows whose field no item has; the server does not flag these. */
+export function missingItemFieldPaths(query: Query, catalogue: Catalogue): Set<string> {
+	const out = new Set<string>();
+	if (!query.where) return out;
+	for (const { condition, path } of conditionsIn(query.where, [])) {
+		if (
+			condition.kind === 'field' &&
+			condition.field_kind !== undefined &&
+			fieldStatus(condition, catalogue) === 'missing'
+		)
+			out.add(pathKey(path));
+	}
+	return out;
 }

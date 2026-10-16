@@ -27,6 +27,9 @@ import {
 	ARCHIVED_FIELD_MESSAGE,
 	conditionFor,
 	fieldSubject,
+	itemFieldPickerItems,
+	missingItemFieldPaths,
+	NO_ITEM_FIELD_MESSAGE,
 	STALE_FIELD_MESSAGE,
 	withSubject,
 	type BuilderView
@@ -36,11 +39,28 @@ import { formatIsoDate } from '$lib/format-date';
 import { describeCondition } from '$lib/query/summary';
 import { buildCatalogue, summaryLookup } from '$lib/query/fields';
 import type { Condition, Query } from '$lib/query/types';
-import { catalogue, stubView } from './query-builder-fixtures';
+import { filterComboboxItems } from '$lib/components/ui/combobox/combobox';
+import { catalogue, itemTypes, stubView } from './query-builder-fixtures';
 
 const valueInput = (condition: Condition) =>
 	render(QueryValueInput, {
 		props: { condition, name: 'Condition 1', view: stubView(), onchange: () => {} }
+	}).body;
+
+const valueInput2 = (condition: Condition) =>
+	render(QueryValueInput, {
+		props: {
+			condition,
+			name: 'Condition 1',
+			view: stubView({
+				catalogue: buildCatalogue(itemTypes, true, [
+					{ key: 'signed', kind: 'boolean', label: 'Signed', count: 2 },
+					{ key: 'mood', kind: 'choice', label: 'Mood', count: 1 },
+					{ key: 'tags', kind: 'multichoice', label: 'Moods', count: 1 }
+				])
+			}),
+			onchange: () => {}
+		}
 	}).body;
 
 const inputs = (html: string) => html.match(/<input\b/g)?.length ?? 0;
@@ -549,5 +569,126 @@ describe('BuilderState (the panel actions)', () => {
 			sort: []
 		});
 		expect(state.draft.where?.children).toEqual([{ kind: 'favourite', value: false }]);
+	});
+});
+
+describe('per-item fields', () => {
+	const itemFields = [
+		{ key: 'signed', kind: 'boolean', label: 'Signed', count: 2 },
+		{ key: 'mood', kind: 'choice', label: 'Mood', count: 1 },
+		{ key: 'tags', kind: 'multichoice', label: 'Moods', count: 1 }
+	];
+	const withFields = buildCatalogue(itemTypes, true, itemFields);
+	const row = (condition: Condition, cat = withFields) =>
+		render(QueryConditionRow, {
+			props: {
+				condition,
+				path: [0],
+				view: stubView({ catalogue: cat, numbers: new Map([['0', 1]]) })
+			}
+		}).body;
+	const perItem = (key: string, kind: string, op: string, value?: unknown): Condition =>
+		({
+			kind: 'field',
+			field_kind: kind,
+			key,
+			op,
+			...(value === undefined ? {} : { value })
+		}) as Condition;
+
+	it('shows the chosen per-item field under its group on the trigger', () => {
+		const html = row(perItem('signed', 'boolean', '='));
+		expect(html).toContain('aria-label="Condition 1, field"');
+		expect(html).toContain('Per-item fields › Signed');
+		expect(html).toContain('aria-label="Condition 1, operator"');
+		expect(html).not.toContain(NO_ITEM_FIELD_MESSAGE);
+	});
+
+	it('flags a per-item field no item has, with its own wording', () => {
+		const html = row(perItem('gone', 'number', '>', 3));
+		expect(html).toContain(NO_ITEM_FIELD_MESSAGE);
+		expect(html).not.toContain(STALE_FIELD_MESSAGE);
+		expect(html).toContain('Per-item fields › gone (no longer exists)');
+	});
+
+	it('does not flag a per-item field when the listing was not read', () => {
+		const html = row(perItem('signed', 'boolean', '='), buildCatalogue(itemTypes, true, null));
+		expect(html).not.toContain(NO_ITEM_FIELD_MESSAGE);
+	});
+
+	it('uses typed text for a per-item choice, which has no option list', () => {
+		const single = valueInput2(perItem('mood', 'choice', '=', 'calm'));
+		expect(single).toContain('aria-label="Condition 1, value"');
+		expect(single).toContain('value="calm"');
+		expect(single).not.toContain('has no options');
+		const many = valueInput2(perItem('mood', 'choice', 'in', ['calm', 'tense']));
+		expect(many).toContain('Separate values with commas');
+		expect(many).not.toContain('has no options');
+		const has = valueInput2(perItem('tags', 'multichoice', 'has', ['calm']));
+		expect(has).toContain('Separate values with commas');
+		expect(has).not.toContain('has no options');
+	});
+
+	it('reads a per-item boolean as yes or no', () => {
+		const html = valueInput2(perItem('signed', 'boolean', '=', true));
+		expect(html).toContain('aria-pressed="true"');
+	});
+
+	it('words the chip and warns about a missing field', () => {
+		const query: Query = {
+			v: 1,
+			where: {
+				op: 'and',
+				children: [perItem('signed', 'boolean', '=', true), perItem('gone', 'number', '>', 3)]
+			},
+			sort: []
+		};
+		const html = render(QueryChips, {
+			props: {
+				query,
+				lookup: summaryLookup(withFields),
+				catalogue: withFields,
+				onopen: () => {},
+				onremove: () => {},
+				onclear: () => {}
+			}
+		}).body;
+		expect(html).toContain('Item field › Signed: is yes');
+		expect(html).toContain(NO_ITEM_FIELD_MESSAGE);
+		expect(html).not.toContain(STALE_FIELD_MESSAGE);
+	});
+
+	it('lists the paths of per-item rows whose field is missing', () => {
+		const query: Query = {
+			v: 1,
+			where: {
+				op: 'and',
+				children: [
+					perItem('signed', 'boolean', '=', true),
+					{ op: 'or', children: [perItem('gone', 'number', '>', 3)] },
+					{ kind: 'field', type: 'film', key: 'gone', op: '=', value: 1 }
+				]
+			},
+			sort: []
+		};
+		expect([...missingItemFieldPaths(query, withFields)]).toEqual(['1.0']);
+		expect(missingItemFieldPaths(query, buildCatalogue(itemTypes, true, null)).size).toBe(0);
+	});
+
+	it('offers the per-item options under their group, found by group name or label', () => {
+		const items = itemFieldPickerItems(withFields);
+		expect(items.map((i) => i.value)).toEqual([
+			'item:boolean:signed',
+			'item:choice:mood',
+			'item:multichoice:tags'
+		]);
+		expect(items[0]).toMatchObject({
+			label: 'Signed',
+			group: 'Per-item fields',
+			selectedLabel: 'Per-item fields › Signed'
+		});
+		expect(filterComboboxItems(items, 'per-item').length).toBe(3);
+		expect(filterComboboxItems(items, 'signed').length).toBe(1);
+		expect(itemFieldPickerItems(catalogue)).toEqual([]);
 	});
 });

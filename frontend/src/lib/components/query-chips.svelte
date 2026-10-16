@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { TriangleAlert, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { chipModels, STALE_FIELD_MESSAGE } from '$lib/query/builder';
+	import { chipModels, missingItemFieldPaths } from '$lib/query/builder';
+	import type { Catalogue } from '$lib/query/fields';
 	import type { SummaryLookup } from '$lib/query/summary';
 	import type { Path, Query } from '$lib/query/types';
 
@@ -9,6 +10,7 @@
 		query,
 		lookup,
 		warned = new Set<string>(),
+		catalogue,
 		onopen,
 		onremove,
 		onclear
@@ -16,14 +18,19 @@
 		query: Query;
 		lookup: SummaryLookup;
 		warned?: ReadonlySet<string>;
+		/** Lets chips for per-item fields that no item has be flagged too. */
+		catalogue?: Catalogue;
 		/** Open the panel at a row. */
 		onopen: (path: Path) => void;
 		onremove: (path: Path, text: string) => void;
 		onclear: () => void;
 	} = $props();
 
-	const model = $derived(chipModels(query, lookup, warned));
-	const anyWarning = $derived(model.chips.some((c) => c.warning));
+	const allWarned = $derived(
+		catalogue ? new Set([...warned, ...missingItemFieldPaths(query, catalogue)]) : warned
+	);
+	const model = $derived(chipModels(query, lookup, allWarned));
+	const notes = $derived([...new Set(model.chips.flatMap((c) => (c.message ? [c.message] : [])))]);
 	const noteId = $props.id();
 </script>
 
@@ -65,10 +72,10 @@
 				<Button variant="ghost" size="sm" class="min-h-9" onclick={onclear}>Clear filters</Button>
 			</li>
 		</ul>
-		{#if anyWarning}
+		{#if notes.length > 0}
 			<p id={noteId} class="flex items-start gap-1.5 text-sm">
 				<TriangleAlert class="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
-				{STALE_FIELD_MESSAGE}
+				{notes.join(' ')}
 			</p>
 		{/if}
 	</div>

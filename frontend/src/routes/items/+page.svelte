@@ -20,6 +20,7 @@
 	import { toast } from 'svelte-sonner';
 	import type { NodeResponse, NodeTypeResponse } from '$lib/api/client';
 	import { fetchAllNodeTypes } from '$lib/node-types';
+	import { fetchItemFields, type ItemField } from '$lib/item-fields';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import QueryBuilder from '$lib/components/query-builder.svelte';
 	import QueryChips from '$lib/components/query-chips.svelte';
@@ -122,10 +123,11 @@
 	const searching = $derived(usesSearch(filter));
 	const conditionCount = $derived(countConditions(filter));
 	let categoriesLoaded = $state(false);
+	let itemFields = $state<ItemField[] | null>(null);
 	const countLine = $derived(
 		totalLine(total, totalCapped, { loading, appending: loading && items.length > 0 })
 	);
-	const catalogue = $derived(buildCatalogue(allCategories, categoriesLoaded));
+	const catalogue = $derived(buildCatalogue(allCategories, categoriesLoaded, itemFields));
 	const lookup = $derived(summaryLookup(catalogue));
 	const filterErrorText = $derived.by(() => {
 		if (!filterError) return '';
@@ -291,8 +293,9 @@
 	}
 
 	async function fetchCategories() {
-		const types = await fetchAllNodeTypes();
+		const [types, fields] = await Promise.all([fetchAllNodeTypes(), fetchItemFields()]);
 		if (types) allCategories = types;
+		itemFields = fields;
 		categoriesLoaded = true;
 	}
 
@@ -497,6 +500,7 @@
 					query={filter}
 					{lookup}
 					warned={marks.conditions}
+					{catalogue}
 					onopen={(path) => openFilters(path)}
 					onremove={removeFilter}
 					onclear={clearFilters}

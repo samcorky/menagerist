@@ -14,7 +14,8 @@
 		operatorLabel,
 		ARCHIVED_FIELD_MESSAGE,
 		fieldStatus,
-		STALE_FIELD_MESSAGE,
+		itemFieldPickerItems,
+		missingFieldMessage,
 		strayValueText,
 		subjectOf,
 		TAG_MODES,
@@ -68,10 +69,20 @@
 				});
 			}
 		}
+		items.push(...itemFieldPickerItems(view.catalogue));
+		// A per-item row chosen before the listing was read still needs a label on the trigger.
+		if (condition.kind === 'field' && condition.field_kind !== undefined && status === 'ok') {
+			if (!items.some((i) => i.value === subject)) {
+				const label = fieldReferenceLabel(view.catalogue, undefined, condition.key);
+				items.push({ value: subject, label });
+			}
+		}
 		return items;
 	});
 	const warned = $derived(view.warned.has(key) || status === 'missing' || status === 'archived');
-	const warning = $derived(status === 'archived' ? ARCHIVED_FIELD_MESSAGE : STALE_FIELD_MESSAGE);
+	const warning = $derived(
+		status === 'archived' ? ARCHIVED_FIELD_MESSAGE : missingFieldMessage(condition)
+	);
 	const problem = $derived(
 		isBlank(condition) || status === 'loading' ? null : conditionProblem(condition, view.catalogue)
 	);
