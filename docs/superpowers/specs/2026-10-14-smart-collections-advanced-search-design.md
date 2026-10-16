@@ -1,6 +1,6 @@
 # Smart collections and advanced search
 
-Status: draft for review (2026-10-14). Not implemented.
+Status: phase 1 implemented (`docs/superpowers/plans/2026-10-14-query-engine-advanced-search.md`); later phases not started.
 
 ## Goal
 
@@ -68,14 +68,14 @@ A condition value is one of:
 Dependency direction is unchanged (`entrypoints → adapters → application → domain`).
 
 - `graph/domain/query.py`: the tree types and structural validation (no framework imports). Validation against the live item types (does this field exist, is the operator allowed, does the `ref` kind match) is an application service in `graph/application/`.
-- `graph/ports/node_repository.py`: `list` and `count` gain `query: Query | None` and a `cursor`. The existing `q`, `type`, `favourite` and `ids` parameters stay; the application layer builds a `Query` from them, so `GET /node` is unchanged. `attribute_search_exclusions` keeps its current meaning for `text` conditions.
+- `graph/ports/node_repository.py`: separate `search` and `search_count` methods take a resolved query and a cursor, beside `list` and `count`. `list` and `count` keep their plain-filter contract, so `GET /node` is unchanged and the keyset paging (by sort values) does not touch the id-ordered list. `attribute_search_exclusions` keeps its current meaning for `text` conditions.
 - `graph/adapters/persistence/node_repository.py` compiles the tree to a SQLAlchemy `WHERE` and `ORDER BY`. `in_memory_node_repository.py` evaluates the same tree in Python.
 - `collections` stays independent of `graph`. A dynamic collection stores `definition` (opaque JSON). Validation and member resolution go through a new `collections` port, implemented in `entrypoints/api/shared/` over the graph use cases, the same bridge pattern as `ItemLookup` and `CollectionMembers`. `GET /node?collection=<id>` resolves a smart collection by passing its query to `ListNodes` instead of an `ids` list.
 - The access scope is always combined with the query last, so a saved query cannot reach another person's items.
 
 ### Field-type operator contract
 
-The backend `FieldTypeDescriptor` declares each type's operators and value shape; the frontend registry declares the matching operators and a filter-input widget. A fixture in `shared/` (operator table per kind) is read by both test suites so the two cannot drift, like the existing `searchable` contract.
+The backend has no field-type descriptors of its own, so its operator table is keyed by field kind (`KIND_OPERATORS` in `field_kinds.py`); the frontend registry declares the matching operators and a filter-input widget. A fixture in `shared/` (operator table per kind) is read by both test suites so the two cannot drift, like the existing `searchable` contract.
 
 ## Performance
 
@@ -95,7 +95,7 @@ The backend `FieldTypeDescriptor` declares each type's operators and value shape
 ## Frontend
 
 - Items page: a **Filters** control opens the builder (a sheet on mobile). Rows are `field / operator / value`, with **Add condition** and **Add group (all / any)**; active filters show as chips. Operators and value inputs adapt to the field type, reusing the field-type registry.
-- The tree is carried in the URL (compressed, base64url) so a search can be shared and survives reload.
+- The tree is carried in the URL (base64url) so a search can be shared and survives reload.
 - **Save as smart collection** from a search; a smart collection's page shows its conditions and an **Edit conditions** action. Existing collection UI (cards, grid and list, search box, Examples filter) is reused.
 - UI copy follows the design guidelines: "smart collection", "condition", "match all / any". Node, edge and graph never appear.
 
@@ -111,6 +111,7 @@ The backend `FieldTypeDescriptor` declares each type's operators and value shape
 1. **Query engine and advanced search.** Domain tree, validation, SQL compiler and in-memory evaluator, migration (indexes), `POST /node/search`, sorting and cursors, builder UI. Includes field references, relative dates and repeating-group rows. No connection conditions yet.
 1b. **Per-item field conditions.** Items can carry their own typed fields (the `extra_schema` overlay). Phase 1 resolves field conditions against the item type's schema only, so per-item fields are reachable by text search but not by field conditions. Phase 1b adds a field condition addressed by key and kind rather than by type (an additive change to the query format, no version bump), a backend read that lists the per-item fields in use with their kinds and counts, and a "Per-item fields" group in the builder. A per-item key can never clash with a type key, so `attributes[key]` is unambiguous. Until then, "Promote to type" makes a per-item field filterable.
 2. **Smart collections.** `kind=dynamic`, definition validation port, resolution through `GET /node?collection=`, save-as, edit, and the collection page changes.
+2b. **"In collection" condition.** A `collection` condition (`{in: [collection_id], mode: any | none}`) so a search or smart collection can include or exclude the members of other collections. A manual collection resolves to its item ids; a smart collection resolves to its own query, inlined with a depth limit and cycle detection (a smart collection may not reference itself, directly or indirectly). A deleted collection is a stale condition: it matches nothing and carries a warning. It is an additive change to the query format (no version bump). `graph` and `collections` still never import each other: resolution goes through a bridge in `entrypoints/api/shared/`. Bulk actions on results stay future.
 3. **Connection conditions.** `exists`, `none`, `to`, and the nested far-end `where`, in the engine, both repositories and the builder.
 4. **Example packs.** Pack format bump so a pack can ship smart collections. Convert *Running low*, *Games for two* and *Still to try* from hand-built lists, and add one or two connection-based ones (*Films to rewatch*).
 
@@ -126,7 +127,7 @@ Each phase gets its own implementation plan; this spec is the shared model.
 - Multi-hop connection chains, e.g. "records by artists whose gigs I attended".
 - Relevance ranking, and an external search engine behind the same repository port if scanning ever proves too slow.
 - Currency-aware money comparison.
-- An "in collection" condition, and bulk actions on results.
+- Bulk actions on results. (The "in collection" condition is phase 2b.)
 
 **Rejected for now:**
 

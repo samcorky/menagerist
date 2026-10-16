@@ -31,6 +31,7 @@ def test_operator_table_matches_the_shared_contract() -> None:
         ({"type": "array", "items": {"type": "string", "enum": ["a"]}}, "multichoice"),
         ({"type": "array", "items": {"type": "object"}}, None),
         ({"type": "object", "x-menagerist": {"kind": "opaque"}}, None),
+        ({"type": "object"}, None),
         ({"type": "string", "x-menagerist": {"kind": "no-such-kind"}}, "text"),
     ],
 )

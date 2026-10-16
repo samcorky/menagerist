@@ -110,6 +110,8 @@ The async engine, `async_sessionmaker`, and shared declarative `Base` live in `p
 
 What's module-specific is which unit of work and use case get constructed from that session factory. That wiring lives in `modules/<context>/adapters/api/dependencies.py`, turning `Depends(get_session_factory)` into `create_graph_uow(session_factory)`, then a `CreateNode` use case. There's no separate per-request session dependency - the unit of work owns session lifecycle itself (see below).
 
+`NodeRepository` has two read paths. `list` and `count` take plain filters (`type`, `q`, `favourite`, `ids`) and order by id. `search` and `search_count` take a `ResolvedQuery` (a parsed condition tree plus the field kinds of the item types it names), page by an opaque `Cursor` over the sort values and id (nulls last), and `search_count` takes an optional `limit` so the database stops counting early; the application layer caps the total at `TOTAL_CAP`. `SqlAlchemyNodeRepository` compiles the tree to SQL in `query_sql.py` (with the text prefilter in `search_sql.py`). The Python evaluator in `query_eval.py`, used by the in-memory adapter, is the reference semantics: the SQL must agree with it, and one scenario table in `tests/modules/graph/adapters/persistence/test_node_search.py` runs against both. Text queries run with `SET LOCAL jit = off`. The reasoning and measurements are in `docs/DECISIONS.md`.
+
 ## Local adapters for fast testing
 
 Every port ships an in-memory adapter alongside its real backend adapter, as a first-class citizen rather than a private test-only fake. Application-layer and router-level tests wire the in-memory adapter directly (constructor injection, or FastAPI `dependency_overrides` for router tests) and need no live infrastructure. Only tests checking the *real* adapter's correctness (a `SqlAlchemyNodeRepository` round-tripping through Postgres) are `@pytest.mark.integration` and can be skipped where that infrastructure isn't available.
@@ -118,7 +120,7 @@ The `SchedulerPort` will need the same shape later (Postgres/APScheduler/Cron ad
 
 ## Domain entities
 
-- Every entity primary key is `uuid7` - time-ordered, so it supports keyset pagination without a separate sort key. List ports paginate as `after: UUID | None` + `limit`, ordered by `id ASC`, not an offset.
+- Every entity primary key is `uuid7` - time-ordered, so it supports keyset pagination without a separate sort key. List ports paginate as `after: UUID | None` + `limit`, ordered by `id ASC`, not an offset. (`NodeRepository.search` is the exception: it pages by keyset on the query's sort values, then id.)
 - Entities set their own timestamps in domain methods (`datetime.now(UTC)`, alongside `uuid7()` generation) rather than via SQLAlchemy `server_default`/`onupdate`. Timestamping is domain behavior, testable with `freezegun`/`time-machine` without a live database.
 - Mixins compose vertically: `Timestamped`, `SoftDeletable(Timestamped)` (a lifecycle change is itself timestamped), concrete entities like `Node(Identifiable, SoftDeletable)`.
 - `kw_only=True, eq=False` on every mixin/entity dataclass - keyword-only keeps constructors unambiguous as fields accumulate across mixins; these entities need identity equality (by ID), not structural equality.

@@ -802,6 +802,57 @@ Behind a TLS-terminating proxy that was not in `MENAGERIST_TRUSTED_PROXIES`, eve
 
 **Not chosen:** a separate link-set record per pack pair (a new table and a second place for the UI to look) and a hidden generated add-on per pair (add-ons block removal of their base, the opposite of what links are for).
 
+## The condition tree is the only stored form of a search (2026-10-15)
+
+**Decision:** a search is one JSON condition tree: `{v, where, sort}`, with `where` a group (`and`, `or`, `not`) of conditions (text, type, favourite, tag, field, date). `v` is the format version, currently 1. The JSON is parsed into frozen domain types (`graph/domain/query.py`) and nothing else is stored or sent. The URL (`?f=`, base64url of the JSON) and, later, smart collections hold the same tree; a text syntax would be a parser and printer over it, not a second format.
+
+**Limits:** depth 4, 50 conditions, text values of 200 characters. A condition that names a field the item type no longer has (deleted or archived) is not an error: it matches nothing, and the response lists it under `warnings` with its path so the page can mark it. A wrong operator for a field, a bad operand or a broken tree is a 400 naming the JSON path of the first bad condition.
+
+**Why:** one form means the builder, the link, the API and saved collections cannot drift, and old links keep working because the version is in the data. Warning instead of failing keeps a shared link or a future saved collection usable after someone edits an item type.
+
+**Not chosen:** storing a text syntax (it would need a parser on every read and a migration on every grammar change) and failing the whole search on a stale field (a saved search would break when a field was removed).
+
+## Search is separate from the list, and pages by keyset on the sort values (2026-10-15)
+
+**Decision:** `NodeRepository.search` and `search_count` sit beside `list` and `count` instead of adding a query parameter to them. `list` and `count` keep their plain-filter contract and `GET /node` is unchanged; `POST /node/search` takes the tree. Paging is keyset on `(sort values, id)`, nulls last, ties broken by id. The cursor is opaque base64url JSON. An offset would make deep pages slow and unstable while items change.
+
+**One meaning, two engines.** The Python evaluator (`query_eval.py`, used by the in-memory adapter) is the reference semantics; the SQL compiler (`query_sql.py`) must agree with it. One scenario table in `test_node_search.py` runs against both adapters, and a new rule is added there first.
+
+**Capped total.** The count is the slowest part of a search, so the response total stops at `TOTAL_CAP = 1000` and says `total_capped` when it stopped; the page shows "1,000+ items". An exact total of a large result is not worth seconds of waiting.
+
+**Indexes.** Migrations add GIN indexes on `attributes` (`jsonb_path_ops`) and `tags`, trigram indexes on name, description and `attributes::text`, and four sort indexes on the owner plus the sort key: name ascending, name descending, created and updated. The descending timestamp indexes were left out: ties are rare and Postgres reads the ascending index backwards with a small incremental sort. Each extra btree costs a little on every write, and every update touches the `updated_at` index (it can never be a heap-only update). That is the price of 12 ms pages instead of seconds.
+
+**Free text.** A text condition first narrows candidates with a trigram prefilter on name, description and `attributes::text`, then applies the exact check. The prefilter is a superset of the exact match (a table of 66 queries against 32 values pins that), and is skipped for queries it cannot serve safely: under three characters, or containing a backslash or control character. `unaccent` maps eleven other characters (U+02BA, U+201C, U+201D, U+201F, U+2033, U+301D, U+301E, U+FF02 to a double quote; U+2216, U+FE68, U+FF3C to a backslash), which JSON escaping would hide from the prefilter, so they skip it too. A test scans every Unicode code point against the real `unaccent` and fails with the code point if Postgres ever maps another character to a quote, a backslash or a control character. `SET LOCAL jit = off` is issued for text queries only (not app-wide): JIT compilation added about 0.8 s to a 70 ms query and helps nothing else we run.
+
+**Measured** (100,000 items, one local Postgres, 51-item pages, eight timed runs each):
+
+| Search | Before | After |
+|---|---|---|
+| Sort by name, first page | 2,189 ms | 12 ms |
+| Sort by name, deep page | 2,253 ms | 15 ms |
+| Sort by created or updated, first page | not measured | 11 to 12 ms |
+| Text "alien", page | 824 ms | 70 ms |
+| Text "alien", count (1,000 matches) | 13,949 ms | 52 ms |
+| List `?q=alien` (`GET /node`) | 654 ms | 59 ms |
+| Rating, descending | 450 ms | 255 ms |
+| "director 42" within a type, page / count | 433 / 10,472 ms | 487 / 476 ms |
+
+The "after" counts above are the uncapped counts; the API now stops counting at 1,000, which took the no-filter count from 62 ms to 4 ms.
+
+Other pages (id order, type, containment filters, tags) were already 10 to 25 ms. At 10,000 items every page was under 60 ms except sort by name (217 ms before) and text (759 ms before).
+
+**Known limits:** sorting on a field (rating) still scans. A free-text query with many candidates still pays for the exact check ("director 42" within a type, about 500 ms at 100,000 items). Postgres `unaccent` expands Æ and œ, and the Python fold does not, so those two letters can differ between the in-memory and SQL adapters (the same difference existed before search).
+
+**`EXPLAIN` findings:** containment forms (choice, yes/no, multi-choice, tags) and name or description trigram searches use the GIN indexes, though at 20,000 items the planner prefers the owner index until a condition is selective. Number, date and partial-date comparisons, and sorting on a field, scan. That is acceptable at the sizes expected and is the first thing to measure if search feels slow; an expression index per hot field is the next step.
+
+## Operators per field kind are one shared table (2026-10-15)
+
+**Decision:** which filter operators each field kind supports lives in `shared/contracts/query-operators.json`. The backend table (`KIND_OPERATORS` in `field_kinds.py`) and the frontend table both have to equal it, and both test suites read the file.
+
+**Why:** the backend has no field-type descriptors of its own (those exist only in the frontend registry), so there is nowhere on the server to declare operators per type. A shared fixture is the same device as the existing regex conformance file: it fails whichever side changes alone. The query shapes fixture (`query-shapes.json`) does the same for the structure of a tree.
+
+**Not chosen:** a backend `FieldTypeDescriptor` (a second registry to keep in step with the frontend one) and generating one side's table from the other at build time (it hides the drift until the build).
+
 ## Direction: roles as data, implied permissions
 
 **Direction (2026-10-10), not built:**
