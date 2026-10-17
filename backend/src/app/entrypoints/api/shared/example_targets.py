@@ -20,6 +20,9 @@ from app.entrypoints.api.shared.preset_usage import GraphPresetUsage
 from app.modules.collections.adapters.persistence.in_memory_collection_repository import (  # noqa: E501
     InMemoryCollectionRepository,
 )
+from app.modules.collections.adapters.persistence.in_memory_definition_checker import (
+    InMemoryDefinitionChecker,
+)
 from app.modules.collections.adapters.persistence.in_memory_membership_repository import (  # noqa: E501
     InMemoryMembershipRepository,
 )
@@ -825,7 +828,10 @@ class CollectionPackTarget:
         self, spec: PackCollection, *, item_ids: Sequence[uuid.UUID]
     ) -> Created:
         """Create the collection, put the items on it and return what was stored."""
-        collection = await CreateCollection(self._stores.uow(), self._access).handle(
+        # Packs only make manual collections, so there is no definition to check.
+        collection = await CreateCollection(
+            self._stores.uow(), self._access, InMemoryDefinitionChecker()
+        ).handle(
             CreateCollectionCommand(name=spec.name, description=spec.description),
             self._actor,
         )

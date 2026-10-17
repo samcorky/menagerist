@@ -2,24 +2,20 @@
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import date  # noqa: TC003
 from typing import Any
 
 import structlog
 
+from app.modules.graph.application.prepare_query import prepare_query, utc_today
 from app.modules.graph.application.query_cursor import decode_cursor, encode_cursor
-from app.modules.graph.application.query_resolution import resolve_fields
-from app.modules.graph.application.schema_meta import search_excluded_keys
-from app.modules.graph.application.type_catalogue import load_node_types
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.query import (
     Cursor,
     FieldKey,
     InvalidQueryError,
     QueryWarning,
-    ResolvedQuery,
     SortKey,
-    parse_query,
 )
 from app.modules.graph.ports.unit_of_work import GraphRepos
 
@@ -33,10 +29,6 @@ logger = structlog.get_logger()
 MAX_LIMIT = 200
 TOTAL_CAP = 1000
 _NUMERIC_KINDS = frozenset({"number", "duration", "rating", "money"})
-
-
-def _utc_today() -> date:
-    return datetime.now(UTC).date()
 
 
 def _is_number(value: object) -> bool:
@@ -96,7 +88,7 @@ class SearchNodes(ScopedQueryHandler[GraphRepos, SearchNodesQuery, SearchNodesRe
         self,
         repos: GraphRepos,
         policy: AccessPolicy,
-        today: Callable[[], date] = _utc_today,
+        today: Callable[[], date] = utc_today,
         total_cap: int = TOTAL_CAP,
     ) -> None:
         super().__init__(repos, policy)
@@ -114,25 +106,14 @@ class SearchNodes(ScopedQueryHandler[GraphRepos, SearchNodesQuery, SearchNodesRe
             raise InvalidQueryError(
                 f"The limit must be 1 to {MAX_LIMIT}.", path="limit"
             )
-        parsed = parse_query(query.query)
-        node_types = await load_node_types(self._repos)
-        schemas = {str(t.slug): t.attributes_schema or {} for t in node_types}
-        resolution = resolve_fields(parsed, schemas)
-        resolved = ResolvedQuery(
-            query=parsed,
-            field_kinds=resolution.kinds,
-            search_exclusions={
-                slug: keys
-                for slug, schema in schemas.items()
-                if (keys := search_excluded_keys(schema))
-            },
-            today=self._today(),
-            stale=resolution.stale,
+        resolved, warnings = await prepare_query(
+            self._repos, query.query, self._today()
         )
+        parsed = resolved.query
         after: Cursor | None = None
         if query.cursor is not None:
             after = decode_cursor(query.cursor, sort_count=len(parsed.sort))
-            _check_cursor_types(after, parsed.sort, resolution.kinds)
+            _check_cursor_types(after, parsed.sort, resolved.field_kinds)
         scope = self._policy.scope_for(actor)
         hits = await self._repos.nodes.search(
             scope=scope, resolved=resolved, after=after, limit=query.limit + 1
@@ -155,5 +136,5 @@ class SearchNodes(ScopedQueryHandler[GraphRepos, SearchNodesQuery, SearchNodesRe
             total=total,
             total_capped=counted > self._total_cap,
             next_cursor=next_cursor,
-            warnings=resolution.warnings,
+            warnings=warnings,
         )

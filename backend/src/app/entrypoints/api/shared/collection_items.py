@@ -1,15 +1,18 @@
-"""The collections module's view of graph items: which of a set of ids are live."""
+"""The collections module's view of graph items: which ids are live, how many match."""
 
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
+import structlog
 from fastapi import Depends
 
 from app.modules.graph.adapters.persistence.unit_of_work import build_graph_repos
+from app.modules.graph.application.prepare_query import count_matching
+from app.modules.graph.domain.query import InvalidQueryError
 from app.platform.database import get_session_factory
 
 if TYPE_CHECKING:
     import uuid
-    from collections.abc import AsyncIterator, Sequence
+    from collections.abc import AsyncIterator, Mapping, Sequence
 
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -17,6 +20,8 @@ if TYPE_CHECKING:
     from app.shared_kernel.access_scope import AccessScope
 
 _CHUNK = 1000
+
+logger = structlog.get_logger()
 
 
 class GraphItemLookup:
@@ -41,6 +46,20 @@ class GraphItemLookup:
             )
             live.update(node.id for node in nodes)
         return live
+
+    async def count_matching(
+        self, definition: Mapping[str, Any], scope: AccessScope, *, cap: int
+    ) -> tuple[int, bool]:
+        """Return how many items in `scope` match `definition`, and if capped.
+
+        A definition naming fields that were removed matches nothing. One that
+        can no longer be read counts as `(0, False)` and is logged.
+        """
+        try:
+            return await count_matching(self._repos, definition, scope, cap=cap)
+        except InvalidQueryError as exc:
+            logger.warning("stored collection definition unreadable", error=str(exc))
+            return 0, False
 
 
 async def get_item_lookup(

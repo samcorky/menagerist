@@ -216,6 +216,7 @@ UNSCOPED_USE_CASES = {
     "CreateNodeType": "shared vocabulary",
     "GetNodeType": "shared vocabulary",
     "ListNodeTypes": "shared vocabulary",
+    "ValidateQuery": "reads item type schemas only; touches no items",
     "UpdateNodeType": "shared vocabulary",
     "CreateEdgeType": "shared vocabulary",
     "GetEdgeType": "shared vocabulary",

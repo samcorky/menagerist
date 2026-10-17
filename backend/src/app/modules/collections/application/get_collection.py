@@ -1,11 +1,20 @@
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 import structlog
 
-from app.modules.collections.domain.collection import Collection
-from app.modules.collections.domain.errors import CollectionNotFoundError
+from app.modules.collections.domain.collection import Collection, CollectionKind
+from app.modules.collections.domain.definition_warning import DefinitionWarning
+from app.modules.collections.domain.errors import (
+    CollectionNotFoundError,
+    InvalidDefinitionError,
+)
+
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.modules.collections.ports.definition_checker import (
+    DefinitionChecker,  # noqa: TC001
+)
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.collections.ports.item_lookup import ItemLookup  # noqa: TC001
@@ -19,13 +28,23 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger()
 
+# Matches the search endpoint's total cap.
+ITEM_COUNT_CAP = 1000
+
 
 @dataclass(kw_only=True, frozen=True)
 class CollectionSummary:
-    """A collection with the number of its members that are live items."""
+    """A collection with the number of its members that are live items.
+
+    For a smart collection the count stops at `ITEM_COUNT_CAP`, and
+    `item_count_capped` says so. `warnings` lists the parts of its definition
+    that no longer apply; only `GetCollection` fills them.
+    """
 
     collection: Collection
     item_count: int
+    item_count_capped: bool = False
+    warnings: tuple[DefinitionWarning, ...] = ()
 
 
 async def summarise(
@@ -35,6 +54,13 @@ async def summarise(
     scope: AccessScope,
 ) -> CollectionSummary:
     """Count `collection`'s members that are live items visible in `scope`."""
+    if collection.kind is CollectionKind.DYNAMIC and collection.definition is not None:
+        count, capped = await items.count_matching(
+            collection.definition, scope, cap=ITEM_COUNT_CAP
+        )
+        return CollectionSummary(
+            collection=collection, item_count=count, item_count_capped=capped
+        )
     member_ids = await repos.memberships.item_ids(collection.id, scope=scope)
     live = await items.live_ids(list(member_ids), scope)
     return CollectionSummary(collection=collection, item_count=len(live))
@@ -53,10 +79,15 @@ class GetCollection(
     """Fetch a single collection with its live item count."""
 
     def __init__(
-        self, repos: CollectionsRepos, policy: AccessPolicy, items: ItemLookup
+        self,
+        repos: CollectionsRepos,
+        policy: AccessPolicy,
+        items: ItemLookup,
+        checker: DefinitionChecker,
     ) -> None:
         super().__init__(repos, policy)
         self._items = items
+        self._checker = checker
 
     async def handle(
         self, query: GetCollectionQuery, actor: Actor
@@ -68,4 +99,15 @@ class GetCollection(
             raise CollectionNotFoundError(f"Collection {query.collection_id} not found")
         self._policy.assert_can_view(actor, collection.owner_id)
         logger.debug("collection fetched", collection_id=collection.id)
-        return await summarise(self._repos, self._items, collection, scope)
+        summary = await summarise(self._repos, self._items, collection, scope)
+        if (
+            collection.kind is not CollectionKind.DYNAMIC
+            or collection.definition is None
+        ):
+            return summary
+        try:
+            warnings = await self._checker.check(collection.definition, scope)
+        except InvalidDefinitionError as exc:
+            # No longer valid (for example an item type changed): matches nothing.
+            warnings = [DefinitionWarning(path=exc.path, message=str(exc))]
+        return replace(summary, warnings=tuple(warnings))

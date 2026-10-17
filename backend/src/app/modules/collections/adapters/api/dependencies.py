@@ -2,6 +2,10 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
 
+from app.entrypoints.api.shared.bridges.collection_definitions import (
+    GraphDefinitionChecker,
+    get_definition_checker,
+)
 from app.entrypoints.api.shared.collection_items import GraphItemLookup, get_item_lookup
 from app.entrypoints.api.shared.dependencies import get_access_policy
 from app.modules.collections.adapters.persistence.unit_of_work import (
@@ -54,16 +58,18 @@ async def get_collections_repos(
 def get_create_collection_use_case(
     uow: Annotated[CollectionsUnitOfWork, Depends(get_collections_uow)],
     policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    checker: Annotated[GraphDefinitionChecker, Depends(get_definition_checker)],
 ) -> CreateCollection:
-    return CreateCollection(uow, policy)
+    return CreateCollection(uow, policy, checker)
 
 
 def get_get_collection_use_case(
     repos: Annotated[CollectionsRepos, Depends(get_collections_repos)],
     policy: Annotated[AccessPolicy, Depends(get_access_policy)],
     items: Annotated[GraphItemLookup, Depends(get_item_lookup)],
+    checker: Annotated[GraphDefinitionChecker, Depends(get_definition_checker)],
 ) -> GetCollection:
-    return GetCollection(repos, policy, items)
+    return GetCollection(repos, policy, items, checker)
 
 
 def get_list_collections_use_case(
@@ -77,8 +83,9 @@ def get_list_collections_use_case(
 def get_update_collection_use_case(
     uow: Annotated[CollectionsUnitOfWork, Depends(get_collections_uow)],
     policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    checker: Annotated[GraphDefinitionChecker, Depends(get_definition_checker)],
 ) -> UpdateCollection:
-    return UpdateCollection(uow, policy)
+    return UpdateCollection(uow, policy, checker)
 
 
 def get_delete_collection_use_case(

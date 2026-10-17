@@ -5,7 +5,11 @@ import structlog
 
 from app.modules.collections.domain.collection import Collection
 from app.modules.collections.domain.errors import InvalidCollectionError
+from app.modules.collections.ports.definition_checker import (
+    DefinitionChecker,  # noqa: TC001
+)
 from app.modules.collections.ports.unit_of_work import CollectionsUnitOfWork
+from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
 from app.shared_kernel.cqrs import ScopedCommandHandler
 from app.shared_kernel.errors import ConflictError
 from app.shared_kernel.slug import Slug, slugify
@@ -38,6 +42,15 @@ class CreateCollection(
 ):
     """Create and persist a new collection owned by the acting user."""
 
+    def __init__(
+        self,
+        uow: CollectionsUnitOfWork,
+        policy: AccessPolicy,
+        checker: DefinitionChecker,
+    ) -> None:
+        super().__init__(uow, policy)
+        self._checker = checker
+
     async def handle(
         self, command: CreateCollectionCommand, actor: Actor
     ) -> Collection:
@@ -45,11 +58,14 @@ class CreateCollection(
 
         Raises:
             InvalidCollectionError: If the name or an explicit slug is unusable.
+            InvalidDefinitionError: If the definition is malformed, with its path.
             ConflictError: If an explicit slug belongs to a live collection of the
                 actor.
         """
         # Slugs are unique per owner: only collections the actor can see count.
         scope = self._policy.scope_for(actor)
+        if command.definition is not None:
+            await self._checker.check(command.definition, scope)
         async with self._uow as repos:
             if command.slug is None:
                 slug = await _free_slug(repos.collections, command.name, scope)

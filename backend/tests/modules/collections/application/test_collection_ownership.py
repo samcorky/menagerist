@@ -60,7 +60,7 @@ def _repos(world: World) -> CollectionsRepos:
 async def _create(
     world: World, actor: Actor, name: str = "Jazz", slug: str | None = None
 ) -> uuid.UUID:
-    created = await CreateCollection(world.uow, POLICY).handle(
+    created = await CreateCollection(world.uow, POLICY, world.checker).handle(
         CreateCollectionCommand(name=name, slug=slug), actor
     )
     assert created.owner_id == actor.id
@@ -72,11 +72,11 @@ async def test_other_user_cannot_get_update_delete_or_remove(world: World) -> No
     shelf = await _create(world, ALICE)
 
     with pytest.raises(CollectionNotFoundError):
-        await GetCollection(_repos(world), POLICY, world.items).handle(
+        await GetCollection(_repos(world), POLICY, world.items, world.checker).handle(
             GetCollectionQuery(collection_id=shelf), BOB
         )
     with pytest.raises(CollectionNotFoundError):
-        await UpdateCollection(world.uow, POLICY).handle(
+        await UpdateCollection(world.uow, POLICY, world.checker).handle(
             UpdateCollectionCommand(collection_id=shelf, name="Mine now"), BOB
         )
     with pytest.raises(CollectionNotFoundError):
@@ -126,7 +126,7 @@ async def test_list_by_item_ignores_other_users_collections(world: World) -> Non
 
 async def test_same_name_gives_each_owner_the_plain_slug(world: World) -> None:
     """A and B both get 'jazz'; a second one for A gets '-2'."""
-    create = CreateCollection(world.uow, POLICY)
+    create = CreateCollection(world.uow, POLICY, world.checker)
     first = await create.handle(CreateCollectionCommand(name="Jazz"), ALICE)
     other = await create.handle(CreateCollectionCommand(name="Jazz"), BOB)
     again = await create.handle(CreateCollectionCommand(name="Jazz"), ALICE)
@@ -229,7 +229,7 @@ async def test_item_count_reflects_only_visible_items(world: World) -> None:
             Membership(collection_id=shelf, item_id=item, added_at=datetime.now(UTC))
         )
 
-    got = await GetCollection(_repos(world), POLICY, world.items).handle(
+    got = await GetCollection(_repos(world), POLICY, world.items, world.checker).handle(
         GetCollectionQuery(collection_id=shelf), ALICE
     )
     listed = await ListCollections(_repos(world), POLICY, world.items).handle(

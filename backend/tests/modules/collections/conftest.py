@@ -9,6 +9,9 @@ import pytest
 from app.modules.collections.adapters.persistence.in_memory_collection_repository import (  # noqa: E501
     InMemoryCollectionRepository,
 )
+from app.modules.collections.adapters.persistence.in_memory_definition_checker import (
+    InMemoryDefinitionChecker,
+)
 from app.modules.collections.adapters.persistence.in_memory_item_lookup import (
     InMemoryItemLookup,
 )
@@ -28,6 +31,7 @@ class World:
     collections: InMemoryCollectionRepository
     memberships: InMemoryMembershipRepository
     items: InMemoryItemLookup
+    checker: InMemoryDefinitionChecker
     uow: InMemoryUnitOfWork[CollectionsRepos]
 
 
@@ -43,6 +47,7 @@ def _make_world() -> World:
         collections=collections,
         memberships=memberships,
         items=InMemoryItemLookup(),
+        checker=InMemoryDefinitionChecker(),
         uow=InMemoryUnitOfWork(
             CollectionsRepos(collections=collections, memberships=memberships)
         ),

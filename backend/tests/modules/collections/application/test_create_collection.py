@@ -29,9 +29,9 @@ if TYPE_CHECKING:
 
 async def _create(world: World, name: str, slug: str | None = None) -> str:
     """Create a collection and return its slug."""
-    created = await CreateCollection(world.uow, OwnerAccessPolicy()).handle(
-        CreateCollectionCommand(name=name, slug=slug), ACTOR
-    )
+    created = await CreateCollection(
+        world.uow, OwnerAccessPolicy(), world.checker
+    ).handle(CreateCollectionCommand(name=name, slug=slug), ACTOR)
     return created.slug.value
 
 
@@ -41,9 +41,9 @@ async def test_slug_is_derived_from_name_and_committed(
     """The slug comes from the name and the collection is stored and committed."""
     add = AsyncMock(wraps=world.collections.add)
     monkeypatch.setattr(world.collections, "add", add)
-    created = await CreateCollection(world.uow, OwnerAccessPolicy()).handle(
-        CreateCollectionCommand(name="  My Vinyl Shelf ", description="d"), ACTOR
-    )
+    created = await CreateCollection(
+        world.uow, OwnerAccessPolicy(), world.checker
+    ).handle(CreateCollectionCommand(name="  My Vinyl Shelf ", description="d"), ACTOR)
 
     assert created.slug.value == "my-vinyl-shelf"
     assert created.name == "My Vinyl Shelf"
@@ -54,9 +54,9 @@ async def test_slug_is_derived_from_name_and_committed(
 
 async def test_owner_is_the_actor(world: World) -> None:
     """The owner id is taken from the acting user."""
-    created = await CreateCollection(world.uow, OwnerAccessPolicy()).handle(
-        CreateCollectionCommand(name="Shelf"), ACTOR
-    )
+    created = await CreateCollection(
+        world.uow, OwnerAccessPolicy(), world.checker
+    ).handle(CreateCollectionCommand(name="Shelf"), ACTOR)
 
     assert created.owner_id == ACTOR.id
 
@@ -109,9 +109,9 @@ async def test_invalid_name_raises(world: World, name: str) -> None:
 
 async def test_slug_is_reusable_after_delete(world: World) -> None:
     """A deleted collection's slug can be taken again, explicitly or derived."""
-    created = await CreateCollection(world.uow, OwnerAccessPolicy()).handle(
-        CreateCollectionCommand(name="Shelf"), ACTOR
-    )
+    created = await CreateCollection(
+        world.uow, OwnerAccessPolicy(), world.checker
+    ).handle(CreateCollectionCommand(name="Shelf"), ACTOR)
     await DeleteCollection(world.uow, OwnerAccessPolicy()).handle(
         DeleteCollectionCommand(collection_id=created.id), ACTOR
     )
@@ -166,9 +166,9 @@ async def test_create_trims_description_and_blank_becomes_none(
     add = AsyncMock(wraps=world.collections.add)
     monkeypatch.setattr(world.collections, "add", add)
 
-    created = await CreateCollection(world.uow, OwnerAccessPolicy()).handle(
-        CreateCollectionCommand(name="Shelf", description=given), ACTOR
-    )
+    created = await CreateCollection(
+        world.uow, OwnerAccessPolicy(), world.checker
+    ).handle(CreateCollectionCommand(name="Shelf", description=given), ACTOR)
 
     assert created.description == stored
     add.assert_awaited_once_with(created)
@@ -179,17 +179,17 @@ async def test_create_with_definition_is_dynamic_and_stored_as_given(
 ) -> None:
     """A definition makes a dynamic collection and is stored untouched."""
     definition = {"op": "and", "conditions": [{"nested": [1, {"a": None}]}]}
-    created = await CreateCollection(world.uow, OwnerAccessPolicy()).handle(
-        CreateCollectionCommand(name="Smart", definition=definition), ACTOR
-    )
+    created = await CreateCollection(
+        world.uow, OwnerAccessPolicy(), world.checker
+    ).handle(CreateCollectionCommand(name="Smart", definition=definition), ACTOR)
     assert created.kind is CollectionKind.DYNAMIC
     assert created.definition == definition
 
 
 async def test_create_without_definition_is_manual(world: World) -> None:
     """No definition leaves a manual collection."""
-    created = await CreateCollection(world.uow, OwnerAccessPolicy()).handle(
-        CreateCollectionCommand(name="Plain"), ACTOR
-    )
+    created = await CreateCollection(
+        world.uow, OwnerAccessPolicy(), world.checker
+    ).handle(CreateCollectionCommand(name="Plain"), ACTOR)
     assert created.kind is CollectionKind.MANUAL
     assert created.definition is None

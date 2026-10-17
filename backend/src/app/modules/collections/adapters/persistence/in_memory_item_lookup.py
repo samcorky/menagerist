@@ -1,8 +1,8 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import uuid
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     from app.shared_kernel.access_scope import AccessScope
 
@@ -11,7 +11,8 @@ class InMemoryItemLookup:
     """`ItemLookup` over settable live item ids, for tests.
 
     Ids in `live` are visible to every scope; `add_owned` registers items that
-    only their owner's scope covers.
+    only their owner's scope covers. A definition is not evaluated: every item
+    inside the scope counts as matching.
     """
 
     def __init__(self, live: set[uuid.UUID] | None = None) -> None:
@@ -28,3 +29,11 @@ class InMemoryItemLookup:
         """Return the subset of `ids` that are live and inside `scope`."""
         owned = {i for i, owner in self._owners.items() if scope.covers(owner)}
         return (self.live | owned).intersection(ids)
+
+    async def count_matching(
+        self, definition: Mapping[str, Any], scope: AccessScope, *, cap: int
+    ) -> tuple[int, bool]:
+        """Count the live items inside `scope`, up to `cap`."""
+        owned = {i for i, owner in self._owners.items() if scope.covers(owner)}
+        total = len(self.live | owned)
+        return min(total, cap), total > cap

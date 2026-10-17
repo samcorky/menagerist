@@ -25,6 +25,7 @@ def _handler(world: World) -> GetCollection:
         CollectionsRepos(collections=world.collections, memberships=world.memberships),
         OwnerAccessPolicy(),
         world.items,
+        world.checker,
     )
 
 

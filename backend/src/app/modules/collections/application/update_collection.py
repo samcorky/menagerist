@@ -6,7 +6,11 @@ import structlog
 
 from app.modules.collections.domain.collection import Collection
 from app.modules.collections.domain.errors import CollectionNotFoundError
+from app.modules.collections.ports.definition_checker import (
+    DefinitionChecker,  # noqa: TC001
+)
 from app.modules.collections.ports.unit_of_work import CollectionsUnitOfWork
+from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
 from app.shared_kernel.cqrs import ScopedCommandHandler
 
 if TYPE_CHECKING:
@@ -33,6 +37,15 @@ class UpdateCollection(
 ):
     """Update an existing collection's editable fields."""
 
+    def __init__(
+        self,
+        uow: CollectionsUnitOfWork,
+        policy: AccessPolicy,
+        checker: DefinitionChecker,
+    ) -> None:
+        super().__init__(uow, policy)
+        self._checker = checker
+
     async def handle(
         self, command: UpdateCollectionCommand, actor: Actor
     ) -> Collection:
@@ -44,11 +57,13 @@ class UpdateCollection(
             CollectionNotFoundError: If the collection does not exist or is deleted.
             InvalidCollectionError: If the new name is not 1 to 120 characters.
             CollectionKindError: If a definition is given for a manual collection.
+            InvalidDefinitionError: If the definition is malformed, with its path.
         """
+        scope = self._policy.scope_for(actor)
+        if command.definition is not None:
+            await self._checker.check(command.definition, scope)
         async with self._uow as repos:
-            collection = await repos.collections.get(
-                command.collection_id, scope=self._policy.scope_for(actor)
-            )
+            collection = await repos.collections.get(command.collection_id, scope=scope)
             if collection is None:
                 raise CollectionNotFoundError(
                     f"Collection {command.collection_id} not found"

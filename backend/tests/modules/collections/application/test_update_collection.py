@@ -35,7 +35,9 @@ async def test_update_changes_name_and_description_not_slug(
     save = AsyncMock(wraps=world.collections.save)
     monkeypatch.setattr(world.collections, "save", save)
 
-    result = await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
+    result = await UpdateCollection(
+        world.uow, OwnerAccessPolicy(), world.checker
+    ).handle(
         UpdateCollectionCommand(collection_id=shelf.id, name=" New ", description="d"),
         SYSTEM_ACTOR,
     )
@@ -55,7 +57,9 @@ async def test_update_description_set_clear_and_unchanged(
     await world.collections.add(shelf)
 
     async def update(description: str | None) -> str | None:
-        result = await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
+        result = await UpdateCollection(
+            world.uow, OwnerAccessPolicy(), world.checker
+        ).handle(
             UpdateCollectionCommand(collection_id=shelf.id, description=description),
             SYSTEM_ACTOR,
         )
@@ -76,9 +80,9 @@ async def test_update_leaves_unset_fields_alone(
     shelf.description = "keep me"
     await world.collections.add(shelf)
 
-    result = await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
-        UpdateCollectionCommand(collection_id=shelf.id), SYSTEM_ACTOR
-    )
+    result = await UpdateCollection(
+        world.uow, OwnerAccessPolicy(), world.checker
+    ).handle(UpdateCollectionCommand(collection_id=shelf.id), SYSTEM_ACTOR)
 
     assert (result.name, result.description) == ("Keep", "keep me")
 
@@ -91,7 +95,7 @@ async def test_update_invalid_name_raises(
     await world.collections.add(shelf)
 
     with pytest.raises(InvalidCollectionError):
-        await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
+        await UpdateCollection(world.uow, OwnerAccessPolicy(), world.checker).handle(
             UpdateCollectionCommand(collection_id=shelf.id, name="  "), SYSTEM_ACTOR
         )
 
@@ -101,7 +105,7 @@ async def test_update_invalid_name_raises(
 async def test_update_unknown_raises_not_found(world: World) -> None:
     """An unknown id raises CollectionNotFoundError."""
     with pytest.raises(CollectionNotFoundError):
-        await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
+        await UpdateCollection(world.uow, OwnerAccessPolicy(), world.checker).handle(
             UpdateCollectionCommand(collection_id=uuid.uuid7(), name="x"),
             SYSTEM_ACTOR,
         )
@@ -118,7 +122,7 @@ async def test_update_deleted_raises_not_found(
     await world.collections.add(shelf)
 
     with pytest.raises(CollectionNotFoundError):
-        await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
+        await UpdateCollection(world.uow, OwnerAccessPolicy(), world.checker).handle(
             UpdateCollectionCommand(collection_id=shelf.id, name="x"), SYSTEM_ACTOR
         )
 
@@ -132,7 +136,9 @@ async def test_update_replaces_definition_of_dynamic_collection(
     )
     await world.collections.add(smart)
 
-    result = await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
+    result = await UpdateCollection(
+        world.uow, OwnerAccessPolicy(), world.checker
+    ).handle(
         UpdateCollectionCommand(collection_id=smart.id, definition={"b": 2}),
         SYSTEM_ACTOR,
     )
@@ -148,7 +154,9 @@ async def test_update_leaves_definition_when_not_given(world: World) -> None:
     )
     await world.collections.add(smart)
 
-    result = await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
+    result = await UpdateCollection(
+        world.uow, OwnerAccessPolicy(), world.checker
+    ).handle(
         UpdateCollectionCommand(collection_id=smart.id, name="Renamed"), SYSTEM_ACTOR
     )
 
@@ -163,7 +171,7 @@ async def test_update_definition_on_manual_collection_is_a_conflict(
     await world.collections.add(shelf)
 
     with pytest.raises(CollectionKindError):
-        await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
+        await UpdateCollection(world.uow, OwnerAccessPolicy(), world.checker).handle(
             UpdateCollectionCommand(collection_id=shelf.id, definition={"a": 1}),
             SYSTEM_ACTOR,
         )
