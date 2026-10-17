@@ -3,6 +3,7 @@
 Each test runs over in-memory repositories and, integration-marked, on Postgres.
 """
 
+import asyncio
 import uuid
 from typing import TYPE_CHECKING, Any
 
@@ -50,12 +51,13 @@ from app.modules.graph.adapters.persistence.in_memory_node_type_repository impor
 from app.modules.graph.adapters.persistence.unit_of_work import (
     create_in_memory_graph_uow,
 )
+from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.platform.database import get_engine, get_session_factory
 from app.shared_kernel.actor import Actor
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from fastapi import FastAPI
 
@@ -74,7 +76,13 @@ RATED: dict[str, Any] = {
 class Env:
     """The app as a client, acting as whoever `actor` is."""
 
-    def __init__(self, app: FastAPI, client: TestClient) -> None:
+    def __init__(
+        self,
+        app: FastAPI,
+        client: TestClient,
+        bulk: Callable[[uuid.UUID, str, int], None],
+    ) -> None:
+        self.bulk = bulk
         self.actor = ALICE
         app.dependency_overrides[get_current_actor] = lambda: self.actor
         self.client = client
@@ -101,7 +109,7 @@ class Env:
         return body
 
 
-def _in_memory_app() -> FastAPI:
+def _in_memory_app() -> tuple[FastAPI, Callable[[uuid.UUID, str, int], None]]:
     app = create_app()
     graph = GraphRepos(
         nodes=InMemoryNodeRepository(),
@@ -118,7 +126,41 @@ def _in_memory_app() -> FastAPI:
     o[get_item_lookup] = lambda: GraphItemLookup(graph)
     o[get_collection_members] = lambda: CollectionsMembers(collections)
     o[get_definition_checker] = lambda: GraphDefinitionChecker(graph)
-    return app
+
+    def bulk(owner_id: uuid.UUID, type_slug: str, count: int) -> None:
+        async def add_all() -> None:
+            for n in range(count):
+                node = Node.create(
+                    owner_id=owner_id, name=f"{type_slug} {n}", type=type_slug
+                )
+                await graph.nodes.add(node)
+
+        asyncio.run(add_all())
+
+    return app, bulk
+
+
+def _postgres_bulk(
+    sync_url: str,
+) -> Callable[[uuid.UUID, str, int], None]:
+    def bulk(owner_id: uuid.UUID, type_slug: str, count: int) -> None:
+        engine = sqlalchemy.create_engine(sync_url)
+        with engine.begin() as connection:
+            connection.execute(
+                sqlalchemy.text(
+                    """
+                    INSERT INTO nodes (id, owner_id, name, type, attributes,
+                                       favourite, tags, created_at, updated_at)
+                    SELECT gen_random_uuid(), :owner, :slug || ' ' || n, :slug,
+                           '{}'::jsonb, false, '[]'::jsonb, now(), now()
+                    FROM generate_series(1, :count) AS n
+                    """
+                ),
+                {"owner": owner_id, "slug": type_slug, "count": count},
+            )
+        engine.dispose()
+
+    return bulk
 
 
 def _wipe(sync_url: str) -> None:
@@ -136,8 +178,8 @@ def _wipe(sync_url: str) -> None:
 def env(request: pytest.FixtureRequest) -> Iterator[Env]:
     """The real app over in-memory repositories or Postgres, as Alice."""
     if request.param == "memory":
-        app = _in_memory_app()
-        yield Env(app, TestClient(app))
+        app, bulk = _in_memory_app()
+        yield Env(app, TestClient(app), bulk)
         return
     request.getfixturevalue("postgres_url")
     sync_url: str = request.getfixturevalue("postgres_sync_url")
@@ -146,7 +188,7 @@ def env(request: pytest.FixtureRequest) -> Iterator[Env]:
     try:
         app = create_app()
         with TestClient(app) as client:
-            yield Env(app, client)
+            yield Env(app, client, _postgres_bulk(sync_url))
     finally:
         get_session_factory.cache_clear()
         get_engine.cache_clear()
@@ -420,3 +462,107 @@ def test_manual_collections_are_unchanged(env: Env) -> None:
 
     assert _names(a.get(f"{NODES}?collection={shelf['id']}")) == {"Ronin"}
     assert a.get(f"{COLLECTIONS}/{shelf['id']}").json()["kind"] == "manual"
+
+
+def _rating_as_text(env: Env, film_type_id: str) -> None:
+    """Change `rating` to a text field, so `>=` no longer fits it."""
+    schema = {
+        "type": "object",
+        "properties": {"rating": {"type": "string", "x-menagerist": {"kind": "text"}}},
+    }
+    patched = env.as_(ALICE).patch(
+        f"/api/v1/node-type/{film_type_id}", json={"attributes_schema": schema}
+    )
+    assert patched.status_code == 200, patched.text
+
+
+def test_count_is_exact_above_the_cap(env: Env) -> None:
+    """The count route passes the 1,000 cap that the collection's own count hits."""
+    _films(env)
+    a = env.as_(ALICE)
+    assert a.post("/api/v1/node-type", json={"slug": "coin", "label": "Coin"})
+    env.bulk(ALICE.id, "coin", 1005)
+    smart = env.smart(
+        {"v": 1, "where": {"op": "and", "children": [{"kind": "text", "q": "coin"}]}}
+    )
+
+    capped = a.get(f"{COLLECTIONS}/{smart['id']}").json()
+    exact = a.get(f"{COLLECTIONS}/{smart['id']}/count")
+
+    assert (capped["item_count"], capped["item_count_capped"]) == (1000, True)
+    assert exact.status_code == 200
+    assert exact.json() == {"count": 1005}
+
+
+def test_count_of_a_manual_collection_is_its_live_members(env: Env) -> None:
+    """Members count; items deleted since are not."""
+    ids = _films(env)
+    a = env.as_(ALICE)
+    shelf = a.post(COLLECTIONS, json={"name": "Shelf"}).json()
+    members = [ids["Alien"], ids["Heat"], ids["Ronin"]]
+    a.put(f"{COLLECTIONS}/{shelf['id']}/item", json={"item_ids": members})
+    assert a.delete(f"{NODES}/{ids['Ronin']}").status_code == 204
+
+    assert a.get(f"{COLLECTIONS}/{shelf['id']}/count").json() == {"count": 2}
+
+
+def test_count_applies_the_definition_only_to_the_callers_items(env: Env) -> None:
+    """Bob's matching film is not in Alice's count."""
+    _films(env)
+    smart = env.smart(_where(_rating("=", 5)))
+
+    assert env.as_(ALICE).get(f"{COLLECTIONS}/{smart['id']}/count").json() == {
+        "count": 1
+    }
+
+
+def test_count_of_a_stale_definition_is_zero(env: Env) -> None:
+    """A removed field matches nothing, without an error."""
+    ids = _films(env)
+    smart = env.smart(_where(_rating(">=", 4)))
+    archived = {
+        "type": "object",
+        "properties": {
+            "rating": {
+                "type": "number",
+                "x-menagerist": {"kind": "rating", "archived": True},
+            }
+        },
+    }
+    a = env.as_(ALICE)
+    a.patch(
+        f"/api/v1/node-type/{ids['film-type-id']}",
+        json={"attributes_schema": archived},
+    )
+
+    counted = a.get(f"{COLLECTIONS}/{smart['id']}/count")
+
+    assert counted.status_code == 200
+    assert counted.json() == {"count": 0}
+
+
+def test_count_of_a_definition_that_no_longer_validates_is_zero(env: Env) -> None:
+    """A field whose kind changed under the query counts 0, never a 500."""
+    ids = _films(env)
+    smart = env.smart(_where(_rating(">=", 4)))
+    _rating_as_text(env, ids["film-type-id"])
+
+    counted = env.as_(ALICE).get(f"{COLLECTIONS}/{smart['id']}/count")
+
+    assert counted.status_code == 200
+    assert counted.json() == {"count": 0}
+
+
+def test_another_persons_count_is_404_like_an_unknown_id(env: Env) -> None:
+    """Bob learns nothing about Alice's smart or manual collection."""
+    _films(env)
+    smart = env.smart(_where(_rating(">=", 4)))
+    shelf = env.as_(ALICE).post(COLLECTIONS, json={"name": "Shelf"}).json()
+    b = env.as_(BOB)
+    ghost = b.get(f"{COLLECTIONS}/{uuid.uuid7()}/count")
+
+    for collection in (smart, shelf):
+        theirs = b.get(f"{COLLECTIONS}/{collection['id']}/count")
+        assert theirs.status_code == ghost.status_code == 404
+        assert theirs.json()["title"] == ghost.json()["title"]
+        assert "count" not in theirs.json()

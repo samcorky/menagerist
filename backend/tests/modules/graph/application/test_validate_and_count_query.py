@@ -168,3 +168,11 @@ async def test_count_raises_for_a_malformed_query() -> None:
             AccessScope.of(OWNER),
             cap=3,
         )
+
+
+async def test_count_without_a_cap_is_exact() -> None:
+    """`cap=None` counts every match and is never flagged as capped."""
+    repos = await _repos(5)
+    query = {"v": 1, "where": None}
+    got = await count_matching(repos, query, AccessScope.of(OWNER), cap=None)
+    assert got == (5, False)

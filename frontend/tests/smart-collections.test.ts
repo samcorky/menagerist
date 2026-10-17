@@ -1,17 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { createCollection, updateCollection, searchNodes } = vi.hoisted(() => ({
-	createCollection: vi.fn(),
-	updateCollection: vi.fn(),
-	searchNodes: vi.fn()
+const { createCollection, updateCollection, searchNodes, countCollectionItems } = vi.hoisted(
+	() => ({
+		createCollection: vi.fn(),
+		updateCollection: vi.fn(),
+		searchNodes: vi.fn(),
+		countCollectionItems: vi.fn()
+	})
+);
+vi.mock('$lib/api/client', () => ({
+	createCollection,
+	updateCollection,
+	searchNodes,
+	countCollectionItems
 }));
-vi.mock('$lib/api/client', () => ({ createCollection, updateCollection, searchNodes }));
 
 import {
+	EXACT_COUNT_ERROR,
+	ExactCountError,
 	SmartCollectionError,
 	countLabel,
 	describeCollectionCount,
 	describeSaveError,
+	fetchExactCount,
 	isSmart,
 	manualCollections,
 	loadSmartCollection,
@@ -287,5 +298,35 @@ describe('describeSaveError', () => {
 
 	it('uses the message alone without a path', () => {
 		expect(describeSaveError(new SmartCollectionError(409, 'Taken'), query)).toBe('Taken');
+	});
+});
+
+describe('fetchExactCount', () => {
+	beforeEach(() => {
+		countCollectionItems.mockReset();
+	});
+
+	it('returns the exact count', async () => {
+		countCollectionItems.mockResolvedValue({ data: { count: 1284 } });
+		expect(await fetchExactCount('c1')).toBe(1284);
+		expect(countCollectionItems).toHaveBeenCalledWith({
+			path: { collection_id: 'c1' },
+			signal: undefined
+		});
+	});
+
+	it('rejects with a typed error on a failed response', async () => {
+		countCollectionItems.mockResolvedValue({ error: {}, response: { status: 500 } });
+		const error = await fetchExactCount('c1').catch((e: unknown) => e);
+		expect(error).toBeInstanceOf(ExactCountError);
+		expect((error as ExactCountError).status).toBe(500);
+		expect((error as ExactCountError).message).toBe(EXACT_COUNT_ERROR);
+	});
+
+	it('wraps a thrown network failure without a status', async () => {
+		countCollectionItems.mockImplementation(() => Promise.reject(new TypeError('Failed to fetch')));
+		const error = await fetchExactCount('c1').catch((e: unknown) => e);
+		expect(error).toBeInstanceOf(ExactCountError);
+		expect((error as ExactCountError).status).toBeNull();
 	});
 });

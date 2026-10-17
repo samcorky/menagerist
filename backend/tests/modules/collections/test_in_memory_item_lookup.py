@@ -29,3 +29,10 @@ async def test_owned_items_are_visible_only_inside_their_owners_scope(
     assert await world.items.live_ids([item], AccessScope.of(owner)) == {item}
     assert await world.items.live_ids([item], ALL) == {item}
     assert await world.items.live_ids([item], AccessScope.of(other)) == set()
+
+
+async def test_count_matching_without_a_cap_is_exact(world: World) -> None:
+    """`cap=None` counts every item inside the scope."""
+    world.items.live = {uuid.uuid7() for _ in range(5)}
+    assert await world.items.count_matching({}, ALL, cap=None) == (5, False)
+    assert await world.items.count_matching({}, ALL, cap=3) == (3, True)

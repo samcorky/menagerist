@@ -52,15 +52,19 @@ async def count_matching(
     raw: Mapping[str, Any],
     scope: AccessScope,
     *,
-    cap: int,
+    cap: int | None,
     today: Callable[[], date] = utc_today,
 ) -> tuple[int, bool]:
     """Return how many items in `scope` match, up to `cap`, and whether it was capped.
+
+    With `cap=None` the count is exact and never capped.
 
     Raises:
         InvalidQueryError: As `prepare_query`.
     """
     resolved, _ = await prepare_query(repos, raw, today())
+    if cap is None:
+        return await repos.nodes.search_count(scope=scope, resolved=resolved), False
     # One past the cap tells "exactly the cap" from "more than the cap".
     counted = await repos.nodes.search_count(
         scope=scope, resolved=resolved, limit=cap + 1

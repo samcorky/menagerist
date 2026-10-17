@@ -129,6 +129,14 @@ class AddItemsResponse(BaseModel):
     added: int = Field(description="How many items were not already on it.")
 
 
+class CollectionCountResponse(BaseModel):
+    """The exact number of items on a collection."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [{"count": 1234}]})
+
+    count: int = Field(description="Live items on it, with no cap.")
+
+
 class DefinitionWarningResponse(BaseModel):
     """A part of a smart collection's definition that no longer applies."""
 

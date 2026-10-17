@@ -31,9 +31,11 @@ class InMemoryItemLookup:
         return (self.live | owned).intersection(ids)
 
     async def count_matching(
-        self, definition: Mapping[str, Any], scope: AccessScope, *, cap: int
+        self, definition: Mapping[str, Any], scope: AccessScope, *, cap: int | None
     ) -> tuple[int, bool]:
-        """Count the live items inside `scope`, up to `cap`."""
+        """Count the live items inside `scope`, up to `cap` (`None` for all)."""
         owned = {i for i, owner in self._owners.items() if scope.covers(owner)}
         total = len(self.live | owned)
+        if cap is None:
+            return total, False
         return min(total, cap), total > cap

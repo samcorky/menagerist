@@ -48,7 +48,7 @@ class GraphItemLookup:
         return live
 
     async def count_matching(
-        self, definition: Mapping[str, Any], scope: AccessScope, *, cap: int
+        self, definition: Mapping[str, Any], scope: AccessScope, *, cap: int | None
     ) -> tuple[int, bool]:
         """Return how many items in `scope` match `definition`, and if capped.
 

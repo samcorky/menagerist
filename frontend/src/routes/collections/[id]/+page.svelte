@@ -45,7 +45,6 @@
 	import { mapWarnings, pathKey } from '$lib/query/warnings';
 	import {
 		SmartCollectionError,
-		describeCollectionCount,
 		isSmart,
 		loadSmartCollection,
 		updateDefinition
@@ -57,6 +56,7 @@
 		validateCollectionName
 	} from '$lib/collections';
 	import AddItemsDialog from '$lib/components/add-items-dialog.svelte';
+	import CollectionCount from '$lib/components/collection-count.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import NodeCard from '$lib/components/node-card.svelte';
@@ -91,6 +91,8 @@
 	const collectionId = $derived(page.params.id ?? '');
 
 	let collection = $state<CollectionResponse | null>(null);
+	// The first page of results has arrived; the exact count waits for it
+	let firstPageLoaded = $state(false);
 	let headerLoading = $state(true);
 	let notFound = $state(false);
 	let loadFailed = $state(false);
@@ -244,7 +246,10 @@
 	async function fetchPage(id: string, search: string, type: string, after?: string) {
 		const seq = ++fetchSeq;
 		loading = true;
-		if (!after) itemsFailed = false;
+		if (!after) {
+			itemsFailed = false;
+			firstPageLoaded = false;
+		}
 		const result = await listNodes({
 			query: {
 				after,
@@ -270,6 +275,7 @@
 			items = after ? [...items, ...result.data] : result.data;
 			hasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
 		}
+		if (!after) firstPageLoaded = true;
 		loading = false;
 	}
 
@@ -292,7 +298,10 @@
 		if (!current) return;
 		const seq = ++fetchSeq;
 		loading = true;
-		if (!more) itemsFailed = false;
+		if (!more) {
+			itemsFailed = false;
+			firstPageLoaded = false;
+		}
 		try {
 			const result = await loadSmartCollection(current, {
 				cursor: more ? smartCursor : null,
@@ -314,6 +323,7 @@
 			}
 			hasMore = false;
 		}
+		if (!more) firstPageLoaded = true;
 		loading = false;
 	}
 
@@ -604,9 +614,7 @@
 								{collection.description}
 							</p>
 						{/if}
-						<p class="mt-1 text-sm text-muted-foreground">
-							{describeCollectionCount(collection)}
-						</p>
+						<CollectionCount {collection} ready={firstPageLoaded} />
 					</div>
 					<div class="flex flex-wrap items-center gap-2">
 						{#if smart}

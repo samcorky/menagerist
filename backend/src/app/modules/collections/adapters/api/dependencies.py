@@ -18,6 +18,9 @@ from app.modules.collections.adapters.persistence.unit_of_work import (
 from app.modules.collections.application.add_items_to_collection import (
     AddItemsToCollection,
 )
+from app.modules.collections.application.count_collection_items import (
+    CountCollectionItems,
+)
 from app.modules.collections.application.create_collection import CreateCollection
 from app.modules.collections.application.delete_collection import DeleteCollection
 from app.modules.collections.application.get_collection import GetCollection
@@ -73,6 +76,14 @@ def get_get_collection_use_case(
     checker: Annotated[GraphDefinitionChecker, Depends(get_definition_checker)],
 ) -> GetCollection:
     return GetCollection(repos, policy, items, checker)
+
+
+def get_count_collection_items_use_case(
+    repos: Annotated[CollectionsRepos, Depends(get_collections_repos)],
+    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    items: Annotated[GraphItemLookup, Depends(get_item_lookup)],
+) -> CountCollectionItems:
+    return CountCollectionItems(repos, policy, items)
 
 
 def get_list_collections_use_case(

@@ -703,6 +703,7 @@ STREAMS = ("/content", "/thumbnail")  # file streams send an ETag too
 # checked in `test_user_b_cannot_edit_a_smart_collections_membership`.
 SMART_TOO: set[Route] = {
     ("GET", "/api/v1/collection/{collection_id}"),
+    ("GET", "/api/v1/collection/{collection_id}/count"),
     ("PATCH", "/api/v1/collection/{collection_id}"),
     ("DELETE", "/api/v1/collection/{collection_id}"),
     ("GET", "/api/v1/node"),
@@ -959,6 +960,8 @@ def test_generated_cases_cover_the_content_routes() -> None:
         "GET /api/v1/node [query:collection]",
         "GET /api/v1/node [smart]",
         "GET /api/v1/collection/{collection_id} [smart]",
+        "GET /api/v1/collection/{collection_id}/count [bare]",
+        "GET /api/v1/collection/{collection_id}/count [smart]",
         "GET /api/v1/collection/{collection_id} [smart-if-none-match]",
         "PATCH /api/v1/collection/{collection_id} [smart-if-match]",
         "GET /api/v1/node/{node_id} [if-none-match]",

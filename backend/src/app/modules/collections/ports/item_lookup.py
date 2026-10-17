@@ -17,11 +17,12 @@ class ItemLookup(Protocol):
         ...
 
     async def count_matching(
-        self, definition: Mapping[str, Any], scope: AccessScope, *, cap: int
+        self, definition: Mapping[str, Any], scope: AccessScope, *, cap: int | None
     ) -> tuple[int, bool]:
         """Return how many items in `scope` match `definition`, and if capped.
 
-        The count stops at `cap`. A stale definition matches nothing, and one
-        that cannot be read counts as `(0, False)`; neither raises.
+        The count stops at `cap`; `None` counts every match. A stale definition
+        matches nothing, and one that cannot be read counts as `(0, False)`;
+        neither raises.
         """
         ...

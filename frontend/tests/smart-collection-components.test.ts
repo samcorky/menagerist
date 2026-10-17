@@ -12,6 +12,7 @@ vi.mock('$lib/components/ui/responsive-dialog/index.js', async () => {
 });
 
 import SaveSmartCollectionDialog from '$lib/components/save-smart-collection-dialog.svelte';
+import CollectionCount from '$lib/components/collection-count.svelte';
 import SmartConditions from '$lib/components/smart-conditions.svelte';
 import { UNREADABLE_CONDITIONS_MESSAGE } from '$lib/smart-collections';
 import type { Query } from '$lib/query/types';
@@ -63,5 +64,32 @@ describe('SaveSmartCollectionDialog', () => {
 		expect(body).toMatch(/<input[^>]*id="[^"]*-name"[^>]*required/);
 		expect(body).toContain('Save smart collection');
 		expect(body).toContain('Cancel');
+	});
+});
+
+describe('CollectionCount', () => {
+	const base = { id: 'c1', kind: 'dynamic', definition: query, item_count: 1000 } as const;
+
+	it('shows the capped label with no button until a request fails', () => {
+		const capped = render(CollectionCount, {
+			props: { collection: { ...base, item_count_capped: true } }
+		}).body;
+		expect(capped).toContain('1,000+ items');
+		expect(capped).not.toContain('Count exactly');
+		expect(capped).toContain('aria-live="polite"');
+
+		const exact = render(CollectionCount, {
+			props: { collection: { ...base, item_count: 12, item_count_capped: false } }
+		}).body;
+		expect(exact).toContain('12 items');
+		expect(exact).not.toContain('<button');
+	});
+
+	it('leaves a manual collection as it was', () => {
+		const { body } = render(CollectionCount, {
+			props: { collection: { id: 'm', kind: 'manual', item_count: 1, item_count_capped: false } }
+		});
+		expect(body).toContain('1 item');
+		expect(body).not.toContain('<button');
 	});
 });

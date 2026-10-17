@@ -20,12 +20,14 @@ from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRou
 from app.modules.collections.adapters.api.collection.schemas import (
     AddItemsRequest,
     AddItemsResponse,
+    CollectionCountResponse,
     CollectionResponse,
     CreateCollectionRequest,
     UpdateCollectionRequest,
 )
 from app.modules.collections.adapters.api.dependencies import (
     get_add_items_to_collection_use_case,
+    get_count_collection_items_use_case,
     get_create_collection_use_case,
     get_delete_collection_use_case,
     get_get_collection_use_case,
@@ -36,6 +38,10 @@ from app.modules.collections.adapters.api.dependencies import (
 from app.modules.collections.application.add_items_to_collection import (
     AddItemsToCollection,
     AddItemsToCollectionCommand,
+)
+from app.modules.collections.application.count_collection_items import (
+    CountCollectionItems,
+    CountCollectionItemsQuery,
 )
 from app.modules.collections.application.create_collection import CreateCollection
 from app.modules.collections.application.delete_collection import (
@@ -192,6 +198,29 @@ async def get_collection(
     ):
         return earlier
     return CollectionResponse.from_domain(summary)
+
+
+@router.get(
+    "/{collection_id}/count",
+    response_model=CollectionCountResponse,
+    operation_id="count_collection_items",
+    responses=_NOT_FOUND,
+)
+async def count_collection_items(
+    collection_id: uuid.UUID,
+    use_case: Annotated[
+        CountCollectionItems, Depends(get_count_collection_items_use_case)
+    ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> CollectionCountResponse:
+    """Count a collection's items exactly, with no cap.
+
+    A smart collection's `item_count` stops at 1000; this does not.
+    """
+    count = await use_case.handle(
+        CountCollectionItemsQuery(collection_id=collection_id), actor
+    )
+    return CollectionCountResponse(count=count)
 
 
 @router.patch(

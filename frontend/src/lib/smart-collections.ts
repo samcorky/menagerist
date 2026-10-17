@@ -1,4 +1,5 @@
 import {
+	countCollectionItems,
 	createCollection,
 	updateCollection,
 	type CollectionResponse,
@@ -186,4 +187,32 @@ export function smartCollectionSummary(
 	const query = parseQuery(definition);
 	if (!query) return null;
 	return chipModels(query, lookup, mapWarnings(warnings).conditions);
+}
+
+export const EXACT_COUNT_ERROR = "Couldn't count the items. Try again.";
+
+/** A failed exact count. `status` is null when there was no response. */
+export class ExactCountError extends Error {
+	readonly status: number | null;
+
+	constructor(status: number | null) {
+		super(EXACT_COUNT_ERROR);
+		this.name = 'ExactCountError';
+		this.status = status;
+	}
+}
+
+/** The uncapped number of items in a collection. Rejects with an ExactCountError. */
+export async function fetchExactCount(collectionId: string, signal?: AbortSignal): Promise<number> {
+	let result: Awaited<ReturnType<typeof countCollectionItems>>;
+	try {
+		result = await countCollectionItems({
+			path: { collection_id: collectionId },
+			signal
+		});
+	} catch {
+		throw new ExactCountError(null);
+	}
+	if (result.error || !result.data) throw new ExactCountError(result.response?.status ?? null);
+	return result.data.count;
 }
