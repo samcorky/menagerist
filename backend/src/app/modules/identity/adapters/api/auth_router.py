@@ -1,5 +1,6 @@
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, Depends
 from starlette.requests import Request
 from starlette.responses import Response
@@ -28,6 +29,7 @@ from app.modules.identity.adapters.api.dependencies import (
     get_sign_out_use_case,
     get_signed_in_user,
 )
+from app.modules.identity.adapters.api.device_header_fields import device_header_fields
 from app.modules.identity.adapters.api.schemas import (
     AuthStatusResponse,
     ChangePasswordRequest,
@@ -60,6 +62,8 @@ from app.modules.identity.domain.errors import (
 from app.modules.identity.domain.user import User
 from app.platform.config import IdentitySettings
 from app.shared_kernel.actor import ANONYMOUS_ACTOR, Actor
+
+logger = structlog.get_logger(__name__)
 
 # Open to callers with no session or CSRF token (sign-in and first-run setup).
 public_router = APIRouter(
@@ -170,6 +174,10 @@ async def sign_in(
     other. Failures are throttled per username and per client address (429 with
     `Retry-After`) whether or not the account exists.
     """
+    logger.debug(
+        "sign_in_device_headers",
+        **device_header_fields(request.headers, client_ip),
+    )
     result = await use_case.handle(payload.to_command(client_ip), ANONYMOUS_ACTOR)
     set_session_cookies(request, response, result.token, settings)
     return UserResponse.from_domain(result.user)

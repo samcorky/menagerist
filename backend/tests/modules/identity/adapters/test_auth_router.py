@@ -1,5 +1,6 @@
 """Router tests for /api/v1/auth and /api/v1/user over in-memory adapters."""
 
+import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
@@ -7,6 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 import time_machine
 from starlette.testclient import TestClient
+from structlog.testing import capture_logs
 
 from app.entrypoints.api import create_app
 from app.modules.identity.adapters.api.dependencies import (
@@ -262,6 +264,67 @@ async def test_login_sets_cookies_and_me_returns_the_user(
     assert SESSION_COOKIE in _cookie_headers(response)
     assert "Clear-Site-Data" not in response.headers
     assert client.get(f"{AUTH}/me").json()["username"] == "alice"
+
+
+async def test_login_logs_only_allowlisted_device_headers(
+    api: Api, make_user: MakeUser
+) -> None:
+    """Sign-in logs diagnostic headers without logging cookie or CSRF secrets."""
+    await api.add_user(make_user, "alice")
+    client = api.new_client()
+    secrets = ("cookie-secret-value", "csrf-secret-value")
+
+    with capture_logs() as events:
+        response = client.post(
+            f"{AUTH}/login",
+            json={"username": "alice", "password": "password-123"},
+            headers={
+                "User-Agent": "Test Browser",
+                "Sec-CH-UA": '"Test";v="1"',
+                "Sec-CH-UA-Mobile": "?0",
+                "Sec-CH-UA-Platform": '"Test OS"',
+                "X-Forwarded-For": "192.0.2.10",
+                "X-Forwarded-Proto": "https",
+                "Forwarded": "for=192.0.2.10;proto=https",
+                "Cookie": f"session={secrets[0]}",
+                "X-CSRF-Token": secrets[1],
+            },
+        )
+
+    assert response.status_code == 200
+    (event,) = [entry for entry in events if entry["event"] == "sign_in_device_headers"]
+    assert event["user_agent"] == "Test Browser"
+    assert event["sec_ch_ua"] == '"Test";v="1"'
+    assert event["sec_ch_ua_mobile"] == "?0"
+    assert event["sec_ch_ua_platform"] == '"Test OS"'
+    assert event["x_forwarded_for"] == "192.0.2.10"
+    assert event["x_forwarded_proto"] == "https"
+    assert event["forwarded"] == "for=192.0.2.10;proto=https"
+    assert event["client_ip"]
+    assert set(event) - {"event", "log_level"} == {
+        "user_agent",
+        "sec_ch_ua",
+        "sec_ch_ua_mobile",
+        "sec_ch_ua_platform",
+        "x_forwarded_for",
+        "x_forwarded_proto",
+        "forwarded",
+        "client_ip",
+    }
+    rendered = repr(events)
+    assert all(secret not in rendered for secret in secrets)
+
+
+async def test_login_device_headers_are_silent_at_default_log_level(
+    api: Api, make_user: MakeUser, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The diagnostic event is debug-only under the normal INFO log level."""
+    await api.add_user(make_user, "alice")
+
+    with caplog.at_level(logging.INFO):
+        api.sign_in("alice")
+
+    assert "sign_in_device_headers" not in caplog.text
 
 
 async def test_every_login_failure_looks_the_same(

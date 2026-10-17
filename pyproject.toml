@@ -276,6 +276,7 @@ help = "Run all unit tests"
 
 [tool.poe.groups.quality.tasks.test-e2e]
 script = "scripts.e2e:main(workers=workers, skip_build=skip_build)"
+deps = ["generate-frontend-client"]
 args = [
   { name = "workers", options = ["-w", "--workers"], type = "integer", help = "Parallel workers, each with its own database and backend (default: CPU cores)" },
   { name = "skip_build", options = ["--skip-build"], type = "boolean", help = "Reuse the existing frontend/build (only when it is current)" },

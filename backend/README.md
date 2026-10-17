@@ -167,7 +167,7 @@ There's no bus or mediator between a router/CLI command and the use case it call
 
 ## Logging
 
-The backend uses **structlog** (configured in `platform/logging_config.py`) with two output modes: colourised console in development, JSON in production (`MENAGERIST_LOG_JSON=true`). The effective log level is controlled by `MENAGERIST_LOG_LEVEL` (default: `INFO`).
+The backend uses **structlog** (configured in `platform/logging_config.py`) with two output modes: colourised console in development, JSON in production (`MENAGERIST_LOG_JSON=true`). The application log level is controlled by `MENAGERIST_LOG_LEVEL` (default: `INFO`); SQLAlchemy's engine log level is controlled independently by `MENAGERIST_SQLALCHEMY_LOG_LEVEL` (default: `WARNING`).
 
 **Where loggers live** - application-layer use cases and adapter modules only. The domain layer has zero framework imports, so it carries no logger. In-memory adapters are test infrastructure and are also logger-free.
 
@@ -176,11 +176,11 @@ The backend uses **structlog** (configured in `platform/logging_config.py`) with
 | Level | When to use |
 |---|---|
 | `INFO` | One log per mutating action (create, update, delete, promote, attach, detach, stage, orphan, cleanup). Logged after `commit()` so only committed work is recorded. |
-| `DEBUG` | Trace-level detail: repository method calls, SQL queries (via SQLAlchemy's stdlib logger), file operations, thumbnail generation steps. Only emitted when `MENAGERIST_LOG_LEVEL=DEBUG`. |
+| `DEBUG` | Trace-level detail: repository method calls, SQL queries (via SQLAlchemy's stdlib logger), file operations, thumbnail generation steps. Application logs require `MENAGERIST_LOG_LEVEL=DEBUG`; SQL queries require `MENAGERIST_SQLALCHEMY_LOG_LEVEL=DEBUG`. |
 | `WARNING` | Recoverable anomalies that need attention (content-type mismatch, degraded trust level). |
 | `ERROR` | Unhandled exceptions, caught by the global exception handler. |
 
-**SQL query logging** is automatic at `DEBUG` level - SQLAlchemy emits every compiled statement through Python's `logging.getLogger("sqlalchemy.engine")`, which structlog's stdlib bridge picks up. No parameters are logged. Enable with `MENAGERIST_LOG_LEVEL=DEBUG`.
+**SQL query logging** is controlled independently of application logging. SQLAlchemy emits statements through Python's `logging.getLogger("sqlalchemy.engine")`, which structlog's stdlib bridge picks up. Set `MENAGERIST_SQLALCHEMY_LOG_LEVEL=INFO` for statements, or `DEBUG` to include result-fetching details. No parameters are logged.
 
 **Call-site pattern:**
 
@@ -200,7 +200,7 @@ Pass values directly - `uuid.UUID` objects are serialised to strings automatical
 
 **Request log context** - every line logged while handling a request carries `request_id` (bound by `RequestContextMiddleware`). Once a session resolves, the actor dependencies (`get_current_actor`, `get_signed_in_user`) also bind `user_id` and `session_id` and copy them to `request.state`, so use-case and adapter lines need not pass them. Requests with no valid session carry neither. `session_id` is the session row's id, which cannot authenticate; the cookie token and its hash are secrets and must never appear in a log line, repr or response.
 
-**Access log** - `RequestContextMiddleware` writes one line per request after the response (logger `app.access`), shaped like Granian's access line: event `"<METHOD> <path>"` with `addr` (the client address after the proxy-header wrapper), `method`, `path`, `protocol`, `status`, `dt_ms`, `request_id`, plus `user_id` and `session_id` when a session resolved. It logs at `info`, or `warning` for 5xx (4xx is ordinary traffic); an unhandled exception is logged as 500 and re-raised. The query string and all headers (`Cookie`, `Authorization`, `X-CSRF-Token`, `Set-Cookie`) are never logged; the path may contain ids. Sign-in and setup requests carry no ids on their own line (the session is created during the request); the "signed in" and "first administrator created" events carry them. The logged path is the raw, still percent-encoded one with control characters escaped, and a client `Request-Id` is only kept if it matches `[A-Za-z0-9._:-]{1,128}`. Only `/api/` paths are logged, minus `/api/health*` (probe polling); the SPA's static files write nothing. `dt_ms` measures time until the response starts. Switch it off with `MENAGERIST_ACCESS_LOG=false`. Granian's own access line is off by default now; `serve --access-log` turns it back on (it uses `GRANIAN_ACCESS_LOG_FORMAT` and carries no user or session ids).
+**Access log** - `RequestContextMiddleware` writes one line per request after the response (logger `app.access`), shaped like Granian's access line: event `"<METHOD> <path>"` with `addr` (the client address after the proxy-header wrapper), `method`, `path`, `protocol`, `status`, `dt_ms`, `request_id`, plus `user_id` and `session_id` when a session resolved. It logs at `info`, or `warning` for 5xx (4xx is ordinary traffic); an unhandled exception is logged as 500 and re-raised. The query string and all headers (`Cookie`, `Authorization`, `X-CSRF-Token`, `Set-Cookie`) are never logged in access lines. The sole exception is the `sign_in_device_headers` debug event on sign-in, which logs only an explicit allowlist of user-agent, Client Hint, forwarding headers, and the resolved client address; values are bounded and control characters escaped. Sign-in and setup requests carry no ids on their own access line (the session is created during the request); the "signed in" and "first administrator created" events carry them. The logged path is the raw, still percent-encoded one with control characters escaped, and a client `Request-Id` is only kept if it matches `[A-Za-z0-9._:-]{1,128}`. Only `/api/` paths are logged, minus `/api/health*` (probe polling); the SPA's static files write nothing. `dt_ms` measures time until the response starts. Switch it off with `MENAGERIST_ACCESS_LOG=false`. Granian's own access line is off by default now; `serve --access-log` turns it back on (it uses `GRANIAN_ACCESS_LOG_FORMAT` and carries no user or session ids).
 
 **Future:** when an event bus / pipeline behavior is introduced, cross-cutting logging will migrate to a central pipeline stage. The per-use-case logger calls will be removed at that point.
 
