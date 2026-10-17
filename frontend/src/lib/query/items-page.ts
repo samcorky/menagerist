@@ -46,9 +46,14 @@ export function usesSearch(query: Query): boolean {
 
 const NUMBER = new Intl.NumberFormat('en-GB');
 
+/** "12", or "1,000+" when the server stopped counting. */
+export function formatCount(total: number, capped: boolean): string {
+	return `${NUMBER.format(total)}${capped ? '+' : ''}`;
+}
+
 /** "12 items", "1 item", or "1,000+ items" when the server stopped counting. */
 export function formatTotal(total: number, capped: boolean): string {
-	const count = `${NUMBER.format(total)}${capped ? '+' : ''}`;
+	const count = formatCount(total, capped);
 	return `${count} ${total === 1 && !capped ? 'item' : 'items'}`;
 }
 

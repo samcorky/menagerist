@@ -251,10 +251,9 @@ function group(data: unknown, depth: number, budget: { conditions: number }): Gr
 	return { op, children };
 }
 
-/** Parse a query from the URL, or null when it is not a well-formed one. Never throws. */
-export function decodeQuery(token: string): Query | null {
+/** Validate an already-parsed query (such as a saved definition), or null. Never throws. */
+export function parseQuery(data: unknown): Query | null {
 	try {
-		const data: unknown = JSON.parse(fromBase64Url(token));
 		if (!isRec(data) || data.v !== 1) return null;
 		// A missing sort means creation order.
 		const rawSort = data.sort === undefined ? [] : data.sort;
@@ -268,6 +267,15 @@ export function decodeQuery(token: string): Query | null {
 		if (data.where === null || data.where === undefined) return { v: 1, where: null, sort };
 		const where = group(data.where, 1, { conditions: 0 });
 		return where === null ? null : { v: 1, where, sort };
+	} catch {
+		return null;
+	}
+}
+
+/** Parse a query from the URL, or null when it is not a well-formed one. Never throws. */
+export function decodeQuery(token: string): Query | null {
+	try {
+		return parseQuery(JSON.parse(fromBase64Url(token)));
 	} catch {
 		return null;
 	}
