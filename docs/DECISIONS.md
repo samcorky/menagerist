@@ -893,6 +893,19 @@ Further known limits, left as they are for now:
 
 **Not chosen:** resolving per-item keys through the type (no type is involved) and a server-side stale-field warning (it would need a scan of every overlay on each search).
 
+## Device details captured at sign-in, frontend labelling with bowser (2026-10-17)
+
+**Decision:** Sessions store `user_agent` (truncated to 256 characters), `client_ip`, `client_platform` (truncated to 64 characters), and `client_mobile` captured once upon session creation. The API returns these raw values, and the frontend derives user-facing labels ("Firefox on Linux", "Chrome on Windows") using `bowser`.
+
+**Rationale & Key Choices:**
+- **`bowser` over `ua-parser-js`:** `bowser` is licensed under MIT, making it fully compatible with Menagerist's Apache 2.0 licence. `ua-parser-js` 2.x is licensed under AGPL-3.0-or-later, which is incompatible with Apache 2.0 and excluded from this project.
+- **Client Hints for platform and mobile:** Low-entropy Client Hints (`Sec-CH-UA-Platform`, `Sec-CH-UA-Mobile`) are sent by default over HTTPS and localhost without requiring an explicit `Accept-CH` opt-in. Because Chromium freezes OS versions in user-agent strings, Client Hints provide the accurate source for platform and form-factor hints. Browsers that do not send Client Hints (Firefox, Safari) fall back to `bowser` user-agent parsing.
+- **No fingerprinting:** Canvas, font, audio, or hardware fingerprinting and high-entropy Client Hints (such as device model) are intentionally avoided to respect user privacy and avoid brittle heuristics.
+- **Sign-in address only:** Tracking the latest IP address on every request would require a database write on every single authenticated request, adding write contention and unnecessary tracking. Recording only the address at sign-in keeps request overhead minimal while providing sufficient device context.
+- **Current device protection:** Ending one's own current session through the devices API is refused with a 409 Conflict. Sign-out has its own dedicated flow that also clears authentication cookies and prevents accidental lockouts.
+
+**Not chosen:** Parsing user agents on the backend (adds runtime dependencies and container bloat when the frontend can resolve labels on display) and tracking latest IP addresses per request (adds database write amplification and privacy degradation).
+
 ## Direction: roles as data, implied permissions
 
 **Direction (2026-10-10), not built:**
