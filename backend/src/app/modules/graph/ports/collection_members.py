@@ -1,16 +1,37 @@
-from typing import TYPE_CHECKING, Protocol
+import uuid
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    import uuid
-
     from app.shared_kernel.access_scope import AccessScope
 
 
-class CollectionMembers(Protocol):
-    """Read the item ids on a collection, owned by another module."""
+@dataclass(frozen=True, kw_only=True)
+class ManualSource:
+    """A manual collection: the item ids put on it."""
 
-    async def item_ids(
+    ids: frozenset[uuid.UUID]
+
+
+@dataclass(frozen=True, kw_only=True)
+class SmartSource:
+    """A smart collection: its stored search query, as JSON."""
+
+    definition: Mapping[str, Any]
+
+
+type CollectionSource = ManualSource | SmartSource
+
+
+class CollectionMembers(Protocol):
+    """Read what a collection holds, owned by another module."""
+
+    async def resolve(
         self, collection_id: uuid.UUID, scope: AccessScope
-    ) -> set[uuid.UUID] | None:
-        """Return the item ids on the collection, or None if not visible in `scope`."""
+    ) -> CollectionSource | None:
+        """Return what the collection holds, or None if not visible in `scope`.
+
+        A collection that is missing, deleted or owned by someone else is None.
+        """
         ...

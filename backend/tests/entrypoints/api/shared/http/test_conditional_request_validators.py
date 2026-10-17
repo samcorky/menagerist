@@ -89,3 +89,17 @@ def test_patch_if_unmodified_since_alone_still_412_when_stale() -> None:
 
     assert result is not None
     assert result.status_code == 412
+
+
+def test_get_if_modified_since_is_ignored_when_dates_do_not_cover_the_body() -> None:
+    """With `honour_if_modified_since=False` only If-None-Match can give a 304."""
+    dated = _cond(If_Modified_Since=_LAST_MODIFIED).check_get(
+        _ENTITY, honour_if_modified_since=False
+    )
+    tagged = _cond(If_None_Match=_ETAG).check_get(
+        _ENTITY, honour_if_modified_since=False
+    )
+
+    assert dated is None
+    assert tagged is not None
+    assert tagged.status_code == 304

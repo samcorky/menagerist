@@ -1,3 +1,5 @@
+import hashlib
+import json
 import uuid
 from typing import Annotated
 
@@ -54,7 +56,9 @@ from app.modules.collections.application.remove_item_from_collection import (
     RemoveItemFromCollectionCommand,
 )
 from app.modules.collections.application.update_collection import UpdateCollection
+from app.modules.collections.domain.collection import Collection, CollectionKind
 from app.modules.collections.domain.errors import (
+    CollectionKindError,
     CollectionNotFoundError,
     InvalidCollectionError,
 )
@@ -69,6 +73,27 @@ _NOT_FOUND = error_response(
     CollectionNotFoundError,
     detail="Collection 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
 )
+_SMART = error_response(
+    CollectionKindError,
+    detail="Items cannot be added to or removed from a smart collection.",
+)
+
+
+def _is_smart(collection: Collection) -> bool:
+    return collection.kind is CollectionKind.DYNAMIC
+
+
+def _etag_extra(summary: CollectionSummary) -> str:
+    """The state the body shows that does not move `updated_at`.
+
+    A manual collection shows only its count. A smart one also shows whether
+    the count is capped and its warnings, which change as items and fields do.
+    """
+    if not _is_smart(summary.collection):
+        return str(summary.item_count)
+    warnings = sorted([w.path, w.message] for w in summary.warnings)
+    digest = hashlib.sha256(json.dumps(warnings).encode()).hexdigest()[:16]
+    return f"{summary.item_count}:{int(summary.item_count_capped)}:{digest}"
 
 
 @router.post(
@@ -89,13 +114,22 @@ _NOT_FOUND = error_response(
 async def create_collection(
     payload: CreateCollectionRequest,
     use_case: Annotated[CreateCollection, Depends(get_create_collection_use_case)],
+    get_usecase: Annotated[GetCollection, Depends(get_get_collection_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> CollectionResponse:
-    """Create a collection. The slug is derived from the name unless given."""
+    """Create a collection. The slug is derived from the name unless given.
+
+    A `definition` makes it a smart collection, whose items are those matching it.
+    """
     collection = await use_case.handle(payload.to_command(), actor)
-    return CollectionResponse.from_domain(
-        CollectionSummary(collection=collection, item_count=0)
+    if not _is_smart(collection):
+        return CollectionResponse.from_domain(
+            CollectionSummary(collection=collection, item_count=0)
+        )
+    summary = await get_usecase.handle(
+        GetCollectionQuery(collection_id=collection.id), actor
     )
+    return CollectionResponse.from_domain(summary)
 
 
 @router.get(
@@ -146,11 +180,16 @@ async def get_collection(
     actor: Annotated[Actor, Depends(get_current_actor)],
     cond: ConditionalRequestDep,
 ) -> CollectionResponse | Response:
-    """Fetch a single collection by id."""
+    """Fetch a single collection by id, with a smart collection's warnings."""
     summary = await use_case.handle(
         GetCollectionQuery(collection_id=collection_id), actor
     )
-    if earlier := cond.check_get(summary.collection, str(summary.item_count)):
+    # A smart collection's count moves without `updated_at`, so dates cannot 304.
+    if earlier := cond.check_get(
+        summary.collection,
+        _etag_extra(summary),
+        honour_if_modified_since=not _is_smart(summary.collection),
+    ):
         return earlier
     return CollectionResponse.from_domain(summary)
 
@@ -166,6 +205,10 @@ async def get_collection(
             InvalidCollectionError,
             detail="A collection name must be 1 to 120 characters.",
         ),
+        **error_response(
+            CollectionKindError,
+            detail="Only a smart collection has a definition.",
+        ),
     },
 )
 async def update_collection(
@@ -178,17 +221,27 @@ async def update_collection(
     cond: ConditionalRequestDep,
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> CollectionResponse | Response:
-    """Update a collection's name or description. `slug` is immutable."""
+    """Update a collection's name, description or smart definition.
+
+    `slug` and the kind are immutable.
+    """
     current = await get_usecase.handle(
         GetCollectionQuery(collection_id=collection_id), actor
     )
-    if earlier := cond.check_patch(current.collection, str(current.item_count)):
+    if earlier := cond.check_patch(current.collection, _etag_extra(current)):
         return earlier
     collection = await update_usecase.handle(payload.to_command(collection_id), actor)
-    cond.set_response_etag(collection, str(current.item_count))
-    return CollectionResponse.from_domain(
-        CollectionSummary(collection=collection, item_count=current.item_count)
-    )
+    if _is_smart(collection):
+        # The definition may have changed, and with it the count and warnings.
+        summary = await get_usecase.handle(
+            GetCollectionQuery(collection_id=collection_id), actor
+        )
+    else:
+        summary = CollectionSummary(
+            collection=collection, item_count=current.item_count
+        )
+    cond.set_response_etag(summary.collection, _etag_extra(summary))
+    return CollectionResponse.from_domain(summary)
 
 
 @router.delete(
@@ -212,6 +265,7 @@ async def delete_collection(
     operation_id="add_items_to_collection",
     responses={
         **_NOT_FOUND,
+        **_SMART,
         **error_response(
             ValidationError, detail="Unknown or deleted items: 01978c3e-2b8b-7c3a"
         ),
@@ -239,7 +293,7 @@ async def add_items_to_collection(
     "/{collection_id}/item/{item_id}",
     status_code=204,
     operation_id="remove_item_from_collection",
-    responses=_NOT_FOUND,
+    responses={**_NOT_FOUND, **_SMART},
 )
 async def remove_item_from_collection(
     collection_id: uuid.UUID,

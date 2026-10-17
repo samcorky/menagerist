@@ -117,8 +117,11 @@ class SqlAlchemyCollectionRepository:
         self, collection_id: uuid.UUID, *, scope: AccessScope
     ) -> Collection | None:
         """Return the live collection with `collection_id` in `scope`, or `None`."""
-        stmt = select(CollectionModel).where(
-            _in_scope(scope), CollectionModel.id == collection_id
+        stmt = (
+            select(CollectionModel)
+            .where(_in_scope(scope), CollectionModel.id == collection_id)
+            # A read session may outlive a commit made through another session.
+            .execution_options(populate_existing=True)
         )
         model = (await self._session.execute(stmt)).scalar_one_or_none()
         return None if model is None else _to_domain(model)

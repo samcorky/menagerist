@@ -87,7 +87,10 @@ def test_create_returns_201_with_derived_slug_and_exact_body(api: Api) -> None:
         "description",
         "kind",
         "visibility",
+        "definition",
         "item_count",
+        "item_count_capped",
+        "warnings",
         "created_at",
         "updated_at",
     }
@@ -97,6 +100,9 @@ def test_create_returns_201_with_derived_slug_and_exact_body(api: Api) -> None:
     assert body["kind"] == "manual"
     assert body["visibility"] == "private"
     assert body["item_count"] == 0
+    assert body["definition"] is None
+    assert body["item_count_capped"] is False
+    assert body["warnings"] == []
     assert api.client.get(f"{BASE}/{body['id']}").json() == body
 
 
