@@ -118,10 +118,7 @@ def configure_logging(*, level: int | str | None = None) -> None:
     logging.getLogger("alembic.runtime.migration").setLevel(logging.WARNING)
     logging.getLogger("alembic.runtime.plugins").setLevel(logging.WARNING)
 
-    # SQLAlchemy engine logs (SQL statements, result rows) are only useful when
-    # actively debugging; suppress them unless the app itself is running at DEBUG.
-    if root_logger.level > logging.DEBUG:
-        logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    logging.getLogger("sqlalchemy.engine").setLevel(settings.sqlalchemy_log_level.value)
 
 
 # Propagate Granian loggers to root so they render via structlog.
@@ -137,22 +134,16 @@ GRANIAN_ACCESS_LOG_FORMAT = (
 def granian_log_dictconfig() -> dict[str, dict[str, LoggerConfig]]:
     """Return the logging dictConfig fragment passed to Granian at server start.
 
-    SQLAlchemy engine logs are only enabled when the configured log level is DEBUG,
-    matching the suppression applied by configure_logging() for the non-Granian path.
+    SQLAlchemy engine logs use their own configured level, independent of the
+    application log level.
     """
     settings = get_logging_settings()
-    numeric_level = logging.getLevelName(settings.log_level.upper())
-    sqlalchemy_level = (
-        "DEBUG"
-        if isinstance(numeric_level, int) and numeric_level <= logging.DEBUG
-        else "WARNING"
-    )
     return {
         "loggers": {
             "_granian": {"level": "INFO", "handlers": [], "propagate": True},
             "granian.access": {"level": "INFO", "handlers": [], "propagate": True},
             "sqlalchemy.engine": {
-                "level": sqlalchemy_level,
+                "level": settings.sqlalchemy_log_level.value,
                 "handlers": [],
                 "propagate": True,
             },

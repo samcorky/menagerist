@@ -6,7 +6,7 @@ from app.platform.config.identity_cli import (
     IdentityCliSettings,
     get_identity_cli_settings,
 )
-from app.platform.config.logging import LoggingSettings, get_logging_settings
+from app.platform.config.logging import LoggingSettings, LogLevel, get_logging_settings
 from app.platform.config.media import MediaSettings, get_media_settings
 
 __all__ = [
@@ -14,6 +14,7 @@ __all__ = [
     "DatabaseSettings",
     "IdentityCliSettings",
     "IdentitySettings",
+    "LogLevel",
     "LoggingSettings",
     "MediaSettings",
     "MenageristBaseSettings",
