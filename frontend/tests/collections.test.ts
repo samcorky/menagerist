@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
 	MAX_COLLECTION_NAME_LENGTH,
 	addItemsErrorMessage,
+	canonicalSlugFor,
+	collectionRouteParams,
 	collectionSaveErrorMessage,
+	slugPatch,
+	slugSaveErrorMessage,
 	describeAddResult,
 	describeItemCount,
 	validateCollectionName
@@ -71,5 +75,52 @@ describe('collectionSaveErrorMessage', () => {
 		);
 		expect(collectionSaveErrorMessage(404)).toBe('This collection no longer exists.');
 		expect(collectionSaveErrorMessage(500)).toBe("Couldn't save the collection. Try again.");
+	});
+});
+
+describe('canonicalSlugFor', () => {
+	const loaded = { id: '0190-aaaa', slug: 'my-films' };
+	it('asks for the slug when the address uses the id', () => {
+		expect(canonicalSlugFor('0190-aaaa', loaded)).toBe('my-films');
+	});
+	it('asks for the slug when the address uses a different slug', () => {
+		expect(canonicalSlugFor('old-films', loaded)).toBe('my-films');
+	});
+	it('does nothing when the address is already the slug', () => {
+		expect(canonicalSlugFor('my-films', loaded)).toBeNull();
+	});
+	it('does nothing before the collection has loaded', () => {
+		expect(canonicalSlugFor('my-films', null)).toBeNull();
+	});
+});
+
+describe('slugPatch', () => {
+	it('sends nothing for an unchanged slug', () => {
+		expect(slugPatch('my-films', 'my-films')).toEqual({});
+		expect(slugPatch('my-films', '  my-films ')).toEqual({});
+	});
+	it('sends the new slug when it changed', () => {
+		expect(slugPatch('my-films', 'films')).toEqual({ slug: 'films' });
+	});
+});
+
+describe('slugSaveErrorMessage', () => {
+	it('explains a taken slug', () => {
+		expect(slugSaveErrorMessage(409, 'x')).toBe('That link is already used by another collection.');
+	});
+	it('uses the server message for a rejected slug', () => {
+		expect(slugSaveErrorMessage(400, 'Slug cannot be empty')).toBe('Slug cannot be empty');
+		expect(slugSaveErrorMessage(400, '')).toBe('That link is not valid.');
+	});
+	it('returns null for other statuses', () => {
+		expect(slugSaveErrorMessage(500, 'x')).toBeNull();
+	});
+});
+
+describe('collectionRouteParams', () => {
+	it('links by slug, never by id', () => {
+		expect(collectionRouteParams({ slug: 'my-films' })).toEqual({
+			id: 'my-films'
+		});
 	});
 });

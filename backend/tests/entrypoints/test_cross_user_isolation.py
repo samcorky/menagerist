@@ -261,7 +261,9 @@ class Seed:
     film: str
     edge_type: str
     collection: str
+    collection_slug: str
     smart: str
+    smart_slug: str
     asset: str
     staged: str
     user: str
@@ -602,7 +604,9 @@ class World:
             film=film["id"],
             edge_type=edge_type["id"],
             collection=collection["id"],
+            collection_slug=collection["slug"],
             smart=smart["id"],
+            smart_slug=smart["slug"],
             asset=asset["asset_id"],
             staged=staged["id"],
             user=str(user.id),
@@ -708,6 +712,16 @@ SMART_TOO: set[Route] = {
     ("DELETE", "/api/v1/collection/{collection_id}"),
     ("GET", "/api/v1/node"),
 }
+# Routes whose `collection_id` also accepts A's slug. Smart ones also run against
+# A's smart collection by slug (its membership routes are covered separately).
+SLUG_TOO: set[Route] = {
+    ("GET", "/api/v1/collection/{collection_id}"),
+    ("GET", "/api/v1/collection/{collection_id}/count"),
+    ("PATCH", "/api/v1/collection/{collection_id}"),
+    ("DELETE", "/api/v1/collection/{collection_id}"),
+    ("PUT", "/api/v1/collection/{collection_id}/item"),
+    ("DELETE", "/api/v1/collection/{collection_id}/item/{item_id}"),
+}
 SMART_DEFINITION: dict[str, Any] = {
     "v": 1,
     "where": {"op": "and", "children": [{"kind": "text", "q": "xenomorph"}]},
@@ -718,6 +732,15 @@ STAGED_ONLY: set[Route] = {("POST", "/api/v1/media/{asset_id}/promote")}
 
 def _sends_etag(op: dict[str, Any]) -> bool:
     return "ETag" in op.get("responses", {}).get("200", {}).get("headers", {})
+
+
+def _collection_variants(method: str, template: str) -> list[Case]:
+    """The smart and by-slug variants of a collection route."""
+    route = (method, template)
+    variants = ["smart"] if route in SMART_TOO else []
+    if route in SLUG_TOO:
+        variants += ["slug", "smart-slug"] if route in SMART_TOO else ["slug"]
+    return [Case(method, template, v) for v in variants]
 
 
 def generate_cases(app: FastAPI) -> list[Case]:
@@ -735,8 +758,7 @@ def generate_cases(app: FastAPI) -> list[Case]:
         if (method, template) in STAGED_TOO:
             cases.append(Case(method, template, "staged"))
         prefixes = ("", "smart-") if (method, template) in SMART_TOO else ("",)
-        if (method, template) in SMART_TOO:
-            cases.append(Case(method, template, "smart"))
+        cases.extend(_collection_variants(method, template))
         for prefix in prefixes:
             if method == "GET" and (_sends_etag(op) or template.endswith(STREAMS)):
                 cases.append(Case(method, template, f"{prefix}if-none-match"))
@@ -772,6 +794,10 @@ QUERY_OVERRIDES: dict[tuple[str, str], str] = {
 
 def _aim_at_smart(case: Case, values: dict[str, str], seed: Seed) -> dict[str, Any]:
     """For a smart variant, point the collection id or query at A's smart one."""
+    if case.variant.endswith("slug"):
+        smart = case.variant.startswith("smart")
+        values["collection_id"] = seed.smart_slug if smart else seed.collection_slug
+        return {}
     if not case.variant.startswith("smart"):
         return {}
     if "collection_id" in values:
@@ -963,6 +989,13 @@ def test_generated_cases_cover_the_content_routes() -> None:
         "GET /api/v1/collection/{collection_id}/count [bare]",
         "GET /api/v1/collection/{collection_id}/count [smart]",
         "GET /api/v1/collection/{collection_id} [smart-if-none-match]",
+        "GET /api/v1/collection/{collection_id} [slug]",
+        "GET /api/v1/collection/{collection_id} [smart-slug]",
+        "GET /api/v1/collection/{collection_id}/count [slug]",
+        "PATCH /api/v1/collection/{collection_id} [slug]",
+        "DELETE /api/v1/collection/{collection_id} [slug]",
+        "PUT /api/v1/collection/{collection_id}/item [slug]",
+        "DELETE /api/v1/collection/{collection_id}/item/{item_id} [slug]",
         "PATCH /api/v1/collection/{collection_id} [smart-if-match]",
         "GET /api/v1/node/{node_id} [if-none-match]",
         "PATCH /api/v1/node/{node_id} [if-match]",

@@ -85,18 +85,38 @@ class CreateCollectionRequest(RequestModel):
 class UpdateCollectionRequest(RequestModel):
     """Request body for updating a collection.
 
-    `slug` and the kind are immutable. Omitted fields are left unchanged; a
-    blank description clears it. Only a smart collection takes a `definition`.
+    The kind is immutable. Omitted fields are left unchanged; a blank
+    description clears it. Only a smart collection takes a `definition`.
     """
 
     model_config = ConfigDict(
-        json_schema_extra={"examples": [{"name": "Watchlist", "description": ""}]}
+        json_schema_extra={
+            "examples": [
+                {"name": "Watchlist", "description": ""},
+                {"slug": "watchlist"},
+                {"name": "Weekend films", "regenerate_slug": True},
+            ]
+        }
     )
 
     name: str | None = Field(default=None, max_length=MAX_NAME_LENGTH)
     description: str | None = Field(default=None)
     definition: dict[str, Any] | None = Field(
         default=None, description="Replaces a smart collection's search query."
+    )
+    slug: str | None = Field(
+        default=None,
+        description=(
+            "A new slug, normalised. Must be unused among your collections and "
+            + "must not look like an id. The old slug stops working."
+        ),
+    )
+    regenerate_slug: bool = Field(
+        default=False,
+        description=(
+            "Rebuild the slug from the collection's name. Cannot be combined "
+            + "with `slug`."
+        ),
     )
 
     def to_command(self, collection_id: uuid.UUID) -> UpdateCollectionCommand:
@@ -106,6 +126,8 @@ class UpdateCollectionRequest(RequestModel):
             name=self.name,
             description=self.description,
             definition=self.definition,
+            slug=self.slug,
+            regenerate_slug=self.regenerate_slug,
         )
 
 

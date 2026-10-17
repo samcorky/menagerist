@@ -178,3 +178,15 @@ def test_ensure_manual_membership() -> None:
 def test_kind_error_is_a_conflict() -> None:
     """The kind error maps to a 409 through the conflict base type."""
     assert issubclass(CollectionKindError, ConflictError)
+
+
+def test_rename_slug_changes_slug_and_touches() -> None:
+    """The slug is replaced and updated_at moves; the name is untouched."""
+    c = _make()
+    c.updated_at = datetime(2000, 1, 1, tzinfo=UTC)
+
+    c.rename_slug(Slug("new-link"))
+
+    assert c.slug.value == "new-link"
+    assert c.name == "My vinyl"
+    assert c.updated_at > datetime(2000, 1, 1, tzinfo=UTC)

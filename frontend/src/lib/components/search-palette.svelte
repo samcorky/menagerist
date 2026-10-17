@@ -3,7 +3,8 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { ArrowRight, Search } from '@lucide/svelte';
-	import type { NodeResponse, NodeTypeResponse } from '$lib/api/client';
+	import { collectionRouteParams } from '$lib/collections';
+	import type { CollectionResponse, NodeResponse, NodeTypeResponse } from '$lib/api/client';
 	import { delayedLoading } from '$lib/delayed-loading.svelte';
 	import { loadExampleIds } from '$lib/examples';
 	import {
@@ -238,8 +239,11 @@
 
 	const openItem = (item: NodeResponse) =>
 		choose('items', () => void goto(resolve('/items/[id]', { id: item.id })));
-	const openCollection = (id: string) =>
-		choose('collections', () => void goto(resolve('/collections/[id]', { id })));
+	const openCollection = (collection: CollectionResponse) =>
+		choose(
+			'collections',
+			() => void goto(resolve('/collections/[id]', collectionRouteParams(collection)))
+		);
 	// Built before choose() closes the popup, which clears the query
 	const openAllCollections = () => {
 		const path = seeAllCollectionsPath(query);
@@ -361,7 +365,7 @@
 									disabled={isStale('collections')}
 									value={`collection:${collection.id}`}
 									class="min-h-11"
-									onSelect={() => openCollection(collection.id)}
+									onSelect={() => openCollection(collection)}
 								>
 									<div class="min-w-0 flex-1">
 										<span class="block truncate font-medium">{collection.name}</span>

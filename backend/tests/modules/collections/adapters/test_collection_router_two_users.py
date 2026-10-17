@@ -194,3 +194,24 @@ def test_items_in_collection_filter_is_404_for_other_people(
     assert client.get(f"/api/v1/node?collection={collection_id}").status_code == 200
     as_user(app, BOB)
     assert client.get(f"/api/v1/node?collection={collection_id}").status_code == 404
+
+
+def test_other_users_slug_is_404_everywhere_and_never_resolves(world: _World) -> None:
+    """B's lookup by A's slug is the unknown-slug 404; B's own slug is separate."""
+    shelf = _create(world.act_as(ALICE))
+    mine = _create(world.act_as(BOB))
+    url = f"{BASE}/{shelf['slug']}"
+    item = uuid.uuid7()
+    world.items.add_owned(item, BOB)
+    bob = world.act_as(BOB)
+
+    # B's identical slug resolves to B's own collection, never A's.
+    assert bob.get(url).json()["id"] == mine["id"]
+    bob.delete(url)
+    assert bob.get(url).status_code == 404
+    assert bob.patch(url, json={"name": "Mine"}).status_code == 404
+    assert bob.get(f"{url}/count").status_code == 404
+    assert bob.put(f"{url}/item", json={"item_ids": [str(item)]}).status_code == 404
+    assert bob.delete(f"{url}/item/{item}").status_code == 404
+    assert bob.delete(url).status_code == 404
+    assert world.act_as(ALICE).get(url).json()["id"] == shelf["id"]

@@ -182,6 +182,7 @@
 - [ ] **Step 1: Failing tests** for `combineWithSaved` (empty ad-hoc returns the saved tree; limits; sort carry-over; text search becomes a text condition), the bar copy, and the disabled states; component/SSR tests where the harness allows.
 - [ ] **Step 2: Implement; lint-frontend, typecheck-frontend, test-frontend; visual check on the isolated stack in light and dark at desktop and mobile; view the screenshots.**
 - [ ] **Step 3:** e2e additions in Task 6 (narrow, save as new, overwrite with confirmation, clear, explicit edit with cancel).
+- **Carry-over from 5c:** the canonical-slug redirect currently drops the query string and hash (the lint rule forces a plain `resolve()`); 5d puts ad-hoc filters in `?f=` on the collection page, so the redirect must preserve the search parameters (append them to the resolved path before `goto`, and cover it with a test).
 - **Follow-up (after phase 2b):** add **Save as new, linked to this collection**, whose definition is `in collection <this>` AND the ad-hoc conditions, on both smart and manual collection pages (the only way to turn a narrowed manual collection into a smart one). It follows the parent; deleting the parent makes the condition stale; cycles are blocked by 2b. **Update this collection** stays a copy of conditions.
 
 **Checkpoint:** user may commit.

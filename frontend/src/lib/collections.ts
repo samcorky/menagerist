@@ -39,3 +39,33 @@ export function collectionSaveErrorMessage(status: number | undefined): string {
 	if (status === 404) return 'This collection no longer exists.';
 	return "Couldn't save the collection. Try again.";
 }
+
+/** The route parameters of a collection's page; links always use the slug. */
+export function collectionRouteParams(collection: { slug: string }): { id: string } {
+	return { id: collection.slug };
+}
+
+/**
+ * The slug the address should be replaced with, or null when it already is the slug (or the
+ * collection has not loaded). Covers an address that holds the id or a slug that was renamed.
+ */
+export function canonicalSlugFor(
+	segment: string,
+	collection: { slug: string } | null
+): string | null {
+	if (!collection || segment === collection.slug) return null;
+	return collection.slug;
+}
+
+/** The slug part of an update: the typed slug when it changed, otherwise nothing. */
+export function slugPatch(current: string, typed: string): { slug?: string } {
+	const slug = typed.trim();
+	return slug === current ? {} : { slug };
+}
+
+/** The inline message for a rejected slug, or null when the failure is not about the slug. */
+export function slugSaveErrorMessage(status: number | undefined, detail: string): string | null {
+	if (status === 409) return 'That link is already used by another collection.';
+	if (status === 400) return detail || 'That link is not valid.';
+	return null;
+}

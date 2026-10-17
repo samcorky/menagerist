@@ -1,6 +1,7 @@
+import uuid
 from typing import TYPE_CHECKING, Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Path
 
 from app.entrypoints.api.shared.bridges.collection_definitions import (
     GraphDefinitionChecker,
@@ -10,7 +11,7 @@ from app.entrypoints.api.shared.bridges.collection_items import (
     GraphItemLookup,
     get_item_lookup,
 )
-from app.entrypoints.api.shared.dependencies import get_access_policy
+from app.entrypoints.api.shared.dependencies import get_access_policy, get_current_actor
 from app.modules.collections.adapters.persistence.unit_of_work import (
     build_collections_repos,
     create_collections_uow,
@@ -28,6 +29,10 @@ from app.modules.collections.application.list_collections import ListCollections
 from app.modules.collections.application.remove_item_from_collection import (
     RemoveItemFromCollection,
 )
+from app.modules.collections.application.resolve_collection import (
+    ResolveCollection,
+    ResolveCollectionQuery,
+)
 from app.modules.collections.application.update_collection import UpdateCollection
 from app.modules.collections.ports.unit_of_work import (
     CollectionsRepos,
@@ -35,6 +40,7 @@ from app.modules.collections.ports.unit_of_work import (
 )
 from app.platform.database import get_session_factory
 from app.shared_kernel.access_policy import AccessPolicy
+from app.shared_kernel.actor import Actor
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -122,3 +128,33 @@ def get_remove_item_from_collection_use_case(
     policy: Annotated[AccessPolicy, Depends(get_access_policy)],
 ) -> RemoveItemFromCollection:
     return RemoveItemFromCollection(uow, policy)
+
+
+def get_resolve_collection_use_case(
+    repos: Annotated[CollectionsRepos, Depends(get_collections_repos)],
+    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+) -> ResolveCollection:
+    return ResolveCollection(repos, policy)
+
+
+async def resolve_collection_id(
+    collection_id: Annotated[
+        str,
+        Path(
+            description=(
+                "The collection's id (a UUID) or its slug. A slug is looked up "
+                + "among your own collections."
+            ),
+            examples=["01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20", "weekend-watchlist"],
+        ),
+    ],
+    use_case: Annotated[ResolveCollection, Depends(get_resolve_collection_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> uuid.UUID:
+    """Turn the `collection_id` path segment, an id or a slug, into the id."""
+    return await use_case.handle(
+        ResolveCollectionQuery(id_or_slug=collection_id), actor
+    )
+
+
+CollectionIdPath = Annotated[uuid.UUID, Depends(resolve_collection_id)]

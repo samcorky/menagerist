@@ -26,6 +26,7 @@ from app.modules.collections.adapters.api.collection.schemas import (
     UpdateCollectionRequest,
 )
 from app.modules.collections.adapters.api.dependencies import (
+    CollectionIdPath,
     get_add_items_to_collection_use_case,
     get_count_collection_items_use_case,
     get_create_collection_use_case,
@@ -181,12 +182,12 @@ async def list_collections(
     responses={**conditional_get_responses(), **_NOT_FOUND},
 )
 async def get_collection(
-    collection_id: uuid.UUID,
+    collection_id: CollectionIdPath,
     use_case: Annotated[GetCollection, Depends(get_get_collection_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
     cond: ConditionalRequestDep,
 ) -> CollectionResponse | Response:
-    """Fetch a single collection by id, with a smart collection's warnings."""
+    """Fetch a single collection by id or slug, with a smart collection's warnings."""
     summary = await use_case.handle(
         GetCollectionQuery(collection_id=collection_id), actor
     )
@@ -207,7 +208,7 @@ async def get_collection(
     responses=_NOT_FOUND,
 )
 async def count_collection_items(
-    collection_id: uuid.UUID,
+    collection_id: CollectionIdPath,
     use_case: Annotated[
         CountCollectionItems, Depends(get_count_collection_items_use_case)
     ],
@@ -241,7 +242,7 @@ async def count_collection_items(
     },
 )
 async def update_collection(
-    collection_id: uuid.UUID,
+    collection_id: CollectionIdPath,
     payload: UpdateCollectionRequest,
     get_usecase: Annotated[GetCollection, Depends(get_get_collection_use_case)],
     update_usecase: Annotated[
@@ -250,9 +251,11 @@ async def update_collection(
     cond: ConditionalRequestDep,
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> CollectionResponse | Response:
-    """Update a collection's name, description or smart definition.
+    """Update a collection's name, description, slug or smart definition.
 
-    `slug` and the kind are immutable.
+    Give `slug` to set the link or `regenerate_slug` to rebuild it from the
+    name, not both. A slug in use is a 409. The old slug stops working; the id
+    always does. The kind is immutable.
     """
     current = await get_usecase.handle(
         GetCollectionQuery(collection_id=collection_id), actor
@@ -280,7 +283,7 @@ async def update_collection(
     responses=_NOT_FOUND,
 )
 async def delete_collection(
-    collection_id: uuid.UUID,
+    collection_id: CollectionIdPath,
     use_case: Annotated[DeleteCollection, Depends(get_delete_collection_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> None:
@@ -301,7 +304,7 @@ async def delete_collection(
     },
 )
 async def add_items_to_collection(
-    collection_id: uuid.UUID,
+    collection_id: CollectionIdPath,
     payload: AddItemsRequest,
     use_case: Annotated[
         AddItemsToCollection, Depends(get_add_items_to_collection_use_case)
@@ -325,7 +328,7 @@ async def add_items_to_collection(
     responses={**_NOT_FOUND, **_SMART},
 )
 async def remove_item_from_collection(
-    collection_id: uuid.UUID,
+    collection_id: CollectionIdPath,
     item_id: uuid.UUID,
     use_case: Annotated[
         RemoveItemFromCollection, Depends(get_remove_item_from_collection_use_case)

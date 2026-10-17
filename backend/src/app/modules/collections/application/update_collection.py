@@ -4,32 +4,47 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from app.modules.collections.application.collection_slugs import (
+    explicit_slug,
+    free_slug,
+    slug_is_held,
+)
 from app.modules.collections.domain.collection import Collection
-from app.modules.collections.domain.errors import CollectionNotFoundError
+from app.modules.collections.domain.errors import (
+    CollectionNotFoundError,
+    InvalidCollectionError,
+)
 from app.modules.collections.ports.definition_checker import (
     DefinitionChecker,  # noqa: TC001
 )
 from app.modules.collections.ports.unit_of_work import CollectionsUnitOfWork
 from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
 from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.errors import ConflictError
 
 if TYPE_CHECKING:
+    from app.modules.collections.ports.collection_repository import CollectionRepository
+    from app.shared_kernel.access_scope import AccessScope
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.slug import Slug
 
 logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
 class UpdateCollectionCommand:
-    """Request to update a collection's name, description or definition.
+    """Request to update a collection's name, description, slug or definition.
 
-    `slug` and kind are immutable.
+    `slug` sets the slug; `regenerate_slug` rebuilds it from the (new) name. The
+    two are exclusive. The kind is immutable.
     """
 
     collection_id: uuid.UUID
     name: str | None = None
     description: str | None = None
     definition: dict[str, Any] | None = None
+    slug: str | None = None
+    regenerate_slug: bool = False
 
 
 class UpdateCollection(
@@ -55,10 +70,17 @@ class UpdateCollection(
 
         Raises:
             CollectionNotFoundError: If the collection does not exist or is deleted.
-            InvalidCollectionError: If the new name is not 1 to 120 characters.
+            InvalidCollectionError: If the new name is not 1 to 120 characters, the
+                slug is unusable or looks like an id, or both `slug` and
+                `regenerate_slug` are given.
+            ConflictError: If the slug belongs to another live collection of the
+                actor.
             CollectionKindError: If a definition is given for a manual collection.
             InvalidDefinitionError: If the definition is malformed, with its path.
         """
+        if command.slug is not None and command.regenerate_slug:
+            raise InvalidCollectionError("Give either a slug or regenerate_slug.")
+        wanted = None if command.slug is None else explicit_slug(command.slug)
         scope = self._policy.scope_for(actor)
         if command.definition is not None:
             await self._checker.check(command.definition, scope)
@@ -75,8 +97,34 @@ class UpdateCollection(
                 collection.description = command.description.strip() or None
             if command.definition is not None:
                 collection.replace_definition(command.definition)
+            await self._apply_slug(
+                repos.collections, collection, command, wanted, scope
+            )
             collection.touch()
             await repos.collections.save(collection)
             await self._uow.commit()
         logger.info("collection updated", collection_id=command.collection_id)
         return collection
+
+    @staticmethod
+    async def _apply_slug(
+        collections: CollectionRepository,
+        collection: Collection,
+        command: UpdateCollectionCommand,
+        wanted: Slug | None,
+        scope: AccessScope,
+    ) -> None:
+        if wanted is not None:
+            if wanted == collection.slug:
+                return
+            if await slug_is_held(
+                collections, wanted.value, scope, excluding=collection.id
+            ):
+                raise ConflictError(f"A collection with slug '{wanted}' already exists")
+            collection.rename_slug(wanted)
+        elif command.regenerate_slug:
+            collection.rename_slug(
+                await free_slug(
+                    collections, collection.name, scope, excluding=collection.id
+                )
+            )

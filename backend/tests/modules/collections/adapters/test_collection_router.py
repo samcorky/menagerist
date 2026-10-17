@@ -233,15 +233,6 @@ def test_patch_unknown_is_404_and_blank_name_is_400(api: Api) -> None:
     assert blank.status_code == 400
 
 
-def test_patch_rejects_slug_field(api: Api) -> None:
-    """The slug cannot be changed; unknown fields are 422."""
-    created = api.create()
-
-    response = api.client.patch(f"{BASE}/{created['id']}", json={"slug": "new"})
-
-    assert response.status_code == 422
-
-
 def test_delete_returns_204_then_404_and_frees_the_slug(api: Api) -> None:
     """DELETE soft-deletes; GET is then 404 and the slug can be reused."""
     created = api.create("Shelf")
@@ -601,3 +592,163 @@ def test_list_q_ignores_accents(api: Api) -> None:
     response = api.client.get(BASE, params={"q": "cafe"})
 
     assert [c["name"] for c in response.json()] == ["Café"]
+
+
+def test_patch_changes_slug_and_old_slug_stops_resolving(api: Api) -> None:
+    """Patch changes slug and old slug stops resolving."""
+    created = api.create("Shelf")
+
+    response = api.client.patch(f"{BASE}/{created['id']}", json={"slug": "My Link"})
+
+    assert response.status_code == 200
+    assert response.json()["slug"] == "my-link"
+    assert response.json()["id"] == created["id"]
+    assert api.client.get(f"{BASE}/my-link").status_code == 200
+    assert api.client.get(f"{BASE}/shelf").status_code == 404
+    assert api.client.get(f"{BASE}/{created['id']}").status_code == 200
+
+
+def test_patch_slug_conflict_is_409(api: Api) -> None:
+    """Patch slug conflict is 409."""
+    api.create("Taken")
+    created = api.create("Shelf")
+
+    response = api.client.patch(f"{BASE}/{created['id']}", json={"slug": "taken"})
+
+    assert response.status_code == 409
+
+
+def test_patch_unchanged_slug_is_a_success(api: Api) -> None:
+    """Patch unchanged slug is a success."""
+    created = api.create("Shelf")
+
+    response = api.client.patch(f"{BASE}/{created['id']}", json={"slug": "shelf"})
+
+    assert response.status_code == 200
+    assert response.json()["slug"] == "shelf"
+
+
+@pytest.mark.parametrize(
+    "slug", ["", "   ", "!!!", "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20"]
+)
+def test_patch_empty_unusable_or_uuid_slug_is_a_client_error(
+    api: Api, slug: str
+) -> None:
+    """Patch empty unusable or uuid slug is a client error."""
+    created = api.create("Shelf")
+
+    response = api.client.patch(f"{BASE}/{created['id']}", json={"slug": slug})
+
+    assert response.status_code == 400
+
+
+def test_patch_regenerates_slug_from_renamed_name_with_suffix(api: Api) -> None:
+    """Patch regenerates slug from renamed name with suffix."""
+    api.create("Films")
+    created = api.create("Shelf")
+    api.client.patch(f"{BASE}/{created['id']}", json={"name": "Films"})
+
+    response = api.client.patch(
+        f"{BASE}/{created['id']}", json={"regenerate_slug": True}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["slug"] == "films-2"
+
+
+def test_patch_slug_with_regenerate_is_rejected(api: Api) -> None:
+    """Patch slug with regenerate is rejected."""
+    created = api.create("Shelf")
+
+    response = api.client.patch(
+        f"{BASE}/{created['id']}", json={"slug": "x", "regenerate_slug": True}
+    )
+
+    assert response.status_code == 400
+    assert api.client.get(f"{BASE}/shelf").status_code == 200
+
+
+def test_create_with_uuid_shaped_slug_is_rejected(api: Api) -> None:
+    """Create with uuid shaped slug is rejected."""
+    response = api.client.post(BASE, json={"name": "Shelf", "slug": str(uuid.uuid7())})
+
+    assert response.status_code == 400
+
+
+def test_slug_patch_follows_if_match(api: Api) -> None:
+    """Slug patch follows if match."""
+    created = api.create("Shelf")
+    stale = _etag(api, created["id"])
+    assert (
+        api.client.patch(f"{BASE}/{created['id']}", json={"name": "B"}).status_code
+        == 200
+    )
+
+    response = api.client.patch(
+        f"{BASE}/{created['id']}", json={"slug": "new"}, headers={"If-Match": stale}
+    )
+    fresh = api.client.patch(
+        f"{BASE}/{created['id']}",
+        json={"slug": "new"},
+        headers={"If-Match": _etag(api, created["id"])},
+    )
+
+    assert response.status_code == 412
+    assert fresh.status_code == 200
+    assert fresh.headers["ETag"] != stale
+
+
+def test_every_collection_route_accepts_id_or_slug(api: Api) -> None:
+    """Every collection route accepts id or slug."""
+    created = api.create("Shelf")
+    item = api.live_item()
+
+    for ref in (created["id"], "shelf"):
+        url = f"{BASE}/{ref}"
+        assert api.client.get(url).json()["id"] == created["id"]
+        assert (
+            api.client.patch(url, json={"description": ref}).json()["slug"] == "shelf"
+        )
+        assert (
+            api.client.put(f"{url}/item", json={"item_ids": [item]}).status_code == 200
+        )
+        assert api.client.get(f"{url}/count").json() == {"count": 1}
+        assert api.client.delete(f"{url}/item/{item}").status_code == 204
+        assert api.client.get(f"{url}/count").json() == {"count": 0}
+
+    assert api.client.delete(f"{BASE}/shelf").status_code == 204
+    assert api.client.get(f"{BASE}/{created['id']}").status_code == 404
+
+
+def test_unknown_slug_is_404_on_every_route(api: Api) -> None:
+    """Unknown slug is 404 on every route."""
+    item = uuid.uuid4()
+    calls = [
+        api.client.get(f"{BASE}/nope"),
+        api.client.get(f"{BASE}/nope/count"),
+        api.client.patch(f"{BASE}/nope", json={"name": "x"}),
+        api.client.delete(f"{BASE}/nope"),
+        api.client.put(f"{BASE}/nope/item", json={"item_ids": []}),
+        api.client.delete(f"{BASE}/nope/item/{item}"),
+    ]
+
+    assert [c.status_code for c in calls] == [404] * 6
+    assert calls[0].json()["title"] == "CollectionNotFoundError"
+
+
+def test_deleted_collections_slug_no_longer_resolves_and_is_reusable(api: Api) -> None:
+    """Deleted collections slug no longer resolves and is reusable."""
+    created = api.create("Shelf")
+    api.client.delete(f"{BASE}/shelf")
+
+    assert api.client.get(f"{BASE}/shelf").status_code == 404
+    assert (
+        api.client.patch(f"{BASE}/{created['id']}", json={"slug": "x"}).status_code
+        == 404
+    )
+    again = api.create("Other")
+    assert (
+        api.client.patch(f"{BASE}/{again['id']}", json={"slug": "shelf"}).status_code
+        == 200
+    )
+    assert api.client.get(f"{BASE}/shelf").json()["id"] == again["id"]

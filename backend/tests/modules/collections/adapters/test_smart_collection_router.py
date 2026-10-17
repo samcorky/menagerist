@@ -343,3 +343,17 @@ def test_patch_if_match_uses_the_smart_etag(api: Api) -> None:
     assert stale.headers["ETag"] == fresh
     assert ok.status_code == 200
     assert ok.headers["ETag"] == api.client.get(url).headers["ETag"]
+
+
+def test_smart_collection_resolves_by_slug_and_edits_its_slug(api: Api) -> None:
+    """A smart collection is found by slug, and its slug can change."""
+    created = api.smart("Smart")
+
+    got = api.client.get(f"{BASE}/smart")
+    patched = api.client.patch(f"{BASE}/smart", json={"slug": "clever"})
+
+    assert got.json()["id"] == created["id"]
+    assert got.json()["kind"] == "dynamic"
+    assert patched.json()["slug"] == "clever"
+    assert api.client.get(f"{BASE}/clever").status_code == 200
+    assert api.client.get(f"{BASE}/smart").status_code == 404

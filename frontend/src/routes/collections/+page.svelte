@@ -10,6 +10,7 @@
 	import { networkAwareError } from '$lib/api/errors';
 	import {
 		MAX_COLLECTION_NAME_LENGTH,
+		collectionRouteParams,
 		collectionSaveErrorMessage,
 		validateCollectionName
 	} from '$lib/collections';
@@ -171,9 +172,9 @@
 			}
 			return;
 		}
-		const { id } = result.data;
+		const created = result.data;
 		dialogOpen = false;
-		void goto(resolve('/collections/[id]', { id }));
+		void goto(resolve('/collections/[id]', collectionRouteParams(created)));
 	}
 </script>
 
@@ -222,7 +223,7 @@
 				{#each collections as collection (collection.id)}
 					<li>
 						<a
-							href={resolve('/collections/[id]', { id: collection.id })}
+							href={resolve('/collections/[id]', collectionRouteParams(collection))}
 							class="block h-full rounded-xl focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
 						>
 							<Card.Root class="h-full transition-colors hover:bg-muted/50">

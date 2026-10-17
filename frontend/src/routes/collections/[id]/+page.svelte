@@ -30,7 +30,7 @@
 		type NodeResponse,
 		type NodeTypeResponse
 	} from '$lib/api/client';
-	import { networkAwareError } from '$lib/api/errors';
+	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { fetchAllNodeTypes } from '$lib/node-types';
 	import { fetchItemFields, type ItemField } from '$lib/item-fields';
 	import QueryBuilder from '$lib/components/query-builder.svelte';
@@ -52,12 +52,17 @@
 	import {
 		MAX_COLLECTION_NAME_LENGTH,
 		addItemsErrorMessage,
+		canonicalSlugFor,
+		collectionRouteParams,
 		collectionSaveErrorMessage,
+		slugPatch,
+		slugSaveErrorMessage,
 		validateCollectionName
 	} from '$lib/collections';
 	import AddItemsDialog from '$lib/components/add-items-dialog.svelte';
 	import CollectionCount from '$lib/components/collection-count.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
+	import CollectionSlugField from '$lib/components/collection-slug-field.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import NodeCard from '$lib/components/node-card.svelte';
 	import NodeGridCard from '$lib/components/node-grid-card.svelte';
@@ -88,9 +93,11 @@
 		'Your changes are saved to this collection when you close this panel.';
 	const loadingSkeletons = [1, 2, 3, 4, 5];
 
+	// The address segment: an id or a slug. Item queries need the canonical id.
 	const collectionId = $derived(page.params.id ?? '');
 
 	let collection = $state<CollectionResponse | null>(null);
+	const canonicalId = $derived(collection?.id ?? '');
 	// The first page of results has arrived; the exact count waits for it
 	let firstPageLoaded = $state(false);
 	let headerLoading = $state(true);
@@ -143,6 +150,9 @@
 
 	let editOpen = $state(false);
 	let editName = $state('');
+	let editSlug = $state('');
+	let slugError = $state<string | null>(null);
+	let regenerating = $state(false);
 	let editDescription = $state('');
 	let editTouched = $state(false);
 	let saving = $state(false);
@@ -163,6 +173,8 @@
 
 	const nameHint = $derived(validateCollectionName(editName));
 	const showNameHint = $derived(editTouched && nameHint !== null);
+	// The server rebuilds the slug from the saved name, so an unsaved rename must be saved first
+	const nameUnsaved = $derived(collection !== null && editName.trim() !== collection.name);
 
 	// §13a: don't flash a skeleton for loads under 300ms
 	const loadingDisplay = delayedLoading();
@@ -239,8 +251,19 @@
 			collection = null;
 		} else {
 			collection = result.data;
+			showCanonicalAddress(id, result.data);
 		}
 		headerLoading = false;
+	}
+
+	// Replaces an id (or an old slug) in the address with the slug, without a history entry.
+	function showCanonicalAddress(segment: string, loaded: CollectionResponse) {
+		if (canonicalSlugFor(segment, loaded) === null) return;
+		void goto(resolve('/collections/[id]', collectionRouteParams(loaded)), {
+			replaceState: true,
+			keepFocus: true,
+			noScroll: true
+		});
 	}
 
 	async function fetchPage(id: string, search: string, type: string, after?: string) {
@@ -282,6 +305,9 @@
 	$effect(() => {
 		const id = collectionId;
 		if (!id) return;
+		// Already showing this collection (the address just became its slug)
+		const loaded = untrack(() => collection);
+		if (loaded && (loaded.slug === id || loaded.id === id)) return;
 		untrack(() => {
 			collection = null;
 			items = [];
@@ -328,7 +354,7 @@
 	}
 
 	$effect(() => {
-		const id = collectionId;
+		const id = canonicalId;
 		const search = q;
 		const type = selectedType;
 		const kind = collectionKind;
@@ -401,7 +427,7 @@
 			(entries) => {
 				if (entries[0].isIntersecting && hasMore && !loading)
 					if (smart) void fetchSmart(true);
-					else void fetchPage(collectionId, q, selectedType, items.at(-1)?.id);
+					else void fetchPage(canonicalId, q, selectedType, items.at(-1)?.id);
 			},
 			{ rootMargin: '200px' }
 		);
@@ -430,7 +456,7 @@
 
 	function refreshAfterChange() {
 		void loadCollection(collectionId);
-		void fetchPage(collectionId, q, selectedType);
+		void fetchPage(canonicalId, q, selectedType);
 	}
 
 	async function handleRemove(item: NodeResponse) {
@@ -502,6 +528,8 @@
 		if (!collection) return;
 		editTrigger = event.currentTarget as HTMLElement;
 		editName = collection.name;
+		editSlug = collection.slug;
+		slugError = null;
 		editDescription = collection.description ?? '';
 		editTouched = false;
 		saveError = null;
@@ -509,7 +537,7 @@
 	}
 
 	function handleEditOpenChange(open: boolean) {
-		if (!open && saving) return;
+		if (!open && (saving || regenerating)) return;
 		editOpen = open;
 		if (!open) void tick().then(() => editTrigger?.focus());
 	}
@@ -518,11 +546,14 @@
 		event.preventDefault();
 		editTouched = true;
 		if (nameHint !== null || saving) return;
+		if (regenerating) return;
 		saving = true;
 		saveError = null;
+		slugError = null;
+		const slugChange = slugPatch(collection?.slug ?? '', editSlug);
 		const result = await updateCollection({
 			path: { collection_id: collectionId },
-			body: { name: editName.trim(), description: editDescription.trim() }
+			body: { name: editName.trim(), description: editDescription.trim(), ...slugChange }
 		});
 		saving = false;
 		if (result.response?.status === 412) {
@@ -535,14 +566,49 @@
 			if (status === undefined) {
 				const { title, description } = networkAwareError(result);
 				toast.error(title, { description });
+			} else if ('slug' in slugChange && (status === 409 || status === 400)) {
+				slugError = slugSaveErrorMessage(status, errorMessage(result.error));
 			} else {
 				saveError = collectionSaveErrorMessage(status);
 			}
 			return;
 		}
 		collection = result.data;
+		showCanonicalAddress(collectionId, result.data);
 		handleEditOpenChange(false);
 		toast.success('Collection saved');
+	}
+
+	async function regenerateSlug() {
+		if (regenerating || saving || nameUnsaved) return;
+		regenerating = true;
+		slugError = null;
+		saveError = null;
+		const result = await updateCollection({
+			path: { collection_id: collectionId },
+			body: { regenerate_slug: true }
+		});
+		regenerating = false;
+		if (result.response?.status === 412) {
+			saveError = 'This collection was changed elsewhere. Close this and try again.';
+			void loadCollection(collectionId);
+			return;
+		}
+		if (result.error || !result.data) {
+			const status = result.response?.status;
+			if (status === undefined) {
+				const { title, description } = networkAwareError(result);
+				toast.error(title, { description });
+			} else {
+				slugError =
+					slugSaveErrorMessage(status, errorMessage(result.error)) ??
+					collectionSaveErrorMessage(status);
+			}
+			return;
+		}
+		collection = result.data;
+		editSlug = result.data.slug;
+		showCanonicalAddress(collectionId, result.data);
 	}
 
 	function openDelete(event: MouseEvent) {
@@ -818,7 +884,7 @@
 					<Button
 						variant="outline"
 						onclick={() =>
-							smart ? void fetchSmart() : void fetchPage(collectionId, q, selectedType)}
+							smart ? void fetchSmart() : void fetchPage(canonicalId, q, selectedType)}
 					>
 						Try again
 					</Button>
@@ -915,6 +981,14 @@
 					<p id="edit-collection-name-hint" class="text-sm text-destructive">{nameHint}</p>
 				{/if}
 			</div>
+			<CollectionSlugField
+				bind:value={editSlug}
+				error={slugError}
+				{regenerating}
+				disabled={saving}
+				{nameUnsaved}
+				onRegenerate={regenerateSlug}
+			/>
 			<div class="space-y-1.5">
 				<Label for="edit-collection-description">Description</Label>
 				<Textarea
@@ -941,7 +1015,7 @@
 {#if !smart}
 	<AddItemsDialog
 		open={addOpen}
-		{collectionId}
+		collectionId={canonicalId}
 		{typeLabels}
 		onOpenChange={handleAddOpenChange}
 		onAdded={refreshAfterChange}

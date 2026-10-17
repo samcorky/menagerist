@@ -89,6 +89,11 @@ class Collection(Identifiable, SoftDeletable):
         self.name = _clean_name(name)
         self.touch()
 
+    def rename_slug(self, slug: Slug) -> None:
+        """Change the slug, and with it the collection's link."""
+        self.slug = slug
+        self.touch()
+
     def replace_definition(self, definition: dict[str, Any]) -> None:
         """Replace a dynamic collection's definition.
 

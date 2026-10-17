@@ -14,6 +14,7 @@
 	import {
 		MAX_COLLECTION_NAME_LENGTH,
 		addItemsErrorMessage,
+		collectionRouteParams,
 		collectionSaveErrorMessage,
 		validateCollectionName
 	} from '$lib/collections';
@@ -192,7 +193,7 @@
 				{#each memberOf as collection (collection.id)}
 					<li class="flex items-center rounded-full border bg-background text-sm">
 						<a
-							href={resolve('/collections/[id]', { id: collection.id })}
+							href={resolve('/collections/[id]', collectionRouteParams(collection))}
 							class="rounded-l-full py-1 pr-1 pl-3 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 						>
 							{collection.name}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { collectionRouteParams } from '$lib/collections';
 	import { page } from '$app/state';
 	import { beforeNavigate, afterNavigate, goto } from '$app/navigation';
 	import { browser } from '$app/environment';
@@ -176,7 +177,7 @@
 	});
 
 	function savedAsSmart(collection: CollectionResponse) {
-		void goto(resolve('/collections/[id]', { id: collection.id }));
+		void goto(resolve('/collections/[id]', collectionRouteParams(collection)));
 	}
 
 	function removeFilter(path: Path, text: string) {
