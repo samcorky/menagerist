@@ -16,6 +16,7 @@
 		fieldStatus,
 		itemFieldPickerItems,
 		missingFieldMessage,
+		NO_ITEM_FIELD_NOTE,
 		strayValueText,
 		subjectOf,
 		TAG_MODES,
@@ -54,7 +55,11 @@
 				condition.key,
 				condition.sub_key
 			);
-			items.push({ value: subject, label: `${label}${STATUS_SUFFIX[status]}` });
+			const suffix =
+				status === 'missing' && condition.field_kind !== undefined
+					? ` (${NO_ITEM_FIELD_NOTE})`
+					: STATUS_SUFFIX[status];
+			items.push({ value: subject, label: `${label}${suffix}` });
 		}
 		for (const general of GENERAL_SUBJECTS) {
 			items.push({ value: general.value, label: general.label, group: 'Any item' });

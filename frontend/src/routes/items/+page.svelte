@@ -293,10 +293,16 @@
 	}
 
 	async function fetchCategories() {
-		const [types, fields] = await Promise.all([fetchAllNodeTypes(), fetchItemFields()]);
-		if (types) allCategories = types;
-		itemFields = fields;
-		categoriesLoaded = true;
+		// Neither call waits for the other: the slower listing must not hold up the type catalogue.
+		await Promise.all([
+			fetchAllNodeTypes().then((types) => {
+				if (types) allCategories = types;
+				categoriesLoaded = true;
+			}),
+			fetchItemFields().then((fields) => {
+				itemFields = fields;
+			})
+		]);
 	}
 
 	function schemaOf(slug: string | null | undefined): AttributesSchema | null {

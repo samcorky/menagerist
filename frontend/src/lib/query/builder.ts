@@ -2,6 +2,7 @@ import { decodeQuery, encodeQuery } from './codec';
 import {
 	findField,
 	findItemField,
+	ITEM_FIELDS_CAP,
 	itemFieldGroup,
 	itemFieldInfo,
 	itemFieldSubject,
@@ -583,6 +584,8 @@ export function stringList(value: unknown): string[] {
 
 export const STALE_FIELD_MESSAGE = 'This field no longer exists, so nothing matches.';
 export const NO_ITEM_FIELD_MESSAGE = 'No item has this field.';
+/** The same wording, lower-cased for the field picker's trigger. */
+export const NO_ITEM_FIELD_NOTE = 'no item has this field';
 
 /** What to say about a field row that cannot be matched. */
 export function missingFieldMessage(c: Condition): string {
@@ -633,8 +636,11 @@ export function fieldStatus(c: Condition, catalogue: Catalogue): FieldStatus {
 	if (c.kind !== 'field' || isBlank(c)) return 'ok';
 	if (!catalogue.loaded) return 'loading';
 	if (c.field_kind !== undefined) {
-		// An unread listing says nothing either way.
-		const listed = catalogue.itemFields === null || findItemField(catalogue, c.field_kind, c.key);
+		// An unread listing, or one cut off at the server's cap, says nothing either way.
+		const listed =
+			catalogue.itemFields === null ||
+			catalogue.itemFields.length >= ITEM_FIELDS_CAP ||
+			findItemField(catalogue, c.field_kind, c.key);
 		return listed ? 'ok' : 'missing';
 	}
 	const field = fieldOf(c, catalogue);

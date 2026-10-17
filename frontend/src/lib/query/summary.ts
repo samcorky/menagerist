@@ -130,7 +130,7 @@ function describeField(c: Extract<Condition, { kind: 'field' }>, lookup: Summary
 	const head =
 		itemKind === undefined
 			? `${lookup.typeLabel(c.type ?? '')}: ${field}`
-			: `Item field › ${field}:`;
+			: `Per-item field › ${field}:`;
 	if (kind && DATE_KINDS.has(kind) && operatorTakesValue(c.op) && c.value !== undefined)
 		return `${head} ${datePhrase(c.op, c.value, fieldFormat(c, lookup))}`;
 	const op = OPERATOR_LABELS[c.op] ?? c.op;

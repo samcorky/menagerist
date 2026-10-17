@@ -407,7 +407,7 @@ class SqlAlchemyNodeRepository:
         stmt = (
             select(per_title.c.key, per_title.c.kind, total, label[1])
             .group_by(per_title.c.key, per_title.c.kind)
-            .order_by(total.desc(), per_title.c.key, per_title.c.kind)
+            .order_by(total.desc(), per_title.c.key.collate("C"), per_title.c.kind)
             .limit(limit)
         )
         result = await self._session.execute(stmt)

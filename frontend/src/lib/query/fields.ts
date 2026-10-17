@@ -1,4 +1,4 @@
-import { descriptorForProp } from '$lib/field-types';
+import { descriptorForProp, getDescriptor } from '$lib/field-types';
 import { readPropMeta, withPropMeta } from '$lib/schema-meta';
 import type { JsonSchemaProperty } from '$lib/schema-types';
 import type { ItemField } from '$lib/item-fields';
@@ -57,8 +57,14 @@ export type Catalogue = {
 	itemFields: readonly ItemField[] | null;
 };
 
+/** The most rows the server returns; a listing this long may be missing fields. */
+export const ITEM_FIELDS_CAP = 200;
+
 /** The field picker's heading for fields an individual item carries. */
 export const ITEM_FIELDS_LABEL = 'Per-item fields';
+
+/** What a chip calls one per-item field (the group is plural, a single field is not). */
+export const ITEM_FIELD_CHIP_LABEL = 'Per-item field';
 
 function isRec(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -154,9 +160,26 @@ export function itemFieldInfo(catalogue: Catalogue, kind: string, key: string): 
 		key,
 		label,
 		kind,
-		prop: withPropMeta({ title: label, type: 'string' }, { kind }),
+		prop: itemFieldProp(kind, key, label),
 		archived: false
 	};
+}
+
+/** Kinds whose per-item value is typed text, because the listing carries no option list (R17). */
+const TYPED_TEXT_KINDS: ReadonlySet<string> = new Set(['choice', 'multichoice']);
+
+/** The property the kind's own editor would write, so its input widget accepts it. */
+function itemFieldProp(kind: string, key: string, label: string): JsonSchemaProperty {
+	const descriptor = TYPED_TEXT_KINDS.has(kind) ? undefined : getDescriptor(kind);
+	const schema = descriptor?.toSchema({
+		key,
+		label,
+		kind,
+		required: false,
+		options: [],
+		subFields: []
+	}) ?? { title: label, type: 'string' };
+	return withPropMeta(schema, { kind });
 }
 
 export type ItemFieldOption = { value: string; label: string; kind: string; count: number };

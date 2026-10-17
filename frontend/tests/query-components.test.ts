@@ -608,7 +608,7 @@ describe('per-item fields', () => {
 		const html = row(perItem('gone', 'number', '>', 3));
 		expect(html).toContain(NO_ITEM_FIELD_MESSAGE);
 		expect(html).not.toContain(STALE_FIELD_MESSAGE);
-		expect(html).toContain('Per-item fields › gone (no longer exists)');
+		expect(html).toContain('Per-item fields › gone (no item has this field)');
 	});
 
 	it('does not flag a per-item field when the listing was not read', () => {
@@ -653,7 +653,7 @@ describe('per-item fields', () => {
 				onclear: () => {}
 			}
 		}).body;
-		expect(html).toContain('Item field › Signed: is yes');
+		expect(html).toContain('Per-item field › Signed: is yes');
 		expect(html).toContain(NO_ITEM_FIELD_MESSAGE);
 		expect(html).not.toContain(STALE_FIELD_MESSAGE);
 	});

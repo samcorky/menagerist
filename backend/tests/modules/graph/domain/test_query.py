@@ -391,8 +391,21 @@ def test_largest_finite_numbers_are_accepted() -> None:
         _field(key=_SURROGATE),
         _field(type=_SURROGATE),
         _field(sub_key=_SURROGATE),
+        _field(key="a\x00b"),
+        _field(type=None, field_kind="text", key="a\x00b"),
+        _field(type=None, field_kind="text", key="k", op="=", value="a\x00b"),
     ],
-    ids=["q", "type slug", "tag", "key", "type", "sub_key"],
+    ids=[
+        "q",
+        "type slug",
+        "tag",
+        "key",
+        "type",
+        "sub_key",
+        "NUL in a key",
+        "NUL in a per-item key",
+        "NUL in a per-item value",
+    ],
 )
 def test_lone_surrogates_in_names_are_rejected(condition: dict[str, Any]) -> None:
     """Text that cannot be encoded as UTF-8 is a 400, not a database error."""
@@ -476,3 +489,10 @@ def test_per_item_condition_rejections_carry_a_path(
     with pytest.raises(InvalidQueryError) as caught:
         parse_query(_query(_and(condition)))
     assert caught.value.path == path
+
+
+def test_a_field_condition_naming_neither_says_so() -> None:
+    """The message points at both ways of addressing a field."""
+    condition = {k: v for k, v in _per_item().items() if k != "field_kind"}
+    with pytest.raises(InvalidQueryError, match="field kind"):
+        parse_query(_query(_and(condition)))

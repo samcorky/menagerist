@@ -373,3 +373,127 @@ test('the count line stays while more items load', async ({ page, request }) => 
 		.toBe(total);
 	await expect(countLine).toBeVisible();
 });
+
+test('filter items by a per-item field, and never match a type field with the same key', async ({
+	page,
+	request
+}) => {
+	const suffix = uniqueName('k').replace(/\W+/g, '');
+	const key = `shelf${suffix}`;
+	const label = `Shelf${suffix}`;
+	const overlay = {
+		type: 'object',
+		properties: { [key]: { title: label, type: 'string', 'x-menagerist': { kind: 'text' } } }
+	};
+	const names = { a: `Atlas${suffix}`, b: `Brief${suffix}`, c: `Clash${suffix}` };
+
+	async function seed(data: Record<string, unknown>) {
+		const res = await request.post('/api/v1/node', { data });
+		expect(res.status(), await res.text()).toBe(201);
+		seededItemIds.push(((await res.json()) as { id: string }).id);
+	}
+
+	// Two items carry the field themselves; a third is of a type that defines the same key.
+	await seed({ name: names.a, extra_schema: overlay, attributes: { [key]: 'oak' } });
+	await seed({ name: names.b, extra_schema: overlay, attributes: { [key]: 'pine' } });
+	const clashType = await makeItemType(request, uniqueName('Clash'));
+	const patched = await request.patch(`/api/v1/node-type/${clashType.id}`, {
+		data: {
+			attributes_schema: {
+				type: 'object',
+				properties: { [key]: { title: label, type: 'string' } }
+			}
+		}
+	});
+	expect(patched.ok(), await patched.text()).toBeTruthy();
+	await seed({ name: names.c, type: clashType.slug, attributes: { [key]: 'oak' } });
+
+	await page.goto('/items');
+	await expect(page.getByRole('heading', { name: 'My items' })).toBeVisible();
+	await expect(itemLink(page, names.c)).toBeVisible();
+	const dialog = await openFilters(page);
+
+	await dialog.getByRole('combobox', { name: 'Condition 1, field' }).click();
+	await page.getByPlaceholder('Search fields…').fill(`Per-item fields ${label}`);
+	await page.getByRole('option', { name: label, exact: true }).click();
+	await dialog.getByLabel('Condition 1, operator').selectOption({ label: 'is' });
+	await dialog.getByLabel('Condition 1, value').fill('oak');
+	await dialog.getByRole('button', { name: 'Done' }).click();
+	await expect(dialog).toHaveCount(0);
+
+	// Only the item whose own field matches is listed: not B (pine), not C (type field, same value).
+	await expect(itemLink(page, names.a)).toBeVisible();
+	await expect(itemLink(page, names.b)).toHaveCount(0);
+	await expect(itemLink(page, names.c)).toHaveCount(0);
+	await expect(page.getByText('1 item', { exact: true })).toBeVisible();
+	await expect(page).toHaveURL(/[?&]f=/);
+
+	await page.reload();
+	await expect(itemLink(page, names.a)).toBeVisible();
+	await expect(itemLink(page, names.b)).toHaveCount(0);
+	await expect(itemLink(page, names.c)).toHaveCount(0);
+	await expect(page.getByRole('list', { name: 'Active filters' })).toContainText(label);
+});
+
+test('filter items by a per-item number field with at least', async ({ page, request }) => {
+	const suffix = uniqueName('n').replace(/\W+/g, '');
+	const key = `size${suffix}`;
+	const label = `Size${suffix}`;
+	const overlay = {
+		type: 'object',
+		properties: { [key]: { title: label, type: 'number', 'x-menagerist': { kind: 'number' } } }
+	};
+	const names = { small: `Small${suffix}`, big: `Big${suffix}` };
+	for (const [name, size] of [
+		[names.small, 3],
+		[names.big, 12]
+	] as const) {
+		const res = await request.post('/api/v1/node', {
+			data: { name, extra_schema: overlay, attributes: { [key]: size } }
+		});
+		expect(res.status(), await res.text()).toBe(201);
+		seededItemIds.push(((await res.json()) as { id: string }).id);
+	}
+
+	await page.goto('/items');
+	await expect(page.getByRole('heading', { name: 'My items' })).toBeVisible();
+	const dialog = await openFilters(page);
+	await dialog.getByRole('combobox', { name: 'Condition 1, field' }).click();
+	await page.getByPlaceholder('Search fields…').fill(`Per-item fields ${label}`);
+	await page.getByRole('option', { name: label, exact: true }).click();
+	await dialog.getByLabel('Condition 1, operator').selectOption({ label: 'is at least' });
+	await dialog.getByLabel('Condition 1, value').fill('10');
+	await dialog.getByRole('button', { name: 'Done' }).click();
+	await expect(dialog).toHaveCount(0);
+
+	await expect(itemLink(page, names.big)).toBeVisible();
+	await expect(itemLink(page, names.small)).toHaveCount(0);
+	await expect(page.getByRole('list', { name: 'Active filters' })).toContainText(
+		`Per-item field › ${label}`
+	);
+});
+
+test('a per-item condition on a field no item has says so', async ({ page }) => {
+	const query = {
+		v: 1,
+		where: {
+			op: 'and',
+			children: [
+				{
+					kind: 'field',
+					field_kind: 'text',
+					key: `nothing${uniqueName('n').replace(/\W+/g, '')}`,
+					op: '=',
+					value: 'x'
+				}
+			]
+		},
+		sort: []
+	};
+	const token = Buffer.from(JSON.stringify(query)).toString('base64url');
+
+	await page.goto(`/items?f=${token}`);
+	await expect(page.getByRole('heading', { name: 'My items' })).toBeVisible();
+	await openFilters(page);
+	await expect(filtersDialog(page).getByText('No item has this field.')).toBeVisible();
+});

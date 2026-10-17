@@ -872,6 +872,27 @@ Further known limits, left as they are for now:
 
 **Not chosen:** reading `not_in` as "every row is outside the list" for table columns (it would differ from `!=`) and an item-wide complement that also matched other types (it would differ from `!=` and make `or` across types surprising).
 
+## Conditions on an item's own fields are addressed by key and kind (2026-10-16)
+
+**Decision:** a field condition names either an item type (`type`) or a field kind (`field_kind`), never both and never neither. A per-item condition (`{"kind": "field", "key": "signed", "field_kind": "boolean", "op": "=", "value": true}`) applies to an item whose own `extra_schema` overlay declares that key with that kind and has not archived it. The value test is the existing one on `attributes[key]`. The change is additive, so there is no query version bump. Per-item conditions cannot use a table column (`sub_key`) or a field reference (`ref`), and there is no per-item sorting.
+
+**Scope predicate:** `extra_schema IS NOT NULL AND extra_schema @> {"properties": {key: {"x-menagerist": {"kind": kind}}}}`, with archived fields excluded. The `IS NOT NULL` guard keeps the predicate from ever being NULL, so negating it is safe, and it keeps the predicate usable by the index. The check is on the item's own overlay, not on its type. The spec's claim that a per-item key cannot clash with a type key holds only per item: a `weight` field on a Game type and a Film item's own `weight` field are different fields, and the item's own overlay decides, so a type field can never match a per-item condition (the e2e test seeds a type with the same key and value to prove it). An item with no overlay never matches and never errors.
+
+**Rulings:**
+
+- **R14:** only fields with an explicit `x-menagerist.kind` are filterable per item, because `@>` containment needs the kind written down. Overlays made through the editor or by promotion always carry one; a field in an overlay made through the API without a kind is still found by text search only.
+- **R15:** no stale warning. With no item declaring the field the condition just matches nothing, and the builder flags a key that is missing from the listing ("No item has this field.").
+- **R16:** no table columns, field references or sorting per item.
+- **R17:** the listing carries no option list, so a per-item choice or multi-choice field takes typed text in the builder. Adding options to the listing would remove the cost.
+
+**Negation:** bare `not` around a per-item leaf is plain negation, as around a typed leaf, so it includes items that lack the field. Scoping comes from `!=` and `not_in`, which match only items that declare the field: "Signed != yes" never returns items with no such field.
+
+**Index:** a partial GIN index `ix_nodes_extra_schema_gin` (`jsonb_path_ops`, where `extra_schema IS NOT NULL`) serves the containment test. `EXPLAIN` on the scope predicate shows a bitmap index scan on it when the condition is selective; a field most items declare may use the owner index or a sequential scan instead.
+
+**Listing:** `GET /node/item-fields` returns the per-item fields in use as `{key, kind, label, count}`, one row per key and kind (the same key with two kinds gives two rows), for the actor's own items, archived fields excluded. It returns at most 200 rows, most used first and then by key. The label is the most common non-empty JSON Schema `title` in the group (ties by title), falling back to the key.
+
+**Not chosen:** resolving per-item keys through the type (no type is involved) and a server-side stale-field warning (it would need a scan of every overlay on each search).
+
 ## Direction: roles as data, implied permissions
 
 **Direction (2026-10-10), not built:**

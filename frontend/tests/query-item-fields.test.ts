@@ -18,6 +18,7 @@ import { decodeQuery, encodeQuery } from '$lib/query/codec';
 import {
 	buildCatalogue,
 	findItemField,
+	ITEM_FIELDS_CAP,
 	itemFieldGroup,
 	summaryLookup,
 	type Catalogue
@@ -219,8 +220,8 @@ describe('problems and status', () => {
 describe('wording', () => {
 	const lookup = summaryLookup(catalogue);
 
-	it('describes a per-item condition as Item field › label: operator value', () => {
-		expect(describeCondition(signed, lookup)).toBe('Item field › Signed: is yes');
+	it('describes a per-item condition as Per-item field › label: operator value', () => {
+		expect(describeCondition(signed, lookup)).toBe('Per-item field › Signed: is yes');
 		const size: Condition = {
 			kind: 'field',
 			field_kind: 'number',
@@ -228,9 +229,9 @@ describe('wording', () => {
 			op: '>=',
 			value: 3
 		};
-		expect(describeCondition(size, lookup)).toBe('Item field › Size: is at least 3');
+		expect(describeCondition(size, lookup)).toBe('Per-item field › Size: is at least 3');
 		const none: Condition = { kind: 'field', field_kind: 'number', key: 'size', op: 'empty' };
-		expect(describeCondition(none, lookup)).toBe('Item field › Size: is empty');
+		expect(describeCondition(none, lookup)).toBe('Per-item field › Size: is empty');
 	});
 
 	it('formats a rating like the type fields do', () => {
@@ -241,7 +242,7 @@ describe('wording', () => {
 			op: '>=',
 			value: 4
 		};
-		expect(describeCondition(stars, lookup)).toBe('Item field › Stars: is at least 4 stars');
+		expect(describeCondition(stars, lookup)).toBe('Per-item field › Stars: is at least 4 stars');
 	});
 
 	it('words dates as the date conditions do', () => {
@@ -252,17 +253,33 @@ describe('wording', () => {
 			op: '>=',
 			value: { rel: '-30d' }
 		};
-		expect(describeCondition(when, lookup)).toBe('Item field › bought: in the last 30 days');
+		expect(describeCondition(when, lookup)).toBe('Per-item field › bought: in the last 30 days');
 	});
 
 	it('falls back to the key when the label is unknown', () => {
-		expect(describeCondition({ ...signed, key: 'gone' }, lookup)).toBe('Item field › gone: is yes');
+		expect(describeCondition({ ...signed, key: 'gone' }, lookup)).toBe(
+			'Per-item field › gone: is yes'
+		);
 		const bare = { fieldLabel: (_t: string, k: string) => k, typeLabel: (s: string) => s };
-		expect(describeCondition(signed, bare)).toBe('Item field › signed: is yes');
+		expect(describeCondition(signed, bare)).toBe('Per-item field › signed: is yes');
 	});
 
 	it('shows in chips', () => {
 		const { chips } = chipModels(wrap(signed), lookup);
-		expect(chips[0].text).toBe('Item field › Signed: is yes');
+		expect(chips[0].text).toBe('Per-item field › Signed: is yes');
+	});
+});
+
+describe('a listing cut off at the server cap', () => {
+	it('does not flag an absent key as missing, since the field may be beyond the cut', () => {
+		const full = Array.from({ length: ITEM_FIELDS_CAP }, (_, i) => ({
+			key: `f${i}`,
+			kind: 'text',
+			label: `F${i}`,
+			count: 1
+		}));
+		const gone = { ...signed, key: 'zzz' };
+		expect(fieldStatus(gone, buildCatalogue(itemTypes, true, full))).toBe('ok');
+		expect(fieldStatus(gone, buildCatalogue(itemTypes, true, full.slice(1)))).toBe('missing');
 	});
 });

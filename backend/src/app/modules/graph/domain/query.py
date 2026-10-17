@@ -265,7 +265,9 @@ def walk_conditions(
 
 
 def _encodable(raw: str) -> bool:
-    """Whether `raw` is valid UTF-8 text (no lone surrogates)."""
+    """Whether `raw` is storable text: valid UTF-8 with no NUL character."""
+    if "\x00" in raw:
+        return False
     try:
         raw.encode("utf-8")
     except UnicodeEncodeError:
@@ -438,6 +440,9 @@ def _field(data: Mapping[str, object], path: str) -> FieldCondition:
     raw_kind = data.get("field_kind")
     if raw_type is not None and raw_kind is not None:
         msg = "Name an item type or a field kind, not both."
+        raise InvalidQueryError(msg, path=path)
+    if raw_type is None and raw_kind is None:
+        msg = "Name an item type or a field kind."
         raise InvalidQueryError(msg, path=path)
     if raw_kind is None:
         field_type: str | None = _string(raw_type, path, name="type")
