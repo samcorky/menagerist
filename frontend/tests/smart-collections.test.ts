@@ -10,7 +10,10 @@ vi.mock('$lib/api/client', () => ({ createCollection, updateCollection, searchNo
 import {
 	SmartCollectionError,
 	countLabel,
+	describeCollectionCount,
+	describeSaveError,
 	isSmart,
+	manualCollections,
 	loadSmartCollection,
 	saveSmartCollection,
 	smartCollectionSummary,
@@ -231,5 +234,58 @@ describe('loadSmartCollection', () => {
 		await expect(loadSmartCollection(collection(), {})).rejects.toMatchObject({
 			name: 'SearchError'
 		});
+	});
+});
+
+describe('manualCollections', () => {
+	it('drops smart collections and keeps the order of the rest', () => {
+		const list = [
+			collection({ id: 'a', kind: 'manual', definition: null }),
+			collection({ id: 'b' }),
+			collection({ id: 'c', kind: 'manual', definition: null })
+		];
+		expect(manualCollections(list).map((c: { id: string }) => c.id)).toEqual(['a', 'c']);
+	});
+});
+
+describe('describeCollectionCount', () => {
+	it('keeps the manual wording', () => {
+		const manual = (n: number) => collection({ kind: 'manual', item_count: n });
+		expect(describeCollectionCount(manual(0))).toBe('No items');
+		expect(describeCollectionCount(manual(1))).toBe('1 item');
+		expect(describeCollectionCount(manual(12))).toBe('12 items');
+	});
+
+	it('uses the capped label for a smart collection', () => {
+		expect(describeCollectionCount(collection({ item_count: 12 }))).toBe('12 items');
+		expect(describeCollectionCount(collection({ item_count: 1 }))).toBe('1 item');
+		expect(describeCollectionCount(collection({ item_count: 0 }))).toBe('No items');
+		expect(describeCollectionCount(collection({ item_count: 1000, item_count_capped: true }))).toBe(
+			'1,000+ items'
+		);
+	});
+});
+
+describe('describeSaveError', () => {
+	it('numbers the condition the server rejected', () => {
+		const two: Query = {
+			v: 1,
+			where: {
+				op: 'and',
+				children: [
+					{ kind: 'favourite', value: true },
+					{ kind: 'text', op: 'contains', value: 'x' } as never
+				]
+			},
+			sort: []
+		};
+		const error = new SmartCollectionError(400, 'Bad value', 'where.children[1]', {
+			where: [1]
+		});
+		expect(describeSaveError(error, two)).toBe('Condition 2: Bad value');
+	});
+
+	it('uses the message alone without a path', () => {
+		expect(describeSaveError(new SmartCollectionError(409, 'Taken'), query)).toBe('Taken');
 	});
 });

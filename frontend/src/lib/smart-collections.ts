@@ -5,13 +5,14 @@ import {
 	type NodeResponse
 } from '$lib/api/client';
 import { errorMessage } from '$lib/api/errors';
-import { chipModels, type Chip } from '$lib/query/builder';
+import { chipModels, conditionNumbers, type Chip } from '$lib/query/builder';
 import { parseQuery } from '$lib/query/codec';
 import { formatCount } from '$lib/query/items-page';
 import type { SummaryLookup } from '$lib/query/summary';
 import { runSearch, type SearchWarning } from '$lib/query/search';
 import type { Query } from '$lib/query/types';
-import { mapWarnings, parseQueryPath, type QueryTarget } from '$lib/query/warnings';
+import { describeItemCount } from '$lib/collections';
+import { mapWarnings, parseQueryPath, pathKey, type QueryTarget } from '$lib/query/warnings';
 
 /** Shown in place of the conditions when a saved definition cannot be read. */
 export const UNREADABLE_CONDITIONS_MESSAGE = "These conditions can't be shown";
@@ -24,6 +25,23 @@ export function isSmart(collection: Pick<CollectionResponse, 'kind'>): boolean {
 /** "12", or "1,000+" when the count was capped. */
 export function countLabel(count: number, capped: boolean): string {
 	return formatCount(count, capped);
+}
+
+/** The collections a person can add items to by hand; smart collections fill themselves. */
+export function manualCollections<T extends Pick<CollectionResponse, 'kind'>>(
+	collections: readonly T[]
+): T[] {
+	return collections.filter((c) => !isSmart(c));
+}
+
+/** "No items", "1 item", "12 items", or "1,000+ items" for a capped smart collection. */
+export function describeCollectionCount(
+	collection: Pick<CollectionResponse, 'kind' | 'item_count' | 'item_count_capped'>
+): string {
+	if (!isSmart(collection)) return describeItemCount(collection.item_count);
+	const capped = collection.item_count_capped ?? false;
+	if (!capped && collection.item_count <= 1) return describeItemCount(collection.item_count);
+	return `${countLabel(collection.item_count, capped)} items`;
 }
 
 /**
@@ -47,6 +65,13 @@ export class SmartCollectionError extends Error {
 		this.path = path;
 		this.target = target;
 	}
+}
+
+/** The error text for a save, naming the condition ("Condition 2: ...") when the server did. */
+export function describeSaveError(error: SmartCollectionError, query: Query): string {
+	const where = error.target && 'where' in error.target ? error.target.where : null;
+	const n = where ? conditionNumbers(query).get(pathKey(where)) : undefined;
+	return n ? `Condition ${n}: ${error.message}` : error.message;
 }
 
 const FALLBACK_MESSAGE = "Couldn't save the smart collection. Try again.";

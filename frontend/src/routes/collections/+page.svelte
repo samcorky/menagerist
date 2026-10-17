@@ -11,7 +11,6 @@
 	import {
 		MAX_COLLECTION_NAME_LENGTH,
 		collectionSaveErrorMessage,
-		describeItemCount,
 		validateCollectionName
 	} from '$lib/collections';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -24,6 +23,7 @@
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import { loadExampleIds } from '$lib/examples';
 	import { normaliseQuery } from '$lib/search-palette';
+	import { describeCollectionCount, isSmart } from '$lib/smart-collections';
 
 	const PAGE_SIZE = 50;
 
@@ -229,6 +229,9 @@
 								<Card.Header>
 									<Card.Title class="flex items-center gap-2">
 										<span class="min-w-0 truncate">{collection.name}</span>
+										{#if isSmart(collection)}
+											<Badge variant="secondary" class="shrink-0">Smart</Badge>
+										{/if}
 										{#if exampleCollectionIds.has(collection.id)}
 											<Badge variant="outline" class="shrink-0 text-muted-foreground">Example</Badge
 											>
@@ -241,7 +244,7 @@
 									{/if}
 								</Card.Header>
 								<Card.Content class="text-sm text-muted-foreground">
-									{describeItemCount(collection.item_count)}
+									{describeCollectionCount(collection)}
 								</Card.Content>
 							</Card.Root>
 						</a>

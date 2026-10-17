@@ -11,6 +11,8 @@
 		List,
 		Pencil,
 		Plus,
+		SlidersHorizontal,
+		TriangleAlert,
 		SearchX,
 		Trash2,
 		X
@@ -30,11 +32,28 @@
 	} from '$lib/api/client';
 	import { networkAwareError } from '$lib/api/errors';
 	import { fetchAllNodeTypes } from '$lib/node-types';
+	import { fetchItemFields, type ItemField } from '$lib/item-fields';
+	import QueryBuilder from '$lib/components/query-builder.svelte';
+	import SmartConditions from '$lib/components/smart-conditions.svelte';
+	import * as Alert from '$lib/components/ui/alert/index.js';
+	import { conditionNumbers, queryKey, type BuilderError } from '$lib/query/builder';
+	import { parseQuery } from '$lib/query/codec';
+	import { buildCatalogue, summaryLookup } from '$lib/query/fields';
+	import { SearchError, type SearchWarning } from '$lib/query/search';
+	import { emptyQuery } from '$lib/query/tree';
+	import type { Query } from '$lib/query/types';
+	import { mapWarnings, pathKey } from '$lib/query/warnings';
+	import {
+		SmartCollectionError,
+		describeCollectionCount,
+		isSmart,
+		loadSmartCollection,
+		updateDefinition
+	} from '$lib/smart-collections';
 	import {
 		MAX_COLLECTION_NAME_LENGTH,
 		addItemsErrorMessage,
 		collectionSaveErrorMessage,
-		describeItemCount,
 		validateCollectionName
 	} from '$lib/collections';
 	import AddItemsDialog from '$lib/components/add-items-dialog.svelte';
@@ -64,6 +83,9 @@
 	import { matchContext } from '$lib/search-context';
 
 	const PAGE_SIZE = 50;
+	const SMART_EXPLANATION = 'Items are added automatically by the conditions.';
+	const SAVE_ON_CLOSE_NOTICE =
+		'Your changes are saved to this collection when you close this panel.';
 	const loadingSkeletons = [1, 2, 3, 4, 5];
 
 	const collectionId = $derived(page.params.id ?? '');
@@ -91,6 +113,32 @@
 	const shownItems = $derived(visibleItems(items, exampleItemIds, exampleFilter));
 	const exampleFilters = Object.keys(EXAMPLE_FILTER_LABELS) as ExampleFilter[];
 
+	// Smart collections: the kind decides how results load, so nothing loads until it is known.
+	const collectionKind = $derived(collection ? collection.kind : null);
+	const smart = $derived(collection ? isSmart(collection) : false);
+	const storedQuery = $derived(collection && smart ? parseQuery(collection.definition) : null);
+	const unreadable = $derived(smart && storedQuery === null);
+	let smartCursor = $state<string | null>(null);
+	let smartWarnings = $state<SearchWarning[]>([]);
+	let typesLoaded = $state(false);
+	let itemFields = $state<ItemField[] | null>(null);
+	let conditionsOpen = $state(false);
+	let wasConditionsOpen = false;
+	let draft = $state<Query | null>(null);
+	let conditionsSaving = $state(false);
+	let conditionsError = $state<BuilderError | null>(null);
+	const catalogue = $derived(buildCatalogue(itemTypes, typesLoaded, itemFields));
+	const lookup = $derived(summaryLookup(catalogue));
+	const builderQuery = $derived(draft ?? storedQuery ?? emptyQuery());
+	const conditionsErrorText = $derived.by(() => {
+		if (!conditionsError) return '';
+		const n = conditionsError.path
+			? conditionNumbers(builderQuery).get(pathKey(conditionsError.path))
+			: undefined;
+		return n ? `Condition ${n}: ${conditionsError.message}` : conditionsError.message;
+	});
+	const sortWarned = $derived(mapWarnings(smartWarnings).sort);
+
 	let editOpen = $state(false);
 	let editName = $state('');
 	let editDescription = $state('');
@@ -98,6 +146,7 @@
 	let saving = $state(false);
 	let saveError = $state<string | null>(null);
 	let editTrigger: HTMLElement | null = null;
+	let conditionsTrigger: HTMLElement | null = null;
 
 	let removingId = $state<string | null>(null);
 	let addOpen = $state(false);
@@ -134,6 +183,7 @@
 	$effect(() => {
 		void fetchAllNodeTypes().then((types) => {
 			if (types) itemTypes = types;
+			typesLoaded = true;
 		});
 	});
 
@@ -237,19 +287,111 @@
 		void loadCollection(id);
 	});
 
+	async function fetchSmart(more = false) {
+		const current = collection;
+		if (!current) return;
+		const seq = ++fetchSeq;
+		loading = true;
+		if (!more) itemsFailed = false;
+		try {
+			const result = await loadSmartCollection(current, {
+				cursor: more ? smartCursor : null,
+				limit: PAGE_SIZE
+			});
+			if (seq !== fetchSeq) return;
+			items = more ? [...items, ...result.items] : result.items;
+			smartCursor = result.nextCursor;
+			hasMore = result.nextCursor !== null;
+			smartWarnings = result.warnings;
+		} catch (e) {
+			if (seq !== fetchSeq) return;
+			if (more) {
+				toast.error(e instanceof SearchError ? e.title : 'Something went wrong', {
+					description: e instanceof SearchError ? e.description : undefined
+				});
+			} else {
+				itemsFailed = true;
+			}
+			hasMore = false;
+		}
+		loading = false;
+	}
+
 	$effect(() => {
 		const id = collectionId;
 		const search = q;
 		const type = selectedType;
-		if (!id) return;
-		void fetchPage(id, search, type);
+		const kind = collectionKind;
+		if (!id || !kind) return;
+		untrack(() => {
+			if (kind === 'dynamic') {
+				smartCursor = null;
+				void fetchSmart();
+			} else {
+				void fetchPage(id, search, type);
+			}
+		});
+	});
+
+	$effect(() => {
+		if (!smart) return;
+		void fetchItemFields().then((fields) => {
+			itemFields = fields;
+		});
+	});
+
+	async function commitConditions() {
+		const next = draft;
+		if (!next || !collection || conditionsSaving) return;
+		if (storedQuery && queryKey(next) === queryKey(storedQuery)) {
+			draft = null;
+			conditionsError = null;
+			return;
+		}
+		const id = collection.id;
+		conditionsSaving = true;
+		try {
+			const updated = await updateDefinition(id, next);
+			if (id !== collectionId) return;
+			collection = updated;
+			draft = null;
+			conditionsError = null;
+			items = [];
+			smartCursor = null;
+			void fetchSmart();
+			toast.success('Conditions saved');
+		} catch (e) {
+			if (!(e instanceof SmartCollectionError)) throw e;
+			const where = e.target && 'where' in e.target ? e.target.where : null;
+			conditionsError = { message: e.message, path: where };
+		} finally {
+			conditionsSaving = false;
+		}
+	}
+
+	function openConditions(event?: MouseEvent) {
+		if (event) conditionsTrigger = event.currentTarget as HTMLElement;
+		conditionsOpen = true;
+	}
+
+	// Conditions are saved once, when the panel closes.
+	$effect(() => {
+		const open = conditionsOpen;
+		if (wasConditionsOpen && !open) {
+			untrack(() => {
+				void commitConditions();
+				void tick().then(() => conditionsTrigger?.focus());
+			});
+		}
+		wasConditionsOpen = open;
 	});
 
 	function sentinel(node: HTMLElement) {
 		const observer = new IntersectionObserver(
 			(entries) => {
 				if (entries[0].isIntersecting && hasMore && !loading)
-					void fetchPage(collectionId, q, selectedType, items.at(-1)?.id);
+					if (smart) void fetchSmart(true);
+					else void fetchPage(collectionId, q, selectedType, items.at(-1)?.id);
 			},
 			{ rootMargin: '200px' }
 		);
@@ -450,6 +592,9 @@
 							<h1 class="font-heading text-3xl font-semibold tracking-tight break-words">
 								{collection.name}
 							</h1>
+							{#if smart}
+								<Badge variant="secondary" class="shrink-0">Smart</Badge>
+							{/if}
 							{#if exampleCollectionIds.has(collection.id)}
 								<Badge variant="outline" class="shrink-0 text-muted-foreground">Example</Badge>
 							{/if}
@@ -460,14 +605,23 @@
 							</p>
 						{/if}
 						<p class="mt-1 text-sm text-muted-foreground">
-							{describeItemCount(collection.item_count)}
+							{describeCollectionCount(collection)}
 						</p>
 					</div>
 					<div class="flex flex-wrap items-center gap-2">
-						<Button bind:ref={headerAddButton} onclick={openAdd}>
-							<Plus class="size-4" />
-							Add items
-						</Button>
+						{#if smart}
+							{#if !unreadable}
+								<Button bind:ref={headerAddButton} onclick={openConditions}>
+									<SlidersHorizontal class="size-4" />
+									Edit conditions
+								</Button>
+							{/if}
+						{:else}
+							<Button bind:ref={headerAddButton} onclick={openAdd}>
+								<Plus class="size-4" />
+								Add items
+							</Button>
+						{/if}
 						<Button variant="outline" onclick={openEdit}>
 							<Pencil class="size-4" />
 							Edit
@@ -482,16 +636,37 @@
 				<div class="h-16 animate-pulse rounded-xl bg-muted" aria-hidden="true"></div>
 			{/if}
 
+			{#if collection && smart}
+				<div class="flex flex-col gap-3">
+					<SmartConditions definition={collection.definition} {lookup} warnings={smartWarnings} />
+					{#if conditionsError && !conditionsOpen}
+						<Alert.Root variant="destructive">
+							<TriangleAlert />
+							<Alert.Title>These conditions can't be saved</Alert.Title>
+							<Alert.Description>
+								{conditionsErrorText}
+								<Button variant="link" class="h-auto p-0" onclick={() => openConditions()}>
+									Edit conditions
+								</Button>
+							</Alert.Description>
+						</Alert.Root>
+					{/if}
+					<p class="text-sm text-muted-foreground">{SMART_EXPLANATION}</p>
+				</div>
+			{/if}
+
 			<div class="flex flex-wrap items-center gap-2">
-				<input
-					bind:value={searchInput}
-					type="search"
-					placeholder="Search this collection…"
-					aria-label="Search this collection"
-					class="flex h-9 min-w-0 flex-1 basis-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:max-w-sm sm:basis-auto"
-				/>
+				{#if !smart}
+					<input
+						bind:value={searchInput}
+						type="search"
+						placeholder="Search this collection…"
+						aria-label="Search this collection"
+						class="flex h-9 min-w-0 flex-1 basis-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:max-w-sm sm:basis-auto"
+					/>
+				{/if}
 				<div class="ml-auto flex items-center gap-2">
-					{#if showTypeFilter}
+					{#if showTypeFilter && !smart}
 						<NativeSelect.Root
 							size="sm"
 							class="max-sm:[&_select[data-size]]:h-11"
@@ -582,17 +757,19 @@
 								match={q ? matchContext(item, schemaOf(item.type), q) : null}
 								isExample={exampleItemIds.has(item.id)}
 							/>
-							<button
-								type="button"
-								onclick={() => void handleRemove(item)}
-								disabled={removingId === item.id}
-								data-remove-id={item.id}
-								aria-label="Remove {item.name} from this collection"
-								title="Remove from collection"
-								class="absolute top-2 right-2 rounded-full bg-background/90 p-1.5 text-muted-foreground shadow-sm transition-colors after:absolute after:-inset-2.5 after:content-[''] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-							>
-								<X class="size-4" />
-							</button>
+							{#if !smart}
+								<button
+									type="button"
+									onclick={() => void handleRemove(item)}
+									disabled={removingId === item.id}
+									data-remove-id={item.id}
+									aria-label="Remove {item.name} from this collection"
+									title="Remove from collection"
+									class="absolute top-2 right-2 rounded-full bg-background/90 p-1.5 text-muted-foreground shadow-sm transition-colors after:absolute after:-inset-2.5 after:content-[''] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+								>
+									<X class="size-4" />
+								</button>
+							{/if}
 						</div>
 					{/each}
 				</div>
@@ -609,17 +786,19 @@
 									isExample={exampleItemIds.has(item.id)}
 								/>
 							</div>
-							<button
-								type="button"
-								onclick={() => void handleRemove(item)}
-								disabled={removingId === item.id}
-								data-remove-id={item.id}
-								aria-label="Remove {item.name} from this collection"
-								title="Remove from collection"
-								class="relative shrink-0 self-center rounded-md p-2 text-muted-foreground transition-colors after:absolute after:-inset-2 after:content-[''] hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-							>
-								<X class="size-4" />
-							</button>
+							{#if !smart}
+								<button
+									type="button"
+									onclick={() => void handleRemove(item)}
+									disabled={removingId === item.id}
+									data-remove-id={item.id}
+									aria-label="Remove {item.name} from this collection"
+									title="Remove from collection"
+									class="relative shrink-0 self-center rounded-md p-2 text-muted-foreground transition-colors after:absolute after:-inset-2 after:content-[''] hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+								>
+									<X class="size-4" />
+								</button>
+							{/if}
 						</div>
 					{/each}
 				</Item.Group>
@@ -628,7 +807,11 @@
 			{#if itemsFailed}
 				<div class="flex flex-col items-start gap-3 rounded-xl border border-dashed p-5">
 					<p class="text-sm text-muted-foreground">Couldn't load the items in this collection.</p>
-					<Button variant="outline" onclick={() => void fetchPage(collectionId, q, selectedType)}>
+					<Button
+						variant="outline"
+						onclick={() =>
+							smart ? void fetchSmart() : void fetchPage(collectionId, q, selectedType)}
+					>
 						Try again
 					</Button>
 				</div>
@@ -646,9 +829,21 @@
 						Show all items
 					</Button>
 				</div>
+			{:else if items.length === 0 && !loading && !headerLoading && unreadable}
+				<!-- The conditions message above says why; there is nothing to list. -->
 			{:else if items.length === 0 && !loading && !headerLoading}
 				<div class="flex flex-col items-center gap-3 py-12 text-center">
-					{#if q}
+					{#if smart}
+						<SearchX class="size-10 text-muted-foreground/50" />
+						<div>
+							<p class="font-medium">No items match these conditions</p>
+							<p class="text-sm text-muted-foreground">Items appear here as soon as they match.</p>
+						</div>
+						<Button variant="outline" onclick={openConditions}>
+							<SlidersHorizontal class="size-4" />
+							Edit conditions
+						</Button>
+					{:else if q}
 						<SearchX class="size-10 text-muted-foreground/50" />
 						<div>
 							<p class="font-medium">Nothing matched "{q}"</p>
@@ -735,13 +930,28 @@
 	</ResponsiveDialog.Content>
 </ResponsiveDialog.Root>
 
-<AddItemsDialog
-	open={addOpen}
-	{collectionId}
-	{typeLabels}
-	onOpenChange={handleAddOpenChange}
-	onAdded={refreshAfterChange}
-/>
+{#if !smart}
+	<AddItemsDialog
+		open={addOpen}
+		{collectionId}
+		{typeLabels}
+		onOpenChange={handleAddOpenChange}
+		onAdded={refreshAfterChange}
+	/>
+{/if}
+
+{#if smart && !unreadable}
+	<QueryBuilder
+		bind:open={conditionsOpen}
+		query={builderQuery}
+		{catalogue}
+		warned={mapWarnings(smartWarnings).conditions}
+		{sortWarned}
+		error={conditionsError}
+		notice={SAVE_ON_CLOSE_NOTICE}
+		onchange={(next) => (draft = next)}
+	/>
+{/if}
 
 <ConfirmDialog
 	open={confirmDelete}

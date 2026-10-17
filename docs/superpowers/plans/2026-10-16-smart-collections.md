@@ -169,6 +169,25 @@
 
 ---
 
+### Task 5d: Ad-hoc narrowing on a smart collection page
+
+**Files:** frontend only, through the Svelte agent: `src/routes/collections/[id]/+page.svelte`, `src/lib/components/smart-conditions.svelte`, the save dialog, `src/lib/smart-collections.ts`, `src/lib/query/{tree,items-page}.ts` (combine helpers), tests.
+
+**Rulings:** R24 the saved definition is never edited implicitly: opening the page is read-only; ad-hoc filters and the search box narrow the results by ANDing onto the saved conditions and live in the URL (`?f=`), shareable and reloadable; the saved sort applies unless changed in the ad-hoc builder.
+
+**Interfaces:**
+- Produces: the search box, type select and a **Filter** button (the existing builder bound to the ad-hoc conditions only) on a smart collection page; saved conditions shown as locked chips; a narrowed-view bar ("Narrowed by N filters: X of Y items") with **Save as new smart collection** (definition = saved AND ad-hoc, name dialog, reuses the Task 5 save dialog), **Update this collection** (overwrite with the combined definition after a confirmation that states what changes; uses `updateDefinition`) and **Clear**; **Edit conditions** becomes a deliberate action with explicit **Save** and **Cancel** (no silent save on close); both save actions disabled with an explanation when the combined tree exceeds the depth or condition limits (`fitsLimits`); a combine helper `combineWithSaved(saved, adhoc)` in plain TypeScript, flattened and limit-checked.
+- Consumes: Task 4 model, phase 1 `combine`/`fitsLimits`, the filter builder.
+
+- [ ] **Step 1: Failing tests** for `combineWithSaved` (empty ad-hoc returns the saved tree; limits; sort carry-over; text search becomes a text condition), the bar copy, and the disabled states; component/SSR tests where the harness allows.
+- [ ] **Step 2: Implement; lint-frontend, typecheck-frontend, test-frontend; visual check on the isolated stack in light and dark at desktop and mobile; view the screenshots.**
+- [ ] **Step 3:** e2e additions in Task 6 (narrow, save as new, overwrite with confirmation, clear, explicit edit with cancel).
+- **Follow-up (after phase 2b):** add **Save as new, linked to this collection**, whose definition is `in collection <this>` AND the ad-hoc conditions, on both smart and manual collection pages (the only way to turn a narrowed manual collection into a smart one). It follows the parent; deleting the parent makes the condition stale; cycles are blocked by 2b. **Update this collection** stays a copy of conditions.
+
+**Checkpoint:** user may commit.
+
+---
+
 ### Task 6: End-to-end test, documentation, full gates
 
 **Files:** `frontend/tests/e2e/smart-collections.spec.ts` (new), `docs/DECISIONS.md`, `docs/ARCHITECTURE.md` and `backend/README.md` where collections are described, the spec (phase 2 status)
