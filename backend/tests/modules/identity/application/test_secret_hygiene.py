@@ -11,6 +11,7 @@ from app.modules.identity.adapters.security.session_token_generator import (
     InMemorySessionTokenGenerator,
 )
 from app.modules.identity.application.change_password import ChangePasswordCommand
+from app.modules.identity.application.client_device import ClientDevice
 from app.modules.identity.application.create_user import CreateUserCommand
 from app.modules.identity.application.get_current_user import GetCurrentUserQuery
 from app.modules.identity.application.reset_password import ResetPasswordCommand
@@ -34,15 +35,23 @@ TTL = timedelta(hours=1)
 
 
 def test_commands_never_show_secrets_in_their_repr() -> None:
-    """Passwords and tokens stay out of logs and tracebacks."""
+    """Passwords, tokens, and raw user-agents stay out of logs and tracebacks."""
+    device = ClientDevice(user_agent=SECRET, platform="Linux", mobile=False)
+    assert SECRET not in repr(device)
+    assert SECRET not in str(device)
+
     commands = [
-        SignInCommand(username="alice", password=SECRET),
+        SignInCommand(username="alice", password=SECRET, device=device),
         SignOutCommand(token=SECRET),
         GetCurrentUserQuery(token=SECRET),
-        ChangePasswordCommand(current_password=SECRET, new_password=SECRET),
+        ChangePasswordCommand(
+            current_password=SECRET, new_password=SECRET, device=device
+        ),
         CreateUserCommand(username="alice", display_name="A", password=SECRET),
         ResetPasswordCommand(user_id=uuid.uuid7(), password=SECRET),
-        SetupFirstAdminCommand(username="alice", display_name="A", password=SECRET),
+        SetupFirstAdminCommand(
+            username="alice", display_name="A", password=SECRET, device=device
+        ),
     ]
     for command in commands:
         assert SECRET not in repr(command)

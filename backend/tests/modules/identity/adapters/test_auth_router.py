@@ -7,11 +7,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 import time_machine
+from starlette.requests import Request
 from starlette.testclient import TestClient
 from structlog.testing import capture_logs
 
 from app.entrypoints.api import create_app
 from app.modules.identity.adapters.api.dependencies import (
+    get_client_device,
     get_decoy_hash,
     get_existing_data_claim,
     get_identity_repos,
@@ -26,6 +28,7 @@ from app.modules.identity.adapters.claim.no_op_existing_data_claim import (
 from app.modules.identity.adapters.security.in_memory_password_hasher import (
     InMemoryPasswordHasher,
 )
+from app.modules.identity.application.client_device import ClientDevice
 from app.modules.identity.domain.user import Role
 from app.modules.identity.ports.unit_of_work import IdentityRepos
 from app.platform.config import IdentitySettings
@@ -973,3 +976,178 @@ def test_the_openapi_documents_the_cross_site_refusal(api: Api) -> None:
     assert "another site" in setup["403"]["description"]
     assert "CrossSiteRequestError" in login["403"]["description"]
     assert "disabled account" in login["403"]["description"]
+
+
+# --- client device capture ---------------------------------------------------
+
+
+def _make_request(headers: dict[str, str]) -> Request:
+    raw_headers = [
+        (k.lower().encode("latin-1"), v.encode("latin-1")) for k, v in headers.items()
+    ]
+    scope = {"type": "http", "headers": raw_headers}
+    return Request(scope)
+
+
+def test_get_client_device_header_parsing() -> None:
+    """Header parsing handles normal, quoted, blank, boolean, and junk headers."""
+    req1 = _make_request(
+        {
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64)",
+            "Sec-CH-UA-Platform": '"Linux"',
+            "Sec-CH-UA-Mobile": "?0",
+        }
+    )
+    dev1 = get_client_device(req1)
+    assert dev1 == ClientDevice(
+        user_agent="Mozilla/5.0 (X11; Linux x86_64)",
+        platform="Linux",
+        mobile=False,
+    )
+
+    req2 = _make_request(
+        {
+            "User-Agent": "Mobile Safari",
+            "Sec-CH-UA-Platform": "Android",
+            "Sec-CH-UA-Mobile": "?1",
+        }
+    )
+    dev2 = get_client_device(req2)
+    assert dev2 == ClientDevice(
+        user_agent="Mobile Safari",
+        platform="Android",
+        mobile=True,
+    )
+
+    req3 = _make_request(
+        {
+            "User-Agent": "   ",
+            "Sec-CH-UA-Platform": '  "  "  ',
+            "Sec-CH-UA-Mobile": "junk",
+        }
+    )
+    dev3 = get_client_device(req3)
+    assert dev3 == ClientDevice(
+        user_agent=None,
+        platform=None,
+        mobile=None,
+    )
+
+    req4 = _make_request({})
+    dev4 = get_client_device(req4)
+    assert dev4 == ClientDevice(
+        user_agent=None,
+        platform=None,
+        mobile=None,
+    )
+
+
+async def test_sign_in_stores_client_device_and_ip(
+    api: Api, make_user: MakeUser
+) -> None:
+    """Login stores User-Agent, platform, mobile flag, and client IP on session."""
+    api.setup()
+    await api.add_user(make_user, "alice")
+    headers = {
+        "User-Agent": "Mozilla/5.0 Firefox/131.0",
+        "Sec-CH-UA-Platform": '"Linux"',
+        "Sec-CH-UA-Mobile": "?0",
+    }
+    client = api.new_client()
+    resp = client.post(
+        f"{AUTH}/login",
+        json={"username": "alice", "password": "password-123"},
+        headers=headers,
+    )
+    assert resp.status_code == 200
+
+    active_sessions = await api.world.sessions.list_active(now=datetime.now(UTC))
+    alice = await api.world.users.get_by_username("alice")
+    assert alice is not None
+    user_session = next(s for s in active_sessions if s.user_id == alice.id)
+    assert user_session.user_agent == "Mozilla/5.0 Firefox/131.0"
+    assert user_session.client_platform == "Linux"
+    assert user_session.client_mobile is False
+    assert user_session.client_ip == "testclient"
+
+
+async def test_setup_first_admin_stores_client_device_and_ip(api: Api) -> None:
+    """First-run setup stores device details on the initial admin session."""
+    headers = {
+        "User-Agent": "SetupBrowser/1.0",
+        "Sec-CH-UA-Platform": '"macOS"',
+        "Sec-CH-UA-Mobile": "?1",
+    }
+    resp = api.client.post(f"{AUTH}/setup", json=SETUP_BODY, headers=headers)
+    assert resp.status_code == 201
+
+    active_sessions = await api.world.sessions.list_active(now=datetime.now(UTC))
+    assert len(active_sessions) == 1
+    session = active_sessions[0]
+    assert session.user_agent == "SetupBrowser/1.0"
+    assert session.client_platform == "macOS"
+    assert session.client_mobile is True
+    assert session.client_ip == "testclient"
+
+
+async def test_change_password_stores_client_device_and_ip(api: Api) -> None:
+    """Password change replaces sessions with one storing new device details."""
+    api.setup()
+    headers = {
+        "User-Agent": "PasswordChanger/2.0",
+        "Sec-CH-UA-Platform": '"Windows"',
+        "Sec-CH-UA-Mobile": "?0",
+        "X-CSRF-Token": api.client.cookies.get(CSRF_COOKIE) or "",
+    }
+    body = {
+        "current_password": "password-123",
+        "new_password": "new-password-456",
+    }
+    resp = api.client.post(f"{AUTH}/password", json=body, headers=headers)
+    assert resp.status_code == 200
+
+    active_sessions = await api.world.sessions.list_active(now=datetime.now(UTC))
+    assert len(active_sessions) == 1
+    session = active_sessions[0]
+    assert session.user_agent == "PasswordChanger/2.0"
+    assert session.client_platform == "Windows"
+    assert session.client_mobile is False
+    assert session.client_ip == "testclient"
+
+
+async def test_absent_device_headers_store_none(api: Api) -> None:
+    """Requests with absent/empty device headers store None for device columns."""
+    resp = api.client.post(f"{AUTH}/setup", json=SETUP_BODY, headers={"User-Agent": ""})
+    assert resp.status_code == 201
+
+    active_sessions = await api.world.sessions.list_active(now=datetime.now(UTC))
+    assert len(active_sessions) == 1
+    session = active_sessions[0]
+    assert session.user_agent is None
+    assert session.client_platform is None
+    assert session.client_mobile is None
+    assert session.client_ip == "testclient"
+
+
+async def test_sign_in_does_not_log_raw_user_agent_on_success(
+    api: Api, make_user: MakeUser
+) -> None:
+    """The 'signed in' info log line does not contain the raw user-agent or token."""
+    api.setup()
+    await api.add_user(make_user, "alice")
+    unique_ua = "SpecialSecretAgentString/9.9"
+    headers = {"User-Agent": unique_ua}
+
+    with capture_logs() as captured:
+        client = api.new_client()
+        resp = client.post(
+            f"{AUTH}/login",
+            json={"username": "alice", "password": "password-123"},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+
+    signed_in_logs = [log for log in captured if log.get("event") == "signed in"]
+    assert len(signed_in_logs) == 1
+    assert "user_agent" not in signed_in_logs[0]
+    assert unique_ua not in str(signed_in_logs[0])

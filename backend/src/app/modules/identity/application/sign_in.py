@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from app.modules.identity.application.client_device import ClientDevice
 from app.modules.identity.application.session_start import SignedInResult, start_session
 from app.modules.identity.application.sign_in_throttle import (
     Reservation,
@@ -41,6 +42,7 @@ class SignInCommand:
     username: str
     password: str
     client_ip: str | None = None
+    device: ClientDevice | None = None
 
     def __repr__(self) -> str:
         """Keep the password out of logs and tracebacks."""
@@ -136,7 +138,14 @@ class SignIn(CommandHandler[IdentityUnitOfWork, SignInCommand, SignedInResult]):
             await self._throttle.settle_success(repos.attempts, reservation)
             # Sign-in is the only recurring writer here, so it also sweeps old rows.
             await repos.sessions.delete_expired(now)
-            started = await start_session(repos, self._tokens, user, self._ttl)
+            started = await start_session(
+                repos,
+                self._tokens,
+                user,
+                self._ttl,
+                client_ip=command.client_ip,
+                device=command.device,
+            )
             await self._uow.commit()
         logger.info("signed in", user_id=user.id, session_id=started.session_id)
         return SignedInResult(

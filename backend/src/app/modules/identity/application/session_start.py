@@ -7,6 +7,7 @@ from app.modules.identity.domain.session import Session
 from app.modules.identity.domain.user import User
 
 if TYPE_CHECKING:
+    from app.modules.identity.application.client_device import ClientDevice
     from app.modules.identity.ports.session_token_generator import SessionTokenGenerator
     from app.modules.identity.ports.unit_of_work import IdentityRepos
 
@@ -33,6 +34,9 @@ async def start_session(
     tokens: SessionTokenGenerator,
     user: User,
     ttl: timedelta,
+    *,
+    client_ip: str | None = None,
+    device: ClientDevice | None = None,
 ) -> StartedSession:
     """Store a new session for `user` and return its secret token and id."""
     token = tokens.new_token()
@@ -41,6 +45,10 @@ async def start_session(
         token_hash=tokens.token_hash(token),
         now=datetime.now(UTC),
         ttl=ttl,
+        user_agent=device.user_agent if device is not None else None,
+        client_ip=client_ip,
+        client_platform=device.platform if device is not None else None,
+        client_mobile=device.mobile if device is not None else None,
     )
     await repos.sessions.add(session)
     return StartedSession(token=token, session_id=session.id)

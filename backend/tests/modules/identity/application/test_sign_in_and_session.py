@@ -8,6 +8,7 @@ import time_machine
 from app.modules.identity.adapters.security.session_token_generator import (
     InMemorySessionTokenGenerator,
 )
+from app.modules.identity.application.client_device import ClientDevice
 from app.modules.identity.application.get_current_user import (
     GetCurrentUser,
     GetCurrentUserQuery,
@@ -60,6 +61,33 @@ async def test_sign_in_creates_a_session_storing_only_the_token_hash(
     assert stored.user_id == user.id
     assert stored.expires_at == NOW + TTL
     assert await world.sessions.get_by_token_hash("token-1") is None
+
+
+@time_machine.travel(NOW, tick=False)
+async def test_sign_in_stores_device_details_on_created_session(
+    cases: Cases, world: World, make_user: MakeUser
+) -> None:
+    """Device details and client IP pass through into the created session."""
+    user = make_user("alice")
+    await world.users.add(user)
+
+    device = ClientDevice(user_agent="CustomAgent/1.0", platform="Linux", mobile=False)
+    result = await cases.sign_in.handle(
+        SignInCommand(
+            username="alice",
+            password="password-123",
+            client_ip="192.0.2.1",
+            device=device,
+        ),
+        ANONYMOUS_ACTOR,
+    )
+
+    stored = await world.sessions.get_by_token_hash(_hash(result.token))
+    assert stored is not None
+    assert stored.user_agent == "CustomAgent/1.0"
+    assert stored.client_ip == "192.0.2.1"
+    assert stored.client_platform == "Linux"
+    assert stored.client_mobile is False
 
 
 @time_machine.travel(NOW, tick=False)

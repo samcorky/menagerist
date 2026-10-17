@@ -21,13 +21,16 @@ if TYPE_CHECKING:
 NOW = datetime(2026, 10, 10, 12, 0, tzinfo=UTC)
 
 
-def _command(**overrides: str) -> SetupFirstAdminCommand:
-    values = {
-        "username": "Admin",
-        "display_name": "Admin",
-        "password": "password-123",
-    } | overrides
-    return SetupFirstAdminCommand(**values)
+def _command(
+    username: str = "Admin",
+    display_name: str = "Admin",
+    password: str = "password-123",
+) -> SetupFirstAdminCommand:
+    return SetupFirstAdminCommand(
+        username=username,
+        display_name=display_name,
+        password=password,
+    )
 
 
 @time_machine.travel(NOW, tick=False)

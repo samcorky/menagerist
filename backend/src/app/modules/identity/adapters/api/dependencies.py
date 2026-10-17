@@ -33,6 +33,7 @@ from app.modules.identity.adapters.security.session_token_generator import (
     SecretsSessionTokenGenerator,
 )
 from app.modules.identity.application.change_password import ChangePassword
+from app.modules.identity.application.client_device import ClientDevice
 from app.modules.identity.application.create_user import CreateUser
 from app.modules.identity.application.get_current_user import (
     GetCurrentUser,
@@ -124,6 +125,29 @@ def get_client_ip(request: Request) -> str | None:
     `request.client.host`.
     """
     return None if request.client is None else request.client.host
+
+
+def get_client_device(request: Request) -> ClientDevice:
+    """Extract client device hints and user agent from request headers."""
+    ua_raw = request.headers.get("User-Agent")
+    user_agent = ua_raw.strip() if ua_raw is not None and ua_raw.strip() else None
+
+    platform_raw = request.headers.get("Sec-CH-UA-Platform")
+    platform: str | None = None
+    if platform_raw is not None:
+        cleaned_platform = platform_raw.strip().strip('"').strip()
+        platform = cleaned_platform if cleaned_platform else None
+
+    mobile_raw = request.headers.get("Sec-CH-UA-Mobile")
+    mobile: bool | None = None
+    if mobile_raw is not None:
+        val = mobile_raw.strip()
+        if val == "?1":
+            mobile = True
+        elif val == "?0":
+            mobile = False
+
+    return ClientDevice(user_agent=user_agent, platform=platform, mobile=mobile)
 
 
 def get_session_token_generator() -> SessionTokenGenerator:

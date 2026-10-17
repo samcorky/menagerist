@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from app.modules.identity.application.client_device import ClientDevice
 from app.modules.identity.application.session_start import SignedInResult, start_session
 from app.modules.identity.application.sign_in_throttle import (
     SignInThrottle,
@@ -38,6 +39,7 @@ class ChangePasswordCommand:
     current_password: str
     new_password: str
     client_ip: str | None = None
+    device: ClientDevice | None = None
 
     def __repr__(self) -> str:
         """Keep the passwords out of logs and tracebacks."""
@@ -123,7 +125,14 @@ class ChangePassword(
             )
             await repos.users.save(user)
             ended = await repos.sessions.delete_for_user(user.id)
-            started = await start_session(repos, self._tokens, user, self._ttl)
+            started = await start_session(
+                repos,
+                self._tokens,
+                user,
+                self._ttl,
+                client_ip=command.client_ip,
+                device=command.device,
+            )
             await self._uow.commit()
         logger.info("sessions ended", user_id=user.id, count=ended)
         logger.info("password changed", user_id=user.id, session_id=started.session_id)

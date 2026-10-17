@@ -18,6 +18,7 @@ from app.modules.identity.adapters.api.cookies import (
 from app.modules.identity.adapters.api.dependencies import (
     get_active_identity_actor,
     get_change_password_use_case,
+    get_client_device,
     get_client_ip,
     get_get_setup_status_use_case,
     get_identity_actor,
@@ -40,6 +41,7 @@ from app.modules.identity.adapters.api.schemas import (
     UserResponse,
 )
 from app.modules.identity.application.change_password import ChangePassword
+from app.modules.identity.application.client_device import ClientDevice
 from app.modules.identity.application.get_setup_status import (
     GetSetupStatus,
     GetSetupStatusQuery,
@@ -134,12 +136,16 @@ async def setup_first_admin(
     response: Response,
     use_case: Annotated[SetupFirstAdmin, Depends(get_setup_first_admin_use_case)],
     settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
+    client_ip: Annotated[str | None, Depends(get_client_ip)],
+    device: Annotated[ClientDevice, Depends(get_client_device)],
 ) -> SetupResponse:
     """Create the first administrator and sign them in. Only works once.
 
     Refused with 403 `cross_site_refused` when a page on another site sent it.
     """
-    result = await use_case.handle(payload.to_command(), ANONYMOUS_ACTOR)
+    result = await use_case.handle(
+        payload.to_command(client_ip=client_ip, device=device), ANONYMOUS_ACTOR
+    )
     set_session_cookies(request, response, result.token, settings)
     return SetupResponse.from_result(result)
 
@@ -164,6 +170,7 @@ async def sign_in(
     use_case: Annotated[SignIn, Depends(get_sign_in_use_case)],
     settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
     client_ip: Annotated[str | None, Depends(get_client_ip)],
+    device: Annotated[ClientDevice, Depends(get_client_device)],
 ) -> UserResponse:
     """Sign in, setting the session and CSRF cookies.
 
@@ -178,7 +185,9 @@ async def sign_in(
         "sign_in_device_headers",
         **device_header_fields(request.headers, client_ip),
     )
-    result = await use_case.handle(payload.to_command(client_ip), ANONYMOUS_ACTOR)
+    result = await use_case.handle(
+        payload.to_command(client_ip=client_ip, device=device), ANONYMOUS_ACTOR
+    )
     set_session_cookies(request, response, result.token, settings)
     return UserResponse.from_domain(result.user)
 
@@ -283,11 +292,14 @@ async def change_password(
     actor: Annotated[Actor, Depends(get_identity_actor)],
     settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
     client_ip: Annotated[str | None, Depends(get_client_ip)],
+    device: Annotated[ClientDevice, Depends(get_client_device)],
 ) -> UserResponse:
     """Change your password. Other sessions end and this one gets a new token.
 
     Wrong current passwords are throttled per user and per client address.
     """
-    result = await use_case.handle(payload.to_command(client_ip), actor)
+    result = await use_case.handle(
+        payload.to_command(client_ip=client_ip, device=device), actor
+    )
     set_session_cookies(request, response, result.token, settings)
     return UserResponse.from_domain(result.user)

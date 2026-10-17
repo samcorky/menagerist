@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from app.modules.identity.application.client_device import ClientDevice
 from app.modules.identity.application.session_start import start_session
 from app.modules.identity.domain.errors import SetupAlreadyDoneError
 from app.modules.identity.domain.user import Role, User, validate_password
@@ -33,6 +34,8 @@ class SetupFirstAdminCommand:
     username: str
     display_name: str
     password: str
+    client_ip: str | None = None
+    device: ClientDevice | None = None
 
     def __repr__(self) -> str:
         """Keep the password out of logs and tracebacks."""
@@ -97,7 +100,14 @@ class SetupFirstAdmin(
             if await repos.users.count() > 0:
                 raise SetupAlreadyDoneError("Setup has already been completed.")
             await repos.users.add(user)
-            started = await start_session(repos, self._tokens, user, self._ttl)
+            started = await start_session(
+                repos,
+                self._tokens,
+                user,
+                self._ttl,
+                client_ip=command.client_ip,
+                device=command.device,
+            )
             report = await self._claim.claim(user.id)
             await self._uow.commit()
         logger.info(

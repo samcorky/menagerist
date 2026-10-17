@@ -21,6 +21,7 @@ from app.modules.identity.domain.user import (
 from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
+    from app.modules.identity.application.client_device import ClientDevice
     from app.modules.identity.application.setup_first_admin import SetupFirstAdminResult
     from app.modules.identity.application.user_listing import UserListing
     from app.modules.identity.domain.user import User
@@ -61,12 +62,18 @@ class SetupRequest(RequestModel):
     display_name: str = Field(max_length=MAX_DISPLAY_NAME_LENGTH)
     password: str = Field(max_length=_MAX_PASSWORD_INPUT)
 
-    def to_command(self) -> SetupFirstAdminCommand:
+    def to_command(
+        self,
+        client_ip: str | None = None,
+        device: ClientDevice | None = None,
+    ) -> SetupFirstAdminCommand:
         """Convert this request into a `SetupFirstAdminCommand`."""
         return SetupFirstAdminCommand(
             username=self.username,
             display_name=self.display_name,
             password=self.password,
+            client_ip=client_ip,
+            device=device,
         )
 
 
@@ -82,10 +89,17 @@ class LoginRequest(RequestModel):
     username: str = Field(max_length=MAX_USERNAME_LENGTH)
     password: str = Field(max_length=_MAX_PASSWORD_INPUT)
 
-    def to_command(self, client_ip: str | None = None) -> SignInCommand:
+    def to_command(
+        self,
+        client_ip: str | None = None,
+        device: ClientDevice | None = None,
+    ) -> SignInCommand:
         """Convert this request into a `SignInCommand`."""
         return SignInCommand(
-            username=self.username, password=self.password, client_ip=client_ip
+            username=self.username,
+            password=self.password,
+            client_ip=client_ip,
+            device=device,
         )
 
 
@@ -106,12 +120,17 @@ class ChangePasswordRequest(RequestModel):
     current_password: str = Field(max_length=_MAX_PASSWORD_INPUT)
     new_password: str = Field(max_length=_MAX_PASSWORD_INPUT)
 
-    def to_command(self, client_ip: str | None = None) -> ChangePasswordCommand:
+    def to_command(
+        self,
+        client_ip: str | None = None,
+        device: ClientDevice | None = None,
+    ) -> ChangePasswordCommand:
         """Convert this request into a `ChangePasswordCommand`."""
         return ChangePasswordCommand(
             current_password=self.current_password,
             new_password=self.new_password,
             client_ip=client_ip,
+            device=device,
         )
 
 
