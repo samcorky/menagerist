@@ -108,6 +108,110 @@ async def test_session_save_and_raw_token_misses(world: World) -> None:
     assert await world.sessions.get_by_token_hash("raw-token") is None
 
 
+async def test_session_get_by_id(world: World) -> None:
+    """Sessions are retrieved by their row id; unknown ids give None."""
+    session = Session.create(
+        user_id=uuid.uuid7(), token_hash="h1", now=NOW, ttl=timedelta(hours=1)
+    )
+    await world.sessions.add(session)
+    assert await world.sessions.get(session.id) is session
+    assert await world.sessions.get(uuid.uuid7()) is None
+
+
+async def test_session_list_for_user_orders_by_last_seen_and_excludes_expired(
+    world: World,
+) -> None:
+    """`list_for_user` excludes expired rows and orders newest last_seen_at first."""
+    user_id = uuid.uuid7()
+    other_user_id = uuid.uuid7()
+
+    s_old = Session.create(
+        user_id=user_id, token_hash="old", now=NOW, ttl=timedelta(hours=2)
+    )
+    s_old.last_seen_at = NOW
+
+    s_new = Session.create(
+        user_id=user_id, token_hash="new", now=NOW, ttl=timedelta(hours=2)
+    )
+    s_new.last_seen_at = NOW + timedelta(minutes=30)
+
+    s_expired = Session.create(
+        user_id=user_id, token_hash="exp", now=NOW, ttl=timedelta(minutes=10)
+    )
+
+    s_other = Session.create(
+        user_id=other_user_id, token_hash="oth", now=NOW, ttl=timedelta(hours=2)
+    )
+
+    for s in (s_old, s_new, s_expired, s_other):
+        await world.sessions.add(s)
+
+    check_time = NOW + timedelta(minutes=15)
+    listed = await world.sessions.list_for_user(user_id, now=check_time)
+    assert listed == [s_new, s_old]
+
+
+async def test_session_list_active_filters_by_user_or_all(world: World) -> None:
+    """`list_active` returns non-expired sessions, optionally filtered by user_id."""
+    u1, u2 = uuid.uuid7(), uuid.uuid7()
+    s1 = Session.create(user_id=u1, token_hash="s1", now=NOW, ttl=timedelta(hours=1))
+    s1.last_seen_at = NOW + timedelta(minutes=10)
+
+    s2 = Session.create(user_id=u2, token_hash="s2", now=NOW, ttl=timedelta(hours=1))
+    s2.last_seen_at = NOW + timedelta(minutes=20)
+
+    s_exp = Session.create(
+        user_id=u1, token_hash="exp", now=NOW, ttl=timedelta(minutes=5)
+    )
+
+    for s in (s1, s2, s_exp):
+        await world.sessions.add(s)
+
+    now = NOW + timedelta(minutes=6)
+    all_active = await world.sessions.list_active(now=now)
+    assert all_active == [s2, s1]
+
+    u1_active = await world.sessions.list_active(now=now, user_id=u1)
+    assert u1_active == [s1]
+
+    u2_active = await world.sessions.list_active(now=now, user_id=u2)
+    assert u2_active == [s2]
+
+    unknown_active = await world.sessions.list_active(now=now, user_id=uuid.uuid7())
+    assert unknown_active == []
+
+
+async def test_session_delete_all_except_preserves_keep_id_and_others(
+    world: World,
+) -> None:
+    """`delete_all_except` removes other sessions of the target user only."""
+    user_id = uuid.uuid7()
+    other_user = uuid.uuid7()
+
+    s_keep = Session.create(
+        user_id=user_id, token_hash="k", now=NOW, ttl=timedelta(hours=1)
+    )
+    s_drop1 = Session.create(
+        user_id=user_id, token_hash="d1", now=NOW, ttl=timedelta(hours=1)
+    )
+    s_drop2 = Session.create(
+        user_id=user_id, token_hash="d2", now=NOW, ttl=timedelta(hours=1)
+    )
+    s_other = Session.create(
+        user_id=other_user, token_hash="o", now=NOW, ttl=timedelta(hours=1)
+    )
+
+    for s in (s_keep, s_drop1, s_drop2, s_other):
+        await world.sessions.add(s)
+
+    deleted_count = await world.sessions.delete_all_except(user_id, s_keep.id)
+    assert deleted_count == 2
+    assert await world.sessions.get(s_keep.id) is s_keep
+    assert await world.sessions.get(s_drop1.id) is None
+    assert await world.sessions.get(s_drop2.id) is None
+    assert await world.sessions.get(s_other.id) is s_other
+
+
 async def test_for_update_lookup_matches_plain_lookup(
     world: World, make_user: MakeUser
 ) -> None:

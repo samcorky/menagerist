@@ -32,6 +32,10 @@ class SessionModel(IdentifiableMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    user_agent: Mapped[str | None]
+    client_ip: Mapped[str | None]
+    client_platform: Mapped[str | None]
+    client_mobile: Mapped[bool | None]
 
 
 class SignInAttemptModel(Base):
