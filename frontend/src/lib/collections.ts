@@ -69,3 +69,14 @@ export function slugSaveErrorMessage(status: number | undefined, detail: string)
 	if (status === 400) return detail || 'That link is not valid.';
 	return null;
 }
+
+/**
+ * A collection's address (pathname form, for `resolve()`) with a query string and hash carried
+ * over; the slug is always used, never the id.
+ */
+export function collectionAddress(
+	collection: { slug: string },
+	location: { search: string; hash: string }
+): `/collections/${string}` {
+	return `/collections/${encodeURIComponent(collection.slug)}${location.search}${location.hash}`;
+}

@@ -30,6 +30,7 @@ import {
 	smartCollectionSummary,
 	updateDefinition
 } from '$lib/smart-collections';
+import { emptyQuery } from '$lib/query/tree';
 import type { Query } from '$lib/query/types';
 
 const query: Query = {
@@ -194,7 +195,76 @@ describe('loadSmartCollection', () => {
 			total: 1,
 			totalCapped: false,
 			nextCursor: 'abc',
-			warnings: []
+			warnings: [],
+			searchWarnings: [],
+			tooLarge: false
+		});
+	});
+
+	describe('narrowed', () => {
+		const adhoc: Query = {
+			v: 1,
+			where: { op: 'and', children: [{ kind: 'type', in: ['wine'] }] },
+			sort: []
+		};
+
+		it('searches saved AND ad-hoc AND the search text, with the saved sort', async () => {
+			searchNodes.mockResolvedValue(page({ total: 3 }));
+			const result = await loadSmartCollection(collection(), {
+				narrow: { adhoc, basics: { q: 'claret' } },
+				limit: 10
+			});
+			expect(searchNodes).toHaveBeenCalledWith({
+				body: {
+					query: {
+						v: 1,
+						where: {
+							op: 'and',
+							children: [
+								{ kind: 'favourite', value: true },
+								{ kind: 'type', in: ['wine'] },
+								{ kind: 'text', q: 'claret' }
+							]
+						},
+						sort: [{ by: 'name', dir: 'asc' }]
+					},
+					limit: 10,
+					cursor: null
+				}
+			});
+			expect(result.total).toBe(3);
+		});
+
+		it('keeps the collection warnings apart from the search warnings', async () => {
+			searchNodes.mockResolvedValue(
+				page({ warnings: [{ path: 'where.children[1]', message: 'x' }] })
+			);
+			const result = await loadSmartCollection(
+				collection({ warnings: [{ path: 'where.children[0]', message: 'gone' }] }),
+				{ narrow: { adhoc, basics: {} } }
+			);
+			expect(result.searchWarnings).toEqual([{ path: 'where.children[1]', message: 'x' }]);
+			expect(result.warnings).toHaveLength(2);
+		});
+
+		it('does not search when the combination is too large', async () => {
+			const many = Array.from({ length: 30 }, (_, i) => ({
+				kind: 'tag' as const,
+				mode: 'any' as const,
+				tags: [`t${i}`]
+			}));
+			const big: Query = { v: 1, where: { op: 'and', children: many }, sort: [] };
+			const result = await loadSmartCollection(collection({ definition: big }), {
+				narrow: { adhoc: big, basics: {} }
+			});
+			expect(searchNodes).not.toHaveBeenCalled();
+			expect(result).toMatchObject({ items: [], tooLarge: true, total: 0 });
+		});
+
+		it('runs the saved search when nothing is narrowed', async () => {
+			searchNodes.mockResolvedValue(page());
+			await loadSmartCollection(collection(), { narrow: { adhoc: emptyQuery(), basics: {} } });
+			expect(searchNodes.mock.calls[0][0].body.query).toEqual(query);
 		});
 	});
 
@@ -236,7 +306,9 @@ describe('loadSmartCollection', () => {
 			total: 0,
 			totalCapped: false,
 			nextCursor: null,
-			warnings: [{ path: 'where', message: 'm' }]
+			warnings: [{ path: 'where', message: 'm' }],
+			searchWarnings: [],
+			tooLarge: false
 		});
 	});
 

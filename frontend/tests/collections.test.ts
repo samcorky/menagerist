@@ -9,7 +9,8 @@ import {
 	slugSaveErrorMessage,
 	describeAddResult,
 	describeItemCount,
-	validateCollectionName
+	validateCollectionName,
+	collectionAddress
 } from '$lib/collections';
 
 describe('describeItemCount', () => {
@@ -122,5 +123,25 @@ describe('collectionRouteParams', () => {
 		expect(collectionRouteParams({ slug: 'my-films' })).toEqual({
 			id: 'my-films'
 		});
+	});
+});
+
+describe('collectionAddress', () => {
+	const films = { slug: 'my-films' };
+
+	it('keeps the query string and the hash when the address changes', () => {
+		expect(collectionAddress(films, { search: '?f=abc&q=x', hash: '#top' })).toBe(
+			'/collections/my-films?f=abc&q=x#top'
+		);
+	});
+
+	it('adds nothing when there is neither', () => {
+		expect(collectionAddress(films, { search: '', hash: '' })).toBe('/collections/my-films');
+	});
+
+	it('keeps a slug that needs escaping safe', () => {
+		expect(collectionAddress({ slug: 'a b/c' }, { search: '?q=x', hash: '' })).toBe(
+			'/collections/a%20b%2Fc?q=x'
+		);
 	});
 });

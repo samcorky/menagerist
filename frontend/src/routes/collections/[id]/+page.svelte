@@ -18,6 +18,7 @@
 		X
 	} from '@lucide/svelte';
 	import { tick, untrack } from 'svelte';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 	import {
 		addItemsToCollection,
@@ -33,18 +34,40 @@
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { fetchAllNodeTypes } from '$lib/node-types';
 	import { fetchItemFields, type ItemField } from '$lib/item-fields';
+	import NarrowedBar from '$lib/components/narrowed-bar.svelte';
 	import QueryBuilder from '$lib/components/query-builder.svelte';
+	import QueryChips from '$lib/components/query-chips.svelte';
+	import SaveSmartCollectionDialog from '$lib/components/save-smart-collection-dialog.svelte';
 	import SmartConditions from '$lib/components/smart-conditions.svelte';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { conditionNumbers, queryKey, type BuilderError } from '$lib/query/builder';
 	import { parseQuery } from '$lib/query/codec';
 	import { buildCatalogue, summaryLookup } from '$lib/query/fields';
+	import {
+		FILTER_PARAM,
+		INVALID_LINK_MESSAGE,
+		createFilterWriter,
+		readFilter,
+		withFilter
+	} from '$lib/query/items-page';
+	import {
+		NARROW_TOO_LARGE_MESSAGE,
+		locateInCombined,
+		narrowFilterCount,
+		narrowedBarText,
+		narrowedMarks,
+		needsNarrowing,
+		combineWithSaved,
+		saveBlockReason,
+		updateConfirmation
+	} from '$lib/query/narrow';
 	import { SearchError, type SearchWarning } from '$lib/query/search';
-	import { emptyQuery } from '$lib/query/tree';
-	import type { Query } from '$lib/query/types';
-	import { mapWarnings, pathKey } from '$lib/query/warnings';
+	import { countConditions, emptyQuery, removeAt } from '$lib/query/tree';
+	import type { Path, Query } from '$lib/query/types';
+	import { mapWarnings, pathKey, splitDetail } from '$lib/query/warnings';
 	import {
 		SmartCollectionError,
+		describeSaveError,
 		isSmart,
 		loadSmartCollection,
 		updateDefinition
@@ -53,6 +76,7 @@
 		MAX_COLLECTION_NAME_LENGTH,
 		addItemsErrorMessage,
 		canonicalSlugFor,
+		collectionAddress,
 		collectionRouteParams,
 		collectionSaveErrorMessage,
 		slugPatch,
@@ -89,8 +113,8 @@
 
 	const PAGE_SIZE = 50;
 	const SMART_EXPLANATION = 'Items are added automatically by the conditions.';
-	const SAVE_ON_CLOSE_NOTICE =
-		'Your changes are saved to this collection when you close this panel.';
+	const EDIT_CONDITIONS_DESCRIPTION =
+		'Change the saved conditions, then choose Save. Cancel discards your changes.';
 	const loadingSkeletons = [1, 2, 3, 4, 5];
 
 	// The address segment: an id or a slug. Item queries need the canonical id.
@@ -139,14 +163,57 @@
 	const catalogue = $derived(buildCatalogue(itemTypes, typesLoaded, itemFields));
 	const lookup = $derived(summaryLookup(catalogue));
 	const builderQuery = $derived(draft ?? storedQuery ?? emptyQuery());
-	const conditionsErrorText = $derived.by(() => {
-		if (!conditionsError) return '';
-		const n = conditionsError.path
-			? conditionNumbers(builderQuery).get(pathKey(conditionsError.path))
-			: undefined;
-		return n ? `Condition ${n}: ${conditionsError.message}` : conditionsError.message;
+
+	// Ad-hoc narrowing of a smart collection: filters (`?f=`), search (`?q=`) and type (`?type=`)
+	// live in the URL and are ANDed onto the saved conditions. The saved definition is untouched.
+	const adhocState = $derived(
+		smart
+			? readFilter(page.url.searchParams.get(FILTER_PARAM))
+			: { query: emptyQuery(), invalid: false }
+	);
+	const adhoc = $derived(adhocState.query);
+	const adhocKey = $derived(queryKey(adhoc));
+	const adhocCount = $derived(countConditions(adhoc));
+	const basics = $derived({ q, type: selectedType || null });
+	const narrowCount = $derived(narrowFilterCount(adhoc, basics));
+	const narrowed = $derived(smart && storedQuery !== null && needsNarrowing(adhoc, basics));
+	const storedKey = $derived(storedQuery ? queryKey(storedQuery) : '');
+	const combinedQuery = $derived(combineWithSaved(storedQuery ?? emptyQuery(), adhoc, basics));
+	const blockReason = $derived(
+		narrowed && storedQuery ? saveBlockReason(storedQuery, adhoc, basics) : null
+	);
+	let narrowedTotal = $state<{ total: number; capped: boolean } | null>(null);
+	let searchWarnings = $state<SearchWarning[]>([]);
+	let tooLarge = $state(false);
+	let adhocError = $state<BuilderError | null>(null);
+	let filtersOpen = $state(false);
+	let filtersFocus = $state<Path | null>(null);
+	let saveOpen = $state(false);
+	let updateOpen = $state(false);
+	let updating = $state(false);
+	let updateError = $state<string | null>(null);
+	let filterAnnouncement = $state('');
+	// The last search text and type seen in, or written to, the URL
+	let appliedQ = '';
+	let appliedType = '';
+	const savedWarnings = $derived(narrowed ? (collection?.warnings ?? []) : smartWarnings);
+	const sortWarned = $derived(mapWarnings(savedWarnings).sort);
+	const adhocMarks = $derived(
+		narrowed && storedQuery
+			? narrowedMarks(searchWarnings, storedQuery, adhoc, basics)
+			: { conditions: new Set<string>(), sort: false }
+	);
+	const barText = $derived(
+		narrowedBarText(narrowCount, tooLarge || adhocError ? null : narrowedTotal, {
+			count: collection?.item_count ?? 0,
+			capped: collection?.item_count_capped ?? false
+		})
+	);
+	const adhocErrorText = $derived.by(() => {
+		if (!adhocError) return '';
+		const n = adhocError.path ? conditionNumbers(adhoc).get(pathKey(adhocError.path)) : undefined;
+		return n ? `Condition ${n}: ${adhocError.message}` : adhocError.message;
 	});
-	const sortWarned = $derived(mapWarnings(smartWarnings).sort);
 
 	let editOpen = $state(false);
 	let editName = $state('');
@@ -259,11 +326,150 @@
 	// Replaces an id (or an old slug) in the address with the slug, without a history entry.
 	function showCanonicalAddress(segment: string, loaded: CollectionResponse) {
 		if (canonicalSlugFor(segment, loaded) === null) return;
-		void goto(resolve('/collections/[id]', collectionRouteParams(loaded)), {
+		void goto(resolve(collectionAddress(loaded, page.url)), {
 			replaceState: true,
 			keepFocus: true,
 			noScroll: true
 		});
+	}
+
+	function navigateWith(params: URLSearchParams, replace: boolean) {
+		if (!collection) return;
+		const search = params.toString();
+		const address = collectionAddress(collection, {
+			search: search ? `?${search}` : '',
+			hash: page.url.hash
+		});
+		void goto(resolve(address), { replaceState: replace, keepFocus: true, noScroll: true });
+	}
+
+	const writer = createFilterWriter((next: Query, replace: boolean) =>
+		navigateWith(withFilter(page.url.searchParams, next), replace)
+	);
+	$effect(() => () => writer.cancel());
+
+	$effect(() => {
+		if (!adhocState.invalid) return;
+		untrack(() => {
+			toast.error(INVALID_LINK_MESSAGE);
+			const params = new SvelteURLSearchParams(page.url.searchParams);
+			params.delete(FILTER_PARAM);
+			navigateWith(params, true);
+		});
+	});
+
+	// The search box and the type select follow the URL (Back, a shared link) and write to it.
+	$effect(() => {
+		if (!smart) return;
+		const urlQ = page.url.searchParams.get('q') ?? '';
+		const urlType = page.url.searchParams.get('type') ?? '';
+		untrack(() => {
+			if (urlQ !== appliedQ) {
+				appliedQ = urlQ;
+				if (urlQ !== q) {
+					items = [];
+					hasMore = false;
+					q = urlQ;
+				}
+				searchInput = urlQ;
+			}
+			if (urlType !== appliedType) {
+				appliedType = urlType;
+				if (urlType !== selectedType) {
+					items = [];
+					hasMore = false;
+					selectedType = urlType;
+				}
+			}
+		});
+	});
+
+	$effect(() => {
+		if (!smart) return;
+		const nextQ = q;
+		const nextType = selectedType;
+		untrack(() => {
+			if (nextQ === appliedQ && nextType === appliedType) return;
+			appliedQ = nextQ;
+			appliedType = nextType;
+			const params = new SvelteURLSearchParams(page.url.searchParams);
+			if (nextQ) params.set('q', nextQ);
+			else params.delete('q');
+			if (nextType) params.set('type', nextType);
+			else params.delete('type');
+			navigateWith(params, true);
+		});
+	});
+
+	function openFilters(focus: Path | null) {
+		filtersFocus = focus;
+		writer.startSession();
+		filtersOpen = true;
+	}
+
+	$effect(() => {
+		if (!filtersOpen) writer.flush();
+	});
+
+	function removeFilter(path: Path, text: string) {
+		writer.startSession();
+		writer.write(removeAt(adhoc, path));
+		filterAnnouncement = `Filter removed: ${text}.`;
+	}
+
+	function clearAdhocFilters() {
+		writer.startSession();
+		writer.write(emptyQuery());
+		filterAnnouncement = 'Filters cleared.';
+	}
+
+	// Back to the saved view: drops the filters, the search text and the type.
+	function clearNarrowing() {
+		writer.cancel();
+		const params = new SvelteURLSearchParams(page.url.searchParams);
+		for (const key of [FILTER_PARAM, 'q', 'type']) params.delete(key);
+		appliedQ = '';
+		appliedType = '';
+		searchInput = '';
+		q = '';
+		selectedType = '';
+		navigateWith(params, false);
+		filterAnnouncement = 'Showing the saved conditions only.';
+	}
+
+	function savedAsNew(created: CollectionResponse) {
+		void goto(resolve('/collections/[id]', collectionRouteParams(created)));
+	}
+
+	function openUpdate() {
+		updateError = null;
+		updateOpen = true;
+	}
+
+	async function confirmUpdate() {
+		if (!collection || updating) return;
+		const id = collection.id;
+		const definition = combinedQuery;
+		updating = true;
+		updateError = null;
+		try {
+			const updated = await updateDefinition(id, definition);
+			if (id !== collection?.id) return;
+			collection = updated;
+			updateOpen = false;
+			clearNarrowing();
+			toast.success('Collection updated');
+		} catch (e) {
+			if (!(e instanceof SmartCollectionError)) throw e;
+			updateError = describeSaveError(e, definition);
+		} finally {
+			updating = false;
+		}
+	}
+
+	function handleUpdateOpenChange(open: boolean) {
+		if (!open && updating) return;
+		updateOpen = open;
 	}
 
 	async function fetchPage(id: string, search: string, type: string, after?: string) {
@@ -315,6 +521,8 @@
 			q = '';
 			searchInput = '';
 			selectedType = '';
+			appliedQ = '';
+			appliedType = '';
 		});
 		void loadCollection(id);
 	});
@@ -327,20 +535,40 @@
 		if (!more) {
 			itemsFailed = false;
 			firstPageLoaded = false;
+			tooLarge = false;
 		}
 		try {
 			const result = await loadSmartCollection(current, {
 				cursor: more ? smartCursor : null,
-				limit: PAGE_SIZE
+				limit: PAGE_SIZE,
+				narrow: { adhoc, basics }
 			});
 			if (seq !== fetchSeq) return;
 			items = more ? [...items, ...result.items] : result.items;
 			smartCursor = result.nextCursor;
 			hasMore = result.nextCursor !== null;
 			smartWarnings = result.warnings;
+			searchWarnings = result.searchWarnings;
+			tooLarge = result.tooLarge;
+			adhocError = null;
+			narrowedTotal = { total: result.total, capped: result.totalCapped };
 		} catch (e) {
 			if (seq !== fetchSeq) return;
-			if (more) {
+			if (
+				e instanceof SearchError &&
+				e.detail !== null &&
+				(e.status === 400 || e.status === 422) &&
+				storedQuery
+			) {
+				const { target, message } = splitDetail(e.detail);
+				const at =
+					target && 'where' in target
+						? locateInCombined(target.where, storedQuery, adhoc, basics)
+						: null;
+				adhocError = { message, path: at?.part === 'adhoc' ? at.path : null };
+				items = [];
+				hasMore = false;
+			} else if (more) {
 				toast.error(e instanceof SearchError ? e.title : 'Something went wrong', {
 					description: e instanceof SearchError ? e.description : undefined
 				});
@@ -358,6 +586,8 @@
 		const search = q;
 		const type = selectedType;
 		const kind = collectionKind;
+		// Refetch when the filters, or the saved conditions, change
+		void [adhocKey, storedKey];
 		if (!id || !kind) return;
 		untrack(() => {
 			if (kind === 'dynamic') {
@@ -376,33 +606,33 @@
 		});
 	});
 
-	async function commitConditions() {
+	/** Saves the edited conditions; true when there is nothing left to save. */
+	async function commitConditions(): Promise<boolean> {
 		const next = draft;
-		if (!next || !collection || conditionsSaving) return;
-		if (storedQuery && queryKey(next) === queryKey(storedQuery)) {
-			draft = null;
-			conditionsError = null;
-			return;
-		}
+		if (!next || !collection) return true;
+		if (conditionsSaving) return false;
+		if (storedQuery && queryKey(next) === queryKey(storedQuery)) return true;
 		const id = collection.id;
 		conditionsSaving = true;
 		try {
 			const updated = await updateDefinition(id, next);
-			if (id !== collectionId) return;
+			if (id !== collection?.id) return false;
 			collection = updated;
-			draft = null;
-			conditionsError = null;
 			items = [];
-			smartCursor = null;
-			void fetchSmart();
 			toast.success('Conditions saved');
+			return true;
 		} catch (e) {
 			if (!(e instanceof SmartCollectionError)) throw e;
 			const where = e.target && 'where' in e.target ? e.target.where : null;
 			conditionsError = { message: e.message, path: where };
+			return false;
 		} finally {
 			conditionsSaving = false;
 		}
+	}
+
+	async function saveConditions() {
+		if (await commitConditions()) conditionsOpen = false;
 	}
 
 	function openConditions(event?: MouseEvent) {
@@ -410,12 +640,13 @@
 		conditionsOpen = true;
 	}
 
-	// Conditions are saved once, when the panel closes.
+	// Closing the panel any way but Save discards the edits.
 	$effect(() => {
 		const open = conditionsOpen;
 		if (wasConditionsOpen && !open) {
 			untrack(() => {
-				void commitConditions();
+				draft = null;
+				conditionsError = null;
 				void tick().then(() => conditionsTrigger?.focus());
 			});
 		}
@@ -712,25 +943,18 @@
 
 			{#if collection && smart}
 				<div class="flex flex-col gap-3">
-					<SmartConditions definition={collection.definition} {lookup} warnings={smartWarnings} />
-					{#if conditionsError && !conditionsOpen}
-						<Alert.Root variant="destructive">
-							<TriangleAlert />
-							<Alert.Title>These conditions can't be saved</Alert.Title>
-							<Alert.Description>
-								{conditionsErrorText}
-								<Button variant="link" class="h-auto p-0" onclick={() => openConditions()}>
-									Edit conditions
-								</Button>
-							</Alert.Description>
-						</Alert.Root>
-					{/if}
+					<SmartConditions
+						definition={collection.definition}
+						{lookup}
+						warnings={savedWarnings}
+						locked
+					/>
 					<p class="text-sm text-muted-foreground">{SMART_EXPLANATION}</p>
 				</div>
 			{/if}
 
 			<div class="flex flex-wrap items-center gap-2">
-				{#if !smart}
+				{#if !unreadable}
 					<input
 						bind:value={searchInput}
 						type="search"
@@ -740,7 +964,25 @@
 					/>
 				{/if}
 				<div class="ml-auto flex items-center gap-2">
-					{#if showTypeFilter && !smart}
+					{#if smart && !unreadable}
+						<Button
+							variant="outline"
+							class="max-sm:h-11"
+							aria-haspopup="dialog"
+							onclick={() => openFilters(null)}
+						>
+							<SlidersHorizontal />
+							Filter
+							{#if adhocCount > 0}
+								<Badge class="ml-0.5 h-5 min-w-5 px-1.5 tabular-nums">
+									{adhocCount}<span class="sr-only">
+										{adhocCount === 1 ? 'condition' : 'conditions'}</span
+									>
+								</Badge>
+							{/if}
+						</Button>
+					{/if}
+					{#if showTypeFilter && !unreadable}
 						<NativeSelect.Root
 							size="sm"
 							class="max-sm:[&_select[data-size]]:h-11"
@@ -795,6 +1037,52 @@
 					</div>
 				</div>
 			</div>
+
+			{#if smart && !unreadable && (adhocCount > 0 || narrowed)}
+				<div class="flex flex-col gap-3">
+					{#if adhocCount > 0}
+						<QueryChips
+							query={adhoc}
+							{lookup}
+							warned={adhocMarks.conditions}
+							{catalogue}
+							onopen={(path) => openFilters(path)}
+							onremove={removeFilter}
+							onclear={clearAdhocFilters}
+						/>
+					{/if}
+					{#if narrowed}
+						<NarrowedBar
+							text={barText}
+							{blockReason}
+							{updating}
+							onsave={() => (saveOpen = true)}
+							onupdate={openUpdate}
+							onclear={clearNarrowing}
+						/>
+					{/if}
+					{#if adhocError}
+						<Alert.Root variant="destructive">
+							<TriangleAlert />
+							<Alert.Title>This filter can't be used</Alert.Title>
+							<Alert.Description>
+								{adhocErrorText}
+								<Button
+									variant="link"
+									class="h-auto p-0"
+									onclick={() => openFilters(adhocError?.path ?? null)}>Edit filters</Button
+								>
+							</Alert.Description>
+						</Alert.Root>
+					{:else if tooLarge}
+						<Alert.Root>
+							<TriangleAlert />
+							<Alert.Description>{NARROW_TOO_LARGE_MESSAGE}</Alert.Description>
+						</Alert.Root>
+					{/if}
+				</div>
+			{/if}
+			<p class="sr-only" role="status" aria-live="polite">{filterAnnouncement}</p>
 
 			{#if loadingDisplay.show && shownItems.length === 0}
 				<Shimmer loading={true}>
@@ -903,11 +1191,22 @@
 						Show all items
 					</Button>
 				</div>
+			{:else if items.length === 0 && !loading && !headerLoading && (adhocError || tooLarge)}
+				<!-- The notice above says why; there is nothing to list. -->
 			{:else if items.length === 0 && !loading && !headerLoading && unreadable}
 				<!-- The conditions message above says why; there is nothing to list. -->
 			{:else if items.length === 0 && !loading && !headerLoading}
 				<div class="flex flex-col items-center gap-3 py-12 text-center">
-					{#if smart}
+					{#if narrowed}
+						<SearchX class="size-10 text-muted-foreground/50" />
+						<div>
+							<p class="font-medium">No items match your filters</p>
+							<p class="text-sm text-muted-foreground">
+								Change a filter, or clear them to see the whole collection.
+							</p>
+						</div>
+						<Button variant="ghost" size="sm" onclick={clearNarrowing}>Clear</Button>
+					{:else if smart}
 						<SearchX class="size-10 text-muted-foreground/50" />
 						<div>
 							<p class="font-medium">No items match these conditions</p>
@@ -1027,13 +1326,51 @@
 		bind:open={conditionsOpen}
 		query={builderQuery}
 		{catalogue}
-		warned={mapWarnings(smartWarnings).conditions}
+		warned={mapWarnings(savedWarnings).conditions}
 		{sortWarned}
 		error={conditionsError}
-		notice={SAVE_ON_CLOSE_NOTICE}
+		title="Edit conditions"
+		description={EDIT_CONDITIONS_DESCRIPTION}
+		saving={conditionsSaving}
+		onsave={() => void saveConditions()}
+		oncancel={() => (conditionsOpen = false)}
 		onchange={(next) => (draft = next)}
 	/>
+	<QueryBuilder
+		bind:open={filtersOpen}
+		query={adhoc}
+		{catalogue}
+		warned={adhocMarks.conditions}
+		sortWarned={adhocMarks.sort}
+		error={adhocError}
+		notice={tooLarge ? NARROW_TOO_LARGE_MESSAGE : null}
+		focus={filtersFocus}
+		description="Narrow this collection further. Changes apply as you go and are not saved to the collection."
+		onchange={(next, { debounce }) => writer.write(next, { debounce })}
+	/>
+	<SaveSmartCollectionDialog bind:open={saveOpen} query={combinedQuery} onsaved={savedAsNew} />
+	<ConfirmDialog
+		open={updateOpen}
+		title="Update this collection?"
+		description={updateDescription}
+		busy={updating}
+		busyLabel="Updating…"
+		confirmLabel="Update collection"
+		destructive={false}
+		onOpenChange={handleUpdateOpenChange}
+		onConfirm={confirmUpdate}
+	/>
 {/if}
+
+{#snippet updateDescription()}
+	{updateConfirmation(
+		storedQuery ? countConditions(storedQuery) : 0,
+		countConditions(combinedQuery)
+	)}
+	{#if updateError}
+		<span role="alert" class="mt-2 block text-destructive">{updateError}</span>
+	{/if}
+{/snippet}
 
 <ConfirmDialog
 	open={confirmDelete}

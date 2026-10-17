@@ -41,6 +41,11 @@
 		error = null,
 		notice = null,
 		focus = null,
+		title = 'Filters',
+		description = 'Show only the items that match. Changes apply as you go.',
+		saving = false,
+		onsave,
+		oncancel,
 		onchange
 	}: {
 		open?: boolean;
@@ -56,6 +61,12 @@
 		notice?: string | null;
 		/** Filter path of the row to show when the panel opens. */
 		focus?: Path | null;
+		title?: string;
+		description?: string;
+		saving?: boolean;
+		/** With `oncancel`: nothing is kept until Save, and the panel offers Save and Cancel instead of Done. */
+		onsave?: () => void;
+		oncancel?: () => void;
 		onchange: (query: Query, options: { debounce: boolean }) => void;
 	} = $props();
 
@@ -202,13 +213,13 @@
 
 <ResponsiveDialog.Root bind:open>
 	<ResponsiveDialog.Content
-		title="Filters"
+		{title}
 		bind:ref={contentEl}
 		{onOpenAutoFocus}
 		class="flex flex-col pb-0 max-sm:h-dvh max-sm:max-h-dvh max-sm:rounded-none max-sm:border-t-0 sm:max-h-[85dvh] sm:max-w-2xl"
 	>
 		<ResponsiveDialog.Description>
-			Show only the items that match. Changes apply as you go.
+			{description}
 		</ResponsiveDialog.Description>
 
 		<div class="mt-4 flex flex-1 flex-col gap-4">
@@ -271,7 +282,14 @@
 			class="sticky bottom-0 -mx-6 mt-6 flex items-center justify-between gap-2 border-t bg-background px-6 py-4"
 		>
 			<Button variant="ghost" onclick={clearAll}>Clear all</Button>
-			<Button onclick={() => (open = false)}>Done</Button>
+			{#if onsave && oncancel}
+				<div class="flex items-center gap-2">
+					<Button variant="outline" disabled={saving} onclick={oncancel}>Cancel</Button>
+					<Button disabled={saving} onclick={onsave}>{saving ? 'Saving…' : 'Save'}</Button>
+				</div>
+			{:else}
+				<Button onclick={() => (open = false)}>Done</Button>
+			{/if}
 		</div>
 	</ResponsiveDialog.Content>
 </ResponsiveDialog.Root>

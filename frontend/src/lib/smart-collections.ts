@@ -9,6 +9,8 @@ import { errorMessage } from '$lib/api/errors';
 import { chipModels, conditionNumbers, type Chip } from '$lib/query/builder';
 import { parseQuery } from '$lib/query/codec';
 import { formatCount } from '$lib/query/items-page';
+import { fitsLimits } from '$lib/query/limits';
+import { combineWithSaved, needsNarrowing, type NarrowBasics } from '$lib/query/narrow';
 import type { SummaryLookup } from '$lib/query/summary';
 import { runSearch, type SearchWarning } from '$lib/query/search';
 import type { Query } from '$lib/query/types';
@@ -128,7 +130,12 @@ export type SmartCollectionPage = {
 	total: number;
 	totalCapped: boolean;
 	nextCursor: string | null;
+	/** The collection's own warnings merged with the search's. */
 	warnings: SearchWarning[];
+	/** Only what the search reported (paths in the tree that was sent). */
+	searchWarnings: SearchWarning[];
+	/** The saved and ad-hoc conditions together exceed the limits, so nothing was searched. */
+	tooLarge: boolean;
 };
 
 function mergeWarnings(...lists: SearchWarning[][]): SearchWarning[] {
@@ -150,7 +157,12 @@ function mergeWarnings(...lists: SearchWarning[][]): SearchWarning[] {
  */
 export async function loadSmartCollection(
 	collection: Pick<CollectionResponse, 'definition' | 'warnings'>,
-	opts: { cursor?: string | null; limit?: number }
+	opts: {
+		cursor?: string | null;
+		limit?: number;
+		/** The page's own filters, ANDed onto the saved conditions (never saved by this). */
+		narrow?: { adhoc: Query; basics: NarrowBasics };
+	}
 ): Promise<SmartCollectionPage> {
 	const own = collection.warnings ?? [];
 	const query = parseQuery(collection.definition);
@@ -161,17 +173,38 @@ export async function loadSmartCollection(
 			total: 0,
 			totalCapped: false,
 			nextCursor: null,
-			warnings: mergeWarnings(own)
+			warnings: mergeWarnings(own),
+			searchWarnings: [],
+			tooLarge: false
 		};
 	}
-	const page = await runSearch({ query, limit: opts.limit, cursor: opts.cursor });
+	const { narrow } = opts;
+	const sent =
+		narrow && needsNarrowing(narrow.adhoc, narrow.basics)
+			? combineWithSaved(query, narrow.adhoc, narrow.basics)
+			: query;
+	if (!fitsLimits(sent)) {
+		return {
+			query,
+			items: [],
+			total: 0,
+			totalCapped: false,
+			nextCursor: null,
+			warnings: mergeWarnings(own),
+			searchWarnings: [],
+			tooLarge: true
+		};
+	}
+	const page = await runSearch({ query: sent, limit: opts.limit, cursor: opts.cursor });
 	return {
 		query,
 		items: page.items,
 		total: page.total,
 		totalCapped: page.totalCapped,
 		nextCursor: page.nextCursor,
-		warnings: mergeWarnings(own, page.warnings)
+		warnings: mergeWarnings(own, page.warnings),
+		searchWarnings: page.warnings,
+		tooLarge: false
 	};
 }
 

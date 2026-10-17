@@ -292,6 +292,36 @@ describe('query-builder', () => {
 		expect(html).toContain('A filter can have up to 50 conditions.');
 	});
 
+	it('offers Done when changes apply as you go', () => {
+		const html = panel({});
+		expect(html).toContain('Done');
+		expect(html).not.toContain('>Cancel<');
+	});
+
+	it('offers Save and Cancel instead of Done when saving is deliberate', () => {
+		const html = panel({
+			title: 'Edit conditions',
+			description: 'Change the conditions, then choose Save.',
+			onsave: () => {},
+			oncancel: () => {}
+		});
+		expect(html).toContain('Edit conditions');
+		expect(html).toContain('Change the conditions, then choose Save.');
+		expect(html).toContain('>Save<');
+		expect(html).toContain('>Cancel<');
+		expect(html).not.toContain('Done');
+		expect(html).not.toContain('Changes apply as you go');
+	});
+
+	it('disables Save and Cancel while saving', () => {
+		const html = panel({ onsave: () => {}, oncancel: () => {}, saving: true });
+		expect(html).toContain('Saving…');
+		const cancel = (html.match(/<button[\s\S]*?<\/button>/g) ?? []).find((b) =>
+			b.includes('Cancel')
+		);
+		expect(cancel).toMatch(/\sdisabled/);
+	});
+
 	it('shows the page notice when the page filters do not fit', () => {
 		const html = panel({
 			notice: 'Too many conditions to add the page filters. Remove a condition.'

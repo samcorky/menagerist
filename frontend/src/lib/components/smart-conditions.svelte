@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { TriangleAlert } from '@lucide/svelte';
+	import { Lock, TriangleAlert } from '@lucide/svelte';
 	import type { SummaryLookup } from '$lib/query/summary';
 	import type { SearchWarning } from '$lib/query/search';
 	import { UNREADABLE_CONDITIONS_MESSAGE, smartCollectionSummary } from '$lib/smart-collections';
@@ -7,12 +7,15 @@
 	let {
 		definition,
 		lookup,
-		warnings = []
+		warnings = [],
+		locked = false
 	}: {
 		/** The stored definition, as the server sent it. */
 		definition: unknown;
 		lookup: SummaryLookup;
 		warnings?: SearchWarning[];
+		/** The conditions belong to the collection and cannot be changed here. */
+		locked?: boolean;
 	} = $props();
 
 	const summary = $derived(smartCollectionSummary(definition, lookup, warnings));
@@ -25,6 +28,12 @@
 	<p class="text-sm text-muted-foreground">{UNREADABLE_CONDITIONS_MESSAGE}</p>
 {:else if summary.chips.length > 0}
 	<div class="flex flex-col gap-2">
+		{#if locked}
+			<p class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+				<Lock class="size-3" aria-hidden="true" />
+				Saved conditions
+			</p>
+		{/if}
 		<ul class="flex flex-wrap items-center gap-2" aria-label="Conditions">
 			{#if summary.lead}
 				<li class="text-sm text-muted-foreground">{summary.lead}</li>
