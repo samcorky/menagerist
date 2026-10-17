@@ -38,6 +38,14 @@ class SessionRequiredError(UnauthenticatedError):
     problem_type = "unauthenticated"
 
 
+class SessionNotFoundError(NotFoundError):
+    """Raised when a requested session does not exist."""
+
+
+class CurrentSessionError(ConflictError):
+    """Raised when an operation cannot be performed on the current session."""
+
+
 class SetupAlreadyDoneError(ConflictError):
     """Raised when first-run setup is attempted after an account exists."""
 

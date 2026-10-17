@@ -1,7 +1,9 @@
 import uuid
 from datetime import UTC, datetime, timedelta
 
+from app.modules.identity.domain.errors import CurrentSessionError, SessionNotFoundError
 from app.modules.identity.domain.session import Session
+from app.shared_kernel.errors import ConflictError, NotFoundError
 
 NOW = datetime(2026, 10, 10, 12, 0, tzinfo=UTC)
 
@@ -15,6 +17,62 @@ def test_create_sets_expiry_from_ttl() -> None:
     assert session.user_id == user_id
     assert session.created_at == session.last_seen_at == NOW
     assert session.expires_at == NOW + timedelta(hours=1)
+    assert session.user_agent is None
+    assert session.client_ip is None
+    assert session.client_platform is None
+    assert session.client_mobile is None
+
+
+def test_create_stores_device_details() -> None:
+    """Device details pass through to the session."""
+    session = Session.create(
+        user_id=uuid.uuid7(),
+        token_hash="h",
+        now=NOW,
+        ttl=timedelta(hours=1),
+        user_agent="Mozilla/5.0 Firefox/131.0",
+        client_ip="192.0.2.1",
+        client_platform="Linux",
+        client_mobile=False,
+    )
+    assert session.user_agent == "Mozilla/5.0 Firefox/131.0"
+    assert session.client_ip == "192.0.2.1"
+    assert session.client_platform == "Linux"
+    assert session.client_mobile is False
+
+
+def test_create_truncates_long_user_agent_and_platform() -> None:
+    """User agent is cut to 256 characters and platform to 64."""
+    long_ua = "A" * 300
+    long_platform = "P" * 100
+    session = Session.create(
+        user_id=uuid.uuid7(),
+        token_hash="h",
+        now=NOW,
+        ttl=timedelta(hours=1),
+        user_agent=long_ua,
+        client_platform=long_platform,
+    )
+    assert session.user_agent == "A" * 256
+    assert session.client_platform == "P" * 64
+
+
+def test_create_turns_blank_device_details_into_none() -> None:
+    """Empty or whitespace-only device details become `None`."""
+    session = Session.create(
+        user_id=uuid.uuid7(),
+        token_hash="h",
+        now=NOW,
+        ttl=timedelta(hours=1),
+        user_agent="   ",
+        client_ip="",
+        client_platform=" \t\n ",
+        client_mobile=None,
+    )
+    assert session.user_agent is None
+    assert session.client_ip is None
+    assert session.client_platform is None
+    assert session.client_mobile is None
 
 
 def test_is_expired_at_and_after_expiry() -> None:
@@ -68,3 +126,9 @@ def test_activity_restarts_the_idle_clock() -> None:
 
     assert session.is_idle(NOW + timedelta(hours=3), limit) is False
     assert session.is_idle(NOW + timedelta(hours=4), limit) is True
+
+
+def test_session_errors_subclass_shared_kernel_errors() -> None:
+    """Session errors inherit correct HTTP mapping base types."""
+    assert issubclass(SessionNotFoundError, NotFoundError)
+    assert issubclass(CurrentSessionError, ConflictError)
