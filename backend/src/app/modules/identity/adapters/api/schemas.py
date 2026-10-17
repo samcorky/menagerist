@@ -22,6 +22,8 @@ from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
     from app.modules.identity.application.client_device import ClientDevice
+    from app.modules.identity.application.list_own_sessions import OwnSession
+    from app.modules.identity.application.session_listing import SessionListing
     from app.modules.identity.application.setup_first_admin import SetupFirstAdminResult
     from app.modules.identity.application.user_listing import UserListing
     from app.modules.identity.domain.user import User
@@ -297,3 +299,106 @@ class SetupResponse(BaseModel):
             user=UserResponse.from_domain(result.user),
             claimed=dict(result.claim.counts),
         )
+
+
+_SESSION_EXAMPLE: dict[str, Any] = {
+    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
+    "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0",
+    "client_platform": "Linux",
+    "client_mobile": False,
+    "client_ip": "192.0.2.1",
+    "created_at": "2026-10-10T12:00:00.000000Z",
+    "last_seen_at": "2026-10-10T12:30:00.000000Z",
+    "expires_at": "2026-10-11T12:00:00.000000Z",
+    "current": True,
+}
+
+_ADMIN_SESSION_EXAMPLE: dict[str, Any] = {
+    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
+    "user_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e51",
+    "username": "alice",
+    "display_name": "Alice Example",
+    "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0",
+    "client_platform": "Linux",
+    "client_mobile": False,
+    "client_ip": "192.0.2.1",
+    "created_at": "2026-10-10T12:00:00.000000Z",
+    "last_seen_at": "2026-10-10T12:30:00.000000Z",
+    "expires_at": "2026-10-11T12:00:00.000000Z",
+}
+
+
+class SessionResponse(BaseModel):
+    """An active session / device belonging to the current user."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [_SESSION_EXAMPLE]})
+
+    id: uuid.UUID
+    user_agent: str | None = None
+    client_platform: str | None = None
+    client_mobile: bool | None = None
+    client_ip: str | None = None
+    created_at: datetime
+    last_seen_at: datetime
+    expires_at: datetime
+    current: bool
+
+    @classmethod
+    def from_own_session(cls, own: OwnSession) -> SessionResponse:
+        """Build a response from an `OwnSession`."""
+        session = own.session
+        return cls(
+            id=session.id,
+            user_agent=session.user_agent,
+            client_platform=session.client_platform,
+            client_mobile=session.client_mobile,
+            client_ip=session.client_ip,
+            created_at=session.created_at,
+            last_seen_at=session.last_seen_at,
+            expires_at=session.expires_at,
+            current=own.current,
+        )
+
+
+class AdminSessionResponse(BaseModel):
+    """An active session with its owner's identity details, for administrators."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [_ADMIN_SESSION_EXAMPLE]})
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    username: str
+    display_name: str | None = None
+    user_agent: str | None = None
+    client_platform: str | None = None
+    client_mobile: bool | None = None
+    client_ip: str | None = None
+    created_at: datetime
+    last_seen_at: datetime
+    expires_at: datetime
+
+    @classmethod
+    def from_listing(cls, listing: SessionListing) -> AdminSessionResponse:
+        """Build a response from a `SessionListing`."""
+        session = listing.session
+        return cls(
+            id=session.id,
+            user_id=session.user_id,
+            username=listing.username,
+            display_name=listing.display_name,
+            user_agent=session.user_agent,
+            client_platform=session.client_platform,
+            client_mobile=session.client_mobile,
+            client_ip=session.client_ip,
+            created_at=session.created_at,
+            last_seen_at=session.last_seen_at,
+            expires_at=session.expires_at,
+        )
+
+
+class RevokedSessionsResponse(BaseModel):
+    """The number of other sessions that were ended."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [{"ended": 2}]})
+
+    ended: int

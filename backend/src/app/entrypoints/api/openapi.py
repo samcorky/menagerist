@@ -52,6 +52,10 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "Endpoints for managing user accounts.",
     },
     {
+        "name": "Sessions",
+        "description": "Endpoints for managing active user sessions and devices.",
+    },
+    {
         "name": "System",
         "description": "System-level endpoints for health checks and diagnostics.",
     },

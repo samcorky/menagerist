@@ -122,6 +122,16 @@ async def test_list_sessions_returns_all_active_sessions_with_user_details(
     )
     s_alice.seen(NOW - timedelta(minutes=30))
 
+    s_alice_second = Session.create(
+        user_id=alice.id,
+        token_hash="hash-alice-2",
+        now=NOW - timedelta(hours=1, minutes=30),
+        ttl=TTL,
+        user_agent="Firefox on Mobile",
+        client_ip="192.0.2.1",
+    )
+    s_alice_second.seen(NOW - timedelta(minutes=15))
+
     s_bob = Session.create(
         user_id=bob.id,
         token_hash="hash-bob",
@@ -132,8 +142,17 @@ async def test_list_sessions_returns_all_active_sessions_with_user_details(
     )
     s_bob.seen(NOW - timedelta(minutes=5))
 
+    s_orphaned = Session.create(
+        user_id=uuid.uuid7(),
+        token_hash="hash-orphan",
+        now=NOW - timedelta(hours=1),
+        ttl=TTL,
+    )
+
     await world.sessions.add(s_alice)
+    await world.sessions.add(s_alice_second)
     await world.sessions.add(s_bob)
+    await world.sessions.add(s_orphaned)
 
     repos = IdentityRepos(
         users=world.users, sessions=world.sessions, attempts=world.attempts
@@ -144,15 +163,19 @@ async def test_list_sessions_returns_all_active_sessions_with_user_details(
     admin_actor = _make_admin_actor()
     results = await handler.handle(ListSessionsQuery(), admin_actor)
 
-    assert len(results) == 2
-    # Newest last_seen_at first: Bob (5m ago) then Alice (30m ago)
+    assert len(results) == 3
+    # Newest last_seen_at first: Bob (5m), Alice2 (15m), Alice1 (30m)
     assert results[0].session.id == s_bob.id
     assert results[0].username == "bob"
     assert results[0].display_name == "Bob Jones"
 
-    assert results[1].session.id == s_alice.id
+    assert results[1].session.id == s_alice_second.id
     assert results[1].username == "alice"
     assert results[1].display_name == "Alice Smith"
+
+    assert results[2].session.id == s_alice.id
+    assert results[2].username == "alice"
+    assert results[2].display_name == "Alice Smith"
 
 
 @time_machine.travel(NOW, tick=False)
