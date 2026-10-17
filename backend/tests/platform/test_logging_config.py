@@ -5,6 +5,7 @@ import pytest
 import structlog
 
 from app.platform import logging_config
+from app.platform.config import LoggingSettings, LogLevel
 from app.platform.logging_config import configure_logging
 
 if TYPE_CHECKING:
@@ -66,3 +67,64 @@ def test_explicit_level_always_reapplies() -> None:
     configure_logging(level=logging.WARNING)
 
     assert logging.getLogger().level == logging.WARNING
+
+
+@pytest.mark.parametrize(
+    ("sqlalchemy_level", "expected_level"),
+    [
+        ("WARNING", logging.WARNING),
+        ("info", logging.INFO),
+        ("debug", logging.DEBUG),
+    ],
+)
+def test_sqlalchemy_level_is_independent_of_application_level(
+    monkeypatch: pytest.MonkeyPatch,
+    sqlalchemy_level: LogLevel | str,
+    expected_level: int,
+) -> None:
+    """SQLAlchemy's logger level is set independently of the root logger."""
+    monkeypatch.setattr(
+        logging_config,
+        "get_logging_settings",
+        lambda: LoggingSettings(sqlalchemy_log_level=sqlalchemy_level),
+    )
+
+    configure_logging()
+
+    assert logging.getLogger().level == logging.INFO
+    assert logging.getLogger("sqlalchemy.engine").level == expected_level
+
+
+@pytest.mark.parametrize("sqlalchemy_level", ["WARNING", "info", "debug"])
+def test_granian_uses_configured_sqlalchemy_level(
+    monkeypatch: pytest.MonkeyPatch,
+    sqlalchemy_level: str,
+) -> None:
+    """Granian receives the same independent SQLAlchemy logger level."""
+    monkeypatch.setattr(
+        logging_config,
+        "get_logging_settings",
+        lambda: LoggingSettings(sqlalchemy_log_level=sqlalchemy_level),
+    )
+
+    loggers = logging_config.granian_log_dictconfig()["loggers"]
+
+    assert loggers["sqlalchemy.engine"]["level"] == sqlalchemy_level.upper()
+
+
+@pytest.mark.parametrize(
+    ("log_level", "sqlalchemy_log_level"),
+    [("debug", "info"), ("DEBUG", "INFO")],
+)
+def test_logging_settings_accept_uppercase_and_lowercase_values(
+    log_level: str,
+    sqlalchemy_log_level: str,
+) -> None:
+    """Both logging settings accept either casing for enum values."""
+    settings = LoggingSettings(
+        log_level=log_level,
+        sqlalchemy_log_level=sqlalchemy_log_level,
+    )
+
+    assert settings.log_level is LogLevel.DEBUG
+    assert settings.sqlalchemy_log_level is LogLevel.INFO
