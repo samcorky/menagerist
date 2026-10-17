@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -17,11 +17,15 @@ logger = structlog.get_logger()
 
 @dataclass(kw_only=True)
 class UpdateCollectionCommand:
-    """Request to update a collection's name or description. `slug` is immutable."""
+    """Request to update a collection's name, description or definition.
+
+    `slug` and kind are immutable.
+    """
 
     collection_id: uuid.UUID
     name: str | None = None
     description: str | None = None
+    definition: dict[str, Any] | None = None
 
 
 class UpdateCollection(
@@ -39,6 +43,7 @@ class UpdateCollection(
         Raises:
             CollectionNotFoundError: If the collection does not exist or is deleted.
             InvalidCollectionError: If the new name is not 1 to 120 characters.
+            CollectionKindError: If a definition is given for a manual collection.
         """
         async with self._uow as repos:
             collection = await repos.collections.get(
@@ -53,6 +58,8 @@ class UpdateCollection(
                 collection.rename(command.name)
             if command.description is not None:
                 collection.description = command.description.strip() or None
+            if command.definition is not None:
+                collection.replace_definition(command.definition)
             collection.touch()
             await repos.collections.save(collection)
             await self._uow.commit()

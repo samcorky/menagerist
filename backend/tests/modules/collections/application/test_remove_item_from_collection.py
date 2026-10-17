@@ -16,9 +16,14 @@ from app.modules.collections.application.remove_item_from_collection import (
     RemoveItemFromCollection,
     RemoveItemFromCollectionCommand,
 )
-from app.modules.collections.domain.errors import CollectionNotFoundError
+from app.modules.collections.domain.collection import Collection
+from app.modules.collections.domain.errors import (
+    CollectionKindError,
+    CollectionNotFoundError,
+)
 from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.slug import Slug
 
 if TYPE_CHECKING:
     from tests.modules.collections.conftest import MakeCollection, World
@@ -200,4 +205,22 @@ async def test_remove_unknown_collection_does_not_save(
         )
 
     save.assert_not_awaited()
+    assert world.uow.committed is False
+
+
+async def test_remove_from_dynamic_collection_is_a_conflict(world: World) -> None:
+    """Items cannot be taken off a smart collection."""
+    smart = Collection.create(
+        name="Smart", slug=Slug("smart"), owner_id=SYSTEM_ACTOR.id, definition={}
+    )
+    await world.collections.add(smart)
+
+    with pytest.raises(CollectionKindError):
+        await RemoveItemFromCollection(world.uow, OwnerAccessPolicy()).handle(
+            RemoveItemFromCollectionCommand(
+                collection_id=smart.id, item_id=uuid.uuid7()
+            ),
+            SYSTEM_ACTOR,
+        )
+
     assert world.uow.committed is False

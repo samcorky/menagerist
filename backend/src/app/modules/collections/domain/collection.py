@@ -2,8 +2,12 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
+from typing import Any
 
-from app.modules.collections.domain.errors import InvalidCollectionError
+from app.modules.collections.domain.errors import (
+    CollectionKindError,
+    InvalidCollectionError,
+)
 from app.shared_kernel.mixins import Identifiable, SoftDeletable
 from app.shared_kernel.slug import Slug
 
@@ -14,6 +18,7 @@ class CollectionKind(StrEnum):
     """How a collection decides what it holds."""
 
     MANUAL = "manual"
+    DYNAMIC = "dynamic"
 
 
 class Visibility(StrEnum):
@@ -41,6 +46,7 @@ class Collection(Identifiable, SoftDeletable):
     kind: CollectionKind = CollectionKind.MANUAL
     owner_id: uuid.UUID
     visibility: Visibility = Visibility.PRIVATE
+    definition: dict[str, Any] | None = None
 
     @classmethod
     def create(
@@ -50,8 +56,11 @@ class Collection(Identifiable, SoftDeletable):
         slug: Slug,
         owner_id: uuid.UUID,
         description: str | None = None,
+        definition: dict[str, Any] | None = None,
     ) -> Collection:
-        """Create a manual, private collection with a new id and timestamps.
+        """Create a private collection with a new id and timestamps.
+
+        The collection is dynamic when a `definition` is given, otherwise manual.
 
         Raises:
             InvalidCollectionError: If the trimmed name is not 1 to 120 characters.
@@ -63,6 +72,10 @@ class Collection(Identifiable, SoftDeletable):
             slug=slug,
             description=description,
             owner_id=owner_id,
+            kind=(
+                CollectionKind.MANUAL if definition is None else CollectionKind.DYNAMIC
+            ),
+            definition=definition,
             created_at=now,
             updated_at=now,
         )
@@ -75,6 +88,28 @@ class Collection(Identifiable, SoftDeletable):
         """
         self.name = _clean_name(name)
         self.touch()
+
+    def replace_definition(self, definition: dict[str, Any]) -> None:
+        """Replace a dynamic collection's definition.
+
+        Raises:
+            CollectionKindError: If the collection is manual.
+        """
+        if self.kind is not CollectionKind.DYNAMIC:
+            raise CollectionKindError("Only a smart collection has a definition.")
+        self.definition = definition
+        self.touch()
+
+    def ensure_manual_membership(self) -> None:
+        """Guard a change to the collection's items.
+
+        Raises:
+            CollectionKindError: If the collection is dynamic.
+        """
+        if self.kind is CollectionKind.DYNAMIC:
+            raise CollectionKindError(
+                "Items cannot be added to or removed from a smart collection."
+            )
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)

@@ -1,4 +1,4 @@
-from app.shared_kernel.errors import NotFoundError, ValidationError
+from app.shared_kernel.errors import ConflictError, NotFoundError, ValidationError
 
 
 class InvalidCollectionError(ValidationError):
@@ -7,3 +7,7 @@ class InvalidCollectionError(ValidationError):
 
 class CollectionNotFoundError(NotFoundError):
     """Raised when a requested collection does not exist."""
+
+
+class CollectionKindError(ConflictError):
+    """Raised when an operation does not suit the collection's kind."""

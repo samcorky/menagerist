@@ -4,7 +4,9 @@ from typing import TYPE_CHECKING
 from app.modules.collections.adapters.persistence.in_memory_collection_repository import (  # noqa: E501
     InMemoryCollectionRepository,
 )
+from app.modules.collections.domain.collection import Collection, CollectionKind
 from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.slug import Slug
 
 if TYPE_CHECKING:
     from tests.modules.collections.conftest import MakeCollection
@@ -182,3 +184,17 @@ async def test_list_q_ignores_accents_both_ways(
     assert await ids("CAFÉ") == {accented.id, plain.id, percent.id}
     assert await ids("creme") == {described.id}
     assert await ids("50% cafe") == {percent.id}
+
+
+async def test_definition_is_kept_on_save() -> None:
+    """A dynamic collection keeps its definition through add and save."""
+    repo = InMemoryCollectionRepository()
+    smart = Collection.create(
+        name="Smart", slug=Slug("smart"), owner_id=uuid.uuid7(), definition={"a": [1]}
+    )
+    await repo.add(smart)
+    smart.replace_definition({"b": 2})
+    await repo.save(smart)
+    stored = await repo.get(smart.id, scope=AccessScope.everyone())
+    assert stored is not None
+    assert (stored.kind, stored.definition) == (CollectionKind.DYNAMIC, {"b": 2})

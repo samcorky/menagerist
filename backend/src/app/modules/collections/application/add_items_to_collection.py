@@ -50,6 +50,7 @@ class AddItemsToCollection(
                 or any id is not a live item the actor can see; nothing is added.
             CollectionNotFoundError: If the collection is missing, deleted or not
                 the actor's.
+            CollectionKindError: If the collection is a smart collection.
         """
         if len(command.item_ids) > MAX_ITEMS_PER_REQUEST:
             raise ValidationError(
@@ -64,6 +65,7 @@ class AddItemsToCollection(
                     f"Collection {command.collection_id} not found"
                 )
             self._policy.assert_can_modify(actor, collection.owner_id)
+            collection.ensure_manual_membership()
             if not requested:
                 return 0
             live = await self._items.live_ids(requested, scope)

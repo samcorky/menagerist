@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -22,11 +22,15 @@ _FALLBACK_SLUG = "collection"
 
 @dataclass(kw_only=True)
 class CreateCollectionCommand:
-    """Request to create a collection; the slug is derived from the name if omitted."""
+    """Request to create a collection; the slug is derived from the name if omitted.
+
+    A `definition` makes it a smart collection, stored as given.
+    """
 
     name: str
     description: str | None = None
     slug: str | None = None
+    definition: dict[str, Any] | None = None
 
 
 class CreateCollection(
@@ -63,6 +67,7 @@ class CreateCollection(
                 slug=slug,
                 owner_id=actor.id,
                 description=(command.description or "").strip() or None,
+                definition=command.definition,
             )
             await repos.collections.add(collection)
             await self._uow.commit()

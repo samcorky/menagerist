@@ -15,6 +15,7 @@ from app.modules.collections.application.delete_collection import (
     DeleteCollection,
     DeleteCollectionCommand,
 )
+from app.modules.collections.domain.collection import CollectionKind
 from app.modules.collections.domain.errors import InvalidCollectionError
 from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import Actor
@@ -171,3 +172,24 @@ async def test_create_trims_description_and_blank_becomes_none(
 
     assert created.description == stored
     add.assert_awaited_once_with(created)
+
+
+async def test_create_with_definition_is_dynamic_and_stored_as_given(
+    world: World,
+) -> None:
+    """A definition makes a dynamic collection and is stored untouched."""
+    definition = {"op": "and", "conditions": [{"nested": [1, {"a": None}]}]}
+    created = await CreateCollection(world.uow, OwnerAccessPolicy()).handle(
+        CreateCollectionCommand(name="Smart", definition=definition), ACTOR
+    )
+    assert created.kind is CollectionKind.DYNAMIC
+    assert created.definition == definition
+
+
+async def test_create_without_definition_is_manual(world: World) -> None:
+    """No definition leaves a manual collection."""
+    created = await CreateCollection(world.uow, OwnerAccessPolicy()).handle(
+        CreateCollectionCommand(name="Plain"), ACTOR
+    )
+    assert created.kind is CollectionKind.MANUAL
+    assert created.definition is None

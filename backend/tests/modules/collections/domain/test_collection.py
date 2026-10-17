@@ -11,10 +11,11 @@ from app.modules.collections.domain.collection import (
     Visibility,
 )
 from app.modules.collections.domain.errors import (
+    CollectionKindError,
     CollectionNotFoundError,
     InvalidCollectionError,
 )
-from app.shared_kernel.errors import NotFoundError, ValidationError
+from app.shared_kernel.errors import ConflictError, NotFoundError, ValidationError
 from app.shared_kernel.slug import Slug
 
 
@@ -115,3 +116,65 @@ def test_errors_map_to_shared_kernel_bases() -> None:
     """Validation and not-found errors use the bases that map to 422 and 404."""
     assert issubclass(InvalidCollectionError, ValidationError)
     assert issubclass(CollectionNotFoundError, NotFoundError)
+
+
+_DEFINITION = {"op": "and", "conditions": [{"field": "name", "value": {"a": [1, 2]}}]}
+
+
+def test_create_without_definition_is_manual() -> None:
+    """No definition means a manual collection."""
+    c = _make()
+    assert c.kind is CollectionKind.MANUAL
+    assert c.definition is None
+
+
+def test_create_with_definition_is_dynamic() -> None:
+    """A definition makes the collection dynamic and is stored as given."""
+    c = Collection.create(
+        name="Smart", slug=Slug("smart"), owner_id=uuid.uuid7(), definition=_DEFINITION
+    )
+    assert c.kind is CollectionKind.DYNAMIC
+    assert c.definition == _DEFINITION
+
+
+def test_create_with_empty_definition_is_dynamic() -> None:
+    """An empty definition is still a definition."""
+    c = Collection.create(
+        name="Smart", slug=Slug("smart"), owner_id=uuid.uuid7(), definition={}
+    )
+    assert c.kind is CollectionKind.DYNAMIC
+
+
+def test_replace_definition_on_dynamic_touches_updated_at() -> None:
+    """Replacing a dynamic collection's definition stores it and bumps updated_at."""
+    c = Collection.create(
+        name="Smart", slug=Slug("smart"), owner_id=uuid.uuid7(), definition={}
+    )
+    c.updated_at = datetime(2000, 1, 1, tzinfo=UTC)
+    c.replace_definition(_DEFINITION)
+    assert c.definition == _DEFINITION
+    assert c.updated_at > datetime(2000, 1, 1, tzinfo=UTC)
+    assert c.kind is CollectionKind.DYNAMIC
+
+
+def test_replace_definition_on_manual_raises() -> None:
+    """A manual collection never gains a definition."""
+    c = _make()
+    with pytest.raises(CollectionKindError):
+        c.replace_definition(_DEFINITION)
+    assert c.definition is None
+
+
+def test_ensure_manual_membership() -> None:
+    """Only manual collections accept membership changes."""
+    _make().ensure_manual_membership()
+    smart = Collection.create(
+        name="Smart", slug=Slug("smart"), owner_id=uuid.uuid7(), definition={}
+    )
+    with pytest.raises(CollectionKindError):
+        smart.ensure_manual_membership()
+
+
+def test_kind_error_is_a_conflict() -> None:
+    """The kind error maps to a 409 through the conflict base type."""
+    assert issubclass(CollectionKindError, ConflictError)

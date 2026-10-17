@@ -34,6 +34,7 @@ class RemoveItemFromCollection(
 
         Raises:
             CollectionNotFoundError: If the collection is missing or deleted.
+            CollectionKindError: If the collection is a smart collection.
         """
         async with self._uow as repos:
             collection = await repos.collections.get(
@@ -44,6 +45,7 @@ class RemoveItemFromCollection(
                     f"Collection {command.collection_id} not found"
                 )
             self._policy.assert_can_modify(actor, collection.owner_id)
+            collection.ensure_manual_membership()
             await repos.memberships.remove(collection.id, command.item_id)
             collection.touch()
             await repos.collections.save(collection)

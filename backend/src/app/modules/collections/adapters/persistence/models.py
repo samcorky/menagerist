@@ -1,7 +1,9 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import DateTime, ForeignKey, Index, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.platform.database import Base
@@ -31,6 +33,8 @@ class CollectionModel(IdentifiableMixin, SoftDeletableMixin, Base):
     kind: Mapped[str]
     owner_id: Mapped[uuid.UUID]
     visibility: Mapped[str]
+    # Null for manual collections; opaque to this module.
+    definition: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
 
 class CollectionMemberModel(Base):

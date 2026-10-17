@@ -8,7 +8,7 @@ from app.modules.collections.adapters.persistence.collection_repository import (
     SqlAlchemyCollectionRepository,
     _to_model,
 )
-from app.modules.collections.domain.collection import Collection
+from app.modules.collections.domain.collection import Collection, CollectionKind
 from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.errors import ConflictError
 from app.shared_kernel.slug import Slug
@@ -263,3 +263,51 @@ async def test_list_q_ignores_accents_both_ways(db_session: AsyncSession) -> Non
     assert await ids("CAFÉ") == {accented.id, plain.id, percent.id}
     assert await ids("creme") == {described.id}
     assert await ids("50% cafe") == {percent.id}
+
+
+async def test_definition_round_trips_nested_json(db_session: AsyncSession) -> None:
+    """A dynamic collection keeps its nested definition and kind."""
+    repo = SqlAlchemyCollectionRepository(db_session)
+    definition = {"op": "and", "conditions": [{"v": [1, "x", None, {"k": True}]}]}
+    smart = Collection.create(
+        name="Smart", slug=Slug("smart"), owner_id=_OWNER, definition=definition
+    )
+    await repo.add(smart)
+    db_session.expire_all()
+
+    stored = await repo.get(smart.id, scope=AccessScope.everyone())
+
+    assert stored is not None
+    assert stored.kind is CollectionKind.DYNAMIC
+    assert stored.definition == definition
+
+
+async def test_manual_collection_has_no_definition(db_session: AsyncSession) -> None:
+    """A manual collection reads back with a null definition and manual kind."""
+    repo = SqlAlchemyCollectionRepository(db_session)
+    plain = _collection()
+    await repo.add(plain)
+    db_session.expire_all()
+
+    stored = await repo.get(plain.id, scope=AccessScope.everyone())
+
+    assert stored is not None
+    assert stored.kind is CollectionKind.MANUAL
+    assert stored.definition is None
+
+
+async def test_saving_replaced_definition_persists(db_session: AsyncSession) -> None:
+    """A replaced definition is written by `save`."""
+    repo = SqlAlchemyCollectionRepository(db_session)
+    smart = Collection.create(
+        name="Smart", slug=Slug("smart"), owner_id=_OWNER, definition={"a": 1}
+    )
+    await repo.add(smart)
+    smart.replace_definition({"b": [2]})
+    await repo.save(smart)
+    db_session.expire_all()
+
+    stored = await repo.get(smart.id, scope=AccessScope.everyone())
+
+    assert stored is not None
+    assert stored.definition == {"b": [2]}

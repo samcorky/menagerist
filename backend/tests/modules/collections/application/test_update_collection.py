@@ -12,11 +12,14 @@ from app.modules.collections.application.update_collection import (
     UpdateCollection,
     UpdateCollectionCommand,
 )
+from app.modules.collections.domain.collection import Collection, CollectionKind
 from app.modules.collections.domain.errors import (
+    CollectionKindError,
     CollectionNotFoundError,
     InvalidCollectionError,
 )
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.slug import Slug
 
 if TYPE_CHECKING:
     from tests.modules.collections.conftest import MakeCollection, World
@@ -118,3 +121,53 @@ async def test_update_deleted_raises_not_found(
         await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
             UpdateCollectionCommand(collection_id=shelf.id, name="x"), SYSTEM_ACTOR
         )
+
+
+async def test_update_replaces_definition_of_dynamic_collection(
+    world: World,
+) -> None:
+    """A dynamic collection's definition is replaced and its kind is kept."""
+    smart = Collection.create(
+        name="Smart", slug=Slug("smart"), owner_id=SYSTEM_ACTOR.id, definition={"a": 1}
+    )
+    await world.collections.add(smart)
+
+    result = await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
+        UpdateCollectionCommand(collection_id=smart.id, definition={"b": 2}),
+        SYSTEM_ACTOR,
+    )
+
+    assert result.definition == {"b": 2}
+    assert result.kind is CollectionKind.DYNAMIC
+
+
+async def test_update_leaves_definition_when_not_given(world: World) -> None:
+    """Omitting the definition keeps the stored one."""
+    smart = Collection.create(
+        name="Smart", slug=Slug("smart"), owner_id=SYSTEM_ACTOR.id, definition={"a": 1}
+    )
+    await world.collections.add(smart)
+
+    result = await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
+        UpdateCollectionCommand(collection_id=smart.id, name="Renamed"), SYSTEM_ACTOR
+    )
+
+    assert result.definition == {"a": 1}
+
+
+async def test_update_definition_on_manual_collection_is_a_conflict(
+    world: World, make_collection: MakeCollection
+) -> None:
+    """A manual collection cannot gain a definition, and nothing is committed."""
+    shelf = make_collection()
+    await world.collections.add(shelf)
+
+    with pytest.raises(CollectionKindError):
+        await UpdateCollection(world.uow, OwnerAccessPolicy()).handle(
+            UpdateCollectionCommand(collection_id=shelf.id, definition={"a": 1}),
+            SYSTEM_ACTOR,
+        )
+
+    assert shelf.kind is CollectionKind.MANUAL
+    assert shelf.definition is None
+    assert world.uow.committed is False
