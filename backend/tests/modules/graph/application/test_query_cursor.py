@@ -89,6 +89,7 @@ def test_encoded_token_is_unpadded_url_safe() -> None:
         _token('{"s":["\\ud800"],"i":"' + _ID + '"}'),
         base64.urlsafe_b64encode(b"\xff\xfe\xfd\xfc").decode(),
     ],
+    ids=lambda token: f"length-{len(token)}-{token[:10]}",
 )
 def test_rejects_garbage(token: str) -> None:
     """Malformed tokens raise InvalidQueryError on the cursor path."""
