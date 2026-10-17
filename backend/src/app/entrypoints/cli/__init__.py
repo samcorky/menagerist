@@ -58,7 +58,7 @@ app.command(media_app)
 
 def _claim_existing_data(session: AsyncSession) -> ExistingDataClaim:
     """Build the claim identity cannot build itself: it spans the other modules."""
-    from app.entrypoints.api.shared.claim_existing_data import (
+    from app.entrypoints.api.shared.bridges.claim_existing_data import (
         build_sql_claim_existing_data,
     )
 

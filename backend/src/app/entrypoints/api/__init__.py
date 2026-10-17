@@ -5,17 +5,21 @@ from starlette.middleware.cors import CORSMiddleware
 from app.entrypoints.api.docs.router import router as docs_router
 from app.entrypoints.api.openapi import configure_openapi
 from app.entrypoints.api.permissions_router import router as permissions_router
-from app.entrypoints.api.shared.claim_existing_data import get_claim_existing_data
-from app.entrypoints.api.shared.csrf import verify_csrf
-from app.entrypoints.api.shared.permission_aware_route import cookie_scheme
-from app.entrypoints.api.shared.problem_response import register_exception_handlers
-from app.entrypoints.api.shared.proxy_header_observer import ProxyHeaderObserver
-from app.entrypoints.api.shared.request_context_middleware import (
+from app.entrypoints.api.shared.bridges.claim_existing_data import (
+    get_claim_existing_data,
+)
+from app.entrypoints.api.shared.http.csrf import verify_csrf
+from app.entrypoints.api.shared.http.problem_response import register_exception_handlers
+from app.entrypoints.api.shared.http.proxy_header_observer import ProxyHeaderObserver
+from app.entrypoints.api.shared.http.request_context_middleware import (
     RequestContextMiddleware,
 )
-from app.entrypoints.api.shared.security_headers import SecurityHeadersMiddleware
-from app.entrypoints.api.shared.upload_limit_middleware import UploadLimitMiddleware
-from app.entrypoints.api.shared.version_header import VersionHeaderMiddleware
+from app.entrypoints.api.shared.http.security_headers import SecurityHeadersMiddleware
+from app.entrypoints.api.shared.http.upload_limit_middleware import (
+    UploadLimitMiddleware,
+)
+from app.entrypoints.api.shared.http.version_header import VersionHeaderMiddleware
+from app.entrypoints.api.shared.permission_aware_route import cookie_scheme
 from app.entrypoints.api.spa import SpaStaticFiles
 from app.entrypoints.api.startup import lifespan
 from app.modules.collections.adapters.api.collection.router import (

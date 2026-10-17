@@ -366,7 +366,7 @@ Separately, `schema-editor.svelte`'s `handleFieldRowChange` now toasts ("No long
 
 ## Weak ETags to survive a compressing proxy (open question 76)
 
-**Decision:** `shared_kernel/etag.py`'s `etag_from_entity` now emits weak ETags (`W/"<digest>"`), not strong ones. `ConditionalRequest.check_get`/`check_patch` (`entrypoints/api/shared/conditional_request.py`) compare `If-None-Match`/`If-Match` against the current ETag with a leading `W/` stripped from both sides first, so a weak and a strong form of the same underlying tag are treated as equal.
+**Decision:** `shared_kernel/etag.py`'s `etag_from_entity` now emits weak ETags (`W/"<digest>"`), not strong ones. `ConditionalRequest.check_get`/`check_patch` (`entrypoints/api/shared/http/conditional_request.py`) compare `If-None-Match`/`If-Match` against the current ETag with a leading `W/` stripped from both sides first, so a weak and a strong form of the same underlying tag are treated as equal.
 
 **Root cause (found from live Network-tab evidence, not guessed):** `frontend/nginx.conf` gzip-compresses `/api/` JSON responses. Something in the proxy chain in front of the backend rewrites a *strong* ETag to a *weak* one whenever the response it's attached to actually gets compressed (confirmed directly: a 412 response, which has no body and so is never gzipped, kept the backend's original strong ETag untouched; the very next 200, which did have `content-encoding: gzip`, carried a weak one). The frontend's ETag cache correctly stores whatever the response actually said - the weakened value - so the following PATCH's `If-Match` carried that weakened form, while the backend recomputed a fresh strong ETag and did a strict string comparison against it. Mismatch, every time a save followed a compressed GET, which is normal browser behaviour - hence "the first save always fails, the second always succeeds" (the 412 response clears the client's cache, so the retry sends no `If-Match` at all and the conditional check is skipped).
 
@@ -516,7 +516,7 @@ So a plain private array is the source of truth, `active` is a write-only `$stat
 
 **Decision:** optional example packs (item types, connection types, items, connections and presets) live in their own `examples` module. A pack is a JSON file shipped inside the module (`modules/examples/packs/`, listed by `index.json`). Installing records every entity it creates in an `example_installations` row, so removal knows exactly what the pack owns.
 
-**Rationale:** the presets pack format describes reusable field definitions, not items and connections between them. A `source_pack` column on nodes and types would touch every table, and every query that lists them, to answer a question only one screen asks. The module owns its own ports (`PresetTarget`, `GraphTarget`) and never imports `graph` or `presets`; the adapters that call the real use cases sit in `entrypoints/api/shared/example_targets.py`, beside `preset_usage.py`.
+**Rationale:** the presets pack format describes reusable field definitions, not items and connections between them. A `source_pack` column on nodes and types would touch every table, and every query that lists them, to answer a question only one screen asks. The module owns its own ports (`PresetTarget`, `GraphTarget`) and never imports `graph` or `presets`; the adapters that call the real use cases sit in `entrypoints/api/shared/bridges/example_targets.py`, beside `preset_usage.py`.
 
 **Consequence:** the packs are package data, not content in `shared/`, which is only for files both the backend and the frontend read.
 
@@ -574,7 +574,7 @@ So a plain private array is the source of truth, `active` is a write-only `$stat
 
 ## Two ports and one filter join collections and items
 
-**Decision:** `collections` never imports `graph`, and `graph` never imports `collections` (architecture tests enforce both directions). `collections` owns `ItemLookup`; `graph` owns `CollectionMembers`, used by the `?collection=<id>` filter on the item list. Adapters for both live in `entrypoints/api/shared/`, which may import both modules. The filter passes the member ids to the item query as an `ids` restriction, so the search, type and favourite filters, paging and the total all work unchanged.
+**Decision:** `collections` never imports `graph`, and `graph` never imports `collections` (architecture tests enforce both directions). `collections` owns `ItemLookup`; `graph` owns `CollectionMembers`, used by the `?collection=<id>` filter on the item list. Adapters for both live in `entrypoints/api/shared/bridges/`, which may import both modules. The filter passes the member ids to the item query as an `ids` restriction, so the search, type and favourite filters, paging and the total all work unchanged.
 
 **Rationale:** the same pattern as `examples` and the choice-list source. A missing or deleted collection is a 404, so an empty collection (an empty list, total 0) is distinguishable from a wrong id.
 
@@ -610,7 +610,7 @@ So a plain private array is the source of truth, `active` is a write-only `$stat
 
 ## Example packs can ship collections, installed last and removed first
 
-**Decision:** a version 2 pack has an optional `collections` section: named lists of the pack's own items. `examples` owns a third target port, `CollectionTarget`, and `entrypoints/api/shared/example_targets.py` implements it over the real collections use cases, so `examples` still imports neither `graph` nor `collections`. Install creates collections as the last step, after connections. Removal runs collections before items. A collection's recorded content is its name, description and the sorted ids of its live members, so renaming it, changing the description or adding, removing or deleting any member makes it "edited", and an edited collection is kept.
+**Decision:** a version 2 pack has an optional `collections` section: named lists of the pack's own items. `examples` owns a third target port, `CollectionTarget`, and `entrypoints/api/shared/bridges/example_targets.py` implements it over the real collections use cases, so `examples` still imports neither `graph` nor `collections`. Install creates collections as the last step, after connections. Removal runs collections before items. A collection's recorded content is its name, description and the sorted ids of its live members, so renaming it, changing the description or adding, removing or deleting any member makes it "edited", and an edited collection is kept.
 
 **Rationale:** collections are the way to show that items can be grouped without being typed or connected differently, and a pack is the right place to demonstrate it. Removing them before their items means an unedited example collection stops counting as a reason to keep its members. An example item that is on any collection that survives (the user's own, or an edited example one) counts as user data and is kept, in the same way an item with your own connection is. The collections module derives the slug, so a pack collection can never clash with the user's own.
 
@@ -644,7 +644,7 @@ An add-on item of a base item type inherits that type's cover style, read throug
 
 ## Example packs generate covers as removable PNGs
 
-**Decision (2026-10-09):** pack format version 3 lets an item type declare `cover: {style}`; installing draws a cover per item of that type (records get a sleeve, films a poster, board games a box, recipes a card). Covers are PNG, not SVG, because the media module treats SVG as unsafe and refuses it. Rendering is deterministic from the item name (colour and initial), so a reinstall gives identical bytes. `examples` owns a `CoverTarget` port, bridged to media in `entrypoints/api/shared/`, so it imports neither media nor graph.
+**Decision (2026-10-09):** pack format version 3 lets an item type declare `cover: {style}`; installing draws a cover per item of that type (records get a sleeve, films a poster, board games a box, recipes a card). Covers are PNG, not SVG, because the media module treats SVG as unsafe and refuses it. Rendering is deterministic from the item name (colour and initial), so a reinstall gives identical bytes. `examples` owns a `CoverTarget` port, bridged to media in `entrypoints/api/shared/bridges/`, so it imports neither media nor graph.
 
 **Removal:** a cover is a removable entity settled before items, so a pack's own cover is never counted as the person's file. An untouched cover is deleted; a cover the person replaced is their file, so it is kept and keeps its item. Reinstall re-adopts a kept cover and never takes over a cover the person added to an item that had none.
 

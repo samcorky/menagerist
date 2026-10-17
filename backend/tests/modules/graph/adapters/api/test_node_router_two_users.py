@@ -7,7 +7,7 @@ import pytest
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared.collection_members import get_collection_members
+from app.entrypoints.api.shared.bridges.collection_members import get_collection_members
 from app.modules.graph.adapters.api.dependencies import get_graph_repos, get_graph_uow
 from app.modules.graph.adapters.persistence.in_memory_collection_members import (
     InMemoryCollectionMembers,

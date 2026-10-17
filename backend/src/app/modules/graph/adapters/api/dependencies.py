@@ -2,11 +2,11 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
 
-from app.entrypoints.api.shared.choice_list_source import (
+from app.entrypoints.api.shared.bridges.choice_list_source import (
     PresetChoiceListSource,
     get_choice_list_source,
 )
-from app.entrypoints.api.shared.collection_members import (
+from app.entrypoints.api.shared.bridges.collection_members import (
     CollectionsMembers,
     get_collection_members,
 )

@@ -8,7 +8,7 @@ import pytest
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared.collection_items import get_item_lookup
+from app.entrypoints.api.shared.bridges.collection_items import get_item_lookup
 from app.modules.collections.adapters.api.dependencies import (
     get_collections_repos,
     get_collections_uow,

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.collection_members import CollectionsMembers
+from app.entrypoints.api.shared.bridges.collection_members import CollectionsMembers
 from app.modules.collections.adapters.persistence.unit_of_work import (
     build_collections_repos,
 )

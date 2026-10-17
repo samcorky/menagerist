@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
-from app.entrypoints.api.shared.example_targets import (
+from app.entrypoints.api.shared.bridges.example_targets import (
     CollectionPackTarget,
     GraphPackTarget,
     build_in_memory_collections_repos,

@@ -4,7 +4,9 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.entrypoints.api.shared.attach_target_access import get_attach_target_access
+from app.entrypoints.api.shared.bridges.attach_target_access import (
+    get_attach_target_access,
+)
 from app.entrypoints.api.shared.dependencies import get_access_policy
 from app.modules.media.adapters.imaging.pillow_processor import PillowImageProcessor
 from app.modules.media.adapters.persistence.unit_of_work import (

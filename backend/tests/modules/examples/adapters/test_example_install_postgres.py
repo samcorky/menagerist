@@ -11,12 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker  # noqa: TC0
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared.dependencies import get_current_actor
-from app.entrypoints.api.shared.example_targets import (
+from app.entrypoints.api.shared.bridges.example_targets import (
     CoverPackTarget,
     build_cover_stores,
     get_cover_pack_target,
 )
+from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.examples.adapters.api.dependencies import get_pack_catalogue
 from app.modules.examples.adapters.covers.pillow_cover_renderer import (
     PillowCoverRenderer,

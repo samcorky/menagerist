@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from app.entrypoints.api.shared.content_sniffing import sniff_and_rechain
+from app.entrypoints.api.shared.http.content_sniffing import sniff_and_rechain
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator

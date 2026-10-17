@@ -5,7 +5,7 @@ from starlette.routing import Route
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared.security_headers import SecurityHeadersMiddleware
+from app.entrypoints.api.shared.http.security_headers import SecurityHeadersMiddleware
 
 
 def _endpoint(request: object) -> PlainTextResponse:

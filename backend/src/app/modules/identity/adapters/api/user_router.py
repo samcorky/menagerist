@@ -3,8 +3,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
+from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
-from app.entrypoints.api.shared.problem_response import error_response
 from app.modules.identity.adapters.api.dependencies import (
     get_active_identity_actor,
     get_create_user_use_case,

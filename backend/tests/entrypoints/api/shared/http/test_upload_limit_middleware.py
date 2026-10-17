@@ -7,8 +7,10 @@ import pytest
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared import upload_limit_middleware
-from app.entrypoints.api.shared.upload_limit_middleware import UploadLimitMiddleware
+from app.entrypoints.api.shared.http import upload_limit_middleware
+from app.entrypoints.api.shared.http.upload_limit_middleware import (
+    UploadLimitMiddleware,
+)
 from app.platform.config.media import MediaSettings
 
 if TYPE_CHECKING:

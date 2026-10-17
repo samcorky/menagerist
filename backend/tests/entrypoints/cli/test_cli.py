@@ -242,7 +242,7 @@ def test_identity_commands_are_registered_with_the_real_claim_wired() -> None:
     """`identity` is a command group and first-run setup claims across modules."""
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from app.entrypoints.api.shared.claim_existing_data import ClaimExistingData
+    from app.entrypoints.api.shared.bridges.claim_existing_data import ClaimExistingData
     from app.modules.identity.adapters.cli import identity_app
 
     assert "identity" in cli.app

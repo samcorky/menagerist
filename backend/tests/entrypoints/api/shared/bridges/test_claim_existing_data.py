@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from app.entrypoints.api.shared.claim_existing_data import (
+from app.entrypoints.api.shared.bridges.claim_existing_data import (
     ClaimExistingData,
     build_claim_existing_data,
     get_claim_existing_data,

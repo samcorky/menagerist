@@ -7,8 +7,8 @@ from datetime import UTC, datetime, timedelta
 from starlette.requests import Request
 from starlette.responses import Response
 
-from app.entrypoints.api.shared.conditional_request import ConditionalRequest
-from app.entrypoints.api.shared.http_headers import http_date
+from app.entrypoints.api.shared.http.conditional_request import ConditionalRequest
+from app.entrypoints.api.shared.http.http_headers import http_date
 from app.shared_kernel.etag import etag_from_entity
 
 _UPDATED = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)

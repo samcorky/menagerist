@@ -112,7 +112,7 @@ All data lives in PostgreSQL under a single schema. The core graph:
 
 Identity adds two tables, `users` (username, hash, role, `password_expired`, `disabled`, sign-in throttling state) and `sessions` (token hash, expiry, last seen). Owner columns are added to `nodes`, `edges`, `media_assets` and `example_installations` (nullable; collections already had `owner_id`, NOT NULL). Collection slugs are unique per `(owner_id, slug)`, and the active-pack uniqueness of example installations is per `(pack_id, owner_id)`.
 
-**First run.** With no users, `POST /api/v1/auth/setup` creates the first administrator and, in the same transaction, assigns them every row that has no owner or a legacy owner (the fixed pre-accounts users `UUID(int=0)` and `UUID(int=1)`). The claim is a bridge in `entrypoints/api/shared/claim_existing_data.py` that calls one claim use case per module on a shared session. Setup is serialised by an advisory lock. `menagerist identity create-admin` does the same from the command line.
+**First run.** With no users, `POST /api/v1/auth/setup` creates the first administrator and, in the same transaction, assigns them every row that has no owner or a legacy owner (the fixed pre-accounts users `UUID(int=0)` and `UUID(int=1)`). The claim is a bridge in `entrypoints/api/shared/bridges/claim_existing_data.py` that calls one claim use case per module on a shared session. Setup is serialised by an advisory lock. `menagerist identity create-admin` does the same from the command line.
 
 Every entity uses a `uuid7` primary key (time-ordered; supports keyset pagination without a separate sort column). Timestamps are set in domain methods, not by database defaults. Records are soft-deleted via a `deleted_at` timestamp.
 

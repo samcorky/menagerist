@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 from starlette.responses import Response
 
-from app.entrypoints.api.shared.http_headers import http_date, parse_http_date
+from app.entrypoints.api.shared.http.http_headers import http_date, parse_http_date
 
 if TYPE_CHECKING:
     from starlette.requests import Request

@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from app.entrypoints.api.shared.collection_items import GraphItemLookup
+from app.entrypoints.api.shared.bridges.collection_items import GraphItemLookup
 from app.modules.collections.adapters.persistence.collection_repository import (
     SqlAlchemyCollectionRepository,
 )

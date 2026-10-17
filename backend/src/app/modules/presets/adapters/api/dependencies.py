@@ -2,7 +2,10 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
 
-from app.entrypoints.api.shared.preset_usage import GraphPresetUsage, get_preset_usage
+from app.entrypoints.api.shared.bridges.preset_usage import (
+    GraphPresetUsage,
+    get_preset_usage,
+)
 from app.modules.presets.adapters.persistence.unit_of_work import (
     build_preset_repos,
     create_preset_uow,

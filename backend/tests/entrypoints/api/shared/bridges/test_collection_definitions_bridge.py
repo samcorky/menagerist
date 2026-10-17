@@ -8,7 +8,7 @@ import pytest
 from app.entrypoints.api.shared.bridges.collection_definitions import (
     GraphDefinitionChecker,
 )
-from app.entrypoints.api.shared.collection_items import GraphItemLookup
+from app.entrypoints.api.shared.bridges.collection_items import GraphItemLookup
 from app.modules.collections.domain.errors import InvalidDefinitionError
 from app.modules.graph.adapters.persistence.unit_of_work import build_graph_repos
 from app.modules.graph.domain.node import Node

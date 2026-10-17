@@ -7,7 +7,7 @@ from starlette.routing import Route
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared.request_context_middleware import (
+from app.entrypoints.api.shared.http.request_context_middleware import (
     RequestContextMiddleware,
 )
 

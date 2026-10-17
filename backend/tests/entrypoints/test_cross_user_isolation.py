@@ -22,22 +22,24 @@ from fastapi import Depends
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared.attach_target_access import (
+from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+from app.entrypoints.api.shared.bridges.attach_target_access import (
     GraphAttachTargetAccess,
     get_attach_target_access,
 )
-from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
-from app.entrypoints.api.shared.choice_list_source import (
+from app.entrypoints.api.shared.bridges.choice_list_source import (
     PresetChoiceListSource,
     get_choice_list_source,
 )
-from app.entrypoints.api.shared.collection_items import GraphItemLookup, get_item_lookup
-from app.entrypoints.api.shared.collection_members import (
+from app.entrypoints.api.shared.bridges.collection_items import (
+    GraphItemLookup,
+    get_item_lookup,
+)
+from app.entrypoints.api.shared.bridges.collection_members import (
     CollectionsMembers,
     get_collection_members,
 )
-from app.entrypoints.api.shared.dependencies import get_current_actor
-from app.entrypoints.api.shared.example_targets import (
+from app.entrypoints.api.shared.bridges.example_targets import (
     CollectionPackTarget,
     CoverPackTarget,
     GraphPackTarget,
@@ -52,6 +54,7 @@ from app.entrypoints.api.shared.example_targets import (
     in_memory_graph_stores,
     in_memory_preset_stores,
 )
+from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.collections.adapters.api.dependencies import (
     get_collections_repos,
     get_collections_uow,

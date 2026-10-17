@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 from starlette.requests import Request
 
-from app.entrypoints.api.shared.http_headers import http_date
+from app.entrypoints.api.shared.http.http_headers import http_date
 from app.modules.media.adapters.api.media.content_caching import (
     check_content_not_modified,
     check_thumbnail_not_modified,

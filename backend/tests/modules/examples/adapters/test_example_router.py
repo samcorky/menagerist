@@ -7,13 +7,13 @@ from starlette.testclient import TestClient
 from structlog.testing import capture_logs
 
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared.dependencies import get_current_actor
-from app.entrypoints.api.shared.example_targets import (
+from app.entrypoints.api.shared.bridges.example_targets import (
     get_collection_pack_target,
     get_cover_pack_target,
     get_graph_pack_target,
     get_preset_pack_target,
 )
+from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.examples.adapters.api.dependencies import (
     get_example_repos,
     get_example_uow,

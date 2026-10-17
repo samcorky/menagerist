@@ -7,8 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
-from app.entrypoints.api.shared.problem_response import error_response
 from app.modules.system.adapters.api.dependencies import (
     get_get_health_ready_detail_use_case,
     get_get_health_ready_use_case,

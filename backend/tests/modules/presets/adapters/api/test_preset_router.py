@@ -4,7 +4,10 @@ from typing import TYPE_CHECKING
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared.preset_usage import GraphPresetUsage, get_preset_usage
+from app.entrypoints.api.shared.bridges.preset_usage import (
+    GraphPresetUsage,
+    get_preset_usage,
+)
 from app.modules.presets.adapters.api.dependencies import (
     get_preset_repos,
     get_preset_uow,

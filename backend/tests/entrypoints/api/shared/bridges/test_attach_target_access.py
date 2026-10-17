@@ -4,7 +4,9 @@ import uuid
 
 import pytest
 
-from app.entrypoints.api.shared.attach_target_access import GraphAttachTargetAccess
+from app.entrypoints.api.shared.bridges.attach_target_access import (
+    GraphAttachTargetAccess,
+)
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )

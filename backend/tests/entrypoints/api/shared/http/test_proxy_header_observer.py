@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.proxy_header_observer import ProxyHeaderObserver
+from app.entrypoints.api.shared.http.proxy_header_observer import ProxyHeaderObserver
 from app.platform import proxy_signals
 from app.platform.proxy_signals import ProxySignal
 

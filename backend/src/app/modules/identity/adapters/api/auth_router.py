@@ -4,12 +4,12 @@ from fastapi import APIRouter, Depends
 from starlette.requests import Request
 from starlette.responses import Response
 
-from app.entrypoints.api.shared.cross_site import (
+from app.entrypoints.api.shared.http.cross_site import (
     CrossSiteRequestError,
     refuse_cross_site,
 )
+from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
-from app.entrypoints.api.shared.problem_response import error_response
 from app.modules.identity.adapters.api.cookies import (
     clear_session_cookies,
     set_session_cookies,

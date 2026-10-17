@@ -6,18 +6,18 @@ from fastapi.responses import StreamingResponse
 from starlette.requests import Request
 from starlette.responses import Response
 
-from app.entrypoints.api.shared.conditional_request import ConditionalRequestDep
-from app.entrypoints.api.shared.content_sniffing import sniff_and_rechain
 from app.entrypoints.api.shared.dependencies import get_current_actor
-from app.entrypoints.api.shared.http_headers import (
+from app.entrypoints.api.shared.http.conditional_request import ConditionalRequestDep
+from app.entrypoints.api.shared.http.content_sniffing import sniff_and_rechain
+from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
 )
-from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
-from app.entrypoints.api.shared.problem_response import error_response
-from app.entrypoints.api.shared.upload_limit_middleware import (
+from app.entrypoints.api.shared.http.problem_response import error_response
+from app.entrypoints.api.shared.http.upload_limit_middleware import (
     PAYLOAD_TOO_LARGE_RESPONSE,
 )
+from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.media.adapters.api.dependencies import (
     get_attach_media_use_case,
     get_clear_media_cover_use_case,

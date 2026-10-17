@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared.claim_existing_data import (
+from app.entrypoints.api.shared.bridges.claim_existing_data import (
     ClaimExistingData,
     get_claim_existing_data,
 )

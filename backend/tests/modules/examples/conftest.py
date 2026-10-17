@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from app.entrypoints.api.shared.example_targets import (
+from app.entrypoints.api.shared.bridges.example_targets import (
     CoverPackTarget,
     GraphPackTarget,
     GraphStores,

@@ -3,8 +3,7 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
 
-from app.entrypoints.api.shared.dependencies import get_access_policy
-from app.entrypoints.api.shared.example_targets import (
+from app.entrypoints.api.shared.bridges.example_targets import (
     CollectionPackTarget,
     CoverPackTarget,
     GraphPackTarget,
@@ -14,6 +13,7 @@ from app.entrypoints.api.shared.example_targets import (
     get_graph_pack_target,
     get_preset_pack_target,
 )
+from app.entrypoints.api.shared.dependencies import get_access_policy
 from app.modules.examples.adapters.persistence.unit_of_work import (
     build_example_repos,
     create_example_uow,

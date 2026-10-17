@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 from fastapi.routing import APIRoute
 
 from app.entrypoints.api import api_v1_router, public_v1_router
-from app.entrypoints.api.shared.cross_site import refuse_cross_site
 from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.entrypoints.api.shared.http.cross_site import refuse_cross_site
 from app.modules.identity.adapters.api.dependencies import (
     get_active_identity_actor,
     get_identity_actor,

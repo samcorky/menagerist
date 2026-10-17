@@ -6,9 +6,9 @@ from fastapi import Depends, FastAPI
 from starlette.testclient import TestClient
 from structlog.testing import capture_logs
 
-from app.entrypoints.api.shared import cross_site
-from app.entrypoints.api.shared.cross_site import refuse_cross_site
-from app.entrypoints.api.shared.problem_response import register_exception_handlers
+from app.entrypoints.api.shared.http import cross_site
+from app.entrypoints.api.shared.http.cross_site import refuse_cross_site
+from app.entrypoints.api.shared.http.problem_response import register_exception_handlers
 from app.platform import proxy_signals
 from app.platform.config.api import ApiSettings
 from app.platform.proxy_signals import ProxySignal

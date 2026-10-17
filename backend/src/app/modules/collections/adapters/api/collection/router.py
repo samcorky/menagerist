@@ -5,16 +5,16 @@ from fastapi import APIRouter, Depends, Query
 from starlette.requests import Request
 from starlette.responses import Response
 
-from app.entrypoints.api.shared.conditional_request import ConditionalRequestDep
 from app.entrypoints.api.shared.dependencies import get_current_actor
-from app.entrypoints.api.shared.http_headers import (
+from app.entrypoints.api.shared.http.conditional_request import ConditionalRequestDep
+from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
     link_header_responses,
     link_next_header,
 )
+from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
-from app.entrypoints.api.shared.problem_response import error_response
 from app.modules.collections.adapters.api.collection.schemas import (
     AddItemsRequest,
     AddItemsResponse,

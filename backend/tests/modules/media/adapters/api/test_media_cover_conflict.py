@@ -6,7 +6,9 @@ from typing import TYPE_CHECKING
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared.attach_target_access import get_attach_target_access
+from app.entrypoints.api.shared.bridges.attach_target_access import (
+    get_attach_target_access,
+)
 from app.modules.media.adapters.api.dependencies import (
     get_image_processor,
     get_media_repos,

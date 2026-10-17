@@ -6,7 +6,10 @@ from app.entrypoints.api.shared.bridges.collection_definitions import (
     GraphDefinitionChecker,
     get_definition_checker,
 )
-from app.entrypoints.api.shared.collection_items import GraphItemLookup, get_item_lookup
+from app.entrypoints.api.shared.bridges.collection_items import (
+    GraphItemLookup,
+    get_item_lookup,
+)
 from app.entrypoints.api.shared.dependencies import get_access_policy
 from app.modules.collections.adapters.persistence.unit_of_work import (
     build_collections_repos,

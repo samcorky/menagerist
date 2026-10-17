@@ -11,12 +11,14 @@ from typing import TYPE_CHECKING, Annotated, Any
 from fastapi import Depends
 
 from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
-from app.entrypoints.api.shared.attach_target_access import GraphAttachTargetAccess
 from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
-from app.entrypoints.api.shared.choice_list_source import PresetChoiceListSource
-from app.entrypoints.api.shared.collection_items import GraphItemLookup
+from app.entrypoints.api.shared.bridges.attach_target_access import (
+    GraphAttachTargetAccess,
+)
+from app.entrypoints.api.shared.bridges.choice_list_source import PresetChoiceListSource
+from app.entrypoints.api.shared.bridges.collection_items import GraphItemLookup
+from app.entrypoints.api.shared.bridges.preset_usage import GraphPresetUsage
 from app.entrypoints.api.shared.dependencies import get_current_actor
-from app.entrypoints.api.shared.preset_usage import GraphPresetUsage
 from app.modules.collections.adapters.persistence.in_memory_collection_repository import (  # noqa: E501
     InMemoryCollectionRepository,
 )

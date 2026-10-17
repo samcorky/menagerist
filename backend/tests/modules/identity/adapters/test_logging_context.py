@@ -13,11 +13,9 @@ from starlette.testclient import TestClient
 from structlog.testing import capture_logs
 
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared import (
-    dependencies as shared_dependencies,
-    request_context_middleware,
-)
+from app.entrypoints.api.shared import dependencies as shared_dependencies
 from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.entrypoints.api.shared.http import request_context_middleware
 from app.modules.identity.adapters.api import dependencies as identity_dependencies
 from app.modules.identity.adapters.api.dependencies import (
     get_decoy_hash,
