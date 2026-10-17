@@ -21,7 +21,7 @@ async function newUser(workerBaseURL: string, workerSession: Parameters<typeof s
 
 test('the users page does not scroll sideways', async ({ page, workerBaseURL, workerSession }) => {
 	const user = await newUser(workerBaseURL, workerSession);
-	await page.goto('/settings/users');
+	await page.goto('/admin/users');
 	await expect(userRow(page, user)).toBeVisible();
 	const overflow = await page.evaluate(
 		() => document.documentElement.scrollWidth - document.documentElement.clientWidth
@@ -31,7 +31,7 @@ test('the users page does not scroll sideways', async ({ page, workerBaseURL, wo
 
 test('row actions are at least 44px tall', async ({ page, workerBaseURL, workerSession }) => {
 	const user = await newUser(workerBaseURL, workerSession);
-	await page.goto('/settings/users');
+	await page.goto('/admin/users');
 	const row = userRow(page, user);
 	for (const name of ['Disable', 'Reset password']) {
 		const b = await row.getByRole('button', { name }).boundingBox();
@@ -47,7 +47,7 @@ test('the edit-name pencil is a full-size tap target and editing does not scroll
 	workerSession
 }) => {
 	const user = await newUser(workerBaseURL, workerSession);
-	await page.goto('/settings/users');
+	await page.goto('/admin/users');
 	const row = userRow(page, user);
 	const pencil = row.getByRole('button', { name: `Edit display name for ${user.username}` });
 	const box = await pencil.boundingBox();
@@ -71,7 +71,7 @@ test('disabling asks first, and Cancel leaves the account alone', async ({
 	workerSession
 }) => {
 	const user = await newUser(workerBaseURL, workerSession);
-	await page.goto('/settings/users');
+	await page.goto('/admin/users');
 	const row = userRow(page, user);
 
 	await row.getByRole('button', { name: 'Disable' }).click();
@@ -92,7 +92,7 @@ test('disabling asks first, and Cancel leaves the account alone', async ({
 
 test('confirming disables the account', async ({ page, workerBaseURL, workerSession }) => {
 	const user = await newUser(workerBaseURL, workerSession);
-	await page.goto('/settings/users');
+	await page.goto('/admin/users');
 	const row = userRow(page, user);
 
 	await row.getByRole('button', { name: 'Disable' }).click();
@@ -104,7 +104,7 @@ test('confirming disables the account', async ({ page, workerBaseURL, workerSess
 
 test('resetting a password asks first', async ({ page, workerBaseURL, workerSession }) => {
 	const user = await newUser(workerBaseURL, workerSession);
-	await page.goto('/settings/users');
+	await page.goto('/admin/users');
 	const row = userRow(page, user);
 
 	await row.getByRole('button', { name: 'Reset password' }).click();
@@ -118,7 +118,7 @@ test('resetting a password asks first', async ({ page, workerBaseURL, workerSess
 });
 
 test('the password toggle is a full-size tap target in Add user', async ({ page }) => {
-	await page.goto('/settings/users');
+	await page.goto('/admin/users');
 	await page.getByRole('button', { name: 'Add user' }).first().click();
 	const toggle = page.getByRole('button', { name: 'Show password' });
 	const box = await toggle.boundingBox();

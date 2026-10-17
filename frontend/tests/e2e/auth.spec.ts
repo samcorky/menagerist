@@ -190,10 +190,10 @@ test('a member does not see the Users page', async ({ page }) => {
 
 	await accountMenu(page, member.displayName).click();
 	await expect(page.getByRole('menuitem', { name: 'Account' })).toBeVisible();
-	await expect(page.getByRole('menuitem', { name: 'Users' })).toHaveCount(0);
+	await expect(page.getByRole('menuitem', { name: 'Administration' })).toHaveCount(0);
 	await page.keyboard.press('Escape');
 
-	await page.goto('/settings/users');
+	await page.goto('/admin/users');
 	await expect(page.getByText('Only administrators can manage users.')).toBeVisible();
 });
 
@@ -201,8 +201,10 @@ test('an administrator sees the Users page', async ({ page }) => {
 	await startSignedOut(page);
 	await signInThroughForm(page, ADMIN.username, ADMIN.password);
 	await accountMenu(page, ADMIN.name).click();
-	await page.getByRole('menuitem', { name: 'Users' }).click();
-	await expect(page).toHaveURL(/\/settings\/users$/);
+	await page.getByRole('menuitem', { name: 'Administration' }).click();
+	await expect(page).toHaveURL(/\/admin$/);
+	await page.getByRole('link', { name: /Users/ }).click();
+	await expect(page).toHaveURL(/\/admin\/users$/);
 	await expect(page.getByRole('list', { name: 'Users' })).toContainText(member.username);
 });
 

@@ -7,7 +7,7 @@
 		ChevronRight,
 		Activity,
 		Sparkles,
-		Users,
+		Shield,
 		UserRound
 	} from '@lucide/svelte';
 	import { auth } from '$lib/auth.svelte.js';
@@ -118,7 +118,7 @@
 			</a>
 
 			{#if auth.isAdmin}
-				<a href={resolve('/settings/users')} class="group block">
+				<a href={resolve('/admin')} class="group block">
 					<div
 						class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
 					>
@@ -126,13 +126,11 @@
 							<div
 								class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
 							>
-								<Users class="size-5" />
+								<Shield class="size-5" />
 							</div>
 							<div>
-								<p class="font-heading font-semibold">Users</p>
-								<p class="mt-0.5 text-sm text-muted-foreground">
-									Add people, change roles and reset passwords.
-								</p>
+								<p class="font-heading font-semibold">Administration</p>
+								<p class="mt-0.5 text-sm text-muted-foreground">Manage users and active devices.</p>
 							</div>
 						</div>
 						<ChevronRight

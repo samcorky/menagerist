@@ -113,32 +113,30 @@
 			createError = errorMessage(result.error);
 			return;
 		}
-		issued = {
-			name: result.data.display_name,
-			username: result.data.username,
-			password: newPassword
-		};
+		const created = result.data;
+		issued = { name: created.display_name, username: created.username, password: newPassword };
 		copied = false;
-		users = [...users, result.data];
+		users = [...users, created];
+		showCreate = false;
 		newUsername = '';
 		newDisplayName = '';
 		newPassword = '';
 		newRole = 'member';
-		showCreate = false;
 	}
 
 	async function patch(
 		user: UserResponse,
-		body: { role?: Role; disabled?: boolean },
-		revert?: () => void
+		changes: { display_name?: string; role?: Role; disabled?: boolean }
 	) {
 		rowBusy = user.id;
 		rowError = null;
-		const result = await updateUser({ path: { user_id: user.id }, body });
+		const result = await updateUser({
+			path: { user_id: user.id },
+			body: changes
+		});
 		rowBusy = null;
 		if (result.error || !result.data) {
 			rowError = { id: user.id, message: errorMessage(result.error) };
-			revert?.();
 			return;
 		}
 		const updated = result.data;
@@ -146,24 +144,37 @@
 		if (updated.id === auth.user?.id) await auth.refresh();
 	}
 
-	let editing = $state<{ id: string; draft: string; busy: boolean; error: string | null } | null>(
-		null
-	);
+	// Inline editing state: which user is being edited, the draft name, and field refs.
+	let editing = $state<{
+		id: string;
+		draft: string;
+		error: string | null;
+		busy: boolean;
+	} | null>(null);
 
-	function startEdit(user: UserResponse) {
-		editing = { id: user.id, draft: user.display_name, busy: false, error: null };
+	let editInput = $state<HTMLInputElement | null>(null);
+	let editButton = $state<HTMLButtonElement | null>(null);
+
+	async function startEdit(user: UserResponse) {
+		rowError = null;
+		editing = { id: user.id, draft: user.display_name, error: null, busy: false };
+		await tick();
+		editInput?.focus();
 	}
 
-	async function stopEdit(id: string) {
+	async function stopEdit(_userId?: string) {
 		editing = null;
 		await tick();
-		document.getElementById(`edit-name-${id}`)?.focus();
+		editButton?.focus();
 	}
 
-	async function saveName(user: UserResponse) {
+	async function saveEdit(user: UserResponse) {
 		if (!editing || editing.id !== user.id || editing.busy) return;
 		const decision = renameDecision(user.display_name, editing.draft);
-		if (decision.kind === 'unchanged') return stopEdit(user.id);
+		if (decision.kind === 'unchanged') {
+			await stopEdit(user.id);
+			return;
+		}
 		if (decision.kind === 'problem') {
 			editing.error = decision.message;
 			return;
@@ -260,7 +271,7 @@
 
 <main class="flex-1 px-4 py-8 sm:px-6">
 	<div class="mx-auto flex max-w-2xl flex-col gap-6">
-		<BackButton fallback={resolve('/settings')} />
+		<BackButton fallback={resolve('/admin')} />
 		<div class="flex flex-wrap items-start justify-between gap-3">
 			<div>
 				<h1 class="font-heading text-3xl font-semibold tracking-tight">Users</h1>
@@ -289,32 +300,31 @@
 						</p>
 						<div class="mt-3 flex flex-wrap items-center gap-2">
 							<code
-								class="min-h-11 flex-1 rounded-xl bg-muted px-3 py-2.5 font-mono text-sm break-all select-all"
-								data-testid="issued-password">{issued.password}</code
+								class="rounded-md border bg-muted px-2.5 py-1 font-mono text-sm font-semibold tracking-wider"
 							>
+								{issued.password}
+							</code>
 							<Button variant="outline" class="h-11" onclick={copyPassword}>
 								{#if copied}
 									<Check class="size-4" />
 									Copied
 								{:else}
 									<Copy class="size-4" />
-									Copy
+									Copy password
 								{/if}
 							</Button>
-						</div>
-						<div class="mt-3">
 							<Button variant="ghost" class="h-11" onclick={() => (issued = null)}>Done</Button>
 						</div>
 					</Alert.Description>
 				</Alert.Root>
 			{/if}
 
-			{#if showCreate && canCreate}
+			{#if showCreate}
 				<Card.Root>
 					<Card.Header>
-						<Card.Title>Add a user</Card.Title>
+						<Card.Title>Add user</Card.Title>
 						<Card.Description>
-							Choose a starting password. They will be asked to replace it when they first sign in.
+							Create a starting account. They'll choose a new password the first time they sign in.
 						</Card.Description>
 					</Card.Header>
 					<Card.Content>
@@ -325,12 +335,11 @@
 								</Alert.Root>
 							{/if}
 							<div class="space-y-1.5">
-								<Label for="new-display-name">Name</Label>
+								<Label for="new-name">Name</Label>
 								<Input
-									id="new-display-name"
-									class="h-11"
-									autocomplete="off"
+									id="new-name"
 									required
+									maxlength={DISPLAY_NAME_MAX_LENGTH}
 									disabled={creating}
 									bind:value={newDisplayName}
 								/>
@@ -339,7 +348,6 @@
 								<Label for="new-username">Username</Label>
 								<Input
 									id="new-username"
-									class="h-11"
 									autocomplete="off"
 									autocapitalize="none"
 									spellcheck={false}
@@ -349,10 +357,10 @@
 								/>
 							</div>
 							<div class="space-y-1.5">
-								<Label for="new-user-password">Starting password</Label>
+								<Label for="new-password">Starting password</Label>
 								<div class="flex gap-2">
 									<PasswordInput
-										id="new-user-password"
+										id="new-password"
 										autocomplete="off"
 										autocapitalize="none"
 										spellcheck={false}
@@ -368,7 +376,7 @@
 										onclick={() => (newPassword = generatePassword())}
 									>
 										<Dices class="size-4" />
-										Generate
+										Randomise
 									</Button>
 								</div>
 								<p class="text-xs text-muted-foreground">
@@ -379,34 +387,29 @@
 								<Label for="new-role">Role</Label>
 								<NativeSelect
 									id="new-role"
-									class="w-full [&_select]:h-11"
 									disabled={creating}
-									bind:value={newRole}
+									value={newRole}
+									onchange={(e) => (newRole = e.currentTarget.value as Role)}
 								>
 									<option value="member">Member</option>
 									<option value="admin">Administrator</option>
 								</NativeSelect>
 							</div>
-							<div class="flex flex-wrap justify-end gap-2">
+							<div class="flex gap-2 pt-2">
+								<Button type="submit" class="h-11" disabled={creating || !newPasswordValid}>
+									{#if creating}
+										<Spinner />
+									{/if}
+									Add user
+								</Button>
 								<Button
 									type="button"
 									variant="outline"
 									class="h-11"
 									disabled={creating}
-									onclick={() => {
-										showCreate = false;
-										createError = null;
-									}}
+									onclick={() => (showCreate = false)}
 								>
 									Cancel
-								</Button>
-								<Button type="submit" class="h-11" disabled={creating || !newPasswordValid}>
-									{#if creating}
-										<Spinner class="size-4" />
-										Adding…
-									{:else}
-										Add user
-									{/if}
 								</Button>
 							</div>
 						</form>
@@ -414,128 +417,138 @@
 				</Card.Root>
 			{/if}
 
-			{#if loadError}
+			{#if loading}
+				{#if loadingDisplay.show}
+					<div class="space-y-3" role="status" aria-label="Loading accounts">
+						<Skeleton class="h-28 w-full rounded-xl" />
+						<Skeleton class="h-28 w-full rounded-xl" />
+					</div>
+				{/if}
+			{:else if loadError}
 				<Alert.Root variant="destructive">
-					<Alert.Description>
-						{loadError}
-						<Button variant="link" class="h-11 px-1" onclick={load}>Try again</Button>
-					</Alert.Description>
+					<Alert.Description>{loadError}</Alert.Description>
 				</Alert.Root>
-			{:else if loading}
-				<div class="space-y-3" aria-busy="true">
-					<Skeleton class="h-24 w-full rounded-2xl" />
-					<Skeleton class="h-24 w-full rounded-2xl" />
-				</div>
 			{:else}
-				<ul class="space-y-3" aria-label="Users">
+				<ul class="flex flex-col gap-3" aria-label="Users">
 					{#each users as user (user.id)}
 						{@const isMe = user.id === auth.user?.id}
 						{@const locked = isLocked(user.locked_until)}
-						{@const signedInAt = lastSignIn(user.last_login_at)}
 						<li>
 							<Card.Root>
-								<Card.Content class="space-y-3">
-									{#if editing?.id === user.id}
-										<form
-											class="space-y-2"
-											onsubmit={(e) => {
-												e.preventDefault();
-												void saveName(user);
-											}}
-										>
-											<div class="flex items-center gap-2">
-												<Input
-													class="h-11 min-w-0 flex-1"
-													aria-label="Display name for {user.username}"
-													aria-invalid={editing.error ? true : undefined}
-													autocomplete="off"
-													maxlength={DISPLAY_NAME_MAX_LENGTH}
-													disabled={editing.busy}
-													bind:value={editing.draft}
-													onkeydown={(e) => {
-														if (e.key === 'Escape') {
-															e.preventDefault();
-															void stopEdit(user.id);
-														}
+								<Card.Content class="flex flex-col gap-3 p-4 sm:p-5">
+									<div class="flex flex-wrap items-start justify-between gap-2">
+										<div class="min-w-0 flex-1">
+											{#if editing?.id === user.id}
+												<form
+													class="flex flex-col gap-1.5"
+													onsubmit={(e) => {
+														e.preventDefault();
+														void saveEdit(user);
 													}}
-													{@attach (el: HTMLInputElement) => {
-														el.focus();
-														el.select();
-													}}
-												/>
-												<Button
-													type="submit"
-													size="icon"
-													class="size-11 shrink-0"
-													aria-label="Save display name for {user.username}"
-													disabled={editing.busy}
 												>
-													{#if editing.busy}<Spinner class="size-4" />{:else}<Check
-															class="size-4"
-														/>{/if}
-												</Button>
-												<Button
-													type="button"
-													variant="outline"
-													size="icon"
-													class="size-11 shrink-0"
-													aria-label="Cancel editing display name for {user.username}"
-													disabled={editing.busy}
-													onclick={() => void stopEdit(user.id)}
-												>
-													<X class="size-4" />
-												</Button>
-											</div>
-											{#if editing.error}
-												<p class="text-sm text-destructive" role="alert">{editing.error}</p>
+													<div class="flex items-center gap-2">
+														<Input
+															type="text"
+															class="h-11"
+															bind:value={editing.draft}
+															bind:ref={editInput}
+															disabled={editing.busy}
+															maxlength={DISPLAY_NAME_MAX_LENGTH}
+															aria-label="Display name for {user.username}"
+															onkeydown={(e) => {
+																if (e.key === 'Escape') {
+																	e.preventDefault();
+																	void stopEdit(user.id);
+																}
+															}}
+														/>
+														<Button
+															type="submit"
+															class="h-11"
+															disabled={editing.busy}
+															aria-label="Save display name for {user.username}"
+														>
+															{#if editing.busy}
+																<Spinner />
+															{/if}
+															Save
+														</Button>
+														<Button
+															type="button"
+															variant="ghost"
+															size="icon"
+															class="size-11 shrink-0"
+															disabled={editing.busy}
+															aria-label="Cancel editing name for {user.username}"
+															onclick={() => stopEdit(user.id)}
+														>
+															<X class="size-4" />
+														</Button>
+													</div>
+													{#if editing.error}
+														<p class="text-sm text-destructive" role="alert">
+															{editing.error}
+														</p>
+													{/if}
+												</form>
+											{:else}
+												<div class="flex items-center gap-1.5">
+													<p class="font-heading font-semibold tracking-tight">
+														{user.display_name}
+													</p>
+													{#if canUpdate}
+														<Button
+															type="button"
+															variant="ghost"
+															size="icon"
+															class="size-11 shrink-0"
+															bind:ref={editButton}
+															aria-label="Edit display name for {user.username}"
+															onclick={() => startEdit(user)}
+														>
+															<Pencil class="size-4" />
+														</Button>
+													{/if}
+												</div>
 											{/if}
-										</form>
-									{/if}
-									<div class="flex flex-wrap items-center gap-2">
-										{#if editing?.id !== user.id}
-											<p class="font-heading font-semibold">{user.display_name}</p>
-											{#if canUpdate}
-												<Button
-													id="edit-name-{user.id}"
-													variant="ghost"
-													size="icon"
-													class="size-11 shrink-0"
-													aria-label="Edit display name for {user.username}"
-													onclick={() => startEdit(user)}
-												>
-													<Pencil class="size-4" />
-												</Button>
+											<p class="text-sm text-muted-foreground">{user.username}</p>
+										</div>
+										<div class="flex flex-wrap items-center gap-1.5">
+											{#if isMe}
+												<Badge variant="outline">You</Badge>
 											{/if}
-										{/if}
-										{#if isMe}<Badge variant="secondary">You</Badge>{/if}
-										{#if user.disabled}<Badge variant="outline">Disabled</Badge>{/if}
-										{#if locked && user.locked_until}
-											<Badge variant="destructive">{lockedLabel(user.locked_until)}</Badge>
-										{/if}
-										{#if user.password_expired}<Badge variant="outline">Must change password</Badge
-											>{/if}
+											{#if user.role === 'admin'}
+												<Badge variant="secondary">Admin</Badge>
+											{/if}
+											{#if user.disabled}
+												<Badge variant="destructive">Disabled</Badge>
+											{/if}
+											{#if user.password_expired}
+												<Badge variant="outline">Must change password</Badge>
+											{/if}
+											{#if locked && user.locked_until}
+												<Badge variant="destructive">
+													{lockedLabel(user.locked_until)}
+												</Badge>
+											{/if}
+										</div>
 									</div>
-									<p class="text-sm break-all text-muted-foreground">{user.username}</p>
-									<p class="text-sm text-muted-foreground" title={signedInAt.title}>
-										Last sign-in: {signedInAt.text}
+
+									<p class="text-xs text-muted-foreground">
+										Last sign-in: <span title={lastSignIn(user.last_login_at).title}
+											>{lastSignIn(user.last_login_at).text}</span
+										>
 									</p>
 
-									{#if canUpdate || canReset || (canUnlock && locked)}
-										<div class="flex flex-wrap items-end gap-2">
+									{#if canUpdate || canReset || canUnlock}
+										<div class="flex flex-wrap items-center gap-2 pt-1">
 											{#if canUpdate}
-												<div class="space-y-1">
-													<Label for="role-{user.id}" class="text-xs">Role</Label>
+												<div class="w-36">
 													<NativeSelect
-														id="role-{user.id}"
-														class="[&_select]:h-11"
+														aria-label="Role for {user.username}"
 														disabled={rowBusy === user.id || isMe}
 														value={user.role}
-														onchange={(e) => {
-															const select = e.currentTarget;
-															void patch(user, { role: select.value as Role }, () => {
-																select.value = user.role;
-															});
-														}}
+														onchange={(e) => patch(user, { role: e.currentTarget.value as Role })}
 													>
 														<option value="member">Member</option>
 														<option value="admin">Administrator</option>
@@ -659,12 +672,22 @@
 						onclick={() => (resetPassword = generatePassword())}
 					>
 						<Dices class="size-4" />
-						Generate
+						Randomise
 					</Button>
 				</div>
 				<p class="text-xs text-muted-foreground">At least {PASSWORD_MIN_LENGTH} characters.</p>
 			</div>
-			<div class="flex justify-end gap-2">
+			<div class="flex gap-2 pt-2">
+				<Button
+					type="submit"
+					class="h-11"
+					disabled={resetting || resetPassword.length < PASSWORD_MIN_LENGTH}
+				>
+					{#if resetting}
+						<Spinner />
+					{/if}
+					Save password
+				</Button>
 				<Button
 					type="button"
 					variant="outline"
@@ -673,13 +696,6 @@
 					onclick={() => (resetTarget = null)}
 				>
 					Cancel
-				</Button>
-				<Button
-					type="submit"
-					class="h-11"
-					disabled={resetting || resetPassword.length < PASSWORD_MIN_LENGTH}
-				>
-					{resetting ? 'Resetting…' : 'Reset password'}
 				</Button>
 			</div>
 		</form>

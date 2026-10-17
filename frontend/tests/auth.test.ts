@@ -20,7 +20,7 @@ describe('safeNext', () => {
 		['/', '/'],
 		['/items', '/items'],
 		['/items/abc?x=1#top', '/items/abc?x=1#top'],
-		['/settings/users', '/settings/users']
+		['/admin/users', '/admin/users']
 	])('keeps the same-origin path %s', (input, expected) => {
 		expect(safeNext(input)).toBe(expected);
 	});
@@ -163,7 +163,7 @@ describe('guardDecision', () => {
 
 	it('lets a signed-in user see ordinary pages', () => {
 		expect(guardDecision(base)).toEqual(allow);
-		expect(guardDecision({ ...base, pathname: '/settings/users' })).toEqual(allow);
+		expect(guardDecision({ ...base, pathname: '/admin/users' })).toEqual(allow);
 	});
 });
 
