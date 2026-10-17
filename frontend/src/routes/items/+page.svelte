@@ -6,6 +6,7 @@
 	import { untrack } from 'svelte';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import {
+		BookmarkPlus,
 		EyeOff,
 		List,
 		Plus,
@@ -18,12 +19,13 @@
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import { toast } from 'svelte-sonner';
-	import type { NodeResponse, NodeTypeResponse } from '$lib/api/client';
+	import type { CollectionResponse, NodeResponse, NodeTypeResponse } from '$lib/api/client';
 	import { fetchAllNodeTypes } from '$lib/node-types';
 	import { fetchItemFields, type ItemField } from '$lib/item-fields';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import QueryBuilder from '$lib/components/query-builder.svelte';
 	import QueryChips from '$lib/components/query-chips.svelte';
+	import SaveSmartCollectionDialog from '$lib/components/save-smart-collection-dialog.svelte';
 	import { conditionNumbers, queryKey, type BuilderError } from '$lib/query/builder';
 	import { buildCatalogue, summaryLookup } from '$lib/query/fields';
 	import {
@@ -88,6 +90,7 @@
 	let tooMany = $state(false);
 	let filtersOpen = $state(false);
 	let filtersFocus = $state<Path | null>(null);
+	let saveOpen = $state(false);
 	let filterAnnouncement = $state('');
 	let searchInput = $state('');
 	let q = $state('');
@@ -171,6 +174,10 @@
 	$effect(() => {
 		if (!filtersOpen) writer.flush();
 	});
+
+	function savedAsSmart(collection: CollectionResponse) {
+		void goto(resolve('/collections/[id]', { id: collection.id }));
+	}
 
 	function removeFilter(path: Path, text: string) {
 		writer.startSession();
@@ -511,6 +518,20 @@
 					onremove={removeFilter}
 					onclear={clearFilters}
 				/>
+				{#if conditionCount > 0}
+					<div>
+						<Button
+							variant="outline"
+							size="sm"
+							class="max-sm:h-11"
+							aria-haspopup="dialog"
+							onclick={() => (saveOpen = true)}
+						>
+							<BookmarkPlus />
+							Save as smart collection
+						</Button>
+					</div>
+				{/if}
 				{#if filterError}
 					<Alert.Root variant="destructive">
 						<TriangleAlert />
@@ -666,6 +687,8 @@
 		{/if}
 	</div>
 </main>
+
+<SaveSmartCollectionDialog bind:open={saveOpen} query={filter} onsaved={savedAsSmart} />
 
 <QueryBuilder
 	bind:open={filtersOpen}

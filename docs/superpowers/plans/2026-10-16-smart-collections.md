@@ -135,6 +135,59 @@
 
 ---
 
+### Task 5b: Exact count on request
+
+**Files:** backend `modules/graph/adapters/api/node/router.py` + a graph query handler (reuse `search_count` without the cap), `modules/collections/adapters/api/collection/router.py` and schemas; frontend `src/lib/collections/smart.ts` and the collection page (Svelte, via the Svelte agent).
+
+**Interfaces:**
+- Produces: `GET /collection/{id}/count` (smart or manual) returning `{count: int}` exactly (uncapped), scoped to the caller, 404 for another owner's collection; the collection page shows `1,000+` when `item_count_capped` is set and offers **Count exactly**, which calls it once and shows the exact figure; cards and lists keep the capped count.
+- Consumes: Task 2 `ItemLookup.count_matching` (extend with `cap: int | None`, `None` meaning exact) and the existing bridge.
+
+- [ ] **Step 1: Failing tests**: exact count above the cap (e.g. 1,005 items) on both adapters; another user gets 404; a stale or malformed definition returns 0 without error; the generated isolation test covers the new route; frontend test that the page calls it once and only when capped.
+- [ ] **Step 2: Implement; lint, typecheck, `test-backend`, `test-frontend`, architecture + cqrs tests; domain/application 100%.**
+- [ ] **Step 3: Optional cache (only if a benchmark shows the need):** an in-process cache around this one call, keyed on the owner's access scope, the definition hash, the newest `updated_at` of the owner's items, the item types' newest `updated_at`, and today's date. Skip unless measured.
+
+**Checkpoint:** user may commit.
+
+---
+
+### Task 5c: Editable collection slugs and slug URLs
+
+**Files:** backend `modules/collections/application/{update_collection,create_collection}.py`, `adapters/api/collection/{router,schemas}.py`, `ports/collection_repository.py` (`get_by_slug` exists), a small `resolve` query handler; frontend `src/routes/collections/[id]/+page.ts` and `+page.svelte`, the collection links and the rename dialog (Svelte, via the Svelte agent), `src/lib/collections/*`.
+
+**Rulings:** R23 slugs stay per owner (not global), so ids remain the canonical, always-resolvable form; a slug change does not keep the old slug (no history; links by id keep working). Collections only; item and connection types are out of scope.
+
+**Interfaces:**
+- Produces: `PATCH /collection/{id}` accepts an optional `slug` (normalised with `Slug`, unique among the owner's live collections, 409 if taken, 422 if empty or UUID-shaped) or `regenerate_slug: true` (rebuilds from the current name with the existing free-suffix logic); both together are a 422; `GET /collection/{id_or_slug}` (and its sub-routes where the id is a path parameter) accepts either a UUID or a slug, scoped to the caller, with the same 404 for another owner's collection; `Collection.rename_slug(slug)`; slugs that parse as UUIDs are rejected on create and update so a path segment is never ambiguous.
+- Frontend: collection links use the slug (`/collections/<slug>`); a page opened by id replaces its address with the slug; the rename dialog gets a Slug field with **Regenerate from name** and a note that changing the slug changes the link; a 404 on a stale slug shows the normal not-found state.
+
+- [ ] **Step 1: Failing tests**: change slug (ok, conflict, empty, UUID-shaped, unusable characters); regenerate from a renamed collection with a taken name (suffix); ids and slugs both resolve; another owner's slug never resolves (404, same as unknown); a deleted collection's slug is free again; ETag/If-Match behaviour unchanged for PATCH; frontend: link helper uses the slug, id page canonicalises, dialog emits the right body.
+- [ ] **Step 2: Implement; regenerate the client; lint, typecheck, test-backend, test-frontend, architecture + cqrs; domain/application 100%; the generated isolation test covers the slug path.**
+- [ ] **Step 3:** e2e additions in Task 6 (rename slug, open by slug, regenerate).
+
+**Checkpoint:** user may commit.
+
+---
+
+### Task 5d: Ad-hoc narrowing on a smart collection page
+
+**Files:** frontend only, through the Svelte agent: `src/routes/collections/[id]/+page.svelte`, `src/lib/components/smart-conditions.svelte`, the save dialog, `src/lib/smart-collections.ts`, `src/lib/query/{tree,items-page}.ts` (combine helpers), tests.
+
+**Rulings:** R24 the saved definition is never edited implicitly: opening the page is read-only; ad-hoc filters and the search box narrow the results by ANDing onto the saved conditions and live in the URL (`?f=`), shareable and reloadable; the saved sort applies unless changed in the ad-hoc builder.
+
+**Interfaces:**
+- Produces: the search box, type select and a **Filter** button (the existing builder bound to the ad-hoc conditions only) on a smart collection page; saved conditions shown as locked chips; a narrowed-view bar ("Narrowed by N filters: X of Y items") with **Save as new smart collection** (definition = saved AND ad-hoc, name dialog, reuses the Task 5 save dialog), **Update this collection** (overwrite with the combined definition after a confirmation that states what changes; uses `updateDefinition`) and **Clear**; **Edit conditions** becomes a deliberate action with explicit **Save** and **Cancel** (no silent save on close); both save actions disabled with an explanation when the combined tree exceeds the depth or condition limits (`fitsLimits`); a combine helper `combineWithSaved(saved, adhoc)` in plain TypeScript, flattened and limit-checked.
+- Consumes: Task 4 model, phase 1 `combine`/`fitsLimits`, the filter builder.
+
+- [ ] **Step 1: Failing tests** for `combineWithSaved` (empty ad-hoc returns the saved tree; limits; sort carry-over; text search becomes a text condition), the bar copy, and the disabled states; component/SSR tests where the harness allows.
+- [ ] **Step 2: Implement; lint-frontend, typecheck-frontend, test-frontend; visual check on the isolated stack in light and dark at desktop and mobile; view the screenshots.**
+- [ ] **Step 3:** e2e additions in Task 6 (narrow, save as new, overwrite with confirmation, clear, explicit edit with cancel).
+- **Follow-up (after phase 2b):** add **Save as new, linked to this collection**, whose definition is `in collection <this>` AND the ad-hoc conditions, on both smart and manual collection pages (the only way to turn a narrowed manual collection into a smart one). It follows the parent; deleting the parent makes the condition stale; cycles are blocked by 2b. **Update this collection** stays a copy of conditions.
+
+**Checkpoint:** user may commit.
+
+---
+
 ### Task 6: End-to-end test, documentation, full gates
 
 **Files:** `frontend/tests/e2e/smart-collections.spec.ts` (new), `docs/DECISIONS.md`, `docs/ARCHITECTURE.md` and `backend/README.md` where collections are described, the spec (phase 2 status)

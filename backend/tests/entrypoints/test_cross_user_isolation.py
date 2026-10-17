@@ -13,7 +13,7 @@ import asyncio
 import hashlib
 import re
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Annotated, Any
 
@@ -30,6 +30,10 @@ from app.entrypoints.api.shared.bridges.attach_target_access import (
 from app.entrypoints.api.shared.bridges.choice_list_source import (
     PresetChoiceListSource,
     get_choice_list_source,
+)
+from app.entrypoints.api.shared.bridges.collection_definitions import (
+    GraphDefinitionChecker,
+    get_definition_checker,
 )
 from app.entrypoints.api.shared.bridges.collection_items import (
     GraphItemLookup,
@@ -186,7 +190,13 @@ TINY_JPEG = bytes.fromhex(
     "ffd8ffe000104a46494600010101004800480000ffdb004300080606070605080707070909080a0c140d0c0b0b0c1912130f141d1a1f1e1d1a1c1c20242e2720222c231c1c28372930313434341f27393d38323c2e333432ffc0000b080001000101011100ffc4001f0000010501010101010100000000000000000102030405060708090a0bffda0008010100003f00bf00ffd9"
 )
 # Strings only A's content contains: none may ever appear in a response to B.
-CANARIES = ("Xenomorph Alpha", "Ripley Beta", "Alpha Collection", "poster-alpha.jpg")
+CANARIES = (
+    "Xenomorph Alpha",
+    "Ripley Beta",
+    "Alpha Collection",
+    "Alpha Smart",
+    "poster-alpha.jpg",
+)
 
 
 # ---- the explicit allow-list: routes that are not per-person content ----
@@ -251,6 +261,7 @@ class Seed:
     film: str
     edge_type: str
     collection: str
+    smart: str
     asset: str
     staged: str
     user: str
@@ -473,6 +484,7 @@ class World:
         o[get_choice_list_source] = lambda: PresetChoiceListSource(presets)
         o[get_item_lookup] = lambda: GraphItemLookup(graph)
         o[get_collection_members] = lambda: CollectionsMembers(collections)
+        o[get_definition_checker] = lambda: GraphDefinitionChecker(graph)
         # Readiness would otherwise open a real database connection.
         ready = InMemoryHealthCheckAdapter(_PASSING_READINESS)
         o[get_get_health_ready_use_case] = lambda: GetHealthReady(ready)
@@ -557,6 +569,13 @@ class World:
             ).status_code
             == 200
         )
+        smart = _created(
+            a.post(
+                "/api/v1/collection",
+                json={"name": "Alpha Smart", "definition": SMART_DEFINITION},
+            )
+        )
+        assert smart["item_count"] == 1, smart
         asset = _created(
             a.post(
                 "/api/v1/media/attached",
@@ -583,6 +602,7 @@ class World:
             film=film["id"],
             edge_type=edge_type["id"],
             collection=collection["id"],
+            smart=smart["id"],
             asset=asset["asset_id"],
             staged=staged["id"],
             user=str(user.id),
@@ -603,6 +623,8 @@ class World:
             f"/api/v1/edge/{seed.edge}",
             "/api/v1/collection",
             f"/api/v1/collection/{seed.collection}",
+            f"/api/v1/collection/{seed.smart}",
+            f"/api/v1/node?collection={seed.smart}",
             f"/api/v1/media/for-node/{seed.item}",
             f"/api/v1/media/{seed.asset}",
             f"/api/v1/media/{seed.staged}",
@@ -676,6 +698,19 @@ STAGED_TOO: set[Route] = {
     ("DELETE", "/api/v1/media/{asset_id}"),
 }
 STREAMS = ("/content", "/thumbnail")  # file streams send an ETag too
+# Routes that also run against A's smart collection (its `collection_id` or the
+# `collection` query). Its membership routes are a 409 even for A, so they are
+# checked in `test_user_b_cannot_edit_a_smart_collections_membership`.
+SMART_TOO: set[Route] = {
+    ("GET", "/api/v1/collection/{collection_id}"),
+    ("PATCH", "/api/v1/collection/{collection_id}"),
+    ("DELETE", "/api/v1/collection/{collection_id}"),
+    ("GET", "/api/v1/node"),
+}
+SMART_DEFINITION: dict[str, Any] = {
+    "v": 1,
+    "where": {"op": "and", "children": [{"kind": "text", "q": "xenomorph"}]},
+}
 # Routes that only make sense on a staged (not yet attached) asset.
 STAGED_ONLY: set[Route] = {("POST", "/api/v1/media/{asset_id}/promote")}
 
@@ -698,10 +733,14 @@ def generate_cases(app: FastAPI) -> list[Case]:
             cases.append(Case(method, template, "query:all"))
         if (method, template) in STAGED_TOO:
             cases.append(Case(method, template, "staged"))
-        if method == "GET" and (_sends_etag(op) or template.endswith(STREAMS)):
-            cases.append(Case(method, template, "if-none-match"))
-        elif method != "GET" and _sends_etag(operations.get(("GET", template), {})):
-            cases.append(Case(method, template, "if-match"))
+        prefixes = ("", "smart-") if (method, template) in SMART_TOO else ("",)
+        if (method, template) in SMART_TOO:
+            cases.append(Case(method, template, "smart"))
+        for prefix in prefixes:
+            if method == "GET" and (_sends_etag(op) or template.endswith(STREAMS)):
+                cases.append(Case(method, template, f"{prefix}if-none-match"))
+            elif method != "GET" and _sends_etag(operations.get(("GET", template), {})):
+                cases.append(Case(method, template, f"{prefix}if-match"))
     return cases
 
 
@@ -730,6 +769,16 @@ QUERY_OVERRIDES: dict[tuple[str, str], str] = {
 }
 
 
+def _aim_at_smart(case: Case, values: dict[str, str], seed: Seed) -> dict[str, Any]:
+    """For a smart variant, point the collection id or query at A's smart one."""
+    if not case.variant.startswith("smart"):
+        return {}
+    if "collection_id" in values:
+        values["collection_id"] = seed.smart
+        return {}
+    return {"params": {"collection": seed.smart}}
+
+
 def build_request(
     case: Case, op: dict[str, Any], seed: Seed
 ) -> tuple[str, dict[str, Any]]:
@@ -738,8 +787,8 @@ def build_request(
     values = _fill(case, PATH_PARAMS, path_names, seed, "path")
     if case.variant == "staged" or (case.method, case.template) in STAGED_ONLY:
         values["asset_id"] = seed.staged
+    kwargs = _aim_at_smart(case, values, seed)
     url = case.template.format(**values)
-    kwargs: dict[str, Any] = {}
     query_names = [p["name"] for p in op.get("parameters", []) if p["in"] == "query"]
     if case.variant.startswith("query:"):
         # `after` would skip A's first item, so the combined call leaves it out.
@@ -859,12 +908,14 @@ ADMIN_ROUTES = {
 
 def _etag_headers(world: World, case: Case, seed: Seed) -> dict[str, str]:
     """The conditional header carrying A's current ETag for this resource."""
-    if case.variant not in ("if-none-match", "if-match"):
+    kind = case.variant.removeprefix("smart-")
+    if kind not in ("if-none-match", "if-match"):
         return {}
-    url, _ = build_request(Case("GET", case.template, "bare"), {}, seed)
+    base = "smart" if case.variant.startswith("smart-") else "bare"
+    url, _ = build_request(Case("GET", case.template, base), {}, seed)
     etag = world.act_as(ALICE).get(url).headers.get("ETag")
     assert etag is not None, f"{case.id}: A's {url} sends no ETag"
-    name = "If-None-Match" if case.variant == "if-none-match" else "If-Match"
+    name = "If-None-Match" if kind == "if-none-match" else "If-Match"
     return {name: etag}
 
 
@@ -906,6 +957,10 @@ def test_generated_cases_cover_the_content_routes() -> None:
     for expected in (
         "GET /api/v1/node [query:q]",
         "GET /api/v1/node [query:collection]",
+        "GET /api/v1/node [smart]",
+        "GET /api/v1/collection/{collection_id} [smart]",
+        "GET /api/v1/collection/{collection_id} [smart-if-none-match]",
+        "PATCH /api/v1/collection/{collection_id} [smart-if-match]",
         "GET /api/v1/node/{node_id} [if-none-match]",
         "PATCH /api/v1/node/{node_id} [if-match]",
         "GET /api/v1/media/{asset_id}/content [if-none-match]",
@@ -977,7 +1032,7 @@ def test_user_a_succeeds_on_the_same_call(
 
     response = caller.request(case.method, url, headers=headers, **kwargs)
 
-    expected = 304 if case.variant == "if-none-match" else None
+    expected = 304 if case.variant.endswith("if-none-match") else None
     if expected is not None:
         assert response.status_code == expected, f"{case.id}: {response.text[:300]}"
     else:
@@ -992,3 +1047,34 @@ def test_user_a_succeeds_on_the_same_call(
     )
     if reads_json and (case.template, case.variant) not in EMPTY_FOR_A:
         assert not _empty(response.json()), f"{case.id}: A's own answer is empty"
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda c, s: c.put(
+            f"/api/v1/collection/{s.smart}/item", json={"item_ids": [s.item2]}
+        ),
+        lambda c, s: c.delete(f"/api/v1/collection/{s.smart}/item/{s.item}"),
+    ],
+    ids=["put", "delete"],
+)
+def test_user_b_cannot_edit_a_smart_collections_membership(
+    call: Callable[[TestClient, Seed], Response], as_user: Callable[..., None]
+) -> None:
+    """B gets the 404 of an unknown collection; A gets the smart collection's 409."""
+    world = World(as_user)
+    seed = world.seed()
+    ghost = replace(seed, smart=str(uuid.uuid7()))
+    before = world.snapshot(seed)
+
+    bob = world.act_as(BOB)
+    response = call(bob, seed)
+    unknown = call(bob, ghost)
+
+    assert response.status_code == 404, response.text
+    assert _shape(response) == _shape(unknown)
+    assert world.snapshot(seed) == before
+    owner = call(world.act_as(ALICE), seed)
+    assert owner.status_code == 409
+    assert owner.json()["title"] == "CollectionKindError"

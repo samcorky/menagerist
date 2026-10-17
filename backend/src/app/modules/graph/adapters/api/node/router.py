@@ -181,7 +181,12 @@ async def list_nodes(
     favourite: bool | None = None,
     collection: Annotated[
         uuid.UUID | None,
-        Query(description="Restrict the list to items on this collection."),
+        Query(
+            description=(
+                "Restrict the list to items on this collection. For a smart "
+                + "collection, the items matching its definition, still in id order."
+            )
+        ),
     ] = None,
 ) -> list[NodeResponse]:
     """List node, paginated by id."""

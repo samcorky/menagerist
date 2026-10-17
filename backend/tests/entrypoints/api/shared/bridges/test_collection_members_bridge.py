@@ -11,6 +11,7 @@ from app.modules.collections.adapters.persistence.unit_of_work import (
     build_collections_repos,
 )
 from app.modules.collections.domain.collection import Collection, Membership
+from app.modules.graph.ports.collection_members import ManualSource, SmartSource
 from app.shared_kernel.slug import Slug
 
 if TYPE_CHECKING:
@@ -36,14 +37,14 @@ async def test_unknown_collection_is_none(db_session: AsyncSession) -> None:
     """A collection that does not exist yields None."""
     members, _ = await _shelf(db_session)
 
-    assert await members.item_ids(uuid.uuid7(), ALL) is None
+    assert await members.resolve(uuid.uuid7(), ALL) is None
 
 
 async def test_empty_collection_is_an_empty_set(db_session: AsyncSession) -> None:
-    """A live collection with no items yields an empty set, not None."""
+    """A live collection with no items yields no ids, not None."""
     members, shelf = await _shelf(db_session)
 
-    assert await members.item_ids(shelf.id, ALL) == set()
+    assert await members.resolve(shelf.id, ALL) == ManualSource(ids=frozenset())
 
 
 async def test_returns_the_item_ids_on_the_collection(
@@ -60,7 +61,7 @@ async def test_returns_the_item_ids_on_the_collection(
             )
         )
 
-    assert await members.item_ids(shelf.id, ALL) == item_ids
+    assert await members.resolve(shelf.id, ALL) == ManualSource(ids=frozenset(item_ids))
 
 
 async def test_soft_deleted_collection_is_none(db_session: AsyncSession) -> None:
@@ -75,7 +76,7 @@ async def test_soft_deleted_collection_is_none(db_session: AsyncSession) -> None
     shelf.soft_delete()
     await repos.collections.save(shelf)
 
-    assert await members.item_ids(shelf.id, ALL) is None
+    assert await members.resolve(shelf.id, ALL) is None
 
 
 async def test_collection_of_another_owner_is_none(db_session: AsyncSession) -> None:
@@ -88,5 +89,54 @@ async def test_collection_of_another_owner_is_none(db_session: AsyncSession) -> 
         )
     )
 
-    assert await members.item_ids(shelf.id, AccessScope.of(shelf.owner_id)) is not None
-    assert await members.item_ids(shelf.id, AccessScope.of(uuid.uuid7())) is None
+    assert await members.resolve(shelf.id, AccessScope.of(shelf.owner_id)) is not None
+    assert await members.resolve(shelf.id, AccessScope.of(uuid.uuid7())) is None
+
+
+_DEFINITION = {
+    "v": 1,
+    "where": {"op": "and", "children": [{"kind": "text", "q": "alien"}]},
+    "sort": [{"by": "name"}],
+}
+
+
+async def _smart(session: AsyncSession) -> tuple[CollectionsMembers, Collection]:
+    """Store a smart collection and return the bridge over the same session."""
+    repos = build_collections_repos(session)
+    collection = Collection.create(
+        name="Aliens",
+        slug=Slug("aliens"),
+        owner_id=uuid.uuid7(),
+        definition=_DEFINITION,
+    )
+    await repos.collections.add(collection)
+    return CollectionsMembers(repos), collection
+
+
+async def test_smart_collection_resolves_to_its_definition(
+    db_session: AsyncSession,
+) -> None:
+    """A smart collection yields its stored definition, never a list of ids."""
+    members, smart = await _smart(db_session)
+
+    assert await members.resolve(smart.id, AccessScope.of(smart.owner_id)) == (
+        SmartSource(definition=_DEFINITION)
+    )
+
+
+async def test_smart_collection_of_another_owner_is_none(
+    db_session: AsyncSession,
+) -> None:
+    """Another person's smart collection reads as missing."""
+    members, smart = await _smart(db_session)
+
+    assert await members.resolve(smart.id, AccessScope.of(uuid.uuid7())) is None
+
+
+async def test_soft_deleted_smart_collection_is_none(db_session: AsyncSession) -> None:
+    """A soft-deleted smart collection yields None."""
+    members, smart = await _smart(db_session)
+    smart.soft_delete()
+    await build_collections_repos(db_session).collections.save(smart)
+
+    assert await members.resolve(smart.id, ALL) is None

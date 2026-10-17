@@ -22,6 +22,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
+	import { manualCollections } from '$lib/smart-collections';
 
 	const PAGE_SIZE = 50;
 	const MAX_PAGES = 10;
@@ -64,7 +65,7 @@
 		const found = await fetchAll({ item_id: id });
 		if (id !== itemId) return;
 		if (found) {
-			memberOf = found;
+			memberOf = manualCollections(found);
 			loadFailed = false;
 		} else {
 			loadFailed = true;
@@ -82,7 +83,7 @@
 		pickerLoading = true;
 		pickerFailed = false;
 		const found = await fetchAll({});
-		if (found) allCollections = found;
+		if (found) allCollections = manualCollections(found);
 		else pickerFailed = true;
 		pickerLoading = false;
 	}

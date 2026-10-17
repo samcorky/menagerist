@@ -22,10 +22,18 @@ class ConditionalRequest:
         self._req = request
         self._res = response
 
-    def check_get(self, entity: ETaggable, extra: str | None = None) -> Response | None:
+    def check_get(
+        self,
+        entity: ETaggable,
+        extra: str | None = None,
+        *,
+        honour_if_modified_since: bool = True,
+    ) -> Response | None:
         """Set ETag/Last-Modified on the outgoing response.
 
         Returns a 304 Response if the client's copy is current, else None.
+        Pass `honour_if_modified_since=False` when the body can change without
+        `updated_at` moving, so only If-None-Match can give a 304.
         """
         etag = etag_from_entity(entity, extra)
         last_mod = http_date(entity.updated_at)
@@ -43,7 +51,7 @@ class ConditionalRequest:
             return None
 
         if_modified_since = self._req.headers.get("If-Modified-Since")
-        if if_modified_since:
+        if if_modified_since and honour_if_modified_since:
             since = parse_http_date(if_modified_since)
             utc_updated = entity.updated_at.astimezone(UTC)
             # Compare at second resolution. RFC 1123 omits sub-second precision.
