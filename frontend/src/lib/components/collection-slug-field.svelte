@@ -3,6 +3,8 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 
+	const MAX_SLUG_LENGTH = 120;
+
 	let {
 		value = $bindable(),
 		error = null,
@@ -24,10 +26,12 @@
 
 <div class="space-y-1.5">
 	<Label for="edit-collection-slug">Slug</Label>
-	<div class="flex gap-2">
+	<div class="flex flex-wrap gap-2">
 		<Input
 			id="edit-collection-slug"
 			bind:value
+			maxlength={MAX_SLUG_LENGTH}
+			class="w-auto min-w-48 flex-1"
 			autocomplete="off"
 			autocapitalize="off"
 			spellcheck={false}

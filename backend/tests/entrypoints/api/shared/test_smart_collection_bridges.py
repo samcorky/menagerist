@@ -4,6 +4,7 @@ Each test runs over in-memory repositories and, integration-marked, on Postgres.
 """
 
 import asyncio
+import json
 import uuid
 from typing import TYPE_CHECKING, Any
 
@@ -54,6 +55,7 @@ from app.modules.graph.adapters.persistence.unit_of_work import (
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.platform.database import get_engine, get_session_factory
+from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import Actor
 
 if TYPE_CHECKING:
@@ -81,8 +83,10 @@ class Env:
         app: FastAPI,
         client: TestClient,
         bulk: Callable[[uuid.UUID, str, int], None],
+        store_definition: Callable[[str, object], None],
     ) -> None:
         self.bulk = bulk
+        self.store_definition = store_definition
         self.actor = ALICE
         app.dependency_overrides[get_current_actor] = lambda: self.actor
         self.client = client
@@ -109,7 +113,11 @@ class Env:
         return body
 
 
-def _in_memory_app() -> tuple[FastAPI, Callable[[uuid.UUID, str, int], None]]:
+def _in_memory_app() -> tuple[
+    FastAPI,
+    Callable[[uuid.UUID, str, int], None],
+    Callable[[str, object], None],
+]:
     app = create_app()
     graph = GraphRepos(
         nodes=InMemoryNodeRepository(),
@@ -137,7 +145,19 @@ def _in_memory_app() -> tuple[FastAPI, Callable[[uuid.UUID, str, int], None]]:
 
         asyncio.run(add_all())
 
-    return app, bulk
+    def store_definition(collection_id: str, definition: object) -> None:
+        """Write a definition straight into the store, as a legacy row would hold."""
+
+        async def put() -> None:
+            found = await collections.collections.get(
+                uuid.UUID(collection_id), scope=AccessScope.everyone()
+            )
+            assert found is not None
+            found.definition = definition  # type: ignore[assignment]
+
+        asyncio.run(put())
+
+    return app, bulk, store_definition
 
 
 def _postgres_bulk(
@@ -163,6 +183,22 @@ def _postgres_bulk(
     return bulk
 
 
+def _postgres_store_definition(sync_url: str) -> Callable[[str, object], None]:
+    def store(collection_id: str, definition: object) -> None:
+        engine = sqlalchemy.create_engine(sync_url)
+        with engine.begin() as connection:
+            connection.execute(
+                sqlalchemy.text(
+                    "UPDATE collections SET definition = CAST(:d AS jsonb) "
+                    + "WHERE id = :id"
+                ),
+                {"d": json.dumps(definition), "id": collection_id},
+            )
+        engine.dispose()
+
+    return store
+
+
 def _wipe(sync_url: str) -> None:
     engine = sqlalchemy.create_engine(sync_url)
     with engine.begin() as connection:
@@ -178,8 +214,8 @@ def _wipe(sync_url: str) -> None:
 def env(request: pytest.FixtureRequest) -> Iterator[Env]:
     """The real app over in-memory repositories or Postgres, as Alice."""
     if request.param == "memory":
-        app, bulk = _in_memory_app()
-        yield Env(app, TestClient(app), bulk)
+        app, bulk, store = _in_memory_app()
+        yield Env(app, TestClient(app), bulk, store)
         return
     request.getfixturevalue("postgres_url")
     sync_url: str = request.getfixturevalue("postgres_sync_url")
@@ -188,7 +224,12 @@ def env(request: pytest.FixtureRequest) -> Iterator[Env]:
     try:
         app = create_app()
         with TestClient(app) as client:
-            yield Env(app, client, _postgres_bulk(sync_url))
+            yield Env(
+                app,
+                client,
+                _postgres_bulk(sync_url),
+                _postgres_store_definition(sync_url),
+            )
     finally:
         get_session_factory.cache_clear()
         get_engine.cache_clear()
@@ -566,3 +607,154 @@ def test_another_persons_count_is_404_like_an_unknown_id(env: Env) -> None:
         assert theirs.status_code == ghost.status_code == 404
         assert theirs.json()["title"] == ghost.json()["title"]
         assert "count" not in theirs.json()
+
+
+def _deep(levels: int) -> dict[str, Any]:
+    node: Any = 1
+    for _ in range(levels):
+        node = {"d": node}
+    return {"v": 1, "deep": node}
+
+
+_HOSTILE: dict[str, bytes] = {
+    "nul in an extra key": json.dumps({"v": 1, "note": "a\u0000b"}).encode(),
+    "nul in a condition": json.dumps(
+        {
+            "v": 1,
+            "where": {
+                "op": "and",
+                "children": [{"kind": "favourite", "value": True, "x": "\u0000"}],
+            },
+        }
+    ).encode(),
+    "lone surrogate": b'{"v": 1, "note": "\\ud800"}',
+    "800 levels deep": json.dumps(_deep(800)).encode(),
+    "1 MB of junk": json.dumps({"v": 1, "junk": "x" * 1_000_000}).encode(),
+    "an unknown key": json.dumps({"v": 1, "note": "hello"}).encode(),
+    "NaN": b'{"v": 1, "n": NaN}',
+}
+
+
+@pytest.mark.parametrize("name", list(_HOSTILE))
+def test_hostile_definitions_are_400_and_the_list_stays_healthy(
+    env: Env, name: str
+) -> None:
+    """Every probe from the review is refused on create and on update."""
+    a = env.as_(ALICE)
+    json_type = {"Content-Type": "application/json"}
+    body = b'{"name": "Hostile", "definition": ' + _HOSTILE[name] + b"}"
+    created = a.post(COLLECTIONS, content=body, headers=json_type)
+    assert created.status_code == 400, created.text
+
+    smart = env.smart(_where(_rating(">=", 1)), name="Fine")
+    patched = a.patch(
+        f"{COLLECTIONS}/{smart['id']}",
+        content=b'{"definition": ' + _HOSTILE[name] + b"}",
+        headers=json_type,
+    )
+    assert patched.status_code == 400, patched.text
+    assert (
+        a.get(f"{COLLECTIONS}/{smart['id']}").json()["definition"]
+        == smart["definition"]
+    )
+    listed = a.get(COLLECTIONS)
+    assert listed.status_code == 200
+    assert [c["name"] for c in listed.json()] == ["Fine"]
+
+
+def test_an_unknown_key_is_named_in_the_error(env: Env) -> None:
+    """The 400 names the object's path and the unknown key."""
+    response = env.as_(ALICE).post(
+        COLLECTIONS,
+        json={
+            "name": "Extra",
+            "definition": {"v": 1, "where": None, "note": "hello"},
+        },
+    )
+
+    assert response.status_code == 400
+    assert "'note'" in response.json()["detail"]
+
+
+def test_a_stored_legacy_definition_still_lists_and_loads(env: Env) -> None:
+    """A deep or oversized definition stored before the limits never gives a 500."""
+    a = env.as_(ALICE)
+    deep = env.smart(_where(_rating(">=", 1)), name="Deep")
+    big = env.smart(_where(_rating(">=", 1)), name="Big")
+    env.store_definition(deep["id"], _deep(800))
+    env.store_definition(big["id"], {"v": 1, "junk": "x" * 100_000})
+
+    listed = a.get(COLLECTIONS)
+    assert listed.status_code == 200
+    assert {c["name"] for c in listed.json()} == {"Deep", "Big"}
+    for row in listed.json():
+        assert row["definition"] is None
+        assert row["item_count"] == 0
+    for collection in (deep, big):
+        fetched = a.get(f"{COLLECTIONS}/{collection['id']}")
+        assert fetched.status_code == 200, fetched.text
+        assert fetched.json()["warnings"] != []
+        assert a.get(f"{COLLECTIONS}/{collection['id']}/count").json() == {"count": 0}
+        renamed = a.patch(f"{COLLECTIONS}/{collection['id']}", json={"name": "Again"})
+        assert renamed.status_code == 200, renamed.text
+
+
+def test_a_manual_collection_given_a_malformed_definition_is_409(env: Env) -> None:
+    """Whatever the definition holds, a manual collection answers 409."""
+    a = env.as_(ALICE)
+    shelf = a.post(COLLECTIONS, json={"name": "Shelf"}).json()
+    for definition in ({}, {"v": 1}, {"v": 1, "note": "a\u0000b"}):
+        response = a.patch(
+            f"{COLLECTIONS}/{shelf['id']}", json={"definition": definition}
+        )
+        assert response.status_code == 409, response.text
+
+
+def test_a_too_long_slug_is_400_never_500(env: Env) -> None:
+    """The slug is limited to 120 characters on create and update."""
+    a = env.as_(ALICE)
+    shelf = a.post(COLLECTIONS, json={"name": "Shelf"}).json()
+    too_long = "a" * 121
+
+    assert (
+        a.post(COLLECTIONS, json={"name": "Long", "slug": too_long}).status_code == 422
+    )
+    for slug in (too_long, "".join("ab12"[i % 4] for i in range(12_000))):
+        patched = a.patch(f"{COLLECTIONS}/{shelf['id']}", json={"slug": slug})
+        assert patched.status_code == 422, patched.text
+    ok = a.patch(f"{COLLECTIONS}/{shelf['id']}", json={"slug": "a" * 120})
+    assert ok.status_code == 200, ok.text
+    assert len(ok.json()["slug"]) == 120
+    assert a.get(f"{COLLECTIONS}/{'a' * 120}").status_code == 200
+
+
+def test_a_slug_that_grows_when_normalised_is_400(env: Env) -> None:
+    """A slug short enough raw but over the limit once normalised is a 400."""
+    response = env.as_(ALICE).post(
+        COLLECTIONS, json={"name": "Grows", "slug": "\u33a2" * 50}
+    )
+
+    assert response.status_code == 400, response.text
+
+
+def test_the_list_can_be_limited_to_one_kind(env: Env) -> None:
+    """`kind` returns only manual or only smart collections, for the caller only."""
+    _films(env)
+    a = env.as_(ALICE)
+    a.post(COLLECTIONS, json={"name": "Shelf"})
+    env.smart(_where(_rating(">=", 4)), name="Smart")
+    env.as_(BOB)
+    env.smart(_where(_rating(">=", 4)), name="Bob smart")
+    b = env.as_(BOB)
+    b.post(COLLECTIONS, json={"name": "Bob shelf"})
+    a = env.as_(ALICE)
+
+    def names(query: str) -> list[str]:
+        response = a.get(f"{COLLECTIONS}{query}")
+        assert response.status_code == 200, response.text
+        return [c["name"] for c in response.json()]
+
+    assert names("?kind=manual") == ["Shelf"]
+    assert names("?kind=dynamic") == ["Smart"]
+    assert names("") == ["Shelf", "Smart"]
+    assert a.get(f"{COLLECTIONS}?kind=nope").status_code == 422

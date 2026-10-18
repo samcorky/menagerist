@@ -311,3 +311,63 @@ async def test_saving_replaced_definition_persists(db_session: AsyncSession) -> 
 
     assert stored is not None
     assert stored.definition == {"b": [2]}
+
+
+async def test_save_maps_a_slug_taken_meanwhile_to_conflict(
+    db_session: AsyncSession,
+) -> None:
+    """A rename onto a slug another request just took is a 409, not a 500."""
+    repo = SqlAlchemyCollectionRepository(db_session)
+    holder = _collection("Jazz")
+    mover = _collection("Blues")
+    await repo.add(holder)
+    await repo.add(mover)
+    mover.rename_slug(Slug("jazz"))
+
+    with pytest.raises(ConflictError, match="slug 'jazz' already exists"):
+        await repo.save(mover)
+
+    # The session survives the rejected flush.
+    db_session.expire_all()
+    found = await repo.get_by_slug("blues", scope=AccessScope.everyone())
+    assert found is not None
+    assert found.id == mover.id
+
+
+async def test_list_filters_by_kind(db_session: AsyncSession) -> None:
+    """`kind` keeps only manual or only smart collections, with paging intact."""
+    repo = SqlAlchemyCollectionRepository(db_session)
+    manual = [_collection(f"Shelf {n}") for n in range(3)]
+    smart = [
+        Collection.create(
+            name=f"Smart {n}",
+            slug=Slug(f"smart-{n}"),
+            owner_id=_OWNER,
+            definition={"v": 1},
+        )
+        for n in range(2)
+    ]
+    for collection in (*manual, *smart):
+        await repo.add(collection)
+    everyone = AccessScope.everyone()
+
+    manual_ids = [
+        c.id
+        for c in await repo.list(
+            scope=everyone, after=None, limit=10, kind=CollectionKind.MANUAL
+        )
+    ]
+    smart_ids = [
+        c.id
+        for c in await repo.list(
+            scope=everyone, after=None, limit=10, kind=CollectionKind.DYNAMIC
+        )
+    ]
+    paged = await repo.list(
+        scope=everyone, after=None, limit=2, kind=CollectionKind.MANUAL
+    )
+
+    assert manual_ids == sorted(c.id for c in manual)
+    assert smart_ids == sorted(c.id for c in smart)
+    assert [c.id for c in paged] == manual_ids[:2]
+    assert len(await repo.list(scope=everyone, after=None, limit=10)) == 5

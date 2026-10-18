@@ -10,6 +10,7 @@ from app.modules.collections.application.get_collection import (
 )
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.modules.collections.domain.collection import CollectionKind
 from app.modules.collections.ports.item_lookup import ItemLookup  # noqa: TC001
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
 from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
@@ -25,12 +26,16 @@ logger = structlog.get_logger()
 
 @dataclass(kw_only=True)
 class ListCollectionsQuery:
-    """Request for a page of collections ordered by id, optionally holding an item."""
+    """Request for a page of collections ordered by id, optionally holding an item.
+
+    A `kind` keeps one kind only; the other kind is not loaded or counted.
+    """
 
     after: uuid.UUID | None = None
     limit: int = 50
     item_id: uuid.UUID | None = None
     q: str | None = None
+    kind: CollectionKind | None = None
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -73,7 +78,11 @@ class ListCollections(
         """
         if query.item_id is None:
             return await self._repos.collections.list(
-                scope=scope, after=query.after, limit=query.limit, q=query.q
+                scope=scope,
+                after=query.after,
+                limit=query.limit,
+                q=query.q,
+                kind=query.kind,
             )
         holding = await self._repos.memberships.collection_ids_for(
             query.item_id, scope=scope
@@ -82,7 +91,11 @@ class ListCollections(
         after = query.after
         while len(found) < query.limit:
             batch = await self._repos.collections.list(
-                scope=scope, after=after, limit=query.limit, q=query.q
+                scope=scope,
+                after=after,
+                limit=query.limit,
+                q=query.q,
+                kind=query.kind,
             )
             found.extend(c for c in batch if c.id in holding)
             if len(batch) < query.limit:

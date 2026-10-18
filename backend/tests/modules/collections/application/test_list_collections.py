@@ -242,3 +242,56 @@ async def test_list_q_with_item_filter_fills_page_across_non_matches(
     )
 
     assert [s.collection.name for s in result.items] == ["Tape 0", "Tape 3"]
+
+
+async def test_list_by_kind_never_summarises_the_other_kind(
+    world: World, make_collection: MakeCollection
+) -> None:
+    """With `kind=manual` a smart row is neither loaded nor counted."""
+    from app.modules.collections.domain.collection import CollectionKind
+    from app.shared_kernel.slug import Slug
+
+    manual = make_collection(name="Shelf")
+    smart = Collection.create(
+        name="Smart", slug=Slug("smart"), owner_id=manual.owner_id, definition={"v": 1}
+    )
+    await world.collections.add(manual)
+    await world.collections.add(smart)
+    counted: list[object] = []
+    original = world.items.count_matching
+
+    async def spy(*args: object, **kwargs: object) -> tuple[int, bool]:
+        counted.append(args)
+        return await original(*args, **kwargs)  # type: ignore[arg-type]
+
+    world.items.count_matching = spy  # type: ignore[method-assign]
+
+    result = await _handler(world).handle(
+        ListCollectionsQuery(kind=CollectionKind.MANUAL), SYSTEM_ACTOR
+    )
+    assert [s.collection for s in result.items] == [manual]
+    assert counted == []
+
+    result = await _handler(world).handle(
+        ListCollectionsQuery(kind=CollectionKind.DYNAMIC), SYSTEM_ACTOR
+    )
+    assert [s.collection for s in result.items] == [smart]
+    assert len(counted) == 1
+
+
+async def test_list_by_kind_still_filters_by_held_item(
+    world: World, make_collection: MakeCollection
+) -> None:
+    """`kind` combines with `item_id`, with the filter applied while paging."""
+    from app.modules.collections.domain.collection import CollectionKind
+
+    shelves = await _add_shelves(world, make_collection, 3)
+    item = uuid.uuid7()
+    await _hold(world, shelves[2], item)
+
+    result = await _handler(world).handle(
+        ListCollectionsQuery(item_id=item, kind=CollectionKind.MANUAL, limit=1),
+        SYSTEM_ACTOR,
+    )
+
+    assert [s.collection for s in result.items] == [shelves[2]]

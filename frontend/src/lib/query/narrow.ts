@@ -70,8 +70,9 @@ export function saveBlockReason(saved: Query, adhoc: Query, basics: NarrowBasics
 const conditions = (n: number) => `${n} ${n === 1 ? 'condition' : 'conditions'}`;
 
 /** What "Update this collection" will do, for the confirmation. */
-export function updateConfirmation(before: number, after: number): string {
-	return `This replaces the collection's ${conditions(before)} with ${conditions(after)}: the current ones plus your filters. Items that don't match will leave this collection.`;
+export function updateConfirmation(before: number, after: number, replacesSort = false): string {
+	const sort = replacesSort ? ' and replaces the sort' : '';
+	return `This replaces the collection's ${conditions(before)} with ${conditions(after)}: the current ones plus your filters${sort}. Items that don't match will leave this collection.`;
 }
 
 /**

@@ -303,29 +303,40 @@
 		return (type?.attributes_schema as AttributesSchema | null | undefined) ?? null;
 	}
 
-	async function loadCollection(id: string) {
+	// `id` is the address segment on the first load, then always the canonical id, so the ETag
+	// cache key is `/collection/<uuid>` for every later call. `quiet` keeps the skeleton away.
+	async function loadCollection(id: string, quiet = false) {
 		const seq = ++collectionSeq;
-		headerLoading = true;
+		if (!quiet) headerLoading = true;
 		notFound = false;
 		loadFailed = false;
 		const result = await getCollection({ path: { collection_id: id } });
-		if (seq !== collectionSeq || id !== collectionId) return;
+		if (seq !== collectionSeq) return;
+		if (id !== collectionId && id !== collection?.id) {
+			headerLoading = false;
+			return;
+		}
 		if (result.response?.status === 404) {
 			notFound = true;
 			collection = null;
 		} else if (result.error || !result.data) {
-			loadFailed = true;
-			collection = null;
+			// A background reload that fails leaves the page as it was
+			if (!quiet) {
+				loadFailed = true;
+				collection = null;
+			}
 		} else {
 			collection = result.data;
-			showCanonicalAddress(id, result.data);
+			showCanonicalAddress(result.data);
+			// Reload once by id so later ETags are keyed by id, not by the slug just used
+			if (id !== result.data.id) void loadCollection(result.data.id, true);
 		}
 		headerLoading = false;
 	}
 
 	// Replaces an id (or an old slug) in the address with the slug, without a history entry.
-	function showCanonicalAddress(segment: string, loaded: CollectionResponse) {
-		if (canonicalSlugFor(segment, loaded) === null) return;
+	function showCanonicalAddress(loaded: CollectionResponse) {
+		if (canonicalSlugFor(collectionId, loaded) === null) return;
 		void goto(resolve(collectionAddress(loaded, page.url)), {
 			replaceState: true,
 			keepFocus: true,
@@ -462,6 +473,7 @@
 		} catch (e) {
 			if (!(e instanceof SmartCollectionError)) throw e;
 			updateError = describeSaveError(e, definition);
+			if (e.status === 412) void loadCollection(id, true);
 		} finally {
 			updating = false;
 		}
@@ -625,6 +637,7 @@
 			if (!(e instanceof SmartCollectionError)) throw e;
 			const where = e.target && 'where' in e.target ? e.target.where : null;
 			conditionsError = { message: e.message, path: where };
+			if (e.status === 412) void loadCollection(id, true);
 			return false;
 		} finally {
 			conditionsSaving = false;
@@ -686,13 +699,13 @@
 	}
 
 	function refreshAfterChange() {
-		void loadCollection(collectionId);
+		void loadCollection(canonicalId, true);
 		void fetchPage(canonicalId, q, selectedType);
 	}
 
 	async function handleRemove(item: NodeResponse) {
-		if (removingId !== null) return;
-		const id = collectionId;
+		if (removingId !== null || !collection) return;
+		const id = collection.id;
 		const collectionName = collection?.name ?? 'collection';
 		const searchAtRemoval = q;
 		const typeAtRemoval = selectedType;
@@ -708,9 +721,9 @@
 			toast.error(title, { description });
 			return;
 		}
-		if (id !== collectionId) return;
+		if (id !== collection?.id) return;
 		items = items.filter((i) => i.id !== item.id);
-		void loadCollection(id);
+		void loadCollection(id, true);
 		void tick().then(() => {
 			const next = neighbour
 				? document.querySelector<HTMLElement>(`[data-remove-id="${neighbour.id}"]`)
@@ -740,8 +753,8 @@
 			toast.error(addItemsErrorMessage(result.response?.status));
 			return;
 		}
-		if (id !== collectionId) return;
-		void loadCollection(id);
+		if (id !== collection?.id) return;
+		void loadCollection(id, true);
 		// Restore in id order, unless it belongs on a page that has not loaded yet
 		const last = items.at(-1);
 		const beyondLoaded = hasMore && last !== undefined && item.id > last.id;
@@ -776,20 +789,21 @@
 	async function handleEditSubmit(event: SubmitEvent) {
 		event.preventDefault();
 		editTouched = true;
-		if (nameHint !== null || saving) return;
+		if (nameHint !== null || saving || !collection) return;
 		if (regenerating) return;
+		const id = collection.id;
 		saving = true;
 		saveError = null;
 		slugError = null;
-		const slugChange = slugPatch(collection?.slug ?? '', editSlug);
+		const slugChange = slugPatch(collection.slug, editSlug);
 		const result = await updateCollection({
-			path: { collection_id: collectionId },
+			path: { collection_id: id },
 			body: { name: editName.trim(), description: editDescription.trim(), ...slugChange }
 		});
 		saving = false;
 		if (result.response?.status === 412) {
 			saveError = 'This collection was changed elsewhere. Close this and try again.';
-			void loadCollection(collectionId);
+			void loadCollection(id, true);
 			return;
 		}
 		if (result.error || !result.data) {
@@ -805,24 +819,25 @@
 			return;
 		}
 		collection = result.data;
-		showCanonicalAddress(collectionId, result.data);
+		showCanonicalAddress(result.data);
 		handleEditOpenChange(false);
 		toast.success('Collection saved');
 	}
 
 	async function regenerateSlug() {
-		if (regenerating || saving || nameUnsaved) return;
+		if (regenerating || saving || nameUnsaved || !collection) return;
+		const id = collection.id;
 		regenerating = true;
 		slugError = null;
 		saveError = null;
 		const result = await updateCollection({
-			path: { collection_id: collectionId },
+			path: { collection_id: id },
 			body: { regenerate_slug: true }
 		});
 		regenerating = false;
 		if (result.response?.status === 412) {
 			saveError = 'This collection was changed elsewhere. Close this and try again.';
-			void loadCollection(collectionId);
+			void loadCollection(id, true);
 			return;
 		}
 		if (result.error || !result.data) {
@@ -839,7 +854,7 @@
 		}
 		collection = result.data;
 		editSlug = result.data.slug;
-		showCanonicalAddress(collectionId, result.data);
+		showCanonicalAddress(result.data);
 	}
 
 	function openDelete(event: MouseEvent) {
@@ -854,8 +869,9 @@
 	}
 
 	async function handleDelete() {
+		if (!collection) return;
 		deleting = true;
-		const result = await deleteCollection({ path: { collection_id: collectionId } });
+		const result = await deleteCollection({ path: { collection_id: collection.id } });
 		if (result.error) {
 			deleting = false;
 			confirmDelete = false;
@@ -1365,7 +1381,8 @@
 {#snippet updateDescription()}
 	{updateConfirmation(
 		storedQuery ? countConditions(storedQuery) : 0,
-		countConditions(combinedQuery)
+		countConditions(combinedQuery),
+		adhoc.sort.length > 0
 	)}
 	{#if updateError}
 		<span role="alert" class="mt-2 block text-destructive">{updateError}</span>

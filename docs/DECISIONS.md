@@ -893,6 +893,34 @@ Further known limits, left as they are for now:
 
 **Not chosen:** resolving per-item keys through the type (no type is involved) and a server-side stale-field warning (it would need a scan of every overlay on each search).
 
+## Smart collections: a stored search, resolved through bridges (2026-10-17)
+
+**Decision:** a collection has a `kind`, `manual` or `dynamic` (a smart collection). A smart collection stores a `definition`, the phase 1 condition tree (`{v, where, sort}`), as JSONB. The `collections` module treats it as opaque: it never parses or evaluates it. Members are not stored; they are whatever the search matches for the viewer, so they are always current.
+
+**Rationale:** the query engine lives in `graph`, and the two modules must not import each other. Validation and resolution therefore go through ports that `entrypoints/api/shared/bridges/` implements over graph use cases, the same pattern as `ItemLookup` and `CollectionMembers`: `collection_definitions.py` (validate a definition and report warnings), `collection_items.py` (count matches, capped or exact) and `collection_members.py` (resolve a collection to a manual id set or a smart definition). Bridges now live in `shared/bridges/` and HTTP plumbing (middleware, conditional requests, problem responses) in `shared/http/`, so `shared/` keeps only authorisation and composition concerns. The access scope is applied last inside graph's repository, so a saved query never reaches another person's items, however it is reached.
+
+**Rulings:**
+
+- **R18:** the kind is fixed at creation. There is no manual-to-smart conversion; the data model would allow one later. Adding or removing items on a smart collection, and giving a manual collection a definition, are 409s (`CollectionKindError`); the kind is checked before the definition, so a manual collection given any definition (even a malformed one) is that 409, not a 400.
+- **R19:** `GET /node?collection=<smart>` orders by id with the existing id paging and ignores the saved sort. The collection page runs `POST /node/search` with the stored definition so the saved sort applies.
+- **R20:** a smart collection's `item_count` is the capped search count (`TOTAL_CAP`, 1,000) with an `item_count_capped` flag; cards and lists show "1,000+". `GET /collection/{id}/count` returns the exact, uncapped count (scoped to the caller, 404 for another owner's), and the collection page fetches it automatically in the background when the figure is capped, with a **Count exactly** retry if that request fails.
+- **R21:** the definition is stored exactly as the client sent it once it parses and validates; nothing is rewritten, so relative dates stay relative. The parser rejects unknown keys (on the query, groups, every condition kind and sort keys) and names them with the path of the object, so what is stored is exactly what was validated; the browser decoder drops unknown keys, so only the server is strict. Before it reaches the checker, a definition over 32 KiB as JSON, nested deeper than 12 levels, or holding a NUL character, text that is not valid UTF-8 or a non-finite number is also refused. An invalid or over-limit definition is a 400 naming the path of the first bad condition. A definition stored before these limits that breaks them is shown as `definition: null` with a warning rather than failing the list. A definition that no longer validates when read (a field or type was removed) degrades to "matches nothing" plus warnings, never an error page.
+- **R22:** `GET /node?collection=<smart>` keeps an exact `Total-Count`, as plain `GET /node` does. Only the collection card count is capped. Cost: an API client listing a huge smart collection through this route pays for an exact count; revisit by capping with a flag header.
+- **R23:** collection slugs stay unique per owner, not global, so the id remains the canonical, always-resolvable form. Every `/collection/{id}` route accepts an id or a slug (scoped to the caller; another owner's slug is the same 404 as an unknown one), `PATCH` takes `slug` or `regenerate_slug` (both together is a 400), a taken slug is a 409, and a UUID-shaped slug, or one over 120 characters, is refused so a path segment is never ambiguous and the unique index row stays small. A concurrent rename onto a slug just taken is a 409 too (the repository maps the index violation). A slug change keeps no history: the old slug stops resolving, links by id keep working. The page replaces an id address with the slug (no extra history entry, and the query string and hash are kept). Collections only.
+- **R24:** opening a smart collection is read-only. The search box, type select and ad-hoc filters narrow the results by ANDing onto the saved conditions and live in the address (`?f=`, `?q=`, `?type=`), so they can be shared and reloaded. A narrowed view can be saved as a new smart collection or, after a confirmation, overwrite the collection's definition; **Edit conditions** has explicit Save and Cancel. Both save actions are disabled with a reason when the combined tree exceeds the depth or condition limits or the text exceeds 200 characters. The saved definition is never edited implicitly.
+
+**ETag:** a manual collection's ETag extra is its item count, unchanged. A smart collection's is `count:capped:hash`, the capped count, the capped flag and a hash of the sorted warnings, because `updated_at` does not move when items start or stop matching. Above the cap the body and ETag stay the same. `If-Modified-Since` is skipped for smart collections (only `If-None-Match` can give a 304); `Last-Modified` is still sent and `PATCH`'s `If-Unmodified-Since` is unchanged.
+
+**Parameter ceiling:** a manual collection filters the item list with an `IN (ids)` list, which is bounded by the 32,767 bind-parameter limit. A smart collection is resolved by the search engine and counted in SQL, with no id list, so it has no such ceiling.
+
+**Known limits:**
+
+- The in-memory `count_matching` does not evaluate conditions; it counts every live item. Tests that need real counts for a smart collection use the Postgres bridge tests.
+- The definition checker runs as `SYSTEM_ACTOR`, because validation needs the item types and not an owner's data; the scope is still applied to every count and listing.
+- Fixed in the frontend: the collection page addresses every call by id once the collection has loaded, so the ETag cache (keyed by path) holds one entry per collection and definition saves carry `If-Match`.
+- "Save as new, linked to this collection" waits for the "in collection" condition (phase 2b).
+- Not chosen: converting a collection between kinds, a slug history, and an in-process cache for the exact count (to add only if a benchmark shows the need).
+
 ## Direction: roles as data, implied permissions
 
 **Direction (2026-10-10), not built:**

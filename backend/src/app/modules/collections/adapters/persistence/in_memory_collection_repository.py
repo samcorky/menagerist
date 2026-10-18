@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import uuid
 
-    from app.modules.collections.domain.collection import Collection
+    from app.modules.collections.domain.collection import Collection, CollectionKind
     from app.shared_kernel.access_scope import AccessScope
 
 
@@ -67,11 +67,12 @@ class InMemoryCollectionRepository:
         after: uuid.UUID | None,
         limit: int,
         q: str | None = None,
+        kind: CollectionKind | None = None,
     ) -> list[Collection]:
         """Return up to `limit` live collections in `scope`, ordered by id.
 
         A non-blank `q` keeps collections whose name or description contains it,
-        ignoring case and accents.
+        ignoring case and accents. A `kind` keeps only collections of that kind.
         """
         needle = _fold((q or "").strip())
         live = sorted(
@@ -80,6 +81,7 @@ class InMemoryCollectionRepository:
                 for c in self._collections.values()
                 if self._visible(c, scope)
                 and (after is None or c.id > after)
+                and (kind is None or c.kind is kind)
                 and (
                     not needle
                     or needle in _fold(c.name)

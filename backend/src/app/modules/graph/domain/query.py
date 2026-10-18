@@ -465,6 +465,29 @@ def _field(data: Mapping[str, object], path: str) -> FieldCondition:
     )
 
 
+_CONDITION_KEYS: Final[Mapping[str, frozenset[str]]] = {
+    "text": frozenset({"kind", "q"}),
+    "type": frozenset({"kind", "in"}),
+    "favourite": frozenset({"kind", "value"}),
+    "tag": frozenset({"kind", "mode", "tags"}),
+    "date": frozenset({"kind", "on", "op", "value"}),
+    "field": frozenset({"kind", "type", "field_kind", "key", "sub_key", "op", "value"}),
+}
+_GROUP_KEYS: Final = frozenset({"op", "children"})
+_QUERY_KEYS: Final = frozenset({"v", "where", "sort"})
+_SORT_KEYS: Final = frozenset({"by", "dir"})
+_FIELD_SORT_KEYS: Final = _SORT_KEYS | {"type", "key"}
+
+
+def _only_known(data: Mapping[str, object], allowed: frozenset[str], path: str) -> None:
+    """Reject keys outside `allowed`, so a stored query holds only the grammar."""
+    unknown = sorted(str(key) for key in data if key not in allowed)
+    if unknown:
+        names = ", ".join(f"'{name}'" for name in unknown)
+        msg = f"Unknown {'key' if len(unknown) == 1 else 'keys'}: {names}."
+        raise InvalidQueryError(msg, path=path)
+
+
 _CONDITION_PARSERS: Final[
     Mapping[str, Callable[[Mapping[str, object], str], Condition]]
 ] = {
@@ -486,6 +509,7 @@ def _sort_key(item: object, path: str) -> SortKey:
     if not isinstance(direction, str) or direction not in {"asc", "desc"}:
         msg = "'dir' must be asc or desc."
         raise InvalidQueryError(msg, path=path)
+    _only_known(item, _FIELD_SORT_KEYS if by == "field" else _SORT_KEYS, path)
     by = cast("Literal['name', 'created', 'updated', 'field']", item["by"])
     direction = cast("Literal['asc', 'desc']", direction)
     if by != "field":
@@ -516,6 +540,7 @@ class _Parser:
         if not isinstance(data, Mapping) or data.get("op") not in _GROUP_OPS:
             msg = "Expected a group (and, or, not)."
             raise InvalidQueryError(msg, path=path)
+        _only_known(data, _GROUP_KEYS, path)
         children = data.get("children")
         if not isinstance(children, list) or not children:
             msg = "A group needs at least one child."
@@ -549,6 +574,7 @@ class _Parser:
         if parser is None:
             msg = "Unknown condition kind."
             raise InvalidQueryError(msg, path=path)
+        _only_known(data, _CONDITION_KEYS[cast("str", kind)], path)
         return parser(data, path)
 
 
@@ -566,6 +592,7 @@ def parse_query(data: object) -> Query:
     if isinstance(version, bool) or version != QUERY_VERSION:
         msg = f"Unsupported query version; expected {QUERY_VERSION}."
         raise InvalidQueryError(msg, path="v")
+    _only_known(data, _QUERY_KEYS, "")
     parser = _Parser()
     raw_where = data.get("where")
     where = None if raw_where is None else parser.group(raw_where, "where", 1)

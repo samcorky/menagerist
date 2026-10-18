@@ -21,6 +21,7 @@
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import { auth } from '$lib/auth.svelte.js';
 	import { guardDecision } from '$lib/auth';
+	import { animatesNavigation } from '$lib/view-transition';
 	import { themeController } from '$lib/theme.svelte.js';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { searchPaletteController } from '$lib/search-palette.svelte.js';
@@ -48,7 +49,7 @@
 	});
 
 	onNavigate((navigation) => {
-		if (!document.startViewTransition) return;
+		if (!document.startViewTransition || !animatesNavigation(navigation)) return;
 		return new Promise((done) => {
 			const transition = document.startViewTransition(async () => {
 				done();

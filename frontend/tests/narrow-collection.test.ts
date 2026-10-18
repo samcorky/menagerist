@@ -155,6 +155,11 @@ describe('updateConfirmation', () => {
 	it('uses the singular', () => {
 		expect(updateConfirmation(1, 2)).toContain('1 condition ');
 	});
+
+	it('mentions the sort only when the sort is being replaced', () => {
+		expect(updateConfirmation(2, 3)).not.toMatch(/sort/i);
+		expect(updateConfirmation(2, 3, true)).toContain('and replaces the sort');
+	});
 });
 
 describe('locateInCombined', () => {

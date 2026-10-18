@@ -123,6 +123,15 @@ describe('updateDefinition', () => {
 		});
 	});
 
+	it('explains a 412 as a change made elsewhere', async () => {
+		updateCollection.mockResolvedValue({ error: { detail: 'x' }, response: { status: 412 } });
+		const e = await failure(updateDefinition('c1', query));
+		expect(e.status).toBe(412);
+		expect(e.message).toBe(
+			'This collection was changed elsewhere. Reload to see the latest conditions.'
+		);
+	});
+
 	it('surfaces a 409 and a 400 with a sort path', async () => {
 		updateCollection.mockResolvedValueOnce({ error: { detail: 'x' }, response: { status: 409 } });
 		expect((await failure(updateDefinition('c1', query))).status).toBe(409);
@@ -165,6 +174,10 @@ describe('smartCollectionSummary', () => {
 			{ path: 'where.children[0]', message: 'gone' }
 		]);
 		expect(summary?.chips[0].warning).toBe(true);
+	});
+
+	it('has no chips for a smart collection without conditions', () => {
+		expect(smartCollectionSummary(emptyQuery(), lookup)?.chips).toEqual([]);
 	});
 
 	it('is null for a definition the decoder rejects', () => {

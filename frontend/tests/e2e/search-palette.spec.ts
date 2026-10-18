@@ -1,4 +1,4 @@
-import { test, expect, type Page } from './fixtures';
+import { test, expect, type APIRequestContext, type Page } from './fixtures';
 import { GROUP_CAPS } from '../../src/lib/palette-search';
 import {
 	failCollectionSearch,
@@ -18,6 +18,13 @@ test.afterEach(async ({ request }) => {
 
 const popup = (page: Page) => page.getByRole('dialog', { name: 'Search', exact: true });
 const input = (page: Page) => popup(page).getByPlaceholder('Search everything…');
+
+/** The collection page shows its slug in the address. */
+async function collectionSlug(request: APIRequestContext, id: string) {
+	const res = await request.get(`/api/v1/collection/${id}`);
+	expect(res.ok()).toBe(true);
+	return ((await res.json()) as { slug: string }).slug;
+}
 
 async function openWithSlash(page: Page, path = '/') {
 	await page.goto(path);
@@ -198,7 +205,9 @@ test('choosing an item, a collection and an item type each lands in the right pl
 	await openWithSlash(page);
 	await input(page).fill(token);
 	await row(page, new RegExp(collection.name)).click();
-	await expect(page).toHaveURL(new RegExp(`/collections/${collection.id}$`));
+	await expect(page).toHaveURL(
+		new RegExp(`/collections/${await collectionSlug(request, collection.id)}$`)
+	);
 	await expect(page.getByRole('heading', { name: collection.name, level: 1 })).toBeVisible();
 
 	await openWithSlash(page);
@@ -333,7 +342,9 @@ test('the popup finds an accented collection with unaccented text', async ({ pag
 	await expect(found).toBeVisible();
 	await expect(popup(page).getByText('Collections', { exact: true })).toBeVisible();
 	await found.click();
-	await expect(page).toHaveURL(new RegExp(`/collections/${collection.id}$`));
+	await expect(page).toHaveURL(
+		new RegExp(`/collections/${await collectionSlug(request, collection.id)}$`)
+	);
 });
 
 test('the items page box also finds an accented item with unaccented text', async ({

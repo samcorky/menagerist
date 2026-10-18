@@ -7,13 +7,18 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.modules.collections.application.add_items_to_collection import (
     MAX_ITEMS_PER_REQUEST,
 )
+from app.modules.collections.application.collection_slugs import MAX_SLUG_LENGTH
 from app.modules.collections.application.create_collection import (
     CreateCollectionCommand,
+)
+from app.modules.collections.application.definition_limits import (
+    ensure_definition_within_limits,
 )
 from app.modules.collections.application.update_collection import (
     UpdateCollectionCommand,
 )
 from app.modules.collections.domain.collection import MAX_NAME_LENGTH, CollectionKind
+from app.modules.collections.domain.errors import InvalidDefinitionError
 from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
@@ -66,7 +71,9 @@ class CreateCollectionRequest(RequestModel):
     name: str = Field(max_length=MAX_NAME_LENGTH)
     description: str | None = Field(default=None)
     slug: str | None = Field(
-        default=None, description="Derived from the name when omitted."
+        default=None,
+        max_length=MAX_SLUG_LENGTH,
+        description="Derived from the name when omitted.",
     )
     definition: dict[str, Any] | None = Field(
         default=None, description=_DEFINITION_DESCRIPTION
@@ -106,6 +113,7 @@ class UpdateCollectionRequest(RequestModel):
     )
     slug: str | None = Field(
         default=None,
+        max_length=MAX_SLUG_LENGTH,
         description=(
             "A new slug, normalised. Must be unused among your collections and "
             + "must not look like an id. The old slug stops working."
@@ -211,6 +219,22 @@ class CollectionResponse(BaseModel):
     def from_domain(cls, summary: CollectionSummary) -> CollectionResponse:
         """Build a response from a collection summary."""
         collection = summary.collection
+        definition = collection.definition
+        warnings = [
+            DefinitionWarningResponse(path=w.path, message=w.message)
+            for w in summary.warnings
+        ]
+        if definition is not None:
+            try:
+                ensure_definition_within_limits(definition)
+            except InvalidDefinitionError:
+                # Stored before the limits existed: never fail the response on it.
+                definition = None
+                warnings.append(
+                    DefinitionWarningResponse(
+                        path="", message="The saved conditions cannot be shown."
+                    )
+                )
         return cls(
             id=collection.id,
             name=collection.name,
@@ -218,13 +242,10 @@ class CollectionResponse(BaseModel):
             description=collection.description,
             kind=collection.kind,
             visibility=str(collection.visibility),
-            definition=collection.definition,
+            definition=definition,
             item_count=summary.item_count,
             item_count_capped=summary.item_count_capped,
-            warnings=[
-                DefinitionWarningResponse(path=w.path, message=w.message)
-                for w in summary.warnings
-            ],
+            warnings=warnings,
             created_at=collection.created_at,
             updated_at=collection.updated_at,
         )

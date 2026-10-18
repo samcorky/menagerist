@@ -40,8 +40,14 @@ export function collectionSaveErrorMessage(status: number | undefined): string {
 	return "Couldn't save the collection. Try again.";
 }
 
-/** The route parameters of a collection's page; links always use the slug. */
-export function collectionRouteParams(collection: { slug: string }): { id: string } {
+const UUID_PATTERN = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
+
+/**
+ * The route parameters of a collection's page; links use the slug, except for an old slug that
+ * reads as an id (the server would take it for one), which falls back to the id.
+ */
+export function collectionRouteParams(collection: { id?: string; slug: string }): { id: string } {
+	if (collection.id && UUID_PATTERN.test(collection.slug)) return { id: collection.id };
 	return { id: collection.slug };
 }
 

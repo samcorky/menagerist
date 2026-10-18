@@ -162,10 +162,22 @@ async def list_collections(
             ),
         ),
     ] = None,
+    kind: Annotated[
+        CollectionKind | None,
+        Query(
+            description=(
+                "Keep one kind only. `manual` never loads or counts smart "
+                + "collections, so use it where they cannot be used."
+            )
+        ),
+    ] = None,
 ) -> list[CollectionResponse]:
     """List collections with item counts, optionally only those holding an item."""
     result = await use_case.handle(
-        ListCollectionsQuery(after=after, limit=limit + 1, item_id=item_id, q=q), actor
+        ListCollectionsQuery(
+            after=after, limit=limit + 1, item_id=item_id, q=q, kind=kind
+        ),
+        actor,
     )
     summaries = result.items
     if len(summaries) > limit:

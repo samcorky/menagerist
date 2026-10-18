@@ -11,6 +11,12 @@ if TYPE_CHECKING:
     from app.shared_kernel.access_scope import AccessScope
 
 _FALLBACK_SLUG = "collection"
+MAX_SLUG_LENGTH = 120
+# Leaves room for a `-2`, `-3`... suffix when a derived slug is taken.
+_DERIVED_SLUG_LENGTH = MAX_SLUG_LENGTH - 8
+
+
+_TOO_LONG = f"A collection slug can be up to {MAX_SLUG_LENGTH} characters."
 
 
 def is_uuid_shaped(value: str) -> bool:
@@ -23,13 +29,17 @@ def is_uuid_shaped(value: str) -> bool:
 
 
 def explicit_slug(value: str) -> Slug:
-    """Normalise a caller-supplied slug, mapping an unusable one to a 422."""
+    """Normalise a caller-supplied slug, mapping an unusable one to a 400."""
+    if len(value) > MAX_SLUG_LENGTH:
+        raise InvalidCollectionError(_TOO_LONG)
     try:
         slug = Slug(value)
     except ValueError as exc:
         raise InvalidCollectionError(
             "A collection slug must contain letters or numbers."
         ) from exc
+    if len(slug.value) > MAX_SLUG_LENGTH:
+        raise InvalidCollectionError(_TOO_LONG)
     if is_uuid_shaped(slug.value):
         raise InvalidCollectionError("A collection slug cannot look like an id.")
     return slug
@@ -47,7 +57,7 @@ async def free_slug(
     A candidate that looks like an id is skipped too, so a derived slug is never
     ambiguous in a path. The collection `excluding` does not count as a holder.
     """
-    base = slugify(name) or _FALLBACK_SLUG
+    base = slugify(name)[:_DERIVED_SLUG_LENGTH].strip("-") or _FALLBACK_SLUG
     candidate = base
     number = 2
     while is_uuid_shaped(candidate) or await _held(

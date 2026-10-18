@@ -353,7 +353,8 @@ test('double-clicking Remove sends one request and Undo restores the item', asyn
 
 	let deletes = 0;
 	page.on('request', (r) => {
-		if (r.method() === 'DELETE' && r.url().includes(`/collection/${collection.id}/item/`)) {
+		// The page addresses the collection by its slug, so match on the item.
+		if (r.method() === 'DELETE' && r.url().endsWith(`/item/${item.id}`)) {
 			deletes += 1;
 		}
 	});

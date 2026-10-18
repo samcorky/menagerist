@@ -63,9 +63,10 @@ def check_content_not_modified(request: Request, asset: MediaAsset) -> Response 
     """Return a bare 304 if the client's cached copy of the original is still current.
 
     Deliberately does not use the ConditionalRequest/ETaggable machinery in
-    shared/conditional_request.py: that writes headers onto the request-scoped
-    injected `response` dependency, which only reaches the client when a route
-    returns a plain model for FastAPI to serialize. stream_media_content (and
+    shared/http/conditional_request.py (under entrypoints/api/): that writes
+    headers onto the request-scoped injected `response` dependency, which only
+    reaches the client when a route returns a plain model for FastAPI to
+    serialize. stream_media_content (and
     stream_media_thumbnail) return their own StreamingResponse instead, which
     would silently discard anything written to the injected response - so the
     200-path headers are attached directly via content_cache_headers() at the

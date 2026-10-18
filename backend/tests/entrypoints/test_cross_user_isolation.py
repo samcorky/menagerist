@@ -285,6 +285,7 @@ QUERY_PARAMS: dict[str, Callable[[Seed], str]] = {
     "q": lambda _: "xenomorph",
     "type": lambda _: "film",
     "favourite": lambda _: "true",
+    "kind": lambda _: "manual",
     "collection": lambda s: s.collection,
     "node_id": lambda s: s.item,
     "item_id": lambda s: s.item,

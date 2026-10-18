@@ -94,14 +94,22 @@ class Collection(Identifiable, SoftDeletable):
         self.slug = slug
         self.touch()
 
-    def replace_definition(self, definition: dict[str, Any]) -> None:
-        """Replace a dynamic collection's definition.
+    def ensure_dynamic(self) -> None:
+        """Guard a change to the definition.
 
         Raises:
             CollectionKindError: If the collection is manual.
         """
         if self.kind is not CollectionKind.DYNAMIC:
             raise CollectionKindError("Only a smart collection has a definition.")
+
+    def replace_definition(self, definition: dict[str, Any]) -> None:
+        """Replace a dynamic collection's definition.
+
+        Raises:
+            CollectionKindError: If the collection is manual.
+        """
+        self.ensure_dynamic()
         self.definition = definition
         self.touch()
 

@@ -9,6 +9,9 @@ from app.modules.collections.application.collection_slugs import (
     free_slug,
     slug_is_held,
 )
+from app.modules.collections.application.definition_limits import (
+    ensure_definition_within_limits,
+)
 from app.modules.collections.domain.collection import Collection
 from app.modules.collections.domain.errors import (
     CollectionNotFoundError,
@@ -76,14 +79,16 @@ class UpdateCollection(
             ConflictError: If the slug belongs to another live collection of the
                 actor.
             CollectionKindError: If a definition is given for a manual collection.
-            InvalidDefinitionError: If the definition is malformed, with its path.
+            InvalidDefinitionError: If the definition is malformed, with its path, or
+                is too large, too deeply nested or not storable text.
+
+        A definition for a manual collection is a `CollectionKindError` whatever
+        it holds: the kind is checked before the definition is.
         """
         if command.slug is not None and command.regenerate_slug:
             raise InvalidCollectionError("Give either a slug or regenerate_slug.")
         wanted = None if command.slug is None else explicit_slug(command.slug)
         scope = self._policy.scope_for(actor)
-        if command.definition is not None:
-            await self._checker.check(command.definition, scope)
         async with self._uow as repos:
             collection = await repos.collections.get(command.collection_id, scope=scope)
             if collection is None:
@@ -91,6 +96,10 @@ class UpdateCollection(
                     f"Collection {command.collection_id} not found"
                 )
             self._policy.assert_can_modify(actor, collection.owner_id)
+            if command.definition is not None:
+                collection.ensure_dynamic()
+                ensure_definition_within_limits(command.definition)
+                await self._checker.check(command.definition, scope)
             if command.name is not None:
                 collection.rename(command.name)
             if command.description is not None:

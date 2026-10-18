@@ -34,30 +34,6 @@
       }
     },
     {
-      "name": "unknown keys are ignored",
-      "query": {
-        "v": 1,
-        "extra": 1,
-        "where": {
-          "op": "and",
-          "extra": 2,
-          "children": [
-            {
-              "kind": "favourite",
-              "value": true,
-              "junk": 3
-            }
-          ]
-        },
-        "sort": [
-          {
-            "by": "name",
-            "junk": 4
-          }
-        ]
-      }
-    },
-    {
       "name": "sort by name",
       "query": {
         "v": 1,
@@ -138,20 +114,6 @@
           },
           {
             "by": "updated"
-          }
-        ]
-      }
-    },
-    {
-      "name": "sort by name ignores type and key",
-      "query": {
-        "v": 1,
-        "where": null,
-        "sort": [
-          {
-            "by": "name",
-            "type": 5,
-            "key": null
           }
         ]
       }

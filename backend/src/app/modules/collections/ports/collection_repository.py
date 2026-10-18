@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:
     import uuid
 
-    from app.modules.collections.domain.collection import Collection
+    from app.modules.collections.domain.collection import Collection, CollectionKind
     from app.shared_kernel.access_scope import AccessScope
 
 
@@ -38,11 +38,12 @@ class CollectionRepository(Protocol):
         after: uuid.UUID | None,
         limit: int,
         q: str | None = None,
+        kind: CollectionKind | None = None,
     ) -> list[Collection]:
         """Return up to `limit` live collections in `scope`, ordered by id.
 
         A non-blank `q` keeps collections whose name or description contains it,
-        ignoring case.
+        ignoring case. A `kind` keeps only collections of that kind.
         """
         ...
 

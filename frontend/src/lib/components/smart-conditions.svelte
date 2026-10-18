@@ -2,7 +2,11 @@
 	import { Lock, TriangleAlert } from '@lucide/svelte';
 	import type { SummaryLookup } from '$lib/query/summary';
 	import type { SearchWarning } from '$lib/query/search';
-	import { UNREADABLE_CONDITIONS_MESSAGE, smartCollectionSummary } from '$lib/smart-collections';
+	import {
+		MATCHES_EVERY_ITEM_MESSAGE,
+		UNREADABLE_CONDITIONS_MESSAGE,
+		smartCollectionSummary
+	} from '$lib/smart-collections';
 
 	let {
 		definition,
@@ -26,7 +30,15 @@
 
 {#if !summary}
 	<p class="text-sm text-muted-foreground">{UNREADABLE_CONDITIONS_MESSAGE}</p>
-{:else if summary.chips.length > 0}
+	{#if warnings.length > 0}
+		<p class="flex items-start gap-1.5 text-sm">
+			<TriangleAlert class="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
+			{[...new Set(warnings.map((w) => w.message))].join(' ')}
+		</p>
+	{/if}
+{:else if summary.chips.length === 0}
+	<p class="text-sm text-muted-foreground">{MATCHES_EVERY_ITEM_MESSAGE}</p>
+{:else}
 	<div class="flex flex-col gap-2">
 		{#if locked}
 			<p class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">

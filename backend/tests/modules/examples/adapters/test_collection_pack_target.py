@@ -8,6 +8,7 @@ import pytest
 from app.entrypoints.api.shared.bridges.example_targets import (
     CollectionPackTarget,
     GraphPackTarget,
+    RejectingDefinitionChecker,
     build_in_memory_collections_repos,
     in_memory_collection_stores,
     in_memory_graph_stores,
@@ -187,3 +188,9 @@ async def test_the_graph_target_rejects_kinds_it_does_not_handle(
         await rig.graph.inspect(kind, uuid.uuid7())
     with pytest.raises(ValueError, match="does not handle"):
         await rig.graph.remove(kind, uuid.uuid7())
+
+
+async def test_the_install_checker_rejects_any_definition() -> None:
+    """A definition reaching the install checker is a bug: packs are manual only."""
+    with pytest.raises(RuntimeError, match="smart collections"):
+        await RejectingDefinitionChecker().check({"v": 1}, AccessScope.everyone())

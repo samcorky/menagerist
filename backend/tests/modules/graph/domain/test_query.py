@@ -496,3 +496,84 @@ def test_a_field_condition_naming_neither_says_so() -> None:
     condition = {k: v for k, v in _per_item().items() if k != "field_kind"}
     with pytest.raises(InvalidQueryError, match="field kind"):
         parse_query(_query(_and(condition)))
+
+
+_FAV = {"kind": "favourite", "value": True}
+
+
+@pytest.mark.parametrize(
+    ("query", "path", "key"),
+    [
+        ({"v": 1, "note": 1}, "", "note"),
+        (_query({"op": "and", "children": [_FAV], "x": 1}), "where", "x"),
+        (
+            _query(
+                {"op": "and", "children": [{"op": "or", "children": [_FAV], "y": 1}]}
+            ),
+            "where.children[0]",
+            "y",
+        ),
+        (
+            _query({"op": "and", "children": [{"kind": "text", "q": "a", "z": 1}]}),
+            "where.children[0]",
+            "z",
+        ),
+        (
+            _query({"op": "and", "children": [{"kind": "type", "in": ["a"], "z": 1}]}),
+            "where.children[0]",
+            "z",
+        ),
+        (
+            _query({"op": "and", "children": [{**_FAV, "z": 1}]}),
+            "where.children[0]",
+            "z",
+        ),
+        (
+            _query(
+                {
+                    "op": "and",
+                    "children": [{"kind": "tag", "mode": "any", "tags": ["a"], "z": 1}],
+                }
+            ),
+            "where.children[0]",
+            "z",
+        ),
+        (
+            _query(
+                {
+                    "op": "and",
+                    "children": [
+                        {
+                            "kind": "date",
+                            "on": "created",
+                            "op": "is_set",
+                            "z": 1,
+                        }
+                    ],
+                }
+            ),
+            "where.children[0]",
+            "z",
+        ),
+        (
+            _query({"op": "and", "children": [_field(z=1)]}),
+            "where.children[0]",
+            "z",
+        ),
+        ({"v": 1, "sort": [{"by": "name", "z": 1}]}, "sort[0]", "z"),
+        # `type` and `key` belong to a field sort only.
+        ({"v": 1, "sort": [{"by": "name", "key": "k"}]}, "sort[0]", "key"),
+    ],
+)
+def test_unknown_keys_are_rejected(query: dict[str, Any], path: str, key: str) -> None:
+    """An object with a key the grammar does not know is rejected, naming the key."""
+    with pytest.raises(InvalidQueryError) as caught:
+        parse_query(query)
+    assert caught.value.path == path
+    assert f"'{key}'" in str(caught.value)
+
+
+def test_several_unknown_keys_are_all_named() -> None:
+    """Every unknown key is named, in sorted order."""
+    with pytest.raises(InvalidQueryError, match=r"'b', 'c'"):
+        parse_query({"v": 1, "c": 1, "b": 2})

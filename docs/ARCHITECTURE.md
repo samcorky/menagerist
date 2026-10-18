@@ -28,7 +28,7 @@ Hexagonal architecture (ports and adapters) with DDD, organised as vertical slic
 backend/src/app/
 ├── entrypoints/     # FastAPI app factory, composition root, CLI entrypoints
 ├── modules/         # one directory per bounded context
-│   ├── collections/ # named lists of items: collections and their memberships
+│   ├── collections/ # named lists of items (manual) and saved searches (smart) with their memberships
 │   ├── examples/    # optional example packs: install, remove, shipped pack files
 │   ├── graph/       # nodes, edges, node types, edge types
 │   ├── identity/    # accounts, sessions, sign-in, first-run setup, identity CLI
@@ -110,7 +110,7 @@ All data lives in PostgreSQL under a single schema. The core graph:
 - **Edges** - typed, directed or symmetric relationships between nodes
 - **Edge types** - named relationship categories with forward/reverse labels and optional attribute schemas
 
-Identity adds two tables, `users` (username, hash, role, `password_expired`, `disabled`, sign-in throttling state) and `sessions` (token hash, expiry, last seen). Owner columns are added to `nodes`, `edges`, `media_assets` and `example_installations` (nullable; collections already had `owner_id`, NOT NULL). Collection slugs are unique per `(owner_id, slug)`, and the active-pack uniqueness of example installations is per `(pack_id, owner_id)`.
+Identity adds two tables, `users` (username, hash, role, `password_expired`, `disabled`, sign-in throttling state) and `sessions` (token hash, expiry, last seen). Owner columns are added to `nodes`, `edges`, `media_assets` and `example_installations` (nullable; collections already had `owner_id`, NOT NULL). Collection slugs are unique per `(owner_id, slug)` and, like ids, address a collection in every `/collection/{id_or_slug}` route; a collection has a `kind` (`manual`, or `dynamic` for a smart collection) and a nullable JSONB `definition` holding a smart collection's saved search, which the `collections` module never interprets (graph evaluates it, reached through the bridges in `entrypoints/api/shared/bridges/`), and the active-pack uniqueness of example installations is per `(pack_id, owner_id)`.
 
 **First run.** With no users, `POST /api/v1/auth/setup` creates the first administrator and, in the same transaction, assigns them every row that has no owner or a legacy owner (the fixed pre-accounts users `UUID(int=0)` and `UUID(int=1)`). The claim is a bridge in `entrypoints/api/shared/bridges/claim_existing_data.py` that calls one claim use case per module on a shared session. Setup is serialised by an advisory lock. `menagerist identity create-admin` does the same from the command line.
 

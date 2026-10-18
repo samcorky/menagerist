@@ -108,10 +108,21 @@ class SqlAlchemyCollectionRepository:
             ) from exc
 
     async def save(self, collection: Collection) -> None:
-        """Persist changes to an existing collection, including soft deletion."""
+        """Persist changes to an existing collection, including soft deletion.
+
+        Raises:
+            ConflictError: If a live collection of the same owner uses the slug.
+        """
         logger.debug("saving collection", collection_id=collection.id)
-        await self._session.merge(_to_model(collection))
-        await self._session.flush()
+        try:
+            # A savepoint keeps the session usable after a rejected write.
+            async with self._session.begin_nested():
+                await self._session.merge(_to_model(collection))
+                await self._session.flush()
+        except IntegrityError as exc:
+            raise ConflictError(
+                f"A collection with slug '{collection.slug}' already exists"
+            ) from exc
 
     async def get(
         self, collection_id: uuid.UUID, *, scope: AccessScope
@@ -147,11 +158,12 @@ class SqlAlchemyCollectionRepository:
         after: uuid.UUID | None,
         limit: int,
         q: str | None = None,
+        kind: CollectionKind | None = None,
     ) -> list[Collection]:
         """Return up to `limit` live collections in `scope`, ordered by id.
 
         A non-blank `q` keeps collections whose name or description contains it,
-        ignoring case and accents.
+        ignoring case and accents. A `kind` keeps only collections of that kind.
         """
         stmt = (
             select(CollectionModel)
@@ -161,6 +173,8 @@ class SqlAlchemyCollectionRepository:
         )
         if after is not None:
             stmt = stmt.where(CollectionModel.id > after)
+        if kind is not None:
+            stmt = stmt.where(CollectionModel.kind == kind.value)
         needle = (q or "").strip()
         if needle:
             pattern = _like_pattern(needle)

@@ -22,9 +22,6 @@ from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.collections.adapters.persistence.in_memory_collection_repository import (  # noqa: E501
     InMemoryCollectionRepository,
 )
-from app.modules.collections.adapters.persistence.in_memory_definition_checker import (
-    InMemoryDefinitionChecker,
-)
 from app.modules.collections.adapters.persistence.in_memory_membership_repository import (  # noqa: E501
     InMemoryMembershipRepository,
 )
@@ -170,6 +167,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+    from app.modules.collections.domain.definition_warning import DefinitionWarning
     from app.modules.examples.ports.cover_renderer import CoverRenderer
     from app.shared_kernel.access_policy import AccessPolicy
 
@@ -811,6 +809,19 @@ class GraphPackTarget:
         return RemoveResult.REMOVED
 
 
+class RejectingDefinitionChecker:
+    """`DefinitionChecker` for installs, which never give a collection a definition.
+
+    Packs only create manual collections, so any use of this is a bug.
+    """
+
+    async def check(
+        self, definition: Mapping[str, Any], scope: AccessScope
+    ) -> list[DefinitionWarning]:
+        """Always raise: no definition is expected here."""
+        raise RuntimeError("Example packs do not create smart collections.")
+
+
 class CollectionPackTarget:
     """Implements `CollectionTarget` with the collections use cases, run as `actor`."""
 
@@ -830,9 +841,8 @@ class CollectionPackTarget:
         self, spec: PackCollection, *, item_ids: Sequence[uuid.UUID]
     ) -> Created:
         """Create the collection, put the items on it and return what was stored."""
-        # Packs only make manual collections, so there is no definition to check.
         collection = await CreateCollection(
-            self._stores.uow(), self._access, InMemoryDefinitionChecker()
+            self._stores.uow(), self._access, RejectingDefinitionChecker()
         ).handle(
             CreateCollectionCommand(name=spec.name, description=spec.description),
             self._actor,

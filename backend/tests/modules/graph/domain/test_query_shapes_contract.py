@@ -194,3 +194,34 @@ def test_generated_boundary_cases(query: object, path: str | None) -> None:
     with pytest.raises(InvalidQueryError) as caught:
         parse_query(query)
     assert caught.value.path == path
+
+
+@pytest.mark.parametrize(
+    ("query", "path"),
+    [
+        ({"v": 1, "extra": 1}, ""),
+        (
+            {"v": 1, "where": {"op": "and", "extra": 2, "children": [_FAV]}},
+            "where",
+        ),
+        (_where({**_FAV, "junk": 3}), _C),
+        ({"v": 1, "sort": [{"by": "name", "junk": 4}]}, "sort[0]"),
+        ({"v": 1, "sort": [{"by": "name", "type": 5, "key": None}]}, "sort[0]"),
+    ],
+    ids=[
+        "query key",
+        "group key",
+        "condition key",
+        "sort key",
+        "type and key on a sort that is not by field",
+    ],
+)
+def test_unknown_keys_are_rejected_by_the_server_only(query: object, path: str) -> None:
+    """The server stores what it validates, so it refuses keys the grammar lacks.
+
+    The browser decoder rebuilds queries from the known keys and drops the rest,
+    so these cases stay out of the shared fixture, which the decoder must reject.
+    """
+    with pytest.raises(InvalidQueryError) as caught:
+        parse_query(query)
+    assert caught.value.path == path

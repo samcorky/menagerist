@@ -198,3 +198,27 @@ async def test_definition_is_kept_on_save() -> None:
     stored = await repo.get(smart.id, scope=AccessScope.everyone())
     assert stored is not None
     assert (stored.kind, stored.definition) == (CollectionKind.DYNAMIC, {"b": 2})
+
+
+async def test_list_filters_by_kind(make_collection: MakeCollection) -> None:
+    """`kind` keeps only manual or only smart collections."""
+    repo = InMemoryCollectionRepository()
+    manual = make_collection("Shelf")
+    smart = Collection.create(
+        name="Smart", slug=Slug("smart"), owner_id=uuid.uuid7(), definition={"v": 1}
+    )
+    await repo.add(manual)
+    await repo.add(smart)
+    everyone = AccessScope.everyone()
+
+    only_manual = await repo.list(
+        scope=everyone, after=None, limit=10, kind=CollectionKind.MANUAL
+    )
+    only_smart = await repo.list(
+        scope=everyone, after=None, limit=10, kind=CollectionKind.DYNAMIC
+    )
+    both = await repo.list(scope=everyone, after=None, limit=10)
+
+    assert only_manual == [manual]
+    assert only_smart == [smart]
+    assert len(both) == 2

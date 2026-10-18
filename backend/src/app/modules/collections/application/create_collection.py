@@ -8,6 +8,9 @@ from app.modules.collections.application.collection_slugs import (
     free_slug,
     slug_is_held,
 )
+from app.modules.collections.application.definition_limits import (
+    ensure_definition_within_limits,
+)
 from app.modules.collections.domain.collection import Collection
 from app.modules.collections.ports.definition_checker import (
     DefinitionChecker,  # noqa: TC001
@@ -58,13 +61,15 @@ class CreateCollection(
         Raises:
             InvalidCollectionError: If the name or an explicit slug is unusable, or the
                 slug looks like an id.
-            InvalidDefinitionError: If the definition is malformed, with its path.
+            InvalidDefinitionError: If the definition is malformed, with its path, or
+                is too large, too deeply nested or not storable text.
             ConflictError: If an explicit slug belongs to a live collection of the
                 actor.
         """
         # Slugs are unique per owner: only collections the actor can see count.
         scope = self._policy.scope_for(actor)
         if command.definition is not None:
+            ensure_definition_within_limits(command.definition)
             await self._checker.check(command.definition, scope)
         async with self._uow as repos:
             if command.slug is None:

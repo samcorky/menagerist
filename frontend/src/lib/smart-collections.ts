@@ -30,7 +30,7 @@ export function countLabel(count: number, capped: boolean): string {
 	return formatCount(count, capped);
 }
 
-/** The collections a person can add items to by hand; smart collections fill themselves. */
+/** Defence in depth: the server is asked for `kind=manual`, but smart collections fill themselves and never take items by hand. */
 export function manualCollections<T extends Pick<CollectionResponse, 'kind'>>(
 	collections: readonly T[]
 ): T[] {
@@ -79,8 +79,15 @@ export function describeSaveError(error: SmartCollectionError, query: Query): st
 
 const FALLBACK_MESSAGE = "Couldn't save the smart collection. Try again.";
 
+export const CHANGED_ELSEWHERE_MESSAGE =
+	'This collection was changed elsewhere. Reload to see the latest conditions.';
+
+/** Shown for a smart collection that has no conditions. */
+export const MATCHES_EVERY_ITEM_MESSAGE = 'Matches every item';
+
 function failure(result: { error?: unknown; response?: Response | null }): SmartCollectionError {
 	const status = result.response?.status ?? null;
+	if (status === 412) return new SmartCollectionError(status, CHANGED_ELSEWHERE_MESSAGE);
 	if (status === 400 || status === 409 || status === 422) {
 		const detail = errorMessage(result.error);
 		const match = /^([a-z_.[\]0-9]+): (.+)$/s.exec(detail);

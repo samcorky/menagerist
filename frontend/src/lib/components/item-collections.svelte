@@ -53,7 +53,9 @@
 		const found: CollectionResponse[] = [];
 		let after: string | undefined;
 		for (let i = 0; i < MAX_PAGES; i++) {
-			const result = await listCollections({ query: { ...query, after, limit: PAGE_SIZE } });
+			const result = await listCollections({
+				query: { ...query, kind: 'manual', after, limit: PAGE_SIZE }
+			});
 			if (result.error || !result.data) return null;
 			found.push(...result.data);
 			if (!/rel="next"/.test(result.response?.headers.get('link') ?? '')) break;

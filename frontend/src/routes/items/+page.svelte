@@ -43,6 +43,7 @@
 		withFilter,
 		FILTER_PARAM
 	} from '$lib/query/items-page';
+	import { combineWithSaved, narrowFilterCount, saveBlockReason } from '$lib/query/narrow';
 	import { countConditions, emptyQuery, removeAt } from '$lib/query/tree';
 	import {
 		mapWarnings,
@@ -126,6 +127,11 @@
 	const filterKey = $derived(queryKey(filter));
 	const searching = $derived(usesSearch(filter));
 	const conditionCount = $derived(countConditions(filter));
+	// What is on screen (filter, search box and type select) is what a smart collection saves
+	const saveBasics = $derived({ q, type: selectedType });
+	const saveQuery = $derived(combineWithSaved(emptyQuery(), filter, saveBasics));
+	const saveReason = $derived(saveBlockReason(emptyQuery(), filter, saveBasics));
+	const canSave = $derived(narrowFilterCount(filter, saveBasics) > 0);
 	let categoriesLoaded = $state(false);
 	let itemFields = $state<ItemField[] | null>(null);
 	const countLine = $derived(
@@ -519,20 +525,6 @@
 					onremove={removeFilter}
 					onclear={clearFilters}
 				/>
-				{#if conditionCount > 0}
-					<div>
-						<Button
-							variant="outline"
-							size="sm"
-							class="max-sm:h-11"
-							aria-haspopup="dialog"
-							onclick={() => (saveOpen = true)}
-						>
-							<BookmarkPlus />
-							Save as smart collection
-						</Button>
-					</div>
-				{/if}
 				{#if filterError}
 					<Alert.Root variant="destructive">
 						<TriangleAlert />
@@ -556,6 +548,25 @@
 				{/if}
 				{#if searchTextIgnored(filter, q)}
 					<p class="text-sm text-muted-foreground">{SEARCH_TOO_LONG_MESSAGE}</p>
+				{/if}
+			</div>
+		{/if}
+		{#if canSave}
+			<div class="flex flex-col items-start gap-1.5">
+				<Button
+					variant="outline"
+					size="sm"
+					class="max-sm:h-11"
+					aria-haspopup="dialog"
+					disabled={saveReason !== null}
+					aria-describedby={saveReason ? 'save-smart-reason' : undefined}
+					onclick={() => (saveOpen = true)}
+				>
+					<BookmarkPlus />
+					Save as smart collection
+				</Button>
+				{#if saveReason}
+					<p id="save-smart-reason" class="text-sm text-muted-foreground">{saveReason}</p>
 				{/if}
 			</div>
 		{/if}
@@ -689,7 +700,7 @@
 	</div>
 </main>
 
-<SaveSmartCollectionDialog bind:open={saveOpen} query={filter} onsaved={savedAsSmart} />
+<SaveSmartCollectionDialog bind:open={saveOpen} query={saveQuery} onsaved={savedAsSmart} />
 
 <QueryBuilder
 	bind:open={filtersOpen}

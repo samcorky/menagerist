@@ -123,6 +123,18 @@ describe('collectionRouteParams', () => {
 		expect(collectionRouteParams({ slug: 'my-films' })).toEqual({
 			id: 'my-films'
 		});
+		expect(
+			collectionRouteParams({ id: '0198a3c1-0000-7000-8000-000000000001', slug: 'films' })
+		).toEqual({
+			id: 'films'
+		});
+	});
+
+	it('falls back to the id when the slug reads as an id', () => {
+		const id = '0198a3c1-0000-7000-8000-000000000001';
+		expect(collectionRouteParams({ id, slug: id })).toEqual({ id });
+		expect(collectionRouteParams({ id, slug: id.toUpperCase() })).toEqual({ id });
+		expect(collectionRouteParams({ id, slug: id.replaceAll('-', '') })).toEqual({ id });
 	});
 });
 
