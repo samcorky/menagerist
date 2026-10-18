@@ -934,6 +934,21 @@ Further known limits, left as they are for now:
 
 **Not chosen:** Parsing user agents on the backend (adds runtime dependencies and container bloat when the frontend can resolve labels on display) and tracking latest IP addresses per request (adds database write amplification and privacy degradation).
 
+## Backend tests run in parallel with pytest-xdist (2026-10-18)
+
+**Decision:** `poe test-backend` and `poe test-backend-integration` (hence `test-backend-all` and `coverage`) run with `-n auto --maxprocesses=6 --dist loadscope`. `pytest-xdist` is added to the backend dev dependency group. The flags are in the `poe` tasks, not in `addopts`, so targeted and IDE runs stay serial; `-n 0` or `PYTEST_XDIST_AUTO_NUM_WORKERS` changes the worker count.
+
+**Rationale:**
+- **Small dependency:** `pytest-xdist` (with `execnet`) is dev-only, pure Python, adds nothing to the Docker image and falls under the existing Renovate "python dev dependencies" group. The suite takes roughly 10 minutes serially (3,780 unit and 586 integration tests), which is the main cost of every `poe coverage` run.
+- **`loadscope`:** it keeps a module's tests on one worker, which protects module-scoped fixtures and the Postgres state a module builds up. `worksteal` measured the same on two cores (unit 421 s against 426 s), so the safer option wins.
+- **One container per worker:** the session-scoped `postgres_container` fixture already runs once per worker process, so each worker gets its own container, database and migrated schema. Nothing hard-codes a database name, port or shared path, and the worker cap bounds the number of containers.
+- **Coverage:** pytest-cov combines worker data; per-layer totals before and after match to the decimal (domain, application and shared kernel 100.00%, adapters 98.62%, platform 94.43% combined).
+- **Measured on 2 cores (`nproc` = 2):** unit 610 s serial, 426 s parallel (1.43x); integration 506 s serial, 373 s parallel (1.36x). Unit tests are CPU-bound, so two cores cannot do much better; integration is partly waiting on Postgres. Six workers on six real cores should scale closer to linearly for the unit suite, plausibly 3x to 4x (an estimate, not a measurement).
+
+**Consequence:** the unit suite ran in parallel four times with no failures. The integration suite failed once in four parallel runs: `test_adding_twice_stores_one_row` counted every row in `collection_members`, which other modules sharing the worker's database had left committed, so it only passed when it ran before them. It now counts the rows of its own collection. This is the only test that needed fixing. New tests must not depend on module order or write to fixed paths, ports or database names. Each integration worker holds a Postgres container, so memory use grows with the worker count.
+
+---
+
 ## Direction: roles as data, implied permissions
 
 **Direction (2026-10-10), not built:**

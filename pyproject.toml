@@ -121,15 +121,15 @@ cwd = "backend"
 help = "Type-check backend Python files with mypy"
 
 [tool.poe.groups.quality.tasks.test-backend]
-shell = "coverage erase ; pytest -m 'not integration' --cov=app --cov-branch --cov-report="
+shell = "coverage erase ; pytest -m 'not integration' -n auto --maxprocesses=6 --dist loadscope --cov=app --cov-branch --cov-report="
 interpreter = ["powershell", "posix"]
 cwd = "backend"
-help = "Run backend unit tests from a clean coverage dataset"
+help = "Run backend unit tests in parallel (pytest-xdist, up to 6 workers) from a clean coverage dataset"
 
 [tool.poe.groups.quality.tasks.test-backend-integration]
-cmd = "pytest -m integration --cov=app --cov-append --cov-branch --cov-report="
+cmd = "pytest -m integration -n auto --maxprocesses=6 --dist loadscope --cov=app --cov-append --cov-branch --cov-report="
 cwd = "backend"
-help = "Run backend integration tests, appending to unit test coverage"
+help = "Run backend integration tests in parallel (one Postgres container per worker), appending to unit test coverage"
 
 [tool.poe.groups.quality.tasks.test-backend-all]
 sequence = ["test-backend", "test-backend-integration"]
