@@ -1,15 +1,19 @@
 <script lang="ts">
 	import PasswordInput from '$lib/components/password-input.svelte';
 	import { resolve } from '$app/paths';
-	import { Copy, Check, KeyRound, LockOpen, Plus, Dices, Pencil, X } from '@lucide/svelte';
+	import { Copy, Check, KeyRound, Laptop, LockOpen, Plus, Dices, Pencil, X } from '@lucide/svelte';
 	import { tick } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import {
 		createUser,
+		listOwnSessions,
+		listSessions,
 		listUsers,
 		resetUserPassword,
+		revokeSession,
 		unlockUser,
 		updateUser,
+		type AdminSessionResponse,
 		type Role,
 		type UserResponse
 	} from '$lib/api/client';
@@ -22,9 +26,12 @@
 		PASSWORD_MIN_LENGTH
 	} from '$lib/auth';
 	import { isLocked, lastSignIn, lockedLabel, renameDecision } from '$lib/users';
+	import { describeDevice, formatRelativeTime } from '$lib/devices';
+	import { formatIsoDate } from '$lib/format-date';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
+	import DeviceIcon from '$lib/components/device-icon.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -56,6 +63,13 @@
 	let resetPassword = $state('');
 	let resetting = $state(false);
 	let resetError = $state<string | null>(null);
+
+	let devicesTarget = $state<UserResponse | null>(null);
+	let userDevices = $state<AdminSessionResponse[]>([]);
+	let userDevicesLoading = $state(false);
+	let userDevicesError = $state<string | null>(null);
+	let revokingDeviceId = $state<string | null>(null);
+	let currentSessionId = $state<string | null>(null);
 
 	// Shown once, straight after an account is created or a password is reset.
 	let issued = $state<{ name: string; username: string; password: string } | null>(null);
@@ -92,8 +106,55 @@
 	const canUpdate = $derived(auth.can('identity:user:update'));
 	const canReset = $derived(auth.can('identity:user:reset_password'));
 	const canUnlock = $derived(auth.can('identity:user:unlock'));
+	const canListSessions = $derived(auth.can('identity:session:list'));
+	const canRevokeSessions = $derived(auth.can('identity:session:revoke'));
 
 	const newPasswordValid = $derived(newPassword.length >= PASSWORD_MIN_LENGTH);
+
+	async function loadUserDevices(userId: string) {
+		userDevicesLoading = true;
+		userDevicesError = null;
+		try {
+			const [res, ownRes] = await Promise.all([
+				listSessions({ query: { user_id: userId } }),
+				listOwnSessions()
+			]);
+			if (ownRes.data) {
+				currentSessionId = ownRes.data.find((s) => s.current)?.id ?? null;
+			}
+			if (res.error || !res.data) {
+				userDevicesError = networkAwareError(res).title;
+			} else {
+				userDevices = res.data;
+			}
+		} catch {
+			userDevicesError = 'Could not load devices.';
+		}
+		userDevicesLoading = false;
+	}
+
+	function openDevices(user: UserResponse) {
+		devicesTarget = user;
+		void loadUserDevices(user.id);
+	}
+
+	async function handleRevokeUserDevice(sessionId: string) {
+		if (revokingDeviceId !== null) return;
+		revokingDeviceId = sessionId;
+		try {
+			const res = await revokeSession({ path: { session_id: sessionId } });
+			if (res.error) {
+				toast.error(errorMessage(res.error));
+			} else {
+				toast.success('Device signed out');
+				if (devicesTarget) await loadUserDevices(devicesTarget.id);
+			}
+		} catch {
+			toast.error('Could not sign out device.');
+		} finally {
+			revokingDeviceId = null;
+		}
+	}
 
 	async function handleCreate(event: SubmitEvent) {
 		event.preventDefault();
@@ -540,7 +601,7 @@
 										>
 									</p>
 
-									{#if canUpdate || canReset || canUnlock}
+									{#if canUpdate || canReset || canUnlock || canListSessions}
 										<div class="flex flex-wrap items-center gap-2 pt-1">
 											{#if canUpdate}
 												<div class="w-36">
@@ -588,6 +649,17 @@
 													Unlock
 												</Button>
 											{/if}
+											{#if canListSessions}
+												<Button
+													variant="outline"
+													class="h-11"
+													disabled={rowBusy === user.id}
+													onclick={() => openDevices(user)}
+												>
+													<Laptop class="size-4" />
+													Devices
+												</Button>
+											{/if}
 										</div>
 									{/if}
 
@@ -613,7 +685,7 @@
 <ConfirmDialog
 	open={disableTarget !== null}
 	title="Disable {disableTarget?.display_name}?"
-	description="They are signed out and cannot sign in until re-enabled."
+	description="They will be signed out everywhere and cannot sign in until re-enabled."
 	confirmLabel="Disable"
 	busyLabel="Disabling…"
 	busy={rowBusy !== null && rowBusy === disableTarget?.id}
@@ -626,7 +698,7 @@
 <ConfirmDialog
 	open={confirmResetTarget !== null}
 	title="Reset password for {confirmResetTarget?.display_name}?"
-	description="Their sessions end and they must choose a new password at next sign-in."
+	description="They will be signed out everywhere and must choose a new password at next sign-in."
 	confirmLabel="Continue"
 	destructive={false}
 	onOpenChange={(open) => {
@@ -634,6 +706,97 @@
 	}}
 	onConfirm={confirmReset}
 />
+
+<ResponsiveDialog.Root
+	open={devicesTarget !== null}
+	onOpenChange={(open) => {
+		if (!open) devicesTarget = null;
+	}}
+>
+	<ResponsiveDialog.Content title="Devices for {devicesTarget?.display_name}" size="md">
+		<ResponsiveDialog.Description>
+			Active devices currently signed in to this account.
+		</ResponsiveDialog.Description>
+		<div class="mt-4 space-y-4">
+			{#if userDevicesError}
+				<Alert.Root variant="destructive">
+					<Alert.Description>{userDevicesError}</Alert.Description>
+				</Alert.Root>
+				<Button
+					variant="outline"
+					class="h-11"
+					onclick={() => devicesTarget && void loadUserDevices(devicesTarget.id)}
+				>
+					Retry
+				</Button>
+			{:else if userDevicesLoading}
+				<div class="space-y-3">
+					<Skeleton class="h-16 w-full rounded-xl" />
+					<Skeleton class="h-16 w-full rounded-xl" />
+				</div>
+			{:else if userDevices.length === 0}
+				<p class="text-sm text-muted-foreground">No active devices.</p>
+			{:else}
+				<ul class="space-y-3" aria-label="User devices">
+					{#each userDevices as dev (dev.id)}
+						{@const described = describeDevice({
+							userAgent: dev.user_agent,
+							platform: dev.client_platform,
+							mobile: dev.client_mobile
+						})}
+						<li>
+							<Card.Root>
+								<Card.Content
+									class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+								>
+									<div class="flex items-start gap-3">
+										<div
+											class="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+										>
+											<DeviceIcon kind={described.kind} class="size-5" />
+										</div>
+										<div class="space-y-1">
+											<div class="flex flex-wrap items-center gap-2">
+												<p class="font-medium" title={dev.user_agent ?? undefined}>
+													{described.label}
+												</p>
+												{#if dev.id === currentSessionId}
+													<Badge variant="secondary">This device</Badge>
+												{/if}
+											</div>
+											<p class="text-xs text-muted-foreground">
+												{#if dev.client_ip}
+													{dev.client_ip} &middot;
+												{/if}
+												Signed in {formatIsoDate(dev.created_at.slice(0, 10), 'short')} &middot; Last
+												active {formatRelativeTime(dev.last_seen_at)}
+											</p>
+										</div>
+									</div>
+
+									{#if dev.id !== currentSessionId && canRevokeSessions}
+										<Button
+											type="button"
+											variant="outline"
+											class="h-11 shrink-0"
+											disabled={revokingDeviceId === dev.id}
+											onclick={() => handleRevokeUserDevice(dev.id)}
+										>
+											{#if revokingDeviceId === dev.id}
+												<Spinner class="size-4" />
+											{/if}
+											Sign out
+										</Button>
+									{/if}
+								</Card.Content>
+							</Card.Root>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</div>
+	</ResponsiveDialog.Content>
+</ResponsiveDialog.Root>
 
 <ResponsiveDialog.Root
 	open={resetTarget !== null}
