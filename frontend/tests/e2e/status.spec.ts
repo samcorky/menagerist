@@ -89,3 +89,31 @@ test('an administrator also sees the checks and the build info', async ({ page }
 	expect(network.detailRequests.length).toBeGreaterThanOrEqual(2);
 	expect(network.forbidden).toEqual([]);
 });
+
+test('selecting a check highlights it until the page is clicked elsewhere', async ({ page }) => {
+	await page.goto('/status');
+	await expect(page.getByText('Build info')).toBeVisible();
+
+	const segment = page.locator('a[data-status-check-link]').first();
+	await expect(segment).toBeVisible();
+	const targetId = (await segment.getAttribute('href'))?.slice(1);
+	expect(targetId).toBeTruthy();
+
+	await segment.click();
+
+	const detail = page.locator(`#${targetId}`);
+	await expect(page).toHaveURL(new RegExp(`#${targetId}$`));
+	await expect(detail).toHaveClass(/status-check-highlighted/);
+	await expect
+		.poll(() => detail.evaluate((element) => element === document.activeElement))
+		.toBe(true);
+
+	await page.getByRole('heading', { name: 'System status' }).click();
+
+	await expect(page).toHaveURL(/\/status$/);
+	await expect(detail).not.toHaveClass(/status-check-highlighted/);
+	await expect
+		.poll(() => detail.evaluate((element) => element === document.activeElement))
+		.toBe(false);
+	await expect(detail).toHaveCSS('outline-style', 'none');
+});
