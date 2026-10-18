@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Component } from 'svelte';
+	import { onMount } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { resolve } from '$app/paths';
 	import {
@@ -26,6 +27,7 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import * as PopoverTooltip from '$lib/components/ui/popover-tooltip/index.js';
 	import {
 		Activity,
 		AlertTriangle,
@@ -38,6 +40,7 @@
 		LogIn,
 		Network,
 		PackageCheck,
+		Pencil,
 		RefreshCw,
 		Server,
 		ShieldCheck,
@@ -74,9 +77,9 @@
 	}
 
 	function statusBarTone(status: string): string {
-		if (status === 'pass') return 'bg-emerald-700 dark:bg-emerald-400';
-		if (status === 'fail') return 'bg-destructive';
-		return 'bg-amber-700 dark:bg-amber-400';
+		if (status === 'pass') return 'border border-emerald-500/30 bg-emerald-500/10';
+		if (status === 'fail') return 'border border-destructive/30 bg-destructive/10';
+		return 'border border-amber-500/30 bg-amber-500/10';
 	}
 
 	function statusIcon(status: string): Component {
@@ -100,9 +103,8 @@
 		if (lower.includes('database') || lower.includes('db')) return Database;
 		if (lower.includes('migration') || lower.includes('schema')) return GitBranch;
 		if (lower.includes('pool') || lower.includes('connection')) return Gauge;
-		if (lower.includes('storage') || lower.includes('writable') || lower.includes('space')) {
-			return HardDrive;
-		}
+		if (lower.includes('storage') || lower.includes('space')) return HardDrive;
+		if (lower.includes('writable')) return Pencil;
 		if (lower.includes('version') || lower.includes('build')) return PackageCheck;
 		if (lower.includes('health') || lower.includes('status')) return ShieldCheck;
 		return Wrench;
@@ -124,6 +126,66 @@
 		if (counts.fail > 0) parts.push(`${counts.fail} alert${counts.fail === 1 ? '' : 's'}`);
 		return parts.join(' · ') || 'No checks reported';
 	}
+
+	function urlSafeIdPart(value: string): string {
+		return (
+			value
+				.normalize('NFKD')
+				.replace(/[\u0300-\u036f]/g, '')
+				.toLowerCase()
+				.replace(/[^a-z0-9]+/g, '-')
+				.replace(/^-+|-+$/g, '') || 'check'
+		);
+	}
+
+	function checkAnchorIds(
+		groupKey: string,
+		checks: Array<{ label: string; obs: CheckObservation }>
+	): string[] {
+		const baseIds = checks.map(({ label, obs }) => {
+			const identity = [groupKey, label, obs.observedUnit ?? '']
+				.map((part) => urlSafeIdPart(String(part)))
+				.join('-');
+			return `status-check-${identity}`;
+		});
+		const assignedIds: string[] = [];
+		return baseIds.map((baseId, index) => {
+			const isDuplicate = baseIds.filter((id) => id === baseId).length > 1;
+			let id = isDuplicate ? `${baseId}-${index + 1}` : baseId;
+			while (assignedIds.includes(id)) id = `${id}-${index + 1}`;
+			assignedIds.push(id);
+			return id;
+		});
+	}
+
+	let highlightedCheckId = $state<string | null>(null);
+
+	function clearStatusTarget(event: MouseEvent): void {
+		if (event.target instanceof Element && event.target.closest('a[data-status-check-link]')) {
+			return;
+		}
+
+		highlightedCheckId = null;
+		if (
+			document.activeElement instanceof HTMLElement &&
+			document.activeElement.matches('.status-check-detail')
+		) {
+			document.activeElement.blur();
+		}
+
+		if (window.location.hash) {
+			window.history.replaceState(
+				window.history.state,
+				'',
+				`${window.location.pathname}${window.location.search}`
+			);
+		}
+	}
+
+	onMount(() => {
+		document.addEventListener('click', clearStatusTarget);
+		return () => document.removeEventListener('click', clearStatusTarget);
+	});
 
 	function latestObservationTime(report: ReadyDetailResponse): Date | null {
 		let latest = Number.NEGATIVE_INFINITY;
@@ -413,6 +475,7 @@
 			{/if}
 
 			{#each groups as [groupKey, checks] (groupKey)}
+				{@const anchorIds = checkAnchorIds(groupKey, checks)}
 				{@const GroupIcon = groupIcon(groupKey)}
 				{@const groupHealth = groupStatus(checks)}
 				{@const GroupStatusIcon = statusIcon(groupHealth)}
@@ -433,51 +496,52 @@
 							</Badge>
 						</div>
 					</Card.Header>
-					{@const groupCounts = countStatuses(checks.map(({ obs }) => obs))}
 					<div class="space-y-2 px-5 pt-3 pb-0">
 						<div
-							class="flex h-2 overflow-hidden rounded-full bg-muted"
-							role="img"
-							aria-label={groupSummary(checks)}
+							class="flex h-3 gap-1"
+							role="group"
+							aria-label={`${formatGroup(groupKey)} checks; select a segment to view its details`}
 						>
-							{#if groupCounts.pass > 0}
-								<span
-									aria-hidden="true"
-									class="h-full {statusBarTone(
-										'pass'
-									)} transition-[width] duration-500 ease-out motion-reduce:transition-none"
-									style={`width: ${(groupCounts.pass / groupCounts.total) * 100}%`}
-								></span>
-							{/if}
-							{#if groupCounts.warn > 0}
-								<span
-									aria-hidden="true"
-									class="h-full {statusBarTone(
-										'warn'
-									)} transition-[width] duration-500 ease-out motion-reduce:transition-none"
-									style={`width: ${(groupCounts.warn / groupCounts.total) * 100}%`}
-								></span>
-							{/if}
-							{#if groupCounts.fail > 0}
-								<span
-									aria-hidden="true"
-									class="h-full {statusBarTone(
-										'fail'
-									)} transition-[width] duration-500 ease-out motion-reduce:transition-none"
-									style={`width: ${(groupCounts.fail / groupCounts.total) * 100}%`}
-								></span>
-							{/if}
+							{#each checks as { label, obs }, index (`${label}-${index}`)}
+								<PopoverTooltip.Root>
+									<PopoverTooltip.Trigger>
+										{#snippet child({ props })}
+											<a
+												{...props}
+												data-status-check-link
+												href={`#${anchorIds[index]}`}
+												onclick={() => (highlightedCheckId = anchorIds[index])}
+												class="min-w-0 flex-1 rounded-full {statusBarTone(
+													obs.status
+												)} transition-[filter] duration-150 hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none"
+												aria-label={`${formatLabel(label)}: ${statusLabel(obs.status)}. ${formatValue(obs)}${obs.output ? `. ${obs.output}` : ''}`}
+											></a>
+										{/snippet}
+									</PopoverTooltip.Trigger>
+									<PopoverTooltip.Content class="text-left whitespace-normal">
+										{formatLabel(label)}: {statusLabel(obs.status)}. {formatValue(obs)}
+										{#if obs.output}
+											. {obs.output}
+										{/if}
+									</PopoverTooltip.Content>
+								</PopoverTooltip.Root>
+							{/each}
 						</div>
 						<p class="text-center text-xs font-medium text-muted-foreground">
 							{groupSummary(checks)}
 						</p>
 					</div>
 					<Card.Content class="space-y-3 p-4">
-						{#each checks as { label, obs } (label)}
+						{#each checks as { label, obs }, index (`${label}-${index}`)}
 							{@const MetricIcon = metricIcon(label)}
 							{@const MetricStatusIcon = statusIcon(obs.status)}
 							<div
-								class="flex items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-3 py-3"
+								id={anchorIds[index]}
+								tabindex="-1"
+								class="status-check-detail flex scroll-mt-24 items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-3 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring {highlightedCheckId ===
+								anchorIds[index]
+									? 'status-check-highlighted'
+									: ''}"
 							>
 								<div
 									class="flex size-8 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground ring-1 ring-border/80"
@@ -539,3 +603,27 @@
 		{/if}
 	</div>
 </main>
+
+<style>
+	.status-check-detail.status-check-highlighted {
+		outline: 2px solid var(--color-ring);
+		outline-offset: 2px;
+		animation: status-check-arrive 1.2s ease-out;
+	}
+
+	@keyframes status-check-arrive {
+		from {
+			box-shadow: 0 0 0 6px color-mix(in oklab, var(--color-ring) 35%, transparent);
+		}
+
+		to {
+			box-shadow: 0 0 0 0 transparent;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.status-check-detail.status-check-highlighted {
+			animation: none;
+		}
+	}
+</style>

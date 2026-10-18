@@ -35,3 +35,6 @@ openapi.json
 
 # Python caches
 __pycache__/
+
+# App specific
+data/
