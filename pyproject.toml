@@ -120,14 +120,20 @@ cmd = "mypy"
 cwd = "backend"
 help = "Type-check backend Python files with mypy"
 
+[tool.poe.groups.quality.tasks._coverage-erase]
+cmd = "coverage erase"
+cwd = "backend"
+help = "Clear the backend coverage dataset before running unit tests"
+
 [tool.poe.groups.quality.tasks.test-backend]
-shell = "coverage erase ; pytest -m 'not integration' -n auto --maxprocesses=6 --dist loadscope --cov=app --cov-branch --cov-report="
+shell = "pytest -m 'not integration' -n auto --dist loadscope --cov=app --cov-branch --cov-report="
 interpreter = ["powershell", "posix"]
 cwd = "backend"
-help = "Run backend unit tests in parallel (pytest-xdist, up to 6 workers) from a clean coverage dataset"
+deps = ["_coverage-erase"]
+help = "Run backend unit tests in parallel (pytest-xdist) from a clean coverage dataset"
 
 [tool.poe.groups.quality.tasks.test-backend-integration]
-cmd = "pytest -m integration -n auto --maxprocesses=6 --dist loadscope --cov=app --cov-append --cov-branch --cov-report="
+cmd = "pytest -m integration -n auto --dist loadscope --cov=app --cov-append --cov-branch --cov-report="
 cwd = "backend"
 help = "Run backend integration tests in parallel (one Postgres container per worker), appending to unit test coverage"
 
@@ -271,8 +277,8 @@ cmd = "docker compose -f compose.yaml -f compose.e2e.yaml config --quiet"
 help = "Validate compose.yaml merged with the e2e-test override"
 
 [tool.poe.groups.quality.tasks.test]
-sequence = ["test-backend", "test-frontend"]
-help = "Run all unit tests"
+parallel = ["test-backend", "test-frontend"]
+help = "Run backend and frontend unit tests concurrently"
 
 [tool.poe.groups.quality.tasks.test-e2e]
 script = "scripts.e2e:main(workers=workers, skip_build=skip_build)"

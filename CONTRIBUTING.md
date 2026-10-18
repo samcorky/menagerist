@@ -132,15 +132,16 @@ poe coverage                  # full test suite + enforce all coverage threshold
 
 ### Running tests in parallel
 
-`poe test-backend`, `poe test-backend-integration` (and so `poe test-backend-all` and `poe coverage`) run under pytest-xdist with `-n auto --maxprocesses=6 --dist loadscope`: one worker per CPU core, capped at six, with every test module kept on one worker. The flags live only in the `poe` tasks, so `pytest path::test` and IDE runs stay serial. Coverage is combined across workers automatically.
+`poe test-backend`, `poe test-backend-integration` (and so `poe test-backend-all` and `poe coverage`) run under pytest-xdist with `-n auto --dist loadscope`: one worker per CPU core, with no worker cap by default and every test module kept on one worker. Pass `--maxprocesses=N` to a Poe test task to cap the workers; the flags live only in the `poe` tasks, so `pytest path::test` and IDE runs stay serial. Coverage is combined across workers automatically.
 
 ```sh
-PYTEST_XDIST_AUTO_NUM_WORKERS=3 poe test-backend   # choose the worker count (still capped at 6)
+PYTEST_XDIST_AUTO_NUM_WORKERS=3 poe test-backend   # choose the worker count
+poe test-backend --maxprocesses=6                  # cap auto workers at six
 poe test-backend-integration -n 0                  # serial: a later -n wins
 cd backend && pytest -m 'not integration'          # plain serial run, no coverage-erase
 ```
 
-Each integration worker starts its own Postgres container (`postgres:18-alpine`, roughly 100 MB of memory each), so the cap also caps containers. Lower the worker count on a small machine. Tests must not share state between modules: use `tmp_path` and the per-worker fixtures in `backend/tests/conftest.py`, never fixed paths, ports or database names.
+Each integration worker starts its own Postgres container (`postgres:18-alpine`, roughly 100 MB of memory each), so consider capping workers on a small machine. Tests must not share state between modules: use `tmp_path` and the per-worker fixtures in `backend/tests/conftest.py`, never fixed paths, ports or database names.
 
 ### End-to-end tests
 
