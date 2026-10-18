@@ -86,6 +86,8 @@ services:
       # COOKIE_SECURE=true marks the session cookie Secure when a proxy ends TLS.
       # MENAGERIST_COOKIE_SECURE: "true"
     volumes:
+      # Named volumes are initialised from the image's uid-1000 directory;
+      # bind mounts must be chowned to 1000:1000 on the host.
       - media-data:/data/media
     ports:
       - "8080:8000"

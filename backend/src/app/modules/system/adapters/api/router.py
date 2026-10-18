@@ -118,7 +118,7 @@ class CheckObservation(BaseModel):
         str | None,
         Field(
             default=None,
-            description="Human-readable error detail, set only when status is fail.",
+            description="Human-readable detail, set only when status is fail or warn.",
             examples=["check failed"],
         ),
     ] = None

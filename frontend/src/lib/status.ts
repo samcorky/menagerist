@@ -49,6 +49,14 @@ export function countStatuses(observations: ReadonlyArray<{ status: string }>): 
 export function formatObservedValue(value: unknown, unit: string | null | undefined): string {
 	if (unit === 'percent') return `${value}%`;
 	if (unit === 'ms') return `${value} ms`;
+	if (unit === 'GiB' && typeof value === 'number' && Number.isFinite(value)) {
+		return `${value.toFixed(2)} GiB`;
+	}
+	if (unit === 'state' && typeof value === 'string') {
+		if (value === 'not-writable') return 'Not writable';
+		if (value === 'missing') return 'Missing';
+		if (value === 'writable') return 'Writable';
+	}
 	if (unit === 'flagged requests') {
 		if (value === 0) return 'Nothing unusual in the last hour';
 		return `${value} flagged ${value === 1 ? 'request' : 'requests'} in the last hour`;

@@ -62,6 +62,13 @@ describe('formatObservedValue', () => {
 	it('appends the unit', () => {
 		expect(formatObservedValue(42, 'percent')).toBe('42%');
 		expect(formatObservedValue(12, 'ms')).toBe('12 ms');
+		expect(formatObservedValue(41.7, 'GiB')).toBe('41.70 GiB');
+	});
+
+	it('presents storage states in plain language', () => {
+		expect(formatObservedValue('writable', 'state')).toBe('Writable');
+		expect(formatObservedValue('not-writable', 'state')).toBe('Not writable');
+		expect(formatObservedValue('missing', 'state')).toBe('Missing');
 	});
 
 	it('says nothing unusual rather than zero when no request was flagged', () => {

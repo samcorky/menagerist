@@ -38,6 +38,10 @@ poe db-up && poe migrate && poe serve  # Postgres in Docker + backend at :8000 +
 docker compose up  # full stack including Postgres, all containerized
 ```
 
+The `media-data` named volume is initialised with the application's uid `1000`
+from the image. If you replace it with a bind mount, set ownership on the host
+with `chown 1000:1000 <host directory>` so uploads can be written.
+
 ### Manually, without `poe`
 
 ```sh
@@ -89,7 +93,7 @@ uv run menagerist identity unlock --username sam         # lift a sign-in lockou
 
 **HSTS.** The app deliberately does not send `Strict-Transport-Security`: it cannot know whether it is reached over HTTPS, and a wrong header is hard to undo. Set it at the TLS-terminating proxy. Caddy: `header Strict-Transport-Security "max-age=15552000"`. nginx: `add_header Strict-Transport-Security "max-age=15552000" always;`.
 
-**Health, version and diagnostics.** `GET /api/health` (liveness), `GET /api/health/ready` (readiness) and `GET /api/version` are public and say as little as possible: liveness is `{"status": "pass"}`, readiness is `{"status": "pass"}` (200) or `{"status": "fail"}` (503), and the version is just the name and version number. Container and orchestrator health checks only look at the status code. The measurements and build details sit behind the `system:diagnostics:read` permission, which administrators hold: `GET /api/health/ready/detail` (each check with its observed value; a failing check says only `check failed`, and the real error is in the server log) and `GET /api/version/detail` (commit, branch, build time and migration head).
+**Health, version and diagnostics.** `GET /api/health` (liveness), `GET /api/health/ready` (readiness) and `GET /api/version` are public and say as little as possible: liveness is `{"status": "pass"}`, readiness is `{"status": "pass"}` (200) or `{"status": "fail"}` (503), and the version is just the name and version number. Container and orchestrator health checks only look at the status code. The measurements and build details sit behind the `system:diagnostics:read` permission, which administrators hold: `GET /api/health/ready/detail` (each check with its observed value; a failing check says only `check failed`, a warning may include an operator hint, and unexpected errors are in the server log) and `GET /api/version/detail` (commit, branch, build time and migration head). Storage issues are warnings and do not make the instance unready.
 
 **Forgotten administrator password:** run `reset-password` for that username against the same database (`DATABASE_URL`/`MENAGERIST_*` settings as the app), then sign in with the new password and change it. For the Docker stack, run it inside the container: `docker compose exec menagerist menagerist identity reset-password --username sam`.
 
