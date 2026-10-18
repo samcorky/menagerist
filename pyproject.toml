@@ -234,7 +234,7 @@ cwd = "frontend"
 help = "Type-check frontend files with svelte-check"
 
 [tool.poe.groups.quality.tasks.test-frontend]
-cmd = "npx vitest run ${workers:+--maxWorkers=${workers}}"
+cmd = "node ./node_modules/vitest/vitest.mjs run ${workers:+--maxWorkers=${workers}}"
 cwd = "frontend"
 args = [
   { name = "workers", options = ["-w", "--workers"], default = "", help = "Vitest workers (--maxWorkers): a number or a percentage; vitest's default if omitted" },

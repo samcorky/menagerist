@@ -24,7 +24,7 @@ compose.override.yml
 compose.override.yaml
 
 # Pytest artifacts
-.coverage
+.coverage*
 coverage.xml
 
 # Other
@@ -38,3 +38,4 @@ __pycache__/
 
 # App specific
 data/
+backups/

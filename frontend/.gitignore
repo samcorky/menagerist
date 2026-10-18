@@ -7,6 +7,7 @@ node_modules
 .wrangler
 /.svelte-kit
 /build
+/node_modules
 
 # Lint cache
 .eslintcache
@@ -24,6 +25,7 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+.vite/
 
 # Generated API client (run `poe generate-frontend-client` to regenerate)
 /openapi.json
