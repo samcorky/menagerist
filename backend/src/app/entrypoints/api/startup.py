@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
@@ -8,7 +9,9 @@ from app.modules.identity.application.has_administrator import (
     HasAdministrator,
     HasAdministratorQuery,
 )
+from app.platform.config.media import get_media_settings
 from app.platform.database import get_session_factory
+from app.platform.storage_probe import hint, probe_directory
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 if TYPE_CHECKING:
@@ -41,8 +44,23 @@ async def warn_if_no_administrator() -> None:
         logger.warning(NO_ADMINISTRATOR_WARNING)
 
 
+async def warn_if_storage_not_writable() -> None:
+    """Log a warning for each configured storage directory that cannot be used."""
+    directories = {"media": get_media_settings().media_storage_path}
+    for path in directories.values():
+        try:
+            probe = await asyncio.to_thread(probe_directory, path)
+        except Exception:
+            logger.debug("storage check skipped", path=str(path), exc_info=True)
+            continue
+        message = hint(path, probe.state)
+        if message is not None:
+            logger.warning(message)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Run start-up checks once per worker, then serve."""
+    await warn_if_storage_not_writable()
     await warn_if_no_administrator()
     yield

@@ -217,7 +217,7 @@ USER 1000:1000
 HEALTHCHECK \
     --interval=30s \
     --timeout=5s \
-    --start-period=10s \
+    --start-period=3s \
     --retries=3 \
     CMD ["/app/.venv/bin/python", "/app/healthcheck.py"]
 

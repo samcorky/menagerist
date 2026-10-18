@@ -34,6 +34,7 @@
 		Database,
 		Gauge,
 		GitBranch,
+		HardDrive,
 		LogIn,
 		Network,
 		PackageCheck,
@@ -72,6 +73,12 @@
 		return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400';
 	}
 
+	function statusBarTone(status: string): string {
+		if (status === 'pass') return 'bg-emerald-700 dark:bg-emerald-400';
+		if (status === 'fail') return 'bg-destructive';
+		return 'bg-amber-700 dark:bg-amber-400';
+	}
+
 	function statusIcon(status: string): Component {
 		if (status === 'pass') return CheckCircle2;
 		if (status === 'fail') return CircleX;
@@ -84,6 +91,7 @@
 		if (key === 'pool') return Gauge;
 		if (key === 'migration') return GitBranch;
 		if (key === 'proxy') return Network;
+		if (key === 'storage') return HardDrive;
 		return Server;
 	}
 
@@ -92,9 +100,29 @@
 		if (lower.includes('database') || lower.includes('db')) return Database;
 		if (lower.includes('migration') || lower.includes('schema')) return GitBranch;
 		if (lower.includes('pool') || lower.includes('connection')) return Gauge;
+		if (lower.includes('storage') || lower.includes('writable') || lower.includes('space')) {
+			return HardDrive;
+		}
 		if (lower.includes('version') || lower.includes('build')) return PackageCheck;
 		if (lower.includes('health') || lower.includes('status')) return ShieldCheck;
 		return Wrench;
+	}
+
+	function groupStatus(checks: Array<{ obs: CheckObservation }>): CheckObservation['status'] {
+		if (checks.some(({ obs }) => obs.status === 'fail')) return 'fail';
+		if (checks.some(({ obs }) => obs.status === 'warn')) return 'warn';
+		return 'pass';
+	}
+
+	function groupSummary(checks: Array<{ obs: CheckObservation }>): string {
+		const counts = countStatuses(checks.map(({ obs }) => obs));
+		const parts: string[] = [];
+		if (counts.pass > 0) parts.push(`${counts.pass}/${counts.total} Operational`);
+		if (counts.warn > 0) {
+			parts.push(`${counts.warn} warning${counts.warn === 1 ? '' : 's'}`);
+		}
+		if (counts.fail > 0) parts.push(`${counts.fail} alert${counts.fail === 1 ? '' : 's'}`);
+		return parts.join(' · ') || 'No checks reported';
 	}
 
 	function latestObservationTime(report: ReadyDetailResponse): Date | null {
@@ -301,34 +329,48 @@
 				</Card.Content>
 			</Card.Root>
 		{:else if readiness}
-			{@const isPass = readiness === 'pass'}
-			{@const StatusIcon = statusIcon(readiness)}
+			{@const displayStatus = detail?.status ?? readiness}
+			{@const isPass = displayStatus === 'pass'}
+			{@const isWarning = displayStatus === 'warn'}
+			{@const StatusIcon = statusIcon(displayStatus)}
 			<Card.Root
 				class={isPass
 					? 'border-emerald-500/30 bg-emerald-500/5 shadow-sm'
-					: 'border-destructive/30 bg-destructive/5 shadow-sm'}
+					: isWarning
+						? 'border-amber-500/30 bg-amber-500/5 shadow-sm'
+						: 'border-destructive/30 bg-destructive/5 shadow-sm'}
 			>
 				<Card.Content class="flex items-center justify-between gap-3 px-5 py-4">
 					<div class="flex items-center gap-3">
 						<div
 							class="flex size-8 items-center justify-center rounded-full {isPass
 								? 'bg-emerald-500/10 text-emerald-600'
-								: 'bg-destructive/10 text-destructive'}"
+								: isWarning
+									? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+									: 'bg-destructive/10 text-destructive'}"
 						>
 							<StatusIcon class="size-4" />
 						</div>
 						<div>
-							<p class="font-medium">{isPass ? 'All systems operational' : 'Service degraded'}</p>
+							<p class="font-medium">
+								{isPass
+									? 'All systems operational'
+									: isWarning
+										? 'Some checks need attention'
+										: 'Service degraded'}
+							</p>
 							<p class="text-xs text-muted-foreground">
 								{isPass
 									? 'Everything Menagerist needs is working.'
-									: 'Something Menagerist needs is not working.'}
+									: isWarning
+										? 'The service is ready, but one or more checks reported a warning.'
+										: 'Something Menagerist needs is not working.'}
 							</p>
 						</div>
 					</div>
-					<Badge class={statusTone(readiness)}>
+					<Badge class={statusTone(displayStatus)}>
 						<StatusIcon class="size-3" />
-						{statusLabel(readiness)}
+						{statusLabel(displayStatus)}
 					</Badge>
 				</Card.Content>
 			</Card.Root>
@@ -372,8 +414,8 @@
 
 			{#each groups as [groupKey, checks] (groupKey)}
 				{@const GroupIcon = groupIcon(groupKey)}
-				{@const groupPass = checks.every((c) => c.obs.status === 'pass')}
-				{@const GroupStatusIcon = statusIcon(groupPass ? 'pass' : 'fail')}
+				{@const groupHealth = groupStatus(checks)}
+				{@const GroupStatusIcon = statusIcon(groupHealth)}
 				<Card.Root class="overflow-hidden border-border/70 bg-card shadow-sm">
 					<Card.Header class="px-5 pt-5 pb-0">
 						<div class="flex items-center justify-between gap-3">
@@ -385,18 +427,50 @@
 								</div>
 								<Card.Title class="text-base">{formatGroup(groupKey)}</Card.Title>
 							</div>
-							<Badge class={statusTone(groupPass ? 'pass' : 'fail')}>
+							<Badge class={statusTone(groupHealth)}>
 								<GroupStatusIcon class="size-3" />
-								{groupPass ? 'Operational' : 'Degraded'}
+								{statusLabel(groupHealth)}
 							</Badge>
 						</div>
 					</Card.Header>
-					<div class="px-5 pt-3 pb-0">
+					{@const groupCounts = countStatuses(checks.map(({ obs }) => obs))}
+					<div class="space-y-2 px-5 pt-3 pb-0">
 						<div
-							class="rounded-full border border-border/80 bg-muted/50 px-2.5 py-1 text-center text-[11px] font-medium tracking-[0.12em] text-muted-foreground uppercase"
+							class="flex h-2 overflow-hidden rounded-full bg-muted"
+							role="img"
+							aria-label={groupSummary(checks)}
 						>
-							{checks.filter((c) => c.obs.status === 'pass').length}/{checks.length} passing
+							{#if groupCounts.pass > 0}
+								<span
+									aria-hidden="true"
+									class="h-full {statusBarTone(
+										'pass'
+									)} transition-[width] duration-500 ease-out motion-reduce:transition-none"
+									style={`width: ${(groupCounts.pass / groupCounts.total) * 100}%`}
+								></span>
+							{/if}
+							{#if groupCounts.warn > 0}
+								<span
+									aria-hidden="true"
+									class="h-full {statusBarTone(
+										'warn'
+									)} transition-[width] duration-500 ease-out motion-reduce:transition-none"
+									style={`width: ${(groupCounts.warn / groupCounts.total) * 100}%`}
+								></span>
+							{/if}
+							{#if groupCounts.fail > 0}
+								<span
+									aria-hidden="true"
+									class="h-full {statusBarTone(
+										'fail'
+									)} transition-[width] duration-500 ease-out motion-reduce:transition-none"
+									style={`width: ${(groupCounts.fail / groupCounts.total) * 100}%`}
+								></span>
+							{/if}
 						</div>
+						<p class="text-center text-xs font-medium text-muted-foreground">
+							{groupSummary(checks)}
+						</p>
 					</div>
 					<Card.Content class="space-y-3 p-4">
 						{#each checks as { label, obs } (label)}
@@ -418,16 +492,16 @@
 											{statusLabel(obs.status)}
 										</Badge>
 									</div>
-									<div class="mt-1 flex items-center gap-2 font-mono text-xs text-muted-foreground">
-										<span>{formatValue(obs)}</span>
-										{#if obs.output}
-											<span
-												class={obs.status === 'warn'
-													? 'text-amber-700 dark:text-amber-400'
-													: 'text-destructive'}>• {obs.output}</span
-											>
-										{/if}
-									</div>
+									<p class="mt-1 font-mono text-xs text-muted-foreground">{formatValue(obs)}</p>
+									{#if obs.output}
+										<p
+											class={obs.status === 'warn'
+												? 'mt-2 text-sm leading-relaxed break-words text-amber-700 dark:text-amber-400'
+												: 'mt-2 text-sm leading-relaxed break-words text-destructive'}
+										>
+											{obs.output}
+										</p>
+									{/if}
 								</div>
 							</div>
 						{/each}

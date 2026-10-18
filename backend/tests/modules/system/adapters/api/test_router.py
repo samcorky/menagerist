@@ -207,16 +207,25 @@ def test_readiness_reports_warn_status_without_503() -> None:
     report = ReadinessReport(
         status=CheckStatus.WARN,
         checks={
-            "database:poolUtilization": [
+            "storage:mediaWritable": [
                 CheckObservation(
                     component_type="datastore",
-                    observed_value=80.0,
-                    observed_unit="percent",
+                    observed_value="not-writable",
+                    observed_unit="state",
                     status=CheckStatus.WARN,
                     time=datetime.now(UTC),
-                    output="4/5 connections checked out, 1 available",
+                    output="Use chown 1000:1000 <host directory>.",
                 )
-            ]
+            ],
+            "storage:mediaFreeSpace": [
+                CheckObservation(
+                    component_type="datastore",
+                    observed_value=41.7,
+                    observed_unit="GiB",
+                    status=CheckStatus.PASS,
+                    time=datetime.now(UTC),
+                )
+            ],
         },
     )
     app = create_app()
@@ -239,7 +248,9 @@ def test_readiness_reports_warn_status_without_503() -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "warn"
-    assert data["checks"]["database:poolUtilization"][0]["status"] == "warn"
+    assert data["checks"]["storage:mediaWritable"][0]["status"] == "warn"
+    assert "chown" in data["checks"]["storage:mediaWritable"][0]["output"]
+    assert data["checks"]["storage:mediaFreeSpace"][0]["observedValue"] == 41.7
 
 
 # ---------------------------------------------------------------------------
@@ -274,14 +285,20 @@ def test_readiness_passes_with_real_db(ready_client: TestClient) -> None:
     assert response.headers["content-type"].startswith("application/health+json")
 
     data = response.json()
-    assert data["status"] == "pass"
+    assert data["status"] in {"pass", "warn"}
 
     for key, checks in data["checks"].items():
         for check in checks:
-            assert check["status"] == "pass", (
-                f"{key} should pass against live migrated DB"
-            )
-            assert "output" not in check, f"{key} should have no output when passing"
+            if key.startswith("storage:"):
+                assert check["status"] in {"pass", "warn"}
+            else:
+                assert check["status"] == "pass", (
+                    f"{key} should pass against live migrated DB"
+                )
+            if check["status"] == "pass":
+                assert "output" not in check, (
+                    f"{key} should have no output when passing"
+                )
 
 
 # ---------------------------------------------------------------------------

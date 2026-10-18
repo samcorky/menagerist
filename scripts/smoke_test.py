@@ -234,13 +234,29 @@ def check_startup_time(client: docker.DockerClient) -> None:
     started_at = _log_line_timestamp(logs, "Started worker-1")
     duration = started_at - spawned_at
 
+    startup_lines: list[str] = []
+    in_startup = False
+    for line in logs.splitlines():
+        clean = _ANSI_ESCAPE.sub("", line)
+        if "Spawning worker-1" in clean:
+            in_startup = True
+        if in_startup:
+            startup_lines.append(clean)
+        if "Started worker-1" in clean and in_startup:
+            break
+
+    print(f"  worker started in {duration:.2f}s")
+    if startup_lines:
+        print("  startup logs:")
+        for line in startup_lines:
+            print(f"    {line}")
+
     if duration > _MAX_WORKER_STARTUP_SECONDS:
         raise SmokeTestError(
             f"worker took {duration:.2f}s to start "
             + f"(limit {_MAX_WORKER_STARTUP_SECONDS:.2f}s) - "
             + "check for a heavy import pulled in at module scope"
         )
-    print(f"  worker started in {duration:.2f}s")
 
 
 def check_version_lockstep(client: docker.DockerClient) -> None:
