@@ -61,6 +61,16 @@ def test_managing_users_implies_listing_them() -> None:
     assert expand({IdentityPermission.LIST_USERS}) == {IdentityPermission.LIST_USERS}
 
 
+def test_revoking_sessions_implies_listing_them() -> None:
+    """Revoking sessions grants listing them as well."""
+    assert IdentityPermission.LIST_SESSIONS in expand(
+        {IdentityPermission.REVOKE_SESSION}
+    )
+    assert expand({IdentityPermission.LIST_SESSIONS}) == {
+        IdentityPermission.LIST_SESSIONS
+    }
+
+
 def test_the_real_catalogue_has_no_cycles() -> None:
     """No permission transitively implies itself."""
     for permission in IMPLIES:

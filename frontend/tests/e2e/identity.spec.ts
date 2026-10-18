@@ -29,7 +29,7 @@ test('an administrator sees when a user last signed in', async ({
 	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'seen' });
 	await adminApi.dispose();
 
-	await page.goto('/settings/users');
+	await page.goto('/admin/users');
 	await expect(userRow(page, user)).toContainText('Last sign-in:');
 	await expect(userRow(page, user)).not.toContainText('Last sign-in: Never');
 });
@@ -65,7 +65,7 @@ test('an administrator renames another user from the users page', async ({
 	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'renamed-by-admin' });
 	await adminApi.dispose();
 
-	await page.goto('/settings/users');
+	await page.goto('/admin/users');
 	const row = userRow(page, user);
 	await row.getByRole('button', { name: `Edit display name for ${user.username}` }).click();
 	const field = row.getByRole('textbox', { name: `Display name for ${user.username}` });
@@ -89,7 +89,7 @@ test('Escape cancels a rename without saving', async ({ page, workerBaseURL, wor
 	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'rename-escape' });
 	await adminApi.dispose();
 
-	await page.goto('/settings/users');
+	await page.goto('/admin/users');
 	const row = userRow(page, user);
 	await row.getByRole('button', { name: `Edit display name for ${user.username}` }).click();
 	const field = row.getByRole('textbox', { name: `Display name for ${user.username}` });
@@ -110,7 +110,7 @@ test('a blank name shows a message and keeps the editor open', async ({
 	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'rename-blank' });
 	await adminApi.dispose();
 
-	await page.goto('/settings/users');
+	await page.goto('/admin/users');
 	const row = userRow(page, user);
 	await row.getByRole('button', { name: `Edit display name for ${user.username}` }).click();
 	const field = row.getByRole('textbox', { name: `Display name for ${user.username}` });
@@ -172,7 +172,7 @@ test('an administrator unlocks a locked-out account', async ({
 	expect(locked.status()).toBe(429);
 	await anonymous.dispose();
 
-	await page.goto('/settings/users');
+	await page.goto('/admin/users');
 	const row = userRow(page, user);
 	await expect(row.getByText(/^Locked until/)).toBeVisible();
 	await row.getByRole('button', { name: 'Unlock' }).click();

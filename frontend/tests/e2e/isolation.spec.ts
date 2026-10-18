@@ -156,7 +156,7 @@ test('an administrator can add a member who then has to choose a password at fir
 		.replace(/[^a-z0-9]+/g, '-');
 	const startingPassword = `start-${username}-pw`;
 
-	await page.goto('/settings/users');
+	await page.goto('/admin/users');
 	await page.getByRole('button', { name: 'Add user' }).first().click();
 	const form = page.locator('form').filter({ has: page.getByLabel('Starting password') });
 	await form.getByLabel('Name', { exact: true }).fill('Made Member');
@@ -186,10 +186,10 @@ test('a member cannot open the Users page or call its API', async ({ browser }) 
 	await b.page.goto('/');
 	await b.page.getByRole('button', { name: /^Account menu for / }).click();
 	await expect(b.page.getByRole('menuitem', { name: 'Account' })).toBeVisible();
-	await expect(b.page.getByRole('menuitem', { name: 'Users' })).toHaveCount(0);
+	await expect(b.page.getByRole('menuitem', { name: 'Administration' })).toHaveCount(0);
 	await b.page.keyboard.press('Escape');
 
-	await b.page.goto('/settings/users');
+	await b.page.goto('/admin/users');
 	await expect(b.page.getByText('Only administrators can manage users.')).toBeVisible();
 	expect((await b.request.get('/api/v1/user')).status()).toBe(403);
 	await b.context.close();

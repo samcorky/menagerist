@@ -1,4 +1,5 @@
 import secrets
+import uuid
 from datetime import timedelta
 from functools import cache
 from typing import TYPE_CHECKING, Annotated
@@ -42,8 +43,13 @@ from app.modules.identity.application.get_current_user import (
 )
 from app.modules.identity.application.get_setup_status import GetSetupStatus
 from app.modules.identity.application.has_administrator import HasAdministrator
+from app.modules.identity.application.list_own_sessions import ListOwnSessions
+from app.modules.identity.application.list_sessions import ListSessions
 from app.modules.identity.application.list_users import ListUsers
 from app.modules.identity.application.reset_password import ResetPassword
+from app.modules.identity.application.revoke_other_sessions import RevokeOtherSessions
+from app.modules.identity.application.revoke_own_session import RevokeOwnSession
+from app.modules.identity.application.revoke_session import RevokeSession
 from app.modules.identity.application.set_own_display_name import SetOwnDisplayName
 from app.modules.identity.application.setup_first_admin import SetupFirstAdmin
 from app.modules.identity.application.sign_in import SignIn
@@ -324,6 +330,44 @@ def get_has_administrator_use_case(
     return HasAdministrator(repos)
 
 
+def get_list_own_sessions_use_case(
+    repos: Annotated[IdentityRepos, Depends(get_identity_repos)],
+    settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
+) -> ListOwnSessions:
+    idle = settings.session_idle_hours
+    return ListOwnSessions(repos, idle_timeout=timedelta(hours=idle) if idle else None)
+
+
+def get_revoke_own_session_use_case(
+    uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+) -> RevokeOwnSession:
+    return RevokeOwnSession(uow)
+
+
+def get_revoke_other_sessions_use_case(
+    uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+) -> RevokeOtherSessions:
+    return RevokeOtherSessions(uow)
+
+
+def get_list_sessions_use_case(
+    repos: Annotated[IdentityRepos, Depends(get_identity_repos)],
+    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
+) -> ListSessions:
+    idle = settings.session_idle_hours
+    return ListSessions(
+        repos, authorization, idle_timeout=timedelta(hours=idle) if idle else None
+    )
+
+
+def get_revoke_session_use_case(
+    uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+) -> RevokeSession:
+    return RevokeSession(uow, authorization)
+
+
 def get_session_token(
     request: Request,
     settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
@@ -385,3 +429,18 @@ def get_active_identity_actor(
     if user.password_expired:
         raise PasswordExpiredError("Change your password to continue.")
     return Actor(id=user.id, roles=frozenset({user.role.value}))
+
+
+def get_current_session_id(
+    request: Request,
+    _user: Annotated[User, Depends(get_signed_in_user)],
+) -> uuid.UUID:
+    """Return the current session ID bound to the request.
+
+    Raises:
+        SessionRequiredError: If there is no live session.
+    """
+    session_id: str | uuid.UUID | None = getattr(request.state, "session_id", None)
+    if session_id is None:
+        raise SessionRequiredError("Sign in to continue.")
+    return session_id if isinstance(session_id, uuid.UUID) else uuid.UUID(session_id)

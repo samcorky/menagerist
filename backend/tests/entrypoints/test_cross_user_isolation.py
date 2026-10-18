@@ -227,6 +227,14 @@ ALLOWED: dict[Route, str] = {
     ("PATCH", "/api/v1/auth/me"): OWN_SESSION,
     ("POST", "/api/v1/auth/password"): OWN_SESSION,
     ("GET", "/api/v1/auth/me/permissions"): OWN_SESSION,
+    ("GET", "/api/v1/auth/sessions"): OWN_SESSION,
+    ("DELETE", "/api/v1/auth/sessions/{session_id}"): OWN_SESSION,
+    ("DELETE", "/api/v1/auth/sessions"): OWN_SESSION,
+    ("GET", "/api/v1/session"): "permission-gated: administrators list active sessions",
+    (
+        "DELETE",
+        "/api/v1/session/{session_id}",
+    ): "permission-gated: administrators revoke sessions",
     ("GET", "/api/v1/node-type"): VOCABULARY,
     ("GET", "/api/v1/node-type/{node_type_id}"): VOCABULARY,
     ("POST", "/api/v1/node-type"): VOCABULARY,
@@ -372,7 +380,7 @@ def _not_installed_for_b(response: Response) -> str | None:
 
 SPECIAL[("GET", "/api/v1/example")] = _no_installation
 SPECIAL[("DELETE", "/api/v1/example/{pack_id}/installation")] = _not_installed_for_b
-ADMIN_PREFIXES = ("/api/v1/user",)
+ADMIN_PREFIXES = ("/api/v1/user", "/api/v1/session")
 # Setup the positive control needs because the seed already did the thing.
 POSITIVE_PREP: dict[Route, Callable[[World], None]] = {
     ("PUT", "/api/v1/example/{pack_id}/installation"): lambda w: w.uninstall_pack(),

@@ -32,7 +32,7 @@ NO_ACTOR_ROUTES = {("POST", "/v1/auth/logout")}
 # Identity routes resolve the session through the identity dependencies.
 # Identity-prefixed paths that live in entrypoints and use the content actor.
 CONTENT_ACTOR_ROUTES = {("GET", "/v1/auth/me/permissions")}
-IDENTITY_PREFIXES = ("/v1/auth/", "/v1/user")
+IDENTITY_PREFIXES = ("/v1/auth/", "/v1/user", "/v1/session")
 IDENTITY_ACTORS = {
     get_identity_actor,
     get_active_identity_actor,

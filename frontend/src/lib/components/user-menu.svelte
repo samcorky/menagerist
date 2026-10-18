@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { LogOut, UserRound, Users } from '@lucide/svelte';
+	import { LogOut, UserRound, Shield } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { auth } from '$lib/auth.svelte.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -38,9 +38,9 @@
 				Account
 			</DropdownMenu.Item>
 			{#if auth.isAdmin && !auth.passwordExpired}
-				<DropdownMenu.Item class="min-h-11" onSelect={() => goto(resolve('/settings/users'))}>
-					<Users class="size-4" />
-					Users
+				<DropdownMenu.Item class="min-h-11" onSelect={() => goto(resolve('/admin'))}>
+					<Shield class="size-4" />
+					Administration
 				</DropdownMenu.Item>
 			{/if}
 			<DropdownMenu.Item class="min-h-11" onSelect={handleSignOut}>

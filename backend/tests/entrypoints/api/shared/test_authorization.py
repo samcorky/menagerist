@@ -27,7 +27,7 @@ def test_the_default_member_grant_is_empty() -> None:
 
 
 def test_the_admin_only_set_is_graph_structure_and_user_management() -> None:
-    """Graph structure, user management and system diagnostics are admin-only."""
+    """Graph structure, users, sessions and diagnostics are admin-only."""
     assert (
         frozenset(
             {
@@ -40,6 +40,8 @@ def test_the_admin_only_set_is_graph_structure_and_user_management() -> None:
                 "identity:user:update",
                 "identity:user:reset_password",
                 "identity:user:unlock",
+                "identity:session:list",
+                "identity:session:revoke",
                 "system:diagnostics:read",
             }
         )

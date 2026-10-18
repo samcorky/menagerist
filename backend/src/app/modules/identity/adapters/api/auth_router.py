@@ -1,3 +1,4 @@
+import uuid
 from typing import Annotated
 
 import structlog
@@ -20,9 +21,13 @@ from app.modules.identity.adapters.api.dependencies import (
     get_change_password_use_case,
     get_client_device,
     get_client_ip,
+    get_current_session_id,
     get_get_setup_status_use_case,
     get_identity_actor,
     get_identity_settings_dep,
+    get_list_own_sessions_use_case,
+    get_revoke_other_sessions_use_case,
+    get_revoke_own_session_use_case,
     get_session_token,
     get_set_own_display_name_use_case,
     get_setup_first_admin_use_case,
@@ -35,6 +40,8 @@ from app.modules.identity.adapters.api.schemas import (
     AuthStatusResponse,
     ChangePasswordRequest,
     LoginRequest,
+    RevokedSessionsResponse,
+    SessionResponse,
     SetupRequest,
     SetupResponse,
     UpdateMeRequest,
@@ -46,6 +53,18 @@ from app.modules.identity.application.get_setup_status import (
     GetSetupStatus,
     GetSetupStatusQuery,
 )
+from app.modules.identity.application.list_own_sessions import (
+    ListOwnSessions,
+    ListOwnSessionsQuery,
+)
+from app.modules.identity.application.revoke_other_sessions import (
+    RevokeOtherSessions,
+    RevokeOtherSessionsCommand,
+)
+from app.modules.identity.application.revoke_own_session import (
+    RevokeOwnSession,
+    RevokeOwnSessionCommand,
+)
 from app.modules.identity.application.set_own_display_name import SetOwnDisplayName
 from app.modules.identity.application.setup_first_admin import SetupFirstAdmin
 from app.modules.identity.application.sign_in import SignIn
@@ -53,10 +72,12 @@ from app.modules.identity.application.sign_out import SignOut, SignOutCommand
 from app.modules.identity.domain.errors import (
     AccountDisabledError,
     CurrentPasswordIncorrectError,
+    CurrentSessionError,
     InvalidCredentialsError,
     InvalidPasswordError,
     InvalidUserError,
     PasswordUnchangedError,
+    SessionNotFoundError,
     SessionRequiredError,
     SetupAlreadyDoneError,
     SignInThrottledError,
@@ -303,3 +324,73 @@ async def change_password(
     )
     set_session_cookies(request, response, result.token, settings)
     return UserResponse.from_domain(result.user)
+
+
+@router.get(
+    "/sessions",
+    response_model=list[SessionResponse],
+    operation_id="list_own_sessions",
+    tags=["Sessions"],
+    responses=_UNAUTHENTICATED,
+)
+async def list_own_sessions(
+    use_case: Annotated[ListOwnSessions, Depends(get_list_own_sessions_use_case)],
+    actor: Annotated[Actor, Depends(get_active_identity_actor)],
+    current_session_id: Annotated[uuid.UUID, Depends(get_current_session_id)],
+) -> list[SessionResponse]:
+    """List all active devices for the current user."""
+    sessions = await use_case.handle(
+        ListOwnSessionsQuery(current_session_id=current_session_id),
+        actor,
+    )
+    return [SessionResponse.from_own_session(s) for s in sessions]
+
+
+@router.delete(
+    "/sessions/{session_id}",
+    status_code=204,
+    operation_id="revoke_own_session",
+    tags=["Sessions"],
+    responses={
+        **_UNAUTHENTICATED,
+        **error_response(SessionNotFoundError, detail="That device was not found."),
+        **error_response(
+            CurrentSessionError, detail="Cannot revoke the current device."
+        ),
+    },
+)
+async def revoke_own_session(
+    session_id: uuid.UUID,
+    use_case: Annotated[RevokeOwnSession, Depends(get_revoke_own_session_use_case)],
+    actor: Annotated[Actor, Depends(get_active_identity_actor)],
+    current_session_id: Annotated[uuid.UUID, Depends(get_current_session_id)],
+) -> None:
+    """Sign out one of your active devices."""
+    await use_case.handle(
+        RevokeOwnSessionCommand(
+            session_id=session_id, current_session_id=current_session_id
+        ),
+        actor,
+    )
+
+
+@router.delete(
+    "/sessions",
+    response_model=RevokedSessionsResponse,
+    operation_id="revoke_other_sessions",
+    tags=["Sessions"],
+    responses=_UNAUTHENTICATED,
+)
+async def revoke_other_sessions(
+    use_case: Annotated[
+        RevokeOtherSessions, Depends(get_revoke_other_sessions_use_case)
+    ],
+    actor: Annotated[Actor, Depends(get_active_identity_actor)],
+    current_session_id: Annotated[uuid.UUID, Depends(get_current_session_id)],
+) -> RevokedSessionsResponse:
+    """Sign out all other active devices for your account."""
+    ended = await use_case.handle(
+        RevokeOtherSessionsCommand(current_session_id=current_session_id),
+        actor,
+    )
+    return RevokedSessionsResponse(ended=ended)

@@ -61,12 +61,13 @@ def make_user() -> MakeUser:
     def _make(
         username: str = "alice",
         *,
+        display_name: str | None = None,
         role: Role = Role.MEMBER,
         password: str = "password-123",
     ) -> User:
         return User.create(
             username=username,
-            display_name=username.title(),
+            display_name=display_name or username.title(),
             password_hash=InMemoryPasswordHasher().hash(password),
             role=role,
             now=NOW,
