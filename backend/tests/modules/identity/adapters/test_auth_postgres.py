@@ -52,7 +52,7 @@ def test_setup_then_login_then_me(client: TestClient) -> None:
     assert client.get(f"{AUTH}/me").json()["username"] == "admin"
     assert client.get(f"{AUTH}/status").json() == {"setup_required": False}
 
-    csrf = {"X-CSRF-Token": client.cookies.get("menagerist_csrf") or ""}
+    csrf = {"X-CSRF-Token": client.cookies.get("menagerist-csrf") or ""}
     assert client.post(f"{AUTH}/logout", headers=csrf).status_code == 204
     assert client.get(f"{AUTH}/me").status_code == 401
 

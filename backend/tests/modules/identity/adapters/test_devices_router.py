@@ -35,8 +35,8 @@ if TYPE_CHECKING:
 
 AUTH = "/api/v1/auth"
 SESSIONS = "/api/v1/session"
-CSRF_COOKIE = "menagerist_csrf"
-SESSION_COOKIE = "menagerist_session"
+CSRF_COOKIE = "menagerist-csrf"
+SESSION_COOKIE = "menagerist-session"
 SETUP_BODY = {
     "username": "Admin",
     "display_name": "Admin",

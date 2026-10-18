@@ -49,8 +49,8 @@ pytestmark = pytest.mark.real_actor
 
 AUTH = "/api/v1/auth"
 PROBE = "/api/v1/_probe"
-COOKIE = "menagerist_session"
-CSRF_COOKIE = "menagerist_csrf"
+COOKIE = "menagerist-session"
+CSRF_COOKIE = "menagerist-csrf"
 SETUP_BODY = {"username": "Admin", "display_name": "Admin", "password": "password-123"}
 logger = structlog.get_logger()
 

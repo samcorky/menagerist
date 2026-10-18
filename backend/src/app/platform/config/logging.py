@@ -1,6 +1,8 @@
 from enum import StrEnum
 from functools import lru_cache
 
+from pydantic import Field
+
 from app.platform.config._base import MenageristBaseSettings
 
 
@@ -24,10 +26,22 @@ class LogLevel(StrEnum):
 class LoggingSettings(MenageristBaseSettings):
     """Logging settings."""
 
-    log_level: LogLevel = LogLevel.INFO
-    sqlalchemy_log_level: LogLevel = LogLevel.WARNING
-    log_json: bool = False
-    access_log: bool = True
+    log_level: LogLevel = Field(
+        default=LogLevel.INFO,
+        description="Minimum severity emitted by Menagerist application loggers.",
+    )
+    sqlalchemy_log_level: LogLevel = Field(
+        default=LogLevel.WARNING,
+        description="Minimum severity emitted by SQLAlchemy's engine logger.",
+    )
+    log_json: bool = Field(
+        default=False,
+        description="Emit structured logs as JSON instead of the development format.",
+    )
+    access_log: bool = Field(
+        default=True,
+        description="Emit HTTP access log entries for application requests.",
+    )
 
 
 @lru_cache(maxsize=1)

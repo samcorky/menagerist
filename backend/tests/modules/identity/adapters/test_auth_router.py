@@ -42,8 +42,8 @@ if TYPE_CHECKING:
 
 AUTH = "/api/v1/auth"
 USERS = "/api/v1/user"
-CSRF_COOKIE = "menagerist_csrf"
-SESSION_COOKIE = "menagerist_session"
+CSRF_COOKIE = "menagerist-csrf"
+SESSION_COOKIE = "menagerist-session"
 SETUP_BODY = {
     "username": "Admin",
     "display_name": "Admin",
@@ -456,7 +456,7 @@ def test_unsafe_requests_without_csrf_are_refused(api: Api) -> None:
     mismatched = api.client.post(url, headers={"X-CSRF-Token": "not-the-cookie"})
     no_csrf_cookie = api.new_client()
     no_csrf_cookie.cookies.set(
-        "menagerist_session", "x", domain="testserver.local", path="/"
+        "menagerist-session", "x", domain="testserver.local", path="/"
     )
     header_only = no_csrf_cookie.post(url, headers={"X-CSRF-Token": "abc"})
 

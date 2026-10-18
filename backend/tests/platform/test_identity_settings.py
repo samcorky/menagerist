@@ -9,8 +9,8 @@ def test_defaults() -> None:
     settings = IdentitySettings()
     assert settings.session_ttl_hours == 168
     assert settings.session_idle_hours == 0
-    assert settings.cookie_name == "menagerist_session"
-    assert settings.csrf_cookie_name == "menagerist_csrf"
+    assert settings.cookie_name == "menagerist-session"
+    assert settings.csrf_cookie_name == "menagerist-csrf"
     assert settings.cookie_secure is None
     assert settings.password_hasher == "scrypt"
 
@@ -66,3 +66,52 @@ def test_idle_limit_is_configurable_and_never_negative(
     monkeypatch.setenv("MENAGERIST_SESSION_IDLE_HOURS", "-1")
     with pytest.raises(ValidationError):
         IdentitySettings()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("session_ttl_hours", "0"),
+        ("sign_in_username_attempts", "0"),
+        ("sign_in_ip_attempts", "0"),
+        ("sign_in_window_minutes", "0"),
+        ("password_hash_concurrency", "0"),
+    ],
+)
+def test_positive_identity_limits_reject_zero(
+    monkeypatch: pytest.MonkeyPatch, field: str, value: str
+) -> None:
+    """Session lifetime, throttle limits and hashing concurrency must be positive."""
+    monkeypatch.setenv(f"MENAGERIST_{field.upper()}", value)
+    with pytest.raises(ValidationError):
+        IdentitySettings()
+
+
+def test_password_hasher_must_be_registered(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Only the password-hashing scheme wired into the application is accepted."""
+    monkeypatch.setenv("MENAGERIST_PASSWORD_HASHER", "unknown")
+    with pytest.raises(ValidationError):
+        IdentitySettings()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("MENAGERIST_COOKIE_NAME", ""),
+        ("MENAGERIST_COOKIE_NAME", "invalid name"),
+        ("MENAGERIST_CSRF_COOKIE_NAME", "invalid;name"),
+    ],
+)
+def test_cookie_names_must_be_valid_cookie_tokens(
+    monkeypatch: pytest.MonkeyPatch, field: str, value: str
+) -> None:
+    """Cookie names must be non-empty valid HTTP cookie tokens."""
+    monkeypatch.setenv(field, value)
+    with pytest.raises(ValidationError):
+        IdentitySettings()
+
+
+def test_session_and_csrf_cookie_names_must_differ() -> None:
+    """The browser must be able to distinguish the session and CSRF cookies."""
+    with pytest.raises(ValidationError):
+        IdentitySettings(cookie_name="same", csrf_cookie_name="same")

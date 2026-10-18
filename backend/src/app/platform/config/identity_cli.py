@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import SecretStr  # noqa: TC002 - pydantic resolves it at runtime
+from pydantic import Field, SecretStr
 
 from app.platform.config._base import MenageristBaseSettings
 
@@ -16,7 +16,11 @@ class IdentityCliSettings(MenageristBaseSettings):
     variables show up in `docker inspect` and process listings.
     """
 
-    initial_password: SecretStr | None = None
+    initial_password: SecretStr | None = Field(
+        default=None,
+        min_length=1,
+        description="Optional first-admin password; prefer its Docker secret file.",
+    )
 
 
 def get_identity_cli_settings() -> IdentityCliSettings:

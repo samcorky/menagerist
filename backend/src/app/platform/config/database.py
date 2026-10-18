@@ -1,6 +1,7 @@
 from functools import lru_cache
+from typing import Annotated
 
-from pydantic import PostgresDsn
+from pydantic import Field, PostgresDsn
 
 from app.platform.config._base import MenageristBaseSettings
 
@@ -8,7 +9,10 @@ from app.platform.config._base import MenageristBaseSettings
 class DatabaseSettings(MenageristBaseSettings):
     """Database connection settings."""
 
-    database_url: PostgresDsn = PostgresDsn(
+    database_url: Annotated[
+        PostgresDsn,
+        Field(description="PostgreSQL connection URL for the backend database."),
+    ] = PostgresDsn(
         "postgresql+asyncpg://menagerist:menagerist@localhost:5432/menagerist"
     )
 

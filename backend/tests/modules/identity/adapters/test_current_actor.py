@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 
 pytestmark = pytest.mark.real_actor
 
-COOKIE = "menagerist_session"
+COOKIE = "menagerist-session"
 PATH = "/api/v1/_probe"
 
 
@@ -187,7 +187,7 @@ async def test_password_expired_blocks_content_routes(
     )
     assert change.status_code == 200
     # Changing the password rotated the CSRF cookie; send the new one.
-    csrf = {"X-CSRF-Token": client.cookies.get("menagerist_csrf") or ""}
+    csrf = {"X-CSRF-Token": client.cookies.get("menagerist-csrf") or ""}
     assert client.post("/api/v1/auth/logout", headers=csrf).status_code < 300
 
 
@@ -265,7 +265,7 @@ async def test_a_real_content_route_answers_with_a_session(
 
 
 UNSAFE = f"{REAL_ROUTE}/{uuid.UUID(int=7)}"
-CSRF_COOKIE = "menagerist_csrf"
+CSRF_COOKIE = "menagerist-csrf"
 
 
 def test_unsafe_call_without_a_session_cookie_is_401_not_csrf(world: World) -> None:

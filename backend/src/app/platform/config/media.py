@@ -1,16 +1,33 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field
+
 from app.platform.config._base import MenageristBaseSettings
 
 
 class MediaSettings(MenageristBaseSettings):
     """Configuration for the media module."""
 
-    media_storage_path: Path = Path("/data/media")
-    staged_ttl_hours: int = 24
-    orphaned_ttl_hours: int = 72
-    max_upload_size: int = 100 * 1024 * 1024
+    media_storage_path: Path = Field(
+        default=Path("/data/media"),
+        description="Directory used to store uploaded media and generated assets.",
+    )
+    staged_ttl_hours: int = Field(
+        default=24,
+        ge=1,
+        description="Hours to keep media uploads that have not been attached.",
+    )
+    orphaned_ttl_hours: int = Field(
+        default=72,
+        ge=1,
+        description="Hours to keep media files that are no longer referenced.",
+    )
+    max_upload_size: int = Field(
+        default=100 * 1024 * 1024,
+        gt=0,
+        description="Maximum accepted media upload size in bytes.",
+    )
 
 
 @lru_cache(maxsize=1)
