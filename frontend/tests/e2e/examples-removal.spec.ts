@@ -2,9 +2,7 @@ import { test, expect } from './fixtures';
 import { createItem, createItemType, uniqueName } from './helpers';
 import { MOVIES, MUSIC, exampleData, install, openItem, remove } from './examples-helpers';
 
-/**
- * Example packs: removing a pack, what removal keeps and why, and reinstalling. Serial, and every test cleans up through the API afterwards.
- */
+/** Shared example packs need serial removal specs. */
 test.describe.configure({ mode: 'serial' });
 
 const { ownNames, ownTypeLabels, cleanUp } = exampleData();

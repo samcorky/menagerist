@@ -9,6 +9,7 @@ from app.modules.identity.application.has_administrator import (
     HasAdministrator,
     HasAdministratorQuery,
 )
+from app.platform.config.backup import get_backup_settings
 from app.platform.config.media import get_media_settings
 from app.platform.database import get_session_factory
 from app.platform.storage_probe import hint, probe_directory
@@ -46,7 +47,10 @@ async def warn_if_no_administrator() -> None:
 
 async def warn_if_storage_not_writable() -> None:
     """Log a warning for each configured storage directory that cannot be used."""
-    directories = {"media": get_media_settings().media_storage_path}
+    directories = {
+        "media": get_media_settings().media_storage_path,
+        "backup": get_backup_settings().backup_path,
+    }
     for path in directories.values():
         try:
             probe = await asyncio.to_thread(probe_directory, path)

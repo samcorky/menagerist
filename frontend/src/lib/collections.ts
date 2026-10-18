@@ -15,7 +15,7 @@ export function describeAddResult(added: number, requested: number): string {
 	return skipped > 0 ? `${base}. ${skipped} ${skipped === 1 ? 'was' : 'were'} already there` : base;
 }
 
-/** A friendly message when adding items fails; the server says 400 for items that no longer exist. */
+/** Friendly error text when items cannot be added. */
 export function addItemsErrorMessage(status: number | undefined): string {
 	if (status === 400) return 'Some of those items no longer exist. Refresh and try again.';
 	if (status === 404) return 'This collection no longer exists.';

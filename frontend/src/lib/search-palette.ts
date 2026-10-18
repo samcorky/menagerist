@@ -9,7 +9,7 @@ export function normaliseQuery(raw: string | null | undefined): string {
 	return (raw ?? '').trim().slice(0, MAX_QUERY_LENGTH).trim();
 }
 
-/** The search string (`q=...`, for `/items?${...}`) that opens the items page with the text searched. */
+/** The URL query for opening the items page with this search text. */
 export function seeAllSearch(query: string): string {
 	return new URLSearchParams({ q: normaliseQuery(query) }).toString();
 }

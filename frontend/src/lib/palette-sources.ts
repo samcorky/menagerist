@@ -62,7 +62,7 @@ export function loadItemTypes(): Promise<NodeTypeResponse[]> {
 	return typesPromise;
 }
 
-/** Searches every source for the query, reporting each group as it settles. `only` re-runs just those async sources. */
+/** Search every source and report each group as it settles. */
 export async function searchEverything(
 	query: string,
 	onUpdate: (partial: Partial<Results>) => void,

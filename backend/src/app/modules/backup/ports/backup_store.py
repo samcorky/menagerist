@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
+    from datetime import datetime
     from uuid import UUID
 
     from app.modules.backup.domain.backup import BackupSummary
@@ -28,10 +29,18 @@ class BackupStore(Protocol):
         """Return the sidecar digest, or None if it is absent."""
         ...
 
-    async def list(self) -> list[BackupSummary]:
-        """Return summaries for committed archives only."""
-        ...
-
     async def delete(self, backup_id: UUID) -> None:
         """Delete summary, archive and sidecar in that order."""
+        ...
+
+    async def unreadable(self) -> list[str]:
+        """Report unreadable summary names without deleting their archives."""
+        ...
+
+    async def cleanup_orphans(self, *, before: datetime, dry_run: bool) -> list[str]:
+        """Remove uncommitted archives and staging files older than before."""
+        ...
+
+    async def list(self) -> list[BackupSummary]:
+        """Return summaries for committed archives only."""
         ...

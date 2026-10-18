@@ -148,7 +148,7 @@ export const test = base.extend<object, { workerBaseURL: string; workerSession: 
 
 export type SignedInUser = { page: Page; context: BrowserContext; request: APIRequestContext };
 
-/** Opens a browser context signed in with `session` (used for users other than the worker admin). */
+/** Open a signed-in browser context for a non-admin session. */
 export async function openSession(
 	browser: Browser,
 	baseURL: string,

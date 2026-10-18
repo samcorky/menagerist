@@ -26,6 +26,7 @@ from app.modules.system.application.get_health_ready import GetHealthReady
 from app.modules.system.application.get_health_ready_detail import GetHealthReadyDetail
 from app.modules.system.application.get_version import GetVersion
 from app.modules.system.application.get_version_detail import GetVersionDetail
+from app.platform.config.backup import get_backup_settings
 from app.platform.config.media import get_media_settings
 from app.platform.database import get_session_factory
 
@@ -42,7 +43,12 @@ def get_get_health_use_case() -> GetHealth:
 @lru_cache(maxsize=1)
 def get_storage_check() -> StorageCheck:
     """Return the process-wide storage check and its cached probe results."""
-    return StorageCheck({"media": get_media_settings().media_storage_path})
+    return StorageCheck(
+        {
+            "media": get_media_settings().media_storage_path,
+            "backup": get_backup_settings().backup_path,
+        }
+    )
 
 
 def _readiness_registry(

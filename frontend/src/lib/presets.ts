@@ -92,7 +92,7 @@ export function linkedListId(field: EditorField): string | undefined {
 	return field.meta?.list;
 }
 
-/** Link a choice field to a saved list: its options become the list's, and any copy origin is dropped. */
+/** Link a choice field to a saved list and drop the copy origin. */
 export function linkToList(field: EditorField, preset: Preset): EditorField {
 	const { origin: _origin, ...meta } = field.meta ?? {};
 	return { ...field, options: listOptions(preset), meta: { ...meta, list: preset.id } };

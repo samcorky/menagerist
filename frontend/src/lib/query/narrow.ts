@@ -18,7 +18,7 @@ const nodesOf = (group: Group | null): Node[] =>
 
 const asPageBasics = (basics: NarrowBasics) => ({ q: basics.q ?? '', type: basics.type ?? null });
 
-/** The saved conditions ANDed with the ad-hoc ones, flattened. The saved sort wins unless the ad-hoc one is set. */
+/** Merge saved filters with ad-hoc ones and keep the saved sort by default. */
 export function combineWithSaved(saved: Query, adhoc: Query, basics: NarrowBasics = {}): Query {
 	const extra = combine(adhoc, basics).where;
 	const sort = adhoc.sort.length > 0 ? adhoc.sort : saved.sort;
@@ -34,7 +34,7 @@ export function narrowFilterCount(adhoc: Query, basics: NarrowBasics): number {
 	return countConditions(adhoc) + (basics.q?.trim() ? 1 : 0) + (basics.type ? 1 : 0);
 }
 
-/** Whether the results need the combined search rather than the saved one (a changed sort counts). */
+/** Decide whether the saved and ad-hoc searches need to be combined. */
 export function needsNarrowing(adhoc: Query, basics: NarrowBasics): boolean {
 	return narrowFilterCount(adhoc, basics) > 0 || adhoc.sort.length > 0;
 }

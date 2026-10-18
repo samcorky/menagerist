@@ -131,7 +131,7 @@ RUN for lib in libgcc_s.so.1 libstdc++.so.6; do \
         cp "${src}" "${dest}"; \
     done
 
-RUN mkdir -p /data/media && chown 1000:1000 /data/media
+RUN mkdir -p /data/media /data/backups && chown 1000:1000 /data/media /data/backups
 
 
 FROM node:22-slim AS frontend-deps
@@ -207,6 +207,7 @@ COPY --from=backend-builder /opt/python /opt/python
 COPY --from=backend-builder /app/.venv /app/.venv
 COPY --from=backend-builder /app/backend/scripts/healthcheck.py /app/healthcheck.py
 COPY --from=backend-builder --chown=1000:1000 /data/media /data/media
+COPY --from=backend-builder --chown=1000:1000 /data/backups /data/backups
 COPY --from=frontend-build --chown=1000:1000 /app/build /app/frontend
 COPY shared/ /app/shared/
 

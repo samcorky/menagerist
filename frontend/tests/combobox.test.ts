@@ -1,5 +1,4 @@
-// The combobox's filtering and grouping are plain functions; the trigger is server-rendered.
-// Opening, typing and arrow keys need a real browser and are covered by the advanced-search e2e spec.
+// Browser-only keyboard interactions are covered by the E2E suite.
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'svelte/server';
 

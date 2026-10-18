@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
+import pytest
 from starlette.testclient import TestClient
 from structlog.testing import capture_logs
 
@@ -24,7 +25,7 @@ from app.platform.storage_probe import DirectoryProbe
 if TYPE_CHECKING:
     from pathlib import Path
 
-    import pytest
+    from app.platform.storage_probe import DirectoryState
 
 
 class _Session:
@@ -117,19 +118,35 @@ async def test_an_unreachable_database_is_not_a_startup_error(
     assert [entry["log_level"] for entry in logs] == ["debug"]
 
 
-async def test_warns_when_media_storage_is_not_writable(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+@pytest.mark.parametrize("storage", ["media", "backup"])
+@pytest.mark.parametrize("state", ["not-writable", "missing"])
+async def test_warns_when_storage_cannot_be_used(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    storage: str,
+    state: DirectoryState,
 ) -> None:
-    """A non-writable media path logs bind-mount guidance at warning level."""
+    """Each unusable storage path logs bind-mount guidance at warning level."""
     monkeypatch.setattr(
         startup,
         "get_media_settings",
-        lambda: SimpleNamespace(media_storage_path=tmp_path),
+        lambda: SimpleNamespace(media_storage_path=tmp_path / "media"),
     )
     monkeypatch.setattr(
         startup,
+        "get_backup_settings",
+        lambda: SimpleNamespace(backup_path=tmp_path / "backup"),
+    )
+
+    def probe(path: Path) -> DirectoryProbe:
+        return DirectoryProbe(
+            state=state if path.name == storage else "writable", free_bytes=1024
+        )
+
+    monkeypatch.setattr(
+        startup,
         "probe_directory",
-        lambda _path: DirectoryProbe(state="not-writable", free_bytes=1024),
+        probe,
     )
 
     with capture_logs() as logs:
@@ -137,8 +154,11 @@ async def test_warns_when_media_storage_is_not_writable(
 
     warnings = [entry for entry in logs if entry["log_level"] == "warning"]
     assert len(warnings) == 1
-    assert str(tmp_path) in warnings[0]["event"]
-    assert "chown 1000:1000 <host directory>" in warnings[0]["event"]
+    assert str(tmp_path / storage) in warnings[0]["event"]
+    if state == "not-writable":
+        assert "chown 1000:1000 <host directory>" in warnings[0]["event"]
+    else:
+        assert "Mount a volume or directory there" in warnings[0]["event"]
 
 
 async def test_stays_quiet_when_media_storage_is_writable(
@@ -149,6 +169,11 @@ async def test_stays_quiet_when_media_storage_is_writable(
         startup,
         "get_media_settings",
         lambda: SimpleNamespace(media_storage_path=tmp_path),
+    )
+    monkeypatch.setattr(
+        startup,
+        "get_backup_settings",
+        lambda: SimpleNamespace(backup_path=tmp_path),
     )
 
     with capture_logs() as logs:
@@ -175,7 +200,7 @@ async def test_probe_errors_are_skipped_at_debug_level(
     with capture_logs() as logs:
         await startup.warn_if_storage_not_writable()
 
-    assert [entry["log_level"] for entry in logs] == ["debug"]
+    assert [entry["log_level"] for entry in logs] == ["debug", "debug"]
 
 
 def test_the_application_lifespan_runs_the_check_once(

@@ -15,9 +15,7 @@ import {
 	removeViaApi
 } from './examples-helpers';
 
-/**
- * Add-on packs: they need other packs, which blocks Add until those are in and Remove while the add-on is installed. Serial, and every test cleans up through the API afterwards.
- */
+/** Shared example packs need serial tests because the database is shared. */
 test.describe.configure({ mode: 'serial' });
 
 const { cleanUp } = exampleData();

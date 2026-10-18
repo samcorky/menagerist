@@ -3,32 +3,24 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 
-// Deliberately not the dev ports (8000/5173): the suite starts its own
-// servers wired to throwaway databases, and must never reuse - or collide
-// with - a dev or deployed stack running on the defaults. Worker i uses
-// BACKEND_PORT + i and the database menagerist_w{i} (see scripts/e2e_migrate.py).
+// Keep the suite off the dev ports to avoid clashing with local stacks.
 const BACKEND_PORT = Number(process.env.E2E_BACKEND_PORT ?? 8100);
 
-// The `auth` project has its own backend and an always-empty database (menagerist_auth),
-// because auth.spec.ts drives first-run setup. See scripts/e2e_migrate.py.
+// Auth tests run against a dedicated backend and empty database.
 const AUTH_BACKEND_PORT = Number(process.env.E2E_AUTH_BACKEND_PORT ?? 8190);
 
-// `poe test-e2e --workers N` exports E2E_WORKERS; a bare `npx playwright test` falls back to the core count.
+// Use the configured worker count, or fall back to the machine core count.
 const WORKERS = Number(process.env.E2E_WORKERS) || availableParallelism();
 
-// Production build served by each backend (`poe e2e-build`).
+// Use the production build served by each backend.
 const FRONTEND_DIST = fileURLToPath(new URL('./build', import.meta.url));
 
-// Set via `poe test-e2e-slow` so a headed run is actually watchable: delays
-// every Playwright action by this many milliseconds. The default test
-// timeout would otherwise be eaten by the added delay, so it's extended too.
+// A slow-motion run is easier to watch, so extend the timeout too.
 const slowMo = process.env.PW_SLOWMO ? Number(process.env.PW_SLOWMO) : undefined;
 
 /**
  * A backend on `port` serving the built SPA from the database menagerist_{name}.
- * `--no-sync`: the backends start together, and concurrent syncs fight over
- * .venv\Scripts\menagerist.exe on Windows. `poe test-e2e` syncs once first; run
- * `poe sync-backend` before a manual `npx playwright test`.
+ * `--no-sync` avoids Windows lock clashes while backends start together.
  */
 function backend(port: number, name: string) {
 	return {

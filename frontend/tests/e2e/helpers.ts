@@ -10,10 +10,7 @@ import {
 	type SignedInUser
 } from './fixtures';
 
-/**
- * Reusable flows shared across e2e specs. Each helper drives the real UI (no
- * API shortcuts) so every spec exercises the same paths a user would.
- */
+/** Shared end-to-end helpers drive the real UI. */
 
 /** A name that's unique per call, so tests never collide with earlier runs against the same db. */
 export function uniqueName(prefix: string): string {
@@ -26,7 +23,7 @@ export type FieldSpec = {
 	kind?: string;
 };
 
-/** Creates an item type from Settings > Item types, optionally with fields, and returns its label. */
+/** Create an item type and return its label. */
 export async function createItemType(
 	page: Page,
 	options: { label: string; description?: string; fields?: FieldSpec[] }

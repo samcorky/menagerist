@@ -16,7 +16,7 @@ class IdentitySettings(MenageristBaseSettings):
     session_idle_hours: int = Field(default=0, ge=0)
     cookie_name: str = "menagerist_session"
     csrf_cookie_name: str = "menagerist_csrf"
-    # None means "Secure when the request is HTTPS".
+    # None auto-detects HTTPS and sets Secure accordingly.
     cookie_secure: bool | None = None
     password_hasher: str = "scrypt"
     # Failed password checks allowed in one window before a key is locked.

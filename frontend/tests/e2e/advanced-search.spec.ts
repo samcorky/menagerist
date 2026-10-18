@@ -76,7 +76,7 @@ async function openFilters(page: Page) {
 	return dialog;
 }
 
-/** Picks a field in a row's searchable picker: types the type and field name, then clicks the one match. */
+/** Pick a field by typing its label and choosing the match. */
 async function pickField(page: Page, n: number, field: string) {
 	const [group, label] = field.includes(' › ') ? field.split(' › ') : [undefined, field];
 	await filtersDialog(page)
@@ -360,7 +360,7 @@ test('the count line stays while more items load', async ({ page, request }) => 
 	const piles = page.getByRole('link', { name: new RegExp(`Pile${suffix}`) });
 	await expect(piles).toHaveCount(50);
 
-	// Scroll the last card into view until the next page is in; the count line must not blink out on the way.
+	// Keep the last card visible while the next page loads.
 	await expect
 		.poll(
 			async () => {

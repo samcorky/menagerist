@@ -5,7 +5,7 @@ from app.modules.backup.adapters.storage.in_memory_backup_reader import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncGenerator
 
     from app.modules.backup.ports.archive_member import ArchiveMember
 
@@ -21,6 +21,6 @@ class InMemoryDatabaseSnapshot:
         """Return the configured source revision."""
         return self._revision
 
-    def export(self) -> AsyncIterator[ArchiveMember]:
+    def export(self) -> AsyncGenerator[ArchiveMember]:
         """Stream the supplied table bytes in insertion order."""
         return InMemoryBackupReader(self._tables).members()

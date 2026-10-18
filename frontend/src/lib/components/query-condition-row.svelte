@@ -98,7 +98,7 @@
 	);
 	const error = $derived(view.error?.key === key ? view.error.message : null);
 
-	/** The operators to offer; one the field cannot use is still shown, flagged, so the row never misleads. */
+	/** Show all operators, but flag the ones that a field cannot use. */
 	const operators = $derived.by((): { value: string; label: string }[] => {
 		if (condition.kind === 'tag') return TAG_MODES.map((m) => ({ ...m }));
 		let kind: string;

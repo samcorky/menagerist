@@ -39,3 +39,6 @@ __pycache__/
 # App specific
 data/
 backups/
+
+# Node Stuff
+node_modules/

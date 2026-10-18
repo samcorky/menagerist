@@ -2,9 +2,7 @@ import { test, expect } from './fixtures';
 import { createItem, createItemType, uniqueName } from './helpers';
 import { MUSIC, exampleData, install, openItem, remove } from './examples-helpers';
 
-/**
- * Example packs: install, the Home line, the Examples filter and the first-run link. Installs are global per pack and the database is shared, so the spec is serial and every test cleans up through the API afterwards.
- */
+/** Example packs are shared, so these specs stay serial. */
 test.describe.configure({ mode: 'serial' });
 
 const { ownNames, cleanUp } = exampleData();

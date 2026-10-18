@@ -64,7 +64,7 @@
 		title?: string;
 		description?: string;
 		saving?: boolean;
-		/** With `oncancel`: nothing is kept until Save, and the panel offers Save and Cancel instead of Done. */
+		/** When `oncancel` is set, keep the draft until Save. */
 		onsave?: () => void;
 		oncancel?: () => void;
 		onchange: (query: Query, options: { debounce: boolean }) => void;

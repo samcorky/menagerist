@@ -25,7 +25,7 @@ export function lastSignIn(
 	return { text: formatRelativeTime(value, now), title: formatDateTime(value).local };
 }
 
-/** What saving an edited display name should do: nothing, show a problem, or send the trimmed name. */
+/** Decide whether to keep, reject, or save a display name change. */
 export function renameDecision(
 	current: string,
 	draft: string

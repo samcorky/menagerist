@@ -151,7 +151,7 @@ export function findItemField(
 	return catalogue.itemFields?.find((f) => f.kind === kind && f.key === key);
 }
 
-/** A per-item field as a `FieldInfo`; the kind comes from the condition, the label from the listing. */
+/** Convert a per-item field to a `FieldInfo`. */
 export function itemFieldInfo(catalogue: Catalogue, kind: string, key: string): FieldInfo {
 	const label = findItemField(catalogue, kind, key)?.label ?? key;
 	return {

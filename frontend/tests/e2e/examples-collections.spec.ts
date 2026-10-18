@@ -10,9 +10,7 @@ import {
 	remove
 } from './examples-helpers';
 
-/**
- * Example packs that ship collections: listing, removal, kept collections and adoption on reinstall. Serial, and every test cleans up through the API afterwards.
- */
+/** Example packs are shared, so collection tests stay serial. */
 test.describe.configure({ mode: 'serial' });
 
 const { makeCollection, addToCollection, trackCollectionFromUrl, cleanUp } = exampleData();

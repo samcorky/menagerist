@@ -247,7 +247,7 @@ export function fromWidget(kind: string, raw: unknown): Operand | undefined {
 	return typeof raw === 'string' ? raw : String(raw);
 }
 
-/** A stored operand in the form the field's widget expects. Anything unexpected shows as empty or as text. */
+/** Convert stored operands back into widget-friendly values. */
 export function toWidget(kind: string, operand: unknown): unknown {
 	if (kind === 'money') {
 		if (!isRec(operand)) return {};

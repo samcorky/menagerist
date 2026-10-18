@@ -40,7 +40,7 @@ class BackupManifest:
     created_by: UUID
     format: str = "ndjson"
     format_version: int = 1
-    scope: BackupScope = BackupScope.INSTANCE
+    scope: BackupScope | str = BackupScope.INSTANCE
     tables: list[TableDigest] = field(default_factory=list)
     media: list[MediaFileRef] = field(default_factory=list)
     media_missing: list[UUID] = field(default_factory=list)

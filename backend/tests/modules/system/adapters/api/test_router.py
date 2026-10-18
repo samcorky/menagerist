@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
@@ -11,6 +12,7 @@ from structlog.testing import capture_logs
 from app.entrypoints.api import create_app
 from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
 from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.modules.system.adapters.api import dependencies
 from app.modules.system.adapters.api.dependencies import (
     get_get_health_ready_detail_use_case,
     get_get_health_ready_use_case,
@@ -27,13 +29,17 @@ from app.modules.system.domain.readiness import (
     ReadinessReport,
 )
 from app.platform.database import get_session_factory
+from app.platform.storage_probe import DirectoryProbe
 from app.shared_kernel.actor import Actor
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from pathlib import Path
     from types import TracebackType
 
     from fastapi import FastAPI
+
+    from app.platform.storage_probe import DirectoryState
 
 _PATCH_GET_ENGINE = f"{database_pool_utilization_check.__name__}.get_engine"
 
@@ -202,12 +208,13 @@ def test_pool_healthy_omits_output() -> None:
     assert "output" not in pool_check
 
 
-def test_readiness_reports_warn_status_without_503() -> None:
+@pytest.mark.parametrize("storage", ["media", "backup"])
+def test_readiness_reports_warn_status_without_503(storage: str) -> None:
     """A warn-status check is reflected in the payload but does not trigger 503."""
     report = ReadinessReport(
         status=CheckStatus.WARN,
         checks={
-            "storage:mediaWritable": [
+            f"storage:{storage}Writable": [
                 CheckObservation(
                     component_type="datastore",
                     observed_value="not-writable",
@@ -217,7 +224,7 @@ def test_readiness_reports_warn_status_without_503() -> None:
                     output="Use chown 1000:1000 <host directory>.",
                 )
             ],
-            "storage:mediaFreeSpace": [
+            f"storage:{storage}FreeSpace": [
                 CheckObservation(
                     component_type="datastore",
                     observed_value=41.7,
@@ -248,9 +255,63 @@ def test_readiness_reports_warn_status_without_503() -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "warn"
-    assert data["checks"]["storage:mediaWritable"][0]["status"] == "warn"
-    assert "chown" in data["checks"]["storage:mediaWritable"][0]["output"]
-    assert data["checks"]["storage:mediaFreeSpace"][0]["observedValue"] == 41.7
+    assert data["checks"][f"storage:{storage}Writable"][0]["status"] == "warn"
+    assert "chown" in data["checks"][f"storage:{storage}Writable"][0]["output"]
+    assert data["checks"][f"storage:{storage}FreeSpace"][0]["observedValue"] == 41.7
+
+
+@pytest.mark.parametrize("state", ["writable", "missing", "not-writable"])
+async def test_storage_check_includes_configured_backup_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, state: DirectoryState
+) -> None:
+    """The cached readiness check probes backup storage independently of media."""
+    media_path = tmp_path / "media"
+    backup_path = tmp_path / "backup"
+    monkeypatch.setattr(
+        dependencies,
+        "get_media_settings",
+        lambda: SimpleNamespace(media_storage_path=media_path),
+    )
+    monkeypatch.setattr(
+        dependencies,
+        "get_backup_settings",
+        lambda: SimpleNamespace(backup_path=backup_path),
+    )
+
+    def probe(path: Path) -> DirectoryProbe:
+        return DirectoryProbe(
+            state=state if path == backup_path else "writable",
+            free_bytes=None if path == backup_path and state == "missing" else 2**31,
+        )
+
+    monkeypatch.setattr(
+        "app.modules.system.adapters.platform.checks.storage_check.probe_directory",
+        probe,
+    )
+    dependencies.get_storage_check.cache_clear()
+    try:
+        check = dependencies.get_storage_check()
+        assert dependencies.get_storage_check() is check
+        result = await check.run()
+    finally:
+        dependencies.get_storage_check.cache_clear()
+
+    assert result["storage:mediaWritable"].status is CheckStatus.PASS
+    backup = result["storage:backupWritable"]
+    assert backup.observed_value == state
+    assert backup.status is (
+        CheckStatus.PASS if state == "writable" else CheckStatus.WARN
+    )
+    if state == "writable":
+        assert backup.output is None
+        assert result["storage:backupFreeSpace"].status is CheckStatus.PASS
+    else:
+        assert backup.output is not None
+        assert str(backup_path) in backup.output
+        if state == "missing":
+            assert "storage:backupFreeSpace" not in result
+        else:
+            assert "chown 1000:1000" in backup.output
 
 
 # ---------------------------------------------------------------------------

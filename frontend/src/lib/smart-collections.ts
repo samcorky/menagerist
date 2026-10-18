@@ -30,7 +30,7 @@ export function countLabel(count: number, capped: boolean): string {
 	return formatCount(count, capped);
 }
 
-/** Defence in depth: the server is asked for `kind=manual`, but smart collections fill themselves and never take items by hand. */
+/** Filter out smart collections when a manual list is needed. */
 export function manualCollections<T extends Pick<CollectionResponse, 'kind'>>(
 	collections: readonly T[]
 ): T[] {

@@ -1,15 +1,14 @@
 from typing import TYPE_CHECKING
 
-from app.modules.backup.adapters.storage.in_memory_backup_reader import (
-    InMemoryBackupReader,
-)
 from app.modules.backup.adapters.storage.in_memory_backup_writer import (
     InMemoryBackupWriter,
 )
+from app.modules.backup.adapters.storage.local_backup_reader import LocalBackupReader
 from app.modules.backup.domain.errors import BackupNotFoundError
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
+    from datetime import datetime
     from uuid import UUID
 
     from app.modules.backup.domain.backup import BackupSummary
@@ -30,10 +29,10 @@ class InMemoryBackupStore:
             backup_id, self.archives, self.members, self.summaries, self.digests
         )
 
-    async def open(self, backup_id: UUID) -> InMemoryBackupReader:
+    async def open(self, backup_id: UUID) -> LocalBackupReader:
         """Open a committed archive's members."""
         self._require(backup_id)
-        return InMemoryBackupReader(self.members[backup_id])
+        return LocalBackupReader(self.archives[backup_id])
 
     async def read_bytes(self, backup_id: UUID) -> AsyncIterator[bytes]:
         """Stream the compressed bytes."""
@@ -45,9 +44,22 @@ class InMemoryBackupStore:
         self._require(backup_id)
         return self.digests.get(backup_id)
 
-    async def list(self) -> list[BackupSummary]:
-        """List only archives with a commit marker."""
-        return list(self.summaries.values())
+    async def unreadable(self) -> list[str]:
+        """Report no unreadable commit markers in typed memory storage."""
+        return []
+
+    async def cleanup_orphans(self, *, before: datetime, dry_run: bool) -> list[str]:
+        """Remove uncommitted dictionary entries."""
+        orphan_ids = (
+            self.archives.keys() | self.digests.keys()
+        ) - self.summaries.keys()
+        names = [str(backup_id) for backup_id in orphan_ids]
+        if not dry_run:
+            for backup_id in orphan_ids:
+                self.archives.pop(backup_id, None)
+                self.members.pop(backup_id, None)
+                self.digests.pop(backup_id, None)
+        return names
 
     async def delete(self, backup_id: UUID) -> None:
         """Remove the commit marker before archive data and its sidecar."""
@@ -58,5 +70,9 @@ class InMemoryBackupStore:
         self.digests.pop(backup_id, None)
 
     def _require(self, backup_id: UUID) -> None:
-        if backup_id not in self.summaries:
+        if backup_id not in self.summaries or backup_id not in self.archives:
             raise BackupNotFoundError(f"Backup {backup_id} was not found.")
+
+    async def list(self) -> list[BackupSummary]:
+        """List only archives with a commit marker."""
+        return list(self.summaries.values())
