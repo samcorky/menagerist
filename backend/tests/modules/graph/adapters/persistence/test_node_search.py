@@ -194,6 +194,15 @@ _DATA: list[tuple[str, str | None, dict[str, Any], dict[str, Any]]] = [
 ]
 
 
+# Descriptions for the description and name scenarios; others have none (NULL).
+_DESCRIPTIONS: dict[str, str] = {
+    "Alien": "Ripley fights a xenomorph, 100% tense_scene",
+    "Blade Runner": "Crème brûlée replicants",
+    "Casablanca": "  \t\n ",
+    "Bad data": "",
+}
+
+
 @pytest.fixture(
     params=["in_memory", pytest.param("postgres", marks=pytest.mark.integration)]
 )
@@ -216,9 +225,16 @@ async def _seed(repo: NodeRepository) -> NodeRepository:
         )
         node.tags = extra.get("tags", [])
         node.favourite = extra.get("favourite", False)
+        node.description = _DESCRIPTIONS.get(name)
         await repo.add(node)
     await repo.add(
-        Node.create(owner_id=BOB, name="Secret", type="film", attributes={"rating": 5})
+        Node.create(
+            owner_id=BOB,
+            name="Secret",
+            description="xenomorph secret",
+            type="film",
+            attributes={"rating": 5},
+        )
     )
     return repo
 
@@ -363,6 +379,133 @@ CASES: list[tuple[str, dict[str, Any], set[str]]] = [
     (
         "text does not treat _ as a wildcard",
         _where({"kind": "text", "q": "off_d_y"}),
+        set(),
+    ),
+    (
+        "description ~ finds words in the description only",
+        _where({"kind": "description", "op": "~", "value": "xenomorph"}),
+        {"Alien"},
+    ),
+    (
+        "description ~ is case- and accent-insensitive",
+        _where({"kind": "description", "op": "~", "value": "CREME BRULEE"}),
+        {"Blade Runner"},
+    ),
+    (
+        "description ~ folds accents in the query too",
+        _where({"kind": "description", "op": "~", "value": "crème"}),
+        {"Blade Runner"},
+    ),
+    (
+        "description ~ treats % literally",
+        _where({"kind": "description", "op": "~", "value": "100%"}),
+        {"Alien"},
+    ),
+    (
+        "description ~ treats a lone % as a character, not a wildcard",
+        _where({"kind": "description", "op": "~", "value": "%"}),
+        {"Alien"},
+    ),
+    (
+        "description ~ treats _ literally",
+        _where({"kind": "description", "op": "~", "value": "tense_scene"}),
+        {"Alien"},
+    ),
+    (
+        "description ~ does not treat _ as a wildcard",
+        _where({"kind": "description", "op": "~", "value": "tens_ scene"}),
+        set(),
+    ),
+    (
+        "description ~ does not match the name",
+        _where({"kind": "description", "op": "~", "value": "Casablanca"}),
+        set(),
+    ),
+    (
+        "description ~ never returns another owner's item",
+        _where({"kind": "description", "op": "~", "value": "secret"}),
+        set(),
+    ),
+    (
+        "description ~ inside not keeps items without one",
+        _where(
+            {
+                "op": "not",
+                "children": [{"kind": "description", "op": "~", "value": "xeno"}],
+            }
+        ),
+        {n for n, *_ in _DATA} - {"Alien"},
+    ),
+    (
+        "description empty is NULL, empty and whitespace-only",
+        _where({"kind": "description", "op": "empty"}),
+        {n for n, *_ in _DATA} - {"Alien", "Blade Runner"},
+    ),
+    (
+        "description not_empty needs real text",
+        _where({"kind": "description", "op": "not_empty"}),
+        {"Alien", "Blade Runner"},
+    ),
+    (
+        "description empty combines with a type",
+        _where(_FILM, {"kind": "description", "op": "empty"}),
+        {"Casablanca", "Café Society", "Bad data"},
+    ),
+    (
+        "name ~ finds words in the name only",
+        _where({"kind": "name", "op": "~", "value": "blade"}),
+        {"Blade Runner"},
+    ),
+    (
+        "name ~ is case- and accent-insensitive",
+        _where({"kind": "name", "op": "~", "value": "CAFE soc"}),
+        {"Café Society"},
+    ),
+    (
+        "name ~ does not match the description",
+        _where({"kind": "name", "op": "~", "value": "xenomorph"}),
+        set(),
+    ),
+    (
+        "name ~ treats % and _ literally",
+        _where({"kind": "name", "op": "~", "value": "%"}),
+        set(),
+    ),
+    (
+        "name ~ does not treat _ as a wildcard",
+        _where({"kind": "name", "op": "~", "value": "A_ien"}),
+        set(),
+    ),
+    (
+        "name = is a whole-name match ignoring case and accents",
+        _where({"kind": "name", "op": "=", "value": "CAFE SOCIETY"}),
+        {"Café Society"},
+    ),
+    (
+        "name = folds accents in the query too",
+        _where({"kind": "name", "op": "=", "value": "café society"}),
+        {"Café Society"},
+    ),
+    (
+        "name = does not match part of a name",
+        _where({"kind": "name", "op": "=", "value": "Alie"}),
+        set(),
+    ),
+    (
+        "name = treats % literally",
+        _where({"kind": "name", "op": "=", "value": "%"}),
+        set(),
+    ),
+    (
+        "name = inside not matches everything else",
+        _where(
+            {"op": "not", "children": [{"kind": "name", "op": "=", "value": "alien"}]}
+        ),
+        {n for n, *_ in _DATA} - {"Alien"},
+    ),
+    (
+        "name = never returns another owner's item",
+        _where({"kind": "name", "op": "=", "value": "secret"}),
         set(),
     ),
     (

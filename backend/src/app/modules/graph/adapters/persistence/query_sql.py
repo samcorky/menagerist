@@ -33,6 +33,7 @@ from sqlalchemy import (
     null,
     or_,
     select,
+    true,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql.elements import ColumnElement
@@ -48,11 +49,13 @@ from app.modules.graph.domain.query import (
     Condition,
     Cursor,
     DateCondition,
+    DescriptionCondition,
     FavouriteCondition,
     FieldCondition,
     FieldReference,
     Group,
     Money,
+    NameCondition,
     Operand,
     RelativeDate,
     ResolvedQuery,
@@ -74,6 +77,8 @@ type _Bool = ColumnElement[bool]
 _NUMERIC: Final = frozenset({"number", "duration", "rating"})
 _TEXTUAL: Final = frozenset({"text", "url", "email", "phone", "longtext"})
 _C: Final = "C"  # byte-wise collation: Python's code-point string order
+# Description counts as blank when only ASCII whitespace (see `description_blank`).
+_BLANK_PATTERN: Final = r"^[ \t\n\r\f\v]*$"
 _FLOAT_MAX: Final = Decimal(int(sys.float_info.max))
 
 
@@ -356,10 +361,32 @@ def _tag(condition: TagCondition) -> _Bool:
     return any_of if condition.mode == "any" else not_(any_of)
 
 
+def _description(condition: DescriptionCondition) -> _Bool:
+    """Never NULL; `~` is a bare ILIKE so the description trigram index serves it."""
+    description = NodeModel.description
+    if condition.op == "~":
+        return and_(
+            description.is_not(None),
+            unaccent_ilike(description, like_pattern(condition.value or "")),
+        )
+    blank = func.coalesce(description.op("~")(_BLANK_PATTERN), true())
+    return blank if condition.op == "empty" else not_(blank)
+
+
+def _name(condition: NameCondition) -> _Bool:
+    if condition.op == "~":
+        return unaccent_ilike(NodeModel.name, like_pattern(condition.value))
+    return _folded(NodeModel.name) == _folded(literal(condition.value))
+
+
 def _condition(condition: Condition, ctx: ResolvedQuery) -> _Bool:
     """One leaf; never NULL."""
     if isinstance(condition, TextCondition):
         return search_clause(condition.q, ctx.search_exclusions)
+    if isinstance(condition, DescriptionCondition):
+        return _description(condition)
+    if isinstance(condition, NameCondition):
+        return _name(condition)
     if isinstance(condition, TypeCondition):
         return _never_null(NodeModel.type.in_(condition.slugs))
     if isinstance(condition, FavouriteCondition):

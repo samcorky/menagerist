@@ -112,6 +112,22 @@ class TextCondition:
 
 
 @dataclass(frozen=True, kw_only=True)
+class DescriptionCondition:
+    """Words in the description (`~`), or whether it is blank (`empty`)."""
+
+    op: Literal["~", "empty", "not_empty"]
+    value: str | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class NameCondition:
+    """Words in the name (`~`), or the whole name (`=`)."""
+
+    op: Literal["~", "="]
+    value: str
+
+
+@dataclass(frozen=True, kw_only=True)
 class TypeCondition:
     """The item is one of these types."""
 
@@ -161,6 +177,8 @@ class FieldCondition:
 
 type Condition = (
     TextCondition
+    | DescriptionCondition
+    | NameCondition
     | TypeCondition
     | FavouriteCondition
     | TagCondition
@@ -384,6 +402,33 @@ def _text(data: Mapping[str, object], path: str) -> TextCondition:
     return TextCondition(q=_string(data.get("q"), path, name="q"))
 
 
+def _description(data: Mapping[str, object], path: str) -> DescriptionCondition:
+    op = data.get("op")
+    if not isinstance(op, str) or op not in {"~", "empty", "not_empty"}:
+        msg = "Use ~, empty or not_empty."
+        raise InvalidQueryError(msg, path=path)
+    typed = cast("Literal['~', 'empty', 'not_empty']", op)
+    if op == "~":
+        return DescriptionCondition(
+            op=typed, value=_string(data.get("value"), path, name="value")
+        )
+    if "value" in data:
+        msg = f"'{op}' takes no value."
+        raise InvalidQueryError(msg, path=path)
+    return DescriptionCondition(op=typed)
+
+
+def _name(data: Mapping[str, object], path: str) -> NameCondition:
+    op = data.get("op")
+    if not isinstance(op, str) or op not in {"~", "="}:
+        msg = "Use ~ or =."
+        raise InvalidQueryError(msg, path=path)
+    return NameCondition(
+        op=cast("Literal['~', '=']", op),
+        value=_string(data.get("value"), path, name="value"),
+    )
+
+
 def _type(data: Mapping[str, object], path: str) -> TypeCondition:
     return TypeCondition(slugs=_string_list(data.get("in"), path, name="in"))
 
@@ -467,6 +512,8 @@ def _field(data: Mapping[str, object], path: str) -> FieldCondition:
 
 _CONDITION_KEYS: Final[Mapping[str, frozenset[str]]] = {
     "text": frozenset({"kind", "q"}),
+    "description": frozenset({"kind", "op", "value"}),
+    "name": frozenset({"kind", "op", "value"}),
     "type": frozenset({"kind", "in"}),
     "favourite": frozenset({"kind", "value"}),
     "tag": frozenset({"kind", "mode", "tags"}),
@@ -492,6 +539,8 @@ _CONDITION_PARSERS: Final[
     Mapping[str, Callable[[Mapping[str, object], str], Condition]]
 ] = {
     "text": _text,
+    "description": _description,
+    "name": _name,
     "type": _type,
     "favourite": _favourite,
     "tag": _tag,
