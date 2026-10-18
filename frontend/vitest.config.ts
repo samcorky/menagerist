@@ -1,6 +1,20 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vitest/config';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+
+// Importing modules once per worker (isolate: false) is far faster here, but a file that mocks
+// modules, stubs globals or fakes timers would leak into the files after it. Those files are
+// detected by what they call and keep full isolation; everything else shares modules.
+// Tests must not mutate module-level state without putting it back (see tests/registry.test.ts).
+const testsDir = fileURLToPath(new URL('./tests', import.meta.url));
+const testFiles = readdirSync(testsDir).filter((f) => f.endsWith('.test.ts'));
+const needsIsolation = (file: string) =>
+	/\bvi\.(mock|doMock|stubGlobal|stubEnv|resetModules|useFakeTimers)\b|\bglobalThis\./.test(
+		readFileSync(`${testsDir}/${file}`, 'utf8')
+	);
+const isolated = testFiles.filter(needsIsolation).map((f) => `tests/${f}`);
+const shared = testFiles.filter((f) => !needsIsolation(f)).map((f) => `tests/${f}`);
 
 export default defineConfig({
 	plugins: [svelte()],
@@ -28,8 +42,11 @@ export default defineConfig({
 	},
 	test: {
 		environment: 'node',
-		include: ['tests/**/*.test.ts'],
 		globals: true,
-		setupFiles: ['tests/setup.ts']
+		setupFiles: ['tests/setup.ts'],
+		projects: [
+			{ extends: true, test: { name: 'shared', include: shared, isolate: false } },
+			{ extends: true, test: { name: 'isolated', include: isolated, isolate: true } }
+		]
 	}
 });

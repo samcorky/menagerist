@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import {
 	register,
 	getDescriptor,
@@ -34,8 +34,21 @@ const numberDesc: FieldTypeDescriptor = {
 	InputWidget: StubWidget
 };
 
+// The registry is module state shared with other files when test isolation is off:
+// put back whatever was registered before this file cleared it.
+let original: FieldTypeDescriptor[] = [];
+
+beforeAll(() => {
+	original = allDescriptors();
+});
+
 beforeEach(() => {
 	_clearRegistry();
+});
+
+afterAll(() => {
+	_clearRegistry();
+	original.forEach(register);
 });
 
 describe('register / getDescriptor', () => {

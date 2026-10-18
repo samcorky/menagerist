@@ -120,19 +120,33 @@ cmd = "mypy"
 cwd = "backend"
 help = "Type-check backend Python files with mypy"
 
-[tool.poe.groups.quality.tasks.test-backend]
-shell = "coverage erase ; pytest -m 'not integration' -n auto --maxprocesses=6 --dist loadscope --cov=app --cov-branch --cov-report="
-interpreter = ["powershell", "posix"]
+[tool.poe.groups.quality.tasks._coverage-erase]
+cmd = "coverage erase"
 cwd = "backend"
-help = "Run backend unit tests in parallel (pytest-xdist, up to 6 workers) from a clean coverage dataset"
+help = "Clear the backend coverage dataset before running unit tests"
+
+[tool.poe.groups.quality.tasks.test-backend]
+cmd = "pytest -m 'not integration' -n ${workers} --dist loadscope --cov=app --cov-branch --cov-report="
+cwd = "backend"
+deps = ["_coverage-erase"]
+args = [
+  { name = "workers", options = ["-w", "--workers"], default = "auto", help = "pytest-xdist workers: a number, auto (one per CPU) or 0 for serial" },
+]
+help = "Run backend unit tests in parallel (pytest-xdist, one worker per CPU unless --workers) from a clean coverage dataset"
 
 [tool.poe.groups.quality.tasks.test-backend-integration]
-cmd = "pytest -m integration -n auto --maxprocesses=6 --dist loadscope --cov=app --cov-append --cov-branch --cov-report="
+cmd = "pytest -m integration -n ${workers} --dist loadscope --cov=app --cov-append --cov-branch --cov-report="
 cwd = "backend"
+args = [
+  { name = "workers", options = ["-w", "--workers"], default = "auto", help = "pytest-xdist workers: a number, auto (one per CPU) or 0 for serial" },
+]
 help = "Run backend integration tests in parallel (one Postgres container per worker), appending to unit test coverage"
 
 [tool.poe.groups.quality.tasks.test-backend-all]
-sequence = ["test-backend", "test-backend-integration"]
+sequence = ["test-backend --workers ${workers}", "test-backend-integration --workers ${workers}"]
+args = [
+  { name = "workers", options = ["-w", "--workers"], default = "auto", help = "pytest-xdist workers: a number, auto (one per CPU) or 0 for serial" },
+]
 help = "Run unit + integration backend tests with combined coverage data"
 
 [tool.poe.groups.quality.tasks.coverage-domain]
@@ -176,7 +190,10 @@ cwd = "backend"
 help = "Fail CI when any component is below its Codecov threshold"
 
 [tool.poe.groups.quality.tasks.test-and-status]
-sequence = ["test-backend-all", "coverage-status"]
+sequence = ["test-backend-all --workers ${workers}", "coverage-status"]
+args = [
+  { name = "workers", options = ["-w", "--workers"], default = "auto", help = "pytest-xdist workers: a number, auto (one per CPU) or 0 for serial" },
+]
 help = "Run all backend tests and print per-component coverage status without failing"
 deps = ["sync-backend"]
 
@@ -186,7 +203,10 @@ cwd = "backend"
 help = "Write the combined coverage.xml for Codecov upload"
 
 [tool.poe.groups.quality.tasks.coverage]
-sequence = ["test-backend-all", "coverage-check", "coverage-report"]
+sequence = ["test-backend-all --workers ${workers}", "coverage-check", "coverage-report"]
+args = [
+  { name = "workers", options = ["-w", "--workers"], default = "auto", help = "pytest-xdist workers: a number, auto (one per CPU) or 0 for serial" },
+]
 help = "Run full backend test suite and enforce per-layer coverage thresholds"
 
 [tool.poe.groups.quality.tasks.format-frontend]
@@ -214,9 +234,11 @@ cwd = "frontend"
 help = "Type-check frontend files with svelte-check"
 
 [tool.poe.groups.quality.tasks.test-frontend]
-shell = "npx vitest run"
-interpreter = ["powershell", "posix"]
+cmd = "npx vitest run ${workers:+--maxWorkers=${workers}}"
 cwd = "frontend"
+args = [
+  { name = "workers", options = ["-w", "--workers"], default = "", help = "Vitest workers (--maxWorkers): a number or a percentage; vitest's default if omitted" },
+]
 help = "Run frontend unit tests (vitest)"
 
 [tool.poe.groups.quality.tasks.format]
@@ -271,8 +293,11 @@ cmd = "docker compose -f compose.yaml -f compose.e2e.yaml config --quiet"
 help = "Validate compose.yaml merged with the e2e-test override"
 
 [tool.poe.groups.quality.tasks.test]
-sequence = ["test-backend", "test-frontend"]
-help = "Run all unit tests"
+parallel = ["test-backend ${workers:+--workers ${workers}}", "test-frontend ${workers:+--workers ${workers}}"]
+args = [
+  { name = "workers", options = ["-w", "--workers"], default = "", help = "Parallel workers: a number, auto (one per CPU) or 0 for serial (frontend: its own default if omitted)" },
+]
+help = "Run backend and frontend unit tests concurrently"
 
 [tool.poe.groups.quality.tasks.test-e2e]
 script = "scripts.e2e:main(workers=workers, skip_build=skip_build)"
