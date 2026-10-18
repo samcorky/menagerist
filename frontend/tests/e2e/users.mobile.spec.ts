@@ -33,7 +33,7 @@ test('row actions are at least 44px tall', async ({ page, workerBaseURL, workerS
 	const user = await newUser(workerBaseURL, workerSession);
 	await page.goto('/admin/users');
 	const row = userRow(page, user);
-	for (const name of ['Disable', 'Reset password']) {
+	for (const name of ['Disable', 'Reset password', 'Devices']) {
 		const b = await row.getByRole('button', { name }).boundingBox();
 		expect(b?.height ?? 0, name).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
 	}
@@ -77,7 +77,9 @@ test('disabling asks first, and Cancel leaves the account alone', async ({
 	await row.getByRole('button', { name: 'Disable' }).click();
 	const dialog = page.getByRole('dialog');
 	await expect(dialog).toContainText(user.displayName);
-	await expect(dialog).toContainText('They are signed out and cannot sign in until re-enabled.');
+	await expect(dialog).toContainText(
+		'They will be signed out everywhere and cannot sign in until re-enabled.'
+	);
 
 	for (const name of ['Cancel', 'Disable']) {
 		const b = await dialog.getByRole('button', { name, exact: true }).boundingBox();
@@ -110,7 +112,7 @@ test('resetting a password asks first', async ({ page, workerBaseURL, workerSess
 	await row.getByRole('button', { name: 'Reset password' }).click();
 	const dialog = page.getByRole('dialog');
 	await expect(dialog).toContainText(
-		'Their sessions end and they must choose a new password at next sign-in.'
+		'They will be signed out everywhere and must choose a new password at next sign-in.'
 	);
 	await dialog.getByRole('button', { name: 'Cancel' }).click();
 	await expect(dialog).toHaveCount(0);
