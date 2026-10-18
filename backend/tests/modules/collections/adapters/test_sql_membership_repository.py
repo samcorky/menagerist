@@ -71,7 +71,9 @@ async def test_adding_twice_stores_one_row(db_session: AsyncSession) -> None:
     await repo.add(_membership(shelf.id, item))
 
     count = await db_session.scalar(
-        select(func.count()).select_from(CollectionMemberModel)
+        select(func.count())
+        .select_from(CollectionMemberModel)
+        .where(CollectionMemberModel.collection_id == shelf.id)
     )
 
     assert count == 1

@@ -36,10 +36,11 @@ class _Capture:
         return []
 
 
-async def _plan(db_session: AsyncSession, q: str) -> str:
-    query = parse_query(
-        {"v": 1, "where": {"op": "and", "children": [{"kind": "text", "q": q}]}}
-    )
+async def _plan(
+    db_session: AsyncSession, q: str, kind: dict[str, Any] | None = None
+) -> str:
+    condition = kind or {"kind": "text", "q": q}
+    query = parse_query({"v": 1, "where": {"op": "and", "children": [condition]}})
     resolved = ResolvedQuery(
         query=query,
         field_kinds=resolve_fields(query, {}).kinds,
@@ -92,6 +93,39 @@ async def test_selective_text_search_uses_the_trigram_indexes(
     ):
         assert f"Bitmap Index Scan on {index}" in plan, plan
     assert "Seq Scan" not in plan, plan
+
+
+async def test_description_and_name_words_use_their_trigram_indexes(
+    db_session: AsyncSession,
+) -> None:
+    """`description ~` and `name ~` are answered from their own trigram index."""
+    await db_session.execute(
+        text(
+            """
+            INSERT INTO nodes (id, owner_id, name, description, tags, attributes,
+                               favourite, created_at, updated_at, type)
+            SELECT gen_random_uuid(), :owner, 'Item ' || n,
+                   CASE WHEN n % 5000 = 0 THEN 'zebrafish ' || n
+                        ELSE 'filler text ' || n END,
+                   '[]'::jsonb, '{}'::jsonb, false,
+                   to_timestamp(1700000000 + n), to_timestamp(1700000000 + n),
+                   'film'
+            FROM generate_series(1, 20000) AS n
+            """
+        ),
+        {"owner": OWNER},
+    )
+    await db_session.execute(text("ANALYZE nodes"))
+    description = await _plan(
+        db_session, "", {"kind": "description", "op": "~", "value": "zebrafish"}
+    )
+    assert "Bitmap Index Scan on ix_nodes_description_trgm" in description, description
+    assert "Seq Scan" not in description, description
+    name = await _plan(
+        db_session, "", {"kind": "name", "op": "~", "value": "Item 19999"}
+    )
+    assert "Bitmap Index Scan on ix_nodes_name_trgm" in name, name
+    assert "Seq Scan" not in name, name
 
 
 async def test_only_known_characters_unaccent_to_json_escaped_ones(

@@ -25,6 +25,14 @@ def sort_key(text: str) -> str:
     return "".join(c for c in decomposed if not unicodedata.combining(c)).lower()
 
 
+_BLANK = " \t\n\r\f\v"
+
+
+def description_blank(description: str | None) -> bool:
+    """Whether a description is NULL, empty or only ASCII whitespace."""
+    return not (description or "").strip(_BLANK)
+
+
 def scalar_values(value: Any) -> Iterator[str]:  # noqa: ANN401
     """Yield every string and number inside `value`; never keys, booleans or nulls."""
     if isinstance(value, dict):

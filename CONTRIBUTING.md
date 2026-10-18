@@ -130,6 +130,18 @@ poe test-e2e                  # Playwright end-to-end tests - requires Docker
 poe coverage                  # full test suite + enforce all coverage thresholds
 ```
 
+### Running tests in parallel
+
+`poe test-backend`, `poe test-backend-integration` (and so `poe test-backend-all` and `poe coverage`) run under pytest-xdist with `-n auto --maxprocesses=6 --dist loadscope`: one worker per CPU core, capped at six, with every test module kept on one worker. The flags live only in the `poe` tasks, so `pytest path::test` and IDE runs stay serial. Coverage is combined across workers automatically.
+
+```sh
+PYTEST_XDIST_AUTO_NUM_WORKERS=3 poe test-backend   # choose the worker count (still capped at 6)
+poe test-backend-integration -n 0                  # serial: a later -n wins
+cd backend && pytest -m 'not integration'          # plain serial run, no coverage-erase
+```
+
+Each integration worker starts its own Postgres container (`postgres:18-alpine`, roughly 100 MB of memory each), so the cap also caps containers. Lower the worker count on a small machine. Tests must not share state between modules: use `tmp_path` and the per-worker fixtures in `backend/tests/conftest.py`, never fixed paths, ports or database names.
+
 ### End-to-end tests
 
 `poe test-e2e` runs the Playwright suite in `frontend/tests/e2e/` against an isolated, throwaway Postgres (via `compose.e2e.yaml`). It builds the production frontend (`poe e2e-build`, `npm run build`, roughly two minutes), runs the specs in parallel, and removes the database container afterwards whatever the outcome. It requires Docker. CI runs it as its own `e2e` job, retrying a failed test once and uploading the traces of failures. It covers the roadmap's core happy paths: creating an item, setting an item type, adding a connection, quick capture, and managing item types.

@@ -11,6 +11,7 @@ from datetime import UTC, date
 from typing import TYPE_CHECKING, Any
 
 from app.modules.graph.adapters.persistence.text_match import (
+    description_blank,
     fold,
     sort_key,
     text_matches,
@@ -20,11 +21,13 @@ from app.modules.graph.domain.query import (
     Condition,
     Cursor,
     DateCondition,
+    DescriptionCondition,
     FavouriteCondition,
     FieldCondition,
     FieldReference,
     Group,
     Money,
+    NameCondition,
     Operand,
     RelativeDate,
     ResolvedQuery,
@@ -270,9 +273,25 @@ def _tag_matches(node: Node, condition: TagCondition) -> bool:
     }[condition.mode]
 
 
+def _description_matches(node: Node, condition: DescriptionCondition) -> bool:
+    if condition.op == "~":
+        return fold(condition.value or "") in fold(node.description or "")
+    return description_blank(node.description) == (condition.op == "empty")
+
+
+def _name_matches(node: Node, condition: NameCondition) -> bool:
+    if condition.op == "~":
+        return fold(condition.value) in fold(node.name)
+    return fold(condition.value) == fold(node.name)
+
+
 def _condition(node: Node, condition: Condition, ctx: ResolvedQuery) -> bool:
     if isinstance(condition, TextCondition):
         return text_matches(node, fold(condition.q), ctx.search_exclusions)
+    if isinstance(condition, DescriptionCondition):
+        return _description_matches(node, condition)
+    if isinstance(condition, NameCondition):
+        return _name_matches(node, condition)
     if isinstance(condition, TypeCondition):
         return node.type in condition.slugs
     if isinstance(condition, FavouriteCondition):
