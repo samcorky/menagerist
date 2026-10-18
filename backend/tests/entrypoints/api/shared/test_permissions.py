@@ -4,6 +4,7 @@ from app.entrypoints.api.shared.permissions import (
     Permission,
     expand,
 )
+from app.modules.backup.application.permissions import BackupPermission
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.identity.application.permissions import IdentityPermission
 from app.modules.system.application.permissions import SystemPermission
@@ -43,7 +44,8 @@ def test_expand_terminates_on_a_cycle() -> None:
 def test_the_real_catalogue_is_the_union_of_every_modules_enum() -> None:
     """The aggregate catalogue is the union of every module's enum."""
     assert (
-        frozenset(GraphPermission)
+        frozenset(BackupPermission)
+        | frozenset(GraphPermission)
         | frozenset(IdentityPermission)
         | frozenset(SystemPermission)
     ) == ALL_PERMISSIONS

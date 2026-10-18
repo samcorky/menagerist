@@ -13,6 +13,7 @@ import asyncio
 import hashlib
 import re
 import uuid
+from contextlib import ExitStack, nullcontext
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Annotated, Any
@@ -174,7 +175,7 @@ from app.shared_kernel.actor import Actor
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
     from fastapi import FastAPI
     from httpx2 import Response
@@ -529,7 +530,8 @@ class World:
             password_hash="not-a-real-hash",
             now=datetime.now(UTC),
         )
-        asyncio.run(self.identity.users.add(user))
+        assert self.client.portal is not None
+        self.client.portal.call(self.identity.users.add, user)
         a = self.act_as(ALICE)
         film = _created(
             a.post("/api/v1/node-type", json={"slug": "film", "label": "F"})
@@ -650,6 +652,32 @@ class World:
         content = a.get(f"/api/v1/media/{seed.asset}/content")
         view["content"] = hashlib.sha256(content.content).hexdigest()
         return view
+
+
+@pytest.fixture
+def world(as_user: Callable[..., None]) -> Iterator[World]:
+    """Own the isolation world's client for the duration of one test."""
+    instance = World(as_user)
+    # This in-memory world does not run startup probes against real infrastructure.
+    instance.app.router.lifespan_context = lambda _: nullcontext()
+    with ExitStack() as stack:
+        stack.callback(instance.client.close)
+        stack.enter_context(instance.client)
+        yield instance
+
+
+def test_world_reuses_event_loop_between_requests(world: World) -> None:
+    """Requests must share a live loop instead of opening sockets per request."""
+    loops: list[asyncio.AbstractEventLoop] = []
+
+    @world.app.get("/test-event-loop")
+    async def event_loop() -> None:
+        loops.append(asyncio.get_running_loop())
+
+    for _ in range(2):
+        assert world.client.get("/test-event-loop").status_code == 200
+    assert loops[0] is loops[1]
+    assert not loops[0].is_closed()
 
 
 def _created(response: Response) -> dict[str, Any]:
@@ -1016,11 +1044,8 @@ def test_generated_cases_cover_the_content_routes() -> None:
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda c: c.id)
-def test_user_b_cannot_reach_user_a_content(
-    case: Case, as_user: Callable[..., None]
-) -> None:
+def test_user_b_cannot_reach_user_a_content(case: Case, world: World) -> None:
     """B gets 404/403 or nothing at all; A's own view is untouched afterwards."""
-    world = World(as_user)
     seed = world.seed()
     op = OPERATIONS.get((case.method, case.template), {})
     url, kwargs = build_request(case, op, seed)
@@ -1061,11 +1086,8 @@ def test_user_b_cannot_reach_user_a_content(
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda c: c.id)
-def test_user_a_succeeds_on_the_same_call(
-    case: Case, as_user: Callable[..., None]
-) -> None:
+def test_user_a_succeeds_on_the_same_call(case: Case, world: World) -> None:
     """Positive control: the same call as the owner works, so refusals are real."""
-    world = World(as_user)
     seed = world.seed()
     op = OPERATIONS.get((case.method, case.template), {})
     url, kwargs = build_request(case, op, seed)
@@ -1105,10 +1127,9 @@ def test_user_a_succeeds_on_the_same_call(
     ids=["put", "delete"],
 )
 def test_user_b_cannot_edit_a_smart_collections_membership(
-    call: Callable[[TestClient, Seed], Response], as_user: Callable[..., None]
+    call: Callable[[TestClient, Seed], Response], world: World
 ) -> None:
     """B gets the 404 of an unknown collection; A gets the smart collection's 409."""
-    world = World(as_user)
     seed = world.seed()
     ghost = replace(seed, smart=str(uuid.uuid7()))
     before = world.snapshot(seed)

@@ -111,6 +111,8 @@ def test_ports_layer_has_no_framework_dependencies() -> None:
         .matching("pillow*")
         .matching("filetype*")
         .matching("aiofiles*")
+        .matching("tarfile*")
+        .matching("gzip*")
     )
     assert_passes(rule)
 
@@ -129,6 +131,8 @@ def test_application_layer_has_no_framework_dependencies() -> None:
         .matching("pillow*")
         .matching("filetype*")
         .matching("aiofiles*")
+        .matching("tarfile*")
+        .matching("gzip*")
     )
     assert_passes(rule)
 
@@ -179,7 +183,15 @@ def test_graph_module_is_independent_of_collections() -> None:
 
 def test_no_content_module_imports_identity() -> None:
     """Only the entrypoints (bridges, composition root, CLI) may use `identity`."""
-    for other in ("graph", "presets", "examples", "collections", "media", "system"):
+    for other in (
+        "graph",
+        "presets",
+        "examples",
+        "collections",
+        "media",
+        "system",
+        "backup",
+    ):
         rule = (
             project_files(SRC_PATH)
             .in_folder(f"*modules/{other}*")
@@ -188,6 +200,23 @@ def test_no_content_module_imports_identity() -> None:
             .in_folder("*modules/identity*")
         )
         assert_passes(rule)
+
+
+def test_backup_module_is_independent_of_other_modules() -> None:
+    """Backups cross module boundaries only through entrypoint bridges."""
+    modules = Path(SRC_PATH) / "modules"
+    for other in modules.iterdir():
+        if not other.is_dir() or other.name in {"backup", "__pycache__"}:
+            continue
+        for source, target in (("backup", other.name), (other.name, "backup")):
+            rule = (
+                project_files(SRC_PATH)
+                .in_folder(f"*modules/{source}*")
+                .should_not()
+                .depend_on_files()
+                .in_folder(f"*modules/{target}*")
+            )
+            assert_passes(rule)
 
 
 def test_identity_module_is_independent_of_other_modules() -> None:

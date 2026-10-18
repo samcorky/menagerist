@@ -12,6 +12,10 @@ if TYPE_CHECKING:
 
 URL = "/api/v1/auth/me/permissions"
 ALL = [
+    "backup:archive:create",
+    "backup:archive:delete",
+    "backup:archive:read",
+    "backup:archive:restore",
     "graph:edge_type:delete",
     "graph:edge_type:purge_attribute",
     "graph:node_type:delete",
@@ -28,7 +32,7 @@ ALL = [
 
 
 def test_an_admin_sees_every_permission_sorted(as_user: Callable[..., None]) -> None:
-    """Admins hold all twelve, listed in a stable order."""
+    """Admins hold every catalogue permission, listed in a stable order."""
     app = create_app()
     as_user(app, uuid.uuid4(), "admin")
     response = TestClient(app).get(URL)

@@ -1,6 +1,10 @@
 from itertools import chain
 from typing import TYPE_CHECKING
 
+from app.modules.backup.application.permissions import (
+    IMPLIES as BACKUP_IMPLIES,
+    BackupPermission,
+)
 from app.modules.graph.application.permissions import (
     IMPLIES as GRAPH_IMPLIES,
     GraphPermission,
@@ -18,15 +22,15 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
 
 # Adding a module's permissions is one line here: `| MediaPermission`.
-Permission = GraphPermission | IdentityPermission | SystemPermission
+Permission = BackupPermission | GraphPermission | IdentityPermission | SystemPermission
 
 ALL_PERMISSIONS: frozenset[Permission] = frozenset(
-    chain(GraphPermission, IdentityPermission, SystemPermission)
+    chain(BackupPermission, GraphPermission, IdentityPermission, SystemPermission)
 )
 
 IMPLIES: Mapping[Permission, frozenset[Permission]] = {
     key: frozenset(implied)
-    for catalogue in (GRAPH_IMPLIES, IDENTITY_IMPLIES, SYSTEM_IMPLIES)
+    for catalogue in (BACKUP_IMPLIES, GRAPH_IMPLIES, IDENTITY_IMPLIES, SYSTEM_IMPLIES)
     for key, implied in catalogue.items()
 }
 

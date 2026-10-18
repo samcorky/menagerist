@@ -3,7 +3,9 @@ import inspect
 import pkgutil
 
 import app.modules
-from app.entrypoints.api.shared.permissions import ALL_PERMISSIONS
+from app.entrypoints.api.shared.authorization import MEMBER_PERMISSIONS
+from app.entrypoints.api.shared.permissions import ALL_PERMISSIONS, expand
+from app.modules.backup.application.permissions import BackupPermission
 from app.shared_kernel.cqrs import UseCase
 
 
@@ -32,3 +34,13 @@ def test_every_declared_required_permission_is_in_the_catalogue() -> None:
     assert declared
     for cls, permission in declared.items():
         assert permission in ALL_PERMISSIONS, cls.__name__
+
+
+def test_backup_permissions_are_catalogued_and_admin_only() -> None:
+    """Instance archives are visible only to administrators and system jobs."""
+    assert set(BackupPermission) <= ALL_PERMISSIONS
+    assert not set(BackupPermission) & MEMBER_PERMISSIONS
+    for permission in (BackupPermission.CREATE, BackupPermission.RESTORE):
+        assert expand({permission}) == {permission, BackupPermission.READ}
+    assert expand({BackupPermission.READ}) == {BackupPermission.READ}
+    assert expand({BackupPermission.DELETE}) == {BackupPermission.DELETE}

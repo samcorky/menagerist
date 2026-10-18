@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from app.modules.identity.adapters.persistence.models import UserModel
 from app.modules.identity.domain.errors import UsernameTakenError
 from app.modules.identity.domain.user import Role, User
+from app.platform.advisory_locks import SETUP_LOCK_KEY
 
 if TYPE_CHECKING:
     import uuid
@@ -15,8 +16,6 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger()
 
-# Arbitrary constant naming the first-run setup lock.
-_SETUP_LOCK_KEY = 7_302_024_001
 _ADMIN_LOCK_KEY = 7_302_024_002
 
 
@@ -123,7 +122,7 @@ class SqlAlchemyUserRepository:
 
     async def lock_for_setup(self) -> None:
         """Take a transaction-scoped advisory lock so setups run one at a time."""
-        await self._session.execute(select(func.pg_advisory_xact_lock(_SETUP_LOCK_KEY)))
+        await self._session.execute(select(func.pg_advisory_xact_lock(SETUP_LOCK_KEY)))
 
     async def lock_admin_changes(self) -> None:
         """Take a transaction-scoped advisory lock for admin-removing changes."""

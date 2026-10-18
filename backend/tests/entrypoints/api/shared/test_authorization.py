@@ -9,8 +9,6 @@ from app.entrypoints.api.shared.authorization import (
 )
 from app.entrypoints.api.shared.permissions import ALL_PERMISSIONS
 from app.modules.graph.application.permissions import GraphPermission
-from app.modules.identity.application.permissions import IdentityPermission
-from app.modules.system.application.permissions import SystemPermission
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.errors import ForbiddenError
 
@@ -26,8 +24,8 @@ def test_the_default_member_grant_is_empty() -> None:
     assert ALL_PERMISSIONS - MEMBER_PERMISSIONS == ADMIN_ONLY_ACTIONS
 
 
-def test_the_admin_only_set_is_graph_structure_and_user_management() -> None:
-    """Graph structure, users, sessions and diagnostics are admin-only."""
+def test_the_admin_only_set_matches_the_catalogue() -> None:
+    """Structure, identity, diagnostics and backups are admin-only."""
     assert (
         frozenset(
             {
@@ -43,6 +41,10 @@ def test_the_admin_only_set_is_graph_structure_and_user_management() -> None:
                 "identity:session:list",
                 "identity:session:revoke",
                 "system:diagnostics:read",
+                "backup:archive:create",
+                "backup:archive:read",
+                "backup:archive:restore",
+                "backup:archive:delete",
             }
         )
         == ADMIN_ONLY_ACTIONS
@@ -52,7 +54,7 @@ def test_the_admin_only_set_is_graph_structure_and_user_management() -> None:
 async def test_members_are_forbidden_catalogue_permissions() -> None:
     """Members hold none of the catalogue permissions by default."""
     adapter = RoleAuthorizationAdapter()
-    for permission in (*GraphPermission, *IdentityPermission, *SystemPermission):
+    for permission in ALL_PERMISSIONS:
         with pytest.raises(ForbiddenError):
             await adapter.check(MEMBER, permission)
 
@@ -60,7 +62,7 @@ async def test_members_are_forbidden_catalogue_permissions() -> None:
 async def test_admins_and_the_system_hold_every_permission() -> None:
     """Admins and the system pass every catalogue check."""
     adapter = RoleAuthorizationAdapter()
-    for permission in (*GraphPermission, *IdentityPermission, *SystemPermission):
+    for permission in ALL_PERMISSIONS:
         await adapter.check(ADMIN, permission)
         await adapter.check(SYSTEM_ACTOR, permission)
 

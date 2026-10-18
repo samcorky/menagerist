@@ -1,4 +1,5 @@
 import uuid
+from contextlib import ExitStack, contextmanager
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -15,6 +16,7 @@ from app.shared_kernel.actor import Actor
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable, Iterator
 
+    from anyio.abc import BlockingPortal
     from fastapi import FastAPI
 
 
@@ -95,6 +97,36 @@ def as_user(app: FastAPI, user_id: uuid.UUID, role: str = "member") -> None:
     """Make every request to `app` run as the given user."""
     actor = actor_for(user_id, role)
     app.dependency_overrides[get_current_actor] = lambda: actor
+
+
+@pytest.fixture(autouse=True)
+def _reuse_test_client_portals(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Share one portal per test for unmanaged clients and close every client.
+
+    Explicit client contexts keep their own lifespan and portal.
+    """
+    original_init = TestClient.__init__
+    original_factory = TestClient._portal_factory
+    portal: BlockingPortal | None = None
+    with ExitStack() as stack:
+
+        def init(client: TestClient, *args: Any, **kwargs: Any) -> None:  # noqa: ANN401
+            original_init(client, *args, **kwargs)
+            stack.callback(client.close)
+
+        @contextmanager
+        def portal_factory(client: TestClient) -> Iterator[BlockingPortal]:
+            nonlocal portal
+            if client.portal is not None:
+                yield client.portal
+            else:
+                if portal is None:
+                    portal = stack.enter_context(original_factory(client))
+                yield portal
+
+        monkeypatch.setattr(TestClient, "__init__", init)
+        monkeypatch.setattr(TestClient, "_portal_factory", portal_factory)
+        yield
 
 
 @pytest.fixture(autouse=True)

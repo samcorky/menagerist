@@ -1,5 +1,6 @@
 from app.platform.config._base import MenageristBaseSettings
 from app.platform.config.api import ApiSettings, get_api_settings
+from app.platform.config.backup import BackupSettings, get_backup_settings
 from app.platform.config.database import DatabaseSettings, get_database_settings
 from app.platform.config.identity import IdentitySettings, get_identity_settings
 from app.platform.config.identity_cli import (
@@ -11,6 +12,7 @@ from app.platform.config.media import MediaSettings, get_media_settings
 
 __all__ = [
     "ApiSettings",
+    "BackupSettings",
     "DatabaseSettings",
     "IdentityCliSettings",
     "IdentitySettings",
@@ -19,6 +21,7 @@ __all__ = [
     "MediaSettings",
     "MenageristBaseSettings",
     "get_api_settings",
+    "get_backup_settings",
     "get_database_settings",
     "get_identity_cli_settings",
     "get_identity_settings",
