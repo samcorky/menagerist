@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from uuid import uuid7
 
 import pytest
-from sqlalchemy import create_engine, make_url, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
@@ -33,44 +33,16 @@ from app.modules.media.adapters.storage.local_filesystem import (
     LocalFilesystemMediaStorage,
 )
 from app.modules.media.domain.media_asset import MediaAsset
-from app.platform import alembic_runner
-from app.platform.config import get_database_settings
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Iterator
+    from collections.abc import AsyncIterator
     from pathlib import Path
 
     from sqlalchemy import Table
     from sqlalchemy.ext.asyncio import AsyncConnection
 
 pytestmark = pytest.mark.integration
-
-
-@pytest.fixture
-def snapshot_database(
-    postgres_url: str, postgres_sync_url: str, monkeypatch: pytest.MonkeyPatch
-) -> Iterator[str]:
-    """Migrate a scratch database without changing the shared test schema."""
-    name = f"backup_{uuid7().hex}"
-    engine = create_engine(postgres_sync_url, isolation_level="AUTOCOMMIT")
-    with engine.connect() as connection:
-        connection.execute(text(f'CREATE DATABASE "{name}"'))
-    url = (
-        make_url(postgres_url).set(database=name).render_as_string(hide_password=False)
-    )
-    try:
-        with monkeypatch.context() as patch:
-            patch.setenv("MENAGERIST_DATABASE_URL", url)
-            get_database_settings.cache_clear()
-            alembic_runner.upgrade()
-        get_database_settings.cache_clear()
-        yield url
-    finally:
-        get_database_settings.cache_clear()
-        with engine.connect() as connection:
-            connection.execute(text(f'DROP DATABASE "{name}" WITH (FORCE)'))
-        engine.dispose()
 
 
 async def test_snapshot_reflects_old_schema_and_keeps_one_read_only_snapshot(

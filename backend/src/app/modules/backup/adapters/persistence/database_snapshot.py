@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import MetaData, select
+from sqlalchemy import JSON, MetaData, select
 
 from app.modules.backup.adapters.persistence.row_codec import encode_row
 from app.modules.backup.adapters.persistence.table_rules import TableRule, table_rule
@@ -49,8 +49,23 @@ class SqlAlchemyDatabaseSnapshot:
 
     @staticmethod
     async def _rows(connection: AsyncConnection, table: Table) -> AsyncIterator[bytes]:
+        json_columns = [column for column in table.c if isinstance(column.type, JSON)]
         async with connection.stream(
-            select(table).execution_options(yield_per=1000)
+            select(
+                table,
+                *(
+                    column.is_(None).label(f"$null_{column.name}")
+                    for column in json_columns
+                ),
+            ).execution_options(yield_per=1000)
         ) as result:
             async for row in result.mappings():
-                yield encode_row(dict(row))
+                values = {column.name: row[column.name] for column in table.c}
+                json_nulls = [
+                    column.name
+                    for column in json_columns
+                    if values[column.name] is None and not row[f"$null_{column.name}"]
+                ]
+                if json_nulls:
+                    values["$json_nulls"] = json_nulls
+                yield encode_row(values)

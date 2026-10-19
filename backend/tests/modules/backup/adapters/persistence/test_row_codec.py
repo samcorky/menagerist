@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta, timezone
 from uuid import uuid7
 
 import pytest
-from sqlalchemy import Column, DateTime, Integer, MetaData, String, Table, Uuid
+from sqlalchemy import JSON, Column, DateTime, Integer, MetaData, String, Table, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.modules.backup.adapters.persistence.row_codec import decode_row, encode_row
@@ -48,3 +48,20 @@ def test_unsupported_values_are_not_silently_stringified() -> None:
     """Unrecognised values fail instead of losing their original type."""
     with pytest.raises(TypeError, match="Unsupported backup value"):
         encode_row({"value": object()})
+
+
+def test_root_json_null_is_explicit_and_sql_null_stays_none() -> None:
+    """Optional row metadata preserves the distinction lost by JSON decoding."""
+    table = Table("rows", MetaData(), Column("data", JSONB))
+    assert decode_row({"data": None}, table) == {"data": None}
+    assert decode_row({"data": None, "$json_nulls": ["data"]}, table) == {
+        "data": JSON.NULL
+    }
+
+
+@pytest.mark.parametrize("metadata", [None, "data", [3], ["missing"], ["id"], ["data"]])
+def test_invalid_json_null_metadata_is_refused(metadata: object) -> None:
+    """Metadata cannot override non-JSON columns or replace actual values."""
+    table = Table("rows", MetaData(), Column("id", Uuid), Column("data", JSONB))
+    with pytest.raises(CorruptBackupError, match="JSON null metadata"):
+        decode_row({"id": None, "data": {}, "$json_nulls": metadata}, table)
