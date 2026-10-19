@@ -15,7 +15,7 @@ export const BACKEND_PORT = Number(process.env.E2E_BACKEND_PORT ?? 8100);
 /** Backend port of the `auth` project (its own empty database, see auth.spec.ts). */
 export const AUTH_BACKEND_PORT = Number(process.env.E2E_AUTH_BACKEND_PORT ?? 8190);
 
-export const CSRF_COOKIE = 'menagerist_csrf';
+export const CSRF_COOKIE = 'menagerist-csrf';
 export const CSRF_HEADER = 'X-CSRF-Token';
 
 export type Credentials = { username: string; displayName: string; password: string };

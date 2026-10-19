@@ -32,7 +32,7 @@ const user = {
 };
 
 beforeEach(() => {
-	vi.stubGlobal('document', { cookie: 'a=1; menagerist_csrf=tok123' });
+	vi.stubGlobal('document', { cookie: 'a=1; menagerist-csrf=tok123' });
 	resetAuthEvents();
 });
 
@@ -265,7 +265,7 @@ describe('more auth behaviour', () => {
 			return json({});
 		});
 		await client.post({ url: '/api/v1/thing', body: {} });
-		vi.stubGlobal('document', { cookie: 'menagerist_csrf=rotated' });
+		vi.stubGlobal('document', { cookie: 'menagerist-csrf=rotated' });
 		await client.post({ url: '/api/v1/thing', body: {} });
 		expect(seen).toEqual(['tok123', 'rotated']);
 	});

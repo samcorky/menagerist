@@ -13,7 +13,7 @@ export const LOGIN_PATH = '/login';
 export const SETUP_PATH = '/setup';
 export const STATUS_PATH = '/status';
 export const ACCOUNT_PATH = '/settings/account';
-export const CSRF_COOKIE = 'menagerist_csrf';
+export const CSRF_COOKIE = 'menagerist-csrf';
 export const CSRF_HEADER = 'X-CSRF-Token';
 
 // Sign-in pages: a signed-in person is sent away from these.

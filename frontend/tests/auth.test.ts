@@ -169,8 +169,8 @@ describe('guardDecision', () => {
 
 describe('cookies and methods', () => {
 	it('reads a named cookie', () => {
-		expect(readCookie('a=1; menagerist_csrf=tok%2Fen; b=2', 'menagerist_csrf')).toBe('tok/en');
-		expect(readCookie('a=1', 'menagerist_csrf')).toBeNull();
+		expect(readCookie('a=1; menagerist-csrf=tok%2Fen; b=2', 'menagerist-csrf')).toBe('tok/en');
+		expect(readCookie('a=1', 'menagerist-csrf')).toBeNull();
 		expect(readCookie('', 'x')).toBeNull();
 	});
 

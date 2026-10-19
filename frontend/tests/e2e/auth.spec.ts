@@ -130,7 +130,7 @@ test('an invalid session sends you to sign in and back to the page you wanted', 
 	await expect(accountMenu(page, ADMIN.name)).toBeVisible();
 
 	const sessionCookies = (await context.cookies(baseURL)).filter(
-		(c) => c.name === 'menagerist_session'
+		(c) => c.name === 'menagerist-session'
 	);
 	expect(sessionCookies).toHaveLength(1);
 	await context.addCookies(

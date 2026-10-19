@@ -85,9 +85,9 @@ beforeAll(async () => {
 
 describe('swagger-init csrf interceptor', () => {
 	it('reads a named cookie and decodes it', () => {
-		expect(init.readCookie('a=1; menagerist_csrf=t%20k; b=2', 'menagerist_csrf')).toBe('t k');
-		expect(init.readCookie('a=1', 'menagerist_csrf')).toBeNull();
-		expect(init.readCookie('xmenagerist_csrf=1', 'menagerist_csrf')).toBeNull();
+		expect(init.readCookie('a=1; menagerist-csrf=t%20k; b=2', 'menagerist-csrf')).toBe('t k');
+		expect(init.readCookie('a=1', 'menagerist-csrf')).toBeNull();
+		expect(init.readCookie('xmenagerist-csrf=1', 'menagerist-csrf')).toBeNull();
 	});
 
 	it('only flags unsafe same-origin /api/v1 requests', () => {
@@ -102,8 +102,8 @@ describe('swagger-init csrf interceptor', () => {
 	it('sets the header from the cookie and sends credentials', () => {
 		const req = init.applyCsrf(
 			{ method: 'POST', url: `${ORIGIN}/api/v1/collection`, headers: {} },
-			'menagerist_csrf=abc',
-			'menagerist_csrf',
+			'menagerist-csrf=abc',
+			'menagerist-csrf',
 			ORIGIN
 		);
 		expect(req.headers?.['X-CSRF-Token']).toBe('abc');
@@ -113,22 +113,22 @@ describe('swagger-init csrf interceptor', () => {
 	it('does not overwrite a typed value, skip safe methods or fabricate a token', () => {
 		const typed = init.applyCsrf(
 			{ method: 'POST', url: '/api/v1/x', headers: { 'x-csrf-token': 'mine' } },
-			'menagerist_csrf=abc',
-			'menagerist_csrf',
+			'menagerist-csrf=abc',
+			'menagerist-csrf',
 			ORIGIN
 		);
 		expect(typed.headers).toEqual({ 'x-csrf-token': 'mine' });
 		const safe = init.applyCsrf(
 			{ method: 'GET', url: '/api/v1/x', headers: {} },
-			'menagerist_csrf=abc',
-			'menagerist_csrf',
+			'menagerist-csrf=abc',
+			'menagerist-csrf',
 			ORIGIN
 		);
 		expect(safe.headers).toEqual({});
 		const none = init.applyCsrf(
 			{ method: 'POST', url: '/api/v1/x', headers: {} },
 			'other=1',
-			'menagerist_csrf',
+			'menagerist-csrf',
 			ORIGIN
 		);
 		expect(none.headers).toEqual({});
@@ -141,7 +141,7 @@ describe('swagger-init edge cases', () => {
 	});
 
 	it('keeps = inside a cookie value', () => {
-		expect(init.readCookie('menagerist_csrf=a=b==', 'menagerist_csrf')).toBe('a=b==');
+		expect(init.readCookie('menagerist-csrf=a=b==', 'menagerist-csrf')).toBe('a=b==');
 	});
 
 	it('matches cookie names literally, not as a pattern', () => {
@@ -153,8 +153,8 @@ describe('swagger-init edge cases', () => {
 	it('treats an empty typed header as not typed and replaces it once', () => {
 		const req = init.applyCsrf(
 			{ method: 'POST', url: '/api/v1/x', headers: { 'x-csrf-token': '' } },
-			'menagerist_csrf=abc',
-			'menagerist_csrf',
+			'menagerist-csrf=abc',
+			'menagerist-csrf',
 			ORIGIN
 		);
 		expect(req.headers).toEqual({ 'X-CSRF-Token': 'abc' });
@@ -343,10 +343,10 @@ describe('swagger-init cookie header', () => {
 			{
 				method: 'GET',
 				url: '/api/v1/x',
-				headers: { Cookie: 'menagerist_session=session', A: '1' }
+				headers: { Cookie: 'menagerist-session=session', A: '1' }
 			},
 			'',
-			'menagerist_csrf',
+			'menagerist-csrf',
 			ORIGIN
 		);
 		expect(req.headers).toEqual({ A: '1' });
