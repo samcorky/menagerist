@@ -10,3 +10,4 @@ const defaultBase = typeof window !== 'undefined' ? '' : 'http://localhost';
 client.setConfig({ baseUrl: defaultBase });
 
 export * from './generated';
+export { client };

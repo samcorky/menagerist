@@ -72,6 +72,7 @@ export default defineConfig({
 			name: 'mobile',
 			use: { ...devices['Pixel 5'], viewport: { width: 360, height: 740 } },
 			testMatch: [
+				'**/backups.spec.ts',
 				'**/collections.spec.ts',
 				'**/create-item.spec.ts',
 				'**/connect-items.spec.ts',

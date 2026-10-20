@@ -39,6 +39,7 @@ __pycache__/
 # App specific
 data/
 backups/
+!/frontend/src/routes/admin/backups/
 
 # Node Stuff
 node_modules/
