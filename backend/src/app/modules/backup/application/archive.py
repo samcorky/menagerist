@@ -115,7 +115,7 @@ def _media(value: object) -> MediaFileRef:
 def manifest_bytes(manifest: BackupManifest) -> bytes:
     """Encode the manifest, omitting migration fields on ordinary backups."""
     payload = asdict(manifest)
-    for key in ("from_revision", "to_revision"):
+    for key in ("from_revision", "to_revision", "owner_id"):
         if payload[key] is None:
             del payload[key]
     payload["created_at"] = manifest.created_at.astimezone(UTC).isoformat()
@@ -135,6 +135,11 @@ def parse_manifest(data: bytes) -> BackupManifest:
             label=_text(payload, "label"),
             created_at=_date(payload),
             created_by=UUID(_text(payload, "created_by")),
+            owner_id=(
+                UUID(_text(payload, "owner_id"))
+                if payload.get("owner_id") is not None
+                else None
+            ),
             tables=[_table(value) for value in _array(payload, "tables")],
             media=[_media(value) for value in _array(payload, "media")],
             media_missing=[

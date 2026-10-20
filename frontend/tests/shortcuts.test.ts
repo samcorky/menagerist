@@ -279,6 +279,19 @@ describe('attachShortcuts', () => {
 		detach();
 	});
 
+	it('preserves a pending sequence when unrelated page shortcuts change', () => {
+		const { state, target } = makeTarget();
+		const detach = attachShortcuts(target);
+		const handler = vi.fn();
+		const off = registerShortcut(def('g e', handler));
+		const offPage = registerShortcut(def('Escape', vi.fn()));
+		press(state, 'g');
+		offPage();
+		press(state, 'e');
+		expect(handler).toHaveBeenCalledOnce();
+		off();
+		detach();
+	});
 	it('ignores events whose default was prevented', () => {
 		const { state, target } = makeTarget();
 		const detach = attachShortcuts(target);

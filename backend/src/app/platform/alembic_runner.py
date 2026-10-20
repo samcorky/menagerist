@@ -55,3 +55,18 @@ async def db_current_revisions(
                 lambda c: MigrationContext.configure(c).get_current_heads()
             )
         )
+
+
+def target_revisions(revision: str = "head") -> tuple[str, ...]:
+    """Resolve an Alembic target to its concrete revision identifiers."""
+    scripts = ScriptDirectory.from_config(build_config())
+    return tuple(item.revision for item in scripts.get_revisions(revision))
+
+
+async def pending(revision: str = "head") -> bool:
+    """Report whether upgrading from the live revision would apply scripts."""
+    from app.platform.database import get_session_factory
+
+    current = await db_current_revisions(get_session_factory())
+    scripts = ScriptDirectory.from_config(build_config())
+    return bool(list(scripts.iterate_revisions(revision, current)))

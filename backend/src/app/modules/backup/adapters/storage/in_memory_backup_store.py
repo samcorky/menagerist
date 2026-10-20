@@ -22,6 +22,7 @@ class InMemoryBackupStore:
         self.members: dict[UUID, dict[str, bytes]] = {}
         self.summaries: dict[UUID, BackupSummary] = {}
         self.digests: dict[UUID, str] = {}
+        self.user_stores: dict[UUID, InMemoryBackupStore] = {}
 
     async def begin(self, backup_id: UUID) -> InMemoryBackupWriter:
         """Create unpublished member storage."""
@@ -68,6 +69,19 @@ class InMemoryBackupStore:
         self.archives.pop(backup_id, None)
         self.members.pop(backup_id, None)
         self.digests.pop(backup_id, None)
+
+    async def cleanup_user_exports(
+        self, *, before: datetime, dry_run: bool
+    ) -> list[str]:
+        """Apply export expiry across independent in-memory owner namespaces."""
+        removed = []
+        for owner_id, store in self.user_stores.items():
+            for summary in await store.list():
+                if summary.created_at < before:
+                    if not dry_run:
+                        await store.delete(summary.id)
+                    removed.append(f"users/{owner_id}/instance/{summary.id}.tar.gz")
+        return removed
 
     def _require(self, backup_id: UUID) -> None:
         if backup_id not in self.summaries or backup_id not in self.archives:

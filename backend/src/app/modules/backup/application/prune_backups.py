@@ -41,11 +41,13 @@ class PruneBackups(
         *,
         keep_last: int = 7,
         pre_migration_keep: int = 3,
+        user_export_ttl_hours: int = 24,
     ) -> None:
         super().__init__(authorization)
         self._store = store
         self._keep_last = keep_last
         self._pre_migration_keep = pre_migration_keep
+        self._user_export_ttl = timedelta(hours=user_export_ttl_hours)
 
     def _limits(self, request: PruneBackupsCommand) -> tuple[int, int]:
         ordinary = self._keep_last if request.keep_last is None else request.keep_last
@@ -98,12 +100,16 @@ class PruneBackups(
         orphans = await self._store.cleanup_orphans(
             before=now - timedelta(hours=1), dry_run=request.dry_run
         )
+        user_exports = await self._store.cleanup_user_exports(
+            before=now - self._user_export_ttl, dry_run=request.dry_run
+        )
         report = PruneReport(
             deleted=deleted,
             kept=kept,
             freed_bytes=freed,
             orphans_removed=orphans,
             unreadable=unreadable,
+            user_exports_removed=user_exports,
         )
         logger.info(
             "instance backups pruned",

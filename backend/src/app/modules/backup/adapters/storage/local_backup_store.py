@@ -1,6 +1,7 @@
 import asyncio
 import shutil
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from app.modules.backup.adapters.storage.local_backup_reader import (
     CHUNK_SIZE,
@@ -19,7 +20,6 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator
     from datetime import datetime
     from pathlib import Path
-    from uuid import UUID
 
     from app.modules.backup.domain.backup import BackupSummary
 
@@ -81,6 +81,8 @@ class LocalDirectoryBackupStore:
         unreadable: list[str] = []
         for path in self._instance.glob("*.json"):
             try:
+                if path.is_symlink():
+                    raise ValueError("Backup summaries cannot be symbolic links.")
                 summary = parse_summary(path.read_bytes())
                 if path.stem != str(summary.id):
                     raise ValueError("Summary id differs from its filename.")
@@ -107,6 +109,61 @@ class LocalDirectoryBackupStore:
     async def cleanup_orphans(self, *, before: datetime, dry_run: bool) -> list[str]:
         """Remove uncommitted archives and stale staging operations."""
         return await asyncio.to_thread(self._cleanup, before, dry_run)
+
+    def _user_roots(self) -> list[Path]:
+        root = self._root.resolve()
+        users = root / "users"
+        if users.is_symlink() or users.is_junction() or not users.is_dir():
+            return []
+        roots = []
+        for path in users.iterdir():
+            try:
+                canonical = str(UUID(path.name)) == path.name
+            except ValueError:
+                continue
+            instance = path / "instance"
+            if (
+                canonical
+                and self._safe_directory(path, root)
+                and self._safe_directory(instance, root)
+            ):
+                roots.append(path)
+        return roots
+
+    @staticmethod
+    def _safe_directory(path: Path, root: Path) -> bool:
+        try:
+            return (
+                not path.is_symlink()
+                and not path.is_junction()
+                and path.is_dir()
+                and path.resolve().is_relative_to(root)
+            )
+        except OSError:
+            return False
+
+    async def cleanup_user_exports(
+        self, *, before: datetime, dry_run: bool
+    ) -> list[str]:
+        """Reap expired committed exports without following owner-directory links."""
+        try:
+            roots = await asyncio.to_thread(self._user_roots)
+        except OSError:
+            return []
+        removed = []
+        for root in roots:
+            store = LocalDirectoryBackupStore(root)
+            try:
+                for summary in await store.list():
+                    if summary.created_at < before:
+                        if not dry_run:
+                            await store.delete(summary.id)
+                        removed.append(
+                            f"users/{root.name}/instance/{summary.id}.tar.gz"
+                        )
+            except OSError, BackupNotFoundError:
+                continue
+        return removed
 
     def _orphan_archives(self) -> list[Path]:
         paths: list[Path] = []

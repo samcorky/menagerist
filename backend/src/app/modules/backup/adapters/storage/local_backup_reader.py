@@ -4,7 +4,8 @@ import hashlib
 import io
 import tarfile
 import zlib
-from typing import IO, TYPE_CHECKING, BinaryIO
+from contextvars import ContextVar
+from typing import IO, TYPE_CHECKING, BinaryIO, Self
 
 from app.modules.backup.domain.errors import CorruptBackupError
 from app.modules.backup.ports.archive_member import ArchiveMember
@@ -14,6 +15,62 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 CHUNK_SIZE = 1024 * 1024
+MAX_EXTENSION_BYTES = 64 * 1024
+_header_depth: ContextVar[int] = ContextVar("backup_tar_header_depth", default=0)
+
+
+class _BoundedTarInfo(tarfile.TarInfo):
+    """Bound metadata before the standard parser reads extension bodies."""
+
+    @classmethod
+    def frombuf(cls, buf: bytes | bytearray, encoding: str, errors: str) -> Self:
+        info = super().frombuf(buf, encoding, errors)
+        if info.type == tarfile.GNUTYPE_SPARSE:
+            raise CorruptBackupError("Sparse archive members are unsupported.")
+        if (
+            info.type
+            in {
+                tarfile.XHDTYPE,
+                tarfile.XGLTYPE,
+                tarfile.SOLARIS_XHDTYPE,
+                tarfile.GNUTYPE_LONGNAME,
+                tarfile.GNUTYPE_LONGLINK,
+            }
+            and not 0 <= info.size <= MAX_EXTENSION_BYTES
+        ):
+            raise CorruptBackupError(
+                "Archive extension metadata exceeds its size limit."
+            )
+        return info
+
+    @classmethod
+    def fromtarfile(cls, archive: tarfile.TarFile) -> Self:
+        depth = _header_depth.get()
+        if depth >= 16:
+            raise CorruptBackupError("Archive extension metadata is nested too deeply.")
+        token = _header_depth.set(depth + 1)
+        try:
+            return super().fromtarfile(archive)
+        finally:
+            _header_depth.reset(token)
+
+    def _proc_gnusparse_00(
+        self, next: tarfile.TarInfo, raw_headers: list[tuple[int, bytes, bytes]]
+    ) -> None:
+        raise CorruptBackupError("Sparse archive members are unsupported.")
+
+    def _proc_gnusparse_01(
+        self, next: tarfile.TarInfo, pax_headers: dict[str, str]
+    ) -> None:
+        raise CorruptBackupError("Sparse archive members are unsupported.")
+
+    def _proc_gnusparse_10(
+        self,
+        next: tarfile.TarInfo,
+        pax_headers: dict[str, str],
+        archive: tarfile.TarFile,
+    ) -> None:
+        raise CorruptBackupError("Sparse archive members are unsupported.")
 
 
 class _HashingReader:
@@ -49,7 +106,7 @@ class LocalBackupReader:
         archive: tarfile.TarFile | None = None
         try:
             archive = await asyncio.to_thread(
-                tarfile.open, fileobj=compressed, mode="r|"
+                tarfile.open, fileobj=compressed, mode="r|", tarinfo=_BoundedTarInfo
             )
             while (info := await asyncio.to_thread(archive.next)) is not None:
                 if not info.isfile():

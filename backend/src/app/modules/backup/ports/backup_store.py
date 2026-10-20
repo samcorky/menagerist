@@ -41,6 +41,12 @@ class BackupStore(Protocol):
         """Remove uncommitted archives and staging files older than before."""
         ...
 
+    async def cleanup_user_exports(
+        self, *, before: datetime, dry_run: bool
+    ) -> list[str]:
+        """Remove expired exports across private owner namespaces."""
+        ...
+
     async def list(self) -> list[BackupSummary]:
         """Return summaries for committed archives only."""
         ...

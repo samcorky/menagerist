@@ -606,6 +606,7 @@
 											{#if canUpdate}
 												<div class="w-36">
 													<NativeSelect
+														class="[&_select]:min-h-11"
 														aria-label="Role for {user.username}"
 														disabled={rowBusy === user.id || isMe}
 														value={user.role}

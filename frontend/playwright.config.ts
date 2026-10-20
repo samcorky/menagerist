@@ -1,3 +1,4 @@
+import { mkdirSync } from 'node:fs';
 import { availableParallelism, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +24,9 @@ const slowMo = process.env.PW_SLOWMO ? Number(process.env.PW_SLOWMO) : undefined
  * `--no-sync` avoids Windows lock clashes while backends start together.
  */
 function backend(port: number, name: string) {
+	const backupPath = join(tmpdir(), `menagerist-e2e-backups-${name}`);
+	mkdirSync(backupPath, { recursive: true });
+
 	return {
 		command: `uv run --no-sync menagerist serve --host 127.0.0.1 --port ${port}`,
 		cwd: '..',
@@ -30,7 +34,9 @@ function backend(port: number, name: string) {
 			MENAGERIST_DATABASE_URL: `postgresql+asyncpg://menagerist:menagerist@localhost:55433/menagerist_${name}`,
 			MENAGERIST_FRONTEND_DIST_PATH: FRONTEND_DIST,
 			// Example covers are stored as media, so each backend needs a writable directory.
-			MENAGERIST_MEDIA_STORAGE_PATH: join(tmpdir(), `menagerist-e2e-media-${name}`)
+			MENAGERIST_MEDIA_STORAGE_PATH: join(tmpdir(), `menagerist-e2e-media-${name}`),
+			MENAGERIST_BACKUP_PATH: backupPath,
+			MENAGERIST_BACKUP_BEFORE_MIGRATE: 'false'
 		},
 		url: `http://localhost:${port}/api/health/ready`,
 		reuseExistingServer: !process.env.CI,

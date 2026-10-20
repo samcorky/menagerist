@@ -22,6 +22,10 @@ class RestoreTargetNotEmptyError(ConflictError):
     """Restore would overwrite existing instance content."""
 
 
+class ImportCollisionError(ConflictError):
+    """Imported identifiers or vocabulary conflict with existing content."""
+
+
 class BackupStorageError(DomainError):
     """The backup directory is missing or unwritable.
 

@@ -18,18 +18,23 @@ class BackupMediaFiles:
     """Read originals across owners and preserve their lifecycle buckets."""
 
     def __init__(
-        self, repository: MediaAssetRepository, storage: MediaStoragePort
+        self,
+        repository: MediaAssetRepository,
+        storage: MediaStoragePort,
+        *,
+        scope: AccessScope | None = None,
     ) -> None:
         self._repository = repository
         self._storage = storage
+        # Instance backups deliberately include every owner's originals.
+        self._scope = scope if scope is not None else AccessScope.everyone()
 
     async def list_files(self) -> list[MediaFileRef]:
         """List original assets in all lifecycle buckets, across the instance."""
         refs: list[MediaFileRef] = []
         for status in MediaStatus:
-            # Instance backups deliberately include every owner's originals.
             assets = await self._repository.list_by_status(
-                status=status, scope=AccessScope.everyone()
+                status=status, scope=self._scope
             )
             refs.extend(
                 MediaFileRef(

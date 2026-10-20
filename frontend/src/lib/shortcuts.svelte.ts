@@ -1,4 +1,5 @@
 import { createKeybindingsHandler } from 'tinykeys';
+import { SvelteMap } from 'svelte/reactivity';
 
 export type ShortcutGroup = 'Global' | 'Search' | 'Add item' | 'Item';
 
@@ -94,48 +95,56 @@ export function buildBindings(
 	return bindings;
 }
 
-/**
- * Attaches one long-lived keydown listener that reads the registry at
- * key-press time, so it never depends on effect ordering and keeps tinykeys'
- * sequence state between presses. Bindings are rebuilt only when the
- * registry's list identity changes. The custom `ignore` is needed because
- * tinykeys' default ignores all form-element events, defeating `allowInInputs`.
- */
+/** Attaches one listener, preserving sequence state for unchanged registrations. */
 export function attachShortcuts(
 	target: Pick<Window, 'addEventListener' | 'removeEventListener'>
 ): () => void {
+	type Binding = { def: ShortcutDefinition; handler: (event: KeyboardEvent) => void };
 	let cachedFor: ShortcutDefinition[] | undefined;
-	let handler: ((event: KeyboardEvent) => void) | undefined;
+	let bindings = new SvelteMap<string, Binding>();
 	let matched = false;
 	const listener = (event: KeyboardEvent) => {
 		if (event.defaultPrevented) return;
 		const defs = shortcutRegistry.current;
-		if (!handler || defs !== cachedFor) {
+		if (defs !== cachedFor) {
 			cachedFor = defs;
-			const bindings = buildBindings(defs);
-			for (const keys of Object.keys(bindings)) {
-				const inner = bindings[keys];
-				bindings[keys] = (e) => {
-					matched = true;
-					inner(e);
-				};
+			const next = new SvelteMap<string, Binding>();
+			for (const def of defs) {
+				const existing = bindings.get(def.keys);
+				next.set(
+					def.keys,
+					existing?.def === def
+						? existing
+						: {
+								def,
+								handler: createKeybindingsHandler(
+									{
+										[def.keys]: (e) => {
+											matched = true;
+											if (shouldFire(def, e.target as TypingTarget)) def.handler(e);
+										}
+									},
+									{ ignore: (e) => e.repeat || e.isComposing }
+								)
+							}
+				);
 			}
-			handler = createKeybindingsHandler(bindings, {
-				ignore: (e) => e.repeat || e.isComposing
-			});
+			bindings = next;
 		}
-		handler(event);
-		// tinykeys stops at the first completed binding and leaves the rest of its pending
-		// sequences half-matched (a stale `g e` swallows the next `g`), so start afresh.
-		if (matched) {
-			matched = false;
-			handler = undefined;
+		for (const binding of bindings.values()) {
+			binding.handler(event);
+			if (matched) {
+				// Completed bindings clear other pending sequences sharing the prefix.
+				matched = false;
+				bindings.clear();
+				cachedFor = undefined;
+				break;
+			}
 		}
 	};
 	target.addEventListener('keydown', listener);
 	return () => target.removeEventListener('keydown', listener);
 }
-
 const KEY_GLYPHS: Record<string, string> = {
 	Escape: 'Esc',
 	ArrowUp: '↑',

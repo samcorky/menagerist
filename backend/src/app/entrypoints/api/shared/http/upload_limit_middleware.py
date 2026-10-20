@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 from starlette.datastructures import Headers
 
-from app.platform.config import get_media_settings
+from app.platform.config import get_backup_settings, get_media_settings
 
 if TYPE_CHECKING:
     from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -12,6 +12,13 @@ if TYPE_CHECKING:
 _OVERHEAD_ALLOWANCE = 64 * 1024
 
 _UPLOAD_PATHS = frozenset({"/api/v1/media", "/api/v1/media/attached"})
+_BACKUP_PATHS = frozenset(
+    {
+        "/api/v1/backup/upload",
+        "/api/v1/backup/first-run-restore",
+        "/api/v1/me/import",
+    }
+)
 
 PAYLOAD_TOO_LARGE_RESPONSE: dict[int | str, dict[str, object]] = {
     413: {
@@ -35,7 +42,7 @@ def _is_upload(scope: Scope) -> bool:
     return (
         scope["type"] == "http"
         and scope["method"] == "POST"
-        and scope["path"] in _UPLOAD_PATHS
+        and scope["path"] in _UPLOAD_PATHS | _BACKUP_PATHS
     )
 
 
@@ -123,7 +130,11 @@ class UploadLimitMiddleware:
             await self._app(scope, receive, send)
             return
 
-        limit = get_media_settings().max_upload_size + _OVERHEAD_ALLOWANCE
+        limit = (
+            get_backup_settings().max_upload_size
+            if scope["path"] in _BACKUP_PATHS
+            else get_media_settings().max_upload_size + _OVERHEAD_ALLOWANCE
+        )
         declared = Headers(scope=scope).get("content-length")
         if declared is not None and declared.isdigit() and int(declared) > limit:
             await _refuse(scope, send)

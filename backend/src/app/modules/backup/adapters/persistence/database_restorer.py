@@ -14,6 +14,14 @@ from app.modules.backup.domain.errors import (
 from app.platform.advisory_locks import SETUP_LOCK_KEY
 from app.platform.alembic_runner import db_current_revisions
 
+MAX_ROW_BYTES = 16 * 1024 * 1024
+
+
+def _check_row_size(size: int) -> None:
+    if size > MAX_ROW_BYTES:
+        raise CorruptBackupError("Backup row exceeds the size limit.")
+
+
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
@@ -122,6 +130,7 @@ class SqlAlchemyDatabaseRestorer:
         async for chunk in chunks:
             pending.extend(chunk)
             while (end := pending.find(b"\n")) != -1:
+                _check_row_size(end)
                 line = bytes(pending[:end])
                 del pending[: end + 1]
                 try:
@@ -137,6 +146,7 @@ class SqlAlchemyDatabaseRestorer:
                     await connection.execute(insert(table), rows)
                     rows.clear()
                 rows.append(row)
+            _check_row_size(len(pending))
         if pending:
             raise CorruptBackupError(f"Unterminated backup row in {table.name!r}.")
         if rows:

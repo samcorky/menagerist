@@ -8,6 +8,18 @@ import structlog
 from cyclopts import App, Parameter
 
 from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+from app.entrypoints.cli.backups import (
+    create_backup,
+    export_user_data,
+    import_user_data,
+    restore_backup,
+)
+from app.modules.backup.adapters.cli.backup_app import (
+    backup_app,
+    use_authorization as use_backup_authorization,
+    use_operations,
+    use_user_operations,
+)
 from app.modules.identity.adapters.cli.identity_app import (
     identity_app,
     use_authorization,
@@ -54,6 +66,16 @@ migrate_app = App(name="migrate", help="Manage database migrations.")
 app.command(migrate_app)
 
 app.command(media_app)
+use_backup_authorization(RoleAuthorizationAdapter())
+
+use_operations(
+    lambda label: create_backup(label=label),
+    lambda backup_id, replace, authorization: restore_backup(
+        backup_id, replace=replace, authorization=authorization
+    ),
+)
+use_user_operations(export_user_data, import_user_data)
+app.command(backup_app)
 
 
 def _claim_existing_data(session: AsyncSession) -> ExistingDataClaim:
@@ -113,6 +135,7 @@ def serve(
     access_log: bool = False,
     log_level: ServeLogLevel = ServeLogLevel.info,
     migrate: bool = False,
+    backup: bool = True,
 ) -> None:
     """Run the API server.
 
@@ -125,6 +148,7 @@ def serve(
             the API logs one access line per request itself (with the user and
             session ids); `MENAGERIST_ACCESS_LOG=false` turns that one off.
         log_level: Minimum level for Granian's own server logs.
+        backup: Honour the configured pre-migration backup policy.
         migrate: Apply pending database migrations before starting. Meant for
             single-instance deployments; run `migrate upgrade` separately when
             several instances share one database.
@@ -139,7 +163,7 @@ def serve(
     )
 
     if migrate:
-        upgrade()
+        upgrade(backup=backup)
 
     server = Granian(
         target="app.entrypoints.api:app",
@@ -163,17 +187,18 @@ def _enable_migration_logs() -> None:
 
 
 @migrate_app.command
-def upgrade(revision: str = "head") -> None:
+def upgrade(revision: str = "head", *, backup: bool = True) -> None:
     """Upgrade the database to `revision`.
 
     Args:
         revision: Target revision, or "head" for the latest.
+        backup: Honour the configured pre-migration backup policy.
     """
-    from app.platform import alembic_runner
-
     _enable_migration_logs()
     logger.debug("starting database upgrade", revision=revision)
-    alembic_runner.upgrade(revision)
+    from app.entrypoints.cli.backups import upgrade_with_backup
+
+    upgrade_with_backup(revision, backup=backup)
     logger.info("database upgrade complete", revision=revision)
 
 

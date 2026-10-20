@@ -13,6 +13,7 @@ from app.modules.media.adapters.storage.local_filesystem import (
     LocalFilesystemMediaStorage,
 )
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
+from app.shared_kernel.access_scope import AccessScope
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -21,6 +22,34 @@ if TYPE_CHECKING:
 
 async def _chunks(data: bytes) -> AsyncIterator[bytes]:
     yield data
+
+
+async def test_user_export_lists_only_own_originals(tmp_path: Path) -> None:
+    """A per-user backup must never enumerate another account's media."""
+    repository = InMemoryMediaAssetRepository()
+    owner_id = uuid7()
+    own = MediaAsset.create(
+        owner_id=owner_id,
+        filename="own.png",
+        content_type="image/png",
+        size=3,
+        sha256=hashlib.sha256(b"own").hexdigest(),
+    )
+    foreign = MediaAsset.create(
+        owner_id=uuid7(),
+        filename="foreign.png",
+        content_type="image/png",
+        size=3,
+        sha256=hashlib.sha256(b"not").hexdigest(),
+    )
+    await repository.add(own)
+    await repository.add(foreign)
+    bridge = BackupMediaFiles(
+        repository,
+        LocalFilesystemMediaStorage(tmp_path),
+        scope=AccessScope.of(owner_id),
+    )
+    assert [ref.asset_id for ref in await bridge.list_files()] == [own.id]
 
 
 @pytest.mark.parametrize("status", list(MediaStatus))

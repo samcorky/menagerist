@@ -13,6 +13,12 @@ class BackupSettings(MenageristBaseSettings):
         default=Path("/data/backups"),
         description="Directory used to store instance backup archives.",
     )
+    user_export_ttl_hours: int = Field(
+        default=24,
+        gt=0,
+        validation_alias="MENAGERIST_USER_EXPORT_TTL_HOURS",
+        description="Hours to retain a person's downloadable data export.",
+    )
     before_migrate: bool = Field(
         default=False,
         validation_alias="MENAGERIST_BACKUP_BEFORE_MIGRATE",

@@ -8,6 +8,8 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
+	import { restoreFirstRunArchive } from '$lib/backup-restore';
+	import { toast } from 'svelte-sonner';
 
 	let displayName = $state('');
 	let username = $state('');
@@ -17,6 +19,9 @@
 	let busy = $state(false);
 	let error = $state<string | null>(null);
 	let claimedSummary = $state<string[] | null>(null);
+	let restoring = $state(false);
+	let backupFiles = $state<FileList | undefined>();
+	let backupInput = $state<HTMLInputElement | null>(null);
 
 	const mismatch = $derived(confirm !== '' && confirm !== password);
 	const tooShort = $derived(password !== '' && password.length < PASSWORD_MIN_LENGTH);
@@ -56,6 +61,25 @@
 		await auth.finishSetup();
 		busy = false;
 	}
+
+	async function handleRestore(event: SubmitEvent) {
+		event.preventDefault();
+		const file = backupFiles?.[0];
+		if (busy || !file) return;
+		busy = true;
+		error = null;
+		const result = await restoreFirstRunArchive(file);
+		if (!result.ok) {
+			error = result.message;
+			busy = false;
+			await tick();
+			backupInput?.focus();
+			return;
+		}
+		toast.success('Backup restored. Sign in with your existing account.');
+		await auth.init();
+		busy = false;
+	}
 </script>
 
 <svelte:head>
@@ -80,6 +104,50 @@
 				{/if}
 				Continue
 			</Button>
+		{:else if restoring}
+			<div>
+				<h1 class="font-heading text-3xl font-semibold tracking-tight">Restore from backup</h1>
+				<p class="mt-1 text-muted-foreground">
+					Restore your collection and accounts from a full Menagerist backup. Afterwards, sign in
+					with the account details you used before.
+				</p>
+			</div>
+			<form class="space-y-4" onsubmit={handleRestore}>
+				{#if error}
+					<Alert.Root variant="destructive">
+						<Alert.Description>{error}</Alert.Description>
+					</Alert.Root>
+				{/if}
+				<div class="space-y-1.5">
+					<Label for="setup-backup">Backup file</Label>
+					<input
+						id="setup-backup"
+						type="file"
+						accept=".tar.gz,.gz,application/gzip"
+						bind:this={backupInput}
+						bind:files={backupFiles}
+						disabled={busy}
+						required
+						class="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1 file:text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50"
+					/>
+				</div>
+				<Button type="submit" class="h-11 w-full" disabled={busy || !backupFiles?.length}>
+					{#if busy}<Spinner class="size-4" />Restoring backup…{:else}Restore backup{/if}
+				</Button>
+				<p class="text-xs text-muted-foreground" aria-live="polite">
+					{busy
+						? 'Keep this page open while your backup is uploaded and restored.'
+						: 'Your backup must be from the same Menagerist version as this server.'}
+				</p>
+			</form>
+			<Button
+				variant="ghost"
+				disabled={busy}
+				onclick={() => {
+					restoring = false;
+					error = null;
+				}}>Create an account instead</Button
+			>
 		{:else}
 			<div>
 				<h1 class="font-heading text-3xl font-semibold tracking-tight">Welcome to Menagerist</h1>
@@ -169,6 +237,14 @@
 					{/if}
 				</Button>
 			</form>
+			<Button
+				variant="ghost"
+				disabled={busy}
+				onclick={() => {
+					restoring = true;
+					error = null;
+				}}>Restore from backup instead</Button
+			>
 		{/if}
 	</div>
 </main>

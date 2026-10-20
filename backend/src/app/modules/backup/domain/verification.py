@@ -39,3 +39,4 @@ class PruneReport:
     freed_bytes: int = 0
     orphans_removed: list[str] = field(default_factory=list)
     unreadable: list[str] = field(default_factory=list)
+    user_exports_removed: list[str] = field(default_factory=list)

@@ -1,0 +1,58 @@
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from app.modules.backup.application.import_user_data import ImportUserDataCommand
+from app.modules.backup.application.upload_backup import upload_verified_backup
+from app.modules.backup.domain.backup import BackupScope
+from app.modules.backup.ports.backup_store import BackupStore
+from app.shared_kernel.cqrs import ScopedCommandHandler
+
+if TYPE_CHECKING:
+    from app.modules.backup.application.import_user_data import ImportUserData
+    from app.modules.backup.ports.backup_workspace import BackupWorkspace
+    from app.shared_kernel.access_policy import AccessPolicy
+    from app.shared_kernel.actor import Actor
+
+
+@dataclass(frozen=True, kw_only=True)
+class ImportUserArchiveCommand:
+    """A portable personal archive streamed into the caller's empty account."""
+
+    stream: AsyncIterator[bytes]
+
+
+class ImportUserArchive(
+    ScopedCommandHandler[BackupStore, ImportUserArchiveCommand, None]
+):
+    """Stage an upload privately and remove it after the import attempt."""
+
+    def __init__(
+        self,
+        store: BackupStore,
+        importer: ImportUserData,
+        workspace: BackupWorkspace,
+        policy: AccessPolicy,
+        *,
+        max_upload_size: int = 8 * 1024**3,
+    ) -> None:
+        super().__init__(store, policy)
+        self._store, self._importer, self._workspace = store, importer, workspace
+        self._max_size = max_upload_size
+
+    async def handle(self, request: ImportUserArchiveCommand, actor: Actor) -> None:
+        """Verify a private upload, import it and remove the staged archive."""
+        self._policy.assert_can_view(actor, actor.id)
+        uploaded = await upload_verified_backup(
+            self._store,
+            self._workspace,
+            request.stream,
+            self._max_size,
+            allowed_scope=BackupScope.USER,
+        )
+        try:
+            await self._importer.handle(
+                ImportUserDataCommand(backup_id=uploaded.id), actor
+            )
+        finally:
+            await self._store.delete(uploaded.id)

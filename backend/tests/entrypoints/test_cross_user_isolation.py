@@ -209,6 +209,41 @@ PRESETS = "shared presets: not owned content (decision 6)"
 CREATES_OWN = "references no existing content; creates content owned by the caller"
 
 ALLOWED: dict[Route, str] = {
+    (
+        "POST",
+        "/api/v1/backup",
+    ): "administrator-only instance archive; tested by backup router permission tests",
+    (
+        "GET",
+        "/api/v1/backup",
+    ): "administrator-only instance archive; tested by backup router permission tests",
+    ("POST", "/api/v1/backup/upload"): "administrator-only verified instance upload",
+    ("POST", "/api/v1/backup/prune"): "administrator-only instance retention",
+    (
+        "POST",
+        "/api/v1/backup/{backup_id}/verify",
+    ): "administrator-only instance verification",
+    (
+        "GET",
+        "/api/v1/backup/{backup_id}/download",
+    ): "administrator-only instance download",
+    ("DELETE", "/api/v1/backup/{backup_id}"): "administrator-only instance deletion",
+    (
+        "POST",
+        "/api/v1/backup/first-run-restore",
+    ): "public only before setup; shared-lock and rate-limit integration tests",
+    (
+        "POST",
+        "/api/v1/me/export",
+    ): "personal snapshots and dedicated two-user export API tests",
+    (
+        "GET",
+        "/api/v1/me/export/{backup_id}/download",
+    ): "private owner namespace; API test checks foreign exports return 404",
+    (
+        "POST",
+        "/api/v1/me/import",
+    ): "two-user API and Postgres tests cover owner stamping and isolation",
     ("GET", "/api/health"): PUBLIC,
     ("GET", "/api/health/ready"): PUBLIC,
     ("GET", "/api/version"): PUBLIC,

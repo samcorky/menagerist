@@ -99,7 +99,9 @@ test('a member sees no admin area and cannot access admin routes', async ({
 	// Member navigates to /admin/users
 	await memberSession.page.goto('/admin/users');
 	await expect(
-		memberSession.page.getByText('Only administrators can access this page.')
+		memberSession.page
+			.getByRole('alert')
+			.filter({ hasText: 'Only administrators can manage users.' })
 	).toBeVisible();
 
 	await memberSession.context.close();
@@ -116,16 +118,19 @@ test('filtering by user on /admin/devices narrows the listed devices', async ({
 	await adminApi.dispose();
 
 	await page.goto('/admin/devices');
-	await expect(page.getByText(userA.displayName).first()).toBeVisible();
-	await expect(page.getByText(userB.displayName).first()).toBeVisible();
+	const devices = page.getByRole('table', { name: 'Active devices' });
+	const userARow = devices.getByRole('row').filter({ hasText: userA.displayName });
+	const userBRow = devices.getByRole('row').filter({ hasText: userB.displayName });
+	await expect(userARow).toBeVisible();
+	await expect(userBRow).toBeVisible();
 
 	// Select userA in filter
 	await page.getByLabel('Filter by user').selectOption(userA.id);
-	await expect(page.getByText(userA.displayName).first()).toBeVisible();
-	await expect(page.getByText(userB.displayName)).toHaveCount(0);
+	await expect(userARow).toBeVisible();
+	await expect(userBRow).toHaveCount(0);
 
 	// Select All users
 	await page.getByLabel('Filter by user').selectOption('');
-	await expect(page.getByText(userA.displayName).first()).toBeVisible();
-	await expect(page.getByText(userB.displayName).first()).toBeVisible();
+	await expect(userARow).toBeVisible();
+	await expect(userBRow).toBeVisible();
 });

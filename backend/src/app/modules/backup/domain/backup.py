@@ -8,6 +8,7 @@ class BackupScope(StrEnum):
     """Content included in an archive."""
 
     INSTANCE = "instance"
+    USER = "user"
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -38,6 +39,7 @@ class BackupManifest:
     label: str
     created_at: datetime
     created_by: UUID
+    owner_id: UUID | None = None
     format: str = "ndjson"
     format_version: int = 1
     scope: BackupScope | str = BackupScope.INSTANCE

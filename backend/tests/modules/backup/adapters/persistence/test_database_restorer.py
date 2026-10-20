@@ -30,6 +30,28 @@ if TYPE_CHECKING:
 pytestmark = pytest.mark.integration
 
 
+@pytest.mark.parametrize("data", [b'{"large": "value"}\n', b'{"large": "value"}'])
+async def test_instance_restore_bounds_each_row_and_rolls_back(
+    snapshot_database: str, monkeypatch: pytest.MonkeyPatch, data: bytes
+) -> None:
+    """An oversized row aborts replacement without deleting the existing users."""
+    engine = create_async_engine(snapshot_database)
+    try:
+        await _seed(engine)
+        before = await _capture(engine)
+        monkeypatch.setattr(
+            "app.modules.backup.adapters.persistence.database_restorer.MAX_ROW_BYTES", 8
+        )
+        restorer = SqlAlchemyDatabaseRestorer(async_sessionmaker(engine))
+        with pytest.raises(CorruptBackupError, match="size limit"):
+            await restorer.restore_instance(
+                _members({"data/users.ndjson": data}), replace=True, setup_only=False
+            )
+        assert await _capture(engine) == before
+    finally:
+        await engine.dispose()
+
+
 async def _capture(engine: AsyncEngine) -> dict[str, bytes]:
     snapshot = SqlAlchemyDatabaseSnapshot(async_sessionmaker(engine))
     return {

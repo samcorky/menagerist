@@ -22,6 +22,11 @@ from app.entrypoints.api.shared.http.version_header import VersionHeaderMiddlewa
 from app.entrypoints.api.shared.permission_aware_route import cookie_scheme
 from app.entrypoints.api.spa import SpaStaticFiles
 from app.entrypoints.api.startup import lifespan
+from app.modules.backup.adapters.api.router import (
+    public_router as public_backup_router,
+    router as backup_router,
+)
+from app.modules.backup.adapters.api.user_router import router as user_backup_router
 from app.modules.collections.adapters.api.collection.router import (
     router as collection_router,
 )
@@ -62,6 +67,9 @@ api_v1_router = APIRouter(
 )
 public_v1_router = APIRouter(prefix="/v1", tags=["v1"])
 public_v1_router.include_router(public_auth_router)
+public_v1_router.include_router(public_backup_router)
+api_v1_router.include_router(backup_router)
+api_v1_router.include_router(user_backup_router)
 api_v1_router.include_router(graph_router)
 api_v1_router.include_router(edge_router)
 api_v1_router.include_router(node_type_router)

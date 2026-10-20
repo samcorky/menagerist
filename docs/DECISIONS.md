@@ -975,3 +975,15 @@ Open items from Stage 1; none is scheduled.
 - **Open idea, decided against (2026-10-11):** a readiness `warn` for "setup not completed" (see the 2026-10-11 entry).
 - **Stage 2:** sharing, through a sharing `AccessPolicy` and a wider SQL scope.
 - **OIDC and trusted-proxy sign-in** as further `Authenticator` adapters.
+
+---
+
+## Verified logical backups and portable user archives (2026-10-19)
+
+Backups belong to a separate bounded context, with shared application use cases for CLI, API and future schedulers. A logical NDJSON snapshot works in the distroless image without adding PostgreSQL client binaries and supports owner filtering for user exports. Database adapters reflect the live schema so pre-migration snapshots can record the revision that actually exists. Sessions and sign-in attempts are excluded; user archives also exclude account credentials.
+
+Archives and private staging files live on the persistent backup volume rather than the restricted `/tmp` tmpfs. Each member has a checksum, and instance archives have a separate compressed-byte digest. API uploads stream raw archive bodies without multipart buffering. Verification and revision checks precede restore writes; media compensation participates in the transaction so a failed restore leaves no partial database changes.
+
+Instance restore is exposed through the CLI and a public first-run route guarded by the same setup lock as first-administrator creation. There is no authenticated live restore route. CLI user transfers require an explicit account UUID, use that account as the scoped actor and keep archives in a private owner namespace.
+
+Automatic pre-migration backup remains opt-in (`MENAGERIST_BACKUP_BEFORE_MIGRATE=false` by default), preserving the existing deployment setting. When enabled, both migration entrypoints take a verified archive only for an existing schema with pending upgrades; a backup failure stops DDL. `--no-backup` is the explicit opt-out. Pre-migration retention is separate from ordinary backup retention, and restoring an old archive requires a database at its recorded revision.

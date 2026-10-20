@@ -11,6 +11,7 @@ from app.entrypoints.api.shared.http import upload_limit_middleware
 from app.entrypoints.api.shared.http.upload_limit_middleware import (
     UploadLimitMiddleware,
 )
+from app.platform.config.backup import BackupSettings
 from app.platform.config.media import MediaSettings
 
 if TYPE_CHECKING:
@@ -20,6 +21,28 @@ if TYPE_CHECKING:
 
 LIMIT = 1000
 ALLOWANCE = upload_limit_middleware._OVERHEAD_ALLOWANCE
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/api/v1/backup/upload", "/api/v1/backup/first-run-restore", "/api/v1/me/import"],
+)
+async def test_archive_uploads_use_backup_limit(
+    path: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Archive limits apply before authentication and have no multipart allowance."""
+    monkeypatch.setattr(
+        upload_limit_middleware,
+        "get_backup_settings",
+        lambda: BackupSettings(MENAGERIST_BACKUP_MAX_UPLOAD_SIZE=20),
+    )
+    sent, reads = await _call("POST", path, [(b"content-length", b"21")], [b"x"])
+    assert sent[0]["status"] == 413
+    assert reads == 0
+    sent, _ = await _call("POST", path, [], [b"x" * 11, b"y" * 11])
+    assert sent[0]["status"] == 413
+    sent, _ = await _call("POST", path, [], [b"x" * 20])
+    assert sent[0]["status"] == 204
 
 
 @pytest.fixture(autouse=True)

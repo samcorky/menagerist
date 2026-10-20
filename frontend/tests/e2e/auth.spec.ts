@@ -71,6 +71,19 @@ test('first visit goes to setup, creates the administrator and signs them in', a
 	await page.goto('/items');
 	await expect(page).toHaveURL(/\/setup$/);
 	await expect(page.getByRole('heading', { name: 'Welcome to Menagerist' })).toBeVisible();
+	await page.getByRole('button', { name: 'Restore from backup instead' }).click();
+	await expect(page.getByRole('heading', { name: 'Restore from backup' })).toBeVisible();
+	await page.getByLabel('Backup file').setInputFiles({
+		name: 'damaged.tar.gz',
+		mimeType: 'application/gzip',
+		buffer: Buffer.from('damaged backup')
+	});
+	await page.getByRole('button', { name: 'Restore backup', exact: true }).click();
+	await expect(
+		page.getByText('This backup could not be verified.', { exact: false })
+	).toBeVisible();
+	await expect(page.getByLabel('Backup file')).toBeFocused();
+	await page.getByRole('button', { name: 'Create an account instead' }).click();
 
 	await page.getByLabel('Your name').fill(ADMIN.name);
 	await page.getByLabel('Username').fill(ADMIN.username);
