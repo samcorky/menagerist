@@ -16,3 +16,10 @@ def test_is_system_only_for_the_system_actor() -> None:
     assert SYSTEM_ACTOR.is_system
     assert not Actor(id=uuid.uuid4(), roles=frozenset({"admin"})).is_system
     assert not ANONYMOUS_ACTOR.is_system
+
+
+def test_is_anonymous_only_for_the_anonymous_actor() -> None:
+    """Is anonymous only for the anonymous actor."""
+    assert ANONYMOUS_ACTOR.is_anonymous
+    assert not SYSTEM_ACTOR.is_anonymous
+    assert not Actor(id=uuid.uuid4(), roles=frozenset({"member"})).is_anonymous

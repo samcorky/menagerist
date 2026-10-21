@@ -54,7 +54,8 @@
 >
 	<Upload class="size-5 text-muted-foreground" />
 	<span class="text-muted-foreground">
-		Drop files here or <span class="text-foreground underline underline-offset-2">browse</span>
+		Drop {multiple ? 'files' : 'a file'} here or
+		<span class="text-foreground underline underline-offset-2">browse</span>
 	</span>
 	<input
 		bind:this={fileInputEl}

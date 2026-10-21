@@ -1,0 +1,117 @@
+import uuid
+
+import pytest
+
+from app.entrypoints.api.shared.access_guard import RoleAccessGuard, get_access_guard
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
+from app.modules.graph.application.permissions import GraphPermission
+from app.shared_kernel.access import (
+    Access,
+    Content,
+    OwnAccount,
+    Public,
+    Requires,
+    Shared,
+    System,
+)
+from app.shared_kernel.actor import ANONYMOUS_ACTOR, SYSTEM_ACTOR, Actor
+from app.shared_kernel.errors import ForbiddenError, NotFoundError
+
+MEMBER = Actor(id=uuid.uuid4(), roles=frozenset({"member"}))
+ADMIN = Actor(id=uuid.uuid4(), roles=frozenset({"admin"}))
+PERMISSION = GraphPermission.DELETE_NODE_TYPE
+ACTORS = {
+    "anonymous": ANONYMOUS_ACTOR,
+    "system": SYSTEM_ACTOR,
+    "member": MEMBER,
+    "admin": ADMIN,
+}
+OWNERSHIP_CHECKS = ("assert_can_view", "assert_can_modify", "assert_can_delete")
+
+
+class _Authorisation:
+    """Allows or denies everything and records the actions it was asked about."""
+
+    def __init__(self, *, allow: bool = True) -> None:
+        self.allow = allow
+        self.actions: list[str] = []
+
+    async def check(self, actor: Actor, action: str) -> None:
+        self.actions.append(action)
+        if not self.allow:
+            raise ForbiddenError("You do not have permission to do that.")
+
+
+# Stance -> the actors it allows, as in the spec's allow/refuse table.
+ALLOWED: dict[str, tuple[Access, set[str]]] = {
+    "public": (Public(), {"anonymous", "system", "member", "admin"}),
+    "system": (System(), {"system"}),
+    "own_account": (OwnAccount(), {"member", "admin"}),
+    "shared": (Shared(), {"system", "member", "admin"}),
+    "content": (Content(), {"system", "member", "admin"}),
+    "requires": (Requires(PERMISSION), {"system", "member", "admin"}),
+}
+
+
+@pytest.mark.parametrize("actor_name", list(ACTORS))
+@pytest.mark.parametrize("stance_name", list(ALLOWED))
+async def test_stance_table(stance_name: str, actor_name: str) -> None:
+    """Each stance allows and refuses exactly the actors in the spec."""
+    access, allowed = ALLOWED[stance_name]
+    guard = RoleAccessGuard(_Authorisation(), OwnerAccessPolicy())
+    if actor_name in allowed:
+        await guard.check(ACTORS[actor_name], access)
+    else:
+        with pytest.raises(ForbiddenError, match="do not have permission"):
+            await guard.check(ACTORS[actor_name], access)
+
+
+async def test_requires_denies_anonymous_before_any_permission_lookup() -> None:
+    """The anonymous actor never reaches the authorisation port."""
+    authorisation = _Authorisation(allow=True)
+    guard = RoleAccessGuard(authorisation, OwnerAccessPolicy())
+    with pytest.raises(ForbiddenError):
+        await guard.check(ANONYMOUS_ACTOR, Requires(PERMISSION))
+    assert authorisation.actions == []
+
+
+async def test_requires_delegates_to_the_authorisation_port() -> None:
+    """A member's permission is decided by the port, and its refusal propagates."""
+    allowing = _Authorisation(allow=True)
+    await RoleAccessGuard(allowing, OwnerAccessPolicy()).check(
+        MEMBER, Requires(PERMISSION)
+    )
+    assert allowing.actions == [PERMISSION]
+    denying = RoleAccessGuard(_Authorisation(allow=False), OwnerAccessPolicy())
+    with pytest.raises(ForbiddenError):
+        await denying.check(MEMBER, Requires(PERMISSION))
+
+
+@pytest.mark.parametrize("actor", list(ACTORS.values()), ids=list(ACTORS))
+def test_scope_matches_the_owner_policy(actor: Actor) -> None:
+    """The guard's scope is the policy's scope."""
+    policy = OwnerAccessPolicy()
+    assert RoleAccessGuard(_Authorisation(), policy).scope_for(actor) == (
+        policy.scope_for(actor)
+    )
+
+
+@pytest.mark.parametrize("name", OWNERSHIP_CHECKS)
+@pytest.mark.parametrize("actor", list(ACTORS.values()), ids=list(ACTORS))
+def test_ownership_checks_match_the_owner_policy(actor: Actor, name: str) -> None:
+    """Own, foreign and ownerless content get the policy's verdict."""
+    policy = OwnerAccessPolicy()
+    guard = RoleAccessGuard(_Authorisation(), policy)
+    for owner in (actor.id, MEMBER.id, None):
+        try:
+            getattr(policy, name)(actor, owner)
+        except NotFoundError:
+            with pytest.raises(NotFoundError):
+                getattr(guard, name)(actor, owner)
+        else:
+            getattr(guard, name)(actor, owner)
+
+
+def test_get_access_guard_is_process_wide() -> None:
+    """The same guard instance is returned each time."""
+    assert get_access_guard() is get_access_guard()

@@ -19,6 +19,11 @@ class Actor:
         """Whether this is the system actor."""
         return "system" in self.roles
 
+    @property
+    def is_anonymous(self) -> bool:
+        """Whether this is the anonymous actor."""
+        return "anonymous" in self.roles
+
 
 SYSTEM_ACTOR = Actor(id=uuid.UUID(int=0), roles=frozenset({"system"}))
 """Sentinel actor for background jobs and internal callers."""
