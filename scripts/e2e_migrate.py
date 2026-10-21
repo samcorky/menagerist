@@ -6,7 +6,8 @@ sets up its administrator through the real first-run endpoint.
 
 The ``auth`` project's database, menagerist_auth, is dropped and recreated on every
 run so it is always empty (auth.spec.ts drives first-run setup). No backend may be
-connected to it while this runs. Needs the e2e Postgres container
+connected to it while this runs. The ``cookies`` projects' database, menagerist_cookies,
+is recreated the same way, and when ``E2E_COOKIES=1`` it is the only one prepared. Needs the e2e Postgres container
 (``poe e2e-db-up``). N comes from ``E2E_WORKERS``, falling back to the CPU count.
 """
 
@@ -18,6 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 CONTAINER = "menagerist-e2e-db"
 AUTH_DB = "menagerist_auth"
+COOKIES_DB = "menagerist_cookies"
 URL = "postgresql+asyncpg://menagerist:menagerist@localhost:55433/{db}"
 
 
@@ -65,6 +67,10 @@ def prepare(db: str, *, fresh: bool = False) -> None:
 
 def main() -> None:
     """Create and migrate every worker database."""
+    if os.environ.get("E2E_COOKIES") == "1":
+        prepare(COOKIES_DB, fresh=True)
+        print(f"Migrated e2e database {COOKIES_DB} (empty)")
+        return
     names = [f"menagerist_w{i}" for i in range(worker_count())]
     with ThreadPoolExecutor() as pool:
         list(pool.map(prepare, names))

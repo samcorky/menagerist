@@ -15,6 +15,10 @@ export const BACKEND_PORT = Number(process.env.E2E_BACKEND_PORT ?? 8100);
 /** Backend port of the `auth` project (its own empty database, see auth.spec.ts). */
 export const AUTH_BACKEND_PORT = Number(process.env.E2E_AUTH_BACKEND_PORT ?? 8190);
 
+/** The `cookies` projects' backend (plain HTTP) and the TLS proxy in front of it (see tls-proxy.mjs). */
+export const COOKIES_BACKEND_PORT = Number(process.env.E2E_COOKIES_BACKEND_PORT ?? 8191);
+export const COOKIES_TLS_PORT = Number(process.env.E2E_COOKIES_TLS_PORT ?? 8192);
+
 export type Credentials = { username: string; displayName: string; password: string };
 
 /** The administrator every worker database is set up with (the password is the stable constant). */

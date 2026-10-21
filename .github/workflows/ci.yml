@@ -121,6 +121,13 @@ jobs:
       - name: Run end-to-end tests
         run: uv run poe test-e2e
 
+      - name: Install WebKit and Firefox and their system libraries
+        run: npx playwright install --with-deps webkit firefox
+        working-directory: frontend
+
+      - name: Run cookie tests in WebKit and Firefox
+        run: uv run poe test-e2e-cookies --skip-build
+
       - name: Upload failure traces
         if: failure()
         uses: actions/upload-artifact@v4

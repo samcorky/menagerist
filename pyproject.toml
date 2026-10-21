@@ -59,6 +59,12 @@ interpreter = ["powershell", "posix"]
 cwd = "frontend"
 help = "Download the Chromium build the Playwright e2e suite drives (no-op once installed)"
 
+[tool.poe.groups.setup.tasks.install-e2e-cookie-browsers]
+shell = "npx playwright install webkit firefox"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Download the WebKit and Firefox builds that the cookie e2e specs (test-e2e-cookies) drive (no-op once installed)"
+
 [tool.poe.groups.setup.tasks.install-e2e-deps]
 # sudo needs a real terminal to prompt, which a poe subprocess doesn't get, and it
 # resets PATH (picking root's older Node). So print the command rather than run it.
@@ -307,6 +313,14 @@ args = [
   { name = "skip_build", options = ["--skip-build"], type = "boolean", help = "Reuse the existing frontend/build (only when it is current)" },
 ]
 help = "Run the Playwright e2e suite in parallel against a throwaway Postgres, building the frontend first and tearing the database down afterwards (requires Docker)"
+
+[tool.poe.groups.quality.tasks.test-e2e-cookies]
+script = "scripts.e2e:main(skip_build=skip_build, mode='cookies')"
+deps = ["generate-frontend-client"]
+args = [
+  { name = "skip_build", options = ["--skip-build"], type = "boolean", help = "Reuse the existing frontend/build (only when it is current)" },
+]
+help = "Run only the session-cookie specs in Chromium, WebKit and Firefox, against their own backend behind a TLS proxy (needs Docker, openssl and poe install-e2e-cookie-browsers)"
 
 [tool.poe.groups.quality.tasks.test-e2e-headed]
 script = "scripts.e2e:main(workers=workers, skip_build=skip_build, mode='headed')"
