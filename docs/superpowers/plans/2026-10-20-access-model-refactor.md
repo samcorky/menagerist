@@ -1,159 +1,206 @@
-# Access model refactor: declared access stances, one guard, fewer handler bases
+# Access Model Refactor Implementation Plan
 
-Status: proposal, nothing implemented; names and open questions below are not confirmed by Sam. Written 2026-10-20 from a design discussion. Facts come from `shared_kernel/cqrs.py`, `shared_kernel/actor.py`, `entrypoints/api/shared/{authorization,permissions,dependencies,access_policy,permission_aware_route}.py`, `tests/architecture/test_permission_catalogue.py`, three example use cases (`graph/application/{update_node,get_node,delete_node_type}.py`) and a count of every use case class in `modules/*/application/`. The sketches are not compiled or type-checked.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Related plans: `api-tokens-and-permissions-plan.md` (this plan is its foundation; it replaces that plan's Phase 1 rename and shapes its Phase 2), `csrf-header-protection-plan.md` (independent), `settings-handoff-plan.md` (independent).
+**Goal:** Every use case declares who may call it (`access = ...`), and one `final` method behind one `AccessGuard` enforces it, with no behaviour change.
 
-Working rules (from `AGENTS.md` / `CLAUDE.md`): never create, stage or push commits (ask Sam to commit); British English; `.svelte` and `.svelte.ts` files go through the `svelte-file-editor` subagent; run only the relevant `poe` checks for touched code (`poe lint-backend`, `poe typecheck-backend` (mypy --strict), `poe test-backend`, `poe coverage` before calling backend work done); coverage floors (domain, application, shared_kernel 100%, adapters 80%, platform 70%); every port ships an in-memory sibling; domain errors subclass `shared_kernel.errors`; no try/except in routers; the clone is read-only here, so deliver complete files for Sam to commit. Beware: running Python from inside `backend/src/app/modules` fails, because the `collections` module there shadows the standard library; run scripts from elsewhere with `python3 -I`.
+**Architecture:** New `Guarded*` bases and an `AccessGuard` are added beside the old bases. Modules migrate one at a time (old and new coexist, tests green after each), then the old bases are deleted and `Guarded*` takes the final names `UseCase`/`CommandHandler`/`QueryHandler`.
 
-## Goal
+**Tech Stack:** Python 3.14, FastAPI, pytest, mypy --strict, archunitpython, `poe` tasks.
 
-Every use case declares, in one explicit and test-enforced way, who may call it. Authorisation (permission, ownership filter, session-only) is enforced in one `final` method behind one guard. Persistence (unit of work, repos, other ports) stays a separate concern. This makes "forgot to add a check" impossible, gives API tokens their session-only rule for free, and gives resource-level permissions and sharing a single place to change later.
+**Spec:** `docs/superpowers/specs/2026-10-21-access-model-refactor-design.md` (stances, decisions, stance inventory). Read it first; this plan does not repeat it.
 
-## What exists today (class counts in `application/`)
+## Global Constraints
 
-| Base | Count | Used for |
-|---|---|---|
-| `UseCase` | 3 | system health and version (no persistence, no check) |
-| `CommandHandler` | 21 | sign-in, sign-out, set-up, own-account changes, graph type create/update, presets, "claim orphaned" jobs (a UoW, no check) |
-| `QueryHandler` | 11 | set-up status, own sessions, type and preset reads (repos, no check) |
-| `ScopedCommandHandler` / `ScopedQueryHandler` | 26 / 17 | items, media, collections, examples (ownership through `AccessPolicy`, called by hand) |
-| `AuthorisedUseCase` | 6 | backup (permission check, no UoW) |
-| `AuthorisedCommandHandler` / `AuthorisedQueryHandler` | 10 / 4 | admin identity, graph schema deletion and purge, system detail (permission check, UoW or repos) |
+- Never run `git add`, `git commit` or push. Every "Stop" step means: tell Sam what changed and ask them to commit.
+- British English in code, comments and docs (`Authorisation`, not `Authorization`) except the HTTP `Authorization` header, which must not change.
+- Comments short and only where intent is unclear; Google-style docstrings.
+- Run only relevant checks: `poe lint-backend`, `poe typecheck-backend` (mypy --strict), `poe test-backend`; `poe coverage` before calling the work done. Floors: domain, application, shared_kernel 100%; adapters 80%; platform 70%.
+- Entity and mixin dataclasses use `kw_only=True, eq=False`; frozen value dataclasses as in `shared_kernel/access_scope.py`.
+- Do not run Python from inside `backend/src/app/modules` (its `collections` package shadows the standard library); use `uv run python -I` from `backend/`.
+- No behaviour change: an HTTP or CLI caller that succeeded before succeeds now, and vice versa.
 
-Problems this plan fixes:
-1. "Plain" `CommandHandler`/`QueryHandler` mean three things: public pre-sign-in flows, own-account actions, and shared catalogue content. "Deliberately open" and "forgot the check" look identical.
-2. The permission check is automatic (`handle()` is `@final`, subclasses write `_handle()`); the ownership check is manual in each scoped use case (`policy.scope_for`, `assert_can_modify`). Scoped and plain handlers override `handle()` directly.
-3. A use case cannot need both a permission and a content filter through the base classes (`DeleteNodeType` builds `AccessScope.everyone()` by hand).
-4. Three persistence-free variants exist because the other bases force a UoW or repos. Those use cases do not have "no dependencies": they take ports such as `BackupStore`, `DatabaseSnapshot`, `MediaFiles`, `HealthCheckPort`, `AppInfoPort`.
-5. Spelling: `Authorised*` classes but `AuthorizationPort` and `RoleAuthorizationAdapter` (British English rule).
-6. To verify: graph node and edge type create/update use plain `CommandHandler`, so any signed-in member can change the shared schema. Intended?
+## Review Focus
 
-## Target design
+1. Anonymous actor against `Requires` when `MEMBER_PERMISSIONS` is later non-empty: must be denied before any permission lookup (Task 3).
+2. `SYSTEM_ACTOR` calling an `OwnAccount` use case is denied; CLI flows that use `SYSTEM_ACTOR` must only hit `System`, `Shared`, `Content` or `Requires` use cases (Tasks 3, 6).
+3. A non-`Content` use case calling `self.scope(actor)` raises `TypeError` (Task 4).
+4. A subclass overriding `handle`, or a concrete use case with no `access`, fails an architecture test (Task 5).
+5. The `Public`/`System`/`Shared` sets are pinned by name; adding one without editing the pin fails (Task 5).
+6. `PermissionAwareRoute` finds use cases by the old base classes and reads `required_permission`, so a migrated use case would silently drop out of the OpenAPI docs, and `test_cross_user_isolation.py` (which treats `x-required-permission` as "admin only, skip") would start testing admin routes as member routes. The documented operations must be identical before and after (Task 5a).
 
-Declarations (in `shared_kernel/access.py`):
-```python
-@dataclass(frozen=True)
-class Public: ...                  # anyone, including signed out (sign-in, set-up, health)
-@dataclass(frozen=True)
-class OwnAccount: ...              # any signed-in session actor acting on themselves
-@dataclass(frozen=True)
-class Requires[P: StrEnum]:        # a permission, no ownership filtering (admin work, shared catalogue)
-    permission: P
-@dataclass(frozen=True)
-class Content[P: StrEnum]:         # a permission plus the content filter (items, media, collections)
-    permission: P
+---
 
-Access = Public | OwnAccount | Requires[Any] | Content[Any]
-```
-Possible fifth stance for background and CLI jobs (see Q4).
+## File structure
 
-Guard (replaces separate `AuthorizationPort` and `AccessPolicy` injections; ships an in-memory sibling):
-```python
-class AccessGuard(Protocol):
-    async def check(self, actor: Actor, access: Access) -> None: ...
-    def scope_for(self, actor: Actor) -> ContentFilter: ...
-    def assert_can_view(self, actor: Actor, owner_id: UUID | None) -> None: ...
-    def assert_can_modify(self, actor: Actor, owner_id: UUID | None) -> None: ...
-```
-`check()` rules: `Public` allows (the actor is not looked at, so probes can pass the anonymous actor); `OwnAccount` requires a signed-in session actor (`actor.grants is None` once tokens exist, so tokens are refused here); `Requires` and `Content` require the role to grant the permission and, for a token actor, the token to grant it too.
+- Create `backend/src/app/shared_kernel/access.py`: the stance dataclasses and the `Access` union.
+- Create `backend/src/app/shared_kernel/access_guard.py`: `AccessGuard` Protocol and `InMemoryAccessGuard`.
+- Create `backend/src/app/shared_kernel/guarded.py`: `GuardedUseCase`, `GuardedCommandHandler`, `GuardedQueryHandler` (temporary names).
+- Create `backend/src/app/entrypoints/api/shared/access_guard.py`: `RoleAccessGuard`, `get_access_guard`.
+- Modify `entrypoints/api/shared/permission_aware_route.py` (Tasks 5a and 7); create `tests/entrypoints/api/shared/test_openapi_permissions_pinned.py`.
+- Modify `shared_kernel/actor.py` (`is_anonymous`), `entrypoints/api/shared/dependencies.py`, every module's `adapters/api/dependencies.py` and CLI wiring, every `application/*.py` use case.
+- Delete at the end: the old bases in `shared_kernel/cqrs.py`, `shared_kernel/access_policy.py`, `entrypoints/api/shared/access_policy.py` (folded into the guard).
+- Tests: `tests/shared_kernel/test_access.py`, `test_access_guard.py`, `test_guarded.py` (new); `tests/architecture/test_access_stances.py` (new); update `test_cqrs.py`, `test_access_scope_rules.py` (renamed in Task 1), `test_permission_catalogue.py`.
 
-Three bases (root plus two thin persistence layers):
-```python
-class UseCase[TRequest, TResult](ABC):
-    access: ClassVar[Access]            # a concrete subclass without it cannot be built
-    _guard: AccessGuard
+---
 
-    @final
-    async def handle(self, request: TRequest, actor: Actor) -> TResult:
-        await self._guard.check(actor, self.access)
-        return await self._handle(request, actor)
+### Task 1: Rename `AccessScope` to `ContentFilter`
 
-    @abstractmethod
-    async def _handle(self, request: TRequest, actor: Actor) -> TResult: ...
+**Files:** Rename `shared_kernel/access_scope.py` -> `content_filter.py`, `tests/shared_kernel/test_access_scope.py` -> `test_content_filter.py`, `tests/architecture/test_access_scope_rules.py` -> `test_content_filter_rules.py`; modify the ~148 files that mention `AccessScope` or `access_scope`.
 
-    def scope(self, actor: Actor) -> ContentFilter:
-        assert isinstance(self.access, Content)   # only Content use cases may filter by owner
-        return self._guard.scope_for(actor)
+**Interfaces:**
+- Produces: `app.shared_kernel.content_filter.ContentFilter` with the same members (`user_id`, `of`, `everyone`, `is_everyone`, `covers`). Variable and parameter names such as `scope` stay.
 
-class CommandHandler[TUoW, TCommand, TResult](UseCase[TCommand, TResult], ABC):
-    def __init__(self, uow: TUoW, guard: AccessGuard) -> None: ...   # adds the commit boundary
+- [ ] **Step 1: Rename the three files** with `mv` (no git commands).
+- [ ] **Step 2: Replace identifiers** across `backend/` and `docs/`: `AccessScope` -> `ContentFilter`, `access_scope` -> `content_filter`, `test_access_scope_rules` -> `test_content_filter_rules`. Use a single `sed -i` over `grep -rl` results; skip `.venv`, `node_modules`, `__pycache__`, and the `frontend/src/lib/api/generated/` directory.
+- [ ] **Step 3: Verify nothing remains:** `grep -rn "AccessScope\|access_scope" backend docs AGENTS.md` returns no hits except historical notes in `docs/superpowers/plans/` and `docs/DECISIONS.md`; leave those.
+- [ ] **Step 4: Run** `poe lint-backend && poe typecheck-backend && poe test-backend`. Expected: all pass.
+- [ ] **Step 5: Stop.** Ask Sam to commit ("refactor: rename AccessScope to ContentFilter").
 
-class QueryHandler[TRepos, TQuery, TResult](UseCase[TQuery, TResult], ABC):
-    def __init__(self, repos: TRepos, guard: AccessGuard) -> None: ...  # repos, no commit
-```
-Persistence-free use cases (backup, system) extend `UseCase` directly and inject their own ports plus `guard`; `AuthorisedUseCase` disappears.
+### Task 2: British spelling for the authorisation port
 
-How existing classes read:
-```python
-class GetNode(QueryHandler[GraphRepos, GetNodeQuery, Node]):
-    access = Content(GraphPermission.READ_NODE)
+**Files:** `shared_kernel/authorization.py` -> `authorisation.py`; `entrypoints/api/shared/authorization.py` -> `authorisation.py`; `tests/shared_kernel/test_authorization_port.py` -> `test_authorisation_port.py`; ~52 referencing files.
 
-class DeleteNodeType(CommandHandler[GraphUnitOfWork, DeleteNodeTypeCommand, None]):
-    access = Requires(GraphPermission.DELETE_NODE_TYPE)     # was AuthorisedCommandHandler
+**Interfaces:**
+- Produces: `AuthorisationPort`, `RoleAuthorisationAdapter`, `get_authorisation_port`, `get_role_authorisation`, modules `app.shared_kernel.authorisation` and `app.entrypoints.api.shared.authorisation`. The `check(actor, action)` signature is unchanged.
 
-class SignIn(CommandHandler[IdentityUoW, SignInCommand, SignInResult]):
-    access = Public()
+- [ ] **Step 1: Rename files and replace identifiers:** `AuthorizationPort`, `RoleAuthorizationAdapter`, `get_authorization_port`, `get_role_authorization`, `shared_kernel.authorization`, `shared.authorization`, and constructor parameter names `authorization`/`_authorization` where they refer to the port (leave any `Authorization` HTTP header, `authorization` in test headers and OpenAPI text untouched; review the diff for those).
+- [ ] **Step 2: Run** `poe lint-backend && poe typecheck-backend && poe test-backend`. Expected: pass.
+- [ ] **Step 3: Stop.** Ask Sam to commit ("refactor: use British spelling for the authorisation port").
 
-class ChangePassword(CommandHandler[IdentityUoW, ChangePasswordCommand, None]):
-    access = OwnAccount()
+### Task 3: Stances, `AccessGuard`, `RoleAccessGuard`
 
-class ListBackups(UseCase[ListBackupsQuery, list[Backup]]):
-    access = Requires(BackupPermission.READ)
-    def __init__(self, store: BackupStore, guard: AccessGuard) -> None: ...
+**Files:** Create `shared_kernel/access.py`, `shared_kernel/access_guard.py`, `entrypoints/api/shared/access_guard.py`; modify `shared_kernel/actor.py`, `entrypoints/api/shared/dependencies.py`; tests `tests/shared_kernel/test_access.py`, `tests/shared_kernel/test_access_guard.py`, `tests/entrypoints/api/shared/test_access_guard.py`, `tests/shared_kernel/test_actor.py`.
 
-class GetVersion(UseCase[GetVersionQuery, AppInfo]):
-    access = Public()
-```
-Per-module typing: keep the old `TPermission` cross-module protection with a thin helper per module, for example `def graph(p: GraphPermission) -> Content[GraphPermission]`, so a graph use case cannot declare a backup permission.
+**Interfaces:**
+- Produces in `access.py`: frozen dataclasses `Public`, `System`, `OwnAccount`, `Shared`, `Content` (no fields) and `Requires(permission: StrEnum)`; `Access = Public | System | OwnAccount | Shared | Content | Requires`.
+- Produces in `Actor`: `is_anonymous` property (`"anonymous" in roles`).
+- Produces in `access_guard.py`: `class AccessGuard(Protocol)` with `async def check(self, actor: Actor, access: Access) -> None`, `scope_for(self, actor: Actor) -> ContentFilter`, `assert_can_view / assert_can_modify / assert_can_delete(self, actor: Actor, owner_id: uuid.UUID | None) -> None`; and `class InMemoryAccessGuard` with the same methods that records `checked: list[tuple[Actor, Access]]` and takes `deny: bool = False` (raises `ForbiddenError` from `check` when true), `scope_for` returning `ContentFilter.of(actor.id)` (everyone for the system actor), `assert_can_*` delegating to an `OwnerAccessPolicy`-equivalent rule (own content or system).
+- Produces in `entrypoints/api/shared/access_guard.py`: `class RoleAccessGuard(authorisation: AuthorisationPort, policy: AccessPolicy)` implementing `AccessGuard`, and `get_access_guard() -> AccessGuard` returning one process-wide instance built from `get_authorisation_port()` and `OwnerAccessPolicy()`.
 
-Design notes:
-- Every use case's `_handle` replaces `handle`; the signature test (`tests/shared_kernel/test_cqrs.py`) must forbid overriding `handle`, allow `guard` in any constructor, and require `access` on every concrete class.
-- Session-only for API tokens falls out of the stances: `Public` and `OwnAccount` are never granted to tokens. Permissions still need a "grantable to tokens" flag in the catalogue (see the tokens plan).
-- Resource-level readiness: handlers only call `self.scope(actor)` and `guard.assert_can_*`, so sharing and per-token resource limits later change the guard, the policy and the repositories, not 43 handlers.
+- [ ] **Step 1: Write failing tests** in `tests/entrypoints/api/shared/test_access_guard.py` (parametrised over actors `ANONYMOUS_ACTOR`, `SYSTEM_ACTOR`, a member `Actor(roles={"member"})`, an admin) asserting the allow/refuse table in the spec for every stance, plus:
+  - `Requires(p)` for the anonymous actor raises `ForbiddenError` even when the injected authorisation allows everything (Review Focus 1);
+  - `Requires(p)` for a member delegates to the authorisation port and propagates its `ForbiddenError`;
+  - `scope_for`, `assert_can_view/modify/delete` give the same results as `OwnerAccessPolicy` for the same inputs.
+  In `test_access_guard.py`: `InMemoryAccessGuard` records the checked pairs and raises when `deny=True`. In `test_actor.py`: `ANONYMOUS_ACTOR.is_anonymous` is true, the others false.
+- [ ] **Step 2: Run** `poe test-backend -- tests/shared_kernel tests/entrypoints/api/shared -q`. Expected: FAIL (modules missing).
+- [ ] **Step 3: Implement** the interfaces above. `RoleAccessGuard.check` is a `match` over the stance type: `Public` returns; `System` requires `actor.is_system`; `OwnAccount` requires not anonymous and not system; `Shared`/`Content` require not anonymous; `Requires` requires not anonymous, then `await authorisation.check(actor, access.permission)`. Every refusal raises `ForbiddenError("You do not have permission to do that.")`. `scope_for` and `assert_can_*` delegate to `policy`.
+- [ ] **Step 4: Run** the same command. Expected: PASS; then `poe typecheck-backend`.
+- [ ] **Step 5: Stop.** Ask Sam to commit ("feat(access): add access stances and the access guard").
 
-## Phases (each shippable on its own; run the relevant `poe` checks after each)
+### Task 4: `Guarded*` bases
 
-### Phase 1: mechanical renames (no behaviour change)
-- `AccessScope` -> `ContentFilter` (suggested), so "scope" is free for token scopes; update the ~53 files that mention it, `tests/architecture/test_access_scope_rules.py` (rename too), docs wording.
-- `AuthorizationPort` / `RoleAuthorizationAdapter` / `get_authorization_port` -> British spelling (`Authorisation...`). Separate commit or PR from the first rename.
-- `Scoped*Handler` keeps its name until Phase 4 (it disappears there).
-- **Checkpoint Q1:** final names.
+**Files:** Create `shared_kernel/guarded.py`; test `tests/shared_kernel/test_guarded.py`.
 
-### Phase 2: declare access on today's classes (still no behaviour change)
-- Add `access = ...` to every use case on the existing bases, using the stance names above as plain declarations (the `Access` types and an `ACCESS` marker only; nothing enforces them yet except the test).
-- Architecture test: every concrete `UseCase` subclass in `application/` declares `access`; a `Requires`/`Content` permission is in the catalogue; the `Public` list is small and explicit and reviewed by Sam; `Content` use cases are the ones that use the scoped bases today.
-- This is where the unverified question lands: decide per use case whether graph type create/update, presets and the shared catalogue are `Requires(...)` (need a new permission) or stay open to members (`Content`/new `Shared`?). **Checkpoint Q2.**
-- Flush out classes that have no obvious stance (system-actor jobs, CLI-only flows). **Checkpoint Q4.**
+**Interfaces:**
+- Consumes: `Access`, `Content`, `AccessGuard`, `ContentFilter`.
+- Produces: `GuardedUseCase[TRequest, TResult]` (ABC): `access: ClassVar[Access]`; `__init__` is left to subclasses but they must set `self._guard: AccessGuard`; `@final async def handle(self, request, actor) -> TResult` doing `await self._guard.check(actor, self.access)` then `return await self._handle(request, actor)`; `@abstractmethod async def _handle(...)`; `def scope(self, actor: Actor) -> ContentFilter` that raises `TypeError` unless `isinstance(self.access, Content)`, else `self._guard.scope_for(actor)`.
+  `GuardedCommandHandler[TUoW, TCommand, TResult]`: `__init__(self, uow: TUoW, guard: AccessGuard)` setting `_uow`, `_guard`. `GuardedQueryHandler[TRepos, TQuery, TResult]`: `__init__(self, repos: TRepos, guard: AccessGuard)` setting `_repos`, `_guard`.
 
-### Phase 3: introduce the guard and the new bases beside the old ones
-- `AccessGuard` protocol, a real implementation that wraps `RoleAuthorizationAdapter` and `OwnerAccessPolicy`, and an in-memory sibling for tests.
-- New `UseCase`/`CommandHandler`/`QueryHandler` in `shared_kernel/cqrs.py` under temporary names or a new module while the old ones remain; the composition root provides one guard everywhere.
-- Unit tests for each stance with fake actors: public with the anonymous actor; own-account with and without a session; permission present/absent; content stance exposes `scope()` and other stances assert.
+- [ ] **Step 1: Write failing tests** (using `InMemoryAccessGuard`): `handle` checks `(actor, cls.access)` before `_handle` runs and a denying guard stops `_handle` (assert it did not run); command handler stores `_uow` and `_guard`; query handler stores `_repos` and `_guard`; `scope()` returns the guard's filter for a `Content` use case and raises `TypeError` for `Shared`, `Public`, `Requires` (Review Focus 3).
+- [ ] **Step 2: Run** `poe test-backend -- tests/shared_kernel/test_guarded.py -q`. Expected: FAIL.
+- [ ] **Step 3: Implement** the interfaces. Keep `cqrs.py` untouched.
+- [ ] **Step 4: Run** the test and `poe typecheck-backend`. Expected: PASS.
+- [ ] **Step 5: Stop.** Ask Sam to commit ("feat(access): add guarded use case bases").
 
-### Phase 4: migrate module by module (old and new bases coexist)
-Order (smallest and most self-contained first): system, backup (persistence-free), identity, presets and examples, collections, media, graph. For each class: change the base, move the body to `_handle`, replace `self._policy` with `self.scope(actor)` and `self._guard`, update the constructor and its unit test. After each module: `poe lint-backend`, `poe typecheck-backend`, `poe test-backend`; `poe coverage` at the end of the phase.
+### Task 5: Architecture tests for stances
 
-### Phase 5: remove the old bases
-- Delete `ScopedCommandHandler`, `ScopedQueryHandler`, `AuthorisedUseCase`, `AuthorisedCommandHandler`, `AuthorisedQueryHandler`, `_PolicyHolder`, `_PermissionGate` and the old tests. Update `AGENTS.md`, `backend/README.md` and `docs/DECISIONS.md` (new entry), `ARCHITECTURE.md` if it names the bases.
+**Files:** Create `tests/architecture/test_access_stances.py`; modify `tests/architecture/test_permission_catalogue.py`.
 
-### Phase 6 (later, with sharing or per-resource tokens): resource-level access
-Not part of this refactor; it is what this refactor prepares for. Needed then:
-- `ContentFilter` becomes a predicate ("owned by me OR shared with me OR in my token's allowed set") and repositories translate it (share table join, indexes).
-- `assert_can_view/modify(actor, owner_id)` becomes `assert_can_*(actor, resource_ref)` with id and kind so the policy can look up shares.
-- Decide inheritance (does sharing a collection share its items and media?), share management endpoints, the effect of deleting a user on their shares, and per-token resource limits (intersect the filter).
-- Sam said (2026-10-20) resource-level permissions are wanted later.
+**Interfaces:**
+- Consumes: `GuardedUseCase` and the `Access` types; module discovery as in `test_permission_catalogue._use_cases()`.
 
-## Risks
-- Phase 4 touches about 100 classes. Mitigation: module-by-module, old and new bases coexist, tests green after each.
-- A wrong stance silently changes who can call something. Mitigation: Phase 2 records today's behaviour first (stance = what it does now), the architecture test lists all `Public` use cases, and member-can-still-do-everything tests exist before Phase 4.
-- `scope()` asserting at call time catches misuse at test time, not type-check time. Accept, or split `ContentCommandHandler` and `ContentQueryHandler` subclasses if static checking is wanted (Q3).
-- Constructor changes ripple into the composition root and every unit test that builds a handler.
+- [ ] **Step 1: Write the tests** (they pass trivially now, because no use case is guarded yet; they bite as modules migrate):
+  - every concrete (non-abstract) `GuardedUseCase` subclass in `app.modules.*.application` has `access` as an `Access` instance (`"access" in vars(cls)` somewhere in the MRO below `GuardedUseCase`);
+  - no concrete `GuardedUseCase` subclass defines `handle` in its own `__dict__` (Review Focus 4);
+  - `Requires` permissions are in `ALL_PERMISSIONS` and are members of an enum defined in the same module's `application.permissions`;
+  - `Public`, `System` and `Shared` sets are pinned: three `frozenset[str]` constants of `module.ClassName` strings (`EXPECTED_PUBLIC`, `EXPECTED_SYSTEM`, `EXPECTED_SHARED`), start empty, filled by the module tasks; the test asserts the actual sets equal them (Review Focus 5);
+  - `Content` use cases are exactly those on the old `Scoped*` bases before migration. Express this as the pin `EXPECTED_CONTENT`, also filled by the module tasks.
+- [ ] **Step 2: Run** `poe test-backend -- tests/architecture -q`. Expected: PASS (vacuous).
+- [ ] **Step 3: Stop.** Ask Sam to commit ("test(access): enforce access stances on every use case").
 
-## Open questions
-- **Q1:** final names (`ContentFilter`, `Access`, `Public`/`OwnAccount`/`Requires`/`Content`, `AccessGuard`).
-- **Q2:** are graph node/edge type create/update, presets and other shared catalogue operations meant to be open to every member, and under which stance (`Requires` with a new member-held permission, or a dedicated `Shared` stance)?
-- **Q3:** enforce "only Content use cases may call `scope()`" at runtime (assert) or by separate base classes?
-- **Q4:** background jobs and CLI flows that run as `SYSTEM_ACTOR` (`ClaimOrphaned*`, `CleanupExpiredMedia`, `PruneBackups`, others): a `System` stance, or `Requires` with a permission only the system holds?
-- **Q5:** one `AccessGuard` object, or keep two injections (authorisation and policy)? One is simpler to inject; two keeps the existing ports.
-- **Q6:** should `Public` use cases still take a guard for uniformity, or is a guard-less `PublicUseCase` simpler for health probes?
+### Task 5a: Keep `PermissionAwareRoute` working across the migration
+
+`PermissionAwareRoute` (`entrypoints/api/shared/permission_aware_route.py`) documents permissions in OpenAPI and passes today (`test_permission_aware_route.py`, `test_auth_router.py::test_openapi_documents_the_new_responses_and_permissions`, the Swagger e2e spec). It only documents; it enforces nothing, and it stays that way. Only `Requires` use cases are documented, exactly as `Authorised*` ones are today.
+
+**Files:** Modify `permission_aware_route.py`; create `tests/entrypoints/api/shared/test_openapi_permissions_pinned.py`; extend `tests/entrypoints/api/shared/test_permission_aware_route.py`.
+
+**Interfaces:**
+- Produces: `_find_use_case_type(endpoint)` recognises both the legacy `UseCase`/`CommandHandler` and `GuardedUseCase`/`GuardedCommandHandler`, still preferring a command handler of either kind; `_permission_value` input comes from `required_permission` (legacy) or from `access.permission` when `access` is a `Requires`. No other stance adds a description, `x-required-permission` or `Security` dependency.
+
+- [ ] **Step 1: Pin today's output before touching anything.** Create `test_openapi_permissions_pinned.py` with `EXPECTED: dict[tuple[str, str], str]` mapping `(path, method)` to the permission value for every operation in `create_app().openapi()["paths"]` that has `x-required-permission` (generate it once with `uv run python -I` from `backend/`, then paste it as a literal). The test asserts the live mapping equals `EXPECTED`, and that every other operation has no `x-required-permission` and no "Requires permission" in its description. Run it: PASS.
+- [ ] **Step 2: Write failing tests** in `test_permission_aware_route.py` with dummy guarded use cases and `InMemoryAccessGuard`: `_find_use_case_type` returns a `GuardedCommandHandler` over a `GuardedQueryHandler` in either parameter order; a `Requires(Permission.GRAPH_READ)` use case produces the same `x-required-permission`, description line and `APIKeyCookie` security as the legacy `DocumentedUseCase`; `Public()`, `System()`, `OwnAccount()`, `Shared()` and `Content()` use cases produce no `x-required-permission`, no extra description and no `security`.
+- [ ] **Step 3: Run** `poe test-backend -- tests/entrypoints/api/shared/test_permission_aware_route.py -q`. Expected: the guarded cases FAIL.
+- [ ] **Step 4: Implement** the interfaces: accept a tuple of base classes in the `issubclass` checks, and add `_declared_permission(use_case_cls)` returning `access.permission` for `Requires`, else the legacy `required_permission` attribute, else `None`.
+- [ ] **Step 5: Run** the two test files above, `tests/entrypoints/test_cross_user_isolation.py` and `poe typecheck-backend`. Expected: PASS.
+- [ ] **Step 6: Stop.** Ask Sam to commit ("feat(openapi): document Requires stances in PermissionAwareRoute").
+
+### Task 5a: Keep `PermissionAwareRoute` working across the migration
+
+`PermissionAwareRoute` (`entrypoints/api/shared/permission_aware_route.py`) documents permissions in OpenAPI and passes today (`test_permission_aware_route.py`, `test_auth_router.py::test_openapi_documents_the_new_responses_and_permissions`, the Swagger e2e spec). It only documents; it enforces nothing, and it stays that way. Only `Requires` use cases are documented, exactly as `Authorised*` ones are today.
+
+**Files:** Modify `permission_aware_route.py`; create `tests/entrypoints/api/shared/test_openapi_permissions_pinned.py`; extend `tests/entrypoints/api/shared/test_permission_aware_route.py`.
+
+**Interfaces:**
+- Produces: `_find_use_case_type(endpoint)` recognises both the legacy `UseCase`/`CommandHandler` and `GuardedUseCase`/`GuardedCommandHandler`, still preferring a command handler of either kind; the permission comes from `required_permission` (legacy) or from `access.permission` when `access` is a `Requires`. No other stance adds a description, `x-required-permission` or `Security` dependency.
+
+- [ ] **Step 1: Pin today's output before touching anything.** Create `test_openapi_permissions_pinned.py` with `EXPECTED: dict[tuple[str, str], str]` mapping `(path, method)` to the permission value for every operation in `create_app().openapi()["paths"]` that has `x-required-permission` (generate it once with `uv run python -I` from `backend/`, then paste it as a literal). The test asserts the live mapping equals `EXPECTED`, and that every other operation has no `x-required-permission` and no "Requires permission" in its description. Run it: PASS.
+- [ ] **Step 2: Write failing tests** in `test_permission_aware_route.py` with dummy guarded use cases and `InMemoryAccessGuard`: `_find_use_case_type` returns a `GuardedCommandHandler` over a `GuardedQueryHandler` in either parameter order; a `Requires(Permission.GRAPH_READ)` use case produces the same `x-required-permission`, description line and `APIKeyCookie` security as the legacy `DocumentedUseCase`; `Public()`, `System()`, `OwnAccount()`, `Shared()` and `Content()` use cases produce no `x-required-permission`, no extra description and no `security`.
+- [ ] **Step 3: Run** `poe test-backend -- tests/entrypoints/api/shared/test_permission_aware_route.py -q`. Expected: the guarded cases FAIL.
+- [ ] **Step 4: Implement** the interfaces: accept a tuple of base classes in the `issubclass` checks, and add `_declared_permission(use_case_cls)` returning `access.permission` for `Requires`, else the legacy `required_permission` attribute, else `None`.
+- [ ] **Step 5: Run** the two test files above, `tests/entrypoints/test_cross_user_isolation.py` and `poe typecheck-backend`. Expected: PASS.
+- [ ] **Step 6: Stop.** Ask Sam to commit ("feat(openapi): document Requires stances in PermissionAwareRoute").
+
+### Task 6: Migrate a module (repeat per module, in this order)
+
+Order: system, backup, identity, presets, examples, collections, media, graph. One module per repetition; each ends green and is a stopping point.
+
+**Files per module:** each `modules/<m>/application/*.py` use case; `modules/<m>/adapters/api/dependencies.py` (and `user_dependencies.py` for backup) and any CLI wiring in `modules/<m>/adapters/cli/*.py`, `entrypoints/cli/*.py`, `entrypoints/api/shared/bridges/*.py` that builds these handlers; the module's use case tests; the `EXPECTED_*` pins in `tests/architecture/test_access_stances.py`.
+
+**Interfaces:**
+- Consumes: the stance for each class from the spec's inventory table; `GuardedUseCase/CommandHandler/QueryHandler`; `get_access_guard`.
+- Produces: each migrated class has `access = <stance>`, implements `_handle` (not `handle`), takes `guard` as its last constructor argument (`uow, guard` / `repos, guard` / own ports then `guard`), and no longer holds `_policy` or `_authorization`. Calls `self._policy.scope_for(actor)` become `self.scope(actor)`; `self._policy.assert_can_*` become `self._guard.assert_can_*`.
+
+For each module:
+
+- [ ] **Step 1: Confirm stances.** For each class, grep its callers (router, CLI, bridges) and confirm the actor kind matches the inventory. Report any mismatch to Sam before changing it (spec: stance records today's behaviour).
+- [ ] **Step 2: Update that module's tests first** to build handlers with `InMemoryAccessGuard()` in place of the policy/authorisation stubs, and add one test per module asserting the declared stances as a dict `{UseCaseClass: access}` for its non-`Requires` classes. Run `poe test-backend -- tests/modules/<m> -q`. Expected: FAIL.
+- [ ] **Step 3: Migrate the classes** as described under Interfaces. Replace the old permission property (`required_permission`) with `access = Requires(<Permission>.<MEMBER>)` for `Authorised*` classes; keep the same permission value.
+- [ ] **Step 4: Update wiring** in the dependency functions and CLI so each handler receives `Depends(get_access_guard)` (API) or the process-wide guard (CLI/bridges); delete now-unused `get_access_policy`/`get_authorisation_port` parameters in that module only.
+- [ ] **Step 5: Fill the pins** for the module in `test_access_stances.py`.
+- [ ] **Step 6: Run** `poe lint-backend && poe typecheck-backend && poe test-backend`. Expected: pass. Also run the module's router tests; HTTP status codes must be unchanged. `test_openapi_permissions_pinned.py` must pass unedited: if it fails, a migrated route lost or gained a documented permission; fix the migration, never the pin. After the last module, run `poe test-e2e swagger.spec.ts` once.
+- [ ] **Step 7: Stop.** Ask Sam to commit ("refactor(<module>): declare access stances").
+
+Module-specific notes:
+- **identity:** CLI `identity_app.py` calls `Authorised*` use cases with `SYSTEM_ACTOR` and `SetupFirstAdmin` with `ANONYMOUS_ACTOR`; both keep working. `GetCurrentUser` is called with `ANONYMOUS_ACTOR` from `dependencies.get_current_actor`.
+- **backup:** `RestoreOnFirstRun` is `Public` (called with `ANONYMOUS_ACTOR` behind `backup_setup_gate`); it extends `GuardedUseCase` and takes `guard` after its own ports.
+- **graph, media, collections, examples:** `Claim*` jobs are `System`; the bridges in `entrypoints/api/shared/bridges/` pass `SYSTEM_ACTOR` today (confirm).
+- **media:** if `StageMedia` turns out to read ownership from `actor.id` without any policy call, `Content` is still the stance; its ownership behaviour does not change.
+
+### Task 7: Remove the old bases and rename `Guarded*`
+
+**Files:** `shared_kernel/cqrs.py` (replace contents), delete `shared_kernel/guarded.py`, `shared_kernel/access_policy.py`, `entrypoints/api/shared/access_policy.py` (move `OwnerAccessPolicy` into `access_guard.py` or keep the file if the guard still imports it), update `tests/shared_kernel/test_cqrs.py`, `test_guarded.py`, `test_access_policy_port.py`, `tests/architecture/test_access_stances.py`, `test_content_filter_rules.py`, `test_permission_catalogue.py`.
+
+**Interfaces:**
+- Produces: `app.shared_kernel.cqrs.UseCase`, `CommandHandler`, `QueryHandler` with the exact definitions of `Guarded*` from Task 4. Nothing named `Scoped*`, `Authorised*`, `_PolicyHolder`, `_PermissionGate`, `AccessPolicy` remains.
+
+- [ ] **Step 1: Write the failing check:** extend `test_access_stances.py` so every concrete `UseCase` in `application/` has an `access` (replacing the `Guarded*` references) and add `test_no_legacy_bases`: `cqrs` exposes no attribute starting with `Scoped` or `Authorised`.
+- [ ] **Step 2: Replace `cqrs.py`** with the `Guarded*` code under the final names; rename `Guarded*` -> final names across `backend/` with `sed`; move the `test_guarded.py` cases into `test_cqrs.py`, deleting the old Scoped/Authorised cases; keep the application-layer rules (`test_all_application_use_cases_inherit_from_cqrs_base`, `test_command_handlers_store_uow_not_repository`).
+- [ ] **Step 3: Simplify `PermissionAwareRoute`:** drop the legacy `required_permission` and old-base support from Task 5a (only `UseCase`/`CommandHandler` and `access.permission` remain); update `test_permission_aware_route.py` to the final names and `access = Requires(...)`; update the comment that names `AuthorisationPort.check()`. `test_openapi_permissions_pinned.py` stays unchanged and must pass.
+- [ ] **Step 3b: Delete** the `AccessPolicy` Protocol file and `get_access_policy`; the guard owns `OwnerAccessPolicy` directly.
+- [ ] **Step 4: Run** `poe lint-backend && poe typecheck-backend && poe test-backend`. Expected: pass.
+- [ ] **Step 5: Stop.** Ask Sam to commit ("refactor(access): replace legacy use case bases with the guarded bases").
+
+### Task 8: Docs and the full gate
+
+**Files:** `AGENTS.md` (Business logic / CQRS convention lines), `backend/README.md` (use case bases and permissions sections), `docs/DECISIONS.md` (new entry: why declared access stances, why `Shared` before tokens), `docs/ARCHITECTURE.md` if it names the old bases, the tokens plan's Phase 1 note, `docs/superpowers/plans/2026-10-20-api-tokens-and-permissions.md`.
+
+- [ ] **Step 1: Update docs** to describe the six stances, "declare `access`, write `_handle`", and that `Shared`/`Content` gain a permission with tokens. British English; no graph terminology in user-visible text.
+- [ ] **Step 2: Run** `poe coverage`. Expected: all floors met (`shared_kernel` and `application` at 100%).
+- [ ] **Step 3: Stop.** Report the result and ask Sam to commit ("docs(access): document access stances").
+
+## Self-review notes
+
+- Spec coverage: stances (Task 3), guard (3), bases (4), pins and enforcement (5), inventory migration (6), final names (7), docs (8). Phase 6 resource-level access is out of scope by design.
+- Types: `AccessGuard`, `Access`, `ContentFilter`, `GuardedUseCase` names are used identically in Tasks 3 to 7; `Guarded*` becomes `UseCase`/`CommandHandler`/`QueryHandler` only in Task 7.
+- Risks: Task 6 touches ~106 classes (mitigated by module-by-module stopping points); a wrong stance would silently change access (mitigated by Step 1 call-site check and the pinned sets).
