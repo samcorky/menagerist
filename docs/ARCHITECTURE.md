@@ -71,7 +71,7 @@ Architecture tests (`backend/tests/architecture/test_access_scope_rules.py`) req
 ### Request flow
 
 ```
-Browser ── session cookie (HttpOnly, SameSite=Strict); Sec-Fetch-Site / Origin on unsafe methods
+Browser ── session cookie (HttpOnly, SameSite=Strict, `__Host-Http-` prefix when Secure); Sec-Fetch-Site / Origin on unsafe methods
   │
   ▼
 verify_csrf  →  get_current_actor  →  router  →  use case  →  repository(scope)

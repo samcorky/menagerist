@@ -188,3 +188,20 @@ def test_a_listed_cors_origin_is_refused_here_but_passes_sign_in(
 
     assert client.post("/login", headers=headers).status_code == 200
     assert client.post("/change", headers={**SESSION, **headers}).status_code == 403
+
+
+def test_over_https_the_prefixed_session_cookie_is_checked() -> None:
+    """The check looks for the cookie under the name the session reader uses."""
+    prefixed = {"Cookie": f"__Host-Http-{get_identity_settings().cookie_name}=secret"}
+    headers = {**prefixed, "Sec-Fetch-Site": "cross-site"}
+    client = _client("https://testserver")
+
+    assert client.post("/change", headers=headers).status_code == 403
+
+
+def test_over_https_a_plain_named_cookie_is_no_session() -> None:
+    """A plain-named cookie is never read over HTTPS, so there is nothing to forge."""
+    headers = {**SESSION, "Sec-Fetch-Site": "cross-site"}
+    client = _client("https://testserver")
+
+    assert client.post("/change", headers=headers).status_code == 200

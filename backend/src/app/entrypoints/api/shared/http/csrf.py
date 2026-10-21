@@ -6,6 +6,10 @@ from app.entrypoints.api.shared.http.origin import (
     note_origin_mismatch,
     own_origin,
 )
+from app.modules.identity.adapters.api.cookies import (
+    session_cookie_name,
+    session_cookie_value,
+)
 from app.platform.config import get_identity_settings
 from app.shared_kernel.errors import ForbiddenError
 
@@ -25,7 +29,8 @@ async def verify_csrf(request: Request) -> None:
     it): `same-origin` passes and `cross-site` is refused. Otherwise `Origin`
     must equal the app's own origin; a missing, `null` or malformed value is
     refused. Safe methods and requests without a session cookie pass: there is
-    nothing to forge, and authentication answers 401.
+    nothing to forge, and authentication answers 401. The cookie is read as the
+    session reader reads it, so a duplicated or disguised one counts as none.
 
     Raises:
         CsrfError: If the request is cross-site, `Origin` is not the app's own
@@ -33,7 +38,8 @@ async def verify_csrf(request: Request) -> None:
     """
     if request.method in _SAFE_METHODS:
         return
-    if not request.cookies.get(get_identity_settings().cookie_name):
+    settings = get_identity_settings()
+    if session_cookie_value(request, session_cookie_name(request, settings)) is None:
         return
     site = request.headers.get("Sec-Fetch-Site")
     origin = request.headers.get("Origin")

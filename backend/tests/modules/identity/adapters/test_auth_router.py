@@ -44,6 +44,7 @@ AUTH = "/api/v1/auth"
 USERS = "/api/v1/user"
 FOREIGN_ORIGIN = "https://evil.example"
 SESSION_COOKIE = "menagerist-session"
+PREFIXED_COOKIE = "__Host-Http-menagerist-session"
 SETUP_BODY = {
     "username": "Admin",
     "display_name": "Admin",
@@ -187,23 +188,74 @@ def test_setup_sets_secure_cookie_attributes(api: Api) -> None:
     assert set(cookies) == {SESSION_COOKIE}
 
 
-def test_cookies_are_secure_over_https(world: World) -> None:
-    """Over HTTPS the session cookie carries the Secure flag."""
+def test_cookie_is_host_prefixed_over_https(world: World) -> None:
+    """Over HTTPS the name gets the `__Host-Http-` prefix and its attributes."""
     api = Api(world, base_url="https://testserver")
 
     cookies = _cookie_headers(api.setup())
 
-    assert "secure" in cookies[SESSION_COOKIE].lower()
+    assert set(cookies) == {PREFIXED_COOKIE}
+    session = cookies[PREFIXED_COOKIE].lower()
+    for attribute in ("secure", "httponly", "path=/", "samesite=strict"):
+        assert attribute in session
+    assert "domain" not in session
 
 
 @pytest.mark.parametrize("secure", [True, False])
 def test_cookie_secure_setting_overrides_the_scheme(world: World, secure: bool) -> None:
-    """MENAGERIST_COOKIE_SECURE wins over the request scheme."""
+    """MENAGERIST_COOKIE_SECURE wins over the request scheme, and so does the prefix."""
     api = Api(world, settings=IdentitySettings(cookie_secure=secure))
 
     cookies = _cookie_headers(api.setup())
 
-    assert ("secure" in cookies[SESSION_COOKIE].lower()) is secure
+    name = PREFIXED_COOKIE if secure else SESSION_COOKIE
+    assert set(cookies) == {name}
+    assert ("secure" in cookies[name].lower()) is secure
+
+
+def _https_session(world: World) -> tuple[Api, str]:
+    """An HTTPS app with a signed-in admin, and that session's token."""
+    api = Api(world, base_url="https://testserver")
+    api.setup()
+    return api, api.client.cookies[PREFIXED_COOKIE]
+
+
+def _me(api: Api, cookie: str) -> int:
+    """Status of `GET /auth/me` sending `cookie` as the Cookie header."""
+    client = api.new_client("https://testserver")
+    return client.get(f"{AUTH}/me", headers={"Cookie": cookie}).status_code
+
+
+def test_https_session_is_read_from_the_prefixed_cookie(world: World) -> None:
+    """The prefixed cookie signs the request in."""
+    api, token = _https_session(world)
+
+    assert _me(api, f"{PREFIXED_COOKIE}={token}") == 200
+
+
+def test_https_ignores_a_plain_named_cookie(world: World) -> None:
+    """Only the prefixed name is read over HTTPS, so a plain one is no session."""
+    api, token = _https_session(world)
+
+    assert _me(api, f"{SESSION_COOKIE}={token}") == 401
+
+
+def test_a_duplicated_cookie_name_is_no_session(world: World) -> None:
+    """Two cookies with the exact name are ambiguous, so neither is read."""
+    api, token = _https_session(world)
+
+    assert _me(api, f"{PREFIXED_COOKIE}={token}; {PREFIXED_COOKIE}={token}") == 401
+
+
+def test_logout_clears_the_prefixed_cookie_over_https(world: World) -> None:
+    """Sign-out expires the cookie under the name it was set with."""
+    api, _ = _https_session(world)
+
+    response = api.post(api.client, f"{AUTH}/logout")
+
+    cookies = _cookie_headers(response)
+    assert set(cookies) == {PREFIXED_COOKIE}
+    assert "max-age=0" in cookies[PREFIXED_COOKIE].lower()
 
 
 def test_idle_session_is_a_401_like_an_expired_one(world: World) -> None:

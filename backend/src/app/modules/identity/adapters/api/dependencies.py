@@ -9,6 +9,10 @@ from fastapi import Depends
 from starlette.requests import Request
 
 from app.entrypoints.api.shared.authorization import get_authorization_port
+from app.modules.identity.adapters.api.cookies import (
+    session_cookie_name,
+    session_cookie_value,
+)
 from app.modules.identity.adapters.claim.unwired_existing_data_claim import (
     UnwiredExistingDataClaim,
 )
@@ -373,7 +377,7 @@ def get_session_token(
     settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
 ) -> str | None:
     """Return the session token sent as a cookie, if any."""
-    return request.cookies.get(settings.cookie_name)
+    return session_cookie_value(request, session_cookie_name(request, settings))
 
 
 def bind_session_context(request: Request, resolved: ResolvedSession) -> None:

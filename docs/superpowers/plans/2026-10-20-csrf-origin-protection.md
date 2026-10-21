@@ -237,6 +237,7 @@ Today there are only Chromium projects over plain HTTP, so none of this would ru
 
 ### Open points
 
+0. Disguise characters. Headers are decoded as latin-1, so only single-byte spaces (`\x85`, `\xa0`, `\x0b`, `\x0c`, `\x1c` to `\x1f`) can disguise a name; a UTF-8 U+2000 stays a different name. Backend tests use the single-byte set. In Playwright, U+2000 case 2 is still worth one engine run, but expect it to behave as an unrelated cookie.
 1. Does the e2e TLS proxy script live under `frontend/tests/e2e/` or `shared/` (it is test infrastructure only)? Default: `frontend/tests/e2e/`.
 2. Does the e2e Postgres container create `menagerist_cookies` automatically like the existing `menagerist_w{n}` and `menagerist_auth` databases, or does something need adding? Check before PR 2.
 
@@ -310,3 +311,9 @@ One constant holds the text so the log line and the check output match (e.g. `CO
 1. Confirm no route uses a method outside the five listed (none seen, but not every router was checked).
 2. Confirm the dev frontend on :5173 reaches the backend through the Vite proxy and not cross-origin. If it is cross-origin today, cookie auth is already broken there (credentials off), so this change would not make it worse.
 3. Whether to log the start-up warning at all when running under tests or the CLI; default is the same as the other start-up warnings (lifespan only).
+
+## Follow-ups (not in a PR yet)
+
+- **Browser self-check.** An admin-only `POST /api/v1/system/browser-check` that the status page calls. A `403 csrf_failed` on that call means a proxy is removing `Origin` and `Sec-Fetch-Site`, because the caller is certainly a browser; `origin_differs` shows the seen and sent origins. The result stays on the admin's page and records no proxy signal, so a script cannot raise a false `proxy:configuration` warning. Browsers send `Sec-Fetch-*` only to HTTPS origins (and localhost), so over plain HTTP a missing header is not a failure.
+- **No session-bound token.** Decided against (2026-10-21): the remaining gap needs a browser that misreports its headers or a proxy that strips them, which fails closed with a logged reason.
+- **No `MISSING_ORIGIN_HEADERS` proxy signal.** Non-browser clients are in scope and would trip it.
