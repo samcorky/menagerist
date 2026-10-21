@@ -8,9 +8,10 @@ Besides the per-worker backends, the ``auth`` Playwright project uses one extra 
 (port 8190) on an always-empty database, ``menagerist_auth``, which the migrate step
 recreates on every run.
 
-The ``cookies`` mode (``test-e2e-cookies``) runs only the cookie specs, in Chromium, WebKit
-and Firefox, against their own backend and a TLS proxy (see ``frontend/tests/e2e/tls-proxy.mjs``).
-It is exported as ``E2E_COOKIES=1`` for the migrate script and ``playwright.config.ts``.
+The ``cookies`` mode (``test-e2e-cookies``) runs only the cookie specs, in Chromium,
+WebKit and Firefox, against their own backend and a TLS proxy (see
+``frontend/tests/e2e/tls-proxy.mjs``). It is exported as ``E2E_COOKIES=1`` for the
+migrate script and ``playwright.config.ts``.
 """
 
 import os

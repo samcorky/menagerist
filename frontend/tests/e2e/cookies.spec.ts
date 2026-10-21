@@ -21,6 +21,10 @@ const PLAIN = 'menagerist-session';
 const PREFIXED = `__Host-Http-${PLAIN}`;
 const COLLECTION = '/api/v1/collection';
 
+// Pages are used once their elements appear; the `load` event also waits on fonts and images,
+// which stalls Firefox on a busy machine.
+const READY = { waitUntil: 'domcontentloaded' } as const;
+
 let user: E2EUser;
 
 test.beforeAll(async ({ playwright }, testInfo) => {
@@ -37,7 +41,7 @@ test.beforeAll(async ({ playwright }, testInfo) => {
 const accountMenu = (page: Page) => page.getByRole('button', { name: /^Account menu for / });
 
 async function signIn(page: Page, origin: string) {
-	await page.goto(`${origin}/login`);
+	await page.goto(`${origin}/login`, READY);
 	await page.getByLabel('Username').fill(user.username);
 	await page.getByLabel('Password', { exact: true }).fill(user.password);
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -88,16 +92,18 @@ test.describe('over HTTPS', () => {
 
 	// Not every engine stores or sends these names the same way, so the invariant is only that a
 	// look-alike carrying the real token is never accepted as the session.
-	for (const space of [' ', '\u0085', ' ']) {
-		test(`a cookie named with U+${space.codePointAt(0)!.toString(16).padStart(4, '0')} before the real name is no session`, async ({
-			page
+	for (const code of [0x2000, 0x0085, 0x00a0]) {
+		const hex = code.toString(16).padStart(4, '0');
+		test(`a cookie named with U+${hex} before the real name is no session`, async ({
+			page,
+			browserName
 		}) => {
 			await signIn(page, TLS_URL);
 			const [real] = await sessionCookies(page);
 			await page.context().clearCookies();
 			await page.context().addCookies([
 				{
-					name: `${space}${PREFIXED}`,
+					name: `${String.fromCodePoint(code)}${PREFIXED}`,
 					value: real.value,
 					url: TLS_URL,
 					secure: true,
@@ -105,9 +111,18 @@ test.describe('over HTTPS', () => {
 					sameSite: 'Strict'
 				}
 			]);
-			await page.goto(`${TLS_URL}/`);
 
-			expect(await fromPage(page, 'GET', '/api/v1/auth/me')).toBe(401);
+			let status: number;
+			try {
+				status = await fromPage(page, 'GET', '/api/v1/auth/me');
+			} catch (error) {
+				// WebKit on Linux sometimes cannot send a control character in a cookie name at
+				// all; a name that is never sent cannot be accepted either.
+				if (browserName !== 'webkit') throw error;
+				test.info().annotations.push({ type: 'note', description: 'WebKit could not send it' });
+				return;
+			}
+			expect(status).toBe(401);
 		});
 	}
 
@@ -124,7 +139,7 @@ test.describe('over HTTPS', () => {
 
 	test('page script cannot create the prefixed cookie', async ({ page, browserName }) => {
 		test.skip(browserName === 'webkit', 'Safari does not enforce the __Host-Http- prefix');
-		await page.goto(`${TLS_URL}/login`);
+		await page.goto(`${TLS_URL}/login`, READY);
 
 		await page.evaluate(
 			(name) => (document.cookie = `${name}=forged; Secure; Path=/; SameSite=Strict`),
@@ -164,7 +179,7 @@ test.describe('from another site', () => {
 
 	test('a link into the app arrives without the cookie, then is signed in', async ({ page }) => {
 		await signIn(page, TLS_URL);
-		await page.goto(`${FOREIGN}/`);
+		await page.goto(`${FOREIGN}/`, READY);
 
 		const arrival = page.waitForRequest(
 			(r) => r.isNavigationRequest() && r.url() === `${TLS_URL}/`
@@ -181,7 +196,7 @@ test.describe('from another site', () => {
 		const forged = `Forged ${Date.now()}`;
 		expect(await fromPage(page, 'POST', COLLECTION, { name: own })).toBe(201);
 
-		await page.goto(`${FOREIGN}/`);
+		await page.goto(`${FOREIGN}/`, READY);
 		const target = `${TLS_URL}${COLLECTION}`;
 		// The browser blocks the answer to a credentialed no-cors fetch, so only the end of the
 		// request is observable; the listing below shows that nothing changed.
@@ -223,10 +238,12 @@ test.describe('from another site', () => {
 			[target, forged]
 		);
 		expect([401, 403]).toContain((await form).status());
-		await page.waitForURL(target);
 
-		await page.goto(`${TLS_URL}/`);
-		const listing = await page.evaluate(async (url) => (await fetch(url)).text(), COLLECTION);
+		// A new page, so the check does not depend on how this engine settles the form's
+		// navigation to an error answer.
+		const checker = await page.context().newPage();
+		await checker.goto(`${TLS_URL}/`, READY);
+		const listing = await checker.evaluate(async (url) => (await fetch(url)).text(), COLLECTION);
 		expect(listing).toContain(own);
 		expect(listing).not.toContain(forged);
 	});

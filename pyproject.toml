@@ -71,6 +71,11 @@ help = "Download the WebKit and Firefox builds that the cookie e2e specs (test-e
 cmd = "echo 'Run in your own terminal: cd frontend && sudo env \"PATH=$PATH\" npx playwright install-deps chromium'"
 help = "Linux only: print the one-off command that installs the system libraries Chromium needs"
 
+[tool.poe.groups.setup.tasks.install-e2e-cookie-deps]
+# Same reason as install-e2e-deps: sudo needs a real terminal, so print the command.
+cmd = "echo 'Run in your own terminal: cd frontend && sudo env \"PATH=$PATH\" npx playwright install-deps webkit firefox'"
+help = "Linux only: print the one-off command that installs the system libraries WebKit and Firefox need (for test-e2e-cookies)"
+
 [tool.poe.groups.setup.tasks.dump-schema]
 cmd = "menagerist schema dump --output ../frontend/openapi.json"
 cwd = "backend"

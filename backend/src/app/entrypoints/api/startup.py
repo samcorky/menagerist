@@ -9,6 +9,7 @@ from app.modules.identity.application.has_administrator import (
     HasAdministrator,
     HasAdministratorQuery,
 )
+from app.platform.config.api import CORS_OPEN_HINT, get_api_settings
 from app.platform.config.backup import get_backup_settings
 from app.platform.config.media import get_media_settings
 from app.platform.database import get_session_factory
@@ -62,9 +63,16 @@ async def warn_if_storage_not_writable() -> None:
             logger.warning(message)
 
 
+async def warn_if_cors_open() -> None:
+    """Log one warning when `MENAGERIST_CORS_ORIGINS` allows any origin."""
+    if "*" in get_api_settings().cors_origins:
+        logger.warning(CORS_OPEN_HINT)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Run start-up checks once per worker, then serve."""
     await warn_if_storage_not_writable()
+    await warn_if_cors_open()
     await warn_if_no_administrator()
     yield

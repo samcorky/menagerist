@@ -1,4 +1,4 @@
-"""The start-up check that warns when no administrator exists."""
+"""The start-up checks: no administrator, unusable storage and open CORS."""
 
 from datetime import UTC, datetime
 from types import SimpleNamespace
@@ -20,6 +20,7 @@ from app.modules.identity.adapters.persistence.in_memory_user_repository import 
 )
 from app.modules.identity.domain.user import Role, User
 from app.modules.identity.ports.unit_of_work import IdentityRepos
+from app.platform.config.api import CORS_OPEN_HINT
 from app.platform.storage_probe import DirectoryProbe
 
 if TYPE_CHECKING:
@@ -203,6 +204,34 @@ async def test_probe_errors_are_skipped_at_debug_level(
     assert [entry["log_level"] for entry in logs] == ["debug", "debug"]
 
 
+@pytest.mark.parametrize(
+    ("origins", "warns"),
+    [
+        (["*"], True),
+        (["https://a.example", "*"], True),
+        ([], False),
+        (["https://a.example"], False),
+    ],
+)
+async def test_warns_only_when_cors_allows_any_origin(
+    monkeypatch: pytest.MonkeyPatch, origins: list[str], warns: bool
+) -> None:
+    """Only a `*` is worth a warning; empty and explicit lists stay quiet."""
+    monkeypatch.setattr(
+        startup, "get_api_settings", lambda: SimpleNamespace(cors_origins=origins)
+    )
+
+    with capture_logs() as logs:
+        await startup.warn_if_cors_open()
+
+    if warns:
+        assert [(e["log_level"], e["event"]) for e in logs] == [
+            ("warning", CORS_OPEN_HINT)
+        ]
+    else:
+        assert logs == []
+
+
 def test_the_application_lifespan_runs_the_check_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -212,14 +241,18 @@ def test_the_application_lifespan_runs_the_check_once(
     async def fake_storage() -> None:
         calls.append("storage")
 
+    async def fake_cors() -> None:
+        calls.append("cors")
+
     async def fake_administrator() -> None:
         calls.append("checked")
 
     monkeypatch.setattr(startup, "warn_if_storage_not_writable", fake_storage)
+    monkeypatch.setattr(startup, "warn_if_cors_open", fake_cors)
     monkeypatch.setattr(startup, "warn_if_no_administrator", fake_administrator)
 
     with TestClient(create_app()) as client:
-        assert calls == ["storage", "checked"]
+        assert calls == ["storage", "cors", "checked"]
         client.get("/api/health")
 
-    assert calls == ["storage", "checked"]
+    assert calls == ["storage", "cors", "checked"]

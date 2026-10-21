@@ -67,12 +67,13 @@ const cookieServers = [
 
 // Playwright's WebKit is an engine build, not Safari itself. Use these as a regression guard
 // and still check by hand in Safari on macOS and iOS before a release.
-const cookieProject = (name: string, device: string) => ({
+const cookieProject = (name: string, device: string, extra: Record<string, unknown> = {}) => ({
 	name,
 	use: {
 		...devices[device],
 		baseURL: `https://localhost:${COOKIES_TLS_PORT}`,
-		ignoreHTTPSErrors: true
+		ignoreHTTPSErrors: true,
+		...extra
 	},
 	testMatch: '**/cookies.spec.ts',
 	dependencies: ['cookies-setup']
@@ -85,7 +86,14 @@ const cookieProjects = [
 	},
 	cookieProject('cookies-chromium', 'Desktop Chrome'),
 	cookieProject('cookies-webkit', 'Desktop Safari'),
-	cookieProject('cookies-firefox', 'Desktop Firefox')
+	// The app sends Cross-Origin-Opener-Policy: same-origin, and Playwright's Firefox then
+	// sometimes never finishes a navigation when the machine is busy (a plain static server
+	// with only that header does the same). A shorter navigation timeout makes it fail fast
+	// and the retries absorb it.
+	{
+		...cookieProject('cookies-firefox', 'Desktop Firefox', { navigationTimeout: 15_000 }),
+		retries: 2
+	}
 ];
 
 export default defineConfig({

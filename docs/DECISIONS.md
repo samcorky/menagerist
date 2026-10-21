@@ -1003,6 +1003,10 @@ A cookie-name mismatch between frontend and backend made every signed-in unsafe 
 - **Cost.** Scripts that use the session cookie must send `Origin: <the server's origin>`; API tokens (future) will avoid the cookie, and the check is then skipped for requests a bearer token authenticates.
 - **Follow-ups.** A `__Host-Http-` session cookie with a strict reader and WebKit/Firefox e2e tests; tighter CORS lists and an open-CORS warning.
 
+### Explicit CORS lists and an open-CORS warning (2026-10-21)
+
+The CORS middleware names its methods (GET, POST, PUT, PATCH, DELETE), request headers and exposed response headers instead of `*`, so a preflight for anything else gets 400, and `ETag` and `Retry-After` are now readable by a listed origin. Credentials stay off, so this narrows what a listed site may ask for and does not change who can use a session. A test checks every route method and every header declared in the OpenAPI schema against the lists. `MENAGERIST_CORS_ORIGINS=*` logs a start-up warning and shows as a warn-only `cors:configuration` readiness check; it is a fixed setting, so it does not use the runtime proxy signals. `Authorization` joins the request headers when API tokens arrive.
+
 ### `__Host-Http-` session cookie and strict reader (2026-10-21)
 
 Over HTTPS (a `Secure` cookie) the session cookie is `__Host-Http-menagerist-session`; over plain HTTP it keeps the plain name. The prefix makes browsers that support it (Chrome and Edge 140+, Firefox 143+) refuse a same-named cookie set by a sibling subdomain, a plain-HTTP page or page script. Safari does not enforce it yet, and a disguised name is not stopped by any browser, so the reader is strict too: exactly one cookie with the exact name, read from the raw `Cookie` headers, else no session. A duplicated cookie or a name that only matches once latin-1 spaces are trimmed (Starlette's own parser trims them and keeps the last duplicate) gives no session, so a tossed cookie can sign someone out but not in. `verify_csrf` reads the cookie the same way. Switching between HTTP and HTTPS means signing in again.

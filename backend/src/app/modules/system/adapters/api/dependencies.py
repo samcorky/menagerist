@@ -5,6 +5,9 @@ from fastapi import Depends
 
 from app.entrypoints.api.shared.dependencies import get_authorization_port
 from app.modules.system.adapters.platform.app_info_adapter import PackageAppInfoAdapter
+from app.modules.system.adapters.platform.checks.cors_configuration_check import (
+    CorsConfigurationCheck,
+)
 from app.modules.system.adapters.platform.checks.database_connectivity_check import (
     DatabaseConnectivityCheck,
 )
@@ -26,6 +29,7 @@ from app.modules.system.application.get_health_ready import GetHealthReady
 from app.modules.system.application.get_health_ready_detail import GetHealthReadyDetail
 from app.modules.system.application.get_version import GetVersion
 from app.modules.system.application.get_version_detail import GetVersionDetail
+from app.platform.config.api import get_api_settings
 from app.platform.config.backup import get_backup_settings
 from app.platform.config.media import get_media_settings
 from app.platform.database import get_session_factory
@@ -60,6 +64,7 @@ def _readiness_registry(
             DatabaseMigrationCheck(session_factory),
             DatabasePoolUtilizationCheck(),
             ProxyConfigurationCheck(),
+            CorsConfigurationCheck(get_api_settings().cors_origins),
             get_storage_check(),
         ]
     )

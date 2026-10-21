@@ -6,9 +6,10 @@ sets up its administrator through the real first-run endpoint.
 
 The ``auth`` project's database, menagerist_auth, is dropped and recreated on every
 run so it is always empty (auth.spec.ts drives first-run setup). No backend may be
-connected to it while this runs. The ``cookies`` projects' database, menagerist_cookies,
-is recreated the same way, and when ``E2E_COOKIES=1`` it is the only one prepared. Needs the e2e Postgres container
-(``poe e2e-db-up``). N comes from ``E2E_WORKERS``, falling back to the CPU count.
+connected to it while this runs. The ``cookies`` projects' database,
+menagerist_cookies, is recreated the same way, and when ``E2E_COOKIES=1`` it is the only
+one prepared. Needs the e2e Postgres container (``poe e2e-db-up``). N comes from
+``E2E_WORKERS``, falling back to the CPU count.
 """
 
 import os

@@ -8,6 +8,12 @@ from app.entrypoints.api.permissions_router import router as permissions_router
 from app.entrypoints.api.shared.bridges.claim_existing_data import (
     get_claim_existing_data,
 )
+from app.entrypoints.api.shared.http.cors import (
+    CORS_MAX_AGE_SECONDS,
+    CORS_METHODS,
+    CORS_REQUEST_HEADERS,
+    CORS_RESPONSE_HEADERS,
+)
 from app.entrypoints.api.shared.http.csrf import verify_csrf
 from app.entrypoints.api.shared.http.problem_response import register_exception_handlers
 from app.entrypoints.api.shared.http.proxy_header_observer import ProxyHeaderObserver
@@ -121,9 +127,10 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=get_api_settings().cors_origins,
         allow_credentials=False,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["App-Version", "Total-Count", "Link"],
+        allow_methods=CORS_METHODS,
+        allow_headers=CORS_REQUEST_HEADERS,
+        expose_headers=CORS_RESPONSE_HEADERS,
+        max_age=CORS_MAX_AGE_SECONDS,
     )
     fastapi_app.add_middleware(
         RequestContextMiddleware,
