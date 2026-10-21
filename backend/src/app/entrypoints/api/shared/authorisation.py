@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from app.shared_kernel.actor import Actor
-    from app.shared_kernel.authorization import AuthorizationPort
+    from app.shared_kernel.authorisation import AuthorisationPort
 
 # Granted to every signed-in member; empty today.
 MEMBER_PERMISSIONS: frozenset[Permission] = frozenset()
@@ -21,8 +21,8 @@ MEMBER_PERMISSIONS: frozenset[Permission] = frozenset()
 ADMIN_ONLY_ACTIONS: frozenset[Permission] = ALL_PERMISSIONS - MEMBER_PERMISSIONS
 
 
-class RoleAuthorizationAdapter:
-    """Role-based `AuthorizationPort` over an actor's effective permissions.
+class RoleAuthorisationAdapter:
+    """Role-based `AuthorisationPort` over an actor's effective permissions.
 
     The system actor and administrators hold every permission; members hold
     `MEMBER_PERMISSIONS`. Grants expand through the implication catalogue, and a
@@ -52,14 +52,14 @@ class RoleAuthorizationAdapter:
             raise ForbiddenError("You do not have permission to do that.")
 
 
-_authorization_port = RoleAuthorizationAdapter()
+_authorisation_port = RoleAuthorisationAdapter()
 
 
-def get_role_authorization() -> RoleAuthorizationAdapter:
+def get_role_authorisation() -> RoleAuthorisationAdapter:
     """Return the process-wide role-based authorisation adapter."""
-    return _authorization_port
+    return _authorisation_port
 
 
-def get_authorization_port() -> AuthorizationPort:
-    """Return the process-wide `AuthorizationPort` adapter."""
-    return _authorization_port
+def get_authorisation_port() -> AuthorisationPort:
+    """Return the process-wide `AuthorisationPort` adapter."""
+    return _authorisation_port

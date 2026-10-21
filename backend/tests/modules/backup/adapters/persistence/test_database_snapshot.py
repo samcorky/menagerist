@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.entrypoints.api.shared.backup_media_files import BackupMediaFiles
 from app.modules.backup.adapters.persistence.database_snapshot import (
     SqlAlchemyDatabaseSnapshot,
@@ -167,15 +167,15 @@ async def test_real_instance_archive_verifies_and_reports_tampered_members(
 
             await storage.store(asset.id, asset.status, chunks())
             store = LocalDirectoryBackupStore(tmp_path / "backups")
-            authorization = RoleAuthorizationAdapter()
+            authorisation = RoleAuthorisationAdapter()
             summary = await CreateBackup(
                 store,
                 SqlAlchemyDatabaseSnapshot(factory),
                 media,
-                authorization,
+                authorisation,
                 app_version="test",
             ).handle(CreateBackupCommand(), SYSTEM_ACTOR)
-            verifier = VerifyBackup(store, authorization)
+            verifier = VerifyBackup(store, authorisation)
             query = VerifyBackupQuery(backup_id=summary.id)
             assert not (await verifier.handle(query, SYSTEM_ACTOR)).findings
 

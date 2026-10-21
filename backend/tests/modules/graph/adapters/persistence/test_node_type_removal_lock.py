@@ -9,7 +9,7 @@ import pytest_asyncio
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.modules.graph.adapters.persistence.models import NodeModel, NodeTypeModel
 from app.modules.graph.adapters.persistence.node_repository import (
     SqlAlchemyNodeRepository,
@@ -65,7 +65,7 @@ def _remove(
     factory: async_sessionmaker[AsyncSession], node_type: NodeType
 ) -> asyncio.Task[None]:
     use_case = DeleteUnusedNodeType(
-        create_graph_uow(factory), RoleAuthorizationAdapter()
+        create_graph_uow(factory), RoleAuthorisationAdapter()
     )
     return asyncio.create_task(
         use_case.handle(

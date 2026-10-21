@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.entrypoints.api.shared.authorization import get_authorization_port
+from app.entrypoints.api.shared.authorisation import get_authorisation_port
 from app.entrypoints.api.shared.backup_dependencies import (
     get_media_files,
     get_setup_gate,
@@ -37,7 +37,7 @@ from app.modules.backup.ports.setup_gate import SetupGate
 from app.platform.app_info import load_app_info
 from app.platform.config.backup import get_backup_settings
 from app.platform.database import get_session_factory
-from app.shared_kernel.authorization import AuthorizationPort
+from app.shared_kernel.authorisation import AuthorisationPort
 
 
 def get_backup_store() -> BackupStore:
@@ -68,7 +68,7 @@ def get_create_backup(
     store: Annotated[BackupStore, Depends(get_backup_store)],
     snapshot: Annotated[DatabaseSnapshot, Depends(get_database_snapshot)],
     media: Annotated[MediaFiles, Depends(get_media_files)],
-    auth: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    auth: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
 ) -> CreateBackup:
     """Compose verified instance creation with original media and app metadata."""
     return CreateBackup(
@@ -78,7 +78,7 @@ def get_create_backup(
 
 def get_list_backups(
     store: Annotated[BackupStore, Depends(get_backup_store)],
-    auth: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    auth: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
 ) -> ListBackups:
     """Compose the administrative committed-archive listing."""
     return ListBackups(store, auth)
@@ -86,7 +86,7 @@ def get_list_backups(
 
 def get_verify_backup(
     store: Annotated[BackupStore, Depends(get_backup_store)],
-    auth: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    auth: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
 ) -> VerifyBackup:
     """Compose archive integrity verification."""
     return VerifyBackup(store, auth)
@@ -94,7 +94,7 @@ def get_verify_backup(
 
 def get_open_backup(
     store: Annotated[BackupStore, Depends(get_backup_store)],
-    auth: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    auth: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
 ) -> OpenBackup:
     """Compose authorised streaming downloads of instance archives."""
     return OpenBackup(store, auth)
@@ -102,7 +102,7 @@ def get_open_backup(
 
 def get_delete_backup(
     store: Annotated[BackupStore, Depends(get_backup_store)],
-    auth: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    auth: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
 ) -> DeleteBackup:
     """Compose administrative archive deletion."""
     return DeleteBackup(store, auth)
@@ -110,7 +110,7 @@ def get_delete_backup(
 
 def get_prune_backups(
     store: Annotated[BackupStore, Depends(get_backup_store)],
-    auth: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    auth: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
 ) -> PruneBackups:
     """Apply configured instance retention and personal-export expiry."""
     settings = get_backup_settings()
@@ -126,7 +126,7 @@ def get_prune_backups(
 def get_upload_backup(
     store: Annotated[BackupStore, Depends(get_backup_store)],
     workspace: Annotated[BackupWorkspace, Depends(get_backup_workspace)],
-    auth: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    auth: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
 ) -> UploadBackup:
     """Compose verified uploads with the configured archive size limit."""
     return UploadBackup(

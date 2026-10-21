@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
 
-from app.entrypoints.api.shared.dependencies import get_authorization_port
+from app.entrypoints.api.shared.dependencies import get_authorisation_port
 from app.modules.system.adapters.platform.app_info_adapter import PackageAppInfoAdapter
 from app.modules.system.adapters.platform.checks.cors_configuration_check import (
     CorsConfigurationCheck,
@@ -38,7 +38,7 @@ from app.platform.database import get_session_factory
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-    from app.shared_kernel.authorization import AuthorizationPort
+    from app.shared_kernel.authorisation import AuthorisationPort
 
 
 def get_get_health_use_case() -> GetHealth:
@@ -83,9 +83,9 @@ def get_get_health_ready_detail_use_case(
     session_factory: Annotated[
         async_sessionmaker[AsyncSession], Depends(get_session_factory)
     ],
-    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
 ) -> GetHealthReadyDetail:
-    return GetHealthReadyDetail(_readiness_registry(session_factory), authorization)
+    return GetHealthReadyDetail(_readiness_registry(session_factory), authorisation)
 
 
 def get_get_version_use_case() -> GetVersion:
@@ -93,12 +93,12 @@ def get_get_version_use_case() -> GetVersion:
 
 
 def get_get_version_detail_use_case(
-    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
 ) -> GetVersionDetail:
-    return GetVersionDetail(PackageAppInfoAdapter(), authorization)
+    return GetVersionDetail(PackageAppInfoAdapter(), authorisation)
 
 
 def get_run_browser_check_use_case(
-    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
 ) -> RunBrowserCheck:
-    return RunBrowserCheck(authorization)
+    return RunBrowserCheck(authorisation)

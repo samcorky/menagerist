@@ -2,7 +2,7 @@ import uuid
 
 import pytest
 
-from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.modules.system.adapters.platform.in_memory_app_info_adapter import (
     InMemoryAppInfoAdapter,
 )
@@ -43,7 +43,7 @@ def test_permission_value_follows_the_naming_pattern() -> None:
 async def test_admin_and_system_read_version_detail(actor: Actor) -> None:
     """Holders of the permission get the full build metadata."""
     use_case = GetVersionDetail(
-        InMemoryAppInfoAdapter(APP_INFO), RoleAuthorizationAdapter()
+        InMemoryAppInfoAdapter(APP_INFO), RoleAuthorisationAdapter()
     )
 
     assert await use_case.handle(GetVersionDetailQuery(), actor) is APP_INFO
@@ -52,7 +52,7 @@ async def test_admin_and_system_read_version_detail(actor: Actor) -> None:
 async def test_member_cannot_read_version_detail() -> None:
     """Members hold no diagnostics permission."""
     use_case = GetVersionDetail(
-        InMemoryAppInfoAdapter(APP_INFO), RoleAuthorizationAdapter()
+        InMemoryAppInfoAdapter(APP_INFO), RoleAuthorisationAdapter()
     )
 
     with pytest.raises(ForbiddenError):
@@ -62,7 +62,7 @@ async def test_member_cannot_read_version_detail() -> None:
 async def test_admin_reads_readiness_detail_and_member_is_refused() -> None:
     """The checks run only for a holder of the permission."""
     adapter = InMemoryHealthCheckAdapter(REPORT)
-    use_case = GetHealthReadyDetail(adapter, RoleAuthorizationAdapter())
+    use_case = GetHealthReadyDetail(adapter, RoleAuthorisationAdapter())
 
     assert await use_case.handle(GetHealthReadyDetailQuery(), ADMIN) is REPORT
     with pytest.raises(ForbiddenError):
@@ -74,7 +74,7 @@ async def test_admin_runs_the_browser_check_and_member_is_refused() -> None:
     request = BrowserRequest(
         sec_fetch_site="same-origin", origin="http://x", seen_origin="http://x"
     )
-    use_case = RunBrowserCheck(RoleAuthorizationAdapter())
+    use_case = RunBrowserCheck(RoleAuthorisationAdapter())
 
     result = await use_case.handle(RunBrowserCheckQuery(request=request), ADMIN)
 

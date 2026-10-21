@@ -12,7 +12,7 @@ from app.shared_kernel.errors import ValidationError
 if TYPE_CHECKING:
     from app.modules.backup.ports.backup_store import BackupStore
     from app.shared_kernel.actor import Actor
-    from app.shared_kernel.authorization import AuthorizationPort
+    from app.shared_kernel.authorisation import AuthorisationPort
 
 logger = structlog.get_logger()
 
@@ -37,13 +37,13 @@ class PruneBackups(
     def __init__(
         self,
         store: BackupStore,
-        authorization: AuthorizationPort,
+        authorisation: AuthorisationPort,
         *,
         keep_last: int = 7,
         pre_migration_keep: int = 3,
         user_export_ttl_hours: int = 24,
     ) -> None:
-        super().__init__(authorization)
+        super().__init__(authorisation)
         self._store = store
         self._keep_last = keep_last
         self._pre_migration_keep = pre_migration_keep

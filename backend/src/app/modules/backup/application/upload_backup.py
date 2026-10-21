@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from app.modules.backup.ports.backup_store import BackupStore
     from app.modules.backup.ports.backup_workspace import BackupWorkspace
     from app.shared_kernel.actor import Actor
-    from app.shared_kernel.authorization import AuthorizationPort
+    from app.shared_kernel.authorisation import AuthorisationPort
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -86,11 +86,11 @@ class UploadBackup(
         self,
         store: BackupStore,
         workspace: BackupWorkspace,
-        authorization: AuthorizationPort,
+        authorisation: AuthorisationPort,
         *,
         max_upload_size: int = 8 * 1024**3,
     ) -> None:
-        super().__init__(authorization)
+        super().__init__(authorisation)
         self._store, self._workspace, self._max_size = store, workspace, max_upload_size
 
     async def _handle(

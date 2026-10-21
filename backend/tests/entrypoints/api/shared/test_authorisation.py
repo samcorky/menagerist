@@ -2,10 +2,10 @@ import uuid
 
 import pytest
 
-from app.entrypoints.api.shared.authorization import (
+from app.entrypoints.api.shared.authorisation import (
     ADMIN_ONLY_ACTIONS,
     MEMBER_PERMISSIONS,
-    RoleAuthorizationAdapter,
+    RoleAuthorisationAdapter,
 )
 from app.entrypoints.api.shared.permissions import ALL_PERMISSIONS
 from app.modules.graph.application.permissions import GraphPermission
@@ -53,7 +53,7 @@ def test_the_admin_only_set_matches_the_catalogue() -> None:
 
 async def test_members_are_forbidden_catalogue_permissions() -> None:
     """Members hold none of the catalogue permissions by default."""
-    adapter = RoleAuthorizationAdapter()
+    adapter = RoleAuthorisationAdapter()
     for permission in ALL_PERMISSIONS:
         with pytest.raises(ForbiddenError):
             await adapter.check(MEMBER, permission)
@@ -61,7 +61,7 @@ async def test_members_are_forbidden_catalogue_permissions() -> None:
 
 async def test_admins_and_the_system_hold_every_permission() -> None:
     """Admins and the system pass every catalogue check."""
-    adapter = RoleAuthorizationAdapter()
+    adapter = RoleAuthorisationAdapter()
     for permission in ALL_PERMISSIONS:
         await adapter.check(ADMIN, permission)
         await adapter.check(SYSTEM_ACTOR, permission)
@@ -69,7 +69,7 @@ async def test_admins_and_the_system_hold_every_permission() -> None:
 
 async def test_unknown_permissions_are_denied_to_everyone() -> None:
     """A string outside the catalogue is denied, admin or not."""
-    adapter = RoleAuthorizationAdapter()
+    adapter = RoleAuthorisationAdapter()
     for actor in (MEMBER, ADMIN, SYSTEM_ACTOR):
         with pytest.raises(ForbiddenError):
             await adapter.check(actor, "nonsense:thing:do")
@@ -77,7 +77,7 @@ async def test_unknown_permissions_are_denied_to_everyone() -> None:
 
 def test_effective_permissions_by_role() -> None:
     """Admin and system get everything; members get the default grant."""
-    adapter = RoleAuthorizationAdapter()
+    adapter = RoleAuthorisationAdapter()
     assert adapter.effective_permissions(ADMIN) == ALL_PERMISSIONS
     assert adapter.effective_permissions(SYSTEM_ACTOR) == ALL_PERMISSIONS
     assert adapter.effective_permissions(MEMBER) == frozenset()
@@ -85,7 +85,7 @@ def test_effective_permissions_by_role() -> None:
 
 async def test_granted_permissions_expand_through_implications() -> None:
     """A member granted DELETE also holds what DELETE implies."""
-    adapter = RoleAuthorizationAdapter(
+    adapter = RoleAuthorisationAdapter(
         member_permissions=frozenset({DELETE}),
         implies={DELETE: frozenset({PURGE})},
     )

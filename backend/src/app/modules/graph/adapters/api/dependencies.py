@@ -12,7 +12,7 @@ from app.entrypoints.api.shared.bridges.collection_members import (
 )
 from app.entrypoints.api.shared.dependencies import (
     get_access_policy,
-    get_authorization_port,
+    get_authorisation_port,
 )
 from app.modules.graph.adapters.persistence.unit_of_work import (
     build_graph_repos,
@@ -60,7 +60,7 @@ from app.modules.graph.application.update_node_type import UpdateNodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos, GraphUnitOfWork
 from app.platform.database import get_session_factory
 from app.shared_kernel.access_policy import AccessPolicy
-from app.shared_kernel.authorization import AuthorizationPort
+from app.shared_kernel.authorisation import AuthorisationPort
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -221,9 +221,9 @@ def get_update_node_type_use_case(
 
 def get_delete_node_type_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
-    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
 ) -> DeleteNodeType:
-    return DeleteNodeType(uow, authorization)
+    return DeleteNodeType(uow, authorisation)
 
 
 def get_create_edge_type_use_case(
@@ -256,9 +256,9 @@ def get_update_edge_type_use_case(
 
 def get_delete_edge_type_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
-    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
 ) -> DeleteEdgeType:
-    return DeleteEdgeType(uow, authorization)
+    return DeleteEdgeType(uow, authorisation)
 
 
 def get_count_node_type_attribute_usage_use_case(
@@ -270,9 +270,9 @@ def get_count_node_type_attribute_usage_use_case(
 
 def get_purge_node_type_attribute_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
-    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
 ) -> PurgeNodeTypeAttribute:
-    return PurgeNodeTypeAttribute(uow, authorization)
+    return PurgeNodeTypeAttribute(uow, authorisation)
 
 
 def get_list_attribute_values_use_case(
@@ -291,6 +291,6 @@ def get_count_edge_type_attribute_usage_use_case(
 
 def get_purge_edge_type_attribute_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
-    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
 ) -> PurgeEdgeTypeAttribute:
-    return PurgeEdgeTypeAttribute(uow, authorization)
+    return PurgeEdgeTypeAttribute(uow, authorisation)

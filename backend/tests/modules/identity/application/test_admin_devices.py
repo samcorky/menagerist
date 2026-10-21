@@ -6,9 +6,9 @@ import pytest
 import time_machine
 from structlog.testing import capture_logs
 
-from app.entrypoints.api.shared.authorization import (
+from app.entrypoints.api.shared.authorisation import (
     MEMBER_PERMISSIONS,
-    RoleAuthorizationAdapter,
+    RoleAuthorisationAdapter,
 )
 from app.entrypoints.api.shared.permissions import expand
 from app.modules.identity.application.list_sessions import (
@@ -72,7 +72,7 @@ async def test_list_sessions_forbidden_for_members(
     repos = IdentityRepos(
         users=world.users, sessions=world.sessions, attempts=world.attempts
     )
-    auth = RoleAuthorizationAdapter()
+    auth = RoleAuthorisationAdapter()
     handler = ListSessions(repos, auth, idle_timeout=IDLE_TIMEOUT)
 
     member_actor = _make_member_actor(alice.id)
@@ -88,7 +88,7 @@ async def test_revoke_session_forbidden_for_members(
     alice = make_user("alice")
     await world.users.add(alice)
 
-    auth = RoleAuthorizationAdapter()
+    auth = RoleAuthorisationAdapter()
     handler = RevokeSession(world.uow, auth)
 
     member_actor = _make_member_actor(alice.id)
@@ -157,7 +157,7 @@ async def test_list_sessions_returns_all_active_sessions_with_user_details(
     repos = IdentityRepos(
         users=world.users, sessions=world.sessions, attempts=world.attempts
     )
-    auth = RoleAuthorizationAdapter()
+    auth = RoleAuthorisationAdapter()
     handler = ListSessions(repos, auth, idle_timeout=IDLE_TIMEOUT)
 
     admin_actor = _make_admin_actor()
@@ -216,7 +216,7 @@ async def test_list_sessions_excludes_expired_and_idle_sessions(
     repos = IdentityRepos(
         users=world.users, sessions=world.sessions, attempts=world.attempts
     )
-    auth = RoleAuthorizationAdapter()
+    auth = RoleAuthorisationAdapter()
     handler = ListSessions(repos, auth, idle_timeout=IDLE_TIMEOUT)
 
     admin_actor = _make_admin_actor()
@@ -246,7 +246,7 @@ async def test_list_sessions_filters_by_user_id(
     repos = IdentityRepos(
         users=world.users, sessions=world.sessions, attempts=world.attempts
     )
-    auth = RoleAuthorizationAdapter()
+    auth = RoleAuthorisationAdapter()
     handler = ListSessions(repos, auth, idle_timeout=IDLE_TIMEOUT)
 
     admin_actor = _make_admin_actor()
@@ -273,7 +273,7 @@ async def test_list_sessions_unknown_user_id_returns_empty_list(
     repos = IdentityRepos(
         users=world.users, sessions=world.sessions, attempts=world.attempts
     )
-    auth = RoleAuthorizationAdapter()
+    auth = RoleAuthorisationAdapter()
     handler = ListSessions(repos, auth, idle_timeout=IDLE_TIMEOUT)
 
     admin_actor = _make_admin_actor()
@@ -306,7 +306,7 @@ async def test_revoke_session_success_and_logs(
     await world.sessions.add(alice_session1)
     await world.sessions.add(alice_session2)
 
-    auth = RoleAuthorizationAdapter()
+    auth = RoleAuthorisationAdapter()
     handler = RevokeSession(world.uow, auth)
     admin_actor = _make_admin_actor(admin.id)
 
@@ -345,7 +345,7 @@ async def test_revoke_session_refuses_current_session(
     )
     await world.sessions.add(admin_session)
 
-    auth = RoleAuthorizationAdapter()
+    auth = RoleAuthorisationAdapter()
     handler = RevokeSession(world.uow, auth)
     admin_actor = _make_admin_actor(admin.id)
 
@@ -375,7 +375,7 @@ async def test_revoke_session_raises_not_found_for_unknown_id(
     )
     await world.sessions.add(admin_session)
 
-    auth = RoleAuthorizationAdapter()
+    auth = RoleAuthorisationAdapter()
     handler = RevokeSession(world.uow, auth)
     admin_actor = _make_admin_actor(admin.id)
     unknown_id = uuid.uuid7()

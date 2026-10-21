@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from app.modules.backup.ports.database_snapshot import DatabaseSnapshot
     from app.modules.backup.ports.media_files import MediaFiles
     from app.shared_kernel.actor import Actor
-    from app.shared_kernel.authorization import AuthorizationPort
+    from app.shared_kernel.authorisation import AuthorisationPort
 
 logger = structlog.get_logger()
 
@@ -50,11 +50,11 @@ class CreateBackup(
         store: BackupStore,
         snapshot: DatabaseSnapshot,
         media: MediaFiles,
-        authorization: AuthorizationPort,
+        authorisation: AuthorisationPort,
         *,
         app_version: str,
     ) -> None:
-        super().__init__(authorization)
+        super().__init__(authorisation)
         self._store = store
         self._snapshot = snapshot
         self._media = media

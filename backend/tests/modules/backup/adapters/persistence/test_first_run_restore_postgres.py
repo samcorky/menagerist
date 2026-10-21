@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.entrypoints.api.shared.backup_media_files import BackupMediaFiles
 from app.entrypoints.api.shared.bridges.backup_setup_gate import get_setup_gate
 from app.modules.backup.adapters.persistence.database_restorer import (
@@ -106,7 +106,7 @@ async def test_first_run_restores_credentials_and_rolls_back_media_failure(
             store,
             SqlAlchemyDatabaseSnapshot(factory),
             source_media,
-            RoleAuthorizationAdapter(),
+            RoleAuthorisationAdapter(),
             app_version="test",
         ).handle(CreateBackupCommand(), SYSTEM_ACTOR)
         async with engine.begin() as connection:

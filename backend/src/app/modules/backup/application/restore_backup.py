@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from app.modules.backup.ports.database_restorer import DatabaseRestorer
     from app.modules.backup.ports.media_files import MediaFiles
     from app.shared_kernel.actor import Actor
-    from app.shared_kernel.authorization import AuthorizationPort
+    from app.shared_kernel.authorisation import AuthorisationPort
 
 type MediaUndo = list[tuple[MediaFileRef, UUID | None]]
 
@@ -163,9 +163,9 @@ class RestoreBackup(AuthorisedUseCase[RestoreBackupCommand, None, BackupPermissi
         restorer: DatabaseRestorer,
         media: MediaFiles,
         workspace: BackupWorkspace,
-        authorization: AuthorizationPort,
+        authorisation: AuthorisationPort,
     ) -> None:
-        super().__init__(authorization)
+        super().__init__(authorisation)
         self._store, self._restorer, self._media, self._workspace = (
             store,
             restorer,

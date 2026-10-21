@@ -10,7 +10,7 @@ from starlette.testclient import TestClient
 from structlog.testing import capture_logs
 
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.system.adapters.api import dependencies
 from app.modules.system.adapters.api.dependencies import (
@@ -243,7 +243,7 @@ def test_readiness_reports_warn_status_without_503(storage: str) -> None:
         adapter
     )
     app.dependency_overrides[get_get_health_ready_detail_use_case] = lambda: (
-        GetHealthReadyDetail(adapter, RoleAuthorizationAdapter())
+        GetHealthReadyDetail(adapter, RoleAuthorisationAdapter())
     )
     client = TestClient(app)
 

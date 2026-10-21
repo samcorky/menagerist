@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.modules.graph.adapters.persistence.unit_of_work import (
     build_graph_repos,
     create_in_memory_graph_uow,
@@ -43,7 +43,7 @@ async def test_node_type_slug_is_reusable_after_delete_on_postgres(
     first = await CreateNodeType(uow).handle(
         CreateNodeTypeCommand(slug="record", label="Record"), SYSTEM_ACTOR
     )
-    await DeleteNodeType(uow, RoleAuthorizationAdapter()).handle(
+    await DeleteNodeType(uow, RoleAuthorisationAdapter()).handle(
         DeleteNodeTypeCommand(node_type_id=first.id), SYSTEM_ACTOR
     )
 
@@ -66,7 +66,7 @@ async def test_edge_type_slug_is_reusable_after_delete_on_postgres(
     first = await CreateEdgeType(uow).handle(
         CreateEdgeTypeCommand(slug="signed-by", label="Signed by"), SYSTEM_ACTOR
     )
-    await DeleteEdgeType(uow, RoleAuthorizationAdapter()).handle(
+    await DeleteEdgeType(uow, RoleAuthorisationAdapter()).handle(
         DeleteEdgeTypeCommand(edge_type_id=first.id), SYSTEM_ACTOR
     )
 

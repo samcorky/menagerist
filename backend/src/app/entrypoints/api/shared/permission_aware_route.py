@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 # The session cookie identity issues at sign-in. auto_error=False deliberately:
 # this exists for OpenAPI documentation only; `get_current_actor` rejects the
-# request and `AuthorizationPort.check()` enforces permissions.
+# request and `AuthorisationPort.check()` enforces permissions.
 # The name is read once at import; the runtime lookup always uses live settings.
 cookie_scheme = APIKeyCookie(name=get_identity_settings().cookie_name, auto_error=False)
 

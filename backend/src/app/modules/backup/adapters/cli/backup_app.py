@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from typing import Any
 
     from app.modules.backup.domain.backup import BackupSummary
-    from app.shared_kernel.authorization import AuthorizationPort
+    from app.shared_kernel.authorisation import AuthorisationPort
 
 backup_app = App(name="backup", help="Manage verified instance backups.")
 
@@ -44,13 +44,13 @@ class _DenyAll:
         raise ForbiddenError("Authorisation is not wired for the CLI.")
 
 
-_authorization: AuthorizationPort = _DenyAll()
+_authorisation: AuthorisationPort = _DenyAll()
 
 
-def use_authorization(authorization: AuthorizationPort) -> None:
+def use_authorisation(authorisation: AuthorisationPort) -> None:
     """Supply the composition root's system-actor authorisation."""
-    global _authorization
-    _authorization = authorization
+    global _authorisation
+    _authorisation = authorisation
 
 
 async def _unwired_create(label: str) -> BackupSummary:
@@ -58,13 +58,13 @@ async def _unwired_create(label: str) -> BackupSummary:
 
 
 async def _unwired_restore(
-    backup_id: UUID, replace: bool, authorization: AuthorizationPort
+    backup_id: UUID, replace: bool, authorisation: AuthorisationPort
 ) -> None:
     raise ForbiddenError("Backup composition is not wired for the CLI.")
 
 
 _create: Callable[[str], Coroutine[Any, Any, BackupSummary]] = _unwired_create
-_restore: Callable[[UUID, bool, AuthorizationPort], Coroutine[Any, Any, None]] = (
+_restore: Callable[[UUID, bool, AuthorisationPort], Coroutine[Any, Any, None]] = (
     _unwired_restore
 )
 
@@ -72,7 +72,7 @@ _restore: Callable[[UUID, bool, AuthorizationPort], Coroutine[Any, Any, None]] =
 def use_operations(
     create_operation: Callable[[str], Coroutine[Any, Any, BackupSummary]],
     restore_operation: Callable[
-        [UUID, bool, AuthorizationPort], Coroutine[Any, Any, None]
+        [UUID, bool, AuthorisationPort], Coroutine[Any, Any, None]
     ],
 ) -> None:
     """Wire operations whose media bridge belongs to the composition root."""
@@ -102,7 +102,7 @@ def create(*, label: str = "manual") -> None:
     from app.modules.backup.application.permissions import BackupPermission
 
     async def run() -> None:
-        await _authorization.check(SYSTEM_ACTOR, BackupPermission.CREATE)
+        await _authorisation.check(SYSTEM_ACTOR, BackupPermission.CREATE)
         _print(asdict(await _create(label)))
 
     _run(run())
@@ -115,7 +115,7 @@ def list_backups() -> None:
         [
             asdict(item)
             for item in _run(
-                ListBackups(_store(), _authorization).handle(
+                ListBackups(_store(), _authorisation).handle(
                     ListBackupsQuery(), SYSTEM_ACTOR
                 )
             )
@@ -127,7 +127,7 @@ def list_backups() -> None:
 def verify(backup_id: UUID) -> None:
     """Check every file and the archive checksum."""
     report = _run(
-        VerifyBackup(_store(), _authorization).handle(
+        VerifyBackup(_store(), _authorisation).handle(
             VerifyBackupQuery(backup_id=backup_id), SYSTEM_ACTOR
         )
     )
@@ -149,7 +149,7 @@ def prune(
     report = _run(
         PruneBackups(
             _store(),
-            _authorization,
+            _authorisation,
             keep_last=settings.keep_last,
             pre_migration_keep=settings.pre_migration_keep,
             user_export_ttl_hours=settings.user_export_ttl_hours,
@@ -173,7 +173,7 @@ def download(backup_id: UUID, output: Path) -> None:
     """Stream an archive to a new local file."""
 
     async def run() -> None:
-        opened = await OpenBackup(_store(), _authorization).handle(
+        opened = await OpenBackup(_store(), _authorisation).handle(
             OpenBackupQuery(backup_id=backup_id), SYSTEM_ACTOR
         )
         with output.open("xb") as destination:
@@ -187,7 +187,7 @@ def download(backup_id: UUID, output: Path) -> None:
 def delete(backup_id: UUID) -> None:
     """Delete a committed archive."""
     _run(
-        DeleteBackup(_store(), _authorization).handle(
+        DeleteBackup(_store(), _authorisation).handle(
             DeleteBackupCommand(backup_id=backup_id), SYSTEM_ACTOR
         )
     )
@@ -214,7 +214,7 @@ def upload(archive: Path) -> None:
         UploadBackup(
             _store(),
             LocalBackupWorkspace(settings.backup_path),
-            _authorization,
+            _authorisation,
             max_upload_size=settings.max_upload_size,
         ).handle(UploadBackupCommand(stream=chunks()), SYSTEM_ACTOR)
     )
@@ -224,7 +224,7 @@ def upload(archive: Path) -> None:
 @backup_app.command
 def restore(backup_id: UUID, *, replace: bool = False) -> None:
     """Restore an instance archive. Stop the server before replacing live data."""
-    _run(_restore(backup_id, replace, _authorization))
+    _run(_restore(backup_id, replace, _authorisation))
 
 
 async def _unwired_export_user(user_id: UUID, output: Path) -> BackupSummary:
@@ -256,7 +256,7 @@ def export_user(output: Path, *, user: UUID) -> None:
     from app.modules.backup.application.permissions import BackupPermission
 
     async def run() -> None:
-        await _authorization.check(SYSTEM_ACTOR, BackupPermission.CREATE)
+        await _authorisation.check(SYSTEM_ACTOR, BackupPermission.CREATE)
         _print(asdict(await _export_user(user, output)))
 
     _run(run())
@@ -268,7 +268,7 @@ def import_user(archive: Path, *, user: UUID) -> None:
     from app.modules.backup.application.permissions import BackupPermission
 
     async def run() -> None:
-        await _authorization.check(SYSTEM_ACTOR, BackupPermission.RESTORE)
+        await _authorisation.check(SYSTEM_ACTOR, BackupPermission.RESTORE)
         await _import_user(user, archive)
 
     _run(run())

@@ -131,7 +131,7 @@ async def test_scoped_query_handler_stores_repos_and_policy() -> None:
 # ---------------------------------------------------------------------------
 
 
-class _StubAuthorization:
+class _StubAuthorisation:
     """Records the checked actor/permission; never raises."""
 
     def __init__(self) -> None:
@@ -143,7 +143,7 @@ class _StubAuthorization:
 
 async def test_authorised_use_case_checks_permission_then_handles() -> None:
     """AuthorisedUseCase.handle() checks the permission before delegating."""
-    authorization = _StubAuthorization()
+    authorisation = _StubAuthorisation()
 
     class MyRequest:
         pass
@@ -156,17 +156,17 @@ async def test_authorised_use_case_checks_permission_then_handles() -> None:
         async def _handle(self, request: MyRequest, actor: object) -> str:
             return "ok"
 
-    use_case = MyUseCase(authorization)
+    use_case = MyUseCase(authorisation)
     actor = object()
     result = await use_case.handle(MyRequest(), actor)  # type: ignore[arg-type]
 
     assert result == "ok"
-    assert authorization.checked == [(actor, "graph:read")]
+    assert authorisation.checked == [(actor, "graph:read")]
 
 
 async def test_authorised_command_handler_checks_permission_then_handles() -> None:
     """AuthorisedCommandHandler.handle() checks the permission before delegating."""
-    authorization = _StubAuthorization()
+    authorisation = _StubAuthorisation()
     uow = object()
 
     class MyCommand:
@@ -180,17 +180,17 @@ async def test_authorised_command_handler_checks_permission_then_handles() -> No
         async def _handle(self, command: MyCommand, actor: object) -> str:
             return self._uow  # type: ignore[return-value]
 
-    use_case = MyUseCase(uow, authorization)
+    use_case = MyUseCase(uow, authorisation)
     actor = object()
     result = await use_case.handle(MyCommand(), actor)  # type: ignore[arg-type]
 
     assert result is uow
-    assert authorization.checked == [(actor, "graph:write")]
+    assert authorisation.checked == [(actor, "graph:write")]
 
 
 async def test_authorised_query_handler_checks_permission_then_handles() -> None:
     """AuthorisedQueryHandler.handle() checks the permission before delegating."""
-    authorization = _StubAuthorization()
+    authorisation = _StubAuthorisation()
     repos = object()
 
     class MyQuery:
@@ -204,12 +204,12 @@ async def test_authorised_query_handler_checks_permission_then_handles() -> None
         async def _handle(self, query: MyQuery, actor: object) -> str:
             return self._repos  # type: ignore[return-value]
 
-    use_case = MyUseCase(repos, authorization)
+    use_case = MyUseCase(repos, authorisation)
     actor = object()
     result = await use_case.handle(MyQuery(), actor)  # type: ignore[arg-type]
 
     assert result is repos
-    assert authorization.checked == [(actor, "graph:read")]
+    assert authorisation.checked == [(actor, "graph:read")]
 
 
 # ---------------------------------------------------------------------------

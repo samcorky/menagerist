@@ -4,9 +4,9 @@ from fastapi import Depends
 from starlette.requests import Request
 
 from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
-from app.entrypoints.api.shared.authorization import (
-    get_authorization_port,
-    get_role_authorization,
+from app.entrypoints.api.shared.authorisation import (
+    get_authorisation_port,
+    get_role_authorisation,
 )
 from app.modules.identity.adapters.api.dependencies import (
     bind_session_context,
@@ -73,7 +73,7 @@ def get_access_policy() -> AccessPolicy:
 
 __all__ = [
     "get_access_policy",
-    "get_authorization_port",
+    "get_authorisation_port",
     "get_current_actor",
-    "get_role_authorization",
+    "get_role_authorisation",
 ]

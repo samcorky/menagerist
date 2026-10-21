@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
 
 
-class AuthorizationPort(Protocol):
+class AuthorisationPort(Protocol):
     """Permission checking port shared across modules."""
 
     async def check(self, actor: Actor, action: str) -> None:

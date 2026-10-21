@@ -15,7 +15,7 @@ from app.shared_kernel.cqrs import AuthorisedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
-    from app.shared_kernel.authorization import AuthorizationPort
+    from app.shared_kernel.authorisation import AuthorisationPort
 
 logger = structlog.get_logger()
 
@@ -44,10 +44,10 @@ class ResetPassword(
     def __init__(
         self,
         uow: IdentityUnitOfWork,
-        authorization: AuthorizationPort,
+        authorisation: AuthorisationPort,
         hasher: PasswordHasher,
     ) -> None:
-        super().__init__(uow, authorization)
+        super().__init__(uow, authorisation)
         self._hasher = hasher
 
     async def _handle(self, command: ResetPasswordCommand, actor: Actor) -> None:

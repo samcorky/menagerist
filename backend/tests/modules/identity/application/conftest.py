@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.modules.identity.adapters.claim.no_op_existing_data_claim import (
     NoOpExistingDataClaim,
 )
@@ -86,7 +86,7 @@ def build_cases(world: World, claim: ExistingDataClaim | None = None) -> Cases:
     tokens = InMemorySessionTokenGenerator()
     decoy = hasher.hash("decoy")
     authenticator = PasswordAuthenticator(world.uow, hasher, decoy_hash=decoy)
-    auth = RoleAuthorizationAdapter()
+    auth = RoleAuthorisationAdapter()
     throttle = SignInThrottle()
     repos = IdentityRepos(
         users=world.users, sessions=world.sessions, attempts=world.attempts

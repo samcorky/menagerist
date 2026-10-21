@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from app.modules.identity.ports.existing_data_claim import ExistingDataClaim
     from app.modules.identity.ports.password_hasher import PasswordHasher
     from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
-    from app.shared_kernel.authorization import AuthorizationPort
+    from app.shared_kernel.authorisation import AuthorisationPort
 
 logger = structlog.get_logger(__name__)
 
@@ -39,13 +39,13 @@ class _DenyAll:
         raise ForbiddenError("Authorisation is not wired for the CLI.")
 
 
-_authorization: AuthorizationPort = _DenyAll()
+_authorisation: AuthorisationPort = _DenyAll()
 
 
-def use_authorization(authorization: AuthorizationPort) -> None:
+def use_authorisation(authorisation: AuthorisationPort) -> None:
     """Choose the authorisation the commands check the system actor against."""
-    global _authorization
-    _authorization = authorization
+    global _authorisation
+    _authorisation = authorisation
 
 
 ClaimBuilder = Callable[["AsyncSession"], "ExistingDataClaim"]
@@ -142,7 +142,7 @@ def create_admin(*, username: str, display_name: str | None = None) -> None:
             async with uow as repos:
                 first_run = await repos.users.count() == 0
             if not first_run:
-                user = await CreateUser(uow, _authorization, hasher).handle(
+                user = await CreateUser(uow, _authorisation, hasher).handle(
                     CreateUserCommand(
                         username=username,
                         display_name=name,
@@ -216,7 +216,7 @@ def reset_password(
                 user = await repos.users.get_by_username(username)
             if user is None:
                 raise UserNotFoundError("That account does not exist.")
-            await ResetPassword(uow, _authorization, _hasher()).handle(
+            await ResetPassword(uow, _authorisation, _hasher()).handle(
                 ResetPasswordCommand(user_id=user.id, password=password),
                 SYSTEM_ACTOR,
             )
@@ -261,7 +261,7 @@ def set_display_name(*, username: str, display_name: str) -> None:
         async with get_session_factory()() as session:
             uow = create_identity_uow_on_session(session)
             user = await _find_user(uow, username)
-            updated = await UpdateUser(uow, _authorization).handle(
+            updated = await UpdateUser(uow, _authorisation).handle(
                 UpdateUserCommand(user_id=user.id, display_name=display_name),
                 SYSTEM_ACTOR,
             )
@@ -293,7 +293,7 @@ def unlock(*, username: str) -> None:
         async with get_session_factory()() as session:
             uow = create_identity_uow_on_session(session)
             user = await _find_user(uow, username)
-            await UnlockUser(uow, _authorization).handle(
+            await UnlockUser(uow, _authorisation).handle(
                 UnlockUserCommand(user_id=user.id), SYSTEM_ACTOR
             )
             return f"Sign-in lockout cleared for '{user.username}'."
@@ -332,7 +332,7 @@ def list_accounts(
 
         async with get_session_factory()() as session:
             return await ListUsers(
-                build_identity_repos(session), _authorization
+                build_identity_repos(session), _authorisation
             ).handle(ListUsersQuery(), SYSTEM_ACTOR)
 
     listings = _run(_list())

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Annotated, Any
 from fastapi import Depends
 
 from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
-from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.entrypoints.api.shared.bridges.attach_target_access import (
     GraphAttachTargetAccess,
 )
@@ -786,11 +786,11 @@ class GraphPackTarget:
             elif kind is EntityKind.ITEM_TYPE:
                 # Check and delete in one locked transaction: an item added
                 # meanwhile keeps the type instead of losing it.
-                await DeleteUnusedNodeType(uow, RoleAuthorizationAdapter()).handle(
+                await DeleteUnusedNodeType(uow, RoleAuthorisationAdapter()).handle(
                     DeleteUnusedNodeTypeCommand(node_type_id=entity_id), SYSTEM_ACTOR
                 )
             elif kind is EntityKind.RELATIONSHIP_TYPE:
-                await DeleteEdgeType(uow, RoleAuthorizationAdapter()).handle(
+                await DeleteEdgeType(uow, RoleAuthorisationAdapter()).handle(
                     DeleteEdgeTypeCommand(edge_type_id=entity_id), SYSTEM_ACTOR
                 )
             else:

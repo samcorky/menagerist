@@ -4,7 +4,7 @@ import pytest
 from structlog.testing import capture_logs
 
 from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
-from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -193,7 +193,7 @@ async def test_purge_node_type_attribute_removes_key_and_touches_nodes() -> None
     before = {node.id: node.updated_at for node in nodes}
     uow = InMemoryUnitOfWork(repos)
 
-    await PurgeNodeTypeAttribute(uow, RoleAuthorizationAdapter()).handle(
+    await PurgeNodeTypeAttribute(uow, RoleAuthorisationAdapter()).handle(
         PurgeNodeTypeAttributeCommand(node_type_id=node_type.id, key="old"),
         SYSTEM_ACTOR,
     )
@@ -224,7 +224,7 @@ async def test_purge_node_type_attribute_pages_through_all_nodes(
         )
 
     await PurgeNodeTypeAttribute(
-        InMemoryUnitOfWork(repos), RoleAuthorizationAdapter()
+        InMemoryUnitOfWork(repos), RoleAuthorisationAdapter()
     ).handle(
         PurgeNodeTypeAttributeCommand(node_type_id=node_type.id, key="old"),
         SYSTEM_ACTOR,
@@ -241,7 +241,7 @@ async def test_purge_node_type_attribute_raises_for_missing_type() -> None:
     """An unknown node type id is a not-found error."""
     with pytest.raises(NodeTypeNotFoundError):
         await PurgeNodeTypeAttribute(
-            InMemoryUnitOfWork(_repos()), RoleAuthorizationAdapter()
+            InMemoryUnitOfWork(_repos()), RoleAuthorisationAdapter()
         ).handle(
             PurgeNodeTypeAttributeCommand(node_type_id=uuid.uuid4(), key="old"),
             SYSTEM_ACTOR,
@@ -253,7 +253,7 @@ async def test_purge_edge_type_attribute_removes_key() -> None:
     repos, edge_type, edges = await _edge_setup()
     uow = InMemoryUnitOfWork(repos)
 
-    await PurgeEdgeTypeAttribute(uow, RoleAuthorizationAdapter()).handle(
+    await PurgeEdgeTypeAttribute(uow, RoleAuthorisationAdapter()).handle(
         PurgeEdgeTypeAttributeCommand(edge_type_id=edge_type.id, key="old"),
         SYSTEM_ACTOR,
     )
@@ -266,7 +266,7 @@ async def test_purge_edge_type_attribute_raises_for_missing_type() -> None:
     """An unknown edge type id is a not-found error."""
     with pytest.raises(EdgeTypeNotFoundError):
         await PurgeEdgeTypeAttribute(
-            InMemoryUnitOfWork(_repos()), RoleAuthorizationAdapter()
+            InMemoryUnitOfWork(_repos()), RoleAuthorisationAdapter()
         ).handle(
             PurgeEdgeTypeAttributeCommand(edge_type_id=uuid.uuid4(), key="old"),
             SYSTEM_ACTOR,
@@ -328,7 +328,7 @@ async def test_purge_node_type_attribute_strips_a_group_sub_key_from_every_row()
     await repos.nodes.add(node)
 
     await PurgeNodeTypeAttribute(
-        InMemoryUnitOfWork(repos), RoleAuthorizationAdapter()
+        InMemoryUnitOfWork(repos), RoleAuthorisationAdapter()
     ).handle(
         PurgeNodeTypeAttributeCommand(
             node_type_id=node_type.id, key="ingredients", sub_key="unit"
@@ -394,7 +394,7 @@ async def test_purge_edge_type_attribute_strips_a_group_sub_key_from_every_row()
     await repos.edges.add(edge)
 
     await PurgeEdgeTypeAttribute(
-        InMemoryUnitOfWork(repos), RoleAuthorizationAdapter()
+        InMemoryUnitOfWork(repos), RoleAuthorisationAdapter()
     ).handle(
         PurgeEdgeTypeAttributeCommand(
             edge_type_id=edge_type.id, key="terms", sub_key="duration"
@@ -410,7 +410,7 @@ async def test_purge_node_type_attribute_logs_the_count_it_does_not_return() -> 
 
     with capture_logs() as logs:
         await PurgeNodeTypeAttribute(
-            InMemoryUnitOfWork(repos), RoleAuthorizationAdapter()
+            InMemoryUnitOfWork(repos), RoleAuthorisationAdapter()
         ).handle(
             PurgeNodeTypeAttributeCommand(node_type_id=node_type.id, key="old"),
             SYSTEM_ACTOR,
@@ -425,7 +425,7 @@ async def test_purge_edge_type_attribute_logs_the_count_it_does_not_return() -> 
 
     with capture_logs() as logs:
         await PurgeEdgeTypeAttribute(
-            InMemoryUnitOfWork(repos), RoleAuthorizationAdapter()
+            InMemoryUnitOfWork(repos), RoleAuthorisationAdapter()
         ).handle(
             PurgeEdgeTypeAttributeCommand(edge_type_id=edge_type.id, key="old"),
             SYSTEM_ACTOR,

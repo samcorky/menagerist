@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from app.modules.backup.ports.backup_reader import BackupReader
     from app.modules.backup.ports.backup_store import BackupStore
     from app.shared_kernel.actor import Actor
-    from app.shared_kernel.authorization import AuthorizationPort
+    from app.shared_kernel.authorisation import AuthorisationPort
 
 _METADATA_LIMIT = 16 * 1024 * 1024
 
@@ -119,8 +119,8 @@ class VerifyBackup(
 
     required_permission = BackupPermission.READ
 
-    def __init__(self, store: BackupStore, authorization: AuthorizationPort) -> None:
-        super().__init__(authorization)
+    def __init__(self, store: BackupStore, authorisation: AuthorisationPort) -> None:
+        super().__init__(authorisation)
         self._store = store
 
     async def _handle(

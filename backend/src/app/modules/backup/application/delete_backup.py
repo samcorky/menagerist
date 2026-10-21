@@ -10,7 +10,7 @@ from app.shared_kernel.cqrs import AuthorisedUseCase
 if TYPE_CHECKING:
     from app.modules.backup.ports.backup_store import BackupStore
     from app.shared_kernel.actor import Actor
-    from app.shared_kernel.authorization import AuthorizationPort
+    from app.shared_kernel.authorisation import AuthorisationPort
 
 logger = structlog.get_logger()
 
@@ -27,8 +27,8 @@ class DeleteBackup(AuthorisedUseCase[DeleteBackupCommand, None, BackupPermission
 
     required_permission = BackupPermission.DELETE
 
-    def __init__(self, store: BackupStore, authorization: AuthorizationPort) -> None:
-        super().__init__(authorization)
+    def __init__(self, store: BackupStore, authorisation: AuthorisationPort) -> None:
+        super().__init__(authorisation)
         self._store = store
 
     async def _handle(self, request: DeleteBackupCommand, actor: Actor) -> None:

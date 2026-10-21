@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import SecretStr
 
-from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.modules.identity.adapters.cli import identity_app
 from app.modules.identity.adapters.cli.identity_app import (
     create_admin,
@@ -69,7 +69,7 @@ def claim(monkeypatch: pytest.MonkeyPatch) -> _SpyClaim:
 def _wired(monkeypatch: pytest.MonkeyPatch, world: World) -> None:
     """Run the commands over the in-memory world and its fast hasher."""
     monkeypatch.delenv(PASSWORD_ENV_VAR, raising=False)
-    monkeypatch.setattr(identity_app, "_authorization", RoleAuthorizationAdapter())
+    monkeypatch.setattr(identity_app, "_authorisation", RoleAuthorisationAdapter())
     monkeypatch.setattr(
         "app.platform.config.identity_cli.SECRETS_DIR", Path("/nonexistent-secrets")
     )
@@ -501,7 +501,7 @@ def test_commands_fail_closed_when_authorisation_is_not_wired(
     """Without the entrypoint's wiring the CLI refuses, as the default denies."""
     alice = make_user("alice")
     world.users._users[alice.id] = alice
-    monkeypatch.setattr(identity_app, "_authorization", identity_app._DenyAll())
+    monkeypatch.setattr(identity_app, "_authorisation", identity_app._DenyAll())
 
     with pytest.raises(SystemExit):
         unlock(username="alice")

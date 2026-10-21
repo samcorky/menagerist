@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Annotated
 import structlog
 from cyclopts import App, Parameter
 
-from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.entrypoints.cli.backups import (
     create_backup,
     export_user_data,
@@ -16,13 +16,13 @@ from app.entrypoints.cli.backups import (
 )
 from app.modules.backup.adapters.cli.backup_app import (
     backup_app,
-    use_authorization as use_backup_authorization,
+    use_authorisation as use_backup_authorisation,
     use_operations,
     use_user_operations,
 )
 from app.modules.identity.adapters.cli.identity_app import (
     identity_app,
-    use_authorization,
+    use_authorisation,
     use_existing_data_claim,
 )
 from app.modules.media.adapters.cli.media_app import media_app
@@ -66,12 +66,12 @@ migrate_app = App(name="migrate", help="Manage database migrations.")
 app.command(migrate_app)
 
 app.command(media_app)
-use_backup_authorization(RoleAuthorizationAdapter())
+use_backup_authorisation(RoleAuthorisationAdapter())
 
 use_operations(
     lambda label: create_backup(label=label),
-    lambda backup_id, replace, authorization: restore_backup(
-        backup_id, replace=replace, authorization=authorization
+    lambda backup_id, replace, authorisation: restore_backup(
+        backup_id, replace=replace, authorisation=authorisation
     ),
 )
 use_user_operations(export_user_data, import_user_data)
@@ -88,7 +88,7 @@ def _claim_existing_data(session: AsyncSession) -> ExistingDataClaim:
 
 
 use_existing_data_claim(_claim_existing_data)
-use_authorization(RoleAuthorizationAdapter())
+use_authorisation(RoleAuthorisationAdapter())
 app.command(identity_app)
 
 schema_app = App(name="schema", help="Inspect the API schema.")

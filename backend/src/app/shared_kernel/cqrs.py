@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, final
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
-from app.shared_kernel.authorization import AuthorizationPort  # noqa: TC001
+from app.shared_kernel.authorisation import AuthorisationPort  # noqa: TC001
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -79,7 +79,7 @@ class _PermissionGate[TRequest, TResult, TPermission: StrEnum = StrEnum](ABC):
     Must precede the `UseCase` base in the MRO so its final `handle` wins.
     """
 
-    _authorization: AuthorizationPort
+    _authorisation: AuthorisationPort
 
     @property
     @abstractmethod
@@ -90,7 +90,7 @@ class _PermissionGate[TRequest, TResult, TPermission: StrEnum = StrEnum](ABC):
     @final
     async def handle(self, request: TRequest, actor: Actor) -> TResult:
         """Check `actor` holds `required_permission`, then execute `request`."""
-        await self._authorization.check(actor, self.required_permission)
+        await self._authorisation.check(actor, self.required_permission)
         return await self._handle(request, actor)
 
     @abstractmethod
@@ -104,8 +104,8 @@ class AuthorisedUseCase[TRequest, TResult, TPermission: StrEnum = StrEnum](
 ):
     """Authorised use case with no persistence dependency at all."""
 
-    def __init__(self, authorization: AuthorizationPort) -> None:
-        self._authorization = authorization
+    def __init__(self, authorisation: AuthorisationPort) -> None:
+        self._authorisation = authorisation
 
 
 class AuthorisedCommandHandler[TUoW, TCommand, TResult, TPermission: StrEnum = StrEnum](
@@ -114,9 +114,9 @@ class AuthorisedCommandHandler[TUoW, TCommand, TResult, TPermission: StrEnum = S
 ):
     """State-mutating use case with a UoW AND a mandatory permission check."""
 
-    def __init__(self, uow: TUoW, authorization: AuthorizationPort) -> None:
+    def __init__(self, uow: TUoW, authorisation: AuthorisationPort) -> None:
         super().__init__(uow)
-        self._authorization = authorization
+        self._authorisation = authorisation
 
 
 class AuthorisedQueryHandler[TRepos, TQuery, TResult, TPermission: StrEnum = StrEnum](
@@ -125,6 +125,6 @@ class AuthorisedQueryHandler[TRepos, TQuery, TResult, TPermission: StrEnum = Str
 ):
     """Read-only use case with repos AND a mandatory permission check."""
 
-    def __init__(self, repos: TRepos, authorization: AuthorizationPort) -> None:
+    def __init__(self, repos: TRepos, authorisation: AuthorisationPort) -> None:
         super().__init__(repos)
-        self._authorization = authorization
+        self._authorisation = authorisation

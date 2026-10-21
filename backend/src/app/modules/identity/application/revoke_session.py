@@ -7,7 +7,7 @@ import structlog
 from app.modules.identity.application.permissions import IdentityPermission
 from app.modules.identity.domain.errors import CurrentSessionError, SessionNotFoundError
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
-from app.shared_kernel.authorization import AuthorizationPort  # noqa: TC001
+from app.shared_kernel.authorisation import AuthorisationPort  # noqa: TC001
 from app.shared_kernel.cqrs import AuthorisedCommandHandler
 
 if TYPE_CHECKING:
@@ -40,9 +40,9 @@ class RevokeSession(
     def __init__(
         self,
         uow: IdentityUnitOfWork,
-        authorization: AuthorizationPort,
+        authorisation: AuthorisationPort,
     ) -> None:
-        super().__init__(uow, authorization)
+        super().__init__(uow, authorisation)
 
     async def _handle(self, command: RevokeSessionCommand, actor: Actor) -> None:
         """Revoke the requested session if not the actor's current session.

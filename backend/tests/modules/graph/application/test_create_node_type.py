@@ -1,6 +1,6 @@
 import pytest
 
-from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -113,7 +113,7 @@ async def test_create_node_type_succeeds_after_delete_of_same_slug() -> None:
     first = await CreateNodeType(uow).handle(
         CreateNodeTypeCommand(slug="film", label="Film"), SYSTEM_ACTOR
     )
-    await DeleteNodeType(uow, RoleAuthorizationAdapter()).handle(
+    await DeleteNodeType(uow, RoleAuthorisationAdapter()).handle(
         DeleteNodeTypeCommand(node_type_id=first.id), SYSTEM_ACTOR
     )
 

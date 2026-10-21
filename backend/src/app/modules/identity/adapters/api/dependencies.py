@@ -8,7 +8,7 @@ import structlog
 from fastapi import Depends
 from starlette.requests import Request
 
-from app.entrypoints.api.shared.authorization import get_authorization_port
+from app.entrypoints.api.shared.authorisation import get_authorisation_port
 from app.modules.identity.adapters.api.cookies import (
     session_cookie_name,
     session_cookie_value,
@@ -74,7 +74,7 @@ from app.modules.identity.ports.unit_of_work import IdentityRepos, IdentityUnitO
 from app.platform.config import IdentitySettings, get_identity_settings
 from app.platform.database import get_session_factory
 from app.shared_kernel.actor import ANONYMOUS_ACTOR, Actor
-from app.shared_kernel.authorization import AuthorizationPort
+from app.shared_kernel.authorisation import AuthorisationPort
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -293,39 +293,39 @@ def get_set_own_display_name_use_case(
 
 def get_create_user_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
-    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
     hasher: Annotated[PasswordHasher, Depends(get_password_hasher)],
 ) -> CreateUser:
-    return CreateUser(uow, authorization, hasher)
+    return CreateUser(uow, authorisation, hasher)
 
 
 def get_list_users_use_case(
     repos: Annotated[IdentityRepos, Depends(get_identity_repos)],
-    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
 ) -> ListUsers:
-    return ListUsers(repos, authorization)
+    return ListUsers(repos, authorisation)
 
 
 def get_update_user_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
-    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
 ) -> UpdateUser:
-    return UpdateUser(uow, authorization)
+    return UpdateUser(uow, authorisation)
 
 
 def get_reset_password_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
-    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
     hasher: Annotated[PasswordHasher, Depends(get_password_hasher)],
 ) -> ResetPassword:
-    return ResetPassword(uow, authorization, hasher)
+    return ResetPassword(uow, authorisation, hasher)
 
 
 def get_unlock_user_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
-    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
 ) -> UnlockUser:
-    return UnlockUser(uow, authorization)
+    return UnlockUser(uow, authorisation)
 
 
 def get_has_administrator_use_case(
@@ -356,20 +356,20 @@ def get_revoke_other_sessions_use_case(
 
 def get_list_sessions_use_case(
     repos: Annotated[IdentityRepos, Depends(get_identity_repos)],
-    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
     settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
 ) -> ListSessions:
     idle = settings.session_idle_hours
     return ListSessions(
-        repos, authorization, idle_timeout=timedelta(hours=idle) if idle else None
+        repos, authorisation, idle_timeout=timedelta(hours=idle) if idle else None
     )
 
 
 def get_revoke_session_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
-    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
 ) -> RevokeSession:
-    return RevokeSession(uow, authorization)
+    return RevokeSession(uow, authorisation)
 
 
 def get_session_token(

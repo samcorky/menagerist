@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
     from app.entrypoints.api.shared.backup_media_files import BackupMediaFiles
     from app.modules.backup.domain.backup import BackupSummary
-    from app.shared_kernel.authorization import AuthorizationPort
+    from app.shared_kernel.authorisation import AuthorisationPort
     from app.shared_kernel.content_filter import ContentFilter
 
 
@@ -48,7 +48,7 @@ async def create_backup(
     to_revision: str | None = None,
 ) -> BackupSummary:
     """Build and run a verified backup as the system actor."""
-    from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+    from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
     from app.modules.backup.adapters.persistence.database_snapshot import (
         SqlAlchemyDatabaseSnapshot,
     )
@@ -67,7 +67,7 @@ async def create_backup(
             LocalDirectoryBackupStore(get_backup_settings().backup_path),
             SqlAlchemyDatabaseSnapshot(get_session_factory()),
             media,
-            RoleAuthorizationAdapter(),
+            RoleAuthorisationAdapter(),
             app_version=load_app_info().version,
         ).handle(
             CreateBackupCommand(
@@ -108,7 +108,7 @@ def upgrade_with_backup(revision: str = "head", *, backup: bool = True) -> None:
 
 
 async def restore_backup(
-    backup_id: UUID, *, replace: bool, authorization: AuthorizationPort
+    backup_id: UUID, *, replace: bool, authorisation: AuthorisationPort
 ) -> None:
     """Select the setup gate when no accounts exist and run the restore."""
     from app.modules.backup.adapters.persistence.database_restorer import (
@@ -139,7 +139,7 @@ async def restore_backup(
             SqlAlchemyDatabaseRestorer(factory),
             media,
             LocalBackupWorkspace(settings.backup_path),
-            authorization,
+            authorisation,
         ).handle(
             RestoreBackupCommand(
                 backup_id=backup_id, replace=replace, setup_only=setup_only

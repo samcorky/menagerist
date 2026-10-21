@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from app.modules.identity.application.permissions import IdentityPermission
 from app.modules.identity.application.session_listing import SessionListing
 from app.modules.identity.ports.unit_of_work import IdentityRepos
-from app.shared_kernel.authorization import AuthorizationPort  # noqa: TC001
+from app.shared_kernel.authorisation import AuthorisationPort  # noqa: TC001
 from app.shared_kernel.cqrs import AuthorisedQueryHandler
 
 if TYPE_CHECKING:
@@ -33,11 +33,11 @@ class ListSessions(
     def __init__(
         self,
         repos: IdentityRepos,
-        authorization: AuthorizationPort,
+        authorisation: AuthorisationPort,
         *,
         idle_timeout: timedelta | None = None,
     ) -> None:
-        super().__init__(repos, authorization)
+        super().__init__(repos, authorisation)
         self._idle_timeout = idle_timeout
 
     async def _handle(

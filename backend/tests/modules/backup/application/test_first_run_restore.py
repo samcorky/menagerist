@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.modules.backup.adapters.media.in_memory_media_files import InMemoryMediaFiles
 from app.modules.backup.adapters.persistence.in_memory_database_restorer import (
     InMemoryDatabaseRestorer,
@@ -45,7 +45,7 @@ async def _archive() -> bytes:
             "revision", {"data/users.ndjson": b'{"id":"admin"}\n'}
         ),
         InMemoryMediaFiles(),
-        RoleAuthorizationAdapter(),
+        RoleAuthorisationAdapter(),
         app_version="test",
     ).handle(CreateBackupCommand(), SYSTEM_ACTOR)
     return b"".join([chunk async for chunk in store.read_bytes(summary.id)])

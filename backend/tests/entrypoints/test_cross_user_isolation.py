@@ -23,7 +23,7 @@ from fastapi import Depends
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.entrypoints.api.shared.bridges.attach_target_access import (
     GraphAttachTargetAccess,
     get_attach_target_access,
@@ -536,7 +536,7 @@ class World:
         ready = InMemoryHealthCheckAdapter(_PASSING_READINESS)
         o[get_get_health_ready_use_case] = lambda: GetHealthReady(ready)
         o[get_get_health_ready_detail_use_case] = lambda: GetHealthReadyDetail(
-            ready, RoleAuthorizationAdapter()
+            ready, RoleAuthorisationAdapter()
         )
         o[get_preset_pack_target] = lambda: PresetPackTarget(
             in_memory_preset_stores(presets, graph)

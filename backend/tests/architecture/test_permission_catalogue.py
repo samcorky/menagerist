@@ -3,7 +3,7 @@ import inspect
 import pkgutil
 
 import app.modules
-from app.entrypoints.api.shared.authorization import MEMBER_PERMISSIONS
+from app.entrypoints.api.shared.authorisation import MEMBER_PERMISSIONS
 from app.entrypoints.api.shared.permissions import ALL_PERMISSIONS, expand
 from app.modules.backup.application.permissions import BackupPermission
 from app.shared_kernel.cqrs import UseCase

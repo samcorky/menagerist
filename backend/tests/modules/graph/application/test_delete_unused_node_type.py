@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.entrypoints.api.shared.authorization import RoleAuthorizationAdapter
+from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -44,7 +44,7 @@ def _use_case(
     repos: GraphRepos,
 ) -> tuple[DeleteUnusedNodeType, InMemoryUnitOfWork[GraphRepos]]:
     uow = InMemoryUnitOfWork(repos)
-    return DeleteUnusedNodeType(uow, RoleAuthorizationAdapter()), uow
+    return DeleteUnusedNodeType(uow, RoleAuthorisationAdapter()), uow
 
 
 async def test_an_unused_type_is_soft_deleted() -> None:
