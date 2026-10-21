@@ -30,6 +30,7 @@
 	import { formatDateTime } from '$lib/format-date';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import BackButton from '$lib/components/back-button.svelte';
+	import FileDrop from '$lib/components/file-drop.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -49,7 +50,7 @@
 	let createOpen = $state(false);
 	let createError = $state<string | null>(null);
 	let uploadOpen = $state(false);
-	let files = $state<FileList>();
+	let file = $state<File | null>(null);
 	let uploadError = $state<string | null>(null);
 	let deleteTarget = $state<BackupResponse | null>(null);
 	let deleteError = $state<string | null>(null);
@@ -97,17 +98,17 @@
 	}
 	async function upload(event: SubmitEvent) {
 		event.preventDefault();
-		const file = files?.[0];
-		if (!file || busy || !canCreate) return;
+		const selectedFile = file;
+		if (!selectedFile || busy || !canCreate) return;
 		busy = 'upload';
 		uploadError = null;
 		try {
-			const result = await uploadBackup({ body: file });
+			const result = await uploadBackup({ body: selectedFile });
 			if (result.error || !result.data) uploadError = uploadErrorMessage(result);
 			else {
 				backups = [result.data, ...backups.filter((b) => b.id !== result.data.id)];
 				uploadOpen = false;
-				files = undefined;
+				file = null;
 				toast.success('Backup uploaded');
 			}
 		} catch {
@@ -326,14 +327,15 @@
 		>
 		<form onsubmit={upload} class="mt-4 space-y-4">
 			<div class="space-y-2">
-				<Label for="backup-archive">Backup archive</Label><input
+				<Label for="backup-archive">Backup archive</Label>
+				<FileDrop
 					id="backup-archive"
-					type="file"
+					multiple={false}
 					accept=".tar.gz,.gz,application/gzip"
-					bind:files
-					class="block min-h-11 w-full min-w-0 rounded-md border p-2 text-sm"
 					disabled={loading || busy !== null}
+					onFiles={(selected) => (file = selected[0] ?? null)}
 				/>
+				{#if file}<p class="text-sm text-muted-foreground">{file.name}</p>{/if}
 			</div>
 			{#if uploadError}<Alert.Root variant="destructive"
 					><Alert.Description>{uploadError}</Alert.Description></Alert.Root
@@ -344,7 +346,7 @@
 					class="h-11"
 					disabled={loading || busy !== null}
 					onclick={() => (uploadOpen = false)}><X class="size-4" aria-hidden="true" />Cancel</Button
-				><Button type="submit" class="h-11" disabled={!files?.length || busy !== null}
+				><Button type="submit" class="h-11" disabled={!file || busy !== null}
 					>{#if busy === 'upload'}<Spinner
 							class="motion-reduce:animate-none"
 							aria-hidden="true"

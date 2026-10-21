@@ -3,9 +3,17 @@
 
 	let {
 		onFiles,
+		multiple = true,
+		accept,
+		disabled = false,
+		id,
 		ref = $bindable(null)
 	}: {
 		onFiles: (files: FileList | File[]) => void;
+		multiple?: boolean;
+		accept?: string;
+		disabled?: boolean;
+		id?: string;
 		ref?: HTMLDivElement | null;
 	} = $props();
 
@@ -15,7 +23,10 @@
 	function handleDrop(e: DragEvent) {
 		e.preventDefault();
 		dragOver = false;
-		if (e.dataTransfer?.files) onFiles(e.dataTransfer.files);
+		if (disabled) return;
+		if (e.dataTransfer?.files) {
+			onFiles(multiple ? e.dataTransfer.files : Array.from(e.dataTransfer.files).slice(0, 1));
+		}
 	}
 
 	function handleFileInput(e: Event) {
@@ -28,17 +39,18 @@
 <div
 	bind:this={ref}
 	role="button"
-	tabindex="0"
+	aria-disabled={disabled}
+	tabindex={disabled ? -1 : 0}
 	class="relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-6 text-sm transition-colors {dragOver
 		? 'border-primary bg-primary/5'
 		: 'border-border hover:border-primary/50 hover:bg-muted/40'}"
 	ondragover={(e) => {
 		e.preventDefault();
-		dragOver = true;
+		dragOver = !disabled;
 	}}
 	ondragleave={() => (dragOver = false)}
 	ondrop={handleDrop}
-	onkeydown={(e) => e.key === 'Enter' && fileInputEl?.click()}
+	onkeydown={(e) => !disabled && e.key === 'Enter' && fileInputEl?.click()}
 >
 	<Upload class="size-5 text-muted-foreground" />
 	<span class="text-muted-foreground">
@@ -46,8 +58,11 @@
 	</span>
 	<input
 		bind:this={fileInputEl}
+		{id}
 		type="file"
-		multiple
+		{multiple}
+		{accept}
+		{disabled}
 		tabindex="-1"
 		class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
 		onchange={handleFileInput}

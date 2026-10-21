@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PasswordInput from '$lib/components/password-input.svelte';
+	import FileDrop from '$lib/components/file-drop.svelte';
 	import { tick } from 'svelte';
 	import { auth } from '$lib/auth.svelte.js';
 	import { describeClaimed, PASSWORD_MIN_LENGTH } from '$lib/auth';
@@ -20,8 +21,8 @@
 	let error = $state<string | null>(null);
 	let claimedSummary = $state<string[] | null>(null);
 	let restoring = $state(false);
-	let backupFiles = $state<FileList | undefined>();
-	let backupInput = $state<HTMLInputElement | null>(null);
+	let backupFile = $state<File | null>(null);
+	let backupDrop = $state<HTMLDivElement | null>(null);
 
 	const mismatch = $derived(confirm !== '' && confirm !== password);
 	const tooShort = $derived(password !== '' && password.length < PASSWORD_MIN_LENGTH);
@@ -64,7 +65,7 @@
 
 	async function handleRestore(event: SubmitEvent) {
 		event.preventDefault();
-		const file = backupFiles?.[0];
+		const file = backupFile;
 		if (busy || !file) return;
 		busy = true;
 		error = null;
@@ -73,7 +74,7 @@
 			error = result.message;
 			busy = false;
 			await tick();
-			backupInput?.focus();
+			backupDrop?.focus();
 			return;
 		}
 		toast.success('Backup restored. Sign in with your existing account.');
@@ -120,18 +121,17 @@
 				{/if}
 				<div class="space-y-1.5">
 					<Label for="setup-backup">Backup file</Label>
-					<input
+					<FileDrop
 						id="setup-backup"
-						type="file"
+						multiple={false}
 						accept=".tar.gz,.gz,application/gzip"
-						bind:this={backupInput}
-						bind:files={backupFiles}
 						disabled={busy}
-						required
-						class="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1 file:text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50"
+						bind:ref={backupDrop}
+						onFiles={(selected) => (backupFile = selected[0] ?? null)}
 					/>
+					{#if backupFile}<p class="text-sm text-muted-foreground">{backupFile.name}</p>{/if}
 				</div>
-				<Button type="submit" class="h-11 w-full" disabled={busy || !backupFiles?.length}>
+				<Button type="submit" class="h-11 w-full" disabled={busy || !backupFile}>
 					{#if busy}<Spinner class="size-4" />Restoring backup…{:else}Restore backup{/if}
 				</Button>
 				<p class="text-xs text-muted-foreground" aria-live="polite">
