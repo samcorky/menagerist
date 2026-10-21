@@ -13,47 +13,56 @@ def _clean() -> None:
     proxy_signals.reset()
 
 
+UNTRUSTED = "configuration:proxyUntrustedForwarding"
+MISMATCH = "configuration:proxyOriginMismatch"
+
+
 async def test_passes_when_nothing_suspicious_was_seen() -> None:
-    """No signals, no warning."""
+    """No signals: one passing observation per signal."""
     result = await ProxyConfigurationCheck().run()
 
-    obs = result["proxy:configuration"]
-    assert obs.status is CheckStatus.PASS
-    assert obs.observed_value == 0
-    assert obs.observed_unit == "flagged requests"
-    assert obs.output is None
+    assert set(result) == {UNTRUSTED, MISMATCH}
+    for obs in result.values():
+        assert obs.status is CheckStatus.PASS
+        assert obs.observed_value == 0
+        assert obs.observed_unit == "flagged requests"
+        assert obs.output is None
 
 
 @pytest.mark.parametrize(
-    ("signal", "words"),
+    ("signal", "key", "words"),
     [
-        (ProxySignal.UNTRUSTED_FORWARDING, "forwarding headers"),
-        (ProxySignal.ORIGIN_MISMATCH, "origin differs"),
+        (ProxySignal.UNTRUSTED_FORWARDING, UNTRUSTED, "forwarding headers"),
+        (ProxySignal.ORIGIN_MISMATCH, MISMATCH, "origin differs"),
     ],
 )
 async def test_warns_with_a_hint_for_each_signal(
-    signal: ProxySignal, words: str
+    signal: ProxySignal, key: str, words: str
 ) -> None:
-    """A signal gives a warning that names the setting to look at."""
+    """A signal warns on its own row, naming the setting to look at."""
     proxy_signals.record(signal)
 
-    obs = (await ProxyConfigurationCheck().run())["proxy:configuration"]
+    result = await ProxyConfigurationCheck().run()
 
+    obs = result[key]
     assert obs.status is CheckStatus.WARN
     assert obs.observed_value == 1
     assert obs.output is not None
     assert words in obs.output
     assert "MENAGERIST_TRUSTED_PROXIES" in obs.output
+    others = [o for k, o in result.items() if k != key]
+    assert all(o.status is CheckStatus.PASS for o in others)
 
 
-async def test_both_hints_appear_when_both_signals_were_seen() -> None:
-    """Each signal contributes its own hint."""
+async def test_each_signal_keeps_its_own_count_and_hint() -> None:
+    """Two signals give two warnings, not one merged row."""
     proxy_signals.record(ProxySignal.UNTRUSTED_FORWARDING)
     proxy_signals.record(ProxySignal.ORIGIN_MISMATCH)
+    proxy_signals.record(ProxySignal.ORIGIN_MISMATCH)
 
-    obs = (await ProxyConfigurationCheck().run())["proxy:configuration"]
+    result = await ProxyConfigurationCheck().run()
 
-    assert obs.observed_value == 2
-    assert obs.output is not None
-    assert "forwarding headers" in obs.output
-    assert "origin differs" in obs.output
+    assert result[UNTRUSTED].observed_value == 1
+    assert result[MISMATCH].observed_value == 2
+    assert "forwarding headers" in (result[UNTRUSTED].output or "")
+    assert "origin differs" in (result[MISMATCH].output or "")

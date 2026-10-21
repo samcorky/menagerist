@@ -1,6 +1,6 @@
 # CSRF protection from browser request headers: implementation plan
 
-Status: planned, nothing implemented. Written 2026-10-19 and revised the same day after discussion. Replaces an earlier plan that used a session-bound token (see Decision 4). Follow-up PR 2 covers the `__Host-Http-` session cookie, a strict cookie reader and WebKit/Firefox e2e tests; follow-up PR 3 tightens CORS and adds an open-CORS warning. Based on reading `entrypoints/api/shared/http/csrf.py` and `cross_site.py`, `entrypoints/api/__init__.py`, `entrypoints/api/startup.py`, `modules/identity/adapters/api/{auth_router,cookies,dependencies}.py`, `modules/system/adapters/platform/checks/*`, `platform/{proxy_signals.py, config/api.py, config/identity.py}`, `frontend/src/lib/{auth.ts,api/auth-interceptor.ts}`, `frontend/playwright.config.ts`, `frontend/tests/e2e/{auth.spec.ts,fixtures.ts}`, `entrypoints/api/docs/static/swagger-init.js`, `tests/conftest.py`, `tests/modules/identity/adapters/test_auth_router.py`, Starlette's `cookie_parser`, MDN's CSRF and Set-Cookie pages, OWASP's CSRF cheat sheet, caniuse and PortSwigger's "Cookie Chaos" research.
+Status: PRs 1 to 3 implemented and committed on 2026-10-21 (8ac9881; 89f6382 and 60ab2cb; 5301512). Only the follow-ups at the end remain. Written 2026-10-19 and revised the same day after discussion. Replaces an earlier plan that used a session-bound token (see Decision 4). Follow-up PR 2 covers the `__Host-Http-` session cookie, a strict cookie reader and WebKit/Firefox e2e tests; follow-up PR 3 tightens CORS and adds an open-CORS warning. Based on reading `entrypoints/api/shared/http/csrf.py` and `cross_site.py`, `entrypoints/api/__init__.py`, `entrypoints/api/startup.py`, `modules/identity/adapters/api/{auth_router,cookies,dependencies}.py`, `modules/system/adapters/platform/checks/*`, `platform/{proxy_signals.py, config/api.py, config/identity.py}`, `frontend/src/lib/{auth.ts,api/auth-interceptor.ts}`, `frontend/playwright.config.ts`, `frontend/tests/e2e/{auth.spec.ts,fixtures.ts}`, `entrypoints/api/docs/static/swagger-init.js`, `tests/conftest.py`, `tests/modules/identity/adapters/test_auth_router.py`, Starlette's `cookie_parser`, MDN's CSRF and Set-Cookie pages, OWASP's CSRF cheat sheet, caniuse and PortSwigger's "Cookie Chaos" research.
 
 Working rules (`AGENTS.md` / `CLAUDE.md`): never create, stage or push commits; British English; `.svelte` and `.svelte.ts` files go through the `svelte-file-editor` subagent; run only the relevant `poe` checks (`lint-backend`, `typecheck-backend`, `test-backend`, `coverage` before calling backend work done; frontend equivalents); coverage floors: domain/application/shared_kernel 100%, adapters 80%, platform 70%; no try/except in routers; every port has an in-memory sibling.
 
@@ -312,8 +312,45 @@ One constant holds the text so the log line and the check output match (e.g. `CO
 2. Confirm the dev frontend on :5173 reaches the backend through the Vite proxy and not cross-origin. If it is cross-origin today, cookie auth is already broken there (credentials off), so this change would not make it worse.
 3. Whether to log the start-up warning at all when running under tests or the CLI; default is the same as the other start-up warnings (lifespan only).
 
+## PR 4: browser self-check on the status page
+
+### Why
+
+If a reverse proxy strips `Origin` and `Sec-Fetch-Site`, every sign-in and change from the SPA fails with `403 csrf_failed`. The server cannot tell a stripped browser request from a script, so it cannot warn by itself (see the rejected `MISSING_ORIGIN_HEADERS` signal). An administrator's own browser is certainly a browser, so it can ask the backend what arrived.
+
+### Shape (same layering as the other system use cases)
+
+- **Domain** (`modules/system/domain/browser_check.py`). Frozen `BrowserRequest(sec_fetch_site, origin, seen_origin)` of plain strings (no Starlette types) and `BrowserCheckResult(status: CheckStatus, sec_fetch_site, origin, seen_origin, output)`. A pure function `assess(request) -> BrowserCheckResult`: `pass` when `Sec-Fetch-Site` is `same-origin`, or `Origin` equals `seen_origin`; `warn` when `Sec-Fetch-Site` is `same-origin` but `Origin` is absent or differs (host or scheme is changed on the way in; `MENAGERIST_TRUSTED_PROXIES` and the proxy's `Host`); `warn` when only `Origin` arrived (plain HTTP to a non-localhost host, where browsers send no `Sec-Fetch-*`; the check still works). `output` is the human hint, set only on `warn`. Neither header present never reaches it: `verify_csrf` refuses first, which is the failure the check exists to expose.
+- **Application** (`modules/system/application/run_browser_check.py`). `RunBrowserCheckQuery(request: BrowserRequest)` and `RunBrowserCheck`, an `AuthorisedUseCase` needing `SystemPermission.READ_DIAGNOSTICS` (no new permission). It has no port: it only calls `assess`, so there is nothing to put behind an interface and no in-memory sibling to add. It is a query (no commit), though the route is `POST`.
+- **Adapters/API** (`modules/system/adapters/api/router.py`, `dependencies.py`). `POST /api/browser-check`, `operation_id="run_browser_check"`, `Cache-Control: no-store`. The router builds `BrowserRequest` from the headers and `own_origin(request)` (the header reading is HTTP, so it belongs here, as `verify_csrf` does today) and maps the result to a `BrowserCheckResponse` Pydantic model. No `try/except`; `403` documented with `error_response(ForbiddenError, ...)`, covering both the permission and the CSRF refusal. Wired like `get_get_version_detail_use_case`.
+- **POST on purpose.** `verify_csrf` ignores safe methods, so a `GET` would pass even with the headers stripped and prove nothing. Because the route is unsafe, a stripped request is refused by the existing dependency with `csrf_failed` and never reaches the use case.
+- **No proxy signal.** The route records nothing itself; a script calling it either has no session (401) or no headers (403, already logged by `log_refusal`). The existing `ORIGIN_MISMATCH` note in `verify_csrf` still fires for a genuine browser, which is correct. Nothing a script sends can add a `proxy:configuration` warning.
+
+### Frontend
+
+The status page (administrators only, like the detail cards) gets a "Browser check" card. It calls `runBrowserCheck` on load (the generated client is regenerated with `poe generate-frontend-client`) and shows one of:
+- **Pass**: headers arrived intact.
+- **Warn**: the response's `output`, plus the origin the page has (`location.origin`) beside the one the server saw.
+- **Failed with `403 csrf_failed`**: "Something between your browser and Menagerist removed the browser's `Origin` and `Sec-Fetch-Site` headers, so changes will be refused. Check the proxy passes request headers through." Distinguished from a permission 403 by the problem `type`.
+- **Plain HTTP**: the warn text for "only `Origin` arrived" says this is normal for http to a non-localhost host.
+
+Logic (choosing the message from the call result) goes in `frontend/src/lib/status.ts` next to `readinessOf`, with Vitest cases; the card is a `.svelte` change, so it goes through the `svelte-file-editor` subagent. Copy in British English and without graph terms, per `DESIGN_GUIDELINES.md`.
+
+### Tests
+
+- Domain: every branch of `assess`, no I/O (100% floor).
+- Application: authorised actor gets the result; an actor without `READ_DIAGNOSTICS` is refused; the result is passed through unchanged (100% floor).
+- Router (raw-scope `Request` tests as in PR 1, plus the in-memory wiring): same-origin browser headers give `pass`; same-origin with a differing `Origin` gives `warn` with `seen_origin` filled in; `Origin` only gives `warn`; no headers with a session gives `403 csrf_failed` and the use case is not called; no session gives `401`; a non-admin gives `403` with the permission problem; `Cache-Control: no-store`.
+- Guard tests from PR 3 keep passing: `POST` is already a listed CORS method and the response has no new header.
+- Frontend: Vitest for the message chooser (pass, warn, csrf 403, permission 403, network error). Playwright: in the cookie project, an admin sees "pass" over both the plain and the TLS URL; one test routes the request through a proxy that deletes `Origin` and `Sec-Fetch-Site` (the TLS proxy script can take a flag for it) and expects the stripped-headers message.
+
+### Open points
+
+1. Whether `CsrfError` should carry `seen_origin` and `claimed_origin` in the problem document so the failed case can show both (they are only in the server log today). They are the server's own origin and the browser's own claim, so nothing secret, but it changes a shared error type; default is to leave them out and rely on the page's `location.origin`.
+2. Whether the card runs on load or on a button. Default is on load: it is one cheap authorised request, and the point is that nobody has to remember to run it.
+3. Resolved: `AuthorisedUseCase` (no repos) fits a use case with no port.
+
 ## Follow-ups (not in a PR yet)
 
-- **Browser self-check.** An admin-only `POST /api/v1/system/browser-check` that the status page calls. A `403 csrf_failed` on that call means a proxy is removing `Origin` and `Sec-Fetch-Site`, because the caller is certainly a browser; `origin_differs` shows the seen and sent origins. The result stays on the admin's page and records no proxy signal, so a script cannot raise a false `proxy:configuration` warning. Browsers send `Sec-Fetch-*` only to HTTPS origins (and localhost), so over plain HTTP a missing header is not a failure.
 - **No session-bound token.** Decided against (2026-10-21): the remaining gap needs a browser that misreports its headers or a proxy that strips them, which fails closed with a logged reason.
 - **No `MISSING_ORIGIN_HEADERS` proxy signal.** Non-browser clients are in scope and would trip it.

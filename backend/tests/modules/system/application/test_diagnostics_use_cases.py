@@ -18,7 +18,12 @@ from app.modules.system.application.get_version_detail import (
     GetVersionDetailQuery,
 )
 from app.modules.system.application.permissions import SystemPermission
+from app.modules.system.application.run_browser_check import (
+    RunBrowserCheck,
+    RunBrowserCheckQuery,
+)
 from app.modules.system.domain.app_info import AppInfo
+from app.modules.system.domain.browser_check import BrowserRequest, assess
 from app.modules.system.domain.readiness import CheckStatus, ReadinessReport
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.errors import ForbiddenError
@@ -62,3 +67,17 @@ async def test_admin_reads_readiness_detail_and_member_is_refused() -> None:
     assert await use_case.handle(GetHealthReadyDetailQuery(), ADMIN) is REPORT
     with pytest.raises(ForbiddenError):
         await use_case.handle(GetHealthReadyDetailQuery(), MEMBER)
+
+
+async def test_admin_runs_the_browser_check_and_member_is_refused() -> None:
+    """The result is the assessment; a member holds no diagnostics permission."""
+    request = BrowserRequest(
+        sec_fetch_site="same-origin", origin="http://x", seen_origin="http://x"
+    )
+    use_case = RunBrowserCheck(RoleAuthorizationAdapter())
+
+    result = await use_case.handle(RunBrowserCheckQuery(request=request), ADMIN)
+
+    assert result == assess(request)
+    with pytest.raises(ForbiddenError):
+        await use_case.handle(RunBrowserCheckQuery(request=request), MEMBER)

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { countStatuses, formatObservedValue, readinessOf, readyDetailOf } from '../src/lib/status';
+import {
+	browserCheckOf,
+	countStatuses,
+	formatObservedValue,
+	readinessOf,
+	readyDetailOf
+} from '../src/lib/status';
 import { FILE_TOO_LARGE_MESSAGE, uploadErrorMessage } from '../src/lib/api/errors';
 
 const res = (status: number) => new Response(null, { status });
@@ -99,5 +105,59 @@ describe('uploadErrorMessage', () => {
 
 	it('says offline without a response', () => {
 		expect(uploadErrorMessage({ error: undefined, response: undefined })).toMatch(/offline/);
+	});
+});
+
+describe('browserCheckOf', () => {
+	const body = {
+		status: 'warn',
+		sec_fetch_site: 'same-origin',
+		origin: 'https://public.example',
+		seen_origin: 'http://10.0.0.5:8000',
+		output: 'check the proxy'
+	};
+
+	it('reads the report from a 200', () => {
+		expect(browserCheckOf({ data: body, response: res(200) })).toEqual({
+			state: 'warn',
+			output: 'check the proxy',
+			origin: 'https://public.example',
+			seenOrigin: 'http://10.0.0.5:8000'
+		});
+	});
+
+	it('fills the optional fields with null', () => {
+		const { output, origin, ...rest } = body;
+		void output;
+		void origin;
+		expect(browserCheckOf({ data: { ...rest, status: 'pass' }, response: res(200) })).toEqual({
+			state: 'pass',
+			output: null,
+			origin: null,
+			seenOrigin: 'http://10.0.0.5:8000'
+		});
+	});
+
+	it('reads a csrf_failed 403 as removed headers', () => {
+		const error = { type: 'https://menagerist.example/problems/csrf_failed' };
+		expect(browserCheckOf({ error, response: res(403) })).toEqual({ state: 'stripped' });
+	});
+
+	it('does not blame the headers for a permission 403, other errors or no answer', () => {
+		const permission = { type: 'https://menagerist.example/problems/forbidden' };
+		expect(browserCheckOf({ error: permission, response: res(403) })).toEqual({
+			state: 'unavailable'
+		});
+		expect(browserCheckOf({ error: { type: 'csrf_failed' }, response: res(500) })).toEqual({
+			state: 'unavailable'
+		});
+		expect(browserCheckOf({ error: undefined, response: null })).toEqual({ state: 'unavailable' });
+	});
+});
+
+describe('formatObservedValue for CORS', () => {
+	it('reads the open-origins flag as words', () => {
+		expect(formatObservedValue(0, 'open origins')).toBe('Listed origins only');
+		expect(formatObservedValue(1, 'open origins')).toBe('Any origin allowed');
 	});
 });

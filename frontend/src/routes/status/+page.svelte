@@ -1,13 +1,14 @@
 <script lang="ts">
 	import type { Component } from 'svelte';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { resolve } from '$app/paths';
 	import {
 		getHealthReady,
 		getHealthReadyDetail,
 		getVersion,
-		getVersionDetail
+		getVersionDetail,
+		runBrowserCheck
 	} from '$lib/api/client';
 	import type {
 		CheckObservation,
@@ -18,23 +19,28 @@
 	import { auth } from '$lib/auth.svelte.js';
 	import { LOGIN_PATH, STATUS_PATH } from '$lib/auth';
 	import {
+		browserCheckOf,
 		countStatuses,
 		formatObservedValue,
 		readinessOf,
 		readyDetailOf,
+		type BrowserCheck,
 		type Readiness
 	} from '$lib/status';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import * as Collapsible from '$lib/components/ui/collapsible/index.js';
 	import * as PopoverTooltip from '$lib/components/ui/popover-tooltip/index.js';
 	import {
 		Activity,
 		AlertTriangle,
 		CheckCircle2,
+		ChevronDown,
 		CircleX,
 		Database,
 		Gauge,
+		Globe,
 		GitBranch,
 		HardDrive,
 		LogIn,
@@ -49,7 +55,10 @@
 	} from '@lucide/svelte';
 
 	function formatLabel(camel: string): string {
-		return camel.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase());
+		return camel
+			.replace(/([A-Z])/g, ' $1')
+			.replace(/^./, (s) => s.toUpperCase())
+			.replace(/\bCors\b/g, 'CORS');
 	}
 
 	function formatGroup(key: string): string {
@@ -93,13 +102,14 @@
 		if (key === 'system') return Activity;
 		if (key === 'pool') return Gauge;
 		if (key === 'migration') return GitBranch;
-		if (key === 'proxy') return Network;
+		if (key === 'configuration' || key === 'proxy') return Network;
 		if (key === 'storage') return HardDrive;
 		return Server;
 	}
 
 	function metricIcon(label: string): Component {
 		const lower = label.toLowerCase();
+		if (lower.includes('proxy') || lower.includes('cors')) return Network;
 		if (lower.includes('database') || lower.includes('db')) return Database;
 		if (lower.includes('migration') || lower.includes('schema')) return GitBranch;
 		if (lower.includes('pool') || lower.includes('connection')) return Gauge;
@@ -159,6 +169,60 @@
 	}
 
 	let highlightedCheckId = $state<string | null>(null);
+	const openGroups = new SvelteMap<string, boolean>();
+	const lastGroupStatus = new SvelteMap<string, CheckObservation['status']>();
+	let buildOpen = $state(false);
+
+	type CheckGroups = Map<string, Array<{ label: string; obs: CheckObservation }>>;
+
+	// Problem groups open by default; a pass group that starts failing opens once.
+	// Anything the user toggled is never forced closed.
+	function syncOpenGroups(current: CheckGroups): void {
+		for (const [groupKey, checks] of current) {
+			const status = groupStatus(checks);
+			const previous = lastGroupStatus.get(groupKey);
+			if (previous === undefined) {
+				openGroups.set(groupKey, status !== 'pass');
+			} else if (previous === 'pass' && status !== 'pass') {
+				openGroups.set(groupKey, true);
+			}
+			lastGroupStatus.set(groupKey, status);
+		}
+	}
+
+	async function revealCheck(groupKey: string, anchorId: string): Promise<void> {
+		openGroups.set(groupKey, true);
+		await tick();
+		for (let attempt = 0; attempt < 10; attempt++) {
+			const target = document.getElementById(anchorId);
+			if (target) {
+				target.scrollIntoView({ block: 'start' });
+				target.focus({ preventScroll: true });
+				return;
+			}
+			await new Promise((done) => requestAnimationFrame(() => done(null)));
+		}
+	}
+
+	function openCheckLink(event: MouseEvent, groupKey: string, anchorId: string): void {
+		event.preventDefault();
+		highlightedCheckId = anchorId;
+		if (window.location.hash !== `#${anchorId}`) {
+			window.history.pushState(window.history.state, '', `#${anchorId}`);
+		}
+		void revealCheck(groupKey, anchorId);
+	}
+
+	function revealInitialHash(current: CheckGroups): void {
+		const anchorId = decodeURIComponent(window.location.hash.slice(1));
+		if (!anchorId) return;
+		for (const [groupKey, checks] of current) {
+			if (checkAnchorIds(groupKey, checks).includes(anchorId)) {
+				void revealCheck(groupKey, anchorId);
+				return;
+			}
+		}
+	}
 
 	function clearStatusTarget(event: MouseEvent): void {
 		if (event.target instanceof Element && event.target.closest('a[data-status-check-link]')) {
@@ -200,6 +264,7 @@
 	let detail = $state<ReadyDetailResponse | null>(null);
 	let version = $state<VersionResponse | null>(null);
 	let buildInfo = $state<VersionDetailResponse | null>(null);
+	let browserCheck = $state<BrowserCheck | null>(null);
 	const showDetail = $derived(auth.signedIn && auth.can('system:diagnostics:read'));
 	const signInHref = $derived(`${resolve(LOGIN_PATH)}?next=${encodeURIComponent(STATUS_PATH)}`);
 	let loading = $state(true);
@@ -249,6 +314,16 @@
 		return countStatuses(Object.values(detail.checks).flat());
 	});
 
+	async function checkBrowser(): Promise<Parameters<typeof browserCheckOf>[0]> {
+		try {
+			return await runBrowserCheck();
+		} catch {
+			return {};
+		}
+	}
+
+	let initialHashHandled = false;
+
 	async function load(refresh = false): Promise<void> {
 		if (refresh) {
 			refreshing = true;
@@ -259,11 +334,12 @@
 
 		try {
 			const withDetail = showDetail;
-			const [readyRes, versionRes, detailRes, buildRes] = await Promise.all([
+			const [readyRes, versionRes, detailRes, buildRes, browserRes] = await Promise.all([
 				getHealthReady(),
 				getVersion(),
 				withDetail ? getHealthReadyDetail() : null,
-				withDetail ? getVersionDetail() : null
+				withDetail ? getVersionDetail() : null,
+				withDetail ? checkBrowser() : null
 			]);
 
 			const state = readinessOf(readyRes);
@@ -274,7 +350,13 @@
 			version = versionRes.data;
 			detail = detailRes ? readyDetailOf(detailRes) : null;
 			buildInfo = buildRes?.data ?? null;
+			browserCheck = browserRes ? browserCheckOf(browserRes) : null;
 			lastCheckTime = (detail && latestObservationTime(detail)) || new Date();
+			syncOpenGroups(groups);
+			if (!initialHashHandled) {
+				initialHashHandled = true;
+				revealInitialHash(groups);
+			}
 		} catch (err) {
 			loadError = err instanceof Error ? err.message : 'Unknown error';
 		} finally {
@@ -295,6 +377,9 @@
 		return () => window.clearInterval(timer);
 	});
 
+	const triggerClass =
+		'relative -mb-(--card-spacing) flex min-h-11 w-full items-center justify-center gap-2 border-t border-border/70 px-5 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none';
+
 	function formatTime(date: Date): string {
 		return date.toLocaleString(undefined, {
 			year: 'numeric',
@@ -306,6 +391,13 @@
 		});
 	}
 </script>
+
+{#snippet browserRow(label: string, value: string)}
+	<div class="flex items-center justify-between gap-4 border-t border-border/80 px-5 py-3">
+		<span class="text-sm text-muted-foreground">{label}</span>
+		<span class="max-w-[60%] truncate text-right font-mono text-sm">{value}</span>
+	</div>
+{/snippet}
 
 <svelte:head>
 	<title>System status - Menagerist</title>
@@ -479,125 +571,213 @@
 				{@const GroupIcon = groupIcon(groupKey)}
 				{@const groupHealth = groupStatus(checks)}
 				{@const GroupStatusIcon = statusIcon(groupHealth)}
+				{@const isOpen = openGroups.get(groupKey) ?? false}
 				<Card.Root class="overflow-hidden border-border/70 bg-card shadow-sm">
+					<Collapsible.Root
+						open={isOpen}
+						onOpenChange={(value) => openGroups.set(groupKey, value)}
+						class="flex flex-col gap-(--card-spacing)"
+					>
+						<Card.Header class="px-5 pt-5 pb-0">
+							<div class="flex items-center justify-between gap-3">
+								<div class="flex items-center gap-2.5">
+									<div
+										class="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+									>
+										<GroupIcon class="size-4" />
+									</div>
+									<Card.Title class="text-base">{formatGroup(groupKey)}</Card.Title>
+								</div>
+								<Badge class={statusTone(groupHealth)}>
+									<GroupStatusIcon class="size-3" />
+									{statusLabel(groupHealth)}
+								</Badge>
+							</div>
+						</Card.Header>
+						<div class="space-y-2 px-5 pt-3 pb-0">
+							<div
+								class="flex h-3 gap-1"
+								role="group"
+								aria-label={`${formatGroup(groupKey)} checks; select a segment to view its details`}
+							>
+								{#each checks as { label, obs }, index (`${label}-${index}`)}
+									<PopoverTooltip.Root>
+										<PopoverTooltip.Trigger>
+											{#snippet child({ props })}
+												<a
+													{...props}
+													data-status-check-link
+													href={`#${anchorIds[index]}`}
+													onclick={(event) => openCheckLink(event, groupKey, anchorIds[index])}
+													class="min-w-0 flex-1 rounded-full {statusBarTone(
+														obs.status
+													)} transition-[filter] duration-150 hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none"
+													aria-label={`${formatLabel(label)}: ${statusLabel(obs.status)}. ${formatValue(obs)}${obs.output ? `. ${obs.output}` : ''}`}
+												></a>
+											{/snippet}
+										</PopoverTooltip.Trigger>
+										<PopoverTooltip.Content class="text-left whitespace-normal">
+											{formatLabel(label)}: {statusLabel(obs.status)}. {formatValue(obs)}
+											{#if obs.output}
+												. {obs.output}
+											{/if}
+										</PopoverTooltip.Content>
+									</PopoverTooltip.Root>
+								{/each}
+							</div>
+							<p class="text-center text-xs font-medium text-muted-foreground">
+								{groupSummary(checks)}
+							</p>
+						</div>
+						<Collapsible.Content>
+							<Card.Content class="space-y-3 p-4">
+								{#each checks as { label, obs }, index (`${label}-${index}`)}
+									{@const MetricIcon = metricIcon(label)}
+									{@const MetricStatusIcon = statusIcon(obs.status)}
+									<div
+										id={anchorIds[index]}
+										tabindex="-1"
+										class="status-check-detail flex scroll-mt-24 items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-3 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring {highlightedCheckId ===
+										anchorIds[index]
+											? 'status-check-highlighted'
+											: ''}"
+									>
+										<div
+											class="flex size-8 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground ring-1 ring-border/80"
+										>
+											<MetricIcon class="size-4" />
+										</div>
+										<div class="min-w-0 flex-1">
+											<div class="flex items-center justify-between gap-3">
+												<span class="text-sm font-medium">{formatLabel(label)}</span>
+												<Badge class={statusTone(obs.status)}>
+													<MetricStatusIcon class="size-3" />
+													{statusLabel(obs.status)}
+												</Badge>
+											</div>
+											<p class="mt-1 font-mono text-xs text-muted-foreground">{formatValue(obs)}</p>
+											{#if obs.output}
+												<p
+													class={obs.status === 'warn'
+														? 'mt-2 text-sm leading-relaxed break-words text-amber-700 dark:text-amber-400'
+														: 'mt-2 text-sm leading-relaxed break-words text-destructive'}
+												>
+													{obs.output}
+												</p>
+											{/if}
+										</div>
+									</div>
+								{/each}
+							</Card.Content>
+						</Collapsible.Content>
+						<Collapsible.Trigger class={triggerClass}>
+							<ChevronDown
+								class="size-4 transition-transform motion-reduce:transition-none {isOpen
+									? 'rotate-180'
+									: ''}"
+							/>
+							{isOpen ? 'Hide details' : 'Show details'}
+							<span class="sr-only"> for {formatGroup(groupKey)}</span>
+						</Collapsible.Trigger>
+					</Collapsible.Root>
+				</Card.Root>
+			{/each}
+
+			{#if showDetail && browserCheck}
+				{@const check = browserCheck}
+				<Card.Root
+					class="overflow-hidden border-border/70 bg-card shadow-sm"
+					data-testid="browser-check"
+					data-state={check.state}
+				>
 					<Card.Header class="px-5 pt-5 pb-0">
 						<div class="flex items-center justify-between gap-3">
 							<div class="flex items-center gap-2.5">
 								<div
 									class="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground"
 								>
-									<GroupIcon class="size-4" />
+									<Globe class="size-4" />
 								</div>
-								<Card.Title class="text-base">{formatGroup(groupKey)}</Card.Title>
+								<Card.Title class="text-base">Browser check</Card.Title>
 							</div>
-							<Badge class={statusTone(groupHealth)}>
-								<GroupStatusIcon class="size-3" />
-								{statusLabel(groupHealth)}
-							</Badge>
-						</div>
-					</Card.Header>
-					<div class="space-y-2 px-5 pt-3 pb-0">
-						<div
-							class="flex h-3 gap-1"
-							role="group"
-							aria-label={`${formatGroup(groupKey)} checks; select a segment to view its details`}
-						>
-							{#each checks as { label, obs }, index (`${label}-${index}`)}
-								<PopoverTooltip.Root>
-									<PopoverTooltip.Trigger>
-										{#snippet child({ props })}
-											<a
-												{...props}
-												data-status-check-link
-												href={`#${anchorIds[index]}`}
-												onclick={() => (highlightedCheckId = anchorIds[index])}
-												class="min-w-0 flex-1 rounded-full {statusBarTone(
-													obs.status
-												)} transition-[filter] duration-150 hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none"
-												aria-label={`${formatLabel(label)}: ${statusLabel(obs.status)}. ${formatValue(obs)}${obs.output ? `. ${obs.output}` : ''}`}
-											></a>
-										{/snippet}
-									</PopoverTooltip.Trigger>
-									<PopoverTooltip.Content class="text-left whitespace-normal">
-										{formatLabel(label)}: {statusLabel(obs.status)}. {formatValue(obs)}
-										{#if obs.output}
-											. {obs.output}
-										{/if}
-									</PopoverTooltip.Content>
-								</PopoverTooltip.Root>
-							{/each}
-						</div>
-						<p class="text-center text-xs font-medium text-muted-foreground">
-							{groupSummary(checks)}
-						</p>
-					</div>
-					<Card.Content class="space-y-3 p-4">
-						{#each checks as { label, obs }, index (`${label}-${index}`)}
-							{@const MetricIcon = metricIcon(label)}
-							{@const MetricStatusIcon = statusIcon(obs.status)}
-							<div
-								id={anchorIds[index]}
-								tabindex="-1"
-								class="status-check-detail flex scroll-mt-24 items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-3 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring {highlightedCheckId ===
-								anchorIds[index]
-									? 'status-check-highlighted'
-									: ''}"
-							>
-								<div
-									class="flex size-8 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground ring-1 ring-border/80"
-								>
-									<MetricIcon class="size-4" />
-								</div>
-								<div class="min-w-0 flex-1">
-									<div class="flex items-center justify-between gap-3">
-										<span class="text-sm font-medium">{formatLabel(label)}</span>
-										<Badge class={statusTone(obs.status)}>
-											<MetricStatusIcon class="size-3" />
-											{statusLabel(obs.status)}
-										</Badge>
-									</div>
-									<p class="mt-1 font-mono text-xs text-muted-foreground">{formatValue(obs)}</p>
-									{#if obs.output}
-										<p
-											class={obs.status === 'warn'
-												? 'mt-2 text-sm leading-relaxed break-words text-amber-700 dark:text-amber-400'
-												: 'mt-2 text-sm leading-relaxed break-words text-destructive'}
-										>
-											{obs.output}
-										</p>
-									{/if}
-								</div>
-							</div>
-						{/each}
-					</Card.Content>
-				</Card.Root>
-			{/each}
-
-			{#if buildInfo}
-				<Card.Root class="overflow-hidden border-border/70 bg-card shadow-sm">
-					<Card.Header class="px-5 pt-5 pb-0">
-						<div class="flex items-center gap-2.5">
-							<div
-								class="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground"
-							>
-								<PackageCheck class="size-4" />
-							</div>
-							<Card.Title class="text-base">Build info</Card.Title>
+							{#if check.state === 'pass' || check.state === 'warn' || check.state === 'fail'}
+								{@const BrowserStatusIcon = statusIcon(check.state)}
+								<Badge class={statusTone(check.state)}>
+									<BrowserStatusIcon class="size-3" />
+									{statusLabel(check.state)}
+								</Badge>
+							{/if}
 						</div>
 					</Card.Header>
 					<Card.Content class="space-y-0 p-0">
-						{#each versionRows as { label, value }, i (label)}
-							<div
-								class="flex items-center justify-between gap-4 px-5 py-3 {i !==
-								versionRows.length - 1
-									? 'border-b border-border/80'
-									: ''}"
-							>
-								<span class="text-sm text-muted-foreground">{label}</span>
-								<span class="max-w-[60%] truncate text-right font-mono text-sm">{value}</span>
-							</div>
-						{/each}
+						{#if check.state === 'pass'}
+							<p class="px-5 py-3 text-sm text-emerald-700 dark:text-emerald-400">
+								Your browser's headers reach Menagerist intact.
+							</p>
+						{:else if check.state === 'warn' || check.state === 'fail'}
+							{#if check.output}
+								<p
+									class="px-5 py-3 text-sm leading-relaxed break-words {check.state === 'warn'
+										? 'text-amber-700 dark:text-amber-400'
+										: 'text-destructive'}"
+								>
+									{check.output}
+								</p>
+							{/if}
+							{@render browserRow('Your browser sent', check.origin ?? 'Nothing')}
+							{@render browserRow('Menagerist saw', check.seenOrigin)}
+						{:else if check.state === 'stripped'}
+							<p class="px-5 py-3 text-sm leading-relaxed break-words text-destructive">
+								Something between your browser and Menagerist is removing the Origin and
+								Sec-Fetch-Site headers, so changes made from the app will be refused. Check that
+								your reverse proxy passes request headers through.
+							</p>
+							{@render browserRow('This page', window.location.origin)}
+						{:else}
+							<p class="px-5 py-3 text-sm text-muted-foreground">The check could not be run.</p>
+						{/if}
 					</Card.Content>
+				</Card.Root>
+			{/if}
+
+			{#if buildInfo}
+				<Card.Root class="overflow-hidden border-border/70 bg-card shadow-sm">
+					<Collapsible.Root bind:open={buildOpen} class="flex flex-col gap-(--card-spacing)">
+						<Card.Header class="px-5 pt-5 pb-0">
+							<div class="flex items-center gap-2.5">
+								<div
+									class="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+								>
+									<PackageCheck class="size-4" />
+								</div>
+								<Card.Title class="text-base">Build info</Card.Title>
+							</div>
+						</Card.Header>
+						<Collapsible.Content>
+							<Card.Content class="space-y-0 p-0">
+								{#each versionRows as { label, value }, i (label)}
+									<div
+										class="flex items-center justify-between gap-4 px-5 py-3 {i !==
+										versionRows.length - 1
+											? 'border-b border-border/80'
+											: ''}"
+									>
+										<span class="text-sm text-muted-foreground">{label}</span>
+										<span class="max-w-[60%] truncate text-right font-mono text-sm">{value}</span>
+									</div>
+								{/each}
+							</Card.Content>
+						</Collapsible.Content>
+						<Collapsible.Trigger class={triggerClass}>
+							<ChevronDown
+								class="size-4 transition-transform motion-reduce:transition-none {buildOpen
+									? 'rotate-180'
+									: ''}"
+							/>
+							{buildOpen ? 'Hide details' : 'Show details'}
+							<span class="sr-only"> for build info</span>
+						</Collapsible.Trigger>
+					</Collapsible.Root>
 				</Card.Root>
 			{/if}
 		{/if}

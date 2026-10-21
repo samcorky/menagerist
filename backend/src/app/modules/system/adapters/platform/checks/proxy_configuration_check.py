@@ -17,22 +17,20 @@ class ProxyConfigurationCheck:
     """
 
     async def run(self) -> Mapping[str, CheckObservation]:
-        """Report the signals seen in the last hour."""
+        """Report each signal seen in the last hour as its own observation."""
         now = datetime.now(UTC)
-        seen = proxy_signals.counts(now=now)
-        total = sum(seen.values())
-        output = (
-            " ".join(
-                proxy_signals.HINTS[signal] for signal, count in seen.items() if count
-            )
-            or None
-        )
         return {
-            "proxy:configuration": observation(
-                total,
+            f"configuration:proxy{_camel(signal)}": observation(
+                count,
                 "flagged requests",
                 now=now,
-                status=CheckStatus.WARN if total else CheckStatus.PASS,
-                output=output,
+                status=CheckStatus.WARN if count else CheckStatus.PASS,
+                output=proxy_signals.HINTS[signal] if count else None,
             )
+            for signal, count in proxy_signals.counts(now=now).items()
         }
+
+
+def _camel(signal: proxy_signals.ProxySignal) -> str:
+    """`untrusted_forwarding` -> `UntrustedForwarding`."""
+    return signal.value.title().replace("_", "")

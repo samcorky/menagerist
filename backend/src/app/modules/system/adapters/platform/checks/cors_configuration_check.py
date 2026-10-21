@@ -22,7 +22,7 @@ class CorsConfigurationCheck:
     async def run(self) -> Mapping[str, CheckObservation]:
         """Report whether any origin is allowed."""
         return {
-            "cors:configuration": observation(
+            "configuration:corsOrigins": observation(
                 int(self._open),
                 "open origins",
                 now=datetime.now(UTC),

@@ -4,6 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 import {
 	apiSessionOptions,
 	COOKIES_BACKEND_PORT,
+	COOKIES_STRIPPING_PORT,
 	COOKIES_TLS_PORT,
 	ensureAdminSession
 } from './fixtures';
@@ -17,6 +18,7 @@ import { createUserViaApi, type E2EUser } from './helpers';
  */
 const PLAIN_URL = `http://localhost:${COOKIES_BACKEND_PORT}`;
 const TLS_URL = `https://localhost:${COOKIES_TLS_PORT}`;
+const STRIPPING_URL = `https://localhost:${COOKIES_STRIPPING_PORT}`;
 const PLAIN = 'menagerist-session';
 const PREFIXED = `__Host-Http-${PLAIN}`;
 const COLLECTION = '/api/v1/collection';
@@ -26,24 +28,29 @@ const COLLECTION = '/api/v1/collection';
 const READY = { waitUntil: 'domcontentloaded' } as const;
 
 let user: E2EUser;
+let admin: E2EUser;
 
 test.beforeAll(async ({ playwright }, testInfo) => {
 	const session = await ensureAdminSession(PLAIN_URL);
-	const admin = await playwright.request.newContext(apiSessionOptions(PLAIN_URL, session));
+	const api = await playwright.request.newContext(apiSessionOptions(PLAIN_URL, session));
 	try {
-		user = await createUserViaApi(admin, PLAIN_URL, { prefix: testInfo.project.name });
+		user = await createUserViaApi(api, PLAIN_URL, { prefix: testInfo.project.name });
+		admin = await createUserViaApi(api, PLAIN_URL, {
+			prefix: `${testInfo.project.name}-admin`,
+			role: 'admin'
+		});
 	} finally {
-		await admin.dispose();
+		await api.dispose();
 	}
 });
 
 // Any name: the first test renames the user.
 const accountMenu = (page: Page) => page.getByRole('button', { name: /^Account menu for / });
 
-async function signIn(page: Page, origin: string) {
+async function signIn(page: Page, origin: string, who: E2EUser = user) {
 	await page.goto(`${origin}/login`, READY);
-	await page.getByLabel('Username').fill(user.username);
-	await page.getByLabel('Password', { exact: true }).fill(user.password);
+	await page.getByLabel('Username').fill(who.username);
+	await page.getByLabel('Password', { exact: true }).fill(who.password);
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 	await expect(accountMenu(page)).toBeVisible();
 }
@@ -156,6 +163,37 @@ test('over plain HTTP the cookie keeps the plain name', async ({ page }) => {
 	const cookies = await sessionCookies(page);
 	expect(cookies.map((c) => c.name)).toEqual([PLAIN]);
 	expect(cookies[0]).toMatchObject({ secure: false, httpOnly: true, sameSite: 'Strict' });
+});
+
+// The status page asks the backend what reached it from this browser.
+test.describe('browser check', () => {
+	const card = (page: Page) => page.getByTestId('browser-check');
+
+	test('passes over HTTPS through a proxy that keeps the headers', async ({ page }) => {
+		await signIn(page, TLS_URL, admin);
+		await page.goto(`${TLS_URL}/status`, READY);
+
+		await expect(card(page)).toHaveAttribute('data-state', 'pass');
+	});
+
+	test('over plain HTTP the headers still count, with or without Sec-Fetch-Site', async ({
+		page
+	}) => {
+		await signIn(page, PLAIN_URL, admin);
+		await page.goto(`${PLAIN_URL}/status`, READY);
+
+		// Engines differ on whether http://localhost counts as secure enough for Sec-Fetch-*.
+		await expect(card(page)).toHaveAttribute('data-state', /^(pass|warn)$/);
+	});
+
+	test('notices a proxy that removes Origin and Sec-Fetch-Site', async ({ page }) => {
+		// Sign-in carries no session cookie yet, so it passes without the headers.
+		await signIn(page, STRIPPING_URL, admin);
+		await page.goto(`${STRIPPING_URL}/status`, READY);
+
+		await expect(card(page)).toHaveAttribute('data-state', 'stripped');
+		await expect(card(page)).toContainText('removing the Origin and Sec-Fetch-Site headers');
+	});
 });
 
 // A page the browser treats as another site: 127.0.0.1 and localhost never share a site, in any

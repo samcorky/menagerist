@@ -28,6 +28,7 @@ from app.modules.system.domain.readiness import (
     CheckStatus,
     ReadinessReport,
 )
+from app.platform.config import get_identity_settings
 from app.platform.database import get_session_factory
 from app.platform.storage_probe import DirectoryProbe
 from app.shared_kernel.actor import Actor
@@ -390,3 +391,68 @@ def test_version_detail_is_forbidden_for_members() -> None:
 
     assert response.status_code == 403
     assert "migration_head" not in response.json()
+
+
+# ---------------------------------------------------------------------------
+# Browser check
+# ---------------------------------------------------------------------------
+
+_BROWSER = {"Sec-Fetch-Site": "same-origin", "Origin": "http://testserver"}
+_SESSION = {"Cookie": f"{get_identity_settings().cookie_name}=secret-session-value"}
+
+
+def _browser_client(role: str = "admin") -> TestClient:
+    app = create_app()
+    as_user(app, uuid.UUID(int=7), role)
+    client = TestClient(app)
+    client.headers.pop("Origin", None)
+    return client
+
+
+def test_browser_check_passes_for_intact_headers() -> None:
+    """A browser's own headers reach the app and are reported back."""
+    response = _browser_client().post(
+        "/api/browser-check", headers={**_BROWSER, **_SESSION}
+    )
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json() == {
+        "status": "pass",
+        "sec_fetch_site": "same-origin",
+        "origin": "http://testserver",
+        "seen_origin": "http://testserver",
+    }
+
+
+def test_browser_check_warns_when_the_origin_differs() -> None:
+    """A proxy that changes the host shows both origins."""
+    headers = {"Sec-Fetch-Site": "same-origin", "Origin": "https://public.example"}
+    data = (
+        _browser_client()
+        .post("/api/browser-check", headers={**headers, **_SESSION})
+        .json()
+    )
+
+    assert data["status"] == "warn"
+    assert data["origin"] == "https://public.example"
+    assert data["seen_origin"] == "http://testserver"
+    assert "MENAGERIST_TRUSTED_PROXIES" in data["output"]
+
+
+def test_browser_check_is_refused_when_the_headers_were_removed() -> None:
+    """A signed-in request without Origin or Sec-Fetch-Site is a csrf_failed 403."""
+    response = _browser_client().post("/api/browser-check", headers=_SESSION)
+
+    assert response.status_code == 403
+    assert response.json()["type"].endswith("csrf_failed")
+
+
+def test_browser_check_needs_the_diagnostics_permission() -> None:
+    """A member is refused with the permission problem, not a CSRF one."""
+    response = _browser_client("member").post(
+        "/api/browser-check", headers={**_BROWSER, **_SESSION}
+    )
+
+    assert response.status_code == 403
+    assert not response.json()["type"].endswith("csrf_failed")

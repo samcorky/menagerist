@@ -15,6 +15,7 @@ const AUTH_BACKEND_PORT = Number(process.env.E2E_AUTH_BACKEND_PORT ?? 8190);
 const COOKIES = process.env.E2E_COOKIES === '1';
 const COOKIES_BACKEND_PORT = Number(process.env.E2E_COOKIES_BACKEND_PORT ?? 8191);
 const COOKIES_TLS_PORT = Number(process.env.E2E_COOKIES_TLS_PORT ?? 8192);
+const COOKIES_STRIPPING_PORT = Number(process.env.E2E_COOKIES_STRIPPING_PORT ?? 8193);
 
 // Use the configured worker count, or fall back to the machine core count.
 const WORKERS = Number(process.env.E2E_WORKERS) || availableParallelism();
@@ -59,6 +60,13 @@ const cookieServers = [
 	{
 		command: `node tests/e2e/tls-proxy.mjs ${COOKIES_TLS_PORT} ${COOKIES_BACKEND_PORT}`,
 		url: `https://localhost:${COOKIES_TLS_PORT}/api/health/ready`,
+		ignoreHTTPSErrors: true,
+		reuseExistingServer: !process.env.CI,
+		timeout: 30_000
+	},
+	{
+		command: `node tests/e2e/tls-proxy.mjs ${COOKIES_STRIPPING_PORT} ${COOKIES_BACKEND_PORT} --strip-browser-headers`,
+		url: `https://localhost:${COOKIES_STRIPPING_PORT}/api/health/ready`,
 		ignoreHTTPSErrors: true,
 		reuseExistingServer: !process.env.CI,
 		timeout: 30_000

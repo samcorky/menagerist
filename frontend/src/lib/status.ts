@@ -1,4 +1,4 @@
-import type { ReadyDetailResponse } from '$lib/api/client';
+import type { BrowserCheckResponse, ReadyDetailResponse } from '$lib/api/client';
 
 export type Readiness = 'pass' | 'fail';
 
@@ -57,9 +57,44 @@ export function formatObservedValue(value: unknown, unit: string | null | undefi
 		if (value === 'missing') return 'Missing';
 		if (value === 'writable') return 'Writable';
 	}
+	if (unit === 'open origins') return value === 0 ? 'Listed origins only' : 'Any origin allowed';
 	if (unit === 'flagged requests') {
 		if (value === 0) return 'Nothing unusual in the last hour';
 		return `${value} flagged ${value === 1 ? 'request' : 'requests'} in the last hour`;
 	}
 	return String(value);
+}
+
+export type BrowserCheck =
+	| {
+			state: 'pass' | 'warn' | 'fail';
+			output: string | null;
+			origin: string | null;
+			seenOrigin: string;
+	  }
+	| { state: 'stripped' }
+	| { state: 'unavailable' };
+
+/**
+ * What the browser check found. A `403` of type `csrf_failed` means the headers were removed on
+ * the way in (the caller is a browser); any other failure says nothing about the headers.
+ */
+export function browserCheckOf(result: CallResult): BrowserCheck {
+	const body = result.data;
+	if (isObject(body) && typeof body.seen_origin === 'string') {
+		const { status, output, origin } = body as unknown as BrowserCheckResponse;
+		return {
+			state: status,
+			output: output ?? null,
+			origin: origin ?? null,
+			seenOrigin: body.seen_origin
+		};
+	}
+	const error = result.error;
+	const refusedAsCsrf =
+		result.response?.status === 403 &&
+		isObject(error) &&
+		typeof error.type === 'string' &&
+		error.type.endsWith('csrf_failed');
+	return refusedAsCsrf ? { state: 'stripped' } : { state: 'unavailable' };
 }

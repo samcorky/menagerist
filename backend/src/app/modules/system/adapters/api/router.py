@@ -1,12 +1,14 @@
 from datetime import datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.entrypoints.api.shared.http.csrf import verify_csrf
+from app.entrypoints.api.shared.http.origin import own_origin
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.system.adapters.api.dependencies import (
@@ -15,6 +17,7 @@ from app.modules.system.adapters.api.dependencies import (
     get_get_health_use_case,
     get_get_version_detail_use_case,
     get_get_version_use_case,
+    get_run_browser_check_use_case,
 )
 from app.modules.system.application.get_health import GetHealth, GetHealthQuery
 from app.modules.system.application.get_health_ready import (
@@ -30,6 +33,11 @@ from app.modules.system.application.get_version_detail import (
     GetVersionDetail,
     GetVersionDetailQuery,
 )
+from app.modules.system.application.run_browser_check import (
+    RunBrowserCheck,
+    RunBrowserCheckQuery,
+)
+from app.modules.system.domain.browser_check import BrowserCheckResult, BrowserRequest
 from app.modules.system.domain.readiness import (
     CheckObservation as DomainCheckObservation,
     CheckStatus,
@@ -464,3 +472,96 @@ async def get_version_detail(
         build_timestamp=app_info.build_timestamp,
         migration_head=list(app_info.migration_head),
     )
+
+
+class BrowserCheckResponse(BaseModel):
+    """Whether the browser's own headers reached the app intact."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "status": "pass",
+                    "sec_fetch_site": "same-origin",
+                    "origin": "https://menagerist.example",
+                    "seen_origin": "https://menagerist.example",
+                }
+            ]
+        }
+    )
+
+    status: Annotated[
+        Literal["pass", "warn", "fail"],
+        Field(description="Whether the headers arrived intact.", examples=["pass"]),
+    ]
+    sec_fetch_site: Annotated[
+        str | None,
+        Field(
+            description="The Sec-Fetch-Site header the app received, if any.",
+            examples=["same-origin"],
+        ),
+    ]
+    origin: Annotated[
+        str | None,
+        Field(
+            description="The Origin header the app received, if any.",
+            examples=["https://menagerist.example"],
+        ),
+    ]
+    seen_origin: Annotated[
+        str,
+        Field(
+            description="The origin the app rebuilt from the request.",
+            examples=["https://menagerist.example"],
+        ),
+    ]
+    output: Annotated[
+        str | None,
+        Field(description="What to check, set only when status is warn or fail."),
+    ] = None
+
+    @classmethod
+    def from_domain(cls, result: BrowserCheckResult) -> BrowserCheckResponse:
+        """Build the API schema from the domain result."""
+        return cls(
+            status=result.status.value,
+            sec_fetch_site=result.sec_fetch_site,
+            origin=result.origin,
+            seen_origin=result.seen_origin,
+            output=result.output,
+        )
+
+
+# A POST on purpose: verify_csrf skips safe methods, and a request that lost the
+# browser's headers is refused there with `csrf_failed`, before this runs.
+@router.post(
+    "/browser-check",
+    summary="Browser header check",
+    operation_id="run_browser_check",
+    dependencies=[Depends(verify_csrf)],
+    response_model_exclude_none=True,
+    responses=error_response(ForbiddenError, detail=_FORBIDDEN),
+)
+async def run_browser_check(
+    request: Request,
+    response: Response,
+    use_case: Annotated[RunBrowserCheck, Depends(get_run_browser_check_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> BrowserCheckResponse:
+    """Report whether the browser's origin headers reach the app (administrators).
+
+    Call it from a browser: a `403` `csrf_failed` answer means the headers were
+    removed on the way in.
+    """
+    response.headers["Cache-Control"] = "no-store"
+    result = await use_case.handle(
+        RunBrowserCheckQuery(
+            request=BrowserRequest(
+                sec_fetch_site=request.headers.get("Sec-Fetch-Site"),
+                origin=request.headers.get("Origin"),
+                seen_origin=own_origin(request),
+            )
+        ),
+        actor,
+    )
+    return BrowserCheckResponse.from_domain(result)

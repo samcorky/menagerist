@@ -311,11 +311,12 @@ args = [
 help = "Run backend and frontend unit tests concurrently"
 
 [tool.poe.groups.quality.tasks.test-e2e]
-script = "scripts.e2e:main(workers=workers, skip_build=skip_build)"
+script = "scripts.e2e:main(workers=workers, skip_build=skip_build, files=files)"
 deps = ["generate-frontend-client"]
 args = [
   { name = "workers", options = ["-w", "--workers"], type = "integer", help = "Parallel workers, each with its own database and backend (default: CPU cores)" },
   { name = "skip_build", options = ["--skip-build"], type = "boolean", help = "Reuse the existing frontend/build (only when it is current)" },
+  { name = "files", positional = true, multiple = true, help = "Spec files to run, as Playwright takes them (e.g. tests/e2e/status.spec.ts or status.spec.ts:78); all specs if none" },
 ]
 help = "Run the Playwright e2e suite in parallel against a throwaway Postgres, building the frontend first and tearing the database down afterwards (requires Docker)"
 
@@ -328,18 +329,20 @@ args = [
 help = "Run only the session-cookie specs in Chromium, WebKit and Firefox, against their own backend behind a TLS proxy (needs Docker, openssl and poe install-e2e-cookie-browsers)"
 
 [tool.poe.groups.quality.tasks.test-e2e-headed]
-script = "scripts.e2e:main(workers=workers, skip_build=skip_build, mode='headed')"
+script = "scripts.e2e:main(workers=workers, skip_build=skip_build, mode='headed', files=files)"
 args = [
   { name = "workers", options = ["-w", "--workers"], type = "integer", help = "Parallel workers, each with its own database and backend (default: CPU cores)" },
   { name = "skip_build", options = ["--skip-build"], type = "boolean", help = "Reuse the existing frontend/build (only when it is current)" },
+  { name = "files", positional = true, multiple = true, help = "Spec files to run, as Playwright takes them; all specs if none" },
 ]
 help = "Same as test-e2e, but opens a visible browser window so you can watch the tests run"
 
 [tool.poe.groups.quality.tasks.test-e2e-slow]
-script = "scripts.e2e:main(workers=workers, skip_build=skip_build, mode='slow')"
+script = "scripts.e2e:main(workers=workers, skip_build=skip_build, mode='slow', files=files)"
 args = [
   { name = "workers", options = ["-w", "--workers"], type = "integer", help = "Parallel workers, each with its own database and backend (default: CPU cores)" },
   { name = "skip_build", options = ["--skip-build"], type = "boolean", help = "Reuse the existing frontend/build (only when it is current)" },
+  { name = "files", positional = true, multiple = true, help = "Spec files to run, as Playwright takes them; all specs if none" },
 ]
 help = "Same as test-e2e-headed, but slowed down (1s between actions) so you can actually follow along"
 

@@ -29,6 +29,7 @@ from app.modules.system.application.get_health_ready import GetHealthReady
 from app.modules.system.application.get_health_ready_detail import GetHealthReadyDetail
 from app.modules.system.application.get_version import GetVersion
 from app.modules.system.application.get_version_detail import GetVersionDetail
+from app.modules.system.application.run_browser_check import RunBrowserCheck
 from app.platform.config.api import get_api_settings
 from app.platform.config.backup import get_backup_settings
 from app.platform.config.media import get_media_settings
@@ -95,3 +96,9 @@ def get_get_version_detail_use_case(
     authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
 ) -> GetVersionDetail:
     return GetVersionDetail(PackageAppInfoAdapter(), authorization)
+
+
+def get_run_browser_check_use_case(
+    authorization: Annotated[AuthorizationPort, Depends(get_authorization_port)],
+) -> RunBrowserCheck:
+    return RunBrowserCheck(authorization)

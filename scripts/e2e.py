@@ -35,14 +35,18 @@ def poe(task: str) -> int:
 
 
 def main(
-    workers: int | None = None, skip_build: bool = False, mode: str = "run"
+    workers: int | None = None,
+    skip_build: bool = False,
+    mode: str = "run",
+    files: list[str] | None = None,
 ) -> None:
-    """Run the e2e suite with the requested worker count and mode."""
+    """Run the e2e suite, or only `files`, with the requested worker count and mode."""
     n = workers or default_workers()
     if n < 1:
         sys.exit("--workers must be at least 1")
     os.environ["E2E_WORKERS"] = str(n)
     args = [shutil.which("npx") or "npx", "playwright", "test"]  # npx.cmd on Windows
+    args.extend(files or [])
     if mode in ("headed", "slow"):
         args.append("--headed")
     if mode == "slow":

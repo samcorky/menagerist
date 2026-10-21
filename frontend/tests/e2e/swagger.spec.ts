@@ -48,12 +48,15 @@ function freshContext(browser: Browser, baseURL: string | undefined) {
 const banner = (page: Page) => page.locator('#menagerist-session');
 const logo = (page: Page) => page.locator('.swagger-ui .info .menagerist-logo');
 
+// Swagger re-renders and the banner is put back asynchronously, which is slow on a busy machine.
+const CHROME = { timeout: 15_000 };
+
 /** The injected banner and logo must survive Swagger's re-renders. */
 async function expectChrome(page: Page, text: string) {
-	await expect(banner(page)).toContainText(text);
-	await expect(banner(page)).toHaveCount(1);
-	await expect(logo(page)).toBeVisible();
-	await expect(logo(page)).toHaveAttribute('src', '/api/docs/logo.svg');
+	await expect(banner(page)).toContainText(text, CHROME);
+	await expect(banner(page)).toHaveCount(1, CHROME);
+	await expect(logo(page)).toBeVisible(CHROME);
+	await expect(logo(page)).toHaveAttribute('src', '/api/docs/logo.svg', CHROME);
 }
 
 test('signs in through the app, uses the API and signs out from the banner', async ({

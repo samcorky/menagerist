@@ -155,6 +155,7 @@ Each integration worker starts its own Postgres container (`postgres:18-alpine`,
 poe test-e2e                      # one worker per CPU core
 poe test-e2e --workers 2          # or -w 2; --workers 1 runs serially
 poe test-e2e --skip-build         # reuse frontend/build - only when it is current
+poe test-e2e status.spec.ts       # only these spec files (several allowed; `file.ts:78` runs one test)
 ```
 
 `test-e2e-headed` and `test-e2e-slow` take the same arguments.

@@ -18,6 +18,8 @@ export const AUTH_BACKEND_PORT = Number(process.env.E2E_AUTH_BACKEND_PORT ?? 819
 /** The `cookies` projects' backend (plain HTTP) and the TLS proxy in front of it (see tls-proxy.mjs). */
 export const COOKIES_BACKEND_PORT = Number(process.env.E2E_COOKIES_BACKEND_PORT ?? 8191);
 export const COOKIES_TLS_PORT = Number(process.env.E2E_COOKIES_TLS_PORT ?? 8192);
+// A second TLS proxy that removes the browser's Origin and Sec-Fetch-* headers.
+export const COOKIES_STRIPPING_PORT = Number(process.env.E2E_COOKIES_STRIPPING_PORT ?? 8193);
 
 export type Credentials = { username: string; displayName: string; password: string };
 
