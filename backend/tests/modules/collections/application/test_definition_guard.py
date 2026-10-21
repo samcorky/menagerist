@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from app.modules.collections.domain.definition_warning import DefinitionWarning
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
     from tests.modules.collections.conftest import World
 
 ACTOR = Actor(id=uuid.uuid7())
@@ -39,7 +39,7 @@ class _ForbiddenChecker:
     """Fails the test if the checker is reached."""
 
     async def check(
-        self, definition: Mapping[str, Any], scope: AccessScope
+        self, definition: Mapping[str, Any], scope: ContentFilter
     ) -> list[DefinitionWarning]:
         raise AssertionError("the checker must not be reached")
 

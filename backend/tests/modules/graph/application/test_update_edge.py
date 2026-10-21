@@ -20,8 +20,8 @@ from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import EdgeNotFoundError, InvalidAttributesError
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 
@@ -50,7 +50,7 @@ async def test_update_edge_persists_and_commits() -> None:
     )
 
     assert result.attributes == {"since": "1979"}
-    stored = await repos.edges.get(edge.id, scope=AccessScope.everyone())
+    stored = await repos.edges.get(edge.id, scope=ContentFilter.everyone())
     assert stored is not None
     assert stored.attributes == {"since": "1979"}
     assert uow.committed is True

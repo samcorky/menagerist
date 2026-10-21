@@ -16,8 +16,8 @@ from app.modules.media.adapters.storage.in_memory_media_storage import (
 from app.modules.media.application.orphan_media import OrphanMedia, OrphanMediaCommand
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ValidationError
 
 
@@ -55,7 +55,7 @@ async def test_orphan_transitions_asset_to_orphaned() -> None:
 
     assert result.status is MediaStatus.ORPHANED
     assert (
-        await repo.get(asset.id, scope=AccessScope.everyone())
+        await repo.get(asset.id, scope=ContentFilter.everyone())
     ).status is MediaStatus.ORPHANED  # type: ignore[union-attr]
     assert storage._files.get((asset.id, "orphaned")) == b"data"
     assert (asset.id, "attached") not in storage._files

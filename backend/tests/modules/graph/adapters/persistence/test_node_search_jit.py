@@ -16,10 +16,10 @@ from app.modules.graph.adapters.persistence.node_repository import (
 )
 from app.modules.graph.application.query_resolution import resolve_fields
 from app.modules.graph.domain.query import ResolvedQuery, parse_query
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 OWNER = uuid.UUID(int=212)
-SCOPE = AccessScope.of(OWNER)
+SCOPE = ContentFilter.of(OWNER)
 TEXT: dict[str, Any] = {
     "v": 1,
     "where": {"op": "and", "children": [{"kind": "text", "q": "alien"}]},

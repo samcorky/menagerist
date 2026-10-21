@@ -23,8 +23,8 @@ from app.modules.examples.domain.installation import (
 from app.modules.examples.domain.pack import PackPreset
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.node_type import NodeType
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from tests.modules.examples.conftest import MakeWorld, SamplePack, World
@@ -49,7 +49,7 @@ def _use_case(world: World) -> InstallExamplePack:
 
 async def _active(world: World, pack_id: str = "demo") -> Installation:
     installation = await world.installations.get_active_for_pack(
-        pack_id, scope=AccessScope.everyone()
+        pack_id, scope=ContentFilter.everyone()
     )
     assert installation is not None
     return installation
@@ -71,20 +71,20 @@ def _capture_installations(world: World) -> list[Installation]:
 async def _assert_nothing_left(world: World) -> None:
     assert (
         await world.installations.get_active_for_pack(
-            "demo", scope=AccessScope.everyone()
+            "demo", scope=ContentFilter.everyone()
         )
         is None
     )
     assert await world.graph_repos.node_types.list(after=None, limit=10) == []
     assert (
         await world.graph_repos.nodes.list(
-            scope=AccessScope.everyone(), after=None, limit=10
+            scope=ContentFilter.everyone(), after=None, limit=10
         )
         == []
     )
     assert (
         await world.graph_repos.edges.list(
-            after=None, limit=10, scope=AccessScope.everyone()
+            after=None, limit=10, scope=ContentFilter.everyone()
         )
         == []
     )
@@ -107,7 +107,7 @@ async def test_install_creates_everything_and_records_it(
     assert installation.status is InstallationStatus.INSTALLED
     assert len(installation.owned()) == 7
     assert await world.graph_repos.nodes.list(
-        scope=AccessScope.everyone(), after=None, limit=10
+        scope=ContentFilter.everyone(), after=None, limit=10
     )
     assert len(await world.graph_repos.node_types.list(after=None, limit=10)) == 2
     assert world.uow.committed is True
@@ -162,14 +162,14 @@ async def test_a_slug_clash_creates_nothing_and_names_the_slug(
     assert kind_phrase in str(excinfo.value)
     assert (
         await world.installations.get_active_for_pack(
-            "demo", scope=AccessScope.everyone()
+            "demo", scope=ContentFilter.everyone()
         )
         is None
     )
     assert await world.preset_repos.presets.list(after=None, limit=10) == []
     assert (
         await world.graph_repos.nodes.list(
-            scope=AccessScope.everyone(), after=None, limit=10
+            scope=ContentFilter.everyone(), after=None, limit=10
         )
         == []
     )
@@ -227,7 +227,7 @@ async def test_a_failure_rolls_everything_back(
 
     assert calls == fail_on_call  # the injected failure really happened
     assert isinstance(excinfo.value.__cause__, RuntimeError)
-    assert await world.installations.list_active(scope=AccessScope.everyone()) == []
+    assert await world.installations.list_active(scope=ContentFilter.everyone()) == []
     assert recorded[0].status is InstallationStatus.FAILED
     await _assert_nothing_left(world)
 

@@ -21,8 +21,8 @@ from app.modules.collections.domain.errors import (
     CollectionKindError,
     CollectionNotFoundError,
 )
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.slug import Slug
 
 if TYPE_CHECKING:
@@ -59,9 +59,9 @@ async def test_remove_takes_item_off_and_commits(
     )
 
     remove.assert_awaited_once_with(shelf.id, drop)
-    assert await world.memberships.item_ids(shelf.id, scope=AccessScope.everyone()) == {
-        keep
-    }
+    assert await world.memberships.item_ids(
+        shelf.id, scope=ContentFilter.everyone()
+    ) == {keep}
     assert world.uow.committed is True
 
 
@@ -79,9 +79,9 @@ async def test_remove_absent_item_is_a_no_op_that_commits(
         SYSTEM_ACTOR,
     )
 
-    assert await world.memberships.item_ids(shelf.id, scope=AccessScope.everyone()) == {
-        other
-    }
+    assert await world.memberships.item_ids(
+        shelf.id, scope=ContentFilter.everyone()
+    ) == {other}
     assert world.uow.committed is True
 
 
@@ -99,9 +99,9 @@ async def test_remove_then_add_again(
     )
 
     assert await _shelve(world, shelf.id, item_id) == 1
-    assert await world.memberships.item_ids(shelf.id, scope=AccessScope.everyone()) == {
-        item_id
-    }
+    assert await world.memberships.item_ids(
+        shelf.id, scope=ContentFilter.everyone()
+    ) == {item_id}
 
 
 async def test_remove_item_deleted_elsewhere(
@@ -120,7 +120,7 @@ async def test_remove_item_deleted_elsewhere(
     )
 
     assert (
-        await world.memberships.item_ids(shelf.id, scope=AccessScope.everyone())
+        await world.memberships.item_ids(shelf.id, scope=ContentFilter.everyone())
         == set()
     )
 

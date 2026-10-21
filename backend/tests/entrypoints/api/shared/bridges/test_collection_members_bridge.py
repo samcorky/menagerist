@@ -17,9 +17,9 @@ from app.shared_kernel.slug import Slug
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
-ALL = AccessScope.everyone()
+ALL = ContentFilter.everyone()
 pytestmark = pytest.mark.integration
 
 
@@ -89,8 +89,8 @@ async def test_collection_of_another_owner_is_none(db_session: AsyncSession) -> 
         )
     )
 
-    assert await members.resolve(shelf.id, AccessScope.of(shelf.owner_id)) is not None
-    assert await members.resolve(shelf.id, AccessScope.of(uuid.uuid7())) is None
+    assert await members.resolve(shelf.id, ContentFilter.of(shelf.owner_id)) is not None
+    assert await members.resolve(shelf.id, ContentFilter.of(uuid.uuid7())) is None
 
 
 _DEFINITION = {
@@ -119,7 +119,7 @@ async def test_smart_collection_resolves_to_its_definition(
     """A smart collection yields its stored definition, never a list of ids."""
     members, smart = await _smart(db_session)
 
-    assert await members.resolve(smart.id, AccessScope.of(smart.owner_id)) == (
+    assert await members.resolve(smart.id, ContentFilter.of(smart.owner_id)) == (
         SmartSource(definition=_DEFINITION)
     )
 
@@ -130,7 +130,7 @@ async def test_smart_collection_of_another_owner_is_none(
     """Another person's smart collection reads as missing."""
     members, smart = await _smart(db_session)
 
-    assert await members.resolve(smart.id, AccessScope.of(uuid.uuid7())) is None
+    assert await members.resolve(smart.id, ContentFilter.of(uuid.uuid7())) is None
 
 
 async def test_soft_deleted_smart_collection_is_none(db_session: AsyncSession) -> None:

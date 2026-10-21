@@ -3,14 +3,14 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:
     import uuid
 
-    from app.shared_kernel.access_scope import AccessScope
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class AccessPolicy(Protocol):
     """The only place that knows who may see or change what."""
 
-    def scope_for(self, actor: Actor) -> AccessScope:
+    def scope_for(self, actor: Actor) -> ContentFilter:
         """Return the scope of content `actor` may see."""
         ...
 

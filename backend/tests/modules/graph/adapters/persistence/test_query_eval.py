@@ -27,7 +27,7 @@ from app.modules.graph.domain.query import (
     SortKey,
     parse_query,
 )
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from app.modules.graph.ports.node_repository import NodeRepository
@@ -103,11 +103,11 @@ async def _run(
 ) -> set[str]:
     """Add any of `nodes` not yet stored, then search with the given children."""
     for node in nodes:
-        if await repo.get(node.id, scope=AccessScope.of(OWNER)) is None:
+        if await repo.get(node.id, scope=ContentFilter.of(OWNER)) is None:
             await repo.add(node)
     raw = {"v": 1, "where": {"op": op, "children": list(children)}}
     hits = await repo.search(
-        scope=AccessScope.of(OWNER), resolved=_resolve(raw), after=None, limit=100
+        scope=ContentFilter.of(OWNER), resolved=_resolve(raw), after=None, limit=100
     )
     return {hit.node.name for hit in hits}
 
@@ -399,7 +399,7 @@ async def test_multi_key_sort_with_nulls_and_descending_ties(
         ],
     }
     hits = await repo.search(
-        scope=AccessScope.of(OWNER), resolved=_resolve(raw), after=None, limit=10
+        scope=ContentFilter.of(OWNER), resolved=_resolve(raw), after=None, limit=10
     )
     assert [h.node.name for h in hits] == ["d", "a", "b", "c"]
 

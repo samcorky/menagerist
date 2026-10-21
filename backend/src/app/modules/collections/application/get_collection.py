@@ -20,7 +20,7 @@ from app.modules.collections.ports.definition_checker import (
 from app.modules.collections.ports.item_lookup import ItemLookup  # noqa: TC001
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
 from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
-from app.shared_kernel.access_scope import AccessScope  # noqa: TC001
+from app.shared_kernel.content_filter import ContentFilter  # noqa: TC001
 from app.shared_kernel.cqrs import ScopedQueryHandler
 
 if TYPE_CHECKING:
@@ -51,7 +51,7 @@ async def summarise(
     repos: CollectionsRepos,
     items: ItemLookup,
     collection: Collection,
-    scope: AccessScope,
+    scope: ContentFilter,
 ) -> CollectionSummary:
     """Count `collection`'s members that are live items visible in `scope`."""
     if collection.kind is CollectionKind.DYNAMIC and collection.definition is not None:

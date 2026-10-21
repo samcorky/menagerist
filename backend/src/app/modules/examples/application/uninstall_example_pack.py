@@ -33,7 +33,7 @@ from app.modules.examples.ports.pack_targets import (
     RemoveResult,
 )
 from app.modules.examples.ports.unit_of_work import ExampleUnitOfWork
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.cqrs import ScopedCommandHandler
 
 if TYPE_CHECKING:
@@ -170,7 +170,7 @@ class UninstallExamplePack(
         async with self._uow as repos:
             # all-users check: shared structure
             return await repos.installations.list_for_pack(
-                pack_id, scope=AccessScope.everyone()
+                pack_id, scope=ContentFilter.everyone()
             )
 
     async def _release_shared_types(

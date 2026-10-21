@@ -21,8 +21,8 @@ from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import InvalidAttributesError, NodeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 
@@ -65,7 +65,7 @@ async def test_create_edges_connects_every_target_and_commits() -> None:
     assert result.skipped == []
     assert uow.committed is True
     stored = await repos.edges.list_for_node(
-        source.id, after=None, limit=10, scope=AccessScope.everyone()
+        source.id, after=None, limit=10, scope=ContentFilter.everyone()
     )
     assert len(stored) == 3
 

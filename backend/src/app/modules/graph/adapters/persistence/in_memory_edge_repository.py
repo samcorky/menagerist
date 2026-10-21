@@ -5,7 +5,7 @@ if TYPE_CHECKING:
     import uuid
 
     from app.modules.graph.domain.edge import Edge
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class InMemoryEdgeRepository:
@@ -14,7 +14,7 @@ class InMemoryEdgeRepository:
     def __init__(self) -> None:
         self._edges: dict[uuid.UUID, Edge] = {}
 
-    def _visible(self, scope: AccessScope) -> builtins.list[Edge]:
+    def _visible(self, scope: ContentFilter) -> builtins.list[Edge]:
         """The one visibility rule: live edges the `scope` covers.
 
         Edges with no owner are visible only under `everyone()`.
@@ -33,7 +33,7 @@ class InMemoryEdgeRepository:
         """Persist changes to an existing edge."""
         self._edges[edge.id] = edge
 
-    async def get(self, edge_id: uuid.UUID, *, scope: AccessScope) -> Edge | None:
+    async def get(self, edge_id: uuid.UUID, *, scope: ContentFilter) -> Edge | None:
         """Return the edge with `edge_id`, or `None` if missing, deleted or unseen."""
         return next((e for e in self._visible(scope) if e.id == edge_id), None)
 
@@ -41,7 +41,7 @@ class InMemoryEdgeRepository:
         self,
         node_id: uuid.UUID,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         after: uuid.UUID | None,
         limit: int,
     ) -> list[Edge]:
@@ -59,7 +59,7 @@ class InMemoryEdgeRepository:
         return ordered[:limit]
 
     async def list(
-        self, *, scope: AccessScope, after: uuid.UUID | None, limit: int
+        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
     ) -> list[Edge]:
         """List non-deleted edge ordered by id, starting after `after` if given."""
         ordered = sorted(
@@ -70,7 +70,7 @@ class InMemoryEdgeRepository:
             ordered = [edge for edge in ordered if edge.id > after]
         return ordered[:limit]
 
-    async def has_edges_of_type(self, type_slug: str, *, scope: AccessScope) -> bool:
+    async def has_edges_of_type(self, type_slug: str, *, scope: ContentFilter) -> bool:
         """Return True if any non-deleted edges reference `type_slug`."""
         return any(edge.type == type_slug for edge in self._visible(scope))
 
@@ -79,7 +79,7 @@ class InMemoryEdgeRepository:
         type_slug: str,
         key: str,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         sub_key: str | None = None,
         value: str | None = None,
     ) -> builtins.list[Edge]:
@@ -111,7 +111,7 @@ class InMemoryEdgeRepository:
         type_slug: str,
         key: str,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         sub_key: str | None = None,
         value: str | None = None,
     ) -> int:
@@ -127,7 +127,7 @@ class InMemoryEdgeRepository:
         type_slug: str,
         key: str,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         sub_key: str | None = None,
         after: uuid.UUID | None,
         limit: int,

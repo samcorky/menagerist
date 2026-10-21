@@ -13,16 +13,16 @@ from app.modules.graph.adapters.persistence.node_repository import (
 )
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.query import ItemFieldUse
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from app.modules.graph.ports.node_repository import NodeRepository
 
 ALICE = uuid.UUID(int=101)
 BOB = uuid.UUID(int=102)
-A = AccessScope.of(ALICE)
-B = AccessScope.of(BOB)
-ALL = AccessScope.everyone()
+A = ContentFilter.of(ALICE)
+B = ContentFilter.of(BOB)
+ALL = ContentFilter.everyone()
 
 
 @pytest.fixture(

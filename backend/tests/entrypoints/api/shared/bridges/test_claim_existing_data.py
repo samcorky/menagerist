@@ -43,10 +43,10 @@ from app.modules.media.adapters.persistence.in_memory_media_asset_repository imp
 )
 from app.modules.media.adapters.persistence.unit_of_work import make_in_memory_repos
 from app.modules.media.domain.media_asset import MediaAsset
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.slug import Slug
 
-EVERYONE = AccessScope.everyone()
+EVERYONE = ContentFilter.everyone()
 SYSTEM = uuid.UUID(int=0)
 LEGACY_API = uuid.UUID(int=1)
 OTHER = uuid.uuid7()

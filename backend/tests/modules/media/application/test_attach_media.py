@@ -29,13 +29,13 @@ from app.modules.media.domain.media_attachment import (
     AttachmentTarget,
     MediaAttachment,
 )
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 
 
 class _AllowAllTargets:
     async def can_attach(
-        self, target_type: AttachmentTarget, target_id: uuid.UUID, scope: AccessScope
+        self, target_type: AttachmentTarget, target_id: uuid.UUID, scope: ContentFilter
     ) -> bool:
         return True
 
@@ -167,7 +167,7 @@ async def test_attach_as_cover_raises_when_target_already_has_cover() -> None:
     assert (
         len(
             await attachments.list_for_target(
-                AttachmentTarget.NODE, node_id, scope=AccessScope.everyone()
+                AttachmentTarget.NODE, node_id, scope=ContentFilter.everyone()
             )
         )
         == 1
@@ -196,7 +196,7 @@ async def test_attach_without_key_is_allowed_when_target_has_cover() -> None:
     assert (
         len(
             await attachments.list_for_target(
-                AttachmentTarget.NODE, node_id, scope=AccessScope.everyone()
+                AttachmentTarget.NODE, node_id, scope=ContentFilter.everyone()
             )
         )
         == 2

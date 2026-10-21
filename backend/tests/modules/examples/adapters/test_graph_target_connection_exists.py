@@ -7,7 +7,7 @@ from app.modules.examples.application.install_example_pack import (
     InstallExamplePack,
     InstallExamplePackCommand,
 )
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from tests.modules.examples.conftest import MakeWorld
@@ -28,7 +28,7 @@ async def test_connection_exists_looks_at_type_and_direction(
         world.covers,
     ).handle(InstallExamplePackCommand(pack_id="demo"), world.actor)
     [edge] = await world.graph_repos.edges.list(
-        after=None, limit=10, scope=AccessScope.everyone()
+        after=None, limit=10, scope=ContentFilter.everyone()
     )
 
     assert await world.graph.connection_exists(

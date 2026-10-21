@@ -15,7 +15,7 @@ from app.modules.media.adapters.storage.local_filesystem import (
 )
 from app.platform.config.media import get_media_settings
 from app.platform.database import get_session_factory
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -46,5 +46,5 @@ async def get_user_media_files(
         yield BackupMediaFiles(
             SqlAlchemyMediaAssetRepository(session),
             LocalFilesystemMediaStorage(get_media_settings().media_storage_path),
-            scope=AccessScope.of(actor.id),
+            scope=ContentFilter.of(actor.id),
         )

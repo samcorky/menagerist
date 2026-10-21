@@ -8,7 +8,7 @@ from app.modules.examples.adapters.persistence.installation_repository import (
     SqlAlchemyInstallationRepository,
 )
 from app.modules.examples.domain.installation import EntityKind, Installation, Outcome
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,7 +29,7 @@ async def test_round_trips_entities_through_jsonb(db_session: AsyncSession) -> N
     await repo.add(installation)
     db_session.expire_all()
 
-    stored = await repo.get(installation.id, scope=AccessScope.everyone())
+    stored = await repo.get(installation.id, scope=ContentFilter.everyone())
 
     assert stored is not None
     record = stored.entities[0]
@@ -57,7 +57,7 @@ async def test_a_collection_entity_round_trips_through_jsonb(
     await repo.add(installation)
     db_session.expire_all()
 
-    stored = await repo.get(installation.id, scope=AccessScope.everyone())
+    stored = await repo.get(installation.id, scope=ContentFilter.everyone())
 
     assert stored is not None
     record = stored.entities[0]
@@ -73,7 +73,7 @@ async def test_get_returns_none_when_missing(db_session: AsyncSession) -> None:
     """An unknown id yields `None`."""
     repo = SqlAlchemyInstallationRepository(db_session)
 
-    assert await repo.get(uuid.uuid7(), scope=AccessScope.everyone()) is None
+    assert await repo.get(uuid.uuid7(), scope=ContentFilter.everyone()) is None
 
 
 async def test_save_persists_status_changes(db_session: AsyncSession) -> None:
@@ -85,7 +85,7 @@ async def test_save_persists_status_changes(db_session: AsyncSession) -> None:
     await repo.save(installation)
     db_session.expire_all()
 
-    stored = await repo.get(installation.id, scope=AccessScope.everyone())
+    stored = await repo.get(installation.id, scope=ContentFilter.everyone())
 
     assert stored is not None
     assert stored.installed_at is not None
@@ -101,14 +101,16 @@ async def test_active_lookup_and_list(db_session: AsyncSession) -> None:
     live = Installation.start("demo", OWNER)
     await repo.add(live)
 
-    active = await repo.get_active_for_pack("demo", scope=AccessScope.everyone())
+    active = await repo.get_active_for_pack("demo", scope=ContentFilter.everyone())
 
     assert active is not None
     assert active.id == live.id
-    assert [i.id for i in await repo.list_active(scope=AccessScope.everyone())] == [
+    assert [i.id for i in await repo.list_active(scope=ContentFilter.everyone())] == [
         live.id
     ]
-    assert await repo.get_active_for_pack("other", scope=AccessScope.everyone()) is None
+    assert (
+        await repo.get_active_for_pack("other", scope=ContentFilter.everyone()) is None
+    )
 
 
 async def test_the_index_backs_the_one_active_install_rule(
@@ -137,10 +139,10 @@ async def test_list_for_pack_returns_every_status_newest_first(
         await repo.add(i)
 
     assert [
-        i.id for i in await repo.list_for_pack("demo", scope=AccessScope.everyone())
+        i.id for i in await repo.list_for_pack("demo", scope=ContentFilter.everyone())
     ] == [
         third.id,
         second.id,
         first.id,
     ]
-    assert await repo.list_for_pack("none", scope=AccessScope.everyone()) == []
+    assert await repo.list_for_pack("none", scope=ContentFilter.everyone()) == []

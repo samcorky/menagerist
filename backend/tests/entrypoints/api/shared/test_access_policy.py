@@ -3,8 +3,8 @@ import uuid
 import pytest
 
 from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import NotFoundError
 
 ALICE = Actor(id=uuid.uuid4(), roles=frozenset({"member"}))
@@ -15,13 +15,13 @@ policy = OwnerAccessPolicy()
 
 def test_scope_is_the_actors_own_content() -> None:
     """Scope is the actors own content."""
-    assert policy.scope_for(ALICE) == AccessScope.of(ALICE.id)
-    assert policy.scope_for(ADMIN) == AccessScope.of(ADMIN.id)
+    assert policy.scope_for(ALICE) == ContentFilter.of(ALICE.id)
+    assert policy.scope_for(ADMIN) == ContentFilter.of(ADMIN.id)
 
 
 def test_system_actor_sees_everyone() -> None:
     """System actor sees everyone."""
-    assert policy.scope_for(SYSTEM_ACTOR) == AccessScope.everyone()
+    assert policy.scope_for(SYSTEM_ACTOR) == ContentFilter.everyone()
 
 
 def test_owner_may_view_modify_and_delete() -> None:

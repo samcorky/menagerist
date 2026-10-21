@@ -18,8 +18,8 @@ from app.shared_kernel.cqrs import ScopedQueryHandler
 
 if TYPE_CHECKING:
     from app.modules.collections.domain.collection import Collection
-    from app.shared_kernel.access_scope import AccessScope
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.content_filter import ContentFilter
 
 logger = structlog.get_logger()
 
@@ -69,7 +69,7 @@ class ListCollections(
         return ListCollectionsResult(items=summaries)
 
     async def _page(
-        self, query: ListCollectionsQuery, scope: AccessScope
+        self, query: ListCollectionsQuery, scope: ContentFilter
     ) -> list[Collection]:
         """Return up to `query.limit` collections, keeping only those holding the item.
 

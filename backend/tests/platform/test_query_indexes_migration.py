@@ -12,7 +12,7 @@ from app.modules.graph.adapters.persistence.node_repository import (
 )
 from app.modules.graph.application.query_resolution import resolve_fields
 from app.modules.graph.domain.query import ResolvedQuery, parse_query
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -120,7 +120,7 @@ async def test_per_item_field_condition_uses_the_extra_schema_index(
     )
     capture = _Capture()
     await SqlAlchemyNodeRepository(capture).search(  # type: ignore[arg-type]
-        scope=AccessScope.of(uuid.UUID(int=303)),
+        scope=ContentFilter.of(uuid.UUID(int=303)),
         resolved=resolved,
         after=None,
         limit=51,

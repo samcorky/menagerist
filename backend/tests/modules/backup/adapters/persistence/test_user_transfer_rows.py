@@ -17,7 +17,7 @@ from app.modules.backup.adapters.persistence.user_transfer_rows import (
     read_rows,
 )
 from app.modules.backup.domain.errors import CorruptBackupError
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -69,7 +69,7 @@ async def test_preset_reuse_remaps_only_structural_references() -> None:
     )
     snapshot = InMemoryUserDatabaseSnapshot("rev", tables)
     await restorer.import_user(
-        snapshot.export(scope=AccessScope.of(source)), new_owner_id=destination
+        snapshot.export(scope=ContentFilter.of(source)), new_owner_id=destination
     )
     assert len(restorer.tables["presets"]) == 1
     assert restorer.tables["presets"][0]["builtin"] is True
@@ -109,7 +109,7 @@ async def test_validation_failure_keeps_target_empty() -> None:
     restorer = InMemoryUserDatabaseRestorer("rev", validator=validator)
     with pytest.raises(CorruptBackupError):
         await restorer.import_user(
-            snapshot.export(scope=AccessScope.of(source)), new_owner_id=uuid7()
+            snapshot.export(scope=ContentFilter.of(source)), new_owner_id=uuid7()
         )
     assert restorer.tables == {}
 
@@ -147,7 +147,9 @@ async def test_same_identifier_in_different_vocabulary_tables_is_remapped_safely
     }
     restorer = InMemoryUserDatabaseRestorer("rev", target)
     await restorer.import_user(
-        InMemoryUserDatabaseSnapshot("rev", tables).export(scope=AccessScope.of(owner)),
+        InMemoryUserDatabaseSnapshot("rev", tables).export(
+            scope=ContentFilter.of(owner)
+        ),
         new_owner_id=destination,
     )
     assert str(saved_list) in str(restorer.tables["nodes"][0]["extra_schema"])

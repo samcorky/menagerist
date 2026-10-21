@@ -11,7 +11,7 @@ from app.modules.graph.adapters.persistence.node_repository import (
 )
 from app.modules.graph.application.query_resolution import resolve_fields
 from app.modules.graph.domain.query import Cursor, ResolvedQuery, parse_query
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -54,7 +54,7 @@ async def _plan(
     after = Cursor(sort_values=(cursor_value,), id=uuid.UUID(int=0)) if mid else None
     capture = _Capture()
     await SqlAlchemyNodeRepository(capture).search(  # type: ignore[arg-type]
-        scope=AccessScope.of(OWNER), resolved=resolved, after=after, limit=51
+        scope=ContentFilter.of(OWNER), resolved=resolved, after=after, limit=51
     )
     assert capture.statement is not None
     sql = str(

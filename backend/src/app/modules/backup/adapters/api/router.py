@@ -209,7 +209,7 @@ async def download_backup(
         opened.chunks,
         media_type="application/gzip",
         headers={
-            "Content-Disposition": (f'attachment; filename="{filename}"'),
+            "Content-Disposition": f'attachment; filename="{filename}"',
             "Cache-Control": "no-store",
         },
     )

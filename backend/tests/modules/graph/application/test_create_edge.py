@@ -20,8 +20,8 @@ from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import InvalidAttributesError, NodeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 
@@ -54,7 +54,7 @@ async def test_create_edge_persists_and_commits() -> None:
         SYSTEM_ACTOR,
     )
 
-    assert await repos.edges.get(edge.id, scope=AccessScope.everyone()) is edge
+    assert await repos.edges.get(edge.id, scope=ContentFilter.everyone()) is edge
     assert uow.committed is True
 
 

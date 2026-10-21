@@ -17,8 +17,8 @@ from app.modules.media.application.cleanup_expired_media import (
     CleanupExpiredMediaCommand,
 )
 from app.modules.media.domain.media_asset import MediaAsset
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
+from app.shared_kernel.content_filter import ContentFilter
 
 
 def _make_use_case() -> tuple[
@@ -82,7 +82,7 @@ async def test_cleanup_deletes_expired_staged_assets() -> None:
     count = await use_case.handle(_command(), SYSTEM_ACTOR)
 
     assert count == 1
-    assert await repo.get(expired.id, scope=AccessScope.everyone()) is None
+    assert await repo.get(expired.id, scope=ContentFilter.everyone()) is None
     assert (expired.id, "staged") not in storage._files
 
 
@@ -94,7 +94,7 @@ async def test_cleanup_deletes_expired_orphaned_assets() -> None:
     count = await use_case.handle(_command(), SYSTEM_ACTOR)
 
     assert count == 1
-    assert await repo.get(expired.id, scope=AccessScope.everyone()) is None
+    assert await repo.get(expired.id, scope=ContentFilter.everyone()) is None
     assert (expired.id, "orphaned") not in storage._files
 
 
@@ -114,7 +114,7 @@ async def test_cleanup_leaves_fresh_assets_untouched() -> None:
     count = await use_case.handle(_command(), SYSTEM_ACTOR)
 
     assert count == 0
-    assert await repo.get(fresh.id, scope=AccessScope.everyone()) is fresh
+    assert await repo.get(fresh.id, scope=ContentFilter.everyone()) is fresh
 
 
 async def test_cleanup_returns_total_deleted_count() -> None:
@@ -143,7 +143,7 @@ async def test_cleanup_sees_every_owners_expired_assets() -> None:
 
     assert count == 3
     for asset in (alice, bob, legacy):
-        assert await repo.get(asset.id, scope=AccessScope.everyone()) is None
+        assert await repo.get(asset.id, scope=ContentFilter.everyone()) is None
 
 
 async def test_cleanup_follows_the_policy_scope_for_the_actor() -> None:
@@ -158,5 +158,5 @@ async def test_cleanup_follows_the_policy_scope_for_the_actor() -> None:
     count = await use_case.handle(_command(), Actor(id=me, roles=frozenset({"member"})))
 
     assert count == 1
-    assert await repo.get(theirs.id, scope=AccessScope.everyone()) is theirs
-    assert await repo.get(mine.id, scope=AccessScope.everyone()) is None
+    assert await repo.get(theirs.id, scope=ContentFilter.everyone()) is theirs
+    assert await repo.get(mine.id, scope=ContentFilter.everyone()) is None

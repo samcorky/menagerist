@@ -40,8 +40,8 @@ from app.modules.graph.domain.errors import NodeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import Actor
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 if TYPE_CHECKING:
@@ -68,7 +68,7 @@ class _RecordingPolicy:
         self.calls: list[str] = []
         self._inner = OwnerAccessPolicy()
 
-    def scope_for(self, actor: Actor) -> AccessScope:
+    def scope_for(self, actor: Actor) -> ContentFilter:
         self.calls.append("scope")
         return self._inner.scope_for(actor)
 
@@ -101,8 +101,8 @@ async def test_create_node_stamps_the_actor_as_owner() -> None:
     assert uow.committed is True
 
     assert node.owner_id == ALICE.id
-    assert await repos.nodes.get(node.id, scope=AccessScope.of(ALICE.id)) is node
-    assert await repos.nodes.get(node.id, scope=AccessScope.of(BOB.id)) is None
+    assert await repos.nodes.get(node.id, scope=ContentFilter.of(ALICE.id)) is node
+    assert await repos.nodes.get(node.id, scope=ContentFilter.of(BOB.id)) is None
 
 
 async def test_get_node_is_not_found_for_someone_else() -> None:

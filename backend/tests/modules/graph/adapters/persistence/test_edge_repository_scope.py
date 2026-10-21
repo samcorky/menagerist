@@ -19,7 +19,7 @@ from app.modules.graph.adapters.persistence.node_repository import (
 )
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.node import Node
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from app.modules.graph.ports.edge_repository import EdgeRepository
@@ -27,9 +27,9 @@ if TYPE_CHECKING:
 
 ALICE = uuid.UUID(int=101)
 BOB = uuid.UUID(int=102)
-A = AccessScope.of(ALICE)
-B = AccessScope.of(BOB)
-ALL = AccessScope.everyone()
+A = ContentFilter.of(ALICE)
+B = ContentFilter.of(BOB)
+ALL = ContentFilter.everyone()
 
 
 class _Repos(NamedTuple):
@@ -76,7 +76,7 @@ async def _edge(
     return edge
 
 
-async def _ids(repos: _Repos, scope: AccessScope, **kwargs: Any) -> list[uuid.UUID]:  # noqa: ANN401
+async def _ids(repos: _Repos, scope: ContentFilter, **kwargs: Any) -> list[uuid.UUID]:  # noqa: ANN401
     page = await repos.edges.list(scope=scope, after=None, limit=50, **kwargs)
     return [e.id for e in page]
 
@@ -204,7 +204,7 @@ async def test_count_and_list_with_attribute_match_and_are_scoped(
     await repos.edges.save(gone)
 
     async def listed(
-        scope: AccessScope, key: str, sub_key: str | None = None
+        scope: ContentFilter, key: str, sub_key: str | None = None
     ) -> set[uuid.UUID]:
         page = await repos.edges.list_with_attribute(
             "owns", key, scope=scope, sub_key=sub_key, after=None, limit=50

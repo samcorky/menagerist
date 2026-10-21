@@ -24,13 +24,13 @@ from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.modules.media.domain.media_attachment import AttachmentTarget
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 ALICE = uuid.UUID(int=101)
 BOB = uuid.UUID(int=102)
-A = AccessScope.of(ALICE)
-B = AccessScope.of(BOB)
-ALL = AccessScope.everyone()
+A = ContentFilter.of(ALICE)
+B = ContentFilter.of(BOB)
+ALL = ContentFilter.everyone()
 
 
 @pytest.fixture(

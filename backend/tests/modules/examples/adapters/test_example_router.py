@@ -30,8 +30,8 @@ from app.modules.examples.domain.pack import (
 )
 from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.modules.graph.domain.node_type import NodeType
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import Actor
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -158,7 +158,7 @@ def test_uninstall_reports_kept_entities(make_world: MakeWorld) -> None:
 
 async def _blue(world: World) -> Node:
     nodes = await world.graph_repos.nodes.list(
-        scope=AccessScope.everyone(), after=None, limit=10
+        scope=ContentFilter.everyone(), after=None, limit=10
     )
     return next(n for n in nodes if n.name == "Blue")
 

@@ -15,7 +15,7 @@ from app.modules.media.domain.media_attachment import (
     AttachmentTarget,
     MediaAttachment,
 )
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from tests.modules.examples.conftest import MakeWorld, World
@@ -29,7 +29,7 @@ async def _item(world: World) -> uuid.UUID:
 
 async def _attachments(world: World, item_id: uuid.UUID) -> list[MediaAttachment]:
     return await world.media_repos.attachments.list_for_target(
-        AttachmentTarget.NODE, item_id, scope=AccessScope.everyone()
+        AttachmentTarget.NODE, item_id, scope=ContentFilter.everyone()
     )
 
 
@@ -46,7 +46,7 @@ async def test_create_attaches_the_drawn_image_as_the_items_cover(
     assert created.entity_id == attachment.id
     assert attachment.attribute_key is AttachmentKey.COVER
     asset = await world.media_repos.assets.get(
-        attachment.asset_id, scope=AccessScope.everyone()
+        attachment.asset_id, scope=ContentFilter.everyone()
     )
     assert asset is not None
     assert (asset.content_type, asset.status) == ("image/png", MediaStatus.ATTACHED)
@@ -105,7 +105,7 @@ async def test_inspect_reads_a_renamed_file_as_changed(make_world: MakeWorld) ->
     created = await world.covers.create(item_id, "Blue", "box")
     [attachment] = await _attachments(world, item_id)
     asset = await world.media_repos.assets.get(
-        attachment.asset_id, scope=AccessScope.everyone()
+        attachment.asset_id, scope=ContentFilter.everyone()
     )
     assert asset is not None
     asset.filename = "holiday.png"
@@ -148,7 +148,7 @@ async def test_remove_deletes_attachment_asset_and_stored_files(
     for status in MediaStatus:
         assert (
             await world.media_repos.assets.list_by_status(
-                status=status, scope=AccessScope.everyone()
+                status=status, scope=ContentFilter.everyone()
             )
             == []
         )
@@ -179,7 +179,7 @@ async def test_remove_keeps_an_asset_that_is_attached_elsewhere(
 
     assert result is RemoveResult.REMOVED
     asset = await world.media_repos.assets.get(
-        attachment.asset_id, scope=AccessScope.everyone()
+        attachment.asset_id, scope=ContentFilter.everyone()
     )
     assert isinstance(asset, MediaAsset)
     assert asset.status is MediaStatus.ATTACHED
@@ -202,7 +202,7 @@ async def test_a_failure_setting_the_cover_leaves_nothing_behind(
     for status in MediaStatus:
         assert (
             await world.media_repos.assets.list_by_status(
-                status=status, scope=AccessScope.everyone()
+                status=status, scope=ContentFilter.everyone()
             )
             == []
         )

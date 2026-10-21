@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from sqlalchemy import ColumnElement, SQLColumnExpression
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 logger = structlog.get_logger()
 
@@ -64,7 +64,7 @@ def _to_model(edge: Edge) -> EdgeModel:
     )
 
 
-def _in_scope(scope: AccessScope) -> ColumnElement[bool]:
+def _in_scope(scope: ContentFilter) -> ColumnElement[bool]:
     """The one visibility predicate: live edges the `scope` covers.
 
     Edges with no owner are visible only under `everyone()`.
@@ -94,7 +94,7 @@ class SqlAlchemyEdgeRepository:
         await self._session.merge(_to_model(edge))
         await self._session.flush()
 
-    async def get(self, edge_id: uuid.UUID, *, scope: AccessScope) -> Edge | None:
+    async def get(self, edge_id: uuid.UUID, *, scope: ContentFilter) -> Edge | None:
         """Return the edge with `edge_id`, or `None` if missing, deleted or unseen."""
         logger.debug("fetching edge", edge_id=edge_id)
         result = await self._session.execute(
@@ -107,7 +107,7 @@ class SqlAlchemyEdgeRepository:
         self,
         node_id: uuid.UUID,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         after: uuid.UUID | None,
         limit: int,
     ) -> list[Edge]:
@@ -128,7 +128,7 @@ class SqlAlchemyEdgeRepository:
         return [_to_domain(model) for model in result.scalars()]
 
     async def list(
-        self, *, scope: AccessScope, after: uuid.UUID | None, limit: int
+        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
     ) -> list[Edge]:
         """List non-deleted edge ordered by id, starting after `after` if given."""
         logger.debug("listing edges", after=after, limit=limit)
@@ -143,7 +143,7 @@ class SqlAlchemyEdgeRepository:
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
 
-    async def has_edges_of_type(self, type_slug: str, *, scope: AccessScope) -> bool:
+    async def has_edges_of_type(self, type_slug: str, *, scope: ContentFilter) -> bool:
         """Return True if any non-deleted edges reference `type_slug`."""
         logger.debug("checking edges of type", type_slug=type_slug)
         stmt = select(exists().where(_in_scope(scope), EdgeModel.type == type_slug))
@@ -155,7 +155,7 @@ class SqlAlchemyEdgeRepository:
         type_slug: str,
         key: str,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         sub_key: str | None = None,
         value: str | None = None,
     ) -> int:
@@ -188,7 +188,7 @@ class SqlAlchemyEdgeRepository:
         type_slug: str,
         key: str,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         sub_key: str | None = None,
         after: uuid.UUID | None,
         limit: int,

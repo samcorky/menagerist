@@ -25,8 +25,8 @@ from app.modules.graph.application.delete_unused_node_type import (
 from app.modules.graph.domain.errors import NodeTypeInUseError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -109,7 +109,7 @@ async def test_an_item_being_added_keeps_the_type(
     async with factory() as session:
         assert await SqlAlchemyNodeTypeRepository(session).get(node_type.id)
         items = await SqlAlchemyNodeRepository(session).list(
-            scope=AccessScope.everyone(), after=None, limit=10, type="film"
+            scope=ContentFilter.everyone(), after=None, limit=10, type="film"
         )
         assert [item.type for item in items] == ["film"]
 

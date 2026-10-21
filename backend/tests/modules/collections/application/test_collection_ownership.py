@@ -39,8 +39,8 @@ from app.modules.collections.application.update_collection import (
 from app.modules.collections.domain.collection import Membership
 from app.modules.collections.domain.errors import CollectionNotFoundError
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import Actor
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ConflictError, ValidationError
 
 if TYPE_CHECKING:
@@ -89,7 +89,7 @@ async def test_other_user_cannot_get_update_delete_or_remove(world: World) -> No
             DeleteCollectionCommand(collection_id=shelf), BOB
         )
 
-    kept = await world.collections.get(shelf, scope=AccessScope.of(ALICE.id))
+    kept = await world.collections.get(shelf, scope=ContentFilter.of(ALICE.id))
     assert kept is not None
     assert kept.name == "Jazz"
 
@@ -185,7 +185,7 @@ async def test_cannot_add_other_users_item_to_own_collection(
 
     add.assert_not_awaited()
     assert world.uow.committed is False
-    everyone = AccessScope.everyone()
+    everyone = ContentFilter.everyone()
     assert await world.memberships.item_ids(shelf, scope=everyone) == set()
 
 
@@ -214,7 +214,7 @@ async def test_mixed_own_and_foreign_items_are_rejected_and_nothing_is_written(
     add.assert_not_awaited()
     save.assert_not_awaited()
     assert world.uow.committed is False
-    everyone = AccessScope.everyone()
+    everyone = ContentFilter.everyone()
     assert await world.memberships.item_ids(shelf, scope=everyone) == set()
 
 

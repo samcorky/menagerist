@@ -55,8 +55,8 @@ from app.modules.graph.adapters.persistence.unit_of_work import (
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.platform.database import get_engine, get_session_factory
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import Actor
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -150,7 +150,7 @@ def _in_memory_app() -> tuple[
 
         async def put() -> None:
             found = await collections.collections.get(
-                uuid.UUID(collection_id), scope=AccessScope.everyone()
+                uuid.UUID(collection_id), scope=ContentFilter.everyone()
             )
             assert found is not None
             found.definition = definition  # type: ignore[assignment]

@@ -27,8 +27,8 @@ from app.shared_kernel.errors import ConflictError
 
 if TYPE_CHECKING:
     from app.modules.collections.ports.collection_repository import CollectionRepository
-    from app.shared_kernel.access_scope import AccessScope
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.content_filter import ContentFilter
     from app.shared_kernel.slug import Slug
 
 logger = structlog.get_logger()
@@ -121,7 +121,7 @@ class UpdateCollection(
         collection: Collection,
         command: UpdateCollectionCommand,
         wanted: Slug | None,
-        scope: AccessScope,
+        scope: ContentFilter,
     ) -> None:
         if wanted is not None:
             if wanted == collection.slug:

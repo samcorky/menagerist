@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
     from app.modules.graph.domain.node import Node
     from app.modules.graph.domain.query import Cursor, ResolvedQuery
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 def _sort_at(hit: SearchHit, *, index: int) -> str | float:
@@ -39,7 +39,7 @@ class InMemoryNodeRepository:
     def __init__(self) -> None:
         self._nodes: dict[uuid.UUID, Node] = {}
 
-    def _visible(self, scope: AccessScope) -> builtins.list[Node]:
+    def _visible(self, scope: ContentFilter) -> builtins.list[Node]:
         """The one visibility rule: live nodes the `scope` covers.
 
         Nodes with no owner are visible only under `everyone()`.
@@ -58,14 +58,14 @@ class InMemoryNodeRepository:
         """Persist changes to an existing node."""
         self._nodes[node.id] = node
 
-    async def get(self, node_id: uuid.UUID, *, scope: AccessScope) -> Node | None:
+    async def get(self, node_id: uuid.UUID, *, scope: ContentFilter) -> Node | None:
         """Return the node with `node_id`, or `None` if missing, deleted or unseen."""
         return next((n for n in self._visible(scope) if n.id == node_id), None)
 
     async def list(
         self,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         after: uuid.UUID | None,
         limit: int,
         type: str | None = None,
@@ -99,7 +99,7 @@ class InMemoryNodeRepository:
     async def count(
         self,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         type: str | None = None,
         q: str | None = None,
         favourite: bool | None = None,
@@ -122,7 +122,7 @@ class InMemoryNodeRepository:
         return len(nodes)
 
     def _matching(
-        self, scope: AccessScope, resolved: ResolvedQuery
+        self, scope: ContentFilter, resolved: ResolvedQuery
     ) -> builtins.list[SearchHit]:
         """Every matching node in the query's order (nulls last, then id)."""
         where = resolved.query.where
@@ -143,7 +143,7 @@ class InMemoryNodeRepository:
     async def search(
         self,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         resolved: ResolvedQuery,
         after: Cursor | None,
         limit: int,
@@ -155,13 +155,13 @@ class InMemoryNodeRepository:
         return hits[:limit]
 
     async def search_count(
-        self, *, scope: AccessScope, resolved: ResolvedQuery, limit: int | None = None
+        self, *, scope: ContentFilter, resolved: ResolvedQuery, limit: int | None = None
     ) -> int:
         """Return how many live nodes in `scope` match the query, up to `limit`."""
         count = len(self._matching(scope, resolved))
         return count if limit is None else min(count, limit)
 
-    async def clear_type(self, type_slug: str, *, scope: AccessScope) -> None:
+    async def clear_type(self, type_slug: str, *, scope: ContentFilter) -> None:
         """Set `type` to None on all non-deleted nodes if type matches `type_slug`."""
         for node in self._visible(scope):
             if node.type == type_slug:
@@ -172,7 +172,7 @@ class InMemoryNodeRepository:
         type_slug: str,
         key: str,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         sub_key: str | None = None,
         value: str | None = None,
     ) -> builtins.list[Node]:
@@ -204,7 +204,7 @@ class InMemoryNodeRepository:
         type_slug: str,
         key: str,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         sub_key: str | None = None,
         value: str | None = None,
     ) -> int:
@@ -220,7 +220,7 @@ class InMemoryNodeRepository:
         type_slug: str,
         key: str,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         sub_key: str | None = None,
         after: uuid.UUID | None,
         limit: int,
@@ -236,7 +236,7 @@ class InMemoryNodeRepository:
         type_slug: str,
         key: str,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         q: str | None = None,
         limit: int = 20,
     ) -> builtins.list[tuple[str, int]]:
@@ -256,7 +256,7 @@ class InMemoryNodeRepository:
         return ordered[:limit]
 
     async def item_fields(
-        self, *, scope: AccessScope, limit: int
+        self, *, scope: ContentFilter, limit: int
     ) -> builtins.list[ItemFieldUse]:
         """List the per-item fields declared in the overlays of live nodes."""
         titles: dict[tuple[str, str], dict[str, int]] = {}

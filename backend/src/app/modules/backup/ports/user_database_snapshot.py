@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from app.modules.backup.ports.archive_member import ArchiveMember
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class UserDatabaseSnapshot(Protocol):
@@ -14,6 +14,6 @@ class UserDatabaseSnapshot(Protocol):
         """Return the source migration revision."""
         ...
 
-    def export(self, *, scope: AccessScope) -> AsyncGenerator[ArchiveMember]:
+    def export(self, *, scope: ContentFilter) -> AsyncGenerator[ArchiveMember]:
         """Export only content in one owner's scope."""
         ...

@@ -8,7 +8,7 @@ from app.shared_kernel.slug import Slug, slugify
 
 if TYPE_CHECKING:
     from app.modules.collections.ports.collection_repository import CollectionRepository
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 _FALLBACK_SLUG = "collection"
 MAX_SLUG_LENGTH = 120
@@ -48,7 +48,7 @@ def explicit_slug(value: str) -> Slug:
 async def free_slug(
     collections: CollectionRepository,
     name: str,
-    scope: AccessScope,
+    scope: ContentFilter,
     *,
     excluding: uuid.UUID | None = None,
 ) -> Slug:
@@ -71,7 +71,7 @@ async def free_slug(
 async def slug_is_held(
     collections: CollectionRepository,
     slug: str,
-    scope: AccessScope,
+    scope: ContentFilter,
     *,
     excluding: uuid.UUID | None = None,
 ) -> bool:
@@ -82,7 +82,7 @@ async def slug_is_held(
 async def _held(
     collections: CollectionRepository,
     slug: str,
-    scope: AccessScope,
+    scope: ContentFilter,
     excluding: uuid.UUID | None,
 ) -> bool:
     found = await collections.get_by_slug(slug, scope=scope)

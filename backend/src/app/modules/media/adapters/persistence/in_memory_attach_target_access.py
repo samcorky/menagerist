@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     import uuid
 
     from app.modules.media.domain.media_attachment import AttachmentTarget
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class InMemoryAttachTargetAccess:
@@ -23,7 +23,7 @@ class InMemoryAttachTargetAccess:
         self._owners[(target_type, target_id)] = owner_id
 
     async def can_attach(
-        self, target_type: AttachmentTarget, target_id: uuid.UUID, scope: AccessScope
+        self, target_type: AttachmentTarget, target_id: uuid.UUID, scope: ContentFilter
     ) -> bool:
         """Whether the target is registered and its owner is inside `scope`."""
         key = (target_type, target_id)

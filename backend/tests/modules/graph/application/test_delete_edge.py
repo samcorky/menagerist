@@ -22,8 +22,8 @@ from app.modules.graph.application.delete_edge import DeleteEdge, DeleteEdgeComm
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.errors import EdgeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 
 
 async def test_delete_edge_soft_deletes_and_commits() -> None:
@@ -47,7 +47,7 @@ async def test_delete_edge_soft_deletes_and_commits() -> None:
 
     await use_case.handle(DeleteEdgeCommand(edge_id=edge.id), SYSTEM_ACTOR)
 
-    assert await repos.edges.get(edge.id, scope=AccessScope.everyone()) is None
+    assert await repos.edges.get(edge.id, scope=ContentFilter.everyone()) is None
 
 
 async def test_delete_edge_raises_when_missing() -> None:

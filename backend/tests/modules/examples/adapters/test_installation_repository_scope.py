@@ -16,7 +16,7 @@ from app.modules.examples.domain.installation import Installation
 from app.modules.examples.ports.installation_repository import (  # noqa: TC001
     InstallationRepository,
 )
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,9 +33,9 @@ async def _check_scope(repo: InstallationRepository) -> None:
     for installation in (mine, theirs, removed):
         await repo.add(installation)
     alice, bob, everyone = (
-        AccessScope.of(ALICE),
-        AccessScope.of(BOB),
-        AccessScope.everyone(),
+        ContentFilter.of(ALICE),
+        ContentFilter.of(BOB),
+        ContentFilter.everyone(),
     )
 
     assert await repo.get(mine.id, scope=alice) is not None
@@ -48,7 +48,7 @@ async def _check_scope(repo: InstallationRepository) -> None:
     assert other is not None
     assert other.id == theirs.id
     assert (
-        await repo.get_active_for_pack("demo", scope=AccessScope.of(uuid.uuid7()))
+        await repo.get_active_for_pack("demo", scope=ContentFilter.of(uuid.uuid7()))
         is None
     )
     assert [i.id for i in await repo.list_active(scope=alice)] == [mine.id]
@@ -88,11 +88,11 @@ async def test_owner_round_trips_and_legacy_rows_are_invisible_to_a_person(
     await repo.add(legacy)
     db_session.expire_all()
 
-    stored = await repo.get(mine.id, scope=AccessScope.of(ALICE))
+    stored = await repo.get(mine.id, scope=ContentFilter.of(ALICE))
     assert stored is not None
     assert stored.owner_id == ALICE
-    assert await repo.get(legacy.id, scope=AccessScope.of(ALICE)) is None
-    seen = await repo.get(legacy.id, scope=AccessScope.everyone())
+    assert await repo.get(legacy.id, scope=ContentFilter.of(ALICE)) is None
+    seen = await repo.get(legacy.id, scope=ContentFilter.everyone())
     assert seen is not None
     assert seen.owner_id is None
 

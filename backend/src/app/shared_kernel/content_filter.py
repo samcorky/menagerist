@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)
-class AccessScope:
+class ContentFilter:
     """Which content a query may return; a criterion only, with no rules.
 
     The `AccessPolicy` decides which scope an actor gets; repositories only
@@ -13,12 +13,12 @@ class AccessScope:
     user_id: uuid.UUID | None
 
     @classmethod
-    def of(cls, user_id: uuid.UUID) -> AccessScope:
+    def of(cls, user_id: uuid.UUID) -> ContentFilter:
         """Content owned by `user_id`."""
         return cls(user_id=user_id)
 
     @classmethod
-    def everyone(cls) -> AccessScope:
+    def everyone(cls) -> ContentFilter:
         """Content with no restriction."""
         return cls(user_id=None)
 

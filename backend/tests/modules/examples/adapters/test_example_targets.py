@@ -17,7 +17,7 @@ from app.modules.examples.ports.pack_targets import Created, RemoveResult
 from app.modules.graph.domain.edge import Edge
 from app.modules.media.domain.media_attachment import MediaAttachment
 from app.modules.presets.domain.preset import Preset
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from tests.modules.examples.conftest import MakeWorld, SamplePack, World
@@ -91,7 +91,7 @@ async def test_item_content_ignores_favourite_but_not_edits(
     world = make_world()
     _, _, _, blue, *_ = await _install_all(world, sample_pack)
     node = await world.graph_repos.nodes.get(
-        blue.entity_id, scope=AccessScope.everyone()
+        blue.entity_id, scope=ContentFilter.everyone()
     )
     assert node is not None
 
@@ -366,7 +366,7 @@ async def test_an_item_type_still_used_by_an_item_is_kept(
 
     assert result is RemoveResult.REFUSED_IN_USE
     item = await world.graph_repos.nodes.get(
-        ada.entity_id, scope=AccessScope.everyone()
+        ada.entity_id, scope=ContentFilter.everyone()
     )
     assert item is not None
     assert item.type == "demo-person"
@@ -409,7 +409,7 @@ async def test_content_does_not_alias_the_stored_entity(
     world = make_world()
     _, _, _, blue, *_ = await _install_all(world, sample_pack)
     node = await world.graph_repos.nodes.get(
-        blue.entity_id, scope=AccessScope.everyone()
+        blue.entity_id, scope=ContentFilter.everyone()
     )
     assert node is not None
 

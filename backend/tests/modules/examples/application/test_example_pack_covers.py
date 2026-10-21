@@ -27,7 +27,7 @@ from app.modules.media.domain.media_attachment import (
     AttachmentTarget,
     MediaAttachment,
 )
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     import uuid
@@ -71,14 +71,16 @@ async def _uninstall(world: World) -> UninstallResult:
 
 async def _item_id(world: World, name: str) -> uuid.UUID:
     nodes = await world.graph_repos.nodes.list(
-        scope=AccessScope.everyone(), after=None, limit=10
+        scope=ContentFilter.everyone(), after=None, limit=10
     )
     return next(n.id for n in nodes if n.name == name)
 
 
 async def _attachments(world: World, name: str) -> list[MediaAttachment]:
     return await world.media_repos.attachments.list_for_target(
-        AttachmentTarget.NODE, await _item_id(world, name), scope=AccessScope.everyone()
+        AttachmentTarget.NODE,
+        await _item_id(world, name),
+        scope=ContentFilter.everyone(),
     )
 
 
@@ -87,7 +89,7 @@ async def _assets(world: World) -> list[MediaAsset]:
         a
         for status in MediaStatus
         for a in await world.media_repos.assets.list_by_status(
-            status=status, scope=AccessScope.everyone()
+            status=status, scope=ContentFilter.everyone()
         )
     ]
 
@@ -140,7 +142,7 @@ async def test_a_cover_is_recorded_as_owned_against_its_item(
     await _install(world)
 
     installation = await world.installations.get_active_for_pack(
-        "demo", scope=AccessScope.everyone()
+        "demo", scope=ContentFilter.everyone()
     )
     assert installation is not None
     [cover] = installation.owned(EntityKind.COVER)
@@ -168,7 +170,7 @@ async def test_uninstall_removes_covers_first_and_leaves_no_media(
     assert world.storage._thumbnails == {}
     assert (
         await world.graph_repos.nodes.list(
-            scope=AccessScope.everyone(), after=None, limit=10
+            scope=ContentFilter.everyone(), after=None, limit=10
         )
         == []
     )
@@ -188,7 +190,7 @@ async def test_a_cover_the_person_deleted_does_not_block_removal(
     assert result.kept == ()
     assert (
         await world.graph_repos.nodes.list(
-            scope=AccessScope.everyone(), after=None, limit=10
+            scope=ContentFilter.everyone(), after=None, limit=10
         )
         == []
     )
@@ -214,7 +216,7 @@ async def test_a_replaced_cover_is_kept_and_so_is_its_item(
     assert [
         n.name
         for n in await world.graph_repos.nodes.list(
-            scope=AccessScope.everyone(), after=None, limit=9
+            scope=ContentFilter.everyone(), after=None, limit=9
         )
     ] == ["Blue"]
 
@@ -230,7 +232,7 @@ async def test_a_replaced_cover_is_recorded_as_kept_edited(
     await _uninstall(world)
 
     [history] = await world.installations.list_for_pack(
-        "demo", scope=AccessScope.everyone()
+        "demo", scope=ContentFilter.everyone()
     )
     [cover] = [r for r in history.entities if r.kind is EntityKind.COVER]
     assert (cover.outcome, cover.reason) == (Outcome.KEPT, "edited")
@@ -252,14 +254,14 @@ async def test_a_failure_part_way_removes_the_covers_already_attached(
     assert world.storage._files == {}
     assert (
         await world.graph_repos.nodes.list(
-            scope=AccessScope.everyone(), after=None, limit=10
+            scope=ContentFilter.everyone(), after=None, limit=10
         )
         == []
     )
     assert world.uow.committed is True
     assert (
         await world.installations.get_active_for_pack(
-            "demo", scope=AccessScope.everyone()
+            "demo", scope=ContentFilter.everyone()
         )
         is None
     )
@@ -273,7 +275,7 @@ async def test_reinstall_readopts_a_kept_cover_without_a_second_one(
     await _install(world)
     [original] = await _attachments(world, "Blue")
     first = await world.installations.get_active_for_pack(
-        "demo", scope=AccessScope.everyone()
+        "demo", scope=ContentFilter.everyone()
     )
     assert first is not None
     original_hash = first.owned(EntityKind.COVER)[0].content_hash
@@ -286,7 +288,7 @@ async def test_reinstall_readopts_a_kept_cover_without_a_second_one(
     assert len(world.covers.create_calls) == 1  # none drawn on the reinstall
     assert len(await _attachments(world, "Blue")) == 2
     installation = await world.installations.get_active_for_pack(
-        "demo", scope=AccessScope.everyone()
+        "demo", scope=ContentFilter.everyone()
     )
     assert installation is not None
     [cover] = installation.owned(EntityKind.COVER)
@@ -304,7 +306,7 @@ async def test_an_adopted_item_whose_cover_is_gone_gets_a_fresh_one(
     world = make_world(_pack(sample_pack))
     await _install(world)
     blue = await world.graph_repos.nodes.get(
-        await _item_id(world, "Blue"), scope=AccessScope.everyone()
+        await _item_id(world, "Blue"), scope=ContentFilter.everyone()
     )
     assert blue is not None
     blue.name = "Mine now"
@@ -337,7 +339,7 @@ async def test_a_kept_cover_is_not_adopted_without_its_item(
     assert result.adopted.items == 0
     assert len(world.covers.create_calls) == 2
     installation = await world.installations.get_active_for_pack(
-        "demo", scope=AccessScope.everyone()
+        "demo", scope=ContentFilter.everyone()
     )
     assert installation is not None
     [cover] = installation.owned(EntityKind.COVER)
@@ -347,7 +349,7 @@ async def test_a_kept_cover_is_not_adopted_without_its_item(
 
 async def _rename(world: World, old: str, new: str) -> None:
     node = await world.graph_repos.nodes.get(
-        await _item_id(world, old), scope=AccessScope.everyone()
+        await _item_id(world, old), scope=ContentFilter.everyone()
     )
     assert node is not None
     node.name = new
@@ -379,7 +381,7 @@ async def test_reinstall_never_replaces_a_cover_the_person_set_after_deleting_ou
     assert len(world.covers.create_calls) == 1
     assert await _covers_of(world, "Blue") == [theirs]
     installation = await world.installations.get_active_for_pack(
-        "demo", scope=AccessScope.everyone()
+        "demo", scope=ContentFilter.everyone()
     )
     assert installation is not None
     assert installation.owned(EntityKind.COVER) == []

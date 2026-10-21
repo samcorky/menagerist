@@ -16,7 +16,7 @@ from app.modules.graph.ports.unit_of_work import GraphRepos, GraphUnitOfWork
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
-from app.shared_kernel.access_scope import AccessScope  # noqa: TC001
+from app.shared_kernel.content_filter import ContentFilter  # noqa: TC001
 from app.shared_kernel.cqrs import ScopedCommandHandler
 from app.shared_kernel.slug import slugify
 
@@ -51,7 +51,7 @@ class CreateEdgesResult:
 
 
 async def _existing_targets(
-    repos: GraphRepos, source_id: uuid.UUID, type_: str, scope: AccessScope
+    repos: GraphRepos, source_id: uuid.UUID, type_: str, scope: ContentFilter
 ) -> set[uuid.UUID]:
     """Ids connected to `source_id` by an edge of `type_`, either direction."""
     targets: set[uuid.UUID] = set()

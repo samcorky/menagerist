@@ -30,8 +30,8 @@ from app.modules.media.domain.media_attachment import (
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 
 pytestmark = pytest.mark.integration
 
@@ -72,7 +72,7 @@ async def test_second_cover_for_one_target_raises_cover_already_set(
 
     # The savepoint leaves the session usable and the first cover intact.
     stored = await repo.list_for_target(
-        AttachmentTarget.NODE, node_id, scope=AccessScope.everyone()
+        AttachmentTarget.NODE, node_id, scope=ContentFilter.everyone()
     )
     assert [a.asset_id for a in stored] == [first.id]
 
@@ -146,7 +146,7 @@ async def test_concurrent_set_cover_calls_serialise_to_one_cover(
                 stored = await SqlAlchemyMediaAttachmentRepository(
                     session
                 ).list_for_target(
-                    AttachmentTarget.NODE, node_id, scope=AccessScope.everyone()
+                    AttachmentTarget.NODE, node_id, scope=ContentFilter.everyone()
                 )
             covers = [a for a in stored if a.attribute_key is AttachmentKey.COVER]
             assert len(stored) == 2

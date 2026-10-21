@@ -8,7 +8,7 @@ import pytest
 from app.entrypoints.api.shared.bridges.collection_items import GraphItemLookup
 from app.modules.graph.adapters.persistence.unit_of_work import build_graph_repos
 from app.modules.graph.domain.node import Node
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,7 +39,7 @@ async def test_returns_only_live_items_among_the_given_ids(
     lookup, nodes = await _lookup_with_nodes(db_session, 4, deleted=1)
 
     result = await lookup.live_ids(
-        [*(n.id for n in nodes), uuid.uuid7()], AccessScope.everyone()
+        [*(n.id for n in nodes), uuid.uuid7()], ContentFilter.everyone()
     )
 
     assert result == {n.id for n in nodes[1:]}
@@ -49,14 +49,14 @@ async def test_empty_input_returns_an_empty_set(db_session: AsyncSession) -> Non
     """No ids means no live ids."""
     lookup, _ = await _lookup_with_nodes(db_session, 1)
 
-    assert await lookup.live_ids([], AccessScope.everyone()) == set()
+    assert await lookup.live_ids([], ContentFilter.everyone()) == set()
 
 
 async def test_handles_more_ids_than_one_chunk(db_session: AsyncSession) -> None:
     """More than 1000 ids are looked up in chunks and unioned."""
     lookup, nodes = await _lookup_with_nodes(db_session, 1105)
 
-    result = await lookup.live_ids([n.id for n in nodes], AccessScope.everyone())
+    result = await lookup.live_ids([n.id for n in nodes], ContentFilter.everyone())
 
     assert result == {n.id for n in nodes}
 
@@ -66,7 +66,7 @@ async def test_duplicate_ids_are_collapsed(db_session: AsyncSession) -> None:
     lookup, nodes = await _lookup_with_nodes(db_session, 1)
 
     assert await lookup.live_ids(
-        [nodes[0].id, nodes[0].id], AccessScope.everyone()
+        [nodes[0].id, nodes[0].id], ContentFilter.everyone()
     ) == {nodes[0].id}
 
 
@@ -78,8 +78,8 @@ async def test_ids_outside_the_scope_are_dropped(db_session: AsyncSession) -> No
     await repos.nodes.add(other)
     ids = [*(n.id for n in nodes), other.id]
 
-    mine = await lookup.live_ids(ids, AccessScope.of(uuid.UUID(int=1)))
-    theirs = await lookup.live_ids(ids, AccessScope.of(uuid.UUID(int=2)))
+    mine = await lookup.live_ids(ids, ContentFilter.of(uuid.UUID(int=1)))
+    theirs = await lookup.live_ids(ids, ContentFilter.of(uuid.UUID(int=2)))
 
     assert mine == {n.id for n in nodes}
     assert theirs == {other.id}

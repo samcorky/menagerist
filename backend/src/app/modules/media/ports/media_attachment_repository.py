@@ -7,7 +7,7 @@ if TYPE_CHECKING:
         AttachmentTarget,
         MediaAttachment,
     )
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class MediaAttachmentRepository(Protocol):
@@ -31,7 +31,7 @@ class MediaAttachmentRepository(Protocol):
         ...
 
     async def get(
-        self, attachment_id: uuid.UUID, *, scope: AccessScope
+        self, attachment_id: uuid.UUID, *, scope: ContentFilter
     ) -> MediaAttachment | None:
         """Return an attachment by id, or ``None`` if missing or unseen."""
         ...
@@ -41,13 +41,13 @@ class MediaAttachmentRepository(Protocol):
         target_type: AttachmentTarget,
         target_id: uuid.UUID,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
     ) -> list[MediaAttachment]:
         """Return the attachments on the target whose asset is inside `scope`."""
         ...
 
     async def list_for_asset(
-        self, asset_id: uuid.UUID, *, scope: AccessScope
+        self, asset_id: uuid.UUID, *, scope: ContentFilter
     ) -> list[MediaAttachment]:
         """Return the attachments of the asset, if the asset is inside `scope`."""
         ...

@@ -26,16 +26,16 @@ from app.modules.media.ports.media_asset_repository import MediaAssetRepository
 from app.modules.media.ports.media_attachment_repository import (
     MediaAttachmentRepository,
 )
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 ALICE = uuid.UUID(int=101)
 BOB = uuid.UUID(int=102)
-A = AccessScope.of(ALICE)
-B = AccessScope.of(BOB)
-ALL = AccessScope.everyone()
+A = ContentFilter.of(ALICE)
+B = ContentFilter.of(BOB)
+ALL = ContentFilter.everyone()
 STAGED = MediaStatus.STAGED
 
 

@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import NotFoundError
 
 if TYPE_CHECKING:
@@ -16,11 +16,11 @@ class OwnerAccessPolicy:
     no owner is visible to nobody. The system actor sees everything.
     """
 
-    def scope_for(self, actor: Actor) -> AccessScope:
+    def scope_for(self, actor: Actor) -> ContentFilter:
         """Return everything for the system actor, else the actor's own content."""
         if actor.is_system:
-            return AccessScope.everyone()
-        return AccessScope.of(actor.id)
+            return ContentFilter.everyone()
+        return ContentFilter.of(actor.id)
 
     def assert_can_view(self, actor: Actor, owner_id: uuid.UUID | None) -> None:
         """Raise `NotFoundError` unless the content is the actor's own."""

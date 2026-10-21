@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     import uuid
     from collections.abc import Iterable, Mapping
 
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class InMemoryCollectionMembers:
@@ -42,7 +42,7 @@ class InMemoryCollectionMembers:
         self._collections[collection_id] = (owner_id, source)
 
     async def resolve(
-        self, collection_id: uuid.UUID, scope: AccessScope
+        self, collection_id: uuid.UUID, scope: ContentFilter
     ) -> CollectionSource | None:
         """Return what the collection holds, or None if unknown or outside `scope`."""
         found = self._collections.get(collection_id)

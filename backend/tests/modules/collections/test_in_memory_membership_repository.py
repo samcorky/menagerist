@@ -8,10 +8,10 @@ from app.modules.collections.adapters.persistence.in_memory_membership_repositor
     InMemoryMembershipRepository,
 )
 from app.modules.collections.domain.collection import Collection, Membership
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.slug import Slug
 
-ALL = AccessScope.everyone()
+ALL = ContentFilter.everyone()
 OWNER = uuid.UUID(int=101)
 
 

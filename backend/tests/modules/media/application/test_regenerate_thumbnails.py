@@ -19,8 +19,8 @@ from app.modules.media.application.regenerate_thumbnails import (
     RegenerateThumbnailsCommand,
 )
 from app.modules.media.domain.media_asset import MediaAsset
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
+from app.shared_kernel.content_filter import ContentFilter
 
 
 def _make_use_case(
@@ -65,7 +65,7 @@ async def test_regenerates_thumbnail_for_attached_image() -> None:
 
     assert count == 1
     assert storage._thumbnails[(asset.id, "attached")] == b"fake-webp-thumbnail"
-    updated = await repo.get(asset.id, scope=AccessScope.everyone())
+    updated = await repo.get(asset.id, scope=ContentFilter.everyone())
     assert updated is not None
     assert updated.has_thumbnail is True
 

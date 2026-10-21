@@ -68,8 +68,8 @@ from app.modules.media.domain.media_attachment import (
     MediaAttachment,
 )
 from app.modules.media.ports.unit_of_work import MediaRepos, MediaUnitOfWork
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import NotFoundError
 
 if TYPE_CHECKING:
@@ -183,7 +183,7 @@ async def test_staged_uploads_belong_to_the_uploader(world: World) -> None:
     )
 
     assert asset.owner_id == ALICE.id
-    assert await world.assets.get(asset.id, scope=AccessScope.of(BOB.id)) is None
+    assert await world.assets.get(asset.id, scope=ContentFilter.of(BOB.id)) is None
 
 
 # ── Single asset reads and writes ──────────────────────────────────────────────
@@ -233,7 +233,7 @@ async def test_owner_can_delete_their_asset(world: World) -> None:
         DeleteMediaCommand(asset_id=asset.id), ALICE
     )
 
-    assert await world.assets.get(asset.id, scope=AccessScope.everyone()) is None
+    assert await world.assets.get(asset.id, scope=ContentFilter.everyone()) is None
     assert (asset.id, "staged") not in world.storage._files
 
 
@@ -373,7 +373,9 @@ async def test_upload_and_attach_to_own_item_is_owned_by_the_uploader(
         ALICE,
     )
 
-    asset = await world.assets.get(attachment.asset_id, scope=AccessScope.of(ALICE.id))
+    asset = await world.assets.get(
+        attachment.asset_id, scope=ContentFilter.of(ALICE.id)
+    )
     assert asset is not None
     assert asset.owner_id == ALICE.id
 

@@ -7,7 +7,7 @@ import structlog
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.domain.errors import NodeTypeInUseError, NodeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.cqrs import AuthorisedCommandHandler
 
 if TYPE_CHECKING:
@@ -48,7 +48,7 @@ class DeleteUnusedNodeType(
                 )
             # all-users check: shared structure
             in_use = await repos.nodes.list(
-                scope=AccessScope.everyone(),
+                scope=ContentFilter.everyone(),
                 after=None,
                 limit=1,
                 type=str(node_type.slug),

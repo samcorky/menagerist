@@ -27,8 +27,8 @@ from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.domain.query import InvalidQueryError
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 
 SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -108,8 +108,8 @@ async def test_count_matches_only_the_scopes_items() -> None:
     """The count covers the scope's items and never another owner's."""
     repos = await _repos(3)
     query = {"v": 1, "where": None}
-    mine = await count_matching(repos, query, AccessScope.of(OWNER), cap=10)
-    theirs = await count_matching(repos, query, AccessScope.of(OTHER), cap=10)
+    mine = await count_matching(repos, query, ContentFilter.of(OWNER), cap=10)
+    theirs = await count_matching(repos, query, ContentFilter.of(OTHER), cap=10)
     assert (mine, theirs) == ((3, False), (1, False))
 
 
@@ -117,7 +117,7 @@ async def test_count_applies_the_conditions() -> None:
     """Conditions narrow the count."""
     repos = await _repos(3)
     got = await count_matching(
-        repos, _rating_at_least(1), AccessScope.of(OWNER), cap=10
+        repos, _rating_at_least(1), ContentFilter.of(OWNER), cap=10
     )
     assert got == (2, False)
 
@@ -126,8 +126,11 @@ async def test_count_is_capped() -> None:
     """Above the cap the count stops at the cap and says so."""
     repos = await _repos(5)
     query = {"v": 1, "where": None}
-    assert await count_matching(repos, query, AccessScope.of(OWNER), cap=3) == (3, True)
-    assert await count_matching(repos, query, AccessScope.of(OWNER), cap=5) == (
+    assert await count_matching(repos, query, ContentFilter.of(OWNER), cap=3) == (
+        3,
+        True,
+    )
+    assert await count_matching(repos, query, ContentFilter.of(OWNER), cap=5) == (
         5,
         False,
     )
@@ -137,7 +140,7 @@ async def test_count_of_a_stale_field_matches_nothing() -> None:
     """A stale condition matches nothing and does not raise."""
     repos = await _repos(3)
     got = await count_matching(
-        repos, _rating_at_least(0, key="gone"), AccessScope.of(OWNER), cap=10
+        repos, _rating_at_least(0, key="gone"), ContentFilter.of(OWNER), cap=10
     )
     assert got == (0, False)
 
@@ -147,7 +150,7 @@ async def test_count_uses_the_given_clock() -> None:
     repos = await _repos(1)
     query = {"v": 1, "where": None}
     got = await count_matching(
-        repos, query, AccessScope.of(OWNER), cap=10, today=lambda: date(2026, 1, 1)
+        repos, query, ContentFilter.of(OWNER), cap=10, today=lambda: date(2026, 1, 1)
     )
     assert got == (1, False)
 
@@ -155,7 +158,7 @@ async def test_count_uses_the_given_clock() -> None:
 async def test_count_default_clock_is_utc_today() -> None:
     """Without a clock the count still resolves."""
     repos = await _repos(1)
-    got = await count_matching(repos, {"v": 1}, AccessScope.of(OWNER), cap=10)
+    got = await count_matching(repos, {"v": 1}, ContentFilter.of(OWNER), cap=10)
     assert got == (1, False)
 
 
@@ -165,7 +168,7 @@ async def test_count_raises_for_a_malformed_query() -> None:
         await count_matching(
             await _repos(),
             {"v": 1, "where": {"op": "xor"}},
-            AccessScope.of(OWNER),
+            ContentFilter.of(OWNER),
             cap=3,
         )
 
@@ -174,5 +177,5 @@ async def test_count_without_a_cap_is_exact() -> None:
     """`cap=None` counts every match and is never flagged as capped."""
     repos = await _repos(5)
     query = {"v": 1, "where": None}
-    got = await count_matching(repos, query, AccessScope.of(OWNER), cap=None)
+    got = await count_matching(repos, query, ContentFilter.of(OWNER), cap=None)
     assert got == (5, False)

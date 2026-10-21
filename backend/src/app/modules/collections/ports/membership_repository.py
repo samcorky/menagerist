@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     import uuid
 
     from app.modules.collections.domain.collection import Membership
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class MembershipRepository(Protocol):
@@ -23,7 +23,7 @@ class MembershipRepository(Protocol):
         ...
 
     async def item_ids(
-        self, collection_id: uuid.UUID, *, scope: AccessScope
+        self, collection_id: uuid.UUID, *, scope: ContentFilter
     ) -> set[uuid.UUID]:
         """Return the item ids on `collection_id`; empty unless it is in `scope`.
 
@@ -32,7 +32,7 @@ class MembershipRepository(Protocol):
         ...
 
     async def collection_ids_for(
-        self, item_id: uuid.UUID, *, scope: AccessScope
+        self, item_id: uuid.UUID, *, scope: ContentFilter
     ) -> set[uuid.UUID]:
         """Return the ids of the collections in `scope` holding `item_id`.
 

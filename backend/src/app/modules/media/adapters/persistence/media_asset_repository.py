@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from sqlalchemy import Select
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 logger = structlog.get_logger()
 
@@ -54,7 +54,7 @@ def _to_model(asset: MediaAsset) -> MediaAssetModel:
 
 
 def _scoped(
-    stmt: Select[tuple[MediaAssetModel]], scope: AccessScope
+    stmt: Select[tuple[MediaAssetModel]], scope: ContentFilter
 ) -> Select[tuple[MediaAssetModel]]:
     """Restrict a media asset select to the rows inside `scope`."""
     return stmt.where(owned_by(MediaAssetModel, scope.user_id))
@@ -79,7 +79,7 @@ class SqlAlchemyMediaAssetRepository:
         await self._session.flush()
 
     async def get(
-        self, asset_id: uuid.UUID, *, scope: AccessScope
+        self, asset_id: uuid.UUID, *, scope: ContentFilter
     ) -> MediaAsset | None:
         """Return the asset with `asset_id`, or `None` if missing or unseen."""
         logger.debug("fetching media asset", asset_id=asset_id)
@@ -94,7 +94,7 @@ class SqlAlchemyMediaAssetRepository:
         *,
         status: MediaStatus,
         before: datetime,
-        scope: AccessScope,
+        scope: ContentFilter,
     ) -> list[MediaAsset]:
         """Return assets in `scope` and `status` last updated before `before`."""
         logger.debug("listing expired media assets", status=status.value)
@@ -109,7 +109,7 @@ class SqlAlchemyMediaAssetRepository:
         return [_to_domain(m) for m in result.scalars()]
 
     async def list_by_status(
-        self, *, status: MediaStatus, scope: AccessScope
+        self, *, status: MediaStatus, scope: ContentFilter
     ) -> list[MediaAsset]:
         """Return all assets in `scope` that are in `status`."""
         logger.debug("listing media assets by status", status=status.value)

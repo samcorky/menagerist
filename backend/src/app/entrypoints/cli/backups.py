@@ -15,13 +15,13 @@ if TYPE_CHECKING:
 
     from app.entrypoints.api.shared.backup_media_files import BackupMediaFiles
     from app.modules.backup.domain.backup import BackupSummary
-    from app.shared_kernel.access_scope import AccessScope
     from app.shared_kernel.authorization import AuthorizationPort
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 @asynccontextmanager
 async def media_files(
-    *, scope: AccessScope | None = None
+    *, scope: ContentFilter | None = None
 ) -> AsyncIterator[BackupMediaFiles]:
     """Keep the media repository session alive for a complete operation."""
     from app.entrypoints.api.shared.backup_media_files import BackupMediaFiles
@@ -162,14 +162,14 @@ async def export_user_data(user_id: UUID, output: Path) -> BackupSummary:
         ExportUserDataCommand,
     )
     from app.platform.app_info import load_app_info
-    from app.shared_kernel.access_scope import AccessScope
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.content_filter import ContentFilter
 
     actor = Actor(id=user_id, roles=frozenset({"member"}))
     store = LocalDirectoryBackupStore(
         get_backup_settings().backup_path / "users" / str(user_id)
     )
-    async with media_files(scope=AccessScope.of(user_id)) as media:
+    async with media_files(scope=ContentFilter.of(user_id)) as media:
         summary = await ExportUserData(
             store,
             SqlAlchemyUserDatabaseSnapshot(get_session_factory()),
@@ -204,8 +204,8 @@ async def import_user_data(user_id: UUID, archive: Path) -> None:
     )
     from app.modules.backup.application.upload_backup import upload_verified_backup
     from app.modules.backup.domain.backup import BackupScope
-    from app.shared_kernel.access_scope import AccessScope
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.content_filter import ContentFilter
 
     async def chunks() -> AsyncIterator[bytes]:
         with archive.open("rb") as source:
@@ -224,7 +224,7 @@ async def import_user_data(user_id: UUID, archive: Path) -> None:
         allowed_scope=BackupScope.USER,
     )
     actor = Actor(id=user_id, roles=frozenset({"member"}))
-    async with media_files(scope=AccessScope.of(user_id)) as media:
+    async with media_files(scope=ContentFilter.of(user_id)) as media:
         await ImportUserData(
             store,
             SqlAlchemyUserDatabaseRestorer(

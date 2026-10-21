@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from app.modules.graph.ports.unit_of_work import GraphRepos
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class GraphDefinitionChecker:
@@ -33,7 +33,7 @@ class GraphDefinitionChecker:
     async def check(
         self,
         definition: Mapping[str, Any],
-        scope: AccessScope,
+        scope: ContentFilter,
     ) -> list[DefinitionWarning]:
         """Return the stale-condition warnings, or raise `InvalidDefinitionError`."""
         try:

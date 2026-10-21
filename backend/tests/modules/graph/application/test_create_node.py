@@ -17,8 +17,8 @@ from app.modules.graph.application.create_node import CreateNode, CreateNodeComm
 from app.modules.graph.domain.errors import InvalidAttributesError, InvalidSchemaError
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 
@@ -42,7 +42,7 @@ async def test_create_node_persists_and_commits() -> None:
         SYSTEM_ACTOR,
     )
 
-    assert await repos.nodes.get(node.id, scope=AccessScope.everyone()) is node
+    assert await repos.nodes.get(node.id, scope=ContentFilter.everyone()) is node
     assert uow.committed is True
 
 
@@ -215,7 +215,7 @@ async def test_create_node_rejects_a_malformed_extra_schema() -> None:
 
     assert (
         await repos.nodes.count(
-            scope=AccessScope.everyone(),
+            scope=ContentFilter.everyone(),
         )
         == 0
     )

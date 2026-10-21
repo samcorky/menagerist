@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
     from app.modules.graph.ports.unit_of_work import GraphRepos
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 def utc_today() -> date:
@@ -50,7 +50,7 @@ async def prepare_query(
 async def count_matching(
     repos: GraphRepos,
     raw: Mapping[str, Any],
-    scope: AccessScope,
+    scope: ContentFilter,
     *,
     cap: int | None,
     today: Callable[[], date] = utc_today,

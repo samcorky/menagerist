@@ -7,7 +7,7 @@ import structlog
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.domain.errors import EdgeTypeInUseError, EdgeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.cqrs import AuthorisedCommandHandler
 
 if TYPE_CHECKING:
@@ -45,7 +45,7 @@ class DeleteEdgeType(
                 )
             # admin-wide: affects every user's content
             if await repos.edges.has_edges_of_type(
-                str(edge_type.slug), scope=AccessScope.everyone()
+                str(edge_type.slug), scope=ContentFilter.everyone()
             ):
                 raise EdgeTypeInUseError(
                     f"Edge type '{edge_type.slug}' "

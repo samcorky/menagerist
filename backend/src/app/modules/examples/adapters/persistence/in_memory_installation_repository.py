@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     import uuid
 
     from app.modules.examples.domain.installation import Installation
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class InMemoryInstallationRepository:
@@ -22,14 +22,14 @@ class InMemoryInstallationRepository:
         self._installations[installation.id] = installation
 
     async def get(
-        self, installation_id: uuid.UUID, *, scope: AccessScope
+        self, installation_id: uuid.UUID, *, scope: ContentFilter
     ) -> Installation | None:
         """Return the installation with `installation_id` in `scope`, or `None`."""
         found = self._installations.get(installation_id)
         return found if found is not None and scope.covers(found.owner_id) else None
 
     async def get_active_for_pack(
-        self, pack_id: str, *, scope: AccessScope
+        self, pack_id: str, *, scope: ContentFilter
     ) -> Installation | None:
         """Return the installing or installed installation of `pack_id`, if any."""
         return next(
@@ -41,7 +41,7 @@ class InMemoryInstallationRepository:
             None,
         )
 
-    async def list_active(self, *, scope: AccessScope) -> list[Installation]:
+    async def list_active(self, *, scope: ContentFilter) -> list[Installation]:
         """Return every installing or installed installation, oldest first."""
         return sorted(
             (
@@ -53,7 +53,7 @@ class InMemoryInstallationRepository:
         )
 
     async def list_for_pack(
-        self, pack_id: str, *, scope: AccessScope
+        self, pack_id: str, *, scope: ContentFilter
     ) -> list[Installation]:
         """Return every installation of `pack_id`, whatever its status, newest first."""
         return sorted(

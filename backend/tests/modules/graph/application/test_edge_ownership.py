@@ -33,8 +33,8 @@ from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import EdgeNotFoundError, NodeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import Actor
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 if TYPE_CHECKING:
@@ -68,7 +68,7 @@ class _RecordingPolicy:
         self.calls: list[str] = []
         self._inner: AccessPolicy = OwnerAccessPolicy()
 
-    def scope_for(self, actor: Actor) -> AccessScope:
+    def scope_for(self, actor: Actor) -> ContentFilter:
         self.calls.append("scope")
         return self._inner.scope_for(actor)
 
@@ -133,8 +133,8 @@ async def test_create_edge_stamps_the_actor_as_owner() -> None:
 
     assert uow.committed is True
     assert edge.owner_id == ALICE.id
-    assert await repos.edges.get(edge.id, scope=AccessScope.of(ALICE.id)) is edge
-    assert await repos.edges.get(edge.id, scope=AccessScope.of(BOB.id)) is None
+    assert await repos.edges.get(edge.id, scope=ContentFilter.of(ALICE.id)) is edge
+    assert await repos.edges.get(edge.id, scope=ContentFilter.of(BOB.id)) is None
 
 
 @pytest.mark.parametrize("foreign_end", ["source", "target"])
@@ -214,7 +214,7 @@ async def test_create_edges_stamps_owner_and_ignores_foreign_existing_edges() ->
 
 
 async def _all(repos: GraphRepos) -> list[Edge]:
-    return await repos.edges.list(scope=AccessScope.everyone(), after=None, limit=50)
+    return await repos.edges.list(scope=ContentFilter.everyone(), after=None, limit=50)
 
 
 async def test_get_edge_is_not_found_for_someone_else() -> None:

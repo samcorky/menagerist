@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from app.modules.graph.ports.unit_of_work import GraphRepos
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 _CHUNK = 1000
 
@@ -31,7 +31,7 @@ class GraphItemLookup:
         self._repos = repos
 
     async def live_ids(
-        self, ids: Sequence[uuid.UUID], scope: AccessScope
+        self, ids: Sequence[uuid.UUID], scope: ContentFilter
     ) -> set[uuid.UUID]:
         """Return the subset of `ids` that are live items inside `scope`."""
         unique = list(dict.fromkeys(ids))
@@ -48,7 +48,7 @@ class GraphItemLookup:
         return live
 
     async def count_matching(
-        self, definition: Mapping[str, Any], scope: AccessScope, *, cap: int | None
+        self, definition: Mapping[str, Any], scope: ContentFilter, *, cap: int | None
     ) -> tuple[int, bool]:
         """Return how many items in `scope` match `definition`, and if capped.
 

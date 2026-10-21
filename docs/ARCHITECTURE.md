@@ -34,7 +34,7 @@ backend/src/app/
 │   ├── identity/    # accounts, sessions, sign-in, first-run setup, identity CLI
 │   ├── media/       # attachments and images
 │   └── system/      # health, readiness, version (public: minimal; detail needs system:diagnostics:read)
-├── shared_kernel/   # Actor, AccessScope/AccessPolicy, error base types, UoW protocol, CQRS protocols
+├── shared_kernel/   # Actor, ContentFilter/AccessPolicy, error base types, UoW protocol, CQRS protocols
 ├── platform/        # database engine, session factory, logging (one plausible implementation each)
 └── alembic/         # migrations - one environment for all modules
 ```
@@ -60,13 +60,13 @@ See [backend/README.md](../backend/README.md) for the full description of every 
 
 Every item, connection, collection, file and example installation belongs to the account that created it, and nobody else can see it (Stage 1; sharing is Stage 2).
 
-- **`AccessScope`** (`shared_kernel/access_scope.py`) is a query criterion and carries no rules: `AccessScope.of(user_id)` (owned by that account) or `AccessScope.everyone()`. Every repository method that returns or counts content takes one as a required keyword-only `scope`, so lists, searches, counts, paging and ETags are filtered in SQL. The SQL predicate is the shared `owned_by()` in `platform/orm_mixins.py`; the in-memory twins use `AccessScope.covers()`.
+- **`ContentFilter`** (`shared_kernel/content_filter.py`) is a query criterion and carries no rules: `ContentFilter.of(user_id)` (owned by that account) or `ContentFilter.everyone()`. Every repository method that returns or counts content takes one as a required keyword-only `scope`, so lists, searches, counts, paging and ETags are filtered in SQL. The SQL predicate is the shared `owned_by()` in `platform/orm_mixins.py`; the in-memory twins use `ContentFilter.covers()`.
 - **`AccessPolicy`** (`shared_kernel/access_policy.py`) is the port that decides: `scope_for(actor)`, `assert_can_view/modify/delete(actor, owner_id)` (raising `NotFoundError`, so a foreign id looks like a missing one) and `require_admin(actor)`. `OwnerAccessPolicy` (`entrypoints/api/shared/access_policy.py`) is the only implementation: own content only, admins included. Stage 2 swaps in a sharing policy.
 - **Handler bases** (`shared_kernel/cqrs.py`): `ScopedCommandHandler` / `ScopedQueryHandler` receive the policy and fetch through `policy.scope_for(actor)`; `AuthorisedCommandHandler` / `AuthorisedQueryHandler` / `AuthorisedUseCase` check a `required_permission` before `_handle` runs (used for the admin-only structure operations).
 - **Ownership on entities:** domain entities compose the `Owned` mixin (`owner_id`, `shared_kernel/mixins.py`) and their models `OwnedMixin` (`platform/orm_mixins.py`). The column is nullable in the database in Stage 1, and a row with no owner is visible to nobody.
 - **Permissions** are `<module>:<resource>:<action>` strings declared as an enum per module (`GraphPermission`). `RoleAuthorizationAdapter` expands an actor's grants through the `IMPLIES` catalogue; admins hold all of them. `GET /api/v1/auth/me/permissions` returns the effective set for the frontend's `can()`.
 
-Architecture tests (`backend/tests/architecture/test_access_scope_rules.py`) require `scope` on the content ports and their implementations and a Scoped or Authorised base on every use case; `tests/entrypoints/test_cross_user_isolation.py` generates a request per route as a second account and expects 404, 403 or an empty answer.
+Architecture tests (`backend/tests/architecture/test_content_filter_rules.py`) require `scope` on the content ports and their implementations and a Scoped or Authorised base on every use case; `tests/entrypoints/test_cross_user_isolation.py` generates a request per route as a second account and expects 404, 403 or an empty answer.
 
 ### Request flow
 

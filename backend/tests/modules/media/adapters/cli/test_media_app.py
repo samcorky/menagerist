@@ -21,8 +21,8 @@ from app.modules.media.adapters.storage.in_memory_media_storage import (
 )
 from app.modules.media.domain.media_asset import MediaAsset
 from app.platform.config.media import MediaSettings
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 
 
 def test_cleanup_wires_the_use_case_and_deletes_expired_assets(
@@ -64,7 +64,7 @@ def test_cleanup_wires_the_use_case_and_deletes_expired_assets(
 
     cleanup()
 
-    assert asyncio.run(repo.get(expired.id, scope=AccessScope.everyone())) is None
+    assert asyncio.run(repo.get(expired.id, scope=ContentFilter.everyone())) is None
 
 
 def test_regenerate_thumbnails_wires_the_use_case_and_regenerates(

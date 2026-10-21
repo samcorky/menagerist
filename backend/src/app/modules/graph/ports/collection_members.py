@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -28,7 +28,7 @@ class CollectionMembers(Protocol):
     """Read what a collection holds, owned by another module."""
 
     async def resolve(
-        self, collection_id: uuid.UUID, scope: AccessScope
+        self, collection_id: uuid.UUID, scope: ContentFilter
     ) -> CollectionSource | None:
         """Return what the collection holds, or None if not visible in `scope`.
 

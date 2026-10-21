@@ -34,7 +34,7 @@ from app.modules.examples.ports.pack_targets import (  # noqa: TC001
     PresetTarget,
 )
 from app.modules.examples.ports.unit_of_work import ExampleUnitOfWork
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.cqrs import ScopedCommandHandler
 from app.shared_kernel.slug import slugify
 
@@ -183,7 +183,7 @@ class InstallExamplePack(
         )
 
     async def _apply_links(
-        self, pack: ExamplePack, installation: Installation, scope: AccessScope
+        self, pack: ExamplePack, installation: Installation, scope: ContentFilter
     ) -> int:
         """Apply this pack's links and other packs' links that point at it."""
         async with self._uow as repos:
@@ -215,7 +215,9 @@ class InstallExamplePack(
                 )
         return linked
 
-    async def _check_not_installed(self, pack: ExamplePack, scope: AccessScope) -> None:
+    async def _check_not_installed(
+        self, pack: ExamplePack, scope: ContentFilter
+    ) -> None:
         async with self._uow as repos:
             active = await repos.installations.get_active_for_pack(pack.id, scope=scope)
         if active is not None:
@@ -225,7 +227,7 @@ class InstallExamplePack(
             )
 
     async def _resolve_external(
-        self, pack: ExamplePack, scope: AccessScope, actor_id: uuid.UUID
+        self, pack: ExamplePack, scope: ContentFilter, actor_id: uuid.UUID
     ) -> ResolvedRefs:
         """Resolve the add-on's references to required packs, before anything exists.
 
@@ -240,7 +242,7 @@ class InstallExamplePack(
                 for pack_id in pack.requires
                 # all-users check: shared structure
                 for i in await repos.installations.list_for_pack(
-                    pack_id, scope=AccessScope.everyone()
+                    pack_id, scope=ContentFilter.everyone()
                 )
                 if i.owner_id != actor_id
             ]
@@ -261,7 +263,7 @@ class InstallExamplePack(
         return styles
 
     async def _find_adoptions(
-        self, pack: ExamplePack, cover_styles: dict[str, str], scope: AccessScope
+        self, pack: ExamplePack, cover_styles: dict[str, str], scope: ContentFilter
     ) -> dict[_Key, _Adoption]:
         """Return what the installer's earlier installs kept that still fits."""
         async with self._uow as repos:
@@ -338,7 +340,7 @@ class InstallExamplePack(
         async with self._uow as repos:
             # all-users check: shared structure
             everyone = await repos.installations.list_for_pack(
-                pack_id, scope=AccessScope.everyone()
+                pack_id, scope=ContentFilter.everyone()
             )
         return [i for i in everyone if i.owner_id != actor.id]
 

@@ -22,7 +22,7 @@ from app.modules.examples.domain.pack import PackCollection
 from app.modules.examples.domain.removal import KEEP_EDITED
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.node_type import NodeType
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from app.modules.graph.domain.node import Node
@@ -55,14 +55,14 @@ async def _uninstall(world: World) -> UninstallResult:
 
 async def _node(world: World, name: str) -> Node:
     nodes = await world.graph_repos.nodes.list(
-        scope=AccessScope.everyone(), after=None, limit=10
+        scope=ContentFilter.everyone(), after=None, limit=10
     )
     return next(n for n in nodes if n.name == name)
 
 
 async def _names(world: World) -> list[str]:
     nodes = await world.graph_repos.nodes.list(
-        scope=AccessScope.everyone(), after=None, limit=10
+        scope=ContentFilter.everyone(), after=None, limit=10
     )
     return sorted(n.name for n in nodes)
 
@@ -115,7 +115,7 @@ async def test_adopted_entities_are_recorded_as_owned_by_the_new_install(
     await _install(world)
 
     installation = await world.installations.get_active_for_pack(
-        "demo", scope=AccessScope.everyone()
+        "demo", scope=ContentFilter.everyone()
     )
     assert installation is not None
     assert blue_id in {r.entity_id for r in installation.owned(EntityKind.ITEM)}
@@ -201,7 +201,7 @@ async def test_a_clash_with_something_that_is_not_a_kept_example_still_conflicts
 
     assert (
         await world.installations.get_active_for_pack(
-            "demo", scope=AccessScope.everyone()
+            "demo", scope=ContentFilter.everyone()
         )
         is None
     )
@@ -238,7 +238,7 @@ async def test_a_failed_install_keeps_the_edited_things_it_adopted(
     assert "demo-record" in await _slugs(world)
     assert (
         await world.installations.get_active_for_pack(
-            "demo", scope=AccessScope.everyone()
+            "demo", scope=ContentFilter.everyone()
         )
         is None
     )
@@ -250,7 +250,7 @@ async def _connection_kept_world(make_world: MakeWorld) -> World:
     await _install(world)
     edge = (
         await world.graph_repos.edges.list(
-            after=None, limit=10, scope=AccessScope.everyone()
+            after=None, limit=10, scope=ContentFilter.everyone()
         )
     )[0]
     edge.attributes = {"note": "mine"}
@@ -274,7 +274,7 @@ async def test_connections_are_adopted_when_they_still_join_the_same_items(
     assert (
         len(
             await world.graph_repos.edges.list(
-                after=None, limit=10, scope=AccessScope.everyone()
+                after=None, limit=10, scope=ContentFilter.everyone()
             )
         )
         == 1

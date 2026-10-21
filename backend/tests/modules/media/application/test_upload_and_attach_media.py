@@ -43,8 +43,8 @@ from app.modules.media.domain.media_attachment import (
     AttachmentTarget,
     MediaAttachment,
 )
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 if TYPE_CHECKING:
@@ -61,7 +61,7 @@ async def _stream(*chunks: bytes) -> AsyncIterator[bytes]:
 
 class _AllowAllTargets:
     async def can_attach(
-        self, target_type: AttachmentTarget, target_id: uuid.UUID, scope: AccessScope
+        self, target_type: AttachmentTarget, target_id: uuid.UUID, scope: ContentFilter
     ) -> bool:
         return True
 
@@ -120,7 +120,7 @@ async def test_upload_and_attach_stores_file_and_persists_records() -> None:
     assert attachment.target_type is AttachmentTarget.NODE
     assert attachment.target_id == node_id
 
-    asset = await assets.get(attachment.asset_id, scope=AccessScope.everyone())
+    asset = await assets.get(attachment.asset_id, scope=ContentFilter.everyone())
     assert asset is not None
     assert asset.status is MediaStatus.ATTACHED
     assert asset.filename == "photo.jpg"
@@ -308,7 +308,7 @@ async def test_upload_and_attach_moves_thumbnail_to_attached() -> None:
         SYSTEM_ACTOR,
     )
 
-    asset = await assets.get(attachment.asset_id, scope=AccessScope.everyone())
+    asset = await assets.get(attachment.asset_id, scope=ContentFilter.everyone())
     assert asset is not None
     assert asset.has_thumbnail is True
     assert (asset.id, "attached") in storage._thumbnails

@@ -18,7 +18,7 @@ from app.modules.backup.adapters.storage.in_memory_backup_reader import (
     InMemoryBackupReader,
 )
 from app.modules.backup.domain.errors import ImportCollisionError
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 pytestmark = pytest.mark.integration
 
@@ -65,7 +65,7 @@ async def test_reflected_user_transfer_keeps_other_accounts(
         snapshot = SqlAlchemyUserDatabaseSnapshot(factory)
         members = {
             member.name: b"".join([chunk async for chunk in member.chunks])
-            async for member in snapshot.export(scope=AccessScope.of(owner))
+            async for member in snapshot.export(scope=ContentFilter.of(owner))
         }
         assert b"secret-hash" not in b"".join(members.values())
         assert b"Private" not in b"".join(members.values())

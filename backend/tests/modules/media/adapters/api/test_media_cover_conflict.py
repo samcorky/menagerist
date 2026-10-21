@@ -29,7 +29,7 @@ from app.modules.media.domain.errors import COVER_ALREADY_SET_MESSAGE
 
 if TYPE_CHECKING:
     from app.modules.media.domain.media_attachment import AttachmentTarget
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 TINY_JPEG = bytes.fromhex(
     "ffd8ffe000104a46494600010101004800480000ffdb004300080606070605080707070909080a0c140d0c0b0b0c1912130f141d1a1f1e1d1a1c1c20242e2720222c231c1c28372930313434341f27393d38323c2e333432ffc0000b080001000101011100ffc4001f0000010501010101010100000000000000000102030405060708090a0bffda0008010100003f00bf00ffd9"
@@ -38,7 +38,7 @@ TINY_JPEG = bytes.fromhex(
 
 class _AllowAllTargets:
     async def can_attach(
-        self, target_type: AttachmentTarget, target_id: uuid.UUID, scope: AccessScope
+        self, target_type: AttachmentTarget, target_id: uuid.UUID, scope: ContentFilter
     ) -> bool:
         return True
 

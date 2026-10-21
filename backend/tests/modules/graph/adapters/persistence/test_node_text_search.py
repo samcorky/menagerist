@@ -25,7 +25,7 @@ from app.modules.graph.adapters.persistence.search_sql import (
 from app.modules.graph.application.query_resolution import resolve_fields
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.query import ResolvedQuery, parse_query
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -196,7 +196,7 @@ async def _names(
     repo: NodeRepository, q: str, exclusions: dict[str, list[str]] | None = None
 ) -> list[str]:
     hits = await repo.search(
-        scope=AccessScope.of(OWNER),
+        scope=ContentFilter.of(OWNER),
         resolved=_resolved(q, exclusions),
         after=None,
         limit=100,

@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     import uuid
     from collections.abc import Mapping, Sequence
 
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class InMemoryItemLookup:
@@ -24,14 +24,14 @@ class InMemoryItemLookup:
         self._owners[item_id] = owner_id
 
     async def live_ids(
-        self, ids: Sequence[uuid.UUID], scope: AccessScope
+        self, ids: Sequence[uuid.UUID], scope: ContentFilter
     ) -> set[uuid.UUID]:
         """Return the subset of `ids` that are live and inside `scope`."""
         owned = {i for i, owner in self._owners.items() if scope.covers(owner)}
         return (self.live | owned).intersection(ids)
 
     async def count_matching(
-        self, definition: Mapping[str, Any], scope: AccessScope, *, cap: int | None
+        self, definition: Mapping[str, Any], scope: ContentFilter, *, cap: int | None
     ) -> tuple[int, bool]:
         """Count the live items inside `scope`, up to `cap` (`None` for all)."""
         owned = {i for i, owner in self._owners.items() if scope.covers(owner)}

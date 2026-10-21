@@ -22,14 +22,14 @@ if TYPE_CHECKING:
     from sqlalchemy import Select
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 logger = structlog.get_logger()
 
 _COVER_INDEX = "uq_media_attachment_cover"
 
 
-def _visible(scope: AccessScope) -> Select[tuple[MediaAttachmentModel]]:
+def _visible(scope: ContentFilter) -> Select[tuple[MediaAttachmentModel]]:
     """Select attachments whose asset is inside `scope`."""
     return (
         select(MediaAttachmentModel)
@@ -98,7 +98,7 @@ class SqlAlchemyMediaAttachmentRepository:
             raise CoverAlreadySetError from exc
 
     async def get(
-        self, attachment_id: uuid.UUID, *, scope: AccessScope
+        self, attachment_id: uuid.UUID, *, scope: ContentFilter
     ) -> MediaAttachment | None:
         """Return an attachment by id, or ``None`` if missing or unseen."""
         logger.debug("fetching media attachment", attachment_id=attachment_id)
@@ -111,7 +111,7 @@ class SqlAlchemyMediaAttachmentRepository:
         target_type: AttachmentTarget,
         target_id: uuid.UUID,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
     ) -> list[MediaAttachment]:
         """Return the attachments on the target whose asset is inside `scope`."""
         logger.debug(
@@ -127,7 +127,7 @@ class SqlAlchemyMediaAttachmentRepository:
         return [self._to_domain(r) for r in result.scalars()]
 
     async def list_for_asset(
-        self, asset_id: uuid.UUID, *, scope: AccessScope
+        self, asset_id: uuid.UUID, *, scope: ContentFilter
     ) -> list[MediaAttachment]:
         """Return the attachments of the asset, if the asset is inside `scope`."""
         logger.debug("listing attachments for asset", asset_id=asset_id)

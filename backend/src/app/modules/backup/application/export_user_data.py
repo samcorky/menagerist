@@ -15,7 +15,7 @@ from app.modules.backup.domain.backup import (
 )
 from app.modules.backup.domain.errors import CorruptBackupError, MediaFileMissingError
 from app.modules.backup.ports.user_database_snapshot import UserDatabaseSnapshot
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.cqrs import ScopedCommandHandler
 
 if TYPE_CHECKING:
@@ -89,7 +89,7 @@ class ExportUserData(
         self._policy.assert_can_view(actor, actor.id)
         scope = self._policy.scope_for(actor)
         if scope.is_everyone:
-            scope = AccessScope.of(actor.id)
+            scope = ContentFilter.of(actor.id)
         await prune_user_exports(self._store, older_than=datetime.now(UTC) - self._ttl)
         writer = await self._store.begin(uuid7())
         try:

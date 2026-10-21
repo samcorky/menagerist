@@ -13,7 +13,7 @@ from app.modules.graph.adapters.persistence.node_repository import (
 from app.modules.graph.application.query_resolution import resolve_fields
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.query import Cursor, ResolvedQuery, parse_query
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from app.modules.graph.ports.node_repository import NodeRepository
@@ -293,10 +293,10 @@ def _f(
 
 
 async def _names(
-    repo: NodeRepository, raw: dict[str, Any], scope: AccessScope | None = None
+    repo: NodeRepository, raw: dict[str, Any], scope: ContentFilter | None = None
 ) -> list[str]:
     hits = await repo.search(
-        scope=scope or AccessScope.of(ALICE),
+        scope=scope or ContentFilter.of(ALICE),
         resolved=_resolve(raw),
         after=None,
         limit=100,
@@ -766,7 +766,7 @@ async def test_scenario(
     assert set(await _names(repository, raw)) == expected
     resolved = _resolve(raw)
     assert await repository.search_count(
-        scope=AccessScope.of(ALICE), resolved=resolved
+        scope=ContentFilter.of(ALICE), resolved=resolved
     ) == len(expected)
 
 
@@ -782,7 +782,7 @@ async def test_everyone_scope_sees_every_owner(repository: NodeRepository) -> No
     """Everyone scope sees every owner."""
     await _seed(repository)
     assert "Secret" in await _names(
-        repository, {"v": 1, "where": None}, AccessScope.everyone()
+        repository, {"v": 1, "where": None}, ContentFilter.everyone()
     )
 
 
@@ -826,7 +826,7 @@ async def test_paging_visits_every_item_once(
     after: Cursor | None = None
     while True:
         hits = await repository.search(
-            scope=AccessScope.of(ALICE), resolved=resolved, after=after, limit=2
+            scope=ContentFilter.of(ALICE), resolved=resolved, after=after, limit=2
         )
         seen += [hit.node.name for hit in hits]
         if len(hits) < 2:
@@ -847,14 +847,14 @@ async def test_paging_continues_after_the_cursor_row_is_deleted(
     raw = _where(_FILM, sort=[{"by": "name"}])
     resolved = _resolve(raw)
     first = await repository.search(
-        scope=AccessScope.of(ALICE), resolved=resolved, after=None, limit=2
+        scope=ContentFilter.of(ALICE), resolved=resolved, after=None, limit=2
     )
     victim = first[-1].node
     victim.soft_delete()
     await repository.save(victim)
     cursor = Cursor(sort_values=first[-1].sort_values, id=victim.id)
     rest = await repository.search(
-        scope=AccessScope.of(ALICE), resolved=resolved, after=cursor, limit=10
+        scope=ContentFilter.of(ALICE), resolved=resolved, after=cursor, limit=10
     )
     assert [hit.node.name for hit in rest] == [
         "Blade Runner",
@@ -896,7 +896,7 @@ async def test_search_count_limit_caps_the_count(
     """A count limit bounds the result without changing smaller counts."""
     await _seed(repository)
     count = await repository.search_count(
-        scope=AccessScope.of(ALICE), resolved=_resolve(raw), limit=limit
+        scope=ContentFilter.of(ALICE), resolved=_resolve(raw), limit=limit
     )
     assert count == expected
 
@@ -913,7 +913,7 @@ async def test_paging_by_name_or_time_visits_every_item_once(
     after: Cursor | None = None
     while True:
         hits = await repository.search(
-            scope=AccessScope.of(ALICE), resolved=resolved, after=after, limit=2
+            scope=ContentFilter.of(ALICE), resolved=resolved, after=after, limit=2
         )
         seen += [hit.node.name for hit in hits]
         if len(hits) < 2:
@@ -936,7 +936,7 @@ async def test_paging_through_ties_in_the_first_key_matches_the_unpaged_order(
         node.updated_at = stamp
         await repository.add(node)
     resolved = _resolve({"v": 1, "where": None, "sort": [{"by": by, "dir": direction}]})
-    scope = AccessScope.of(ALICE)
+    scope = ContentFilter.of(ALICE)
     unpaged = await repository.search(
         scope=scope, resolved=resolved, after=None, limit=100
     )
@@ -1035,7 +1035,7 @@ async def test_not_in_leaves_sorting_and_paging_alone(
         sort=[{"by": "field", "type": "film", "key": "rating", "dir": direction}],
     )
     resolved = _resolve(raw)
-    scope = AccessScope.of(ALICE)
+    scope = ContentFilter.of(ALICE)
     unpaged = await repository.search(
         scope=scope, resolved=resolved, after=None, limit=100
     )

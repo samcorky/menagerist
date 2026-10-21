@@ -13,7 +13,7 @@ from app.modules.collections.adapters.persistence.membership_repository import (
 )
 from app.modules.collections.adapters.persistence.models import CollectionMemberModel
 from app.modules.collections.domain.collection import Collection, Membership
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.slug import Slug
 
 if TYPE_CHECKING:
@@ -44,21 +44,21 @@ async def test_add_and_lookup_both_ways(db_session: AsyncSession) -> None:
     await repo.add(_membership(shelf_a.id, item_2))
     await repo.add(_membership(shelf_b.id, item_1))
 
-    assert await repo.item_ids(shelf_a.id, scope=AccessScope.everyone()) == {
+    assert await repo.item_ids(shelf_a.id, scope=ContentFilter.everyone()) == {
         item_1,
         item_2,
     }
-    assert await repo.item_ids(shelf_b.id, scope=AccessScope.everyone()) == {item_1}
-    assert await repo.collection_ids_for(item_1, scope=AccessScope.everyone()) == {
+    assert await repo.item_ids(shelf_b.id, scope=ContentFilter.everyone()) == {item_1}
+    assert await repo.collection_ids_for(item_1, scope=ContentFilter.everyone()) == {
         shelf_a.id,
         shelf_b.id,
     }
-    assert await repo.collection_ids_for(item_2, scope=AccessScope.everyone()) == {
+    assert await repo.collection_ids_for(item_2, scope=ContentFilter.everyone()) == {
         shelf_a.id
     }
-    assert await repo.item_ids(uuid.uuid7(), scope=AccessScope.everyone()) == set()
+    assert await repo.item_ids(uuid.uuid7(), scope=ContentFilter.everyone()) == set()
     assert (
-        await repo.collection_ids_for(uuid.uuid7(), scope=AccessScope.everyone())
+        await repo.collection_ids_for(uuid.uuid7(), scope=ContentFilter.everyone())
         == set()
     )
 
@@ -90,8 +90,8 @@ async def test_remove_drops_only_the_given_pair(db_session: AsyncSession) -> Non
     await repo.remove(shelf_a.id, item_1)
     await repo.remove(shelf_a.id, uuid.uuid7())
 
-    assert await repo.item_ids(shelf_a.id, scope=AccessScope.everyone()) == {item_2}
-    assert await repo.collection_ids_for(item_1, scope=AccessScope.everyone()) == {
+    assert await repo.item_ids(shelf_a.id, scope=ContentFilter.everyone()) == {item_2}
+    assert await repo.collection_ids_for(item_1, scope=ContentFilter.everyone()) == {
         shelf_b.id
     }
 
@@ -108,7 +108,7 @@ async def test_soft_deleting_a_collection_keeps_its_memberships(
     shelf.soft_delete()
     await collections.save(shelf)
 
-    assert await repo.item_ids(shelf.id, scope=AccessScope.everyone()) == {item}
-    assert await repo.collection_ids_for(item, scope=AccessScope.everyone()) == {
+    assert await repo.item_ids(shelf.id, scope=ContentFilter.everyone()) == {item}
+    assert await repo.collection_ids_for(item, scope=ContentFilter.everyone()) == {
         shelf.id
     }

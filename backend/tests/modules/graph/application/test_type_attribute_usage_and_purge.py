@@ -40,8 +40,8 @@ from app.modules.graph.domain.errors import EdgeTypeNotFoundError, NodeTypeNotFo
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 
@@ -231,7 +231,7 @@ async def test_purge_node_type_attribute_pages_through_all_nodes(
     )
     assert (
         await repos.nodes.count_with_attribute(
-            "film", "old", scope=AccessScope.everyone()
+            "film", "old", scope=ContentFilter.everyone()
         )
         == 0
     )

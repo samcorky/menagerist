@@ -23,7 +23,7 @@ from app.modules.examples.domain.installation import (
 )
 from app.modules.examples.domain.pack import ExamplePack, PackCollection
 from app.modules.examples.domain.removal import KEEP_EDITED, KEEP_USER_DATA
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from tests.modules.examples.conftest import (
@@ -75,7 +75,7 @@ async def _world(
 
 async def _item_id(world: World, name: str) -> uuid.UUID:
     nodes = await world.graph_repos.nodes.list(
-        scope=AccessScope.everyone(), after=None, limit=10
+        scope=ContentFilter.everyone(), after=None, limit=10
     )
     return next(n.id for n in nodes if n.name == name)
 
@@ -111,7 +111,7 @@ async def test_install_records_each_collection_with_a_hash(
     await _install(world)
 
     installation = await world.installations.get_active_for_pack(
-        "demo", scope=AccessScope.everyone()
+        "demo", scope=ContentFilter.everyone()
     )
 
     assert installation is not None
@@ -147,7 +147,7 @@ async def test_a_failing_collection_step_rolls_everything_back(
     assert world.collections.collections == {}
     assert (
         await world.graph_repos.nodes.list(
-            scope=AccessScope.everyone(), after=None, limit=10
+            scope=ContentFilter.everyone(), after=None, limit=10
         )
         == []
     )
@@ -155,7 +155,7 @@ async def test_a_failing_collection_step_rolls_everything_back(
     assert await world.preset_repos.presets.list(after=None, limit=10) == []
     assert (
         await world.installations.get_active_for_pack(
-            "demo", scope=AccessScope.everyone()
+            "demo", scope=ContentFilter.everyone()
         )
         is None
     )
@@ -181,7 +181,7 @@ async def test_a_collection_naming_a_missing_item_fails_the_install(
     assert world.collections.create_calls == []
     assert (
         await world.graph_repos.nodes.list(
-            scope=AccessScope.everyone(), after=None, limit=10
+            scope=ContentFilter.everyone(), after=None, limit=10
         )
         == []
     )
@@ -201,7 +201,7 @@ async def test_uninstall_removes_collections_before_items(
     assert world.collections.collections == {}
     assert (
         await world.graph_repos.nodes.list(
-            scope=AccessScope.everyone(), after=None, limit=10
+            scope=ContentFilter.everyone(), after=None, limit=10
         )
         == []
     )
@@ -253,7 +253,7 @@ async def test_an_edited_collection_is_kept_with_its_remaining_members(
     kept_names = {
         n.name
         for n in await world.graph_repos.nodes.list(
-            scope=AccessScope.everyone(), after=None, limit=10
+            scope=ContentFilter.everyone(), after=None, limit=10
         )
     }
     assert kept_names == kept_items
@@ -282,7 +282,7 @@ async def test_a_users_own_collection_keeps_the_item_it_holds(
     names = {
         n.name
         for n in await world.graph_repos.nodes.list(
-            scope=AccessScope.everyone(), after=None, limit=10
+            scope=ContentFilter.everyone(), after=None, limit=10
         )
     }
     assert names == {"Blue"}
@@ -301,7 +301,7 @@ async def test_a_collection_the_user_already_deleted_counts_as_removed(
     assert result.kept == ()
     assert result.removed.collections == 1
     assert "collection" not in world.collections.events
-    installation = await world.installations.list_active(scope=AccessScope.everyone())
+    installation = await world.installations.list_active(scope=ContentFilter.everyone())
     assert installation == []
 
 
@@ -320,7 +320,7 @@ async def test_reinstalling_after_removal_creates_the_collections_again(
     assert len(world.collections.collections) == 2
     assert first.isdisjoint(world.collections.collections)
     installation = await world.installations.get_active_for_pack(
-        "demo", scope=AccessScope.everyone()
+        "demo", scope=ContentFilter.everyone()
     )
     assert installation is not None
     assert all(

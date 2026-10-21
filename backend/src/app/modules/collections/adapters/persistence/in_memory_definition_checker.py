@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from app.modules.collections.domain.definition_warning import DefinitionWarning
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class InMemoryDefinitionChecker:
@@ -20,7 +20,7 @@ class InMemoryDefinitionChecker:
         self.warnings: list[DefinitionWarning] = list(warnings or ())
 
     async def check(
-        self, definition: Mapping[str, Any], scope: AccessScope
+        self, definition: Mapping[str, Any], scope: ContentFilter
     ) -> list[DefinitionWarning]:
         """Return the configured warnings, or raise if `where` is not an object."""
         where = definition.get("where")

@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     import uuid
 
     from app.modules.collections.domain.collection import Collection, CollectionKind
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class CollectionRepository(Protocol):
@@ -22,19 +22,21 @@ class CollectionRepository(Protocol):
         ...
 
     async def get(
-        self, collection_id: uuid.UUID, *, scope: AccessScope
+        self, collection_id: uuid.UUID, *, scope: ContentFilter
     ) -> Collection | None:
         """Return the live collection with `collection_id` in `scope`, or `None`."""
         ...
 
-    async def get_by_slug(self, slug: str, *, scope: AccessScope) -> Collection | None:
+    async def get_by_slug(
+        self, slug: str, *, scope: ContentFilter
+    ) -> Collection | None:
         """Return the live collection with `slug` in `scope`, or `None`."""
         ...
 
     async def list(
         self,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         after: uuid.UUID | None,
         limit: int,
         q: str | None = None,

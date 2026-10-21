@@ -16,7 +16,7 @@ from app.entrypoints.api.shared.bridges.example_targets import (
 from app.modules.examples.domain.installation import EntityKind
 from app.modules.examples.domain.pack import PackCollection
 from app.modules.examples.ports.pack_targets import RemoveResult
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ValidationError
 
 if TYPE_CHECKING:
@@ -105,7 +105,7 @@ async def test_slugs_are_derived_and_never_clash(
     slugs = []
     for created in (first, second):
         stored = await rig.repos.collections.get(
-            created.entity_id, scope=AccessScope.everyone()
+            created.entity_id, scope=ContentFilter.everyone()
         )
         assert stored is not None
         slugs.append(stored.slug.value)
@@ -151,7 +151,7 @@ async def test_a_failed_item_add_leaves_no_collection_behind(
 
     assert (
         await rig.repos.collections.list(
-            scope=AccessScope.everyone(), after=None, limit=10
+            scope=ContentFilter.everyone(), after=None, limit=10
         )
         == []
     )
@@ -193,4 +193,4 @@ async def test_the_graph_target_rejects_kinds_it_does_not_handle(
 async def test_the_install_checker_rejects_any_definition() -> None:
     """A definition reaching the install checker is a bug: packs are manual only."""
     with pytest.raises(RuntimeError, match="smart collections"):
-        await RejectingDefinitionChecker().check({"v": 1}, AccessScope.everyone())
+        await RejectingDefinitionChecker().check({"v": 1}, ContentFilter.everyone())

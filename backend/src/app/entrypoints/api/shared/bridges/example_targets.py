@@ -158,8 +158,8 @@ from app.modules.presets.domain.preset import Preset  # noqa: TC001
 from app.modules.presets.ports.preset_usage import PresetUsage
 from app.modules.presets.ports.unit_of_work import PresetRepos, PresetUnitOfWork
 from app.platform.database import get_session_factory
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
@@ -751,7 +751,7 @@ class GraphPackTarget:
             return None
         items = await repos.nodes.list(
             # all-users check: shared structure
-            scope=AccessScope.everyone(),
+            scope=ContentFilter.everyone(),
             after=None,
             limit=_PAGE,
             type=str(node_type.slug),
@@ -769,7 +769,7 @@ class GraphPackTarget:
             return None
         # all-users check: shared structure
         in_use = await repos.edges.has_edges_of_type(
-            str(edge_type.slug), scope=AccessScope.everyone()
+            str(edge_type.slug), scope=ContentFilter.everyone()
         )
         return Inspection(content=_edge_type_content(edge_type), still_in_use=in_use)
 
@@ -816,7 +816,7 @@ class RejectingDefinitionChecker:
     """
 
     async def check(
-        self, definition: Mapping[str, Any], scope: AccessScope
+        self, definition: Mapping[str, Any], scope: ContentFilter
     ) -> list[DefinitionWarning]:
         """Always raise: no definition is expected here."""
         raise RuntimeError("Example packs do not create smart collections.")

@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from app.modules.media.ports.media_attachment_repository import (
         MediaAttachmentRepository,
     )
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 async def ensure_cover_free(
@@ -19,7 +19,7 @@ async def ensure_cover_free(
     attribute_key: AttachmentKey | None,
     target_type: AttachmentTarget,
     target_id: uuid.UUID,
-    scope: AccessScope,
+    scope: ContentFilter,
 ) -> None:
     """Raise `CoverAlreadySetError` if a new cover would be a second one."""
     if attribute_key is not AttachmentKey.COVER:

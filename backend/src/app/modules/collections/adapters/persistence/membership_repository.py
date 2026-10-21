@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.modules.collections.domain.collection import Membership
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 logger = structlog.get_logger()
 
@@ -55,7 +55,7 @@ class SqlAlchemyMembershipRepository:
         )
 
     async def item_ids(
-        self, collection_id: uuid.UUID, *, scope: AccessScope
+        self, collection_id: uuid.UUID, *, scope: ContentFilter
     ) -> set[uuid.UUID]:
         """Return the item ids on `collection_id`; empty unless it is in `scope`."""
         stmt = (
@@ -72,7 +72,7 @@ class SqlAlchemyMembershipRepository:
         return set((await self._session.execute(stmt)).scalars())
 
     async def collection_ids_for(
-        self, item_id: uuid.UUID, *, scope: AccessScope
+        self, item_id: uuid.UUID, *, scope: ContentFilter
     ) -> set[uuid.UUID]:
         """Return the ids of the collections in `scope` holding `item_id`.
 

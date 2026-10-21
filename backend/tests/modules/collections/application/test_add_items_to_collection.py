@@ -18,8 +18,8 @@ from app.modules.collections.domain.errors import (
     CollectionKindError,
     CollectionNotFoundError,
 )
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ValidationError
 from app.shared_kernel.slug import Slug
 
@@ -50,7 +50,7 @@ async def test_add_several_returns_count(
     assert count == 3
     assert add.await_count == 3
     assert await world.memberships.item_ids(
-        shelf.id, scope=AccessScope.everyone()
+        shelf.id, scope=ContentFilter.everyone()
     ) == set(ids)
     assert world.uow.committed is True
 
@@ -79,7 +79,9 @@ async def test_add_skips_duplicates_and_present_items(
     assert add.await_count == 1
     assert add.await_args is not None
     assert add.await_args.args[0].item_id == second
-    assert await world.memberships.item_ids(shelf.id, scope=AccessScope.everyone()) == {
+    assert await world.memberships.item_ids(
+        shelf.id, scope=ContentFilter.everyone()
+    ) == {
         first,
         second,
     }
@@ -110,7 +112,7 @@ async def test_add_non_live_ids_raise_naming_them_and_add_nothing(
     assert str(good) not in str(excinfo.value)
     add.assert_not_awaited()
     assert (
-        await world.memberships.item_ids(shelf.id, scope=AccessScope.everyone())
+        await world.memberships.item_ids(shelf.id, scope=ContentFilter.everyone())
         == set()
     )
     assert world.uow.committed is False
@@ -163,7 +165,7 @@ async def test_add_to_deleted_collection_raises_not_found(
         )
 
     assert (
-        await world.memberships.item_ids(shelf.id, scope=AccessScope.everyone())
+        await world.memberships.item_ids(shelf.id, scope=ContentFilter.everyone())
         == set()
     )
     assert world.uow.committed is False

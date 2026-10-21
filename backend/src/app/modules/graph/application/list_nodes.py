@@ -35,8 +35,8 @@ from app.shared_kernel.cqrs import ScopedQueryHandler
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from app.shared_kernel.access_scope import AccessScope
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.content_filter import ContentFilter
 
 logger = structlog.get_logger()
 
@@ -95,7 +95,7 @@ class ListNodes(ScopedQueryHandler[GraphRepos, ListNodesQuery, ListNodesResult])
         self._today = today
 
     async def _resolve_collection(
-        self, collection_id: uuid.UUID | None, scope: AccessScope
+        self, collection_id: uuid.UUID | None, scope: ContentFilter
     ) -> CollectionSource | None:
         """Resolve a collection to what it holds, or None when unrestricted.
 
@@ -116,7 +116,7 @@ class ListNodes(ScopedQueryHandler[GraphRepos, ListNodesQuery, ListNodesResult])
         self,
         query: ListNodesQuery,
         definition: Mapping[str, Any],
-        scope: AccessScope,
+        scope: ContentFilter,
     ) -> ListNodesResult:
         """List a smart collection: its saved query AND the list filters, by id.
 

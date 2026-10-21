@@ -4,7 +4,7 @@ from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
 from app.modules.graph.domain.edge import Edge
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 
 def _make_edge() -> Edge:
@@ -23,14 +23,14 @@ async def test_add_and_get_round_trips() -> None:
 
     await repository.add(edge)
 
-    assert await repository.get(edge.id, scope=AccessScope.everyone()) is edge
+    assert await repository.get(edge.id, scope=ContentFilter.everyone()) is edge
 
 
 async def test_get_returns_none_for_missing_edge() -> None:
     """get() returns None for an id that was never added."""
     repository = InMemoryEdgeRepository()
 
-    assert await repository.get(uuid.uuid4(), scope=AccessScope.everyone()) is None
+    assert await repository.get(uuid.uuid4(), scope=ContentFilter.everyone()) is None
 
 
 async def test_get_returns_none_for_a_soft_deleted_edge() -> None:
@@ -42,7 +42,7 @@ async def test_get_returns_none_for_a_soft_deleted_edge() -> None:
     edge.soft_delete()
     await repository.save(edge)
 
-    assert await repository.get(edge.id, scope=AccessScope.everyone()) is None
+    assert await repository.get(edge.id, scope=ContentFilter.everyone()) is None
 
 
 async def test_save_persists_changes_to_an_existing_edge() -> None:
@@ -54,7 +54,7 @@ async def test_save_persists_changes_to_an_existing_edge() -> None:
     edge.attributes = {"since": "1979"}
     await repository.save(edge)
 
-    result = await repository.get(edge.id, scope=AccessScope.everyone())
+    result = await repository.get(edge.id, scope=ContentFilter.everyone())
     assert result is not None
     assert result.attributes == {"since": "1979"}
 
@@ -66,7 +66,7 @@ async def test_list_orders_by_id_ascending() -> None:
     for edge in reversed(edges):
         await repository.add(edge)
 
-    result = await repository.list(after=None, limit=10, scope=AccessScope.everyone())
+    result = await repository.list(after=None, limit=10, scope=ContentFilter.everyone())
 
     assert result == sorted(edges, key=lambda edge: edge.id)
 
@@ -82,7 +82,7 @@ async def test_list_excludes_soft_deleted_edges() -> None:
     deleted.soft_delete()
     await repository.save(deleted)
 
-    result = await repository.list(after=None, limit=10, scope=AccessScope.everyone())
+    result = await repository.list(after=None, limit=10, scope=ContentFilter.everyone())
 
     assert result == [kept]
 
@@ -108,7 +108,7 @@ async def test_list_for_node_returns_edges_touching_the_node_either_direction() 
         await repository.add(edge)
 
     result = await repository.list_for_node(
-        node_id, after=None, limit=10, scope=AccessScope.everyone()
+        node_id, after=None, limit=10, scope=ContentFilter.everyone()
     )
 
     assert set(result) == {outgoing, incoming}
@@ -134,7 +134,7 @@ async def test_list_for_node_respects_after_and_limit() -> None:
         await repository.add(edge)
 
     page = await repository.list_for_node(
-        node_id, after=edges[0].id, limit=2, scope=AccessScope.everyone()
+        node_id, after=edges[0].id, limit=2, scope=ContentFilter.everyone()
     )
 
     assert page == edges[1:3]
@@ -152,7 +152,9 @@ async def test_has_edges_of_type_returns_true_when_matching_edge_exists() -> Non
     await repository.add(edge)
 
     assert (
-        await repository.has_edges_of_type("directed-by", scope=AccessScope.everyone())
+        await repository.has_edges_of_type(
+            "directed-by", scope=ContentFilter.everyone()
+        )
         is True
     )
 
@@ -169,7 +171,9 @@ async def test_has_edges_of_type_returns_false_when_no_match() -> None:
     await repository.add(edge)
 
     assert (
-        await repository.has_edges_of_type("directed-by", scope=AccessScope.everyone())
+        await repository.has_edges_of_type(
+            "directed-by", scope=ContentFilter.everyone()
+        )
         is False
     )
 
@@ -188,7 +192,9 @@ async def test_has_edges_of_type_ignores_soft_deleted_edges() -> None:
     await repository.save(edge)
 
     assert (
-        await repository.has_edges_of_type("directed-by", scope=AccessScope.everyone())
+        await repository.has_edges_of_type(
+            "directed-by", scope=ContentFilter.everyone()
+        )
         is False
     )
 
@@ -214,15 +220,17 @@ async def test_count_and_list_with_attribute_filter_by_type_key_and_deletion() -
         await repository.add(edge)
 
     assert (
-        await repository.count_with_attribute("owns", "k", scope=AccessScope.everyone())
+        await repository.count_with_attribute(
+            "owns", "k", scope=ContentFilter.everyone()
+        )
         == 3
     )
     page = await repository.list_with_attribute(
-        "owns", "k", after=None, limit=2, scope=AccessScope.everyone()
+        "owns", "k", after=None, limit=2, scope=ContentFilter.everyone()
     )
     assert [e.id for e in page] == sorted(e.id for e in edges)[:2]
     rest = await repository.list_with_attribute(
-        "owns", "k", after=page[-1].id, limit=10, scope=AccessScope.everyone()
+        "owns", "k", after=page[-1].id, limit=10, scope=ContentFilter.everyone()
     )
     assert [e.id for e in rest] == sorted(e.id for e in edges)[2:]
 
@@ -244,13 +252,13 @@ async def test_count_with_attribute_can_match_a_value() -> None:
 
     assert (
         await repository.count_with_attribute(
-            "owns", "s", value="Draft", scope=AccessScope.everyone()
+            "owns", "s", value="Draft", scope=ContentFilter.everyone()
         )
         == 2
     )
     assert (
         await repository.count_with_attribute(
-            "owns", "s", value="Gone", scope=AccessScope.everyone()
+            "owns", "s", value="Gone", scope=ContentFilter.everyone()
         )
         == 0
     )
@@ -273,13 +281,13 @@ async def test_count_with_attribute_value_matches_array_membership() -> None:
 
     assert (
         await repository.count_with_attribute(
-            "owns", "f", value="CD", scope=AccessScope.everyone()
+            "owns", "f", value="CD", scope=ContentFilter.everyone()
         )
         == 2
     )
     assert (
         await repository.count_with_attribute(
-            "owns", "f", value="C", scope=AccessScope.everyone()
+            "owns", "f", value="C", scope=ContentFilter.everyone()
         )
         == 0
     )
@@ -311,7 +319,7 @@ async def test_count_and_list_with_attribute_can_match_a_group_sub_key() -> None
 
     assert (
         await repository.count_with_attribute(
-            "loaned-to", "terms", sub_key="duration", scope=AccessScope.everyone()
+            "loaned-to", "terms", sub_key="duration", scope=ContentFilter.everyone()
         )
         == 1
     )
@@ -321,7 +329,7 @@ async def test_count_and_list_with_attribute_can_match_a_group_sub_key() -> None
         sub_key="duration",
         after=None,
         limit=10,
-        scope=AccessScope.everyone(),
+        scope=ContentFilter.everyone(),
     )
     assert [e.id for e in page] == [has_terms.id]
     assert (
@@ -330,7 +338,7 @@ async def test_count_and_list_with_attribute_can_match_a_group_sub_key() -> None
             "terms",
             sub_key="duration",
             value="2w",
-            scope=AccessScope.everyone(),
+            scope=ContentFilter.everyone(),
         )
         == 1
     )
@@ -340,7 +348,7 @@ async def test_count_and_list_with_attribute_can_match_a_group_sub_key() -> None
             "terms",
             sub_key="duration",
             value="1w",
-            scope=AccessScope.everyone(),
+            scope=ContentFilter.everyone(),
         )
         == 0
     )

@@ -23,13 +23,13 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection
     from sqlalchemy.sql.elements import ColumnElement
 
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class SqlAlchemyUserDatabaseSnapshot(SqlAlchemyDatabaseSnapshot):
     """Stream one person's content without any account or authentication rows."""
 
-    async def export(self, *, scope: AccessScope) -> AsyncGenerator[ArchiveMember]:  # type: ignore[override]
+    async def export(self, *, scope: ContentFilter) -> AsyncGenerator[ArchiveMember]:  # type: ignore[override]
         """Take a repeatable snapshot, including only referenced shared vocabulary."""
         if scope.user_id is None:
             raise CorruptBackupError("User export requires one owner.")

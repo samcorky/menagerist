@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm import InstrumentedAttribute
 
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 logger = structlog.get_logger()
 
@@ -44,7 +44,7 @@ def _unaccent_ilike(
     return func.unaccent(column_).ilike(func.unaccent(pattern), escape=_LIKE_ESCAPE)
 
 
-def _in_scope(scope: AccessScope) -> ColumnElement[bool]:
+def _in_scope(scope: ContentFilter) -> ColumnElement[bool]:
     """Live collections whose owner is inside `scope`."""
     return CollectionModel.deleted_at.is_(None) & owned_by(
         CollectionModel, scope.user_id
@@ -125,7 +125,7 @@ class SqlAlchemyCollectionRepository:
             ) from exc
 
     async def get(
-        self, collection_id: uuid.UUID, *, scope: AccessScope
+        self, collection_id: uuid.UUID, *, scope: ContentFilter
     ) -> Collection | None:
         """Return the live collection with `collection_id` in `scope`, or `None`."""
         stmt = (
@@ -137,7 +137,9 @@ class SqlAlchemyCollectionRepository:
         model = (await self._session.execute(stmt)).scalar_one_or_none()
         return None if model is None else _to_domain(model)
 
-    async def get_by_slug(self, slug: str, *, scope: AccessScope) -> Collection | None:
+    async def get_by_slug(
+        self, slug: str, *, scope: ContentFilter
+    ) -> Collection | None:
         """Return the live collection with `slug` in `scope`, or `None`.
 
         Slugs are unique per owner, so under `everyone()` the lowest id wins.
@@ -154,7 +156,7 @@ class SqlAlchemyCollectionRepository:
     async def list(
         self,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         after: uuid.UUID | None,
         limit: int,
         q: str | None = None,

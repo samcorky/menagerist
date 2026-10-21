@@ -13,7 +13,7 @@ from app.modules.media.adapters.storage.local_filesystem import (
     LocalFilesystemMediaStorage,
 )
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -47,7 +47,7 @@ async def test_user_export_lists_only_own_originals(tmp_path: Path) -> None:
     bridge = BackupMediaFiles(
         repository,
         LocalFilesystemMediaStorage(tmp_path),
-        scope=AccessScope.of(owner_id),
+        scope=ContentFilter.of(owner_id),
     )
     assert [ref.asset_id for ref in await bridge.list_files()] == [own.id]
 

@@ -17,8 +17,8 @@ from app.modules.collections.application.delete_collection import (
 )
 from app.modules.collections.domain.collection import CollectionKind
 from app.modules.collections.domain.errors import InvalidCollectionError
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import Actor
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ConflictError
 
 ACTOR = Actor(id=uuid.uuid7())
@@ -127,7 +127,7 @@ async def test_derived_slug_from_suffixed_name_suffixes_again(world: World) -> N
 
 
 async def _delete_by_slug(world: World, slug: str) -> None:
-    found = await world.collections.get_by_slug(slug, scope=AccessScope.everyone())
+    found = await world.collections.get_by_slug(slug, scope=ContentFilter.everyone())
     assert found is not None
     await DeleteCollection(world.uow, OwnerAccessPolicy()).handle(
         DeleteCollectionCommand(collection_id=found.id), ACTOR

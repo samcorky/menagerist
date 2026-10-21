@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     import uuid
 
     from app.modules.examples.domain.installation import Installation
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class InstallationRepository(Protocol):
@@ -19,23 +19,23 @@ class InstallationRepository(Protocol):
         ...
 
     async def get(
-        self, installation_id: uuid.UUID, *, scope: AccessScope
+        self, installation_id: uuid.UUID, *, scope: ContentFilter
     ) -> Installation | None:
         """Return the installation with `installation_id`, or `None`."""
         ...
 
     async def get_active_for_pack(
-        self, pack_id: str, *, scope: AccessScope
+        self, pack_id: str, *, scope: ContentFilter
     ) -> Installation | None:
         """Return the installing or installed installation of `pack_id`, if any."""
         ...
 
-    async def list_active(self, *, scope: AccessScope) -> list[Installation]:
+    async def list_active(self, *, scope: ContentFilter) -> list[Installation]:
         """Return every installing or installed installation."""
         ...
 
     async def list_for_pack(
-        self, pack_id: str, *, scope: AccessScope
+        self, pack_id: str, *, scope: ContentFilter
     ) -> list[Installation]:
         """Return every installation of `pack_id`, whatever its status, newest first."""
         ...

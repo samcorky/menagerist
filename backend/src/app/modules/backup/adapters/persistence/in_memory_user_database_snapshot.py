@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from app.modules.backup.ports.archive_member import ArchiveMember
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class InMemoryUserDatabaseSnapshot:
@@ -31,7 +31,7 @@ class InMemoryUserDatabaseSnapshot:
         """Return the configured source revision."""
         return self.revision
 
-    def export(self, *, scope: AccessScope) -> AsyncGenerator[ArchiveMember]:
+    def export(self, *, scope: ContentFilter) -> AsyncGenerator[ArchiveMember]:
         """Filter child rows through both their owner and content targets."""
         if scope.user_id is None:
             raise CorruptBackupError("User export requires one owner.")

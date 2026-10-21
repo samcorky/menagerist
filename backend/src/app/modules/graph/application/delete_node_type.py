@@ -7,7 +7,7 @@ import structlog
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.cqrs import AuthorisedCommandHandler
 
 if TYPE_CHECKING:
@@ -49,7 +49,7 @@ class DeleteNodeType(
             await repos.node_types.save(node_type)
             # admin-wide: affects every user's content
             await repos.nodes.clear_type(
-                str(node_type.slug), scope=AccessScope.everyone()
+                str(node_type.slug), scope=ContentFilter.everyone()
             )
             await self._uow.commit()
         logger.info("node type deleted", node_type_id=command.node_type_id)

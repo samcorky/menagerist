@@ -4,10 +4,10 @@ from app.modules.graph.adapters.persistence.in_memory_collection_members import 
     InMemoryCollectionMembers,
 )
 from app.modules.graph.ports.collection_members import ManualSource, SmartSource
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 _OWNER = uuid.UUID(int=1)
-_ALL = AccessScope.everyone()
+_ALL = ContentFilter.everyone()
 _DEFINITION = {"v": 1, "where": {"op": "and", "children": [{"kind": "text", "q": "a"}]}}
 
 
@@ -25,7 +25,7 @@ async def test_resolve_returns_registered_ids() -> None:
     ids = {uuid.uuid4() for _ in range(500)}
     members.add_collection(collection_id, ids, owner_id=_OWNER)
 
-    assert await members.resolve(collection_id, AccessScope.of(_OWNER)) == (
+    assert await members.resolve(collection_id, ContentFilter.of(_OWNER)) == (
         ManualSource(ids=frozenset(ids))
     )
     assert await members.resolve(collection_id, _ALL) == ManualSource(
@@ -39,7 +39,7 @@ async def test_resolve_is_none_outside_the_scope() -> None:
     collection_id = uuid.uuid4()
     members.add_collection(collection_id, {uuid.uuid4()}, owner_id=_OWNER)
 
-    other = AccessScope.of(uuid.UUID(int=9))
+    other = ContentFilter.of(uuid.UUID(int=9))
     assert await members.resolve(collection_id, other) is None
 
 
@@ -58,7 +58,7 @@ async def test_resolve_returns_a_smart_collections_definition() -> None:
     collection_id = uuid.uuid4()
     members.add_smart_collection(collection_id, _DEFINITION, owner_id=_OWNER)
 
-    assert await members.resolve(collection_id, AccessScope.of(_OWNER)) == (
+    assert await members.resolve(collection_id, ContentFilter.of(_OWNER)) == (
         SmartSource(definition=_DEFINITION)
     )
 
@@ -69,6 +69,6 @@ async def test_smart_collection_is_none_outside_the_scope() -> None:
     collection_id = uuid.uuid4()
     members.add_smart_collection(collection_id, _DEFINITION, owner_id=_OWNER)
 
-    assert await members.resolve(collection_id, AccessScope.of(uuid.UUID(int=9))) is (
+    assert await members.resolve(collection_id, ContentFilter.of(uuid.UUID(int=9))) is (
         None
     )

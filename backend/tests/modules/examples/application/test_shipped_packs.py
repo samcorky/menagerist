@@ -25,7 +25,7 @@ from app.modules.examples.application.uninstall_example_pack import (
     UninstallExamplePackCommand,
 )
 from app.modules.examples.domain.pack import ExamplePack, preset_refs
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -110,14 +110,14 @@ async def _live_counts(world: World) -> list[int]:
     counts.append(
         len(
             await world.graph_repos.edges.list(
-                scope=AccessScope.everyone(), after=None, limit=_LIMIT
+                scope=ContentFilter.everyone(), after=None, limit=_LIMIT
             )
         )
     )
     counts.append(
         len(
             await world.graph_repos.nodes.list(
-                scope=AccessScope.everyone(), after=None, limit=_LIMIT
+                scope=ContentFilter.everyone(), after=None, limit=_LIMIT
             )
         )
     )

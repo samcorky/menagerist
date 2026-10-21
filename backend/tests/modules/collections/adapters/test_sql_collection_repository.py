@@ -9,7 +9,7 @@ from app.modules.collections.adapters.persistence.collection_repository import (
     _to_model,
 )
 from app.modules.collections.domain.collection import Collection, CollectionKind
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ConflictError
 from app.shared_kernel.slug import Slug
 
@@ -37,7 +37,7 @@ async def test_round_trips_every_field(db_session: AsyncSession) -> None:
     await repo.add(collection)
     db_session.expire_all()
 
-    stored = await repo.get(collection.id, scope=AccessScope.everyone())
+    stored = await repo.get(collection.id, scope=ContentFilter.everyone())
 
     assert stored is not None
     assert (stored.name, stored.slug, stored.description) == (
@@ -58,8 +58,8 @@ async def test_unknown_lookups_return_none(db_session: AsyncSession) -> None:
     """Unknown ids and slugs yield `None`."""
     repo = SqlAlchemyCollectionRepository(db_session)
 
-    assert await repo.get(uuid.uuid7(), scope=AccessScope.everyone()) is None
-    assert await repo.get_by_slug("nope", scope=AccessScope.everyone()) is None
+    assert await repo.get(uuid.uuid7(), scope=ContentFilter.everyone()) is None
+    assert await repo.get_by_slug("nope", scope=ContentFilter.everyone()) is None
 
 
 async def test_save_persists_rename_and_soft_delete(db_session: AsyncSession) -> None:
@@ -70,7 +70,7 @@ async def test_save_persists_rename_and_soft_delete(db_session: AsyncSession) ->
     collection.rename("Blues")
     await repo.save(collection)
     db_session.expire_all()
-    stored = await repo.get(collection.id, scope=AccessScope.everyone())
+    stored = await repo.get(collection.id, scope=ContentFilter.everyone())
     assert stored is not None
     assert stored.name == "Blues"
 
@@ -78,9 +78,9 @@ async def test_save_persists_rename_and_soft_delete(db_session: AsyncSession) ->
     await repo.save(collection)
     db_session.expire_all()
 
-    assert await repo.get(collection.id, scope=AccessScope.everyone()) is None
-    assert await repo.get_by_slug("jazz", scope=AccessScope.everyone()) is None
-    assert await repo.list(scope=AccessScope.everyone(), after=None, limit=10) == []
+    assert await repo.get(collection.id, scope=ContentFilter.everyone()) is None
+    assert await repo.get_by_slug("jazz", scope=ContentFilter.everyone()) is None
+    assert await repo.list(scope=ContentFilter.everyone(), after=None, limit=10) == []
 
 
 async def test_list_is_ordered_by_id_with_keyset_paging(
@@ -92,14 +92,17 @@ async def test_list_is_ordered_by_id_with_keyset_paging(
     for collection in reversed(made):
         await repo.add(collection)
 
-    first = await repo.list(scope=AccessScope.everyone(), after=None, limit=2)
+    first = await repo.list(scope=ContentFilter.everyone(), after=None, limit=2)
     assert [c.id for c in first] == [c.id for c in made[:2]]
-    second = await repo.list(scope=AccessScope.everyone(), after=first[-1].id, limit=2)
+    second = await repo.list(
+        scope=ContentFilter.everyone(), after=first[-1].id, limit=2
+    )
     assert [c.id for c in second] == [c.id for c in made[2:4]]
-    last = await repo.list(scope=AccessScope.everyone(), after=second[-1].id, limit=2)
+    last = await repo.list(scope=ContentFilter.everyone(), after=second[-1].id, limit=2)
     assert [c.id for c in last] == [c.id for c in made[4:]]
     assert (
-        await repo.list(scope=AccessScope.everyone(), after=last[-1].id, limit=2) == []
+        await repo.list(scope=ContentFilter.everyone(), after=last[-1].id, limit=2)
+        == []
     )
 
 
@@ -120,7 +123,7 @@ async def test_list_q_matches_name_or_description_ignoring_case(
         await repo.add(collection)
 
     found = await repo.list(
-        scope=AccessScope.everyone(), after=None, limit=10, q="tape"
+        scope=ContentFilter.everyone(), after=None, limit=10, q="tape"
     )
 
     assert {c.id for c in found} == {by_name.id, by_description.id}
@@ -142,19 +145,19 @@ async def test_list_q_treats_wildcards_and_backslash_literally(
     assert [
         c.id
         for c in await repo.list(
-            scope=AccessScope.everyone(), after=None, limit=10, q="50%"
+            scope=ContentFilter.everyone(), after=None, limit=10, q="50%"
         )
     ] == [percent.id]
     assert [
         c.id
         for c in await repo.list(
-            scope=AccessScope.everyone(), after=None, limit=10, q="a_b"
+            scope=ContentFilter.everyone(), after=None, limit=10, q="a_b"
         )
     ] == [underscore.id]
     assert [
         c.id
         for c in await repo.list(
-            scope=AccessScope.everyone(), after=None, limit=10, q="a\\b"
+            scope=ContentFilter.everyone(), after=None, limit=10, q="a\\b"
         )
     ] == [backslash.id]
 
@@ -168,7 +171,9 @@ async def test_list_blank_q_returns_everything(db_session: AsyncSession) -> None
     for q in (None, "", "   "):
         assert (
             len(
-                await repo.list(scope=AccessScope.everyone(), after=None, limit=10, q=q)
+                await repo.list(
+                    scope=ContentFilter.everyone(), after=None, limit=10, q=q
+                )
             )
             == 2
         )
@@ -186,9 +191,11 @@ async def test_list_q_combines_with_after_limit_and_deletion(
     made[3].soft_delete()
     await repo.save(made[3])
 
-    first = await repo.list(scope=AccessScope.everyone(), after=None, limit=2, q="tape")
+    first = await repo.list(
+        scope=ContentFilter.everyone(), after=None, limit=2, q="tape"
+    )
     rest = await repo.list(
-        scope=AccessScope.everyone(), after=first[-1].id, limit=2, q="tape"
+        scope=ContentFilter.everyone(), after=first[-1].id, limit=2, q="tape"
     )
 
     assert [c.id for c in first] == [c.id for c in made[:2]]
@@ -205,7 +212,7 @@ async def test_slug_reusable_after_soft_delete(db_session: AsyncSession) -> None
     new = _collection()
     await repo.add(new)
 
-    found = await repo.get_by_slug("jazz", scope=AccessScope.everyone())
+    found = await repo.get_by_slug("jazz", scope=ContentFilter.everyone())
 
     assert found is not None
     assert found.id == new.id
@@ -222,7 +229,7 @@ async def test_add_maps_duplicate_live_slug_to_conflict(
     with pytest.raises(ConflictError, match="slug 'jazz' already exists"):
         await repo.add(_collection())
 
-    found = await repo.get_by_slug("jazz", scope=AccessScope.everyone())
+    found = await repo.get_by_slug("jazz", scope=ContentFilter.everyone())
     assert found is not None
     assert found.id == first.id
 
@@ -255,7 +262,7 @@ async def test_list_q_ignores_accents_both_ways(db_session: AsyncSession) -> Non
         return {
             c.id
             for c in await repo.list(
-                scope=AccessScope.everyone(), after=None, limit=10, q=q
+                scope=ContentFilter.everyone(), after=None, limit=10, q=q
             )
         }
 
@@ -275,7 +282,7 @@ async def test_definition_round_trips_nested_json(db_session: AsyncSession) -> N
     await repo.add(smart)
     db_session.expire_all()
 
-    stored = await repo.get(smart.id, scope=AccessScope.everyone())
+    stored = await repo.get(smart.id, scope=ContentFilter.everyone())
 
     assert stored is not None
     assert stored.kind is CollectionKind.DYNAMIC
@@ -289,7 +296,7 @@ async def test_manual_collection_has_no_definition(db_session: AsyncSession) -> 
     await repo.add(plain)
     db_session.expire_all()
 
-    stored = await repo.get(plain.id, scope=AccessScope.everyone())
+    stored = await repo.get(plain.id, scope=ContentFilter.everyone())
 
     assert stored is not None
     assert stored.kind is CollectionKind.MANUAL
@@ -307,7 +314,7 @@ async def test_saving_replaced_definition_persists(db_session: AsyncSession) -> 
     await repo.save(smart)
     db_session.expire_all()
 
-    stored = await repo.get(smart.id, scope=AccessScope.everyone())
+    stored = await repo.get(smart.id, scope=ContentFilter.everyone())
 
     assert stored is not None
     assert stored.definition == {"b": [2]}
@@ -329,7 +336,7 @@ async def test_save_maps_a_slug_taken_meanwhile_to_conflict(
 
     # The session survives the rejected flush.
     db_session.expire_all()
-    found = await repo.get_by_slug("blues", scope=AccessScope.everyone())
+    found = await repo.get_by_slug("blues", scope=ContentFilter.everyone())
     assert found is not None
     assert found.id == mover.id
 
@@ -349,7 +356,7 @@ async def test_list_filters_by_kind(db_session: AsyncSession) -> None:
     ]
     for collection in (*manual, *smart):
         await repo.add(collection)
-    everyone = AccessScope.everyone()
+    everyone = ContentFilter.everyone()
 
     manual_ids = [
         c.id

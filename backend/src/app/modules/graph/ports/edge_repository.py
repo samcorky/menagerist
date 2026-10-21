@@ -5,7 +5,7 @@ if TYPE_CHECKING:
     import uuid
 
     from app.modules.graph.domain.edge import Edge
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class EdgeRepository(Protocol):
@@ -19,7 +19,7 @@ class EdgeRepository(Protocol):
         """Persist changes to an existing edge."""
         ...
 
-    async def get(self, edge_id: uuid.UUID, *, scope: AccessScope) -> Edge | None:
+    async def get(self, edge_id: uuid.UUID, *, scope: ContentFilter) -> Edge | None:
         """Return the edge with `edge_id`, or `None` if missing, deleted or unseen."""
         ...
 
@@ -27,7 +27,7 @@ class EdgeRepository(Protocol):
         self,
         node_id: uuid.UUID,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         after: uuid.UUID | None,
         limit: int,
     ) -> list[Edge]:
@@ -35,12 +35,12 @@ class EdgeRepository(Protocol):
         ...
 
     async def list(
-        self, *, scope: AccessScope, after: uuid.UUID | None, limit: int
+        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
     ) -> list[Edge]:
         """List non-deleted edge ordered by id, starting after `after` if given."""
         ...
 
-    async def has_edges_of_type(self, type_slug: str, *, scope: AccessScope) -> bool:
+    async def has_edges_of_type(self, type_slug: str, *, scope: ContentFilter) -> bool:
         """Return True if any non-deleted edges reference `type_slug`."""
         ...
 
@@ -49,7 +49,7 @@ class EdgeRepository(Protocol):
         type_slug: str,
         key: str,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         sub_key: str | None = None,
         value: str | None = None,
     ) -> int:
@@ -67,7 +67,7 @@ class EdgeRepository(Protocol):
         type_slug: str,
         key: str,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         sub_key: str | None = None,
         after: uuid.UUID | None,
         limit: int,

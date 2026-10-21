@@ -16,8 +16,8 @@ from app.modules.media.adapters.storage.in_memory_media_storage import (
 from app.modules.media.application.delete_media import DeleteMedia, DeleteMediaCommand
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 
 
 def _make_use_case() -> tuple[
@@ -44,7 +44,7 @@ async def test_delete_removes_asset_from_db_and_storage() -> None:
 
     await use_case.handle(DeleteMediaCommand(asset_id=asset.id), SYSTEM_ACTOR)
 
-    assert await repo.get(asset.id, scope=AccessScope.everyone()) is None
+    assert await repo.get(asset.id, scope=ContentFilter.everyone()) is None
     assert (asset.id, "staged") not in storage._files
 
 

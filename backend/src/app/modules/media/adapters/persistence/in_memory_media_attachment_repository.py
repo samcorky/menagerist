@@ -13,7 +13,7 @@ if TYPE_CHECKING:
         AttachmentTarget,
         MediaAttachment,
     )
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class InMemoryMediaAttachmentRepository:
@@ -26,7 +26,7 @@ class InMemoryMediaAttachmentRepository:
         self._assets = assets
         self._store: dict[uuid.UUID, MediaAttachment] = {}
 
-    def _visible(self, attachment: MediaAttachment, scope: AccessScope) -> bool:
+    def _visible(self, attachment: MediaAttachment, scope: ContentFilter) -> bool:
         """Whether the attachment's asset is inside `scope`."""
         return scope.covers(self._assets.owner_of(attachment.asset_id))
 
@@ -51,7 +51,7 @@ class InMemoryMediaAttachmentRepository:
         self._store[attachment.id] = attachment
 
     async def get(
-        self, attachment_id: uuid.UUID, *, scope: AccessScope
+        self, attachment_id: uuid.UUID, *, scope: ContentFilter
     ) -> MediaAttachment | None:
         """Return an attachment by id, or ``None`` if missing or unseen."""
         found = self._store.get(attachment_id)
@@ -62,7 +62,7 @@ class InMemoryMediaAttachmentRepository:
         target_type: AttachmentTarget,
         target_id: uuid.UUID,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
     ) -> list[MediaAttachment]:
         """Return the attachments on the target whose asset is inside `scope`."""
         return [
@@ -74,7 +74,7 @@ class InMemoryMediaAttachmentRepository:
         ]
 
     async def list_for_asset(
-        self, asset_id: uuid.UUID, *, scope: AccessScope
+        self, asset_id: uuid.UUID, *, scope: ContentFilter
     ) -> list[MediaAttachment]:
         """Return the attachments of the asset, if the asset is inside `scope`."""
         return [

@@ -5,7 +5,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class MediaAssetRepository(Protocol):
@@ -20,7 +20,7 @@ class MediaAssetRepository(Protocol):
         ...
 
     async def get(
-        self, asset_id: uuid.UUID, *, scope: AccessScope
+        self, asset_id: uuid.UUID, *, scope: ContentFilter
     ) -> MediaAsset | None:
         """Return the asset with `asset_id`, or `None` if missing or unseen."""
         ...
@@ -30,13 +30,13 @@ class MediaAssetRepository(Protocol):
         *,
         status: MediaStatus,
         before: datetime,
-        scope: AccessScope,
+        scope: ContentFilter,
     ) -> list[MediaAsset]:
         """Return assets in `scope` and `status` last updated before `before`."""
         ...
 
     async def list_by_status(
-        self, *, status: MediaStatus, scope: AccessScope
+        self, *, status: MediaStatus, scope: ContentFilter
     ) -> list[MediaAsset]:
         """Return all assets in `scope` that are in `status`."""
         ...

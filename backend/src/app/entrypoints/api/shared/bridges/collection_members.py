@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from app.modules.collections.ports.unit_of_work import CollectionsRepos
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class CollectionsMembers:
@@ -32,7 +32,7 @@ class CollectionsMembers:
         self._repos = repos
 
     async def resolve(
-        self, collection_id: uuid.UUID, scope: AccessScope
+        self, collection_id: uuid.UUID, scope: ContentFilter
     ) -> CollectionSource | None:
         """Return what the collection holds, or `None` if not visible in `scope`.
 

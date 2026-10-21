@@ -13,8 +13,8 @@ from app.modules.media.adapters.persistence.unit_of_work import (
 from app.modules.media.application.update_media import UpdateMedia, UpdateMediaCommand
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 
 
 def _make_use_case() -> tuple[UpdateMedia, InMemoryMediaAssetRepository]:
@@ -40,7 +40,7 @@ async def test_update_renames_and_persists_asset() -> None:
     )
 
     assert result.filename == "front page.jpg"
-    stored = await repo.get(asset.id, scope=AccessScope.everyone())
+    stored = await repo.get(asset.id, scope=ContentFilter.everyone())
     assert stored is not None
     assert stored.filename == "front page.jpg"
 

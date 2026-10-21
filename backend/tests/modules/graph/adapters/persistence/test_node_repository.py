@@ -7,7 +7,7 @@ from app.modules.graph.adapters.persistence.node_repository import (
     SqlAlchemyNodeRepository,
 )
 from app.modules.graph.domain.node import Node
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,7 +38,7 @@ async def test_add_and_get_round_trips(db_session: AsyncSession) -> None:
     node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
 
     await repository.add(node)
-    result = await repository.get(node.id, scope=AccessScope.everyone())
+    result = await repository.get(node.id, scope=ContentFilter.everyone())
 
     assert result is not None
     assert _fields(result) == _fields(node)
@@ -52,7 +52,7 @@ async def test_add_and_get_round_trips_a_null_extra_schema(
     node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
 
     await repository.add(node)
-    result = await repository.get(node.id, scope=AccessScope.everyone())
+    result = await repository.get(node.id, scope=ContentFilter.everyone())
 
     assert result is not None
     assert result.extra_schema is None
@@ -72,7 +72,7 @@ async def test_add_and_get_round_trips_an_extra_schema(
     )
 
     await repository.add(node)
-    result = await repository.get(node.id, scope=AccessScope.everyone())
+    result = await repository.get(node.id, scope=ContentFilter.everyone())
 
     assert result is not None
     assert result.extra_schema == schema
@@ -86,7 +86,7 @@ async def test_save_persists_a_changed_extra_schema(db_session: AsyncSession) ->
 
     node.update(extra_schema={"type": "object", "properties": {}})
     await repository.save(node)
-    result = await repository.get(node.id, scope=AccessScope.everyone())
+    result = await repository.get(node.id, scope=ContentFilter.everyone())
 
     assert result is not None
     assert result.extra_schema == {"type": "object", "properties": {}}
@@ -96,7 +96,7 @@ async def test_get_returns_none_for_missing_node(db_session: AsyncSession) -> No
     """get() returns None for an id that was never added."""
     repository = SqlAlchemyNodeRepository(db_session)
 
-    assert await repository.get(uuid.uuid4(), scope=AccessScope.everyone()) is None
+    assert await repository.get(uuid.uuid4(), scope=ContentFilter.everyone()) is None
 
 
 async def test_list_orders_by_id_ascending(db_session: AsyncSession) -> None:
@@ -109,7 +109,7 @@ async def test_list_orders_by_id_ascending(db_session: AsyncSession) -> None:
     for node in reversed(nodes):
         await repository.add(node)
 
-    result = await repository.list(scope=AccessScope.everyone(), after=None, limit=10)
+    result = await repository.list(scope=ContentFilter.everyone(), after=None, limit=10)
 
     assert [n.id for n in result] == sorted(n.id for n in nodes)
 
@@ -128,7 +128,7 @@ async def test_list_respects_after_and_limit(db_session: AsyncSession) -> None:
         await repository.add(node)
 
     page = await repository.list(
-        scope=AccessScope.everyone(), after=nodes[0].id, limit=2
+        scope=ContentFilter.everyone(), after=nodes[0].id, limit=2
     )
 
     assert [n.id for n in page] == [n.id for n in nodes[1:3]]
@@ -145,7 +145,7 @@ async def test_save_persists_changes_to_an_existing_node(
     node.update(name="Alien (1979)")
     await repository.save(node)
 
-    result = await repository.get(node.id, scope=AccessScope.everyone())
+    result = await repository.get(node.id, scope=ContentFilter.everyone())
     assert result is not None
     assert result.name == "Alien (1979)"
 
@@ -161,7 +161,7 @@ async def test_get_returns_none_for_a_soft_deleted_node(
     node.soft_delete()
     await repository.save(node)
 
-    assert await repository.get(node.id, scope=AccessScope.everyone()) is None
+    assert await repository.get(node.id, scope=ContentFilter.everyone()) is None
 
 
 async def test_favourite_field_round_trips(db_session: AsyncSession) -> None:
@@ -170,7 +170,7 @@ async def test_favourite_field_round_trips(db_session: AsyncSession) -> None:
     node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", favourite=True)
 
     await repository.add(node)
-    result = await repository.get(node.id, scope=AccessScope.everyone())
+    result = await repository.get(node.id, scope=ContentFilter.everyone())
 
     assert result is not None
     assert result.favourite is True
@@ -186,7 +186,7 @@ async def test_save_persists_favourite_change(db_session: AsyncSession) -> None:
     node.update(favourite=True)
     await repository.save(node)
 
-    result = await repository.get(node.id, scope=AccessScope.everyone())
+    result = await repository.get(node.id, scope=ContentFilter.everyone())
     assert result is not None
     assert result.favourite is True
 
@@ -200,7 +200,7 @@ async def test_list_filters_by_favourite(db_session: AsyncSession) -> None:
     await repository.add(plain)
 
     result = await repository.list(
-        scope=AccessScope.everyone(), after=None, limit=10, favourite=True
+        scope=ContentFilter.everyone(), after=None, limit=10, favourite=True
     )
 
     assert [n.id for n in result] == [starred.id]
@@ -216,8 +216,8 @@ async def test_count_filters_by_favourite(db_session: AsyncSession) -> None:
     for _ in range(2):
         await repository.add(Node.create(owner_id=uuid.UUID(int=1), name="Predator"))
 
-    assert await repository.count(scope=AccessScope.everyone(), favourite=True) == 3
-    assert await repository.count(scope=AccessScope.everyone(), favourite=False) == 2
+    assert await repository.count(scope=ContentFilter.everyone(), favourite=True) == 3
+    assert await repository.count(scope=ContentFilter.everyone(), favourite=False) == 2
 
 
 async def test_list_excludes_soft_deleted_nodes(db_session: AsyncSession) -> None:
@@ -231,7 +231,7 @@ async def test_list_excludes_soft_deleted_nodes(db_session: AsyncSession) -> Non
     deleted.soft_delete()
     await repository.save(deleted)
 
-    result = await repository.list(scope=AccessScope.everyone(), after=None, limit=10)
+    result = await repository.list(scope=ContentFilter.everyone(), after=None, limit=10)
 
     assert [n.id for n in result] == [kept.id]
 
@@ -244,14 +244,14 @@ async def test_tags_round_trip(db_session: AsyncSession) -> None:
     )
     await repository.add(node)
 
-    result = await repository.get(node.id, scope=AccessScope.everyone())
+    result = await repository.get(node.id, scope=ContentFilter.everyone())
 
     assert result is not None
     assert result.tags == ["sci-fi", "horror"]
 
     node.update(tags=["classic"])
     await repository.save(node)
-    updated = await repository.get(node.id, scope=AccessScope.everyone())
+    updated = await repository.get(node.id, scope=ContentFilter.everyone())
 
     assert updated is not None
     assert updated.tags == ["classic"]
@@ -291,21 +291,23 @@ async def test_count_and_list_with_attribute_use_jsonb_key_lookup(
         await repository.add(node)
 
     assert (
-        await repository.count_with_attribute("film", "k", scope=AccessScope.everyone())
+        await repository.count_with_attribute(
+            "film", "k", scope=ContentFilter.everyone()
+        )
         == 4
     )
     page = await repository.list_with_attribute(
-        "film", "k", after=None, limit=2, scope=AccessScope.everyone()
+        "film", "k", after=None, limit=2, scope=ContentFilter.everyone()
     )
     assert len(page) == 2
     rest = await repository.list_with_attribute(
-        "film", "k", after=page[-1].id, limit=10, scope=AccessScope.everyone()
+        "film", "k", after=page[-1].id, limit=10, scope=ContentFilter.everyone()
     )
     assert len(rest) == 2
     assert {n.name for n in [*page, *rest]} == {"n0", "n1", "n2", "null"}
     assert (
         await repository.count_with_attribute(
-            "film", "missing", scope=AccessScope.everyone()
+            "film", "missing", scope=ContentFilter.everyone()
         )
         == 0
     )
@@ -332,18 +334,20 @@ async def test_count_with_attribute_matches_an_exact_string_value(
 
     assert (
         await repository.count_with_attribute(
-            "film", "s", value="Draft", scope=AccessScope.everyone()
+            "film", "s", value="Draft", scope=ContentFilter.everyone()
         )
         == 2
     )
     assert (
         await repository.count_with_attribute(
-            "film", "s", value="1", scope=AccessScope.everyone()
+            "film", "s", value="1", scope=ContentFilter.everyone()
         )
         == 0
     )
     assert (
-        await repository.count_with_attribute("film", "s", scope=AccessScope.everyone())
+        await repository.count_with_attribute(
+            "film", "s", scope=ContentFilter.everyone()
+        )
         == 4
     )
 
@@ -365,13 +369,13 @@ async def test_count_with_attribute_value_matches_array_membership(
 
     assert (
         await repository.count_with_attribute(
-            "film", "f", value="CD", scope=AccessScope.everyone()
+            "film", "f", value="CD", scope=ContentFilter.everyone()
         )
         == 2
     )
     assert (
         await repository.count_with_attribute(
-            "film", "f", value="C", scope=AccessScope.everyone()
+            "film", "f", value="C", scope=ContentFilter.everyone()
         )
         == 0
     )
@@ -409,7 +413,7 @@ async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
 
     assert (
         await repository.count_with_attribute(
-            "recipe", "ingredients", sub_key="unit", scope=AccessScope.everyone()
+            "recipe", "ingredients", sub_key="unit", scope=ContentFilter.everyone()
         )
         == 1
     )
@@ -419,7 +423,7 @@ async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
         sub_key="unit",
         after=None,
         limit=10,
-        scope=AccessScope.everyone(),
+        scope=ContentFilter.everyone(),
     )
     assert [n.id for n in page] == [has_ingredient.id]
     assert (
@@ -428,7 +432,7 @@ async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
             "ingredients",
             sub_key="unit",
             value="g",
-            scope=AccessScope.everyone(),
+            scope=ContentFilter.everyone(),
         )
         == 1
     )
@@ -438,7 +442,7 @@ async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
             "ingredients",
             sub_key="unit",
             value="kg",
-            scope=AccessScope.everyone(),
+            scope=ContentFilter.everyone(),
         )
         == 0
     )
@@ -499,7 +503,7 @@ async def test_list_attribute_values_counts_distinct_strings_most_used_first(
         await repository.add(node)
 
     values = await repository.list_attribute_values(
-        "film", "status", scope=AccessScope.everyone()
+        "film", "status", scope=ContentFilter.everyone()
     )
 
     assert values == [("Draft", 2), ("Live", 1)]
@@ -521,10 +525,10 @@ async def test_list_attribute_values_filters_by_q_and_limit(
         )
 
     assert await repository.list_attribute_values(
-        "film", "status", q="live", scope=AccessScope.everyone()
+        "film", "status", q="live", scope=ContentFilter.everyone()
     ) == [("Live", 1)]
     assert await repository.list_attribute_values(
-        "film", "status", limit=1, scope=AccessScope.everyone()
+        "film", "status", limit=1, scope=ContentFilter.everyone()
     ) == [("Draft", 2)]
 
 
@@ -538,14 +542,14 @@ async def _search_ids(
     exclusions: dict[str, list[str]] | None = None,
 ) -> list[uuid.UUID]:
     listed = await repository.list(
-        scope=AccessScope.everyone(),
+        scope=ContentFilter.everyone(),
         after=None,
         limit=50,
         q=q,
         attribute_search_exclusions=exclusions,
     )
     counted = await repository.count(
-        scope=AccessScope.everyone(), q=q, attribute_search_exclusions=exclusions
+        scope=ContentFilter.everyone(), q=q, attribute_search_exclusions=exclusions
     )
     assert counted == len(listed), q
     return [node.id for node in listed]
@@ -679,11 +683,11 @@ async def test_ids_restricts_list_and_count(db_session: AsyncSession) -> None:
     wanted = {nodes[3].id, nodes[1].id}
 
     result = await repository.list(
-        scope=AccessScope.everyone(), after=None, limit=10, ids=wanted
+        scope=ContentFilter.everyone(), after=None, limit=10, ids=wanted
     )
 
     assert [n.id for n in result] == [nodes[1].id, nodes[3].id]
-    assert await repository.count(scope=AccessScope.everyone(), ids=wanted) == 2
+    assert await repository.count(scope=ContentFilter.everyone(), ids=wanted) == 2
 
 
 async def test_ids_none_means_no_restriction(db_session: AsyncSession) -> None:
@@ -692,10 +696,12 @@ async def test_ids_none_means_no_restriction(db_session: AsyncSession) -> None:
 
     assert len(
         await repository.list(
-            scope=AccessScope.everyone(), after=None, limit=10, ids=None
+            scope=ContentFilter.everyone(), after=None, limit=10, ids=None
         )
     ) == len(nodes)
-    assert await repository.count(scope=AccessScope.everyone(), ids=None) == len(nodes)
+    assert await repository.count(scope=ContentFilter.everyone(), ids=None) == len(
+        nodes
+    )
 
 
 async def test_empty_ids_returns_nothing(db_session: AsyncSession) -> None:
@@ -704,11 +710,11 @@ async def test_empty_ids_returns_nothing(db_session: AsyncSession) -> None:
 
     assert (
         await repository.list(
-            scope=AccessScope.everyone(), after=None, limit=10, ids=set()
+            scope=ContentFilter.everyone(), after=None, limit=10, ids=set()
         )
         == []
     )
-    assert await repository.count(scope=AccessScope.everyone(), ids=set()) == 0
+    assert await repository.count(scope=ContentFilter.everyone(), ids=set()) == 0
 
 
 async def test_ids_ignores_unknown_and_deleted_nodes(db_session: AsyncSession) -> None:
@@ -719,11 +725,11 @@ async def test_ids_ignores_unknown_and_deleted_nodes(db_session: AsyncSession) -
     wanted = [nodes[0].id, nodes[1].id, uuid.uuid4()]
 
     result = await repository.list(
-        scope=AccessScope.everyone(), after=None, limit=10, ids=wanted
+        scope=ContentFilter.everyone(), after=None, limit=10, ids=wanted
     )
 
     assert [n.id for n in result] == [nodes[1].id]
-    assert await repository.count(scope=AccessScope.everyone(), ids=wanted) == 1
+    assert await repository.count(scope=ContentFilter.everyone(), ids=wanted) == 1
 
 
 async def test_ids_combines_with_other_filters(db_session: AsyncSession) -> None:
@@ -733,39 +739,40 @@ async def test_ids_combines_with_other_filters(db_session: AsyncSession) -> None
     films = {nodes[0].id, nodes[1].id, nodes[3].id}
 
     by_type = await repository.list(
-        scope=AccessScope.everyone(), after=None, limit=10, ids=films, type="film"
+        scope=ContentFilter.everyone(), after=None, limit=10, ids=films, type="film"
     )
     assert [n.id for n in by_type] == [nodes[0].id, nodes[1].id]
     assert (
-        await repository.count(scope=AccessScope.everyone(), ids=films, type="film")
+        await repository.count(scope=ContentFilter.everyone(), ids=films, type="film")
         == 2
     )
 
     by_q = await repository.list(
-        scope=AccessScope.everyone(), after=None, limit=10, ids=films, q="alien"
+        scope=ContentFilter.everyone(), after=None, limit=10, ids=films, q="alien"
     )
     assert [n.id for n in by_q] == [nodes[0].id, nodes[1].id]
     assert (
-        await repository.count(scope=AccessScope.everyone(), ids=films, q="alien") == 2
+        await repository.count(scope=ContentFilter.everyone(), ids=films, q="alien")
+        == 2
     )
 
     by_fav = await repository.list(
-        scope=AccessScope.everyone(), after=None, limit=10, ids=films, favourite=True
+        scope=ContentFilter.everyone(), after=None, limit=10, ids=films, favourite=True
     )
     assert by_fav == []
     assert (
         await repository.count(
-            scope=AccessScope.everyone(), ids=everything, favourite=True
+            scope=ContentFilter.everyone(), ids=everything, favourite=True
         )
         == 1
     )
 
     paged = await repository.list(
-        scope=AccessScope.everyone(), after=nodes[0].id, limit=1, ids=films
+        scope=ContentFilter.everyone(), after=nodes[0].id, limit=1, ids=films
     )
     assert [n.id for n in paged] == [nodes[1].id]
     nxt = await repository.list(
-        scope=AccessScope.everyone(), after=nodes[1].id, limit=5, ids=films
+        scope=ContentFilter.everyone(), after=nodes[1].id, limit=5, ids=films
     )
     assert [n.id for n in nxt] == [nodes[3].id]
 
@@ -815,13 +822,13 @@ async def test_list_attribute_values_q_ignores_accents(
     expected = [("Zoe", 1), ("Zoë", 1)]
     assert (
         await repository.list_attribute_values(
-            "film", "s", q="zoe", scope=AccessScope.everyone()
+            "film", "s", q="zoe", scope=ContentFilter.everyone()
         )
         == expected
     )
     assert (
         await repository.list_attribute_values(
-            "film", "s", q="ZOË", scope=AccessScope.everyone()
+            "film", "s", q="ZOË", scope=ContentFilter.everyone()
         )
         == expected
     )

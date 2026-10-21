@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from app.modules.graph.ports.unit_of_work import GraphRepos
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class GraphAttachTargetAccess:
@@ -25,7 +25,7 @@ class GraphAttachTargetAccess:
         self._repos = repos
 
     async def can_attach(
-        self, target_type: AttachmentTarget, target_id: uuid.UUID, scope: AccessScope
+        self, target_type: AttachmentTarget, target_id: uuid.UUID, scope: ContentFilter
     ) -> bool:
         """Whether the target exists, is not deleted and is inside `scope`."""
         if target_type is AttachmentTarget.NODE:

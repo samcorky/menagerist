@@ -45,8 +45,8 @@ from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.media.domain.media_asset import MediaStatus
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
+from app.shared_kernel.content_filter import ContentFilter
 
 USER_A = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
 USER_B = Actor(id=uuid.UUID(int=0xB2), roles=frozenset({"member"}))
@@ -93,7 +93,7 @@ async def _uninstall(world: World, pack_id: str = "demo") -> UninstallResult:
 
 
 async def _items(world: World, owner: uuid.UUID | None = None) -> list[Node]:
-    scope = AccessScope.everyone() if owner is None else AccessScope.of(owner)
+    scope = ContentFilter.everyone() if owner is None else ContentFilter.of(owner)
     return await world.graph_repos.nodes.list(scope=scope, after=None, limit=50)
 
 
@@ -107,7 +107,7 @@ async def _assets_by_owner(world: World) -> list[uuid.UUID | None]:
     return [
         a.owner_id
         for a in await world.media_repos.assets.list_by_status(
-            status=MediaStatus.ATTACHED, scope=AccessScope.everyone()
+            status=MediaStatus.ATTACHED, scope=ContentFilter.everyone()
         )
     ]
 
@@ -140,7 +140,7 @@ async def test_each_person_gets_their_own_items_collections_and_covers(
         [USER_A.id, USER_B.id], key=str
     )
     edges = await a.graph_repos.edges.list(
-        after=None, limit=50, scope=AccessScope.everyone()
+        after=None, limit=50, scope=ContentFilter.everyone()
     )
     assert sorted(e.owner_id for e in edges) == [USER_A.id, USER_B.id]  # type: ignore[type-var]
     assert len(await a.graph_repos.node_types.list(after=None, limit=50)) == 3
@@ -176,7 +176,7 @@ async def test_shared_types_stay_until_the_last_person_removes_the_pack(
     assert await _assets_by_owner(a) == []
     # A's record of the types they left is closed too.
     (old,) = await a.installations.list_for_pack(
-        "demo", scope=AccessScope.of(USER_A.id)
+        "demo", scope=ContentFilter.of(USER_A.id)
     )
     assert all(r.outcome is Outcome.REMOVED for r in old.entities)
 
@@ -342,11 +342,11 @@ async def test_an_add_on_needs_the_installers_own_base_pack(
     await _install(b, "games")
     await _install(b, "extras")
     edges = await a.graph_repos.edges.list(
-        after=None, limit=50, scope=AccessScope.of(USER_B.id)
+        after=None, limit=50, scope=ContentFilter.of(USER_B.id)
     )
     (edge,) = edges
     target = await a.graph_repos.nodes.get(
-        edge.target_id, scope=AccessScope.of(USER_B.id)
+        edge.target_id, scope=ContentFilter.of(USER_B.id)
     )
     assert target is not None
     assert (target.name, target.owner_id) == ("Game A", USER_B.id)
@@ -404,17 +404,17 @@ async def test_rows_reowned_to_the_installer_uninstall_cleanly(
         node.owner_id = USER_A.id
         await system.graph_repos.nodes.save(node)
     for edge in await system.graph_repos.edges.list(
-        after=None, limit=50, scope=AccessScope.everyone()
+        after=None, limit=50, scope=ContentFilter.everyone()
     ):
         edge.owner_id = USER_A.id
         await system.graph_repos.edges.save(edge)
     for asset in await system.media_repos.assets.list_by_status(
-        status=MediaStatus.ATTACHED, scope=AccessScope.everyone()
+        status=MediaStatus.ATTACHED, scope=ContentFilter.everyone()
     ):
         asset.owner_id = USER_A.id
         await system.media_repos.assets.save(asset)
     for installation in await system.installations.list_active(
-        scope=AccessScope.everyone()
+        scope=ContentFilter.everyone()
     ):
         installation.owner_id = USER_A.id
         await system.installations.save(installation)
@@ -488,6 +488,6 @@ async def test_a_kept_type_that_is_already_gone_is_closed_when_the_last_leaves(
     await _uninstall(b)
 
     (old,) = await a.installations.list_for_pack(
-        "demo", scope=AccessScope.of(USER_A.id)
+        "demo", scope=ContentFilter.of(USER_A.id)
     )
     assert all(r.outcome is Outcome.REMOVED for r in old.entities)

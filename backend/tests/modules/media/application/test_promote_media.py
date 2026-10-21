@@ -19,8 +19,8 @@ from app.modules.media.application.promote_media import (
 )
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ValidationError
 
 
@@ -57,7 +57,7 @@ async def test_promote_transitions_asset_to_attached() -> None:
 
     assert result.status is MediaStatus.ATTACHED
     assert (
-        await repo.get(asset.id, scope=AccessScope.everyone())
+        await repo.get(asset.id, scope=ContentFilter.everyone())
     ).status is MediaStatus.ATTACHED  # type: ignore[union-attr]
     assert storage._files.get((asset.id, "attached")) == b"data"
     assert (asset.id, "staged") not in storage._files

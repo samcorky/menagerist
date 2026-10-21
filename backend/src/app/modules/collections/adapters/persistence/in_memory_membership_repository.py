@@ -7,7 +7,7 @@ if TYPE_CHECKING:
         InMemoryCollectionRepository,
     )
     from app.modules.collections.domain.collection import Membership
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class InMemoryMembershipRepository:
@@ -20,7 +20,7 @@ class InMemoryMembershipRepository:
         self._collections = collections
         self._memberships: dict[tuple[uuid.UUID, uuid.UUID], Membership] = {}
 
-    def _covered(self, collection_id: uuid.UUID, scope: AccessScope) -> bool:
+    def _covered(self, collection_id: uuid.UUID, scope: ContentFilter) -> bool:
         """Whether the collection exists and its owner is inside `scope`."""
         owner = self._collections.owner_of(collection_id)
         return owner is not None and scope.covers(owner)
@@ -36,7 +36,7 @@ class InMemoryMembershipRepository:
         self._memberships.pop((collection_id, item_id), None)
 
     async def item_ids(
-        self, collection_id: uuid.UUID, *, scope: AccessScope
+        self, collection_id: uuid.UUID, *, scope: ContentFilter
     ) -> set[uuid.UUID]:
         """Return the item ids on `collection_id`; empty unless it is in `scope`."""
         if not self._covered(collection_id, scope):
@@ -44,7 +44,7 @@ class InMemoryMembershipRepository:
         return {i for c, i in self._memberships if c == collection_id}
 
     async def collection_ids_for(
-        self, item_id: uuid.UUID, *, scope: AccessScope
+        self, item_id: uuid.UUID, *, scope: ContentFilter
     ) -> set[uuid.UUID]:
         """Return the ids of the collections in `scope` holding `item_id`."""
         return {

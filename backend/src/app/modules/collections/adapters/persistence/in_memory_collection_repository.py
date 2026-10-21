@@ -5,7 +5,7 @@ if TYPE_CHECKING:
     import uuid
 
     from app.modules.collections.domain.collection import Collection, CollectionKind
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 def _fold(text: str) -> str:
@@ -38,18 +38,20 @@ class InMemoryCollectionRepository:
         return None if found is None else found.owner_id
 
     @staticmethod
-    def _visible(collection: Collection, scope: AccessScope) -> bool:
+    def _visible(collection: Collection, scope: ContentFilter) -> bool:
         """Whether `collection` is live and its owner is inside `scope`."""
         return not collection.is_deleted and scope.covers(collection.owner_id)
 
     async def get(
-        self, collection_id: uuid.UUID, *, scope: AccessScope
+        self, collection_id: uuid.UUID, *, scope: ContentFilter
     ) -> Collection | None:
         """Return the live collection with `collection_id` in `scope`, or `None`."""
         found = self._collections.get(collection_id)
         return found if found is not None and self._visible(found, scope) else None
 
-    async def get_by_slug(self, slug: str, *, scope: AccessScope) -> Collection | None:
+    async def get_by_slug(
+        self, slug: str, *, scope: ContentFilter
+    ) -> Collection | None:
         """Return the live collection with `slug` in `scope`, or `None`."""
         return next(
             (
@@ -63,7 +65,7 @@ class InMemoryCollectionRepository:
     async def list(
         self,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         after: uuid.UUID | None,
         limit: int,
         q: str | None = None,

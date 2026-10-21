@@ -17,7 +17,7 @@ from app.platform.orm_mixins import claim_rows, owned_by
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 logger = structlog.get_logger()
 _ACTIVE = (InstallationStatus.INSTALLING.value, InstallationStatus.INSTALLED.value)
@@ -94,7 +94,7 @@ class SqlAlchemyInstallationRepository:
         await self._session.flush()
 
     async def get(
-        self, installation_id: uuid.UUID, *, scope: AccessScope
+        self, installation_id: uuid.UUID, *, scope: ContentFilter
     ) -> Installation | None:
         """Return the installation with `installation_id` in `scope`, or `None`."""
         stmt = select(ExampleInstallationModel).where(
@@ -105,7 +105,7 @@ class SqlAlchemyInstallationRepository:
         return None if model is None else _to_domain(model)
 
     async def get_active_for_pack(
-        self, pack_id: str, *, scope: AccessScope
+        self, pack_id: str, *, scope: ContentFilter
     ) -> Installation | None:
         """Return the installing or installed installation of `pack_id`, if any."""
         stmt = select(ExampleInstallationModel).where(
@@ -118,7 +118,7 @@ class SqlAlchemyInstallationRepository:
         model = (await self._session.execute(stmt)).scalar_one_or_none()
         return None if model is None else _to_domain(model)
 
-    async def list_active(self, *, scope: AccessScope) -> list[Installation]:
+    async def list_active(self, *, scope: ContentFilter) -> list[Installation]:
         """Return every installing or installed installation, oldest first."""
         stmt = (
             select(ExampleInstallationModel)
@@ -131,7 +131,7 @@ class SqlAlchemyInstallationRepository:
         return [_to_domain(m) for m in (await self._session.execute(stmt)).scalars()]
 
     async def list_for_pack(
-        self, pack_id: str, *, scope: AccessScope
+        self, pack_id: str, *, scope: ContentFilter
     ) -> list[Installation]:
         """Return every installation of `pack_id`, whatever its status, newest first."""
         stmt = (

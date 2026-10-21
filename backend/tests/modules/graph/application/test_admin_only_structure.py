@@ -40,8 +40,8 @@ from app.modules.graph.domain.errors import EdgeTypeInUseError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import Actor
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ForbiddenError
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -49,7 +49,7 @@ ADMIN = Actor(id=uuid.UUID(int=100), roles=frozenset({"admin"}))
 ALICE = Actor(id=uuid.UUID(int=101), roles=frozenset({"member"}))
 BOB = Actor(id=uuid.UUID(int=102), roles=frozenset({"member"}))
 POLICY = OwnerAccessPolicy()
-ALL = AccessScope.everyone()
+ALL = ContentFilter.everyone()
 
 
 def _repos() -> GraphRepos:

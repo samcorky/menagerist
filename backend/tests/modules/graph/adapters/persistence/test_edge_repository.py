@@ -11,7 +11,7 @@ from app.modules.graph.adapters.persistence.node_repository import (
 )
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.node import Node
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,7 +43,7 @@ async def test_add_and_get_round_trips(db_session: AsyncSession) -> None:
     repository = SqlAlchemyEdgeRepository(db_session)
     edge = await _make_edge(db_session)
 
-    result = await repository.get(edge.id, scope=AccessScope.everyone())
+    result = await repository.get(edge.id, scope=ContentFilter.everyone())
 
     assert result is not None
     assert result.id == edge.id
@@ -57,7 +57,7 @@ async def test_get_returns_none_for_missing_edge(db_session: AsyncSession) -> No
     """get() returns None for an id that was never added."""
     repository = SqlAlchemyEdgeRepository(db_session)
 
-    assert await repository.get(uuid.uuid4(), scope=AccessScope.everyone()) is None
+    assert await repository.get(uuid.uuid4(), scope=ContentFilter.everyone()) is None
 
 
 async def test_get_returns_none_for_a_soft_deleted_edge(
@@ -70,7 +70,7 @@ async def test_get_returns_none_for_a_soft_deleted_edge(
     edge.soft_delete()
     await repository.save(edge)
 
-    assert await repository.get(edge.id, scope=AccessScope.everyone()) is None
+    assert await repository.get(edge.id, scope=ContentFilter.everyone()) is None
 
 
 async def test_save_persists_changes_to_an_existing_edge(
@@ -83,7 +83,7 @@ async def test_save_persists_changes_to_an_existing_edge(
     edge.update(attributes={"since": "1979"})
     await repository.save(edge)
 
-    result = await repository.get(edge.id, scope=AccessScope.everyone())
+    result = await repository.get(edge.id, scope=ContentFilter.everyone())
     assert result is not None
     assert result.attributes == {"since": "1979"}
 
@@ -93,7 +93,7 @@ async def test_list_orders_by_id_ascending(db_session: AsyncSession) -> None:
     repository = SqlAlchemyEdgeRepository(db_session)
     edges = [await _make_edge(db_session) for _ in range(3)]
 
-    result = await repository.list(after=None, limit=10, scope=AccessScope.everyone())
+    result = await repository.list(after=None, limit=10, scope=ContentFilter.everyone())
 
     assert [e.id for e in result] == sorted(e.id for e in edges)
 
@@ -107,7 +107,7 @@ async def test_list_excludes_soft_deleted_edges(db_session: AsyncSession) -> Non
     deleted.soft_delete()
     await repository.save(deleted)
 
-    result = await repository.list(after=None, limit=10, scope=AccessScope.everyone())
+    result = await repository.list(after=None, limit=10, scope=ContentFilter.everyone())
 
     assert [e.id for e in result] == [kept.id]
 
@@ -134,7 +134,7 @@ async def test_list_for_node_returns_edges_touching_the_node_either_direction(
     unrelated = await _make_edge(db_session)
 
     result = await repository.list_for_node(
-        node.id, after=None, limit=10, scope=AccessScope.everyone()
+        node.id, after=None, limit=10, scope=ContentFilter.everyone()
     )
 
     assert {e.id for e in result} == {outgoing.id, incoming.id}
@@ -161,7 +161,7 @@ async def test_list_for_node_respects_after_and_limit(
     edges.sort(key=lambda e: e.id)
 
     page = await repository.list_for_node(
-        node.id, after=edges[0].id, limit=2, scope=AccessScope.everyone()
+        node.id, after=edges[0].id, limit=2, scope=ContentFilter.everyone()
     )
 
     assert [e.id for e in page] == [e.id for e in edges[1:3]]
@@ -191,19 +191,21 @@ async def test_count_and_list_with_attribute_use_jsonb_key_lookup(
         await repository.add(edge)
 
     assert (
-        await repository.count_with_attribute("owns", "k", scope=AccessScope.everyone())
+        await repository.count_with_attribute(
+            "owns", "k", scope=ContentFilter.everyone()
+        )
         == 3
     )
     page = await repository.list_with_attribute(
-        "owns", "k", after=None, limit=2, scope=AccessScope.everyone()
+        "owns", "k", after=None, limit=2, scope=ContentFilter.everyone()
     )
     rest = await repository.list_with_attribute(
-        "owns", "k", after=page[-1].id, limit=10, scope=AccessScope.everyone()
+        "owns", "k", after=page[-1].id, limit=10, scope=ContentFilter.everyone()
     )
     assert [e.id for e in [*page, *rest]] == sorted(e.id for e in edges)
     assert (
         await repository.count_with_attribute(
-            "owns", "missing", scope=AccessScope.everyone()
+            "owns", "missing", scope=ContentFilter.everyone()
         )
         == 0
     )
@@ -229,13 +231,13 @@ async def test_count_with_attribute_matches_an_exact_string_value(
 
     assert (
         await repository.count_with_attribute(
-            "owns", "s", value="Draft", scope=AccessScope.everyone()
+            "owns", "s", value="Draft", scope=ContentFilter.everyone()
         )
         == 2
     )
     assert (
         await repository.count_with_attribute(
-            "owns", "s", value="Gone", scope=AccessScope.everyone()
+            "owns", "s", value="Gone", scope=ContentFilter.everyone()
         )
         == 0
     )
@@ -261,13 +263,13 @@ async def test_count_with_attribute_value_matches_array_membership(
 
     assert (
         await repository.count_with_attribute(
-            "owns", "f", value="CD", scope=AccessScope.everyone()
+            "owns", "f", value="CD", scope=ContentFilter.everyone()
         )
         == 2
     )
     assert (
         await repository.count_with_attribute(
-            "owns", "f", value="C", scope=AccessScope.everyone()
+            "owns", "f", value="C", scope=ContentFilter.everyone()
         )
         == 0
     )
@@ -297,7 +299,7 @@ async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
 
     assert (
         await repository.count_with_attribute(
-            "loaned-to", "terms", sub_key="duration", scope=AccessScope.everyone()
+            "loaned-to", "terms", sub_key="duration", scope=ContentFilter.everyone()
         )
         == 1
     )
@@ -307,7 +309,7 @@ async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
         sub_key="duration",
         after=None,
         limit=10,
-        scope=AccessScope.everyone(),
+        scope=ContentFilter.everyone(),
     )
     assert [e.id for e in page] == [has_terms.id]
     assert (
@@ -316,7 +318,7 @@ async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
             "terms",
             sub_key="duration",
             value="2w",
-            scope=AccessScope.everyone(),
+            scope=ContentFilter.everyone(),
         )
         == 1
     )
@@ -326,7 +328,7 @@ async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
             "terms",
             sub_key="duration",
             value="1w",
-            scope=AccessScope.everyone(),
+            scope=ContentFilter.everyone(),
         )
         == 0
     )

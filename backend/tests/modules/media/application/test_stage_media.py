@@ -18,8 +18,8 @@ from app.modules.media.adapters.storage.in_memory_media_storage import (
 from app.modules.media.application.stage_media import StageMedia, StageMediaCommand
 from app.modules.media.domain.errors import ImageTooLargeError, MediaFileTooLargeError
 from app.modules.media.domain.media_asset import MediaStatus
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -56,7 +56,7 @@ async def test_stage_persists_asset_and_commits() -> None:
     assert asset.status is MediaStatus.STAGED
     assert asset.filename == "cover.jpg"
     assert asset.size == 5
-    assert await repo.get(asset.id, scope=AccessScope.everyone()) is asset
+    assert await repo.get(asset.id, scope=ContentFilter.everyone()) is asset
     assert storage._files[(asset.id, "staged")] == b"hello"
 
 
@@ -192,7 +192,7 @@ async def test_stage_refuses_an_image_too_large_to_decode_and_cleans_up() -> Non
     assert storage._files == {}
     assert (
         await repo.list_by_status(
-            status=MediaStatus.STAGED, scope=AccessScope.everyone()
+            status=MediaStatus.STAGED, scope=ContentFilter.everyone()
         )
         == []
     )

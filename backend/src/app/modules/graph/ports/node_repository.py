@@ -13,7 +13,7 @@ if TYPE_CHECKING:
         ResolvedQuery,
         SearchHit,
     )
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class NodeRepository(Protocol):
@@ -31,14 +31,14 @@ class NodeRepository(Protocol):
         """Persist changes to an existing node."""
         ...
 
-    async def get(self, node_id: uuid.UUID, *, scope: AccessScope) -> Node | None:
+    async def get(self, node_id: uuid.UUID, *, scope: ContentFilter) -> Node | None:
         """Return the node with `node_id`, or `None` if missing, deleted or unseen."""
         ...
 
     async def list(
         self,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         after: uuid.UUID | None,
         limit: int,
         type: str | None = None,
@@ -60,7 +60,7 @@ class NodeRepository(Protocol):
     async def count(
         self,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         type: str | None = None,
         q: str | None = None,
         favourite: bool | None = None,
@@ -73,7 +73,7 @@ class NodeRepository(Protocol):
     async def search(
         self,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         resolved: ResolvedQuery,
         after: Cursor | None,
         limit: int,
@@ -88,7 +88,7 @@ class NodeRepository(Protocol):
         ...
 
     async def search_count(
-        self, *, scope: AccessScope, resolved: ResolvedQuery, limit: int | None = None
+        self, *, scope: ContentFilter, resolved: ResolvedQuery, limit: int | None = None
     ) -> int:
         """Return how many live nodes in `scope` match the query.
 
@@ -98,7 +98,7 @@ class NodeRepository(Protocol):
         ...
 
     async def item_fields(
-        self, *, scope: AccessScope, limit: int
+        self, *, scope: ContentFilter, limit: int
     ) -> builtins.list[ItemFieldUse]:
         """List the per-item fields declared in the overlays of live nodes in `scope`.
 
@@ -109,7 +109,7 @@ class NodeRepository(Protocol):
         """
         ...
 
-    async def clear_type(self, type_slug: str, *, scope: AccessScope) -> None:
+    async def clear_type(self, type_slug: str, *, scope: ContentFilter) -> None:
         """Null out `type` on all non-deleted nodes that reference `type_slug`."""
         ...
 
@@ -118,7 +118,7 @@ class NodeRepository(Protocol):
         type_slug: str,
         key: str,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         sub_key: str | None = None,
         value: str | None = None,
     ) -> int:
@@ -136,7 +136,7 @@ class NodeRepository(Protocol):
         type_slug: str,
         key: str,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         sub_key: str | None = None,
         after: uuid.UUID | None,
         limit: int,
@@ -153,7 +153,7 @@ class NodeRepository(Protocol):
         type_slug: str,
         key: str,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
         q: str | None = None,
         limit: int = 20,
     ) -> builtins.list[tuple[str, int]]:

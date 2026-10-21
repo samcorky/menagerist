@@ -193,17 +193,17 @@ async def test_list_counts_but_does_not_warn(world: World) -> None:
 
 async def test_in_memory_checker_accepts_an_object_where(world: World) -> None:
     """Only a non-object `where` is malformed."""
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
-    ok = await world.checker.check({"where": {"op": "and"}}, AccessScope.everyone())
+    ok = await world.checker.check({"where": {"op": "and"}}, ContentFilter.everyone())
     assert ok == []
 
 
 async def test_in_memory_lookup_counts_and_caps(world: World) -> None:
     """The in-memory count covers the scope and honours the cap."""
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
     world.items.live = {uuid.uuid7() for _ in range(3)}
-    scope = AccessScope.everyone()
+    scope = ContentFilter.everyone()
     assert await world.items.count_matching(GOOD, scope, cap=5) == (3, False)
     assert await world.items.count_matching(GOOD, scope, cap=2) == (2, True)

@@ -7,7 +7,7 @@ import structlog
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.cqrs import AuthorisedCommandHandler
 
 if TYPE_CHECKING:
@@ -80,7 +80,7 @@ class PurgeNodeTypeAttribute(
             while page := await repos.nodes.list_with_attribute(
                 slug,
                 command.key,
-                scope=AccessScope.everyone(),
+                scope=ContentFilter.everyone(),
                 sub_key=command.sub_key,
                 after=after,
                 limit=_PAGE_SIZE,

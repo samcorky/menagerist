@@ -21,15 +21,15 @@ from app.modules.collections.adapters.persistence.membership_repository import (
 from app.modules.collections.domain.collection import Collection, Membership
 from app.modules.collections.ports.collection_repository import CollectionRepository
 from app.modules.collections.ports.membership_repository import MembershipRepository
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ConflictError
 from app.shared_kernel.slug import Slug
 
 ALICE = uuid.UUID(int=101)
 BOB = uuid.UUID(int=102)
-A = AccessScope.of(ALICE)
-B = AccessScope.of(BOB)
-ALL = AccessScope.everyone()
+A = ContentFilter.of(ALICE)
+B = ContentFilter.of(BOB)
+ALL = ContentFilter.everyone()
 
 
 @dataclass

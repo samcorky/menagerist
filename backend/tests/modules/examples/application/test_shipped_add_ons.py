@@ -20,7 +20,7 @@ from app.modules.examples.domain.errors import (
     RequiredByInstalledPackError,
     RequirementsNotMetError,
 )
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from tests.modules.examples.conftest import MakeWorld, World
@@ -61,13 +61,13 @@ async def _edges(world: World) -> set[tuple[str, str, str]]:
     nodes = {
         n.id: n.name
         for n in await world.graph_repos.nodes.list(
-            scope=AccessScope.everyone(), after=None, limit=500
+            scope=ContentFilter.everyone(), after=None, limit=500
         )
     }
     return {
         (nodes[e.source_id], nodes[e.target_id], e.type)
         for e in await world.graph_repos.edges.list(
-            after=None, limit=500, scope=AccessScope.everyone()
+            after=None, limit=500, scope=ContentFilter.everyone()
         )
     }
 
@@ -80,10 +80,10 @@ async def _live(world: World) -> int:
     )
     others = sum([len(await r.list(after=None, limit=500)) for r in repos])
     items = await world.graph_repos.nodes.list(
-        scope=AccessScope.everyone(), after=None, limit=500
+        scope=ContentFilter.everyone(), after=None, limit=500
     )
     edges = await world.graph_repos.edges.list(
-        scope=AccessScope.everyone(), after=None, limit=500
+        scope=ContentFilter.everyone(), after=None, limit=500
     )
     return others + len(items) + len(edges) + len(world.collections.collections)
 

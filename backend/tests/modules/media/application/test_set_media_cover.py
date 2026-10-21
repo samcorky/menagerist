@@ -35,7 +35,7 @@ from app.modules.media.domain.media_attachment import (
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 if TYPE_CHECKING:
-    from app.shared_kernel.access_scope import AccessScope
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 def _make_image_asset() -> MediaAsset:
@@ -235,7 +235,7 @@ class _RecordingAttachments(InMemoryMediaAttachmentRepository):
         target_type: AttachmentTarget,
         target_id: uuid.UUID,
         *,
-        scope: AccessScope,
+        scope: ContentFilter,
     ) -> list[MediaAttachment]:
         self.calls.append("list")
         return await super().list_for_target(target_type, target_id, scope=scope)

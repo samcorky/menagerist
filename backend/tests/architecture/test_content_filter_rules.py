@@ -155,20 +155,20 @@ def _signature(function: Any) -> inspect.Signature:  # noqa: ANN401
     return inspect.signature(function, annotation_format=annotationlib.Format.STRING)
 
 
-def _has_access_scope(function: Any) -> bool:  # noqa: ANN401
+def _has_content_filter(function: Any) -> bool:  # noqa: ANN401
     parameter = _signature(function).parameters.get("scope")
-    return parameter is not None and parameter.annotation == "AccessScope"
+    return parameter is not None and parameter.annotation == "ContentFilter"
 
 
 @pytest.mark.parametrize("port", [p for p, _ in PORTS], ids=lambda p: p.__name__)
-def test_every_port_method_takes_an_access_scope(port: type) -> None:
-    """A port method that is not a known no-content write needs `scope: AccessScope`."""
+def test_every_port_method_takes_a_content_filter(port: type) -> None:
+    """A port method that is not a known no-content write takes a `ContentFilter`."""
     missing = [
         name
         for name, method in _public_methods(port).items()
-        if name not in NO_SCOPE_NEEDED[port] and not _has_access_scope(method)
+        if name not in NO_SCOPE_NEEDED[port] and not _has_content_filter(method)
     ]
-    assert missing == [], f"{port.__name__} methods without scope: AccessScope"
+    assert missing == [], f"{port.__name__} methods without scope: ContentFilter"
 
 
 @pytest.mark.parametrize("port", [p for p, _ in PORTS], ids=lambda p: p.__name__)
@@ -203,8 +203,8 @@ def test_implementations_mirror_the_port_scope(
         got = [(p.name, p.kind) for p in _signature(impl_method).parameters.values()]
         if want != got:
             drift.append(f"{name}: parameters {got} != port {want}")
-        if name not in NO_SCOPE_NEEDED[port] and not _has_access_scope(impl_method):
-            drift.append(f"{name}: scope is not annotated AccessScope")
+        if name not in NO_SCOPE_NEEDED[port] and not _has_content_filter(impl_method):
+            drift.append(f"{name}: scope is not annotated ContentFilter")
     assert drift == [], f"{implementation.__name__} drifts from {port.__name__}"
 
 

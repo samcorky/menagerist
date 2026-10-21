@@ -14,8 +14,8 @@ from app.modules.collections.application.delete_collection import (
 )
 from app.modules.collections.domain.collection import Membership
 from app.modules.collections.domain.errors import CollectionNotFoundError
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from tests.modules.collections.conftest import MakeCollection, World
@@ -42,10 +42,10 @@ async def test_delete_is_soft_and_keeps_memberships(
 
     save.assert_awaited_once_with(shelf)
     assert shelf.is_deleted
-    assert await world.collections.get(shelf.id, scope=AccessScope.everyone()) is None
-    assert await world.memberships.item_ids(shelf.id, scope=AccessScope.everyone()) == {
-        item_id
-    }
+    assert await world.collections.get(shelf.id, scope=ContentFilter.everyone()) is None
+    assert await world.memberships.item_ids(
+        shelf.id, scope=ContentFilter.everyone()
+    ) == {item_id}
     assert world.items.live == {item_id}
     assert world.uow.committed is True
 

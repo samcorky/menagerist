@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from app.modules.backup.domain.backup import MediaFileRef
 from app.modules.backup.domain.errors import MediaFileMissingError
 from app.modules.media.domain.media_asset import MediaStatus
-from app.shared_kernel.access_scope import AccessScope
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -22,12 +22,12 @@ class BackupMediaFiles:
         repository: MediaAssetRepository,
         storage: MediaStoragePort,
         *,
-        scope: AccessScope | None = None,
+        scope: ContentFilter | None = None,
     ) -> None:
         self._repository = repository
         self._storage = storage
         # Instance backups deliberately include every owner's originals.
-        self._scope = scope if scope is not None else AccessScope.everyone()
+        self._scope = scope if scope is not None else ContentFilter.everyone()
 
     async def list_files(self) -> list[MediaFileRef]:
         """List original assets in all lifecycle buckets, across the instance."""

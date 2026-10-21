@@ -27,8 +27,8 @@ from app.modules.examples.domain.pack import (
     PackRelationshipType,
 )
 from app.modules.examples.domain.removal import KEEP_EDITED
-from app.shared_kernel.access_scope import AccessScope
 from app.shared_kernel.actor import Actor
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from tests.modules.examples.conftest import MakeWorld, World
@@ -80,18 +80,18 @@ async def _pairs(world: World) -> set[tuple[str, str]]:
     names = {
         n.id: n.name
         for n in await world.graph_repos.nodes.list(
-            scope=AccessScope.everyone(), after=None, limit=50
+            scope=ContentFilter.everyone(), after=None, limit=50
         )
     }
     edges = await world.graph_repos.edges.list(
-        after=None, limit=50, scope=AccessScope.everyone()
+        after=None, limit=50, scope=ContentFilter.everyone()
     )
     return {(names[e.source_id], names[e.target_id]) for e in edges}
 
 
 async def _installation(world: World, pack_id: str) -> Installation:
     found = await world.installations.get_active_for_pack(
-        pack_id, scope=AccessScope.everyone()
+        pack_id, scope=ContentFilter.everyone()
     )
     assert found is not None
     return found
@@ -140,7 +140,7 @@ async def test_a_deleted_endpoint_skips_the_link_quietly(
     movies_a = next(
         n
         for n in await world.graph_repos.nodes.list(
-            scope=AccessScope.everyone(), after=None, limit=50
+            scope=ContentFilter.everyone(), after=None, limit=50
         )
         if n.name == "Movies A"
     )
@@ -243,7 +243,7 @@ async def test_removing_the_declaring_pack_removes_the_link(
     names = {
         n.name
         for n in await world.graph_repos.nodes.list(
-            scope=AccessScope.everyone(), after=None, limit=50
+            scope=ContentFilter.everyone(), after=None, limit=50
         )
     }
     assert names == {"Movies A", "Movies B"}
@@ -258,7 +258,7 @@ async def test_an_edited_link_is_kept_and_keeps_its_item(
     await _install(world, "music")
     await _install(world, "movies")
     [edge] = await world.graph_repos.edges.list(
-        after=None, limit=10, scope=AccessScope.everyone()
+        after=None, limit=10, scope=ContentFilter.everyone()
     )
     edge.attributes = {"note": "mine"}
     await world.graph_repos.edges.save(edge)
@@ -279,7 +279,7 @@ async def test_a_kept_link_is_not_duplicated_when_the_pack_comes_back(
     await _install(world, "music")
     await _install(world, "movies")
     [edge] = await world.graph_repos.edges.list(
-        after=None, limit=10, scope=AccessScope.everyone()
+        after=None, limit=10, scope=ContentFilter.everyone()
     )
     edge.attributes = {"note": "mine"}
     await world.graph_repos.edges.save(edge)
