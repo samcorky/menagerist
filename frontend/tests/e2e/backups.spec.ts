@@ -13,11 +13,16 @@ test('an administrator creates, verifies, downloads, uploads and deletes a backu
 		await page.goto('/admin');
 		await page.getByRole('link', { name: /Backups/ }).click();
 		await expect(page.getByRole('heading', { name: 'Backups', exact: true })).toBeVisible();
+		await expect(page.getByLabel('Backup label')).toHaveCount(0);
+		await page.getByRole('button', { name: 'Create backup', exact: true }).click();
 		await page.getByLabel('Backup label').fill(label);
 		const created = page.waitForResponse(
 			(res) => res.url().endsWith('/api/v1/backup') && res.request().method() === 'POST'
 		);
-		await page.getByRole('button', { name: 'Create backup', exact: true }).click();
+		await page
+			.getByRole('dialog')
+			.getByRole('button', { name: 'Create backup', exact: true })
+			.click();
 		const archive = await (await created).json();
 		ids.push(archive.id);
 		const row = page
@@ -26,7 +31,7 @@ test('an administrator creates, verifies, downloads, uploads and deletes a backu
 			.filter({ hasText: label });
 		await expect(row).toBeVisible();
 		await row.getByRole('button', { name: 'Verify', exact: true }).click();
-		await expect(row.getByText('Backup verified', { exact: true })).toBeVisible();
+		await expect(row.getByRole('status', { name: 'Backup verified' })).toBeVisible();
 
 		if (isMobile) {
 			const overflow = await page.evaluate(
@@ -42,7 +47,13 @@ test('an administrator creates, verifies, downloads, uploads and deletes a backu
 		const downloadEvent = page.waitForEvent('download');
 		await row.getByRole('link', { name: 'Download', exact: true }).click();
 		const download = await downloadEvent;
-		expect(download.suggestedFilename()).toContain(archive.id);
+		const slug = label
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, '-')
+			.replace(/^-|-$/g, '');
+		expect(download.suggestedFilename()).toBe(
+			`menagerist-${slug}-${archive.created_at.slice(0, 10)}-${archive.id}.tar.gz`
+		);
 		const path = await download.path();
 		expect(path).toBeTruthy();
 		const bytes = await readFile(path!);

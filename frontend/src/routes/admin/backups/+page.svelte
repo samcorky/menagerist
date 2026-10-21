@@ -3,6 +3,19 @@
 	import { tick, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import {
+		Plus,
+		Upload,
+		Download,
+		RefreshCw,
+		ShieldCheck,
+		Trash2,
+		Check,
+		CircleAlert,
+		X
+	} from '@lucide/svelte';
+	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { Spinner } from '$lib/components/ui/spinner/index.js';
+	import {
 		client,
 		createBackup,
 		listBackups,
@@ -33,6 +46,8 @@
 	let error = $state<string | null>(null);
 	let busy = $state<string | null>(null);
 	let label = $state('manual');
+	let createOpen = $state(false);
+	let createError = $state<string | null>(null);
 	let uploadOpen = $state(false);
 	let files = $state<FileList>();
 	let uploadError = $state<string | null>(null);
@@ -65,16 +80,17 @@
 		event.preventDefault();
 		if (busy || !canCreate) return;
 		busy = 'create';
-		error = null;
+		createError = null;
 		try {
 			const result = await createBackup({ body: { label: label.trim() || 'manual' } });
-			if (result.error || !result.data) error = networkAwareError(result).title;
+			if (result.error || !result.data) createError = networkAwareError(result).title;
 			else {
 				backups = [result.data, ...backups];
+				createOpen = false;
 				toast.success('Backup created');
 			}
 		} catch {
-			error = 'Could not create backup. Try again.';
+			createError = 'Could not create backup. Try again.';
 		} finally {
 			busy = null;
 		}
@@ -163,27 +179,17 @@
 				><Alert.Description>Only administrators can manage backups.</Alert.Description></Alert.Root
 			>
 		{:else}
-			{#if canCreate}
-				<form onsubmit={create} class="flex flex-col gap-3 sm:flex-row sm:items-end">
-					<div class="flex-1 space-y-2">
-						<Label for="backup-label">Backup label</Label><Input
-							id="backup-label"
-							bind:value={label}
-							maxlength={120}
-							class="h-11"
-							disabled={loading || busy !== null}
-						/>
-					</div>
-					<Button
-						type="submit"
+			<div class="flex flex-wrap gap-2">
+				{#if canCreate}<Button
 						bind:ref={createButton}
 						class="h-11"
 						disabled={loading || busy !== null}
-						>{busy === 'create' ? 'Creating backup...' : 'Create backup'}</Button
-					>
-				</form>
-			{/if}
-			<div class="flex flex-wrap gap-2">
+						onclick={() => {
+							label = 'manual';
+							createError = null;
+							createOpen = true;
+						}}><Plus class="size-4" aria-hidden="true" />Create backup</Button
+					>{/if}
 				{#if canCreate}<Button
 						variant="outline"
 						class="h-11"
@@ -191,10 +197,10 @@
 						onclick={() => {
 							uploadError = null;
 							uploadOpen = true;
-						}}>Upload backup</Button
+						}}><Upload class="size-4" aria-hidden="true" />Upload backup</Button
 					>{/if}
 				<Button variant="outline" class="h-11" disabled={loading || busy !== null} onclick={load}
-					>Refresh</Button
+					><RefreshCw class="size-4" aria-hidden="true" />Refresh</Button
 				>
 			</div>
 			{#if error}<Alert.Root variant="destructive"
@@ -202,7 +208,7 @@
 						variant="outline"
 						class="mt-2 h-11"
 						disabled={loading || busy !== null}
-						onclick={load}>Retry</Button
+						onclick={load}><RefreshCw class="size-4" aria-hidden="true" />Retry</Button
 					></Alert.Root
 				>{/if}
 			{#if loadingDisplay.show}
@@ -219,7 +225,24 @@
 					<li>
 						<Card.Root>
 							<Card.Header
-								><Card.Title class="break-words">{backup.label}</Card.Title><Card.Description
+								><div class="flex flex-wrap items-center gap-2">
+									<Card.Title class="min-w-0 break-words">{backup.label}</Card.Title
+									>{#if busy === backup.id}<Badge variant="secondary" role="status"
+											><Spinner
+												class="size-3 motion-reduce:animate-none"
+												aria-hidden="true"
+											/>Checking</Badge
+										>{:else if reports[backup.id]?.findings.length === 0}<Badge
+											role="status"
+											aria-label="Backup verified"
+											class="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+											><Check aria-hidden="true" />Verified</Badge
+										>{:else if reports[backup.id] || rowErrors[backup.id]}<Badge
+											variant="destructive"
+											><CircleAlert aria-hidden="true" />Verification failed</Badge
+										>{/if}
+								</div>
+								<Card.Description
 									><time datetime={backup.created_at} title={formatDateTime(backup.created_at).utc}
 										>{formatDateTime(backup.created_at).local}</time
 									>
@@ -238,22 +261,28 @@
 									</div>
 								</dl>
 								<div class="flex flex-wrap gap-2">
-									<Button href={downloadUrl(backup.id)} download variant="outline" class="h-11"
-										>Download</Button
+									<Button href={downloadUrl(backup.id)} download variant="default" class="h-11"
+										><Download class="size-4" aria-hidden="true" />Download</Button
 									><Button
 										variant="outline"
 										class="h-11"
 										disabled={loading || busy !== null}
 										onclick={() => verify(backup)}
-										>{busy === backup.id ? 'Verifying...' : 'Verify'}</Button
+										>{#if busy === backup.id}<Spinner
+												class="motion-reduce:animate-none"
+												aria-hidden="true"
+											/>{:else}<ShieldCheck class="size-4" aria-hidden="true" />{/if}{busy ===
+										backup.id
+											? 'Verifying...'
+											: 'Verify'}</Button
 									>{#if canDelete}<Button
-											variant="outline"
-											class="h-11 text-destructive"
+											variant="destructive"
+											class="h-11"
 											disabled={loading || busy !== null}
 											onclick={() => {
 												deleteError = null;
 												deleteTarget = backup;
-											}}>Delete</Button
+											}}><Trash2 class="size-4" aria-hidden="true" />Delete</Button
 										>{/if}
 								</div>
 								{#if rowErrors[backup.id]}<Alert.Root variant="destructive"
@@ -262,9 +291,7 @@
 										></Alert.Root
 									>{/if}
 								{#if reports[backup.id]}
-									{#if reports[backup.id].findings.length === 0}<p role="status" class="text-sm">
-											Backup verified
-										</p>{:else}<Alert.Root variant="destructive"
+									{#if reports[backup.id].findings.length > 0}<Alert.Root variant="destructive"
 											><Alert.Title>Backup verification failed</Alert.Title><Alert.Description
 												><ul class="space-y-1">
 													{#each reports[backup.id].findings as finding, index (index)}<li
@@ -316,9 +343,14 @@
 					variant="outline"
 					class="h-11"
 					disabled={loading || busy !== null}
-					onclick={() => (uploadOpen = false)}>Cancel</Button
+					onclick={() => (uploadOpen = false)}><X class="size-4" aria-hidden="true" />Cancel</Button
 				><Button type="submit" class="h-11" disabled={!files?.length || busy !== null}
-					>{busy === 'upload' ? 'Uploading...' : 'Upload backup'}</Button
+					>{#if busy === 'upload'}<Spinner
+							class="motion-reduce:animate-none"
+							aria-hidden="true"
+						/>{:else}<Upload class="size-4" aria-hidden="true" />{/if}{busy === 'upload'
+						? 'Uploading...'
+						: 'Upload backup'}</Button
 				>
 			</div>
 		</form>
@@ -342,13 +374,63 @@
 				variant="outline"
 				class="h-11"
 				disabled={loading || busy !== null}
-				onclick={() => (deleteTarget = null)}>Cancel</Button
+				onclick={() => (deleteTarget = null)}><X class="size-4" aria-hidden="true" />Cancel</Button
 			><Button
 				variant="destructive"
 				class="h-11"
 				disabled={loading || busy !== null}
-				onclick={remove}>{busy === 'delete' ? 'Deleting...' : 'Delete backup'}</Button
+				onclick={remove}
+				>{#if busy === 'delete'}<Spinner
+						class="motion-reduce:animate-none"
+						aria-hidden="true"
+					/>{:else}<Trash2 class="size-4" aria-hidden="true" />{/if}{busy === 'delete'
+					? 'Deleting...'
+					: 'Delete backup'}</Button
 			>
 		</div></ResponsiveDialog.Content
 	>
 </ResponsiveDialog.Root>
+
+<ResponsiveDialog.Root
+	open={createOpen}
+	onOpenChange={(open) => {
+		if (!busy) createOpen = open;
+	}}
+	><ResponsiveDialog.Content title="Create backup"
+		><ResponsiveDialog.Description
+			>Create a complete backup of this Menagerist. Add an optional label to help recognise it
+			later.</ResponsiveDialog.Description
+		>
+		<form onsubmit={create} class="mt-4 space-y-4">
+			<div class="space-y-2">
+				<Label for="backup-label"
+					>Backup label <span class="font-normal text-muted-foreground">(optional)</span></Label
+				><Input
+					id="backup-label"
+					bind:value={label}
+					maxlength={120}
+					class="h-11"
+					disabled={busy !== null}
+				/>
+			</div>
+			{#if createError}<Alert.Root variant="destructive"
+					><Alert.Description>{createError}</Alert.Description></Alert.Root
+				>{/if}
+			<div class="flex justify-end gap-2">
+				<Button
+					variant="outline"
+					class="h-11"
+					disabled={busy !== null}
+					onclick={() => (createOpen = false)}><X class="size-4" aria-hidden="true" />Cancel</Button
+				><Button type="submit" class="h-11" disabled={busy !== null}
+					>{#if busy === 'create'}<Spinner
+							class="motion-reduce:animate-none"
+							aria-hidden="true"
+						/>{:else}<Plus class="size-4" aria-hidden="true" />{/if}{busy === 'create'
+						? 'Creating backup...'
+						: 'Create backup'}</Button
+				>
+			</div>
+		</form></ResponsiveDialog.Content
+	></ResponsiveDialog.Root
+>

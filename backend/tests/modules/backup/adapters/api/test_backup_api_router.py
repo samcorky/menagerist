@@ -112,6 +112,25 @@ def test_backup_member_is_forbidden(client: TestClient) -> None:
     assert client.post("/api/v1/backup", json={}).status_code == 403
 
 
+@pytest.mark.parametrize(
+    ("label", "slug"),
+    [
+        ("Before upgrade", "before-upgrade"),
+        ("Café / Photos", "cafe-photos"),
+        ("📚", "backup"),
+        ('a"\r\nb', "a-b"),
+    ],
+)
+def test_backup_download_filename(client: TestClient, label: str, slug: str) -> None:
+    """Downloads have a safe label, creation date and unique archive id."""
+    created = client.post("/api/v1/backup", json={"label": label}).json()
+    response = client.get(f"/api/v1/backup/{created['id']}/download")
+    expected = f"menagerist-{slug}-{created['created_at'][:10]}-{created['id']}.tar.gz"
+    assert (
+        response.headers["content-disposition"] == f'attachment; filename="{expected}"'
+    )
+
+
 def test_public_first_run_restore_then_closed_gate(client: TestClient) -> None:
     """Restored accounts close the anonymous restore path with no live restore API."""
     created = client.post("/api/v1/backup", json={}).json()

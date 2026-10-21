@@ -1,3 +1,4 @@
+from datetime import UTC
 from typing import Annotated
 from uuid import UUID
 
@@ -46,6 +47,7 @@ from app.modules.backup.application.upload_backup import (
 )
 from app.modules.backup.application.verify_backup import VerifyBackup, VerifyBackupQuery
 from app.shared_kernel.actor import ANONYMOUS_ACTOR, Actor
+from app.shared_kernel.slug import slugify
 
 router = APIRouter(prefix="/backup", tags=["Backups"], route_class=PermissionAwareRoute)
 public_router = APIRouter(
@@ -200,13 +202,14 @@ async def download_backup(
 ) -> StreamingResponse:
     """Stream the committed compressed archive."""
     opened = await use_case.handle(OpenBackupQuery(backup_id=backup_id), actor)
+    label = slugify(opened.summary.label)[:120].rstrip("-") or "backup"
+    date = opened.summary.created_at.astimezone(UTC).date().isoformat()
+    filename = f"menagerist-{label}-{date}-{backup_id}.tar.gz"
     return StreamingResponse(
         opened.chunks,
         media_type="application/gzip",
         headers={
-            "Content-Disposition": (
-                f'attachment; filename="menagerist-{backup_id}.tar.gz"'
-            ),
+            "Content-Disposition": (f'attachment; filename="{filename}"'),
             "Cache-Control": "no-store",
         },
     )
