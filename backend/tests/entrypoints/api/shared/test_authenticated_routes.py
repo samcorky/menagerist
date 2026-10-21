@@ -27,13 +27,14 @@ PUBLIC_ROUTES = {
     # The backup restorer rechecks setup under the shared identity lock.
     ("POST", "/v1/backup/first-run-restore"),
 }
-# Unauthenticated POSTs have no CSRF token to check, so they refuse cross-site calls.
+# Unauthenticated POSTs have no session cookie to check, so they refuse
+# cross-site calls.
 CROSS_SITE_GUARDED_ROUTES = {
     ("POST", "/v1/auth/setup"),
     ("POST", "/v1/auth/login"),
     ("POST", "/v1/backup/first-run-restore"),
 }
-# On the CSRF-protected router but deliberately tolerant of a missing session.
+# On the same-origin-checked router but deliberately tolerant of a missing session.
 NO_ACTOR_ROUTES = {("POST", "/v1/auth/logout")}
 # Identity routes resolve the session through the identity dependencies.
 # Identity-prefixed paths that live in entrypoints and use the content actor.

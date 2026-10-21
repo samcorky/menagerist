@@ -2,7 +2,7 @@ import {
 	test,
 	expect,
 	request as playwrightRequest,
-	sessionOptions,
+	apiSessionOptions,
 	type APIRequestContext,
 	type Locator,
 	type Page
@@ -410,7 +410,7 @@ test('another user cannot open a smart collection by id or by slug, nor count or
 	await seedItems(request, tool);
 	const smart = await makeSmart(request, uniqueName('Private'), weightAtLeast(tool, 1));
 
-	const admin = await playwrightRequest.newContext(sessionOptions(workerBaseURL, workerSession));
+	const admin = await playwrightRequest.newContext(apiSessionOptions(workerBaseURL, workerSession));
 	const other = await createUserViaApi(admin, workerBaseURL, { prefix: 'smart-b' });
 	await admin.dispose();
 	const b = await asUser(browser, other);

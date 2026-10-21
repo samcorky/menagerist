@@ -12,7 +12,6 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.platform.app_info import AppInfo, load_app_info
-from app.platform.config import get_identity_settings
 
 router = APIRouter(route_class=PermissionAwareRoute)
 
@@ -52,9 +51,7 @@ _REVALIDATE = "no-cache"
 _IMMUTABLE = "public, max-age=31536000, immutable"
 
 
-def render_swagger_page(
-    *, title: str, csrf_cookie_name: str, init_js_version: str
-) -> str:
+def render_swagger_page(*, title: str, init_js_version: str) -> str:
     """Fill the Swagger template; every value is HTML-escaped."""
     values = {
         "swagger_css_url": _SWAGGER_CSS_URL,
@@ -64,7 +61,6 @@ def render_swagger_page(
         "favicon_url": "/api/docs/favicon.svg",
         "title": title,
         "init_js_url": f"{_INIT_JS_URL}?v={init_js_version}",
-        "csrf_cookie_name": csrf_cookie_name,
         "openapi_url": "/api/openapi.json",
         "oauth2_redirect_url": "/api/docs/oauth2-redirect",
     }
@@ -95,7 +91,6 @@ def _swagger_body(title: str) -> tuple[bytes, str]:
     """Render once per title: the body and its strong ETag."""
     body = render_swagger_page(
         title=title,
-        csrf_cookie_name=get_identity_settings().csrf_cookie_name,
         init_js_version=_init_js_version(),
     ).encode()
     return body, f'"{hashlib.sha256(body).hexdigest()[:32]}"'
@@ -129,7 +124,7 @@ def get_favicon() -> FileResponse:
 
 @router.get("/docs/swagger-init.js", include_in_schema=False)
 def get_swagger_init() -> FileResponse:
-    """Serve the Swagger UI setup script (CSRF header and sign-in banner)."""
+    """Serve the Swagger UI setup script (same-origin requests and sign-in banner)."""
     return FileResponse(
         _STATIC_DIR / "swagger-init.js",
         media_type="text/javascript",

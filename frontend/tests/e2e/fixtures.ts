@@ -15,9 +15,6 @@ export const BACKEND_PORT = Number(process.env.E2E_BACKEND_PORT ?? 8100);
 /** Backend port of the `auth` project (its own empty database, see auth.spec.ts). */
 export const AUTH_BACKEND_PORT = Number(process.env.E2E_AUTH_BACKEND_PORT ?? 8190);
 
-export const CSRF_COOKIE = 'menagerist-csrf';
-export const CSRF_HEADER = 'X-CSRF-Token';
-
 export type Credentials = { username: string; displayName: string; password: string };
 
 /** The administrator every worker database is set up with (the password is the stable constant). */
@@ -28,22 +25,23 @@ export const E2E_ADMIN: Credentials = {
 };
 
 type StorageState = Awaited<ReturnType<APIRequestContext['storageState']>>;
-export type Session = { storageState: StorageState; csrf: string };
+export type Session = { storageState: StorageState };
 
-/** The context options that make a browser context or API context act as a signed-in user. */
+/** The context options that make a browser context act as a signed-in user. */
 export function sessionOptions(baseURL: string, session: Session) {
-	return {
-		baseURL,
-		storageState: session.storageState,
-		extraHTTPHeaders: { [CSRF_HEADER]: session.csrf }
-	};
+	return { baseURL, storageState: session.storageState };
+}
+
+/**
+ * The same for an API context. It sends the app's own `Origin`, as a browser would: the server
+ * refuses cookie-authenticated unsafe requests without it. Browser contexts must not set it.
+ */
+export function apiSessionOptions(baseURL: string, session: Session) {
+	return { ...sessionOptions(baseURL, session), extraHTTPHeaders: { Origin: baseURL } };
 }
 
 async function captureSession(api: APIRequestContext): Promise<Session> {
-	const storageState = await api.storageState();
-	const csrf = storageState.cookies.find((c) => c.name === CSRF_COOKIE)?.value;
-	if (!csrf) throw new Error('The server did not set a CSRF cookie.');
-	return { storageState, csrf };
+	return { storageState: await api.storageState() };
 }
 
 /** Signs in through the API and returns the session; throws on bad credentials. */
@@ -70,7 +68,7 @@ export async function changePasswordViaApi(
 	next: string
 ): Promise<Session> {
 	const api = await playwrightRequest.newContext({
-		...sessionOptions(baseURL, session)
+		...apiSessionOptions(baseURL, session)
 	});
 	try {
 		const res = await api.post('/api/v1/auth/password', {
@@ -119,7 +117,7 @@ export async function ensureAdminSession(baseURL: string): Promise<Session> {
 /**
  * Each worker has its own backend (serving the built SPA) and database, so `baseURL` follows
  * `parallelIndex`. The worker signs in once as the e2e admin (setting the database up on its
- * first run); `page` and `request` then both carry that session and its CSRF header.
+ * first run); `page` and `request` then both carry that session; `request` also sends the app's `Origin`.
  */
 export const test = base.extend<object, { workerBaseURL: string; workerSession: Session }>({
 	workerBaseURL: [
@@ -141,8 +139,12 @@ export const test = base.extend<object, { workerBaseURL: string; workerSession: 
 	storageState: async ({ workerSession }, use) => {
 		await use(workerSession.storageState);
 	},
-	extraHTTPHeaders: async ({ workerSession }, use) => {
-		await use({ [CSRF_HEADER]: workerSession.csrf });
+	request: async ({ playwright, workerBaseURL, workerSession }, use) => {
+		const api = await playwright.request.newContext(
+			apiSessionOptions(workerBaseURL, workerSession)
+		);
+		await use(api);
+		await api.dispose();
 	}
 });
 
@@ -156,5 +158,8 @@ export async function openSession(
 ): Promise<SignedInUser> {
 	const context = await browser.newContext(sessionOptions(baseURL, session));
 	const page = await context.newPage();
-	return { page, context, request: context.request };
+	// A browser context's own `request` cannot send `Origin`, which the server requires.
+	const request = await playwrightRequest.newContext(apiSessionOptions(baseURL, session));
+	context.on('close', () => void request.dispose());
+	return { page, context, request };
 }

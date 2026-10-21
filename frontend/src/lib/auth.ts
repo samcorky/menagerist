@@ -13,16 +13,11 @@ export const LOGIN_PATH = '/login';
 export const SETUP_PATH = '/setup';
 export const STATUS_PATH = '/status';
 export const ACCOUNT_PATH = '/settings/account';
-export const CSRF_COOKIE = 'menagerist-csrf';
-export const CSRF_HEADER = 'X-CSRF-Token';
 
 // Sign-in pages: a signed-in person is sent away from these.
 const PUBLIC_PATHS = [LOGIN_PATH, SETUP_PATH];
 // Pages anyone may open, signed in or not.
 const OPEN_PATHS = [STATUS_PATH];
-const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-
-export const isUnsafeMethod = (method: string): boolean => UNSAFE_METHODS.has(method.toUpperCase());
 
 function normalisePath(pathname: string): string {
 	return pathname.length > 1 ? pathname.replace(/\/+$/, '') || '/' : pathname;
@@ -118,27 +113,6 @@ export function guardDecision(input: GuardInput): GuardDecision {
 		return go(path === LOGIN_PATH ? safeNext(new URLSearchParams(search).get('next')) : '/');
 	}
 	return allow;
-}
-
-/** Read one cookie from a `document.cookie`-style string. */
-export function readCookie(cookies: string, name: string): string | null {
-	for (const part of cookies.split(';')) {
-		const index = part.indexOf('=');
-		if (index === -1 || part.slice(0, index).trim() !== name) continue;
-		const raw = part.slice(index + 1).trim();
-		try {
-			return decodeURIComponent(raw);
-		} catch {
-			return raw;
-		}
-	}
-	return null;
-}
-
-/** The CSRF token the server set for this browser, if any. */
-export function csrfToken(): string | null {
-	if (typeof document === 'undefined') return null;
-	return readCookie(document.cookie, CSRF_COOKIE) || null;
 }
 
 /** The RFC 9457 `title` of a failed call, e.g. `PasswordUnchangedError`. */

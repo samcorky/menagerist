@@ -1,17 +1,16 @@
-from urllib.parse import urlsplit
-
 import structlog
 from starlette.requests import Request  # noqa: TC002
 
-from app.platform import proxy_signals
+from app.entrypoints.api.shared.http.origin import (
+    claimed_origin,
+    log_refusal,
+    note_origin_mismatch,
+    own_origin,
+)
 from app.platform.config import get_api_settings
-from app.platform.proxy_signals import ProxySignal
 from app.shared_kernel.errors import ForbiddenError
-from app.shared_kernel.log_safe import loggable
 
 logger = structlog.get_logger()
-
-_DEFAULT_PORTS = {"http": 80, "https": 443}
 
 
 class CrossSiteRequestError(ForbiddenError):
@@ -20,18 +19,11 @@ class CrossSiteRequestError(ForbiddenError):
     problem_type = "cross_site_refused"
 
 
-def _origin_of(scheme: str, netloc: str) -> str:
-    """Return `scheme://host[:port]` lower-cased, without a default port."""
-    netloc = netloc.lower()
-    default = f":{_DEFAULT_PORTS.get(scheme, '')}"
-    return f"{scheme}://{netloc.removesuffix(default)}"
-
-
 async def refuse_cross_site(request: Request) -> None:
     """Refuse a request that a page on another site sent.
 
-    The public sign-in and setup routes have no session, so the CSRF token
-    cannot protect them. The browser's own `Sec-Fetch-Site` header decides first
+    The public sign-in and setup routes have no session, so `verify_csrf` does
+    not cover them. The browser's own `Sec-Fetch-Site` header decides first
     (page script cannot set it): `cross-site` is refused and `same-origin` passes.
     When it is missing or says `same-site` (older browsers, plain HTTP, a sibling
     subdomain), any `Origin` must be the request's own or a configured CORS
@@ -47,28 +39,19 @@ async def refuse_cross_site(request: Request) -> None:
     """
     site = request.headers.get("Sec-Fetch-Site")
     origin = request.headers.get("Origin")
-    own = _origin_of(request.url.scheme, request.url.netloc)
+    own = own_origin(request)
     claimed = None
     if origin is not None:
-        try:
-            parts = urlsplit(origin)
-        except ValueError:
+        claimed = claimed_origin(origin)
+        if claimed is None:
             _refuse("malformed origin", site, origin, own)
-        claimed = _origin_of(parts.scheme, parts.netloc)
 
     if site == "cross-site":
         _refuse("browser reports cross-site", site, origin, own)
     if origin is None:
         return
     if site == "same-origin":
-        if claimed != own:
-            proxy_signals.record(ProxySignal.ORIGIN_MISMATCH)
-            logger.warning(
-                "same-origin request has a different origin than the app saw",
-                claimed_origin=loggable(origin),
-                seen_origin=own,
-                hint="check MENAGERIST_TRUSTED_PROXIES and the proxy's Host header",
-            )
+        note_origin_mismatch(origin, own)
         return
     allowed = {entry for entry in get_api_settings().cors_origins if entry != "*"}
     if claimed != own and claimed not in allowed:
@@ -76,11 +59,5 @@ async def refuse_cross_site(request: Request) -> None:
 
 
 def _refuse(reason: str, site: str | None, origin: str | None, own: str) -> None:
-    logger.warning(
-        "cross-site request refused",
-        reason=reason,
-        sec_fetch_site=loggable(site or ""),
-        claimed_origin=loggable(origin or ""),
-        seen_origin=own,
-    )
+    log_refusal(reason, site, origin, own)
     raise CrossSiteRequestError("This request was sent from another site.")

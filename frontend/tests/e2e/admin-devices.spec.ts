@@ -1,4 +1,4 @@
-import { expect, request, sessionOptions, test } from './fixtures';
+import { expect, request, apiSessionOptions, test } from './fixtures';
 import { asUser, createUserViaApi } from './helpers';
 
 /**
@@ -13,7 +13,7 @@ test('an administrator can view all active devices and revoke a member device', 
 	workerBaseURL,
 	workerSession
 }) => {
-	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
 	const member = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'admin-dev-member' });
 	await adminApi.dispose();
 
@@ -44,7 +44,7 @@ test('an administrator can view and revoke devices from the users page dialog', 
 	workerBaseURL,
 	workerSession
 }) => {
-	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
 	const member = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'admin-user-dev' });
 	await adminApi.dispose();
 
@@ -76,7 +76,7 @@ test('a member sees no admin area and cannot access admin routes', async ({
 	workerBaseURL,
 	workerSession
 }) => {
-	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
 	const member = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'plain-member' });
 	await adminApi.dispose();
 
@@ -112,7 +112,7 @@ test('filtering by user on /admin/devices narrows the listed devices', async ({
 	workerBaseURL,
 	workerSession
 }) => {
-	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
 	const userA = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'filter-a' });
 	const userB = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'filter-b' });
 	await adminApi.dispose();

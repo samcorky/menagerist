@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 
 AUTH = "/api/v1/auth"
 USERS = "/api/v1/user"
-CSRF_COOKIE = "menagerist-csrf"
+FOREIGN_ORIGIN = "https://evil.example"
 SESSION_COOKIE = "menagerist-session"
 SETUP_BODY = {
     "username": "Admin",
@@ -52,7 +52,7 @@ SETUP_BODY = {
 
 
 class Api:
-    """A client with no ambient CSRF credentials, plus helpers to send them."""
+    """A client sending its own origin, plus helpers to send a foreign one."""
 
     def __init__(
         self,
@@ -78,10 +78,9 @@ class Api:
         self.client = self.new_client(base_url)
 
     def new_client(self, base_url: str = "http://testserver") -> TestClient:
-        """Return a client holding no CSRF cookie or header."""
+        """Return a client with no cookies that sends its own `Origin`."""
         client = TestClient(self.app, base_url=base_url)
         client.cookies.clear()
-        client.headers.pop("X-CSRF-Token")
         return client
 
     @staticmethod
@@ -92,17 +91,14 @@ class Api:
         *,
         csrf: bool = True,
     ) -> Response:
-        """POST with the CSRF header copied from the client's CSRF cookie."""
-        headers = {}
-        if csrf and (token := client.cookies.get(CSRF_COOKIE)):
-            headers["X-CSRF-Token"] = token
+        """POST from the client's own origin; a foreign one if `csrf` is off."""
+        headers = {} if csrf else {"Origin": FOREIGN_ORIGIN}
         return client.post(url, json=json, headers=headers)
 
     @staticmethod
     def patch(client: TestClient, url: str, json: Mapping[str, object]) -> Response:
-        """PATCH with the CSRF header copied from the client's CSRF cookie."""
-        token = client.cookies.get(CSRF_COOKIE) or ""
-        return client.patch(url, json=json, headers={"X-CSRF-Token": token})
+        """PATCH from the client's own origin."""
+        return client.patch(url, json=json)
 
     def setup(self, client: TestClient | None = None) -> Response:
         """Run first-run setup, leaving `client` signed in as an admin."""
@@ -154,7 +150,7 @@ def test_status_reports_setup_required_until_the_first_account(api: Api) -> None
 
 
 def test_setup_creates_a_signed_in_admin_and_sets_cookies(api: Api) -> None:
-    """Setup answers 201, signs in, and needs no CSRF token."""
+    """Setup answers 201, signs in, and needs no origin check."""
     response = api.setup()
 
     body = response.json()
@@ -179,29 +175,25 @@ def test_setup_creates_a_signed_in_admin_and_sets_cookies(api: Api) -> None:
 
 
 def test_setup_sets_secure_cookie_attributes(api: Api) -> None:
-    """The session cookie is HttpOnly/Lax; the CSRF cookie is readable."""
+    """The session cookie is HttpOnly and SameSite=Strict; no CSRF cookie is set."""
     cookies = _cookie_headers(api.setup())
 
     session = cookies[SESSION_COOKIE].lower()
     assert "httponly" in session
-    assert "samesite=lax" in session
+    assert "samesite=strict" in session
     assert "path=/" in session
     assert "max-age=604800" in session
     assert "secure" not in session
-    csrf = cookies[CSRF_COOKIE].lower()
-    assert "httponly" not in csrf
-    assert "samesite=lax" in csrf
-    assert "path=/" in csrf
+    assert set(cookies) == {SESSION_COOKIE}
 
 
 def test_cookies_are_secure_over_https(world: World) -> None:
-    """Over HTTPS both cookies carry the Secure flag."""
+    """Over HTTPS the session cookie carries the Secure flag."""
     api = Api(world, base_url="https://testserver")
 
     cookies = _cookie_headers(api.setup())
 
     assert "secure" in cookies[SESSION_COOKIE].lower()
-    assert "secure" in cookies[CSRF_COOKIE].lower()
 
 
 @pytest.mark.parametrize("secure", [True, False])
@@ -257,7 +249,7 @@ def test_setup_rejects_a_weak_password_and_unknown_fields(api: Api) -> None:
 async def test_login_sets_cookies_and_me_returns_the_user(
     api: Api, make_user: MakeUser
 ) -> None:
-    """A good login needs no CSRF token and starts a session."""
+    """A good login needs no origin check and starts a session."""
     await api.add_user(make_user, "alice")
 
     client, response = api.sign_in("ALICE")
@@ -272,10 +264,10 @@ async def test_login_sets_cookies_and_me_returns_the_user(
 async def test_login_logs_only_allowlisted_device_headers(
     api: Api, make_user: MakeUser
 ) -> None:
-    """Sign-in logs diagnostic headers without logging cookie or CSRF secrets."""
+    """Sign-in logs diagnostic headers without logging cookie secrets."""
     await api.add_user(make_user, "alice")
     client = api.new_client()
-    secrets = ("cookie-secret-value", "csrf-secret-value")
+    secrets = ("cookie-secret-value",)
 
     with capture_logs() as events:
         response = client.post(
@@ -290,7 +282,6 @@ async def test_login_logs_only_allowlisted_device_headers(
                 "X-Forwarded-Proto": "https",
                 "Forwarded": "for=192.0.2.10;proto=https",
                 "Cookie": f"session={secrets[0]}",
-                "X-CSRF-Token": secrets[1],
             },
         )
 
@@ -397,15 +388,14 @@ def test_logout_ends_the_session_and_clears_cookies(api: Api) -> None:
     assert response.status_code == 204
     cookies = _cookie_headers(response)
     assert "max-age=0" in cookies[SESSION_COOKIE].lower()
-    assert "max-age=0" in cookies[CSRF_COOKIE].lower()
+    assert "samesite=strict" in cookies[SESSION_COOKIE].lower()
+    assert set(cookies) == {SESSION_COOKIE}
     api.client.cookies.set(SESSION_COOKIE, token, domain="testserver.local")
     assert api.client.get(f"{AUTH}/me").status_code == 401
 
 
 def test_logout_without_a_session_changes_nothing(api: Api) -> None:
     """No session: 204, no cookies touched, no Clear-Site-Data."""
-    api.client.cookies.set(CSRF_COOKIE, "t", domain="testserver.local")
-
     response = api.post(api.client, f"{AUTH}/logout")
 
     assert response.status_code == 204
@@ -414,10 +404,8 @@ def test_logout_without_a_session_changes_nothing(api: Api) -> None:
 
 
 def test_cross_site_style_logout_cannot_clear_cookies(api: Api) -> None:
-    """A POST with only the CSRF cookie and no header or session ends nothing."""
-    api.client.cookies.set(CSRF_COOKIE, "t", domain="testserver.local")
-
-    response = api.client.post(f"{AUTH}/logout", headers={})
+    """A foreign-origin POST with no session ends nothing."""
+    response = api.client.post(f"{AUTH}/logout", headers={"Origin": FOREIGN_ORIGIN})
 
     assert response.status_code == 204
     assert "set-cookie" not in response.headers
@@ -447,26 +435,24 @@ def test_other_auth_routes_do_not_clear_site_data(api: Api) -> None:
 # --- CSRF ------------------------------------------------------------------
 
 
-def test_unsafe_requests_without_csrf_are_refused(api: Api) -> None:
-    """With a session cookie, a missing or mismatched token answers 403."""
+def test_unsafe_requests_from_another_origin_are_refused(api: Api) -> None:
+    """With a session cookie, a foreign, missing or `null` origin answers 403."""
     api.setup()
     url = f"{AUTH}/logout"
 
-    missing = api.post(api.client, url, csrf=False)
-    mismatched = api.client.post(url, headers={"X-CSRF-Token": "not-the-cookie"})
-    no_csrf_cookie = api.new_client()
-    no_csrf_cookie.cookies.set(
-        "menagerist-session", "x", domain="testserver.local", path="/"
-    )
-    header_only = no_csrf_cookie.post(url, headers={"X-CSRF-Token": "abc"})
+    foreign = api.post(api.client, url, csrf=False)
+    no_origin = api.client.post(url, headers={"Origin": ""})
+    null_origin = api.client.post(url, headers={"Origin": "null"})
+    del api.client.headers["Origin"]
+    missing = api.client.post(url)
 
-    for response in (missing, mismatched, header_only):
+    for response in (foreign, no_origin, null_origin, missing):
         assert response.status_code == 403
         assert response.json()["type"] == "csrf_failed"
 
 
-def test_valid_csrf_with_a_session_cookie_is_accepted(api: Api) -> None:
-    """The matching header and cookie pass alongside the session cookie."""
+def test_same_origin_unsafe_request_with_a_session_cookie_is_accepted(api: Api) -> None:
+    """The app's own origin passes alongside the session cookie."""
     api.setup()
 
     assert api.post(api.client, f"{AUTH}/logout").status_code < 300
@@ -476,7 +462,9 @@ def test_csrf_applies_to_other_v1_routes_and_never_to_safe_methods(api: Api) -> 
     """The rule covers every /api/v1 route, not just identity ones."""
     api.setup()
 
-    blocked = api.client.post("/api/v1/collection", json={"name": "x"})
+    blocked = api.client.post(
+        "/api/v1/collection", json={"name": "x"}, headers={"Origin": FOREIGN_ORIGIN}
+    )
     safe = api.client.get(f"{AUTH}/me")
 
     assert blocked.status_code == 403
@@ -485,7 +473,7 @@ def test_csrf_applies_to_other_v1_routes_and_never_to_safe_methods(api: Api) -> 
 
 
 def test_login_and_setup_are_exempt_from_csrf(api: Api) -> None:
-    """No cookie exists yet when these are called."""
+    """No session cookie exists yet when these are called."""
     setup = api.client.post(f"{AUTH}/setup", json=SETUP_BODY)
     login = api.client.post(
         f"{AUTH}/login", json={"username": "admin", "password": "password-123"}
@@ -573,8 +561,6 @@ async def test_change_password_rejects_a_wrong_current_password(
 
 def test_change_password_requires_a_session(api: Api) -> None:
     """No session, no password change."""
-    api.client.cookies.set(CSRF_COOKIE, "t", domain="testserver.local")
-
     response = api.post(
         api.client,
         f"{AUTH}/password",
@@ -812,14 +798,16 @@ async def test_patch_me_validates_the_name(api: Api, make_user: MakeUser) -> Non
     assert client.get(f"{AUTH}/me").json()["display_name"] == "Alice"
 
 
-async def test_patch_me_needs_a_session_and_csrf(api: Api, make_user: MakeUser) -> None:
-    """No session is refused; a wrong CSRF header answers 403."""
+async def test_patch_me_needs_a_session_and_origin(
+    api: Api, make_user: MakeUser
+) -> None:
+    """No session is refused; a foreign origin answers 403."""
     await api.add_user(make_user, "alice")
     client, _ = api.sign_in()
 
     anonymous = api.patch(api.new_client(), f"{AUTH}/me", {"display_name": "X"})
     no_csrf = client.patch(
-        f"{AUTH}/me", json={"display_name": "X"}, headers={"X-CSRF-Token": "wrong"}
+        f"{AUTH}/me", json={"display_name": "X"}, headers={"Origin": FOREIGN_ORIGIN}
     )
 
     assert anonymous.status_code in (401, 403)
@@ -1097,7 +1085,6 @@ async def test_change_password_stores_client_device_and_ip(api: Api) -> None:
         "User-Agent": "PasswordChanger/2.0",
         "Sec-CH-UA-Platform": '"Windows"',
         "Sec-CH-UA-Mobile": "?0",
-        "X-CSRF-Token": api.client.cookies.get(CSRF_COOKIE) or "",
     }
     body = {
         "current_password": "password-123",

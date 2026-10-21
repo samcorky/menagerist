@@ -1,4 +1,3 @@
-import secrets
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -17,41 +16,26 @@ def _secure(request: Request, settings: IdentitySettings) -> bool:
 def set_session_cookies(
     request: Request, response: Response, token: str, settings: IdentitySettings
 ) -> None:
-    """Set the HttpOnly session cookie and a fresh script-readable CSRF cookie."""
-    secure = _secure(request, settings)
-    max_age = settings.session_ttl_hours * 3600
+    """Set the HttpOnly, SameSite=Strict session cookie."""
     response.set_cookie(
         settings.cookie_name,
         token,
-        max_age=max_age,
+        max_age=settings.session_ttl_hours * 3600,
         path="/",
-        secure=secure,
+        secure=_secure(request, settings),
         httponly=True,
-        samesite="lax",
-    )
-    response.set_cookie(
-        settings.csrf_cookie_name,
-        secrets.token_urlsafe(32),
-        max_age=max_age,
-        path="/",
-        secure=secure,
-        httponly=False,
-        samesite="lax",
+        samesite="strict",
     )
 
 
 def clear_session_cookies(
     request: Request, response: Response, settings: IdentitySettings
 ) -> None:
-    """Expire both cookies."""
-    secure = _secure(request, settings)
+    """Expire the session cookie."""
     response.delete_cookie(
-        settings.cookie_name, path="/", secure=secure, httponly=True, samesite="lax"
-    )
-    response.delete_cookie(
-        settings.csrf_cookie_name,
+        settings.cookie_name,
         path="/",
-        secure=secure,
-        httponly=False,
-        samesite="lax",
+        secure=_secure(request, settings),
+        httponly=True,
+        samesite="strict",
     )

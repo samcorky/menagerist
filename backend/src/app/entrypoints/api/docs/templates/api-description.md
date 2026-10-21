@@ -7,8 +7,8 @@ Menagerist is a self-hostable collection manager. Keep track of the things you c
 Run `POST /api/v1/auth/login` with "Try it out" on this page, or use the "Sign in" button in the banner under the title. The banner shows who is signed in.
 
 - The session is the HttpOnly `$session_cookie_name` cookie, which scripts cannot read. It ends when you sign out with `POST /api/v1/auth/logout`.
-- A second, readable cookie, `$csrf_cookie_name`, holds a CSRF token. Send its value in the `X-CSRF-Token` header on every POST, PUT, PATCH and DELETE request. This page does that for you; other clients must do it themselves.
-- Requests without a matching token are refused with `403 csrf_failed`.
+- The cookie is `SameSite=Strict`. Every POST, PUT, PATCH and DELETE request that carries it must come from this site's own pages, which browsers (including this page) arrange by themselves. Scripts and tools such as curl must send `Origin: <this server's origin>` with the session cookie (for example `curl -b cookies.txt -H 'Origin: https://menagerist.example.com' -X POST ...`); pasting a curl command from this page needs `-b` with your session cookie added.
+- Other requests are refused with `403 csrf_failed`.
 
 ReDoc (`/api/redoc`) is read-only.
 
@@ -18,4 +18,4 @@ Operations that change the shared structure (item types and relationship types) 
 
 ## Errors
 
-Errors are RFC 9457 `application/problem+json` documents. Expect `401` when you are not signed in (or `setup_required` before the first administrator exists), `403` for `csrf_failed` or `password_expired`, `404` for content you do not own, and `429` with a `Retry-After` header after too many sign-in attempts.
+Errors are RFC 9457 `application/problem+json` documents. Expect `401` when you are not signed in (or `setup_required` before the first administrator exists), `403` for `csrf_failed` (a cookie-authenticated change not sent from this site) or `password_expired`, `404` for content you do not own, and `429` with a `Retry-After` header after too many sign-in attempts.

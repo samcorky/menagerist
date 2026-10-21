@@ -32,45 +32,11 @@ const user = {
 };
 
 beforeEach(() => {
-	vi.stubGlobal('document', { cookie: 'a=1; menagerist-csrf=tok123' });
 	resetAuthEvents();
 });
 
 afterEach(() => {
 	vi.unstubAllGlobals();
-});
-
-describe('CSRF header', () => {
-	it('is sent on unsafe methods only', async () => {
-		const seen: Record<string, string | null> = {};
-		vi.stubGlobal('fetch', async (request: Request) => {
-			seen[request.method] = request.headers.get('X-CSRF-Token');
-			return json({});
-		});
-		await client.get({ url: '/api/v1/thing' });
-		await client.post({ url: '/api/v1/thing', body: {} });
-		await client.put({ url: '/api/v1/thing', body: {} });
-		await client.patch({ url: '/api/v1/thing', body: {} });
-		await client.delete({ url: '/api/v1/thing' });
-		expect(seen).toEqual({
-			GET: null,
-			POST: 'tok123',
-			PUT: 'tok123',
-			PATCH: 'tok123',
-			DELETE: 'tok123'
-		});
-	});
-
-	it('is omitted when there is no CSRF cookie', async () => {
-		vi.stubGlobal('document', { cookie: '' });
-		let header: string | null = 'unset';
-		vi.stubGlobal('fetch', async (request: Request) => {
-			header = request.headers.get('X-CSRF-Token');
-			return json({});
-		});
-		await client.post({ url: '/api/v1/thing', body: {} });
-		expect(header).toBeNull();
-	});
 });
 
 describe('401 handling', () => {
@@ -256,18 +222,6 @@ describe('more auth behaviour', () => {
 		await client.get({ url: '/api/v1/a' });
 		expect(getEtag('/api/v1/node')).toBeUndefined();
 		expect(auth.user).toBeNull();
-	});
-
-	it('follows a changed CSRF cookie between requests', async () => {
-		const seen: (string | null)[] = [];
-		vi.stubGlobal('fetch', async (request: Request) => {
-			seen.push(request.headers.get('X-CSRF-Token'));
-			return json({});
-		});
-		await client.post({ url: '/api/v1/thing', body: {} });
-		vi.stubGlobal('document', { cookie: 'menagerist-csrf=rotated' });
-		await client.post({ url: '/api/v1/thing', body: {} });
-		expect(seen).toEqual(['tok123', 'rotated']);
 	});
 
 	it('ignores a 403 that is not password_expired', async () => {

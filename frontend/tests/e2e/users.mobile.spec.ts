@@ -1,4 +1,4 @@
-import { expect, request, sessionOptions, test, type Page } from './fixtures';
+import { expect, request, apiSessionOptions, sessionOptions, test, type Page } from './fixtures';
 import { createUserViaApi, type E2EUser } from './helpers';
 
 /** Users page on a phone: no sideways scroll, a confirm before Disable, and tappable actions. */
@@ -13,7 +13,7 @@ const userRow = (page: Page, user: E2EUser) =>
 		.filter({ hasText: user.username });
 
 async function newUser(workerBaseURL: string, workerSession: Parameters<typeof sessionOptions>[1]) {
-	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
 	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'mobile' });
 	await adminApi.dispose();
 	return user;

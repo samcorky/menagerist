@@ -36,8 +36,8 @@ async function execute(page: Page, id: string, body?: object) {
 
 /** A context with no session and none of the fixtures' default headers. */
 function freshContext(browser: Browser, baseURL: string | undefined) {
-	// Explicit empty storage state and headers, so the worker admin's session and CSRF header
-	// (which the fixtures add to every context) are not inherited.
+	// Explicit empty storage state and headers, so the worker admin's session
+	// (which the fixtures add to every context) is not inherited.
 	return browser.newContext({
 		baseURL,
 		storageState: { cookies: [], origins: [] },
@@ -188,7 +188,7 @@ test('locks follow the real session without changing requests', async ({ browser
 
 	// The placeholder must not leak: nothing is stored, and Swagger's generated curl carries no
 	// cookie. (The browser would silently drop a script-set Cookie header, so the curl snippet
-	// is the honest place to look. The CSRF header may appear there; that is expected.)
+	// is the honest place to look. The Origin header does appear there, on purpose.)
 	const created = await execute(page, 'Collections-create_collection', {
 		name: `Lock check ${Date.now()}`
 	});
@@ -210,6 +210,8 @@ test('locks follow the real session without changing requests', async ({ browser
 		list.locator('.live-responses-table .response .response-col_status').first()
 	).toHaveText(/200/);
 	const getCurl = await list.locator('.curl-command').first().innerText();
+	// The generated curl carries the server's own origin, which the API requires with a cookie.
+	expect(postCurl).toContain(`-H 'Origin: ${new URL(page.url()).origin}'`);
 	for (const curl of [postCurl, getCurl]) {
 		expect(curl).toContain('curl');
 		expect(curl).not.toMatch(/cookie/i);

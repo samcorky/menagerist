@@ -174,7 +174,6 @@ def client(seeded: Seeded) -> Iterator[TestClient]:
     get_engine.cache_clear()
     try:
         with TestClient(create_app(), raise_server_exceptions=False) as c:
-            c.headers.pop("X-CSRF-Token")  # use the cookie the server issues
             yield c
     finally:
         get_session_factory.cache_clear()
@@ -266,7 +265,6 @@ def test_a_failure_inside_the_claim_rolls_the_whole_setup_back(
     app.dependency_overrides[get_existing_data_claim] = _failing_claim
     try:
         with TestClient(app, raise_server_exceptions=False) as c:
-            c.headers.pop("X-CSRF-Token")
             response = c.post(f"{AUTH}/setup", json=SETUP_BODY)
             status = c.get(f"{AUTH}/status")
     finally:

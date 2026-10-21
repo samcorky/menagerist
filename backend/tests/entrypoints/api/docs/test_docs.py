@@ -97,16 +97,14 @@ def test_openapi_schema_renames_multipart_body_schemas() -> None:
     assert schemas["UploadAndAttachMediaBody"]["title"] == "UploadAndAttachMediaBody"
 
 
-def test_swagger_page_references_init_script_and_csrf_cookie_name() -> None:
-    """The page loads our setup script and gets the CSRF cookie name from settings."""
+def test_swagger_page_references_init_script() -> None:
+    """The page loads our setup script and carries no CSRF cookie name."""
     client = TestClient(create_app())
     response = client.get("/api/docs")
 
     assert response.status_code == 200
     assert 'src="/api/docs/swagger-init.js?v=' in response.text
-    assert f'data-csrf-cookie="{get_identity_settings().csrf_cookie_name}"' in (
-        response.text
-    )
+    assert "data-csrf-cookie" not in response.text
     assert "swagger-ui-dist@5.33.0/" in response.text
     assert "/api/docs/favicon.svg" in response.text
 
@@ -144,7 +142,8 @@ def test_swagger_init_script_is_served() -> None:
     assert response.status_code == 200
     assert response.headers["Content-Type"].startswith("text/javascript")
     assert response.headers["Cache-Control"] == ("public, max-age=31536000, immutable")
-    assert "X-CSRF-Token" in response.text
+    assert "prepareRequest" in response.text
+    assert "X-CSRF-Token" not in response.text
     assert "unsafe-eval" not in response.headers["Content-Security-Policy"]
 
 
@@ -189,11 +188,9 @@ def test_swagger_page_references_versioned_init_script() -> None:
 
 
 def test_swagger_template_escapes_values() -> None:
-    """Hostile titles and cookie names cannot break out of the markup."""
+    """Hostile titles cannot break out of the markup."""
     hostile = '"><script>alert(1)</script>'
-    html = render_swagger_page(
-        title=hostile, csrf_cookie_name=hostile, init_js_version="abc"
-    )
+    html = render_swagger_page(title=hostile, init_js_version="abc")
 
     assert "<script>alert(1)" not in html
     assert "&quot;&gt;&lt;script&gt;" in html
@@ -207,7 +204,7 @@ def test_swagger_template_placeholders_match_supplied_values() -> None:
     in_template = set(
         re.findall(r"\$([a-z0-9_]+)", template.read_text(encoding="utf-8"))
     )
-    html = render_swagger_page(title="t", csrf_cookie_name="c", init_js_version="v")
+    html = render_swagger_page(title="t", init_js_version="v")
 
     assert in_template == {
         "swagger_css_url",
@@ -217,7 +214,6 @@ def test_swagger_template_placeholders_match_supplied_values() -> None:
         "favicon_url",
         "title",
         "init_js_url",
-        "csrf_cookie_name",
         "openapi_url",
         "oauth2_redirect_url",
     }
@@ -258,7 +254,7 @@ def test_swagger_etag_changes_when_the_template_changes(
     docs_router._swagger_body.cache_clear()
     original = docs_router._swagger_body("T")[1]
     changed = tmp_path / "swagger.html"
-    changed.write_text("<p>$title $csrf_cookie_name</p>", encoding="utf-8")
+    changed.write_text("<p>$title</p>", encoding="utf-8")
     monkeypatch.setattr(docs_router, "_TEMPLATE_PATH", changed)
     docs_router._swagger_body.cache_clear()
     try:
@@ -302,7 +298,6 @@ def test_openapi_has_summary_and_sectioned_description() -> None:
     headings = re.findall(r"^## (.+)$", description, flags=re.MULTILINE)
     assert headings == ["About", "Signing in", "Permissions", "Errors"]
     settings = get_identity_settings()
-    assert settings.csrf_cookie_name in description
     assert settings.cookie_name in description
     for word in ("node", "edge", "graph", "shelf"):
         assert not re.search(rf"\b{word}s?\b", description, flags=re.IGNORECASE)
@@ -316,11 +311,13 @@ def test_every_tag_description_is_one_short_plain_line() -> None:
         assert len(text) <= 80, tag["name"]
 
 
-def test_signing_in_section_explains_sessions_and_csrf() -> None:
-    """The long description carries the cookie and CSRF explanation."""
+def test_signing_in_section_explains_sessions_and_the_origin_rule() -> None:
+    """The long description carries the cookie and same-origin explanation."""
     description = create_app().openapi()["info"]["description"]
 
-    assert "X-CSRF-Token" in description
+    assert "X-CSRF-Token" not in description
+    assert "SameSite=Strict" in description
+    assert "Origin: <this server's origin>" in description
     assert "csrf_failed" in description
 
 
@@ -328,7 +325,7 @@ def test_api_description_placeholders_match_supplied_values() -> None:
     """The description file uses exactly the placeholders the code supplies."""
     in_file = set(re.findall(r"\$([a-z_]+)", _DESCRIPTION_PATH.read_text("utf-8")))
 
-    assert in_file == {"session_cookie_name", "csrf_cookie_name"}
+    assert in_file == {"session_cookie_name"}
     assert "$" not in api_description()
 
 

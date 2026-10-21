@@ -1,5 +1,5 @@
 import { expect, request, test, type Page } from '@playwright/test';
-import { sessionOptions, signInViaApi } from './fixtures';
+import { apiSessionOptions, signInViaApi } from './fixtures';
 import { createUserViaApi, type E2EUser } from './helpers';
 
 /**
@@ -52,7 +52,7 @@ async function startSignedOut(page: Page) {
 
 async function adminApi() {
 	const session = await signInViaApi(baseURL, ADMIN.username, ADMIN.password);
-	return request.newContext(sessionOptions(baseURL, session));
+	return request.newContext(apiSessionOptions(baseURL, session));
 }
 
 test.beforeAll(async ({ playwright }, testInfo) => {

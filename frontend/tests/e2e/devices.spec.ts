@@ -1,4 +1,4 @@
-import { expect, request, sessionOptions, signInViaApi, test } from './fixtures';
+import { expect, request, apiSessionOptions, sessionOptions, signInViaApi, test } from './fixtures';
 import { asUser, createUserViaApi } from './helpers';
 
 /**
@@ -11,7 +11,7 @@ test('a user sees their devices and signs out another device', async ({
 	workerBaseURL,
 	workerSession
 }) => {
-	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
 	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'devices-own' });
 	await adminApi.dispose();
 
@@ -57,7 +57,7 @@ test('a user can sign out all other devices at once', async ({
 	workerBaseURL,
 	workerSession
 }) => {
-	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
 	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'devices-others' });
 	await adminApi.dispose();
 

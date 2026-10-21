@@ -75,7 +75,6 @@ def api_description() -> str:
     settings = get_identity_settings()
     return Template(_DESCRIPTION_PATH.read_text(encoding="utf-8")).substitute(
         session_cookie_name=settings.cookie_name,
-        csrf_cookie_name=settings.csrf_cookie_name,
     )
 
 

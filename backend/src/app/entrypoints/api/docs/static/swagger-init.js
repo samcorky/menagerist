@@ -1,9 +1,8 @@
 /*
  * Swagger UI setup for the Menagerist interactive API docs.
  *
- * - Adds the X-CSRF-Token header to unsafe same-origin /api/v1 requests, read
- *   from the (readable) CSRF cookie on every request.
- * - Sends same-origin cookies, so a session started with POST /auth/login works.
+ * - Sends same-origin cookies, so a session started with POST /auth/login works, and adds
+ *   the server's own Origin to the generated curl snippets.
  * - Shows who is signed in (with sign-in actions) in Swagger's scheme bar, and the logo.
  *
  * The pure helpers are exposed on globalThis.MenageristSwaggerInit for tests.
@@ -11,61 +10,24 @@
 (function (root) {
 	'use strict';
 
-	var UNSAFE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 	var API_PREFIX = '/api/v1';
 	var SESSION_PATHS = ['/auth/login', '/auth/logout', '/auth/setup', '/auth/password'];
-	var CSRF_HEADER = 'X-CSRF-Token';
 
-	/** Reads one cookie from a `document.cookie`-style string; null when absent. */
-	function readCookie(cookieString, name) {
-		var parts = String(cookieString || '').split(';');
-		for (var i = 0; i < parts.length; i++) {
-			var part = parts[i].trim();
-			var eq = part.indexOf('=');
-			if (eq > 0 && part.slice(0, eq) === name) {
-				try {
-					return decodeURIComponent(part.slice(eq + 1));
-				} catch (e) {
-					return part.slice(eq + 1);
-				}
-			}
-		}
-		return null;
-	}
-
-	/** True for an unsafe request to this origin's /api/v1. */
-	function needsCsrf(method, url, origin) {
-		if (UNSAFE_METHODS.indexOf(String(method || 'GET').toUpperCase()) === -1) return false;
-		var parsed;
-		try {
-			parsed = new URL(url, origin);
-		} catch (e) {
-			return false;
-		}
-		return (
-			parsed.origin === origin &&
-			(parsed.pathname === API_PREFIX || parsed.pathname.indexOf(API_PREFIX + '/') === 0)
-		);
-	}
-
-	/** Sets the CSRF header when needed; never overwrites a value the user typed. */
-	function applyCsrf(req, cookieString, cookieName, origin) {
+	/**
+	 * Sends same-origin cookies and tidies what the curl snippet shows. The browser sets the
+	 * real Origin and Sec-Fetch-Site itself, which is what the server's same-origin check uses.
+	 */
+	function prepareRequest(req, origin) {
 		req.credentials = 'same-origin';
+		var headers = req.headers || (req.headers = {});
 		// Swagger adds a Cookie header for the placeholder lock authorisation. Browsers drop it
 		// (the real cookie goes with the request), but it would mislead in the curl snippet.
-		for (var name in req.headers || {}) {
-			if (name.toLowerCase() === 'cookie') delete req.headers[name];
+		for (var name in headers) {
+			if (name.toLowerCase() === 'cookie') delete headers[name];
 		}
-		if (!needsCsrf(req.method, req.url, origin)) return req;
-		var headers = req.headers || (req.headers = {});
-		// A non-empty typed value wins; an empty one counts as not typed and is replaced.
-		for (var key in headers) {
-			if (key.toLowerCase() !== CSRF_HEADER.toLowerCase()) continue;
-			if (headers[key]) return req;
-			delete headers[key];
-		}
-		var token = readCookie(cookieString, cookieName);
-		if (token) headers[CSRF_HEADER] = token;
+		// Origin is a forbidden header name: fetch drops this and sends the identical real
+		// value, so only the generated curl snippet shows it.
+		headers.Origin = origin;
 		return req;
 	}
 
@@ -213,7 +175,6 @@
 
 	function init() {
 		var script = document.currentScript;
-		var cookieName = script.getAttribute('data-csrf-cookie');
 		var openapiUrl = script.getAttribute('data-openapi-url');
 		var oauth2Redirect = script.getAttribute('data-oauth2-redirect');
 		var origin = root.location.origin;
@@ -245,13 +206,7 @@
 		}
 
 		function signOut() {
-			var req = applyCsrf(
-				{ method: 'POST', url: API_PREFIX + '/auth/logout', headers: {} },
-				document.cookie,
-				cookieName,
-				origin
-			);
-			fetch(req.url, { method: req.method, headers: req.headers, credentials: 'same-origin' })
+			fetch(API_PREFIX + '/auth/logout', { method: 'POST', credentials: 'same-origin' })
 				.then(function (res) {
 					return res.ok ? '' : 'Could not sign out (HTTP ' + res.status + ').';
 				})
@@ -359,7 +314,7 @@
 			oauth2RedirectUrl: root.location.origin + oauth2Redirect,
 			presets: [root.SwaggerUIBundle.presets.apis, root.SwaggerUIBundle.SwaggerUIStandalonePreset],
 			requestInterceptor: function (req) {
-				return applyCsrf(req, document.cookie, cookieName, origin);
+				return prepareRequest(req, origin);
 			},
 			responseInterceptor: function (res) {
 				if (isSessionChange(res.url, origin)) setTimeout(refreshBanner, 0);
@@ -371,9 +326,7 @@
 	}
 
 	root.MenageristSwaggerInit = {
-		readCookie: readCookie,
-		needsCsrf: needsCsrf,
-		applyCsrf: applyCsrf,
+		prepareRequest: prepareRequest,
 		isSessionChange: isSessionChange,
 		bannerModel: bannerModel,
 		renderBanner: renderBanner,

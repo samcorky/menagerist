@@ -10,7 +10,6 @@ def test_defaults() -> None:
     assert settings.session_ttl_hours == 168
     assert settings.session_idle_hours == 0
     assert settings.cookie_name == "menagerist-session"
-    assert settings.csrf_cookie_name == "menagerist-csrf"
     assert settings.cookie_secure is None
     assert settings.password_hasher == "scrypt"
 
@@ -99,7 +98,6 @@ def test_password_hasher_must_be_registered(monkeypatch: pytest.MonkeyPatch) -> 
     [
         ("MENAGERIST_COOKIE_NAME", ""),
         ("MENAGERIST_COOKIE_NAME", "invalid name"),
-        ("MENAGERIST_CSRF_COOKIE_NAME", "invalid;name"),
     ],
 )
 def test_cookie_names_must_be_valid_cookie_tokens(
@@ -111,7 +109,9 @@ def test_cookie_names_must_be_valid_cookie_tokens(
         IdentitySettings()
 
 
-def test_session_and_csrf_cookie_names_must_differ() -> None:
-    """The browser must be able to distinguish the session and CSRF cookies."""
-    with pytest.raises(ValidationError):
-        IdentitySettings(cookie_name="same", csrf_cookie_name="same")
+def test_a_leftover_csrf_cookie_name_variable_is_ignored(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Deployments still setting the removed variable start normally."""
+    monkeypatch.setenv("MENAGERIST_CSRF_COOKIE_NAME", "menagerist-csrf")
+    assert IdentitySettings().cookie_name == "menagerist-session"

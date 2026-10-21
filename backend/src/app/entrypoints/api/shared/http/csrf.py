@@ -1,40 +1,53 @@
-import hmac
-
 from starlette.requests import Request  # noqa: TC002
 
+from app.entrypoints.api.shared.http.origin import (
+    claimed_origin,
+    log_refusal,
+    note_origin_mismatch,
+    own_origin,
+)
 from app.platform.config import get_identity_settings
 from app.shared_kernel.errors import ForbiddenError
 
-CSRF_HEADER = "X-CSRF-Token"
-_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
 class CsrfError(ForbiddenError):
-    """Raised when a state-changing request lacks a matching CSRF token."""
+    """Raised when a cookie-authenticated unsafe request is not from this site."""
 
     problem_type = "csrf_failed"
 
 
 async def verify_csrf(request: Request) -> None:
-    """Require the CSRF header to equal the CSRF cookie on unsafe methods.
+    """Refuse an unsafe, cookie-authenticated request not sent by this app's own pages.
 
-    Requests without a session cookie pass: there is nothing to forge, and
-    authentication rejects them with 401.
+    The browser's `Sec-Fetch-Site` header decides first (page script cannot set
+    it): `same-origin` passes and `cross-site` is refused. Otherwise `Origin`
+    must equal the app's own origin; a missing, `null` or malformed value is
+    refused. Safe methods and requests without a session cookie pass: there is
+    nothing to forge, and authentication answers 401.
 
     Raises:
-        CsrfError: If either is missing or they differ.
+        CsrfError: If the request is cross-site, `Origin` is not the app's own
+            origin, or neither header is present.
     """
     if request.method in _SAFE_METHODS:
         return
-    settings = get_identity_settings()
-    if settings.cookie_name not in request.cookies:
-        # No session to protect: authentication answers 401 (or setup required).
+    if not request.cookies.get(get_identity_settings().cookie_name):
         return
-    cookie = request.cookies.get(settings.csrf_cookie_name)
-    header = request.headers.get(CSRF_HEADER)
-    if (
-        not cookie
-        or not header
-        or not hmac.compare_digest(cookie.encode(), header.encode())
-    ):
-        raise CsrfError("The request could not be verified. Reload the page.")
+    site = request.headers.get("Sec-Fetch-Site")
+    origin = request.headers.get("Origin")
+    own = own_origin(request)
+    if site == "same-origin":
+        note_origin_mismatch(origin, own)
+        return
+    if site == "cross-site":
+        reason = "browser reports cross-site"
+    elif origin is None:
+        reason = "no Sec-Fetch-Site or Origin"
+    elif claimed_origin(origin) != own:
+        reason = "origin differs"
+    else:
+        return
+    log_refusal(reason, site, origin, own)
+    raise CsrfError("This request was not sent from this site's own pages.")

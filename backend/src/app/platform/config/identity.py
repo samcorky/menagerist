@@ -1,7 +1,7 @@
 from functools import lru_cache
-from typing import Literal, Self
+from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field
 
 from app.platform.config._base import MenageristBaseSettings
 
@@ -24,12 +24,6 @@ class IdentitySettings(MenageristBaseSettings):
         min_length=1,
         pattern=r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$",
         description="Name of the HTTP-only session cookie.",
-    )
-    csrf_cookie_name: str = Field(
-        default="menagerist-csrf",
-        min_length=1,
-        pattern=r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$",
-        description="Name of the cookie containing the CSRF token.",
     )
     cookie_secure: bool | None = Field(
         default=None,
@@ -61,13 +55,6 @@ class IdentitySettings(MenageristBaseSettings):
             "Maximum number of simultaneous password-hash operations in this process."
         ),
     )
-
-    @model_validator(mode="after")
-    def validate_cookie_names_are_distinct(self) -> Self:
-        """Require separate names so the session and CSRF cookies do not collide."""
-        if self.cookie_name == self.csrf_cookie_name:
-            raise ValueError("Session and CSRF cookie names must be different.")
-        return self
 
 
 @lru_cache(maxsize=1)

@@ -75,9 +75,9 @@ services:
       # Behind a reverse proxy, set its subnet to preserve client IPs and allow HTTPS sign-in.
       # MENAGERIST_TRUSTED_PROXIES: 172.18.0.0/16
     volumes:
-      # Bind mounts must be owned by uid/gid 1000.
+      # The backups bind mount must be owned by uid/gid 1000.
       - media-data:/data/media
-      - /backups:/data/backups
+      - ./backups:/data/backups
     ports:
       - "8080:8000"
     depends_on:

@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 
 AUTH = "/api/v1/auth"
 SESSIONS = "/api/v1/session"
-CSRF_COOKIE = "menagerist-csrf"
+FOREIGN_ORIGIN = "https://evil.example"
 SESSION_COOKIE = "menagerist-session"
 SETUP_BODY = {
     "username": "Admin",
@@ -45,7 +45,7 @@ SETUP_BODY = {
 
 
 class Api:
-    """A client with no ambient CSRF credentials, plus helpers to send them."""
+    """A client sending its own origin, plus helpers to send a foreign one."""
 
     def __init__(
         self,
@@ -71,10 +71,9 @@ class Api:
         self.client = self.new_client(base_url)
 
     def new_client(self, base_url: str = "http://testserver") -> TestClient:
-        """Return a client holding no CSRF cookie or header."""
+        """Return a client with no cookies that sends its own `Origin`."""
         client = TestClient(self.app, base_url=base_url)
         client.cookies.clear()
-        client.headers.pop("X-CSRF-Token", None)
         return client
 
     @staticmethod
@@ -85,10 +84,8 @@ class Api:
         *,
         csrf: bool = True,
     ) -> Response:
-        """POST with the CSRF header copied from the client's CSRF cookie."""
-        headers = {}
-        if csrf and (token := client.cookies.get(CSRF_COOKIE)):
-            headers["X-CSRF-Token"] = token
+        """POST from the client's own origin; a foreign one if `csrf` is off."""
+        headers = {} if csrf else {"Origin": FOREIGN_ORIGIN}
         return client.post(url, json=json, headers=headers)
 
     @staticmethod
@@ -98,10 +95,8 @@ class Api:
         *,
         csrf: bool = True,
     ) -> Response:
-        """DELETE with the CSRF header copied from the client's CSRF cookie."""
-        headers = {}
-        if csrf and (token := client.cookies.get(CSRF_COOKIE)):
-            headers["X-CSRF-Token"] = token
+        """DELETE from the client's own origin; a foreign one if `csrf` is off."""
+        headers = {} if csrf else {"Origin": FOREIGN_ORIGIN}
         return client.delete(url, headers=headers)
 
     def setup(self, client: TestClient | None = None) -> Response:
@@ -259,7 +254,7 @@ async def test_revoke_own_session_foreign_and_unknown_ids_return_404(
 
 
 async def test_revoke_own_session_requires_csrf(api: Api, make_user: MakeUser) -> None:
-    """DELETE /auth/sessions/{id} requires a valid CSRF token."""
+    """DELETE /auth/sessions/{id} requires a same-origin request."""
     await api.add_user(make_user, "alice")
     c1, _ = api.sign_in("alice")
     _c2, _ = api.sign_in("alice")
@@ -295,7 +290,7 @@ async def test_revoke_other_sessions_success(api: Api, make_user: MakeUser) -> N
 async def test_revoke_other_sessions_requires_csrf(
     api: Api, make_user: MakeUser
 ) -> None:
-    """DELETE /auth/sessions requires a valid CSRF token."""
+    """DELETE /auth/sessions requires a same-origin request."""
     await api.add_user(make_user, "alice")
     c1, _ = api.sign_in("alice")
 
@@ -428,7 +423,7 @@ async def test_revoke_session_forbidden_for_members(
 async def test_revoke_session_requires_csrf(
     api: Api,
 ) -> None:
-    """DELETE /session/{id} requires a valid CSRF token."""
+    """DELETE /session/{id} requires a same-origin request."""
     api.setup()
     admin_client = api.client
 

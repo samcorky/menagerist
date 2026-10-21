@@ -1,4 +1,4 @@
-import { expect, request, sessionOptions, test, type Page } from './fixtures';
+import { expect, request, apiSessionOptions, test, type Page } from './fixtures';
 import { asUser, createUserViaApi } from './helpers';
 
 /** Records every /detail request and every 4xx answer the page causes (the sign-in probe aside). */
@@ -59,7 +59,7 @@ test('a member sees the public view and causes no forbidden answers', async ({
 	workerBaseURL,
 	workerSession
 }) => {
-	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
 	const member = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'statusmember' });
 	await adminApi.dispose();
 

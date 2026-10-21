@@ -24,7 +24,6 @@ def client(postgres_url: str, postgres_sync_url: str) -> Iterator[TestClient]:
     get_engine.cache_clear()
     try:
         with TestClient(create_app()) as c:
-            c.headers.pop("X-CSRF-Token")  # use the cookie the server issues
             yield c
     finally:
         get_session_factory.cache_clear()
@@ -52,8 +51,7 @@ def test_setup_then_login_then_me(client: TestClient) -> None:
     assert client.get(f"{AUTH}/me").json()["username"] == "admin"
     assert client.get(f"{AUTH}/status").json() == {"setup_required": False}
 
-    csrf = {"X-CSRF-Token": client.cookies.get("menagerist-csrf") or ""}
-    assert client.post(f"{AUTH}/logout", headers=csrf).status_code == 204
+    assert client.post(f"{AUTH}/logout").status_code == 204
     assert client.get(f"{AUTH}/me").status_code == 401
 
     wrong = client.post(

@@ -10,7 +10,7 @@ from testcontainers.community.postgres import PostgresContainer
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.platform import alembic_runner
-from app.platform.config import get_database_settings, get_identity_settings
+from app.platform.config import get_database_settings
 from app.shared_kernel.actor import Actor
 
 if TYPE_CHECKING:
@@ -84,7 +84,6 @@ async def db_session(postgres_url: str) -> AsyncIterator[AsyncSession]:
     await engine.dispose()
 
 
-TEST_CSRF_TOKEN = "test-csrf-token"
 DEFAULT_MEMBER_ID = uuid.UUID(int=1)
 
 
@@ -130,25 +129,16 @@ def _reuse_test_client_portals(monkeypatch: pytest.MonkeyPatch) -> Iterator[None
 
 
 @pytest.fixture(autouse=True)
-def _csrf_for_test_clients(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Give every TestClient a matching CSRF cookie and header.
+def _origin_for_test_clients(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Give every TestClient the app's own `Origin`, as a browser would.
 
-    The production rule is unchanged: the CSRF tests remove both to prove it.
+    The same-origin rule is unchanged: the CSRF tests remove or change it.
     """
     original_init = TestClient.__init__
-    settings = get_identity_settings()
 
     def init(self: TestClient, *args: Any, **kwargs: Any) -> None:  # noqa: ANN401
         original_init(self, *args, **kwargs)
-        host = self.base_url.host
-        self.cookies.set(
-            settings.csrf_cookie_name,
-            TEST_CSRF_TOKEN,
-            # The cookie jar files dotless hosts under "<host>.local".
-            domain=host if "." in host else f"{host}.local",
-            path="/",
-        )
-        self.headers["X-CSRF-Token"] = TEST_CSRF_TOKEN
+        self.headers["Origin"] = str(self.base_url).rstrip("/")
 
     monkeypatch.setattr(TestClient, "__init__", init)
 

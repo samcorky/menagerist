@@ -50,13 +50,12 @@ pytestmark = pytest.mark.real_actor
 AUTH = "/api/v1/auth"
 PROBE = "/api/v1/_probe"
 COOKIE = "menagerist-session"
-CSRF_COOKIE = "menagerist-csrf"
 SETUP_BODY = {"username": "Admin", "display_name": "Admin", "password": "password-123"}
 logger = structlog.get_logger()
 
 
 class Api:
-    """An in-memory app over the identity world, with CSRF-aware helpers."""
+    """An in-memory app over the identity world, with same-origin helpers."""
 
     def __init__(self, world: World) -> None:
         self.world = world
@@ -74,19 +73,17 @@ class Api:
         self.client = self.new_client()
 
     def new_client(self) -> TestClient:
-        """Return a client holding no CSRF cookie or header."""
+        """Return a client with no cookies that sends its own `Origin`."""
         client = TestClient(self.app)
         client.cookies.clear()
-        client.headers.pop("X-CSRF-Token")
         return client
 
     @staticmethod
     def post(
         client: TestClient, url: str, json: dict[str, str] | None = None
     ) -> Response:
-        """POST with the CSRF header copied from the client's CSRF cookie."""
-        token = client.cookies.get(CSRF_COOKIE) or ""
-        return client.post(url, json=json, headers={"X-CSRF-Token": token})
+        """POST from the client's own origin."""
+        return client.post(url, json=json)
 
     def setup(self) -> Response:
         """Run first-run setup, leaving `client` signed in as an admin."""
@@ -358,8 +355,7 @@ def test_no_secret_reaches_any_log_event(
     assert failed.status_code == 401
     client, _ = api.sign_in("admin")
     first_token = client.cookies[COOKIE]
-    csrf = client.cookies[CSRF_COOKIE]
-    cookie_header = f"{COOKIE}={first_token}; {CSRF_COOKIE}={csrf}"
+    cookie_header = f"{COOKIE}={first_token}"
     client.get(f"{AUTH}/me")
     client.get(PROBE)
     new_password = "a-brand-new-passphrase"
@@ -377,8 +373,6 @@ def test_no_secret_reaches_any_log_event(
         *tokens,
         *(hashlib.sha256(t.encode()).hexdigest() for t in tokens),
         cookie_header,
-        csrf,
-        api.client.cookies[CSRF_COOKIE],
         SETUP_BODY["password"],
         bad_password,
         new_password,
@@ -405,7 +399,6 @@ def test_a_request_writes_exactly_one_access_line_without_query_or_headers(
         headers={
             "Authorization": "Bearer secret-auth",
             "Cookie": "other=secret-cookie",
-            "X-CSRF-Token": "secret-csrf",
         },
     )
 
@@ -420,7 +413,7 @@ def test_a_request_writes_exactly_one_access_line_without_query_or_headers(
     assert line["log_level"] == "info"
     assert "user_id" not in line
     assert "session_id" not in line
-    for secret in ("secret-query", "secret-auth", "secret-cookie", "secret-csrf"):
+    for secret in ("secret-query", "secret-auth", "secret-cookie"):
         assert secret not in repr(events)
 
 

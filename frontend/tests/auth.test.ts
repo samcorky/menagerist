@@ -6,10 +6,8 @@ import {
 	displayNameProblem,
 	isPasswordUnchanged,
 	guardDecision,
-	isUnsafeMethod,
 	problemTitle,
 	problemType,
-	readCookie,
 	safeNext,
 	throttleMessage,
 	type GuardInput
@@ -164,19 +162,6 @@ describe('guardDecision', () => {
 	it('lets a signed-in user see ordinary pages', () => {
 		expect(guardDecision(base)).toEqual(allow);
 		expect(guardDecision({ ...base, pathname: '/admin/users' })).toEqual(allow);
-	});
-});
-
-describe('cookies and methods', () => {
-	it('reads a named cookie', () => {
-		expect(readCookie('a=1; menagerist-csrf=tok%2Fen; b=2', 'menagerist-csrf')).toBe('tok/en');
-		expect(readCookie('a=1', 'menagerist-csrf')).toBeNull();
-		expect(readCookie('', 'x')).toBeNull();
-	});
-
-	it('flags only unsafe methods', () => {
-		for (const m of ['POST', 'put', 'PATCH', 'DELETE']) expect(isUnsafeMethod(m)).toBe(true);
-		for (const m of ['GET', 'HEAD', 'OPTIONS']) expect(isUnsafeMethod(m)).toBe(false);
 	});
 });
 

@@ -1,4 +1,4 @@
-import { expect, request, sessionOptions, signInViaApi, test, type Page } from './fixtures';
+import { expect, request, apiSessionOptions, signInViaApi, test, type Page } from './fixtures';
 import { asUser, createUserViaApi, type E2EUser } from './helpers';
 
 /**
@@ -25,7 +25,7 @@ test('an administrator sees when a user last signed in', async ({
 	workerBaseURL,
 	workerSession
 }) => {
-	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
 	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'seen' });
 	await adminApi.dispose();
 
@@ -39,7 +39,7 @@ test('a display-name change shows in the user menu at once', async ({
 	workerBaseURL,
 	workerSession
 }) => {
-	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
 	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'rename' });
 	await adminApi.dispose();
 
@@ -61,7 +61,7 @@ test('an administrator renames another user from the users page', async ({
 	workerBaseURL,
 	workerSession
 }) => {
-	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
 	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'renamed-by-admin' });
 	await adminApi.dispose();
 
@@ -85,7 +85,7 @@ test('an administrator renames another user from the users page', async ({
 });
 
 test('Escape cancels a rename without saving', async ({ page, workerBaseURL, workerSession }) => {
-	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
 	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'rename-escape' });
 	await adminApi.dispose();
 
@@ -106,7 +106,7 @@ test('a blank name shows a message and keeps the editor open', async ({
 	workerBaseURL,
 	workerSession
 }) => {
-	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
 	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'rename-blank' });
 	await adminApi.dispose();
 
@@ -125,7 +125,7 @@ test('a disabled account sees why, and a wrong password stays generic', async ({
 	workerBaseURL,
 	workerSession
 }) => {
-	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
 	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'disabled' });
 	const res = await adminApi.patch(`/api/v1/user/${user.id}`, { data: { disabled: true } });
 	expect(res.ok(), await res.text()).toBeTruthy();
@@ -155,7 +155,7 @@ test('an administrator unlocks a locked-out account', async ({
 	workerBaseURL,
 	workerSession
 }) => {
-	const adminApi = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
 	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'locked' });
 	await adminApi.dispose();
 

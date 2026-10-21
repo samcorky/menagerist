@@ -2,7 +2,7 @@ import { client } from './generated/client.gen';
 
 // Register the ETag interceptor.
 import './etag-interceptor';
-// CSRF header on unsafe requests, and 401 / password-expired handling.
+// 401 / password-expired handling.
 import './auth-interceptor';
 
 // Use relative URL in browser, fallback to localhost for Node tests.

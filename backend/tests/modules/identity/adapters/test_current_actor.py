@@ -186,9 +186,7 @@ async def test_password_expired_blocks_content_routes(
         json={"current_password": "password-123", "new_password": "another-pass-456"},
     )
     assert change.status_code == 200
-    # Changing the password rotated the CSRF cookie; send the new one.
-    csrf = {"X-CSRF-Token": client.cookies.get("menagerist-csrf") or ""}
-    assert client.post("/api/v1/auth/logout", headers=csrf).status_code < 300
+    assert client.post("/api/v1/auth/logout").status_code < 300
 
 
 async def test_password_expired_admin_cannot_use_user_administration(
@@ -265,13 +263,13 @@ async def test_a_real_content_route_answers_with_a_session(
 
 
 UNSAFE = f"{REAL_ROUTE}/{uuid.UUID(int=7)}"
-CSRF_COOKIE = "menagerist-csrf"
+FOREIGN_ORIGIN = "https://evil.example"
 
 
 def test_unsafe_call_without_a_session_cookie_is_401_not_csrf(world: World) -> None:
     """Before setup, an unsafe call answers setup_required rather than csrf_failed."""
     client = _client(world)
-    response = client.delete(UNSAFE, headers={"X-CSRF-Token": "x"})
+    response = client.delete(UNSAFE, headers={"Origin": FOREIGN_ORIGIN})
     assert response.status_code == 401
     assert response.json()["type"] == "setup_required"
 
@@ -291,18 +289,17 @@ async def test_unsafe_call_after_cookies_expire_is_401_not_csrf(
 async def test_csrf_is_enforced_while_a_session_cookie_is_present(
     world: World, make_user: MakeUser
 ) -> None:
-    """A session cookie needs the matching header and cookie; a valid pair passes."""
+    """A session cookie needs the app's own origin; a foreign one is refused."""
     user = make_user("alice")
     await world.users.add(user)
     client = _client(world)
     client.cookies.set(COOKIE, await _session_for(world, user.id))
 
-    wrong = client.delete(UNSAFE, headers={"X-CSRF-Token": "not-the-cookie"})
+    wrong = client.delete(UNSAFE, headers={"Origin": FOREIGN_ORIGIN})
     assert wrong.status_code == 403
     assert wrong.json()["type"] == "csrf_failed"
 
-    token = client.cookies.get(CSRF_COOKIE)
-    good = client.delete(UNSAFE, headers={"X-CSRF-Token": token or ""})
+    good = client.delete(UNSAFE)
     assert good.json().get("type") not in {"csrf_failed", "unauthenticated"}
 
 

@@ -58,7 +58,8 @@ api_router = APIRouter(prefix="/api")
 api_router.include_router(system_router)
 api_router.include_router(docs_router)
 
-# Every unsafe method here needs a matching CSRF header and cookie; sign-in and
+# Every unsafe cookie-authenticated request here must come from this site's own
+# pages (Sec-Fetch-Site / Origin); sign-in and
 # first-run setup live on the public router below because no cookie exists yet.
 api_v1_router = APIRouter(
     prefix="/v1",

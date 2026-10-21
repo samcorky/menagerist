@@ -88,11 +88,11 @@ from app.shared_kernel.actor import ANONYMOUS_ACTOR, Actor
 
 logger = structlog.get_logger(__name__)
 
-# Open to callers with no session or CSRF token (sign-in and first-run setup).
+# Open to callers with no session (sign-in and first-run setup).
 public_router = APIRouter(
     prefix="/auth", tags=["Authentication"], route_class=PermissionAwareRoute
 )
-# Needs the CSRF check like the rest of the API.
+# Needs the same-origin check like the rest of the API.
 router = APIRouter(
     prefix="/auth", tags=["Authentication"], route_class=PermissionAwareRoute
 )
@@ -193,7 +193,7 @@ async def sign_in(
     client_ip: Annotated[str | None, Depends(get_client_ip)],
     device: Annotated[ClientDevice, Depends(get_client_device)],
 ) -> UserResponse:
-    """Sign in, setting the session and CSRF cookies.
+    """Sign in, setting the session cookie.
 
     Refused with 403 `cross_site_refused` when a page on another site sent it.
 
@@ -240,8 +240,8 @@ async def sign_out(
 ) -> None:
     """Sign out, ending the session and clearing the cookies.
 
-    Without a session cookie nothing is changed: CSRF is not checked then, so
-    clearing cookies would let a cross-site POST log someone out.
+    Without a session cookie nothing is changed: the same-origin check does not
+    apply then, so clearing cookies would let a cross-site POST log someone out.
     """
     if token is None:
         return

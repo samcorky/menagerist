@@ -1,4 +1,4 @@
-import { expect, request, sessionOptions, test, type APIRequestContext } from './fixtures';
+import { expect, request, apiSessionOptions, test, type APIRequestContext } from './fixtures';
 import {
 	asUser,
 	createUserViaApi,
@@ -47,7 +47,7 @@ async function makeContent(api: APIRequestContext, label: string): Promise<Made>
 }
 
 test.beforeAll(async ({ workerBaseURL, workerSession }) => {
-	admin = await request.newContext(sessionOptions(workerBaseURL, workerSession));
+	admin = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
 	userA = await createUserViaApi(admin, workerBaseURL, { prefix: 'iso-a' });
 	userB = await createUserViaApi(admin, workerBaseURL, { prefix: 'iso-b' });
 });

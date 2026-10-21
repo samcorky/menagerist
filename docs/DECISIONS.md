@@ -987,3 +987,18 @@ Archives and private staging files live on the persistent backup volume rather t
 Instance restore is exposed through the CLI and a public first-run route guarded by the same setup lock as first-administrator creation. There is no authenticated live restore route. CLI user transfers require an explicit account UUID, use that account as the scoped actor and keep archives in a private owner namespace.
 
 Automatic pre-migration backup remains opt-in (`MENAGERIST_BACKUP_BEFORE_MIGRATE=false` by default), preserving the existing deployment setting. When enabled, both migration entrypoints take a verified archive only for an existing schema with pending upgrades; a backup failure stops DDL. `--no-backup` is the explicit opt-out. Pre-migration retention is separate from ordinary backup retention, and restoring an old archive requires a database at its recorded revision.
+
+---
+
+## CSRF protection from browser request headers (2026-10-20)
+
+Supersedes the double-submit parts of the identity section (the readable `menagerist-csrf` cookie and `X-CSRF-Token` header) and of the interactive-docs entry (Swagger adding that header).
+
+A cookie-name mismatch between frontend and backend made every signed-in unsafe request fail with 403 `csrf_failed`. Rather than align the names, the token is gone: `verify_csrf` now checks headers that browsers set themselves, and the session cookie is `SameSite=Strict`.
+
+- **Rule.** A POST, PUT, PATCH or DELETE that carries the session cookie must come from the app's own pages. `Sec-Fetch-Site: same-origin` allows it and `cross-site` refuses it. Otherwise (`same-site`, `none`, or no header, as on plain-HTTP installs) `Origin` must equal the app's own origin as seen after the trusted-proxy wrapper; a missing, `null` or malformed `Origin` is refused. The check fails closed. Safe methods and requests with no session cookie are not checked. A refusal is 403 `csrf_failed`.
+- **Why not a token.** Go's `http.CrossOriginProtection` and Datasette take the same approach and OWASP names Fetch Metadata as the primary signal. Double-submit can be passed by anyone who can plant cookies (a sibling subdomain, plain HTTP). It also removes the cookie name that had to be agreed between stacks. A session-bound token can be added later as an extra layer if OIDC with `SameSite=Lax` or a cross-origin cookie SPA ever needs it.
+- **CORS plays no part.** CORS never carries credentials here, so a listed `MENAGERIST_CORS_ORIGINS` entry gets no extra trust for cookie requests (it still counts on the public sign-in and setup routes, which keep `refuse_cross_site`).
+- **Removed.** The CSRF cookie, `X-CSRF-Token`, `MENAGERIST_CSRF_COOKIE_NAME` (a leftover value is ignored) and their frontend and Swagger plumbing. The Swagger page still sends same-origin credentials and strips the placeholder `Cookie` header, and now adds `Origin` to generated curl snippets (a forbidden header name for `fetch`, so only the snippet shows it).
+- **Cost.** Scripts that use the session cookie must send `Origin: <the server's origin>`; API tokens (future) will avoid the cookie, and the check is then skipped for requests a bearer token authenticates.
+- **Follow-ups.** A `__Host-Http-` session cookie with a strict reader and WebKit/Firefox e2e tests; tighter CORS lists and an open-CORS warning.
