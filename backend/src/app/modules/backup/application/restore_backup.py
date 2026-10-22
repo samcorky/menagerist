@@ -1,6 +1,6 @@
 from contextlib import aclosing
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 from uuid import UUID
 
 import structlog
@@ -15,7 +15,8 @@ from app.modules.backup.domain.errors import (
     MediaFileMissingError,
     RestoreTargetNotEmptyError,
 )
-from app.shared_kernel.cqrs import AuthorisedUseCase
+from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.guarded import GuardedUseCase
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -26,8 +27,8 @@ if TYPE_CHECKING:
     from app.modules.backup.ports.backup_workspace import BackupWorkspace
     from app.modules.backup.ports.database_restorer import DatabaseRestorer
     from app.modules.backup.ports.media_files import MediaFiles
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
-    from app.shared_kernel.authorisation import AuthorisationPort
 
 type MediaUndo = list[tuple[MediaFileRef, UUID | None]]
 
@@ -152,10 +153,10 @@ async def restore_verified_backup(
         await cleanup_media(workspace, undo)
 
 
-class RestoreBackup(AuthorisedUseCase[RestoreBackupCommand, None, BackupPermission]):
+class RestoreBackup(GuardedUseCase[RestoreBackupCommand, None]):
     """Administrative instance restoration."""
 
-    required_permission = BackupPermission.RESTORE
+    access: ClassVar[Access] = Requires(BackupPermission.RESTORE)
 
     def __init__(
         self,
@@ -163,9 +164,9 @@ class RestoreBackup(AuthorisedUseCase[RestoreBackupCommand, None, BackupPermissi
         restorer: DatabaseRestorer,
         media: MediaFiles,
         workspace: BackupWorkspace,
-        authorisation: AuthorisationPort,
+        guard: AccessGuard,
     ) -> None:
-        super().__init__(authorisation)
+        self._guard = guard
         self._store, self._restorer, self._media, self._workspace = (
             store,
             restorer,

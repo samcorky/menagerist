@@ -2,11 +2,12 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
 
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.backup_dependencies import get_user_media_files
 from app.entrypoints.api.shared.bridges.backup_user_validator import (
     BackupUserImportValidator,
 )
-from app.entrypoints.api.shared.dependencies import get_access_policy, get_current_actor
+from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.backup.adapters.api.dependencies import get_backup_workspace
 from app.modules.backup.adapters.persistence.user_database_restorer import (
     SqlAlchemyUserDatabaseRestorer,
@@ -33,7 +34,7 @@ if TYPE_CHECKING:
     from app.modules.backup.ports.media_files import MediaFiles
     from app.modules.backup.ports.user_database_restorer import UserDatabaseRestorer
     from app.modules.backup.ports.user_database_snapshot import UserDatabaseSnapshot
-    from app.shared_kernel.access_policy import AccessPolicy
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 
@@ -64,14 +65,14 @@ def get_export_user_data(
     store: Annotated[BackupStore, Depends(get_user_backup_store)],
     snapshot: Annotated[UserDatabaseSnapshot, Depends(get_user_database_snapshot)],
     media: Annotated[MediaFiles, Depends(get_user_media_files)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ExportUserData:
     """Compose verified personal exports with private retention."""
     return ExportUserData(
         store,
         snapshot,
         media,
-        policy,
+        guard,
         app_version=load_app_info().version,
         ttl_hours=get_backup_settings().user_export_ttl_hours,
     )
@@ -82,33 +83,33 @@ def get_import_user_data(
     restorer: Annotated[UserDatabaseRestorer, Depends(get_user_database_restorer)],
     media: Annotated[MediaFiles, Depends(get_user_media_files)],
     workspace: Annotated[BackupWorkspace, Depends(get_backup_workspace)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ImportUserData:
     """Compose owner-stamped imports and reversible media writes."""
-    return ImportUserData(store, restorer, media, workspace, policy)
+    return ImportUserData(store, restorer, media, workspace, guard)
 
 
 def get_import_user_archive(
     store: Annotated[BackupStore, Depends(get_user_backup_store)],
     importer: Annotated[ImportUserData, Depends(get_import_user_data)],
     workspace: Annotated[BackupWorkspace, Depends(get_backup_workspace)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ImportUserArchive:
     """Compose bounded uploads and private import staging."""
     return ImportUserArchive(
         store,
         importer,
         workspace,
-        policy,
+        guard,
         max_upload_size=get_backup_settings().max_upload_size,
     )
 
 
 def get_open_user_export(
     store: Annotated[BackupStore, Depends(get_user_backup_store)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> OpenUserExport:
     """Compose downloads restricted to the caller's export namespace."""
     return OpenUserExport(
-        store, policy, ttl_hours=get_backup_settings().user_export_ttl_hours
+        store, guard, ttl_hours=get_backup_settings().user_export_ttl_hours
     )

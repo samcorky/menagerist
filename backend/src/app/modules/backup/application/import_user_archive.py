@@ -1,17 +1,18 @@
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from app.modules.backup.application.import_user_data import ImportUserDataCommand
 from app.modules.backup.application.upload_backup import upload_verified_backup
 from app.modules.backup.domain.backup import BackupScope
 from app.modules.backup.ports.backup_store import BackupStore
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.modules.backup.application.import_user_data import ImportUserData
     from app.modules.backup.ports.backup_workspace import BackupWorkspace
-    from app.shared_kernel.access_policy import AccessPolicy
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 
@@ -23,26 +24,28 @@ class ImportUserArchiveCommand:
 
 
 class ImportUserArchive(
-    ScopedCommandHandler[BackupStore, ImportUserArchiveCommand, None]
+    GuardedCommandHandler[BackupStore, ImportUserArchiveCommand, None]
 ):
     """Stage an upload privately and remove it after the import attempt."""
+
+    access: ClassVar[Access] = Content()
 
     def __init__(
         self,
         store: BackupStore,
         importer: ImportUserData,
         workspace: BackupWorkspace,
-        policy: AccessPolicy,
+        guard: AccessGuard,
         *,
         max_upload_size: int = 8 * 1024**3,
     ) -> None:
-        super().__init__(store, policy)
+        super().__init__(store, guard)
         self._store, self._importer, self._workspace = store, importer, workspace
         self._max_size = max_upload_size
 
-    async def handle(self, request: ImportUserArchiveCommand, actor: Actor) -> None:
+    async def _handle(self, request: ImportUserArchiveCommand, actor: Actor) -> None:
         """Verify a private upload, import it and remove the staged archive."""
-        self._policy.assert_can_view(actor, actor.id)
+        self._guard.assert_can_view(actor, actor.id)
         uploaded = await upload_verified_backup(
             self._store,
             self._workspace,

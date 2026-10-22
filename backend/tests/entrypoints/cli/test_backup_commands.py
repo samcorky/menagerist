@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.backup.adapters.cli import backup_app as commands
 from app.modules.backup.adapters.media.in_memory_media_files import InMemoryMediaFiles
 from app.modules.backup.adapters.persistence.in_memory_database_snapshot import (
@@ -32,13 +32,13 @@ def archive(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> BackupSummary:
     """Store a real archive so command tests exercise integrity and streaming."""
     settings = BackupSettings(backup_path=tmp_path / "backups")
     monkeypatch.setattr(commands, "get_backup_settings", lambda: settings)
-    monkeypatch.setattr(commands, "_authorisation", RoleAuthorisationAdapter())
+    monkeypatch.setattr(commands, "_guard", get_access_guard())
     return asyncio.run(
         CreateBackup(
             LocalDirectoryBackupStore(settings.backup_path),
             InMemoryDatabaseSnapshot("old", {"data/users.ndjson": b"{}\n"}),
             InMemoryMediaFiles(),
-            RoleAuthorisationAdapter(),
+            get_access_guard(),
             app_version="test",
         ).handle(CreateBackupCommand(), SYSTEM_ACTOR)
     )
@@ -98,7 +98,7 @@ def test_unwired_authorisation_fails_closed(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """An unwired command refuses to create a backup before any DB access."""
-    monkeypatch.setattr(commands, "_authorisation", commands._DenyAll())
+    monkeypatch.setattr(commands, "_guard", commands._DenyAll())
     with pytest.raises(SystemExit, match="1"):
         commands.create()
     assert "not wired" in capsys.readouterr().err
@@ -124,7 +124,7 @@ def test_user_transfers_require_explicit_owner(
     assert json.loads(capsys.readouterr().out)["id"] == str(archive.id)
     commands.import_user(output, user=owner_id)
     import_operation.assert_awaited_once_with(owner_id, output)
-    monkeypatch.setattr(commands, "_authorisation", commands._DenyAll())
+    monkeypatch.setattr(commands, "_guard", commands._DenyAll())
     with pytest.raises(SystemExit, match="1"):
         commands.export_user(output, user=owner_id)
     with pytest.raises(SystemExit, match="1"):

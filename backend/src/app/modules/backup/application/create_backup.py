@@ -1,7 +1,7 @@
 from contextlib import aclosing
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 from uuid import UUID, uuid7
 
 import structlog
@@ -15,15 +15,16 @@ from app.modules.backup.domain.backup import (
     TableDigest,
 )
 from app.modules.backup.domain.errors import CorruptBackupError, MediaFileMissingError
-from app.shared_kernel.cqrs import AuthorisedUseCase
+from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.guarded import GuardedUseCase
 
 if TYPE_CHECKING:
     from app.modules.backup.ports.backup_store import BackupStore
     from app.modules.backup.ports.backup_writer import BackupWriter
     from app.modules.backup.ports.database_snapshot import DatabaseSnapshot
     from app.modules.backup.ports.media_files import MediaFiles
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
-    from app.shared_kernel.authorisation import AuthorisationPort
 
 logger = structlog.get_logger()
 
@@ -38,23 +39,21 @@ class CreateBackupCommand:
     to_revision: str | None = None
 
 
-class CreateBackup(
-    AuthorisedUseCase[CreateBackupCommand, BackupSummary, BackupPermission]
-):
+class CreateBackup(GuardedUseCase[CreateBackupCommand, BackupSummary]):
     """Archive a consistent database snapshot and original media files."""
 
-    required_permission = BackupPermission.CREATE
+    access: ClassVar[Access] = Requires(BackupPermission.CREATE)
 
     def __init__(
         self,
         store: BackupStore,
         snapshot: DatabaseSnapshot,
         media: MediaFiles,
-        authorisation: AuthorisationPort,
+        guard: AccessGuard,
         *,
         app_version: str,
     ) -> None:
-        super().__init__(authorisation)
+        self._guard = guard
         self._store = store
         self._snapshot = snapshot
         self._media = media

@@ -1,7 +1,7 @@
 import hashlib
 from contextlib import aclosing
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 from uuid import UUID
 
 from app.modules.backup.application.archive import analyse_members
@@ -13,14 +13,15 @@ from app.modules.backup.domain.verification import (
     FindingKind,
     VerificationReport,
 )
-from app.shared_kernel.cqrs import AuthorisedUseCase
+from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.guarded import GuardedUseCase
 
 if TYPE_CHECKING:
     from app.modules.backup.ports.archive_member import ArchiveMember
     from app.modules.backup.ports.backup_reader import BackupReader
     from app.modules.backup.ports.backup_store import BackupStore
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
-    from app.shared_kernel.authorisation import AuthorisationPort
 
 _METADATA_LIMIT = 16 * 1024 * 1024
 
@@ -112,15 +113,13 @@ async def verify_archive(store: BackupStore, backup_id: UUID) -> VerificationRep
     return VerificationReport(findings=findings)
 
 
-class VerifyBackup(
-    AuthorisedUseCase[VerifyBackupQuery, VerificationReport, BackupPermission]
-):
+class VerifyBackup(GuardedUseCase[VerifyBackupQuery, VerificationReport]):
     """Verify integrity without turning findings into exceptions."""
 
-    required_permission = BackupPermission.READ
+    access: ClassVar[Access] = Requires(BackupPermission.READ)
 
-    def __init__(self, store: BackupStore, authorisation: AuthorisationPort) -> None:
-        super().__init__(authorisation)
+    def __init__(self, store: BackupStore, guard: AccessGuard) -> None:
+        self._guard = guard
         self._store = store
 
     async def _handle(

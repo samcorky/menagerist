@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.backup.adapters.media.in_memory_media_files import InMemoryMediaFiles
 from app.modules.backup.adapters.persistence.in_memory_database_restorer import (
     InMemoryDatabaseRestorer,
@@ -45,7 +45,7 @@ async def _archive() -> bytes:
             "revision", {"data/users.ndjson": b'{"id":"admin"}\n'}
         ),
         InMemoryMediaFiles(),
-        RoleAuthorisationAdapter(),
+        get_access_guard(),
         app_version="test",
     ).handle(CreateBackupCommand(), SYSTEM_ACTOR)
     return b"".join([chunk async for chunk in store.read_bytes(summary.id)])
@@ -65,6 +65,7 @@ async def test_first_run_restores_accounts_and_removes_temporary_upload() -> Non
         target,
         InMemoryMediaFiles(),
         InMemoryBackupWorkspace(),
+        get_access_guard(),
     )
     await use_case.handle(
         RestoreOnFirstRunCommand(stream=_chunks(await _archive())), ANONYMOUS_ACTOR
@@ -91,6 +92,7 @@ async def test_closed_setup_does_not_read_upload() -> None:
         InMemoryDatabaseRestorer("revision"),
         InMemoryMediaFiles(),
         InMemoryBackupWorkspace(),
+        get_access_guard(),
     )
     with pytest.raises(RestoreTargetNotEmptyError):
         await use_case.handle(
@@ -108,6 +110,7 @@ async def test_corrupt_upload_keeps_setup_empty() -> None:
         target,
         InMemoryMediaFiles(),
         InMemoryBackupWorkspace(),
+        get_access_guard(),
     )
     with pytest.raises(CorruptBackupError):
         await use_case.handle(

@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.entrypoints.api.shared.authorisation import get_authorisation_port
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.backup_dependencies import (
     get_media_files,
     get_setup_gate,
@@ -37,7 +37,7 @@ from app.modules.backup.ports.setup_gate import SetupGate
 from app.platform.app_info import load_app_info
 from app.platform.config.backup import get_backup_settings
 from app.platform.database import get_session_factory
-from app.shared_kernel.authorisation import AuthorisationPort
+from app.shared_kernel.access_guard import AccessGuard
 
 
 def get_backup_store() -> BackupStore:
@@ -68,55 +68,55 @@ def get_create_backup(
     store: Annotated[BackupStore, Depends(get_backup_store)],
     snapshot: Annotated[DatabaseSnapshot, Depends(get_database_snapshot)],
     media: Annotated[MediaFiles, Depends(get_media_files)],
-    auth: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> CreateBackup:
     """Compose verified instance creation with original media and app metadata."""
     return CreateBackup(
-        store, snapshot, media, auth, app_version=load_app_info().version
+        store, snapshot, media, guard, app_version=load_app_info().version
     )
 
 
 def get_list_backups(
     store: Annotated[BackupStore, Depends(get_backup_store)],
-    auth: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ListBackups:
     """Compose the administrative committed-archive listing."""
-    return ListBackups(store, auth)
+    return ListBackups(store, guard)
 
 
 def get_verify_backup(
     store: Annotated[BackupStore, Depends(get_backup_store)],
-    auth: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> VerifyBackup:
     """Compose archive integrity verification."""
-    return VerifyBackup(store, auth)
+    return VerifyBackup(store, guard)
 
 
 def get_open_backup(
     store: Annotated[BackupStore, Depends(get_backup_store)],
-    auth: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> OpenBackup:
     """Compose authorised streaming downloads of instance archives."""
-    return OpenBackup(store, auth)
+    return OpenBackup(store, guard)
 
 
 def get_delete_backup(
     store: Annotated[BackupStore, Depends(get_backup_store)],
-    auth: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> DeleteBackup:
     """Compose administrative archive deletion."""
-    return DeleteBackup(store, auth)
+    return DeleteBackup(store, guard)
 
 
 def get_prune_backups(
     store: Annotated[BackupStore, Depends(get_backup_store)],
-    auth: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> PruneBackups:
     """Apply configured instance retention and personal-export expiry."""
     settings = get_backup_settings()
     return PruneBackups(
         store,
-        auth,
+        guard,
         keep_last=settings.keep_last,
         pre_migration_keep=settings.pre_migration_keep,
         user_export_ttl_hours=settings.user_export_ttl_hours,
@@ -126,11 +126,11 @@ def get_prune_backups(
 def get_upload_backup(
     store: Annotated[BackupStore, Depends(get_backup_store)],
     workspace: Annotated[BackupWorkspace, Depends(get_backup_workspace)],
-    auth: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> UploadBackup:
     """Compose verified uploads with the configured archive size limit."""
     return UploadBackup(
-        store, workspace, auth, max_upload_size=get_backup_settings().max_upload_size
+        store, workspace, guard, max_upload_size=get_backup_settings().max_upload_size
     )
 
 
@@ -140,6 +140,7 @@ def get_restore_on_first_run(
     restorer: Annotated[DatabaseRestorer, Depends(get_database_restorer)],
     media: Annotated[MediaFiles, Depends(get_media_files)],
     workspace: Annotated[BackupWorkspace, Depends(get_backup_workspace)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> RestoreOnFirstRun:
     """Compose anonymous restoration behind the existing identity setup gate."""
     return RestoreOnFirstRun(
@@ -148,5 +149,6 @@ def get_restore_on_first_run(
         restorer,
         media,
         workspace,
+        guard,
         max_upload_size=get_backup_settings().max_upload_size,
     )

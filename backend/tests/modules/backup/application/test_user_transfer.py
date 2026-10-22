@@ -6,7 +6,6 @@ from uuid import UUID, uuid7
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.backup.adapters.media.in_memory_media_files import InMemoryMediaFiles
 from app.modules.backup.adapters.persistence.in_memory_user_database_restorer import (
     InMemoryUserDatabaseRestorer,
@@ -37,6 +36,7 @@ from app.modules.backup.domain.errors import (
     IncompatibleBackupError,
     RestoreTargetNotEmptyError,
 )
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 
 if TYPE_CHECKING:
@@ -108,7 +108,7 @@ async def exported(
         store,
         InMemoryUserDatabaseSnapshot("rev", tables),
         media,
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         app_version="test",
     ).handle(ExportUserDataCommand(), actor)
     return store, summary.id, media, actor, tables
@@ -128,7 +128,7 @@ async def test_two_user_round_trip(missing: bool) -> None:
     destination = Actor(id=uuid7())
     restorer, media = InMemoryUserDatabaseRestorer("rev"), InMemoryMediaFiles()
     use_case = ImportUserData(
-        store, restorer, media, InMemoryBackupWorkspace(), OwnerAccessPolicy()
+        store, restorer, media, InMemoryBackupWorkspace(), InMemoryAccessGuard()
     )
     await use_case.handle(ImportUserDataCommand(backup_id=backup_id), destination)
     assert str(restorer.tables["nodes"][0]["owner_id"]) == str(destination.id)
@@ -155,7 +155,7 @@ async def test_slug_reuse_and_collision_are_atomic() -> None:
         restorer,
         InMemoryMediaFiles(),
         InMemoryBackupWorkspace(),
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
     ).handle(ImportUserDataCommand(backup_id=backup_id), Actor(id=uuid7()))
     assert restorer.tables["node_types"] == [existing_type]
     assert restorer.tables["nodes"][0]["owner_id"] == existing_owner
@@ -171,7 +171,7 @@ async def test_slug_reuse_and_collision_are_atomic() -> None:
                 restorer,
                 InMemoryMediaFiles(),
                 InMemoryBackupWorkspace(),
-                OwnerAccessPolicy(),
+                InMemoryAccessGuard(),
             ).handle(ImportUserDataCommand(backup_id=backup_id), Actor(id=uuid7()))
         assert json.dumps(target, default=str) == before
 
@@ -185,7 +185,7 @@ async def test_wrong_revision_and_scope(monkeypatch: pytest.MonkeyPatch) -> None
             InMemoryUserDatabaseRestorer("other"),
             InMemoryMediaFiles(),
             InMemoryBackupWorkspace(),
-            OwnerAccessPolicy(),
+            InMemoryAccessGuard(),
         ).handle(ImportUserDataCommand(backup_id=backup_id), Actor(id=uuid7()))
     manifest = await archive_manifest(store, backup_id)
 
@@ -201,7 +201,7 @@ async def test_wrong_revision_and_scope(monkeypatch: pytest.MonkeyPatch) -> None
             InMemoryUserDatabaseRestorer("rev"),
             InMemoryMediaFiles(),
             InMemoryBackupWorkspace(),
-            OwnerAccessPolicy(),
+            InMemoryAccessGuard(),
         ).handle(ImportUserDataCommand(backup_id=backup_id), Actor(id=uuid7()))
 
 
@@ -212,7 +212,7 @@ async def test_system_export_remains_personal_and_bad_media_aborts() -> None:
         "rev", {"nodes": [{"id": uuid7(), "owner_id": uuid7(), "name": "Private"}]}
     )
     result = await ExportUserData(
-        store, snapshot, InMemoryMediaFiles(), OwnerAccessPolicy(), app_version="test"
+        store, snapshot, InMemoryMediaFiles(), InMemoryAccessGuard(), app_version="test"
     ).handle(ExportUserDataCommand(), SYSTEM_ACTOR)
     assert store.members[result.id]["data/nodes.ndjson"] == b""
     media = InMemoryMediaFiles()
@@ -220,7 +220,7 @@ async def test_system_export_remains_personal_and_bad_media_aborts() -> None:
     media.refs[ref.asset_id], media.files[(ref.asset_id, ref.status)] = ref, b"x"
     with pytest.raises(CorruptBackupError):
         await ExportUserData(
-            store, snapshot, media, OwnerAccessPolicy(), app_version="test"
+            store, snapshot, media, InMemoryAccessGuard(), app_version="test"
         ).handle(ExportUserDataCommand(), SYSTEM_ACTOR)
 
 
@@ -271,7 +271,7 @@ async def test_export_verification_failure_deletes_archive(
             store,
             InMemoryUserDatabaseSnapshot("rev", {}),
             InMemoryMediaFiles(),
-            OwnerAccessPolicy(),
+            InMemoryAccessGuard(),
             app_version="test",
         ).handle(ExportUserDataCommand(), Actor(id=uuid7()))
     assert await store.list() == []
@@ -307,7 +307,7 @@ async def test_media_failure_rolls_back_database_and_files() -> None:
     target, media = InMemoryUserDatabaseRestorer("rev"), FailingMedia()
     with pytest.raises(RuntimeError, match="disk full"):
         await ImportUserData(
-            store, target, media, InMemoryBackupWorkspace(), OwnerAccessPolicy()
+            store, target, media, InMemoryBackupWorkspace(), InMemoryAccessGuard()
         ).handle(ImportUserDataCommand(backup_id=backup_id), Actor(id=uuid7()))
     assert target.tables == {}
     assert media.files == {}
@@ -339,7 +339,7 @@ async def test_incompatible_user_manifest(
             InMemoryUserDatabaseRestorer("rev"),
             InMemoryMediaFiles(),
             InMemoryBackupWorkspace(),
-            OwnerAccessPolicy(),
+            InMemoryAccessGuard(),
         ).handle(ImportUserDataCommand(backup_id=backup_id), Actor(id=uuid7()))
 
 

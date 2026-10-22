@@ -5,7 +5,7 @@ from uuid import uuid7
 
 import pytest
 
-from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.backup.adapters.media.in_memory_media_files import InMemoryMediaFiles
 from app.modules.backup.adapters.persistence.in_memory_database_restorer import (
     InMemoryDatabaseRestorer,
@@ -80,7 +80,7 @@ async def archive() -> tuple[InMemoryBackupStore, BackupSummary, MediaFileRef]:
         store,
         InMemoryDatabaseSnapshot("rev", {"data/users.ndjson": b"{}\n"}),
         media,
-        RoleAuthorisationAdapter(),
+        get_access_guard(),
         app_version="1",
     ).handle(CreateBackupCommand(), SYSTEM_ACTOR)
     return store, summary, ref
@@ -107,13 +107,13 @@ async def test_upload_and_restore_round_trip() -> None:
         InMemoryBackupWorkspace(),
         InMemoryMediaFiles(),
     )
-    uploaded = await UploadBackup(store, workspace, RoleAuthorisationAdapter()).handle(
+    uploaded = await UploadBackup(store, workspace, get_access_guard()).handle(
         UploadBackupCommand(stream=source.read_bytes(summary.id)), SYSTEM_ACTOR
     )
     target = InMemoryDatabaseRestorer("rev")
-    await RestoreBackup(
-        store, target, media, workspace, RoleAuthorisationAdapter()
-    ).handle(RestoreBackupCommand(backup_id=uploaded.id), SYSTEM_ACTOR)
+    await RestoreBackup(store, target, media, workspace, get_access_guard()).handle(
+        RestoreBackupCommand(backup_id=uploaded.id), SYSTEM_ACTOR
+    )
     assert target.tables == {"data/users.ndjson": b"{}\n"}
     assert media.files[(ref.asset_id, ref.status)] == b"new"
     assert not workspace.files

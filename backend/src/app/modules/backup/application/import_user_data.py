@@ -1,7 +1,7 @@
 import json
 from contextlib import aclosing
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 from uuid import UUID
 
 import structlog
@@ -15,7 +15,8 @@ from app.modules.backup.application.restore_backup import (
 from app.modules.backup.domain.backup import BackupScope
 from app.modules.backup.domain.errors import CorruptBackupError, IncompatibleBackupError
 from app.modules.backup.ports.user_database_restorer import UserDatabaseRestorer
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -25,7 +26,7 @@ if TYPE_CHECKING:
     from app.modules.backup.ports.backup_store import BackupStore
     from app.modules.backup.ports.backup_workspace import BackupWorkspace
     from app.modules.backup.ports.media_files import MediaFiles
-    from app.shared_kernel.access_policy import AccessPolicy
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -99,9 +100,11 @@ class ImportUserDataCommand:
 
 
 class ImportUserData(
-    ScopedCommandHandler[UserDatabaseRestorer, ImportUserDataCommand, None]
+    GuardedCommandHandler[UserDatabaseRestorer, ImportUserDataCommand, None]
 ):
     """Preserve identifiers while assigning all incoming content to the caller."""
+
+    access: ClassVar[Access] = Content()
 
     def __init__(
         self,
@@ -109,9 +112,9 @@ class ImportUserData(
         restorer: UserDatabaseRestorer,
         media: MediaFiles,
         workspace: BackupWorkspace,
-        policy: AccessPolicy,
+        guard: AccessGuard,
     ) -> None:
-        super().__init__(restorer, policy)
+        super().__init__(restorer, guard)
         self._store, self._restorer, self._media, self._workspace = (
             store,
             restorer,
@@ -119,9 +122,9 @@ class ImportUserData(
             workspace,
         )
 
-    async def handle(self, request: ImportUserDataCommand, actor: Actor) -> None:
+    async def _handle(self, request: ImportUserDataCommand, actor: Actor) -> None:
         """Verify before writes and compensate media if the database load fails."""
-        self._policy.assert_can_modify(actor, actor.id)
+        self._guard.assert_can_modify(actor, actor.id)
         expected_digest = await self._store.archive_digest(request.backup_id)
         manifest = await archive_manifest(self._store, request.backup_id)
         if (

@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator
 from contextlib import aclosing
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 from uuid import uuid7
 
 from app.modules.backup.application.archive import analyse_members, parse_manifest
@@ -9,13 +9,14 @@ from app.modules.backup.application.permissions import BackupPermission
 from app.modules.backup.application.verify_backup import _scan
 from app.modules.backup.domain.backup import BackupScope, BackupSummary
 from app.modules.backup.domain.errors import CorruptBackupError, IncompatibleBackupError
-from app.shared_kernel.cqrs import AuthorisedUseCase
+from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.guarded import GuardedUseCase
 
 if TYPE_CHECKING:
     from app.modules.backup.ports.backup_store import BackupStore
     from app.modules.backup.ports.backup_workspace import BackupWorkspace
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
-    from app.shared_kernel.authorisation import AuthorisationPort
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -75,22 +76,20 @@ async def upload_verified_backup(
         await workspace.remove(key)
 
 
-class UploadBackup(
-    AuthorisedUseCase[UploadBackupCommand, BackupSummary, BackupPermission]
-):
+class UploadBackup(GuardedUseCase[UploadBackupCommand, BackupSummary]):
     """Publish a verified administrative instance upload."""
 
-    required_permission = BackupPermission.CREATE
+    access: ClassVar[Access] = Requires(BackupPermission.CREATE)
 
     def __init__(
         self,
         store: BackupStore,
         workspace: BackupWorkspace,
-        authorisation: AuthorisationPort,
+        guard: AccessGuard,
         *,
         max_upload_size: int = 8 * 1024**3,
     ) -> None:
-        super().__init__(authorisation)
+        self._guard = guard
         self._store, self._workspace, self._max_size = store, workspace, max_upload_size
 
     async def _handle(

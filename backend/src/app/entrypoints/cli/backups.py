@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
     from app.entrypoints.api.shared.backup_media_files import BackupMediaFiles
     from app.modules.backup.domain.backup import BackupSummary
-    from app.shared_kernel.authorisation import AuthorisationPort
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.content_filter import ContentFilter
 
 
@@ -48,7 +48,7 @@ async def create_backup(
     to_revision: str | None = None,
 ) -> BackupSummary:
     """Build and run a verified backup as the system actor."""
-    from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
+    from app.entrypoints.api.shared.access_guard import get_access_guard
     from app.modules.backup.adapters.persistence.database_snapshot import (
         SqlAlchemyDatabaseSnapshot,
     )
@@ -67,7 +67,7 @@ async def create_backup(
             LocalDirectoryBackupStore(get_backup_settings().backup_path),
             SqlAlchemyDatabaseSnapshot(get_session_factory()),
             media,
-            RoleAuthorisationAdapter(),
+            get_access_guard(),
             app_version=load_app_info().version,
         ).handle(
             CreateBackupCommand(
@@ -107,9 +107,7 @@ def upgrade_with_backup(revision: str = "head", *, backup: bool = True) -> None:
     alembic_runner.upgrade(revision)
 
 
-async def restore_backup(
-    backup_id: UUID, *, replace: bool, authorisation: AuthorisationPort
-) -> None:
+async def restore_backup(backup_id: UUID, *, replace: bool, guard: AccessGuard) -> None:
     """Select the setup gate when no accounts exist and run the restore."""
     from app.modules.backup.adapters.persistence.database_restorer import (
         SqlAlchemyDatabaseRestorer,
@@ -139,7 +137,7 @@ async def restore_backup(
             SqlAlchemyDatabaseRestorer(factory),
             media,
             LocalBackupWorkspace(settings.backup_path),
-            authorisation,
+            guard,
         ).handle(
             RestoreBackupCommand(
                 backup_id=backup_id, replace=replace, setup_only=setup_only
@@ -150,7 +148,7 @@ async def restore_backup(
 
 async def export_user_data(user_id: UUID, output: Path) -> BackupSummary:
     """Export one explicit owner and stream their archive to a local file."""
-    from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
+    from app.entrypoints.api.shared.access_guard import get_access_guard
     from app.modules.backup.adapters.persistence.user_database_snapshot import (
         SqlAlchemyUserDatabaseSnapshot,
     )
@@ -174,7 +172,7 @@ async def export_user_data(user_id: UUID, output: Path) -> BackupSummary:
             store,
             SqlAlchemyUserDatabaseSnapshot(get_session_factory()),
             media,
-            OwnerAccessPolicy(),
+            get_access_guard(),
             app_version=load_app_info().version,
         ).handle(ExportUserDataCommand(), actor)
         with output.open("xb") as destination:
@@ -185,7 +183,7 @@ async def export_user_data(user_id: UUID, output: Path) -> BackupSummary:
 
 async def import_user_data(user_id: UUID, archive: Path) -> None:
     """Verify a user archive in the owner's namespace before importing it."""
-    from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
+    from app.entrypoints.api.shared.access_guard import get_access_guard
     from app.entrypoints.api.shared.bridges.backup_user_validator import (
         BackupUserImportValidator,
     )
@@ -232,5 +230,5 @@ async def import_user_data(user_id: UUID, archive: Path) -> None:
             ),
             media,
             workspace,
-            OwnerAccessPolicy(),
+            get_access_guard(),
         ).handle(ImportUserDataCommand(backup_id=summary.id), actor)

@@ -2,7 +2,6 @@ from uuid import uuid7
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.backup.adapters.media.in_memory_media_files import InMemoryMediaFiles
 from app.modules.backup.adapters.persistence.in_memory_user_database_restorer import (
     InMemoryUserDatabaseRestorer,
@@ -33,6 +32,7 @@ from app.modules.backup.domain.errors import (
     BackupNotFoundError,
     RestoreTargetNotEmptyError,
 )
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 
 
@@ -41,7 +41,7 @@ async def test_personal_download_import_and_temporary_cleanup() -> None:
     source, destination = Actor(id=uuid7()), Actor(id=uuid7())
     node_id = uuid7()
     store = InMemoryBackupStore()
-    media, policy = InMemoryMediaFiles(), OwnerAccessPolicy()
+    media, guard = InMemoryMediaFiles(), InMemoryAccessGuard()
     snapshot = InMemoryUserDatabaseSnapshot(
         "revision",
         {
@@ -49,14 +49,14 @@ async def test_personal_download_import_and_temporary_cleanup() -> None:
         },
     )
     summary = await ExportUserData(
-        store, snapshot, media, policy, app_version="test"
+        store, snapshot, media, guard, app_version="test"
     ).handle(ExportUserDataCommand(), source)
-    opened = await OpenUserExport(store, policy).handle(
+    opened = await OpenUserExport(store, guard).handle(
         OpenUserExportQuery(backup_id=summary.id), source
     )
     assert opened.summary.id == summary.id
     with pytest.raises(BackupNotFoundError):
-        await OpenUserExport(store, policy).handle(
+        await OpenUserExport(store, guard).handle(
             OpenUserExportQuery(backup_id=uuid7()), source
         )
     target = InMemoryUserDatabaseRestorer("revision")
@@ -64,9 +64,9 @@ async def test_personal_download_import_and_temporary_cleanup() -> None:
     upload_store = InMemoryBackupStore()
     importer = ImportUserArchive(
         upload_store,
-        ImportUserData(upload_store, target, media, workspace, policy),
+        ImportUserData(upload_store, target, media, workspace, guard),
         workspace,
-        policy,
+        guard,
     )
     await importer.handle(ImportUserArchiveCommand(stream=opened.chunks), destination)
     row = target.tables["nodes"][0]

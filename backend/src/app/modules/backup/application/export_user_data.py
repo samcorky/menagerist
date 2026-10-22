@@ -1,7 +1,7 @@
 from contextlib import aclosing
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 from uuid import UUID, uuid7
 
 import structlog
@@ -15,15 +15,16 @@ from app.modules.backup.domain.backup import (
 )
 from app.modules.backup.domain.errors import CorruptBackupError, MediaFileMissingError
 from app.modules.backup.ports.user_database_snapshot import UserDatabaseSnapshot
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.content_filter import ContentFilter
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.modules.backup.domain.backup import MediaFileRef
     from app.modules.backup.ports.backup_store import BackupStore
     from app.modules.backup.ports.backup_writer import BackupWriter
     from app.modules.backup.ports.media_files import MediaFiles
-    from app.shared_kernel.access_policy import AccessPolicy
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -45,21 +46,23 @@ class ExportUserDataCommand:
 
 
 class ExportUserData(
-    ScopedCommandHandler[UserDatabaseSnapshot, ExportUserDataCommand, BackupSummary]
+    GuardedCommandHandler[UserDatabaseSnapshot, ExportUserDataCommand, BackupSummary]
 ):
     """Export personal content through a private per-owner archive store."""
+
+    access: ClassVar[Access] = Content()
 
     def __init__(
         self,
         store: BackupStore,
         snapshot: UserDatabaseSnapshot,
         media: MediaFiles,
-        policy: AccessPolicy,
+        guard: AccessGuard,
         *,
         app_version: str,
         ttl_hours: int = 24,
     ) -> None:
-        super().__init__(snapshot, policy)
+        super().__init__(snapshot, guard)
         self._store, self._snapshot, self._media = store, snapshot, media
         self._app_version = app_version
         self._ttl = timedelta(hours=ttl_hours)
@@ -82,12 +85,12 @@ class ExportUserData(
                     )
         return missing
 
-    async def handle(
+    async def _handle(
         self, request: ExportUserDataCommand, actor: Actor
     ) -> BackupSummary:
         """Scope every snapshot to the signed-in actor, including administrators."""
-        self._policy.assert_can_view(actor, actor.id)
-        scope = self._policy.scope_for(actor)
+        self._guard.assert_can_view(actor, actor.id)
+        scope = self.scope(actor)
         if scope.is_everyone:
             scope = ContentFilter.of(actor.id)
         await prune_user_exports(self._store, older_than=datetime.now(UTC) - self._ttl)

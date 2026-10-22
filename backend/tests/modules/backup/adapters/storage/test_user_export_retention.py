@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from uuid import uuid7
 
-from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.backup.adapters.storage.in_memory_backup_store import (
     InMemoryBackupStore,
 )
@@ -49,7 +49,7 @@ async def test_global_prune_expires_inactive_users_exports() -> None:
     root.user_stores[owner] = user
     expired = await _export(user, timedelta(hours=3))
     recent = await _export(user, timedelta(minutes=30))
-    prune = PruneBackups(root, RoleAuthorisationAdapter(), user_export_ttl_hours=2)
+    prune = PruneBackups(root, get_access_guard(), user_export_ttl_hours=2)
     report = await prune.handle(PruneBackupsCommand(dry_run=True), SYSTEM_ACTOR)
     expected = [f"users/{owner}/instance/{expired.id}.tar.gz"]
     assert report.user_exports_removed == expected

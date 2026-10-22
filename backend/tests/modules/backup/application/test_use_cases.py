@@ -8,7 +8,7 @@ from uuid import UUID, uuid7
 
 import pytest
 
-from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.backup.adapters.media.in_memory_media_files import InMemoryMediaFiles
 from app.modules.backup.adapters.persistence.in_memory_database_snapshot import (
     InMemoryDatabaseSnapshot,
@@ -51,7 +51,7 @@ def _creator(
         store,
         InMemoryDatabaseSnapshot("revision", {"data/users.ndjson": b"{}\n"}),
         media or InMemoryMediaFiles(),
-        RoleAuthorisationAdapter(),
+        get_access_guard(),
         app_version="1.0",
     )
 
@@ -60,31 +60,31 @@ async def test_create_verify_open_list_delete() -> None:
     """A completed instance archive is verified, listed and downloadable."""
     store = InMemoryBackupStore()
     summary = await _creator(store).handle(CreateBackupCommand(), SYSTEM_ACTOR)
-    auth = RoleAuthorisationAdapter()
-    report = await VerifyBackup(store, auth).handle(
+    guard = get_access_guard()
+    report = await VerifyBackup(store, guard).handle(
         VerifyBackupQuery(backup_id=summary.id), SYSTEM_ACTOR
     )
     assert report.findings == []
-    assert await ListBackups(store, auth).handle(ListBackupsQuery(), SYSTEM_ACTOR) == [
+    assert await ListBackups(store, guard).handle(ListBackupsQuery(), SYSTEM_ACTOR) == [
         summary
     ]
-    opened = await OpenBackup(store, auth).handle(
+    opened = await OpenBackup(store, guard).handle(
         OpenBackupQuery(backup_id=summary.id), SYSTEM_ACTOR
     )
     assert opened.summary == summary
     assert (
         b"".join([chunk async for chunk in opened.chunks]) == store.archives[summary.id]
     )
-    await DeleteBackup(store, auth).handle(
+    await DeleteBackup(store, guard).handle(
         DeleteBackupCommand(backup_id=summary.id), SYSTEM_ACTOR
     )
     assert await store.list() == []
     with pytest.raises(BackupNotFoundError):
-        await OpenBackup(store, auth).handle(
+        await OpenBackup(store, guard).handle(
             OpenBackupQuery(backup_id=summary.id), SYSTEM_ACTOR
         )
     with pytest.raises(BackupNotFoundError):
-        await DeleteBackup(store, auth).handle(
+        await DeleteBackup(store, guard).handle(
             DeleteBackupCommand(backup_id=summary.id), SYSTEM_ACTOR
         )
 
@@ -120,7 +120,7 @@ async def test_verification_reports_missing_sidecar_and_corruption() -> None:
         CreateBackupCommand(verify=False), SYSTEM_ACTOR
     )
     del store.digests[summary.id]
-    verifier = VerifyBackup(store, RoleAuthorisationAdapter())
+    verifier = VerifyBackup(store, get_access_guard())
     assert (
         await verifier.handle(VerifyBackupQuery(backup_id=summary.id), SYSTEM_ACTOR)
     ).findings
@@ -144,7 +144,7 @@ async def test_prune_keeps_group_floors_and_honours_age_and_dry_run() -> None:
         store.summaries[summary.id] = replace(
             summary, created_at=now - timedelta(days=20 - len(ids))
         )
-    prune = PruneBackups(store, RoleAuthorisationAdapter())
+    prune = PruneBackups(store, get_access_guard())
     command = PruneBackupsCommand(
         keep_last=1, older_than=timedelta(days=7), pre_migration_keep=1, dry_run=True
     )
@@ -167,7 +167,7 @@ async def test_prune_age_only_and_settings_defaults() -> None:
     store = InMemoryBackupStore()
     for _ in range(3):
         await _creator(store).handle(CreateBackupCommand(verify=False), SYSTEM_ACTOR)
-    prune = PruneBackups(store, RoleAuthorisationAdapter(), keep_last=2)
+    prune = PruneBackups(store, get_access_guard(), keep_last=2)
     assert len((await prune.handle(PruneBackupsCommand(), SYSTEM_ACTOR)).deleted) == 1
     assert (
         await prune.handle(
@@ -197,7 +197,7 @@ async def test_prune_age_only_and_settings_defaults() -> None:
 async def test_prune_rejects_negative_limits(command: PruneBackupsCommand) -> None:
     """Invalid limits cannot delete backups."""
     with pytest.raises(ValidationError):
-        await PruneBackups(InMemoryBackupStore(), RoleAuthorisationAdapter()).handle(
+        await PruneBackups(InMemoryBackupStore(), get_access_guard()).handle(
             command, SYSTEM_ACTOR
         )
 
@@ -245,7 +245,7 @@ async def test_failed_export_closes_snapshot_and_discards_partial_archive() -> N
         store,
         snapshot,
         InMemoryMediaFiles(),
-        RoleAuthorisationAdapter(),
+        get_access_guard(),
         app_version="1.0",
     )
     with pytest.raises(OSError, match="failed read"):
@@ -263,11 +263,11 @@ async def test_open_finds_backup_among_other_summaries() -> None:
     second = await _creator(store).handle(
         CreateBackupCommand(verify=False), SYSTEM_ACTOR
     )
-    opened = await OpenBackup(store, RoleAuthorisationAdapter()).handle(
+    opened = await OpenBackup(store, get_access_guard()).handle(
         OpenBackupQuery(backup_id=second.id), SYSTEM_ACTOR
     )
     assert opened.summary == second
-    summaries = await ListBackups(store, RoleAuthorisationAdapter()).handle(
+    summaries = await ListBackups(store, get_access_guard()).handle(
         ListBackupsQuery(), SYSTEM_ACTOR
     )
     assert summaries == [second, first]
@@ -294,7 +294,7 @@ async def test_duplicate_members_and_metadata_size_limit(
             archive.addfile(info, io.BytesIO(data))
     store.archives[summary.id] = buffer.getvalue()
     store.digests[summary.id] = hashlib.sha256(buffer.getvalue()).hexdigest()
-    verifier = VerifyBackup(store, RoleAuthorisationAdapter())
+    verifier = VerifyBackup(store, get_access_guard())
     report = await verifier.handle(
         VerifyBackupQuery(backup_id=summary.id), SYSTEM_ACTOR
     )
@@ -329,7 +329,7 @@ async def test_digest_read_failure_is_a_verification_finding(
         CreateBackupCommand(verify=False), SYSTEM_ACTOR
     )
     monkeypatch.setattr(LocalBackupReader, "archive_digest", failed_digest)
-    report = await VerifyBackup(store, RoleAuthorisationAdapter()).handle(
+    report = await VerifyBackup(store, get_access_guard()).handle(
         VerifyBackupQuery(backup_id=summary.id), SYSTEM_ACTOR
     )
     assert any(

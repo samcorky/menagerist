@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.backup_media_files import BackupMediaFiles
 from app.entrypoints.api.shared.bridges.backup_setup_gate import get_setup_gate
 from app.modules.backup.adapters.persistence.database_restorer import (
@@ -106,7 +106,7 @@ async def test_first_run_restores_credentials_and_rolls_back_media_failure(
             store,
             SqlAlchemyDatabaseSnapshot(factory),
             source_media,
-            RoleAuthorisationAdapter(),
+            get_access_guard(),
             app_version="test",
         ).handle(CreateBackupCommand(), SYSTEM_ACTOR)
         async with engine.begin() as connection:
@@ -129,7 +129,12 @@ async def test_first_run_restores_credentials_and_rolls_back_media_failure(
         gate = await anext(gate_stream)
         workspace = LocalBackupWorkspace(tmp_path / "backups")
         restore = RestoreOnFirstRun(
-            gate, store, SqlAlchemyDatabaseRestorer(factory), target_media, workspace
+            gate,
+            store,
+            SqlAlchemyDatabaseRestorer(factory),
+            target_media,
+            workspace,
+            get_access_guard(),
         )
         command = RestoreOnFirstRunCommand(stream=store.read_bytes(backup.id))
         if fail_media:

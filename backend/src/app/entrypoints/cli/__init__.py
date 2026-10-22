@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Annotated
 import structlog
 from cyclopts import App, Parameter
 
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.entrypoints.cli.backups import (
     create_backup,
@@ -16,7 +17,7 @@ from app.entrypoints.cli.backups import (
 )
 from app.modules.backup.adapters.cli.backup_app import (
     backup_app,
-    use_authorisation as use_backup_authorisation,
+    use_access_guard as use_backup_access_guard,
     use_operations,
     use_user_operations,
 )
@@ -66,12 +67,12 @@ migrate_app = App(name="migrate", help="Manage database migrations.")
 app.command(migrate_app)
 
 app.command(media_app)
-use_backup_authorisation(RoleAuthorisationAdapter())
+use_backup_access_guard(get_access_guard())
 
 use_operations(
     lambda label: create_backup(label=label),
-    lambda backup_id, replace, authorisation: restore_backup(
-        backup_id, replace=replace, authorisation=authorisation
+    lambda backup_id, replace, guard: restore_backup(
+        backup_id, replace=replace, guard=guard
     ),
 )
 use_user_operations(export_user_data, import_user_data)

@@ -1,18 +1,19 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.backup.application.permissions import BackupPermission
 from app.modules.backup.domain.verification import PruneReport
-from app.shared_kernel.cqrs import AuthorisedUseCase
+from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.errors import ValidationError
+from app.shared_kernel.guarded import GuardedUseCase
 
 if TYPE_CHECKING:
     from app.modules.backup.ports.backup_store import BackupStore
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
-    from app.shared_kernel.authorisation import AuthorisationPort
 
 logger = structlog.get_logger()
 
@@ -27,23 +28,21 @@ class PruneBackupsCommand:
     dry_run: bool = False
 
 
-class PruneBackups(
-    AuthorisedUseCase[PruneBackupsCommand, PruneReport, BackupPermission]
-):
+class PruneBackups(GuardedUseCase[PruneBackupsCommand, PruneReport]):
     """Prune summary-based retention groups without opening any archives."""
 
-    required_permission = BackupPermission.DELETE
+    access: ClassVar[Access] = Requires(BackupPermission.DELETE)
 
     def __init__(
         self,
         store: BackupStore,
-        authorisation: AuthorisationPort,
+        guard: AccessGuard,
         *,
         keep_last: int = 7,
         pre_migration_keep: int = 3,
         user_export_ttl_hours: int = 24,
     ) -> None:
-        super().__init__(authorisation)
+        self._guard = guard
         self._store = store
         self._keep_last = keep_last
         self._pre_migration_keep = pre_migration_keep
