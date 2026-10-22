@@ -21,6 +21,7 @@ from app.modules.graph.application.update_edge_type import (
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import EdgeTypeNotFoundError, InvalidSchemaError
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -40,7 +41,7 @@ async def test_update_edge_type_persists_and_commits() -> None:
     uow, repos = _make_uow()
     et = EdgeType.create(slug="directed-by", label="Directed By")
     await repos.edge_types.add(et)
-    use_case = UpdateEdgeType(uow)
+    use_case = UpdateEdgeType(uow, InMemoryAccessGuard())
 
     result = await use_case.handle(
         UpdateEdgeTypeCommand(edge_type_id=et.id, label="Helmed By"),
@@ -66,7 +67,7 @@ async def test_update_edge_type_persists_attributes_schema() -> None:
             "since": {"title": "Since", "type": "string", "format": "date"},
         },
     }
-    use_case = UpdateEdgeType(uow)
+    use_case = UpdateEdgeType(uow, InMemoryAccessGuard())
 
     result = await use_case.handle(
         UpdateEdgeTypeCommand(edge_type_id=et.id, attributes_schema=schema),
@@ -84,7 +85,7 @@ async def test_update_edge_type_raises_on_invalid_schema() -> None:
     uow, repos = _make_uow()
     et = EdgeType.create(slug="directed-by", label="Directed By")
     await repos.edge_types.add(et)
-    use_case = UpdateEdgeType(uow)
+    use_case = UpdateEdgeType(uow, InMemoryAccessGuard())
 
     with pytest.raises(InvalidSchemaError):
         await use_case.handle(
@@ -99,7 +100,7 @@ async def test_update_edge_type_raises_on_invalid_schema() -> None:
 async def test_update_edge_type_raises_when_missing() -> None:
     """UpdateEdgeType raises EdgeTypeNotFoundError when the edge type doesn't exist."""
     uow, _ = _make_uow()
-    use_case = UpdateEdgeType(uow)
+    use_case = UpdateEdgeType(uow, InMemoryAccessGuard())
 
     with pytest.raises(EdgeTypeNotFoundError):
         await use_case.handle(

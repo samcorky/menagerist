@@ -2,7 +2,6 @@ import uuid
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -20,6 +19,7 @@ from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import InvalidAttributesError, NodeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
@@ -47,7 +47,7 @@ async def test_create_edge_persists_and_commits() -> None:
     """CreateEdge adds the edge to the repository and commits the unit of work."""
     repos, source, target = await _repos_with_two_nodes()
     uow = InMemoryUnitOfWork(repos)
-    use_case = CreateEdge(uow, OwnerAccessPolicy())
+    use_case = CreateEdge(uow, InMemoryAccessGuard())
 
     edge = await use_case.handle(
         CreateEdgeCommand(source_id=source.id, target_id=target.id, type="directed-by"),
@@ -62,7 +62,7 @@ async def test_create_edge_raises_when_source_missing() -> None:
     """CreateEdge raises NodeNotFoundError when the source node doesn't exist."""
     repos, _source, target = await _repos_with_two_nodes()
     uow = InMemoryUnitOfWork(repos)
-    use_case = CreateEdge(uow, OwnerAccessPolicy())
+    use_case = CreateEdge(uow, InMemoryAccessGuard())
 
     with pytest.raises(NodeNotFoundError):
         await use_case.handle(
@@ -77,7 +77,7 @@ async def test_create_edge_raises_when_target_missing() -> None:
     """CreateEdge raises NodeNotFoundError when the target node doesn't exist."""
     repos, source, _target = await _repos_with_two_nodes()
     uow = InMemoryUnitOfWork(repos)
-    use_case = CreateEdge(uow, OwnerAccessPolicy())
+    use_case = CreateEdge(uow, InMemoryAccessGuard())
 
     with pytest.raises(NodeNotFoundError):
         await use_case.handle(
@@ -103,7 +103,7 @@ async def test_create_edge_validates_attributes_against_schema() -> None:
         )
     )
     uow = InMemoryUnitOfWork(repos)
-    use_case = CreateEdge(uow, OwnerAccessPolicy())
+    use_case = CreateEdge(uow, InMemoryAccessGuard())
 
     with pytest.raises(InvalidAttributesError):
         await use_case.handle(

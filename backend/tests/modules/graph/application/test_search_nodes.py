@@ -4,7 +4,6 @@ from typing import Any
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -27,6 +26,7 @@ from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.domain.query import Cursor, InvalidQueryError, SortValue
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 
 SCHEMA: dict[str, Any] = {
@@ -61,7 +61,7 @@ async def _setup(count: int = 5, **options: Any) -> SearchNodes:  # noqa: ANN401
             )
         )
     return SearchNodes(
-        repos, OwnerAccessPolicy(), today=lambda: date(2026, 10, 14), **options
+        repos, InMemoryAccessGuard(), today=lambda: date(2026, 10, 14), **options
     )
 
 
@@ -253,7 +253,7 @@ async def test_stale_sort_field_warns_and_still_pages() -> None:
 async def test_default_clock_is_utc_today() -> None:
     """SearchNodes: default clock is utc today."""
     use_case = await _setup()
-    default = SearchNodes(use_case._repos, OwnerAccessPolicy())
+    default = SearchNodes(use_case._repos, InMemoryAccessGuard())
     result = await default.handle(SearchNodesQuery(query=_body()), SYSTEM_ACTOR)
     assert result.total == 5
 

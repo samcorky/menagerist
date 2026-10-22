@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
@@ -13,13 +13,14 @@ from app.modules.graph.domain.errors import NodeNotFoundError
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.access import Access, Content
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
-from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.guarded import GuardedCommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -35,25 +36,27 @@ class CreateEdgeCommand:
     attributes: dict[str, Any] = field(default_factory=dict)
 
 
-class CreateEdge(ScopedCommandHandler[GraphUnitOfWork, CreateEdgeCommand, Edge]):
+class CreateEdge(GuardedCommandHandler[GraphUnitOfWork, CreateEdgeCommand, Edge]):
     """Create and persist a new edge, auto-creating its EdgeType if not yet known."""
+
+    access: ClassVar[Access] = Content()
 
     def __init__(
         self,
         uow: GraphUnitOfWork,
-        policy: AccessPolicy,
+        guard: AccessGuard,
         choice_lists: ChoiceListSource | None = None,
     ) -> None:
-        super().__init__(uow, policy)
+        super().__init__(uow, guard)
         self._choice_lists = choice_lists
 
-    async def handle(self, command: CreateEdgeCommand, actor: Actor) -> Edge:
+    async def _handle(self, command: CreateEdgeCommand, actor: Actor) -> Edge:
         """Create an edge from `command` and commit it.
 
         If no EdgeType exists for the given type slug, one is created automatically
         so the vocabulary builds itself as edges are added.
         """
-        scope = self._policy.scope_for(actor)
+        scope = self.scope(actor)
         async with self._uow as repos:
             if await repos.nodes.get(command.source_id, scope=scope) is None:
                 raise NodeNotFoundError(f"Node {command.source_id} not found")

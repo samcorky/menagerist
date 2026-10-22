@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
@@ -10,9 +10,11 @@ from app.modules.graph.domain.node_type import NodeType
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.cqrs import QueryHandler
+from app.shared_kernel.access import Access, Shared
+from app.shared_kernel.guarded import GuardedQueryHandler
 
 if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -26,16 +28,23 @@ class ListNodeTypesQuery:
     limit: int = 50
 
 
-class ListNodeTypes(QueryHandler[GraphRepos, ListNodeTypesQuery, list[NodeType]]):
+class ListNodeTypes(
+    GuardedQueryHandler[GraphRepos, ListNodeTypesQuery, list[NodeType]]
+):
     """List node types with keyset pagination."""
 
+    access: ClassVar[Access] = Shared()
+
     def __init__(
-        self, repos: GraphRepos, choice_lists: ChoiceListSource | None = None
+        self,
+        repos: GraphRepos,
+        guard: AccessGuard,
+        choice_lists: ChoiceListSource | None = None,
     ) -> None:
-        super().__init__(repos)
+        super().__init__(repos, guard)
         self._choice_lists = choice_lists
 
-    async def handle(self, query: ListNodeTypesQuery, actor: Actor) -> list[NodeType]:
+    async def _handle(self, query: ListNodeTypesQuery, actor: Actor) -> list[NodeType]:
         """Return a page of node types after `query.after`, up to `query.limit`."""
         result = await self._repos.node_types.list(after=query.after, limit=query.limit)
         logger.debug("node types listed", count=len(result))

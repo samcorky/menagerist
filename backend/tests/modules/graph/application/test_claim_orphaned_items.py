@@ -22,6 +22,7 @@ from app.modules.graph.application.claim_orphaned_items import (
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
@@ -47,7 +48,7 @@ async def test_claims_system_owned_items_and_connections_and_commits() -> None:
     await edges.add(edge)
     owner = uuid.uuid7()
 
-    result = await ClaimOrphanedItems(uow).handle(
+    result = await ClaimOrphanedItems(uow, InMemoryAccessGuard()).handle(
         ClaimOrphanedItemsCommand(owner_id=owner), SYSTEM_ACTOR
     )
 

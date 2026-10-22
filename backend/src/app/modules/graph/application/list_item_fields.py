@@ -1,13 +1,14 @@
 """List the fields individual items carry in their own overlay."""
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.graph.domain.query import ItemFieldUse
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.cqrs import ScopedQueryHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedQueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -23,7 +24,7 @@ class ListItemFieldsQuery:
 
 
 class ListItemFields(
-    ScopedQueryHandler[GraphRepos, ListItemFieldsQuery, list[ItemFieldUse]]
+    GuardedQueryHandler[GraphRepos, ListItemFieldsQuery, list[ItemFieldUse]]
 ):
     """List per-item fields the caller can filter on, most used first.
 
@@ -34,12 +35,14 @@ class ListItemFields(
     title among items sharing the key and kind, falling back to the key.
     """
 
-    async def handle(
+    access: ClassVar[Access] = Content()
+
+    async def _handle(
         self, query: ListItemFieldsQuery, actor: Actor
     ) -> list[ItemFieldUse]:
         """Return at most `MAX_ITEM_FIELDS` fields, by count then key."""
         fields = await self._repos.nodes.item_fields(
-            scope=self._policy.scope_for(actor), limit=MAX_ITEM_FIELDS
+            scope=self.scope(actor), limit=MAX_ITEM_FIELDS
         )
         logger.debug("item fields listed", count=len(fields))
         return fields

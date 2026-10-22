@@ -1,12 +1,13 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.access import Access, System
 from app.shared_kernel.actor import SYSTEM_ACTOR
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -33,14 +34,18 @@ class ClaimedItemsResult:
 
 
 class ClaimOrphanedItems(
-    CommandHandler[GraphUnitOfWork, ClaimOrphanedItemsCommand, ClaimedItemsResult]
+    GuardedCommandHandler[
+        GraphUnitOfWork, ClaimOrphanedItemsCommand, ClaimedItemsResult
+    ]
 ):
     """Give content that predates accounts to its first owner.
 
     System-level and unscoped: not reachable from any user route.
     """
 
-    async def handle(
+    access: ClassVar[Access] = System()
+
+    async def _handle(
         self, command: ClaimOrphanedItemsCommand, actor: Actor
     ) -> ClaimedItemsResult:
         """Re-own every ownerless or system-owned item and connection."""

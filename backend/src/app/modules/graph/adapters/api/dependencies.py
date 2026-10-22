@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
 
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.bridges.choice_list_source import (
     PresetChoiceListSource,
     get_choice_list_source,
@@ -9,10 +10,6 @@ from app.entrypoints.api.shared.bridges.choice_list_source import (
 from app.entrypoints.api.shared.bridges.collection_members import (
     CollectionsMembers,
     get_collection_members,
-)
-from app.entrypoints.api.shared.dependencies import (
-    get_access_policy,
-    get_authorisation_port,
 )
 from app.modules.graph.adapters.persistence.unit_of_work import (
     build_graph_repos,
@@ -59,8 +56,7 @@ from app.modules.graph.application.update_node import UpdateNode
 from app.modules.graph.application.update_node_type import UpdateNodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos, GraphUnitOfWork
 from app.platform.database import get_session_factory
-from app.shared_kernel.access_policy import AccessPolicy
-from app.shared_kernel.authorisation import AuthorisationPort
+from app.shared_kernel.access_guard import AccessGuard
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -90,207 +86,215 @@ async def get_graph_repos(
 def get_create_node_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
     choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> CreateNode:
-    return CreateNode(uow, policy, choice_lists)
+    return CreateNode(uow, guard, choice_lists)
 
 
 def get_get_node_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> GetNode:
-    return GetNode(repos, policy)
+    return GetNode(repos, guard)
 
 
 def get_list_nodes_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
     collection_members: Annotated[CollectionsMembers, Depends(get_collection_members)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ListNodes:
-    return ListNodes(repos, policy, collection_members)
+    return ListNodes(repos, guard, collection_members)
 
 
 def get_search_nodes_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> SearchNodes:
-    return SearchNodes(repos, policy)
+    return SearchNodes(repos, guard)
 
 
 def get_list_item_fields_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ListItemFields:
-    return ListItemFields(repos, policy)
+    return ListItemFields(repos, guard)
 
 
 def get_update_node_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
     choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> UpdateNode:
-    return UpdateNode(uow, policy, choice_lists)
+    return UpdateNode(uow, guard, choice_lists)
 
 
 def get_delete_node_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> DeleteNode:
-    return DeleteNode(uow, policy)
+    return DeleteNode(uow, guard)
 
 
 def get_promote_extra_schema_field_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> PromoteExtraSchemaField:
-    return PromoteExtraSchemaField(uow, policy)
+    return PromoteExtraSchemaField(uow, guard)
 
 
 def get_create_edge_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
     choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
 ) -> CreateEdge:
-    return CreateEdge(uow, policy, choice_lists)
+    return CreateEdge(uow, guard, choice_lists)
 
 
 def get_create_edges_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
     choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
 ) -> CreateEdges:
-    return CreateEdges(uow, policy, choice_lists)
+    return CreateEdges(uow, guard, choice_lists)
 
 
 def get_get_edge_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> GetEdge:
-    return GetEdge(repos, policy)
+    return GetEdge(repos, guard)
 
 
 def get_list_edges_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ListEdges:
-    return ListEdges(repos, policy)
+    return ListEdges(repos, guard)
 
 
 def get_update_edge_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
     choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
 ) -> UpdateEdge:
-    return UpdateEdge(uow, policy, choice_lists)
+    return UpdateEdge(uow, guard, choice_lists)
 
 
 def get_delete_edge_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> DeleteEdge:
-    return DeleteEdge(uow, policy)
+    return DeleteEdge(uow, guard)
 
 
 def get_create_node_type_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
     choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> CreateNodeType:
-    return CreateNodeType(uow, choice_lists)
+    return CreateNodeType(uow, guard, choice_lists)
 
 
 def get_get_node_type_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
     choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> GetNodeType:
-    return GetNodeType(repos, choice_lists)
+    return GetNodeType(repos, guard, choice_lists)
 
 
 def get_list_node_types_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
     choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ListNodeTypes:
-    return ListNodeTypes(repos, choice_lists)
+    return ListNodeTypes(repos, guard, choice_lists)
 
 
 def get_update_node_type_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
     choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> UpdateNodeType:
-    return UpdateNodeType(uow, choice_lists)
+    return UpdateNodeType(uow, guard, choice_lists)
 
 
 def get_delete_node_type_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
-    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> DeleteNodeType:
-    return DeleteNodeType(uow, authorisation)
+    return DeleteNodeType(uow, guard)
 
 
 def get_create_edge_type_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
     choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> CreateEdgeType:
-    return CreateEdgeType(uow, choice_lists)
+    return CreateEdgeType(uow, guard, choice_lists)
 
 
 def get_get_edge_type_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
     choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> GetEdgeType:
-    return GetEdgeType(repos, choice_lists)
+    return GetEdgeType(repos, guard, choice_lists)
 
 
 def get_list_edge_types_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
     choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ListEdgeTypes:
-    return ListEdgeTypes(repos, choice_lists)
+    return ListEdgeTypes(repos, guard, choice_lists)
 
 
 def get_update_edge_type_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
     choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> UpdateEdgeType:
-    return UpdateEdgeType(uow, choice_lists)
+    return UpdateEdgeType(uow, guard, choice_lists)
 
 
 def get_delete_edge_type_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
-    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> DeleteEdgeType:
-    return DeleteEdgeType(uow, authorisation)
+    return DeleteEdgeType(uow, guard)
 
 
 def get_count_node_type_attribute_usage_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> CountNodeTypeAttributeUsage:
-    return CountNodeTypeAttributeUsage(repos, policy)
+    return CountNodeTypeAttributeUsage(repos, guard)
 
 
 def get_purge_node_type_attribute_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
-    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> PurgeNodeTypeAttribute:
-    return PurgeNodeTypeAttribute(uow, authorisation)
+    return PurgeNodeTypeAttribute(uow, guard)
 
 
 def get_list_attribute_values_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ListAttributeValues:
-    return ListAttributeValues(repos, policy)
+    return ListAttributeValues(repos, guard)
 
 
 def get_count_edge_type_attribute_usage_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> CountEdgeTypeAttributeUsage:
-    return CountEdgeTypeAttributeUsage(repos, policy)
+    return CountEdgeTypeAttributeUsage(repos, guard)
 
 
 def get_purge_edge_type_attribute_use_case(
     uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
-    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> PurgeEdgeTypeAttribute:
-    return PurgeEdgeTypeAttribute(uow, authorisation)
+    return PurgeEdgeTypeAttribute(uow, guard)

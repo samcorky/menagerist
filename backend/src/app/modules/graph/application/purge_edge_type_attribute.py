@@ -1,14 +1,15 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.domain.errors import EdgeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.content_filter import ContentFilter
-from app.shared_kernel.cqrs import AuthorisedCommandHandler
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -44,9 +45,7 @@ def _purged_attributes(
 
 
 class PurgeEdgeTypeAttribute(
-    AuthorisedCommandHandler[
-        GraphUnitOfWork, PurgeEdgeTypeAttributeCommand, None, GraphPermission
-    ]
+    GuardedCommandHandler[GraphUnitOfWork, PurgeEdgeTypeAttributeCommand, None]
 ):
     """Remove an attribute key from every edge of a edge type (administrators only).
 
@@ -61,7 +60,7 @@ class PurgeEdgeTypeAttribute(
     save instead of writing the purged value back.
     """
 
-    required_permission = GraphPermission.PURGE_EDGE_TYPE_ATTRIBUTE
+    access: ClassVar[Access] = Requires(GraphPermission.PURGE_EDGE_TYPE_ATTRIBUTE)
 
     async def _handle(
         self, command: PurgeEdgeTypeAttributeCommand, actor: Actor

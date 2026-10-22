@@ -27,6 +27,7 @@ from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.domain.query import InvalidQueryError
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
 
@@ -80,7 +81,7 @@ def _rating_at_least(value: int, key: str = "rating") -> dict[str, Any]:
 
 
 async def _validate(repos: GraphRepos, query: dict[str, Any]) -> Any:  # noqa: ANN401
-    return await ValidateQuery(repos).handle(
+    return await ValidateQuery(repos, InMemoryAccessGuard()).handle(
         ValidateQueryQuery(query=query), SYSTEM_ACTOR
     )
 

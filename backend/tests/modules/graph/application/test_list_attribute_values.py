@@ -2,7 +2,6 @@ import uuid
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -24,6 +23,7 @@ from app.modules.graph.domain.errors import NodeTypeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
@@ -83,7 +83,7 @@ async def test_list_attribute_values_orders_by_count_then_value() -> None:
     """Values are most-used first, ties broken alphabetically; non-strings ignored."""
     repos, node_type = await _setup()
 
-    values = await ListAttributeValues(repos, OwnerAccessPolicy()).handle(
+    values = await ListAttributeValues(repos, InMemoryAccessGuard()).handle(
         ListAttributeValuesQuery(node_type_id=node_type.id, key="status"),
         SYSTEM_ACTOR,
     )
@@ -98,7 +98,7 @@ async def test_list_attribute_values_filters_by_q_case_insensitively() -> None:
     """`q` filters values by case-insensitive substring."""
     repos, node_type = await _setup()
 
-    values = await ListAttributeValues(repos, OwnerAccessPolicy()).handle(
+    values = await ListAttributeValues(repos, InMemoryAccessGuard()).handle(
         ListAttributeValuesQuery(node_type_id=node_type.id, key="status", q="live"),
         SYSTEM_ACTOR,
     )
@@ -110,7 +110,7 @@ async def test_list_attribute_values_respects_limit() -> None:
     """At most `limit` values are returned."""
     repos, node_type = await _setup()
 
-    values = await ListAttributeValues(repos, OwnerAccessPolicy()).handle(
+    values = await ListAttributeValues(repos, InMemoryAccessGuard()).handle(
         ListAttributeValuesQuery(node_type_id=node_type.id, key="status", limit=1),
         SYSTEM_ACTOR,
     )
@@ -121,7 +121,7 @@ async def test_list_attribute_values_respects_limit() -> None:
 async def test_list_attribute_values_raises_for_missing_type() -> None:
     """An unknown node type id is a not-found error."""
     with pytest.raises(NodeTypeNotFoundError):
-        await ListAttributeValues(_repos(), OwnerAccessPolicy()).handle(
+        await ListAttributeValues(_repos(), InMemoryAccessGuard()).handle(
             ListAttributeValuesQuery(node_type_id=uuid.uuid4(), key="status"),
             SYSTEM_ACTOR,
         )

@@ -6,7 +6,6 @@ from typing import Any
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_collection_members import (
     InMemoryCollectionMembers,
 )
@@ -27,6 +26,7 @@ from app.modules.graph.domain.errors import CollectionNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 
 ALICE = uuid.UUID(int=1)
@@ -64,7 +64,7 @@ class World:
         self.members = InMemoryCollectionMembers()
         self.use_case = ListNodes(
             self.repos,
-            OwnerAccessPolicy(),
+            InMemoryAccessGuard(),
             self.members,
             today=lambda: date(2026, 10, 17),
         )

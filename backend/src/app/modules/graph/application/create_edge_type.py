@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import jsonschema
 import structlog
@@ -15,10 +15,12 @@ from app.modules.graph.domain.errors import (
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.access import Access, Shared
+from app.shared_kernel.guarded import GuardedCommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -36,16 +38,23 @@ class CreateEdgeTypeCommand:
     attributes_schema: dict[str, Any] | None = field(default=None)
 
 
-class CreateEdgeType(CommandHandler[GraphUnitOfWork, CreateEdgeTypeCommand, EdgeType]):
+class CreateEdgeType(
+    GuardedCommandHandler[GraphUnitOfWork, CreateEdgeTypeCommand, EdgeType]
+):
     """Create and persist a new edge type."""
 
+    access: ClassVar[Access] = Shared()
+
     def __init__(
-        self, uow: GraphUnitOfWork, choice_lists: ChoiceListSource | None = None
+        self,
+        uow: GraphUnitOfWork,
+        guard: AccessGuard,
+        choice_lists: ChoiceListSource | None = None,
     ) -> None:
-        super().__init__(uow)
+        super().__init__(uow, guard)
         self._choice_lists = choice_lists
 
-    async def handle(self, command: CreateEdgeTypeCommand, actor: Actor) -> EdgeType:
+    async def _handle(self, command: CreateEdgeTypeCommand, actor: Actor) -> EdgeType:
         """Create an edge type from `command` and commit it."""
         if command.attributes_schema is not None:
             try:

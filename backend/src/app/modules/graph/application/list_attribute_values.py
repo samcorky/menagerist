@@ -1,12 +1,13 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.cqrs import ScopedQueryHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedQueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -33,13 +34,15 @@ class ListAttributeValuesQuery:
 
 
 class ListAttributeValues(
-    ScopedQueryHandler[
+    GuardedQueryHandler[
         GraphRepos, ListAttributeValuesQuery, list[AttributeValueCountResult]
     ]
 ):
     """List distinct string values used for a node type's attribute, most-used first."""
 
-    async def handle(
+    access: ClassVar[Access] = Content()
+
+    async def _handle(
         self, query: ListAttributeValuesQuery, actor: Actor
     ) -> list[AttributeValueCountResult]:
         """Return the values, or raise `NodeTypeNotFoundError` if missing."""
@@ -49,7 +52,7 @@ class ListAttributeValues(
         values = await self._repos.nodes.list_attribute_values(
             str(node_type.slug),
             query.key,
-            scope=self._policy.scope_for(actor),
+            scope=self.scope(actor),
             q=query.q,
             limit=query.limit,
         )

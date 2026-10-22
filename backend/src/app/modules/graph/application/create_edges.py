@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
@@ -13,14 +13,15 @@ from app.modules.graph.domain.errors import NodeNotFoundError
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos, GraphUnitOfWork
+from app.shared_kernel.access import Access, Content
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
-from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
 from app.shared_kernel.content_filter import ContentFilter  # noqa: TC001
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.guarded import GuardedCommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -69,24 +70,26 @@ async def _existing_targets(
 
 
 class CreateEdges(
-    ScopedCommandHandler[GraphUnitOfWork, CreateEdgesCommand, CreateEdgesResult]
+    GuardedCommandHandler[GraphUnitOfWork, CreateEdgesCommand, CreateEdgesResult]
 ):
     """Create edges from one source to several targets in a single transaction."""
+
+    access: ClassVar[Access] = Content()
 
     def __init__(
         self,
         uow: GraphUnitOfWork,
-        policy: AccessPolicy,
+        guard: AccessGuard,
         choice_lists: ChoiceListSource | None = None,
     ) -> None:
-        super().__init__(uow, policy)
+        super().__init__(uow, guard)
         self._choice_lists = choice_lists
 
-    async def handle(
+    async def _handle(
         self, command: CreateEdgesCommand, actor: Actor
     ) -> CreateEdgesResult:
         """Create the edges in `command`, skipping targets already connected."""
-        scope = self._policy.scope_for(actor)
+        scope = self.scope(actor)
         async with self._uow as repos:
             if await repos.nodes.get(command.source_id, scope=scope) is None:
                 raise NodeNotFoundError(f"Node {command.source_id} not found")

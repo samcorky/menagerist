@@ -3,7 +3,7 @@
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date  # noqa: TC003
-from typing import Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
@@ -18,11 +18,14 @@ from app.modules.graph.domain.query import (
     SortKey,
 )
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access import Access, Content
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
-from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
 from app.shared_kernel.actor import Actor  # noqa: TC001
-from app.shared_kernel.cqrs import ScopedQueryHandler
+from app.shared_kernel.guarded import GuardedQueryHandler
+
+if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
 
 logger = structlog.get_logger()
 
@@ -81,21 +84,23 @@ class SearchNodesResult:
     warnings: list[QueryWarning]
 
 
-class SearchNodes(ScopedQueryHandler[GraphRepos, SearchNodesQuery, SearchNodesResult]):
+class SearchNodes(GuardedQueryHandler[GraphRepos, SearchNodesQuery, SearchNodesResult]):
     """Search items by condition tree, ordered and paged by keyset."""
+
+    access: ClassVar[Access] = Content()
 
     def __init__(
         self,
         repos: GraphRepos,
-        policy: AccessPolicy,
+        guard: AccessGuard,
         today: Callable[[], date] = utc_today,
         total_cap: int = TOTAL_CAP,
     ) -> None:
-        super().__init__(repos, policy)
+        super().__init__(repos, guard)
         self._today = today
         self._total_cap = total_cap
 
-    async def handle(self, query: SearchNodesQuery, actor: Actor) -> SearchNodesResult:
+    async def _handle(self, query: SearchNodesQuery, actor: Actor) -> SearchNodesResult:
         """Return a page of matching items.
 
         Raises:
@@ -114,7 +119,7 @@ class SearchNodes(ScopedQueryHandler[GraphRepos, SearchNodesQuery, SearchNodesRe
         if query.cursor is not None:
             after = decode_cursor(query.cursor, sort_count=len(parsed.sort))
             _check_cursor_types(after, parsed.sort, resolved.field_kinds)
-        scope = self._policy.scope_for(actor)
+        scope = self.scope(actor)
         hits = await self._repos.nodes.search(
             scope=scope, resolved=resolved, after=after, limit=query.limit + 1
         )

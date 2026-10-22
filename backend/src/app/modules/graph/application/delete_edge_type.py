@@ -1,14 +1,15 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.domain.errors import EdgeTypeInUseError, EdgeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.content_filter import ContentFilter
-from app.shared_kernel.cqrs import AuthorisedCommandHandler
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -24,16 +25,14 @@ class DeleteEdgeTypeCommand:
 
 
 class DeleteEdgeType(
-    AuthorisedCommandHandler[
-        GraphUnitOfWork, DeleteEdgeTypeCommand, None, GraphPermission
-    ]
+    GuardedCommandHandler[GraphUnitOfWork, DeleteEdgeTypeCommand, None]
 ):
     """Soft-delete an edge type (administrators only).
 
     The in-use check spans every person's connections.
     """
 
-    required_permission = GraphPermission.DELETE_EDGE_TYPE
+    access: ClassVar[Access] = Requires(GraphPermission.DELETE_EDGE_TYPE)
 
     async def _handle(self, command: DeleteEdgeTypeCommand, actor: Actor) -> None:
         """Soft-delete the edge type or raise EdgeTypeNotFoundError."""

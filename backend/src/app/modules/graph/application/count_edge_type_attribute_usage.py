@@ -1,12 +1,13 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.graph.domain.errors import EdgeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.cqrs import ScopedQueryHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedQueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -25,11 +26,13 @@ class CountEdgeTypeAttributeUsageQuery:
 
 
 class CountEdgeTypeAttributeUsage(
-    ScopedQueryHandler[GraphRepos, CountEdgeTypeAttributeUsageQuery, int]
+    GuardedQueryHandler[GraphRepos, CountEdgeTypeAttributeUsageQuery, int]
 ):
     """Count the edges of a edge type whose attributes contain a key."""
 
-    async def handle(
+    access: ClassVar[Access] = Content()
+
+    async def _handle(
         self, query: CountEdgeTypeAttributeUsageQuery, actor: Actor
     ) -> int:
         """Return the count, or raise `EdgeTypeNotFoundError` if the type is missing."""
@@ -39,7 +42,7 @@ class CountEdgeTypeAttributeUsage(
         count = await self._repos.edges.count_with_attribute(
             str(edge_type.slug),
             query.key,
-            scope=self._policy.scope_for(actor),
+            scope=self.scope(actor),
             sub_key=query.sub_key,
             value=query.value,
         )

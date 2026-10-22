@@ -16,6 +16,7 @@ from app.modules.graph.application.list_edge_types import (
 )
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
@@ -35,7 +36,7 @@ async def test_list_edge_types_returns_all() -> None:
     et2 = EdgeType.create(slug="written-by", label="Written By")
     await edge_types.add(et1)
     await edge_types.add(et2)
-    use_case = ListEdgeTypes(_make_repos(edge_types))
+    use_case = ListEdgeTypes(_make_repos(edge_types), InMemoryAccessGuard())
 
     results = await use_case.handle(ListEdgeTypesQuery(), SYSTEM_ACTOR)
 
@@ -48,7 +49,7 @@ async def test_list_edge_types_respects_limit() -> None:
     edge_types = InMemoryEdgeTypeRepository()
     for i in range(5):
         await edge_types.add(EdgeType.create(slug=f"type-{i}", label=f"Type {i}"))
-    use_case = ListEdgeTypes(_make_repos(edge_types))
+    use_case = ListEdgeTypes(_make_repos(edge_types), InMemoryAccessGuard())
 
     results = await use_case.handle(ListEdgeTypesQuery(limit=2), SYSTEM_ACTOR)
 
@@ -61,7 +62,7 @@ async def test_list_edge_types_excludes_deleted() -> None:
     et = EdgeType.create(slug="directed-by", label="Directed By")
     et.soft_delete()
     await edge_types.add(et)
-    use_case = ListEdgeTypes(_make_repos(edge_types))
+    use_case = ListEdgeTypes(_make_repos(edge_types), InMemoryAccessGuard())
 
     results = await use_case.handle(ListEdgeTypesQuery(), SYSTEM_ACTOR)
 

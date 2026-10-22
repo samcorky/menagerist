@@ -37,6 +37,7 @@ from app.modules.graph.domain.errors import InvalidAttributesError, InvalidSchem
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.platform.shared_data import shared_data_path
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -169,7 +170,7 @@ async def test_create_node_type_rejects_uncompilable_pattern(
     """CreateNodeType rejects a pattern Python cannot compile."""
     uow, _ = _make_uow()
     with pytest.raises(InvalidSchemaError):
-        await CreateNodeType(uow).handle(
+        await CreateNodeType(uow, InMemoryAccessGuard()).handle(
             CreateNodeTypeCommand(slug="film", label="Film", attributes_schema=schema),
             SYSTEM_ACTOR,
         )
@@ -184,7 +185,7 @@ async def test_update_node_type_rejects_uncompilable_pattern(
     nt = NodeType.create(slug="film", label="Film")
     await repos.node_types.add(nt)
     with pytest.raises(InvalidSchemaError):
-        await UpdateNodeType(uow).handle(
+        await UpdateNodeType(uow, InMemoryAccessGuard()).handle(
             UpdateNodeTypeCommand(node_type_id=nt.id, attributes_schema=schema),
             SYSTEM_ACTOR,
         )
@@ -197,7 +198,7 @@ async def test_create_edge_type_rejects_uncompilable_pattern(
     """CreateEdgeType rejects a pattern Python cannot compile."""
     uow, _ = _make_uow()
     with pytest.raises(InvalidSchemaError):
-        await CreateEdgeType(uow).handle(
+        await CreateEdgeType(uow, InMemoryAccessGuard()).handle(
             CreateEdgeTypeCommand(slug="made", label="Made", attributes_schema=schema),
             SYSTEM_ACTOR,
         )
@@ -212,7 +213,7 @@ async def test_update_edge_type_rejects_uncompilable_pattern(
     et = EdgeType.create(slug="made", label="Made")
     await repos.edge_types.add(et)
     with pytest.raises(InvalidSchemaError):
-        await UpdateEdgeType(uow).handle(
+        await UpdateEdgeType(uow, InMemoryAccessGuard()).handle(
             UpdateEdgeTypeCommand(edge_type_id=et.id, attributes_schema=schema),
             SYSTEM_ACTOR,
         )

@@ -18,6 +18,7 @@ from app.modules.graph.application.get_node_type import GetNodeType, GetNodeType
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
@@ -35,7 +36,7 @@ async def test_get_node_type_returns_existing() -> None:
     node_types = InMemoryNodeTypeRepository()
     nt = NodeType.create(slug="film", label="Film")
     await node_types.add(nt)
-    use_case = GetNodeType(_make_repos(node_types))
+    use_case = GetNodeType(_make_repos(node_types), InMemoryAccessGuard())
 
     result = await use_case.handle(GetNodeTypeQuery(node_type_id=nt.id), SYSTEM_ACTOR)
 
@@ -44,7 +45,9 @@ async def test_get_node_type_returns_existing() -> None:
 
 async def test_get_node_type_raises_when_missing() -> None:
     """GetNodeType raises NodeTypeNotFoundError for an unknown id."""
-    use_case = GetNodeType(_make_repos(InMemoryNodeTypeRepository()))
+    use_case = GetNodeType(
+        _make_repos(InMemoryNodeTypeRepository()), InMemoryAccessGuard()
+    )
 
     with pytest.raises(NodeTypeNotFoundError):
         await use_case.handle(GetNodeTypeQuery(node_type_id=uuid.uuid4()), SYSTEM_ACTOR)
@@ -64,7 +67,9 @@ async def test_get_node_type_fills_in_linked_choice_options() -> None:
     node_types = InMemoryNodeTypeRepository()
     nt = NodeType.create(slug="film", label="Film", attributes_schema=schema)
     await node_types.add(nt)
-    use_case = GetNodeType(_make_repos(node_types), _Options(["Mint", "Good"]))
+    use_case = GetNodeType(
+        _make_repos(node_types), InMemoryAccessGuard(), _Options(["Mint", "Good"])
+    )
 
     result = await use_case.handle(GetNodeTypeQuery(node_type_id=nt.id), SYSTEM_ACTOR)
 

@@ -1,6 +1,6 @@
 import pytest
 
-from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -26,6 +26,7 @@ from app.modules.graph.domain.errors import (
     NodeTypeSlugConflictError,
 )
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -43,7 +44,7 @@ def _make_uow() -> tuple[InMemoryUnitOfWork[GraphRepos], GraphRepos]:
 async def test_create_node_type_persists_and_commits() -> None:
     """CreateNodeType adds the node type to the repository and commits."""
     uow, repos = _make_uow()
-    use_case = CreateNodeType(uow)
+    use_case = CreateNodeType(uow, InMemoryAccessGuard())
 
     nt = await use_case.handle(
         CreateNodeTypeCommand(slug="film", label="Film"),
@@ -64,7 +65,7 @@ async def test_create_node_type_persists_attributes_schema() -> None:
             "year": {"title": "Year", "type": "number"},
         },
     }
-    use_case = CreateNodeType(uow)
+    use_case = CreateNodeType(uow, InMemoryAccessGuard())
 
     nt = await use_case.handle(
         CreateNodeTypeCommand(slug="film", label="Film", attributes_schema=schema),
@@ -79,7 +80,7 @@ async def test_create_node_type_persists_attributes_schema() -> None:
 async def test_create_node_type_raises_on_invalid_schema() -> None:
     """CreateNodeType rejects a schema that is not valid JSON Schema."""
     uow, _ = _make_uow()
-    use_case = CreateNodeType(uow)
+    use_case = CreateNodeType(uow, InMemoryAccessGuard())
 
     with pytest.raises(InvalidSchemaError):
         await use_case.handle(
@@ -95,7 +96,7 @@ async def test_create_node_type_raises_on_invalid_schema() -> None:
 async def test_create_node_type_raises_on_slug_conflict() -> None:
     """CreateNodeType raises NodeTypeSlugConflictError when slug already exists."""
     uow, _ = _make_uow()
-    use_case = CreateNodeType(uow)
+    use_case = CreateNodeType(uow, InMemoryAccessGuard())
     await use_case.handle(
         CreateNodeTypeCommand(slug="film", label="Film"), SYSTEM_ACTOR
     )
@@ -110,14 +111,14 @@ async def test_create_node_type_raises_on_slug_conflict() -> None:
 async def test_create_node_type_succeeds_after_delete_of_same_slug() -> None:
     """A deleted node type stops reserving its slug; the live one wins afterwards."""
     uow, repos = _make_uow()
-    first = await CreateNodeType(uow).handle(
+    first = await CreateNodeType(uow, InMemoryAccessGuard()).handle(
         CreateNodeTypeCommand(slug="film", label="Film"), SYSTEM_ACTOR
     )
-    await DeleteNodeType(uow, RoleAuthorisationAdapter()).handle(
+    await DeleteNodeType(uow, get_access_guard()).handle(
         DeleteNodeTypeCommand(node_type_id=first.id), SYSTEM_ACTOR
     )
 
-    second = await CreateNodeType(uow).handle(
+    second = await CreateNodeType(uow, InMemoryAccessGuard()).handle(
         CreateNodeTypeCommand(slug="film", label="Film again"), SYSTEM_ACTOR
     )
 
@@ -125,7 +126,7 @@ async def test_create_node_type_succeeds_after_delete_of_same_slug() -> None:
     assert await repos.node_types.get_by_slug("film") is second
 
     with pytest.raises(NodeTypeSlugConflictError):
-        await CreateNodeType(uow).handle(
+        await CreateNodeType(uow, InMemoryAccessGuard()).handle(
             CreateNodeTypeCommand(slug="film", label="Third"), SYSTEM_ACTOR
         )
 
@@ -133,7 +134,7 @@ async def test_create_node_type_succeeds_after_delete_of_same_slug() -> None:
 async def test_create_node_type_raises_on_malformed_metadata() -> None:
     """CreateNodeType rejects a wrongly typed `x-menagerist` member."""
     uow, _ = _make_uow()
-    use_case = CreateNodeType(uow)
+    use_case = CreateNodeType(uow, InMemoryAccessGuard())
 
     with pytest.raises(InvalidSchemaError):
         await use_case.handle(
@@ -149,7 +150,7 @@ async def test_create_node_type_raises_on_malformed_metadata() -> None:
 async def test_create_node_type_rejects_highlight_of_unknown_field() -> None:
     """CreateNodeType rejects a highlight that names a field that does not exist."""
     uow, _ = _make_uow()
-    use_case = CreateNodeType(uow)
+    use_case = CreateNodeType(uow, InMemoryAccessGuard())
 
     with pytest.raises(InvalidSchemaError):
         await use_case.handle(

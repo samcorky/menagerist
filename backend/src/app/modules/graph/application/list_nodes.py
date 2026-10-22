@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Callable  # noqa: TC003
 from dataclasses import dataclass, replace
 from datetime import date  # noqa: TC003
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
@@ -27,14 +27,15 @@ from app.modules.graph.ports.collection_members import (
     SmartSource,
 )
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access import Access, Content
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
-from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
-from app.shared_kernel.cqrs import ScopedQueryHandler
+from app.shared_kernel.guarded import GuardedQueryHandler
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
     from app.shared_kernel.content_filter import ContentFilter
 
@@ -80,17 +81,19 @@ def _combine(saved: Group | None, filters: list[Condition]) -> Group | None:
     return Group(op="and", children=tuple(children)) if children else None
 
 
-class ListNodes(ScopedQueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
+class ListNodes(GuardedQueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
     """List node with keyset pagination."""
+
+    access: ClassVar[Access] = Content()
 
     def __init__(
         self,
         repos: GraphRepos,
-        policy: AccessPolicy,
+        guard: AccessGuard,
         collection_members: CollectionMembers | None = None,
         today: Callable[[], date] = utc_today,
     ) -> None:
-        super().__init__(repos, policy)
+        super().__init__(repos, guard)
         self._collection_members = collection_members
         self._today = today
 
@@ -146,9 +149,9 @@ class ListNodes(ScopedQueryHandler[GraphRepos, ListNodesQuery, ListNodesResult])
                 exclusions[str(node_type.slug)] = keys
         return exclusions
 
-    async def handle(self, query: ListNodesQuery, actor: Actor) -> ListNodesResult:
+    async def _handle(self, query: ListNodesQuery, actor: Actor) -> ListNodesResult:
         """Return a page of nodes and total count matching the query."""
-        scope = self._policy.scope_for(actor)
+        scope = self.scope(actor)
         source = await self._resolve_collection(query.collection, scope)
         if isinstance(source, SmartSource):
             smart = await self._list_smart(query, source.definition, scope)

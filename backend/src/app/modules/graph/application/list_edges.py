@@ -1,12 +1,13 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.cqrs import ScopedQueryHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedQueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -23,12 +24,14 @@ class ListEdgesQuery:
     node_id: uuid.UUID | None = None
 
 
-class ListEdges(ScopedQueryHandler[GraphRepos, ListEdgesQuery, list[Edge]]):
+class ListEdges(GuardedQueryHandler[GraphRepos, ListEdgesQuery, list[Edge]]):
     """List edge with keyset pagination, optionally scoped to a single node."""
 
-    async def handle(self, query: ListEdgesQuery, actor: Actor) -> list[Edge]:
+    access: ClassVar[Access] = Content()
+
+    async def _handle(self, query: ListEdgesQuery, actor: Actor) -> list[Edge]:
         """Return a page of edge after `query.after`, up to `query.limit`."""
-        scope = self._policy.scope_for(actor)
+        scope = self.scope(actor)
         if query.node_id is not None:
             edges = await self._repos.edges.list_for_node(
                 query.node_id, scope=scope, after=query.after, limit=query.limit

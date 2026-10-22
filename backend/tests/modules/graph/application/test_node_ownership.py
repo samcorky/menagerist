@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -40,16 +39,18 @@ from app.modules.graph.domain.errors import NodeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 if TYPE_CHECKING:
-    from app.shared_kernel.access_policy import AccessPolicy
+    from app.shared_kernel.access import Access
+    from app.shared_kernel.access_guard import AccessGuard
 
 ALICE = Actor(id=uuid.UUID(int=101), roles=frozenset({"member"}))
 BOB = Actor(id=uuid.UUID(int=102), roles=frozenset({"member"}))
-POLICY = OwnerAccessPolicy()
+POLICY = InMemoryAccessGuard()
 
 
 def _repos() -> GraphRepos:
@@ -61,12 +62,15 @@ def _repos() -> GraphRepos:
     )
 
 
-class _RecordingPolicy:
-    """Wraps the real policy and records which check each use case asks for."""
+class _RecordingGuard:
+    """Wraps the in-memory guard and records which check each use case asks for."""
 
     def __init__(self) -> None:
         self.calls: list[str] = []
-        self._inner = OwnerAccessPolicy()
+        self._inner = InMemoryAccessGuard()
+
+    async def check(self, actor: Actor, access: Access) -> None:
+        await self._inner.check(actor, access)
 
     def scope_for(self, actor: Actor) -> ContentFilter:
         self.calls.append("scope")
@@ -213,27 +217,27 @@ async def test_usage_counts_and_value_suggestions_use_the_viewers_scope() -> Non
     ]
 
 
-async def test_each_use_case_asks_the_policy_for_the_right_check() -> None:
+async def test_each_use_case_asks_the_guard_for_the_right_check() -> None:
     """Reads ask for view, edits for modify and deletes for delete."""
     repos = _repos()
     node = await _alices_item(repos)
     uow = InMemoryUnitOfWork(repos)
-    recorder = _RecordingPolicy()
-    policy: AccessPolicy = recorder
+    recorder = _RecordingGuard()
+    guard: AccessGuard = recorder
 
-    await GetNode(repos, policy).handle(GetNodeQuery(node_id=node.id), ALICE)
+    await GetNode(repos, guard).handle(GetNodeQuery(node_id=node.id), ALICE)
     assert recorder.calls == ["scope", "view"]
 
     recorder.calls.clear()
-    await UpdateNode(uow, policy).handle(
+    await UpdateNode(uow, guard).handle(
         UpdateNodeCommand(node_id=node.id, name="Aliens"), ALICE
     )
     assert recorder.calls == ["scope", "modify"]
 
     recorder.calls.clear()
-    await ListNodes(repos, policy).handle(ListNodesQuery(), ALICE)
+    await ListNodes(repos, guard).handle(ListNodesQuery(), ALICE)
     assert recorder.calls == ["scope"]
 
     recorder.calls.clear()
-    await DeleteNode(uow, policy).handle(DeleteNodeCommand(node_id=node.id), ALICE)
+    await DeleteNode(uow, guard).handle(DeleteNodeCommand(node_id=node.id), ALICE)
     assert recorder.calls == ["scope", "delete"]

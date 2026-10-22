@@ -1,6 +1,5 @@
 import uuid
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -20,6 +19,7 @@ from app.modules.graph.application.list_item_fields import (
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.query import ItemFieldUse
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 ALICE = uuid.UUID(int=1)
@@ -39,7 +39,7 @@ async def test_returns_an_empty_list_when_no_item_has_an_overlay() -> None:
     repos = _repos()
     await repos.nodes.add(Node.create(owner_id=ALICE, name="Plain"))
 
-    result = await ListItemFields(repos, OwnerAccessPolicy()).handle(
+    result = await ListItemFields(repos, InMemoryAccessGuard()).handle(
         ListItemFieldsQuery(), SYSTEM_ACTOR
     )
 
@@ -61,7 +61,7 @@ async def test_lists_the_per_item_fields_in_use() -> None:
     }
     await repos.nodes.add(Node.create(owner_id=ALICE, name="A", extra_schema=schema))
 
-    result = await ListItemFields(repos, OwnerAccessPolicy()).handle(
+    result = await ListItemFields(repos, InMemoryAccessGuard()).handle(
         ListItemFieldsQuery(), SYSTEM_ACTOR
     )
 

@@ -2,7 +2,6 @@ import uuid
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -19,6 +18,7 @@ from app.modules.graph.application.get_node import GetNode, GetNodeQuery
 from app.modules.graph.domain.errors import NodeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
@@ -36,7 +36,7 @@ async def test_get_node_returns_existing_node() -> None:
     nodes = InMemoryNodeRepository()
     node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
     await nodes.add(node)
-    use_case = GetNode(_make_repos(nodes), OwnerAccessPolicy())
+    use_case = GetNode(_make_repos(nodes), InMemoryAccessGuard())
 
     result = await use_case.handle(GetNodeQuery(node_id=node.id), SYSTEM_ACTOR)
 
@@ -45,7 +45,7 @@ async def test_get_node_returns_existing_node() -> None:
 
 async def test_get_node_raises_when_missing() -> None:
     """GetNode raises NodeNotFoundError when the node doesn't exist."""
-    use_case = GetNode(_make_repos(InMemoryNodeRepository()), OwnerAccessPolicy())
+    use_case = GetNode(_make_repos(InMemoryNodeRepository()), InMemoryAccessGuard())
 
     with pytest.raises(NodeNotFoundError):
         await use_case.handle(GetNodeQuery(node_id=uuid.uuid4()), SYSTEM_ACTOR)

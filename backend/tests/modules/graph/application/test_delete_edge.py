@@ -2,7 +2,6 @@ import uuid
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -22,6 +21,7 @@ from app.modules.graph.application.delete_edge import DeleteEdge, DeleteEdgeComm
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.errors import EdgeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
 
@@ -43,7 +43,7 @@ async def test_delete_edge_soft_deletes_and_commits() -> None:
         edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = create_in_memory_graph_uow(repos)
-    use_case = DeleteEdge(uow, OwnerAccessPolicy())
+    use_case = DeleteEdge(uow, InMemoryAccessGuard())
 
     await use_case.handle(DeleteEdgeCommand(edge_id=edge.id), SYSTEM_ACTOR)
 
@@ -59,7 +59,7 @@ async def test_delete_edge_raises_when_missing() -> None:
         edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = create_in_memory_graph_uow(repos)
-    use_case = DeleteEdge(uow, OwnerAccessPolicy())
+    use_case = DeleteEdge(uow, InMemoryAccessGuard())
 
     with pytest.raises(EdgeNotFoundError):
         await use_case.handle(DeleteEdgeCommand(edge_id=uuid.uuid4()), SYSTEM_ACTOR)

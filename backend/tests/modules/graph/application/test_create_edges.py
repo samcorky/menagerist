@@ -2,7 +2,6 @@ import uuid
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -21,6 +20,7 @@ from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import InvalidAttributesError, NodeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
@@ -52,7 +52,7 @@ async def test_create_edges_connects_every_target_and_commits() -> None:
     repos, source, targets = await _repos_with_source_and_targets(3)
     uow = InMemoryUnitOfWork(repos)
 
-    result = await CreateEdges(uow, OwnerAccessPolicy()).handle(
+    result = await CreateEdges(uow, InMemoryAccessGuard()).handle(
         CreateEdgesCommand(
             source_id=source.id,
             target_ids=[t.id for t in targets],
@@ -81,7 +81,7 @@ async def test_create_edges_skips_a_target_already_connected() -> None:
     )
     await repos.edges.add(existing)
 
-    result = await CreateEdges(InMemoryUnitOfWork(repos), OwnerAccessPolicy()).handle(
+    result = await CreateEdges(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
         CreateEdgesCommand(
             source_id=source.id,
             target_ids=[t.id for t in targets],
@@ -105,7 +105,7 @@ async def test_create_edges_does_not_skip_a_different_type() -> None:
     )
     await repos.edges.add(other_type)
 
-    result = await CreateEdges(InMemoryUnitOfWork(repos), OwnerAccessPolicy()).handle(
+    result = await CreateEdges(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
         CreateEdgesCommand(
             source_id=source.id, target_ids=[targets[0].id], type="pictured-with"
         ),
@@ -127,7 +127,7 @@ async def test_create_edges_treats_an_incoming_edge_as_already_connected() -> No
     )
     await repos.edges.add(reverse)
 
-    result = await CreateEdges(InMemoryUnitOfWork(repos), OwnerAccessPolicy()).handle(
+    result = await CreateEdges(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
         CreateEdgesCommand(
             source_id=source.id, target_ids=[targets[0].id], type="pictured-with"
         ),
@@ -143,7 +143,7 @@ async def test_create_edges_raises_for_a_missing_source() -> None:
     repos, _source, targets = await _repos_with_source_and_targets(1)
 
     with pytest.raises(NodeNotFoundError):
-        await CreateEdges(InMemoryUnitOfWork(repos), OwnerAccessPolicy()).handle(
+        await CreateEdges(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
             CreateEdgesCommand(
                 source_id=uuid.uuid4(), target_ids=[targets[0].id], type="pictured-with"
             ),
@@ -156,7 +156,7 @@ async def test_create_edges_raises_for_a_missing_target() -> None:
     repos, source, targets = await _repos_with_source_and_targets(1)
 
     with pytest.raises(NodeNotFoundError):
-        await CreateEdges(InMemoryUnitOfWork(repos), OwnerAccessPolicy()).handle(
+        await CreateEdges(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
             CreateEdgesCommand(
                 source_id=source.id,
                 target_ids=[targets[0].id, uuid.uuid4()],
@@ -181,7 +181,7 @@ async def test_create_edges_validates_attributes_against_the_type_schema() -> No
     )
 
     with pytest.raises(InvalidAttributesError):
-        await CreateEdges(InMemoryUnitOfWork(repos), OwnerAccessPolicy()).handle(
+        await CreateEdges(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
             CreateEdgesCommand(
                 source_id=source.id,
                 target_ids=[t.id for t in targets],
@@ -196,7 +196,7 @@ async def test_create_edges_auto_creates_an_unknown_edge_type() -> None:
     """An unknown type slug creates the edge type, as CreateEdge already does."""
     repos, source, targets = await _repos_with_source_and_targets(1)
 
-    await CreateEdges(InMemoryUnitOfWork(repos), OwnerAccessPolicy()).handle(
+    await CreateEdges(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
         CreateEdgesCommand(
             source_id=source.id, target_ids=[targets[0].id], type="pictured-with"
         ),

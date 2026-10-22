@@ -1,12 +1,13 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.graph.domain.errors import NodeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -21,18 +22,18 @@ class DeleteNodeCommand:
     node_id: uuid.UUID
 
 
-class DeleteNode(ScopedCommandHandler[GraphUnitOfWork, DeleteNodeCommand, None]):
+class DeleteNode(GuardedCommandHandler[GraphUnitOfWork, DeleteNodeCommand, None]):
     """Soft-delete an existing node."""
 
-    async def handle(self, command: DeleteNodeCommand, actor: Actor) -> None:
+    access: ClassVar[Access] = Content()
+
+    async def _handle(self, command: DeleteNodeCommand, actor: Actor) -> None:
         """Soft-delete the node identified by `command` and commit."""
         async with self._uow as repos:
-            node = await repos.nodes.get(
-                command.node_id, scope=self._policy.scope_for(actor)
-            )
+            node = await repos.nodes.get(command.node_id, scope=self.scope(actor))
             if node is None:
                 raise NodeNotFoundError(f"Node {command.node_id} not found")
-            self._policy.assert_can_delete(actor, node.owner_id)
+            self._guard.assert_can_delete(actor, node.owner_id)
 
             node.soft_delete()
 

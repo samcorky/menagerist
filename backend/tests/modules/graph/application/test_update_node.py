@@ -2,7 +2,6 @@ import uuid
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -24,6 +23,7 @@ from app.modules.graph.domain.errors import (
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
@@ -41,7 +41,7 @@ async def test_update_node_persists_and_commits() -> None:
         edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = InMemoryUnitOfWork(repos)
-    use_case = UpdateNode(uow, OwnerAccessPolicy())
+    use_case = UpdateNode(uow, InMemoryAccessGuard())
 
     result = await use_case.handle(
         UpdateNodeCommand(node_id=node.id, name="Alien (1979)"),
@@ -64,7 +64,7 @@ async def test_update_node_raises_when_missing() -> None:
         edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = InMemoryUnitOfWork(repos)
-    use_case = UpdateNode(uow, OwnerAccessPolicy())
+    use_case = UpdateNode(uow, InMemoryAccessGuard())
 
     with pytest.raises(NodeNotFoundError):
         await use_case.handle(
@@ -90,7 +90,7 @@ async def test_update_node_skips_node_type_creation_when_type_exists() -> None:
         edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = InMemoryUnitOfWork(repos)
-    use_case = UpdateNode(uow, OwnerAccessPolicy())
+    use_case = UpdateNode(uow, InMemoryAccessGuard())
 
     await use_case.handle(
         UpdateNodeCommand(node_id=node.id, type="Film"),
@@ -113,7 +113,7 @@ async def test_update_node_creates_node_type_when_type_is_new() -> None:
         edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = InMemoryUnitOfWork(repos)
-    use_case = UpdateNode(uow, OwnerAccessPolicy())
+    use_case = UpdateNode(uow, InMemoryAccessGuard())
 
     await use_case.handle(
         UpdateNodeCommand(node_id=node.id, type="Film"),
@@ -141,7 +141,7 @@ async def test_update_node_skips_validation_when_node_type_has_no_schema() -> No
         edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = InMemoryUnitOfWork(repos)
-    use_case = UpdateNode(uow, OwnerAccessPolicy())
+    use_case = UpdateNode(uow, InMemoryAccessGuard())
 
     result = await use_case.handle(
         UpdateNodeCommand(node_id=node.id, attributes={"anything": "goes"}),
@@ -173,7 +173,7 @@ async def test_update_node_validates_attributes_against_schema() -> None:
         edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = InMemoryUnitOfWork(repos)
-    use_case = UpdateNode(uow, OwnerAccessPolicy())
+    use_case = UpdateNode(uow, InMemoryAccessGuard())
 
     with pytest.raises(InvalidAttributesError):
         await use_case.handle(
@@ -210,7 +210,7 @@ async def test_update_node_ignores_stale_value_that_was_not_edited() -> None:
         node_types=node_types,
         edge_types=InMemoryEdgeTypeRepository(),
     )
-    use_case = UpdateNode(InMemoryUnitOfWork(repos), OwnerAccessPolicy())
+    use_case = UpdateNode(InMemoryUnitOfWork(repos), InMemoryAccessGuard())
 
     result = await use_case.handle(
         UpdateNodeCommand(
@@ -243,7 +243,7 @@ async def test_update_node_validates_attributes_against_an_extra_schema() -> Non
     node = Node.create(owner_id=uuid.UUID(int=1), name="Alien")
     repos = _empty_repos()
     await repos.nodes.add(node)
-    use_case = UpdateNode(InMemoryUnitOfWork(repos), OwnerAccessPolicy())
+    use_case = UpdateNode(InMemoryUnitOfWork(repos), InMemoryAccessGuard())
 
     with pytest.raises(InvalidAttributesError):
         await use_case.handle(
@@ -271,7 +271,7 @@ async def test_update_node_reuses_the_stored_extra_schema_when_none_is_given() -
     )
     repos = _empty_repos()
     await repos.nodes.add(node)
-    use_case = UpdateNode(InMemoryUnitOfWork(repos), OwnerAccessPolicy())
+    use_case = UpdateNode(InMemoryUnitOfWork(repos), InMemoryAccessGuard())
 
     with pytest.raises(InvalidAttributesError):
         await use_case.handle(
@@ -295,7 +295,7 @@ async def test_update_node_rejects_extra_schema_redefining_a_type_field() -> Non
         )
     )
     await repos.nodes.add(node)
-    use_case = UpdateNode(InMemoryUnitOfWork(repos), OwnerAccessPolicy())
+    use_case = UpdateNode(InMemoryUnitOfWork(repos), InMemoryAccessGuard())
 
     with pytest.raises(InvalidSchemaError):
         await use_case.handle(
@@ -314,7 +314,7 @@ async def test_update_node_rejects_extra_schema_redefining_a_type_field() -> Non
 async def test_update_node_rejects_malformed_extra_schema_before_node_load() -> None:
     """An invalid `extra_schema` is rejected even for a node id that does not exist."""
     repos = _empty_repos()
-    use_case = UpdateNode(InMemoryUnitOfWork(repos), OwnerAccessPolicy())
+    use_case = UpdateNode(InMemoryUnitOfWork(repos), InMemoryAccessGuard())
 
     with pytest.raises(InvalidSchemaError):
         await use_case.handle(
@@ -331,7 +331,7 @@ async def test_update_node_sets_extra_schema_and_leaves_it_when_not_given() -> N
     node = Node.create(owner_id=uuid.UUID(int=1), name="Alien")
     repos = _empty_repos()
     await repos.nodes.add(node)
-    use_case = UpdateNode(InMemoryUnitOfWork(repos), OwnerAccessPolicy())
+    use_case = UpdateNode(InMemoryUnitOfWork(repos), InMemoryAccessGuard())
     schema = {"type": "object", "properties": {"signed": {"type": "boolean"}}}
 
     await use_case.handle(

@@ -21,6 +21,7 @@ from app.modules.graph.application.update_node_type import (
 from app.modules.graph.domain.errors import InvalidSchemaError, NodeTypeNotFoundError
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -40,7 +41,7 @@ async def test_update_node_type_persists_and_commits() -> None:
     uow, repos = _make_uow()
     nt = NodeType.create(slug="film", label="Film")
     await repos.node_types.add(nt)
-    use_case = UpdateNodeType(uow)
+    use_case = UpdateNodeType(uow, InMemoryAccessGuard())
 
     result = await use_case.handle(
         UpdateNodeTypeCommand(node_type_id=nt.id, label="Movie"),
@@ -66,7 +67,7 @@ async def test_update_node_type_persists_attributes_schema() -> None:
             "year": {"title": "Year", "type": "number"},
         },
     }
-    use_case = UpdateNodeType(uow)
+    use_case = UpdateNodeType(uow, InMemoryAccessGuard())
 
     result = await use_case.handle(
         UpdateNodeTypeCommand(node_type_id=nt.id, attributes_schema=schema),
@@ -84,7 +85,7 @@ async def test_update_node_type_raises_on_invalid_schema() -> None:
     uow, repos = _make_uow()
     nt = NodeType.create(slug="film", label="Film")
     await repos.node_types.add(nt)
-    use_case = UpdateNodeType(uow)
+    use_case = UpdateNodeType(uow, InMemoryAccessGuard())
 
     with pytest.raises(InvalidSchemaError):
         await use_case.handle(
@@ -99,7 +100,7 @@ async def test_update_node_type_raises_on_invalid_schema() -> None:
 async def test_update_node_type_raises_when_missing() -> None:
     """UpdateNodeType raises NodeTypeNotFoundError when the node type doesn't exist."""
     uow, _ = _make_uow()
-    use_case = UpdateNodeType(uow)
+    use_case = UpdateNodeType(uow, InMemoryAccessGuard())
 
     with pytest.raises(NodeTypeNotFoundError):
         await use_case.handle(

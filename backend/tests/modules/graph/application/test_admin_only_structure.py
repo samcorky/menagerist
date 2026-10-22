@@ -4,8 +4,7 @@ import uuid
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
-from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -40,6 +39,7 @@ from app.modules.graph.domain.errors import EdgeTypeInUseError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ForbiddenError
@@ -48,7 +48,7 @@ from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 ADMIN = Actor(id=uuid.UUID(int=100), roles=frozenset({"admin"}))
 ALICE = Actor(id=uuid.UUID(int=101), roles=frozenset({"member"}))
 BOB = Actor(id=uuid.UUID(int=102), roles=frozenset({"member"}))
-POLICY = OwnerAccessPolicy()
+POLICY = InMemoryAccessGuard()
 ALL = ContentFilter.everyone()
 
 
@@ -108,7 +108,7 @@ async def test_member_cannot_delete_a_node_type() -> None:
     uow = InMemoryUnitOfWork(repos)
 
     with pytest.raises(ForbiddenError):
-        await DeleteNodeType(uow, RoleAuthorisationAdapter()).handle(
+        await DeleteNodeType(uow, get_access_guard()).handle(
             DeleteNodeTypeCommand(node_type_id=node_type.id), ALICE
         )
 
@@ -123,7 +123,7 @@ async def test_admin_deleting_a_node_type_clears_everyones_items() -> None:
     node_type, nodes = await _items_of_two_people(repos)
     uow = InMemoryUnitOfWork(repos)
 
-    await DeleteNodeType(uow, RoleAuthorisationAdapter()).handle(
+    await DeleteNodeType(uow, get_access_guard()).handle(
         DeleteNodeTypeCommand(node_type_id=node_type.id), ADMIN
     )
 
@@ -139,7 +139,7 @@ async def test_member_cannot_purge_a_node_type_attribute() -> None:
     uow = InMemoryUnitOfWork(repos)
 
     with pytest.raises(ForbiddenError):
-        await PurgeNodeTypeAttribute(uow, RoleAuthorisationAdapter()).handle(
+        await PurgeNodeTypeAttribute(uow, get_access_guard()).handle(
             PurgeNodeTypeAttributeCommand(node_type_id=node_type.id, key="rating"),
             BOB,
         )
@@ -154,7 +154,7 @@ async def test_admin_purging_a_node_type_attribute_spans_everyones_items() -> No
     node_type, nodes = await _items_of_two_people(repos)
     uow = InMemoryUnitOfWork(repos)
 
-    await PurgeNodeTypeAttribute(uow, RoleAuthorisationAdapter()).handle(
+    await PurgeNodeTypeAttribute(uow, get_access_guard()).handle(
         PurgeNodeTypeAttributeCommand(node_type_id=node_type.id, key="rating"), ADMIN
     )
     assert [n.attributes for n in nodes] == [{"keep": "me"}, {"keep": "me"}]
@@ -168,7 +168,7 @@ async def test_member_cannot_delete_an_edge_type() -> None:
     uow = InMemoryUnitOfWork(repos)
 
     with pytest.raises(ForbiddenError):
-        await DeleteEdgeType(uow, RoleAuthorisationAdapter()).handle(
+        await DeleteEdgeType(uow, get_access_guard()).handle(
             DeleteEdgeTypeCommand(edge_type_id=edge_type.id), ALICE
         )
 
@@ -193,7 +193,7 @@ async def test_admin_edge_type_delete_sees_everyones_connections() -> None:
     uow = InMemoryUnitOfWork(repos)
 
     with pytest.raises(EdgeTypeInUseError):
-        await DeleteEdgeType(uow, RoleAuthorisationAdapter()).handle(
+        await DeleteEdgeType(uow, get_access_guard()).handle(
             DeleteEdgeTypeCommand(edge_type_id=edge_type.id), ADMIN
         )
 
@@ -207,7 +207,7 @@ async def test_admin_can_delete_an_unused_edge_type() -> None:
     await repos.edge_types.add(edge_type)
     uow = InMemoryUnitOfWork(repos)
 
-    await DeleteEdgeType(uow, RoleAuthorisationAdapter()).handle(
+    await DeleteEdgeType(uow, get_access_guard()).handle(
         DeleteEdgeTypeCommand(edge_type_id=edge_type.id), ADMIN
     )
 
@@ -222,7 +222,7 @@ async def test_member_cannot_purge_an_edge_type_attribute() -> None:
     uow = InMemoryUnitOfWork(repos)
 
     with pytest.raises(ForbiddenError):
-        await PurgeEdgeTypeAttribute(uow, RoleAuthorisationAdapter()).handle(
+        await PurgeEdgeTypeAttribute(uow, get_access_guard()).handle(
             PurgeEdgeTypeAttributeCommand(edge_type_id=edge_type.id, key="n"), ALICE
         )
 
@@ -238,7 +238,7 @@ async def test_admin_purging_an_edge_type_attribute_spans_everyones_connections(
     edge_type, edges = await _connections_of_two_people(repos, attributes={"n": "1"})
     uow = InMemoryUnitOfWork(repos)
 
-    await PurgeEdgeTypeAttribute(uow, RoleAuthorisationAdapter()).handle(
+    await PurgeEdgeTypeAttribute(uow, get_access_guard()).handle(
         PurgeEdgeTypeAttributeCommand(edge_type_id=edge_type.id, key="n"), ADMIN
     )
     assert [e.attributes for e in edges] == [{}, {}]

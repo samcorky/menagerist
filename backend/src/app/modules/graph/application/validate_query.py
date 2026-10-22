@@ -3,13 +3,17 @@
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date  # noqa: TC003
-from typing import Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from app.modules.graph.application.prepare_query import prepare_query, utc_today
 from app.modules.graph.domain.query import QueryWarning
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access import Access, Shared
 from app.shared_kernel.actor import Actor  # noqa: TC001
-from app.shared_kernel.cqrs import QueryHandler
+from app.shared_kernel.guarded import GuardedQueryHandler
+
+if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
 
 
 @dataclass(kw_only=True)
@@ -26,16 +30,23 @@ class ValidateQueryResult:
     warnings: list[QueryWarning]
 
 
-class ValidateQuery(QueryHandler[GraphRepos, ValidateQueryQuery, ValidateQueryResult]):
+class ValidateQuery(
+    GuardedQueryHandler[GraphRepos, ValidateQueryQuery, ValidateQueryResult]
+):
     """Validate a condition tree against the current item types."""
 
+    access: ClassVar[Access] = Shared()
+
     def __init__(
-        self, repos: GraphRepos, today: Callable[[], date] = utc_today
+        self,
+        repos: GraphRepos,
+        guard: AccessGuard,
+        today: Callable[[], date] = utc_today,
     ) -> None:
-        super().__init__(repos)
+        super().__init__(repos, guard)
         self._today = today
 
-    async def handle(
+    async def _handle(
         self, request: ValidateQueryQuery, actor: Actor
     ) -> ValidateQueryResult:
         """Return the stale-condition warnings.

@@ -3,8 +3,7 @@ import uuid
 import pytest
 from structlog.testing import capture_logs
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
-from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -40,6 +39,7 @@ from app.modules.graph.domain.errors import EdgeTypeNotFoundError, NodeTypeNotFo
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
@@ -121,7 +121,7 @@ async def test_count_node_type_attribute_usage_counts_only_that_type() -> None:
     """Only live nodes of the type that hold the key are counted."""
     repos, node_type, _ = await _node_setup()
 
-    count = await CountNodeTypeAttributeUsage(repos, OwnerAccessPolicy()).handle(
+    count = await CountNodeTypeAttributeUsage(repos, InMemoryAccessGuard()).handle(
         CountNodeTypeAttributeUsageQuery(node_type_id=node_type.id, key="old"),
         SYSTEM_ACTOR,
     )
@@ -133,7 +133,7 @@ async def test_count_node_type_attribute_usage_can_match_a_value() -> None:
     """With `value`, only nodes holding that exact value are counted."""
     repos, node_type, _ = await _node_setup()
 
-    count = await CountNodeTypeAttributeUsage(repos, OwnerAccessPolicy()).handle(
+    count = await CountNodeTypeAttributeUsage(repos, InMemoryAccessGuard()).handle(
         CountNodeTypeAttributeUsageQuery(
             node_type_id=node_type.id, key="keep", value="a"
         ),
@@ -147,7 +147,7 @@ async def test_count_edge_type_attribute_usage_can_match_a_value() -> None:
     """With `value`, only edges holding that exact value are counted."""
     repos, edge_type, _ = await _edge_setup()
 
-    count = await CountEdgeTypeAttributeUsage(repos, OwnerAccessPolicy()).handle(
+    count = await CountEdgeTypeAttributeUsage(repos, InMemoryAccessGuard()).handle(
         CountEdgeTypeAttributeUsageQuery(
             edge_type_id=edge_type.id, key="old", value="x"
         ),
@@ -160,7 +160,7 @@ async def test_count_edge_type_attribute_usage_can_match_a_value() -> None:
 async def test_count_node_type_attribute_usage_raises_for_missing_type() -> None:
     """An unknown node type id is a not-found error."""
     with pytest.raises(NodeTypeNotFoundError):
-        await CountNodeTypeAttributeUsage(_repos(), OwnerAccessPolicy()).handle(
+        await CountNodeTypeAttributeUsage(_repos(), InMemoryAccessGuard()).handle(
             CountNodeTypeAttributeUsageQuery(node_type_id=uuid.uuid4(), key="old"),
             SYSTEM_ACTOR,
         )
@@ -170,7 +170,7 @@ async def test_count_edge_type_attribute_usage_counts_only_that_type() -> None:
     """Only live edges of the type that hold the key are counted."""
     repos, edge_type, _ = await _edge_setup()
 
-    count = await CountEdgeTypeAttributeUsage(repos, OwnerAccessPolicy()).handle(
+    count = await CountEdgeTypeAttributeUsage(repos, InMemoryAccessGuard()).handle(
         CountEdgeTypeAttributeUsageQuery(edge_type_id=edge_type.id, key="old"),
         SYSTEM_ACTOR,
     )
@@ -181,7 +181,7 @@ async def test_count_edge_type_attribute_usage_counts_only_that_type() -> None:
 async def test_count_edge_type_attribute_usage_raises_for_missing_type() -> None:
     """An unknown edge type id is a not-found error."""
     with pytest.raises(EdgeTypeNotFoundError):
-        await CountEdgeTypeAttributeUsage(_repos(), OwnerAccessPolicy()).handle(
+        await CountEdgeTypeAttributeUsage(_repos(), InMemoryAccessGuard()).handle(
             CountEdgeTypeAttributeUsageQuery(edge_type_id=uuid.uuid4(), key="old"),
             SYSTEM_ACTOR,
         )
@@ -193,7 +193,7 @@ async def test_purge_node_type_attribute_removes_key_and_touches_nodes() -> None
     before = {node.id: node.updated_at for node in nodes}
     uow = InMemoryUnitOfWork(repos)
 
-    await PurgeNodeTypeAttribute(uow, RoleAuthorisationAdapter()).handle(
+    await PurgeNodeTypeAttribute(uow, get_access_guard()).handle(
         PurgeNodeTypeAttributeCommand(node_type_id=node_type.id, key="old"),
         SYSTEM_ACTOR,
     )
@@ -223,9 +223,7 @@ async def test_purge_node_type_attribute_pages_through_all_nodes(
             )
         )
 
-    await PurgeNodeTypeAttribute(
-        InMemoryUnitOfWork(repos), RoleAuthorisationAdapter()
-    ).handle(
+    await PurgeNodeTypeAttribute(InMemoryUnitOfWork(repos), get_access_guard()).handle(
         PurgeNodeTypeAttributeCommand(node_type_id=node_type.id, key="old"),
         SYSTEM_ACTOR,
     )
@@ -241,7 +239,7 @@ async def test_purge_node_type_attribute_raises_for_missing_type() -> None:
     """An unknown node type id is a not-found error."""
     with pytest.raises(NodeTypeNotFoundError):
         await PurgeNodeTypeAttribute(
-            InMemoryUnitOfWork(_repos()), RoleAuthorisationAdapter()
+            InMemoryUnitOfWork(_repos()), get_access_guard()
         ).handle(
             PurgeNodeTypeAttributeCommand(node_type_id=uuid.uuid4(), key="old"),
             SYSTEM_ACTOR,
@@ -253,7 +251,7 @@ async def test_purge_edge_type_attribute_removes_key() -> None:
     repos, edge_type, edges = await _edge_setup()
     uow = InMemoryUnitOfWork(repos)
 
-    await PurgeEdgeTypeAttribute(uow, RoleAuthorisationAdapter()).handle(
+    await PurgeEdgeTypeAttribute(uow, get_access_guard()).handle(
         PurgeEdgeTypeAttributeCommand(edge_type_id=edge_type.id, key="old"),
         SYSTEM_ACTOR,
     )
@@ -266,7 +264,7 @@ async def test_purge_edge_type_attribute_raises_for_missing_type() -> None:
     """An unknown edge type id is a not-found error."""
     with pytest.raises(EdgeTypeNotFoundError):
         await PurgeEdgeTypeAttribute(
-            InMemoryUnitOfWork(_repos()), RoleAuthorisationAdapter()
+            InMemoryUnitOfWork(_repos()), get_access_guard()
         ).handle(
             PurgeEdgeTypeAttributeCommand(edge_type_id=uuid.uuid4(), key="old"),
             SYSTEM_ACTOR,
@@ -295,7 +293,7 @@ async def test_count_node_type_attribute_usage_can_match_a_group_sub_key() -> No
         )
     )
 
-    count = await CountNodeTypeAttributeUsage(repos, OwnerAccessPolicy()).handle(
+    count = await CountNodeTypeAttributeUsage(repos, InMemoryAccessGuard()).handle(
         CountNodeTypeAttributeUsageQuery(
             node_type_id=node_type.id, key="ingredients", sub_key="unit"
         ),
@@ -327,9 +325,7 @@ async def test_purge_node_type_attribute_strips_a_group_sub_key_from_every_row()
     )
     await repos.nodes.add(node)
 
-    await PurgeNodeTypeAttribute(
-        InMemoryUnitOfWork(repos), RoleAuthorisationAdapter()
-    ).handle(
+    await PurgeNodeTypeAttribute(InMemoryUnitOfWork(repos), get_access_guard()).handle(
         PurgeNodeTypeAttributeCommand(
             node_type_id=node_type.id, key="ingredients", sub_key="unit"
         ),
@@ -366,7 +362,7 @@ async def test_count_edge_type_attribute_usage_can_match_a_group_sub_key() -> No
         )
     )
 
-    count = await CountEdgeTypeAttributeUsage(repos, OwnerAccessPolicy()).handle(
+    count = await CountEdgeTypeAttributeUsage(repos, InMemoryAccessGuard()).handle(
         CountEdgeTypeAttributeUsageQuery(
             edge_type_id=edge_type.id, key="terms", sub_key="duration"
         ),
@@ -393,9 +389,7 @@ async def test_purge_edge_type_attribute_strips_a_group_sub_key_from_every_row()
     )
     await repos.edges.add(edge)
 
-    await PurgeEdgeTypeAttribute(
-        InMemoryUnitOfWork(repos), RoleAuthorisationAdapter()
-    ).handle(
+    await PurgeEdgeTypeAttribute(InMemoryUnitOfWork(repos), get_access_guard()).handle(
         PurgeEdgeTypeAttributeCommand(
             edge_type_id=edge_type.id, key="terms", sub_key="duration"
         ),
@@ -410,7 +404,7 @@ async def test_purge_node_type_attribute_logs_the_count_it_does_not_return() -> 
 
     with capture_logs() as logs:
         await PurgeNodeTypeAttribute(
-            InMemoryUnitOfWork(repos), RoleAuthorisationAdapter()
+            InMemoryUnitOfWork(repos), get_access_guard()
         ).handle(
             PurgeNodeTypeAttributeCommand(node_type_id=node_type.id, key="old"),
             SYSTEM_ACTOR,
@@ -425,7 +419,7 @@ async def test_purge_edge_type_attribute_logs_the_count_it_does_not_return() -> 
 
     with capture_logs() as logs:
         await PurgeEdgeTypeAttribute(
-            InMemoryUnitOfWork(repos), RoleAuthorisationAdapter()
+            InMemoryUnitOfWork(repos), get_access_guard()
         ).handle(
             PurgeEdgeTypeAttributeCommand(edge_type_id=edge_type.id, key="old"),
             SYSTEM_ACTOR,

@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -33,16 +32,17 @@ from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import EdgeNotFoundError, NodeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 if TYPE_CHECKING:
-    from app.shared_kernel.access_policy import AccessPolicy
+    from app.shared_kernel.access import Access
 
 ALICE = Actor(id=uuid.UUID(int=101), roles=frozenset({"member"}))
 BOB = Actor(id=uuid.UUID(int=102), roles=frozenset({"member"}))
-POLICY = OwnerAccessPolicy()
+POLICY = InMemoryAccessGuard()
 
 
 class _SpyEdges(InMemoryEdgeRepository):
@@ -61,12 +61,15 @@ class _SpyEdges(InMemoryEdgeRepository):
         await super().save(edge)
 
 
-class _RecordingPolicy:
-    """Wraps the real policy and records which check each use case asks for."""
+class _RecordingGuard:
+    """Wraps the in-memory guard and records which check each use case asks for."""
 
     def __init__(self) -> None:
         self.calls: list[str] = []
-        self._inner: AccessPolicy = OwnerAccessPolicy()
+        self._inner = InMemoryAccessGuard()
+
+    async def check(self, actor: Actor, access: Access) -> None:
+        await self._inner.check(actor, access)
 
     def scope_for(self, actor: Actor) -> ContentFilter:
         self.calls.append("scope")
@@ -306,16 +309,16 @@ async def test_edge_type_usage_counts_use_the_viewers_scope() -> None:
     assert await use_case.handle(query, BOB) == 2
 
 
-async def test_use_cases_ask_the_policy_for_the_right_check() -> None:
+async def test_use_cases_ask_the_guard_for_the_right_check() -> None:
     """Each path calls scope plus the matching assert, nothing else."""
     repos, _ = _repos()
     edge = await _connection(repos, ALICE, attributes={"k": "v"})
 
     async def calls(build: type, command: object, *, query: bool = False) -> list[str]:
-        policy = _RecordingPolicy()
+        guard = _RecordingGuard()
         arg = repos if query else InMemoryUnitOfWork(repos)
-        await build(arg, policy).handle(command, ALICE)
-        return policy.calls
+        await build(arg, guard).handle(command, ALICE)
+        return guard.calls
 
     assert await calls(GetEdge, GetEdgeQuery(edge_id=edge.id), query=True) == [
         "scope",

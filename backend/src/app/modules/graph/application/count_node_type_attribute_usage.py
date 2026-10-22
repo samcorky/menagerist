@@ -1,12 +1,13 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.cqrs import ScopedQueryHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedQueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -25,11 +26,13 @@ class CountNodeTypeAttributeUsageQuery:
 
 
 class CountNodeTypeAttributeUsage(
-    ScopedQueryHandler[GraphRepos, CountNodeTypeAttributeUsageQuery, int]
+    GuardedQueryHandler[GraphRepos, CountNodeTypeAttributeUsageQuery, int]
 ):
     """Count the nodes of a node type whose attributes contain a key."""
 
-    async def handle(
+    access: ClassVar[Access] = Content()
+
+    async def _handle(
         self, query: CountNodeTypeAttributeUsageQuery, actor: Actor
     ) -> int:
         """Return the count, or raise `NodeTypeNotFoundError` if the type is missing."""
@@ -39,7 +42,7 @@ class CountNodeTypeAttributeUsage(
         count = await self._repos.nodes.count_with_attribute(
             str(node_type.slug),
             query.key,
-            scope=self._policy.scope_for(actor),
+            scope=self.scope(actor),
             sub_key=query.sub_key,
             value=query.value,
         )

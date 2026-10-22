@@ -18,6 +18,7 @@ from app.modules.graph.application.get_edge_type import GetEdgeType, GetEdgeType
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import EdgeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
@@ -35,7 +36,7 @@ async def test_get_edge_type_returns_existing() -> None:
     edge_types = InMemoryEdgeTypeRepository()
     et = EdgeType.create(slug="directed-by", label="Directed By")
     await edge_types.add(et)
-    use_case = GetEdgeType(_make_repos(edge_types))
+    use_case = GetEdgeType(_make_repos(edge_types), InMemoryAccessGuard())
 
     result = await use_case.handle(GetEdgeTypeQuery(edge_type_id=et.id), SYSTEM_ACTOR)
 
@@ -44,7 +45,9 @@ async def test_get_edge_type_returns_existing() -> None:
 
 async def test_get_edge_type_raises_when_missing() -> None:
     """GetEdgeType raises EdgeTypeNotFoundError for an unknown id."""
-    use_case = GetEdgeType(_make_repos(InMemoryEdgeTypeRepository()))
+    use_case = GetEdgeType(
+        _make_repos(InMemoryEdgeTypeRepository()), InMemoryAccessGuard()
+    )
 
     with pytest.raises(EdgeTypeNotFoundError):
         await use_case.handle(GetEdgeTypeQuery(edge_type_id=uuid.uuid4()), SYSTEM_ACTOR)

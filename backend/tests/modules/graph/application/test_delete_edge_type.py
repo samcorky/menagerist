@@ -2,7 +2,7 @@ import uuid
 
 import pytest
 
-from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -42,7 +42,7 @@ async def test_delete_edge_type_soft_deletes_and_commits() -> None:
     uow, repos = _make_uow()
     et = EdgeType.create(slug="directed-by", label="Directed By")
     await repos.edge_types.add(et)
-    use_case = DeleteEdgeType(uow, RoleAuthorisationAdapter())
+    use_case = DeleteEdgeType(uow, get_access_guard())
 
     await use_case.handle(DeleteEdgeTypeCommand(edge_type_id=et.id), SYSTEM_ACTOR)
 
@@ -53,7 +53,7 @@ async def test_delete_edge_type_soft_deletes_and_commits() -> None:
 async def test_delete_edge_type_raises_when_missing() -> None:
     """DeleteEdgeType raises EdgeTypeNotFoundError when the edge type doesn't exist."""
     uow, _ = _make_uow()
-    use_case = DeleteEdgeType(uow, RoleAuthorisationAdapter())
+    use_case = DeleteEdgeType(uow, get_access_guard())
 
     with pytest.raises(EdgeTypeNotFoundError):
         await use_case.handle(
@@ -73,7 +73,7 @@ async def test_delete_edge_type_raises_when_edges_still_reference_it() -> None:
         type="directed-by",
     )
     await repos.edges.add(edge)
-    use_case = DeleteEdgeType(uow, RoleAuthorisationAdapter())
+    use_case = DeleteEdgeType(uow, get_access_guard())
 
     with pytest.raises(EdgeTypeInUseError):
         await use_case.handle(DeleteEdgeTypeCommand(edge_type_id=et.id), SYSTEM_ACTOR)
@@ -94,7 +94,7 @@ async def test_delete_edge_type_succeeds_when_no_edges_reference_it() -> None:
         type="produced-by",
     )
     await repos.edges.add(other_edge)
-    use_case = DeleteEdgeType(uow, RoleAuthorisationAdapter())
+    use_case = DeleteEdgeType(uow, get_access_guard())
 
     await use_case.handle(DeleteEdgeTypeCommand(edge_type_id=et.id), SYSTEM_ACTOR)
 

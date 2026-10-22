@@ -2,7 +2,6 @@ import uuid
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -27,6 +26,7 @@ from app.modules.graph.domain.errors import (
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -76,7 +76,7 @@ async def test_moves_the_property_and_keeps_the_value() -> None:
         node_id=node.id, node_type_id=node_type.id, key="condition"
     )
 
-    updated = await PromoteExtraSchemaField(uow, OwnerAccessPolicy()).handle(
+    updated = await PromoteExtraSchemaField(uow, InMemoryAccessGuard()).handle(
         command, SYSTEM_ACTOR
     )
 
@@ -121,7 +121,7 @@ async def test_moves_one_property_and_keeps_the_others_in_the_overlay() -> None:
         node_id=node.id, node_type_id=node_type.id, key="condition"
     )
 
-    updated = await PromoteExtraSchemaField(uow, OwnerAccessPolicy()).handle(
+    updated = await PromoteExtraSchemaField(uow, InMemoryAccessGuard()).handle(
         command, SYSTEM_ACTOR
     )
 
@@ -145,7 +145,7 @@ async def test_key_not_in_the_overlay_raises() -> None:
     uow = InMemoryUnitOfWork(_repos(nodes=nodes, node_types=node_types))
 
     with pytest.raises(InvalidSchemaError):
-        await PromoteExtraSchemaField(uow, OwnerAccessPolicy()).handle(
+        await PromoteExtraSchemaField(uow, InMemoryAccessGuard()).handle(
             PromoteExtraSchemaFieldCommand(
                 node_id=node.id, node_type_id=node_type.id, key="condition"
             ),
@@ -180,7 +180,7 @@ async def test_key_already_on_the_type_raises() -> None:
     uow = InMemoryUnitOfWork(_repos(nodes=nodes, node_types=node_types))
 
     with pytest.raises(InvalidSchemaError):
-        await PromoteExtraSchemaField(uow, OwnerAccessPolicy()).handle(
+        await PromoteExtraSchemaField(uow, InMemoryAccessGuard()).handle(
             PromoteExtraSchemaFieldCommand(
                 node_id=node.id, node_type_id=node_type.id, key="condition"
             ),
@@ -196,7 +196,7 @@ async def test_node_not_found_raises() -> None:
     uow = InMemoryUnitOfWork(_repos(node_types=node_types))
 
     with pytest.raises(NodeNotFoundError):
-        await PromoteExtraSchemaField(uow, OwnerAccessPolicy()).handle(
+        await PromoteExtraSchemaField(uow, InMemoryAccessGuard()).handle(
             PromoteExtraSchemaFieldCommand(
                 node_id=uuid.uuid7(), node_type_id=node_type.id, key="condition"
             ),
@@ -220,7 +220,7 @@ async def test_node_type_not_found_raises() -> None:
     uow = InMemoryUnitOfWork(_repos(nodes=nodes))
 
     with pytest.raises(NodeTypeNotFoundError):
-        await PromoteExtraSchemaField(uow, OwnerAccessPolicy()).handle(
+        await PromoteExtraSchemaField(uow, InMemoryAccessGuard()).handle(
             PromoteExtraSchemaFieldCommand(
                 node_id=node.id, node_type_id=uuid.uuid7(), key="condition"
             ),

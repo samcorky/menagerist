@@ -1,6 +1,5 @@
 import uuid
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -16,6 +15,7 @@ from app.modules.graph.adapters.persistence.in_memory_node_type_repository impor
 from app.modules.graph.application.list_edges import ListEdges, ListEdgesQuery
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
@@ -42,7 +42,7 @@ async def test_list_edges_returns_all_edges() -> None:
     ]
     for edge in items:
         await edges.add(edge)
-    use_case = ListEdges(_make_repos(edges), OwnerAccessPolicy())
+    use_case = ListEdges(_make_repos(edges), InMemoryAccessGuard())
 
     result = await use_case.handle(ListEdgesQuery(), SYSTEM_ACTOR)
 
@@ -67,7 +67,7 @@ async def test_list_edges_filters_by_node_id() -> None:
     )
     await edges.add(touching)
     await edges.add(unrelated)
-    use_case = ListEdges(_make_repos(edges), OwnerAccessPolicy())
+    use_case = ListEdges(_make_repos(edges), InMemoryAccessGuard())
 
     result = await use_case.handle(ListEdgesQuery(node_id=node_id), SYSTEM_ACTOR)
 

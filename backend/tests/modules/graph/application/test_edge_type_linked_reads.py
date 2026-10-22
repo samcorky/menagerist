@@ -19,6 +19,7 @@ from app.modules.graph.application.list_edge_types import (
 )
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 LIST_ID = "6f1d2a7e-3c4b-4e5f-8a9b-0c1d2e3f4a5b"
@@ -56,9 +57,9 @@ async def test_get_edge_type_fills_in_linked_options() -> None:
     et = EdgeType.create(slug="rated", label="Rated", attributes_schema=SCHEMA)
     await edge_types.add(et)
 
-    result = await GetEdgeType(_repos(edge_types), _Options()).handle(
-        GetEdgeTypeQuery(edge_type_id=et.id), SYSTEM_ACTOR
-    )
+    result = await GetEdgeType(
+        _repos(edge_types), InMemoryAccessGuard(), _Options()
+    ).handle(GetEdgeTypeQuery(edge_type_id=et.id), SYSTEM_ACTOR)
 
     assert result.attributes_schema is not None
     assert result.attributes_schema["properties"]["rating"]["enum"] == ["Low", "High"]
@@ -70,9 +71,9 @@ async def test_get_edge_type_returns_the_stored_object_when_nothing_is_linked() 
     et = EdgeType.create(slug="plain", label="Plain")
     await edge_types.add(et)
 
-    result = await GetEdgeType(_repos(edge_types), _Options()).handle(
-        GetEdgeTypeQuery(edge_type_id=et.id), SYSTEM_ACTOR
-    )
+    result = await GetEdgeType(
+        _repos(edge_types), InMemoryAccessGuard(), _Options()
+    ).handle(GetEdgeTypeQuery(edge_type_id=et.id), SYSTEM_ACTOR)
 
     assert result is et
 
@@ -84,9 +85,9 @@ async def test_list_edge_types_fills_in_linked_options() -> None:
         EdgeType.create(slug="rated", label="Rated", attributes_schema=SCHEMA)
     )
 
-    results = await ListEdgeTypes(_repos(edge_types), _Options()).handle(
-        ListEdgeTypesQuery(), SYSTEM_ACTOR
-    )
+    results = await ListEdgeTypes(
+        _repos(edge_types), InMemoryAccessGuard(), _Options()
+    ).handle(ListEdgeTypesQuery(), SYSTEM_ACTOR)
 
     assert results[0].attributes_schema is not None
     assert results[0].attributes_schema["properties"]["rating"]["enum"] == [

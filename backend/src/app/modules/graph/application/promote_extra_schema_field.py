@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
@@ -16,7 +16,8 @@ from app.modules.graph.domain.errors import (
     NodeTypeNotFoundError,
 )
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedCommandHandler
 from app.shared_kernel.unit_of_work import JoinedUnitOfWork
 
 if TYPE_CHECKING:
@@ -42,7 +43,7 @@ class PromoteExtraSchemaFieldCommand:
 
 
 class PromoteExtraSchemaField(
-    ScopedCommandHandler[GraphUnitOfWork, PromoteExtraSchemaFieldCommand, "Node"]
+    GuardedCommandHandler[GraphUnitOfWork, PromoteExtraSchemaFieldCommand, "Node"]
 ):
     """Move an overlay field definition onto the item type; its value is untouched.
 
@@ -53,19 +54,19 @@ class PromoteExtraSchemaField(
     separate requests.
     """
 
-    async def handle(
+    access: ClassVar[Access] = Content()
+
+    async def _handle(
         self, command: PromoteExtraSchemaFieldCommand, actor: Actor
     ) -> Node:
         """Move `command.key` from the node's overlay to the item type's schema."""
         async with self._uow as repos:
             joined = JoinedUnitOfWork(repos, owner=self._uow)
 
-            node = await repos.nodes.get(
-                command.node_id, scope=self._policy.scope_for(actor)
-            )
+            node = await repos.nodes.get(command.node_id, scope=self.scope(actor))
             if node is None:
                 raise NodeNotFoundError(f"Node {command.node_id} not found")
-            self._policy.assert_can_modify(actor, node.owner_id)
+            self._guard.assert_can_modify(actor, node.owner_id)
             extra_properties: dict[str, Any] = (node.extra_schema or {}).get(
                 "properties"
             ) or {}
@@ -97,7 +98,7 @@ class PromoteExtraSchemaField(
                     command.key: extra_properties[command.key],
                 },
             }
-            await UpdateNodeType(joined).handle(
+            await UpdateNodeType(joined, self._guard).handle(
                 UpdateNodeTypeCommand(
                     node_type_id=command.node_type_id,
                     attributes_schema=new_type_schema,
@@ -107,7 +108,7 @@ class PromoteExtraSchemaField(
 
             remaining = {k: v for k, v in extra_properties.items() if k != command.key}
             new_extra_schema = {**(node.extra_schema or {}), "properties": remaining}
-            updated_node = await UpdateNode(joined, self._policy).handle(
+            updated_node = await UpdateNode(joined, self._guard).handle(
                 UpdateNodeCommand(
                     node_id=command.node_id, extra_schema=new_extra_schema
                 ),

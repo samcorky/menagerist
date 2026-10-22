@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
@@ -18,13 +18,14 @@ from app.modules.graph.domain.node_type import NodeType
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos, GraphUnitOfWork
+from app.shared_kernel.access import Access, Content
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
-from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.guarded import GuardedCommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -48,29 +49,29 @@ class UpdateNodeCommand:
     extra_schema: dict[str, Any] | None = field(default=None)
 
 
-class UpdateNode(ScopedCommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
+class UpdateNode(GuardedCommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
     """Update an existing node's editable fields."""
+
+    access: ClassVar[Access] = Content()
 
     def __init__(
         self,
         uow: GraphUnitOfWork,
-        policy: AccessPolicy,
+        guard: AccessGuard,
         choice_lists: ChoiceListSource | None = None,
     ) -> None:
-        super().__init__(uow, policy)
+        super().__init__(uow, guard)
         self._choice_lists = choice_lists
 
-    async def handle(self, command: UpdateNodeCommand, actor: Actor) -> Node:
+    async def _handle(self, command: UpdateNodeCommand, actor: Actor) -> Node:
         """Apply `command`'s changes to the node and commit."""
         if command.extra_schema is not None:
             check_schema_definition(command.extra_schema)
         async with self._uow as repos:
-            node = await repos.nodes.get(
-                command.node_id, scope=self._policy.scope_for(actor)
-            )
+            node = await repos.nodes.get(command.node_id, scope=self.scope(actor))
             if node is None:
                 raise NodeNotFoundError(f"Node {command.node_id} not found")
-            self._policy.assert_can_modify(actor, node.owner_id)
+            self._guard.assert_can_modify(actor, node.owner_id)
 
             if command.extra_schema is not None:
                 check_extra_schema_limits(

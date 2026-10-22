@@ -2,7 +2,6 @@ import uuid
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -20,6 +19,7 @@ from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import EdgeNotFoundError, InvalidAttributesError
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
@@ -42,7 +42,7 @@ async def test_update_edge_persists_and_commits() -> None:
         edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = InMemoryUnitOfWork(repos)
-    use_case = UpdateEdge(uow, OwnerAccessPolicy())
+    use_case = UpdateEdge(uow, InMemoryAccessGuard())
 
     result = await use_case.handle(
         UpdateEdgeCommand(edge_id=edge.id, attributes={"since": "1979"}),
@@ -75,7 +75,7 @@ async def test_update_edge_keeps_attributes_when_omitted() -> None:
     )
     uow = InMemoryUnitOfWork(repos)
 
-    result = await UpdateEdge(uow, OwnerAccessPolicy()).handle(
+    result = await UpdateEdge(uow, InMemoryAccessGuard()).handle(
         UpdateEdgeCommand(edge_id=edge.id, attributes=None),
         SYSTEM_ACTOR,
     )
@@ -93,7 +93,7 @@ async def test_update_edge_raises_when_missing() -> None:
         edge_types=InMemoryEdgeTypeRepository(),
     )
     uow = InMemoryUnitOfWork(repos)
-    use_case = UpdateEdge(uow, OwnerAccessPolicy())
+    use_case = UpdateEdge(uow, InMemoryAccessGuard())
 
     with pytest.raises(EdgeNotFoundError):
         await use_case.handle(
@@ -128,7 +128,7 @@ async def test_update_edge_validates_attributes_against_schema() -> None:
         edge_types=edge_types,
     )
     uow = InMemoryUnitOfWork(repos)
-    use_case = UpdateEdge(uow, OwnerAccessPolicy())
+    use_case = UpdateEdge(uow, InMemoryAccessGuard())
 
     with pytest.raises(InvalidAttributesError):
         await use_case.handle(
@@ -166,7 +166,7 @@ async def test_update_edge_ignores_stale_invalid_value_that_was_not_edited() -> 
         node_types=InMemoryNodeTypeRepository(),
         edge_types=edge_types,
     )
-    use_case = UpdateEdge(InMemoryUnitOfWork(repos), OwnerAccessPolicy())
+    use_case = UpdateEdge(InMemoryUnitOfWork(repos), InMemoryAccessGuard())
 
     result = await use_case.handle(
         UpdateEdgeCommand(

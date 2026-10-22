@@ -1,7 +1,6 @@
 import uuid
 from typing import Any
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -19,6 +18,7 @@ from app.modules.graph.application.schema_meta import search_excluded_keys
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 _FILM_SCHEMA: dict[str, Any] = {
@@ -45,7 +45,7 @@ def _repos() -> GraphRepos:
 
 
 async def _search(repos: GraphRepos, q: str) -> list[Node]:
-    result = await ListNodes(repos, OwnerAccessPolicy()).handle(
+    result = await ListNodes(repos, InMemoryAccessGuard()).handle(
         ListNodesQuery(q=q), SYSTEM_ACTOR
     )
     return result.items
@@ -151,7 +151,7 @@ async def test_search_total_agrees_with_items() -> None:
     repos, film = await _film_repos()
     await repos.nodes.add(Node.create(owner_id=uuid.UUID(int=1), name="Unrelated"))
 
-    result = await ListNodes(repos, OwnerAccessPolicy()).handle(
+    result = await ListNodes(repos, InMemoryAccessGuard()).handle(
         ListNodesQuery(q="scott"), SYSTEM_ACTOR
     )
 
@@ -190,7 +190,7 @@ async def test_list_without_search_does_not_load_node_types() -> None:
     node = Node.create(owner_id=uuid.UUID(int=1), name="Alien")
     await repos.nodes.add(node)
 
-    result = await ListNodes(repos, OwnerAccessPolicy()).handle(
+    result = await ListNodes(repos, InMemoryAccessGuard()).handle(
         ListNodesQuery(), SYSTEM_ACTOR
     )
 

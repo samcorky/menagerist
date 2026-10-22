@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.graph.adapters.persistence.unit_of_work import (
     build_graph_repos,
     create_in_memory_graph_uow,
@@ -27,6 +27,7 @@ from app.modules.graph.domain.errors import (
     EdgeTypeSlugConflictError,
     NodeTypeSlugConflictError,
 )
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 if TYPE_CHECKING:
@@ -40,20 +41,20 @@ async def test_node_type_slug_is_reusable_after_delete_on_postgres(
 ) -> None:
     """Delete frees a slug and a live type holds it, in the use cases and the index."""
     uow = create_in_memory_graph_uow(build_graph_repos(db_session))
-    first = await CreateNodeType(uow).handle(
+    first = await CreateNodeType(uow, InMemoryAccessGuard()).handle(
         CreateNodeTypeCommand(slug="record", label="Record"), SYSTEM_ACTOR
     )
-    await DeleteNodeType(uow, RoleAuthorisationAdapter()).handle(
+    await DeleteNodeType(uow, get_access_guard()).handle(
         DeleteNodeTypeCommand(node_type_id=first.id), SYSTEM_ACTOR
     )
 
-    second = await CreateNodeType(uow).handle(
+    second = await CreateNodeType(uow, InMemoryAccessGuard()).handle(
         CreateNodeTypeCommand(slug="record", label="Record again"), SYSTEM_ACTOR
     )
 
     assert second.id != first.id
     with pytest.raises(NodeTypeSlugConflictError):
-        await CreateNodeType(uow).handle(
+        await CreateNodeType(uow, InMemoryAccessGuard()).handle(
             CreateNodeTypeCommand(slug="record", label="Third"), SYSTEM_ACTOR
         )
 
@@ -63,19 +64,19 @@ async def test_edge_type_slug_is_reusable_after_delete_on_postgres(
 ) -> None:
     """Delete frees a slug and a live type holds it, in the use cases and the index."""
     uow = create_in_memory_graph_uow(build_graph_repos(db_session))
-    first = await CreateEdgeType(uow).handle(
+    first = await CreateEdgeType(uow, InMemoryAccessGuard()).handle(
         CreateEdgeTypeCommand(slug="signed-by", label="Signed by"), SYSTEM_ACTOR
     )
-    await DeleteEdgeType(uow, RoleAuthorisationAdapter()).handle(
+    await DeleteEdgeType(uow, get_access_guard()).handle(
         DeleteEdgeTypeCommand(edge_type_id=first.id), SYSTEM_ACTOR
     )
 
-    second = await CreateEdgeType(uow).handle(
+    second = await CreateEdgeType(uow, InMemoryAccessGuard()).handle(
         CreateEdgeTypeCommand(slug="signed-by", label="Signed by again"), SYSTEM_ACTOR
     )
 
     assert second.id != first.id
     with pytest.raises(EdgeTypeSlugConflictError):
-        await CreateEdgeType(uow).handle(
+        await CreateEdgeType(uow, InMemoryAccessGuard()).handle(
             CreateEdgeTypeCommand(slug="signed-by", label="Third"), SYSTEM_ACTOR
         )

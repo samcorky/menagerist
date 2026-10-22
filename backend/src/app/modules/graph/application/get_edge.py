@@ -1,13 +1,14 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.errors import EdgeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.cqrs import ScopedQueryHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedQueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -22,16 +23,16 @@ class GetEdgeQuery:
     edge_id: uuid.UUID
 
 
-class GetEdge(ScopedQueryHandler[GraphRepos, GetEdgeQuery, Edge]):
+class GetEdge(GuardedQueryHandler[GraphRepos, GetEdgeQuery, Edge]):
     """Fetch a single edge by id."""
 
-    async def handle(self, query: GetEdgeQuery, actor: Actor) -> Edge:
+    access: ClassVar[Access] = Content()
+
+    async def _handle(self, query: GetEdgeQuery, actor: Actor) -> Edge:
         """Return the requested edge, raising `EdgeNotFoundError` if it's missing."""
-        edge = await self._repos.edges.get(
-            query.edge_id, scope=self._policy.scope_for(actor)
-        )
+        edge = await self._repos.edges.get(query.edge_id, scope=self.scope(actor))
         if edge is None:
             raise EdgeNotFoundError(f"Edge {query.edge_id} not found")
-        self._policy.assert_can_view(actor, edge.owner_id)
+        self._guard.assert_can_view(actor, edge.owner_id)
         logger.debug("edge fetched", edge_id=query.edge_id)
         return edge

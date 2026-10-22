@@ -1,6 +1,6 @@
 import pytest
 
-from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -26,6 +26,7 @@ from app.modules.graph.domain.errors import (
     InvalidSchemaError,
 )
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -43,7 +44,7 @@ def _make_uow() -> tuple[InMemoryUnitOfWork[GraphRepos], GraphRepos]:
 async def test_create_edge_type_persists_and_commits() -> None:
     """CreateEdgeType adds the edge type to the repository and commits."""
     uow, repos = _make_uow()
-    use_case = CreateEdgeType(uow)
+    use_case = CreateEdgeType(uow, InMemoryAccessGuard())
 
     et = await use_case.handle(
         CreateEdgeTypeCommand(slug="directed-by", label="Directed By"),
@@ -64,7 +65,7 @@ async def test_create_edge_type_persists_attributes_schema() -> None:
             "since": {"title": "Since", "type": "string", "format": "date"},
         },
     }
-    use_case = CreateEdgeType(uow)
+    use_case = CreateEdgeType(uow, InMemoryAccessGuard())
 
     et = await use_case.handle(
         CreateEdgeTypeCommand(
@@ -81,7 +82,7 @@ async def test_create_edge_type_persists_attributes_schema() -> None:
 async def test_create_edge_type_raises_on_invalid_schema() -> None:
     """CreateEdgeType rejects a schema that is not valid JSON Schema."""
     uow, _ = _make_uow()
-    use_case = CreateEdgeType(uow)
+    use_case = CreateEdgeType(uow, InMemoryAccessGuard())
 
     with pytest.raises(InvalidSchemaError):
         await use_case.handle(
@@ -97,14 +98,14 @@ async def test_create_edge_type_raises_on_invalid_schema() -> None:
 async def test_create_edge_type_succeeds_after_delete_of_same_slug() -> None:
     """A deleted edge type stops reserving its slug; the live one wins afterwards."""
     uow, repos = _make_uow()
-    first = await CreateEdgeType(uow).handle(
+    first = await CreateEdgeType(uow, InMemoryAccessGuard()).handle(
         CreateEdgeTypeCommand(slug="directed-by", label="Directed By"), SYSTEM_ACTOR
     )
-    await DeleteEdgeType(uow, RoleAuthorisationAdapter()).handle(
+    await DeleteEdgeType(uow, get_access_guard()).handle(
         DeleteEdgeTypeCommand(edge_type_id=first.id), SYSTEM_ACTOR
     )
 
-    second = await CreateEdgeType(uow).handle(
+    second = await CreateEdgeType(uow, InMemoryAccessGuard()).handle(
         CreateEdgeTypeCommand(slug="directed-by", label="Directed By again"),
         SYSTEM_ACTOR,
     )
@@ -113,7 +114,7 @@ async def test_create_edge_type_succeeds_after_delete_of_same_slug() -> None:
     assert await repos.edge_types.get_by_slug("directed-by") is second
 
     with pytest.raises(EdgeTypeSlugConflictError):
-        await CreateEdgeType(uow).handle(
+        await CreateEdgeType(uow, InMemoryAccessGuard()).handle(
             CreateEdgeTypeCommand(slug="directed-by", label="Third"), SYSTEM_ACTOR
         )
 
@@ -121,7 +122,7 @@ async def test_create_edge_type_succeeds_after_delete_of_same_slug() -> None:
 async def test_create_edge_type_raises_on_slug_conflict() -> None:
     """CreateEdgeType raises EdgeTypeSlugConflictError when slug already exists."""
     uow, _ = _make_uow()
-    use_case = CreateEdgeType(uow)
+    use_case = CreateEdgeType(uow, InMemoryAccessGuard())
     await use_case.handle(
         CreateEdgeTypeCommand(slug="directed-by", label="Directed By"), SYSTEM_ACTOR
     )
