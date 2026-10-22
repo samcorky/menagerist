@@ -23,7 +23,7 @@ from fastapi import Depends
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.bridges.attach_target_access import (
     GraphAttachTargetAccess,
     get_attach_target_access,
@@ -534,9 +534,11 @@ class World:
         o[get_definition_checker] = lambda: GraphDefinitionChecker(graph)
         # Readiness would otherwise open a real database connection.
         ready = InMemoryHealthCheckAdapter(_PASSING_READINESS)
-        o[get_get_health_ready_use_case] = lambda: GetHealthReady(ready)
+        o[get_get_health_ready_use_case] = lambda: GetHealthReady(
+            ready, get_access_guard()
+        )
         o[get_get_health_ready_detail_use_case] = lambda: GetHealthReadyDetail(
-            ready, RoleAuthorisationAdapter()
+            ready, get_access_guard()
         )
         o[get_preset_pack_target] = lambda: PresetPackTarget(
             in_memory_preset_stores(presets, graph)

@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
 
-from app.entrypoints.api.shared.dependencies import get_authorisation_port
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.system.adapters.platform.app_info_adapter import PackageAppInfoAdapter
 from app.modules.system.adapters.platform.checks.cors_configuration_check import (
     CorsConfigurationCheck,
@@ -38,11 +38,13 @@ from app.platform.database import get_session_factory
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-    from app.shared_kernel.authorisation import AuthorisationPort
+    from app.shared_kernel.access_guard import AccessGuard
 
 
-def get_get_health_use_case() -> GetHealth:
-    return GetHealth()
+def get_get_health_use_case(
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> GetHealth:
+    return GetHealth(guard)
 
 
 @lru_cache(maxsize=1)
@@ -75,30 +77,33 @@ def get_get_health_ready_use_case(
     session_factory: Annotated[
         async_sessionmaker[AsyncSession], Depends(get_session_factory)
     ],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> GetHealthReady:
-    return GetHealthReady(_readiness_registry(session_factory))
+    return GetHealthReady(_readiness_registry(session_factory), guard)
 
 
 def get_get_health_ready_detail_use_case(
     session_factory: Annotated[
         async_sessionmaker[AsyncSession], Depends(get_session_factory)
     ],
-    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> GetHealthReadyDetail:
-    return GetHealthReadyDetail(_readiness_registry(session_factory), authorisation)
+    return GetHealthReadyDetail(_readiness_registry(session_factory), guard)
 
 
-def get_get_version_use_case() -> GetVersion:
-    return GetVersion(PackageAppInfoAdapter())
+def get_get_version_use_case(
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> GetVersion:
+    return GetVersion(PackageAppInfoAdapter(), guard)
 
 
 def get_get_version_detail_use_case(
-    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> GetVersionDetail:
-    return GetVersionDetail(PackageAppInfoAdapter(), authorisation)
+    return GetVersionDetail(PackageAppInfoAdapter(), guard)
 
 
 def get_run_browser_check_use_case(
-    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> RunBrowserCheck:
-    return RunBrowserCheck(authorisation)
+    return RunBrowserCheck(guard)

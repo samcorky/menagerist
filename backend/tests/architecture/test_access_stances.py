@@ -13,7 +13,9 @@ from app.shared_kernel.guarded import GuardedUseCase
 
 # Pinned by name so widening who can call something needs an edit here.
 # Filled in as each module migrates.
-EXPECTED_PUBLIC: frozenset[str] = frozenset()
+EXPECTED_PUBLIC: frozenset[str] = frozenset(
+    {"system.GetHealth", "system.GetHealthReady", "system.GetVersion"}
+)
 EXPECTED_SYSTEM: frozenset[str] = frozenset()
 EXPECTED_SHARED: frozenset[str] = frozenset()
 EXPECTED_CONTENT: frozenset[str] = frozenset()

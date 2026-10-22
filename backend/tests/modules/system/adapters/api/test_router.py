@@ -10,7 +10,7 @@ from starlette.testclient import TestClient
 from structlog.testing import capture_logs
 
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.system.adapters.api import dependencies
 from app.modules.system.adapters.api.dependencies import (
@@ -31,6 +31,7 @@ from app.modules.system.domain.readiness import (
 from app.platform.config import get_identity_settings
 from app.platform.database import get_session_factory
 from app.platform.storage_probe import DirectoryProbe
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 
 if TYPE_CHECKING:
@@ -240,10 +241,10 @@ def test_readiness_reports_warn_status_without_503(storage: str) -> None:
     as_user(app, uuid.UUID(int=7), "admin")
     adapter = InMemoryHealthCheckAdapter(report)
     app.dependency_overrides[get_get_health_ready_use_case] = lambda: GetHealthReady(
-        adapter
+        adapter, InMemoryAccessGuard()
     )
     app.dependency_overrides[get_get_health_ready_detail_use_case] = lambda: (
-        GetHealthReadyDetail(adapter, RoleAuthorisationAdapter())
+        GetHealthReadyDetail(adapter, get_access_guard())
     )
     client = TestClient(app)
 

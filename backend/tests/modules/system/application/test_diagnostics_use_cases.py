@@ -2,6 +2,8 @@ import uuid
 
 import pytest
 
+from app.entrypoints.api.shared.access_guard import RoleAccessGuard
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.modules.system.adapters.platform.in_memory_app_info_adapter import (
     InMemoryAppInfoAdapter,
@@ -28,6 +30,7 @@ from app.modules.system.domain.readiness import CheckStatus, ReadinessReport
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.errors import ForbiddenError
 
+GUARD = RoleAccessGuard(RoleAuthorisationAdapter(), OwnerAccessPolicy())
 ADMIN = Actor(id=uuid.UUID(int=1), roles=frozenset({"admin"}))
 MEMBER = Actor(id=uuid.UUID(int=2), roles=frozenset({"member"}))
 APP_INFO = AppInfo(name="menagerist", version="1.2.3", migration_head=("abc123",))
@@ -42,18 +45,14 @@ def test_permission_value_follows_the_naming_pattern() -> None:
 @pytest.mark.parametrize("actor", [ADMIN, SYSTEM_ACTOR])
 async def test_admin_and_system_read_version_detail(actor: Actor) -> None:
     """Holders of the permission get the full build metadata."""
-    use_case = GetVersionDetail(
-        InMemoryAppInfoAdapter(APP_INFO), RoleAuthorisationAdapter()
-    )
+    use_case = GetVersionDetail(InMemoryAppInfoAdapter(APP_INFO), GUARD)
 
     assert await use_case.handle(GetVersionDetailQuery(), actor) is APP_INFO
 
 
 async def test_member_cannot_read_version_detail() -> None:
     """Members hold no diagnostics permission."""
-    use_case = GetVersionDetail(
-        InMemoryAppInfoAdapter(APP_INFO), RoleAuthorisationAdapter()
-    )
+    use_case = GetVersionDetail(InMemoryAppInfoAdapter(APP_INFO), GUARD)
 
     with pytest.raises(ForbiddenError):
         await use_case.handle(GetVersionDetailQuery(), MEMBER)
@@ -62,7 +61,7 @@ async def test_member_cannot_read_version_detail() -> None:
 async def test_admin_reads_readiness_detail_and_member_is_refused() -> None:
     """The checks run only for a holder of the permission."""
     adapter = InMemoryHealthCheckAdapter(REPORT)
-    use_case = GetHealthReadyDetail(adapter, RoleAuthorisationAdapter())
+    use_case = GetHealthReadyDetail(adapter, GUARD)
 
     assert await use_case.handle(GetHealthReadyDetailQuery(), ADMIN) is REPORT
     with pytest.raises(ForbiddenError):
@@ -74,7 +73,7 @@ async def test_admin_runs_the_browser_check_and_member_is_refused() -> None:
     request = BrowserRequest(
         sec_fetch_site="same-origin", origin="http://x", seen_origin="http://x"
     )
-    use_case = RunBrowserCheck(RoleAuthorisationAdapter())
+    use_case = RunBrowserCheck(GUARD)
 
     result = await use_case.handle(RunBrowserCheckQuery(request=request), ADMIN)
 

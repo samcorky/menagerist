@@ -1,8 +1,10 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from app.modules.system.domain.app_info import AppInfo
-from app.shared_kernel.cqrs import UseCase
+from app.shared_kernel.access import Access, Public
+from app.shared_kernel.access_guard import AccessGuard  # noqa: TC001
+from app.shared_kernel.guarded import GuardedUseCase
 
 if TYPE_CHECKING:
     from app.modules.system.ports.app_info_port import AppInfoPort
@@ -14,12 +16,15 @@ class GetVersionQuery:
     """Request for the running instance's version and build metadata."""
 
 
-class GetVersion(UseCase[GetVersionQuery, AppInfo]):
+class GetVersion(GuardedUseCase[GetVersionQuery, AppInfo]):
     """Report the project version and build provenance of the running instance."""
 
-    def __init__(self, app_info: AppInfoPort) -> None:
-        self._app_info = app_info
+    access: ClassVar[Access] = Public()
 
-    async def handle(self, query: GetVersionQuery, actor: Actor) -> AppInfo:
+    def __init__(self, app_info: AppInfoPort, guard: AccessGuard) -> None:
+        self._app_info = app_info
+        self._guard = guard
+
+    async def _handle(self, query: GetVersionQuery, actor: Actor) -> AppInfo:
         """Return the current application's version and build metadata."""
         return await self._app_info.load()

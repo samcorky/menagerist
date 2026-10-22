@@ -1,3 +1,4 @@
+import annotationlib
 import importlib
 import inspect
 import pkgutil
@@ -5,6 +6,7 @@ from enum import StrEnum
 
 import pytest
 
+import app.modules
 from app.shared_kernel.cqrs import (
     AuthorisedCommandHandler,
     AuthorisedQueryHandler,
@@ -13,7 +15,9 @@ from app.shared_kernel.cqrs import (
     QueryHandler,
     ScopedCommandHandler,
     ScopedQueryHandler,
+    UseCase,
 )
+from app.shared_kernel.guarded import GuardedUseCase
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 # ---------------------------------------------------------------------------
@@ -218,13 +222,13 @@ async def test_authorised_query_handler_checks_permission_then_handles() -> None
 
 
 def _application_use_case_classes() -> list[type]:
-    """Return every public class defined in app.modules.graph.application.*."""
-    import app.modules.graph.application as pkg
-
+    """Return every public class defined in app.modules.*.application.*."""
     classes: list[type] = []
     for _finder, module_name, _ispkg in pkgutil.walk_packages(
-        pkg.__path__, prefix=pkg.__name__ + "."
+        app.modules.__path__, prefix="app.modules."
     ):
+        if ".application" not in module_name:
+            continue
         module = importlib.import_module(module_name)
         for _name, obj in inspect.getmembers(module, inspect.isclass):
             if obj.__module__ == module_name and not _name.endswith(
@@ -235,13 +239,13 @@ def _application_use_case_classes() -> list[type]:
 
 
 def test_all_application_use_cases_inherit_from_cqrs_base() -> None:
-    """All application use cases extend CommandHandler or QueryHandler."""
+    """Every application class with a `handle` method extends a use case root."""
     violations: list[str] = []
     for cls in _application_use_case_classes():
-        if not (issubclass(cls, CommandHandler) or issubclass(cls, QueryHandler)):
+        if hasattr(cls, "handle") and not issubclass(cls, (UseCase, GuardedUseCase)):
             violations.append(cls.__qualname__)
     assert not violations, (
-        "Classes lacking CommandHandler/QueryHandler base:\n"
+        "Classes with `handle` that are not use cases:\n"
         + "\n".join(f"  {v}" for v in violations)
     )
 
@@ -252,7 +256,9 @@ def test_command_handlers_store_uow_not_repository() -> None:
     for cls in _application_use_case_classes():
         if not issubclass(cls, CommandHandler):
             continue
-        sig = inspect.signature(cls.__init__)
+        sig = inspect.signature(
+            cls.__init__, annotation_format=annotationlib.Format.FORWARDREF
+        )
         params = list(sig.parameters.values())
         # params[0] is self; params[1] should be `uow` with the UoW type
         if len(params) > 1:

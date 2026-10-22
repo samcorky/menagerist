@@ -1,10 +1,11 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from app.modules.system.application.permissions import SystemPermission
 from app.modules.system.domain.app_info import AppInfo
 from app.modules.system.ports.app_info_port import AppInfoPort
-from app.shared_kernel.cqrs import AuthorisedQueryHandler
+from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.guarded import GuardedQueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -16,13 +17,11 @@ class GetVersionDetailQuery:
 
 
 class GetVersionDetail(
-    AuthorisedQueryHandler[
-        AppInfoPort, GetVersionDetailQuery, AppInfo, SystemPermission
-    ]
+    GuardedQueryHandler[AppInfoPort, GetVersionDetailQuery, AppInfo]
 ):
     """Report commit, branch and migration head, for administrators."""
 
-    required_permission = SystemPermission.READ_DIAGNOSTICS
+    access: ClassVar[Access] = Requires(SystemPermission.READ_DIAGNOSTICS)
 
     async def _handle(self, query: GetVersionDetailQuery, actor: Actor) -> AppInfo:
         """Return the application's version and full build metadata."""

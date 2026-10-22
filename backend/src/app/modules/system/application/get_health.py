@@ -1,7 +1,9 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
-from app.shared_kernel.cqrs import UseCase
+from app.shared_kernel.access import Access, Public
+from app.shared_kernel.access_guard import AccessGuard  # noqa: TC001
+from app.shared_kernel.guarded import GuardedUseCase
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -12,9 +14,14 @@ class GetHealthQuery:
     """Request for a liveness check."""
 
 
-class GetHealth(UseCase[GetHealthQuery, None]):
+class GetHealth(GuardedUseCase[GetHealthQuery, None]):
     """Report that the process is up and able to accept requests."""
 
-    async def handle(self, query: GetHealthQuery, actor: Actor) -> None:
+    access: ClassVar[Access] = Public()
+
+    def __init__(self, guard: AccessGuard) -> None:
+        self._guard = guard
+
+    async def _handle(self, query: GetHealthQuery, actor: Actor) -> None:
         """Liveness has no dependencies to check - succeeding is the signal."""
         return None

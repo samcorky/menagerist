@@ -12,6 +12,7 @@ from app.modules.system.domain.readiness import (
     CheckStatus,
     ReadinessReport,
 )
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
@@ -31,7 +32,7 @@ async def test_get_health_ready_delegates_to_health_check_port() -> None:
             ]
         },
     )
-    use_case = GetHealthReady(InMemoryHealthCheckAdapter(report))
+    use_case = GetHealthReady(InMemoryHealthCheckAdapter(report), InMemoryAccessGuard())
 
     result = await use_case.handle(GetHealthReadyQuery(), SYSTEM_ACTOR)
 
