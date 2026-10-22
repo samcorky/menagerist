@@ -59,7 +59,29 @@ async function expectChrome(page: Page, text: string) {
 	await expect(logo(page)).toHaveAttribute('src', '/api/docs/logo.svg', CHROME);
 }
 
-test('shows a checking banner at once, before the sign-in state is known', async ({
+test('asks for the sign-in state while Swagger loads, and shows no banner until it has', async ({
+	browser,
+	baseURL
+}) => {
+	const context = await freshContext(browser, baseURL);
+	const page = await context.newPage();
+	let release!: () => void;
+	const held = new Promise<void>((resolve) => (release = resolve));
+	await page.route('**/api/openapi.json', async (route) => {
+		await held;
+		await route.continue();
+	});
+	const asked = page.waitForRequest('**/api/v1/auth/me');
+	await page.goto('/api/docs', { waitUntil: 'commit' });
+	await asked;
+	await expect(banner(page)).toHaveCount(0);
+
+	release();
+	await expectChrome(page, 'Not signed in');
+	await context.close();
+});
+
+test('shows a checking banner once Swagger has loaded, until the sign-in state is known', async ({
 	browser,
 	baseURL
 }) => {

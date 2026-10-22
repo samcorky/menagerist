@@ -1,13 +1,25 @@
 import { errorMessage } from '$lib/api/errors';
 import type {
 	BackupPermission,
+	CollectionPermission,
+	ExamplePermission,
 	GraphPermission,
 	IdentityPermission,
+	MediaPermission,
+	PresetPermission,
 	SystemPermission
 } from '$lib/api/generated/types.gen';
 
 /** Every permission the backend can report. */
-export type Permission = BackupPermission | GraphPermission | IdentityPermission | SystemPermission;
+export type Permission =
+	| BackupPermission
+	| CollectionPermission
+	| ExamplePermission
+	| GraphPermission
+	| IdentityPermission
+	| MediaPermission
+	| PresetPermission
+	| SystemPermission;
 
 export const LOGIN_PATH = '/login';
 export const SETUP_PATH = '/setup';

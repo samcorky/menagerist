@@ -4,7 +4,8 @@
  * - Sends same-origin cookies, so a session started with POST /auth/login works, and adds
  *   the server's own Origin to the generated curl snippets.
  * - Shows who is signed in (with sign-in actions) in Swagger's scheme bar, and the logo.
- *   The banner appears at once in a "checking" state and is filled in when the answer arrives.
+ *   The two sign-in requests start at once, but the banner is only put on the page when Swagger
+ *   has finished rendering. It shows a "checking" state if the answer is still on its way.
  *
  * The pure helpers are exposed on globalThis.MenageristSwaggerInit for tests.
  */
@@ -209,6 +210,8 @@
 		var state = { status: null, me: null, failed: false, notice: '', checking: true };
 		var sequence = 0;
 		var locksFor = null;
+		// The banner stays off the page until Swagger has rendered, so it never sits above an empty page.
+		var revealed = false;
 
 		// One live region, created once so screen readers announce text changes inside it.
 		var box = document.createElement('div');
@@ -271,16 +274,19 @@
 			applyLocks(ui, names, signedIn);
 		}
 
-		// Swagger re-renders with React, so (re)insert whatever has gone missing. Until Swagger's
-		// scheme bar exists the banner sits at the top of the page, so it shows at once.
+		// Swagger re-renders with React, so (re)insert whatever has gone missing. If its scheme bar
+		// is missing (the spec failed to load) the banner sits at the top of the page instead.
 		function ensure() {
 			if (!state.checking) syncLocks();
-			var slot =
-				host.querySelector('.scheme-container .schemes') || host.querySelector('.scheme-container');
-			if (slot) {
-				if (box.parentNode !== slot) slot.insertBefore(box, slot.firstChild);
-			} else if (!host.contains(box)) {
-				host.insertBefore(box, host.firstChild);
+			if (revealed) {
+				var slot =
+					host.querySelector('.scheme-container .schemes') ||
+					host.querySelector('.scheme-container');
+				if (slot) {
+					if (box.parentNode !== slot) slot.insertBefore(box, slot.firstChild);
+				} else if (!host.contains(box)) {
+					host.insertBefore(box, host.firstChild);
+				}
 			}
 			var info = host.querySelector('.info');
 			if (info && !info.querySelector('.menagerist-logo')) {
@@ -294,6 +300,11 @@
 					info.insertBefore(img, info.firstChild);
 				}
 			}
+		}
+
+		function reveal() {
+			revealed = true;
+			ensure();
 		}
 
 		function refreshBanner() {
@@ -349,10 +360,14 @@
 				if (isSessionChange(res.url, origin)) setTimeout(refreshBanner, 0);
 				return res;
 			},
-			onComplete: ensure
+			onComplete: reveal
+		});
+		// If Swagger never completes (for example the spec fails to load) still show the sign-in state.
+		root.addEventListener('load', function () {
+			setTimeout(reveal, 3000);
 		});
 		new MutationObserver(ensure).observe(host, { childList: true, subtree: true });
-		// Start checking now, in parallel with Swagger loading the spec.
+		// Ask now, in parallel with Swagger loading the spec.
 		refreshBanner();
 	}
 
