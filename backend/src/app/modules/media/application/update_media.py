@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.media.application.permissions import MediaPermission
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
@@ -28,7 +29,7 @@ class UpdateMediaCommand:
 class UpdateMedia(CommandHandler[MediaUnitOfWork, UpdateMediaCommand, MediaAsset]):
     """Update a media asset's editable metadata."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(MediaPermission.ITEM_WRITE)
 
     async def _handle(self, command: UpdateMediaCommand, actor: Actor) -> MediaAsset:
         """Persist the new filename for a media asset."""

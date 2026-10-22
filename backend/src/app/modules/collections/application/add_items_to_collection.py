@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.collections.application.permissions import CollectionPermission
 from app.modules.collections.domain.collection import Membership
 from app.modules.collections.domain.errors import CollectionNotFoundError
 
@@ -37,7 +38,7 @@ class AddItemsToCollection(
 ):
     """Put live items on a collection, skipping those already on it."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(CollectionPermission.COLLECTION_WRITE)
 
     def __init__(
         self, uow: CollectionsUnitOfWork, guard: AccessGuard, items: ItemLookup

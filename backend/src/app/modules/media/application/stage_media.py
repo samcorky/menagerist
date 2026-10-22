@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.media.application.permissions import MediaPermission
 from app.modules.media.domain.content_type_safety import (
     guessed_type_matches,
     resolve_trusted_content_type,
@@ -45,7 +46,7 @@ class StageMediaCommand:
 class StageMedia(CommandHandler[MediaUnitOfWork, StageMediaCommand, MediaAsset]):
     """Stream an upload to staging storage and record it in the database."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(MediaPermission.ITEM_WRITE)
 
     def __init__(
         self,

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.media.application.permissions import MediaPermission
 from app.modules.media.domain.errors import (
     MediaAssetNotFoundError,
     MediaAttachmentNotFoundError,
@@ -31,7 +32,7 @@ class ClearMediaCoverCommand:
 class ClearMediaCover(CommandHandler[MediaUnitOfWork, ClearMediaCoverCommand, None]):
     """Clear the cover flag on an attachment, leaving the asset attached."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(MediaPermission.ITEM_WRITE)
 
     async def _handle(self, command: ClearMediaCoverCommand, actor: Actor) -> None:
         """Clear `asset_id`'s cover flag on the given target."""

@@ -8,6 +8,7 @@ from app.modules.collections.application.get_collection import (
     CollectionSummary,
     summarise,
 )
+from app.modules.collections.application.permissions import CollectionPermission
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.collections.domain.collection import CollectionKind
@@ -51,7 +52,7 @@ class ListCollections(
 ):
     """List collections with keyset pagination and live item counts."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(CollectionPermission.COLLECTION_READ)
 
     def __init__(
         self, repos: CollectionsRepos, guard: AccessGuard, items: ItemLookup

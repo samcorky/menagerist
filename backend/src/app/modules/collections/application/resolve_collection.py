@@ -2,6 +2,7 @@ import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
+from app.modules.collections.application.permissions import CollectionPermission
 from app.modules.collections.domain.errors import CollectionNotFoundError
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
 from app.shared_kernel.access import Access, Content
@@ -23,7 +24,7 @@ class ResolveCollection(
 ):
     """Resolve an id or a slug to a collection id within the caller's scope."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(CollectionPermission.COLLECTION_READ)
 
     async def _handle(self, query: ResolveCollectionQuery, actor: Actor) -> uuid.UUID:
         """Return the id: a UUID passes through; a slug is looked up.

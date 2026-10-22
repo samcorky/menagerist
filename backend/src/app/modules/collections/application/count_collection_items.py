@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.collections.application.permissions import CollectionPermission
 from app.modules.collections.domain.collection import CollectionKind
 from app.modules.collections.domain.errors import CollectionNotFoundError
 
@@ -32,7 +33,7 @@ class CountCollectionItems(
 ):
     """Count a collection's items exactly, with no cap."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(CollectionPermission.COLLECTION_READ)
 
     def __init__(
         self, repos: CollectionsRepos, guard: AccessGuard, items: ItemLookup

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.media.application.permissions import MediaPermission
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
@@ -28,7 +29,7 @@ class PromoteMediaCommand:
 class PromoteMedia(CommandHandler[MediaUnitOfWork, PromoteMediaCommand, MediaAsset]):
     """Promote a staged asset to attached once it has been referenced by a node."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(MediaPermission.ITEM_WRITE)
 
     def __init__(
         self, uow: MediaUnitOfWork, guard: AccessGuard, storage: MediaStoragePort

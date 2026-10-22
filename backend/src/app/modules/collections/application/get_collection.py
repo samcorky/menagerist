@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.collections.application.permissions import CollectionPermission
 from app.modules.collections.domain.collection import Collection, CollectionKind
 from app.modules.collections.domain.definition_warning import DefinitionWarning
 from app.modules.collections.domain.errors import (
@@ -79,7 +80,7 @@ class GetCollection(
 ):
     """Fetch a single collection with its live item count."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(CollectionPermission.COLLECTION_READ)
 
     def __init__(
         self,

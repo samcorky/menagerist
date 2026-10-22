@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.media.application.permissions import MediaPermission
 from app.modules.media.domain.errors import (
     MediaAssetNotFoundError,
     MediaAttachmentNotFoundError,
@@ -40,7 +41,7 @@ class SetMediaCover(
     serialised, so simultaneous calls both succeed and the last one wins.
     """
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(MediaPermission.ITEM_WRITE)
 
     async def _handle(
         self, command: SetMediaCoverCommand, actor: Actor

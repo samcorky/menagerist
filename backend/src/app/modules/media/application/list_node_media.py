@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.media.application.permissions import MediaPermission
 from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
 from app.modules.media.ports.unit_of_work import MediaRepos
@@ -34,7 +35,7 @@ class NodeMediaItem:
 class ListNodeMedia(QueryHandler[MediaRepos, ListNodeMediaQuery, list[NodeMediaItem]]):
     """Return all media assets currently attached to a node, with their slot labels."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(MediaPermission.ITEM_READ)
 
     async def _handle(
         self, query: ListNodeMediaQuery, actor: Actor

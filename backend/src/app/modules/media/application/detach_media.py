@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.media.application.permissions import MediaPermission
 from app.modules.media.domain.errors import (
     MediaAssetNotFoundError,
     MediaAttachmentNotFoundError,
@@ -40,7 +41,7 @@ class DetachMedia(CommandHandler[MediaUnitOfWork, DetachMediaCommand, None]):
     ``on_commit``) so the cleanup job can reap it.
     """
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(MediaPermission.ITEM_WRITE)
 
     def __init__(
         self, uow: MediaUnitOfWork, guard: AccessGuard, storage: MediaStoragePort

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.media.application.permissions import MediaPermission
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.shared_kernel.access import Access, Content
@@ -28,7 +29,7 @@ class DeleteMediaCommand:
 class DeleteMedia(CommandHandler[MediaUnitOfWork, DeleteMediaCommand, None]):
     """Hard-delete a media asset from both the database and storage."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(MediaPermission.ITEM_WRITE)
 
     def __init__(
         self, uow: MediaUnitOfWork, guard: AccessGuard, storage: MediaStoragePort

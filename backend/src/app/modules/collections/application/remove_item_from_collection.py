@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.collections.application.permissions import CollectionPermission
 from app.modules.collections.domain.errors import CollectionNotFoundError
 from app.modules.collections.ports.unit_of_work import CollectionsUnitOfWork
 from app.shared_kernel.access import Access, Content
@@ -28,7 +29,7 @@ class RemoveItemFromCollection(
 ):
     """Take an item off a collection; removing an absent item is a no-op."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(CollectionPermission.COLLECTION_WRITE)
 
     async def _handle(
         self, command: RemoveItemFromCollectionCommand, actor: Actor

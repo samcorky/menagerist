@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, ClassVar
 import structlog
 
 from app.modules.media.application.cover_guard import ensure_cover_free
+from app.modules.media.application.permissions import MediaPermission
 from app.modules.media.domain.errors import (
     AttachTargetNotFoundError,
     MediaAssetNotFoundError,
@@ -42,7 +43,7 @@ class AttachMediaCommand:
 class AttachMedia(CommandHandler[MediaUnitOfWork, AttachMediaCommand, MediaAttachment]):
     """Link a media asset to a target entity, promoting from staged if needed."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(MediaPermission.ITEM_WRITE)
 
     def __init__(
         self,

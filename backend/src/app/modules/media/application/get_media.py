@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.media.application.permissions import MediaPermission
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.media.ports.unit_of_work import MediaRepos
@@ -26,7 +27,7 @@ class GetMediaQuery:
 class GetMedia(QueryHandler[MediaRepos, GetMediaQuery, MediaAsset]):
     """Fetch a single media asset by id."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(MediaPermission.ITEM_READ)
 
     async def _handle(self, query: GetMediaQuery, actor: Actor) -> MediaAsset:
         """Return the requested asset, raising `MediaAssetNotFoundError` if missing."""

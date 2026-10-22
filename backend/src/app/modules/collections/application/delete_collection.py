@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.collections.application.permissions import CollectionPermission
 from app.modules.collections.domain.errors import CollectionNotFoundError
 from app.modules.collections.ports.unit_of_work import CollectionsUnitOfWork
 from app.shared_kernel.access import Access, Content
@@ -27,7 +28,7 @@ class DeleteCollection(
 ):
     """Soft-delete a collection, leaving its memberships and items alone."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(CollectionPermission.COLLECTION_WRITE)
 
     async def _handle(self, command: DeleteCollectionCommand, actor: Actor) -> None:
         """Soft-delete the collection identified by `command` and commit."""

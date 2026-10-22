@@ -98,6 +98,13 @@ def test_shared_vocabulary_needs_the_type_permissions() -> None:
     assert {u: u.access for u in VOCABULARY_STANCES} == VOCABULARY_STANCES
 
 
+def test_promote_extra_schema_field_needs_what_its_inner_use_cases_need() -> None:
+    """The composite runs UpdateNodeType then UpdateNode under the same actor."""
+    assert PromoteExtraSchemaField.access == Content(GraphPermission.TYPE_WRITE)
+    assert UpdateNodeType.access == Requires(GraphPermission.TYPE_WRITE)
+    assert UpdateNode.access == Content(GraphPermission.ITEM_WRITE)
+
+
 def test_structural_changes_keep_their_permissions() -> None:
     """Deleting or purging type structure stays admin-only."""
     assert {

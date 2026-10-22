@@ -12,6 +12,7 @@ from app.modules.collections.application.collection_slugs import (
 from app.modules.collections.application.definition_limits import (
     ensure_definition_within_limits,
 )
+from app.modules.collections.application.permissions import CollectionPermission
 from app.modules.collections.domain.collection import Collection
 from app.modules.collections.domain.errors import (
     CollectionNotFoundError,
@@ -56,7 +57,7 @@ class UpdateCollection(
 ):
     """Update an existing collection's editable fields."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(CollectionPermission.COLLECTION_WRITE)
 
     def __init__(
         self,

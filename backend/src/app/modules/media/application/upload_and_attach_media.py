@@ -6,6 +6,7 @@ import structlog
 
 from app.modules.media.application.attach_media import AttachMedia, AttachMediaCommand
 from app.modules.media.application.cover_guard import ensure_cover_free
+from app.modules.media.application.permissions import MediaPermission
 from app.modules.media.application.stage_media import StageMedia, StageMediaCommand
 from app.modules.media.domain.errors import AttachTargetNotFoundError
 from app.modules.media.domain.media_attachment import (
@@ -50,7 +51,7 @@ class UploadAndAttachMedia(
 ):
     """Stream a file to storage and attach it within a single transaction."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(MediaPermission.ITEM_WRITE)
 
     def __init__(
         self,
