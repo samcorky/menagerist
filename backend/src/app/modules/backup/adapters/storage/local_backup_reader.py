@@ -22,15 +22,22 @@ _header_depth: ContextVar[int] = ContextVar("backup_tar_header_depth", default=0
 class _BoundedTarInfo(tarfile.TarInfo):
     """Bound metadata before the standard parser reads extension bodies."""
 
+    # tarfile parses every header, follow-ups included, through the private
+    # `_frombuf`/`_fromtarfile`; the public methods only wrap them.
     @classmethod
-    def frombuf(
+    def _frombuf(
         cls,
         buf: bytes | bytearray,
         encoding: str,
         errors: str,
+        *,
+        dircheck: bool = True,
     ) -> Self:
         """Validate header limits before extension bodies are read."""
-        info = super().frombuf(buf, encoding, errors)
+        # Private tarfile hooks are missing from the type stubs.
+        info: Self = super()._frombuf(  # type: ignore[misc]
+            buf, encoding, errors, dircheck=dircheck
+        )
         if info.type == tarfile.GNUTYPE_SPARSE:
             raise CorruptBackupError("Sparse archive members are unsupported.")
         if (
@@ -50,14 +57,17 @@ class _BoundedTarInfo(tarfile.TarInfo):
         return info
 
     @classmethod
-    def fromtarfile(cls, archive: tarfile.TarFile) -> Self:
+    def _fromtarfile(cls, archive: tarfile.TarFile, *, dircheck: bool = True) -> Self:
         """Bound recursive parsing of extension headers."""
         depth = _header_depth.get()
         if depth >= 16:
             raise CorruptBackupError("Archive extension metadata is nested too deeply.")
         token = _header_depth.set(depth + 1)
         try:
-            return super().fromtarfile(archive)
+            info: Self = super()._fromtarfile(  # type: ignore[misc]
+                archive, dircheck=dircheck
+            )
+            return info
         finally:
             _header_depth.reset(token)
 
