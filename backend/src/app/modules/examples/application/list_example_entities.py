@@ -1,10 +1,11 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from app.modules.examples.domain.installation import EntityKind
 from app.modules.examples.ports.unit_of_work import ExampleRepos
-from app.shared_kernel.cqrs import ScopedQueryHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedQueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -25,19 +26,19 @@ class ExampleEntities:
 
 
 class ListExampleEntities(
-    ScopedQueryHandler[ExampleRepos, ListExampleEntitiesQuery, ExampleEntities]
+    GuardedQueryHandler[ExampleRepos, ListExampleEntitiesQuery, ExampleEntities]
 ):
     """List what the viewer's own active example sets own."""
 
-    async def handle(
+    access: ClassVar[Access] = Content()
+
+    async def _handle(
         self,
         query: ListExampleEntitiesQuery,
         actor: Actor,
     ) -> ExampleEntities:
         """Return the owned item, item type and collection ids across installations."""
-        active = await self._repos.installations.list_active(
-            scope=self._policy.scope_for(actor)
-        )
+        active = await self._repos.installations.list_active(scope=self.scope(actor))
         return ExampleEntities(
             item_ids=[r.entity_id for i in active for r in i.owned(EntityKind.ITEM)],
             item_type_ids=[

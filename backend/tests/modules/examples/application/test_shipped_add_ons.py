@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.examples.adapters.platform.file_pack_catalogue import FilePackCatalogue
 from app.modules.examples.application.install_example_pack import (
     InstallExamplePack,
@@ -20,6 +19,7 @@ from app.modules.examples.domain.errors import (
     RequiredByInstalledPackError,
     RequirementsNotMetError,
 )
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
@@ -36,7 +36,7 @@ def _world(make_world: MakeWorld) -> World:
 async def _install(world: World, pack_id: str) -> InstallResult:
     return await InstallExamplePack(
         world.uow,
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         _CATALOGUE,
         world.presets,
         world.graph,
@@ -48,7 +48,7 @@ async def _install(world: World, pack_id: str) -> InstallResult:
 async def _uninstall(world: World, pack_id: str) -> UninstallResult:
     return await UninstallExamplePack(
         world.uow,
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         _CATALOGUE,
         world.presets,
         world.graph,

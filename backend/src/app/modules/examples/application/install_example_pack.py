@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, NoReturn, cast
+from typing import TYPE_CHECKING, Any, ClassVar, NoReturn, cast
 
 import structlog
 
@@ -34,14 +34,15 @@ from app.modules.examples.ports.pack_targets import (  # noqa: TC001
     PresetTarget,
 )
 from app.modules.examples.ports.unit_of_work import ExampleUnitOfWork
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.content_filter import ContentFilter
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.guarded import GuardedCommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from app.shared_kernel.access_policy import AccessPolicy
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -93,7 +94,7 @@ class _Run:
 
 
 class InstallExamplePack(
-    ScopedCommandHandler[ExampleUnitOfWork, InstallExamplePackCommand, InstallResult]
+    GuardedCommandHandler[ExampleUnitOfWork, InstallExamplePackCommand, InstallResult]
 ):
     """Install a pack as ordered steps, recording every entity as it is made.
 
@@ -116,10 +117,12 @@ class InstallExamplePack(
         InstallFailedError: a step failed; what had been created was removed.
     """
 
+    access: ClassVar[Access] = Content()
+
     def __init__(
         self,
         uow: ExampleUnitOfWork,
-        policy: AccessPolicy,
+        guard: AccessGuard,
         catalogue: PackCatalogue,
         presets: PresetTarget,
         graph: GraphTarget,
@@ -127,21 +130,21 @@ class InstallExamplePack(
         covers: CoverTarget,
     ) -> None:
         """Initialise with the unit of work, policy, catalogue and four targets."""
-        super().__init__(uow, policy)
+        super().__init__(uow, guard)
         self._catalogue = catalogue
         self._presets = presets
         self._graph = graph
         self._collections = collections
         self._covers = covers
 
-    async def handle(
+    async def _handle(
         self, command: InstallExamplePackCommand, actor: Actor
     ) -> InstallResult:
         """Install the pack and return what was created."""
         pack = await self._catalogue.get(command.pack_id)
         if pack is None:
             raise PackNotFoundError(f"Example pack '{command.pack_id}' not found")
-        scope = self._policy.scope_for(actor)
+        scope = self.scope(actor)
         await self._check_not_installed(pack, scope)
         external = await self._resolve_external(pack, scope, actor.id)
         cover_styles = await self._cover_styles(pack)

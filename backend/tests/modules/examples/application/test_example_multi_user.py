@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.examples.application.install_example_pack import (
     InstallExamplePack,
     InstallExamplePackCommand,
@@ -45,6 +44,7 @@ from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.media.domain.media_asset import MediaStatus
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.content_filter import ContentFilter
 
@@ -71,7 +71,7 @@ def _pack(sample_pack_factory: SamplePack) -> ExamplePack:
 async def _install(world: World, pack_id: str = "demo") -> InstallResult:
     return await InstallExamplePack(
         world.uow,
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         world.catalogue,
         world.presets,
         world.graph,
@@ -83,7 +83,7 @@ async def _install(world: World, pack_id: str = "demo") -> InstallResult:
 async def _uninstall(world: World, pack_id: str = "demo") -> UninstallResult:
     return await UninstallExamplePack(
         world.uow,
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         world.catalogue,
         world.presets,
         world.graph,
@@ -245,13 +245,13 @@ async def test_people_cannot_see_each_others_installations_or_entities(
     await _install(a)
 
     listed = await ListExamplePacks(
-        ExampleRepos(installations=b.installations), OwnerAccessPolicy(), b.catalogue
+        ExampleRepos(installations=b.installations), InMemoryAccessGuard(), b.catalogue
     ).handle(ListExamplePacksQuery(), USER_B)
     entities = await ListExampleEntities(
-        ExampleRepos(installations=b.installations), OwnerAccessPolicy()
+        ExampleRepos(installations=b.installations), InMemoryAccessGuard()
     ).handle(ListExampleEntitiesQuery(), USER_B)
     own = await ListExampleEntities(
-        ExampleRepos(installations=a.installations), OwnerAccessPolicy()
+        ExampleRepos(installations=a.installations), InMemoryAccessGuard()
     ).handle(ListExampleEntitiesQuery(), USER_A)
 
     assert [s.installation for s in listed] == [None]

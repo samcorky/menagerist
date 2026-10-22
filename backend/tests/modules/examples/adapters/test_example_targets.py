@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.bridges.example_targets import (
     CollectionPackTarget,
     GraphPackTarget,
@@ -17,6 +17,7 @@ from app.modules.examples.ports.pack_targets import Created, RemoveResult
 from app.modules.graph.domain.edge import Edge
 from app.modules.media.domain.media_attachment import MediaAttachment
 from app.modules.presets.domain.preset import Preset
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
@@ -457,19 +458,18 @@ async def test_ensure_content_equals_what_inspect_returns_later(
         assert outcome.content == inspection.content
 
 
-async def test_targets_default_to_their_own_owner_policy_and_accept_another(
+async def test_targets_default_to_the_shared_guard_and_accept_another(
     make_world: MakeWorld,
 ) -> None:
-    """Each target builds its own `OwnerAccessPolicy` unless one is supplied."""
+    """Each target uses the process-wide guard unless one is supplied."""
     world = make_world()
     stores = in_memory_graph_stores(
         world.graph_repos, world.media_repos, world.preset_repos
     )
     default = GraphPackTarget(stores, world.actor)
-    assert isinstance(default._access, OwnerAccessPolicy)
-    assert default._access is not GraphPackTarget(stores, world.actor)._access
+    assert default._access is get_access_guard()
 
-    custom = OwnerAccessPolicy()
+    custom = InMemoryAccessGuard()
     assert GraphPackTarget(stores, world.actor, access=custom)._access is custom
     collections = CollectionPackTarget(
         in_memory_collection_stores(

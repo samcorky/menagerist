@@ -2,11 +2,11 @@
 
 from typing import TYPE_CHECKING
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.examples.application.install_example_pack import (
     InstallExamplePack,
     InstallExamplePackCommand,
 )
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
@@ -20,7 +20,7 @@ async def test_connection_exists_looks_at_type_and_direction(
     world = make_world()
     await InstallExamplePack(
         world.uow,
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         world.catalogue,
         world.presets,
         world.graph,

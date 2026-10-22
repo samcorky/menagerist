@@ -12,6 +12,7 @@ from app.modules.examples.application.claim_orphaned_installations import (
 )
 from app.modules.examples.domain.installation import Installation
 from app.modules.examples.ports.unit_of_work import ExampleRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
@@ -25,7 +26,7 @@ async def test_claims_system_owned_installations_and_commits() -> None:
     await installations.add(theirs)
     owner = uuid.uuid7()
 
-    count = await ClaimOrphanedInstallations(uow).handle(
+    count = await ClaimOrphanedInstallations(uow, InMemoryAccessGuard()).handle(
         ClaimOrphanedInstallationsCommand(owner_id=owner), SYSTEM_ACTOR
     )
 

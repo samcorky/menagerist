@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.examples.application.install_example_pack import (
     InstallExamplePack,
     InstallExamplePackCommand,
@@ -27,6 +26,7 @@ from app.modules.media.domain.media_attachment import (
     AttachmentTarget,
     MediaAttachment,
 )
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
@@ -48,7 +48,7 @@ def _pack(sample_pack: SamplePack, *, extra: bool = False) -> ExamplePack:
 async def _install(world: World) -> InstallResult:
     return await InstallExamplePack(
         world.uow,
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         world.catalogue,
         world.presets,
         world.graph,
@@ -60,7 +60,7 @@ async def _install(world: World) -> InstallResult:
 async def _uninstall(world: World) -> UninstallResult:
     return await UninstallExamplePack(
         world.uow,
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         world.catalogue,
         world.presets,
         world.graph,

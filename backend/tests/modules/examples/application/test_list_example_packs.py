@@ -1,7 +1,6 @@
 import uuid
 from typing import TYPE_CHECKING
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.examples.adapters.persistence.in_memory_installation_repository import (  # noqa: E501
     InMemoryInstallationRepository,
 )
@@ -21,6 +20,7 @@ from app.modules.examples.domain.pack import (
     PackRelationshipType,
 )
 from app.modules.examples.ports.unit_of_work import ExampleRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 
 if TYPE_CHECKING:
@@ -44,7 +44,7 @@ async def test_lists_each_pack_with_its_active_installation(
 
     result = await ListExamplePacks(
         ExampleRepos(installations=world.installations),
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         world.catalogue,
     ).handle(ListExamplePacksQuery(), world.actor)
 
@@ -82,7 +82,7 @@ async def test_a_pack_lists_the_packs_it_links_with(make_world: MakeWorld) -> No
 
     result = await ListExamplePacks(
         ExampleRepos(installations=world.installations),
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         world.catalogue,
     ).handle(ListExamplePacksQuery(), world.actor)
 
@@ -95,7 +95,7 @@ async def test_lists_nothing_for_an_empty_catalogue() -> None:
     """An empty catalogue yields an empty list."""
     result = await ListExamplePacks(
         ExampleRepos(installations=InMemoryInstallationRepository()),
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         InMemoryPackCatalogue(),
     ).handle(ListExamplePacksQuery(), USER_A)
     assert result == []

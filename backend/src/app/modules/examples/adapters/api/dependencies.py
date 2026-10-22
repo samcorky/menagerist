@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
 
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.bridges.example_targets import (
     CollectionPackTarget,
     CoverPackTarget,
@@ -13,7 +14,6 @@ from app.entrypoints.api.shared.bridges.example_targets import (
     get_graph_pack_target,
     get_preset_pack_target,
 )
-from app.entrypoints.api.shared.dependencies import get_access_policy
 from app.modules.examples.adapters.persistence.unit_of_work import (
     build_example_repos,
     create_example_uow,
@@ -26,7 +26,7 @@ from app.modules.examples.application.uninstall_example_pack import UninstallExa
 from app.modules.examples.ports.pack_catalogue import PackCatalogue
 from app.modules.examples.ports.unit_of_work import ExampleRepos, ExampleUnitOfWork
 from app.platform.database import get_session_factory
-from app.shared_kernel.access_policy import AccessPolicy
+from app.shared_kernel.access_guard import AccessGuard
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -65,22 +65,22 @@ def get_pack_catalogue() -> PackCatalogue:
 
 def get_list_example_packs_use_case(
     repos: Annotated[ExampleRepos, Depends(get_example_repos)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
     catalogue: Annotated[PackCatalogue, Depends(get_pack_catalogue)],
 ) -> ListExamplePacks:
-    return ListExamplePacks(repos, policy, catalogue)
+    return ListExamplePacks(repos, guard, catalogue)
 
 
 def get_list_example_entities_use_case(
     repos: Annotated[ExampleRepos, Depends(get_example_repos)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ListExampleEntities:
-    return ListExampleEntities(repos, policy)
+    return ListExampleEntities(repos, guard)
 
 
 def get_install_example_pack_use_case(
     uow: Annotated[ExampleUnitOfWork, Depends(get_example_uow)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
     catalogue: Annotated[PackCatalogue, Depends(get_pack_catalogue)],
     presets: Annotated[PresetPackTarget, Depends(get_preset_pack_target)],
     graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
@@ -88,13 +88,13 @@ def get_install_example_pack_use_case(
     covers: Annotated[CoverPackTarget, Depends(get_cover_pack_target)],
 ) -> InstallExamplePack:
     return InstallExamplePack(
-        uow, policy, catalogue, presets, graph, collections, covers
+        uow, guard, catalogue, presets, graph, collections, covers
     )
 
 
 def get_uninstall_example_pack_use_case(
     uow: Annotated[ExampleUnitOfWork, Depends(get_example_uow)],
-    policy: Annotated[AccessPolicy, Depends(get_access_policy)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
     catalogue: Annotated[PackCatalogue, Depends(get_pack_catalogue)],
     presets: Annotated[PresetPackTarget, Depends(get_preset_pack_target)],
     graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
@@ -102,5 +102,5 @@ def get_uninstall_example_pack_use_case(
     covers: Annotated[CoverPackTarget, Depends(get_cover_pack_target)],
 ) -> UninstallExamplePack:
     return UninstallExamplePack(
-        uow, policy, catalogue, presets, graph, collections, covers
+        uow, guard, catalogue, presets, graph, collections, covers
     )

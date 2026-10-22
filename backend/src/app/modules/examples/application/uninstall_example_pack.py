@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
@@ -33,11 +33,12 @@ from app.modules.examples.ports.pack_targets import (
     RemoveResult,
 )
 from app.modules.examples.ports.unit_of_work import ExampleUnitOfWork
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.content_filter import ContentFilter
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
-    from app.shared_kernel.access_policy import AccessPolicy
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -60,7 +61,7 @@ class UninstallResult:
 
 
 class UninstallExamplePack(
-    ScopedCommandHandler[
+    GuardedCommandHandler[
         ExampleUnitOfWork, UninstallExamplePackCommand, UninstallResult
     ]
 ):
@@ -77,30 +78,32 @@ class UninstallExamplePack(
         (nothing is touched).
     """
 
+    access: ClassVar[Access] = Content()
+
     def __init__(
         self,
         uow: ExampleUnitOfWork,
-        policy: AccessPolicy,
+        guard: AccessGuard,
         catalogue: PackCatalogue,
         presets: PresetTarget,
         graph: GraphTarget,
         collections: CollectionTarget,
         covers: CoverTarget,
     ) -> None:
-        super().__init__(uow, policy)
+        super().__init__(uow, guard)
         self._catalogue = catalogue
         self._presets = presets
         self._graph = graph
         self._collections = collections
         self._covers = covers
 
-    async def handle(
+    async def _handle(
         self,
         command: UninstallExamplePackCommand,
         actor: Actor,
     ) -> UninstallResult:
         """Settle every owned entity, then close the installation."""
-        scope = self._policy.scope_for(actor)
+        scope = self.scope(actor)
         async with self._uow as repos:
             installation = await repos.installations.get_active_for_pack(
                 command.pack_id, scope=scope

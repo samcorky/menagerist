@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.examples.application.install_example_pack import (
     InstallExamplePack,
     InstallExamplePackCommand,
@@ -27,6 +26,7 @@ from app.modules.examples.domain.pack import (
     PackRelationshipType,
 )
 from app.modules.examples.domain.removal import KEEP_EDITED
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
 
@@ -67,7 +67,7 @@ def _world(make_world: MakeWorld) -> World:
 async def _install(world: World, pack_id: str) -> InstallResult:
     return await InstallExamplePack(
         world.uow,
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         world.catalogue,
         world.presets,
         world.graph,
@@ -192,7 +192,7 @@ async def test_another_persons_installations_are_left_alone(
 async def _uninstall(world: World, pack_id: str) -> UninstallResult:
     return await UninstallExamplePack(
         world.uow,
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         world.catalogue,
         world.presets,
         world.graph,

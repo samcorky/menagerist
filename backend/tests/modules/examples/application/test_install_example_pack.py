@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.examples.application.install_example_pack import (
     InstallExamplePack,
     InstallExamplePackCommand,
@@ -23,6 +22,7 @@ from app.modules.examples.domain.installation import (
 from app.modules.examples.domain.pack import PackPreset
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.node_type import NodeType
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.content_filter import ContentFilter
 
@@ -38,7 +38,7 @@ _COMMAND = InstallExamplePackCommand(pack_id="demo")
 def _use_case(world: World) -> InstallExamplePack:
     return InstallExamplePack(
         world.uow,
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         world.catalogue,
         world.presets,
         world.graph,
