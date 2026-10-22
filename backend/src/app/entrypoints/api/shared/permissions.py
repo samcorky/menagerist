@@ -1,49 +1,51 @@
 from itertools import chain
 from typing import TYPE_CHECKING
 
-from app.modules.backup.application.permissions import (
-    IMPLIES as BACKUP_IMPLIES,
-    BackupPermission,
-)
-from app.modules.graph.application.permissions import (
-    IMPLIES as GRAPH_IMPLIES,
-    GraphPermission,
-)
-from app.modules.identity.application.permissions import (
-    IMPLIES as IDENTITY_IMPLIES,
-    IdentityPermission,
-)
-from app.modules.system.application.permissions import (
-    IMPLIES as SYSTEM_IMPLIES,
-    SystemPermission,
-)
+from app.modules.backup.application.permissions import BackupPermission
+from app.modules.collections.application.permissions import CollectionPermission
+from app.modules.examples.application.permissions import ExamplePermission
+from app.modules.graph.application.permissions import GraphPermission
+from app.modules.identity.application.permissions import IdentityPermission
+from app.modules.media.application.permissions import MediaPermission
+from app.modules.presets.application.permissions import PresetPermission
+from app.modules.system.application.permissions import SystemPermission
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping
+    from collections.abc import Iterable
 
-# Adding a module's permissions is one line here: `| MediaPermission`.
-Permission = BackupPermission | GraphPermission | IdentityPermission | SystemPermission
+    from app.shared_kernel.permission import PermissionEnum
 
-ALL_PERMISSIONS: frozenset[Permission] = frozenset(
-    chain(BackupPermission, GraphPermission, IdentityPermission, SystemPermission)
+Permission = (
+    BackupPermission
+    | CollectionPermission
+    | ExamplePermission
+    | GraphPermission
+    | IdentityPermission
+    | MediaPermission
+    | PresetPermission
+    | SystemPermission
 )
 
-IMPLIES: Mapping[Permission, frozenset[Permission]] = {
-    key: frozenset(implied)
-    for catalogue in (BACKUP_IMPLIES, GRAPH_IMPLIES, IDENTITY_IMPLIES, SYSTEM_IMPLIES)
-    for key, implied in catalogue.items()
-}
+ALL_PERMISSIONS: frozenset[Permission] = frozenset(
+    chain(
+        BackupPermission,
+        CollectionPermission,
+        ExamplePermission,
+        GraphPermission,
+        IdentityPermission,
+        MediaPermission,
+        PresetPermission,
+        SystemPermission,
+    )
+)
 
 
-def expand(
-    granted: Iterable[Permission],
-    implies: Mapping[Permission, frozenset[Permission]] = IMPLIES,
-) -> frozenset[Permission]:
+def expand[P: PermissionEnum](granted: Iterable[P]) -> frozenset[P]:
     """Return `granted` plus everything it transitively implies."""
     result = set(granted)
     pending = list(result)
     while pending:
-        for implied in implies.get(pending.pop(), frozenset()):
+        for implied in pending.pop().implied():
             if implied not in result:
                 result.add(implied)
                 pending.append(implied)

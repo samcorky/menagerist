@@ -1,18 +1,10 @@
-from enum import StrEnum
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from collections.abc import Mapping
+from app.shared_kernel.permission import PermissionEnum
 
 
-class SystemPermission(StrEnum):
+class SystemPermission(PermissionEnum):
     """Permissions for operational detail the public probes leave out.
 
     Values read `<module>:<resource>:<action>`.
     """
 
     READ_DIAGNOSTICS = "system:diagnostics:read"
-
-
-# Holding the key also grants the values. None yet.
-IMPLIES: Mapping[SystemPermission, frozenset[SystemPermission]] = {}

@@ -1,20 +1,21 @@
-from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import Self
 
-if TYPE_CHECKING:
-    from collections.abc import Mapping
+from app.shared_kernel.permission import PermissionEnum
 
 
-class BackupPermission(StrEnum):
-    """Administrator permissions for instance archives."""
+class BackupPermission(PermissionEnum):
+    """Instance archives (administrators) and a member's own data export/import."""
 
     CREATE = "backup:archive:create"
     READ = "backup:archive:read"
     RESTORE = "backup:archive:restore"
     DELETE = "backup:archive:delete"
+    EXPORT_OWN_DATA = "backup:own_data:export"
+    IMPORT_OWN_DATA = "backup:own_data:import"
 
-
-IMPLIES: Mapping[BackupPermission, frozenset[BackupPermission]] = {
-    BackupPermission.CREATE: frozenset({BackupPermission.READ}),
-    BackupPermission.RESTORE: frozenset({BackupPermission.READ}),
-}
+    def implied(self) -> frozenset[Self]:
+        """Return what holding this permission also grants."""
+        cls = type(self)
+        if self in (cls.CREATE, cls.RESTORE):
+            return frozenset({cls.READ})
+        return frozenset()

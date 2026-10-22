@@ -4,7 +4,9 @@ import pytest
 
 from app.entrypoints.api.shared.access_guard import RoleAccessGuard, get_access_guard
 from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
+from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.modules.graph.application.permissions import GraphPermission
+from app.modules.media.application.permissions import MediaPermission
 from app.shared_kernel.access import (
     Access,
     Content,
@@ -50,6 +52,10 @@ ALLOWED: dict[str, tuple[Access, set[str]]] = {
     "shared": (Shared(), {"system", "member", "admin"}),
     "content": (Content(), {"system", "member", "admin"}),
     "requires": (Requires(PERMISSION), {"system", "member", "admin"}),
+    "content_with_permission": (
+        Content(MediaPermission.ITEM_READ),
+        {"system", "member", "admin"},
+    ),
 }
 
 
@@ -85,6 +91,34 @@ async def test_requires_delegates_to_the_authorisation_port() -> None:
     denying = RoleAccessGuard(_Authorisation(allow=False), OwnerAccessPolicy())
     with pytest.raises(ForbiddenError):
         await denying.check(MEMBER, Requires(PERMISSION))
+
+
+async def test_content_permission_denies_anonymous_before_any_lookup() -> None:
+    """The anonymous actor never reaches the authorisation port."""
+    authorisation = _Authorisation(allow=True)
+    guard = RoleAccessGuard(authorisation, OwnerAccessPolicy())
+    with pytest.raises(ForbiddenError):
+        await guard.check(ANONYMOUS_ACTOR, Content(MediaPermission.ITEM_READ))
+    assert authorisation.actions == []
+
+
+async def test_content_permission_delegates_to_the_authorisation_port() -> None:
+    """A member's content permission is decided by the port."""
+    allowing = _Authorisation(allow=True)
+    await RoleAccessGuard(allowing, OwnerAccessPolicy()).check(
+        MEMBER, Content(MediaPermission.ITEM_READ)
+    )
+    assert allowing.actions == [MediaPermission.ITEM_READ]
+
+
+async def test_content_permission_fails_for_a_member_with_an_empty_grant() -> None:
+    """With no member grant, a member is refused a permissioned stance."""
+    guard = RoleAccessGuard(
+        RoleAuthorisationAdapter(member_permissions=frozenset()), OwnerAccessPolicy()
+    )
+    with pytest.raises(ForbiddenError):
+        await guard.check(MEMBER, Content(MediaPermission.ITEM_READ))
+    await guard.check(ADMIN, Content(MediaPermission.ITEM_READ))
 
 
 @pytest.mark.parametrize("actor", list(ACTORS.values()), ids=list(ACTORS))

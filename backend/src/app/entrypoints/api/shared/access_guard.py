@@ -26,7 +26,7 @@ class RoleAccessGuard:
     """Role-based `AccessGuard`: stances over roles, ownership over the policy.
 
     The anonymous actor is refused before any permission lookup for every
-    stance except `Public`, so a later non-empty member grant cannot reach it.
+    stance except `Public`, so a member grant cannot reach it.
     """
 
     def __init__(
@@ -44,13 +44,12 @@ class RoleAccessGuard:
                 allowed = actor.is_system
             case OwnAccount():
                 allowed = not actor.is_anonymous and not actor.is_system
-            case Shared() | Content():
+            case Shared():
                 allowed = not actor.is_anonymous
-            case Requires(permission=permission):
-                if not actor.is_anonymous:
-                    await self._authorisation.check(actor, permission)
-                    return
-                allowed = False
+            case Requires() | Content():
+                allowed = not actor.is_anonymous
+                if allowed and access.permission is not None:
+                    await self._authorisation.check(actor, access.permission)
             case _:
                 assert_never(access)
         if not allowed:

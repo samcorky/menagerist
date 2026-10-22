@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from enum import StrEnum
+
+from app.shared_kernel.permission import PermissionEnum
 
 
 @dataclass(frozen=True)
@@ -24,14 +25,19 @@ class Shared:
 
 @dataclass(frozen=True)
 class Content:
-    """Owned content: as `Shared`, and the use case may call `scope()`."""
+    """Owned content: as `Shared`, and the use case may call `scope()`.
+
+    `permission` is transitional: when set, the actor's role must grant it.
+    """
+
+    permission: PermissionEnum | None = None
 
 
 @dataclass(frozen=True)
 class Requires:
     """An actor whose role grants `permission`."""
 
-    permission: StrEnum
+    permission: PermissionEnum
 
 
 type Access = Public | System | OwnAccount | Shared | Content | Requires

@@ -11,7 +11,23 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 URL = "/api/v1/auth/me/permissions"
-ALL = [
+CONTENT = [
+    "backup:own_data:export",
+    "backup:own_data:import",
+    "collections:collection:read",
+    "collections:collection:write",
+    "examples:pack:install",
+    "examples:pack:read",
+    "graph:item:read",
+    "graph:item:write",
+    "graph:type:read",
+    "graph:type:write",
+    "media:item:read",
+    "media:item:write",
+    "presets:preset:read",
+    "presets:preset:write",
+]
+ADMIN = [
     "backup:archive:create",
     "backup:archive:delete",
     "backup:archive:read",
@@ -29,6 +45,7 @@ ALL = [
     "identity:user:update",
     "system:diagnostics:read",
 ]
+ALL = sorted(ADMIN + CONTENT)
 
 
 def test_an_admin_sees_every_permission_sorted(as_user: Callable[..., None]) -> None:
@@ -41,12 +58,12 @@ def test_an_admin_sees_every_permission_sorted(as_user: Callable[..., None]) -> 
     assert response.headers["Cache-Control"] == "private, no-store"
 
 
-def test_a_member_sees_none(as_user: Callable[..., None]) -> None:
-    """Members hold no catalogue permissions."""
+def test_a_member_sees_the_content_set(as_user: Callable[..., None]) -> None:
+    """Members hold the content permissions, expanded, and no admin ones."""
     app = create_app()
     as_user(app, uuid.uuid4(), "member")
     response = TestClient(app).get(URL)
-    assert response.json() == {"permissions": []}
+    assert response.json() == {"permissions": CONTENT}
     assert response.headers["Cache-Control"] == "private, no-store"
 
 

@@ -1,21 +1,40 @@
 from typing import TYPE_CHECKING
 
-from app.entrypoints.api.shared.permissions import (
-    ALL_PERMISSIONS,
-    IMPLIES,
-    Permission,
-    expand,
-)
+from app.entrypoints.api.shared.permissions import ALL_PERMISSIONS, Permission, expand
+from app.modules.backup.application.permissions import BackupPermission
+from app.modules.collections.application.permissions import CollectionPermission
+from app.modules.examples.application.permissions import ExamplePermission
+from app.modules.graph.application.permissions import GraphPermission
+from app.modules.media.application.permissions import MediaPermission
+from app.modules.presets.application.permissions import PresetPermission
 from app.shared_kernel.errors import ForbiddenError
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
     from app.shared_kernel.actor import Actor
     from app.shared_kernel.authorisation import AuthorisationPort
 
-# Granted to every signed-in member; empty today.
-MEMBER_PERMISSIONS: frozenset[Permission] = frozenset()
+# Permissions for owned content and the shared catalogue.
+CONTENT_PERMISSIONS: frozenset[Permission] = frozenset(
+    {
+        GraphPermission.ITEM_READ,
+        GraphPermission.ITEM_WRITE,
+        GraphPermission.TYPE_READ,
+        GraphPermission.TYPE_WRITE,
+        MediaPermission.ITEM_READ,
+        MediaPermission.ITEM_WRITE,
+        CollectionPermission.COLLECTION_READ,
+        CollectionPermission.COLLECTION_WRITE,
+        PresetPermission.PRESET_READ,
+        PresetPermission.PRESET_WRITE,
+        ExamplePermission.PACK_READ,
+        ExamplePermission.PACK_INSTALL,
+        BackupPermission.EXPORT_OWN_DATA,
+        BackupPermission.IMPORT_OWN_DATA,
+    }
+)
+
+# Granted to every signed-in member.
+MEMBER_PERMISSIONS: frozenset[Permission] = CONTENT_PERMISSIONS
 
 # Derived: what only administrators hold.
 ADMIN_ONLY_ACTIONS: frozenset[Permission] = ALL_PERMISSIONS - MEMBER_PERMISSIONS
@@ -32,10 +51,8 @@ class RoleAuthorisationAdapter:
     def __init__(
         self,
         member_permissions: frozenset[Permission] = MEMBER_PERMISSIONS,
-        implies: Mapping[Permission, frozenset[Permission]] = IMPLIES,
     ) -> None:
         self._member_permissions = member_permissions
-        self._implies = implies
 
     def effective_permissions(self, actor: Actor) -> frozenset[Permission]:
         """Return every permission `actor` holds, implications included."""
@@ -44,7 +61,7 @@ class RoleAuthorisationAdapter:
             if actor.is_admin or actor.is_system
             else self._member_permissions
         )
-        return expand(granted, self._implies)
+        return expand(granted)
 
     async def check(self, actor: Actor, action: str) -> None:
         """Raise `ForbiddenError` unless `action` is in the actor's permissions."""

@@ -20,6 +20,7 @@ from app.shared_kernel.access import (
     System,
 )
 from app.shared_kernel.cqrs import UseCase
+from app.shared_kernel.permission import PermissionEnum
 
 # Pinned by name so widening who can call something needs an edit here.
 # Filled in as each module migrates.
@@ -309,7 +310,7 @@ class _InAdapter(_Open):
 _InAdapter.__module__ = "app.modules.demo.adapters.api.router"
 
 
-class _ForeignPermission(StrEnum):
+class _ForeignPermission(PermissionEnum):
     NOPE = "nope:nothing:read"
 
 

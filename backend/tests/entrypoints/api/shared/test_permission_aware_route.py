@@ -1,4 +1,3 @@
-from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar
 
 import pytest
@@ -21,12 +20,13 @@ from app.shared_kernel.access import (
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.cqrs import CommandHandler, QueryHandler, UseCase
+from app.shared_kernel.permission import PermissionEnum
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
 
-class Permission(StrEnum):
+class Permission(PermissionEnum):
     """Dummy permission enum for testing."""
 
     GRAPH_READ = "graph:read"

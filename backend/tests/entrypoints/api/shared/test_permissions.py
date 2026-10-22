@@ -1,52 +1,70 @@
-from app.entrypoints.api.shared.permissions import (
-    ALL_PERMISSIONS,
-    IMPLIES,
-    Permission,
-    expand,
-)
+from typing import Self
+
+from app.entrypoints.api.shared.permissions import ALL_PERMISSIONS, expand
 from app.modules.backup.application.permissions import BackupPermission
+from app.modules.collections.application.permissions import CollectionPermission
+from app.modules.examples.application.permissions import ExamplePermission
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.identity.application.permissions import IdentityPermission
+from app.modules.media.application.permissions import MediaPermission
+from app.modules.presets.application.permissions import PresetPermission
 from app.modules.system.application.permissions import SystemPermission
+from app.shared_kernel.permission import PermissionEnum
 
-A = GraphPermission.DELETE_NODE_TYPE
-B = GraphPermission.DELETE_EDGE_TYPE
-C = GraphPermission.PURGE_NODE_TYPE_ATTRIBUTE
-D = GraphPermission.PURGE_EDGE_TYPE_ATTRIBUTE
+
+class _Chain(PermissionEnum):
+    A = "test:chain:a"
+    B = "test:chain:b"
+    C = "test:chain:c"
+    D = "test:chain:d"
+
+    def implied(self) -> frozenset[Self]:
+        cls = type(self)
+        if self is cls.A:
+            return frozenset({cls.B})
+        if self is cls.B:
+            return frozenset({cls.C})
+        return frozenset()
+
+
+class _Cycle(PermissionEnum):
+    A = "test:cycle:a"
+    B = "test:cycle:b"
+
+    def implied(self) -> frozenset[Self]:
+        cls = type(self)
+        return frozenset({cls.B if self is cls.A else cls.A})
 
 
 def test_expand_without_implications_returns_the_grant() -> None:
-    """With an empty catalogue nothing is added."""
-    assert expand({A}, {}) == frozenset({A})
-    assert expand(set(), {}) == frozenset()
+    """A member with no implications adds nothing."""
+    assert expand({_Chain.D}) == frozenset({_Chain.D})
+    assert expand(set()) == frozenset()
 
 
 def test_expand_follows_implications_transitively() -> None:
     """A implies B and B implies C, so A grants all three."""
-    implies: dict[Permission, frozenset[Permission]] = {
-        A: frozenset({B}),
-        B: frozenset({C}),
-    }
-    assert expand({A}, implies) == frozenset({A, B, C})
-    assert expand({B}, implies) == frozenset({B, C})
-    assert D not in expand({A}, implies)
+    a, b, c, d = _Chain.A, _Chain.B, _Chain.C, _Chain.D
+    assert expand({a}) == frozenset({a, b, c})
+    assert expand({b}) == frozenset({b, c})
+    assert d not in expand({a})
 
 
 def test_expand_terminates_on_a_cycle() -> None:
-    """A cyclic catalogue still closes without looping."""
-    implies: dict[Permission, frozenset[Permission]] = {
-        A: frozenset({B}),
-        B: frozenset({A}),
-    }
-    assert expand({A}, implies) == frozenset({A, B})
+    """A cyclic implication still closes without looping."""
+    assert expand({_Cycle.A}) == frozenset({_Cycle.A, _Cycle.B})
 
 
 def test_the_real_catalogue_is_the_union_of_every_modules_enum() -> None:
     """The aggregate catalogue is the union of every module's enum."""
     assert (
         frozenset(BackupPermission)
+        | frozenset(CollectionPermission)
+        | frozenset(ExamplePermission)
         | frozenset(GraphPermission)
         | frozenset(IdentityPermission)
+        | frozenset(MediaPermission)
+        | frozenset(PresetPermission)
         | frozenset(SystemPermission)
     ) == ALL_PERMISSIONS
 
@@ -75,19 +93,12 @@ def test_revoking_sessions_implies_listing_them() -> None:
 
 def test_the_real_catalogue_has_no_cycles() -> None:
     """No permission transitively implies itself."""
-    for permission in IMPLIES:
-        reached: set[Permission] = set()
-        frontier = set(IMPLIES[permission])
+    for permission in ALL_PERMISSIONS:
+        reached: set[PermissionEnum] = set()
+        frontier = set(permission.implied())
         while frontier:
             current = frontier.pop()
             assert current != permission
             if current not in reached:
                 reached.add(current)
-                frontier |= IMPLIES.get(current, frozenset())
-
-
-def test_every_implied_permission_exists() -> None:
-    """Implications only name permissions the catalogue knows."""
-    for source, targets in IMPLIES.items():
-        assert source in ALL_PERMISSIONS
-        assert targets <= ALL_PERMISSIONS
+                frontier |= current.implied()

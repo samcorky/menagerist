@@ -92,8 +92,22 @@ Done (2026-10-22): see `2026-10-20-access-model-refactor.md` and `specs/2026-10-
 ### Phase 6: OIDC (Authorization Code + PKCE, backend-terminated)
 - Out of scope for detailed design here. It ends in the same cookie session. Keep `SameSite=Strict` in mind: after the callback land on a same-site page so the SPA's own requests carry the cookie; add a Playwright test against a fake provider. State, nonce and PKCE on the callback are the login-CSRF defence and are separate from the Origin check.
 
-### Later: resource-level access
-Sam wants this later. It is prepared by the access refactor (one guard, one policy) and is detailed in that plan's Phase 6: the content filter becomes a predicate, row checks take a resource reference, shares need a table, inheritance rules and share management need a product decision, and per-token resource limits intersect the filter inside the guard.
+### Later: sharing and resource-level access
+Sam wants this later (2026-10-22 discussion). It needs its own plan; this records how it fits so that plan starts from here.
+
+**Two layers stay separate.** Capability (a permission held by the role and granted by the token, checked by `AccessGuard.check`) and resource access (which rows, at what level, decided by the content filter and `assert_can_*`). Sharing changes only the second. Reading a shared collection still needs `collections:collection:read`; editing it still needs `collections:collection:write`. The full rule: permission held by the role AND granted by the token AND (owner OR a share at the required level) AND within any per-token resource limit.
+
+**What it adds**
+- A share table storing a level, not permissions: `(resource_type, resource_id, grantee_id, level)` with levels `view` and `edit`. The guard maps action to level (read needs `view`, write needs `edit`; delete and re-share stay owner-only), so there is no second permission vocabulary.
+- `ContentFilter` becomes a predicate ("owner is me, or a share reaches me"); repositories translate it to SQL with a join on shares. `scope()` and `ContentFilter` are the seam the access refactor built.
+- Guard row checks take a resource reference (type, id, owner) instead of `owner_id`.
+- A separate `collections:collection:share` permission, kept out of any read or read-and-write token preset, because sharing gives your data to another account.
+
+**Product decisions the plan must settle:** whether sharing a collection exposes its items and media (leaning yes) and connections (only when both ends are visible); how smart collections resolve (under the owner's visibility, shown to the sharee); view-only sharing first, since a sharee adding their own items to your collection raises ownership questions; hidden content keeps returning 404, not 403; "anyone with the link" is a different mechanism (an unguessable capability, closer to `Public`) and a separate plan; a sharee picker needs a member-usable user lookup, not admin `ListUsers`.
+
+**Interactions:** tokens act as their owner and inherit shares for free; a per-token collection allow-list is one more intersection inside the guard; data-driven roles stay consistent (removing `collections:collection:write` from a role also stops it editing shared collections).
+
+**Guard-rail now:** `tests/architecture/test_no_direct_ownership_checks.py` (added in the content permissions plan, Task 6) keeps ownership comparisons inside the guard so sharing has one place to change.
 
 ## Suggested order
 Access refactor -> Phase 2 -> (Phase 3 only after its own plan) -> Phase 4 -> Phase 5 -> Phase 6. Phase 4 does not need Phase 3. The CSRF plan (PR 1) is independent and can go first.
