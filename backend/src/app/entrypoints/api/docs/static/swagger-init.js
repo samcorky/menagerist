@@ -4,6 +4,7 @@
  * - Sends same-origin cookies, so a session started with POST /auth/login works, and adds
  *   the server's own Origin to the generated curl snippets.
  * - Shows who is signed in (with sign-in actions) in Swagger's scheme bar, and the logo.
+ *   The banner appears at once in a "checking" state and is filled in when the answer arrives.
  *
  * The pure helpers are exposed on globalThis.MenageristSwaggerInit for tests.
  */
@@ -57,8 +58,12 @@
 	/**
 	 * What the banner shows: a tone (ok, warn, error), a message and its actions.
 	 * An action is either a link ({label, href}) or a button ({label, action}).
+	 * While `checking`, the answer is not known yet, so it is busy and has no actions.
 	 */
-	function bannerModel(status, me, failed, notice) {
+	function bannerModel(status, me, failed, notice, checking) {
+		if (checking) {
+			return { tone: 'info', text: 'Checking sign-in state…', busy: true, actions: [] };
+		}
 		if (failed) {
 			return { tone: 'error', text: 'Could not check the sign-in state.', actions: [] };
 		}
@@ -137,8 +142,19 @@
 			return node;
 		}
 		box.className = 'menagerist-session menagerist-session-' + model.tone;
+		box.setAttribute('aria-busy', model.busy ? 'true' : 'false');
 		var body = el('div', 'menagerist-session-body');
-		body.appendChild(el('span', 'menagerist-session-text', model.text));
+		var text = el('span', 'menagerist-session-text', model.text);
+		if (model.busy) {
+			var spinner = el('span', 'menagerist-spinner');
+			spinner.setAttribute('aria-hidden', 'true');
+			var lead = el('span', 'menagerist-session-lead');
+			lead.appendChild(spinner);
+			lead.appendChild(text);
+			body.appendChild(lead);
+		} else {
+			body.appendChild(text);
+		}
 		if (model.notice) body.appendChild(el('span', 'menagerist-session-notice', model.notice));
 		var actions = el('span', 'menagerist-session-actions');
 		model.actions.forEach(function (action) {
@@ -190,7 +206,7 @@
 		}
 
 		var ui;
-		var state = { status: null, me: null, failed: false, notice: '', loaded: false };
+		var state = { status: null, me: null, failed: false, notice: '', checking: true };
 		var sequence = 0;
 		var locksFor = null;
 
@@ -201,7 +217,13 @@
 		box.setAttribute('aria-live', 'polite');
 
 		function paint() {
-			var model = bannerModel(state.status, state.me, state.failed, state.notice);
+			var model = bannerModel(
+				state.status,
+				state.me,
+				state.failed,
+				state.notice,
+				state.checking
+			);
 			renderBanner(document, box, model, signOut);
 		}
 
@@ -249,13 +271,17 @@
 			applyLocks(ui, names, signedIn);
 		}
 
-		// Swagger re-renders with React, so (re)insert whatever has gone missing.
+		// Swagger re-renders with React, so (re)insert whatever has gone missing. Until Swagger's
+		// scheme bar exists the banner sits at the top of the page, so it shows at once.
 		function ensure() {
-			if (!state.loaded) return;
-			syncLocks();
+			if (!state.checking) syncLocks();
 			var slot =
 				host.querySelector('.scheme-container .schemes') || host.querySelector('.scheme-container');
-			if (slot && box.parentNode !== slot) slot.insertBefore(box, slot.firstChild);
+			if (slot) {
+				if (box.parentNode !== slot) slot.insertBefore(box, slot.firstChild);
+			} else if (!host.contains(box)) {
+				host.insertBefore(box, host.firstChild);
+			}
 			var info = host.querySelector('.info');
 			if (info && !info.querySelector('.menagerist-logo')) {
 				var logo = currentLogo();
@@ -272,6 +298,9 @@
 
 		function refreshBanner() {
 			var mine = ++sequence;
+			state = Object.assign({}, state, { checking: true });
+			paint();
+			ensure();
 			// The sign-in state comes from /auth/me; a failing /auth/status only loses the setup hint.
 			return Promise.all([
 				fetchJson(API_PREFIX + '/auth/status', false).catch(function () {
@@ -292,7 +321,7 @@
 					me: results[1].me,
 					failed: results[1].failed,
 					notice: '',
-					loaded: true
+					checking: false
 				};
 				locksFor = null;
 				paint();
@@ -320,9 +349,11 @@
 				if (isSessionChange(res.url, origin)) setTimeout(refreshBanner, 0);
 				return res;
 			},
-			onComplete: refreshBanner
+			onComplete: ensure
 		});
 		new MutationObserver(ensure).observe(host, { childList: true, subtree: true });
+		// Start checking now, in parallel with Swagger loading the spec.
+		refreshBanner();
 	}
 
 	root.MenageristSwaggerInit = {

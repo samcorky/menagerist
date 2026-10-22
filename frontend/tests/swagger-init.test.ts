@@ -48,11 +48,13 @@ type Init = {
 		status: { setup_required: boolean } | null,
 		me: { display_name: string; role: string; password_expired: boolean } | null,
 		failed?: boolean,
-		notice?: string
+		notice?: string,
+		checking?: boolean
 	): {
 		tone: string;
 		text: string;
 		notice?: string;
+		busy?: boolean;
 		actions: { label: string; href?: string; action?: string }[];
 	};
 	loginHref(): string;
@@ -262,6 +264,49 @@ describe('swagger-init session banner', () => {
 		expect(tags).not.toContain('img');
 		expect(tags).not.toContain('b');
 		expect(box.className).toBe('menagerist-session menagerist-session-error');
+	});
+
+	it('shows a busy, action-free state while the sign-in state is being checked', () => {
+		expect(init.bannerModel(null, null, false, '', true)).toEqual({
+			tone: 'info',
+			text: 'Checking sign-in state…',
+			busy: true,
+			actions: []
+		});
+	});
+
+	it('checks again rather than showing a stale signed-in state', () => {
+		const model = init.bannerModel({ setup_required: false }, me, false, '', true);
+		expect(model.busy).toBe(true);
+		expect(model.actions).toEqual([]);
+	});
+
+	it('marks the live region busy and adds a hidden spinner only while checking', () => {
+		const doc: FakeDocument = { createElement: (tag) => new FakeNode(tag) };
+		const box = new FakeNode('div');
+		init.renderBanner(doc, box, init.bannerModel(null, null, false, '', true), () => {});
+		expect(box.className).toBe('menagerist-session menagerist-session-info');
+		expect(box.attrs['aria-busy']).toBe('true');
+		const nodes: FakeNode[] = [];
+		const walk = (n: FakeNode) => {
+			nodes.push(n);
+			n.children.forEach(walk);
+		};
+		box.children.forEach(walk);
+		const spinner = nodes.find((n) => n.className === 'menagerist-spinner');
+		expect(spinner?.attrs['aria-hidden']).toBe('true');
+		expect(nodes.some((n) => n.tag === 'a' || n.tag === 'button')).toBe(false);
+		expect(box.textContent).toContain('Checking sign-in state…');
+
+		init.renderBanner(doc, box, init.bannerModel(null, null, false), () => {});
+		expect(box.attrs['aria-busy']).toBe('false');
+		const after: FakeNode[] = [];
+		const walkAfter = (n: FakeNode) => {
+			after.push(n);
+			n.children.forEach(walkAfter);
+		};
+		box.children.forEach(walkAfter);
+		expect(after.some((n) => n.className === 'menagerist-spinner')).toBe(false);
 	});
 
 	it('wires the sign-out button and link targets', () => {

@@ -59,6 +59,29 @@ async function expectChrome(page: Page, text: string) {
 	await expect(logo(page)).toHaveAttribute('src', '/api/docs/logo.svg', CHROME);
 }
 
+test('shows a checking banner at once, before the sign-in state is known', async ({
+	browser,
+	baseURL
+}) => {
+	const context = await freshContext(browser, baseURL);
+	const page = await context.newPage();
+	let answer!: () => void;
+	const held = new Promise<void>((resolve) => (answer = resolve));
+	await page.route('**/api/v1/auth/me', async (route) => {
+		await held;
+		await route.continue();
+	});
+	await page.goto('/api/docs');
+	await expect(banner(page)).toContainText('Checking sign-in state', CHROME);
+	await expect(banner(page)).toHaveAttribute('aria-busy', 'true');
+	await expect(banner(page).getByRole('link')).toHaveCount(0);
+
+	answer();
+	await expectChrome(page, 'Not signed in');
+	await expect(banner(page)).toHaveAttribute('aria-busy', 'false');
+	await context.close();
+});
+
 test('signs in through the app, uses the API and signs out from the banner', async ({
 	browser,
 	baseURL
