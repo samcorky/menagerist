@@ -90,6 +90,8 @@ Read [backend/README.md](backend/README.md) in full before writing backend code.
 
 **CQRS convention** - commands depend on `UnitOfWork` and call `commit()`. Queries depend on a repository directly and do not commit.
 
+**Access stances** - every use case sets `access = ...` (`Public`, `System`, `OwnAccount`, `Shared`, `Content` or `Requires(permission)`, from `shared_kernel/access.py`) and implements `_handle`, never `handle`; the final `handle` runs the `AccessGuard` check first. Content use cases fetch with `self.scope(actor)` and call `self._guard.assert_can_*`. An architecture test fails a use case without a stance, and the `Public`, `System`, `Shared` and `Content` sets are pinned by name in `tests/architecture/test_access_stances.py`, so widening access means editing the pin.
+
 **Error handling** - domain errors subclass `shared_kernel.errors` base types. No `try/except` in routers. `register_exception_handlers()` maps base types to RFC 9457 HTTP responses globally; module-specific subclasses get the correct status for free.
 
 **Entity conventions** - primary keys are `uuid7`. Timestamps set in domain methods via `datetime.now(UTC)`, not via DB defaults. All entity/mixin dataclasses use `kw_only=True, eq=False`.

@@ -54,7 +54,7 @@ In the UI and API docs, say "scopes" (industry word); in code, say `grants`, bec
 ## Phases (each shippable on its own; stop at the checkpoints)
 
 ### Phase 1: access model refactor
-Moved to `access-model-refactor-plan.md` (renames, declared stances, one guard, three bases). It must be done, or at least through its Phase 4 for the graph and media modules, before Phase 2 here.
+Done (2026-10-22): see `2026-10-20-access-model-refactor.md` and `specs/2026-10-21-access-model-refactor-design.md`. Every use case declares an `access` stance behind one `AccessGuard`. `Shared` and `Content` carry no permission yet; Phase 2 gives them one, as a one-line change per use case (`Requires(...)`). Names in this plan that predate the refactor (`AccessScope`, `Scoped*Handler`, `AuthorizationPort`) are now `ContentFilter`, `Content`/`Shared` stances and `AuthorisationPort`.
 
 ### Phase 2: content permissions
 - Add per module, in the existing format: for graph `graph:node:read|write`, `graph:node_type:read|write`, `graph:edge:read|write`, `graph:edge_type:read|write`; for media `media:item:read|write`, etc. `write` implies `read` in `IMPLIES`. Keep the existing admin permissions.

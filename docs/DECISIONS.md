@@ -58,6 +58,8 @@ Significant architectural choices and their rationale. Entries are added when a 
 
 ## CQRS as a typing convention, not a bus
 
+*(The base classes changed on 2026-10-22: see "Declared access stances behind one guard" at the end.)*
+
 **Decision:** `shared_kernel/cqrs.py` defines `CommandHandler[TCommand, TResult]` and `QueryHandler[TQuery, TResult]` Protocols. Every use case implements one. Routers call use cases directly - there is no mediator, dispatcher, or pipeline.
 
 **Rationale:** The pattern enforces a consistent shape for every use case and makes `mypy --strict` verify it. A bus with pipeline behaviors would give a single seam for cross-cutting concerns, but nothing currently requires that uniformity enforced. Adding a bus later is possible - the typed-handler convention is a prerequisite and is already in place.
@@ -685,7 +687,7 @@ An add-on item of a base item type inherits that type's cover style, read throug
 
 **Access model**
 
-- **Authorisation lives in an `AccessPolicy`, not in repositories.** `AccessPolicy` is a `shared_kernel` port; the Stage 1 implementation is `OwnerAccessPolicy` (`entrypoints/api/shared/access_policy.py`). It is the only place that knows who may see or change what: `scope_for(actor)`, `assert_can_view/modify/delete(actor, owner_id)` (all raise `NotFoundError`, so existence never leaks) and `require_admin(actor)` (403). Administrators get no special view of other people's content.
+- **Authorisation lives in an access rule, not in repositories.** *(2026-10-22: the `AccessPolicy` port is now the `AccessGuard`; see the entry at the end.)* `AccessPolicy` was a `shared_kernel` port; the Stage 1 implementation is `OwnerAccessPolicy` (`entrypoints/api/shared/access_policy.py`). It is the only place that knows who may see or change what: `scope_for(actor)`, `assert_can_view/modify/delete(actor, owner_id)` (all raise `NotFoundError`, so existence never leaks) and `require_admin(actor)` (403). Administrators get no special view of other people's content.
 - **Repositories take a required `AccessScope` criterion** (`AccessScope.of(user_id)` or `AccessScope.everyone()`) on every method that returns or counts content, so lists, searches, counts, keyset paging and ETags are filtered in SQL; filtering afterwards would break `Total-Count` and paging. Repositories contain no rules. A missing scope is a type error, and architecture tests plus a generated cross-user isolation test (every route, as a second user) enforce it. Stage 2 replaces `OwnerAccessPolicy` with a sharing policy and widens what a scope means in SQL; use cases do not change.
 - **Connections and files have their own `owner_id`.** A connection is owned by its creator, and creating one needs both endpoints visible to that person. A media asset is owned by its uploader and attachments follow their asset; attaching needs an owned asset and a visible target (a media port, bridged to graph).
 - **Owner columns stay nullable in the database in Stage 1** (items, connections, files, example installations; collections are NOT NULL already). A row with no owner is visible to nobody, and the domain requires an owner on construction. Making the columns NOT NULL is a follow-up migration once every deployment has claimed its data.
@@ -968,7 +970,7 @@ Further known limits, left as they are for now:
 
 Open items from Stage 1; none is scheduled.
 
-- **A universal `handle`/`_handle` template for all use cases**, with an `_authorise` hook, a `Scoped._scope(actor)` helper and a single place for a future activity log. Today only the `Authorised*` bases split `handle` from `_handle`; `Scoped*` handlers implement `handle` directly.
+- **A universal `handle`/`_handle` template for all use cases** *(done 2026-10-22: every use case has a final `handle` and implements `_handle`, with `self.scope(actor)` for content)*; a single place for a future activity log is still open.
 - **Combined Authorised and Scoped handlers** when one use case needs both. Example: Stage 3 public-link creation needs a permission gate and an owner scope.
 - **Per-person favourites** once sharing exists (an existing follow-up: the favourite flag is on the item, so it would be shared).
 - **Make the owner columns NOT NULL** (items, connections, files, example installations) after every deployment has claimed its data.
@@ -1010,3 +1012,27 @@ The CORS middleware names its methods (GET, POST, PUT, PATCH, DELETE), request h
 ### `__Host-Http-` session cookie and strict reader (2026-10-21)
 
 Over HTTPS (a `Secure` cookie) the session cookie is `__Host-Http-menagerist-session`; over plain HTTP it keeps the plain name. The prefix makes browsers that support it (Chrome and Edge 140+, Firefox 143+) refuse a same-named cookie set by a sibling subdomain, a plain-HTTP page or page script. Safari does not enforce it yet, and a disguised name is not stopped by any browser, so the reader is strict too: exactly one cookie with the exact name, read from the raw `Cookie` headers, else no session. A duplicated cookie or a name that only matches once latin-1 spaces are trimmed (Starlette's own parser trims them and keeps the last duplicate) gives no session, so a tossed cookie can sign someone out but not in. `verify_csrf` reads the cookie the same way. Switching between HTTP and HTTPS means signing in again.
+
+
+---
+
+## Declared access stances behind one guard (2026-10-22)
+
+**Decision:** every use case declares who may call it with `access = ...` (`Public`, `System`, `OwnAccount`, `Shared`, `Content`, `Requires(permission)`), and the final `handle` on the `UseCase`/`CommandHandler`/`QueryHandler` bases checks it through one `AccessGuard` before calling `_handle`. The guard also holds the ownership rules (`scope_for`, `assert_can_view/modify/delete`) that the `AccessPolicy` port held. The `Scoped*` and `Authorised*` bases, `AccessPolicy` and `get_access_policy` are gone. No behaviour changed for any caller.
+
+**Rationale:**
+
+- "Plain" handlers meant three things (public flows, own-account actions, the shared catalogue), and a use case could not need both a permission and an ownership filter through the bases. A deliberately open use case looked the same as a forgotten check.
+- API tokens need "session only" and "grantable" as first-class ideas. With one guard, that changes one place, not every handler.
+- Enforcement is by tests rather than the type system: an architecture test fails a concrete use case with no stance, and the `Public`, `System`, `Shared` and `Content` sets are pinned by name, so widening access shows up in review. `Requires` is not generic over the permission type; a test checks that its permission is catalogued and belongs to the use case's own module.
+
+**Choices worth keeping:**
+
+- **`Shared` stance.** Item types, connection types, presets and query validation are open to any signed-in actor. Making them `Requires(permission)` later is a one-line change per use case, done with the tokens plan.
+- **`Content` and `Shared` carry no permission yet.** `MEMBER_PERMISSIONS` is empty and no scoped use case checked a permission, so one here would lock members out.
+- **The anonymous actor is refused before any permission lookup** for every stance except `Public`, because `RoleAuthorisationAdapter` treats any non-admin, non-system actor as a member and a later non-empty member grant would otherwise reach it.
+- **`System` is for background and CLI jobs** and admits only the system actor. `OwnAccount` refuses the system actor.
+- **`Public` use cases still take the guard**, for one constructor shape.
+- **`PermissionAwareRoute` documents only `Requires` stances**, and a test pins the set of documented operations, so the migration could not add or drop an OpenAPI permission.
+
+**Tradeoff:** a stance is exclusive. A use case that needs both a permission and an owner scope (public-link creation in a later stage) has no stance for it yet.
