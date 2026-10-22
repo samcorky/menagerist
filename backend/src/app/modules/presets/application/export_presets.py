@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
@@ -11,7 +11,8 @@ from app.modules.presets.domain.errors import (
 )
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
-from app.shared_kernel.cqrs import QueryHandler
+from app.shared_kernel.access import Access, Shared
+from app.shared_kernel.guarded import GuardedQueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -26,10 +27,12 @@ class ExportPresetsQuery:
     ids: list[uuid.UUID] = field(default_factory=list)
 
 
-class ExportPresets(QueryHandler[PresetRepos, ExportPresetsQuery, list[Preset]]):
+class ExportPresets(GuardedQueryHandler[PresetRepos, ExportPresetsQuery, list[Preset]]):
     """Fetch the presets to put in a pack, in the order requested."""
 
-    async def handle(self, query: ExportPresetsQuery, actor: Actor) -> list[Preset]:
+    access: ClassVar[Access] = Shared()
+
+    async def _handle(self, query: ExportPresetsQuery, actor: Actor) -> list[Preset]:
         """Return the presets for `query.ids`, or raise on the first missing one.
 
         :raises PresetNotFoundError: an id does not resolve to a live preset.

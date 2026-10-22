@@ -1,12 +1,13 @@
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
-from app.shared_kernel.cqrs import QueryHandler
+from app.shared_kernel.access import Access, Shared
+from app.shared_kernel.guarded import GuardedQueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -24,10 +25,12 @@ class ListPresetsQuery:
     q: str | None = field(default=None)
 
 
-class ListPresets(QueryHandler[PresetRepos, ListPresetsQuery, list[Preset]]):
+class ListPresets(GuardedQueryHandler[PresetRepos, ListPresetsQuery, list[Preset]]):
     """List presets, paginated by id."""
 
-    async def handle(self, query: ListPresetsQuery, actor: Actor) -> list[Preset]:
+    access: ClassVar[Access] = Shared()
+
+    async def _handle(self, query: ListPresetsQuery, actor: Actor) -> list[Preset]:
         """Return presets matching `query`."""
         presets = await self._repos.presets.list(
             after=query.after, limit=query.limit, kind=query.kind, q=query.q

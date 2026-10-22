@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
 
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.bridges.preset_usage import (
     GraphPresetUsage,
     get_preset_usage,
@@ -25,6 +26,8 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+    from app.shared_kernel.access_guard import AccessGuard
+
 
 def get_preset_uow(
     session_factory: Annotated[
@@ -47,42 +50,49 @@ async def get_preset_repos(
 
 def get_create_preset_use_case(
     uow: Annotated[PresetUnitOfWork, Depends(get_preset_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> CreatePreset:
-    return CreatePreset(uow)
+    return CreatePreset(uow, guard)
 
 
 def get_get_preset_use_case(
     repos: Annotated[PresetRepos, Depends(get_preset_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> GetPreset:
-    return GetPreset(repos)
+    return GetPreset(repos, guard)
 
 
 def get_list_presets_use_case(
     repos: Annotated[PresetRepos, Depends(get_preset_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ListPresets:
-    return ListPresets(repos)
+    return ListPresets(repos, guard)
 
 
 def get_update_preset_use_case(
     uow: Annotated[PresetUnitOfWork, Depends(get_preset_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> UpdatePreset:
-    return UpdatePreset(uow)
+    return UpdatePreset(uow, guard)
 
 
 def get_delete_preset_use_case(
     uow: Annotated[PresetUnitOfWork, Depends(get_preset_uow)],
     usage: Annotated[GraphPresetUsage, Depends(get_preset_usage)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> DeletePreset:
-    return DeletePreset(uow, usage)
+    return DeletePreset(uow, guard, usage)
 
 
 def get_export_presets_use_case(
     repos: Annotated[PresetRepos, Depends(get_preset_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ExportPresets:
-    return ExportPresets(repos)
+    return ExportPresets(repos, guard)
 
 
 def get_import_presets_use_case(
     uow: Annotated[PresetUnitOfWork, Depends(get_preset_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ImportPresets:
-    return ImportPresets(uow)
+    return ImportPresets(uow, guard)

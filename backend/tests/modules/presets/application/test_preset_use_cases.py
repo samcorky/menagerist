@@ -26,6 +26,7 @@ from app.modules.presets.domain.errors import (
 )
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -38,7 +39,7 @@ async def test_create_preset_persists_and_commits() -> None:
     """CreatePreset adds the preset to the repository and commits the unit of work."""
     repos = _empty_repos()
     uow = InMemoryUnitOfWork(repos)
-    use_case = CreatePreset(uow)
+    use_case = CreatePreset(uow, InMemoryAccessGuard())
 
     preset = await use_case.handle(
         CreatePresetCommand(
@@ -54,7 +55,7 @@ async def test_create_preset_persists_and_commits() -> None:
 async def test_create_preset_rejects_a_malformed_definition() -> None:
     """A malformed definition is rejected and nothing is stored."""
     repos = _empty_repos()
-    use_case = CreatePreset(InMemoryUnitOfWork(repos))
+    use_case = CreatePreset(InMemoryUnitOfWork(repos), InMemoryAccessGuard())
 
     with pytest.raises(InvalidPresetDefinitionError):
         await use_case.handle(
@@ -71,7 +72,7 @@ async def test_get_preset_returns_it() -> None:
     preset = Preset.create(kind="field", label="Condition", definition={})
     await repos.presets.add(preset)
 
-    result = await GetPreset(repos).handle(
+    result = await GetPreset(repos, InMemoryAccessGuard()).handle(
         GetPresetQuery(preset_id=preset.id), SYSTEM_ACTOR
     )
 
@@ -81,7 +82,7 @@ async def test_get_preset_returns_it() -> None:
 async def test_get_preset_raises_for_a_missing_id() -> None:
     """An unknown id is a not-found error."""
     with pytest.raises(PresetNotFoundError):
-        await GetPreset(_empty_repos()).handle(
+        await GetPreset(_empty_repos(), InMemoryAccessGuard()).handle(
             GetPresetQuery(preset_id=uuid.uuid4()), SYSTEM_ACTOR
         )
 
@@ -97,12 +98,12 @@ async def test_list_presets_filters_by_kind_and_q() -> None:
     for preset in [field, other_kind, other_label]:
         await repos.presets.add(preset)
 
-    by_kind = await ListPresets(repos).handle(
+    by_kind = await ListPresets(repos, InMemoryAccessGuard()).handle(
         ListPresetsQuery(kind="field"), SYSTEM_ACTOR
     )
     assert {p.id for p in by_kind} == {field.id, other_label.id}
 
-    by_q = await ListPresets(repos).handle(
+    by_q = await ListPresets(repos, InMemoryAccessGuard()).handle(
         ListPresetsQuery(q="condition"), SYSTEM_ACTOR
     )
     assert {p.id for p in by_q} == {field.id, other_kind.id}
@@ -117,12 +118,12 @@ async def test_update_preset_bumps_version_only_when_definition_changes() -> Non
     await repos.presets.add(preset)
     uow = InMemoryUnitOfWork(repos)
 
-    renamed = await UpdatePreset(uow).handle(
+    renamed = await UpdatePreset(uow, InMemoryAccessGuard()).handle(
         UpdatePresetCommand(preset_id=preset.id, label="Grade"), SYSTEM_ACTOR
     )
     assert renamed.version == 1
 
-    redefined = await UpdatePreset(uow).handle(
+    redefined = await UpdatePreset(uow, InMemoryAccessGuard()).handle(
         UpdatePresetCommand(
             preset_id=preset.id,
             definition={"property": {"type": "number"}},
@@ -142,7 +143,7 @@ async def test_update_preset_rejects_a_malformed_definition() -> None:
     await repos.presets.add(preset)
 
     with pytest.raises(InvalidPresetDefinitionError):
-        await UpdatePreset(InMemoryUnitOfWork(repos)).handle(
+        await UpdatePreset(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
             UpdatePresetCommand(preset_id=preset.id, definition={"options": []}),
             SYSTEM_ACTOR,
         )
@@ -151,9 +152,9 @@ async def test_update_preset_rejects_a_malformed_definition() -> None:
 async def test_update_preset_raises_for_a_missing_id() -> None:
     """An unknown id is a not-found error."""
     with pytest.raises(PresetNotFoundError):
-        await UpdatePreset(InMemoryUnitOfWork(_empty_repos())).handle(
-            UpdatePresetCommand(preset_id=uuid.uuid4(), label="X"), SYSTEM_ACTOR
-        )
+        await UpdatePreset(
+            InMemoryUnitOfWork(_empty_repos()), InMemoryAccessGuard()
+        ).handle(UpdatePresetCommand(preset_id=uuid.uuid4(), label="X"), SYSTEM_ACTOR)
 
 
 async def test_update_preset_raises_for_a_builtin_preset() -> None:
@@ -163,7 +164,7 @@ async def test_update_preset_raises_for_a_builtin_preset() -> None:
     await repos.presets.add(preset)
 
     with pytest.raises(BuiltinPresetError):
-        await UpdatePreset(InMemoryUnitOfWork(repos)).handle(
+        await UpdatePreset(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
             UpdatePresetCommand(preset_id=preset.id, label="Renamed"), SYSTEM_ACTOR
         )
 
@@ -175,7 +176,7 @@ async def test_delete_preset_soft_deletes_and_commits() -> None:
     await repos.presets.add(preset)
     uow = InMemoryUnitOfWork(repos)
 
-    await DeletePreset(uow).handle(
+    await DeletePreset(uow, InMemoryAccessGuard()).handle(
         DeletePresetCommand(preset_id=preset.id), SYSTEM_ACTOR
     )
 
@@ -186,9 +187,9 @@ async def test_delete_preset_soft_deletes_and_commits() -> None:
 async def test_delete_preset_raises_for_a_missing_id() -> None:
     """An unknown id is a not-found error."""
     with pytest.raises(PresetNotFoundError):
-        await DeletePreset(InMemoryUnitOfWork(_empty_repos())).handle(
-            DeletePresetCommand(preset_id=uuid.uuid4()), SYSTEM_ACTOR
-        )
+        await DeletePreset(
+            InMemoryUnitOfWork(_empty_repos()), InMemoryAccessGuard()
+        ).handle(DeletePresetCommand(preset_id=uuid.uuid4()), SYSTEM_ACTOR)
 
 
 async def test_delete_preset_raises_for_a_builtin_preset() -> None:
@@ -198,7 +199,7 @@ async def test_delete_preset_raises_for_a_builtin_preset() -> None:
     await repos.presets.add(preset)
 
     with pytest.raises(BuiltinPresetError):
-        await DeletePreset(InMemoryUnitOfWork(repos)).handle(
+        await DeletePreset(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
             DeletePresetCommand(preset_id=preset.id), SYSTEM_ACTOR
         )
 

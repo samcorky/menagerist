@@ -1,12 +1,13 @@
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
 from app.modules.presets.application.preset_definitions import check_definition
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.access import Access, Shared
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -24,10 +25,14 @@ class CreatePresetCommand:
     definition: dict[str, Any] = field(default_factory=dict)
 
 
-class CreatePreset(CommandHandler[PresetUnitOfWork, CreatePresetCommand, Preset]):
+class CreatePreset(
+    GuardedCommandHandler[PresetUnitOfWork, CreatePresetCommand, Preset]
+):
     """Create and persist a new preset."""
 
-    async def handle(self, command: CreatePresetCommand, actor: Actor) -> Preset:
+    access: ClassVar[Access] = Shared()
+
+    async def _handle(self, command: CreatePresetCommand, actor: Actor) -> Preset:
         """Create a preset from `command` and commit it."""
         check_definition(command.kind, command.definition)
         preset = Preset.create(

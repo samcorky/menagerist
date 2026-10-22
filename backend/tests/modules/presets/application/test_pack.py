@@ -25,6 +25,7 @@ from app.modules.presets.domain.errors import (
 )
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -43,7 +44,7 @@ def _item(**overrides: object) -> dict[str, object]:
 
 
 def _importer(repos: PresetRepos) -> ImportPresets:
-    return ImportPresets(InMemoryUnitOfWork(repos))
+    return ImportPresets(InMemoryUnitOfWork(repos), InMemoryAccessGuard())
 
 
 async def test_import_creates_new_presets_with_fresh_ids() -> None:
@@ -141,7 +142,7 @@ async def test_export_returns_presets_in_requested_order() -> None:
     await repos.presets.add(first)
     await repos.presets.add(second)
 
-    result = await ExportPresets(repos).handle(
+    result = await ExportPresets(repos, InMemoryAccessGuard()).handle(
         ExportPresetsQuery(ids=[second.id, first.id]), SYSTEM_ACTOR
     )
 
@@ -153,7 +154,7 @@ async def test_export_rejects_a_missing_id() -> None:
     repos = PresetRepos(presets=InMemoryPresetRepository())
 
     with pytest.raises(PresetNotFoundError):
-        await ExportPresets(repos).handle(
+        await ExportPresets(repos, InMemoryAccessGuard()).handle(
             ExportPresetsQuery(ids=[uuid.uuid7()]), SYSTEM_ACTOR
         )
 
@@ -174,7 +175,9 @@ async def test_export_rejects_more_ids_than_a_pack_holds() -> None:
     ids = [uuid.uuid7() for _ in range(MAX_PACK_ITEMS + 1)]
 
     with pytest.raises(InvalidPresetDefinitionError):
-        await ExportPresets(repos).handle(ExportPresetsQuery(ids=ids), SYSTEM_ACTOR)
+        await ExportPresets(repos, InMemoryAccessGuard()).handle(
+            ExportPresetsQuery(ids=ids), SYSTEM_ACTOR
+        )
 
 
 async def test_import_detects_repeats_beyond_the_first_page() -> None:

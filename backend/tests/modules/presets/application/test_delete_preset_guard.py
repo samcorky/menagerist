@@ -10,6 +10,7 @@ from app.modules.presets.application.delete_preset import (
 from app.modules.presets.domain.errors import PresetInUseError
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -37,7 +38,9 @@ async def test_delete_is_refused_while_a_type_uses_the_preset() -> None:
     """A preset an item type uses is kept, and the types are named."""
     repos = PresetRepos(presets=InMemoryPresetRepository())
     preset = await _store(repos)
-    use_case = DeletePreset(InMemoryUnitOfWork(repos), _Usage(["Film", "Book"]))
+    use_case = DeletePreset(
+        InMemoryUnitOfWork(repos), InMemoryAccessGuard(), _Usage(["Film", "Book"])
+    )
 
     with pytest.raises(PresetInUseError, match="Film, Book"):
         await use_case.handle(DeletePresetCommand(preset_id=preset.id), SYSTEM_ACTOR)
@@ -49,7 +52,9 @@ async def test_delete_proceeds_when_no_type_uses_the_preset() -> None:
     """With no referencing types the preset is soft-deleted."""
     repos = PresetRepos(presets=InMemoryPresetRepository())
     preset = await _store(repos)
-    use_case = DeletePreset(InMemoryUnitOfWork(repos), _Usage([]))
+    use_case = DeletePreset(
+        InMemoryUnitOfWork(repos), InMemoryAccessGuard(), _Usage([])
+    )
 
     await use_case.handle(DeletePresetCommand(preset_id=preset.id), SYSTEM_ACTOR)
 

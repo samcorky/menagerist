@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
@@ -8,7 +8,8 @@ from app.modules.presets.application.preset_definitions import check_definition
 from app.modules.presets.domain.errors import PresetNotFoundError
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.access import Access, Shared
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -30,13 +31,17 @@ class UpdatePresetCommand:
     definition: dict[str, Any] | None = field(default=None)
 
 
-class UpdatePreset(CommandHandler[PresetUnitOfWork, UpdatePresetCommand, Preset]):
+class UpdatePreset(
+    GuardedCommandHandler[PresetUnitOfWork, UpdatePresetCommand, Preset]
+):
     """Update an existing preset's editable fields.
 
     :raises BuiltinPresetError: a built-in preset cannot be edited.
     """
 
-    async def handle(self, command: UpdatePresetCommand, actor: Actor) -> Preset:
+    access: ClassVar[Access] = Shared()
+
+    async def _handle(self, command: UpdatePresetCommand, actor: Actor) -> Preset:
         """Apply `command`'s changes to the preset and commit."""
         async with self._uow as repos:
             preset = await repos.presets.get(command.preset_id)

@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
@@ -12,7 +12,8 @@ from app.modules.presets.application.pack import (
 from app.modules.presets.application.preset_definitions import check_definition
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.access import Access, Shared
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.modules.presets.ports.preset_repository import PresetRepository
@@ -50,14 +51,16 @@ class ImportPresetsResult:
 
 
 class ImportPresets(
-    CommandHandler[PresetUnitOfWork, ImportPresetsCommand, ImportPresetsResult]
+    GuardedCommandHandler[PresetUnitOfWork, ImportPresetsCommand, ImportPresetsResult]
 ):
     """Import a pack, skipping any preset whose content already exists.
 
     The whole pack is checked before anything is stored, so one bad item rejects it all.
     """
 
-    async def handle(
+    access: ClassVar[Access] = Shared()
+
+    async def _handle(
         self, command: ImportPresetsCommand, actor: Actor
     ) -> ImportPresetsResult:
         """Validate `command` and store the presets it holds that are new."""

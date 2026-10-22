@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import Depends
 
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.entrypoints.api.shared.bridges.attach_target_access import (
@@ -543,7 +544,9 @@ class PresetPackTarget:
                 for p in presets
             ],
         )
-        result = await ImportPresets(self._stores.uow()).handle(command, SYSTEM_ACTOR)
+        result = await ImportPresets(self._stores.uow(), get_access_guard()).handle(
+            command, SYSTEM_ACTOR
+        )
         # Built from the spec: the import stores these fields unchanged, and a
         # read-back failing here would leave committed presets unrecorded.
         return [
@@ -571,9 +574,9 @@ class PresetPackTarget:
         """Remove the preset unless it is built in or an item type still uses it."""
         async with self._stores.usage() as usage:
             try:
-                await DeletePreset(self._stores.uow(), usage).handle(
-                    DeletePresetCommand(preset_id=preset_id), SYSTEM_ACTOR
-                )
+                await DeletePreset(
+                    self._stores.uow(), get_access_guard(), usage
+                ).handle(DeletePresetCommand(preset_id=preset_id), SYSTEM_ACTOR)
             except PresetInUseError, BuiltinPresetError:
                 return RemoveResult.REFUSED_IN_USE
             except PresetNotFoundError:

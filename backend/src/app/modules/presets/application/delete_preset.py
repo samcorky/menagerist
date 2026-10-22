@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
@@ -9,9 +9,11 @@ from app.modules.presets.domain.errors import PresetInUseError, PresetNotFoundEr
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.presets.ports.preset_usage import PresetUsage  # noqa: TC001
 from app.modules.presets.ports.unit_of_work import PresetUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.access import Access, Shared
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -24,18 +26,25 @@ class DeletePresetCommand:
     preset_id: uuid.UUID
 
 
-class DeletePreset(CommandHandler[PresetUnitOfWork, DeletePresetCommand, None]):
+class DeletePreset(GuardedCommandHandler[PresetUnitOfWork, DeletePresetCommand, None]):
     """Soft-delete an existing preset.
 
     :raises BuiltinPresetError: a built-in preset cannot be deleted.
     :raises PresetInUseError: an item type still references the preset.
     """
 
-    def __init__(self, uow: PresetUnitOfWork, usage: PresetUsage | None = None) -> None:
-        super().__init__(uow)
+    access: ClassVar[Access] = Shared()
+
+    def __init__(
+        self,
+        uow: PresetUnitOfWork,
+        guard: AccessGuard,
+        usage: PresetUsage | None = None,
+    ) -> None:
+        super().__init__(uow, guard)
         self._usage = usage
 
-    async def handle(self, command: DeletePresetCommand, actor: Actor) -> None:
+    async def _handle(self, command: DeletePresetCommand, actor: Actor) -> None:
         """Soft-delete the preset identified by `command` and commit."""
         async with self._uow as repos:
             preset = await repos.presets.get(command.preset_id)

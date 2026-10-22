@@ -28,7 +28,17 @@ EXPECTED_PUBLIC: frozenset[str] = frozenset(
     }
 )
 EXPECTED_SYSTEM: frozenset[str] = frozenset()
-EXPECTED_SHARED: frozenset[str] = frozenset()
+EXPECTED_SHARED: frozenset[str] = frozenset(
+    {
+        "presets.CreatePreset",
+        "presets.DeletePreset",
+        "presets.ExportPresets",
+        "presets.GetPreset",
+        "presets.ImportPresets",
+        "presets.ListPresets",
+        "presets.UpdatePreset",
+    }
+)
 EXPECTED_CONTENT: frozenset[str] = frozenset(
     {
         "backup.ExportUserData",
