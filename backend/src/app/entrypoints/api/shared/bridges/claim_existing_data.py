@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
 
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.collections.adapters.persistence.unit_of_work import (
     build_collections_repos,
 )
@@ -99,10 +100,10 @@ def build_claim_existing_data(
     The use cases never commit: the owner of the transaction does.
     """
     return ClaimExistingData(
-        ClaimOrphanedItems(AmbientUnitOfWork(graph)),
-        ClaimLegacyCollections(AmbientUnitOfWork(collections)),
-        ClaimOrphanedMedia(AmbientUnitOfWork(media)),
-        ClaimOrphanedInstallations(AmbientUnitOfWork(examples)),
+        ClaimOrphanedItems(AmbientUnitOfWork(graph), get_access_guard()),
+        ClaimLegacyCollections(AmbientUnitOfWork(collections), get_access_guard()),
+        ClaimOrphanedMedia(AmbientUnitOfWork(media), get_access_guard()),
+        ClaimOrphanedInstallations(AmbientUnitOfWork(examples), get_access_guard()),
     )
 
 

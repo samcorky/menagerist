@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import Depends
 
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.collections.domain.definition_warning import DefinitionWarning
 from app.modules.collections.domain.errors import InvalidDefinitionError
 from app.modules.graph.adapters.persistence.unit_of_work import build_graph_repos
@@ -38,7 +39,7 @@ class GraphDefinitionChecker:
         """Return the stale-condition warnings, or raise `InvalidDefinitionError`."""
         try:
             # Validation reads item types only, so the actor is immaterial.
-            result = await ValidateQuery(self._repos).handle(
+            result = await ValidateQuery(self._repos, get_access_guard()).handle(
                 ValidateQueryQuery(query=definition), SYSTEM_ACTOR
             )
         except InvalidQueryError as exc:

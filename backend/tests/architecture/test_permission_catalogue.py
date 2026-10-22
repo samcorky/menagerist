@@ -6,7 +6,9 @@ import app.modules
 from app.entrypoints.api.shared.authorisation import MEMBER_PERMISSIONS
 from app.entrypoints.api.shared.permissions import ALL_PERMISSIONS, expand
 from app.modules.backup.application.permissions import BackupPermission
+from app.shared_kernel.access import Requires
 from app.shared_kernel.cqrs import UseCase
+from app.shared_kernel.guarded import GuardedUseCase
 
 
 def _use_cases() -> list[type]:
@@ -18,7 +20,8 @@ def _use_cases() -> list[type]:
         found.extend(
             obj
             for _, obj in inspect.getmembers(module, inspect.isclass)
-            if obj.__module__ == module.__name__ and issubclass(obj, UseCase)
+            if obj.__module__ == module.__name__
+            and issubclass(obj, (UseCase, GuardedUseCase))
         )
     return found
 
@@ -30,6 +33,11 @@ def test_every_declared_required_permission_is_in_the_catalogue() -> None:
         for cls in _use_cases()
         if "required_permission" in cls.__dict__
         and not isinstance(cls.__dict__["required_permission"], property)
+    }
+    declared |= {
+        cls: cls.__dict__["access"].permission
+        for cls in _use_cases()
+        if isinstance(cls.__dict__.get("access"), Requires)
     }
     assert declared
     for cls, permission in declared.items():

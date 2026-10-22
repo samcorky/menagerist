@@ -11,8 +11,6 @@ from typing import TYPE_CHECKING, Annotated, Any
 from fastapi import Depends
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
-from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.entrypoints.api.shared.bridges.attach_target_access import (
     GraphAttachTargetAccess,
 )
@@ -170,7 +168,7 @@ if TYPE_CHECKING:
 
     from app.modules.collections.domain.definition_warning import DefinitionWarning
     from app.modules.examples.ports.cover_renderer import CoverRenderer
-    from app.shared_kernel.access_policy import AccessPolicy
+    from app.shared_kernel.access_guard import AccessGuard
 
 _PAGE = 1
 _EDGE_PAGE = 200
@@ -593,11 +591,11 @@ class GraphPackTarget:
     """
 
     def __init__(
-        self, stores: GraphStores, actor: Actor, *, access: AccessPolicy | None = None
+        self, stores: GraphStores, actor: Actor, *, access: AccessGuard | None = None
     ) -> None:
         self._stores = stores
         self._actor = actor
-        self._access = access or OwnerAccessPolicy()
+        self._access = access or get_access_guard()
         self._scope = self._access.scope_for(actor)
 
     async def slug_taken(self, kind: EntityKind, slug: str) -> bool:
@@ -621,9 +619,9 @@ class GraphPackTarget:
             attributes_schema=_resolved(spec.attributes_schema, presets),
         )
         async with self._stores.choice_lists() as source:
-            edge_type = await CreateEdgeType(self._stores.uow(), source).handle(
-                command, self._actor
-            )
+            edge_type = await CreateEdgeType(
+                self._stores.uow(), get_access_guard(), source
+            ).handle(command, self._actor)
         return Created(entity_id=edge_type.id, content=_edge_type_content(edge_type))
 
     async def create_item_type(
@@ -637,9 +635,9 @@ class GraphPackTarget:
             attributes_schema=_resolved(spec.attributes_schema, presets),
         )
         async with self._stores.choice_lists() as source:
-            node_type = await CreateNodeType(self._stores.uow(), source).handle(
-                command, self._actor
-            )
+            node_type = await CreateNodeType(
+                self._stores.uow(), get_access_guard(), source
+            ).handle(command, self._actor)
         return Created(entity_id=node_type.id, content=_node_type_content(node_type))
 
     async def create_item(self, spec: PackItem, *, type_slug: str) -> Created:
@@ -789,11 +787,11 @@ class GraphPackTarget:
             elif kind is EntityKind.ITEM_TYPE:
                 # Check and delete in one locked transaction: an item added
                 # meanwhile keeps the type instead of losing it.
-                await DeleteUnusedNodeType(uow, RoleAuthorisationAdapter()).handle(
+                await DeleteUnusedNodeType(uow, get_access_guard()).handle(
                     DeleteUnusedNodeTypeCommand(node_type_id=entity_id), SYSTEM_ACTOR
                 )
             elif kind is EntityKind.RELATIONSHIP_TYPE:
-                await DeleteEdgeType(uow, RoleAuthorisationAdapter()).handle(
+                await DeleteEdgeType(uow, get_access_guard()).handle(
                     DeleteEdgeTypeCommand(edge_type_id=entity_id), SYSTEM_ACTOR
                 )
             else:
@@ -833,11 +831,11 @@ class CollectionPackTarget:
         stores: CollectionStores,
         actor: Actor,
         *,
-        access: AccessPolicy | None = None,
+        access: AccessGuard | None = None,
     ) -> None:
         self._stores = stores
         self._actor = actor
-        self._access = access or OwnerAccessPolicy()
+        self._access = access or get_access_guard()
         self._scope = self._access.scope_for(actor)
 
     async def create_collection(
@@ -915,11 +913,11 @@ class CoverPackTarget:
         storage: MediaStoragePort,
         policy: AttachmentPolicyPort,
         image_processor: ImageProcessorPort,
-        access: AccessPolicy | None = None,
+        access: AccessGuard | None = None,
     ) -> None:
         self._stores = stores
         self._actor = actor
-        self._access = access or OwnerAccessPolicy()
+        self._access = access or get_access_guard()
         self._scope = self._access.scope_for(actor)
         self._renderer = renderer
         self._storage = storage

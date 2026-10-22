@@ -75,6 +75,7 @@ from app.modules.media.ports.media_attachment_repository import (
 )
 from app.platform.database import Base
 from app.platform.orm_mixins import OwnedMixin
+from app.shared_kernel.access import Content, Requires
 from app.shared_kernel.cqrs import (
     AuthorisedCommandHandler,
     AuthorisedQueryHandler,
@@ -83,6 +84,7 @@ from app.shared_kernel.cqrs import (
     ScopedQueryHandler,
     UseCase,
 )
+from app.shared_kernel.guarded import GuardedUseCase
 
 # Port methods that take no scope, per port, and why. Anything else must take
 # `scope`; an entry naming a method the port no longer has fails as stale.
@@ -222,8 +224,6 @@ UNSCOPED_USE_CASES = {
     "GetEdgeType": "shared vocabulary",
     "ListEdgeTypes": "shared vocabulary",
     "UpdateEdgeType": "shared vocabulary",
-    # Creates an owned row stamped from the actor; reads no existing content.
-    "StageMedia": "creates a staged upload owned by the actor",
     # System-actor jobs run once by the first-admin claim: assign owners only.
     "ClaimOrphanedItems": "first-admin claim",
     "ClaimLegacyCollections": "first-admin claim",
@@ -237,6 +237,7 @@ SAFE_BASES = (
     AuthorisedQueryHandler,
     AuthorisedUseCase,
 )
+SAFE_STANCES = (Content, Requires)
 CONTENT_MODULES = ("graph", "collections", "media", "examples")
 
 
@@ -249,11 +250,18 @@ def _use_cases() -> dict[str, type]:
             for name, cls in inspect.getmembers(loaded, inspect.isclass):
                 if (
                     cls.__module__ == loaded.__name__
-                    and issubclass(cls, UseCase)
+                    and issubclass(cls, (UseCase, GuardedUseCase))
                     and not inspect.isabstract(cls)
                 ):
                     found[name] = cls
     return found
+
+
+def _is_safe(cls: type) -> bool:
+    """Whether the use case is scoped or gated, by its old base or its stance."""
+    return issubclass(cls, SAFE_BASES) or isinstance(
+        getattr(cls, "access", None), SAFE_STANCES
+    )
 
 
 def test_every_content_use_case_is_scoped_or_excluded() -> None:
@@ -261,7 +269,7 @@ def test_every_content_use_case_is_scoped_or_excluded() -> None:
     unscoped = sorted(
         name
         for name, cls in _use_cases().items()
-        if not issubclass(cls, SAFE_BASES) and name not in UNSCOPED_USE_CASES
+        if not _is_safe(cls) and name not in UNSCOPED_USE_CASES
     )
     assert unscoped == [], "extend ScopedCommandHandler/ScopedQueryHandler"
 
@@ -272,7 +280,7 @@ def test_exclusions_are_current() -> None:
     stale = sorted(
         name
         for name in UNSCOPED_USE_CASES
-        if name not in cases or issubclass(cases[name], SAFE_BASES)
+        if name not in cases or _is_safe(cases[name])
     )
     assert stale == []
 
