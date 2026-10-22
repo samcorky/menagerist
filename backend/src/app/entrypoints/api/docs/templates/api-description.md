@@ -14,7 +14,7 @@ ReDoc (`/api/redoc`) is read-only.
 
 ## Permissions
 
-Operations that change the shared structure (item types and relationship types) are for administrators and carry a "Requires permission" line. `GET /api/v1/auth/me/permissions` lists the permissions of the signed-in account.
+Every operation that needs a permission names it in a "Requires permission" line. Members hold the content permissions (items, collections, media and the like); administrators hold every permission, including those for shared structure such as item types and relationship types, accounts and backups. `GET /api/v1/auth/me/permissions` lists the permissions of the signed-in account.
 
 ## Errors
 

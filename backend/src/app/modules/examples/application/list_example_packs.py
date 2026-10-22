@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
+from app.modules.examples.application.permissions import ExamplePermission
 from app.modules.examples.application.required_by import dependants_by_pack
 from app.modules.examples.domain.installation import Installation
 from app.modules.examples.domain.pack import PackSummary
@@ -35,7 +36,7 @@ class ListExamplePacks(
 ):
     """List the shipped packs and which of them are installed."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(ExamplePermission.PACK_READ)
 
     def __init__(
         self, repos: ExampleRepos, guard: AccessGuard, catalogue: PackCatalogue

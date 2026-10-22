@@ -199,9 +199,8 @@ test('shows required permissions and per-operation locks', async ({ browser, bas
 	await expect(admin).toContainText('x-required-permission');
 
 	const list = await openOperation(page, 'Nodes', 'Nodes-list_nodes');
-	await expect(list.locator('.opblock-description-wrapper')).not.toContainText(
-		'Requires permission'
-	);
+	await expect(list.locator('.opblock-description-wrapper')).toContainText('Requires permission');
+	await expect(list.locator('.opblock-description-wrapper')).toContainText('graph:item:read');
 
 	// Protected operations keep a lock that cannot open the Authorize dialog.
 	const lock = list.locator('.authorization__btn');

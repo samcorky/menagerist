@@ -20,10 +20,10 @@ class BackupSettings(MenageristBaseSettings):
         description="Hours to retain a person's downloadable data export.",
     )
     before_migrate: bool = Field(
-        default=False,
+        default=True,
         validation_alias="MENAGERIST_BACKUP_BEFORE_MIGRATE",
         description=(
-            "Create a backup before applying database migrations. Disabled by default."
+            "Create a backup before applying database migrations. Enabled by default."
         ),
     )
     keep_last: int = Field(

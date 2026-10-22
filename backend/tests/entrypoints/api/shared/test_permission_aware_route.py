@@ -8,13 +8,13 @@ from app.entrypoints.api.shared.permission_aware_route import (
     PermissionAwareRoute,
     _find_use_case_type,
 )
+from app.modules.media.application.permissions import MediaPermission
 from app.shared_kernel.access import (
     Access,
     Content,
     OwnAccount,
     Public,
     Requires,
-    Shared,
     System,
 )
 from app.shared_kernel.access_guard import InMemoryAccessGuard
@@ -165,11 +165,35 @@ def test_openapi_leaves_open_use_cases_unchanged() -> None:
     assert "securitySchemes" not in schema.get("components", {})
 
 
-@pytest.mark.parametrize(
-    "stance", [Public(), System(), OwnAccount(), Shared(), Content()]
-)
+def test_openapi_documents_content_permission() -> None:
+    """A `Content` stance is documented exactly like `Requires`."""
+
+    class ContentUseCase(UseCase[object, str]):
+        """Content use case."""
+
+        access: ClassVar[Access] = Content(MediaPermission.ITEM_READ)
+
+        async def _handle(self, request: object, actor: Actor) -> str:
+            return "ok"
+
+    def get_content() -> ContentUseCase:
+        return ContentUseCase.__new__(ContentUseCase)
+
+    async def endpoint(
+        use_case: Annotated[ContentUseCase, Depends(get_content)],
+    ) -> dict[str, str]:
+        """Content endpoint."""
+        return {}
+
+    operation = _schema(endpoint)["paths"]["/x"]["get"]
+    assert operation["x-required-permission"] == "media:item:read"
+    assert "**Requires permission:** `media:item:read`" in operation["description"]
+    assert operation["security"] == [{"APIKeyCookie": []}]
+
+
+@pytest.mark.parametrize("stance", [Public(), System(), OwnAccount()])
 def test_other_stances_add_no_documentation(stance: Access) -> None:
-    """Only `Requires` is documented; every other stance leaves the route plain."""
+    """Stances without a permission leave the route plain."""
 
     class Plain(UseCase[object, str]):
         """Plain use case."""

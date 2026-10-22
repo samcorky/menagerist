@@ -3,10 +3,11 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
+from app.modules.presets.application.permissions import PresetPermission
 from app.modules.presets.application.preset_definitions import check_definition
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetUnitOfWork
-from app.shared_kernel.access import Access, Shared
+from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
@@ -28,7 +29,7 @@ class CreatePresetCommand:
 class CreatePreset(CommandHandler[PresetUnitOfWork, CreatePresetCommand, Preset]):
     """Create and persist a new preset."""
 
-    access: ClassVar[Access] = Shared()
+    access: ClassVar[Access] = Requires(PresetPermission.PRESET_WRITE)
 
     async def _handle(self, command: CreatePresetCommand, actor: Actor) -> Preset:
         """Create a preset from `command` and commit it."""

@@ -6,6 +6,10 @@ services:
 
   menagerist:
     container_name: app
+    environment:
+      # A fresh database skips the pre-migration backup anyway; opting out keeps the
+      # smoke run independent of the host ./backups bind mount's ownership.
+      MENAGERIST_BACKUP_BEFORE_MIGRATE: "false"
     ports: !override
       - "18080:8000"
 

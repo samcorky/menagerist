@@ -357,3 +357,20 @@ def test_openapi_throttled_response_documents_retry_after(path: str) -> None:
     headers = schema["paths"][path]["post"]["responses"]["429"]["headers"]
 
     assert headers["Retry-After"]["schema"] == {"type": "integer"}
+
+
+def test_swagger_security_is_unchanged() -> None:
+    """One cookie scheme; content and admin routes are locked, public ones not."""
+    schema = create_app().openapi()
+    assert schema["components"]["securitySchemes"] == {
+        "APIKeyCookie": {
+            "type": "apiKey",
+            "in": "cookie",
+            "name": get_identity_settings().cookie_name,
+        }
+    }
+    paths = schema["paths"]
+    cookie: list[dict[str, list[str]]] = [{"APIKeyCookie": []}]
+    assert paths["/api/v1/node"]["get"]["security"] == cookie
+    assert paths["/api/v1/user"]["get"]["security"] == cookie
+    assert "security" not in paths["/api/v1/auth/login"]["post"]

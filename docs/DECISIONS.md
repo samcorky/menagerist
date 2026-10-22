@@ -693,7 +693,7 @@ An add-on item of a base item type inherits that type's cover style, read throug
 - **Owner columns stay nullable in the database in Stage 1** (items, connections, files, example installations; collections are NOT NULL already). A row with no owner is visible to nobody, and the domain requires an owner on construction. Making the columns NOT NULL is a follow-up migration once every deployment has claimed its data.
 - **Collection slugs are unique per owner** (`(owner_id, slug)` among live collections), and `get_by_slug` is scoped.
 - **Destructive structure operations are admin-only.** Deleting an item type or connection type (it clears the type on everyone's content) and purging an attribute run through `AuthorisedCommandHandler` with a permission. Usage counts and attribute-value suggestions are scoped to the viewer. Creating and editing structure stays open to every member.
-- **Permission strings read `<module>:<resource>:<action>`** (for example `graph:node_type:delete`), declared as a `StrEnum` per module. `RoleAuthorizationAdapter` gives admins and the system actor every permission and members `MEMBER_PERMISSIONS` (empty today). `GET /api/v1/auth/me/permissions` returns the signed-in account's effective permissions as a typed list, and the frontend hides controls with `auth.can(...)`; the server still enforces them.
+- **Permission strings read `<module>:<resource>:<action>`** (for example `graph:node_type:delete`), declared as a `StrEnum` per module. `RoleAuthorizationAdapter` gives admins and the system actor every permission and members `MEMBER_PERMISSIONS` (empty today; *superseded 2026-10-22: it is now the 14 content permissions*). `GET /api/v1/auth/me/permissions` returns the signed-in account's effective permissions as a typed list, and the frontend hides controls with `auth.can(...)`; the server still enforces them.
 - **Example packs install per user.** `example_installations.owner_id` is added, the active-pack uniqueness becomes `(pack_id, owner_id)`, and pack targets run as the installing person, not the system actor. Shared types a pack needs that exist because another person installed the same pack are reused (never recorded as owned by this person, never removed by them); removal of a shared type keeps it while any person's content still uses it, using an all-scope in-use check. A clash with a type from anywhere else is still a 409.
 
 **First run**
@@ -719,7 +719,7 @@ An add-on item of a base item type inherits that type's cover style, read throug
 
 **A disabled account is disclosed only after its password verified.** Correct credentials on a disabled account answer 403 `account_disabled` ("This account has been disabled. Ask an administrator."), so a person is not left guessing why a right password fails. A wrong password for a disabled account is the same generic 401 as any other, and every path spends one scrypt verify, so the answer is not a username oracle. A correct password on a disabled account is not a failure: it neither counts toward nor clears a lock.
 
-**User management has its own permissions.** `IdentityPermission` (`identity:user:create`, `list`, `update`, `reset_password`, `unlock`) joins the catalogue; create, update, reset and unlock each imply list. The use cases run through `AuthorisedCommandHandler` / `AuthorisedQueryHandler`, so `PermissionAwareRoute` reflects them as `x-required-permission` and `/auth/me/permissions` lists them. The ad-hoc `require_admin` helper is gone. Admins and the system actor hold all of them; members hold none. Changing your own display name (`PATCH /auth/me`) needs no permission. `Permission` is now a real union of the graph and identity enums.
+**User management has its own permissions.** `IdentityPermission` (`identity:user:create`, `list`, `update`, `reset_password`, `unlock`) joins the catalogue; create, update, reset and unlock each imply list. The use cases run through `AuthorisedCommandHandler` / `AuthorisedQueryHandler`, so `PermissionAwareRoute` reflects them as `x-required-permission` and `/auth/me/permissions` lists them. The ad-hoc `require_admin` helper is gone. Admins and the system actor hold all of them; members hold none of these. Changing your own display name (`PATCH /auth/me`) needs no permission. `Permission` is now a real union of the graph and identity enums.
 
 **The CLI takes the initial password from settings.** `IdentityCliSettings` (`MENAGERIST_INITIAL_PASSWORD`, or a `menagerist_initial_password` file in `/run/secrets`) is loaded only by the `identity` CLI and is not part of the server settings; the hidden, confirmed prompt is the fallback. A file is preferred because an environment variable appears in `docker inspect` and process listings.
 
@@ -960,7 +960,7 @@ Further known limits, left as they are for now:
 
 **Direction (2026-10-10), not built:**
 
-- Permissions stay fixed in code, per module, as enums. Each module declares an `IMPLIES` catalogue (holding one permission also grants others) and the grant is expanded to its transitive closure when an actor's permissions are loaded. Grants only; there are no denies.
+- Permissions stay fixed in code, per module, as enums. Each module declares an `IMPLIES` catalogue (holding one permission also grants others) and the grant is expanded to its transitive closure when an actor's permissions are loaded. Grants only; there are no denies. *Superseded 2026-10-22: the catalogue is now an `implied()` method on each enum; see "Content permissions as enums with `implied()` (2026-10-22)".*
 - Roles become data later: a roles table where admin means everything, member means a default set, and people can define their own roles. That replaces the `Role` enum and `MEMBER_PERMISSIONS`.
 - Resource-specific access (sharing grants on a particular item or collection) is not a role permission. It is deferred to Stage 2 and goes through `AccessPolicy`.
 
@@ -988,7 +988,7 @@ Archives and private staging files live on the persistent backup volume rather t
 
 Instance restore is exposed through the CLI and a public first-run route guarded by the same setup lock as first-administrator creation. There is no authenticated live restore route. CLI user transfers require an explicit account UUID, use that account as the scoped actor and keep archives in a private owner namespace.
 
-Automatic pre-migration backup remains opt-in (`MENAGERIST_BACKUP_BEFORE_MIGRATE=false` by default), preserving the existing deployment setting. When enabled, both migration entrypoints take a verified archive only for an existing schema with pending upgrades; a backup failure stops DDL. `--no-backup` is the explicit opt-out. Pre-migration retention is separate from ordinary backup retention, and restoring an old archive requires a database at its recorded revision.
+Automatic pre-migration backup was opt-in at first and became the default on 2026-10-22 (`MENAGERIST_BACKUP_BEFORE_MIGRATE=true`; set it to `false` to opt out), because a failed upgrade is the moment a restorable archive matters most. Both migration entrypoints take a verified archive only for an existing schema with pending upgrades; a backup failure stops DDL. `--no-backup` is the explicit opt-out. Pre-migration retention is separate from ordinary backup retention, and restoring an old archive requires a database at its recorded revision.
 
 ---
 
@@ -1018,21 +1018,46 @@ Over HTTPS (a `Secure` cookie) the session cookie is `__Host-Http-menagerist-ses
 
 ## Declared access stances behind one guard (2026-10-22)
 
+*Superseded in part 2026-10-22: `Shared` is removed and `Content` now carries a permission; see "Content permissions as enums with `implied()` (2026-10-22)".*
+
 **Decision:** every use case declares who may call it with `access = ...` (`Public`, `System`, `OwnAccount`, `Shared`, `Content`, `Requires(permission)`), and the final `handle` on the `UseCase`/`CommandHandler`/`QueryHandler` bases checks it through one `AccessGuard` before calling `_handle`. The guard also holds the ownership rules (`scope_for`, `assert_can_view/modify/delete`) that the `AccessPolicy` port held. The `Scoped*` and `Authorised*` bases, `AccessPolicy` and `get_access_policy` are gone. No behaviour changed for any caller.
 
 **Rationale:**
 
 - "Plain" handlers meant three things (public flows, own-account actions, the shared catalogue), and a use case could not need both a permission and an ownership filter through the bases. A deliberately open use case looked the same as a forgotten check.
 - API tokens need "session only" and "grantable" as first-class ideas. With one guard, that changes one place, not every handler.
-- Enforcement is by tests rather than the type system: an architecture test fails a concrete use case with no stance, and the `Public`, `System`, `Shared` and `Content` sets are pinned by name, so widening access shows up in review. `Requires` is not generic over the permission type; a test checks that its permission is catalogued and belongs to the use case's own module.
+- Enforcement is by tests rather than the type system: an architecture test fails a concrete use case with no stance, and the `Public`, `System`, `Shared` and `Content` sets are pinned by name (the `Shared` pin is gone; see the 2026-10-22 entry), so widening access shows up in review. `Requires` is not generic over the permission type; a test checks that its permission is catalogued and belongs to the use case's own module.
 
 **Choices worth keeping:**
 
-- **`Shared` stance.** Item types, connection types, presets and query validation are open to any signed-in actor. Making them `Requires(permission)` later is a one-line change per use case, done with the tokens plan.
-- **`Content` and `Shared` carry no permission yet.** `MEMBER_PERMISSIONS` is empty and no scoped use case checked a permission, so one here would lock members out.
+- **`Shared` stance** (*superseded 2026-10-22: removed, those use cases are `Requires`*). Item types, connection types, presets and query validation are open to any signed-in actor. Making them `Requires(permission)` later is a one-line change per use case, done with the tokens plan.
+- **`Content` and `Shared` carry no permission yet** (*superseded 2026-10-22: both now carry one and `MEMBER_PERMISSIONS` is the content set*). `MEMBER_PERMISSIONS` is empty and no scoped use case checked a permission, so one here would lock members out.
 - **The anonymous actor is refused before any permission lookup** for every stance except `Public`, because `RoleAuthorisationAdapter` treats any non-admin, non-system actor as a member and a later non-empty member grant would otherwise reach it.
 - **`System` is for background and CLI jobs** and admits only the system actor. `OwnAccount` refuses the system actor.
 - **`Public` use cases still take the guard**, for one constructor shape.
-- **`PermissionAwareRoute` documents only `Requires` stances**, and a test pins the set of documented operations, so the migration could not add or drop an OpenAPI permission.
+- **`PermissionAwareRoute` documents only `Requires` stances** (*now `Requires` and `Content`*), and a test pins the set of documented operations, so the migration could not add or drop an OpenAPI permission.
 
 **Tradeoff:** a stance is exclusive. A use case that needs both a permission and an owner scope (public-link creation in a later stage) has no stance for it yet.
+
+---
+
+## Content permissions as enums with `implied()` (2026-10-22)
+
+**Decision:** every owned-content and catalogue use case now has a real permission, held by all members. Permissions are members of per-module enums deriving `PermissionEnum` (`shared_kernel/permission.py`), and each enum owns its implications in an `implied()` method; the central `IMPLIES` dicts are gone. `Content(permission)` and `Requires(permission)` both require a permission, and the `Shared` stance is removed (its use cases are `Requires`). 14 member permissions were added to the 16 admin ones, 30 in all, and `MEMBER_PERMISSIONS` is exactly that content set. No behaviour changed for any user, client or CLI command.
+
+**Rationale:**
+
+- API tokens need something to carry. A token holds a subset of permissions, so content access had to be expressed as permissions before tokens could be limited to "read only".
+- An enum that owns `implied()` keeps a permission and its implications in one place, so adding a permission cannot forget the catalogue entry.
+- Pins moved from "who is open" to "what each use case needs": `tests/architecture/test_permission_mapping.py` pins every use case's permission, the catalogue of 30 and that every non-admin permission is a member permission. `test_no_direct_ownership_checks.py` keeps ownership comparisons inside `AccessGuard`, so sharing later changes one place.
+
+**Choices worth keeping:**
+
+- **The strings are a public contract.** Permission strings appear in OpenAPI (`x-required-permission`), tests, and soon in stored token grants and roles. They are never renamed. A permission that proves too coarse is split by making the coarse one imply the finer ones, which needs no data migration.
+- **Coarse first.** The vocabulary is user-facing (`graph:item:*`, `graph:type:*`, `media:item:*`, `collections:collection:*`, `presets:preset:*`, `examples:pack:read|install`, `backup:own_data:export|import`), one read and one write per resource. Existing admin strings such as `graph:node_type:delete` keep their names. Each write or install implies its read counterpart.
+- **Member grant equals the content set.** Members hold every content permission, so nothing changes for them; the permissions only bite once a token or a data-driven role holds fewer. Export, import and pack install are their own permissions so a "read only" token never includes them.
+- **`Content` is the only stance that may call `scope()`.**
+- **Composite use cases need every inner permission.** `UploadAndAttachMedia`, `PromoteExtraSchemaField` and `ImportUserArchive` call other guarded use cases; the tokens plan records the inner permissions.
+- **One allow-listed exception:** `install_example_pack.py` still compares ownership directly until sharing lands.
+
+**Tradeoff:** a permission per resource is a wide vocabulary to maintain, and a mapping pin means every new use case needs an edit in review. That friction is the point.

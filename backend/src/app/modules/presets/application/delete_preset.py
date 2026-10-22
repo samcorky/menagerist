@@ -4,12 +4,13 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.presets.application.permissions import PresetPermission
 from app.modules.presets.domain.errors import PresetInUseError, PresetNotFoundError
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.presets.ports.preset_usage import PresetUsage  # noqa: TC001
 from app.modules.presets.ports.unit_of_work import PresetUnitOfWork
-from app.shared_kernel.access import Access, Shared
+from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
@@ -33,7 +34,7 @@ class DeletePreset(CommandHandler[PresetUnitOfWork, DeletePresetCommand, None]):
     :raises PresetInUseError: an item type still references the preset.
     """
 
-    access: ClassVar[Access] = Shared()
+    access: ClassVar[Access] = Requires(PresetPermission.PRESET_WRITE)
 
     def __init__(
         self,

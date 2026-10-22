@@ -4,9 +4,10 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.presets.application.permissions import PresetPermission
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
-from app.shared_kernel.access import Access, Shared
+from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
@@ -28,7 +29,7 @@ class ListPresetsQuery:
 class ListPresets(QueryHandler[PresetRepos, ListPresetsQuery, list[Preset]]):
     """List presets, paginated by id."""
 
-    access: ClassVar[Access] = Shared()
+    access: ClassVar[Access] = Requires(PresetPermission.PRESET_READ)
 
     async def _handle(self, query: ListPresetsQuery, actor: Actor) -> list[Preset]:
         """Return presets matching `query`."""

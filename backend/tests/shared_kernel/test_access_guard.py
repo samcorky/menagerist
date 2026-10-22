@@ -8,7 +8,6 @@ from app.shared_kernel.access import (
     OwnAccount,
     Public,
     Requires,
-    Shared,
     System,
 )
 from app.shared_kernel.access_guard import DenyAllAccessGuard, InMemoryAccessGuard
@@ -24,8 +23,8 @@ async def test_check_records_the_pair() -> None:
     """Every check is recorded in order."""
     guard = InMemoryAccessGuard()
     await guard.check(ALICE, Public())
-    await guard.check(BOB, Content())
-    assert guard.checked == [(ALICE, Public()), (BOB, Content())]
+    await guard.check(BOB, Content(_Permission))  # type: ignore[arg-type]
+    assert guard.checked == [(ALICE, Public()), (BOB, Content(_Permission))]  # type: ignore[arg-type]
 
 
 async def test_a_denying_guard_raises_forbidden() -> None:
@@ -69,8 +68,7 @@ async def test_deny_all_guard_lets_only_public_use_cases_run() -> None:
     refused: tuple[Access, ...] = (
         System(),
         OwnAccount(),
-        Shared(),
-        Content(),
+        Content(_Permission),  # type: ignore[arg-type]
         Requires(_Permission),  # type: ignore[arg-type]
     )
     for access in refused:

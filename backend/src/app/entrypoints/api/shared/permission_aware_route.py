@@ -6,7 +6,7 @@ from fastapi.routing import APIRoute
 from fastapi.security import APIKeyCookie
 
 from app.platform.config import get_identity_settings
-from app.shared_kernel.access import Requires
+from app.shared_kernel.access import Content, Requires
 from app.shared_kernel.cqrs import CommandHandler, UseCase
 
 if TYPE_CHECKING:
@@ -43,13 +43,13 @@ def _find_use_case_type(endpoint: Callable[..., Any]) -> type[UseCase[Any, Any]]
 
 
 def _declared_permission(use_case_cls: type[UseCase[Any, Any]]) -> str | None:
-    """Return the permission a use case requires, if it declares one."""
+    """Return the permission a `Requires` or `Content` stance declares, if any."""
     access = getattr(use_case_cls, "access", None)
-    return access.permission.value if isinstance(access, Requires) else None
+    return access.permission.value if isinstance(access, Requires | Content) else None
 
 
 class PermissionAwareRoute(APIRoute):
-    """Reflect a use case's `Requires` stance into OpenAPI documentation.
+    """Reflect a use case's `Requires` or `Content` stance into OpenAPI documentation.
 
     This does not enforce authorisation. It only documents permissions already
     declared by the use case.

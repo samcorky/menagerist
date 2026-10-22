@@ -20,10 +20,29 @@ def test_first_run_restore_is_public() -> None:
     assert RestoreOnFirstRun.access == Public()
 
 
+EXPORT = Content(BackupPermission.EXPORT_OWN_DATA)
+IMPORT = Content(BackupPermission.IMPORT_OWN_DATA)
+
+
 def test_personal_archives_are_content() -> None:
-    """Each caller exports and imports only their own content."""
-    for use_case in (ExportUserData, ImportUserData, ImportUserArchive, OpenUserExport):
-        assert use_case.access == Content()
+    """Each caller exports and imports only their own content, given the permission."""
+    assert {
+        ExportUserData: ExportUserData.access,
+        OpenUserExport: OpenUserExport.access,
+        ImportUserData: ImportUserData.access,
+        ImportUserArchive: ImportUserArchive.access,
+    } == {
+        ExportUserData: EXPORT,
+        OpenUserExport: EXPORT,
+        ImportUserData: IMPORT,
+        ImportUserArchive: IMPORT,
+    }
+
+
+def test_import_archive_needs_what_its_inner_use_case_needs() -> None:
+    """The composite runs ImportUserData under the same actor."""
+    needed = {ImportUserArchive.access, ImportUserData.access}
+    assert needed == {Content(BackupPermission.IMPORT_OWN_DATA)}
 
 
 def test_instance_archives_keep_their_permissions() -> None:

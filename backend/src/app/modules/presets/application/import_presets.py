@@ -9,10 +9,11 @@ from app.modules.presets.application.pack import (
     check_pack_item,
     content_hash,
 )
+from app.modules.presets.application.permissions import PresetPermission
 from app.modules.presets.application.preset_definitions import check_definition
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetUnitOfWork
-from app.shared_kernel.access import Access, Shared
+from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
@@ -58,7 +59,7 @@ class ImportPresets(
     The whole pack is checked before anything is stored, so one bad item rejects it all.
     """
 
-    access: ClassVar[Access] = Shared()
+    access: ClassVar[Access] = Requires(PresetPermission.PRESET_WRITE)
 
     async def _handle(
         self, command: ImportPresetsCommand, actor: Actor

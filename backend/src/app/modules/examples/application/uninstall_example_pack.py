@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 import structlog
 
 from app.modules.examples.application.content_hash import content_hash
+from app.modules.examples.application.permissions import ExamplePermission
 from app.modules.examples.application.removal import (
     REMOVAL_ORDER_SHARED,
     KeptEntity,
@@ -76,7 +77,7 @@ class UninstallExamplePack(
         (nothing is touched).
     """
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(ExamplePermission.PACK_INSTALL)
 
     def __init__(
         self,

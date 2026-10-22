@@ -60,7 +60,12 @@ def prepare(db: str, *, fresh: bool = False) -> None:
         psql(f'DROP DATABASE IF EXISTS "{db}" WITH (FORCE)')
     if not psql(f"SELECT 1 FROM pg_database WHERE datname = '{db}'"):
         psql(f'CREATE DATABASE "{db}"')
-    env = {**os.environ, "MENAGERIST_DATABASE_URL": URL.format(db=db)}
+    # Throwaway databases: skip the pre-migration backup, which needs /data/backups.
+    env = {
+        **os.environ,
+        "MENAGERIST_DATABASE_URL": URL.format(db=db),
+        "MENAGERIST_BACKUP_BEFORE_MIGRATE": "false",
+    }
     subprocess.run(
         ["menagerist", "migrate", "upgrade"], cwd=ROOT / "backend", env=env, check=True
     )

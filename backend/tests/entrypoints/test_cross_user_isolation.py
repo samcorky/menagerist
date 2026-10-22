@@ -24,6 +24,7 @@ from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
 from app.entrypoints.api.shared.access_guard import get_access_guard
+from app.entrypoints.api.shared.authorisation import ADMIN_ONLY_ACTIONS
 from app.entrypoints.api.shared.bridges.attach_target_access import (
     GraphAttachTargetAccess,
     get_attach_target_access,
@@ -1003,7 +1004,8 @@ OPERATIONS = _operations(_APP)
 ADMIN_ROUTES = {
     route
     for route, op in OPERATIONS.items()
-    if "x-required-permission" in op or route[1].startswith(ADMIN_PREFIXES)
+    if op.get("x-required-permission") in ADMIN_ONLY_ACTIONS
+    or route[1].startswith(ADMIN_PREFIXES)
 }
 
 

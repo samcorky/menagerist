@@ -2,14 +2,7 @@ from typing import TYPE_CHECKING, assert_never
 
 from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.entrypoints.api.shared.authorisation import get_authorisation_port
-from app.shared_kernel.access import (
-    Content,
-    OwnAccount,
-    Public,
-    Requires,
-    Shared,
-    System,
-)
+from app.shared_kernel.access import Content, OwnAccount, Public, Requires, System
 from app.shared_kernel.errors import ForbiddenError
 
 if TYPE_CHECKING:
@@ -44,11 +37,9 @@ class RoleAccessGuard:
                 allowed = actor.is_system
             case OwnAccount():
                 allowed = not actor.is_anonymous and not actor.is_system
-            case Shared():
-                allowed = not actor.is_anonymous
             case Requires() | Content():
                 allowed = not actor.is_anonymous
-                if allowed and access.permission is not None:
+                if allowed:
                     await self._authorisation.check(actor, access.permission)
             case _:
                 assert_never(access)

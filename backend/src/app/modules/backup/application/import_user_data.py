@@ -6,6 +6,7 @@ from uuid import UUID
 
 import structlog
 
+from app.modules.backup.application.permissions import BackupPermission
 from app.modules.backup.application.restore_backup import (
     archive_manifest,
     cleanup_media,
@@ -102,7 +103,7 @@ class ImportUserDataCommand:
 class ImportUserData(CommandHandler[UserDatabaseRestorer, ImportUserDataCommand, None]):
     """Preserve identifiers while assigning all incoming content to the caller."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(BackupPermission.IMPORT_OWN_DATA)
 
     def __init__(
         self,

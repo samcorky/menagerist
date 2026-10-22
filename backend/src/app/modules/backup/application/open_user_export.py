@@ -5,6 +5,7 @@ from uuid import UUID
 
 from app.modules.backup.application.export_user_data import prune_user_exports
 from app.modules.backup.application.open_backup import OpenedBackup
+from app.modules.backup.application.permissions import BackupPermission
 from app.modules.backup.domain.errors import BackupNotFoundError
 from app.modules.backup.ports.backup_store import BackupStore
 from app.shared_kernel.access import Access, Content
@@ -25,7 +26,7 @@ class OpenUserExportQuery:
 class OpenUserExport(QueryHandler[BackupStore, OpenUserExportQuery, OpenedBackup]):
     """Open committed exports within the caller's private namespace."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(BackupPermission.EXPORT_OWN_DATA)
 
     def __init__(
         self, store: BackupStore, guard: AccessGuard, *, ttl_hours: int = 24

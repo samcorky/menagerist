@@ -19,18 +19,13 @@ class OwnAccount:
 
 
 @dataclass(frozen=True)
-class Shared:
-    """Shared catalogue: any signed-in actor, system included."""
-
-
-@dataclass(frozen=True)
 class Content:
-    """Owned content: as `Shared`, and the use case may call `scope()`.
+    """Owned content: the actor's role must grant `permission`.
 
-    `permission` is transitional: when set, the actor's role must grant it.
+    The use case may also call `scope()`.
     """
 
-    permission: PermissionEnum | None = None
+    permission: PermissionEnum
 
 
 @dataclass(frozen=True)
@@ -40,4 +35,4 @@ class Requires:
     permission: PermissionEnum
 
 
-type Access = Public | System | OwnAccount | Shared | Content | Requires
+type Access = Public | System | OwnAccount | Content | Requires

@@ -2,6 +2,7 @@ import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
+from app.modules.examples.application.permissions import ExamplePermission
 from app.modules.examples.domain.installation import EntityKind
 from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.shared_kernel.access import Access, Content
@@ -30,7 +31,7 @@ class ListExampleEntities(
 ):
     """List what the viewer's own active example sets own."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(ExamplePermission.PACK_READ)
 
     async def _handle(
         self,

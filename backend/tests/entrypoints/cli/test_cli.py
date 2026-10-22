@@ -135,7 +135,7 @@ def test_serve_migrates_before_starting_when_asked(
         alembic_runner, "upgrade", lambda revision: order.append(f"upgrade:{revision}")
     )
 
-    cli.serve(migrate=True)
+    cli.serve(migrate=True, backup=False)
 
     assert order == ["upgrade:head", "configured", "served"]
 
@@ -175,7 +175,7 @@ def test_migrate_upgrade_enables_migration_logs_and_delegates(
     )
     logging.getLogger("alembic.runtime.migration").setLevel(logging.WARNING)
 
-    cli.upgrade("abc123")
+    cli.upgrade("abc123", backup=False)
 
     assert calls == ["abc123"]
     assert logging.getLogger("alembic.runtime.migration").level == logging.INFO

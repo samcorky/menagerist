@@ -10,6 +10,7 @@ from app.modules.examples.application.external_refs import (
     resolve_external_refs,
 )
 from app.modules.examples.application.pack_links import apply_links
+from app.modules.examples.application.permissions import ExamplePermission
 from app.modules.examples.application.removal import inspect_record, settle_installation
 from app.modules.examples.domain.errors import (
     InstallFailedError,
@@ -117,7 +118,7 @@ class InstallExamplePack(
         InstallFailedError: a step failed; what had been created was removed.
     """
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(ExamplePermission.PACK_INSTALL)
 
     def __init__(
         self,

@@ -14,7 +14,6 @@ from app.shared_kernel.access import (
     OwnAccount,
     Public,
     Requires,
-    Shared,
     System,
 )
 from app.shared_kernel.access_guard import InMemoryAccessGuard
@@ -70,7 +69,7 @@ def test_command_handler_stores_uow_and_guard() -> None:
     """The command base keeps both collaborators."""
 
     class Command(CommandHandler[object, str, str]):
-        access: ClassVar[Access] = Shared()
+        access: ClassVar[Access] = Public()
 
         async def _handle(self, request: str, actor: Actor) -> str:
             return request
@@ -85,7 +84,7 @@ def test_query_handler_stores_repos_and_guard() -> None:
     """The query base keeps both collaborators."""
 
     class Query(QueryHandler[object, str, str]):
-        access: ClassVar[Access] = Shared()
+        access: ClassVar[Access] = Public()
 
         async def _handle(self, request: str, actor: Actor) -> str:
             return request
@@ -98,12 +97,13 @@ def test_query_handler_stores_repos_and_guard() -> None:
 
 def test_scope_returns_the_guards_filter_for_content() -> None:
     """A `Content` use case gets its caller's content filter."""
-    assert _probe_with(Content()).scope(ALICE) == ContentFilter.of(ALICE.id)
+    probe = _probe_with(Content(_Permission))  # type: ignore[arg-type]
+    assert probe.scope(ALICE) == ContentFilter.of(ALICE.id)
 
 
 @pytest.mark.parametrize(
     "access",
-    [Shared(), Public(), System(), OwnAccount(), Requires(_Permission)],  # type: ignore[arg-type]
+    [Public(), System(), OwnAccount(), Requires(_Permission)],  # type: ignore[arg-type]
 )
 def test_scope_is_refused_outside_content(access: Access) -> None:
     """Only `Content` use cases may ask for a content filter."""
@@ -117,7 +117,7 @@ async def test_command_handler_uow_is_available_during_handle() -> None:
     received: list[object] = []
 
     class MyCommand(CommandHandler[object, str, None]):
-        access: ClassVar[Access] = Shared()
+        access: ClassVar[Access] = Public()
 
         async def _handle(self, request: str, actor: Actor) -> None:
             received.append(self._uow)
@@ -130,7 +130,7 @@ def test_a_use_case_without_handle_logic_cannot_be_instantiated() -> None:
     """Omitting `_handle` leaves the class abstract."""
 
     class Incomplete(QueryHandler[object, str, None]):
-        access: ClassVar[Access] = Shared()
+        access: ClassVar[Access] = Public()
 
     with pytest.raises(TypeError):
         Incomplete(object(), InMemoryAccessGuard())  # type: ignore[abstract]

@@ -13,7 +13,6 @@ from app.shared_kernel.access import (
     OwnAccount,
     Public,
     Requires,
-    Shared,
     System,
 )
 from app.shared_kernel.actor import ANONYMOUS_ACTOR, SYSTEM_ACTOR, Actor
@@ -49,8 +48,6 @@ ALLOWED: dict[str, tuple[Access, set[str]]] = {
     "public": (Public(), {"anonymous", "system", "member", "admin"}),
     "system": (System(), {"system"}),
     "own_account": (OwnAccount(), {"member", "admin"}),
-    "shared": (Shared(), {"system", "member", "admin"}),
-    "content": (Content(), {"system", "member", "admin"}),
     "requires": (Requires(PERMISSION), {"system", "member", "admin"}),
     "content_with_permission": (
         Content(MediaPermission.ITEM_READ),

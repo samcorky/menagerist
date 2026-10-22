@@ -5,13 +5,14 @@ from typing import TYPE_CHECKING, ClassVar
 import structlog
 
 from app.modules.presets.application.pack import MAX_PACK_ITEMS
+from app.modules.presets.application.permissions import PresetPermission
 from app.modules.presets.domain.errors import (
     InvalidPresetDefinitionError,
     PresetNotFoundError,
 )
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
-from app.shared_kernel.access import Access, Shared
+from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
@@ -30,7 +31,7 @@ class ExportPresetsQuery:
 class ExportPresets(QueryHandler[PresetRepos, ExportPresetsQuery, list[Preset]]):
     """Fetch the presets to put in a pack, in the order requested."""
 
-    access: ClassVar[Access] = Shared()
+    access: ClassVar[Access] = Requires(PresetPermission.PRESET_READ)
 
     async def _handle(self, query: ExportPresetsQuery, actor: Actor) -> list[Preset]:
         """Return the presets for `query.ids`, or raise on the first missing one.

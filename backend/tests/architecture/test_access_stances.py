@@ -16,7 +16,6 @@ from app.shared_kernel.access import (
     OwnAccount,
     Public,
     Requires,
-    Shared,
     System,
 )
 from app.shared_kernel.cqrs import UseCase
@@ -46,17 +45,6 @@ EXPECTED_SYSTEM: frozenset[str] = frozenset(
         "media.ClaimOrphanedMedia",
         "media.CleanupExpiredMedia",
         "media.RegenerateThumbnails",
-    }
-)
-EXPECTED_SHARED: frozenset[str] = frozenset(
-    {
-        "presets.CreatePreset",
-        "presets.DeletePreset",
-        "presets.ExportPresets",
-        "presets.GetPreset",
-        "presets.ImportPresets",
-        "presets.ListPresets",
-        "presets.UpdatePreset",
     }
 )
 EXPECTED_OWN_ACCOUNT: frozenset[str] = frozenset(
@@ -244,7 +232,6 @@ def test_required_permissions_belong_to_the_use_cases_module() -> None:
         (Public, EXPECTED_PUBLIC),
         (System, EXPECTED_SYSTEM),
         (OwnAccount, EXPECTED_OWN_ACCOUNT),
-        (Shared, EXPECTED_SHARED),
         (Content, EXPECTED_CONTENT),
     ],
 )

@@ -6,6 +6,7 @@ from uuid import UUID, uuid7
 
 import structlog
 
+from app.modules.backup.application.permissions import BackupPermission
 from app.modules.backup.application.verify_backup import verify_archive
 from app.modules.backup.domain.backup import (
     BackupManifest,
@@ -50,7 +51,7 @@ class ExportUserData(
 ):
     """Export personal content through a private per-owner archive store."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(BackupPermission.EXPORT_OWN_DATA)
 
     def __init__(
         self,

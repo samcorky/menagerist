@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
 from app.modules.backup.application.import_user_data import ImportUserDataCommand
+from app.modules.backup.application.permissions import BackupPermission
 from app.modules.backup.application.upload_backup import upload_verified_backup
 from app.modules.backup.domain.backup import BackupScope
 from app.modules.backup.ports.backup_store import BackupStore
@@ -26,7 +27,7 @@ class ImportUserArchiveCommand:
 class ImportUserArchive(CommandHandler[BackupStore, ImportUserArchiveCommand, None]):
     """Stage an upload privately and remove it after the import attempt."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(BackupPermission.IMPORT_OWN_DATA)
 
     def __init__(
         self,

@@ -50,9 +50,11 @@ cd frontend && npm install && cd ..
 
 docker compose up -d postgres
 
-uv run menagerist migrate upgrade
+uv run menagerist migrate upgrade --no-backup
 uv run menagerist serve --host 0.0.0.0 --reload   # backend at :8000
 ```
+
+Migrations take a verified backup first once a schema has pending upgrades, which needs a writable `/data/backups`. `--no-backup` (or `MENAGERIST_BACKUP_BEFORE_MIGRATE=false`) skips it on a development machine; `poe migrate` does this by default.
 
 ```sh
 cd frontend && npm run dev -- --host 0.0.0.0       # frontend at :5173, in a second shell
