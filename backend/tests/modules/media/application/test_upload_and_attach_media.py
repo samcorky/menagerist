@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.imaging.in_memory_image_processor import (
     InMemoryImageProcessor,
 )
@@ -43,6 +42,7 @@ from app.modules.media.domain.media_attachment import (
     AttachmentTarget,
     MediaAttachment,
 )
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
@@ -99,7 +99,7 @@ async def test_upload_and_attach_stores_file_and_persists_records() -> None:
     uow, assets, _, storage = _make_uow_and_repos()
     use_case = UploadAndAttachMedia(
         uow,
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         storage,
         _AllowAllPolicy(),
         InMemoryImageProcessor(),
@@ -147,7 +147,7 @@ async def test_upload_and_attach_single_transaction() -> None:
 
     use_case = UploadAndAttachMedia(
         uow,
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         storage,
         _AllowAllPolicy(),
         InMemoryImageProcessor(),
@@ -193,7 +193,7 @@ async def test_storage_move_fires_after_commit_not_before() -> None:
 
     use_case = UploadAndAttachMedia(
         uow,
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         storage,
         _AllowAllPolicy(),
         InMemoryImageProcessor(),
@@ -227,7 +227,7 @@ async def test_policy_violation_propagates_and_no_storage_move() -> None:
     uow, _, _, storage = _make_uow_and_repos()
     use_case = UploadAndAttachMedia(
         uow,
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         storage,
         _RejectAllPolicy(),
         InMemoryImageProcessor(),
@@ -261,7 +261,7 @@ async def test_attribute_key_forwarded_to_attachment() -> None:
     uow, _, _, storage = _make_uow_and_repos()
     use_case = UploadAndAttachMedia(
         uow,
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         storage,
         _AllowAllPolicy(),
         InMemoryImageProcessor(),
@@ -289,7 +289,7 @@ async def test_upload_and_attach_moves_thumbnail_to_attached() -> None:
     uow, assets, _, storage = _make_uow_and_repos()
     use_case = UploadAndAttachMedia(
         uow,
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         storage,
         _AllowAllPolicy(),
         InMemoryImageProcessor(),
@@ -326,7 +326,7 @@ async def test_cover_upload_is_refused_before_staging_when_cover_exists() -> Non
     )
     use_case = UploadAndAttachMedia(
         uow,
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         storage,
         _AllowAllPolicy(),
         InMemoryImageProcessor(),

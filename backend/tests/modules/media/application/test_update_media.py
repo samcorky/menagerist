@@ -2,7 +2,6 @@ import uuid
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
     InMemoryMediaAssetRepository,
 )
@@ -13,6 +12,7 @@ from app.modules.media.adapters.persistence.unit_of_work import (
 from app.modules.media.application.update_media import UpdateMedia, UpdateMediaCommand
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
 
@@ -20,7 +20,7 @@ from app.shared_kernel.content_filter import ContentFilter
 def _make_use_case() -> tuple[UpdateMedia, InMemoryMediaAssetRepository]:
     repo = InMemoryMediaAssetRepository()
     uow = create_in_memory_media_uow(make_in_memory_repos(assets=repo))
-    return UpdateMedia(uow, OwnerAccessPolicy()), repo
+    return UpdateMedia(uow, InMemoryAccessGuard()), repo
 
 
 async def test_update_renames_and_persists_asset() -> None:

@@ -1,13 +1,14 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedCommandHandler
 from app.shared_kernel.log_safe import loggable
 
 if TYPE_CHECKING:
@@ -25,21 +26,21 @@ class UpdateMediaCommand:
 
 
 class UpdateMedia(
-    ScopedCommandHandler[MediaUnitOfWork, UpdateMediaCommand, MediaAsset]
+    GuardedCommandHandler[MediaUnitOfWork, UpdateMediaCommand, MediaAsset]
 ):
     """Update a media asset's editable metadata."""
 
-    async def handle(self, command: UpdateMediaCommand, actor: Actor) -> MediaAsset:
+    access: ClassVar[Access] = Content()
+
+    async def _handle(self, command: UpdateMediaCommand, actor: Actor) -> MediaAsset:
         """Persist the new filename for a media asset."""
         async with self._uow as repos:
-            asset = await repos.assets.get(
-                command.asset_id, scope=self._policy.scope_for(actor)
-            )
+            asset = await repos.assets.get(command.asset_id, scope=self.scope(actor))
             if asset is None:
                 raise MediaAssetNotFoundError(
                     f"Media asset {command.asset_id} not found"
                 )
-            self._policy.assert_can_modify(actor, asset.owner_id)
+            self._guard.assert_can_modify(actor, asset.owner_id)
             asset.rename(command.filename)
             await repos.assets.save(asset)
             await self._uow.commit()

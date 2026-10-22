@@ -12,7 +12,7 @@ media_app = App(name="media", help="Manage media assets.")
 @media_app.command
 def cleanup() -> None:
     """Hard-delete staged and orphaned media assets that have passed their TTL."""
-    from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
+    from app.entrypoints.api.shared.access_guard import get_access_guard
     from app.modules.media.adapters.persistence.unit_of_work import create_media_uow
     from app.modules.media.adapters.storage.local_filesystem import (
         LocalFilesystemMediaStorage,
@@ -32,7 +32,7 @@ def cleanup() -> None:
     async def _run() -> int:
         uow = create_media_uow(get_session_factory())
         storage = LocalFilesystemMediaStorage(settings.media_storage_path)
-        use_case = CleanupExpiredMedia(uow, OwnerAccessPolicy(), storage)
+        use_case = CleanupExpiredMedia(uow, get_access_guard(), storage)
         return await use_case.handle(
             CleanupExpiredMediaCommand(
                 staged_before=now - timedelta(hours=settings.staged_ttl_hours),
@@ -52,7 +52,7 @@ def regenerate_thumbnails(*, max_dimension: int = 320) -> None:
     Args:
         max_dimension: Longest edge, in pixels, for regenerated thumbnails.
     """
-    from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
+    from app.entrypoints.api.shared.access_guard import get_access_guard
     from app.modules.media.adapters.imaging.pillow_processor import PillowImageProcessor
     from app.modules.media.adapters.persistence.unit_of_work import create_media_uow
     from app.modules.media.adapters.storage.local_filesystem import (
@@ -73,7 +73,7 @@ def regenerate_thumbnails(*, max_dimension: int = 320) -> None:
         uow = create_media_uow(get_session_factory())
         storage = LocalFilesystemMediaStorage(settings.media_storage_path)
         use_case = RegenerateThumbnails(
-            uow, OwnerAccessPolicy(), storage, PillowImageProcessor()
+            uow, get_access_guard(), storage, PillowImageProcessor()
         )
         return await use_case.handle(
             RegenerateThumbnailsCommand(max_dimension=max_dimension), SYSTEM_ACTOR

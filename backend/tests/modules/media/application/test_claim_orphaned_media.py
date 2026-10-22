@@ -12,6 +12,7 @@ from app.modules.media.application.claim_orphaned_media import (
     ClaimOrphanedMediaCommand,
 )
 from app.modules.media.domain.media_asset import MediaAsset
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
@@ -37,7 +38,7 @@ async def test_claims_system_owned_assets_and_commits() -> None:
     await assets.add(theirs)
     owner = uuid.uuid7()
 
-    count = await ClaimOrphanedMedia(uow).handle(
+    count = await ClaimOrphanedMedia(uow, InMemoryAccessGuard()).handle(
         ClaimOrphanedMediaCommand(owner_id=owner), SYSTEM_ACTOR
     )
 

@@ -2,7 +2,6 @@ import uuid
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
     InMemoryMediaAssetRepository,
 )
@@ -10,13 +9,14 @@ from app.modules.media.adapters.persistence.unit_of_work import make_in_memory_r
 from app.modules.media.application.get_media import GetMedia, GetMediaQuery
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
 def _make_use_case() -> tuple[GetMedia, InMemoryMediaAssetRepository]:
     repo = InMemoryMediaAssetRepository()
     repos = make_in_memory_repos(assets=repo)
-    return GetMedia(repos, OwnerAccessPolicy()), repo
+    return GetMedia(repos, InMemoryAccessGuard()), repo
 
 
 async def test_get_returns_asset_by_id() -> None:

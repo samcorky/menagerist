@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.imaging.in_memory_image_processor import (
     InMemoryImageProcessor,
 )
@@ -68,6 +67,7 @@ from app.modules.media.domain.media_attachment import (
     MediaAttachment,
 )
 from app.modules.media.ports.unit_of_work import MediaRepos, MediaUnitOfWork
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import NotFoundError
@@ -77,7 +77,7 @@ if TYPE_CHECKING:
 
 ALICE = Actor(id=uuid.UUID(int=101), roles=frozenset({"member"}))
 BOB = Actor(id=uuid.UUID(int=102), roles=frozenset({"member"}))
-POLICY = OwnerAccessPolicy()
+POLICY = InMemoryAccessGuard()
 NODE = AttachmentTarget.NODE
 
 
@@ -173,7 +173,9 @@ def _no_writes(world: World) -> None:
 
 async def test_staged_uploads_belong_to_the_uploader(world: World) -> None:
     """The actor becomes the owner of what they stage."""
-    use_case = StageMedia(world.uow, world.storage, InMemoryImageProcessor())
+    use_case = StageMedia(
+        world.uow, InMemoryAccessGuard(), world.storage, InMemoryImageProcessor()
+    )
 
     asset = await use_case.handle(
         StageMediaCommand(

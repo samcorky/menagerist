@@ -2,7 +2,6 @@
 
 import uuid
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
     InMemoryMediaAssetRepository,
 )
@@ -16,6 +15,7 @@ from app.modules.media.application.list_node_media import (
 )
 from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.media.domain.media_attachment import AttachmentKey, MediaAttachment
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 
@@ -35,7 +35,7 @@ def _make_use_case() -> tuple[
     assets = InMemoryMediaAssetRepository()
     attachments = InMemoryMediaAttachmentRepository(assets)
     repos = make_in_memory_repos(assets=assets, attachments=attachments)
-    return ListNodeMedia(repos, OwnerAccessPolicy()), assets, attachments
+    return ListNodeMedia(repos, InMemoryAccessGuard()), assets, attachments
 
 
 async def test_list_node_media_returns_attached_assets() -> None:

@@ -1,17 +1,18 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from datetime import datetime
 
     from app.modules.media.ports.media_storage import MediaStoragePort
-    from app.shared_kernel.access_policy import AccessPolicy
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -26,23 +27,25 @@ class CleanupExpiredMediaCommand:
 
 
 class CleanupExpiredMedia(
-    ScopedCommandHandler[MediaUnitOfWork, CleanupExpiredMediaCommand, int]
+    GuardedCommandHandler[MediaUnitOfWork, CleanupExpiredMediaCommand, int]
 ):
     """Hard-delete staged and orphaned assets that have passed their TTL."""
 
+    access: ClassVar[Access] = Content()
+
     def __init__(
-        self, uow: MediaUnitOfWork, policy: AccessPolicy, storage: MediaStoragePort
+        self, uow: MediaUnitOfWork, guard: AccessGuard, storage: MediaStoragePort
     ) -> None:
-        super().__init__(uow, policy)
+        super().__init__(uow, guard)
         self._storage = storage
 
-    async def handle(self, command: CleanupExpiredMediaCommand, actor: Actor) -> int:
+    async def _handle(self, command: CleanupExpiredMediaCommand, actor: Actor) -> int:
         """Delete all expired assets and return the number removed."""
         pairs = (
             (MediaStatus.STAGED, command.staged_before),
             (MediaStatus.ORPHANED, command.orphaned_before),
         )
-        scope = self._policy.scope_for(actor)
+        scope = self.scope(actor)
         expired = []
         for status, before in pairs:
             async with self._uow as repos:

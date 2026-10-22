@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
     InMemoryMediaAssetRepository,
 )
@@ -32,6 +31,7 @@ from app.modules.media.domain.media_attachment import (
     AttachmentTarget,
     MediaAttachment,
 )
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 if TYPE_CHECKING:
@@ -57,7 +57,7 @@ def _make_use_case() -> tuple[
     attachments = InMemoryMediaAttachmentRepository(assets)
     repos = make_in_memory_repos(assets=assets, attachments=attachments)
     uow = create_in_memory_media_uow(repos)
-    return SetMediaCover(uow, OwnerAccessPolicy()), assets, attachments
+    return SetMediaCover(uow, InMemoryAccessGuard()), assets, attachments
 
 
 async def test_set_cover_atomically_unsets_previous_cover() -> None:
@@ -206,7 +206,7 @@ async def test_set_cover_still_replaces_an_existing_cover() -> None:
         make_in_memory_repos(assets=assets, attachments=attachments)
     )
 
-    await SetMediaCover(uow, OwnerAccessPolicy()).handle(
+    await SetMediaCover(uow, InMemoryAccessGuard()).handle(
         SetMediaCoverCommand(
             asset_id=new.id, target_type=AttachmentTarget.NODE, target_id=node_id
         ),
@@ -249,7 +249,7 @@ async def test_set_cover_locks_the_target_before_reading_its_attachments() -> No
         create_in_memory_media_uow(
             make_in_memory_repos(assets=assets, attachments=attachments)
         ),
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
     )
     node_id = uuid.uuid4()
     asset = _make_image_asset()

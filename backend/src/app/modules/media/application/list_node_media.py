@@ -1,13 +1,14 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
 from app.modules.media.ports.unit_of_work import MediaRepos
-from app.shared_kernel.cqrs import ScopedQueryHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedQueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -31,15 +32,17 @@ class NodeMediaItem:
 
 
 class ListNodeMedia(
-    ScopedQueryHandler[MediaRepos, ListNodeMediaQuery, list[NodeMediaItem]]
+    GuardedQueryHandler[MediaRepos, ListNodeMediaQuery, list[NodeMediaItem]]
 ):
     """Return all media assets currently attached to a node, with their slot labels."""
 
-    async def handle(
+    access: ClassVar[Access] = Content()
+
+    async def _handle(
         self, query: ListNodeMediaQuery, actor: Actor
     ) -> list[NodeMediaItem]:
         """Fetch attachments for the node then resolve each asset."""
-        scope = self._policy.scope_for(actor)
+        scope = self.scope(actor)
         attachments = await self._repos.attachments.list_for_target(
             AttachmentTarget.NODE, query.node_id, scope=scope
         )

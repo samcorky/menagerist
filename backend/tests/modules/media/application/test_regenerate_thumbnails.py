@@ -1,6 +1,5 @@
 import uuid
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.imaging.in_memory_image_processor import (
     InMemoryImageProcessor,
 )
@@ -19,6 +18,7 @@ from app.modules.media.application.regenerate_thumbnails import (
     RegenerateThumbnailsCommand,
 )
 from app.modules.media.domain.media_asset import MediaAsset
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.content_filter import ContentFilter
 
@@ -31,7 +31,7 @@ def _make_use_case(
     uow = create_in_memory_media_uow(make_in_memory_repos(assets=repo))
     processor = image_processor or InMemoryImageProcessor()
     return (
-        RegenerateThumbnails(uow, OwnerAccessPolicy(), storage, processor),
+        RegenerateThumbnails(uow, InMemoryAccessGuard(), storage, processor),
         repo,
         storage,
     )

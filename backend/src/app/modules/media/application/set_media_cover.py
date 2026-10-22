@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
@@ -11,7 +11,8 @@ from app.modules.media.domain.errors import (
 )
 from app.modules.media.domain.media_attachment import AttachmentTarget, MediaAttachment
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -29,7 +30,7 @@ class SetMediaCoverCommand:
 
 
 class SetMediaCover(
-    ScopedCommandHandler[MediaUnitOfWork, SetMediaCoverCommand, MediaAttachment]
+    GuardedCommandHandler[MediaUnitOfWork, SetMediaCoverCommand, MediaAttachment]
 ):
     """Atomically move the cover flag to a different attachment of the same target.
 
@@ -39,17 +40,19 @@ class SetMediaCover(
     serialised, so simultaneous calls both succeed and the last one wins.
     """
 
-    async def handle(
+    access: ClassVar[Access] = Content()
+
+    async def _handle(
         self, command: SetMediaCoverCommand, actor: Actor
     ) -> MediaAttachment:
         """Set `asset_id`'s attachment as cover, clearing any previous cover."""
         async with self._uow as repos:
-            scope = self._policy.scope_for(actor)
+            scope = self.scope(actor)
             asset = await repos.assets.get(command.asset_id, scope=scope)
             if asset is None:
                 msg = f"Media asset {command.asset_id} not found"
                 raise MediaAssetNotFoundError(msg)
-            self._policy.assert_can_modify(actor, asset.owner_id)
+            self._guard.assert_can_modify(actor, asset.owner_id)
             if not asset.content_type.startswith("image/"):
                 raise UnsupportedMediaTypeError(
                     f"{asset.content_type!r} cannot be used as a cover"

@@ -1,17 +1,18 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.modules.media.ports.media_storage import MediaStoragePort
-    from app.shared_kernel.access_policy import AccessPolicy
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -25,30 +26,30 @@ class OrphanMediaCommand:
 
 
 class OrphanMedia(
-    ScopedCommandHandler[MediaUnitOfWork, OrphanMediaCommand, MediaAsset]
+    GuardedCommandHandler[MediaUnitOfWork, OrphanMediaCommand, MediaAsset]
 ):
     """Transition an attached asset to orphaned."""
 
+    access: ClassVar[Access] = Content()
+
     def __init__(
-        self, uow: MediaUnitOfWork, policy: AccessPolicy, storage: MediaStoragePort
+        self, uow: MediaUnitOfWork, guard: AccessGuard, storage: MediaStoragePort
     ) -> None:
-        super().__init__(uow, policy)
+        super().__init__(uow, guard)
         self._storage = storage
 
-    async def handle(self, command: OrphanMediaCommand, actor: Actor) -> MediaAsset:
+    async def _handle(self, command: OrphanMediaCommand, actor: Actor) -> MediaAsset:
         """Transition the asset from attached to orphaned.
 
         Follows the same DB-first, then file-move ordering as `PromoteMedia`.
         """
         async with self._uow as repos:
-            asset = await repos.assets.get(
-                command.asset_id, scope=self._policy.scope_for(actor)
-            )
+            asset = await repos.assets.get(command.asset_id, scope=self.scope(actor))
             if asset is None:
                 raise MediaAssetNotFoundError(
                     f"Media asset {command.asset_id} not found"
                 )
-            self._policy.assert_can_modify(actor, asset.owner_id)
+            self._guard.assert_can_modify(actor, asset.owner_id)
             asset.orphan()
             await repos.assets.save(asset)
             await self._uow.commit()

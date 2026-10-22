@@ -2,7 +2,7 @@ import asyncio
 import hashlib
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
@@ -14,7 +14,8 @@ from app.modules.media.domain.errors import ImageTooLargeError
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
 from app.modules.media.domain.thumbnail_eligibility import is_thumbnailable_image
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedCommandHandler
 from app.shared_kernel.log_safe import loggable
 
 if TYPE_CHECKING:
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
 
     from app.modules.media.ports.image_processor import ImageProcessorPort
     from app.modules.media.ports.media_storage import MediaStoragePort
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger(__name__)
@@ -40,20 +42,23 @@ class StageMediaCommand:
     max_size: int | None = field(default=None)
 
 
-class StageMedia(CommandHandler[MediaUnitOfWork, StageMediaCommand, MediaAsset]):
+class StageMedia(GuardedCommandHandler[MediaUnitOfWork, StageMediaCommand, MediaAsset]):
     """Stream an upload to staging storage and record it in the database."""
+
+    access: ClassVar[Access] = Content()
 
     def __init__(
         self,
         uow: MediaUnitOfWork,
+        guard: AccessGuard,
         storage: MediaStoragePort,
         image_processor: ImageProcessorPort,
     ) -> None:
-        super().__init__(uow)
+        super().__init__(uow, guard)
         self._storage = storage
         self._image_processor = image_processor
 
-    async def handle(self, command: StageMediaCommand, actor: Actor) -> MediaAsset:
+    async def _handle(self, command: StageMediaCommand, actor: Actor) -> MediaAsset:
         """Write the stream to staged storage, then persist the asset record.
 
         The id is pre-generated so the storage adapter knows the destination path

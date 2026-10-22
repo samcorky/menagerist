@@ -7,7 +7,6 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.media.adapters.persistence.media_asset_repository import (
     SqlAlchemyMediaAssetRepository,
 )
@@ -26,6 +25,7 @@ from app.modules.media.domain.media_attachment import (
     AttachmentTarget,
     MediaAttachment,
 )
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -130,7 +130,7 @@ async def test_concurrent_set_cover_calls_serialise_to_one_cover(
                 asset_id: uuid.UUID, node_id: uuid.UUID = node_id
             ) -> None:
                 await SetMediaCover(
-                    create_media_uow(factory), OwnerAccessPolicy()
+                    create_media_uow(factory), InMemoryAccessGuard()
                 ).handle(
                     SetMediaCoverCommand(
                         asset_id=asset_id,

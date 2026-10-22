@@ -18,6 +18,7 @@ from app.modules.media.adapters.storage.in_memory_media_storage import (
 from app.modules.media.application.stage_media import StageMedia, StageMediaCommand
 from app.modules.media.domain.errors import ImageTooLargeError, MediaFileTooLargeError
 from app.modules.media.domain.media_asset import MediaStatus
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
 
@@ -37,7 +38,7 @@ def _make_use_case(
     storage = InMemoryMediaStorage()
     uow = create_in_memory_media_uow(make_in_memory_repos(assets=repo))
     proc = image_processor or InMemoryImageProcessor()
-    return StageMedia(uow, storage, proc), repo, storage
+    return StageMedia(uow, InMemoryAccessGuard(), storage, proc), repo, storage
 
 
 async def test_stage_persists_asset_and_commits() -> None:

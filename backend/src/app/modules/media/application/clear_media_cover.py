@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
@@ -10,7 +10,8 @@ from app.modules.media.domain.errors import (
 )
 from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -28,19 +29,21 @@ class ClearMediaCoverCommand:
 
 
 class ClearMediaCover(
-    ScopedCommandHandler[MediaUnitOfWork, ClearMediaCoverCommand, None]
+    GuardedCommandHandler[MediaUnitOfWork, ClearMediaCoverCommand, None]
 ):
     """Clear the cover flag on an attachment, leaving the asset attached."""
 
-    async def handle(self, command: ClearMediaCoverCommand, actor: Actor) -> None:
+    access: ClassVar[Access] = Content()
+
+    async def _handle(self, command: ClearMediaCoverCommand, actor: Actor) -> None:
         """Clear `asset_id`'s cover flag on the given target."""
         async with self._uow as repos:
-            scope = self._policy.scope_for(actor)
+            scope = self.scope(actor)
             asset = await repos.assets.get(command.asset_id, scope=scope)
             if asset is None:
                 msg = f"Media asset {command.asset_id} not found"
                 raise MediaAssetNotFoundError(msg)
-            self._policy.assert_can_modify(actor, asset.owner_id)
+            self._guard.assert_can_modify(actor, asset.owner_id)
             candidates = await repos.attachments.list_for_target(
                 command.target_type, command.target_id, scope=scope
             )

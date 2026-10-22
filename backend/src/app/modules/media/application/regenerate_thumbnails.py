@@ -1,7 +1,7 @@
 import asyncio
 import hashlib
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
@@ -9,12 +9,13 @@ from app.modules.media.domain.errors import ImageTooLargeError
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.domain.thumbnail_eligibility import is_thumbnailable_image
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.modules.media.ports.image_processor import ImageProcessorPort
     from app.modules.media.ports.media_storage import MediaStoragePort
-    from app.shared_kernel.access_policy import AccessPolicy
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -30,7 +31,7 @@ class RegenerateThumbnailsCommand:
 
 
 class RegenerateThumbnails(
-    ScopedCommandHandler[MediaUnitOfWork, RegenerateThumbnailsCommand, int]
+    GuardedCommandHandler[MediaUnitOfWork, RegenerateThumbnailsCommand, int]
 ):
     """Re-generate and re-store thumbnails for already-attached media assets.
 
@@ -39,22 +40,24 @@ class RegenerateThumbnails(
     catch up without re-uploading the original file.
     """
 
+    access: ClassVar[Access] = Content()
+
     def __init__(
         self,
         uow: MediaUnitOfWork,
-        policy: AccessPolicy,
+        guard: AccessGuard,
         storage: MediaStoragePort,
         image_processor: ImageProcessorPort,
     ) -> None:
-        super().__init__(uow, policy)
+        super().__init__(uow, guard)
         self._storage = storage
         self._image_processor = image_processor
 
-    async def handle(self, command: RegenerateThumbnailsCommand, actor: Actor) -> int:
+    async def _handle(self, command: RegenerateThumbnailsCommand, actor: Actor) -> int:
         """Regenerate thumbnails for eligible attached assets; return the count done."""
         async with self._uow as repos:
             assets = await repos.assets.list_by_status(
-                status=MediaStatus.ATTACHED, scope=self._policy.scope_for(actor)
+                status=MediaStatus.ATTACHED, scope=self.scope(actor)
             )
 
         count = 0

@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
@@ -14,7 +14,8 @@ from app.modules.media.domain.media_attachment import (
     MediaAttachment,
 )
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedCommandHandler
 from app.shared_kernel.unit_of_work import JoinedUnitOfWork
 
 if TYPE_CHECKING:
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
     from app.modules.media.ports.attachment_policy import AttachmentPolicyPort
     from app.modules.media.ports.image_processor import ImageProcessorPort
     from app.modules.media.ports.media_storage import MediaStoragePort
-    from app.shared_kernel.access_policy import AccessPolicy
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -45,30 +46,32 @@ class UploadAndAttachMediaCommand:
 
 
 class UploadAndAttachMedia(
-    ScopedCommandHandler[MediaUnitOfWork, UploadAndAttachMediaCommand, MediaAttachment]
+    GuardedCommandHandler[MediaUnitOfWork, UploadAndAttachMediaCommand, MediaAttachment]
 ):
     """Stream a file to storage and attach it within a single transaction."""
+
+    access: ClassVar[Access] = Content()
 
     def __init__(
         self,
         uow: MediaUnitOfWork,
-        policy: AccessPolicy,
+        guard: AccessGuard,
         storage: MediaStoragePort,
         attachment_policy: AttachmentPolicyPort,
         image_processor: ImageProcessorPort,
         targets: AttachTargetAccess,
     ) -> None:
-        super().__init__(uow, policy)
+        super().__init__(uow, guard)
         self._storage = storage
         self._attachment_policy = attachment_policy
         self._image_processor = image_processor
         self._targets = targets
 
-    async def handle(
+    async def _handle(
         self, command: UploadAndAttachMediaCommand, actor: Actor
     ) -> MediaAttachment:
         """Stage the file then immediately attach it within a single transaction."""
-        scope = self._policy.scope_for(actor)
+        scope = self.scope(actor)
         # Checked before streaming so a refused upload leaves no file behind.
         if not await self._targets.can_attach(
             command.target_type, command.target_id, scope
@@ -86,7 +89,9 @@ class UploadAndAttachMedia(
             )
             joined = JoinedUnitOfWork(repos, owner=self._uow)
 
-            stage = StageMedia(joined, self._storage, self._image_processor)
+            stage = StageMedia(
+                joined, self._guard, self._storage, self._image_processor
+            )
             asset = await stage.handle(
                 StageMediaCommand(
                     filename=command.filename,
@@ -100,7 +105,7 @@ class UploadAndAttachMedia(
 
             attach = AttachMedia(
                 joined,
-                self._policy,
+                self._guard,
                 self._storage,
                 self._attachment_policy,
                 self._targets,
