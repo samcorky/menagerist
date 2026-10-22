@@ -14,7 +14,7 @@ from app.modules.collections.domain.collection import CollectionKind
 from app.modules.collections.ports.item_lookup import ItemLookup  # noqa: TC001
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.modules.collections.domain.collection import Collection
@@ -47,7 +47,7 @@ class ListCollectionsResult:
 
 
 class ListCollections(
-    GuardedQueryHandler[CollectionsRepos, ListCollectionsQuery, ListCollectionsResult]
+    QueryHandler[CollectionsRepos, ListCollectionsQuery, ListCollectionsResult]
 ):
     """List collections with keyset pagination and live item counts."""
 

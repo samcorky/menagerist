@@ -17,7 +17,7 @@ from app.modules.backup.domain.errors import CorruptBackupError, MediaFileMissin
 from app.modules.backup.ports.user_database_snapshot import UserDatabaseSnapshot
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.content_filter import ContentFilter
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.modules.backup.domain.backup import MediaFileRef
@@ -46,7 +46,7 @@ class ExportUserDataCommand:
 
 
 class ExportUserData(
-    GuardedCommandHandler[UserDatabaseSnapshot, ExportUserDataCommand, BackupSummary]
+    CommandHandler[UserDatabaseSnapshot, ExportUserDataCommand, BackupSummary]
 ):
     """Export personal content through a private per-owner archive store."""
 

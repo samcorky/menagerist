@@ -30,7 +30,7 @@ from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Content
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -81,7 +81,7 @@ def _combine(saved: Group | None, filters: list[Condition]) -> Group | None:
     return Group(op="and", children=tuple(children)) if children else None
 
 
-class ListNodes(GuardedQueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
+class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
     """List node with keyset pagination."""
 
     access: ClassVar[Access] = Content()

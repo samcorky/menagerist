@@ -10,7 +10,7 @@ from app.modules.presets.domain.errors import PresetInUseError, PresetNotFoundEr
 from app.modules.presets.ports.preset_usage import PresetUsage  # noqa: TC001
 from app.modules.presets.ports.unit_of_work import PresetUnitOfWork
 from app.shared_kernel.access import Access, Shared
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -26,7 +26,7 @@ class DeletePresetCommand:
     preset_id: uuid.UUID
 
 
-class DeletePreset(GuardedCommandHandler[PresetUnitOfWork, DeletePresetCommand, None]):
+class DeletePreset(CommandHandler[PresetUnitOfWork, DeletePresetCommand, None]):
     """Soft-delete an existing preset.
 
     :raises BuiltinPresetError: a built-in preset cannot be deleted.

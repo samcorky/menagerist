@@ -6,7 +6,7 @@ import structlog
 
 from app.modules.backup.application.permissions import BackupPermission
 from app.shared_kernel.access import Access, Requires
-from app.shared_kernel.guarded import GuardedUseCase
+from app.shared_kernel.cqrs import UseCase
 
 if TYPE_CHECKING:
     from app.modules.backup.ports.backup_store import BackupStore
@@ -23,7 +23,7 @@ class DeleteBackupCommand:
     backup_id: UUID
 
 
-class DeleteBackup(GuardedUseCase[DeleteBackupCommand, None]):
+class DeleteBackup(UseCase[DeleteBackupCommand, None]):
     """Remove an archive's commit marker before its bytes."""
 
     access: ClassVar[Access] = Requires(BackupPermission.DELETE)

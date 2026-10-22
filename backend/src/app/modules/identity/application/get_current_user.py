@@ -9,7 +9,7 @@ from app.modules.identity.ports.session_token_generator import (  # noqa: TC001
 )
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
 from app.shared_kernel.access import Access, Public
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -38,9 +38,7 @@ class ResolvedSession:
 
 
 class GetCurrentUser(
-    GuardedCommandHandler[
-        IdentityUnitOfWork, GetCurrentUserQuery, ResolvedSession | None
-    ]
+    CommandHandler[IdentityUnitOfWork, GetCurrentUserQuery, ResolvedSession | None]
 ):
     """Resolve a session token to its user.
 

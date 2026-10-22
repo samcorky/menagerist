@@ -16,7 +16,7 @@ from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.access import Access, Shared
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -35,9 +35,7 @@ class CreateNodeTypeCommand:
     attributes_schema: dict[str, Any] | None = field(default=None)
 
 
-class CreateNodeType(
-    GuardedCommandHandler[GraphUnitOfWork, CreateNodeTypeCommand, NodeType]
-):
+class CreateNodeType(CommandHandler[GraphUnitOfWork, CreateNodeTypeCommand, NodeType]):
     """Create and persist a new node type."""
 
     access: ClassVar[Access] = Shared()

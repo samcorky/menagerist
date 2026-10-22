@@ -1,5 +1,4 @@
 import inspect
-from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin, get_type_hints
 
 from fastapi import Security
@@ -9,25 +8,18 @@ from fastapi.security import APIKeyCookie
 from app.platform.config import get_identity_settings
 from app.shared_kernel.access import Requires
 from app.shared_kernel.cqrs import CommandHandler, UseCase
-from app.shared_kernel.guarded import GuardedCommandHandler, GuardedUseCase
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
 # The session cookie identity issues at sign-in. auto_error=False deliberately:
 # this exists for OpenAPI documentation only; `get_current_actor` rejects the
-# request and `AuthorisationPort.check()` enforces permissions.
+# request and the access guard enforces permissions.
 # The name is read once at import; the runtime lookup always uses live settings.
 cookie_scheme = APIKeyCookie(name=get_identity_settings().cookie_name, auto_error=False)
 
 
-type AnyUseCase = type[UseCase[Any, Any]] | type[GuardedUseCase[Any, Any]]
-
-_USE_CASE_BASES = (UseCase, GuardedUseCase)
-_COMMAND_BASES = (CommandHandler, GuardedCommandHandler)
-
-
-def _find_use_case_type(endpoint: Callable[..., Any]) -> AnyUseCase | None:
+def _find_use_case_type(endpoint: Callable[..., Any]) -> type[UseCase[Any, Any]] | None:
     """Return the route parameter type annotated as a UseCase subclass, if any.
 
     An endpoint may depend on more than one use case, e.g. a PATCH handler
@@ -36,39 +28,28 @@ def _find_use_case_type(endpoint: Callable[..., Any]) -> AnyUseCase | None:
     authorises the request - independent of parameter declaration order.
     """
     hints = get_type_hints(endpoint, include_extras=True)
-    use_case_types: list[AnyUseCase] = []
+    use_case_types: list[type[UseCase[Any, Any]]] = []
     for hint in hints.values():
         if get_origin(hint) is not Annotated:
             continue
         actual_type, *_ = get_args(hint)
-        if isinstance(actual_type, type) and issubclass(actual_type, _USE_CASE_BASES):
+        if isinstance(actual_type, type) and issubclass(actual_type, UseCase):
             use_case_types.append(actual_type)
 
     for use_case_type in use_case_types:
-        if issubclass(use_case_type, _COMMAND_BASES):
+        if issubclass(use_case_type, CommandHandler):
             return use_case_type
     return use_case_types[0] if use_case_types else None
 
 
-def _permission_value(permission: object) -> str | None:
-    """Return a serialisable permission value when one is statically declared."""
-    if isinstance(permission, StrEnum):
-        return permission.value
-    if isinstance(permission, str):
-        return permission
-    return None
-
-
-def _declared_permission(use_case_cls: AnyUseCase) -> object:
-    """Return the permission from `access`, else the legacy attribute."""
+def _declared_permission(use_case_cls: type[UseCase[Any, Any]]) -> str | None:
+    """Return the permission a use case requires, if it declares one."""
     access = getattr(use_case_cls, "access", None)
-    if isinstance(access, Requires):
-        return access.permission
-    return getattr(use_case_cls, "required_permission", None)
+    return access.permission.value if isinstance(access, Requires) else None
 
 
 class PermissionAwareRoute(APIRoute):
-    """Reflect a use case's static required_permission into OpenAPI documentation.
+    """Reflect a use case's `Requires` stance into OpenAPI documentation.
 
     This does not enforce authorisation. It only documents permissions already
     declared by the use case.
@@ -85,9 +66,7 @@ class PermissionAwareRoute(APIRoute):
 
         use_case_cls = _find_use_case_type(endpoint)
         permission = (
-            _permission_value(_declared_permission(use_case_cls))
-            if use_case_cls is not None
-            else None
+            _declared_permission(use_case_cls) if use_case_cls is not None else None
         )
 
         if permission is not None:

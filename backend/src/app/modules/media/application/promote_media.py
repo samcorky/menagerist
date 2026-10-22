@@ -8,7 +8,7 @@ from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.modules.media.ports.media_storage import MediaStoragePort
@@ -25,9 +25,7 @@ class PromoteMediaCommand:
     asset_id: uuid.UUID
 
 
-class PromoteMedia(
-    GuardedCommandHandler[MediaUnitOfWork, PromoteMediaCommand, MediaAsset]
-):
+class PromoteMedia(CommandHandler[MediaUnitOfWork, PromoteMediaCommand, MediaAsset]):
     """Promote a staged asset to attached once it has been referenced by a node."""
 
     access: ClassVar[Access] = Content()

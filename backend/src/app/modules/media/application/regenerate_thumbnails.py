@@ -10,7 +10,7 @@ from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.domain.thumbnail_eligibility import is_thumbnailable_image
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.modules.media.ports.image_processor import ImageProcessorPort
@@ -31,7 +31,7 @@ class RegenerateThumbnailsCommand:
 
 
 class RegenerateThumbnails(
-    GuardedCommandHandler[MediaUnitOfWork, RegenerateThumbnailsCommand, int]
+    CommandHandler[MediaUnitOfWork, RegenerateThumbnailsCommand, int]
 ):
     """Re-generate and re-store thumbnails for already-attached media assets.
 

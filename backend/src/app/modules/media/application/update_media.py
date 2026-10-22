@@ -8,7 +8,7 @@ from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.log_safe import loggable
 
 if TYPE_CHECKING:
@@ -25,9 +25,7 @@ class UpdateMediaCommand:
     filename: str
 
 
-class UpdateMedia(
-    GuardedCommandHandler[MediaUnitOfWork, UpdateMediaCommand, MediaAsset]
-):
+class UpdateMedia(CommandHandler[MediaUnitOfWork, UpdateMediaCommand, MediaAsset]):
     """Update a media asset's editable metadata."""
 
     access: ClassVar[Access] = Content()

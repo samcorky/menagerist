@@ -13,7 +13,7 @@ from app.modules.presets.application.preset_definitions import check_definition
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetUnitOfWork
 from app.shared_kernel.access import Access, Shared
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.modules.presets.ports.preset_repository import PresetRepository
@@ -51,7 +51,7 @@ class ImportPresetsResult:
 
 
 class ImportPresets(
-    GuardedCommandHandler[PresetUnitOfWork, ImportPresetsCommand, ImportPresetsResult]
+    CommandHandler[PresetUnitOfWork, ImportPresetsCommand, ImportPresetsResult]
 ):
     """Import a pack, skipping any preset whose content already exists.
 

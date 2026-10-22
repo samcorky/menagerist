@@ -7,7 +7,7 @@ import structlog
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -24,7 +24,7 @@ class ListEdgesQuery:
     node_id: uuid.UUID | None = None
 
 
-class ListEdges(GuardedQueryHandler[GraphRepos, ListEdgesQuery, list[Edge]]):
+class ListEdges(QueryHandler[GraphRepos, ListEdgesQuery, list[Edge]]):
     """List edge with keyset pagination, optionally scoped to a single node."""
 
     access: ClassVar[Access] = Content()

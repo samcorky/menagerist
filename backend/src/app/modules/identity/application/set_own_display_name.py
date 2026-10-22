@@ -7,7 +7,7 @@ from app.modules.identity.domain.errors import UserNotFoundError
 from app.modules.identity.domain.user import User
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
 from app.shared_kernel.access import Access, OwnAccount
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -23,7 +23,7 @@ class SetOwnDisplayNameCommand:
 
 
 class SetOwnDisplayName(
-    GuardedCommandHandler[IdentityUnitOfWork, SetOwnDisplayNameCommand, User]
+    CommandHandler[IdentityUnitOfWork, SetOwnDisplayNameCommand, User]
 ):
     """Rename the acting user; everyone may change their own display name."""
 

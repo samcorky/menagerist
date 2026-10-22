@@ -15,7 +15,7 @@ from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
 from app.modules.media.domain.thumbnail_eligibility import is_thumbnailable_image
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.log_safe import loggable
 
 if TYPE_CHECKING:
@@ -42,7 +42,7 @@ class StageMediaCommand:
     max_size: int | None = field(default=None)
 
 
-class StageMedia(GuardedCommandHandler[MediaUnitOfWork, StageMediaCommand, MediaAsset]):
+class StageMedia(CommandHandler[MediaUnitOfWork, StageMediaCommand, MediaAsset]):
     """Stream an upload to staging storage and record it in the database."""
 
     access: ClassVar[Access] = Content()

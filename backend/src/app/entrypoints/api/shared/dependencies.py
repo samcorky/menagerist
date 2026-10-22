@@ -1,9 +1,8 @@
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from fastapi import Depends
 from starlette.requests import Request
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.entrypoints.api.shared.authorisation import (
     get_authorisation_port,
     get_role_authorisation,
@@ -28,11 +27,6 @@ from app.modules.identity.domain.errors import (
     SetupRequiredError,
 )
 from app.shared_kernel.actor import ANONYMOUS_ACTOR, Actor
-
-if TYPE_CHECKING:
-    from app.shared_kernel.access_policy import AccessPolicy
-
-_access_policy = OwnerAccessPolicy()
 
 
 async def get_current_actor(
@@ -66,13 +60,7 @@ async def get_current_actor(
     return Actor(id=user.id, roles=frozenset({user.role.value}))
 
 
-def get_access_policy() -> AccessPolicy:
-    """Return the process-wide `AccessPolicy`."""
-    return _access_policy
-
-
 __all__ = [
-    "get_access_policy",
     "get_authorisation_port",
     "get_current_actor",
     "get_role_authorisation",

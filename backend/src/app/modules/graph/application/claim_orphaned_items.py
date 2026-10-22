@@ -7,7 +7,7 @@ import structlog
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.access import Access, System
 from app.shared_kernel.actor import SYSTEM_ACTOR
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -34,9 +34,7 @@ class ClaimedItemsResult:
 
 
 class ClaimOrphanedItems(
-    GuardedCommandHandler[
-        GraphUnitOfWork, ClaimOrphanedItemsCommand, ClaimedItemsResult
-    ]
+    CommandHandler[GraphUnitOfWork, ClaimOrphanedItemsCommand, ClaimedItemsResult]
 ):
     """Give content that predates accounts to its first owner.
 

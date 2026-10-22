@@ -8,7 +8,7 @@ from app.modules.graph.domain.errors import NodeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -23,7 +23,7 @@ class GetNodeQuery:
     node_id: uuid.UUID
 
 
-class GetNode(GuardedQueryHandler[GraphRepos, GetNodeQuery, Node]):
+class GetNode(QueryHandler[GraphRepos, GetNodeQuery, Node]):
     """Fetch a single node by id."""
 
     access: ClassVar[Access] = Content()

@@ -7,7 +7,7 @@ from app.modules.identity.application.sign_in_throttle import username_key
 from app.modules.identity.application.user_listing import UserListing
 from app.modules.identity.ports.unit_of_work import IdentityRepos
 from app.shared_kernel.access import Access, Requires
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -18,7 +18,7 @@ class ListUsersQuery:
     """Request to list every account."""
 
 
-class ListUsers(GuardedQueryHandler[IdentityRepos, ListUsersQuery, list[UserListing]]):
+class ListUsers(QueryHandler[IdentityRepos, ListUsersQuery, list[UserListing]]):
     """List every account with its sign-in lock state, for administrators."""
 
     access: ClassVar[Access] = Requires(IdentityPermission.LIST_USERS)

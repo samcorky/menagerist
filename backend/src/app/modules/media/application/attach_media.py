@@ -17,7 +17,7 @@ from app.modules.media.domain.media_attachment import (
 )
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.modules.media.ports.attach_target_access import AttachTargetAccess
@@ -39,9 +39,7 @@ class AttachMediaCommand:
     attribute_key: AttachmentKey | None = field(default=None)
 
 
-class AttachMedia(
-    GuardedCommandHandler[MediaUnitOfWork, AttachMediaCommand, MediaAttachment]
-):
+class AttachMedia(CommandHandler[MediaUnitOfWork, AttachMediaCommand, MediaAttachment]):
     """Link a media asset to a target entity, promoting from staged if needed."""
 
     access: ClassVar[Access] = Content()

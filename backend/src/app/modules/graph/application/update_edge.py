@@ -15,7 +15,7 @@ from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.access import Access, Content
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
@@ -37,7 +37,7 @@ class UpdateEdgeCommand:
     attributes: dict[str, Any] | None = field(default=None)
 
 
-class UpdateEdge(GuardedCommandHandler[GraphUnitOfWork, UpdateEdgeCommand, Edge]):
+class UpdateEdge(CommandHandler[GraphUnitOfWork, UpdateEdgeCommand, Edge]):
     """Update an existing edge's editable fields."""
 
     access: ClassVar[Access] = Content()

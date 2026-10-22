@@ -21,7 +21,7 @@ from app.modules.collections.ports.item_lookup import ItemLookup  # noqa: TC001
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.content_filter import ContentFilter  # noqa: TC001
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -75,7 +75,7 @@ class GetCollectionQuery:
 
 
 class GetCollection(
-    GuardedQueryHandler[CollectionsRepos, GetCollectionQuery, CollectionSummary]
+    QueryHandler[CollectionsRepos, GetCollectionQuery, CollectionSummary]
 ):
     """Fetch a single collection with its live item count."""
 

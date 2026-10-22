@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from app.modules.identity.ports.unit_of_work import IdentityRepos
 from app.shared_kernel.access import Access, Public
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -14,7 +14,7 @@ class HasAdministratorQuery:
     """Request to learn whether any enabled administrator exists."""
 
 
-class HasAdministrator(GuardedQueryHandler[IdentityRepos, HasAdministratorQuery, bool]):
+class HasAdministrator(QueryHandler[IdentityRepos, HasAdministratorQuery, bool]):
     """Whether at least one enabled administrator exists."""
 
     access: ClassVar[Access] = Public()

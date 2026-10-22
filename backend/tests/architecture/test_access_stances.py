@@ -1,4 +1,5 @@
 import importlib
+import importlib.util
 import inspect
 import pkgutil
 from enum import StrEnum
@@ -9,7 +10,7 @@ import pytest
 import app.modules
 from app.entrypoints.api.shared.permissions import ALL_PERMISSIONS
 from app.shared_kernel.access import Access, Content, Public, Requires, Shared, System
-from app.shared_kernel.guarded import GuardedUseCase
+from app.shared_kernel.cqrs import UseCase
 
 # Pinned by name so widening who can call something needs an edit here.
 # Filled in as each module migrates.
@@ -108,7 +109,7 @@ EXPECTED_CONTENT: frozenset[str] = frozenset(
     }
 )
 
-type UseCaseType = type[GuardedUseCase[Any, Any]]
+type UseCaseType = type[UseCase[Any, Any]]
 
 _STANCES = get_args(Access.__value__)
 
@@ -123,7 +124,7 @@ def _use_cases() -> list[UseCaseType]:
             obj
             for _, obj in inspect.getmembers(module, inspect.isclass)
             if obj.__module__ == module.__name__
-            and issubclass(obj, GuardedUseCase)
+            and issubclass(obj, UseCase)
             and not inspect.isabstract(obj)
         )
     return found
@@ -138,9 +139,9 @@ def _name(cls: type) -> str:
 
 
 def _declared(cls: type) -> object:
-    """Return the `access` set below `GuardedUseCase`, or None."""
+    """Return the `access` set below `UseCase`, or None."""
     for base in cls.__mro__:
-        if base is GuardedUseCase:
+        if base is UseCase:
             break
         if "access" in vars(base):
             return vars(base)["access"]
@@ -218,7 +219,7 @@ def _fake[T: type](cls: T) -> T:
 
 
 @_fake
-class _NoAccess(GuardedUseCase[str, str]):
+class _NoAccess(UseCase[str, str]):
     async def _handle(self, request: str, actor: object) -> str:
         return request
 
@@ -249,3 +250,13 @@ def test_the_checks_catch_bad_use_cases() -> None:
     assert _overriding_handle([_Open, _Overrides]) == [_name(_Overrides)]
     assert _bad_permissions([_Open, _Gated]) == [_name(_Gated)]
     assert _with_stance([_Open, _Gated], Public) == {_name(_Open)}
+
+
+def test_no_legacy_bases() -> None:
+    """The scoped and authorised bases are gone: access is a declared stance."""
+    import app.shared_kernel.cqrs as cqrs
+
+    legacy = [n for n in dir(cqrs) if n.startswith(("Scoped", "Authorised", "_Policy"))]
+    assert legacy == []
+    assert importlib.util.find_spec("app.shared_kernel.access_policy") is None
+    assert importlib.util.find_spec("app.shared_kernel.guarded") is None

@@ -7,7 +7,7 @@ import structlog
 from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.modules.media.domain.media_asset import MediaAsset
@@ -25,7 +25,7 @@ class DeleteMediaCommand:
     asset_id: uuid.UUID
 
 
-class DeleteMedia(GuardedCommandHandler[MediaUnitOfWork, DeleteMediaCommand, None]):
+class DeleteMedia(CommandHandler[MediaUnitOfWork, DeleteMediaCommand, None]):
     """Hard-delete a media asset from both the database and storage."""
 
     access: ClassVar[Access] = Content()

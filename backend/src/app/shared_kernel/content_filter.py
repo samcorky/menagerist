@@ -6,7 +6,7 @@ from dataclasses import dataclass
 class ContentFilter:
     """Which content a query may return; a criterion only, with no rules.
 
-    The `AccessPolicy` decides which scope an actor gets; repositories only
+    The access guard decides which scope an actor gets; repositories only
     apply it.
     """
 

@@ -11,7 +11,7 @@ from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Shared
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -28,9 +28,7 @@ class ListNodeTypesQuery:
     limit: int = 50
 
 
-class ListNodeTypes(
-    GuardedQueryHandler[GraphRepos, ListNodeTypesQuery, list[NodeType]]
-):
+class ListNodeTypes(QueryHandler[GraphRepos, ListNodeTypesQuery, list[NodeType]]):
     """List node types with keyset pagination."""
 
     access: ClassVar[Access] = Shared()

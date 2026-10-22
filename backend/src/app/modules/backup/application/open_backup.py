@@ -7,7 +7,7 @@ from app.modules.backup.application.permissions import BackupPermission
 from app.modules.backup.domain.backup import BackupSummary
 from app.modules.backup.domain.errors import BackupNotFoundError
 from app.shared_kernel.access import Access, Requires
-from app.shared_kernel.guarded import GuardedUseCase
+from app.shared_kernel.cqrs import UseCase
 
 if TYPE_CHECKING:
     from app.modules.backup.ports.backup_store import BackupStore
@@ -30,7 +30,7 @@ class OpenedBackup:
     chunks: AsyncIterator[bytes]
 
 
-class OpenBackup(GuardedUseCase[OpenBackupQuery, OpenedBackup]):
+class OpenBackup(UseCase[OpenBackupQuery, OpenedBackup]):
     """Resolve the commit marker before returning download bytes."""
 
     access: ClassVar[Access] = Requires(BackupPermission.READ)

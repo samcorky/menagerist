@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, ClassVar
 from app.modules.identity.domain.session import Session
 from app.modules.identity.ports.unit_of_work import IdentityRepos
 from app.shared_kernel.access import Access, OwnAccount
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -29,7 +29,7 @@ class OwnSession:
 
 
 class ListOwnSessions(
-    GuardedQueryHandler[IdentityRepos, ListOwnSessionsQuery, list[OwnSession]]
+    QueryHandler[IdentityRepos, ListOwnSessionsQuery, list[OwnSession]]
 ):
     """List active sessions for the calling user, newest first."""
 

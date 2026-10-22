@@ -10,7 +10,7 @@ from app.modules.graph.domain.query import QueryWarning
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Shared
 from app.shared_kernel.actor import Actor  # noqa: TC001
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -30,9 +30,7 @@ class ValidateQueryResult:
     warnings: list[QueryWarning]
 
 
-class ValidateQuery(
-    GuardedQueryHandler[GraphRepos, ValidateQueryQuery, ValidateQueryResult]
-):
+class ValidateQuery(QueryHandler[GraphRepos, ValidateQueryQuery, ValidateQueryResult]):
     """Validate a condition tree against the current item types."""
 
     access: ClassVar[Access] = Shared()

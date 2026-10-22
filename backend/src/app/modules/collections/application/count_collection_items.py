@@ -11,7 +11,7 @@ from app.modules.collections.domain.errors import CollectionNotFoundError
 from app.modules.collections.ports.item_lookup import ItemLookup  # noqa: TC001
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -28,7 +28,7 @@ class CountCollectionItemsQuery:
 
 
 class CountCollectionItems(
-    GuardedQueryHandler[CollectionsRepos, CountCollectionItemsQuery, int]
+    QueryHandler[CollectionsRepos, CountCollectionItemsQuery, int]
 ):
     """Count a collection's items exactly, with no cap."""
 

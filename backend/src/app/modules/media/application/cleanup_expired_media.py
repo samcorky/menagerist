@@ -6,7 +6,7 @@ import structlog
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -27,7 +27,7 @@ class CleanupExpiredMediaCommand:
 
 
 class CleanupExpiredMedia(
-    GuardedCommandHandler[MediaUnitOfWork, CleanupExpiredMediaCommand, int]
+    CommandHandler[MediaUnitOfWork, CleanupExpiredMediaCommand, int]
 ):
     """Hard-delete staged and orphaned assets that have passed their TTL."""
 

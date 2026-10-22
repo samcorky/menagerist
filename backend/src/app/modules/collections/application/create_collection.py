@@ -17,8 +17,8 @@ from app.modules.collections.ports.definition_checker import (
 )
 from app.modules.collections.ports.unit_of_work import CollectionsUnitOfWork
 from app.shared_kernel.access import Access, Content
+from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.errors import ConflictError
-from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -41,7 +41,7 @@ class CreateCollectionCommand:
 
 
 class CreateCollection(
-    GuardedCommandHandler[CollectionsUnitOfWork, CreateCollectionCommand, Collection]
+    CommandHandler[CollectionsUnitOfWork, CreateCollectionCommand, Collection]
 ):
     """Create and persist a new collection owned by the acting user."""
 

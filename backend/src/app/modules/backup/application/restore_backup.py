@@ -16,7 +16,7 @@ from app.modules.backup.domain.errors import (
     RestoreTargetNotEmptyError,
 )
 from app.shared_kernel.access import Access, Requires
-from app.shared_kernel.guarded import GuardedUseCase
+from app.shared_kernel.cqrs import UseCase
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -153,7 +153,7 @@ async def restore_verified_backup(
         await cleanup_media(workspace, undo)
 
 
-class RestoreBackup(GuardedUseCase[RestoreBackupCommand, None]):
+class RestoreBackup(UseCase[RestoreBackupCommand, None]):
     """Administrative instance restoration."""
 
     access: ClassVar[Access] = Requires(BackupPermission.RESTORE)

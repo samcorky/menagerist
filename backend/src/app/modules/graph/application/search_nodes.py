@@ -22,7 +22,7 @@ from app.shared_kernel.access import Access, Content
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.shared_kernel.actor import Actor  # noqa: TC001
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -84,7 +84,7 @@ class SearchNodesResult:
     warnings: list[QueryWarning]
 
 
-class SearchNodes(GuardedQueryHandler[GraphRepos, SearchNodesQuery, SearchNodesResult]):
+class SearchNodes(QueryHandler[GraphRepos, SearchNodesQuery, SearchNodesResult]):
     """Search items by condition tree, ordered and paged by keyset."""
 
     access: ClassVar[Access] = Content()

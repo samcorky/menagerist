@@ -11,7 +11,7 @@ from app.modules.media.domain.errors import (
 from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -28,9 +28,7 @@ class ClearMediaCoverCommand:
     target_id: uuid.UUID
 
 
-class ClearMediaCover(
-    GuardedCommandHandler[MediaUnitOfWork, ClearMediaCoverCommand, None]
-):
+class ClearMediaCover(CommandHandler[MediaUnitOfWork, ClearMediaCoverCommand, None]):
     """Clear the cover flag on an attachment, leaving the asset attached."""
 
     access: ClassVar[Access] = Content()

@@ -36,7 +36,7 @@ from app.modules.examples.ports.pack_targets import (  # noqa: TC001
 from app.modules.examples.ports.unit_of_work import ExampleUnitOfWork
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.content_filter import ContentFilter
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
@@ -94,7 +94,7 @@ class _Run:
 
 
 class InstallExamplePack(
-    GuardedCommandHandler[ExampleUnitOfWork, InstallExamplePackCommand, InstallResult]
+    CommandHandler[ExampleUnitOfWork, InstallExamplePackCommand, InstallResult]
 ):
     """Install a pack as ordered steps, recording every entity as it is made.
 

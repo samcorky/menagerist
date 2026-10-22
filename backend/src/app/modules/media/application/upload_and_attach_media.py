@@ -15,7 +15,7 @@ from app.modules.media.domain.media_attachment import (
 )
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.unit_of_work import JoinedUnitOfWork
 
 if TYPE_CHECKING:
@@ -46,7 +46,7 @@ class UploadAndAttachMediaCommand:
 
 
 class UploadAndAttachMedia(
-    GuardedCommandHandler[MediaUnitOfWork, UploadAndAttachMediaCommand, MediaAttachment]
+    CommandHandler[MediaUnitOfWork, UploadAndAttachMediaCommand, MediaAttachment]
 ):
     """Stream a file to storage and attach it within a single transaction."""
 

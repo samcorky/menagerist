@@ -12,7 +12,7 @@ from app.modules.identity.domain.user import validate_password
 from app.modules.identity.ports.password_hasher import PasswordHasher  # noqa: TC001
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
 from app.shared_kernel.access import Access, Requires
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -33,9 +33,7 @@ class ResetPasswordCommand:
         return f"ResetPasswordCommand(user_id={self.user_id!r})"
 
 
-class ResetPassword(
-    GuardedCommandHandler[IdentityUnitOfWork, ResetPasswordCommand, None]
-):
+class ResetPassword(CommandHandler[IdentityUnitOfWork, ResetPasswordCommand, None]):
     """Set a new initial password, end the user's sessions and require a change."""
 
     access: ClassVar[Access] = Requires(IdentityPermission.RESET_USER_PASSWORD)

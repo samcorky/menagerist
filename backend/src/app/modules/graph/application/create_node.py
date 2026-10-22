@@ -19,7 +19,7 @@ from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.access import Access, Content
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
@@ -42,7 +42,7 @@ class CreateNodeCommand:
     extra_schema: dict[str, Any] | None = field(default=None)
 
 
-class CreateNode(GuardedCommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
+class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
     """Create and persist a new node, auto-creating its NodeType if not yet known."""
 
     access: ClassVar[Access] = Content()

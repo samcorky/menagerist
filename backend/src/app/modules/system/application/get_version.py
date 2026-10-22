@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 from app.modules.system.domain.app_info import AppInfo
 from app.shared_kernel.access import Access, Public
 from app.shared_kernel.access_guard import AccessGuard  # noqa: TC001
-from app.shared_kernel.guarded import GuardedUseCase
+from app.shared_kernel.cqrs import UseCase
 
 if TYPE_CHECKING:
     from app.modules.system.ports.app_info_port import AppInfoPort
@@ -16,7 +16,7 @@ class GetVersionQuery:
     """Request for the running instance's version and build metadata."""
 
 
-class GetVersion(GuardedUseCase[GetVersionQuery, AppInfo]):
+class GetVersion(UseCase[GetVersionQuery, AppInfo]):
     """Report the project version and build provenance of the running instance."""
 
     access: ClassVar[Access] = Public()

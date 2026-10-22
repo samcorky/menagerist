@@ -9,7 +9,7 @@ from app.modules.identity.application.sign_in_throttle import user_id_key, usern
 from app.modules.identity.domain.errors import UserNotFoundError
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
 from app.shared_kernel.access import Access, Requires
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -24,7 +24,7 @@ class UnlockUserCommand:
     user_id: uuid.UUID
 
 
-class UnlockUser(GuardedCommandHandler[IdentityUnitOfWork, UnlockUserCommand, None]):
+class UnlockUser(CommandHandler[IdentityUnitOfWork, UnlockUserCommand, None]):
     """Clear the failed-attempt counters for an account.
 
     The username counter (sign-in) and the user-id counter (password change),

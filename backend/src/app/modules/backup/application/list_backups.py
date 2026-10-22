@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 from app.modules.backup.application.permissions import BackupPermission
 from app.modules.backup.domain.backup import BackupSummary
 from app.shared_kernel.access import Access, Requires
-from app.shared_kernel.guarded import GuardedUseCase
+from app.shared_kernel.cqrs import UseCase
 
 if TYPE_CHECKING:
     from app.modules.backup.ports.backup_store import BackupStore
@@ -17,7 +17,7 @@ class ListBackupsQuery:
     """List committed instance backup summaries."""
 
 
-class ListBackups(GuardedUseCase[ListBackupsQuery, list[BackupSummary]]):
+class ListBackups(UseCase[ListBackupsQuery, list[BackupSummary]]):
     """Read committed summaries in newest-first order."""
 
     access: ClassVar[Access] = Requires(BackupPermission.READ)

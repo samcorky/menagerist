@@ -21,7 +21,7 @@ from app.modules.graph.ports.unit_of_work import GraphRepos, GraphUnitOfWork
 from app.shared_kernel.access import Access, Content
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
@@ -49,7 +49,7 @@ class UpdateNodeCommand:
     extra_schema: dict[str, Any] | None = field(default=None)
 
 
-class UpdateNode(GuardedCommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
+class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
     """Update an existing node's editable fields."""
 
     access: ClassVar[Access] = Content()

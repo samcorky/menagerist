@@ -9,7 +9,7 @@ from app.modules.system.domain.browser_check import (
 )
 from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.access_guard import AccessGuard  # noqa: TC001
-from app.shared_kernel.guarded import GuardedUseCase
+from app.shared_kernel.cqrs import UseCase
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -22,7 +22,7 @@ class RunBrowserCheckQuery:
     request: BrowserRequest
 
 
-class RunBrowserCheck(GuardedUseCase[RunBrowserCheckQuery, BrowserCheckResult]):
+class RunBrowserCheck(UseCase[RunBrowserCheckQuery, BrowserCheckResult]):
     """Report whether the browser's origin headers reach the app, for administrators."""
 
     access: ClassVar[Access] = Requires(SystemPermission.READ_DIAGNOSTICS)

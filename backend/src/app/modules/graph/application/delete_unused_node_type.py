@@ -9,7 +9,7 @@ from app.modules.graph.domain.errors import NodeTypeInUseError, NodeTypeNotFound
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.content_filter import ContentFilter
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -25,7 +25,7 @@ class DeleteUnusedNodeTypeCommand:
 
 
 class DeleteUnusedNodeType(
-    GuardedCommandHandler[GraphUnitOfWork, DeleteUnusedNodeTypeCommand, None]
+    CommandHandler[GraphUnitOfWork, DeleteUnusedNodeTypeCommand, None]
 ):
     """Soft-delete an item type that nothing uses (for example-pack removal).
 

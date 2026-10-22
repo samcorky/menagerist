@@ -9,7 +9,7 @@ from app.modules.graph.domain.errors import EdgeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.content_filter import ContentFilter
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -45,7 +45,7 @@ def _purged_attributes(
 
 
 class PurgeEdgeTypeAttribute(
-    GuardedCommandHandler[GraphUnitOfWork, PurgeEdgeTypeAttributeCommand, None]
+    CommandHandler[GraphUnitOfWork, PurgeEdgeTypeAttributeCommand, None]
 ):
     """Remove an attribute key from every edge of a edge type (administrators only).
 

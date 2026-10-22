@@ -7,7 +7,7 @@ import structlog
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.shared_kernel.access import Access, System
 from app.shared_kernel.actor import SYSTEM_ACTOR
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -25,7 +25,7 @@ class ClaimOrphanedMediaCommand:
 
 
 class ClaimOrphanedMedia(
-    GuardedCommandHandler[MediaUnitOfWork, ClaimOrphanedMediaCommand, int]
+    CommandHandler[MediaUnitOfWork, ClaimOrphanedMediaCommand, int]
 ):
     """Give media that predates accounts to its first owner.
 

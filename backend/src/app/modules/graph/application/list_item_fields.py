@@ -8,7 +8,7 @@ import structlog
 from app.modules.graph.domain.query import ItemFieldUse
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -23,9 +23,7 @@ class ListItemFieldsQuery:
     """Request for the per-item fields in use."""
 
 
-class ListItemFields(
-    GuardedQueryHandler[GraphRepos, ListItemFieldsQuery, list[ItemFieldUse]]
-):
+class ListItemFields(QueryHandler[GraphRepos, ListItemFieldsQuery, list[ItemFieldUse]]):
     """List per-item fields the caller can filter on, most used first.
 
     Fields come from the `extra_schema` overlays of the caller's items. Only

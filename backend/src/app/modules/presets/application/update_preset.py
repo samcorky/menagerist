@@ -9,7 +9,7 @@ from app.modules.presets.domain.errors import PresetNotFoundError
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetUnitOfWork
 from app.shared_kernel.access import Access, Shared
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -31,9 +31,7 @@ class UpdatePresetCommand:
     definition: dict[str, Any] | None = field(default=None)
 
 
-class UpdatePreset(
-    GuardedCommandHandler[PresetUnitOfWork, UpdatePresetCommand, Preset]
-):
+class UpdatePreset(CommandHandler[PresetUnitOfWork, UpdatePresetCommand, Preset]):
     """Update an existing preset's editable fields.
 
     :raises BuiltinPresetError: a built-in preset cannot be edited.

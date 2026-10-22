@@ -17,7 +17,6 @@ if TYPE_CHECKING:
 
     from app.shared_kernel.access import Access
     from app.shared_kernel.access_guard import AccessGuard
-    from app.shared_kernel.access_policy import AccessPolicy
     from app.shared_kernel.actor import Actor
     from app.shared_kernel.authorisation import AuthorisationPort
     from app.shared_kernel.content_filter import ContentFilter
@@ -30,7 +29,9 @@ class RoleAccessGuard:
     stance except `Public`, so a later non-empty member grant cannot reach it.
     """
 
-    def __init__(self, authorisation: AuthorisationPort, policy: AccessPolicy) -> None:
+    def __init__(
+        self, authorisation: AuthorisationPort, policy: OwnerAccessPolicy
+    ) -> None:
         self._authorisation = authorisation
         self._policy = policy
 

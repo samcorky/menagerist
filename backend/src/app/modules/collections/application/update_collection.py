@@ -22,8 +22,8 @@ from app.modules.collections.ports.definition_checker import (
 )
 from app.modules.collections.ports.unit_of_work import CollectionsUnitOfWork
 from app.shared_kernel.access import Access, Content
+from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.errors import ConflictError
-from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.modules.collections.ports.collection_repository import CollectionRepository
@@ -52,7 +52,7 @@ class UpdateCollectionCommand:
 
 
 class UpdateCollection(
-    GuardedCommandHandler[CollectionsUnitOfWork, UpdateCollectionCommand, Collection]
+    CommandHandler[CollectionsUnitOfWork, UpdateCollectionCommand, Collection]
 ):
     """Update an existing collection's editable fields."""
 

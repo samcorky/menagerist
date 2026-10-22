@@ -5,7 +5,7 @@ from app.modules.system.application.permissions import SystemPermission
 from app.modules.system.domain.app_info import AppInfo
 from app.modules.system.ports.app_info_port import AppInfoPort
 from app.shared_kernel.access import Access, Requires
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -16,9 +16,7 @@ class GetVersionDetailQuery:
     """Request for the full build provenance of the running instance."""
 
 
-class GetVersionDetail(
-    GuardedQueryHandler[AppInfoPort, GetVersionDetailQuery, AppInfo]
-):
+class GetVersionDetail(QueryHandler[AppInfoPort, GetVersionDetailQuery, AppInfo]):
     """Report commit, branch and migration head, for administrators."""
 
     access: ClassVar[Access] = Requires(SystemPermission.READ_DIAGNOSTICS)

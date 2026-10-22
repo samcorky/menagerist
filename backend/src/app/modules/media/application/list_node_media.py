@@ -8,7 +8,7 @@ from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
 from app.modules.media.ports.unit_of_work import MediaRepos
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -31,9 +31,7 @@ class NodeMediaItem:
     attribute_key: AttachmentKey | None
 
 
-class ListNodeMedia(
-    GuardedQueryHandler[MediaRepos, ListNodeMediaQuery, list[NodeMediaItem]]
-):
+class ListNodeMedia(QueryHandler[MediaRepos, ListNodeMediaQuery, list[NodeMediaItem]]):
     """Return all media assets currently attached to a node, with their slot labels."""
 
     access: ClassVar[Access] = Content()

@@ -7,7 +7,7 @@ from app.modules.backup.application.upload_backup import upload_verified_backup
 from app.modules.backup.domain.backup import BackupScope
 from app.modules.backup.ports.backup_store import BackupStore
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.modules.backup.application.import_user_data import ImportUserData
@@ -23,9 +23,7 @@ class ImportUserArchiveCommand:
     stream: AsyncIterator[bytes]
 
 
-class ImportUserArchive(
-    GuardedCommandHandler[BackupStore, ImportUserArchiveCommand, None]
-):
+class ImportUserArchive(CommandHandler[BackupStore, ImportUserArchiveCommand, None]):
     """Stage an upload privately and remove it after the import attempt."""
 
     access: ClassVar[Access] = Content()

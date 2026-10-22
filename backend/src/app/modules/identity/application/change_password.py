@@ -25,7 +25,7 @@ from app.modules.identity.ports.session_token_generator import (  # noqa: TC001
 )
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
 from app.shared_kernel.access import Access, OwnAccount
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -49,7 +49,7 @@ class ChangePasswordCommand:
 
 
 class ChangePassword(
-    GuardedCommandHandler[IdentityUnitOfWork, ChangePasswordCommand, SignedInResult]
+    CommandHandler[IdentityUnitOfWork, ChangePasswordCommand, SignedInResult]
 ):
     """Change the acting user's password and replace every session with one new one."""
 

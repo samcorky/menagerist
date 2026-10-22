@@ -8,7 +8,7 @@ from app.modules.media.domain.errors import MediaAssetNotFoundError
 from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.media.ports.unit_of_work import MediaRepos
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -23,7 +23,7 @@ class GetMediaQuery:
     asset_id: uuid.UUID
 
 
-class GetMedia(GuardedQueryHandler[MediaRepos, GetMediaQuery, MediaAsset]):
+class GetMedia(QueryHandler[MediaRepos, GetMediaQuery, MediaAsset]):
     """Fetch a single media asset by id."""
 
     access: ClassVar[Access] = Content()

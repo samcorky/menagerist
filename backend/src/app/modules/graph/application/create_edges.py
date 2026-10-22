@@ -17,7 +17,7 @@ from app.shared_kernel.access import Access, Content
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.shared_kernel.content_filter import ContentFilter  # noqa: TC001
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
@@ -70,7 +70,7 @@ async def _existing_targets(
 
 
 class CreateEdges(
-    GuardedCommandHandler[GraphUnitOfWork, CreateEdgesCommand, CreateEdgesResult]
+    CommandHandler[GraphUnitOfWork, CreateEdgesCommand, CreateEdgesResult]
 ):
     """Create edges from one source to several targets in a single transaction."""
 

@@ -12,8 +12,8 @@ from app.modules.collections.domain.errors import CollectionNotFoundError
 from app.modules.collections.ports.item_lookup import ItemLookup  # noqa: TC001
 from app.modules.collections.ports.unit_of_work import CollectionsUnitOfWork
 from app.shared_kernel.access import Access, Content
+from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.errors import ValidationError
-from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -33,7 +33,7 @@ class AddItemsToCollectionCommand:
 
 
 class AddItemsToCollection(
-    GuardedCommandHandler[CollectionsUnitOfWork, AddItemsToCollectionCommand, int]
+    CommandHandler[CollectionsUnitOfWork, AddItemsToCollectionCommand, int]
 ):
     """Put live items on a collection, skipping those already on it."""
 

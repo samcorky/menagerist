@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 from app.modules.system.domain.readiness import ReadinessReport
 from app.shared_kernel.access import Access, Public
 from app.shared_kernel.access_guard import AccessGuard  # noqa: TC001
-from app.shared_kernel.guarded import GuardedUseCase
+from app.shared_kernel.cqrs import UseCase
 
 if TYPE_CHECKING:
     from app.modules.system.ports.health_check_port import HealthCheckPort
@@ -16,7 +16,7 @@ class GetHealthReadyQuery:
     """Request for a readiness check."""
 
 
-class GetHealthReady(GuardedUseCase[GetHealthReadyQuery, ReadinessReport]):
+class GetHealthReady(UseCase[GetHealthReadyQuery, ReadinessReport]):
     """Report readiness by verifying all required dependencies are reachable."""
 
     access: ClassVar[Access] = Public()

@@ -12,7 +12,7 @@ from app.modules.graph.domain.errors import EdgeTypeNotFoundError
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Shared
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -28,7 +28,7 @@ class GetEdgeTypeQuery:
     edge_type_id: uuid.UUID
 
 
-class GetEdgeType(GuardedQueryHandler[GraphRepos, GetEdgeTypeQuery, EdgeType]):
+class GetEdgeType(QueryHandler[GraphRepos, GetEdgeTypeQuery, EdgeType]):
     """Retrieve a single edge type by id."""
 
     access: ClassVar[Access] = Shared()

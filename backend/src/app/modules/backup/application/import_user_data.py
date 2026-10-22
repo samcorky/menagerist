@@ -16,7 +16,7 @@ from app.modules.backup.domain.backup import BackupScope
 from app.modules.backup.domain.errors import CorruptBackupError, IncompatibleBackupError
 from app.modules.backup.ports.user_database_restorer import UserDatabaseRestorer
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -99,9 +99,7 @@ class ImportUserDataCommand:
     backup_id: UUID
 
 
-class ImportUserData(
-    GuardedCommandHandler[UserDatabaseRestorer, ImportUserDataCommand, None]
-):
+class ImportUserData(CommandHandler[UserDatabaseRestorer, ImportUserDataCommand, None]):
     """Preserve identifiers while assigning all incoming content to the caller."""
 
     access: ClassVar[Access] = Content()

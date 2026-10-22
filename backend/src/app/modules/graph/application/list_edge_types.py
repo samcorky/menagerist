@@ -11,7 +11,7 @@ from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Shared
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -28,9 +28,7 @@ class ListEdgeTypesQuery:
     limit: int = 50
 
 
-class ListEdgeTypes(
-    GuardedQueryHandler[GraphRepos, ListEdgeTypesQuery, list[EdgeType]]
-):
+class ListEdgeTypes(QueryHandler[GraphRepos, ListEdgeTypesQuery, list[EdgeType]]):
     """List edge types with keyset pagination."""
 
     access: ClassVar[Access] = Shared()

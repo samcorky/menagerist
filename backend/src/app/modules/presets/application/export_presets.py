@@ -12,7 +12,7 @@ from app.modules.presets.domain.errors import (
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
 from app.shared_kernel.access import Access, Shared
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -27,7 +27,7 @@ class ExportPresetsQuery:
     ids: list[uuid.UUID] = field(default_factory=list)
 
 
-class ExportPresets(GuardedQueryHandler[PresetRepos, ExportPresetsQuery, list[Preset]]):
+class ExportPresets(QueryHandler[PresetRepos, ExportPresetsQuery, list[Preset]]):
     """Fetch the presets to put in a pack, in the order requested."""
 
     access: ClassVar[Access] = Shared()

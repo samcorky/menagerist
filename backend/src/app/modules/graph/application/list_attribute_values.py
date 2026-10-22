@@ -7,7 +7,7 @@ import structlog
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -34,9 +34,7 @@ class ListAttributeValuesQuery:
 
 
 class ListAttributeValues(
-    GuardedQueryHandler[
-        GraphRepos, ListAttributeValuesQuery, list[AttributeValueCountResult]
-    ]
+    QueryHandler[GraphRepos, ListAttributeValuesQuery, list[AttributeValueCountResult]]
 ):
     """List distinct string values used for a node type's attribute, most-used first."""
 

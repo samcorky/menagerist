@@ -10,7 +10,7 @@ from app.modules.identity.domain.user import Role, User, validate_password
 from app.modules.identity.ports.password_hasher import PasswordHasher  # noqa: TC001
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
 from app.shared_kernel.access import Access, Requires
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -33,7 +33,7 @@ class CreateUserCommand:
         return f"CreateUserCommand(username={self.username!r})"
 
 
-class CreateUser(GuardedCommandHandler[IdentityUnitOfWork, CreateUserCommand, User]):
+class CreateUser(CommandHandler[IdentityUnitOfWork, CreateUserCommand, User]):
     """Create an account that must change its initial password at first sign-in."""
 
     access: ClassVar[Access] = Requires(IdentityPermission.CREATE_USER)

@@ -17,7 +17,7 @@ from app.modules.graph.domain.errors import (
 )
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.unit_of_work import JoinedUnitOfWork
 
 if TYPE_CHECKING:
@@ -43,7 +43,7 @@ class PromoteExtraSchemaFieldCommand:
 
 
 class PromoteExtraSchemaField(
-    GuardedCommandHandler[GraphUnitOfWork, PromoteExtraSchemaFieldCommand, "Node"]
+    CommandHandler[GraphUnitOfWork, PromoteExtraSchemaFieldCommand, "Node"]
 ):
     """Move an overlay field definition onto the item type; its value is untouched.
 

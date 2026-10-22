@@ -8,7 +8,7 @@ from app.modules.backup.application.restore_backup import restore_verified_backu
 from app.modules.backup.application.upload_backup import upload_verified_backup
 from app.modules.backup.domain.errors import RestoreTargetNotEmptyError
 from app.shared_kernel.access import Access, Public
-from app.shared_kernel.guarded import GuardedUseCase
+from app.shared_kernel.cqrs import UseCase
 
 if TYPE_CHECKING:
     from app.modules.backup.ports.backup_store import BackupStore
@@ -29,7 +29,7 @@ class RestoreOnFirstRunCommand:
     stream: AsyncIterator[bytes]
 
 
-class RestoreOnFirstRun(GuardedUseCase[RestoreOnFirstRunCommand, None]):
+class RestoreOnFirstRun(UseCase[RestoreOnFirstRunCommand, None]):
     """Restore accounts only while first-run setup remains open."""
 
     access: ClassVar[Access] = Public()

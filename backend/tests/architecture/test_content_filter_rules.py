@@ -1,8 +1,8 @@
 """Every route to content is scoped: ports, implementations, use cases and models.
 
-A new content method without a `scope`, a new content use case without the scoped
-bases, or a new owned model without `OwnedMixin` fails here, so none can ship
-silently unscoped.
+A new content method without a `scope`, a new content use case without a
+`Content` stance, or a new owned model without `OwnedMixin` fails here, so none
+can ship silently unscoped.
 """
 
 import annotationlib
@@ -76,15 +76,7 @@ from app.modules.media.ports.media_attachment_repository import (
 from app.platform.database import Base
 from app.platform.orm_mixins import OwnedMixin
 from app.shared_kernel.access import Content, Requires
-from app.shared_kernel.cqrs import (
-    AuthorisedCommandHandler,
-    AuthorisedQueryHandler,
-    AuthorisedUseCase,
-    ScopedCommandHandler,
-    ScopedQueryHandler,
-    UseCase,
-)
-from app.shared_kernel.guarded import GuardedUseCase
+from app.shared_kernel.cqrs import UseCase
 
 # Port methods that take no scope, per port, and why. Anything else must take
 # `scope`; an entry naming a method the port no longer has fails as stale.
@@ -211,7 +203,7 @@ def test_implementations_mirror_the_port_scope(
 
 
 # Use cases that carry no per-person content, and why. Every other use case in
-# the content modules must extend a scoped or authorised base.
+# the content modules must declare a `Content` or `Requires` stance.
 UNSCOPED_USE_CASES = {
     # Item-type and relationship-type vocabulary is shared by every member
     # (decision 6); only deleting/purging it is admin-only (an authorised base).
@@ -230,13 +222,6 @@ UNSCOPED_USE_CASES = {
     "ClaimOrphanedMedia": "first-admin claim",
     "ClaimOrphanedInstallations": "first-admin claim",
 }
-SAFE_BASES = (
-    ScopedCommandHandler,
-    ScopedQueryHandler,
-    AuthorisedCommandHandler,
-    AuthorisedQueryHandler,
-    AuthorisedUseCase,
-)
 SAFE_STANCES = (Content, Requires)
 CONTENT_MODULES = ("graph", "collections", "media", "examples")
 
@@ -250,7 +235,7 @@ def _use_cases() -> dict[str, type]:
             for name, cls in inspect.getmembers(loaded, inspect.isclass):
                 if (
                     cls.__module__ == loaded.__name__
-                    and issubclass(cls, (UseCase, GuardedUseCase))
+                    and issubclass(cls, UseCase)
                     and not inspect.isabstract(cls)
                 ):
                     found[name] = cls
@@ -258,10 +243,8 @@ def _use_cases() -> dict[str, type]:
 
 
 def _is_safe(cls: type) -> bool:
-    """Whether the use case is scoped or gated, by its old base or its stance."""
-    return issubclass(cls, SAFE_BASES) or isinstance(
-        getattr(cls, "access", None), SAFE_STANCES
-    )
+    """Whether the use case is scoped to its owner or gated by a permission."""
+    return isinstance(getattr(cls, "access", None), SAFE_STANCES)
 
 
 def test_every_content_use_case_is_scoped_or_excluded() -> None:
@@ -271,7 +254,7 @@ def test_every_content_use_case_is_scoped_or_excluded() -> None:
         for name, cls in _use_cases().items()
         if not _is_safe(cls) and name not in UNSCOPED_USE_CASES
     )
-    assert unscoped == [], "extend ScopedCommandHandler/ScopedQueryHandler"
+    assert unscoped == [], "declare access = Content() or Requires(...)"
 
 
 def test_exclusions_are_current() -> None:

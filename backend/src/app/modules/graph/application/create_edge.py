@@ -16,7 +16,7 @@ from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.access import Access, Content
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
@@ -36,7 +36,7 @@ class CreateEdgeCommand:
     attributes: dict[str, Any] = field(default_factory=dict)
 
 
-class CreateEdge(GuardedCommandHandler[GraphUnitOfWork, CreateEdgeCommand, Edge]):
+class CreateEdge(CommandHandler[GraphUnitOfWork, CreateEdgeCommand, Edge]):
     """Create and persist a new edge, auto-creating its EdgeType if not yet known."""
 
     access: ClassVar[Access] = Content()

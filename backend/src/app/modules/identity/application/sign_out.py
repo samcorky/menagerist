@@ -8,7 +8,7 @@ from app.modules.identity.ports.session_token_generator import (  # noqa: TC001
 )
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
 from app.shared_kernel.access import Access, Public
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -28,7 +28,7 @@ class SignOutCommand:
         return "SignOutCommand()"
 
 
-class SignOut(GuardedCommandHandler[IdentityUnitOfWork, SignOutCommand, None]):
+class SignOut(CommandHandler[IdentityUnitOfWork, SignOutCommand, None]):
     """End a session; an unknown token is ignored."""
 
     access: ClassVar[Access] = Public()

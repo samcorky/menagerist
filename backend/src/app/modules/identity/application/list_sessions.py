@@ -7,7 +7,7 @@ from app.modules.identity.application.permissions import IdentityPermission
 from app.modules.identity.application.session_listing import SessionListing
 from app.modules.identity.ports.unit_of_work import IdentityRepos
 from app.shared_kernel.access import Access, Requires
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.modules.identity.domain.user import User
@@ -23,7 +23,7 @@ class ListSessionsQuery:
 
 
 class ListSessions(
-    GuardedQueryHandler[IdentityRepos, ListSessionsQuery, list[SessionListing]]
+    QueryHandler[IdentityRepos, ListSessionsQuery, list[SessionListing]]
 ):
     """List active sessions for all users or a specific user, for administrators."""
 

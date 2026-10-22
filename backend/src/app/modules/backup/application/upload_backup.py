@@ -10,7 +10,7 @@ from app.modules.backup.application.verify_backup import _scan
 from app.modules.backup.domain.backup import BackupScope, BackupSummary
 from app.modules.backup.domain.errors import CorruptBackupError, IncompatibleBackupError
 from app.shared_kernel.access import Access, Requires
-from app.shared_kernel.guarded import GuardedUseCase
+from app.shared_kernel.cqrs import UseCase
 
 if TYPE_CHECKING:
     from app.modules.backup.ports.backup_store import BackupStore
@@ -76,7 +76,7 @@ async def upload_verified_backup(
         await workspace.remove(key)
 
 
-class UploadBackup(GuardedUseCase[UploadBackupCommand, BackupSummary]):
+class UploadBackup(UseCase[UploadBackupCommand, BackupSummary]):
     """Publish a verified administrative instance upload."""
 
     access: ClassVar[Access] = Requires(BackupPermission.CREATE)

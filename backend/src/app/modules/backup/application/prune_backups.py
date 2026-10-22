@@ -7,8 +7,8 @@ import structlog
 from app.modules.backup.application.permissions import BackupPermission
 from app.modules.backup.domain.verification import PruneReport
 from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.cqrs import UseCase
 from app.shared_kernel.errors import ValidationError
-from app.shared_kernel.guarded import GuardedUseCase
 
 if TYPE_CHECKING:
     from app.modules.backup.ports.backup_store import BackupStore
@@ -28,7 +28,7 @@ class PruneBackupsCommand:
     dry_run: bool = False
 
 
-class PruneBackups(GuardedUseCase[PruneBackupsCommand, PruneReport]):
+class PruneBackups(UseCase[PruneBackupsCommand, PruneReport]):
     """Prune summary-based retention groups without opening any archives."""
 
     access: ClassVar[Access] = Requires(BackupPermission.DELETE)

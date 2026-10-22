@@ -12,7 +12,7 @@ from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.modules.media.ports.media_storage import MediaStoragePort
@@ -32,7 +32,7 @@ class DetachMediaCommand:
     attribute_key: AttachmentKey | None = field(default=None)
 
 
-class DetachMedia(GuardedCommandHandler[MediaUnitOfWork, DetachMediaCommand, None]):
+class DetachMedia(CommandHandler[MediaUnitOfWork, DetachMediaCommand, None]):
     """Remove a media-entity attachment; orphan the asset if now unreferenced.
 
     After the attachment row is deleted we check whether the asset is still

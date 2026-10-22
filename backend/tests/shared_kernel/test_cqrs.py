@@ -2,218 +2,130 @@ import annotationlib
 import importlib
 import inspect
 import pkgutil
-from enum import StrEnum
+import uuid
+from typing import ClassVar
 
 import pytest
 
 import app.modules
-from app.shared_kernel.cqrs import (
-    AuthorisedCommandHandler,
-    AuthorisedQueryHandler,
-    AuthorisedUseCase,
-    CommandHandler,
-    QueryHandler,
-    ScopedCommandHandler,
-    ScopedQueryHandler,
-    UseCase,
+from app.shared_kernel.access import Access, Content, Public, Requires, Shared
+from app.shared_kernel.access_guard import InMemoryAccessGuard
+from app.shared_kernel.actor import Actor
+from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.cqrs import CommandHandler, QueryHandler, UseCase
+from app.shared_kernel.errors import ForbiddenError
+
+ALICE = Actor(id=uuid.uuid4(), roles=frozenset({"member"}))
+
+
+class _Permission:
+    value = "demo.read"
+
+
+class _Probe(UseCase[str, str]):
+    """Concrete use case that records whether `_handle` ran."""
+
+    access: ClassVar[Access] = Public()
+
+    def __init__(self, guard: InMemoryAccessGuard) -> None:
+        self._guard = guard
+        self.ran = False
+
+    async def _handle(self, request: str, actor: Actor) -> str:
+        self.ran = True
+        return request.upper()
+
+
+def _probe_with(access: Access) -> UseCase[str, str]:
+    probe_type: type[_Probe] = type("_Declared", (_Probe,), {"access": access})
+    return probe_type(InMemoryAccessGuard())
+
+
+async def test_handle_checks_access_before_running() -> None:
+    """The guard sees the declared stance, then `_handle` runs."""
+    guard = InMemoryAccessGuard()
+    probe = _Probe(guard)
+    assert await probe.handle("hi", ALICE) == "HI"
+    assert guard.checked == [(ALICE, Public())]
+    assert probe.ran
+
+
+async def test_a_denying_guard_stops_the_use_case() -> None:
+    """A refused check means `_handle` never runs."""
+    probe = _Probe(InMemoryAccessGuard(deny=True))
+    with pytest.raises(ForbiddenError):
+        await probe.handle("hi", ALICE)
+    assert not probe.ran
+
+
+def test_command_handler_stores_uow_and_guard() -> None:
+    """The command base keeps both collaborators."""
+
+    class Command(CommandHandler[object, str, str]):
+        access: ClassVar[Access] = Shared()
+
+        async def _handle(self, request: str, actor: Actor) -> str:
+            return request
+
+    uow, guard = object(), InMemoryAccessGuard()
+    handler = Command(uow, guard)
+    assert handler._uow is uow
+    assert handler._guard is guard
+
+
+def test_query_handler_stores_repos_and_guard() -> None:
+    """The query base keeps both collaborators."""
+
+    class Query(QueryHandler[object, str, str]):
+        access: ClassVar[Access] = Shared()
+
+        async def _handle(self, request: str, actor: Actor) -> str:
+            return request
+
+    repos, guard = object(), InMemoryAccessGuard()
+    handler = Query(repos, guard)
+    assert handler._repos is repos
+    assert handler._guard is guard
+
+
+def test_scope_returns_the_guards_filter_for_content() -> None:
+    """A `Content` use case gets its caller's content filter."""
+    assert _probe_with(Content()).scope(ALICE) == ContentFilter.of(ALICE.id)
+
+
+@pytest.mark.parametrize(
+    "access",
+    [Shared(), Public(), Requires(_Permission)],  # type: ignore[arg-type]
 )
-from app.shared_kernel.guarded import GuardedUseCase
-from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
-
-# ---------------------------------------------------------------------------
-# CommandHandler contract
-# ---------------------------------------------------------------------------
-
-
-async def test_command_handler_stores_uow() -> None:
-    """A CommandHandler subclass receives self._uow from the base __init__."""
-    sentinel = object()
-
-    class MyCommand:
-        pass
-
-    class MyUseCase(CommandHandler[object, MyCommand, None]):
-        async def handle(self, command: MyCommand, actor: object) -> None:
-            pass
-
-    use_case = MyUseCase(sentinel)
-    assert use_case._uow is sentinel
-
-
-async def test_command_handler_cannot_be_instantiated_without_handle() -> None:
-    """A CommandHandler subclass that omits handle() cannot be instantiated."""
-
-    class IncompleteCommand(CommandHandler[object, object, None]):
-        pass
-
+def test_scope_is_refused_outside_content(access: Access) -> None:
+    """Only `Content` use cases may ask for a content filter."""
     with pytest.raises(TypeError):
-        IncompleteCommand(object())  # type: ignore[abstract]
+        _probe_with(access).scope(ALICE)
 
 
 async def test_command_handler_uow_is_available_during_handle() -> None:
-    """self._uow is accessible inside handle() without subclass boilerplate."""
-    uow = InMemoryUnitOfWork(repos=object())
+    """`self._uow` is accessible inside `_handle` without subclass boilerplate."""
+    uow = object()
     received: list[object] = []
 
-    class MyCommand:
-        pass
+    class MyCommand(CommandHandler[object, str, None]):
+        access: ClassVar[Access] = Shared()
 
-    class MyUseCase(CommandHandler[InMemoryUnitOfWork[object], MyCommand, None]):
-        async def handle(self, command: MyCommand, actor: object) -> None:
+        async def _handle(self, request: str, actor: Actor) -> None:
             received.append(self._uow)
 
-    await MyUseCase(uow).handle(MyCommand(), object())
+    await MyCommand(uow, InMemoryAccessGuard()).handle("go", ALICE)
     assert received == [uow]
 
 
-# ---------------------------------------------------------------------------
-# QueryHandler contract
-# ---------------------------------------------------------------------------
+def test_a_use_case_without_handle_logic_cannot_be_instantiated() -> None:
+    """Omitting `_handle` leaves the class abstract."""
 
-
-async def test_query_handler_cannot_be_instantiated_without_handle() -> None:
-    """A QueryHandler subclass that omits handle() cannot be instantiated."""
-
-    class IncompleteQuery(QueryHandler[object, object, None]):
-        pass
+    class Incomplete(QueryHandler[object, str, None]):
+        access: ClassVar[Access] = Shared()
 
     with pytest.raises(TypeError):
-        IncompleteQuery(object())  # type: ignore[abstract]
-
-
-async def test_query_handler_concrete_subclass_is_instantiable() -> None:
-    """A complete QueryHandler subclass instantiates and handle() is callable."""
-    repo = object()
-
-    class MyQuery:
-        pass
-
-    class MyUseCase(QueryHandler[object, MyQuery, str]):
-        def __init__(self, repo: object) -> None:
-            self._repo = repo
-
-        async def handle(self, query: MyQuery, actor: object) -> str:
-            return "ok"
-
-    result = await MyUseCase(repo).handle(MyQuery(), object())
-    assert result == "ok"
-
-
-# ---------------------------------------------------------------------------
-# Scoped* contract
-# ---------------------------------------------------------------------------
-
-
-async def test_scoped_command_handler_stores_uow_and_policy() -> None:
-    """A ScopedCommandHandler keeps both the UoW and the access policy."""
-    uow, policy = object(), object()
-
-    class MyUseCase(ScopedCommandHandler[object, object, None]):
-        async def handle(self, request: object, actor: object) -> None:
-            pass
-
-    use_case = MyUseCase(uow, policy)  # type: ignore[arg-type]
-    assert use_case._uow is uow
-    assert use_case._policy is policy
-
-
-async def test_scoped_query_handler_stores_repos_and_policy() -> None:
-    """A ScopedQueryHandler keeps both the repos and the access policy."""
-    repos, policy = object(), object()
-
-    class MyUseCase(ScopedQueryHandler[object, object, None]):
-        async def handle(self, request: object, actor: object) -> None:
-            pass
-
-    use_case = MyUseCase(repos, policy)  # type: ignore[arg-type]
-    assert use_case._repos is repos
-    assert use_case._policy is policy
-
-
-# ---------------------------------------------------------------------------
-# Authorised* contract
-# ---------------------------------------------------------------------------
-
-
-class _StubAuthorisation:
-    """Records the checked actor/permission; never raises."""
-
-    def __init__(self) -> None:
-        self.checked: list[tuple[object, object]] = []
-
-    async def check(self, actor: object, action: object) -> None:
-        self.checked.append((actor, action))
-
-
-async def test_authorised_use_case_checks_permission_then_handles() -> None:
-    """AuthorisedUseCase.handle() checks the permission before delegating."""
-    authorisation = _StubAuthorisation()
-
-    class MyRequest:
-        pass
-
-    class MyUseCase(AuthorisedUseCase[MyRequest, str]):
-        @property
-        def required_permission(self) -> str:  # type: ignore[override]
-            return "graph:read"
-
-        async def _handle(self, request: MyRequest, actor: object) -> str:
-            return "ok"
-
-    use_case = MyUseCase(authorisation)
-    actor = object()
-    result = await use_case.handle(MyRequest(), actor)  # type: ignore[arg-type]
-
-    assert result == "ok"
-    assert authorisation.checked == [(actor, "graph:read")]
-
-
-async def test_authorised_command_handler_checks_permission_then_handles() -> None:
-    """AuthorisedCommandHandler.handle() checks the permission before delegating."""
-    authorisation = _StubAuthorisation()
-    uow = object()
-
-    class MyCommand:
-        pass
-
-    class MyUseCase(AuthorisedCommandHandler[object, MyCommand, str]):
-        @property
-        def required_permission(self) -> str:  # type: ignore[override]
-            return "graph:write"
-
-        async def _handle(self, command: MyCommand, actor: object) -> str:
-            return self._uow  # type: ignore[return-value]
-
-    use_case = MyUseCase(uow, authorisation)
-    actor = object()
-    result = await use_case.handle(MyCommand(), actor)  # type: ignore[arg-type]
-
-    assert result is uow
-    assert authorisation.checked == [(actor, "graph:write")]
-
-
-async def test_authorised_query_handler_checks_permission_then_handles() -> None:
-    """AuthorisedQueryHandler.handle() checks the permission before delegating."""
-    authorisation = _StubAuthorisation()
-    repos = object()
-
-    class MyQuery:
-        pass
-
-    class MyUseCase(AuthorisedQueryHandler[object, MyQuery, str]):
-        @property
-        def required_permission(self) -> str:  # type: ignore[override]
-            return "graph:read"
-
-        async def _handle(self, query: MyQuery, actor: object) -> str:
-            return self._repos  # type: ignore[return-value]
-
-    use_case = MyUseCase(repos, authorisation)
-    actor = object()
-    result = await use_case.handle(MyQuery(), actor)  # type: ignore[arg-type]
-
-    assert result is repos
-    assert authorisation.checked == [(actor, "graph:read")]
+        Incomplete(object(), InMemoryAccessGuard())  # type: ignore[abstract]
 
 
 # ---------------------------------------------------------------------------
@@ -239,10 +151,10 @@ def _application_use_case_classes() -> list[type]:
 
 
 def test_all_application_use_cases_inherit_from_cqrs_base() -> None:
-    """Every application class with a `handle` method extends a use case root."""
+    """Every application class with a `handle` method extends a use case."""
     violations: list[str] = []
     for cls in _application_use_case_classes():
-        if hasattr(cls, "handle") and not issubclass(cls, (UseCase, GuardedUseCase)):
+        if hasattr(cls, "handle") and not issubclass(cls, UseCase):
             violations.append(cls.__qualname__)
     assert not violations, (
         "Classes with `handle` that are not use cases:\n"
@@ -273,28 +185,3 @@ def test_command_handlers_store_uow_not_repository() -> None:
         "CommandHandler subclasses must take a UnitOfWork, not a repository:\n"
         + "\n".join(f"  {v}" for v in violations)
     )
-
-
-class _Perm(StrEnum):
-    X = "x"
-
-
-async def test_denied_permission_stops_before_handle_runs() -> None:
-    """A failing authorisation check raises before `_handle` is reached."""
-    ran: list[bool] = []
-
-    class _Denying:
-        async def check(self, actor: object, action: object) -> None:
-            msg = "denied"
-            raise PermissionError(msg)
-
-    class MyUseCase(AuthorisedUseCase[object, None]):
-        required_permission = _Perm.X
-
-        async def _handle(self, request: object, actor: object) -> None:
-            ran.append(True)
-
-    with pytest.raises(PermissionError):
-        await MyUseCase(_Denying()).handle(object(), object())  # type: ignore[arg-type]
-    assert ran == []
-    assert MyUseCase.required_permission == "x"

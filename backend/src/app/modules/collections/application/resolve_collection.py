@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, ClassVar
 from app.modules.collections.domain.errors import CollectionNotFoundError
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -19,7 +19,7 @@ class ResolveCollectionQuery:
 
 
 class ResolveCollection(
-    GuardedQueryHandler[CollectionsRepos, ResolveCollectionQuery, uuid.UUID]
+    QueryHandler[CollectionsRepos, ResolveCollectionQuery, uuid.UUID]
 ):
     """Resolve an id or a slug to a collection id within the caller's scope."""
 

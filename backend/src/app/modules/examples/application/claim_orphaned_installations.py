@@ -7,7 +7,7 @@ import structlog
 from app.modules.examples.ports.unit_of_work import ExampleUnitOfWork
 from app.shared_kernel.access import Access, System
 from app.shared_kernel.actor import SYSTEM_ACTOR
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -25,7 +25,7 @@ class ClaimOrphanedInstallationsCommand:
 
 
 class ClaimOrphanedInstallations(
-    GuardedCommandHandler[ExampleUnitOfWork, ClaimOrphanedInstallationsCommand, int]
+    CommandHandler[ExampleUnitOfWork, ClaimOrphanedInstallationsCommand, int]
 ):
     """Give example installations that predate accounts to their first owner.
 

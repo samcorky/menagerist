@@ -35,7 +35,7 @@ from app.modules.examples.ports.pack_targets import (
 from app.modules.examples.ports.unit_of_work import ExampleUnitOfWork
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.content_filter import ContentFilter
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -61,9 +61,7 @@ class UninstallResult:
 
 
 class UninstallExamplePack(
-    GuardedCommandHandler[
-        ExampleUnitOfWork, UninstallExamplePackCommand, UninstallResult
-    ]
+    CommandHandler[ExampleUnitOfWork, UninstallExamplePackCommand, UninstallResult]
 ):
     """Remove what a pack created and the user has not changed; keep the rest.
 

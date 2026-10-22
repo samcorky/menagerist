@@ -9,7 +9,7 @@ from app.modules.graph.domain.errors import NodeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.content_filter import ContentFilter
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -24,9 +24,7 @@ class DeleteNodeTypeCommand:
     node_type_id: uuid.UUID
 
 
-class DeleteNodeType(
-    GuardedCommandHandler[GraphUnitOfWork, DeleteNodeTypeCommand, None]
-):
+class DeleteNodeType(CommandHandler[GraphUnitOfWork, DeleteNodeTypeCommand, None]):
     """Soft-delete an existing node type (administrators only).
 
     Clearing the type spans every person's items.

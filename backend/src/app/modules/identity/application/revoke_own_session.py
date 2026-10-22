@@ -7,7 +7,7 @@ import structlog
 from app.modules.identity.domain.errors import CurrentSessionError, SessionNotFoundError
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
 from app.shared_kernel.access import Access, OwnAccount
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -24,7 +24,7 @@ class RevokeOwnSessionCommand:
 
 
 class RevokeOwnSession(
-    GuardedCommandHandler[IdentityUnitOfWork, RevokeOwnSessionCommand, None]
+    CommandHandler[IdentityUnitOfWork, RevokeOwnSessionCommand, None]
 ):
     """End one of the user's sessions.
 

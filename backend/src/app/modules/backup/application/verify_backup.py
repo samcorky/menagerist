@@ -14,7 +14,7 @@ from app.modules.backup.domain.verification import (
     VerificationReport,
 )
 from app.shared_kernel.access import Access, Requires
-from app.shared_kernel.guarded import GuardedUseCase
+from app.shared_kernel.cqrs import UseCase
 
 if TYPE_CHECKING:
     from app.modules.backup.ports.archive_member import ArchiveMember
@@ -113,7 +113,7 @@ async def verify_archive(store: BackupStore, backup_id: UUID) -> VerificationRep
     return VerificationReport(findings=findings)
 
 
-class VerifyBackup(GuardedUseCase[VerifyBackupQuery, VerificationReport]):
+class VerifyBackup(UseCase[VerifyBackupQuery, VerificationReport]):
     """Verify integrity without turning findings into exceptions."""
 
     access: ClassVar[Access] = Requires(BackupPermission.READ)

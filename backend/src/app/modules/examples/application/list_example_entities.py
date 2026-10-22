@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, ClassVar
 from app.modules.examples.domain.installation import EntityKind
 from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -26,7 +26,7 @@ class ExampleEntities:
 
 
 class ListExampleEntities(
-    GuardedQueryHandler[ExampleRepos, ListExampleEntitiesQuery, ExampleEntities]
+    QueryHandler[ExampleRepos, ListExampleEntitiesQuery, ExampleEntities]
 ):
     """List what the viewer's own active example sets own."""
 

@@ -8,7 +8,7 @@ from app.modules.backup.application.open_backup import OpenedBackup
 from app.modules.backup.domain.errors import BackupNotFoundError
 from app.modules.backup.ports.backup_store import BackupStore
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -22,9 +22,7 @@ class OpenUserExportQuery:
     backup_id: UUID
 
 
-class OpenUserExport(
-    GuardedQueryHandler[BackupStore, OpenUserExportQuery, OpenedBackup]
-):
+class OpenUserExport(QueryHandler[BackupStore, OpenUserExportQuery, OpenedBackup]):
     """Open committed exports within the caller's private namespace."""
 
     access: ClassVar[Access] = Content()

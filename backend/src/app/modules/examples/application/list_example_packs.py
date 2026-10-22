@@ -7,7 +7,7 @@ from app.modules.examples.domain.pack import PackSummary
 from app.modules.examples.ports.pack_catalogue import PackCatalogue  # noqa: TC001
 from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -31,7 +31,7 @@ class ExamplePackStatus:
 
 
 class ListExamplePacks(
-    GuardedQueryHandler[ExampleRepos, ListExamplePacksQuery, list[ExamplePackStatus]]
+    QueryHandler[ExampleRepos, ListExamplePacksQuery, list[ExamplePackStatus]]
 ):
     """List the shipped packs and which of them are installed."""
 

@@ -14,7 +14,7 @@ from app.modules.graph.domain.errors import EdgeTypeNotFoundError, InvalidSchema
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.access import Access, Shared
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -35,9 +35,7 @@ class UpdateEdgeTypeCommand:
     attributes_schema: dict[str, Any] | None = field(default=None)
 
 
-class UpdateEdgeType(
-    GuardedCommandHandler[GraphUnitOfWork, UpdateEdgeTypeCommand, EdgeType]
-):
+class UpdateEdgeType(CommandHandler[GraphUnitOfWork, UpdateEdgeTypeCommand, EdgeType]):
     """Apply partial updates to an existing edge type."""
 
     access: ClassVar[Access] = Shared()

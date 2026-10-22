@@ -7,7 +7,7 @@ from app.modules.presets.application.preset_definitions import check_definition
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetUnitOfWork
 from app.shared_kernel.access import Access, Shared
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -25,9 +25,7 @@ class CreatePresetCommand:
     definition: dict[str, Any] = field(default_factory=dict)
 
 
-class CreatePreset(
-    GuardedCommandHandler[PresetUnitOfWork, CreatePresetCommand, Preset]
-):
+class CreatePreset(CommandHandler[PresetUnitOfWork, CreatePresetCommand, Preset]):
     """Create and persist a new preset."""
 
     access: ClassVar[Access] = Shared()

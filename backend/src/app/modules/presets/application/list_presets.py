@@ -7,7 +7,7 @@ import structlog
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
 from app.shared_kernel.access import Access, Shared
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -25,7 +25,7 @@ class ListPresetsQuery:
     q: str | None = field(default=None)
 
 
-class ListPresets(GuardedQueryHandler[PresetRepos, ListPresetsQuery, list[Preset]]):
+class ListPresets(QueryHandler[PresetRepos, ListPresetsQuery, list[Preset]]):
     """List presets, paginated by id."""
 
     access: ClassVar[Access] = Shared()

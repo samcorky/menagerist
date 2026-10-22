@@ -8,7 +8,7 @@ from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.errors import EdgeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -23,7 +23,7 @@ class GetEdgeQuery:
     edge_id: uuid.UUID
 
 
-class GetEdge(GuardedQueryHandler[GraphRepos, GetEdgeQuery, Edge]):
+class GetEdge(QueryHandler[GraphRepos, GetEdgeQuery, Edge]):
     """Fetch a single edge by id."""
 
     access: ClassVar[Access] = Content()

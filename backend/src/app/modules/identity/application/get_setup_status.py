@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from app.modules.identity.ports.unit_of_work import IdentityRepos
 from app.shared_kernel.access import Access, Public
-from app.shared_kernel.guarded import GuardedQueryHandler
+from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -14,7 +14,7 @@ class GetSetupStatusQuery:
     """Request to learn whether first-run setup is still to be done."""
 
 
-class GetSetupStatus(GuardedQueryHandler[IdentityRepos, GetSetupStatusQuery, bool]):
+class GetSetupStatus(QueryHandler[IdentityRepos, GetSetupStatusQuery, bool]):
     """Whether no account exists yet."""
 
     access: ClassVar[Access] = Public()

@@ -16,7 +16,7 @@ from app.modules.backup.domain.backup import (
 )
 from app.modules.backup.domain.errors import CorruptBackupError, MediaFileMissingError
 from app.shared_kernel.access import Access, Requires
-from app.shared_kernel.guarded import GuardedUseCase
+from app.shared_kernel.cqrs import UseCase
 
 if TYPE_CHECKING:
     from app.modules.backup.ports.backup_store import BackupStore
@@ -39,7 +39,7 @@ class CreateBackupCommand:
     to_revision: str | None = None
 
 
-class CreateBackup(GuardedUseCase[CreateBackupCommand, BackupSummary]):
+class CreateBackup(UseCase[CreateBackupCommand, BackupSummary]):
     """Archive a consistent database snapshot and original media files."""
 
     access: ClassVar[Access] = Requires(BackupPermission.CREATE)

@@ -7,7 +7,7 @@ import structlog
 from app.modules.collections.domain.errors import CollectionNotFoundError
 from app.modules.collections.ports.unit_of_work import CollectionsUnitOfWork
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.guarded import GuardedCommandHandler
+from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -24,7 +24,7 @@ class RemoveItemFromCollectionCommand:
 
 
 class RemoveItemFromCollection(
-    GuardedCommandHandler[CollectionsUnitOfWork, RemoveItemFromCollectionCommand, None]
+    CommandHandler[CollectionsUnitOfWork, RemoveItemFromCollectionCommand, None]
 ):
     """Take an item off a collection; removing an absent item is a no-op."""
 
