@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
@@ -7,9 +7,11 @@ from app.modules.identity.ports.session_token_generator import (  # noqa: TC001
     SessionTokenGenerator,
 )
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.access import Access, Public
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -26,14 +28,18 @@ class SignOutCommand:
         return "SignOutCommand()"
 
 
-class SignOut(CommandHandler[IdentityUnitOfWork, SignOutCommand, None]):
+class SignOut(GuardedCommandHandler[IdentityUnitOfWork, SignOutCommand, None]):
     """End a session; an unknown token is ignored."""
 
-    def __init__(self, uow: IdentityUnitOfWork, tokens: SessionTokenGenerator) -> None:
-        super().__init__(uow)
+    access: ClassVar[Access] = Public()
+
+    def __init__(
+        self, uow: IdentityUnitOfWork, guard: AccessGuard, tokens: SessionTokenGenerator
+    ) -> None:
+        super().__init__(uow, guard)
         self._tokens = tokens
 
-    async def handle(self, command: SignOutCommand, actor: Actor) -> None:
+    async def _handle(self, command: SignOutCommand, actor: Actor) -> None:
         """Delete the session whose token is `command.token`, if any."""
         async with self._uow as repos:
             session = await repos.sessions.get_by_token_hash(

@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
@@ -19,9 +19,11 @@ from app.modules.identity.ports.session_token_generator import (  # noqa: TC001
     SessionTokenGenerator,
 )
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.access import Access, Public
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -53,26 +55,31 @@ class SetupFirstAdminResult:
 
 
 class SetupFirstAdmin(
-    CommandHandler[IdentityUnitOfWork, SetupFirstAdminCommand, SetupFirstAdminResult]
+    GuardedCommandHandler[
+        IdentityUnitOfWork, SetupFirstAdminCommand, SetupFirstAdminResult
+    ]
 ):
     """Create the first administrator, sign them in and claim existing content."""
+
+    access: ClassVar[Access] = Public()
 
     def __init__(
         self,
         uow: IdentityUnitOfWork,
+        guard: AccessGuard,
         hasher: PasswordHasher,
         tokens: SessionTokenGenerator,
         claim: ExistingDataClaim,
         *,
         session_ttl: timedelta,
     ) -> None:
-        super().__init__(uow)
+        super().__init__(uow, guard)
         self._hasher = hasher
         self._tokens = tokens
         self._claim = claim
         self._ttl = session_ttl
 
-    async def handle(
+    async def _handle(
         self, command: SetupFirstAdminCommand, actor: Actor
     ) -> SetupFirstAdminResult:
         """Create the administrator when no account exists yet.

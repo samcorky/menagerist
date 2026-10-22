@@ -8,7 +8,6 @@ import structlog
 from cyclopts import App, Parameter
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
-from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.entrypoints.cli.backups import (
     create_backup,
     export_user_data,
@@ -23,7 +22,7 @@ from app.modules.backup.adapters.cli.backup_app import (
 )
 from app.modules.identity.adapters.cli.identity_app import (
     identity_app,
-    use_authorisation,
+    use_access_guard,
     use_existing_data_claim,
 )
 from app.modules.media.adapters.cli.media_app import media_app
@@ -89,7 +88,7 @@ def _claim_existing_data(session: AsyncSession) -> ExistingDataClaim:
 
 
 use_existing_data_claim(_claim_existing_data)
-use_authorisation(RoleAuthorisationAdapter())
+use_access_guard(get_access_guard())
 app.command(identity_app)
 
 schema_app = App(name="schema", help="Inspect the API schema.")

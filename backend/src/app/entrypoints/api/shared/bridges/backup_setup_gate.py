@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import Depends
 from sqlalchemy import func, select
 
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.backup.domain.errors import RestoreTargetNotEmptyError
 from app.modules.identity.adapters.api.dependencies import get_client_ip
 from app.modules.identity.adapters.persistence.sign_in_attempt_repository import (
@@ -38,7 +39,7 @@ class BackupSetupGate:
     """Expose the existing setup-status query through the backup port."""
 
     def __init__(self, repos: IdentityRepos) -> None:
-        self._status = GetSetupStatus(repos)
+        self._status = GetSetupStatus(repos, get_access_guard())
 
     async def is_open(self) -> bool:
         """Use the same condition as the existing first-run account setup."""

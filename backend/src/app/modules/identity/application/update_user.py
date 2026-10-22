@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
@@ -11,7 +11,8 @@ from app.modules.identity.application.user_listing import UserListing
 from app.modules.identity.domain.errors import LastAdministratorError, UserNotFoundError
 from app.modules.identity.domain.user import Role
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
-from app.shared_kernel.cqrs import AuthorisedCommandHandler
+from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -30,13 +31,11 @@ class UpdateUserCommand:
 
 
 class UpdateUser(
-    AuthorisedCommandHandler[
-        IdentityUnitOfWork, UpdateUserCommand, UserListing, IdentityPermission
-    ]
+    GuardedCommandHandler[IdentityUnitOfWork, UpdateUserCommand, UserListing]
 ):
     """Rename, re-role, disable or enable an account."""
 
-    required_permission = IdentityPermission.UPDATE_USER
+    access: ClassVar[Access] = Requires(IdentityPermission.UPDATE_USER)
 
     async def _handle(self, command: UpdateUserCommand, actor: Actor) -> UserListing:
         """Apply the change under a row lock.

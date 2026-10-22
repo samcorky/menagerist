@@ -6,6 +6,7 @@ import pytest
 import time_machine
 from structlog.testing import capture_logs
 
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.identity.application.list_own_sessions import (
     ListOwnSessions,
     ListOwnSessionsQuery,
@@ -69,7 +70,7 @@ async def test_list_own_sessions_returns_active_sessions_newest_first(
     repos = IdentityRepos(
         users=world.users, sessions=world.sessions, attempts=world.attempts
     )
-    handler = ListOwnSessions(repos, idle_timeout=IDLE_TIMEOUT)
+    handler = ListOwnSessions(repos, get_access_guard(), idle_timeout=IDLE_TIMEOUT)
 
     actor = _make_actor(alice.id)
     results = await handler.handle(
@@ -124,7 +125,7 @@ async def test_list_own_sessions_excludes_expired_and_idle_sessions(
     repos = IdentityRepos(
         users=world.users, sessions=world.sessions, attempts=world.attempts
     )
-    handler = ListOwnSessions(repos, idle_timeout=IDLE_TIMEOUT)
+    handler = ListOwnSessions(repos, get_access_guard(), idle_timeout=IDLE_TIMEOUT)
 
     actor = _make_actor(alice.id)
     results = await handler.handle(
@@ -158,7 +159,7 @@ async def test_list_own_sessions_excludes_other_users_sessions(
     repos = IdentityRepos(
         users=world.users, sessions=world.sessions, attempts=world.attempts
     )
-    handler = ListOwnSessions(repos, idle_timeout=IDLE_TIMEOUT)
+    handler = ListOwnSessions(repos, get_access_guard(), idle_timeout=IDLE_TIMEOUT)
 
     actor = _make_actor(alice.id)
     results = await handler.handle(
@@ -183,7 +184,7 @@ async def test_list_own_sessions_with_unknown_or_none_current_session(
     repos = IdentityRepos(
         users=world.users, sessions=world.sessions, attempts=world.attempts
     )
-    handler = ListOwnSessions(repos, idle_timeout=IDLE_TIMEOUT)
+    handler = ListOwnSessions(repos, get_access_guard(), idle_timeout=IDLE_TIMEOUT)
 
     actor = _make_actor(alice.id)
     results1 = await handler.handle(
@@ -214,7 +215,7 @@ async def test_revoke_own_session_success(world: World, make_user: MakeUser) -> 
     await world.sessions.add(current_session)
     await world.sessions.add(other_session)
 
-    handler = RevokeOwnSession(world.uow)
+    handler = RevokeOwnSession(world.uow, get_access_guard())
     actor = _make_actor(alice.id)
 
     with capture_logs() as logs:
@@ -250,7 +251,7 @@ async def test_revoke_own_session_refuses_current_session(
     )
     await world.sessions.add(current_session)
 
-    handler = RevokeOwnSession(world.uow)
+    handler = RevokeOwnSession(world.uow, get_access_guard())
     actor = _make_actor(alice.id)
 
     with pytest.raises(CurrentSessionError, match="Cannot revoke the current session"):
@@ -278,7 +279,7 @@ async def test_revoke_own_session_raises_not_found_for_unknown_id(
     )
     await world.sessions.add(current_session)
 
-    handler = RevokeOwnSession(world.uow)
+    handler = RevokeOwnSession(world.uow, get_access_guard())
     actor = _make_actor(alice.id)
     unknown_id = uuid.uuid7()
 
@@ -311,7 +312,7 @@ async def test_revoke_own_session_raises_not_found_and_preserves_foreign_session
     await world.sessions.add(alice_session)
     await world.sessions.add(bob_session)
 
-    handler = RevokeOwnSession(world.uow)
+    handler = RevokeOwnSession(world.uow, get_access_guard())
     actor = _make_actor(alice.id)
 
     # Review Focus #1: Foreign id looks identical to unknown id (404, never 403)
@@ -356,7 +357,7 @@ async def test_revoke_other_sessions_deletes_others_and_preserves_current(
     await world.sessions.add(other2)
     await world.sessions.add(bob_session)
 
-    handler = RevokeOtherSessions(world.uow)
+    handler = RevokeOtherSessions(world.uow, get_access_guard())
     actor = _make_actor(alice.id)
 
     with capture_logs() as logs:

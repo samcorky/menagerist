@@ -9,7 +9,7 @@ import pytest_asyncio
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.identity.adapters.persistence.models import SessionModel, UserModel
 from app.modules.identity.adapters.persistence.session_repository import (
     SqlAlchemySessionRepository,
@@ -86,6 +86,7 @@ def _setup(
 ) -> SetupFirstAdmin:
     return SetupFirstAdmin(
         create_identity_uow(sessions),
+        get_access_guard(),
         InMemoryPasswordHasher(),
         SecretsSessionTokenGenerator(),
         claim,
@@ -168,7 +169,7 @@ async def _add_admins(factory: async_sessionmaker[AsyncSession]) -> list[User]:
 async def _disable(
     factory: async_sessionmaker[AsyncSession], target: User, by: User
 ) -> UserListing:
-    return await UpdateUser(_slow_uow(factory), RoleAuthorisationAdapter()).handle(
+    return await UpdateUser(_slow_uow(factory), get_access_guard()).handle(
         UpdateUserCommand(user_id=target.id, disabled=True),
         Actor(id=by.id, roles=frozenset({"admin"})),
     )

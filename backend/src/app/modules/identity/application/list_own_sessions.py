@@ -1,13 +1,15 @@
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from app.modules.identity.domain.session import Session
 from app.modules.identity.ports.unit_of_work import IdentityRepos
-from app.shared_kernel.cqrs import QueryHandler
+from app.shared_kernel.access import Access, OwnAccount
+from app.shared_kernel.guarded import GuardedQueryHandler
 
 if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 
@@ -27,20 +29,23 @@ class OwnSession:
 
 
 class ListOwnSessions(
-    QueryHandler[IdentityRepos, ListOwnSessionsQuery, list[OwnSession]]
+    GuardedQueryHandler[IdentityRepos, ListOwnSessionsQuery, list[OwnSession]]
 ):
     """List active sessions for the calling user, newest first."""
+
+    access: ClassVar[Access] = OwnAccount()
 
     def __init__(
         self,
         repos: IdentityRepos,
+        guard: AccessGuard,
         *,
         idle_timeout: timedelta | None = None,
     ) -> None:
-        super().__init__(repos)
+        super().__init__(repos, guard)
         self._idle_timeout = idle_timeout
 
-    async def handle(
+    async def _handle(
         self, query: ListOwnSessionsQuery, actor: Actor
     ) -> list[OwnSession]:
         """Return the actor's active sessions marked with whether they are current."""

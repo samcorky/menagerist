@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.identity.adapters.persistence.unit_of_work import build_identity_repos
 from app.modules.identity.application.has_administrator import (
     HasAdministrator,
@@ -36,9 +37,9 @@ async def warn_if_no_administrator() -> None:
     """
     try:
         async with get_session_factory()() as session:
-            exists = await HasAdministrator(build_identity_repos(session)).handle(
-                HasAdministratorQuery(), SYSTEM_ACTOR
-            )
+            exists = await HasAdministrator(
+                build_identity_repos(session), get_access_guard()
+            ).handle(HasAdministratorQuery(), SYSTEM_ACTOR)
     except Exception:
         logger.debug("administrator check skipped", exc_info=True)
         return

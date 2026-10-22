@@ -1,12 +1,13 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.identity.domain.errors import UserNotFoundError
 from app.modules.identity.domain.user import User
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.access import Access, OwnAccount
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -22,11 +23,13 @@ class SetOwnDisplayNameCommand:
 
 
 class SetOwnDisplayName(
-    CommandHandler[IdentityUnitOfWork, SetOwnDisplayNameCommand, User]
+    GuardedCommandHandler[IdentityUnitOfWork, SetOwnDisplayNameCommand, User]
 ):
     """Rename the acting user; everyone may change their own display name."""
 
-    async def handle(self, command: SetOwnDisplayNameCommand, actor: Actor) -> User:
+    access: ClassVar[Access] = OwnAccount()
+
+    async def _handle(self, command: SetOwnDisplayNameCommand, actor: Actor) -> User:
         """Rename the acting account under a row lock.
 
         Raises:

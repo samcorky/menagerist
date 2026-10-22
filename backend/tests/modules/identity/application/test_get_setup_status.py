@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.identity.application.get_setup_status import (
     GetSetupStatus,
     GetSetupStatusQuery,
@@ -18,7 +19,8 @@ async def test_setup_is_required_only_while_there_are_no_accounts(
     use_case = GetSetupStatus(
         IdentityRepos(
             users=world.users, sessions=world.sessions, attempts=world.attempts
-        )
+        ),
+        get_access_guard(),
     )
 
     assert await use_case.handle(GetSetupStatusQuery(), ANONYMOUS_ACTOR) is True

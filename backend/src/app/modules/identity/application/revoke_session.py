@@ -1,16 +1,17 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.identity.application.permissions import IdentityPermission
 from app.modules.identity.domain.errors import CurrentSessionError, SessionNotFoundError
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
-from app.shared_kernel.authorisation import AuthorisationPort  # noqa: TC001
-from app.shared_kernel.cqrs import AuthorisedCommandHandler
+from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -25,9 +26,7 @@ class RevokeSessionCommand:
 
 
 class RevokeSession(
-    AuthorisedCommandHandler[
-        IdentityUnitOfWork, RevokeSessionCommand, None, IdentityPermission
-    ]
+    GuardedCommandHandler[IdentityUnitOfWork, RevokeSessionCommand, None]
 ):
     """End any active session by ID, for administrators.
 
@@ -35,14 +34,14 @@ class RevokeSession(
     and with `SessionNotFoundError` if the session does not exist.
     """
 
-    required_permission = IdentityPermission.REVOKE_SESSION
+    access: ClassVar[Access] = Requires(IdentityPermission.REVOKE_SESSION)
 
     def __init__(
         self,
         uow: IdentityUnitOfWork,
-        authorisation: AuthorisationPort,
+        guard: AccessGuard,
     ) -> None:
-        super().__init__(uow, authorisation)
+        super().__init__(uow, guard)
 
     async def _handle(self, command: RevokeSessionCommand, actor: Actor) -> None:
         """Revoke the requested session if not the actor's current session.

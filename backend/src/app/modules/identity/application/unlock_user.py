@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
@@ -8,7 +8,8 @@ from app.modules.identity.application.permissions import IdentityPermission
 from app.modules.identity.application.sign_in_throttle import user_id_key, username_key
 from app.modules.identity.domain.errors import UserNotFoundError
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
-from app.shared_kernel.cqrs import AuthorisedCommandHandler
+from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -23,11 +24,7 @@ class UnlockUserCommand:
     user_id: uuid.UUID
 
 
-class UnlockUser(
-    AuthorisedCommandHandler[
-        IdentityUnitOfWork, UnlockUserCommand, None, IdentityPermission
-    ]
-):
+class UnlockUser(GuardedCommandHandler[IdentityUnitOfWork, UnlockUserCommand, None]):
     """Clear the failed-attempt counters for an account.
 
     The username counter (sign-in) and the user-id counter (password change),
@@ -35,7 +32,7 @@ class UnlockUser(
     account's disabled flag is untouched. Unlocking an unlocked account is a no-op.
     """
 
-    required_permission = IdentityPermission.UNLOCK_USER
+    access: ClassVar[Access] = Requires(IdentityPermission.UNLOCK_USER)
 
     async def _handle(self, command: UnlockUserCommand, actor: Actor) -> None:
         """Clear the lock.

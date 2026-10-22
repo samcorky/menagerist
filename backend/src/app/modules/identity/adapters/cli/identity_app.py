@@ -15,9 +15,12 @@ from app.modules.identity.adapters.claim.unwired_existing_data_claim import (
     UnwiredExistingDataClaim,
 )
 from app.platform.config import get_identity_cli_settings
+from app.shared_kernel.access import Public
 from app.shared_kernel.errors import DomainError, ForbiddenError
 
 if TYPE_CHECKING:
+    import uuid
+
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.modules.identity.application.user_listing import UserListing
@@ -25,7 +28,10 @@ if TYPE_CHECKING:
     from app.modules.identity.ports.existing_data_claim import ExistingDataClaim
     from app.modules.identity.ports.password_hasher import PasswordHasher
     from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
-    from app.shared_kernel.authorisation import AuthorisationPort
+    from app.shared_kernel.access import Access
+    from app.shared_kernel.access_guard import AccessGuard
+    from app.shared_kernel.actor import Actor
+    from app.shared_kernel.content_filter import ContentFilter
 
 logger = structlog.get_logger(__name__)
 
@@ -33,19 +39,31 @@ identity_app = App(name="identity", help="Manage accounts.")
 
 
 class _DenyAll:
-    """Fail-closed default until the entrypoint wires the real authorisation."""
+    """Fail-closed default until the entrypoint wires the real guard.
 
-    async def check(self, actor: object, action: str) -> None:
+    Public use cases still run, as they do under the real guard.
+    """
+
+    async def check(self, actor: Actor, access: Access) -> None:
+        if not isinstance(access, Public):
+            raise ForbiddenError("Authorisation is not wired for the CLI.")
+
+    def scope_for(self, actor: Actor) -> ContentFilter:
         raise ForbiddenError("Authorisation is not wired for the CLI.")
 
+    def assert_can_view(self, actor: Actor, owner_id: uuid.UUID | None) -> None:
+        raise ForbiddenError("Authorisation is not wired for the CLI.")
 
-_authorisation: AuthorisationPort = _DenyAll()
+    assert_can_modify = assert_can_delete = assert_can_view
 
 
-def use_authorisation(authorisation: AuthorisationPort) -> None:
-    """Choose the authorisation the commands check the system actor against."""
-    global _authorisation
-    _authorisation = authorisation
+_guard: AccessGuard = _DenyAll()
+
+
+def use_access_guard(guard: AccessGuard) -> None:
+    """Choose the guard the commands check the system actor against."""
+    global _guard
+    _guard = guard
 
 
 ClaimBuilder = Callable[["AsyncSession"], "ExistingDataClaim"]
@@ -142,7 +160,7 @@ def create_admin(*, username: str, display_name: str | None = None) -> None:
             async with uow as repos:
                 first_run = await repos.users.count() == 0
             if not first_run:
-                user = await CreateUser(uow, _authorisation, hasher).handle(
+                user = await CreateUser(uow, _guard, hasher).handle(
                     CreateUserCommand(
                         username=username,
                         display_name=name,
@@ -158,6 +176,7 @@ def create_admin(*, username: str, display_name: str | None = None) -> None:
             ttl = timedelta(hours=get_identity_settings().session_ttl_hours)
             result = await SetupFirstAdmin(
                 uow,
+                _guard,
                 hasher,
                 SecretsSessionTokenGenerator(),
                 _claim_builder(session),
@@ -216,7 +235,7 @@ def reset_password(
                 user = await repos.users.get_by_username(username)
             if user is None:
                 raise UserNotFoundError("That account does not exist.")
-            await ResetPassword(uow, _authorisation, _hasher()).handle(
+            await ResetPassword(uow, _guard, _hasher()).handle(
                 ResetPasswordCommand(user_id=user.id, password=password),
                 SYSTEM_ACTOR,
             )
@@ -261,7 +280,7 @@ def set_display_name(*, username: str, display_name: str) -> None:
         async with get_session_factory()() as session:
             uow = create_identity_uow_on_session(session)
             user = await _find_user(uow, username)
-            updated = await UpdateUser(uow, _authorisation).handle(
+            updated = await UpdateUser(uow, _guard).handle(
                 UpdateUserCommand(user_id=user.id, display_name=display_name),
                 SYSTEM_ACTOR,
             )
@@ -293,7 +312,7 @@ def unlock(*, username: str) -> None:
         async with get_session_factory()() as session:
             uow = create_identity_uow_on_session(session)
             user = await _find_user(uow, username)
-            await UnlockUser(uow, _authorisation).handle(
+            await UnlockUser(uow, _guard).handle(
                 UnlockUserCommand(user_id=user.id), SYSTEM_ACTOR
             )
             return f"Sign-in lockout cleared for '{user.username}'."
@@ -331,9 +350,9 @@ def list_accounts(
         from app.shared_kernel.actor import SYSTEM_ACTOR
 
         async with get_session_factory()() as session:
-            return await ListUsers(
-                build_identity_repos(session), _authorisation
-            ).handle(ListUsersQuery(), SYSTEM_ACTOR)
+            return await ListUsers(build_identity_repos(session), _guard).handle(
+                ListUsersQuery(), SYSTEM_ACTOR
+            )
 
     listings = _run(_list())
     if json_output:

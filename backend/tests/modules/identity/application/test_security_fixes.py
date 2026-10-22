@@ -9,6 +9,7 @@ import pytest
 import time_machine
 from structlog.testing import capture_logs
 
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.identity.adapters.security.in_memory_password_hasher import (
     InMemoryPasswordHasher,
 )
@@ -91,6 +92,7 @@ async def test_a_password_changed_after_the_check_voids_the_sign_in(
 
     sign_in = SignIn(
         world.uow,
+        get_access_guard(),
         _AfterAuthenticator(
             PasswordAuthenticator(world.uow, hasher, decoy_hash="fake$decoy"), change
         ),
@@ -124,6 +126,7 @@ class _CountingHasher(InMemoryPasswordHasher):
 def _sign_in_with(world: World, hasher: _CountingHasher) -> SignIn:
     return SignIn(
         world.uow,
+        get_access_guard(),
         PasswordAuthenticator(world.uow, hasher, decoy_hash="fake$decoy"),
         InMemorySessionTokenGenerator(),
         hasher,

@@ -8,6 +8,7 @@ import pytest_asyncio
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.identity.adapters.persistence.models import (
     SessionModel,
     SignInAttemptModel,
@@ -195,6 +196,7 @@ async def test_parallel_guesses_never_verify_more_than_the_limit(
         # One unit of work per request, as in the app.
         return SignIn(
             create_identity_uow(factory),
+            get_access_guard(),
             PasswordAuthenticator(
                 create_identity_uow(factory), hasher, decoy_hash="fake$decoy"
             ),
@@ -234,6 +236,7 @@ async def test_a_password_change_between_check_and_session_voids_the_sign_in(
     throttle = SignInThrottle()
     change = ChangePassword(
         create_identity_uow(factory),
+        get_access_guard(),
         hasher,
         tokens,
         throttle,
@@ -259,6 +262,7 @@ async def test_a_password_change_between_check_and_session_voids_the_sign_in(
 
     sign_in = SignIn(
         create_identity_uow(factory),
+        get_access_guard(),
         _Racing(),
         tokens,
         hasher,

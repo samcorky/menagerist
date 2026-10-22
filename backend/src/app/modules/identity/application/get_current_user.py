@@ -1,16 +1,18 @@
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from app.modules.identity.domain.user import User
 from app.modules.identity.ports.session_token_generator import (  # noqa: TC001
     SessionTokenGenerator,
 )
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.access import Access, Public
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 LAST_SEEN_INTERVAL = timedelta(minutes=1)
@@ -36,7 +38,9 @@ class ResolvedSession:
 
 
 class GetCurrentUser(
-    CommandHandler[IdentityUnitOfWork, GetCurrentUserQuery, ResolvedSession | None]
+    GuardedCommandHandler[
+        IdentityUnitOfWork, GetCurrentUserQuery, ResolvedSession | None
+    ]
 ):
     """Resolve a session token to its user.
 
@@ -44,18 +48,21 @@ class GetCurrentUser(
     once a minute, so most calls write nothing.
     """
 
+    access: ClassVar[Access] = Public()
+
     def __init__(
         self,
         uow: IdentityUnitOfWork,
+        guard: AccessGuard,
         tokens: SessionTokenGenerator,
         *,
         idle_timeout: timedelta | None = None,
     ) -> None:
-        super().__init__(uow)
+        super().__init__(uow, guard)
         self._tokens = tokens
         self._idle_timeout = idle_timeout
 
-    async def handle(
+    async def _handle(
         self, query: GetCurrentUserQuery, actor: Actor
     ) -> ResolvedSession | None:
         """Return the user and session id, or `None` if there is no usable session.

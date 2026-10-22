@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.identity.adapters.security.in_memory_password_hasher import (
     InMemoryPasswordHasher,
 )
@@ -92,6 +93,7 @@ async def test_sign_in_rechecks_the_account_after_authentication(
     hasher = InMemoryPasswordHasher()
     use_case = SignIn(
         world.uow,
+        get_access_guard(),
         _FixedAuthenticator("alice", user.password_hash),
         InMemorySessionTokenGenerator(),
         hasher,

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 import time_machine
 
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.identity.adapters.security.in_memory_password_hasher import (
     InMemoryPasswordHasher,
 )
@@ -44,6 +45,7 @@ from app.modules.identity.domain.errors import (
 )
 from app.modules.identity.domain.user import Role
 from app.modules.identity.ports.unit_of_work import IdentityRepos
+from app.shared_kernel.access import Requires
 from app.shared_kernel.actor import ANONYMOUS_ACTOR, Actor
 from app.shared_kernel.errors import ForbiddenError
 
@@ -245,6 +247,7 @@ async def test_a_locked_attempt_costs_a_hash_but_never_reaches_the_authenticator
     authenticator = _NeverAuthenticator()
     sign_in = SignIn(
         world.uow,
+        get_access_guard(),
         authenticator,
         InMemorySessionTokenGenerator(),
         hasher,
@@ -536,14 +539,13 @@ async def test_every_user_management_use_case_requires_its_permission(
     cases: Cases, make_user: MakeUser, admin_actor: Actor
 ) -> None:
     """Each use case declares the permission the catalogue knows."""
-    assert cases.create_user.required_permission is IdentityPermission.CREATE_USER
-    assert cases.list_users.required_permission is IdentityPermission.LIST_USERS
-    assert cases.update_user.required_permission is IdentityPermission.UPDATE_USER
-    assert (
-        cases.reset_password.required_permission
-        is IdentityPermission.RESET_USER_PASSWORD
+    assert cases.create_user.access == Requires(IdentityPermission.CREATE_USER)
+    assert cases.list_users.access == Requires(IdentityPermission.LIST_USERS)
+    assert cases.update_user.access == Requires(IdentityPermission.UPDATE_USER)
+    assert cases.reset_password.access == Requires(
+        IdentityPermission.RESET_USER_PASSWORD
     )
-    assert cases.unlock_user.required_permission is IdentityPermission.UNLOCK_USER
+    assert cases.unlock_user.access == Requires(IdentityPermission.UNLOCK_USER)
     with pytest.raises(ForbiddenError):
         await cases.list_users.handle(ListUsersQuery(), MEMBER)
 
@@ -558,7 +560,7 @@ async def test_has_administrator_counts_enabled_administrators(
     repos = IdentityRepos(
         users=world.users, sessions=world.sessions, attempts=world.attempts
     )
-    query = HasAdministrator(repos)
+    query = HasAdministrator(repos, get_access_guard())
     assert await query.handle(HasAdministratorQuery(), ANONYMOUS_ACTOR) is False
 
     await world.users.add(make_user("member"))

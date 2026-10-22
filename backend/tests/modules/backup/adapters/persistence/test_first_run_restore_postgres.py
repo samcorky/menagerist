@@ -149,6 +149,7 @@ async def test_first_run_restores_credentials_and_rolls_back_media_failure(
             assert not await gate.is_open()
             sign_in = SignIn(
                 create_identity_uow(factory),
+                get_access_guard(),
                 PasswordAuthenticator(
                     create_identity_uow(factory),
                     hasher,

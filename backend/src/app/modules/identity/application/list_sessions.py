@@ -1,16 +1,17 @@
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from app.modules.identity.application.permissions import IdentityPermission
 from app.modules.identity.application.session_listing import SessionListing
 from app.modules.identity.ports.unit_of_work import IdentityRepos
-from app.shared_kernel.authorisation import AuthorisationPort  # noqa: TC001
-from app.shared_kernel.cqrs import AuthorisedQueryHandler
+from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.guarded import GuardedQueryHandler
 
 if TYPE_CHECKING:
     from app.modules.identity.domain.user import User
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 
@@ -22,22 +23,20 @@ class ListSessionsQuery:
 
 
 class ListSessions(
-    AuthorisedQueryHandler[
-        IdentityRepos, ListSessionsQuery, list[SessionListing], IdentityPermission
-    ]
+    GuardedQueryHandler[IdentityRepos, ListSessionsQuery, list[SessionListing]]
 ):
     """List active sessions for all users or a specific user, for administrators."""
 
-    required_permission = IdentityPermission.LIST_SESSIONS
+    access: ClassVar[Access] = Requires(IdentityPermission.LIST_SESSIONS)
 
     def __init__(
         self,
         repos: IdentityRepos,
-        authorisation: AuthorisationPort,
+        guard: AccessGuard,
         *,
         idle_timeout: timedelta | None = None,
     ) -> None:
-        super().__init__(repos, authorisation)
+        super().__init__(repos, guard)
         self._idle_timeout = idle_timeout
 
     async def _handle(

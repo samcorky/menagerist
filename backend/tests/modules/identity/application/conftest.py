@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.identity.adapters.claim.no_op_existing_data_claim import (
     NoOpExistingDataClaim,
 )
@@ -86,17 +86,23 @@ def build_cases(world: World, claim: ExistingDataClaim | None = None) -> Cases:
     tokens = InMemorySessionTokenGenerator()
     decoy = hasher.hash("decoy")
     authenticator = PasswordAuthenticator(world.uow, hasher, decoy_hash=decoy)
-    auth = RoleAuthorisationAdapter()
+    guard = get_access_guard()
     throttle = SignInThrottle()
     repos = IdentityRepos(
         users=world.users, sessions=world.sessions, attempts=world.attempts
     )
     return Cases(
         setup=SetupFirstAdmin(
-            world.uow, hasher, tokens, claim or NoOpExistingDataClaim(), session_ttl=TTL
+            world.uow,
+            get_access_guard(),
+            hasher,
+            tokens,
+            claim or NoOpExistingDataClaim(),
+            session_ttl=TTL,
         ),
         sign_in=SignIn(
             world.uow,
+            get_access_guard(),
             authenticator,
             tokens,
             hasher,
@@ -104,17 +110,17 @@ def build_cases(world: World, claim: ExistingDataClaim | None = None) -> Cases:
             decoy_hash=decoy,
             session_ttl=TTL,
         ),
-        sign_out=SignOut(world.uow, tokens),
-        current_user=GetCurrentUser(world.uow, tokens),
+        sign_out=SignOut(world.uow, get_access_guard(), tokens),
+        current_user=GetCurrentUser(world.uow, get_access_guard(), tokens),
         change_password=ChangePassword(
-            world.uow, hasher, tokens, throttle, session_ttl=TTL
+            world.uow, get_access_guard(), hasher, tokens, throttle, session_ttl=TTL
         ),
-        create_user=CreateUser(world.uow, auth, hasher),
-        list_users=ListUsers(repos, auth),
-        update_user=UpdateUser(world.uow, auth),
-        reset_password=ResetPassword(world.uow, auth, hasher),
-        unlock_user=UnlockUser(world.uow, auth),
-        set_own_display_name=SetOwnDisplayName(world.uow),
+        create_user=CreateUser(world.uow, guard, hasher),
+        list_users=ListUsers(repos, guard),
+        update_user=UpdateUser(world.uow, guard),
+        reset_password=ResetPassword(world.uow, guard, hasher),
+        unlock_user=UnlockUser(world.uow, guard),
+        set_own_display_name=SetOwnDisplayName(world.uow, get_access_guard()),
         throttle=throttle,
     )
 

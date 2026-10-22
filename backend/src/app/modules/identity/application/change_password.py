@@ -1,7 +1,7 @@
 import asyncio
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
@@ -24,9 +24,11 @@ from app.modules.identity.ports.session_token_generator import (  # noqa: TC001
     SessionTokenGenerator,
 )
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.access import Access, OwnAccount
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -47,20 +49,23 @@ class ChangePasswordCommand:
 
 
 class ChangePassword(
-    CommandHandler[IdentityUnitOfWork, ChangePasswordCommand, SignedInResult]
+    GuardedCommandHandler[IdentityUnitOfWork, ChangePasswordCommand, SignedInResult]
 ):
     """Change the acting user's password and replace every session with one new one."""
+
+    access: ClassVar[Access] = OwnAccount()
 
     def __init__(
         self,
         uow: IdentityUnitOfWork,
+        guard: AccessGuard,
         hasher: PasswordHasher,
         tokens: SessionTokenGenerator,
         throttle: SignInThrottle,
         *,
         session_ttl: timedelta,
     ) -> None:
-        super().__init__(uow)
+        super().__init__(uow, guard)
         self._hasher = hasher
         self._throttle = throttle
         self._tokens = tokens
@@ -81,7 +86,7 @@ class ChangePassword(
             )
         return None
 
-    async def handle(
+    async def _handle(
         self, command: ChangePasswordCommand, actor: Actor
     ) -> SignedInResult:
         """Change the password, returning the user and the replacement session token.

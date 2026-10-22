@@ -1,11 +1,12 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.access import Access, OwnAccount
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -21,11 +22,13 @@ class RevokeOtherSessionsCommand:
 
 
 class RevokeOtherSessions(
-    CommandHandler[IdentityUnitOfWork, RevokeOtherSessionsCommand, int]
+    GuardedCommandHandler[IdentityUnitOfWork, RevokeOtherSessionsCommand, int]
 ):
     """End all active sessions of the calling user except the current one."""
 
-    async def handle(self, command: RevokeOtherSessionsCommand, actor: Actor) -> int:
+    access: ClassVar[Access] = OwnAccount()
+
+    async def _handle(self, command: RevokeOtherSessionsCommand, actor: Actor) -> int:
         """Revoke all sessions for `actor` except `command.current_session_id`."""
         async with self._uow as repos:
             ended = await repos.sessions.delete_all_except(

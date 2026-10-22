@@ -8,7 +8,7 @@ import structlog
 from fastapi import Depends
 from starlette.requests import Request
 
-from app.entrypoints.api.shared.authorisation import get_authorisation_port
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.identity.adapters.api.cookies import (
     session_cookie_name,
     session_cookie_value,
@@ -73,8 +73,8 @@ from app.modules.identity.ports.session_token_generator import SessionTokenGener
 from app.modules.identity.ports.unit_of_work import IdentityRepos, IdentityUnitOfWork
 from app.platform.config import IdentitySettings, get_identity_settings
 from app.platform.database import get_session_factory
+from app.shared_kernel.access_guard import AccessGuard
 from app.shared_kernel.actor import ANONYMOUS_ACTOR, Actor
-from app.shared_kernel.authorisation import AuthorisationPort
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -227,8 +227,9 @@ def get_setup_first_admin_use_case(
     tokens: Annotated[SessionTokenGenerator, Depends(get_session_token_generator)],
     claim: Annotated[ExistingDataClaim, Depends(get_existing_data_claim)],
     ttl: Annotated[timedelta, Depends(get_session_ttl)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> SetupFirstAdmin:
-    return SetupFirstAdmin(uow, hasher, tokens, claim, session_ttl=ttl)
+    return SetupFirstAdmin(uow, guard, hasher, tokens, claim, session_ttl=ttl)
 
 
 def get_sign_in_use_case(
@@ -239,9 +240,11 @@ def get_sign_in_use_case(
     throttle: Annotated[SignInThrottle, Depends(get_sign_in_throttle)],
     decoy_hash: Annotated[str, Depends(get_decoy_hash)],
     ttl: Annotated[timedelta, Depends(get_session_ttl)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> SignIn:
     return SignIn(
         uow,
+        guard,
         authenticator,
         tokens,
         hasher,
@@ -254,25 +257,28 @@ def get_sign_in_use_case(
 def get_sign_out_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
     tokens: Annotated[SessionTokenGenerator, Depends(get_session_token_generator)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> SignOut:
-    return SignOut(uow, tokens)
+    return SignOut(uow, guard, tokens)
 
 
 def get_get_current_user_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
     tokens: Annotated[SessionTokenGenerator, Depends(get_session_token_generator)],
     settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> GetCurrentUser:
     idle = settings.session_idle_hours
     return GetCurrentUser(
-        uow, tokens, idle_timeout=timedelta(hours=idle) if idle else None
+        uow, guard, tokens, idle_timeout=timedelta(hours=idle) if idle else None
     )
 
 
 def get_get_setup_status_use_case(
     repos: Annotated[IdentityRepos, Depends(get_identity_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> GetSetupStatus:
-    return GetSetupStatus(repos)
+    return GetSetupStatus(repos, guard)
 
 
 def get_change_password_use_case(
@@ -281,95 +287,103 @@ def get_change_password_use_case(
     tokens: Annotated[SessionTokenGenerator, Depends(get_session_token_generator)],
     throttle: Annotated[SignInThrottle, Depends(get_sign_in_throttle)],
     ttl: Annotated[timedelta, Depends(get_session_ttl)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ChangePassword:
-    return ChangePassword(uow, hasher, tokens, throttle, session_ttl=ttl)
+    return ChangePassword(uow, guard, hasher, tokens, throttle, session_ttl=ttl)
 
 
 def get_set_own_display_name_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> SetOwnDisplayName:
-    return SetOwnDisplayName(uow)
+    return SetOwnDisplayName(uow, guard)
 
 
 def get_create_user_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
-    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
     hasher: Annotated[PasswordHasher, Depends(get_password_hasher)],
 ) -> CreateUser:
-    return CreateUser(uow, authorisation, hasher)
+    return CreateUser(uow, guard, hasher)
 
 
 def get_list_users_use_case(
     repos: Annotated[IdentityRepos, Depends(get_identity_repos)],
-    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ListUsers:
-    return ListUsers(repos, authorisation)
+    return ListUsers(repos, guard)
 
 
 def get_update_user_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
-    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> UpdateUser:
-    return UpdateUser(uow, authorisation)
+    return UpdateUser(uow, guard)
 
 
 def get_reset_password_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
-    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
     hasher: Annotated[PasswordHasher, Depends(get_password_hasher)],
 ) -> ResetPassword:
-    return ResetPassword(uow, authorisation, hasher)
+    return ResetPassword(uow, guard, hasher)
 
 
 def get_unlock_user_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
-    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> UnlockUser:
-    return UnlockUser(uow, authorisation)
+    return UnlockUser(uow, guard)
 
 
 def get_has_administrator_use_case(
     repos: Annotated[IdentityRepos, Depends(get_identity_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> HasAdministrator:
-    return HasAdministrator(repos)
+    return HasAdministrator(repos, guard)
 
 
 def get_list_own_sessions_use_case(
     repos: Annotated[IdentityRepos, Depends(get_identity_repos)],
     settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ListOwnSessions:
     idle = settings.session_idle_hours
-    return ListOwnSessions(repos, idle_timeout=timedelta(hours=idle) if idle else None)
+    return ListOwnSessions(
+        repos, guard, idle_timeout=timedelta(hours=idle) if idle else None
+    )
 
 
 def get_revoke_own_session_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> RevokeOwnSession:
-    return RevokeOwnSession(uow)
+    return RevokeOwnSession(uow, guard)
 
 
 def get_revoke_other_sessions_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> RevokeOtherSessions:
-    return RevokeOtherSessions(uow)
+    return RevokeOtherSessions(uow, guard)
 
 
 def get_list_sessions_use_case(
     repos: Annotated[IdentityRepos, Depends(get_identity_repos)],
-    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
     settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
 ) -> ListSessions:
     idle = settings.session_idle_hours
     return ListSessions(
-        repos, authorisation, idle_timeout=timedelta(hours=idle) if idle else None
+        repos, guard, idle_timeout=timedelta(hours=idle) if idle else None
     )
 
 
 def get_revoke_session_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
-    authorisation: Annotated[AuthorisationPort, Depends(get_authorisation_port)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> RevokeSession:
-    return RevokeSession(uow, authorisation)
+    return RevokeSession(uow, guard)
 
 
 def get_session_token(

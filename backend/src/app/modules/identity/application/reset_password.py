@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
@@ -11,11 +11,12 @@ from app.modules.identity.domain.errors import UserNotFoundError
 from app.modules.identity.domain.user import validate_password
 from app.modules.identity.ports.password_hasher import PasswordHasher  # noqa: TC001
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
-from app.shared_kernel.cqrs import AuthorisedCommandHandler
+from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
-    from app.shared_kernel.authorisation import AuthorisationPort
 
 logger = structlog.get_logger()
 
@@ -33,21 +34,19 @@ class ResetPasswordCommand:
 
 
 class ResetPassword(
-    AuthorisedCommandHandler[
-        IdentityUnitOfWork, ResetPasswordCommand, None, IdentityPermission
-    ]
+    GuardedCommandHandler[IdentityUnitOfWork, ResetPasswordCommand, None]
 ):
     """Set a new initial password, end the user's sessions and require a change."""
 
-    required_permission = IdentityPermission.RESET_USER_PASSWORD
+    access: ClassVar[Access] = Requires(IdentityPermission.RESET_USER_PASSWORD)
 
     def __init__(
         self,
         uow: IdentityUnitOfWork,
-        authorisation: AuthorisationPort,
+        guard: AccessGuard,
         hasher: PasswordHasher,
     ) -> None:
-        super().__init__(uow, authorisation)
+        super().__init__(uow, guard)
         self._hasher = hasher
 
     async def _handle(self, command: ResetPasswordCommand, actor: Actor) -> None:

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import pytest
 import time_machine
 
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.identity.adapters.security.session_token_generator import (
     InMemorySessionTokenGenerator,
 )
@@ -248,7 +249,12 @@ IDLE = timedelta(minutes=30)
 
 
 def _idle_aware(cases: Cases, world: World) -> GetCurrentUser:
-    return GetCurrentUser(world.uow, InMemorySessionTokenGenerator(), idle_timeout=IDLE)
+    return GetCurrentUser(
+        world.uow,
+        get_access_guard(),
+        InMemorySessionTokenGenerator(),
+        idle_timeout=IDLE,
+    )
 
 
 async def test_idle_limit_is_off_by_default(

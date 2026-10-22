@@ -1,12 +1,13 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.identity.domain.errors import CurrentSessionError, SessionNotFoundError
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
-from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.access import Access, OwnAccount
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -23,7 +24,7 @@ class RevokeOwnSessionCommand:
 
 
 class RevokeOwnSession(
-    CommandHandler[IdentityUnitOfWork, RevokeOwnSessionCommand, None]
+    GuardedCommandHandler[IdentityUnitOfWork, RevokeOwnSessionCommand, None]
 ):
     """End one of the user's sessions.
 
@@ -31,7 +32,9 @@ class RevokeOwnSession(
     and with `SessionNotFoundError` if unknown or owned by another user.
     """
 
-    async def handle(self, command: RevokeOwnSessionCommand, actor: Actor) -> None:
+    access: ClassVar[Access] = OwnAccount()
+
+    async def _handle(self, command: RevokeOwnSessionCommand, actor: Actor) -> None:
         """Revoke the requested session if it belongs to `actor`."""
         if command.session_id == command.current_session_id:
             raise CurrentSessionError("Cannot revoke the current session.")

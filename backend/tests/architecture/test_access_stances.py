@@ -16,6 +16,12 @@ from app.shared_kernel.guarded import GuardedUseCase
 EXPECTED_PUBLIC: frozenset[str] = frozenset(
     {
         "backup.RestoreOnFirstRun",
+        "identity.GetCurrentUser",
+        "identity.GetSetupStatus",
+        "identity.HasAdministrator",
+        "identity.SetupFirstAdmin",
+        "identity.SignIn",
+        "identity.SignOut",
         "system.GetHealth",
         "system.GetHealthReady",
         "system.GetVersion",
