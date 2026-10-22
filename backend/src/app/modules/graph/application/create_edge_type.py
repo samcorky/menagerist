@@ -5,6 +5,7 @@ import jsonschema
 import structlog
 
 from app.modules.graph.application.choice_lists import check_list_refs, strip_list_enums
+from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.schema_meta import check_meta_shape
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import (
@@ -15,7 +16,7 @@ from app.modules.graph.domain.errors import (
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
-from app.shared_kernel.access import Access, Shared
+from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
 
@@ -41,7 +42,7 @@ class CreateEdgeTypeCommand:
 class CreateEdgeType(CommandHandler[GraphUnitOfWork, CreateEdgeTypeCommand, EdgeType]):
     """Create and persist a new edge type."""
 
-    access: ClassVar[Access] = Shared()
+    access: ClassVar[Access] = Requires(GraphPermission.TYPE_WRITE)
 
     def __init__(
         self,

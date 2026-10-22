@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
+from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.prepare_query import prepare_query, utc_today
 from app.modules.graph.application.schema_meta import search_excluded_keys
 from app.modules.graph.application.type_catalogue import load_node_types
@@ -84,7 +85,7 @@ def _combine(saved: Group | None, filters: list[Condition]) -> Group | None:
 class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
     """List node with keyset pagination."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(GraphPermission.ITEM_READ)
 
     def __init__(
         self,

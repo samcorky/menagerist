@@ -50,15 +50,6 @@ EXPECTED_SYSTEM: frozenset[str] = frozenset(
 )
 EXPECTED_SHARED: frozenset[str] = frozenset(
     {
-        "graph.CreateEdgeType",
-        "graph.CreateNodeType",
-        "graph.GetEdgeType",
-        "graph.GetNodeType",
-        "graph.ListEdgeTypes",
-        "graph.ListNodeTypes",
-        "graph.UpdateEdgeType",
-        "graph.UpdateNodeType",
-        "graph.ValidateQuery",
         "presets.CreatePreset",
         "presets.DeletePreset",
         "presets.ExportPresets",

@@ -5,13 +5,14 @@ from typing import TYPE_CHECKING, ClassVar
 import structlog
 
 from app.modules.graph.application.choice_lists import resolve_choice_lists
+from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
 from app.modules.graph.domain.node_type import NodeType
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.access import Access, Shared
+from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
@@ -31,7 +32,7 @@ class GetNodeTypeQuery:
 class GetNodeType(QueryHandler[GraphRepos, GetNodeTypeQuery, NodeType]):
     """Fetch a single node type by id."""
 
-    access: ClassVar[Access] = Shared()
+    access: ClassVar[Access] = Requires(GraphPermission.TYPE_READ)
 
     def __init__(
         self,

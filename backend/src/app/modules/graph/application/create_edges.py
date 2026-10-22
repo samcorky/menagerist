@@ -6,6 +6,7 @@ import structlog
 
 from app.modules.graph.application._validate_attributes import validate_attributes
 from app.modules.graph.application.choice_lists import resolve_choice_lists
+from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.errors import NodeNotFoundError
@@ -74,7 +75,7 @@ class CreateEdges(
 ):
     """Create edges from one source to several targets in a single transaction."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(GraphPermission.ITEM_WRITE)
 
     def __init__(
         self,

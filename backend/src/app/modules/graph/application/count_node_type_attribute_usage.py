@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Content
@@ -30,7 +31,7 @@ class CountNodeTypeAttributeUsage(
 ):
     """Count the nodes of a node type whose attributes contain a key."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(GraphPermission.ITEM_READ)
 
     async def _handle(
         self, query: CountNodeTypeAttributeUsageQuery, actor: Actor

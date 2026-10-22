@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.domain.errors import NodeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
@@ -26,7 +27,7 @@ class GetNodeQuery:
 class GetNode(QueryHandler[GraphRepos, GetNodeQuery, Node]):
     """Fetch a single node by id."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(GraphPermission.ITEM_READ)
 
     async def _handle(self, query: GetNodeQuery, actor: Actor) -> Node:
         """Return the requested node, raising `NodeNotFoundError` if it's missing."""

@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING, Any
+
 from app.modules.graph.application.claim_orphaned_items import ClaimOrphanedItems
 from app.modules.graph.application.count_edge_type_attribute_usage import (
     CountEdgeTypeAttributeUsage,
@@ -41,31 +43,48 @@ from app.modules.graph.application.update_edge_type import UpdateEdgeType
 from app.modules.graph.application.update_node import UpdateNode
 from app.modules.graph.application.update_node_type import UpdateNodeType
 from app.modules.graph.application.validate_query import ValidateQuery
-from app.shared_kernel.access import Content, Requires, Shared, System
+from app.shared_kernel.access import Access, Content, Requires, System
+
+if TYPE_CHECKING:
+    from app.shared_kernel.cqrs import UseCase
+
+ITEM_STANCES: dict[type[UseCase[Any, Any]], Access] = {
+    GetNode: Content(GraphPermission.ITEM_READ),
+    ListNodes: Content(GraphPermission.ITEM_READ),
+    SearchNodes: Content(GraphPermission.ITEM_READ),
+    GetEdge: Content(GraphPermission.ITEM_READ),
+    ListEdges: Content(GraphPermission.ITEM_READ),
+    ListAttributeValues: Content(GraphPermission.ITEM_READ),
+    ListItemFields: Content(GraphPermission.ITEM_READ),
+    CountNodeTypeAttributeUsage: Content(GraphPermission.ITEM_READ),
+    CountEdgeTypeAttributeUsage: Content(GraphPermission.ITEM_READ),
+    CreateNode: Content(GraphPermission.ITEM_WRITE),
+    UpdateNode: Content(GraphPermission.ITEM_WRITE),
+    DeleteNode: Content(GraphPermission.ITEM_WRITE),
+    CreateEdge: Content(GraphPermission.ITEM_WRITE),
+    CreateEdges: Content(GraphPermission.ITEM_WRITE),
+    UpdateEdge: Content(GraphPermission.ITEM_WRITE),
+    DeleteEdge: Content(GraphPermission.ITEM_WRITE),
+    PromoteExtraSchemaField: Content(GraphPermission.TYPE_WRITE),
+}
 
 
-def test_content_use_cases_are_owner_scoped() -> None:
-    """Each person sees and changes only their own content."""
-    for use_case in (
-        CountEdgeTypeAttributeUsage,
-        CountNodeTypeAttributeUsage,
-        CreateEdge,
-        CreateEdges,
-        CreateNode,
-        DeleteEdge,
-        DeleteNode,
-        GetEdge,
-        GetNode,
-        ListAttributeValues,
-        ListEdges,
-        ListItemFields,
-        ListNodes,
-        PromoteExtraSchemaField,
-        SearchNodes,
-        UpdateEdge,
-        UpdateNode,
-    ):
-        assert use_case.access == Content()
+VOCABULARY_STANCES: dict[type[UseCase[Any, Any]], Access] = {
+    GetNodeType: Requires(GraphPermission.TYPE_READ),
+    ListNodeTypes: Requires(GraphPermission.TYPE_READ),
+    GetEdgeType: Requires(GraphPermission.TYPE_READ),
+    ListEdgeTypes: Requires(GraphPermission.TYPE_READ),
+    ValidateQuery: Requires(GraphPermission.TYPE_READ),
+    CreateNodeType: Requires(GraphPermission.TYPE_WRITE),
+    UpdateNodeType: Requires(GraphPermission.TYPE_WRITE),
+    CreateEdgeType: Requires(GraphPermission.TYPE_WRITE),
+    UpdateEdgeType: Requires(GraphPermission.TYPE_WRITE),
+}
+
+
+def test_item_use_cases_need_the_item_permissions() -> None:
+    """Each person sees and changes only their own content, given the permission."""
+    assert {use_case: use_case.access for use_case in ITEM_STANCES} == ITEM_STANCES
 
 
 def test_claim_jobs_are_system_only() -> None:
@@ -74,20 +93,9 @@ def test_claim_jobs_are_system_only() -> None:
         assert use_case.access == System()
 
 
-def test_shared_vocabulary_is_open_to_any_signed_in_actor() -> None:
-    """Item and relationship types are shared by every account."""
-    for use_case in (
-        CreateEdgeType,
-        CreateNodeType,
-        GetEdgeType,
-        GetNodeType,
-        ListEdgeTypes,
-        ListNodeTypes,
-        UpdateEdgeType,
-        UpdateNodeType,
-        ValidateQuery,
-    ):
-        assert use_case.access == Shared()
+def test_shared_vocabulary_needs_the_type_permissions() -> None:
+    """Item and relationship types are shared, read or written by permission."""
+    assert {u: u.access for u in VOCABULARY_STANCES} == VOCABULARY_STANCES
 
 
 def test_structural_changes_keep_their_permissions() -> None:

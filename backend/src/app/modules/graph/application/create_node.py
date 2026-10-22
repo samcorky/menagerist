@@ -6,6 +6,7 @@ import structlog
 from app.modules.graph.application._validate_attributes import validate_attributes
 from app.modules.graph.application.choice_lists import resolve_choice_lists
 from app.modules.graph.application.extra_schema_limits import check_extra_schema_limits
+from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.schema_meta import (
     check_schema_definition,
     merge_attribute_schemas,
@@ -45,7 +46,7 @@ class CreateNodeCommand:
 class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
     """Create and persist a new node, auto-creating its NodeType if not yet known."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(GraphPermission.ITEM_WRITE)
 
     def __init__(
         self,

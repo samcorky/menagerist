@@ -205,17 +205,6 @@ def test_implementations_mirror_the_port_scope(
 # Use cases that carry no per-person content, and why. Every other use case in
 # the content modules must declare a `Content` or `Requires` stance.
 UNSCOPED_USE_CASES = {
-    # Item-type and relationship-type vocabulary is shared by every member
-    # (decision 6); only deleting/purging it is admin-only (a `Requires` stance).
-    "CreateNodeType": "shared vocabulary",
-    "GetNodeType": "shared vocabulary",
-    "ListNodeTypes": "shared vocabulary",
-    "ValidateQuery": "reads item type schemas only; touches no items",
-    "UpdateNodeType": "shared vocabulary",
-    "CreateEdgeType": "shared vocabulary",
-    "GetEdgeType": "shared vocabulary",
-    "ListEdgeTypes": "shared vocabulary",
-    "UpdateEdgeType": "shared vocabulary",
     # System-actor jobs run once by the first-admin claim: assign owners only.
     "ClaimOrphanedItems": "first-admin claim",
     "ClaimLegacyCollections": "first-admin claim",

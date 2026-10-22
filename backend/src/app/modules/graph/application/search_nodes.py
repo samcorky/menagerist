@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
+from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.prepare_query import prepare_query, utc_today
 from app.modules.graph.application.query_cursor import decode_cursor, encode_cursor
 from app.modules.graph.domain.node import Node
@@ -87,7 +88,7 @@ class SearchNodesResult:
 class SearchNodes(QueryHandler[GraphRepos, SearchNodesQuery, SearchNodesResult]):
     """Search items by condition tree, ordered and paged by keyset."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(GraphPermission.ITEM_READ)
 
     def __init__(
         self,

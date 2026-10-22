@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.domain.errors import NodeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.access import Access, Content
@@ -25,7 +26,7 @@ class DeleteNodeCommand:
 class DeleteNode(CommandHandler[GraphUnitOfWork, DeleteNodeCommand, None]):
     """Soft-delete an existing node."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(GraphPermission.ITEM_WRITE)
 
     async def _handle(self, command: DeleteNodeCommand, actor: Actor) -> None:
         """Soft-delete the node identified by `command` and commit."""

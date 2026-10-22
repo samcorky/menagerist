@@ -5,10 +5,11 @@ from dataclasses import dataclass
 from datetime import date  # noqa: TC003
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.prepare_query import prepare_query, utc_today
 from app.modules.graph.domain.query import QueryWarning
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.access import Access, Shared
+from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.actor import Actor  # noqa: TC001
 from app.shared_kernel.cqrs import QueryHandler
 
@@ -33,7 +34,7 @@ class ValidateQueryResult:
 class ValidateQuery(QueryHandler[GraphRepos, ValidateQueryQuery, ValidateQueryResult]):
     """Validate a condition tree against the current item types."""
 
-    access: ClassVar[Access] = Shared()
+    access: ClassVar[Access] = Requires(GraphPermission.TYPE_READ)
 
     def __init__(
         self,

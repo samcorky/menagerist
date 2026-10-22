@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.domain.query import ItemFieldUse
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Content
@@ -33,7 +34,7 @@ class ListItemFields(QueryHandler[GraphRepos, ListItemFieldsQuery, list[ItemFiel
     title among items sharing the key and kind, falling back to the key.
     """
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(GraphPermission.ITEM_READ)
 
     async def _handle(
         self, query: ListItemFieldsQuery, actor: Actor

@@ -12,11 +12,19 @@ EXPECTED: dict[tuple[str, str], str] = {
     ("/api/v1/backup/{backup_id}", "delete"): "backup:archive:delete",
     ("/api/v1/backup/{backup_id}/download", "get"): "backup:archive:read",
     ("/api/v1/backup/{backup_id}/verify", "post"): "backup:archive:read",
+    ("/api/v1/edge-type", "get"): "graph:type:read",
+    ("/api/v1/edge-type", "post"): "graph:type:write",
     ("/api/v1/edge-type/{edge_type_id}", "delete"): "graph:edge_type:delete",
+    ("/api/v1/edge-type/{edge_type_id}", "get"): "graph:type:read",
+    ("/api/v1/edge-type/{edge_type_id}", "patch"): "graph:type:write",
     ("/api/v1/edge-type/{edge_type_id}/attribute/{key}", "delete"): (
         "graph:edge_type:purge_attribute"
     ),
+    ("/api/v1/node-type", "get"): "graph:type:read",
+    ("/api/v1/node-type", "post"): "graph:type:write",
     ("/api/v1/node-type/{node_type_id}", "delete"): "graph:node_type:delete",
+    ("/api/v1/node-type/{node_type_id}", "get"): "graph:type:read",
+    ("/api/v1/node-type/{node_type_id}", "patch"): "graph:type:write",
     ("/api/v1/node-type/{node_type_id}/attribute/{key}", "delete"): (
         "graph:node_type:purge_attribute"
     ),

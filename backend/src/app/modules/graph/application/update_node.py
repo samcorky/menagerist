@@ -7,6 +7,7 @@ import structlog
 from app.modules.graph.application._validate_attributes import validate_attributes
 from app.modules.graph.application.choice_lists import resolve_choice_lists
 from app.modules.graph.application.extra_schema_limits import check_extra_schema_limits
+from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.schema_meta import (
     check_schema_definition,
     merge_attribute_schemas,
@@ -52,7 +53,7 @@ class UpdateNodeCommand:
 class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
     """Update an existing node's editable fields."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(GraphPermission.ITEM_WRITE)
 
     def __init__(
         self,

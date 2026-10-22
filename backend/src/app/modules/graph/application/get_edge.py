@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.errors import EdgeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphRepos
@@ -26,7 +27,7 @@ class GetEdgeQuery:
 class GetEdge(QueryHandler[GraphRepos, GetEdgeQuery, Edge]):
     """Fetch a single edge by id."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(GraphPermission.ITEM_READ)
 
     async def _handle(self, query: GetEdgeQuery, actor: Actor) -> Edge:
         """Return the requested edge, raising `EdgeNotFoundError` if it's missing."""

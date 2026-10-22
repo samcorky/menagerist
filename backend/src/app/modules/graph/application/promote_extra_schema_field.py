@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
+from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.schema_meta import archived_keys
 from app.modules.graph.application.update_node import UpdateNode, UpdateNodeCommand
 from app.modules.graph.application.update_node_type import (
@@ -54,7 +55,7 @@ class PromoteExtraSchemaField(
     separate requests.
     """
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(GraphPermission.TYPE_WRITE)
 
     async def _handle(
         self, command: PromoteExtraSchemaFieldCommand, actor: Actor

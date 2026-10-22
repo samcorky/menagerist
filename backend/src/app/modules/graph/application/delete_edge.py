@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.domain.errors import EdgeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.access import Access, Content
@@ -25,7 +26,7 @@ class DeleteEdgeCommand:
 class DeleteEdge(CommandHandler[GraphUnitOfWork, DeleteEdgeCommand, None]):
     """Soft-delete an existing edge."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = Content(GraphPermission.ITEM_WRITE)
 
     async def _handle(self, command: DeleteEdgeCommand, actor: Actor) -> None:
         """Soft-delete the edge identified by `command` and commit."""
