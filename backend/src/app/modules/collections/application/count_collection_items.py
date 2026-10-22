@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
@@ -10,10 +10,11 @@ from app.modules.collections.domain.errors import CollectionNotFoundError
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.collections.ports.item_lookup import ItemLookup  # noqa: TC001
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
-from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
-from app.shared_kernel.cqrs import ScopedQueryHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedQueryHandler
 
 if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -27,27 +28,29 @@ class CountCollectionItemsQuery:
 
 
 class CountCollectionItems(
-    ScopedQueryHandler[CollectionsRepos, CountCollectionItemsQuery, int]
+    GuardedQueryHandler[CollectionsRepos, CountCollectionItemsQuery, int]
 ):
     """Count a collection's items exactly, with no cap."""
 
+    access: ClassVar[Access] = Content()
+
     def __init__(
-        self, repos: CollectionsRepos, policy: AccessPolicy, items: ItemLookup
+        self, repos: CollectionsRepos, guard: AccessGuard, items: ItemLookup
     ) -> None:
-        super().__init__(repos, policy)
+        super().__init__(repos, guard)
         self._items = items
 
-    async def handle(self, query: CountCollectionItemsQuery, actor: Actor) -> int:
+    async def _handle(self, query: CountCollectionItemsQuery, actor: Actor) -> int:
         """Return the count, or raise `CollectionNotFoundError` if missing.
 
         A smart collection counts the items matching its definition in the
         caller's scope; a manual one counts its members that are live items.
         """
-        scope = self._policy.scope_for(actor)
+        scope = self.scope(actor)
         collection = await self._repos.collections.get(query.collection_id, scope=scope)
         if collection is None:
             raise CollectionNotFoundError(f"Collection {query.collection_id} not found")
-        self._policy.assert_can_view(actor, collection.owner_id)
+        self._guard.assert_can_view(actor, collection.owner_id)
         if (
             collection.kind is CollectionKind.DYNAMIC
             and collection.definition is not None

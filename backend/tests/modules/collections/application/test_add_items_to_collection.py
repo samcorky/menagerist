@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.collections.application.add_items_to_collection import (
     MAX_ITEMS_PER_REQUEST,
     AddItemsToCollection,
@@ -18,6 +17,7 @@ from app.modules.collections.domain.errors import (
     CollectionKindError,
     CollectionNotFoundError,
 )
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ValidationError
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 def _handler(world: World) -> AddItemsToCollection:
     """Build the use case over `world`."""
-    return AddItemsToCollection(world.uow, OwnerAccessPolicy(), world.items)
+    return AddItemsToCollection(world.uow, InMemoryAccessGuard(), world.items)
 
 
 async def test_add_several_returns_count(

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
@@ -16,11 +16,12 @@ from app.modules.collections.ports.definition_checker import (
     DefinitionChecker,  # noqa: TC001
 )
 from app.modules.collections.ports.unit_of_work import CollectionsUnitOfWork
-from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.errors import ConflictError
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -40,20 +41,22 @@ class CreateCollectionCommand:
 
 
 class CreateCollection(
-    ScopedCommandHandler[CollectionsUnitOfWork, CreateCollectionCommand, Collection]
+    GuardedCommandHandler[CollectionsUnitOfWork, CreateCollectionCommand, Collection]
 ):
     """Create and persist a new collection owned by the acting user."""
+
+    access: ClassVar[Access] = Content()
 
     def __init__(
         self,
         uow: CollectionsUnitOfWork,
-        policy: AccessPolicy,
+        guard: AccessGuard,
         checker: DefinitionChecker,
     ) -> None:
-        super().__init__(uow, policy)
+        super().__init__(uow, guard)
         self._checker = checker
 
-    async def handle(
+    async def _handle(
         self, command: CreateCollectionCommand, actor: Actor
     ) -> Collection:
         """Create a collection from `command` and commit it.
@@ -67,7 +70,7 @@ class CreateCollection(
                 actor.
         """
         # Slugs are unique per owner: only collections the actor can see count.
-        scope = self._policy.scope_for(actor)
+        scope = self.scope(actor)
         if command.definition is not None:
             ensure_definition_within_limits(command.definition)
             await self._checker.check(command.definition, scope)

@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.collections.application.add_items_to_collection import (
     AddItemsToCollection,
     AddItemsToCollectionCommand,
@@ -39,6 +38,7 @@ from app.modules.collections.application.update_collection import (
 from app.modules.collections.domain.collection import Membership
 from app.modules.collections.domain.errors import CollectionNotFoundError
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ConflictError, ValidationError
@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 
 ALICE = Actor(id=uuid.UUID(int=101), roles=frozenset({"member"}))
 BOB = Actor(id=uuid.UUID(int=102), roles=frozenset({"member"}))
-POLICY = OwnerAccessPolicy()
+POLICY = InMemoryAccessGuard()
 
 
 def _repos(world: World) -> CollectionsRepos:

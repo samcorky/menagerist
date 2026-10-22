@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.collections.application.get_collection import (
     GetCollection,
     GetCollectionQuery,
@@ -14,6 +13,7 @@ from app.modules.collections.application.get_collection import (
 from app.modules.collections.domain.collection import Membership
 from app.modules.collections.domain.errors import CollectionNotFoundError
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 if TYPE_CHECKING:
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 def _handler(world: World) -> GetCollection:
     return GetCollection(
         CollectionsRepos(collections=world.collections, memberships=world.memberships),
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         world.items,
         world.checker,
     )

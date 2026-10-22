@@ -15,6 +15,7 @@ from app.modules.collections.application.claim_legacy_collections import (
 )
 from app.modules.collections.domain.collection import Collection
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.slug import Slug
 
@@ -35,7 +36,7 @@ async def test_claims_both_legacy_owners_and_commits() -> None:
         await collections.add(collection)
     owner = uuid.uuid7()
 
-    count = await ClaimLegacyCollections(uow).handle(
+    count = await ClaimLegacyCollections(uow, InMemoryAccessGuard()).handle(
         ClaimLegacyCollectionsCommand(owner_id=owner), SYSTEM_ACTOR
     )
 

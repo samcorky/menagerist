@@ -1,12 +1,13 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.collections.domain.errors import CollectionNotFoundError
 from app.modules.collections.ports.unit_of_work import CollectionsUnitOfWork
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -23,11 +24,13 @@ class RemoveItemFromCollectionCommand:
 
 
 class RemoveItemFromCollection(
-    ScopedCommandHandler[CollectionsUnitOfWork, RemoveItemFromCollectionCommand, None]
+    GuardedCommandHandler[CollectionsUnitOfWork, RemoveItemFromCollectionCommand, None]
 ):
     """Take an item off a collection; removing an absent item is a no-op."""
 
-    async def handle(
+    access: ClassVar[Access] = Content()
+
+    async def _handle(
         self, command: RemoveItemFromCollectionCommand, actor: Actor
     ) -> None:
         """Remove the item, bump the collection's `updated_at` and commit.
@@ -38,13 +41,13 @@ class RemoveItemFromCollection(
         """
         async with self._uow as repos:
             collection = await repos.collections.get(
-                command.collection_id, scope=self._policy.scope_for(actor)
+                command.collection_id, scope=self.scope(actor)
             )
             if collection is None:
                 raise CollectionNotFoundError(
                     f"Collection {command.collection_id} not found"
                 )
-            self._policy.assert_can_modify(actor, collection.owner_id)
+            self._guard.assert_can_modify(actor, collection.owner_id)
             collection.ensure_manual_membership()
             await repos.memberships.remove(collection.id, command.item_id)
             collection.touch()

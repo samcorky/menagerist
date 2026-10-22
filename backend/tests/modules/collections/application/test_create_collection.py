@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.collections.application.create_collection import (
     CreateCollection,
     CreateCollectionCommand,
@@ -17,6 +16,7 @@ from app.modules.collections.application.delete_collection import (
 )
 from app.modules.collections.domain.collection import CollectionKind
 from app.modules.collections.domain.errors import InvalidCollectionError
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ConflictError
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 async def _create(world: World, name: str, slug: str | None = None) -> str:
     """Create a collection and return its slug."""
     created = await CreateCollection(
-        world.uow, OwnerAccessPolicy(), world.checker
+        world.uow, InMemoryAccessGuard(), world.checker
     ).handle(CreateCollectionCommand(name=name, slug=slug), ACTOR)
     return created.slug.value
 
@@ -42,7 +42,7 @@ async def test_slug_is_derived_from_name_and_committed(
     add = AsyncMock(wraps=world.collections.add)
     monkeypatch.setattr(world.collections, "add", add)
     created = await CreateCollection(
-        world.uow, OwnerAccessPolicy(), world.checker
+        world.uow, InMemoryAccessGuard(), world.checker
     ).handle(CreateCollectionCommand(name="  My Vinyl Shelf ", description="d"), ACTOR)
 
     assert created.slug.value == "my-vinyl-shelf"
@@ -55,7 +55,7 @@ async def test_slug_is_derived_from_name_and_committed(
 async def test_owner_is_the_actor(world: World) -> None:
     """The owner id is taken from the acting user."""
     created = await CreateCollection(
-        world.uow, OwnerAccessPolicy(), world.checker
+        world.uow, InMemoryAccessGuard(), world.checker
     ).handle(CreateCollectionCommand(name="Shelf"), ACTOR)
 
     assert created.owner_id == ACTOR.id
@@ -110,9 +110,9 @@ async def test_invalid_name_raises(world: World, name: str) -> None:
 async def test_slug_is_reusable_after_delete(world: World) -> None:
     """A deleted collection's slug can be taken again, explicitly or derived."""
     created = await CreateCollection(
-        world.uow, OwnerAccessPolicy(), world.checker
+        world.uow, InMemoryAccessGuard(), world.checker
     ).handle(CreateCollectionCommand(name="Shelf"), ACTOR)
-    await DeleteCollection(world.uow, OwnerAccessPolicy()).handle(
+    await DeleteCollection(world.uow, InMemoryAccessGuard()).handle(
         DeleteCollectionCommand(collection_id=created.id), ACTOR
     )
 
@@ -129,7 +129,7 @@ async def test_derived_slug_from_suffixed_name_suffixes_again(world: World) -> N
 async def _delete_by_slug(world: World, slug: str) -> None:
     found = await world.collections.get_by_slug(slug, scope=ContentFilter.everyone())
     assert found is not None
-    await DeleteCollection(world.uow, OwnerAccessPolicy()).handle(
+    await DeleteCollection(world.uow, InMemoryAccessGuard()).handle(
         DeleteCollectionCommand(collection_id=found.id), ACTOR
     )
 
@@ -167,7 +167,7 @@ async def test_create_trims_description_and_blank_becomes_none(
     monkeypatch.setattr(world.collections, "add", add)
 
     created = await CreateCollection(
-        world.uow, OwnerAccessPolicy(), world.checker
+        world.uow, InMemoryAccessGuard(), world.checker
     ).handle(CreateCollectionCommand(name="Shelf", description=given), ACTOR)
 
     assert created.description == stored
@@ -180,7 +180,7 @@ async def test_create_with_definition_is_dynamic_and_stored_as_given(
     """A definition makes a dynamic collection and is stored untouched."""
     definition = {"op": "and", "conditions": [{"nested": [1, {"a": None}]}]}
     created = await CreateCollection(
-        world.uow, OwnerAccessPolicy(), world.checker
+        world.uow, InMemoryAccessGuard(), world.checker
     ).handle(CreateCollectionCommand(name="Smart", definition=definition), ACTOR)
     assert created.kind is CollectionKind.DYNAMIC
     assert created.definition == definition
@@ -189,7 +189,7 @@ async def test_create_with_definition_is_dynamic_and_stored_as_given(
 async def test_create_without_definition_is_manual(world: World) -> None:
     """No definition leaves a manual collection."""
     created = await CreateCollection(
-        world.uow, OwnerAccessPolicy(), world.checker
+        world.uow, InMemoryAccessGuard(), world.checker
     ).handle(CreateCollectionCommand(name="Plain"), ACTOR)
     assert created.kind is CollectionKind.MANUAL
     assert created.definition is None

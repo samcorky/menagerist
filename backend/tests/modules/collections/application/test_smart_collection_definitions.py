@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.collections.application.create_collection import (
     CreateCollection,
     CreateCollectionCommand,
@@ -31,6 +30,7 @@ from app.modules.collections.domain.errors import (
     InvalidDefinitionError,
 )
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.slug import Slug
 
@@ -47,7 +47,7 @@ def _get(world: World) -> GetCollection:
     repos = CollectionsRepos(
         collections=world.collections, memberships=world.memberships
     )
-    return GetCollection(repos, OwnerAccessPolicy(), world.items, world.checker)
+    return GetCollection(repos, InMemoryAccessGuard(), world.items, world.checker)
 
 
 async def _smart(world: World, definition: dict[str, Any] = GOOD) -> Collection:
@@ -61,7 +61,7 @@ async def _smart(world: World, definition: dict[str, Any] = GOOD) -> Collection:
 async def test_create_stores_a_valid_definition_exactly_as_sent(world: World) -> None:
     """R21: nothing is rewritten, and an empty `where` is valid."""
     created = await CreateCollection(
-        world.uow, OwnerAccessPolicy(), world.checker
+        world.uow, InMemoryAccessGuard(), world.checker
     ).handle(CreateCollectionCommand(name="Smart", definition=GOOD), ACTOR)
     assert created.definition == GOOD
 
@@ -71,7 +71,7 @@ async def test_create_rejects_a_malformed_definition_with_its_path(
 ) -> None:
     """The first bad condition's path is carried by the error and nothing is stored."""
     with pytest.raises(InvalidDefinitionError) as caught:
-        await CreateCollection(world.uow, OwnerAccessPolicy(), world.checker).handle(
+        await CreateCollection(world.uow, InMemoryAccessGuard(), world.checker).handle(
             CreateCollectionCommand(name="Smart", definition=BAD), ACTOR
         )
     assert caught.value.path == "where"
@@ -83,7 +83,7 @@ async def test_create_without_a_definition_skips_the_check(world: World) -> None
     """A manual collection is not checked."""
     world.checker.warnings = [STALE]
     created = await CreateCollection(
-        world.uow, OwnerAccessPolicy(), world.checker
+        world.uow, InMemoryAccessGuard(), world.checker
     ).handle(CreateCollectionCommand(name="Shelf"), ACTOR)
     assert created.definition is None
 
@@ -91,7 +91,7 @@ async def test_create_without_a_definition_skips_the_check(world: World) -> None
 async def test_update_validates_and_stores_the_definition(world: World) -> None:
     """A valid replacement is stored as sent; a bad one is rejected unchanged."""
     shelf = await _smart(world)
-    update = UpdateCollection(world.uow, OwnerAccessPolicy(), world.checker)
+    update = UpdateCollection(world.uow, InMemoryAccessGuard(), world.checker)
     new = {"v": 1, "where": {"op": "and", "children": []}}
     result = await update.handle(
         UpdateCollectionCommand(collection_id=shelf.id, definition=new), ACTOR
@@ -112,7 +112,7 @@ async def test_update_definition_on_a_manual_collection_is_a_kind_error(
     shelf = Collection.create(name="M", slug=Slug("m"), owner_id=ACTOR.id)
     await world.collections.add(shelf)
     with pytest.raises(CollectionKindError):
-        await UpdateCollection(world.uow, OwnerAccessPolicy(), world.checker).handle(
+        await UpdateCollection(world.uow, InMemoryAccessGuard(), world.checker).handle(
             UpdateCollectionCommand(collection_id=shelf.id, definition=GOOD), ACTOR
         )
 
@@ -185,7 +185,7 @@ async def test_list_counts_but_does_not_warn(world: World) -> None:
     repos = CollectionsRepos(
         collections=world.collections, memberships=world.memberships
     )
-    result = await ListCollections(repos, OwnerAccessPolicy(), world.items).handle(
+    result = await ListCollections(repos, InMemoryAccessGuard(), world.items).handle(
         ListCollectionsQuery(), ACTOR
     )
     assert [(s.item_count, s.warnings) for s in result.items] == [(1, ())]

@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
@@ -21,12 +21,13 @@ from app.modules.collections.ports.definition_checker import (
     DefinitionChecker,  # noqa: TC001
 )
 from app.modules.collections.ports.unit_of_work import CollectionsUnitOfWork
-from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.errors import ConflictError
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
     from app.modules.collections.ports.collection_repository import CollectionRepository
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
     from app.shared_kernel.content_filter import ContentFilter
     from app.shared_kernel.slug import Slug
@@ -51,20 +52,22 @@ class UpdateCollectionCommand:
 
 
 class UpdateCollection(
-    ScopedCommandHandler[CollectionsUnitOfWork, UpdateCollectionCommand, Collection]
+    GuardedCommandHandler[CollectionsUnitOfWork, UpdateCollectionCommand, Collection]
 ):
     """Update an existing collection's editable fields."""
+
+    access: ClassVar[Access] = Content()
 
     def __init__(
         self,
         uow: CollectionsUnitOfWork,
-        policy: AccessPolicy,
+        guard: AccessGuard,
         checker: DefinitionChecker,
     ) -> None:
-        super().__init__(uow, policy)
+        super().__init__(uow, guard)
         self._checker = checker
 
-    async def handle(
+    async def _handle(
         self, command: UpdateCollectionCommand, actor: Actor
     ) -> Collection:
         """Apply `command`'s changes to the collection and commit.
@@ -88,14 +91,14 @@ class UpdateCollection(
         if command.slug is not None and command.regenerate_slug:
             raise InvalidCollectionError("Give either a slug or regenerate_slug.")
         wanted = None if command.slug is None else explicit_slug(command.slug)
-        scope = self._policy.scope_for(actor)
+        scope = self.scope(actor)
         async with self._uow as repos:
             collection = await repos.collections.get(command.collection_id, scope=scope)
             if collection is None:
                 raise CollectionNotFoundError(
                     f"Collection {command.collection_id} not found"
                 )
-            self._policy.assert_can_modify(actor, collection.owner_id)
+            self._guard.assert_can_modify(actor, collection.owner_id)
             if command.definition is not None:
                 collection.ensure_dynamic()
                 ensure_definition_within_limits(command.definition)

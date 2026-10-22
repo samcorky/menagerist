@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.collections.application.create_collection import (
     CreateCollection,
     CreateCollectionCommand,
@@ -23,6 +22,7 @@ from app.modules.collections.domain.errors import (
     InvalidCollectionError,
 )
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ConflictError
 
@@ -44,15 +44,17 @@ def _repos(world: World) -> CollectionsRepos:
 async def _create(
     world: World, name: str, slug: str | None = None, actor: Actor = ACTOR
 ) -> Collection:
-    return await CreateCollection(world.uow, OwnerAccessPolicy(), world.checker).handle(
-        CreateCollectionCommand(name=name, slug=slug), actor
-    )
+    return await CreateCollection(
+        world.uow, InMemoryAccessGuard(), world.checker
+    ).handle(CreateCollectionCommand(name=name, slug=slug), actor)
 
 
 async def _update(
     world: World, collection: Collection, actor: Actor = ACTOR, **fields: object
 ) -> Collection:
-    return await UpdateCollection(world.uow, OwnerAccessPolicy(), world.checker).handle(
+    return await UpdateCollection(
+        world.uow, InMemoryAccessGuard(), world.checker
+    ).handle(
         UpdateCollectionCommand(collection_id=collection.id, **fields),  # type: ignore[arg-type]
         actor,
     )
@@ -68,11 +70,11 @@ async def test_slug_change_is_normalised_and_committed(world: World) -> None:
     assert result.slug.value == "my-new-link"
     assert world.uow.committed is True
     found = await world.collections.get_by_slug(
-        "my-new-link", scope=OwnerAccessPolicy().scope_for(ACTOR)
+        "my-new-link", scope=InMemoryAccessGuard().scope_for(ACTOR)
     )
     assert found is shelf
     old = await world.collections.get_by_slug(
-        "shelf", scope=OwnerAccessPolicy().scope_for(ACTOR)
+        "shelf", scope=InMemoryAccessGuard().scope_for(ACTOR)
     )
     assert old is None
 
@@ -199,7 +201,7 @@ async def test_resolve_by_id_passes_through_and_by_slug_looks_up(
 ) -> None:
     """Resolve by id passes through and by slug looks up."""
     shelf = await _create(world, "Shelf")
-    resolve = ResolveCollection(_repos(world), OwnerAccessPolicy())
+    resolve = ResolveCollection(_repos(world), InMemoryAccessGuard())
 
     by_id = await resolve.handle(
         ResolveCollectionQuery(id_or_slug=str(shelf.id)), ACTOR
@@ -214,7 +216,7 @@ async def test_resolve_unknown_or_other_owners_slug_is_not_found(
 ) -> None:
     """Resolve unknown or other owners slug is not found."""
     await _create(world, "Shelf", actor=OTHER)
-    resolve = ResolveCollection(_repos(world), OwnerAccessPolicy())
+    resolve = ResolveCollection(_repos(world), InMemoryAccessGuard())
 
     for slug in ("shelf", "nothing"):
         with pytest.raises(CollectionNotFoundError):

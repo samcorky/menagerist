@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.collections.application.collection_slugs import MAX_SLUG_LENGTH
 from app.modules.collections.application.create_collection import (
     CreateCollection,
@@ -21,6 +20,7 @@ from app.modules.collections.domain.errors import (
     InvalidCollectionError,
     InvalidDefinitionError,
 )
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.slug import Slug
 
@@ -67,7 +67,7 @@ async def test_create_refuses_a_hostile_definition_before_the_checker(
     """A definition over the limits is refused and nothing is stored."""
     with pytest.raises(InvalidDefinitionError):
         await CreateCollection(
-            world.uow, OwnerAccessPolicy(), _ForbiddenChecker()
+            world.uow, InMemoryAccessGuard(), _ForbiddenChecker()
         ).handle(CreateCollectionCommand(name="Smart", definition=definition), ACTOR)
     assert world.uow.committed is False
 
@@ -83,7 +83,7 @@ async def test_update_refuses_a_hostile_definition_before_the_checker(
     await world.collections.add(shelf)
     with pytest.raises(InvalidDefinitionError):
         await UpdateCollection(
-            world.uow, OwnerAccessPolicy(), _ForbiddenChecker()
+            world.uow, InMemoryAccessGuard(), _ForbiddenChecker()
         ).handle(
             UpdateCollectionCommand(collection_id=shelf.id, definition=definition),
             ACTOR,
@@ -97,7 +97,7 @@ async def test_a_manual_collection_given_any_definition_is_a_kind_error(
     """The kind guard runs before the checker, so even junk is the documented 409."""
     shelf = Collection.create(name="M", slug=Slug("m"), owner_id=ACTOR.id)
     await world.collections.add(shelf)
-    update = UpdateCollection(world.uow, OwnerAccessPolicy(), _ForbiddenChecker())
+    update = UpdateCollection(world.uow, InMemoryAccessGuard(), _ForbiddenChecker())
     for definition in ({}, {"v": 1, "where": "nope"}, HOSTILE[0]):
         with pytest.raises(CollectionKindError):
             await update.handle(
@@ -115,7 +115,7 @@ async def test_a_bad_definition_still_does_not_change_the_name(world: World) -> 
     await world.collections.add(shelf)
     world.checker.warnings = []
     with pytest.raises(InvalidDefinitionError):
-        await UpdateCollection(world.uow, OwnerAccessPolicy(), world.checker).handle(
+        await UpdateCollection(world.uow, InMemoryAccessGuard(), world.checker).handle(
             UpdateCollectionCommand(
                 collection_id=shelf.id,
                 name="Renamed",
@@ -128,7 +128,7 @@ async def test_a_bad_definition_still_does_not_change_the_name(world: World) -> 
 
 async def test_create_with_a_too_long_slug_is_invalid(world: World) -> None:
     """An explicit slug over the limit is a 400; the limit itself is fine."""
-    create = CreateCollection(world.uow, OwnerAccessPolicy(), world.checker)
+    create = CreateCollection(world.uow, InMemoryAccessGuard(), world.checker)
     made = await create.handle(
         CreateCollectionCommand(name="A", slug="a" * MAX_SLUG_LENGTH), ACTOR
     )
@@ -144,7 +144,7 @@ async def test_update_with_a_too_long_slug_is_invalid(world: World) -> None:
     shelf = Collection.create(name="M", slug=Slug("m"), owner_id=ACTOR.id)
     await world.collections.add(shelf)
     with pytest.raises(InvalidCollectionError, match="slug"):
-        await UpdateCollection(world.uow, OwnerAccessPolicy(), world.checker).handle(
+        await UpdateCollection(world.uow, InMemoryAccessGuard(), world.checker).handle(
             UpdateCollectionCommand(
                 collection_id=shelf.id, slug="b" * (MAX_SLUG_LENGTH + 1)
             ),
@@ -157,7 +157,7 @@ async def test_a_slug_that_grows_when_normalised_is_still_limited(
 ) -> None:
     """NFKD can expand a character, so the normalised slug is measured too."""
     with pytest.raises(InvalidCollectionError, match="slug"):
-        await CreateCollection(world.uow, OwnerAccessPolicy(), world.checker).handle(
+        await CreateCollection(world.uow, InMemoryAccessGuard(), world.checker).handle(
             CreateCollectionCommand(name="B", slug="\u33a2" * 50),
             ACTOR,  # circled 8
         )
@@ -165,7 +165,9 @@ async def test_a_slug_that_grows_when_normalised_is_still_limited(
 
 async def test_a_derived_slug_from_a_long_expanding_name_fits(world: World) -> None:
     """A name that normalises to more than the limit is truncated, not refused."""
-    made = await CreateCollection(world.uow, OwnerAccessPolicy(), world.checker).handle(
+    made = await CreateCollection(
+        world.uow, InMemoryAccessGuard(), world.checker
+    ).handle(
         CreateCollectionCommand(name="\u33a2" * 60),
         ACTOR,  # square km, expands to 'km2'
     )

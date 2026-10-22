@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
@@ -13,11 +13,12 @@ from app.modules.collections.application.get_collection import (
 from app.modules.collections.domain.collection import CollectionKind
 from app.modules.collections.ports.item_lookup import ItemLookup  # noqa: TC001
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
-from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
-from app.shared_kernel.cqrs import ScopedQueryHandler
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.guarded import GuardedQueryHandler
 
 if TYPE_CHECKING:
     from app.modules.collections.domain.collection import Collection
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
     from app.shared_kernel.content_filter import ContentFilter
 
@@ -46,21 +47,23 @@ class ListCollectionsResult:
 
 
 class ListCollections(
-    ScopedQueryHandler[CollectionsRepos, ListCollectionsQuery, ListCollectionsResult]
+    GuardedQueryHandler[CollectionsRepos, ListCollectionsQuery, ListCollectionsResult]
 ):
     """List collections with keyset pagination and live item counts."""
 
+    access: ClassVar[Access] = Content()
+
     def __init__(
-        self, repos: CollectionsRepos, policy: AccessPolicy, items: ItemLookup
+        self, repos: CollectionsRepos, guard: AccessGuard, items: ItemLookup
     ) -> None:
-        super().__init__(repos, policy)
+        super().__init__(repos, guard)
         self._items = items
 
-    async def handle(
+    async def _handle(
         self, query: ListCollectionsQuery, actor: Actor
     ) -> ListCollectionsResult:
         """Return a page of collections after `query.after`, up to `query.limit`."""
-        scope = self._policy.scope_for(actor)
+        scope = self.scope(actor)
         collections = await self._page(query, scope)
         summaries = [
             await summarise(self._repos, self._items, c, scope) for c in collections

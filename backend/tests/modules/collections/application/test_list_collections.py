@@ -4,13 +4,13 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.collections.application.list_collections import (
     ListCollections,
     ListCollectionsQuery,
 )
 from app.modules.collections.domain.collection import Collection, Membership
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 if TYPE_CHECKING:
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 def _handler(world: World) -> ListCollections:
     return ListCollections(
         CollectionsRepos(collections=world.collections, memberships=world.memberships),
-        OwnerAccessPolicy(),
+        InMemoryAccessGuard(),
         world.items,
     )
 

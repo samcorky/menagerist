@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.modules.collections.application.count_collection_items import (
     CountCollectionItems,
     CountCollectionItemsQuery,
@@ -15,6 +14,7 @@ from app.modules.collections.application.get_collection import ITEM_COUNT_CAP
 from app.modules.collections.domain.collection import Collection, Membership
 from app.modules.collections.domain.errors import CollectionNotFoundError
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.slug import Slug
 
@@ -30,7 +30,7 @@ def _count(world: World) -> CountCollectionItems:
     repos = CollectionsRepos(
         collections=world.collections, memberships=world.memberships
     )
-    return CountCollectionItems(repos, OwnerAccessPolicy(), world.items)
+    return CountCollectionItems(repos, InMemoryAccessGuard(), world.items)
 
 
 async def test_smart_collection_count_is_not_capped(world: World) -> None:

@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
@@ -11,11 +11,12 @@ from app.modules.collections.domain.errors import CollectionNotFoundError
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.collections.ports.item_lookup import ItemLookup  # noqa: TC001
 from app.modules.collections.ports.unit_of_work import CollectionsUnitOfWork
-from app.shared_kernel.access_policy import AccessPolicy  # noqa: TC001
-from app.shared_kernel.cqrs import ScopedCommandHandler
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.errors import ValidationError
+from app.shared_kernel.guarded import GuardedCommandHandler
 
 if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 logger = structlog.get_logger()
@@ -32,17 +33,19 @@ class AddItemsToCollectionCommand:
 
 
 class AddItemsToCollection(
-    ScopedCommandHandler[CollectionsUnitOfWork, AddItemsToCollectionCommand, int]
+    GuardedCommandHandler[CollectionsUnitOfWork, AddItemsToCollectionCommand, int]
 ):
     """Put live items on a collection, skipping those already on it."""
 
+    access: ClassVar[Access] = Content()
+
     def __init__(
-        self, uow: CollectionsUnitOfWork, policy: AccessPolicy, items: ItemLookup
+        self, uow: CollectionsUnitOfWork, guard: AccessGuard, items: ItemLookup
     ) -> None:
-        super().__init__(uow, policy)
+        super().__init__(uow, guard)
         self._items = items
 
-    async def handle(self, command: AddItemsToCollectionCommand, actor: Actor) -> int:
+    async def _handle(self, command: AddItemsToCollectionCommand, actor: Actor) -> int:
         """Add the requested items and return how many were newly added.
 
         Raises:
@@ -57,14 +60,14 @@ class AddItemsToCollection(
                 f"At most {MAX_ITEMS_PER_REQUEST} items can be added at once"
             )
         requested = list(dict.fromkeys(command.item_ids))
-        scope = self._policy.scope_for(actor)
+        scope = self.scope(actor)
         async with self._uow as repos:
             collection = await repos.collections.get(command.collection_id, scope=scope)
             if collection is None:
                 raise CollectionNotFoundError(
                     f"Collection {command.collection_id} not found"
                 )
-            self._policy.assert_can_modify(actor, collection.owner_id)
+            self._guard.assert_can_modify(actor, collection.owner_id)
             collection.ensure_manual_membership()
             if not requested:
                 return 0
