@@ -1,5 +1,8 @@
 import uuid
 
+import pytest
+
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.media.adapters.imaging.in_memory_image_processor import (
     InMemoryImageProcessor,
 )
@@ -18,20 +21,23 @@ from app.modules.media.application.regenerate_thumbnails import (
     RegenerateThumbnailsCommand,
 )
 from app.modules.media.domain.media_asset import MediaAsset
-from app.shared_kernel.access_guard import InMemoryAccessGuard
-from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
+from app.shared_kernel.access_guard import AccessGuard, InMemoryAccessGuard
+from app.shared_kernel.actor import ANONYMOUS_ACTOR, SYSTEM_ACTOR, Actor
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.errors import ForbiddenError
 
 
 def _make_use_case(
-    *, image_processor: InMemoryImageProcessor | None = None
+    *,
+    image_processor: InMemoryImageProcessor | None = None,
+    guard: AccessGuard | None = None,
 ) -> tuple[RegenerateThumbnails, InMemoryMediaAssetRepository, InMemoryMediaStorage]:
     repo = InMemoryMediaAssetRepository()
     storage = InMemoryMediaStorage()
     uow = create_in_memory_media_uow(make_in_memory_repos(assets=repo))
     processor = image_processor or InMemoryImageProcessor()
     return (
-        RegenerateThumbnails(uow, InMemoryAccessGuard(), storage, processor),
+        RegenerateThumbnails(uow, guard or InMemoryAccessGuard(), storage, processor),
         repo,
         storage,
     )
@@ -149,21 +155,17 @@ async def test_regenerates_for_every_owner_and_legacy_rows() -> None:
     assert count == 3
 
 
-async def test_follows_the_policy_scope_for_the_actor() -> None:
-    """A non-system actor only regenerates its own assets."""
-    use_case, repo, storage = _make_use_case()
-    theirs = await _add_attached(repo, storage)
-    theirs.owner_id = uuid.uuid7()
-    mine = await _add_attached(repo, storage)
-    mine.owner_id = uuid.uuid7()
+async def test_is_refused_to_anyone_but_the_system_actor() -> None:
+    """The job is system-only: a member cannot run it, and nothing is rebuilt."""
+    use_case, repo, storage = _make_use_case(guard=get_access_guard())
+    asset = await _add_attached(repo, storage)
+    member = Actor(id=uuid.uuid7(), roles=frozenset({"member"}))
 
-    count = await use_case.handle(
-        RegenerateThumbnailsCommand(), Actor(id=mine.owner_id, roles=frozenset())
-    )
+    for actor in (member, ANONYMOUS_ACTOR):
+        with pytest.raises(ForbiddenError):
+            await use_case.handle(RegenerateThumbnailsCommand(), actor)
 
-    assert count == 1
-    assert (mine.id, "attached") in storage._thumbnails
-    assert (theirs.id, "attached") not in storage._thumbnails
+    assert (asset.id, "attached") not in storage._thumbnails
 
 
 async def test_skips_an_image_that_is_too_large_to_decode() -> None:

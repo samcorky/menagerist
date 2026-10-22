@@ -206,7 +206,7 @@ def test_implementations_mirror_the_port_scope(
 # the content modules must declare a `Content` or `Requires` stance.
 UNSCOPED_USE_CASES = {
     # Item-type and relationship-type vocabulary is shared by every member
-    # (decision 6); only deleting/purging it is admin-only (an authorised base).
+    # (decision 6); only deleting/purging it is admin-only (a `Requires` stance).
     "CreateNodeType": "shared vocabulary",
     "GetNodeType": "shared vocabulary",
     "ListNodeTypes": "shared vocabulary",
@@ -221,6 +221,9 @@ UNSCOPED_USE_CASES = {
     "ClaimLegacyCollections": "first-admin claim",
     "ClaimOrphanedMedia": "first-admin claim",
     "ClaimOrphanedInstallations": "first-admin claim",
+    # System-actor maintenance jobs, run from the media CLI: they sweep all content.
+    "CleanupExpiredMedia": "system maintenance job",
+    "RegenerateThumbnails": "system maintenance job",
 }
 SAFE_STANCES = (Content, Requires)
 CONTENT_MODULES = ("graph", "collections", "media", "examples")
@@ -248,7 +251,7 @@ def _is_safe(cls: type) -> bool:
 
 
 def test_every_content_use_case_is_scoped_or_excluded() -> None:
-    """A use case without a scoped/authorised base and not excluded fails."""
+    """A use case with no `Content` or `Requires` stance and not excluded fails."""
     unscoped = sorted(
         name
         for name, cls in _use_cases().items()

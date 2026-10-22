@@ -19,6 +19,7 @@ from app.modules.backup.application.create_backup import (
     CreateBackupCommand,
 )
 from app.platform.config.backup import BackupSettings
+from app.shared_kernel.access_guard import DenyAllAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 if TYPE_CHECKING:
@@ -98,7 +99,7 @@ def test_unwired_authorisation_fails_closed(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """An unwired command refuses to create a backup before any DB access."""
-    monkeypatch.setattr(commands, "_guard", commands._DenyAll())
+    monkeypatch.setattr(commands, "_guard", DenyAllAccessGuard())
     with pytest.raises(SystemExit, match="1"):
         commands.create()
     assert "not wired" in capsys.readouterr().err
@@ -124,7 +125,7 @@ def test_user_transfers_require_explicit_owner(
     assert json.loads(capsys.readouterr().out)["id"] == str(archive.id)
     commands.import_user(output, user=owner_id)
     import_operation.assert_awaited_once_with(owner_id, output)
-    monkeypatch.setattr(commands, "_guard", commands._DenyAll())
+    monkeypatch.setattr(commands, "_guard", DenyAllAccessGuard())
     with pytest.raises(SystemExit, match="1"):
         commands.export_user(output, user=owner_id)
     with pytest.raises(SystemExit, match="1"):

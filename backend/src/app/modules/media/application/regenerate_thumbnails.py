@@ -9,7 +9,8 @@ from app.modules.media.domain.errors import ImageTooLargeError
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.domain.thumbnail_eligibility import is_thumbnailable_image
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
-from app.shared_kernel.access import Access, Content
+from app.shared_kernel.access import Access, System
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
@@ -40,7 +41,7 @@ class RegenerateThumbnails(
     catch up without re-uploading the original file.
     """
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = System()
 
     def __init__(
         self,
@@ -57,7 +58,7 @@ class RegenerateThumbnails(
         """Regenerate thumbnails for eligible attached assets; return the count done."""
         async with self._uow as repos:
             assets = await repos.assets.list_by_status(
-                status=MediaStatus.ATTACHED, scope=self.scope(actor)
+                status=MediaStatus.ATTACHED, scope=ContentFilter.everyone()
             )
 
         count = 0

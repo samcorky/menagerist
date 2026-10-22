@@ -17,6 +17,25 @@ if TYPE_CHECKING:
 CHUNK_SIZE = 1024 * 1024
 MAX_EXTENSION_BYTES = 64 * 1024
 _header_depth: ContextVar[int] = ContextVar("backup_tar_header_depth", default=0)
+_PRIVATE_HOOKS = ("_frombuf", "_fromtarfile")
+
+
+def require_private_tar_hooks(info_class: type) -> None:
+    """Fail loudly if `tarfile` no longer parses headers through the hooks we bound.
+
+    The header limits below override tarfile's private parsing methods. On a
+    Python that parses elsewhere they would silently never run.
+    """
+    missing = [name for name in _PRIVATE_HOOKS if not hasattr(info_class, name)]
+    if missing:
+        raise RuntimeError(
+            "tarfile no longer parses headers through "
+            + ", ".join(missing)
+            + ", so the backup reader's header limits would not run."
+        )
+
+
+require_private_tar_hooks(tarfile.TarInfo)
 
 
 class _BoundedTarInfo(tarfile.TarInfo):

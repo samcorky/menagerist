@@ -3,10 +3,7 @@ from typing import Annotated
 from fastapi import Depends
 from starlette.requests import Request
 
-from app.entrypoints.api.shared.authorisation import (
-    get_authorisation_port,
-    get_role_authorisation,
-)
+from app.entrypoints.api.shared.authorisation import get_role_authorisation
 from app.modules.identity.adapters.api.dependencies import (
     bind_session_context,
     get_get_current_user_use_case,
@@ -61,7 +58,6 @@ async def get_current_actor(
 
 
 __all__ = [
-    "get_authorisation_port",
     "get_current_actor",
     "get_role_authorisation",
 ]

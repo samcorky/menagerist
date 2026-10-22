@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, assert_never
 
 from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.entrypoints.api.shared.authorisation import get_authorisation_port
@@ -51,6 +51,8 @@ class RoleAccessGuard:
                     await self._authorisation.check(actor, permission)
                     return
                 allowed = False
+            case _:
+                assert_never(access)
         if not allowed:
             raise ForbiddenError("You do not have permission to do that.")
 

@@ -5,7 +5,8 @@ import structlog
 
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.ports.unit_of_work import MediaUnitOfWork
-from app.shared_kernel.access import Access, Content
+from app.shared_kernel.access import Access, System
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
@@ -31,7 +32,7 @@ class CleanupExpiredMedia(
 ):
     """Hard-delete staged and orphaned assets that have passed their TTL."""
 
-    access: ClassVar[Access] = Content()
+    access: ClassVar[Access] = System()
 
     def __init__(
         self, uow: MediaUnitOfWork, guard: AccessGuard, storage: MediaStoragePort
@@ -45,7 +46,7 @@ class CleanupExpiredMedia(
             (MediaStatus.STAGED, command.staged_before),
             (MediaStatus.ORPHANED, command.orphaned_before),
         )
-        scope = self.scope(actor)
+        scope = ContentFilter.everyone()
         expired = []
         for status, before in pairs:
             async with self._uow as repos:

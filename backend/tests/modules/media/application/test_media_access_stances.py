@@ -20,7 +20,6 @@ def test_content_use_cases_are_owner_scoped() -> None:
     """Each person sees and changes only their own content."""
     for use_case in (
         AttachMedia,
-        CleanupExpiredMedia,
         ClearMediaCover,
         DeleteMedia,
         DetachMedia,
@@ -28,7 +27,6 @@ def test_content_use_cases_are_owner_scoped() -> None:
         ListNodeMedia,
         OrphanMedia,
         PromoteMedia,
-        RegenerateThumbnails,
         SetMediaCover,
         StageMedia,
         UpdateMedia,
@@ -37,7 +35,7 @@ def test_content_use_cases_are_owner_scoped() -> None:
         assert use_case.access == Content()
 
 
-def test_claim_jobs_are_system_only() -> None:
-    """Only the system actor hands pre-account content to the first owner."""
-    for use_case in (ClaimOrphanedMedia,):
+def test_system_jobs_are_system_only() -> None:
+    """Claiming and the clean-up and rebuild jobs are for the system actor only."""
+    for use_case in (ClaimOrphanedMedia, CleanupExpiredMedia, RegenerateThumbnails):
         assert use_case.access == System()

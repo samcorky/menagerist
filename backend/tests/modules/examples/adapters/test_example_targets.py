@@ -7,9 +7,11 @@ from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.bridges.example_targets import (
     CollectionPackTarget,
     GraphPackTarget,
+    PresetPackTarget,
     build_in_memory_collections_repos,
     in_memory_collection_stores,
     in_memory_graph_stores,
+    in_memory_preset_stores,
 )
 from app.modules.examples.domain.errors import InvalidPackError
 from app.modules.examples.domain.installation import EntityKind
@@ -479,3 +481,11 @@ async def test_targets_default_to_the_shared_guard_and_accept_another(
         access=custom,
     )
     assert collections._access is custom
+    presets = PresetPackTarget(
+        in_memory_preset_stores(world.preset_repos, world.graph_repos), access=custom
+    )
+    assert presets._access is custom
+    default_presets = PresetPackTarget(
+        in_memory_preset_stores(world.preset_repos, world.graph_repos)
+    )
+    assert default_presets._access is get_access_guard()

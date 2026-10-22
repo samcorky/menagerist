@@ -522,8 +522,11 @@ class PresetPackTarget:
     Presets are shared structure with no owner, so they run as the system actor.
     """
 
-    def __init__(self, stores: PresetStores) -> None:
+    def __init__(
+        self, stores: PresetStores, *, access: AccessGuard | None = None
+    ) -> None:
         self._stores = stores
+        self._access = access or get_access_guard()
 
     async def ensure(self, presets: Sequence[PackPreset]) -> list[PresetOutcome]:
         """Create each preset unless an identical one exists."""
@@ -542,7 +545,7 @@ class PresetPackTarget:
                 for p in presets
             ],
         )
-        result = await ImportPresets(self._stores.uow(), get_access_guard()).handle(
+        result = await ImportPresets(self._stores.uow(), self._access).handle(
             command, SYSTEM_ACTOR
         )
         # Built from the spec: the import stores these fields unchanged, and a
@@ -572,9 +575,9 @@ class PresetPackTarget:
         """Remove the preset unless it is built in or an item type still uses it."""
         async with self._stores.usage() as usage:
             try:
-                await DeletePreset(
-                    self._stores.uow(), get_access_guard(), usage
-                ).handle(DeletePresetCommand(preset_id=preset_id), SYSTEM_ACTOR)
+                await DeletePreset(self._stores.uow(), self._access, usage).handle(
+                    DeletePresetCommand(preset_id=preset_id), SYSTEM_ACTOR
+                )
             except PresetInUseError, BuiltinPresetError:
                 return RemoveResult.REFUSED_IN_USE
             except PresetNotFoundError:
@@ -620,7 +623,7 @@ class GraphPackTarget:
         )
         async with self._stores.choice_lists() as source:
             edge_type = await CreateEdgeType(
-                self._stores.uow(), get_access_guard(), source
+                self._stores.uow(), self._access, source
             ).handle(command, self._actor)
         return Created(entity_id=edge_type.id, content=_edge_type_content(edge_type))
 
@@ -636,7 +639,7 @@ class GraphPackTarget:
         )
         async with self._stores.choice_lists() as source:
             node_type = await CreateNodeType(
-                self._stores.uow(), get_access_guard(), source
+                self._stores.uow(), self._access, source
             ).handle(command, self._actor)
         return Created(entity_id=node_type.id, content=_node_type_content(node_type))
 
@@ -787,11 +790,11 @@ class GraphPackTarget:
             elif kind is EntityKind.ITEM_TYPE:
                 # Check and delete in one locked transaction: an item added
                 # meanwhile keeps the type instead of losing it.
-                await DeleteUnusedNodeType(uow, get_access_guard()).handle(
+                await DeleteUnusedNodeType(uow, self._access).handle(
                     DeleteUnusedNodeTypeCommand(node_type_id=entity_id), SYSTEM_ACTOR
                 )
             elif kind is EntityKind.RELATIONSHIP_TYPE:
-                await DeleteEdgeType(uow, get_access_guard()).handle(
+                await DeleteEdgeType(uow, self._access).handle(
                     DeleteEdgeTypeCommand(edge_type_id=entity_id), SYSTEM_ACTOR
                 )
             else:

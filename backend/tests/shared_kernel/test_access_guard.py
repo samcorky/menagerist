@@ -2,8 +2,16 @@ import uuid
 
 import pytest
 
-from app.shared_kernel.access import Content, Public
-from app.shared_kernel.access_guard import InMemoryAccessGuard
+from app.shared_kernel.access import (
+    Access,
+    Content,
+    OwnAccount,
+    Public,
+    Requires,
+    Shared,
+    System,
+)
+from app.shared_kernel.access_guard import DenyAllAccessGuard, InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ForbiddenError, NotFoundError
@@ -48,3 +56,37 @@ def test_ownership_asserts(method: str) -> None:
         check(ALICE, BOB.id)
     with pytest.raises(NotFoundError):
         check(ALICE, None)
+
+
+class _Permission:
+    value = "demo:thing:read"
+
+
+async def test_deny_all_guard_lets_only_public_use_cases_run() -> None:
+    """Unwired, the guard admits `Public` and refuses every other stance."""
+    guard = DenyAllAccessGuard()
+    await guard.check(SYSTEM_ACTOR, Public())
+    refused: tuple[Access, ...] = (
+        System(),
+        OwnAccount(),
+        Shared(),
+        Content(),
+        Requires(_Permission),  # type: ignore[arg-type]
+    )
+    for access in refused:
+        with pytest.raises(ForbiddenError):
+            await guard.check(SYSTEM_ACTOR, access)
+
+
+def test_deny_all_guard_refuses_every_ownership_question() -> None:
+    """With nothing wired, no content is visible or changeable."""
+    guard = DenyAllAccessGuard()
+    with pytest.raises(ForbiddenError):
+        guard.scope_for(ALICE)
+    for check in (
+        guard.assert_can_view,
+        guard.assert_can_modify,
+        guard.assert_can_delete,
+    ):
+        with pytest.raises(ForbiddenError):
+            check(ALICE, ALICE.id)

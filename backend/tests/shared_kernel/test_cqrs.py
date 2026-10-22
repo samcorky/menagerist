@@ -8,7 +8,15 @@ from typing import ClassVar
 import pytest
 
 import app.modules
-from app.shared_kernel.access import Access, Content, Public, Requires, Shared
+from app.shared_kernel.access import (
+    Access,
+    Content,
+    OwnAccount,
+    Public,
+    Requires,
+    Shared,
+    System,
+)
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
@@ -95,7 +103,7 @@ def test_scope_returns_the_guards_filter_for_content() -> None:
 
 @pytest.mark.parametrize(
     "access",
-    [Shared(), Public(), Requires(_Permission)],  # type: ignore[arg-type]
+    [Shared(), Public(), System(), OwnAccount(), Requires(_Permission)],  # type: ignore[arg-type]
 )
 def test_scope_is_refused_outside_content(access: Access) -> None:
     """Only `Content` use cases may ask for a content filter."""

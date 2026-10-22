@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Protocol
 
+from app.shared_kernel.access import Public
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ForbiddenError, NotFoundError
 
@@ -70,3 +71,36 @@ class InMemoryAccessGuard:
     def assert_can_delete(self, actor: Actor, owner_id: uuid.UUID | None) -> None:
         """Raise `NotFoundError` unless the content is the actor's own."""
         self.assert_can_view(actor, owner_id)
+
+
+class DenyAllAccessGuard:
+    """Fail-closed guard for code that has not been given a real one.
+
+    `Public` use cases still run, as they do under the real guard. Everything
+    else, including every ownership question, is refused.
+    """
+
+    async def check(self, actor: Actor, access: Access) -> None:
+        """Refuse every stance except `Public`."""
+        if not isinstance(access, Public):
+            raise self._refusal()
+
+    def scope_for(self, actor: Actor) -> ContentFilter:
+        """Refuse: no content is visible until a real guard is wired."""
+        raise self._refusal()
+
+    def assert_can_view(self, actor: Actor, owner_id: uuid.UUID | None) -> None:
+        """Refuse: no content is visible until a real guard is wired."""
+        raise self._refusal()
+
+    def assert_can_modify(self, actor: Actor, owner_id: uuid.UUID | None) -> None:
+        """Refuse: no content can change until a real guard is wired."""
+        raise self._refusal()
+
+    def assert_can_delete(self, actor: Actor, owner_id: uuid.UUID | None) -> None:
+        """Refuse: no content can be deleted until a real guard is wired."""
+        raise self._refusal()
+
+    @staticmethod
+    def _refusal() -> ForbiddenError:
+        return ForbiddenError("Authorisation is not wired.")

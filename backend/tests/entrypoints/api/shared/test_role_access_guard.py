@@ -115,3 +115,10 @@ def test_ownership_checks_match_the_owner_policy(actor: Actor, name: str) -> Non
 def test_get_access_guard_is_process_wide() -> None:
     """The same guard instance is returned each time."""
     assert get_access_guard() is get_access_guard()
+
+
+async def test_an_unknown_stance_is_an_error_not_a_silent_gap() -> None:
+    """A stance the guard has no rule for fails loudly, never as an unbound name."""
+    guard = RoleAccessGuard(_Authorisation(), OwnerAccessPolicy())
+    with pytest.raises(AssertionError):
+        await guard.check(MEMBER, object())  # type: ignore[arg-type]

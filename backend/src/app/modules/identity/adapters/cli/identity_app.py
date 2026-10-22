@@ -15,12 +15,10 @@ from app.modules.identity.adapters.claim.unwired_existing_data_claim import (
     UnwiredExistingDataClaim,
 )
 from app.platform.config import get_identity_cli_settings
-from app.shared_kernel.access import Public
-from app.shared_kernel.errors import DomainError, ForbiddenError
+from app.shared_kernel.access_guard import DenyAllAccessGuard
+from app.shared_kernel.errors import DomainError
 
 if TYPE_CHECKING:
-    import uuid
-
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.modules.identity.application.user_listing import UserListing
@@ -28,36 +26,14 @@ if TYPE_CHECKING:
     from app.modules.identity.ports.existing_data_claim import ExistingDataClaim
     from app.modules.identity.ports.password_hasher import PasswordHasher
     from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
-    from app.shared_kernel.access import Access
     from app.shared_kernel.access_guard import AccessGuard
-    from app.shared_kernel.actor import Actor
-    from app.shared_kernel.content_filter import ContentFilter
 
 logger = structlog.get_logger(__name__)
 
 identity_app = App(name="identity", help="Manage accounts.")
 
 
-class _DenyAll:
-    """Fail-closed default until the entrypoint wires the real guard.
-
-    Public use cases still run, as they do under the real guard.
-    """
-
-    async def check(self, actor: Actor, access: Access) -> None:
-        if not isinstance(access, Public):
-            raise ForbiddenError("Authorisation is not wired for the CLI.")
-
-    def scope_for(self, actor: Actor) -> ContentFilter:
-        raise ForbiddenError("Authorisation is not wired for the CLI.")
-
-    def assert_can_view(self, actor: Actor, owner_id: uuid.UUID | None) -> None:
-        raise ForbiddenError("Authorisation is not wired for the CLI.")
-
-    assert_can_modify = assert_can_delete = assert_can_view
-
-
-_guard: AccessGuard = _DenyAll()
+_guard: AccessGuard = DenyAllAccessGuard()
 
 
 def use_access_guard(guard: AccessGuard) -> None:

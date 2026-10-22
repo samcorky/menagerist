@@ -1,6 +1,9 @@
 import uuid
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
+from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
     InMemoryMediaAssetRepository,
 )
@@ -16,18 +19,20 @@ from app.modules.media.application.cleanup_expired_media import (
     CleanupExpiredMediaCommand,
 )
 from app.modules.media.domain.media_asset import MediaAsset
-from app.shared_kernel.access_guard import InMemoryAccessGuard
-from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
+from app.shared_kernel.access_guard import AccessGuard, InMemoryAccessGuard
+from app.shared_kernel.actor import ANONYMOUS_ACTOR, SYSTEM_ACTOR, Actor
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.errors import ForbiddenError
 
 
-def _make_use_case() -> tuple[
-    CleanupExpiredMedia, InMemoryMediaAssetRepository, InMemoryMediaStorage
-]:
+def _make_use_case(
+    *, guard: AccessGuard | None = None
+) -> tuple[CleanupExpiredMedia, InMemoryMediaAssetRepository, InMemoryMediaStorage]:
     repo = InMemoryMediaAssetRepository()
     storage = InMemoryMediaStorage()
     uow = create_in_memory_media_uow(make_in_memory_repos(assets=repo))
-    return CleanupExpiredMedia(uow, InMemoryAccessGuard(), storage), repo, storage
+    use_case = CleanupExpiredMedia(uow, guard or InMemoryAccessGuard(), storage)
+    return use_case, repo, storage
 
 
 def _command(
@@ -146,17 +151,14 @@ async def test_cleanup_sees_every_owners_expired_assets() -> None:
         assert await repo.get(asset.id, scope=ContentFilter.everyone()) is None
 
 
-async def test_cleanup_follows_the_policy_scope_for_the_actor() -> None:
-    """A non-system actor only cleans up its own expired assets."""
-    use_case, repo, storage = _make_use_case()
-    theirs = await _add_expired_staged(repo, storage)
-    me = uuid.uuid7()
-    theirs.owner_id = uuid.uuid7()
-    mine = await _add_expired_staged(repo, storage)
-    mine.owner_id = me
+async def test_cleanup_is_refused_to_anyone_but_the_system_actor() -> None:
+    """The job is system-only: a member cannot sweep, and nothing is deleted."""
+    use_case, repo, storage = _make_use_case(guard=get_access_guard())
+    expired = await _add_expired_staged(repo, storage)
+    member = Actor(id=uuid.uuid7(), roles=frozenset({"member"}))
 
-    count = await use_case.handle(_command(), Actor(id=me, roles=frozenset({"member"})))
+    for actor in (member, ANONYMOUS_ACTOR):
+        with pytest.raises(ForbiddenError):
+            await use_case.handle(_command(), actor)
 
-    assert count == 1
-    assert await repo.get(theirs.id, scope=ContentFilter.everyone()) is theirs
-    assert await repo.get(mine.id, scope=ContentFilter.everyone()) is None
+    assert await repo.get(expired.id, scope=ContentFilter.everyone()) is expired

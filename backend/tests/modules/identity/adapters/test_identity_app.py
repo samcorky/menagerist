@@ -28,6 +28,7 @@ from app.modules.identity.domain.user import Role, User
 from app.modules.identity.ports.existing_data_claim import ClaimReport
 from app.modules.identity.ports.unit_of_work import IdentityRepos
 from app.platform.config import IdentityCliSettings, IdentitySettings
+from app.shared_kernel.access_guard import DenyAllAccessGuard
 
 if TYPE_CHECKING:
     import uuid
@@ -501,7 +502,7 @@ def test_commands_fail_closed_when_authorisation_is_not_wired(
     """Without the entrypoint's wiring the CLI refuses, as the default denies."""
     alice = make_user("alice")
     world.users._users[alice.id] = alice
-    monkeypatch.setattr(identity_app, "_guard", identity_app._DenyAll())
+    monkeypatch.setattr(identity_app, "_guard", DenyAllAccessGuard())
 
     with pytest.raises(SystemExit):
         unlock(username="alice")

@@ -66,7 +66,7 @@ Every item, connection, collection, file and example installation belongs to the
 - **Ownership on entities:** domain entities compose the `Owned` mixin (`owner_id`, `shared_kernel/mixins.py`) and their models `OwnedMixin` (`platform/orm_mixins.py`). The column is nullable in the database in Stage 1, and a row with no owner is visible to nobody.
 - **Permissions** are `<module>:<resource>:<action>` strings declared as an enum per module (`GraphPermission`). `RoleAuthorisationAdapter` expands an actor's grants through the `IMPLIES` catalogue; admins hold all of them. `GET /api/v1/auth/me/permissions` returns the effective set for the frontend's `can()`.
 
-Architecture tests (`backend/tests/architecture/test_content_filter_rules.py`) require `scope` on the content ports and their implementations and a `Content` or `Requires` stance (or a named exclusion) on every use case; `test_access_stances.py` fails any use case without a stance and pins the `Public`, `System`, `Shared` and `Content` sets by name; `tests/entrypoints/test_cross_user_isolation.py` generates a request per route as a second account and expects 404, 403 or an empty answer.
+Architecture tests (`backend/tests/architecture/test_content_filter_rules.py`) require `scope` on the content ports and their implementations and a `Content` or `Requires` stance (or a named exclusion) on every use case; `test_access_stances.py` fails any use case without a stance and pins the `Public`, `System`, `OwnAccount`, `Shared` and `Content` sets by name; `tests/entrypoints/test_cross_user_isolation.py` generates a request per route as a second account and expects 404, 403 or an empty answer.
 
 ### Request flow
 
@@ -80,7 +80,7 @@ verify_csrf  →  get_current_actor  →  router  →  use case  →  repository
                  └ 401 setup_required | 401 unauthenticated | 403 password_expired
 ```
 
-`get_current_actor` (`entrypoints/api/shared/dependencies.py`) reads the session cookie, resolves it through the identity module and returns the `Actor`; the router passes it to the use case, which asks the `AccessPolicy` for the scope. Identity routes (`/api/v1/auth/*`, `/api/v1/user*`) use identity's own actor dependency so a user whose password has expired can still reach them. `/auth/status`, `/auth/setup` and `/auth/login` are public and exempt from the same-origin check (they have their own `refuse_cross_site` guard), as are health, version, docs and the SPA shell. The `identity` module imports no other module, and no content module imports it; the architecture tests enforce both.
+`get_current_actor` (`entrypoints/api/shared/dependencies.py`) reads the session cookie, resolves it through the identity module and returns the `Actor`; the router passes it to the use case, whose `access` stance the `AccessGuard` checks before it runs; content use cases then ask the guard for the scope. Identity routes (`/api/v1/auth/*`, `/api/v1/user*`) use identity's own actor dependency so a user whose password has expired can still reach them. `/auth/status`, `/auth/setup` and `/auth/login` are public and exempt from the same-origin check (they have their own `refuse_cross_site` guard), as are health, version, docs and the SPA shell. The `identity` module imports no other module, and no content module imports it; the architecture tests enforce both.
 
 ## Frontend
 

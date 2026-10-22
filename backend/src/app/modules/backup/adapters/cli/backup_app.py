@@ -27,6 +27,7 @@ from app.modules.backup.application.prune_backups import (
 from app.modules.backup.application.verify_backup import VerifyBackup, VerifyBackupQuery
 from app.platform.config.backup import get_backup_settings
 from app.shared_kernel.access import Requires
+from app.shared_kernel.access_guard import DenyAllAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.errors import DomainError, ForbiddenError
 
@@ -35,30 +36,12 @@ if TYPE_CHECKING:
     from typing import Any
 
     from app.modules.backup.domain.backup import BackupSummary
-    from app.shared_kernel.access import Access
     from app.shared_kernel.access_guard import AccessGuard
-    from app.shared_kernel.actor import Actor
-    from app.shared_kernel.content_filter import ContentFilter
 
 backup_app = App(name="backup", help="Manage verified instance backups.")
 
 
-class _DenyAll:
-    """Guard used until the composition root supplies the real one."""
-
-    async def check(self, actor: Actor, access: Access) -> None:
-        raise ForbiddenError("Authorisation is not wired for the CLI.")
-
-    def scope_for(self, actor: Actor) -> ContentFilter:
-        raise ForbiddenError("Authorisation is not wired for the CLI.")
-
-    def assert_can_view(self, actor: Actor, owner_id: UUID | None) -> None:
-        raise ForbiddenError("Authorisation is not wired for the CLI.")
-
-    assert_can_modify = assert_can_delete = assert_can_view
-
-
-_guard: AccessGuard = _DenyAll()
+_guard: AccessGuard = DenyAllAccessGuard()
 
 
 def use_access_guard(guard: AccessGuard) -> None:
