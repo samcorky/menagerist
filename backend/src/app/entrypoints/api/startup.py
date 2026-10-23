@@ -10,6 +10,7 @@ from app.modules.identity.application.has_administrator import (
     HasAdministrator,
     HasAdministratorQuery,
 )
+from app.platform.config import INSTANCE_SETTINGS
 from app.platform.config.api import CORS_OPEN_HINT, get_api_settings
 from app.platform.config.backup import get_backup_settings
 from app.platform.config.media import get_media_settings
@@ -70,9 +71,24 @@ async def warn_if_cors_open() -> None:
         logger.warning(CORS_OPEN_HINT)
 
 
+def log_instance_settings() -> None:
+    """Log each settings group once at INFO; never prevents start-up."""
+    for getter in INSTANCE_SETTINGS:
+        try:
+            settings = getter()
+            logger.info(
+                "settings",
+                group=type(settings).__name__,
+                values=settings.model_dump(mode="json"),
+            )
+        except Exception:
+            logger.debug("settings logging skipped", exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Run start-up checks once per worker, then serve."""
+    log_instance_settings()
     await warn_if_storage_not_writable()
     await warn_if_cors_open()
     await warn_if_no_administrator()
