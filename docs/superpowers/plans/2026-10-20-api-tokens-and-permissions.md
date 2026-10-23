@@ -1,6 +1,6 @@
 # API tokens, content permissions and data-driven roles: plan
 
-Status: Phases 1 and 2 done (2026-10-22); Phase 4 is the next build, Phase 3 needs its own plan, Phases 5 and 6 need separate plans. Written 2026-10-20 from a design discussion; updated 2026-10-22. Facts about the code come from reading `shared_kernel/cqrs.py`, `shared_kernel/actor.py`, `entrypoints/api/shared/{authorization,permissions,dependencies,access_policy,permission_aware_route}.py`, the module `application/permissions.py` files and `tests/architecture/test_permission_catalogue.py`. Not read: the identity routers and the auth port implementation beyond `RoleAuthorizationAdapter`, so route names here are indicative.
+Status: Phases 1 and 2 done (2026-10-22); Phase 4 has its task plan (`2026-10-23-api-tokens.md`) and is the next build, Phase 3 needs its own plan, Phases 5 and 6 need separate plans. Written 2026-10-20 from a design discussion; updated 2026-10-22. Facts about the code come from reading `shared_kernel/cqrs.py`, `shared_kernel/actor.py`, `entrypoints/api/shared/{authorization,permissions,dependencies,access_policy,permission_aware_route}.py`, the module `application/permissions.py` files and `tests/architecture/test_permission_catalogue.py`. Not read: the identity routers and the auth port implementation beyond `RoleAuthorizationAdapter`, so route names here are indicative.
 
 What Sam has said (2026-10-20): roles will become data-driven soon, and that roles design does not exist yet; resource-level permissions are wanted later; tokens should be considered with refresh tokens and a client id and secret (answered below: personal access tokens first, OAuth later if third-party apps need it).
 
@@ -65,7 +65,7 @@ Done (2026-10-22): see `2026-10-22-content-permissions.md` and the decision entr
 - Tokens (Phase 4) work with the constants for now; Phase 3 can land later without changing token design, because `check()` already intersects "role permissions" with "token grants".
 
 ### Phase 4: API tokens (personal access tokens)
-Review decisions (2026-10-22); to be built from a plan of its own.
+Review decisions (2026-10-22). The task plan is `2026-10-23-api-tokens.md` (rulings R1 to R12 settle Q5 and refine the sketch below; where they differ, the task plan wins).
 
 **Why personal access tokens, not OAuth.** A PAT is a user issuing a credential to themselves: a stored hash, a name, the permissions granted and a mandatory expiry. OAuth is delegation to third-party apps and needs an authorisation server, a consent screen, PKCE, refresh tokens and client registration, which is overkill for a self-hosted tool. The permission strings can double as OAuth scopes later. Token verification should sit behind one function that returns an actor plus permissions, so an OAuth access token could become a second Bearer format without touching the guard.
 
