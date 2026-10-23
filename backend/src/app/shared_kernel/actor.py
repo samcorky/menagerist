@@ -8,6 +8,8 @@ class Actor:
 
     id: uuid.UUID
     roles: frozenset[str] = field(default_factory=frozenset)
+    grants: frozenset[str] | None = None
+    """Permission ceiling of a token request; `None` for a session (no ceiling)."""
 
     @property
     def is_admin(self) -> bool:

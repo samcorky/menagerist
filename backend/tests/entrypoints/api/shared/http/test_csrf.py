@@ -205,3 +205,33 @@ def test_over_https_a_plain_named_cookie_is_no_session() -> None:
     client = _client("https://testserver")
 
     assert client.post("/change", headers=headers).status_code == 200
+
+
+@pytest.mark.parametrize("method", ["POST", "PUT", "PATCH", "DELETE"])
+def test_a_bearer_request_passes_without_origin_or_fetch_metadata(method: str) -> None:
+    """Scripts send neither header; a token cannot be forged by a browser page."""
+    assert _send(method, {"Authorization": "Bearer mnst_x"}, session=False) == 200
+
+
+@pytest.mark.parametrize("method", ["POST", "PUT", "PATCH", "DELETE"])
+def test_a_bearer_request_passes_even_when_cross_site(method: str) -> None:
+    """The token alone authenticates, so cross-site fetch metadata is irrelevant."""
+    headers = {
+        "Authorization": "Bearer mnst_x",
+        "Sec-Fetch-Site": "cross-site",
+        "Origin": "https://evil.example",
+    }
+
+    assert _send(method, headers) == 200
+
+
+@pytest.mark.parametrize("method", ["POST", "PUT", "PATCH", "DELETE"])
+def test_a_cookie_request_without_origin_still_fails(method: str) -> None:
+    """Without a bearer header the cookie rules are unchanged."""
+    assert _send(method, {}) == 403
+
+
+@pytest.mark.parametrize("method", ["POST", "PUT", "PATCH", "DELETE"])
+def test_a_basic_authorization_header_does_not_skip_the_check(method: str) -> None:
+    """A proxy's Basic credentials are not a token credential."""
+    assert _send(method, {"Authorization": "Basic abc"}) == 403

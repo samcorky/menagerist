@@ -6,6 +6,9 @@ from datetime import UTC, datetime
 
 import pytest
 
+from app.modules.identity.adapters.persistence.in_memory_api_token_repository import (
+    InMemoryApiTokenRepository,
+)
 from app.modules.identity.adapters.persistence.in_memory_session_repository import (
     InMemorySessionRepository,
 )
@@ -32,6 +35,7 @@ class World:
     users: InMemoryUserRepository
     sessions: InMemorySessionRepository
     attempts: InMemorySignInAttemptRepository
+    tokens: InMemoryApiTokenRepository
     uow: InMemoryUnitOfWork[IdentityRepos]
 
 
@@ -44,12 +48,16 @@ def world() -> World:
     users = InMemoryUserRepository()
     sessions = InMemorySessionRepository()
     attempts = InMemorySignInAttemptRepository()
+    tokens = InMemoryApiTokenRepository()
     return World(
         users=users,
         sessions=sessions,
         attempts=attempts,
+        tokens=tokens,
         uow=InMemoryUnitOfWork(
-            IdentityRepos(users=users, sessions=sessions, attempts=attempts)
+            IdentityRepos(
+                users=users, sessions=sessions, attempts=attempts, tokens=tokens
+            )
         ),
     )
 

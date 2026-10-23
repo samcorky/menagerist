@@ -10,6 +10,9 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
+from app.modules.identity.adapters.persistence.api_token_repository import (
+    SqlAlchemyApiTokenRepository,
+)
 from app.modules.identity.adapters.persistence.models import SessionModel, UserModel
 from app.modules.identity.adapters.persistence.session_repository import (
     SqlAlchemySessionRepository,
@@ -142,6 +145,7 @@ def _slow_uow(factory: async_sessionmaker[AsyncSession]) -> IdentityUnitOfWork:
             users=SqlAlchemyUserRepository(session),
             sessions=_SlowSessionRepository(session),
             attempts=SqlAlchemySignInAttemptRepository(session),
+            tokens=SqlAlchemyApiTokenRepository(session),
         )
 
     return SqlAlchemySessionUnitOfWork(factory, build)

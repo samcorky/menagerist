@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 class RoleAccessGuard:
     """Role-based `AccessGuard`: stances over roles, ownership over the policy.
 
+    Account management is session-only, so a token actor fails `OwnAccount`.
     The anonymous actor is refused before any permission lookup for every
     stance except `Public`, so a member grant cannot reach it.
     """
@@ -36,7 +37,11 @@ class RoleAccessGuard:
             case System():
                 allowed = actor.is_system
             case OwnAccount():
-                allowed = not actor.is_anonymous and not actor.is_system
+                allowed = (
+                    not actor.is_anonymous
+                    and not actor.is_system
+                    and actor.grants is None
+                )
             case Requires() | Content():
                 allowed = not actor.is_anonymous
                 if allowed:

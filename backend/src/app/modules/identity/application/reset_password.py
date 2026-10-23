@@ -68,6 +68,8 @@ class ResetPassword(CommandHandler[IdentityUnitOfWork, ResetPasswordCommand, Non
             await repos.attempts.clear(username_key(user.username))
             await repos.attempts.clear(user_id_key(user.id))
             ended = await repos.sessions.delete_for_user(user.id)
+            tokens_ended = await repos.tokens.delete_for_user(user.id)
             await self._uow.commit()
         logger.info("sessions ended", user_id=user.id, count=ended)
+        logger.info("api tokens ended", user_id=user.id, count=tokens_ended)
         logger.info("password reset", user_id=user.id, reset_by=actor.id)

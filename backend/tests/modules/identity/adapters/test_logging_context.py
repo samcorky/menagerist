@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import json
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Annotated
 
 import httpx2
@@ -31,6 +32,10 @@ from app.modules.identity.adapters.claim.no_op_existing_data_claim import (
 from app.modules.identity.adapters.security.in_memory_password_hasher import (
     InMemoryPasswordHasher,
 )
+from app.modules.identity.adapters.security.secrets_api_token_generator import (
+    SecretsApiTokenGenerator,
+)
+from app.modules.identity.domain.api_token import ApiToken
 from app.modules.identity.ports.unit_of_work import IdentityRepos
 from app.platform.config import LoggingSettings
 from app.shared_kernel.actor import Actor  # noqa: TC001
@@ -62,7 +67,10 @@ class Api:
         self.app = create_app()
         hasher = InMemoryPasswordHasher()
         repos = IdentityRepos(
-            users=world.users, sessions=world.sessions, attempts=world.attempts
+            users=world.users,
+            sessions=world.sessions,
+            attempts=world.attempts,
+            tokens=world.tokens,
         )
         self.app.dependency_overrides[get_identity_uow] = lambda: world.uow
         self.app.dependency_overrides[get_setup_identity_uow] = lambda: world.uow
@@ -530,3 +538,44 @@ def test_a_password_expired_response_still_logs_the_ids(
     assert line["status"] == 403
     assert str(line["user_id"]) == str(user.id)
     assert str(line["session_id"]) == _session_id(world, client.cookies[COOKIE])
+
+
+def test_token_request_logs_carry_the_token_id_and_never_a_secret(
+    api: Api, world: World, make_user: MakeUser, events: list[EventDict]
+) -> None:
+    """The token's row id is bound; its value and the header are not logged."""
+    _add(api, make_user, "alice")
+    (alice,) = world.users._users.values()
+    generator = SecretsApiTokenGenerator()
+    new = generator.new_token()
+    now = datetime.now(UTC)
+    asyncio.run(
+        world.tokens.add(
+            ApiToken.create(
+                token_id=new.token_id,
+                user_id=alice.id,
+                name="Script",
+                secret_hash=generator.hash(new.secret),
+                grants={"graph:item:read"},
+                now=now,
+                expires_at=now + timedelta(days=1),
+            )
+        )
+    )
+    events.clear()
+
+    response = api.new_client().get(
+        PROBE, headers={"Authorization": f"Bearer {new.plaintext}"}
+    )
+
+    assert response.status_code == 200
+    (probe,) = _named(events, "probe")
+    assert str(probe["user_id"]) == str(alice.id)
+    assert probe["token_id"] == str(new.token_id)
+    assert "session_id" not in probe
+    (access,) = [e for e in events if e["event"] == f"GET {PROBE}"]
+    assert access["token_id"] == str(new.token_id)
+    text = repr(events)
+    assert new.secret not in text
+    assert new.plaintext not in text
+    assert "Bearer" not in text

@@ -26,7 +26,7 @@ from app.shared_kernel.actor import ANONYMOUS_ACTOR, SYSTEM_ACTOR, Actor
 from app.shared_kernel.errors import ForbiddenError
 
 if TYPE_CHECKING:
-    from tests.modules.identity.application.conftest import ActorFor, Cases
+    from tests.modules.identity.application.conftest import ActorFor, Cases, IssueToken
     from tests.modules.identity.conftest import MakeUser, World
 
 NOW = datetime(2026, 10, 10, 12, 0, tzinfo=UTC)
@@ -370,3 +370,56 @@ async def test_ending_sessions_logs_a_count_and_no_token(
     ended = [log for log in logs if log["event"] == "sessions ended"]
     assert [(log["user_id"], log["count"]) for log in ended] == [(user.id, 2)]
     assert not any(token in str(logs) for token in tokens)
+
+
+@time_machine.travel(NOW, tick=False)
+async def test_change_password_deletes_the_users_tokens_and_logs_the_count(
+    cases: Cases,
+    world: World,
+    make_user: MakeUser,
+    actor_for: ActorFor,
+    issue_token: IssueToken,
+) -> None:
+    """A password change also signs tokens out; other users' tokens stay."""
+    alice, bob = make_user("alice"), make_user("bob")
+    await world.users.add(alice)
+    await world.users.add(bob)
+    mine = await issue_token(alice)
+    theirs = await issue_token(bob)
+
+    with capture_logs() as logs:
+        await cases.change_password.handle(
+            ChangePasswordCommand(
+                current_password="password-123", new_password="a-much-better-one"
+            ),
+            actor_for(alice),
+        )
+
+    assert await world.tokens.get(mine.token.id) is None
+    assert await world.tokens.get(theirs.token.id) is not None
+    event = next(e for e in logs if e["event"] == "api tokens ended")
+    assert event["count"] == 1
+
+
+@time_machine.travel(NOW, tick=False)
+async def test_reset_password_deletes_the_users_tokens_and_logs_the_count(
+    cases: Cases,
+    world: World,
+    make_user: MakeUser,
+    admin_actor: Actor,
+    issue_token: IssueToken,
+) -> None:
+    """A reset removes the user's tokens."""
+    alice = make_user("alice")
+    await world.users.add(alice)
+    mine = await issue_token(alice)
+
+    with capture_logs() as logs:
+        await cases.reset_password.handle(
+            ResetPasswordCommand(user_id=alice.id, password="brand-new-pass"),
+            admin_actor,
+        )
+
+    assert await world.tokens.get(mine.token.id) is None
+    event = next(e for e in logs if e["event"] == "api tokens ended")
+    assert event["count"] == 1

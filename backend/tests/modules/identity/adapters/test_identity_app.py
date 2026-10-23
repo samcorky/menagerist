@@ -75,7 +75,10 @@ def _wired(monkeypatch: pytest.MonkeyPatch, world: World) -> None:
         "app.platform.config.identity_cli.SECRETS_DIR", Path("/nonexistent-secrets")
     )
     repos = IdentityRepos(
-        users=world.users, sessions=world.sessions, attempts=world.attempts
+        users=world.users,
+        sessions=world.sessions,
+        attempts=world.attempts,
+        tokens=world.tokens,
     )
     monkeypatch.setattr("app.platform.database.get_session_factory", lambda: _Session)
     monkeypatch.setattr(

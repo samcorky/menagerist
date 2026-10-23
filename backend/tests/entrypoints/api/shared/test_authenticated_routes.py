@@ -2,6 +2,7 @@
 
 from typing import TYPE_CHECKING
 
+from fastapi.dependencies.utils import get_dependant
 from fastapi.routing import APIRoute
 
 from app.entrypoints.api import api_v1_router, public_v1_router
@@ -10,6 +11,7 @@ from app.entrypoints.api.shared.http.cross_site import refuse_cross_site
 from app.modules.identity.adapters.api.dependencies import (
     get_active_identity_actor,
     get_identity_actor,
+    get_session_token,
     get_signed_in_user,
 )
 
@@ -108,3 +110,10 @@ def test_unauthenticated_posts_refuse_cross_site_requests() -> None:
     }
     public_posts = {(m, p) for m, p in PUBLIC_ROUTES if m == "POST"}
     assert guarded == CROSS_SITE_GUARDED_ROUTES == public_posts
+
+
+def test_identity_actors_read_only_the_cookie_reader() -> None:
+    """Account routes resolve through `get_session_token`, which ignores a bearer."""
+    for call in (get_identity_actor, get_active_identity_actor, get_signed_in_user):
+        dependant = get_dependant(path="/", call=call)
+        assert get_session_token in _calls(dependant)

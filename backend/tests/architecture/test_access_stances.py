@@ -26,6 +26,7 @@ from app.shared_kernel.permission import PermissionEnum
 EXPECTED_PUBLIC: frozenset[str] = frozenset(
     {
         "backup.RestoreOnFirstRun",
+        "identity.AuthenticateApiToken",
         "identity.GetCurrentUser",
         "identity.GetSetupStatus",
         "identity.HasAdministrator",
@@ -50,9 +51,14 @@ EXPECTED_SYSTEM: frozenset[str] = frozenset(
 EXPECTED_OWN_ACCOUNT: frozenset[str] = frozenset(
     {
         "identity.ChangePassword",
+        "identity.CreateApiToken",
+        "identity.ListGrantablePermissions",
+        "identity.ListOwnApiTokens",
         "identity.ListOwnSessions",
         "identity.RevokeOtherSessions",
+        "identity.RevokeOwnApiToken",
         "identity.RevokeOwnSession",
+        "identity.RotateApiToken",
         "identity.SetOwnDisplayName",
     }
 )

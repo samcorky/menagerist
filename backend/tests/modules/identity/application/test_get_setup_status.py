@@ -18,7 +18,10 @@ async def test_setup_is_required_only_while_there_are_no_accounts(
     """Status flips once the first account exists."""
     use_case = GetSetupStatus(
         IdentityRepos(
-            users=world.users, sessions=world.sessions, attempts=world.attempts
+            users=world.users,
+            sessions=world.sessions,
+            attempts=world.attempts,
+            tokens=world.tokens,
         ),
         get_access_guard(),
     )

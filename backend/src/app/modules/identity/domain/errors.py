@@ -81,3 +81,21 @@ class AccountDisabledError(ForbiddenError):
 
 class PasswordUnchangedError(ValidationError):
     """Raised when a new password is the same as the current one."""
+
+
+class InvalidApiTokenError(UnauthenticatedError):
+    """Raised when a bearer token is malformed, unknown, expired or revoked."""
+
+    problem_type = "invalid_token"
+
+
+class InvalidApiTokenRequestError(ValidationError):
+    """Raised when a token's name, permissions or lifetime are not acceptable."""
+
+
+class ApiTokenLimitError(ConflictError):
+    """Raised when a person already holds the maximum number of tokens."""
+
+
+class ApiTokenNotFoundError(NotFoundError):
+    """Raised when a requested token does not exist."""

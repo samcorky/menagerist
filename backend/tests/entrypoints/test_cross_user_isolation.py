@@ -114,6 +114,9 @@ from app.modules.identity.adapters.api.dependencies import (
     get_identity_uow,
     get_signed_in_user,
 )
+from app.modules.identity.adapters.persistence.in_memory_api_token_repository import (
+    InMemoryApiTokenRepository,
+)
 from app.modules.identity.adapters.persistence.in_memory_session_repository import (
     InMemorySessionRepository,
 )
@@ -481,6 +484,7 @@ class World:
             users=InMemoryUserRepository(),
             sessions=InMemorySessionRepository(),
             attempts=InMemorySignInAttemptRepository(),
+            tokens=InMemoryApiTokenRepository(),
         )
         storage = InMemoryMediaStorage()
         processor = InMemoryImageProcessor()

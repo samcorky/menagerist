@@ -3,6 +3,7 @@
 import ast
 from pathlib import Path
 
+import app
 import app.modules
 
 _MODULES = Path(app.modules.__path__[0])
@@ -65,3 +66,39 @@ def test_allow_list_has_no_stale_entries() -> None:
         path = _MODULES / entry
         assert path.is_file(), entry
         assert _has_violation(path), f"{entry} is clean: remove it from ALLOWED"
+
+
+_SRC = Path(app.__path__[0])
+
+# Role checks belong to the guard and the authorisation adapter. The ownership
+# policy is the one other place: the system actor sees every owner's content.
+ROLE_FLAG_ALLOWED: frozenset[str] = frozenset(
+    {
+        "entrypoints/api/shared/authorisation.py",
+        "entrypoints/api/shared/access_guard.py",
+        "entrypoints/api/shared/access_policy.py",
+    }
+)
+
+
+def _reads_role_flag(path: Path) -> bool:
+    return any(
+        isinstance(node, ast.Attribute) and node.attr in {"is_admin", "is_system"}
+        for node in ast.walk(ast.parse(path.read_text()))
+    )
+
+
+def test_role_flags_are_read_only_where_access_is_decided() -> None:
+    """`is_admin` and `is_system` stay out of use cases, routers and the CLI."""
+    offenders = [
+        p.relative_to(_SRC).as_posix()
+        for p in _SRC.rglob("*.py")
+        if "shared_kernel" not in p.relative_to(_SRC).parts and _reads_role_flag(p)
+    ]
+    assert sorted(set(offenders) - ROLE_FLAG_ALLOWED) == []
+
+
+def test_role_flag_allow_list_has_no_stale_entries() -> None:
+    """Each allowed file still reads a role flag."""
+    for entry in ROLE_FLAG_ALLOWED:
+        assert _reads_role_flag(_SRC / entry), f"{entry} is clean: remove it"

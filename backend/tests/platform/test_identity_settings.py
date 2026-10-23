@@ -115,3 +115,27 @@ def test_a_leftover_csrf_cookie_name_variable_is_ignored(
     """Deployments still setting the removed variable start normally."""
     monkeypatch.setenv("MENAGERIST_CSRF_COOKIE_NAME", "menagerist-csrf")
     assert IdentitySettings().cookie_name == "menagerist-session"
+
+
+def test_api_token_limits_default_and_are_configurable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ninety days by default, a year at most, twenty tokens per person."""
+    defaults = IdentitySettings()
+    assert defaults.api_token_default_days == 90
+    assert defaults.api_token_max_days == 365
+    assert defaults.api_tokens_per_user == 20
+
+    monkeypatch.setenv("MENAGERIST_API_TOKEN_DEFAULT_DAYS", "30")
+    monkeypatch.setenv("MENAGERIST_API_TOKEN_MAX_DAYS", "60")
+    monkeypatch.setenv("MENAGERIST_API_TOKENS_PER_USER", "3")
+    settings = IdentitySettings()
+    assert settings.api_token_default_days == 30
+    assert settings.api_token_max_days == 60
+    assert settings.api_tokens_per_user == 3
+
+
+def test_api_token_default_above_max_is_rejected() -> None:
+    """A default lifetime longer than the maximum is a configuration error."""
+    with pytest.raises(ValidationError):
+        IdentitySettings(api_token_default_days=100, api_token_max_days=50)

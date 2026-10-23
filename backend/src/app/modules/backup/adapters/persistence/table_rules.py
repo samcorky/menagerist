@@ -30,6 +30,7 @@ TABLE_RULES = {
         ),
         TableRule.KEEP,
     ),
+    "api_tokens": TableRule.SKIP,
     "sessions": TableRule.SKIP,
     "sign_in_attempts": TableRule.SKIP,
     "alembic_version": TableRule.IGNORE,

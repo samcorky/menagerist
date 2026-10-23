@@ -15,6 +15,9 @@ from app.modules.backup.domain.errors import RestoreTargetNotEmptyError
 from app.modules.identity.adapters.persistence import (
     in_memory_sign_in_attempt_repository as attempts_adapter,
 )
+from app.modules.identity.adapters.persistence.in_memory_api_token_repository import (
+    InMemoryApiTokenRepository,
+)
 from app.modules.identity.adapters.persistence.in_memory_session_repository import (
     InMemorySessionRepository,
 )
@@ -50,6 +53,7 @@ async def test_in_memory_gate_uses_identity_setup_condition() -> None:
             users=users,
             sessions=InMemorySessionRepository(),
             attempts=attempts_adapter.InMemorySignInAttemptRepository(),
+            tokens=InMemoryApiTokenRepository(),
         )
     )
     assert await gate.is_open()

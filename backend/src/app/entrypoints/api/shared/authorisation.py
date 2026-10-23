@@ -36,6 +36,12 @@ CONTENT_PERMISSIONS: frozenset[Permission] = frozenset(
 # Granted to every signed-in member.
 MEMBER_PERMISSIONS: frozenset[Permission] = CONTENT_PERMISSIONS
 
+# What a token may be granted: the content permissions minus the two backup ones.
+TOKEN_GRANTABLE_PERMISSIONS: frozenset[Permission] = MEMBER_PERMISSIONS - {
+    BackupPermission.EXPORT_OWN_DATA,
+    BackupPermission.IMPORT_OWN_DATA,
+}
+
 # Derived: what only administrators hold.
 ADMIN_ONLY_ACTIONS: frozenset[Permission] = ALL_PERMISSIONS - MEMBER_PERMISSIONS
 
@@ -45,7 +51,8 @@ class RoleAuthorisationAdapter:
 
     The system actor and administrators hold every permission; members hold
     `MEMBER_PERMISSIONS`. Grants expand through the implication catalogue, and a
-    permission outside the catalogue is denied to everyone.
+    permission outside the catalogue is denied to everyone. A token actor's grants
+    cap what its owner holds; grant strings outside the catalogue deny.
     """
 
     def __init__(
@@ -61,7 +68,11 @@ class RoleAuthorisationAdapter:
             if actor.is_admin or actor.is_system
             else self._member_permissions
         )
-        return expand(granted)
+        held = expand(granted)
+        if actor.grants is None:
+            return held
+        ceiling = expand(p for p in ALL_PERMISSIONS if p.value in actor.grants)
+        return held & ceiling
 
     async def check(self, actor: Actor, action: str) -> None:
         """Raise `ForbiddenError` unless `action` is in the actor's permissions."""

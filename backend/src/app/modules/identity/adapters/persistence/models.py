@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Index, PrimaryKeyConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.platform.database import Base
@@ -36,6 +37,22 @@ class SessionModel(IdentifiableMixin, Base):
     client_ip: Mapped[str | None]
     client_platform: Mapped[str | None]
     client_mobile: Mapped[bool | None]
+
+
+class ApiTokenModel(IdentifiableMixin, Base):
+    """ORM row for a personal access token; only the secret's hash is stored."""
+
+    __tablename__ = "api_tokens"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str]
+    secret_hash: Mapped[str]
+    grants: Mapped[list[str]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class SignInAttemptModel(Base):

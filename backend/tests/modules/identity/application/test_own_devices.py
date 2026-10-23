@@ -68,7 +68,10 @@ async def test_list_own_sessions_returns_active_sessions_newest_first(
     await world.sessions.add(s2)
 
     repos = IdentityRepos(
-        users=world.users, sessions=world.sessions, attempts=world.attempts
+        users=world.users,
+        sessions=world.sessions,
+        attempts=world.attempts,
+        tokens=world.tokens,
     )
     handler = ListOwnSessions(repos, get_access_guard(), idle_timeout=IDLE_TIMEOUT)
 
@@ -123,7 +126,10 @@ async def test_list_own_sessions_excludes_expired_and_idle_sessions(
     await world.sessions.add(idle)
 
     repos = IdentityRepos(
-        users=world.users, sessions=world.sessions, attempts=world.attempts
+        users=world.users,
+        sessions=world.sessions,
+        attempts=world.attempts,
+        tokens=world.tokens,
     )
     handler = ListOwnSessions(repos, get_access_guard(), idle_timeout=IDLE_TIMEOUT)
 
@@ -157,7 +163,10 @@ async def test_list_own_sessions_excludes_other_users_sessions(
     await world.sessions.add(bob_session)
 
     repos = IdentityRepos(
-        users=world.users, sessions=world.sessions, attempts=world.attempts
+        users=world.users,
+        sessions=world.sessions,
+        attempts=world.attempts,
+        tokens=world.tokens,
     )
     handler = ListOwnSessions(repos, get_access_guard(), idle_timeout=IDLE_TIMEOUT)
 
@@ -182,7 +191,10 @@ async def test_list_own_sessions_with_unknown_or_none_current_session(
     await world.sessions.add(s1)
 
     repos = IdentityRepos(
-        users=world.users, sessions=world.sessions, attempts=world.attempts
+        users=world.users,
+        sessions=world.sessions,
+        attempts=world.attempts,
+        tokens=world.tokens,
     )
     handler = ListOwnSessions(repos, get_access_guard(), idle_timeout=IDLE_TIMEOUT)
 

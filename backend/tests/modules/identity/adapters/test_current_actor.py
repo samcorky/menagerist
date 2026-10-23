@@ -35,9 +35,13 @@ from app.modules.identity.adapters.api.dependencies import (
 from app.modules.identity.adapters.security.in_memory_password_hasher import (
     InMemoryPasswordHasher,
 )
+from app.modules.identity.adapters.security.secrets_api_token_generator import (
+    SecretsApiTokenGenerator,
+)
 from app.modules.identity.adapters.security.session_token_generator import (
     SecretsSessionTokenGenerator,
 )
+from app.modules.identity.domain.api_token import ApiToken
 from app.modules.identity.domain.session import Session
 from app.modules.identity.domain.user import Role
 from app.modules.identity.ports.unit_of_work import IdentityRepos
@@ -50,12 +54,16 @@ pytestmark = pytest.mark.real_actor
 
 COOKIE = "menagerist-session"
 PATH = "/api/v1/_probe"
+GRANTS_PATH = "/api/v1/_grants"
 
 
 def _client(world: World) -> TestClient:
     app = create_app()
     repos = IdentityRepos(
-        users=world.users, sessions=world.sessions, attempts=world.attempts
+        users=world.users,
+        sessions=world.sessions,
+        attempts=world.attempts,
+        tokens=world.tokens,
     )
     app.dependency_overrides[get_identity_uow] = lambda: world.uow
     app.dependency_overrides[get_identity_repos] = lambda: repos
@@ -76,6 +84,16 @@ def _client(world: World) -> TestClient:
         actor: Annotated[Actor, Depends(get_current_actor)],
     ) -> dict[str, object]:
         return {"id": str(actor.id), "roles": sorted(actor.roles)}
+
+    @app.get(GRANTS_PATH)
+    async def grants(
+        actor: Annotated[Actor, Depends(get_current_actor)],
+    ) -> dict[str, object]:
+        return {
+            "id": str(actor.id),
+            "roles": sorted(actor.roles),
+            "grants": None if actor.grants is None else sorted(actor.grants),
+        }
 
     return TestClient(app)
 
@@ -313,3 +331,256 @@ async def test_permissions_endpoint_needs_a_session(
     response = _client(world).get("/api/v1/auth/me/permissions")
     assert response.status_code == 401
     assert response.json()["type"] == "unauthenticated"
+
+
+# --- personal access tokens --------------------------------------------------
+
+READ = frozenset({"graph:item:read", "media:item:read"})
+
+
+async def _token_for(
+    world: World,
+    user_id: uuid.UUID,
+    *,
+    grants: frozenset[str] = READ,
+    ttl: timedelta = timedelta(days=1),
+) -> str:
+    generator = SecretsApiTokenGenerator()
+    new = generator.new_token()
+    now = datetime.now(UTC)
+    await world.tokens.add(
+        ApiToken.create(
+            token_id=new.token_id,
+            user_id=user_id,
+            name="Script",
+            secret_hash=generator.hash(new.secret),
+            grants=grants,
+            now=now - timedelta(days=2),
+            expires_at=now + ttl,
+        )
+    )
+    return new.plaintext
+
+
+def _bearer(value: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {value}"}
+
+
+async def test_a_valid_token_gives_its_owner_with_exactly_its_grants(
+    world: World, make_user: MakeUser
+) -> None:
+    """The actor is the owner, capped by the token's grants."""
+    user = make_user("alice")
+    await world.users.add(user)
+    token = await _token_for(world, user.id)
+
+    response = _client(world).get(GRANTS_PATH, headers=_bearer(token))
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": str(user.id),
+        "roles": ["member"],
+        "grants": sorted(READ),
+    }
+
+
+async def test_a_session_actor_has_no_grant_ceiling(
+    world: World, make_user: MakeUser
+) -> None:
+    """Cookie requests carry `grants=None`."""
+    user = make_user("alice")
+    await world.users.add(user)
+    client = _client(world)
+    client.cookies.set(COOKIE, await _session_for(world, user.id))
+
+    assert client.get(GRANTS_PATH).json()["grants"] is None
+
+
+@pytest.mark.parametrize(
+    "value", ["", "garbage", "mnst_nothex_nothex", f"mnst_{'a' * 32}_{'b' * 64}"]
+)
+async def test_a_bad_or_unknown_token_is_401_invalid_token(
+    world: World, make_user: MakeUser, value: str
+) -> None:
+    """Malformed, empty and unknown values are all the same answer."""
+    await world.users.add(make_user("alice"))
+
+    response = _client(world).get(PATH, headers=_bearer(value))
+
+    assert response.status_code == 401
+    assert response.json()["type"] == "invalid_token"
+
+
+async def test_an_expired_token_is_401_invalid_token(
+    world: World, make_user: MakeUser
+) -> None:
+    """Expiry is indistinguishable from an unknown token."""
+    user = make_user("alice")
+    await world.users.add(user)
+    token = await _token_for(world, user.id, ttl=timedelta(seconds=-1))
+
+    response = _client(world).get(PATH, headers=_bearer(token))
+
+    assert response.status_code == 401
+    assert response.json()["type"] == "invalid_token"
+
+
+async def test_a_bad_bearer_beside_a_valid_cookie_is_401_not_the_cookie_user(
+    world: World, make_user: MakeUser
+) -> None:
+    """Bearer is authoritative: no fallback to the cookie."""
+    user = make_user("alice")
+    await world.users.add(user)
+    client = _client(world)
+    client.cookies.set(COOKIE, await _session_for(world, user.id))
+
+    response = client.get(PATH, headers=_bearer("garbage"))
+
+    assert response.status_code == 401
+    assert response.json()["type"] == "invalid_token"
+
+
+async def test_a_valid_bearer_beside_another_users_cookie_is_the_token_owner(
+    world: World, make_user: MakeUser
+) -> None:
+    """The cookie is never read when a bearer header is present."""
+    alice, bob = make_user("alice"), make_user("bob")
+    await world.users.add(alice)
+    await world.users.add(bob)
+    token = await _token_for(world, alice.id)
+    client = _client(world)
+    client.cookies.set(COOKIE, await _session_for(world, bob.id))
+
+    response = client.get(GRANTS_PATH, headers=_bearer(token))
+
+    assert response.json()["id"] == str(alice.id)
+    assert response.json()["grants"] == sorted(READ)
+
+
+async def test_basic_authorization_leaves_cookie_sign_in_working(
+    world: World, make_user: MakeUser
+) -> None:
+    """A reverse proxy's Basic header is ignored."""
+    user = make_user("alice")
+    await world.users.add(user)
+    client = _client(world)
+    client.cookies.set(COOKIE, await _session_for(world, user.id))
+
+    response = client.get(PATH, headers={"Authorization": "Basic YTpi"})
+
+    assert response.status_code == 200
+    assert response.json()["id"] == str(user.id)
+
+
+async def test_a_disabled_owner_is_401_on_the_next_request(
+    world: World, make_user: MakeUser
+) -> None:
+    """Disabling the user stops their tokens."""
+    user = make_user("alice")
+    await world.users.add(user)
+    token = await _token_for(world, user.id)
+    client = _client(world)
+    assert client.get(PATH, headers=_bearer(token)).status_code == 200
+
+    user.disabled = True
+    await world.users.save(user)
+
+    response = client.get(PATH, headers=_bearer(token))
+    assert response.status_code == 401
+    assert response.json()["type"] == "invalid_token"
+
+
+async def test_a_password_expired_owner_is_refused_like_a_session(
+    world: World, make_user: MakeUser
+) -> None:
+    """The owner must change their password first."""
+    user = make_user("alice")
+    user.password_expired = True
+    await world.users.add(user)
+    token = await _token_for(world, user.id)
+
+    response = _client(world).get(PATH, headers=_bearer(token))
+
+    assert response.status_code == 403
+    assert response.json()["type"] == "password_expired"
+
+
+async def test_a_revoked_token_stops_working_at_once(
+    world: World, make_user: MakeUser
+) -> None:
+    """Revoking deletes the row; the next request is a 401."""
+    user = make_user("alice")
+    await world.users.add(user)
+    token = await _token_for(world, user.id)
+    client = _client(world)
+    assert client.get(PATH, headers=_bearer(token)).status_code == 200
+
+    (stored,) = await world.tokens.list_for_user(user.id, now=datetime.now(UTC))
+    await world.tokens.delete(stored.id)
+
+    assert client.get(PATH, headers=_bearer(token)).status_code == 401
+
+
+async def test_account_routes_refuse_a_token_request(
+    world: World, make_user: MakeUser
+) -> None:
+    """Cookie-only routes never see a token: the bearer hides the cookie."""
+    user = make_user("alice")
+    await world.users.add(user)
+    token = await _token_for(world, user.id)
+    client = _client(world)
+    client.cookies.set(COOKIE, await _session_for(world, user.id))
+
+    me = client.get("/api/v1/auth/me", headers=_bearer(token))
+    change = client.post(
+        "/api/v1/auth/password",
+        json={"current_password": "password-123", "new_password": "another-pass-456"},
+        headers=_bearer(token),
+    )
+    only_token = _client(world).get("/api/v1/auth/me", headers=_bearer(token))
+
+    for response in (me, change, only_token):
+        assert response.status_code == 401
+        assert response.json()["type"] == "unauthenticated"
+
+
+async def test_a_cross_site_cookie_plus_bearer_is_the_token_alone(
+    world: World, make_user: MakeUser
+) -> None:
+    """CSRF does not refuse it, and the cookie gets no say."""
+    user = make_user("alice")
+    await world.users.add(user)
+    token = await _token_for(world, user.id)
+    client = _client(world)
+    client.cookies.set(COOKIE, await _session_for(world, user.id))
+    cross_site = {"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"}
+
+    content = client.delete(UNSAFE, headers={**cross_site, **_bearer(token)})
+    cookie_only = client.delete(UNSAFE, headers=cross_site)
+    account = client.post(
+        "/api/v1/auth/password",
+        json={"current_password": "password-123", "new_password": "another-pass-456"},
+        headers={**cross_site, **_bearer(token)},
+    )
+
+    assert content.json().get("type") not in {"csrf_failed", "invalid_token"}
+    assert cookie_only.json()["type"] == "csrf_failed"
+    assert account.status_code == 401
+    assert account.json()["type"] == "unauthenticated"
+
+
+async def test_a_token_request_needs_no_origin_for_an_unsafe_call(
+    world: World, make_user: MakeUser
+) -> None:
+    """Scripts send no Origin; a cookie-only unsafe call without one still fails."""
+    user = make_user("alice")
+    await world.users.add(user)
+    token = await _token_for(world, user.id)
+    client = _client(world)
+
+    with_token = client.delete(UNSAFE, headers=_bearer(token))
+    client.cookies.set(COOKIE, await _session_for(world, user.id))
+    cookie_only = client.delete(UNSAFE, headers={"Origin": "https://evil.example"})
+
+    assert with_token.json().get("type") != "csrf_failed"
+    assert cookie_only.json()["type"] == "csrf_failed"

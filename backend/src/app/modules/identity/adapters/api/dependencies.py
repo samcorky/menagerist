@@ -9,6 +9,7 @@ from fastapi import Depends
 from starlette.requests import Request
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
+from app.entrypoints.api.shared.http.bearer import bearer_token
 from app.modules.identity.adapters.api.cookies import (
     session_cookie_name,
     session_cookie_value,
@@ -34,9 +35,13 @@ from app.modules.identity.adapters.security.scrypt_password_hasher import (
     SCHEME as SCRYPT_SCHEME,
     ScryptPasswordHasher,
 )
+from app.modules.identity.adapters.security.secrets_api_token_generator import (
+    SecretsApiTokenGenerator,
+)
 from app.modules.identity.adapters.security.session_token_generator import (
     SecretsSessionTokenGenerator,
 )
+from app.modules.identity.application.authenticate_api_token import AuthenticateApiToken
 from app.modules.identity.application.change_password import ChangePassword
 from app.modules.identity.application.client_device import ClientDevice
 from app.modules.identity.application.create_user import CreateUser
@@ -67,6 +72,7 @@ from app.modules.identity.domain.errors import (
 )
 from app.modules.identity.domain.throttle import ThrottlePolicy
 from app.modules.identity.domain.user import User
+from app.modules.identity.ports.api_token_generator import ApiTokenGenerator
 from app.modules.identity.ports.existing_data_claim import ExistingDataClaim
 from app.modules.identity.ports.password_hasher import PasswordHasher
 from app.modules.identity.ports.session_token_generator import SessionTokenGenerator
@@ -163,6 +169,11 @@ def get_client_device(request: Request) -> ClientDevice:
 def get_session_token_generator() -> SessionTokenGenerator:
     """Return the session token generator."""
     return SecretsSessionTokenGenerator()
+
+
+def get_api_token_generator() -> ApiTokenGenerator:
+    """Return the personal access token generator."""
+    return SecretsApiTokenGenerator()
 
 
 def get_existing_data_claim() -> ExistingDataClaim:
@@ -272,6 +283,14 @@ def get_get_current_user_use_case(
     return GetCurrentUser(
         uow, guard, tokens, idle_timeout=timedelta(hours=idle) if idle else None
     )
+
+
+def get_authenticate_api_token_use_case(
+    uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    tokens: Annotated[ApiTokenGenerator, Depends(get_api_token_generator)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> AuthenticateApiToken:
+    return AuthenticateApiToken(uow, guard, tokens)
 
 
 def get_get_setup_status_use_case(
@@ -390,7 +409,13 @@ def get_session_token(
     request: Request,
     settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
 ) -> str | None:
-    """Return the session token sent as a cookie, if any."""
+    """Return the session token sent as a cookie, if any.
+
+    A bearer header beside it makes the request token-authenticated, so the cookie
+    is not read at all and every cookie-only route refuses it.
+    """
+    if bearer_token(request) is not None:
+        return None
     return session_cookie_value(request, session_cookie_name(request, settings))
 
 

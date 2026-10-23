@@ -9,6 +9,9 @@ from starlette.testclient import TestClient
 from structlog.testing import capture_logs
 
 from app.entrypoints.api import create_app, startup
+from app.modules.identity.adapters.persistence.in_memory_api_token_repository import (
+    InMemoryApiTokenRepository,
+)
 from app.modules.identity.adapters.persistence.in_memory_session_repository import (
     InMemorySessionRepository,
 )
@@ -42,6 +45,7 @@ def _wire(monkeypatch: pytest.MonkeyPatch, users: InMemoryUserRepository) -> Non
         users=users,
         sessions=InMemorySessionRepository(),
         attempts=InMemorySignInAttemptRepository(),
+        tokens=InMemoryApiTokenRepository(),
     )
     monkeypatch.setattr(startup, "get_session_factory", lambda: _Session)
     monkeypatch.setattr(startup, "build_identity_repos", lambda _session: repos)

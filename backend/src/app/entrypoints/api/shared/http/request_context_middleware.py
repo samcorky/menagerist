@@ -86,7 +86,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             "status": status,
             "dt_ms": round((time.perf_counter() - started) * 1000, 3),
         }
-        for key in ("user_id", "session_id"):
+        for key in ("user_id", "session_id", "token_id"):
             if (value := getattr(request.state, key, None)) is not None:
                 fields[key] = value
         log = access_logger.warning if status >= 500 else access_logger.info

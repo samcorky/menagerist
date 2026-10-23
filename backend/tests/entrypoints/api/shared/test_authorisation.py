@@ -118,3 +118,51 @@ async def test_granted_permissions_expand_through_implications() -> None:
     await adapter.check(MEMBER, LIST)
     with pytest.raises(ForbiddenError):
         await adapter.check(MEMBER, GraphPermission.DELETE_EDGE_TYPE)
+
+
+def _token_actor(base: Actor, *grants: str) -> Actor:
+    return Actor(id=base.id, roles=base.roles, grants=frozenset(grants))
+
+
+def test_token_actor_holds_its_grants_and_their_implications_only() -> None:
+    """A member token with item write holds item write and the implied read."""
+    held = RoleAuthorisationAdapter().effective_permissions(
+        _token_actor(MEMBER, "graph:item:write")
+    )
+    assert held == {GraphPermission.ITEM_WRITE, GraphPermission.ITEM_READ}
+
+
+def test_admin_token_never_holds_admin_permissions() -> None:
+    """An admin's token is bounded by its grants, not by the admin role."""
+    held = RoleAuthorisationAdapter().effective_permissions(
+        _token_actor(ADMIN, "graph:item:write")
+    )
+    assert held == {GraphPermission.ITEM_WRITE, GraphPermission.ITEM_READ}
+
+
+def test_a_grant_outside_the_owners_role_adds_nothing() -> None:
+    """A member cannot gain an admin permission by granting it to a token."""
+    held = RoleAuthorisationAdapter().effective_permissions(
+        _token_actor(MEMBER, "identity:user:list", "graph:item:read")
+    )
+    assert held == {GraphPermission.ITEM_READ}
+
+
+def test_unknown_grant_strings_add_nothing() -> None:
+    """Grant strings naming no catalogue permission deny."""
+    adapter = RoleAuthorisationAdapter()
+    assert adapter.effective_permissions(_token_actor(MEMBER, "nope:x:y")) == set()
+
+
+def test_losing_the_role_that_held_a_permission_removes_it_from_the_token() -> None:
+    """The token is a ceiling: the owner's current role still decides."""
+    adapter = RoleAuthorisationAdapter(member_permissions=frozenset())
+    held = adapter.effective_permissions(_token_actor(MEMBER, "graph:item:read"))
+    assert held == set()
+
+
+def test_session_actor_is_unchanged_by_the_ceiling() -> None:
+    """`grants=None` leaves the member and admin sets as they were."""
+    adapter = RoleAuthorisationAdapter()
+    assert adapter.effective_permissions(MEMBER) == expand(MEMBER_PERMISSIONS)
+    assert adapter.effective_permissions(ADMIN) == ALL_PERMISSIONS

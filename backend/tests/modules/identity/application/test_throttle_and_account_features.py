@@ -558,7 +558,10 @@ async def test_has_administrator_counts_enabled_administrators(
 ) -> None:
     """Members and disabled administrators do not count."""
     repos = IdentityRepos(
-        users=world.users, sessions=world.sessions, attempts=world.attempts
+        users=world.users,
+        sessions=world.sessions,
+        attempts=world.attempts,
+        tokens=world.tokens,
     )
     query = HasAdministrator(repos, get_access_guard())
     assert await query.handle(HasAdministratorQuery(), ANONYMOUS_ACTOR) is False

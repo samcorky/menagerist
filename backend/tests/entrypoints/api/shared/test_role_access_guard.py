@@ -153,3 +153,29 @@ async def test_an_unknown_stance_is_an_error_not_a_silent_gap() -> None:
     guard = RoleAccessGuard(_Authorisation(), OwnerAccessPolicy())
     with pytest.raises(AssertionError):
         await guard.check(MEMBER, object())  # type: ignore[arg-type]
+
+
+async def test_token_actor_is_refused_own_account_but_not_public() -> None:
+    """Account management is session-only; public routes stay open."""
+    token_actor = Actor(
+        id=uuid.uuid4(), roles=frozenset({"member"}), grants=frozenset({"x:y:z"})
+    )
+    guard = RoleAccessGuard(_Authorisation(), OwnerAccessPolicy())
+    with pytest.raises(ForbiddenError, match="do not have permission"):
+        await guard.check(token_actor, OwnAccount())
+    with pytest.raises(ForbiddenError):
+        await guard.check(token_actor, System())
+    await guard.check(token_actor, Public())
+
+
+async def test_token_actor_content_check_goes_to_the_authorisation_port() -> None:
+    """Content stances still reach the port, where the intersection happens."""
+    token_actor = Actor(
+        id=uuid.uuid4(),
+        roles=frozenset({"member"}),
+        grants=frozenset({"media:item:read"}),
+    )
+    guard = RoleAccessGuard(RoleAuthorisationAdapter(), OwnerAccessPolicy())
+    await guard.check(token_actor, Content(MediaPermission.ITEM_READ))
+    with pytest.raises(ForbiddenError):
+        await guard.check(token_actor, Content(MediaPermission.ITEM_WRITE))

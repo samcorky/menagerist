@@ -68,7 +68,10 @@ async def test_list_sessions_forbidden_for_members(
     await world.users.add(alice)
 
     repos = IdentityRepos(
-        users=world.users, sessions=world.sessions, attempts=world.attempts
+        users=world.users,
+        sessions=world.sessions,
+        attempts=world.attempts,
+        tokens=world.tokens,
     )
     guard = get_access_guard()
     handler = ListSessions(repos, guard, idle_timeout=IDLE_TIMEOUT)
@@ -153,7 +156,10 @@ async def test_list_sessions_returns_all_active_sessions_with_user_details(
     await world.sessions.add(s_orphaned)
 
     repos = IdentityRepos(
-        users=world.users, sessions=world.sessions, attempts=world.attempts
+        users=world.users,
+        sessions=world.sessions,
+        attempts=world.attempts,
+        tokens=world.tokens,
     )
     guard = get_access_guard()
     handler = ListSessions(repos, guard, idle_timeout=IDLE_TIMEOUT)
@@ -212,7 +218,10 @@ async def test_list_sessions_excludes_expired_and_idle_sessions(
     await world.sessions.add(idle)
 
     repos = IdentityRepos(
-        users=world.users, sessions=world.sessions, attempts=world.attempts
+        users=world.users,
+        sessions=world.sessions,
+        attempts=world.attempts,
+        tokens=world.tokens,
     )
     guard = get_access_guard()
     handler = ListSessions(repos, guard, idle_timeout=IDLE_TIMEOUT)
@@ -242,7 +251,10 @@ async def test_list_sessions_filters_by_user_id(
     await world.sessions.add(s_bob)
 
     repos = IdentityRepos(
-        users=world.users, sessions=world.sessions, attempts=world.attempts
+        users=world.users,
+        sessions=world.sessions,
+        attempts=world.attempts,
+        tokens=world.tokens,
     )
     guard = get_access_guard()
     handler = ListSessions(repos, guard, idle_timeout=IDLE_TIMEOUT)
@@ -269,7 +281,10 @@ async def test_list_sessions_unknown_user_id_returns_empty_list(
     await world.sessions.add(s_alice)
 
     repos = IdentityRepos(
-        users=world.users, sessions=world.sessions, attempts=world.attempts
+        users=world.users,
+        sessions=world.sessions,
+        attempts=world.attempts,
+        tokens=world.tokens,
     )
     guard = get_access_guard()
     handler = ListSessions(repos, guard, idle_timeout=IDLE_TIMEOUT)

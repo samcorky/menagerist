@@ -1,5 +1,8 @@
 from typing import TYPE_CHECKING
 
+from app.modules.identity.adapters.persistence.api_token_repository import (
+    SqlAlchemyApiTokenRepository,
+)
 from app.modules.identity.adapters.persistence.session_repository import (
     SqlAlchemySessionRepository,
 )
@@ -28,6 +31,7 @@ def build_identity_repos(session: AsyncSession) -> IdentityRepos:
         users=SqlAlchemyUserRepository(session),
         sessions=SqlAlchemySessionRepository(session),
         attempts=SqlAlchemySignInAttemptRepository(session),
+        tokens=SqlAlchemyApiTokenRepository(session),
     )
 
 

@@ -23,3 +23,12 @@ def test_is_anonymous_only_for_the_anonymous_actor() -> None:
     assert ANONYMOUS_ACTOR.is_anonymous
     assert not SYSTEM_ACTOR.is_anonymous
     assert not Actor(id=uuid.uuid4(), roles=frozenset({"member"})).is_anonymous
+
+
+def test_grants_default_to_none_meaning_no_ceiling() -> None:
+    """A session actor carries no grants; a token actor carries its set."""
+    assert Actor(id=uuid.uuid4()).grants is None
+    token_actor = Actor(id=uuid.uuid4(), grants=frozenset({"graph:item:read"}))
+    assert token_actor.grants == frozenset({"graph:item:read"})
+    assert SYSTEM_ACTOR.grants is None
+    assert ANONYMOUS_ACTOR.grants is None

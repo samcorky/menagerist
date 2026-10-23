@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from app.platform.config._base import MenageristBaseSettings
 
@@ -55,6 +55,29 @@ class IdentitySettings(MenageristBaseSettings):
             "Maximum number of simultaneous password-hash operations in this process."
         ),
     )
+
+    api_token_default_days: int = Field(
+        default=90,
+        ge=1,
+        description="Lifetime in days offered for a new API token.",
+    )
+    api_token_max_days: int = Field(
+        default=365,
+        ge=1,
+        description="Longest lifetime in days an API token may be given.",
+    )
+    api_tokens_per_user: int = Field(
+        default=20,
+        ge=1,
+        description="Most active API tokens one person may hold.",
+    )
+
+    @model_validator(mode="after")
+    def _default_within_max(self) -> IdentitySettings:
+        if self.api_token_default_days > self.api_token_max_days:
+            msg = "api_token_default_days must not exceed api_token_max_days"
+            raise ValueError(msg)
+        return self
 
 
 @lru_cache(maxsize=1)

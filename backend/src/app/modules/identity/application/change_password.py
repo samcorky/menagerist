@@ -130,6 +130,7 @@ class ChangePassword(
             )
             await repos.users.save(user)
             ended = await repos.sessions.delete_for_user(user.id)
+            tokens_ended = await repos.tokens.delete_for_user(user.id)
             started = await start_session(
                 repos,
                 self._tokens,
@@ -140,6 +141,7 @@ class ChangePassword(
             )
             await self._uow.commit()
         logger.info("sessions ended", user_id=user.id, count=ended)
+        logger.info("api tokens ended", user_id=user.id, count=tokens_ended)
         logger.info("password changed", user_id=user.id, session_id=started.session_id)
         return SignedInResult(
             user=user, token=started.token, session_id=started.session_id

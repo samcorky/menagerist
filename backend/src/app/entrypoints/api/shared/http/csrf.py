@@ -1,5 +1,6 @@
 from starlette.requests import Request  # noqa: TC002
 
+from app.entrypoints.api.shared.http.bearer import bearer_token
 from app.entrypoints.api.shared.http.origin import (
     claimed_origin,
     log_refusal,
@@ -28,7 +29,9 @@ async def verify_csrf(request: Request) -> None:
     The browser's `Sec-Fetch-Site` header decides first (page script cannot set
     it): `same-origin` passes and `cross-site` is refused. Otherwise `Origin`
     must equal the app's own origin; a missing, `null` or malformed value is
-    refused. Safe methods and requests without a session cookie pass: there is
+    refused. Safe methods, bearer-token requests (never cookie-authenticated, since
+    the bearer header makes the session reader ignore the cookie) and requests
+    without a session cookie pass: there is
     nothing to forge, and authentication answers 401. The cookie is read as the
     session reader reads it, so a duplicated or disguised one counts as none.
 
@@ -36,7 +39,7 @@ async def verify_csrf(request: Request) -> None:
         CsrfError: If the request is cross-site, `Origin` is not the app's own
             origin, or neither header is present.
     """
-    if request.method in _SAFE_METHODS:
+    if request.method in _SAFE_METHODS or bearer_token(request) is not None:
         return
     settings = get_identity_settings()
     if session_cookie_value(request, session_cookie_name(request, settings)) is None:
