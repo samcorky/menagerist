@@ -33,15 +33,17 @@ _STATUS_BY_DOMAIN_ERROR: dict[type[DomainError], int] = {
 class ProblemDetail(BaseModel):
     """RFC 9457 `application/problem+json` body every `DomainError` maps to."""
 
+    # Every response carries its own example, so this one only shows in the
+    # schema list; a pinned test fails any response that would borrow it.
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
                 {
                     "type": "about:blank",
-                    "title": "NodeNotFoundError",
-                    "status": 404,
-                    "detail": "Node 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10 not found",
-                    "instance": "https://localhost/api/v1/node/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                    "title": "ValidationError",
+                    "status": 400,
+                    "detail": "A value is not acceptable.",
+                    "instance": "https://menagerist.example/api/v1/node",
                 }
             ]
         }
@@ -55,6 +57,47 @@ class ProblemDetail(BaseModel):
     errors: list[dict[str, str]] | None = None
 
 
+# Swapped for a URL that fits each route when the OpenAPI document is built.
+INSTANCE_PLACEHOLDER = "{instance}"
+PROBLEM_JSON = "application/problem+json"
+_PROBLEM_SCHEMA_REF = {"$ref": "#/components/schemas/ProblemDetail"}
+
+
+def problem_example(
+    status: int, title: str, detail: str, *, type_: str = "about:blank"
+) -> dict[str, Any]:
+    """Build an example body shaped like the problem response the app sends."""
+    return {
+        "type": type_,
+        "title": title,
+        "status": status,
+        "detail": detail,
+        "instance": INSTANCE_PLACEHOLDER,
+    }
+
+
+def problem_response(
+    status: int,
+    description: str,
+    title: str,
+    detail: str,
+    *,
+    type_: str = "about:blank",
+) -> dict[int | str, dict[str, Any]]:
+    """Build an OpenAPI responses entry with one problem+json example."""
+    return {
+        status: {
+            "description": description,
+            "content": {
+                PROBLEM_JSON: {
+                    "schema": _PROBLEM_SCHEMA_REF,
+                    "example": problem_example(status, title, detail, type_=type_),
+                }
+            },
+        }
+    }
+
+
 def _status_for(error_type: type[DomainError]) -> int:
     return next(
         status
@@ -63,28 +106,37 @@ def _status_for(error_type: type[DomainError]) -> int:
     )
 
 
+_BASE_DESCRIPTIONS: dict[type[DomainError], str] = {
+    ValidationError: "A value is not acceptable; the detail says which.",
+    ForbiddenError: "Signed in, but not permitted to do this.",
+    ConflictError: "The request conflicts with the current state.",
+    NotFoundError: "The resource does not exist, or is not yours.",
+}
+
+
+def _describe(error_type: type[DomainError]) -> str:
+    """Turn the error's docstring into a response description."""
+    if error_type in _BASE_DESCRIPTIONS:
+        return _BASE_DESCRIPTIONS[error_type]
+    text = (error_type.__doc__ or error_type.__name__).strip().split("\n")[0]
+    return text.replace("Raised when ", "Returned when ", 1)
+
+
 def error_response(
-    error_type: type[DomainError], *, detail: str
+    error_type: type[DomainError], *, detail: str, description: str | None = None
 ) -> dict[int | str, dict[str, Any]]:
-    """Build an OpenAPI responses entry documenting error_type for a route."""
-    status_code = _status_for(error_type)
-    return {
-        status_code: {
-            "description": (error_type.__doc__ or error_type.__name__).strip(),
-            "content": {
-                "application/problem+json": {
-                    "schema": ProblemDetail.model_json_schema(),
-                    "example": {
-                        "type": "about:blank",
-                        "title": error_type.__name__,
-                        "status": status_code,
-                        "detail": detail,
-                        "instance": "string",
-                    },
-                }
-            },
-        }
-    }
+    """Build an OpenAPI responses entry documenting error_type for a route.
+
+    The example carries the error's real `title` (its class name) and `type`;
+    its `instance` is filled in per route when the OpenAPI document is built.
+    """
+    return problem_response(
+        _status_for(error_type),
+        description or _describe(error_type),
+        error_type.__name__,
+        detail,
+        type_=error_type.problem_type,
+    )
 
 
 def _problem_response(request: Request, exc: Exception) -> JSONResponse:

@@ -37,7 +37,11 @@ async def get_my_permissions(
     actor: Annotated[Actor, Depends(get_current_actor)],
     authorisation: Annotated[RoleAuthorisationAdapter, Depends(get_role_authorisation)],
 ) -> PermissionsResponse:
-    """List the permissions the signed-in account holds, implications included."""
+    """List the permissions the caller holds, implications included.
+
+    With a token this is the token's own permissions (what its owner holds, limited
+    to what it was given).
+    """
     response.headers["Cache-Control"] = "private, no-store"
     return PermissionsResponse(
         permissions=sorted(authorisation.effective_permissions(actor))

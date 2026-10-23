@@ -114,7 +114,9 @@ _LOGIN_403[403]["description"] += (
 _UNAUTHENTICATED = error_response(SessionRequiredError, detail="Sign in to continue.")
 
 _THROTTLED = error_response(
-    SignInThrottledError, detail="Too many failed attempts. Try again later."
+    SignInThrottledError,
+    detail="Too many failed attempts. Try again later.",
+    description="Too many failed attempts recently; wait for `Retry-After` seconds.",
 )
 _THROTTLED[429]["headers"] = {
     "Retry-After": {

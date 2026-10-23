@@ -1,8 +1,9 @@
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from starlette.datastructures import Headers
 
+from app.entrypoints.api.shared.http.problem_response import problem_response
 from app.platform.config import get_backup_settings, get_media_settings
 
 if TYPE_CHECKING:
@@ -20,22 +21,12 @@ _BACKUP_PATHS = frozenset(
     }
 )
 
-PAYLOAD_TOO_LARGE_RESPONSE: dict[int | str, dict[str, object]] = {
-    413: {
-        "description": "The request body is larger than the upload limit.",
-        "content": {
-            "application/problem+json": {
-                "example": {
-                    "type": "about:blank",
-                    "title": "Payload Too Large",
-                    "status": 413,
-                    "detail": "The upload is larger than this server allows.",
-                    "instance": "string",
-                }
-            }
-        },
-    }
-}
+PAYLOAD_TOO_LARGE_RESPONSE: dict[int | str, dict[str, Any]] = problem_response(
+    413,
+    "The request body is larger than the upload limit.",
+    "Payload Too Large",
+    "The upload is larger than this server allows.",
+)
 
 
 def _is_upload(scope: Scope) -> bool:

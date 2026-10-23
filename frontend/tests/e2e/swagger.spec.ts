@@ -48,10 +48,17 @@ function freshContext(browser: Browser, baseURL: string | undefined) {
 const banner = (page: Page) => page.locator('#menagerist-session');
 const authorizeButton = (page: Page) =>
 	page.locator('.swagger-ui .auth-wrapper').getByRole('button', { name: 'Authorize' });
+const dialogSession = (page: Page) => page.locator('.dialog-ux #menagerist-session-dialog');
 const logo = (page: Page) => page.locator('.swagger-ui .info .menagerist-logo');
 
 // Swagger re-renders and the banner is put back asynchronously, which is slow on a busy machine.
 const CHROME = { timeout: 15_000 };
+
+/** Opens Authorize and follows the Browser session block's Sign in link. */
+async function signInThroughDialog(page: Page) {
+	await authorizeButton(page).click();
+	await dialogSession(page).getByRole('link', { name: 'Sign in' }).click();
+}
 
 /** The injected banner and logo must survive Swagger's re-renders. */
 async function expectChrome(page: Page, text: string) {
@@ -117,13 +124,19 @@ test('signs in through the app, uses the API and signs out from the banner', asy
 	await expect(authorizeButton(page)).toBeVisible();
 
 	// /api/docs is a server route: signing in on the app's page must come back here.
-	await banner(page).getByRole('link', { name: 'Sign in' }).click();
+	// The banner has no Sign in button: Authorize does that.
+	await expect(banner(page).getByRole('link', { name: 'Sign in' })).toHaveCount(0);
+	await expect(banner(page).getByRole('link', { name: 'Set up' })).toHaveCount(0);
+	await expect(banner(page)).toContainText(
+		'Not signed in. Use Authorize to sign in or add an API token.'
+	);
+	await signInThroughDialog(page);
 	await expect(page).toHaveURL(/\/login\?next=%2Fapi%2Fdocs/);
 	await page.getByLabel('Username').fill(E2E_ADMIN.username);
 	await page.getByLabel('Password', { exact: true }).fill(E2E_ADMIN.password);
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 	await expect(page).toHaveURL(/\/api\/docs$/);
-	await expectChrome(page, `Signed in as ${E2E_ADMIN.displayName}`);
+	await expectChrome(page, `Signed in as ${E2E_ADMIN.displayName} (browser session).`);
 	await expect(banner(page).getByRole('link', { name: 'Open Menagerist' })).toHaveAttribute(
 		'href',
 		'/'
@@ -211,12 +224,24 @@ test('shows required permissions and per-operation locks', async ({ browser, bas
 	await lock.click();
 	const dialog = page.locator('.dialog-ux');
 	await expect(dialog).toBeVisible();
-	await expect(dialog.locator('.auth-container:not([hidden])')).toHaveCount(1);
-	await expect(dialog.locator('.auth-container:not([hidden])')).toContainText('HTTPBearer');
+	await expect(dialog.locator('.auth-container:not([hidden])')).toHaveCount(2);
+	// Browser session first, the API token block (Swagger's own) second.
+	await expect(dialog.locator('.auth-container:not([hidden]) h4')).toHaveText([
+		'Browser session',
+		/HTTPBearer/
+	]);
+	await expect(dialog.locator('.menagerist-token-hint')).toHaveText(
+		'Or use a token instead of a session.'
+	);
+	await expect(dialog.locator('.auth-container:not([hidden]):has(input)')).toContainText(
+		'HTTPBearer'
+	);
 	await expect(dialog.locator('.auth-container[hidden]')).toContainText('APIKeyCookie');
 	// Swagger's own cookie block (and its Logout) is gone; the Session section is real.
 	await expect(dialog.locator('.auth-container:not([hidden]) input[type="text"]')).toHaveCount(1);
-	await expect(dialog.locator('#menagerist-session-dialog')).toContainText('Not signed in');
+	const signedOut = dialog.locator('#menagerist-session-dialog.auth-container');
+	await expect(signedOut).toContainText('Not signed in');
+	await expect(signedOut.getByRole('link', { name: 'Sign in' })).toBeVisible();
 	await dialog.getByRole('button', { name: 'Close' }).click();
 	await expect(dialog).toHaveCount(0);
 
@@ -238,7 +263,7 @@ test('locks follow the real session without changing requests', async ({ browser
 	const lockIcon = list.locator('.authorization__btn svg');
 	await expect(lockIcon).toHaveClass('unlocked');
 
-	await banner(page).getByRole('link', { name: 'Sign in' }).click();
+	await signInThroughDialog(page);
 	await page.getByLabel('Username').fill(E2E_ADMIN.username);
 	await page.getByLabel('Password', { exact: true }).fill(E2E_ADMIN.password);
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -308,12 +333,27 @@ test('the Authorize dialog shows the real session and signs out from it', async 
 	const session = dialog.locator('#menagerist-session-dialog');
 	await expect(session).toContainText(`Signed in as ${E2E_ADMIN.displayName}`);
 	// Only the bearer scheme's native block is left.
-	await expect(dialog.locator('.auth-container:not([hidden])')).toHaveCount(1);
-	await expect(dialog.locator('.auth-container:not([hidden])')).toContainText('HTTPBearer');
+	await expect(dialog.locator('.auth-container:not([hidden]):has(input)')).toHaveCount(1);
+	await expect(dialog.locator('.auth-container:not([hidden]):has(input)')).toContainText(
+		'HTTPBearer'
+	);
 	await expect(dialog.getByText('APIKeyCookie')).toBeHidden();
 
+	await expect(session.locator('h4')).toHaveText('Browser session');
+	// The state lines are paragraphs, not headings, and the precedence sentence follows.
+	await expect(session.locator('h6')).toHaveCount(0);
+	await expect(session.locator('p.menagerist-session-text')).toContainText(
+		`Signed in as ${E2E_ADMIN.displayName} (browser session).`
+	);
+	await expect(session).toContainText(
+		'An API token, when set below, takes precedence over the session for Try it out.'
+	);
+	await expect(banner(page)).toContainText(
+		`Signed in as ${E2E_ADMIN.displayName} (browser session).`
+	);
 	await session.getByRole('button', { name: 'Sign out' }).click();
 	await expect(session).toContainText('Not signed in');
+	await expect(session.getByRole('link', { name: 'Sign in' })).toBeVisible();
 	await expect(banner(page)).toContainText('Not signed in', CHROME);
 	await dialog.getByRole('button', { name: 'Close' }).click();
 	await expect(lockIcon).toHaveClass('unlocked');

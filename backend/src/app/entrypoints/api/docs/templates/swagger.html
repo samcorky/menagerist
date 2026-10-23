@@ -1,58 +1,130 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link type="text/css" rel="stylesheet" href="$swagger_css_url"
-  integrity="$swagger_css_integrity" crossorigin="anonymous">
-<link rel="shortcut icon" href="$favicon_url">
-<title>$title</title>
-<style>
-/* Authorize takes a bearer token only: browsers cannot set a Cookie header, so swagger-init.js hides the cookie
-   scheme's block in the dialog. The sign-in state and actions are injected into Swagger's scheme bar by it too. */
-.swagger-ui .menagerist-session {
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-  gap: 12px; width: 100%; box-sizing: border-box; padding: 10px 14px;
-  border: 1px solid rgba(59, 65, 81, 0.2); border-left-width: 4px; border-radius: 4px;
-  /* As tall as the signed-in banner, so the page does not jump when the answer arrives. */
-  min-height: 66px;
-  background: #fff; color: #3b4151; font-family: inherit; font-size: 14px;
-}
-.swagger-ui .menagerist-session-info { border-left-color: #4990e2; }
-.swagger-ui .menagerist-session-ok { border-left-color: #49cc90; }
-.swagger-ui .menagerist-session-warn { border-left-color: #fca130; }
-.swagger-ui .menagerist-session-error { border-left-color: #f93e3e; }
-.swagger-ui .menagerist-session-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.swagger-ui .menagerist-session .btn {
-  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
-  min-height: 44px; padding: 5px 23px; text-decoration: none; color: #3b4151; cursor: pointer;
-}
-.swagger-ui .menagerist-session-body {
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-  gap: 12px; width: 100%;
-}
-.swagger-ui .menagerist-session-lead { display: inline-flex; align-items: center; gap: 10px; }
-.swagger-ui .menagerist-spinner {
-  box-sizing: border-box; width: 16px; height: 16px; flex: none; border-radius: 50%;
-  border: 2px solid rgba(59, 65, 81, 0.25); border-top-color: #4990e2;
-  animation: menagerist-spin 0.8s linear infinite;
-}
-@keyframes menagerist-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .swagger-ui .menagerist-spinner { animation: none; } }
-.swagger-ui .menagerist-session-notice { flex-basis: 100%; color: #f93e3e; }
-.swagger-ui .menagerist-session .btn:focus-visible { outline: 3px solid #4990e2; outline-offset: 2px; }
-.swagger-ui .menagerist-logo { float: left; height: 44px; margin: 0 14px 8px 0; }
-.swagger-ui .menagerist-dialog-session { margin: 0 0 16px; }
-.swagger-ui .menagerist-dialog-session .menagerist-session { min-height: 0; }
-#swagger-ui > .menagerist-session { margin: 16px; width: auto; }
-</style>
-</head>
-<body>
-<div id="swagger-ui"></div>
-<script src="$swagger_js_url"
-  integrity="$swagger_js_integrity" crossorigin="anonymous"></script>
-<script src="$init_js_url"
-  data-openapi-url="$openapi_url"
-  data-oauth2-redirect="$oauth2_redirect_url"></script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      type="text/css"
+      rel="stylesheet"
+      href="$swagger_css_url"
+      integrity="$swagger_css_integrity"
+      crossorigin="anonymous"
+    />
+    <link rel="shortcut icon" href="$favicon_url" />
+    <title>$title</title>
+    <style>
+      /* Browsers cannot set a Cookie header, so swagger-init.js hides the cookie scheme's block in the Authorize dialog
+   and adds a Browser session block above the bearer token block. The page-level status goes into the scheme bar. */
+      .swagger-ui .menagerist-session {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px 14px;
+        border: 1px solid rgba(59, 65, 81, 0.2);
+        border-left-width: 4px;
+        border-radius: 4px;
+        /* As tall as the signed-in banner, so the page does not jump when the answer arrives. */
+        min-height: 66px;
+        background: #fff;
+        color: #3b4151;
+        font-family: inherit;
+        font-size: 14px;
+      }
+      .swagger-ui .menagerist-session-info {
+        border-left-color: #4990e2;
+      }
+      .swagger-ui .menagerist-session-ok {
+        border-left-color: #49cc90;
+      }
+      .swagger-ui .menagerist-session-warn {
+        border-left-color: #fca130;
+      }
+      .swagger-ui .menagerist-session-error {
+        border-left-color: #f93e3e;
+      }
+      .swagger-ui .menagerist-session-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .swagger-ui .menagerist-session .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        min-height: 44px;
+        padding: 5px 23px;
+        text-decoration: none;
+        color: #3b4151;
+        cursor: pointer;
+      }
+      .swagger-ui .menagerist-session-body {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        width: 100%;
+      }
+      .swagger-ui .menagerist-session-lead {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .swagger-ui .menagerist-spinner {
+        box-sizing: border-box;
+        width: 16px;
+        height: 16px;
+        flex: none;
+        border-radius: 50%;
+        border: 2px solid rgba(59, 65, 81, 0.25);
+        border-top-color: #4990e2;
+        animation: menagerist-spin 0.8s linear infinite;
+      }
+      @keyframes menagerist-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .swagger-ui .menagerist-spinner {
+          animation: none;
+        }
+      }
+      .swagger-ui .menagerist-session-notice {
+        flex-basis: 100%;
+        color: #f93e3e;
+      }
+      .swagger-ui .menagerist-session .btn:focus-visible {
+        outline: 3px solid #4990e2;
+        outline-offset: 2px;
+      }
+      .swagger-ui .menagerist-logo {
+        float: left;
+        height: 44px;
+        margin: 0 14px 8px 0;
+      }
+      #swagger-ui > .menagerist-session {
+        margin: 16px;
+        width: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script
+      src="$swagger_js_url"
+      integrity="$swagger_js_integrity"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="$init_js_url"
+      data-openapi-url="$openapi_url"
+      data-oauth2-redirect="$oauth2_redirect_url"
+    ></script>
+  </body>
 </html>

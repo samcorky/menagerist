@@ -49,18 +49,37 @@ type Init = {
 		me: { display_name: string; role: string; password_expired: boolean } | null,
 		failed?: boolean,
 		notice?: string,
-		checking?: boolean
+		checking?: boolean,
+		token?: { status: string; count?: number } | null
 	): {
 		tone: string;
 		text: string;
+		sessionText: string;
 		notice?: string;
 		busy?: boolean;
 		actions: { label: string; href?: string; action?: string }[];
+		sessionActions: { label: string; href?: string; action?: string }[];
 	};
+	checkToken(
+		token: string,
+		fetchFn: (
+			url: string,
+			init: { headers: Record<string, string>; credentials: string }
+		) => Promise<unknown>
+	): Promise<{ status: string; count?: number }>;
+	bearerSchemes(definitions: Record<string, { type?: string; scheme?: string }>): string[];
+	bearerToken(authorized: Record<string, { value?: unknown }>, names: string[]): string;
+	hintSchemeBlocks(doc: FakeDocument, container: unknown, names: string[]): void;
 	loginHref(): string;
 	safeLogoUrl(logo: unknown, origin?: string): string | null;
 	cookieSchemes(definitions: Record<string, { type?: string; in?: string }>): string[];
 	applyLocks(ui: unknown, names: string[], signedIn: boolean): void;
+	renderDialogSession(
+		doc: FakeDocument,
+		section: FakeNode,
+		model: ReturnType<Init['bannerModel']>,
+		onSignOut: () => void
+	): FakeNode;
 	hideSchemeBlocks(container: unknown, names: string[]): number;
 	renderBanner(
 		doc: FakeDocument,
@@ -140,18 +159,23 @@ describe('swagger-init session banner', () => {
 
 	const me = { display_name: 'Ada', role: 'admin', password_expired: false };
 
-	it('offers sign in with an encoded next when signed out', () => {
+	it('points at Authorize when signed out, with no banner buttons', () => {
 		const model = init.bannerModel({ setup_required: false }, null);
 		expect(model.tone).toBe('warn');
-		expect(model.text).toMatch(/^Not signed in/);
-		expect(model.actions).toEqual([{ label: 'Sign in', href: '/login?next=%2Fapi%2Fdocs' }]);
+		expect(model.text).toBe('Not signed in. Use Authorize to sign in or add an API token.');
+		expect(model.actions).toEqual([]);
+		expect(model.sessionText).toBe('Not signed in.');
+		expect(model.sessionActions).toEqual([{ label: 'Sign in', href: '/login?next=%2Fapi%2Fdocs' }]);
 		expect(init.loginHref()).toBe('/login?next=%2Fapi%2Fdocs');
 	});
 
-	it('offers setup on a first run', () => {
+	it('points at Authorize to set up on a first run', () => {
 		const model = init.bannerModel({ setup_required: true }, null);
-		expect(model.text).toMatch(/^First run/);
-		expect(model.actions).toEqual([{ label: 'Set up', href: '/setup' }]);
+		expect(model.text).toBe(
+			'First run: create the administrator account. Use Authorize to set up.'
+		);
+		expect(model.actions).toEqual([]);
+		expect(model.sessionActions).toEqual([{ label: 'Set up', href: '/setup' }]);
 	});
 
 	it('offers the account page when the password has expired', () => {
@@ -163,15 +187,143 @@ describe('swagger-init session banner', () => {
 	it('shows the person with open and sign-out actions when signed in', () => {
 		const model = init.bannerModel({ setup_required: false }, me);
 		expect(model.tone).toBe('ok');
-		expect(model.text).toBe('Signed in as Ada (admin)');
+		expect(model.text).toBe('Signed in as Ada (browser session).');
 		expect(model.actions).toEqual([
 			{ label: 'Open Menagerist', href: '/' },
 			{ label: 'Sign out', action: 'signout' }
 		]);
+		expect(model.sessionActions).toEqual([{ label: 'Sign out', action: 'signout' }]);
+	});
+
+	describe('with an API token', () => {
+		const out = { setup_required: false };
+		const rejected = 'This API token was not accepted (invalid, expired or revoked).';
+
+		it('says it is checking a token while signed out', () => {
+			const model = init.bannerModel(out, null, false, '', false, { status: 'checking' });
+			expect(model.text).toBe('Using an API token.');
+			expect(model.tone).toBe('info');
+			expect(model.actions).toEqual([]);
+		});
+
+		it('counts the permissions of an accepted token', () => {
+			const ok = (count: number) =>
+				init.bannerModel(out, null, false, '', false, { status: 'ok', count });
+			expect(ok(3).text).toBe('Using an API token with 3 permissions.');
+			expect(ok(3).tone).toBe('ok');
+			expect(ok(1).text).toBe('Using an API token with 1 permission.');
+		});
+
+		it('warns when the token is rejected and when it could not be checked', () => {
+			const bad = init.bannerModel(out, null, false, '', false, { status: 'rejected' });
+			expect(bad.tone).toBe('warn');
+			expect(bad.text).toBe(rejected);
+			const down = init.bannerModel(out, null, false, '', false, { status: 'failed' });
+			expect(down.tone).toBe('error');
+			expect(down.text).toBe('Could not check the API token.');
+		});
+
+		it('prefers the token text over the first-run hint', () => {
+			const model = init.bannerModel({ setup_required: true }, null, false, '', false, {
+				status: 'ok',
+				count: 2
+			});
+			expect(model.text).toBe('Using an API token with 2 permissions.');
+		});
+
+		it('says the token takes precedence when signed in as well', () => {
+			const both = init.bannerModel(out, me, false, '', false, { status: 'ok', count: 4 });
+			expect(both.text).toBe(
+				'Signed in as Ada. An API token is also set and takes precedence for Try it out.'
+			);
+			expect(both.tone).toBe('ok');
+			expect(both.sessionText).toBe('Signed in as Ada (browser session).');
+			expect(both.actions.map((a) => a.label)).toEqual(['Open Menagerist', 'Sign out']);
+		});
+
+		it('appends the failure when the token is also bad', () => {
+			const bad = init.bannerModel(out, me, false, '', false, { status: 'rejected' });
+			expect(bad.tone).toBe('warn');
+			expect(bad.text).toMatch(/^Signed in as Ada\. An API token is also set/);
+			expect(bad.text.endsWith(rejected)).toBe(true);
+			const down = init.bannerModel(out, me, false, '', false, { status: 'failed' });
+			expect(down.text.endsWith('Could not check the API token.')).toBe(true);
+		});
+
+		it('finds bearer schemes and the token Swagger holds, and never invents one', () => {
+			expect(
+				init.bearerSchemes({
+					HTTPBearer: { type: 'http', scheme: 'bearer' },
+					Basic: { type: 'http', scheme: 'basic' },
+					Cookie: { type: 'apiKey' }
+				})
+			).toEqual(['HTTPBearer']);
+			expect(init.bearerSchemes({})).toEqual([]);
+			expect(init.bearerToken({ HTTPBearer: { value: 'mnst_x' } }, ['HTTPBearer'])).toBe('mnst_x');
+			expect(init.bearerToken({ HTTPBearer: { value: '' } }, ['HTTPBearer'])).toBe('');
+			expect(init.bearerToken({ Other: { value: 'x' } }, ['HTTPBearer'])).toBe('');
+			expect(init.bearerToken({}, [])).toBe('');
+		});
+
+		describe('checkToken', () => {
+			const reply =
+				(status: number, body: unknown = {}) =>
+				() =>
+					Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(body) });
+
+			it('sends the bearer header without cookies and counts the permissions', async () => {
+				let seen: { url: string; credentials: string; auth: string } | undefined;
+				const result = await init.checkToken('mnst_secret', (url, options) => {
+					seen = { url, credentials: options.credentials, auth: options.headers.Authorization };
+					return reply(200, { permissions: ['a:b:c', 'd:e:f'] })();
+				});
+				expect(result).toEqual({ status: 'ok', count: 2 });
+				expect(seen?.url).toBe('/api/v1/auth/me/permissions');
+				expect(seen?.credentials).toBe('omit');
+				expect(seen?.auth).toBe('Bearer mnst_secret');
+				expect(seen?.url).not.toContain('mnst_secret');
+			});
+
+			it('maps 401 to rejected and anything else to failed', async () => {
+				await expect(init.checkToken('t', reply(401))).resolves.toEqual({ status: 'rejected' });
+				await expect(init.checkToken('t', reply(500))).resolves.toEqual({ status: 'failed' });
+				await expect(init.checkToken('t', reply(200, { nope: 1 }))).resolves.toEqual({
+					status: 'failed'
+				});
+				await expect(init.checkToken('t', () => Promise.reject(new Error('net')))).resolves.toEqual(
+					{ status: 'failed' }
+				);
+			});
+		});
+
+		it('adds the token hint under the bearer heading once', () => {
+			const doc: FakeDocument = { createElement: (tag) => new FakeNode(tag) };
+			const inserted: { tag: string; text: string; before: unknown }[] = [];
+			const heading = {
+				textContent: 'HTTPBearer (http, Bearer)',
+				nextSibling: 'NEXT',
+				parentNode: {
+					insertBefore: (n: FakeNode, ref: unknown) =>
+						inserted.push({ tag: n.tag, text: n.textContent, before: ref })
+				}
+			};
+			let hinted = false;
+			const block = {
+				hidden: false,
+				querySelector: (sel: string) => (sel === 'h4' ? heading : hinted ? {} : null)
+			};
+			const container = { querySelectorAll: () => [block] };
+			init.hintSchemeBlocks(doc, container, ['HTTPBearer']);
+			hinted = true;
+			init.hintSchemeBlocks(doc, container, ['HTTPBearer']);
+			expect(inserted).toEqual([
+				{ tag: 'p', text: 'Or use a token instead of a session.', before: 'NEXT' }
+			]);
+		});
 	});
 
 	it('reports a failed check as an error with no actions', () => {
-		expect(init.bannerModel(null, null, true)).toEqual({
+		expect(init.bannerModel(null, null, true)).toMatchObject({
 			tone: 'error',
 			text: 'Could not check the sign-in state.',
 			actions: []
@@ -282,11 +434,13 @@ describe('swagger-init session banner', () => {
 	});
 
 	it('shows a busy, action-free state while the sign-in state is being checked', () => {
-		expect(init.bannerModel(null, null, false, '', true)).toEqual({
+		const model = init.bannerModel(null, null, false, '', true);
+		expect(model).toMatchObject({
 			tone: 'info',
 			text: 'Checking sign-in state…',
 			busy: true,
-			actions: []
+			actions: [],
+			sessionActions: []
 		});
 	});
 
@@ -352,5 +506,88 @@ describe('swagger-init cookie header', () => {
 			ORIGIN
 		);
 		expect(req.headers).toEqual({ A: '1', Origin: ORIGIN });
+	});
+
+	describe('dialog session block', () => {
+		const doc: FakeDocument = { createElement: (tag) => new FakeNode(tag) };
+		const me = { display_name: 'Alice', role: 'member', password_expired: false };
+		const all = (root: FakeNode) => {
+			const found: FakeNode[] = [];
+			const walk = (n: FakeNode) => {
+				found.push(n);
+				n.children.forEach(walk);
+			};
+			root.children.forEach(walk);
+			return found;
+		};
+
+		it('uses Swagger block classes with a primary Sign in link when signed out', () => {
+			const section = new FakeNode('div');
+			init.renderDialogSession(doc, section, init.bannerModel(null, null, false), () => {});
+			expect(section.className).toBe('auth-container');
+			const nodes = all(section);
+			expect(nodes.find((n) => n.tag === 'h4')?.textContent).toBe('Browser session');
+			expect(nodes.some((n) => n.tag === 'h6')).toBe(false);
+			expect(nodes.find((n) => n.tag === 'p')?.textContent).toContain('Not signed in');
+			expect(nodes.filter((n) => n.tag === 'p').at(-1)?.textContent).toBe(
+				'An API token, when set below, takes precedence over the session for Try it out.'
+			);
+			// The dialog shows the session only, even when a token is set.
+			const withToken = new FakeNode('div');
+			init.renderDialogSession(
+				doc,
+				withToken,
+				init.bannerModel(null, null, false, '', false, { status: 'ok', count: 2 }),
+				() => {}
+			);
+			expect(withToken.textContent).toContain('Not signed in.');
+			expect(withToken.textContent).not.toContain('Using an API token');
+			const link = nodes.find((n) => n.tag === 'a');
+			expect(link?.className).toBe('btn modal-btn auth authorize button');
+			expect(link?.attrs.href).toBe('/login?next=%2Fapi%2Fdocs');
+			expect(nodes.some((n) => n.className === 'auth-btn-wrapper')).toBe(true);
+		});
+
+		it('shows a plain Sign out button, the name and a failure notice when signed in', () => {
+			const section = new FakeNode('div');
+			let clicked = 0;
+			init.renderDialogSession(
+				doc,
+				section,
+				init.bannerModel(null, me, false, 'Could not sign out.'),
+				() => clicked++
+			);
+			const nodes = all(section);
+			const button = nodes.find((n) => n.tag === 'button');
+			expect(button?.className).toBe('btn modal-btn auth button');
+			button?.listeners.click();
+			expect(clicked).toBe(1);
+			const lines = nodes.filter((n) => n.tag === 'p').map((n) => n.textContent);
+			expect(lines[0]).toBe('Signed in as Alice (browser session).');
+			expect(lines[1]).toBe('Could not sign out.');
+			expect(nodes.find((n) => n.className === 'menagerist-session-notice')).toBeDefined();
+		});
+
+		it('is busy with no buttons while checking, and shows the setup hint', () => {
+			const section = new FakeNode('div');
+			init.renderDialogSession(
+				doc,
+				section,
+				init.bannerModel(null, null, false, '', true),
+				() => {}
+			);
+			expect(section.attrs['aria-busy']).toBe('true');
+			expect(all(section).some((n) => n.tag === 'a' || n.tag === 'button')).toBe(false);
+			expect(section.textContent).toContain('Checking sign-in state…');
+			init.renderDialogSession(
+				doc,
+				section,
+				init.bannerModel({ setup_required: true }, null, false),
+				() => {}
+			);
+			expect(section.attrs['aria-busy']).toBe('false');
+			expect(section.textContent).toContain('First run');
+			expect(all(section).find((n) => n.tag === 'a')?.attrs.href).toBe('/setup');
+		});
 	});
 });

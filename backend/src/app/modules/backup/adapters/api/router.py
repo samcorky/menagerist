@@ -1,5 +1,5 @@
 from datetime import UTC
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from app.entrypoints.api.shared.bridges.backup_setup_gate import first_run_restore_slot
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.entrypoints.api.shared.http.cross_site import refuse_cross_site
+from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.http.upload_limit_middleware import (
     PAYLOAD_TOO_LARGE_RESPONSE,
 )
@@ -46,7 +47,13 @@ from app.modules.backup.application.upload_backup import (
     UploadBackupCommand,
 )
 from app.modules.backup.application.verify_backup import VerifyBackup, VerifyBackupQuery
+from app.modules.backup.domain.errors import (
+    BackupNotFoundError,
+    CorruptBackupError,
+    RestoreTargetNotEmptyError,
+)
 from app.shared_kernel.actor import ANONYMOUS_ACTOR, Actor
+from app.shared_kernel.errors import ForbiddenError
 from app.shared_kernel.slug import slugify
 
 router = APIRouter(prefix="/backup", tags=["Backups"], route_class=PermissionAwareRoute)
@@ -62,9 +69,15 @@ ARCHIVE_BODY = {
         },
     }
 }
-ADMIN_RESPONSES: dict[int | str, dict[str, object]] = {
-    403: {"description": "Administrator permission required."}
-}
+ADMIN_RESPONSES: dict[int | str, dict[str, Any]] = error_response(
+    ForbiddenError,
+    detail="You do not have permission to do that.",
+    description="Administrator permission required.",
+)
+_BACKUP_NOT_FOUND = error_response(
+    BackupNotFoundError,
+    detail="Backup 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40 was not found.",
+)
 
 
 @router.post(
@@ -145,12 +158,16 @@ async def upload_backup(
     openapi_extra=ARCHIVE_BODY,
     dependencies=[Depends(refuse_cross_site), Depends(first_run_restore_slot)],
     responses={
-        409: {
-            "description": (
-                "Setup has already been completed or the target is not empty."
-            )
-        },
-        400: {"description": "The archive failed verification."},
+        **error_response(
+            RestoreTargetNotEmptyError,
+            detail="Restore would overwrite existing instance content.",
+            description="Setup has already been completed or the target is not empty.",
+        ),
+        **error_response(
+            CorruptBackupError,
+            detail="The archive failed integrity or structural validation.",
+            description="The archive failed verification.",
+        ),
         **PAYLOAD_TOO_LARGE_RESPONSE,
     },
 )
@@ -169,7 +186,7 @@ async def restore_on_first_run(
     "/{backup_id}/verify",
     response_model=VerificationResponse,
     operation_id="verify_backup",
-    responses=ADMIN_RESPONSES,
+    responses={**ADMIN_RESPONSES, **_BACKUP_NOT_FOUND},
 )
 async def verify_backup(
     backup_id: UUID,
@@ -187,6 +204,7 @@ async def verify_backup(
     operation_id="download_backup",
     responses={
         **ADMIN_RESPONSES,
+        **_BACKUP_NOT_FOUND,
         200: {
             "description": "The compressed backup archive.",
             "content": {
@@ -219,7 +237,7 @@ async def download_backup(
     "/{backup_id}",
     status_code=204,
     operation_id="delete_backup",
-    responses=ADMIN_RESPONSES,
+    responses={**ADMIN_RESPONSES, **_BACKUP_NOT_FOUND},
 )
 async def delete_backup(
     backup_id: UUID,

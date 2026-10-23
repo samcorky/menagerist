@@ -4,10 +4,12 @@ import pytest
 from fastapi import APIRouter, Depends, FastAPI
 from starlette.testclient import TestClient
 
+from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.entrypoints.api.shared.permission_aware_route import (
     PermissionAwareRoute,
     _find_use_case_type,
 )
+from app.modules.identity.adapters.api.dependencies import get_identity_actor
 from app.modules.identity.application.permissions import IdentityPermission
 from app.modules.media.application.permissions import MediaPermission
 from app.shared_kernel.access import (
@@ -183,6 +185,7 @@ def test_openapi_documents_content_permission() -> None:
 
     async def endpoint(
         use_case: Annotated[ContentUseCase, Depends(get_content)],
+        actor: Annotated[Actor, Depends(get_current_actor)],
     ) -> dict[str, str]:
         """Content endpoint."""
         return {}
@@ -219,6 +222,45 @@ def test_admin_only_permission_documents_the_cookie_alone() -> None:
 
     operation = _schema(endpoint)["paths"]["/x"]["get"]
     assert operation["x-required-permission"] == "identity:user:list"
+    assert operation["security"] == [{"APIKeyCookie": []}]
+
+
+def test_a_route_with_no_stance_accepts_a_token_when_it_uses_the_token_actor() -> None:
+    """No declared permission, but `get_current_actor` reads the bearer: documented."""
+
+    async def endpoint(
+        actor: Annotated[Actor, Depends(get_current_actor)],
+    ) -> dict[str, str]:
+        """Own permissions."""
+        return {}
+
+    operation = _schema(endpoint)["paths"]["/x"]["get"]
+    assert "x-required-permission" not in operation
+    assert operation["security"] == [{"HTTPBearer": []}]
+
+
+def test_a_content_route_on_the_cookie_only_actor_documents_no_bearer() -> None:
+    """Documentation follows behaviour: identity's actor never reads the header."""
+
+    class ContentUseCase(UseCase[object, str]):
+        """Content use case."""
+
+        access: ClassVar[Access] = Content(MediaPermission.ITEM_READ)
+
+        async def _handle(self, request: object, actor: Actor) -> str:
+            return "ok"
+
+    def get_content() -> ContentUseCase:
+        return ContentUseCase.__new__(ContentUseCase)
+
+    async def endpoint(
+        use_case: Annotated[ContentUseCase, Depends(get_content)],
+        actor: Annotated[Actor, Depends(get_identity_actor)],
+    ) -> dict[str, str]:
+        """Content endpoint."""
+        return {}
+
+    operation = _schema(endpoint)["paths"]["/x"]["get"]
     assert operation["security"] == [{"APIKeyCookie": []}]
 
 

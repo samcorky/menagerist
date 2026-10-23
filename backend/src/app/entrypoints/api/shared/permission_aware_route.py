@@ -2,16 +2,20 @@ import inspect
 from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin, get_type_hints
 
 from fastapi import Security
+from fastapi.dependencies.utils import get_dependant
 from fastapi.routing import APIRoute
 from fastapi.security import APIKeyCookie, HTTPBearer
 
 from app.entrypoints.api.shared.authorisation import TOKEN_GRANTABLE_PERMISSIONS
+from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.platform.config import get_identity_settings
 from app.shared_kernel.access import Content, Requires
 from app.shared_kernel.cqrs import CommandHandler, UseCase
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from fastapi.dependencies.models import Dependant
 
 # The session cookie identity issues at sign-in. auto_error=False deliberately:
 # this exists for OpenAPI documentation only; `get_current_actor` rejects the
@@ -63,6 +67,32 @@ def _declared_permission(use_case_cls: type[UseCase[Any, Any]]) -> str | None:
     return access.permission.value if isinstance(access, Requires | Content) else None
 
 
+def _calls(dependant: Dependant) -> set[Callable[..., Any]]:
+    """Return every callable `dependant` depends on, however deeply."""
+    found: set[Callable[..., Any]] = set()
+    for sub in dependant.dependencies:
+        if sub.call is not None:
+            found.add(sub.call)
+        found |= _calls(sub)
+    return found
+
+
+def _accepts_token(
+    path: str, endpoint: Callable[..., Any], permission: str | None
+) -> bool:
+    """Whether a bearer token can authenticate this route, for the documentation.
+
+    Derived from what the route really does: only `get_current_actor` reads the
+    `Authorization` header (identity's own dependencies read the cookie alone), and
+    a declared permission must be one a token can hold (administration is
+    session-only). A route with no declared permission, such as the caller's own
+    permission list, accepts a token whenever it resolves its actor that way.
+    """
+    if get_current_actor not in _calls(get_dependant(path=path, call=endpoint)):
+        return False
+    return permission is None or permission in _TOKEN_PERMISSIONS
+
+
 class PermissionAwareRoute(APIRoute):
     """Reflect a use case's `Requires` or `Content` stance into OpenAPI documentation.
 
@@ -84,11 +114,12 @@ class PermissionAwareRoute(APIRoute):
             _declared_permission(use_case_cls) if use_case_cls is not None else None
         )
 
+        accepts_token = _accepts_token(path, endpoint, permission)
+
         if permission is not None:
             dependencies = list(params.get("dependencies") or [])
             dependencies.append(Security(cookie_scheme))
-            # Only permissions a token can hold; administration is session-only.
-            if permission in _TOKEN_PERMISSIONS:
+            if accepts_token:
                 dependencies.append(Security(bearer_scheme))
             params["dependencies"] = dependencies
 
@@ -105,5 +136,12 @@ class PermissionAwareRoute(APIRoute):
                 if existing_description
                 else permission_line
             )
+
+        elif accepts_token:
+            # No stance of its own, but it takes a token all the same.
+            params["dependencies"] = [
+                *(params.get("dependencies") or []),
+                Security(bearer_scheme),
+            ]
 
         super().__init__(path, endpoint, **params)

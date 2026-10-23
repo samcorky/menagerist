@@ -14,6 +14,7 @@
 		type SessionResponse
 	} from '$lib/api/client';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
+	import ApiTokensCard from '$lib/components/api-tokens-card.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import DeviceIcon from '$lib/components/device-icon.svelte';
@@ -387,6 +388,8 @@
 					</ul>
 				{/if}
 			</section>
+
+			<ApiTokensCard />
 
 			<ConfirmDialog
 				open={confirmRevokeOthers}

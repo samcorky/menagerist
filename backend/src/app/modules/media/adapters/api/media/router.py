@@ -214,7 +214,9 @@ async def list_node_media(
             MediaAssetNotFoundError,
             detail="Media asset 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
         ),
-        304: {"description": "Not Modified"},
+        304: {
+            "description": "Not modified: the condition matched, so there is no body."
+        },
     },
 )
 async def get_media(

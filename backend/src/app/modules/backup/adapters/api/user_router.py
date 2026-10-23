@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import StreamingResponse
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.http.upload_limit_middleware import (
     PAYLOAD_TOO_LARGE_RESPONSE,
 )
@@ -27,6 +28,10 @@ from app.modules.backup.application.import_user_archive import (
 from app.modules.backup.application.open_user_export import (
     OpenUserExport,
     OpenUserExportQuery,
+)
+from app.modules.backup.domain.errors import (
+    BackupNotFoundError,
+    IncompatibleBackupError,
 )
 from app.shared_kernel.actor import Actor
 
@@ -66,12 +71,16 @@ async def export_user_data(
     "/export/{backup_id}/download",
     operation_id="download_user_export",
     responses={
+        **error_response(
+            BackupNotFoundError,
+            detail="Export 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40 was not found.",
+        ),
         200: {
             "description": "The caller's personal archive.",
             "content": {
                 "application/gzip": {"schema": {"type": "string", "format": "binary"}}
             },
-        }
+        },
     },
 )
 async def download_user_export(
@@ -100,11 +109,11 @@ async def download_user_export(
     openapi_extra=ARCHIVE_BODY,
     responses={
         **PAYLOAD_TOO_LARGE_RESPONSE,
-        409: {
-            "description": (
-                "The account contains content or the archive is incompatible."
-            )
-        },
+        **error_response(
+            IncompatibleBackupError,
+            detail="The archive's revision, format or scope cannot be restored here.",
+            description="The account contains content or the archive is incompatible.",
+        ),
     },
 )
 async def import_user_data(

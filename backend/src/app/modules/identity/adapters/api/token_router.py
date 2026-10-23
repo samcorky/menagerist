@@ -56,7 +56,9 @@ _UNAUTHENTICATED = error_response(
 )
 
 _THROTTLED = error_response(
-    SignInThrottledError, detail="Too many failed attempts. Try again later."
+    SignInThrottledError,
+    detail="Too many failed attempts. Try again later.",
+    description="Too many wrong passwords recently; wait for `Retry-After` seconds.",
 )
 _THROTTLED[429]["headers"] = {
     "Retry-After": {
@@ -68,11 +70,10 @@ _THROTTLED[429]["headers"] = {
 _NOT_FOUND = error_response(ApiTokenNotFoundError, detail="That token was not found.")
 
 _CREATE_400 = error_response(
-    CurrentPasswordIncorrectError, detail="The current password is incorrect."
-)
-_CREATE_400[400]["description"] += (
-    " Also used for a name, permission set or lifetime that is not acceptable"
-    + f" (`{InvalidApiTokenRequestError.__name__}`)."
+    CurrentPasswordIncorrectError,
+    detail="The current password is incorrect.",
+    description="The password is wrong. Also used for a name, permission set or"
+    + f" lifetime that is not acceptable (`{InvalidApiTokenRequestError.__name__}`).",
 )
 
 _LIMIT = error_response(

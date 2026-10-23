@@ -117,3 +117,23 @@ def test_identity_actors_read_only_the_cookie_reader() -> None:
     for call in (get_identity_actor, get_active_identity_actor, get_signed_in_user):
         dependant = get_dependant(path="/", call=call)
         assert get_session_token in _calls(dependant)
+
+
+def test_a_route_documented_as_taking_a_token_never_uses_the_cookie_only_actor() -> (
+    None
+):
+    """Docs and behaviour agree: bearer is documented only where the header is read."""
+    from app.entrypoints.api import create_app
+
+    paths = create_app().openapi()["paths"]
+    documented = {
+        (method.upper(), path.removeprefix("/api"))
+        for path, item in paths.items()
+        for method, operation in item.items()
+        if {"HTTPBearer": []} in operation.get("security", [])
+    }
+    assert documented
+    for method, path, route in _all(api_v1_router):
+        if (method, path) in documented:
+            assert not _calls(route.dependant) & IDENTITY_ACTORS, f"{method} {path}"
+            assert get_current_actor in _calls(route.dependant), f"{method} {path}"
