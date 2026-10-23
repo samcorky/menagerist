@@ -83,11 +83,30 @@ from app.shared_kernel.cqrs import UseCase
 _CLAIM = "system job that assigns owners to ownerless rows; reads no content"
 _ADD = "persists a new entity; the use case stamps the owner"
 _SAVE = "persists an entity already fetched through a scoped read"
+_PURGE = "system-only hard delete by id; the System use case reads no content"
 NO_SCOPE_NEEDED: dict[type, dict[str, str]] = {
-    NodeRepository: {"add": _ADD, "save": _SAVE, "claim_orphaned": _CLAIM},
-    EdgeRepository: {"add": _ADD, "save": _SAVE, "claim_orphaned": _CLAIM},
-    CollectionRepository: {"add": _ADD, "save": _SAVE, "claim_orphaned": _CLAIM},
+    NodeRepository: {
+        "add": _ADD,
+        "save": _SAVE,
+        "claim_orphaned": _CLAIM,
+        "purge": _PURGE,
+    },
+    EdgeRepository: {
+        "add": _ADD,
+        "save": _SAVE,
+        "claim_orphaned": _CLAIM,
+        "purge": _PURGE,
+        "purge_for_node": _PURGE,
+    },
+    CollectionRepository: {
+        "add": _ADD,
+        "save": _SAVE,
+        "claim_orphaned": _CLAIM,
+        "purge": _PURGE,
+    },
     MembershipRepository: {
+        "purge_for_collection": _PURGE,
+        "purge_for_item": _PURGE,
         "add": "links ids the use case already checked in scope",
         "remove": "unlinks ids the use case already checked in scope",
     },
@@ -213,6 +232,12 @@ UNSCOPED_USE_CASES = {
     # System-actor maintenance jobs, run from the media CLI: they sweep all content.
     "CleanupExpiredMedia": "system maintenance job",
     "RegenerateThumbnails": "system maintenance job",
+    # System-actor hard deletes run by example-pack removal, by id.
+    "PurgeNode": "system purge",
+    "PurgeEdge": "system purge",
+    "PurgeCollection": "system purge",
+    "PurgeItemMemberships": "system purge",
+    "PurgeAttachment": "system purge",
 }
 SAFE_STANCES = (Content, Requires)
 CONTENT_MODULES = ("graph", "collections", "media", "examples")

@@ -37,11 +37,14 @@ from app.modules.collections.application.create_collection import (
     CreateCollection,
     CreateCollectionCommand,
 )
-from app.modules.collections.application.delete_collection import (
-    DeleteCollection,
-    DeleteCollectionCommand,
+from app.modules.collections.application.purge_collection import (
+    PurgeCollection,
+    PurgeCollectionCommand,
 )
-from app.modules.collections.domain.errors import CollectionNotFoundError
+from app.modules.collections.application.purge_item_memberships import (
+    PurgeItemMemberships,
+    PurgeItemMembershipsCommand,
+)
 from app.modules.collections.ports.item_lookup import ItemLookup
 from app.modules.collections.ports.unit_of_work import (
     CollectionsRepos,
@@ -81,23 +84,21 @@ from app.modules.graph.application.create_node_type import (
     CreateNodeType,
     CreateNodeTypeCommand,
 )
-from app.modules.graph.application.delete_edge import DeleteEdge, DeleteEdgeCommand
 from app.modules.graph.application.delete_edge_type import (
     DeleteEdgeType,
     DeleteEdgeTypeCommand,
 )
-from app.modules.graph.application.delete_node import DeleteNode, DeleteNodeCommand
 from app.modules.graph.application.delete_unused_node_type import (
     DeleteUnusedNodeType,
     DeleteUnusedNodeTypeCommand,
 )
+from app.modules.graph.application.purge_edge import PurgeEdge, PurgeEdgeCommand
+from app.modules.graph.application.purge_node import PurgeNode, PurgeNodeCommand
 from app.modules.graph.domain.edge import Edge  # noqa: TC001
 from app.modules.graph.domain.edge_type import EdgeType  # noqa: TC001
 from app.modules.graph.domain.errors import (
-    EdgeNotFoundError,
     EdgeTypeInUseError,
     EdgeTypeNotFoundError,
-    NodeNotFoundError,
     NodeTypeInUseError,
     NodeTypeNotFoundError,
 )
@@ -115,8 +116,10 @@ from app.modules.media.adapters.persistence.unit_of_work import (
     create_in_memory_media_uow,
     create_media_uow,
 )
-from app.modules.media.application.delete_media import DeleteMedia, DeleteMediaCommand
-from app.modules.media.application.detach_media import DetachMedia, DetachMediaCommand
+from app.modules.media.application.purge_attachment import (
+    PurgeAttachment,
+    PurgeAttachmentCommand,
+)
 from app.modules.media.application.set_media_cover import (
     SetMediaCover,
     SetMediaCoverCommand,
@@ -125,7 +128,6 @@ from app.modules.media.application.upload_and_attach_media import (
     UploadAndAttachMedia,
     UploadAndAttachMediaCommand,
 )
-from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
 from app.modules.media.ports.attach_target_access import AttachTargetAccess
 from app.modules.media.ports.attachment_policy import (
@@ -203,6 +205,7 @@ class GraphStores:
     media: Callable[[], AbstractAsyncContextManager[MediaRepos]]
     choice_lists: Callable[[], AbstractAsyncContextManager[ChoiceListSource]]
     collections: Callable[[], AbstractAsyncContextManager[CollectionsRepos]]
+    collections_uow: Callable[[], CollectionsUnitOfWork]
 
 
 @dataclass(kw_only=True)
@@ -281,6 +284,7 @@ def in_memory_graph_stores(
         media=media,
         choice_lists=choice_lists,
         collections=collections,
+        collections_uow=lambda: create_in_memory_collections_uow(collection_repos),
     )
 
 
@@ -375,6 +379,7 @@ def build_graph_stores(
         media=media,
         choice_lists=choice_lists,
         collections=collections,
+        collections_uow=lambda: create_collections_uow(session_factory),
     )
 
 
@@ -778,38 +783,59 @@ class GraphPackTarget:
         return Inspection(content=_edge_type_content(edge_type), still_in_use=in_use)
 
     async def remove(self, kind: EntityKind, entity_id: uuid.UUID) -> RemoveResult:
-        """Remove the entity through its delete use case."""
+        """Remove the entity: items and connections hard, types soft.
+
+        Types stay soft-deleted so their slugs stay reusable and other rows may
+        still name them.
+        """
         if kind not in _GRAPH_KINDS:
             raise ValueError(f"The graph target does not handle {kind.value} entities")
+        if kind is EntityKind.ITEM:
+            return await self._purge_item(entity_id)
+        if kind is EntityKind.CONNECTION:
+            return await self._purge_connection(entity_id)
         uow = self._stores.uow()
         try:
-            if kind is EntityKind.ITEM:
-                await DeleteNode(uow, self._access).handle(
-                    DeleteNodeCommand(node_id=entity_id), self._actor
-                )
-            elif kind is EntityKind.ITEM_TYPE:
+            if kind is EntityKind.ITEM_TYPE:
                 # Check and delete in one locked transaction: an item added
                 # meanwhile keeps the type instead of losing it.
                 await DeleteUnusedNodeType(uow, self._access).handle(
                     DeleteUnusedNodeTypeCommand(node_type_id=entity_id), SYSTEM_ACTOR
                 )
-            elif kind is EntityKind.RELATIONSHIP_TYPE:
+            else:
                 await DeleteEdgeType(uow, self._access).handle(
                     DeleteEdgeTypeCommand(edge_type_id=entity_id), SYSTEM_ACTOR
                 )
-            else:
-                await DeleteEdge(uow, self._access).handle(
-                    DeleteEdgeCommand(edge_id=entity_id), self._actor
-                )
-        except (
-            NodeNotFoundError,
-            NodeTypeNotFoundError,
-            EdgeTypeNotFoundError,
-            EdgeNotFoundError,
-        ):
+        except NodeTypeNotFoundError, EdgeTypeNotFoundError:
             return RemoveResult.ALREADY_GONE
         except EdgeTypeInUseError, NodeTypeInUseError:
             return RemoveResult.REFUSED_IN_USE
+        return RemoveResult.REMOVED
+
+    async def _purge_item(self, item_id: uuid.UUID) -> RemoveResult:
+        """Hard-delete an item the actor owns, with its connections and memberships.
+
+        The item goes last, so a run interrupted before that finds it and repeats.
+        """
+        async with self._stores.read() as repos:
+            if await repos.nodes.get(item_id, scope=self._scope) is None:
+                return RemoveResult.ALREADY_GONE
+        await PurgeItemMemberships(self._stores.collections_uow(), self._access).handle(
+            PurgeItemMembershipsCommand(item_id=item_id), SYSTEM_ACTOR
+        )
+        await PurgeNode(self._stores.uow(), self._access).handle(
+            PurgeNodeCommand(node_id=item_id), SYSTEM_ACTOR
+        )
+        return RemoveResult.REMOVED
+
+    async def _purge_connection(self, edge_id: uuid.UUID) -> RemoveResult:
+        """Hard-delete a connection the actor owns."""
+        async with self._stores.read() as repos:
+            if await repos.edges.get(edge_id, scope=self._scope) is None:
+                return RemoveResult.ALREADY_GONE
+        await PurgeEdge(self._stores.uow(), self._access).handle(
+            PurgeEdgeCommand(edge_id=edge_id), SYSTEM_ACTOR
+        )
         return RemoveResult.REMOVED
 
 
@@ -889,13 +915,13 @@ class CollectionPackTarget:
         )
 
     async def remove(self, collection_id: uuid.UUID) -> RemoveResult:
-        """Soft-delete the collection through its delete use case."""
-        try:
-            await DeleteCollection(self._stores.uow(), self._access).handle(
-                DeleteCollectionCommand(collection_id=collection_id), self._actor
-            )
-        except CollectionNotFoundError:
-            return RemoveResult.ALREADY_GONE
+        """Hard-delete a collection the actor owns, with its memberships."""
+        async with self._stores.read() as repos:
+            if await repos.collections.get(collection_id, scope=self._scope) is None:
+                return RemoveResult.ALREADY_GONE
+        await PurgeCollection(self._stores.uow(), self._access).handle(
+            PurgeCollectionCommand(collection_id=collection_id), SYSTEM_ACTOR
+        )
         return RemoveResult.REMOVED
 
 
@@ -995,27 +1021,14 @@ class CoverPackTarget:
         )
 
     async def remove(self, cover_id: uuid.UUID) -> RemoveResult:
-        """Detach the cover, then delete its asset, file and thumbnail."""
+        """Purge the cover's attachment, and its asset and file if unused elsewhere."""
         async with self._stores.read() as repos:
             attachment = await repos.attachments.get(cover_id, scope=self._scope)
         if attachment is None:
             return RemoveResult.ALREADY_GONE
-        await DetachMedia(self._stores.uow(), self._access, self._storage).handle(
-            DetachMediaCommand(
-                asset_id=attachment.asset_id,
-                target_type=attachment.target_type,
-                target_id=attachment.target_id,
-                attribute_key=attachment.attribute_key,
-            ),
-            self._actor,
+        await PurgeAttachment(self._stores.uow(), self._access, self._storage).handle(
+            PurgeAttachmentCommand(attachment_id=attachment.id), SYSTEM_ACTOR
         )
-        async with self._stores.read() as repos:
-            asset = await repos.assets.get(attachment.asset_id, scope=self._scope)
-        # Detaching orphans the asset only when nothing else uses it.
-        if asset is not None and asset.status is MediaStatus.ORPHANED:
-            await DeleteMedia(self._stores.uow(), self._access, self._storage).handle(
-                DeleteMediaCommand(asset_id=asset.id), self._actor
-            )
         return RemoveResult.REMOVED
 
 

@@ -49,6 +49,13 @@ class CollectionRepository(Protocol):
         """
         ...
 
+    async def purge(self, collection_id: uuid.UUID) -> None:
+        """Hard-delete the collection row, live or soft-deleted; unknown is a no-op.
+
+        The caller purges its memberships first (`MembershipRepository`).
+        """
+        ...
+
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
     ) -> int:

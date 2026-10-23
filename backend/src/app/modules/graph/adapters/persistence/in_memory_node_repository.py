@@ -290,6 +290,10 @@ class InMemoryNodeRepository:
         rows.sort(key=lambda row: (-row.count, row.key, row.kind))
         return rows[:limit]
 
+    async def purge(self, node_id: uuid.UUID) -> None:
+        """Hard-delete the node row, live or soft-deleted; an unknown id is a no-op."""
+        self._nodes.pop(node_id, None)
+
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
     ) -> int:

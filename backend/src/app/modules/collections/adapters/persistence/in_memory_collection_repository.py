@@ -94,6 +94,10 @@ class InMemoryCollectionRepository:
         )
         return live[:limit]
 
+    async def purge(self, collection_id: uuid.UUID) -> None:
+        """Hard-delete the collection row, live or soft-deleted; unknown is a no-op."""
+        self._collections.pop(collection_id, None)
+
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
     ) -> int:

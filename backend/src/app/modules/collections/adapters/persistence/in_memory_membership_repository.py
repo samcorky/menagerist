@@ -35,6 +35,18 @@ class InMemoryMembershipRepository:
         """Remove a membership; a missing pair is a no-op."""
         self._memberships.pop((collection_id, item_id), None)
 
+    async def purge_for_collection(self, collection_id: uuid.UUID) -> None:
+        """Remove every membership of the collection; none is a no-op."""
+        self._memberships = {
+            key: m for key, m in self._memberships.items() if key[0] != collection_id
+        }
+
+    async def purge_for_item(self, item_id: uuid.UUID) -> None:
+        """Remove the item from every collection, soft-deleted ones included."""
+        self._memberships = {
+            key: m for key, m in self._memberships.items() if key[1] != item_id
+        }
+
     async def item_ids(
         self, collection_id: uuid.UUID, *, scope: ContentFilter
     ) -> set[uuid.UUID]:

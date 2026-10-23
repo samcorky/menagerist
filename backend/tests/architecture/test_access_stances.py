@@ -41,10 +41,15 @@ EXPECTED_PUBLIC: frozenset[str] = frozenset(
 EXPECTED_SYSTEM: frozenset[str] = frozenset(
     {
         "collections.ClaimLegacyCollections",
+        "collections.PurgeCollection",
+        "collections.PurgeItemMemberships",
         "examples.ClaimOrphanedInstallations",
         "graph.ClaimOrphanedItems",
+        "graph.PurgeEdge",
+        "graph.PurgeNode",
         "media.ClaimOrphanedMedia",
         "media.CleanupExpiredMedia",
+        "media.PurgeAttachment",
         "media.RegenerateThumbnails",
     }
 )

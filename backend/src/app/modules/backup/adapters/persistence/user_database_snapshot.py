@@ -94,6 +94,11 @@ class SqlAlchemyUserDatabaseSnapshot(SqlAlchemyDatabaseSnapshot):
             "example_installations",
         ):
             predicates[name] = tables[name].c.owner_id == owner_id
+        # Soft-deleted content is left out, as vocabulary already is.
+        for name in ("nodes", "edges", "collections"):
+            predicates[name] = and_(
+                predicates[name], tables[name].c.deleted_at.is_(None)
+            )
         nodes = select(tables["nodes"].c.id).where(predicates["nodes"])
         predicates["edges"] = and_(
             predicates["edges"],

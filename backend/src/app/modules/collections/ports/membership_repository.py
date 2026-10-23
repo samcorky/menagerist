@@ -22,6 +22,14 @@ class MembershipRepository(Protocol):
         """Remove a membership; a missing pair is a no-op."""
         ...
 
+    async def purge_for_collection(self, collection_id: uuid.UUID) -> None:
+        """Remove every membership of the collection; none is a no-op."""
+        ...
+
+    async def purge_for_item(self, item_id: uuid.UUID) -> None:
+        """Remove the item from every collection, soft-deleted ones included."""
+        ...
+
     async def item_ids(
         self, collection_id: uuid.UUID, *, scope: ContentFilter
     ) -> set[uuid.UUID]:

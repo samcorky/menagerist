@@ -7,6 +7,7 @@ from sqlalchemy import (
     case,
     cast,
     column,
+    delete,
     func,
     literal,
     or_,
@@ -415,6 +416,11 @@ class SqlAlchemyNodeRepository:
             ItemFieldUse(key=key, kind=kind_, label=name or key, count=int(count))
             for key, kind_, count, name in result.all()
         ]
+
+    async def purge(self, node_id: uuid.UUID) -> None:
+        """Hard-delete the node row, live or soft-deleted; an unknown id is a no-op."""
+        await self._session.execute(delete(NodeModel).where(NodeModel.id == node_id))
+        await self._session.flush()
 
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]

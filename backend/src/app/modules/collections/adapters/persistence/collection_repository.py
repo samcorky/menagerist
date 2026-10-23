@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 import structlog
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.modules.collections.adapters.persistence.models import CollectionModel
@@ -185,6 +185,13 @@ class SqlAlchemyCollectionRepository:
                 | _unaccent_ilike(CollectionModel.description, pattern)
             )
         return [_to_domain(m) for m in (await self._session.execute(stmt)).scalars()]
+
+    async def purge(self, collection_id: uuid.UUID) -> None:
+        """Hard-delete the collection row, live or soft-deleted; unknown is a no-op."""
+        await self._session.execute(
+            delete(CollectionModel).where(CollectionModel.id == collection_id)
+        )
+        await self._session.flush()
 
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]

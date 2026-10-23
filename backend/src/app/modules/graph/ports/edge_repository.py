@@ -79,6 +79,14 @@ class EdgeRepository(Protocol):
         """
         ...
 
+    async def purge(self, edge_id: uuid.UUID) -> None:
+        """Hard-delete the edge row, live or soft-deleted; an unknown id is a no-op."""
+        ...
+
+    async def purge_for_node(self, node_id: uuid.UUID) -> None:
+        """Hard-delete every edge, live or soft-deleted, touching `node_id`."""
+        ...
+
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
     ) -> int:

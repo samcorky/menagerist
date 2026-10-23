@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 from app.modules.backup.adapters.persistence.row_codec import encode_row
 from app.modules.backup.adapters.persistence.user_transfer_rows import (
     OWNED_TABLES,
+    SOFT_DELETABLE,
     USER_TABLES,
     installation_vocabulary,
     preset_ids,
@@ -40,6 +41,7 @@ class InMemoryUserDatabaseSnapshot:
                 row
                 for row in self.tables.get(name, [])
                 if str(row.get("owner_id")) == str(scope.user_id)
+                and (name not in SOFT_DELETABLE or row.get("deleted_at") is None)
             ]
             for name in OWNED_TABLES
         }

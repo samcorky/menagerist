@@ -1,3 +1,4 @@
+import asyncio
 import io
 import json
 import uuid
@@ -7,7 +8,7 @@ import pytest
 import sqlalchemy
 from fastapi import Depends
 from PIL import Image
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker  # noqa: TC002
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
@@ -17,6 +18,9 @@ from app.entrypoints.api.shared.bridges.example_targets import (
     get_cover_pack_target,
 )
 from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.modules.backup.adapters.persistence.user_database_snapshot import (
+    SqlAlchemyUserDatabaseSnapshot,
+)
 from app.modules.examples.adapters.api.dependencies import get_pack_catalogue
 from app.modules.examples.adapters.covers.pillow_cover_renderer import (
     PillowCoverRenderer,
@@ -35,6 +39,7 @@ from app.modules.media.adapters.storage.local_filesystem import (
 from app.modules.media.ports.media_storage import MediaStoragePort  # noqa: TC001
 from app.platform.database import get_engine, get_session_factory
 from app.shared_kernel.actor import Actor
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -52,6 +57,8 @@ def _wipe(sync_url: str) -> None:
     engine = sqlalchemy.create_engine(sync_url)
     with engine.begin() as connection:
         for table in (
+            "collection_members",
+            "collections",
             "media_attachments",
             "media_assets",
             "edges",
@@ -127,6 +134,7 @@ def client(
     (tmp_path / "index.json").write_text(json.dumps(index), encoding="utf-8")
     pack_data["version"] = 3
     pack_data["item_types"][0]["cover"] = {"style": "sleeve"}
+    pack_data["collections"] = [{"ref": "c", "name": "Both", "items": ["a", "b"]}]
     (tmp_path / "demo.json").write_text(json.dumps(pack_data), encoding="utf-8")
     get_session_factory.cache_clear()
     get_engine.cache_clear()
@@ -166,6 +174,108 @@ def test_install_uninstall_and_reinstall_on_postgres(
     again = client.put("/api/v1/example/demo/installation")
     assert again.status_code == 200, again.text
     client.delete("/api/v1/example/demo/installation")
+
+
+_CONTENT_TABLES = (
+    "nodes",
+    "edges",
+    "collections",
+    "collection_members",
+    "media_attachments",
+    "media_assets",
+)
+
+
+def _row_counts(sync_url: str) -> dict[str, int]:
+    """Row counts read straight from the tables, so soft-deleted rows would count."""
+    engine = sqlalchemy.create_engine(sync_url)
+    with engine.connect() as connection:
+        counts = {
+            table: connection.execute(
+                sqlalchemy.text(f"SELECT count(*) FROM {table}")
+            ).scalar_one()
+            for table in _CONTENT_TABLES
+        }
+    engine.dispose()
+    return counts
+
+
+def test_uninstall_hard_deletes_everything_the_pack_created(
+    client: TestClient, postgres_sync_url: str
+) -> None:
+    """No row of the pack is left in any table, and a reinstall is clean."""
+    assert client.put("/api/v1/example/demo/installation").status_code == 200
+    installed = _row_counts(postgres_sync_url)
+    assert installed == {
+        "nodes": 2,
+        "edges": 1,
+        "collections": 1,
+        "collection_members": 2,
+        "media_attachments": 2,
+        "media_assets": 2,
+    }
+
+    removed = client.delete("/api/v1/example/demo/installation")
+
+    assert removed.status_code == 200, removed.text
+    assert removed.json()["kept"] == []
+    assert _row_counts(postgres_sync_url) == dict.fromkeys(_CONTENT_TABLES, 0)
+    assert client.put("/api/v1/example/demo/installation").status_code == 200
+    assert _row_counts(postgres_sync_url) == installed
+
+
+def test_a_kept_item_and_the_persons_own_collection_survive_a_purge(
+    client: TestClient, postgres_sync_url: str
+) -> None:
+    """An item in the person's own collection is kept, with its membership."""
+    assert client.put("/api/v1/example/demo/installation").status_code == 200
+    items = {n["name"]: n for n in client.get("/api/v1/node?limit=100").json()}
+    mine = client.post("/api/v1/collection", json={"name": "Mine"})
+    assert mine.status_code == 201, mine.text
+    added = client.put(
+        f"/api/v1/collection/{mine.json()['id']}/item",
+        json={"item_ids": [items["A"]["id"]]},
+    )
+    assert added.status_code == 200, added.text
+
+    removed = client.delete("/api/v1/example/demo/installation").json()
+
+    assert ("item", "A") in {(k["kind"], k["label"]) for k in removed["kept"]}
+    counts = _row_counts(postgres_sync_url)
+    assert (counts["nodes"], counts["collections"]) == (1, 1)
+    assert counts["collection_members"] == 1
+
+
+def test_an_export_after_install_and_uninstall_holds_no_deleted_rows(
+    client: TestClient, postgres_url: str
+) -> None:
+    """Soft-deleted items and removed packs add nothing to the personal export."""
+    assert client.put("/api/v1/example/demo/installation").status_code == 200
+    assert client.delete("/api/v1/example/demo/installation").status_code == 200
+    created = client.post("/api/v1/node", json={"name": "Gone", "type": None})
+    assert created.status_code == 201, created.text
+    assert client.delete(f"/api/v1/node/{created.json()['id']}").status_code == 204
+    kept = client.post("/api/v1/node", json={"name": "Kept", "type": None})
+    assert kept.status_code == 201, kept.text
+
+    async def export() -> dict[str, bytes]:
+        engine = create_async_engine(postgres_url)
+        try:
+            snapshot = SqlAlchemyUserDatabaseSnapshot(async_sessionmaker(engine))
+            return {
+                member.name: b"".join([c async for c in member.chunks])
+                async for member in snapshot.export(scope=ContentFilter.of(MEMBER.id))
+            }
+        finally:
+            await engine.dispose()
+
+    members = asyncio.run(export())
+
+    nodes = [json.loads(line) for line in members["data/nodes.ndjson"].splitlines()]
+    assert [n["name"] for n in nodes] == ["Kept"]
+    for table in ("edges", "collections", "collection_members", "media_attachments"):
+        assert members[f"data/{table}.ndjson"] == b""
+    assert members["data/media_assets.ndjson"] == b""
 
 
 def test_reinstall_adopts_an_edited_item_on_postgres(client: TestClient) -> None:

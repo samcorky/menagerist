@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
 import structlog
-from sqlalchemy import and_, column, exists, func, literal, or_, select
+from sqlalchemy import and_, column, delete, exists, func, literal, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.modules.graph.adapters.persistence.models import EdgeModel
@@ -207,6 +207,20 @@ class SqlAlchemyEdgeRepository:
             stmt = stmt.where(EdgeModel.id > after)
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
+
+    async def purge(self, edge_id: uuid.UUID) -> None:
+        """Hard-delete the edge row, live or soft-deleted; an unknown id is a no-op."""
+        await self._session.execute(delete(EdgeModel).where(EdgeModel.id == edge_id))
+        await self._session.flush()
+
+    async def purge_for_node(self, node_id: uuid.UUID) -> None:
+        """Hard-delete every edge, live or soft-deleted, touching `node_id`."""
+        await self._session.execute(
+            delete(EdgeModel).where(
+                or_(EdgeModel.source_id == node_id, EdgeModel.target_id == node_id)
+            )
+        )
+        await self._session.flush()
 
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]

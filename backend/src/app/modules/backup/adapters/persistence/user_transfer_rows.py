@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 OWNED_TABLES = frozenset(
     {"nodes", "edges", "collections", "media_assets", "example_installations"}
 )
+# Content tables whose soft-deleted rows an export leaves out and an import skips.
+SOFT_DELETABLE = frozenset({"nodes", "edges", "collections"})
 USER_TABLES = (
     "presets",
     "node_types",
@@ -43,6 +45,26 @@ def installation_vocabulary(records: object) -> dict[str, set[str]]:
                 if name is not None:
                     result[name].add(str(record.get("entity_id")))
     return result
+
+
+_PARENTS = {
+    "edges": (("source_id", "nodes"), ("target_id", "nodes")),
+    "collection_members": (("collection_id", "collections"), ("item_id", "nodes")),
+    "media_attachments": (("target_id", "nodes"),),
+}
+
+
+def skip_row(name: str, row: dict[str, object], skipped: dict[str, set[str]]) -> bool:
+    """Whether an incoming row is soft-deleted or hangs off a skipped one.
+
+    Records the id of a skipped soft-deletable row, so its dependants follow.
+    """
+    if name in SOFT_DELETABLE and row.get("deleted_at") is not None:
+        skipped[name].add(str(row.get("id")))
+        return True
+    return any(
+        str(row.get(key)) in skipped[parent] for key, parent in _PARENTS.get(name, ())
+    )
 
 
 def import_table_name(member_name: str, seen: set[str]) -> str:

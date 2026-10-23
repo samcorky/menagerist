@@ -9,12 +9,14 @@ from app.modules.backup.adapters.persistence.user_database_restorer import (
 )
 from app.modules.backup.adapters.persistence.user_transfer_rows import (
     OWNED_TABLES,
+    SOFT_DELETABLE,
     USER_TABLES,
     VOCABULARY,
     compatible,
     import_table_name,
     prepare_row,
     read_rows,
+    skip_row,
 )
 from app.modules.backup.domain.errors import (
     CorruptBackupError,
@@ -64,10 +66,13 @@ class InMemoryUserDatabaseRestorer:
         imported: dict[str, set[str]] = {name: set() for name in USER_TABLES}
         remap: dict[str, str] = {}
         seen: set[str] = set()
+        skipped: dict[str, set[str]] = {n: set() for n in SOFT_DELETABLE}
         async for member in members:
             name = import_table_name(member.name, seen)
             rows = target.setdefault(name, [])
             async for raw in read_rows(member.chunks):
+                if skip_row(name, raw, skipped):
+                    continue
                 row = prepare_row(name, raw, new_owner_id, remap)
                 await self._validator.validate(name, row)
                 _validate_references(name, row, imported)

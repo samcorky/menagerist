@@ -278,10 +278,10 @@ async def test_a_type_and_connection_can_be_removed_and_inspected(
 
     await world.graph.remove(EntityKind.ITEM, blue.entity_id)
     await world.graph.remove(EntityKind.ITEM, ada.entity_id)
-    # Deleting items does not cascade to their connection.
+    # Purging items takes their connections with them.
     assert (
         await world.graph.remove(EntityKind.CONNECTION, edge.entity_id)
-        is RemoveResult.REMOVED
+        is RemoveResult.ALREADY_GONE
     )
     assert (
         await world.graph.remove(EntityKind.ITEM_TYPE, types[1].entity_id)

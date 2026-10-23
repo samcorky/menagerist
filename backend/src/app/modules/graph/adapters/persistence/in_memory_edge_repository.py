@@ -138,6 +138,17 @@ class InMemoryEdgeRepository:
             edges = [edge for edge in edges if edge.id > after]
         return edges[:limit]
 
+    async def purge(self, edge_id: uuid.UUID) -> None:
+        """Hard-delete the edge row, live or soft-deleted; an unknown id is a no-op."""
+        self._edges.pop(edge_id, None)
+
+    async def purge_for_node(self, node_id: uuid.UUID) -> None:
+        """Hard-delete every edge, live or soft-deleted, touching `node_id`."""
+        for edge_id in [
+            e.id for e in self._edges.values() if node_id in (e.source_id, e.target_id)
+        ]:
+            del self._edges[edge_id]
+
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
     ) -> int:
