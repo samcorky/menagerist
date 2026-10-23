@@ -138,3 +138,40 @@ export function narrowedMarks(
 	}
 	return marks;
 }
+
+export const LINKED_TOO_LARGE_MESSAGE =
+	'Too many conditions to link this to the collection. Remove a filter to save it.';
+
+/**
+ * The conditions for "Save as new, linked to this collection": `in collection <parent>` ANDed
+ * with the ad-hoc filters (and the page's search text and type, as in `combineWithSaved`).
+ * The parent's own conditions are not copied. Null when the result would break a limit.
+ */
+export function linkedNarrow(
+	parentId: string,
+	adhoc: Query,
+	basics: NarrowBasics = {}
+): Query | null {
+	const linked: Query = {
+		v: 1,
+		where: {
+			op: 'and',
+			children: [
+				{ kind: 'collection', mode: 'any', in: [parentId] },
+				...nodesOf(combine(adhoc, basics).where)
+			]
+		},
+		sort: adhoc.sort
+	};
+	return fitsLimits(linked) ? linked : null;
+}
+
+/** Why the linked collection cannot be saved, or null when it can. */
+export function linkedBlockReason(
+	parentId: string,
+	adhoc: Query,
+	basics: NarrowBasics
+): string | null {
+	if (searchTextTooLong(basics.q)) return SAVE_TEXT_TOO_LONG_MESSAGE;
+	return linkedNarrow(parentId, adhoc, basics) ? null : LINKED_TOO_LARGE_MESSAGE;
+}

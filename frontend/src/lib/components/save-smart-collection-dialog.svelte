@@ -16,11 +16,15 @@
 	let {
 		open = $bindable(false),
 		query,
+		title = 'Save as smart collection',
+		intro = 'Items that match the current conditions are added automatically.',
 		onsaved
 	}: {
 		open?: boolean;
 		/** The search to save. */
 		query: Query;
+		title?: string;
+		intro?: string;
 		onsaved: (collection: CollectionResponse) => void;
 	} = $props();
 
@@ -71,10 +75,10 @@
 </script>
 
 <ResponsiveDialog.Root {open} onOpenChange={handleOpenChange}>
-	<ResponsiveDialog.Content title="Save as smart collection" size="md">
+	<ResponsiveDialog.Content {title} size="md">
 		<form class="mt-4 space-y-4" onsubmit={handleSubmit} novalidate>
 			<p class="text-sm text-muted-foreground">
-				Items that match the current conditions are added automatically.
+				{intro}
 			</p>
 			<div class="space-y-1.5">
 				<Label for="{nameId}-name">Name</Label>

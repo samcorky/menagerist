@@ -4,6 +4,7 @@ import structlog
 from sqlalchemy import (
     Text,
     and_,
+    any_,
     case,
     cast,
     column,
@@ -16,7 +17,7 @@ from sqlalchemy import (
     true,
     update,
 )
-from sqlalchemy.dialects.postgresql import JSONB, aggregate_order_by
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID, aggregate_order_by
 
 from app.modules.graph.adapters.persistence.models import NodeModel
 from app.modules.graph.adapters.persistence.query_env import QueryEnv
@@ -103,6 +104,15 @@ def _in_scope(scope: ContentFilter) -> ColumnElement[bool]:
     return and_(NodeModel.deleted_at.is_(None), owned_by(NodeModel, scope.user_id))
 
 
+def _id_in(ids: collections.abc.Collection[uuid.UUID]) -> ColumnElement[bool]:
+    """Match any of `ids` with one array parameter.
+
+    `IN` binds one parameter per id: slow to build at thousands of ids, and
+    asyncpg refuses more than 32767.
+    """
+    return NodeModel.id == any_(cast(list(ids), ARRAY(UUID)))
+
+
 def _has_text(resolved: ResolvedQuery) -> bool:
     return any(
         isinstance(c, TextCondition) for _, c in walk_conditions(resolved.query.where)
@@ -177,7 +187,7 @@ class SqlAlchemyNodeRepository:
             .limit(limit)
         )
         if ids is not None:
-            stmt = stmt.where(NodeModel.id.in_(ids))
+            stmt = stmt.where(_id_in(ids))
         if type is not None:
             stmt = stmt.where(NodeModel.type == type)
         if after is not None:
@@ -253,7 +263,7 @@ class SqlAlchemyNodeRepository:
             return 0
         stmt = select(func.count()).select_from(NodeModel).where(_in_scope(scope))
         if ids is not None:
-            stmt = stmt.where(NodeModel.id.in_(ids))
+            stmt = stmt.where(_id_in(ids))
         if type is not None:
             stmt = stmt.where(NodeModel.type == type)
         if q is not None:

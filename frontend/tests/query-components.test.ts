@@ -27,9 +27,11 @@ import {
 	ARCHIVED_FIELD_MESSAGE,
 	conditionFor,
 	fieldSubject,
+	GENERAL_SUBJECTS,
 	itemFieldPickerItems,
 	missingItemFieldPaths,
 	NO_ITEM_FIELD_MESSAGE,
+	STALE_COLLECTION_MESSAGE,
 	STALE_FIELD_MESSAGE,
 	withSubject,
 	type BuilderView
@@ -720,5 +722,126 @@ describe('per-item fields', () => {
 		expect(filterComboboxItems(items, 'per-item').length).toBe(3);
 		expect(filterComboboxItems(items, 'signed').length).toBe(1);
 		expect(itemFieldPickerItems(catalogue)).toEqual([]);
+	});
+});
+
+describe('content rows: name, description, media and collection', () => {
+	const A = '0190c1d2-0000-7000-8000-000000000001';
+	const B = '0190c1d2-0000-7000-8000-000000000002';
+	const SELF = '0190c1d2-0000-7000-8000-000000000003';
+	const collections = [
+		{ id: A, name: 'Watchlist' },
+		{ id: B, name: 'Signed' },
+		{ id: SELF, name: 'This one' }
+	];
+	const row = (condition: Condition, overrides: Partial<BuilderView> = {}) =>
+		render(QueryConditionRow, {
+			props: {
+				condition,
+				path: [0],
+				view: stubView({ numbers: new Map([['0', 1]]), ...overrides })
+			}
+		}).body;
+	/** The text of a select's options, in order. */
+	const optionText = (html: string, label: string) =>
+		(
+			html.match(new RegExp(`<select[^>]*aria-label="${label}"[^>]*>([\\s\\S]*?)</select>`))?.[1] ??
+			''
+		)
+			.replace(/<[^>]*>/g, ' ')
+			.replace(/\s+/g, ' ');
+
+	it('offers the four new subjects under Content', () => {
+		const html = row({ kind: 'text', q: '' });
+		expect(html).toContain('aria-label="Condition 1, field"');
+		const items = GENERAL_SUBJECTS.filter((s) => s.group === 'Content').map((s) => s.label);
+		expect(items).toEqual(['In collection', 'Media', 'Name', 'Description']);
+	});
+
+	it('shows a contains/is empty operator and a text box for a description', () => {
+		const html = row({ kind: 'description', op: '~', value: 'signed' });
+		expect(html).toContain('aria-label="Condition 1, operator"');
+		expect(optionText(html, 'Condition 1, operator')).toMatch(/contains.*is empty.*is not empty/s);
+		expect(html).toContain('aria-label="Condition 1, value"');
+		expect(html).toContain('value="signed"');
+	});
+
+	it('hides the text box once a description is tested for being empty', () => {
+		const html = row({ kind: 'description', op: 'empty' });
+		expect(html).not.toContain('aria-label="Condition 1, value"');
+	});
+
+	it('offers contains and is for a name', () => {
+		const html = row({ kind: 'name', op: '=', value: 'Alien' });
+		expect(optionText(html, 'Condition 1, operator')).toMatch(/contains.*is/s);
+		expect(html).toContain('value="Alien"');
+		expect(html).toContain('placeholder="The exact name"');
+	});
+
+	it('asks has or has no, and which kind of media', () => {
+		const html = row({ kind: 'media', mode: 'none', type: 'image' });
+		expect(optionText(html, 'Condition 1, operator')).toBe(' has has no ');
+		expect(optionText(html, 'Condition 1, value')).toMatch(/media.*an image.*a document/s);
+	});
+
+	it('lists the chosen collections by name and leaves the one being edited out of the picker', () => {
+		const html = row(
+			{ kind: 'collection', mode: 'any', in: [A] },
+			{ collections, excludeCollectionId: SELF }
+		);
+		expect(optionText(html, 'Condition 1, operator')).toMatch(/is in any of.*is in none of/s);
+		expect(html).toContain('aria-label="Condition 1, value"');
+		expect(html).toContain('Watchlist');
+		expect(html).toContain('aria-label="Remove Watchlist from Condition 1"');
+		expect(html).toContain('aria-label="Condition 1, value, add a collection"');
+		expect(html).not.toContain('Condition 1, value, add a collection" disabled');
+	});
+
+	it('shows a gone collection as Deleted collection with the warning', () => {
+		const html = row(
+			{ kind: 'collection', mode: 'none', in: [B, '0190c1d2-0000-7000-8000-0000000000ff'] },
+			{
+				collections: [{ id: B, name: 'Signed' }]
+			}
+		);
+		expect(html).toContain('Deleted collection');
+		expect(html).toContain(STALE_COLLECTION_MESSAGE);
+		expect(html).toContain('Remove Deleted collection from Condition 1');
+	});
+
+	it('does not call a collection gone while the list is still loading', () => {
+		const html = row({ kind: 'collection', mode: 'any', in: [A] }, { collections: null });
+		expect(html).not.toContain('Deleted collection');
+		expect(html).not.toContain(STALE_COLLECTION_MESSAGE);
+	});
+
+	it('shows the server warning on a collection row', () => {
+		const html = row(
+			{ kind: 'collection', mode: 'any', in: [A] },
+			{ collections, warned: new Set(['0']) }
+		);
+		expect(html).toContain(STALE_COLLECTION_MESSAGE);
+	});
+
+	it('says what is missing for a collection row with none chosen', () => {
+		const html = row({ kind: 'collection', mode: 'any', in: [] }, { collections });
+		expect(html).toContain('Choose at least one collection.');
+	});
+
+	it('says plainly that the collections could not be read, with a Retry', () => {
+		const html = row(
+			{ kind: 'collection', mode: 'any', in: [] },
+			{ collections: null, collectionsFailed: true }
+		);
+		expect(html).toContain('role="alert"');
+		expect(html).toContain('Could not load your collections.');
+		expect(html).toContain('aria-label="Condition 1, retry loading collections"');
+		expect(html).not.toContain('add a collection');
+	});
+
+	it('keeps the loading state while the collections are still being read', () => {
+		const html = row({ kind: 'collection', mode: 'any', in: [] }, { collections: null });
+		expect(html).not.toContain('Could not load your collections.');
+		expect(html).toContain('Collections not available yet');
 	});
 });

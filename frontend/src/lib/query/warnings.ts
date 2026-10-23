@@ -3,7 +3,10 @@ import type { Path } from './types';
 /** Where a server path points: a node in the condition tree, or a sort key. */
 export type QueryTarget = { where: Path } | { sort: number };
 
-const WHERE = /^where((?:\.children\[\d{1,4}\])*)$/;
+// A warning inside a collection row names the id (`.in[n]`) or a rule of a smart collection
+// it inlines (`.in[n].children[m]`, nested further the same way); both belong to the row itself.
+const WHERE =
+	/^where((?:\.children\[\d{1,4}\])*)(?:\.in\[\d{1,4}\](?:\.(?:in|children)\[\d{1,4}\])*)?$/;
 const SORT = /^sort\[(\d{1,2})\]$/;
 
 /** Parse a server path such as `where.children[2].children[0]` or `sort[0]`; null when unknown. */

@@ -20,6 +20,14 @@ export const KIND_OPERATORS: Record<string, readonly string[]> = {
 	checklist: ['incomplete', 'complete', 'empty', 'not_empty']
 };
 
+/** Operators of the description and name conditions (backend graph/domain/query.py). */
+export const DESCRIPTION_OPERATORS = ['~', 'empty', 'not_empty'] as const;
+export const NAME_OPERATORS = ['~', '='] as const;
+
+export function operatorsForCondition(kind: 'description' | 'name'): readonly string[] {
+	return kind === 'description' ? DESCRIPTION_OPERATORS : NAME_OPERATORS;
+}
+
 export const OPERATOR_LABELS: Record<string, string> = {
 	'=': 'is',
 	'!=': 'is not',

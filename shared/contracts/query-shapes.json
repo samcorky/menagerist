@@ -1702,6 +1702,230 @@
         },
         "sort": []
       }
+    },
+    {
+      "name": "description contains",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "description",
+              "op": "~",
+              "value": "signed"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "description contains non-ASCII",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "description",
+              "op": "~",
+              "value": "caf\u00e9 \u2713"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "description is empty",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "description",
+              "op": "empty"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "description is not empty",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "description",
+              "op": "not_empty"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "name contains",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "name",
+              "op": "~",
+              "value": "alien"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "name equals",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "name",
+              "op": "=",
+              "value": "Alien"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "media has",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "media",
+              "mode": "has"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "media none",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "media",
+              "mode": "none"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "media has image",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "media",
+              "mode": "has",
+              "type": "image"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "media none document",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "media",
+              "mode": "none",
+              "type": "document"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "collection any one",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "collection",
+              "mode": "any",
+              "in": [
+                "018f5c2e-7b1a-7c3e-9d4f-1a2b3c4d5e6f"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "collection none two",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "collection",
+              "mode": "none",
+              "in": [
+                "018f5c2e-7b1a-7c3e-9d4f-1a2b3c4d5e6f",
+                "018f5c2e-7b1a-7c3e-9d4f-1a2b3c4d5e70"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "collection id in upper case",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "collection",
+              "mode": "any",
+              "in": [
+                "018F5C2E-7B1A-7C3E-9D4F-1A2B3C4D5E6F"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
     }
   ],
   "invalid": [
@@ -5760,6 +5984,529 @@
               "field_kind": "boolean",
               "op": "=",
               "value": true
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "description contains without value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "description",
+              "op": "~"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "description contains empty value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "description",
+              "op": "~",
+              "value": ""
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "description contains number",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "description",
+              "op": "~",
+              "value": 5
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "description empty with value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "description",
+              "op": "empty",
+              "value": "x"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "description not_empty with value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "description",
+              "op": "not_empty",
+              "value": "x"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "description equals",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "description",
+              "op": "=",
+              "value": "x"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "description op missing",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "description",
+              "value": "x"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "description op is not text",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "description",
+              "op": [
+                "~"
+              ],
+              "value": "x"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "name contains without value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "name",
+              "op": "~"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "name equals empty value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "name",
+              "op": "=",
+              "value": ""
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "name equals without value",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "name",
+              "op": "="
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "name empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "name",
+              "op": "empty"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "name not_empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "name",
+              "op": "not_empty"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "name not equal",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "name",
+              "op": "!=",
+              "value": "a"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "name op missing",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "name",
+              "value": "a"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "media mode missing",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "media"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "media mode unknown",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "media",
+              "mode": "some"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "media mode is not text",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "media",
+              "mode": 1
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "media type unknown",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "media",
+              "mode": "has",
+              "type": "video"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "media type is not text",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "media",
+              "mode": "has",
+              "type": 3
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "collection mode missing",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "collection",
+              "in": [
+                "018f5c2e-7b1a-7c3e-9d4f-1a2b3c4d5e6f"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "collection mode all",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "collection",
+              "mode": "all",
+              "in": [
+                "018f5c2e-7b1a-7c3e-9d4f-1a2b3c4d5e6f"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "collection mode is not text",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "collection",
+              "mode": 1,
+              "in": [
+                "018f5c2e-7b1a-7c3e-9d4f-1a2b3c4d5e6f"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "collection in missing",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "collection",
+              "mode": "any"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "collection in empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "collection",
+              "mode": "any",
+              "in": []
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "collection in is text",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "collection",
+              "mode": "any",
+              "in": "018f5c2e-7b1a-7c3e-9d4f-1a2b3c4d5e6f"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "collection id is not a uuid",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "collection",
+              "mode": "any",
+              "in": [
+                "not-a-uuid"
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "collection id is empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "collection",
+              "mode": "any",
+              "in": [
+                ""
+              ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "collection id is a number",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "collection",
+              "mode": "any",
+              "in": [
+                5
+              ]
             }
           ]
         },

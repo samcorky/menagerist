@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { X } from '@lucide/svelte';
 	import { descriptorForProp } from '$lib/field-types';
 	import DateInput from '$lib/field-types/date/DateInput.svelte';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -9,24 +10,34 @@
 	import TagsInput from '$lib/components/tags-input.svelte';
 	import type { JsonSchemaProperty } from '$lib/schema-types';
 	import {
+		collectionLabel,
 		fieldOf,
 		fieldOptions,
 		fromWidget,
 		isRef,
 		isRel,
 		isTypedKind,
+		MEDIA_TYPES,
 		relative,
 		relativeParts,
 		RELATIVE_MODES,
 		stringList,
 		toWidget,
 		valueShape,
+		withCollectionIds,
+		withMediaType,
 		type BuilderView,
 		type RelativeMode
 	} from '$lib/query/builder';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { canCompareWithField, refCandidates, typeLabel, type FieldInfo } from '$lib/query/fields';
-	import type { Condition, Operand, Value } from '$lib/query/types';
+	import {
+		MAX_COLLECTION_IDS,
+		type Condition,
+		type MediaType,
+		type Operand,
+		type Value
+	} from '$lib/query/types';
 
 	type SetOperand = (operand: Operand | undefined, debounce: boolean) => void;
 
@@ -136,6 +147,30 @@
 		if (condition.kind !== 'field') return;
 		if (isRef(condition.value)) setValue(undefined, false);
 		else setValue({ ref: refCandidates(view.catalogue, f)[0]?.key ?? '' }, false);
+	}
+
+	let pendingCollection = $state('');
+	const chosenCollections = $derived(condition.kind === 'collection' ? condition.in : []);
+	const collectionItems = $derived.by((): ComboboxItem[] => {
+		if (!view.collections) return [];
+		return view.collections
+			.filter((c) => c.id !== view.excludeCollectionId && !chosenCollections.includes(c.id))
+			.map((c) => ({ value: c.id, label: c.name }));
+	});
+
+	function addCollection(id: string) {
+		pendingCollection = '';
+		if (id) onchange(withCollectionIds(condition, [...chosenCollections, id]), false);
+	}
+
+	function removeCollection(id: string) {
+		onchange(
+			withCollectionIds(
+				condition,
+				chosenCollections.filter((c) => c !== id)
+			),
+			false
+		);
 	}
 
 	const segment =
@@ -305,6 +340,84 @@
 			{@render dateOperand(to, `${label} to`, (o, d) => setEnd(1, o, d))}
 		{:else}
 			{@render dateOperand(condition.value, label, (o, d) => setValue(o, d))}
+		{/if}
+	{:else if condition.kind === 'description' || condition.kind === 'name'}
+		{#if condition.op === '~' || condition.op === '='}
+			<Input
+				type={condition.op === '~' ? 'search' : 'text'}
+				class="h-9"
+				aria-label={label}
+				placeholder={condition.op === '~' ? 'Words to look for' : 'The exact name'}
+				value={condition.value ?? ''}
+				oninput={(e) => onchange({ ...condition, value: e.currentTarget.value }, true)}
+			/>
+		{/if}
+	{:else if condition.kind === 'media'}
+		<NativeSelect.Root
+			class="w-fit max-w-full [&_select]:h-9"
+			aria-label={label}
+			value={condition.type ?? 'any'}
+			onchange={(e) =>
+				onchange(
+					withMediaType(
+						condition,
+						e.currentTarget.value === 'any' ? null : (e.currentTarget.value as MediaType)
+					),
+					false
+				)}
+		>
+			{#each MEDIA_TYPES as option (option.value)}
+				<NativeSelect.Option value={option.value}>{option.label}</NativeSelect.Option>
+			{/each}
+		</NativeSelect.Root>
+	{:else if condition.kind === 'collection'}
+		<div role="group" aria-label={label} class="flex flex-wrap gap-2">
+			{#each chosenCollections as id (id)}
+				{@const collectionName = collectionLabel(view.collections, id)}
+				<span
+					class="flex max-w-full min-w-0 items-center rounded-full border border-input bg-secondary pl-3 text-sm text-secondary-foreground"
+				>
+					<span class="truncate" title={collectionName}>{collectionName}</span>
+					<button
+						type="button"
+						class="relative ml-1 rounded-full p-1.5 after:absolute after:-inset-2.5 after:content-[''] hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+						aria-label="Remove {collectionName} from {name}"
+						onclick={() => removeCollection(id)}
+					>
+						<X class="size-3.5" aria-hidden="true" />
+					</button>
+				</span>
+			{/each}
+		</div>
+		{#if view.collectionsFailed}
+			<div class="flex flex-wrap items-center gap-2">
+				<p role="alert" class="text-sm text-destructive">Could not load your collections.</p>
+				<Button
+					variant="outline"
+					size="sm"
+					class="min-h-9"
+					aria-label="{name}, retry loading collections"
+					onclick={() => view.retryCollections()}>Retry</Button
+				>
+			</div>
+		{:else if chosenCollections.length >= MAX_COLLECTION_IDS}
+			<p class="text-sm text-muted-foreground">
+				You can choose up to {MAX_COLLECTION_IDS} collections.
+			</p>
+		{:else}
+			<Combobox.Root
+				class="h-9 max-w-80"
+				aria-label="{label}, add a collection"
+				disabled={view.collections === null}
+				items={collectionItems}
+				bind:value={pendingCollection}
+				placeholder={view.collections === null
+					? 'Collections not available yet'
+					: 'Add a collection'}
+				searchPlaceholder="Search collections…"
+				emptyText="No other collections"
+				onValueChange={addCollection}
+			/>
 		{/if}
 	{:else if condition.kind === 'field' && !field}
 		{#if 'value' in condition && condition.value !== undefined}

@@ -1,3 +1,5 @@
+import { listCollections, type CollectionResponse } from '$lib/api/client';
+
 export const MAX_COLLECTION_NAME_LENGTH = 120;
 
 /** "No items", "1 item", "12 items". */
@@ -85,4 +87,42 @@ export function collectionAddress(
 	location: { search: string; hash: string }
 ): `/collections/${string}` {
 	return `/collections/${encodeURIComponent(collection.slug)}${location.search}${location.hash}`;
+}
+
+export const COLLECTIONS_PAGE_SIZE = 50;
+const MAX_COLLECTION_PAGES = 20;
+
+/** Read every collection (manual and smart), following the next link; null if any page fails. */
+export async function fetchAllCollections(): Promise<CollectionResponse[] | null> {
+	const all: CollectionResponse[] = [];
+	let after: string | undefined;
+	for (let page = 0; page < MAX_COLLECTION_PAGES; page++) {
+		const result = await listCollections({ query: { after, limit: COLLECTIONS_PAGE_SIZE } });
+		if (result.error || !result.data) return null;
+		all.push(...result.data);
+		const hasNext = /rel="next"/.test(result.response?.headers.get('link') ?? '');
+		if (!hasNext || result.data.length === 0) break;
+		after = result.data[result.data.length - 1].id;
+	}
+	return all;
+}
+
+/** Collections a condition may name; the one being edited is left out (it cannot refer to itself). */
+export function collectionTargets<T extends { id: string }>(
+	all: readonly T[],
+	selfId?: string
+): T[] {
+	return all.filter((c) => c.id !== selfId);
+}
+
+/**
+ * A name lookup for `describeCondition`: the name, null when the id is not in the list (the
+ * collection is gone or not yours), or undefined while the list is still `null` (loading).
+ */
+export function collectionNameLookup(
+	all: readonly { id: string; name: string }[] | null
+): (id: string) => string | null | undefined {
+	if (all === null) return () => undefined;
+	const names = new Map(all.map((c) => [c.id, c.name]));
+	return (id) => names.get(id) ?? null;
 }

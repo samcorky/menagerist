@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { collectionRouteParams } from '$lib/collections';
+	import {
+		collectionNameLookup,
+		collectionRouteParams,
+		fetchAllCollections
+	} from '$lib/collections';
 	import { page } from '$app/state';
 	import { beforeNavigate, afterNavigate, goto } from '$app/navigation';
 	import { browser } from '$app/environment';
@@ -134,11 +138,13 @@
 	const canSave = $derived(narrowFilterCount(filter, saveBasics) > 0);
 	let categoriesLoaded = $state(false);
 	let itemFields = $state<ItemField[] | null>(null);
+	let collectionsFailed = $state(false);
+	let allCollections = $state<{ id: string; name: string }[] | null>(null);
 	const countLine = $derived(
 		totalLine(total, totalCapped, { loading, appending: loading && items.length > 0 })
 	);
 	const catalogue = $derived(buildCatalogue(allCategories, categoriesLoaded, itemFields));
-	const lookup = $derived(summaryLookup(catalogue));
+	const lookup = $derived(summaryLookup(catalogue, collectionNameLookup(allCollections)));
 	const filterErrorText = $derived.by(() => {
 		if (!filterError) return '';
 		const n = filterError.path
@@ -306,6 +312,14 @@
 		loading = false;
 	}
 
+	// Quiet on failure: only the collection picker says so.
+	async function loadCollections() {
+		collectionsFailed = false;
+		const all = await fetchAllCollections();
+		allCollections = all;
+		collectionsFailed = all === null;
+	}
+
 	async function fetchCategories() {
 		// Neither call waits for the other: the slower listing must not hold up the type catalogue.
 		await Promise.all([
@@ -315,7 +329,8 @@
 			}),
 			fetchItemFields().then((fields) => {
 				itemFields = fields;
-			})
+			}),
+			loadCollections()
 		]);
 	}
 
@@ -706,6 +721,9 @@
 	bind:open={filtersOpen}
 	query={filter}
 	{catalogue}
+	collections={allCollections}
+	{collectionsFailed}
+	onretrycollections={() => void loadCollections()}
 	warned={marks.conditions}
 	sortWarned={marks.sort}
 	error={filterError}

@@ -1,4 +1,5 @@
 import {
+	MAX_COLLECTION_IDS,
 	MAX_CONDITIONS,
 	MAX_DEPTH,
 	MAX_LIST_LENGTH,
@@ -12,7 +13,12 @@ import {
 	type SortKey,
 	type Value
 } from './types';
-import { LIST_OPERATORS, operatorsForKind, operatorTakesValue } from './operators';
+import {
+	LIST_OPERATORS,
+	operatorsForCondition,
+	operatorsForKind,
+	operatorTakesValue
+} from './operators';
 
 function toBase64Url(text: string): string {
 	let binary = '';
@@ -173,6 +179,25 @@ function fieldCondition(data: Rec): Condition | null {
 	return out;
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function collectionIds(value: unknown): string[] | null {
+	if (!Array.isArray(value) || value.length < 1 || value.length > MAX_COLLECTION_IDS) return null;
+	return value.every((id) => typeof id === 'string' && UUID.test(id)) ? (value as string[]) : null;
+}
+
+/** Description (`~`, `empty`, `not_empty`) and name (`~`, `=`): a value exactly when one is needed. */
+function textCondition(data: Rec): Condition | null {
+	const kind = data.kind === 'name' ? 'name' : 'description';
+	const op = data.op;
+	if (typeof op !== 'string' || !operatorsForCondition(kind).includes(op)) return null;
+	if (!operatorTakesValue(op)) {
+		return 'value' in data ? null : ({ kind, op } as Condition);
+	}
+	const value = str(data.value);
+	return value === null ? null : ({ kind, op, value } as Condition);
+}
+
 function condition(data: Rec): Condition | null {
 	switch (data.kind) {
 		case 'text': {
@@ -198,6 +223,21 @@ function condition(data: Rec): Condition | null {
 			if (on !== 'created' && on !== 'updated') return null;
 			const value = comparisonValue(op, data);
 			return value === null || value === undefined ? null : { kind: 'date', on, op, value };
+		}
+		case 'description':
+		case 'name':
+			return textCondition(data);
+		case 'media': {
+			const { mode, type } = data;
+			if (mode !== 'has' && mode !== 'none') return null;
+			if (type === undefined) return { kind: 'media', mode };
+			return type === 'image' || type === 'document' ? { kind: 'media', mode, type } : null;
+		}
+		case 'collection': {
+			const { mode } = data;
+			const ids = collectionIds(data.in);
+			if ((mode !== 'any' && mode !== 'none') || ids === null) return null;
+			return { kind: 'collection', mode, in: ids };
 		}
 		case 'field':
 			return fieldCondition(data);

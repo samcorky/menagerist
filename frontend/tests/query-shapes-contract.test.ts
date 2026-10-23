@@ -61,6 +61,12 @@ function bulk(): [string, unknown, boolean][] {
 		const text = 'a'.repeat(size);
 		cases.push([`text of ${size}`, where({ kind: 'text', q: text }), ok]);
 		cases.push([`type slug of ${size}`, where({ kind: 'type', in: [text] }), ok]);
+		cases.push([
+			`description of ${size}`,
+			where({ kind: 'description', op: '~', value: text }),
+			ok
+		]);
+		cases.push([`name of ${size}`, where({ kind: 'name', op: '=', value: text }), ok]);
 		cases.push([`tag of ${size}`, where({ kind: 'tag', mode: 'any', tags: [text] }), ok]);
 		cases.push([`field type of ${size}`, where(field('=', { type: text, value: 1 })), ok]);
 		cases.push([`field key of ${size}`, where(field('=', { key: text, value: 1 })), ok]);
@@ -99,6 +105,15 @@ function bulk(): [string, unknown, boolean][] {
 		cases.push([`tag list of ${size}`, where({ kind: 'tag', mode: 'any', tags: items }), ok]);
 		cases.push([`in list of ${size}`, where(field('in', { value: items })), ok]);
 		cases.push([`has list of ${size}`, where(field('has', { value: items })), ok]);
+		const ids = Array.from(
+			{ length: size },
+			(_, n) => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`
+		);
+		cases.push([
+			`collection list of ${size}`,
+			where({ kind: 'collection', mode: 'any', in: ids }),
+			ok
+		]);
 	}
 	// Length counts characters, not UTF-16 units.
 	cases.push(['text of 200 astral characters', where({ kind: 'text', q: '🎬'.repeat(200) }), true]);

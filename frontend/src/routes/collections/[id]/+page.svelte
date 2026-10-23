@@ -52,6 +52,8 @@
 	} from '$lib/query/items-page';
 	import {
 		NARROW_TOO_LARGE_MESSAGE,
+		linkedBlockReason,
+		linkedNarrow,
 		locateInCombined,
 		narrowFilterCount,
 		narrowedBarText,
@@ -77,8 +79,10 @@
 		addItemsErrorMessage,
 		canonicalSlugFor,
 		collectionAddress,
+		collectionNameLookup,
 		collectionRouteParams,
 		collectionSaveErrorMessage,
+		fetchAllCollections,
 		slugPatch,
 		slugSaveErrorMessage,
 		validateCollectionName
@@ -161,7 +165,9 @@
 	let conditionsSaving = $state(false);
 	let conditionsError = $state<BuilderError | null>(null);
 	const catalogue = $derived(buildCatalogue(itemTypes, typesLoaded, itemFields));
-	const lookup = $derived(summaryLookup(catalogue));
+	let collectionsFailed = $state(false);
+	let allCollections = $state<CollectionResponse[] | null>(null);
+	const lookup = $derived(summaryLookup(catalogue, collectionNameLookup(allCollections)));
 	const builderQuery = $derived(draft ?? storedQuery ?? emptyQuery());
 
 	// Ad-hoc narrowing of a smart collection: filters (`?f=`), search (`?q=`) and type (`?type=`)
@@ -182,6 +188,19 @@
 	const blockReason = $derived(
 		narrowed && storedQuery ? saveBlockReason(storedQuery, adhoc, basics) : null
 	);
+	// "Save as new, linked": `in collection <this>` plus the filters, search text and type.
+	const linkedQuery = $derived(linkedNarrow(canonicalId, adhoc, basics));
+	const linkedReason = $derived(linkedBlockReason(canonicalId, adhoc, basics));
+	// A manual collection narrows by search text and type only, and offers only the linked save.
+	const manualNarrowed = $derived(
+		!!collection && !smart && (q.trim() !== '' || selectedType !== '')
+	);
+	const manualBarText = $derived(
+		narrowedBarText(narrowFilterCount(emptyQuery(), basics), null, {
+			count: collection?.item_count ?? 0,
+			capped: collection?.item_count_capped ?? false
+		})
+	);
 	let narrowedTotal = $state<{ total: number; capped: boolean } | null>(null);
 	let searchWarnings = $state<SearchWarning[]>([]);
 	let tooLarge = $state(false);
@@ -189,6 +208,7 @@
 	let filtersOpen = $state(false);
 	let filtersFocus = $state<Path | null>(null);
 	let saveOpen = $state(false);
+	let linkedOpen = $state(false);
 	let updateOpen = $state(false);
 	let updating = $state(false);
 	let updateError = $state<string | null>(null);
@@ -448,6 +468,22 @@
 		filterAnnouncement = 'Showing the saved conditions only.';
 	}
 
+	// Quiet on failure: only the collection picker says so.
+	async function loadCollections() {
+		collectionsFailed = false;
+		const all = await fetchAllCollections();
+		allCollections = all;
+		collectionsFailed = all === null;
+	}
+
+	function clearManualNarrowing() {
+		items = [];
+		hasMore = false;
+		searchInput = '';
+		q = '';
+		selectedType = '';
+	}
+
 	function savedAsNew(created: CollectionResponse) {
 		void goto(resolve('/collections/[id]', collectionRouteParams(created)));
 	}
@@ -609,6 +645,11 @@
 				void fetchPage(id, search, type);
 			}
 		});
+	});
+
+	$effect(() => {
+		if (!smart) return;
+		void loadCollections();
 	});
 
 	$effect(() => {
@@ -1072,7 +1113,9 @@
 							text={barText}
 							{blockReason}
 							{updating}
+							linkedBlockReason={linkedReason}
 							onsave={() => (saveOpen = true)}
+							onlinked={() => (linkedOpen = true)}
 							onupdate={openUpdate}
 							onclear={clearNarrowing}
 						/>
@@ -1097,6 +1140,15 @@
 						</Alert.Root>
 					{/if}
 				</div>
+			{/if}
+			{#if manualNarrowed}
+				<NarrowedBar
+					text={manualBarText}
+					blockReason={null}
+					linkedBlockReason={linkedReason}
+					onlinked={() => (linkedOpen = true)}
+					onclear={clearManualNarrowing}
+				/>
 			{/if}
 			<p class="sr-only" role="status" aria-live="polite">{filterAnnouncement}</p>
 
@@ -1337,11 +1389,25 @@
 	/>
 {/if}
 
+{#if linkedQuery}
+	<SaveSmartCollectionDialog
+		bind:open={linkedOpen}
+		query={linkedQuery}
+		title="Save as new, linked to this collection"
+		intro="The new collection is always the items in this collection that match these conditions."
+		onsaved={savedAsNew}
+	/>
+{/if}
+
 {#if smart && !unreadable}
 	<QueryBuilder
 		bind:open={conditionsOpen}
 		query={builderQuery}
 		{catalogue}
+		collections={allCollections}
+		{collectionsFailed}
+		onretrycollections={() => void loadCollections()}
+		excludeCollectionId={canonicalId}
 		warned={mapWarnings(savedWarnings).conditions}
 		{sortWarned}
 		error={conditionsError}
@@ -1356,6 +1422,10 @@
 		bind:open={filtersOpen}
 		query={adhoc}
 		{catalogue}
+		collections={allCollections}
+		{collectionsFailed}
+		onretrycollections={() => void loadCollections()}
+		excludeCollectionId={canonicalId}
 		warned={adhocMarks.conditions}
 		sortWarned={adhocMarks.sort}
 		error={adhocError}

@@ -5,12 +5,12 @@ import { render } from 'svelte/server';
 
 vi.mock('@lucide/svelte', async () => {
 	const Noop = (await import('./mocks/noop.svelte')).default;
-	return { TriangleAlert: Noop, Lock: Noop, X: Noop, BookmarkPlus: Noop };
+	return { TriangleAlert: Noop, Lock: Noop, X: Noop, BookmarkPlus: Noop, Link: Noop };
 });
 
 import NarrowedBar from '$lib/components/narrowed-bar.svelte';
 import SmartConditions from '$lib/components/smart-conditions.svelte';
-import { SAVE_TOO_LARGE_MESSAGE } from '$lib/query/narrow';
+import { LINKED_TOO_LARGE_MESSAGE, SAVE_TOO_LARGE_MESSAGE } from '$lib/query/narrow';
 import type { Query } from '$lib/query/types';
 
 const bar = (props: Partial<ComponentProps<typeof NarrowedBar>> = {}) =>
@@ -56,6 +56,38 @@ describe('NarrowedBar', () => {
 	it('shows progress while the collection is being updated', () => {
 		const html = bar({ updating: true });
 		expect(button(html, 'Update this collection')).toMatch(/\sdisabled(=|\s|>)/);
+	});
+});
+
+describe('NarrowedBar linked save', () => {
+	const LINKED = 'Save as new, linked to this collection';
+
+	it('offers the linked save beside the other actions, with a short explanation', () => {
+		const html = bar({ onlinked: () => {} });
+		expect(html).toContain(LINKED);
+		expect(html).toContain('Save as new smart collection');
+		expect(html).toContain('Update this collection');
+		expect(html).toContain('follows this collection as it changes');
+		expect(button(html, LINKED)).not.toMatch(/\sdisabled(=|\s|>)/);
+	});
+
+	it('does not offer the linked save unless asked to', () => {
+		expect(bar()).not.toContain(LINKED);
+	});
+
+	it('disables only the linked save, and says why, when it would be too large', () => {
+		const html = bar({ onlinked: () => {}, linkedBlockReason: LINKED_TOO_LARGE_MESSAGE });
+		expect(html).toContain(LINKED_TOO_LARGE_MESSAGE);
+		expect(button(html, LINKED)).toMatch(/\sdisabled(=|\s|>)/);
+		expect(button(html, 'Save as new smart collection')).not.toMatch(/\sdisabled(=|\s|>)/);
+	});
+
+	it('on a manual collection shows only the linked save and Clear', () => {
+		const html = bar({ onsave: undefined, onupdate: undefined, onlinked: () => {} });
+		expect(html).toContain(LINKED);
+		expect(html).not.toContain('Save as new smart collection');
+		expect(html).not.toContain('Update this collection');
+		expect(html).toContain('Clear');
 	});
 });
 

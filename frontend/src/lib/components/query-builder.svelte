@@ -36,6 +36,10 @@
 		open = $bindable(false),
 		query,
 		catalogue,
+		collections = null,
+		excludeCollectionId = null,
+		collectionsFailed = false,
+		onretrycollections,
 		warned = new Set<string>(),
 		sortWarned = false,
 		error = null,
@@ -52,6 +56,13 @@
 		/** The filter as applied (from the URL). */
 		query: Query;
 		catalogue: Catalogue;
+		/** Every collection the person has, for "In collection"; null until read. */
+		collections?: readonly { id: string; name: string }[] | null;
+		/** The collection being edited; it cannot be picked. */
+		excludeCollectionId?: string | null;
+		/** Reading the collections failed. */
+		collectionsFailed?: boolean;
+		onretrycollections?: () => void;
 		/** Filter path keys of conditions the server could not match. */
 		warned?: ReadonlySet<string>;
 		sortWarned?: boolean;
@@ -126,6 +137,12 @@
 
 	const view: BuilderView = $derived({
 		catalogue,
+		collections,
+		excludeCollectionId,
+		collectionsFailed,
+		retryCollections() {
+			onretrycollections?.();
+		},
 		numbers,
 		warned: warnedDraft,
 		error: errorKey && error ? { key: errorKey, message: error.message } : null,

@@ -10,6 +10,11 @@ export type SummaryLookup = {
 	formatItemValue?(kind: string, key: string, value: unknown): string | null;
 	/** A table column's label ("Cast › Role"); when absent the raw column key is used. */
 	subFieldLabel?(type: string, key: string, subKey: string): string | null;
+	/**
+	 * A collection's name: the name, null when it no longer exists, undefined while the
+	 * collections are still loading (or when no lookup is given).
+	 */
+	collectionName?(id: string): string | null | undefined;
 	/** The field's kind, so date fields read like the Added / Changed conditions. */
 	fieldKind?(type: string, key: string, subKey: string | undefined): string | null;
 	/** Formats a plain field value (not a `rel` or `ref`); null leaves the default text. */
@@ -176,6 +181,29 @@ function listText(items: unknown): string {
 	return Array.isArray(items) ? items.map(String).join(', ') : '';
 }
 
+const MEDIA_WORDS = { image: 'an image', document: 'a document' } as const;
+const GONE = 'a collection that no longer exists';
+
+function describeMedia(c: Extract<Condition, { kind: 'media' }>): string {
+	const type = c.type === 'image' || c.type === 'document' ? c.type : null;
+	if (c.mode === 'none') return `Has no ${type ?? 'media'}`;
+	return `Has ${type ? MEDIA_WORDS[type] : 'media'}`;
+}
+
+function describeCollection(
+	c: Extract<Condition, { kind: 'collection' }>,
+	lookup: SummaryLookup
+): string {
+	const ids = Array.isArray(c.in) ? c.in : [];
+	const names = ids.map((id) => {
+		const name = safe(() => lookup.collectionName?.(id));
+		return name === undefined ? 'a collection' : (name ?? GONE);
+	});
+	const none = c.mode === 'none';
+	if (names.length === 1) return `${none ? 'Not in' : 'In'} ${names[0]}`;
+	return `In ${none ? 'none' : 'any'} of ${names.join(', ')}`;
+}
+
 function describe(c: Condition, lookup: SummaryLookup): string {
 	switch (c.kind) {
 		case 'field':
@@ -184,6 +212,16 @@ function describe(c: Condition, lookup: SummaryLookup): string {
 			return `${c.on === 'updated' ? 'Changed' : 'Added'} ${datePhrase(c.op, c.value)}`;
 		case 'text':
 			return `Contains “${c.q ?? ''}”`;
+		case 'description':
+		case 'name': {
+			const subject = c.kind === 'name' ? 'Name' : 'Description';
+			const op = OPERATOR_LABELS[c.op] ?? c.op;
+			return operatorTakesValue(c.op) ? `${subject} ${op} “${c.value ?? ''}”` : `${subject} ${op}`;
+		}
+		case 'media':
+			return describeMedia(c);
+		case 'collection':
+			return describeCollection(c, lookup);
 		case 'favourite':
 			return c.value ? 'Is a favourite' : 'Is not a favourite';
 		case 'tag': {

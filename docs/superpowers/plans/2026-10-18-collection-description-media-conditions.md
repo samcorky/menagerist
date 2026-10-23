@@ -1,5 +1,7 @@
 # "In collection", description, name and media conditions (phases 2b and 2c) Implementation Plan
 
+> **Status (2026-10-23):** Tasks 1 to 6 built and documented: conditions, bridges, frontend model and builder rows, linked save, e2e (`smart-collection-conditions.spec.ts`) and the DECISIONS entry. The whole-phase review and `poe coverage` belong to the controller.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A search or smart collection can say "in (or not in) these collections", search words in the description or the name on their own, test for an empty or present description, and test whether an item has media (for "a signature with no photo"), with the collection page offering "Save as new, linked to this collection".

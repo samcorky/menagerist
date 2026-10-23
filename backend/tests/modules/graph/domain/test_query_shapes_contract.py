@@ -7,6 +7,7 @@ lists, many conditions) are generated here rather than stored in the fixture;
 """
 
 import json
+import uuid
 from typing import Any
 
 import pytest
@@ -40,6 +41,16 @@ def _bulk() -> list[tuple[str, dict[str, Any], str | None]]:
         text = "a" * size
         add(f"text of {size}", _where({"kind": "text", "q": text}), path)
         add(f"type slug of {size}", _where({"kind": "type", "in": [text]}), path)
+        add(
+            f"description of {size}",
+            _where({"kind": "description", "op": "~", "value": text}),
+            path,
+        )
+        add(
+            f"name of {size}",
+            _where({"kind": "name", "op": "=", "value": text}),
+            path,
+        )
         add(
             f"tag of {size}",
             _where({"kind": "tag", "mode": "any", "tags": [text]}),
@@ -102,6 +113,12 @@ def _bulk() -> list[tuple[str, dict[str, Any], str | None]]:
         )
         add(f"in list of {size}", _where(_field("in", value=items)), path)
         add(f"has list of {size}", _where(_field("has", value=items)), path)
+        ids = [str(uuid.UUID(int=n)) for n in range(size)]
+        add(
+            f"collection list of {size}",
+            _where({"kind": "collection", "mode": "any", "in": ids}),
+            path,
+        )
     # Length counts characters, not UTF-16 units.
     add(
         "text of 200 astral characters",

@@ -913,14 +913,14 @@ Further known limits, left as they are for now:
 
 **ETag:** a manual collection's ETag extra is its item count, unchanged. A smart collection's is `count:capped:hash`, the capped count, the capped flag and a hash of the sorted warnings, because `updated_at` does not move when items start or stop matching. Above the cap the body and ETag stay the same. `If-Modified-Since` is skipped for smart collections (only `If-None-Match` can give a 304); `Last-Modified` is still sent and `PATCH`'s `If-Unmodified-Since` is unchanged.
 
-**Parameter ceiling:** a manual collection filters the item list with an `IN (ids)` list, which is bounded by the 32,767 bind-parameter limit. A smart collection is resolved by the search engine and counted in SQL, with no id list, so it has no such ceiling.
+**Parameter ceiling:** a manual collection used to filter the item list with an `IN (ids)` list, bounded by the 32,767 bind-parameter limit; it now binds one array (see "Collection, media, description and name conditions"). A smart collection is resolved by the search engine and counted in SQL, with no id list, so it has no such ceiling.
 
 **Known limits:**
 
 - The in-memory `count_matching` does not evaluate conditions; it counts every live item. Tests that need real counts for a smart collection use the Postgres bridge tests.
 - The definition checker runs as `SYSTEM_ACTOR`, because validation needs the item types and not an owner's data; the scope is still applied to every count and listing.
 - Fixed in the frontend: the collection page addresses every call by id once the collection has loaded, so the ETag cache (keyed by path) holds one entry per collection and definition saves carry `If-Match`.
-- "Save as new, linked to this collection" waits for the "in collection" condition (phase 2b).
+- "Save as new, linked to this collection" was built with the "in collection" condition (2026-10-23).
 - Not chosen: converting a collection between kinds, a slug history, and an in-process cache for the exact count (to add only if a benchmark shows the need).
 
 ## Device details captured at sign-in, frontend labelling with bowser (2026-10-17)
@@ -1119,3 +1119,37 @@ Over HTTPS (a `Secure` cookie) the session cookie is `__Host-Http-menagerist-ses
 - A purge removes every connection touching the item, whoever owns the other end, so callers must first confirm the item has none of anyone else's; pack removal keeps such items.
 - `media_assets` has no `deleted_at`, so the export cannot filter it; an asset attached only to a soft-deleted item is exported as an orphan, which is harmless.
 - Not built, by decision: a retention purge of hand-deleted content (`data purge-deleted`), superseded by the planned "Recently deleted" view.
+
+## Collection, media, description and name conditions (2026-10-23)
+
+**Decision:** four condition kinds join the search and smart-collection tree, additively (`v` stays 1): `collection` ("in" or "not in" a list of collections), `media` ("has" or "has no" media, optionally an image or a document), `description` (contains, is empty, is not empty) and `name` (contains, is). `description` and `name` are plain graph conditions, matched like free text (case- and accent-insensitive, `%` and `_` literal). `collection` and `media` need data that other modules own, so graph gets a small port of external predicates (`ExternalConditions`, with `CollectionDefinitions` to read stored smart definitions) that `entrypoints/api/shared/bridges/` implements over the collection and media tables; graph never imports either module. The collections page also offers **Save as new, linked to this collection**.
+
+**Rulings:**
+
+- **R25:** foreign data enters through the injected port, not as pre-resolved id lists and not by graph importing foreign tables. The SQL form is an `EXISTS` subquery (attachments by `target_id`, memberships by `item_id`); the in-memory evaluator has its own sibling implementation. Not chosen: an `id = ANY(array)` of foreign ids, because "has no media" would ship an array as large as the library. Cost: the bridge is a second place that knows SQL shapes.
+- **R26:** a manual collection resolves by membership rows. A smart collection is inlined at query-preparation time from its stored definition (depth limit 3, a visited trail, at most 50 expansions per query) and is resolved under the owner's visibility, so a smart collection referenced by another is evaluated the same way as on its own page. Anything not visible to the caller (another person's, deleted or unknown) is stale: it matches nothing, carries a warning, and is indistinguishable from an id that never existed.
+- **R27:** `media` counts attachments of the item itself, from any attribute key, whose asset is `attached` (staged and orphaned assets do not count, nor do thumbnails) and owned by the caller. `type: image` is a content type starting `image/`, `type: document` is any other. There is no soft-delete column on assets; orphaned is the deleted state.
+- **R28:** "Save as new, linked" stores `in collection <this>` AND the ad-hoc conditions (filters, search text, type). Deleting the parent later makes that condition stale: the child matches nothing and shows a warning.
+
+**Semantics as built:**
+
+- The wire form keeps `mode` (`any` or `none` for `collection`, `has` or `none` for `media`). The internal collection port has no mode: it answers "any of these manual collections", and graph composes `none` as NOT over the live targets (manual predicates and inlined smart groups).
+- An all-stale leaf matches nothing in both modes: `not in` a deleted collection is not "every item", consistent with stale field conditions. With a mix, stale ids contribute nothing and `none` negates the live ones.
+- Like other leaves, `not in collection` and `media: none` are plain negations and match items of any type.
+- Cycles: saving a definition whose collection list reaches the collection being saved, directly or through other smart collections, is a 400 naming the path (`a > b > self`). A cycle that does not involve the saved collection, a chain deeper than 3 or more than 50 expansions degrade to stale plus a warning, at save and at read, never recursion or a 500. A stored smart definition that no longer parses makes that target stale.
+- The access scope is still applied last, and the predicates filter by owner too, so a condition cannot reveal another person's items, collections or media (tested through search, counts, `GET /node?collection=` and saving).
+- The picker leaves the collection being edited out, so the page cannot offer a self reference; other loops are refused by the server and the message is shown in the dialog.
+
+**Performance (100,000 items, one owner, Postgres 18, tables analysed, median of 5):** the new conditions cost 30 to 80 ms for a page plus the capped count; media has AND a 5,000-member manual collection is the slowest combination at about 240 ms (two semi joins make the planner scan `nodes`; below the 300 ms threshold, so left). `EXPLAIN` shows `ix_media_attachments_target_id`, `media_assets_pkey` and `collection_members_pkey` used per candidate row. No index or migration was added. An earlier run on un-analysed tables measured 820 ms and 1.6 s for the manual and combined cases; those were not reproducible after `ANALYZE`, and autovacuum analyses after a real import. A rewrite of `collection_predicate` that moved ownership out of the correlated subquery measured no gain and was not applied.
+
+**Parameter ceiling removed:** `GET /node?collection=<manual>` used `id IN (ids)`, one bind per member (about 340 to 560 ms at 5,000 members, and asyncpg refuses more than 32,767 parameters). `NodeRepository.list` and `count` now bind one array (`id = ANY(:array)`): 158 ms at 5,000 members, 124 ms with a type filter, no cliff, same semantics.
+
+**Known slow spot (undecided):** `GET /node?q=` counts exactly with no cap, so a very common term (15% of items) costs about 0.9 s, nearly all in the unaccent recheck of the trigram hits; a rarer term is instant. It is older than these conditions. The `SearchNodes` path is capped and takes about 100 ms. Options: cap it with `total_capped` like search, or drop the exact total for `q`. Not changed, because it is an API decision.
+
+**Save as new, linked:** offered on smart collection pages (alongside "Save as new smart collection" and "Update this collection") and on manual pages when the search text or type is set (the only ad-hoc narrowing a manual page has), where it is the only save. The dialog says the new collection always holds the items of this one that match, so it follows it. It is blocked, with a reason, when the combined tree would exceed the depth or condition limits or the text is over 200 characters.
+
+**Frontend:** the decoder drops unknown keys (only the server is strict) and requires canonical UUIDs for collection ids. While the collection list loads, chips read "a collection" and rows do not claim deletion; a failed read shows "Could not load your collections." with Retry. A removed collection reads "Deleted collection" in chips and "a collection that no longer exists" in summaries.
+
+**Tests:** one scenario table (`test_node_search_external.py`) runs on both adapters; `tests/e2e/smart-collection-conditions.spec.ts` covers the builder, saving, stale references, both linked saves, the cycle message, isolation through a second user and the picker error state.
+
+**Known limits:** a chain of nested smart collections deeper than 3 is a warning, not a refusal; the picker loads all collections (paged, at most 20 pages of 50).

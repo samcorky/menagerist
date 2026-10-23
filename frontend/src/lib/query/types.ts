@@ -14,7 +14,25 @@ export type Condition =
 	| { kind: 'favourite'; value: boolean }
 	| { kind: 'tag'; mode: 'any' | 'all' | 'none'; tags: string[] }
 	| { kind: 'date'; on: 'created' | 'updated'; op: string; value: Value }
+	| DescriptionCondition
+	| NameCondition
+	| MediaCondition
+	| CollectionCondition
 	| FieldCondition;
+
+/** `~` needs a value (1 to 200 characters); `empty` and `not_empty` take none. */
+export type DescriptionCondition = {
+	kind: 'description';
+	op: '~' | 'empty' | 'not_empty';
+	value?: string;
+};
+/** Both operators need a value (1 to 200 characters). */
+export type NameCondition = { kind: 'name'; op: '~' | '='; value: string };
+/** Whether the item has media; `type` narrows it to images or documents. */
+export type MediaCondition = { kind: 'media'; mode: 'has' | 'none'; type?: MediaType };
+/** In (`any`) or in none of (`none`) 1 to 50 collections, by id. */
+export type CollectionCondition = { kind: 'collection'; mode: 'any' | 'none'; in: string[] };
+export type MediaType = 'image' | 'document';
 
 /**
  * Names an item type (`type`) or, for a field an individual item carries, its kind
@@ -52,6 +70,8 @@ export const MAX_CONDITIONS = 50;
 export const MAX_SORT_KEYS = 3;
 export const MAX_TEXT_LENGTH = 200;
 export const MAX_LIST_LENGTH = 50;
+/** Collections one condition may name (the server's list limit). */
+export const MAX_COLLECTION_IDS = MAX_LIST_LENGTH;
 
 export function isGroup(node: Node): node is Group {
 	return !('kind' in node);

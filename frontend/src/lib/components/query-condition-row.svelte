@@ -11,8 +11,10 @@
 		fieldSubject,
 		GENERAL_SUBJECTS,
 		isBlank,
+		MEDIA_MODES,
 		operatorLabel,
 		ARCHIVED_FIELD_MESSAGE,
+		COLLECTION_MODES,
 		fieldStatus,
 		itemFieldPickerItems,
 		missingFieldMessage,
@@ -20,12 +22,14 @@
 		strayValueText,
 		subjectOf,
 		TAG_MODES,
+		withCollectionMode,
+		withMediaMode,
 		withOperator,
 		withSubject,
 		type BuilderView
 	} from '$lib/query/builder';
 	import { fieldReferenceLabel, filterableFields, groupByType } from '$lib/query/fields';
-	import { operatorsForKind } from '$lib/query/operators';
+	import { operatorsForCondition, operatorsForKind } from '$lib/query/operators';
 	import { pathKey } from '$lib/query/warnings';
 	import type { ComboboxItem } from '$lib/components/ui/combobox/index.js';
 	import type { Condition, Path } from '$lib/query/types';
@@ -62,7 +66,7 @@
 			items.push({ value: subject, label: `${label}${suffix}` });
 		}
 		for (const general of GENERAL_SUBJECTS) {
-			items.push({ value: general.value, label: general.label, group: 'Any item' });
+			items.push({ value: general.value, label: general.label, group: general.group });
 		}
 		for (const group of fieldGroups) {
 			for (const f of group.fields) {
@@ -84,7 +88,15 @@
 		}
 		return items;
 	});
-	const warned = $derived(view.warned.has(key) || status === 'missing' || status === 'archived');
+	// A collection the person no longer has: known as soon as the list of collections is in.
+	const goneCollection = $derived(
+		condition.kind === 'collection' &&
+			view.collections !== null &&
+			condition.in.some((id) => !view.collections?.some((c) => c.id === id))
+	);
+	const warned = $derived(
+		view.warned.has(key) || status === 'missing' || status === 'archived' || goneCollection
+	);
 	const warning = $derived(
 		status === 'archived' ? ARCHIVED_FIELD_MESSAGE : missingFieldMessage(condition)
 	);
@@ -101,6 +113,14 @@
 	/** Show all operators, but flag the ones that a field cannot use. */
 	const operators = $derived.by((): { value: string; label: string }[] => {
 		if (condition.kind === 'tag') return TAG_MODES.map((m) => ({ ...m }));
+		if (condition.kind === 'media') return MEDIA_MODES.map((m) => ({ ...m }));
+		if (condition.kind === 'collection') return COLLECTION_MODES.map((m) => ({ ...m }));
+		if (condition.kind === 'description' || condition.kind === 'name') {
+			return operatorsForCondition(condition.kind).map((op) => ({
+				value: op,
+				label: operatorLabel(condition.kind, op)
+			}));
+		}
 		let kind: string;
 		let ops: readonly string[];
 		if (condition.kind === 'date') {
@@ -116,7 +136,11 @@
 		return [{ value: condition.op, label: unsuitable }, ...options];
 	});
 	const operatorValue = $derived(
-		condition.kind === 'tag' ? condition.mode : 'op' in condition ? condition.op : ''
+		condition.kind === 'tag' || condition.kind === 'media' || condition.kind === 'collection'
+			? condition.mode
+			: 'op' in condition
+				? condition.op
+				: ''
 	);
 	const fixedOperator = $derived(
 		condition.kind === 'text'
@@ -136,6 +160,10 @@
 		if (condition.kind === 'tag') {
 			const mode = TAG_MODES.find((m) => m.value === value)?.value ?? 'any';
 			view.update(path, { ...condition, mode });
+		} else if (condition.kind === 'media') {
+			view.update(path, withMediaMode(condition, value === 'none' ? 'none' : 'has'));
+		} else if (condition.kind === 'collection') {
+			view.update(path, withCollectionMode(condition, value === 'none' ? 'none' : 'any'));
 		} else view.update(path, withOperator(condition, value, view.catalogue));
 	}
 </script>

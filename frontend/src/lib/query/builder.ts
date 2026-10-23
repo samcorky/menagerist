@@ -11,14 +11,22 @@ import {
 	type FieldInfo
 } from './fields';
 import type { ComboboxItem } from '$lib/components/ui/combobox/combobox';
-import { LIST_OPERATORS, OPERATOR_LABELS, operatorsForKind, operatorTakesValue } from './operators';
+import {
+	LIST_OPERATORS,
+	OPERATOR_LABELS,
+	operatorsForCondition,
+	operatorsForKind,
+	operatorTakesValue
+} from './operators';
 import { describeCondition, type SummaryLookup } from './summary';
 import { pathKey } from './warnings';
 import {
 	isGroup,
+	MAX_COLLECTION_IDS,
 	MAX_TEXT_LENGTH,
 	type Condition,
 	type Group,
+	type MediaType,
 	type Node,
 	type Operand,
 	type Path,
@@ -38,7 +46,18 @@ type FieldCondition = Extract<Condition, { kind: 'field' }>;
 export { itemFieldSubject, parseItemFieldSubject };
 type DateCondition = Extract<Condition, { kind: 'date' }>;
 
-export type Subject = 'blank' | 'text' | 'type' | 'favourite' | 'tag' | 'created' | 'updated';
+export type Subject =
+	| 'blank'
+	| 'text'
+	| 'type'
+	| 'favourite'
+	| 'tag'
+	| 'created'
+	| 'updated'
+	| 'collection'
+	| 'media'
+	| 'name'
+	| 'description';
 
 const SUBJECT_LABELS: Record<Exclude<Subject, 'blank'>, string> = {
 	type: 'Type',
@@ -46,12 +65,27 @@ const SUBJECT_LABELS: Record<Exclude<Subject, 'blank'>, string> = {
 	tag: 'Tags',
 	created: 'Added',
 	updated: 'Changed',
-	text: 'Text'
+	text: 'Text',
+	collection: 'In collection',
+	media: 'Media',
+	name: 'Name',
+	description: 'Description'
 };
+
+const CONTENT_SUBJECTS: ReadonlySet<string> = new Set([
+	'collection',
+	'media',
+	'name',
+	'description'
+]);
 
 export const GENERAL_SUBJECTS = (
 	Object.keys(SUBJECT_LABELS) as (keyof typeof SUBJECT_LABELS)[]
-).map((value) => ({ value, label: SUBJECT_LABELS[value] }));
+).map((value) => ({
+	value,
+	label: SUBJECT_LABELS[value],
+	group: CONTENT_SUBJECTS.has(value) ? 'Content' : 'Any item'
+}));
 
 export function fieldSubject(type: string, key: string, subKey?: string): string {
 	return `field:${JSON.stringify([type, key, subKey ?? null])}`;
@@ -116,6 +150,14 @@ export function conditionFor(subject: string, catalogue: Catalogue): Condition {
 			return { kind: 'favourite', value: true };
 		case 'tag':
 			return { kind: 'tag', mode: 'any', tags: [] };
+		case 'description':
+			return { kind: 'description', op: '~', value: '' };
+		case 'name':
+			return { kind: 'name', op: '~', value: '' };
+		case 'media':
+			return { kind: 'media', mode: 'has' };
+		case 'collection':
+			return { kind: 'collection', mode: 'any', in: [] };
 		case 'created':
 		case 'updated':
 			return { kind: 'date', on: subject, op: '>=', value: LAST_30_DAYS };
@@ -177,6 +219,44 @@ export function operatorLabel(kind: string, op: string): string {
 	return OPERATOR_LABELS[op] ?? op;
 }
 
+export const MEDIA_MODES = [
+	{ value: 'has', label: 'has' },
+	{ value: 'none', label: 'has no' }
+] as const;
+
+/** What kind of media a media row asks about; `any` leaves out the condition's `type`. */
+export const MEDIA_TYPES = [
+	{ value: 'any', label: 'media' },
+	{ value: 'image', label: 'an image' },
+	{ value: 'document', label: 'a document' }
+] as const;
+
+export const COLLECTION_MODES = [
+	{ value: 'any', label: 'is in any of' },
+	{ value: 'none', label: 'is in none of' }
+] as const;
+
+export function withMediaMode(c: Condition, mode: 'has' | 'none'): Condition {
+	return c.kind === 'media' ? { ...c, mode } : c;
+}
+
+/** Narrow a media row to images or documents; null means any media. */
+export function withMediaType(c: Condition, type: MediaType | null): Condition {
+	if (c.kind !== 'media') return c;
+	const { type: _old, ...rest } = c;
+	return type === null ? rest : { ...rest, type };
+}
+
+export function withCollectionMode(c: Condition, mode: 'any' | 'none'): Condition {
+	return c.kind === 'collection' ? { ...c, mode } : c;
+}
+
+/** Set the collections a row names: duplicates dropped, at most 50 kept. */
+export function withCollectionIds(c: Condition, ids: readonly string[]): Condition {
+	if (c.kind !== 'collection') return c;
+	return { ...c, in: [...new Set(ids)].slice(0, MAX_COLLECTION_IDS) };
+}
+
 export const TAG_MODES = [
 	{ value: 'any', label: 'has any of' },
 	{ value: 'all', label: 'has all of' },
@@ -191,6 +271,11 @@ function emptyValueFor(shape: ValueShape): Value | undefined {
 
 /** Change a field or date condition's operator, keeping the value when its shape still fits. */
 export function withOperator(c: Condition, op: string, catalogue: Catalogue): Condition {
+	if (c.kind === 'description' || c.kind === 'name') {
+		if (op === c.op || !operatorsForCondition(c.kind).includes(op)) return c;
+		if (!operatorTakesValue(op)) return { kind: c.kind, op } as Condition;
+		return { kind: c.kind, op, value: c.value ?? '' } as Condition;
+	}
 	if (c.kind === 'date') {
 		const wasRange = c.op === 'between';
 		const isRange = op === 'between';
@@ -378,14 +463,32 @@ function valueProblem(kind: string, op: string, value: unknown): string | null {
 	return operandProblem(kind, value);
 }
 
+const EMPTY_WORDS = 'Enter some words to look for.';
+
 /** Why a row cannot be sent yet, or null when it is ready. Never throws. */
 export function conditionProblem(c: Condition, catalogue: Catalogue): string | null {
 	try {
 		switch (c.kind) {
 			case 'text': {
 				const q = typeof c.q === 'string' ? c.q.trim() : '';
-				if (!q) return 'Enter some words to look for.';
+				if (!q) return EMPTY_WORDS;
 				return [...q].length > MAX_TEXT_LENGTH ? 'Use 200 characters or fewer.' : null;
+			}
+			case 'description':
+			case 'name': {
+				if (!operatorTakesValue(c.op)) return null;
+				const words = typeof c.value === 'string' ? c.value.trim() : '';
+				if (!words) return c.kind === 'name' && c.op === '=' ? 'Enter a name.' : EMPTY_WORDS;
+				return [...words].length > MAX_TEXT_LENGTH ? 'Use 200 characters or fewer.' : null;
+			}
+			case 'media':
+				return null;
+			case 'collection': {
+				const count = Array.isArray(c.in) ? c.in.length : 0;
+				if (count === 0) return 'Choose at least one collection.';
+				return count > MAX_COLLECTION_IDS
+					? `Choose ${MAX_COLLECTION_IDS} collections or fewer.`
+					: null;
 			}
 			case 'type':
 				return Array.isArray(c.in) && c.in.length > 0 ? null : 'Choose at least one type.';
@@ -551,6 +654,13 @@ export type BuilderView = {
 	warned: ReadonlySet<string>;
 	/** Draft path key of the row a server error names, and its message. */
 	error: { key: string; message: string } | null;
+	/** Every collection the person has (null while loading or if it could not be read). */
+	collections: readonly { id: string; name: string }[] | null;
+	/** The collection being edited; it cannot be picked (it cannot refer to itself). */
+	excludeCollectionId: string | null;
+	/** Reading the collections failed; `retryCollections` reads them again. */
+	collectionsFailed: boolean;
+	retryCollections(): void;
 	canAddCondition: boolean;
 	canAddGroup(groupPath: Path): boolean;
 	update(path: Path, condition: Condition, options?: { debounce?: boolean }): void;
@@ -583,12 +693,15 @@ export function stringList(value: unknown): string[] {
 }
 
 export const STALE_FIELD_MESSAGE = 'This field no longer exists, so nothing matches.';
+export const STALE_COLLECTION_MESSAGE =
+	'A collection here no longer exists, so it matches nothing.';
 export const NO_ITEM_FIELD_MESSAGE = 'No item has this field.';
 /** The same wording, lower-cased for the field picker's trigger. */
 export const NO_ITEM_FIELD_NOTE = 'no item has this field';
 
 /** What to say about a field row that cannot be matched. */
 export function missingFieldMessage(c: Condition): string {
+	if (c.kind === 'collection') return STALE_COLLECTION_MESSAGE;
 	return c.kind === 'field' && c.field_kind !== undefined
 		? NO_ITEM_FIELD_MESSAGE
 		: STALE_FIELD_MESSAGE;
@@ -673,4 +786,15 @@ export function missingItemFieldPaths(query: Query, catalogue: Catalogue): Set<s
 			out.add(pathKey(path));
 	}
 	return out;
+}
+
+export const DELETED_COLLECTION_LABEL = 'Deleted collection';
+
+/** The name of a collection a row names, or a stand-in when it is gone or still loading. */
+export function collectionLabel(
+	collections: readonly { id: string; name: string }[] | null,
+	id: string
+): string {
+	if (collections === null) return 'Collection';
+	return collections.find((c) => c.id === id)?.name ?? DELETED_COLLECTION_LABEL;
 }

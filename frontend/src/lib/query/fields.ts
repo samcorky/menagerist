@@ -268,8 +268,12 @@ export function formatFieldValue(field: FieldInfo, value: unknown): string | nul
 }
 
 /** Labels and value formatting for `describeCondition`, read from the item types. */
-export function summaryLookup(catalogue: Catalogue): SummaryLookup {
+export function summaryLookup(
+	catalogue: Catalogue,
+	collectionName?: SummaryLookup['collectionName']
+): SummaryLookup {
 	return {
+		collectionName,
 		typeLabel: (slug) => typeLabel(catalogue, slug),
 		fieldLabel: (type, key) => findField(catalogue, type, key)?.label ?? key,
 		itemFieldLabel: (kind, key) => findItemField(catalogue, kind, key)?.label ?? key,
