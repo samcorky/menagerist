@@ -1100,3 +1100,22 @@ Over HTTPS (a `Secure` cookie) the session cookie is `__Host-Http-menagerist-ses
 - **Every error example must match its status** (`status` equals the response code, `type` from the exception's `problem_type`, a route-specific `instance`, no placeholders). `tests/entrypoints/api/test_openapi_response_examples.py` enforces it for every operation, so a new route needs accurate descriptions and examples.
 
 **Tradeoff:** a wider surface to guard (a second credential, a table of secrets) and a few accepted costs above. Bearer-authoritative and session-only stances keep that surface from reaching account management.
+
+## Removing an example pack purges what it created; exports skip deleted rows (2026-10-23)
+
+**Decision:** removing an example pack hard-deletes what the removal removes: the item and the connections that touch it, collections and their memberships, and cover attachments with the assets and stored files only they used. Stored files go only after the transaction commits. Anything the person edited, connected to their own content or still uses is kept exactly as before, and item types and presets stay soft-deleted (their rows keep slugs reusable and other rows may still name them). The purge use cases are `System`-only, pinned in the stance tests and reachable from no route. Personal exports and restores ignore soft-deleted items, connections and collections.
+
+**Rationale:**
+
+- The old removal only set `deleted_at`, and the export selected rows by owner alone, so every install and remove added another copy of the pack to every later export. Nothing ever hard-deleted content, so the rows also never left the database.
+- A pack can be reinstalled from the catalogue, so a soft-deleted copy has no value.
+- Skipping soft-deleted rows in the export fixes the symptom for everything deleted by hand too, and matches the vocabulary tables, which already ignored them.
+
+**Consequences:**
+
+- Removal is no longer recoverable. No undo was ever offered.
+- **Behaviour change:** an item a person deleted by hand is no longer in their export. A future "Recently deleted" view (restore, and purge on request) will need its own export rule; until it exists, hand-deleted content stays soft-deleted and nothing purges it automatically.
+- Rows left behind by earlier removals stay as they are: no clean-up command was built, because none is needed for this deployment.
+- A purge removes every connection touching the item, whoever owns the other end, so callers must first confirm the item has none of anyone else's; pack removal keeps such items.
+- `media_assets` has no `deleted_at`, so the export cannot filter it; an asset attached only to a soft-deleted item is exported as an orphan, which is harmless.
+- Not built, by decision: a retention purge of hand-deleted content (`data purge-deleted`), superseded by the planned "Recently deleted" view.

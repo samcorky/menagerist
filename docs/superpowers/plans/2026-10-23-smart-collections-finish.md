@@ -217,6 +217,8 @@ Independent of Parts A to C; it can run first, or any time after the prerequisit
 
 ### Task 11: Clean up existing leftovers, docs and gates
 
+> **Dropped (Sam, 2026-10-23):** no clean-up command for rows left by earlier removals (P3 is not built). Only the DECISIONS entry and the gates were done; see "Removing an example pack purges what it created" in `docs/DECISIONS.md`.
+
 **Files:**
 - Create: `backend/src/app/modules/examples/application/purge_removed_example_leftovers.py` (a `System` use case) and its CLI command `data purge-removed-examples [--dry-run]`, registered the way the `backup` and `identity` commands are in `entrypoints/cli/`
 - Modify: `backend/README.md`, `CONTRIBUTING.md` (operations note), `docs/DECISIONS.md`
@@ -232,6 +234,8 @@ Independent of Parts A to C; it can run first, or any time after the prerequisit
 - [ ] **Step 5: Stop for review** with these checks: nothing live is purged; foreign-key order; files removed only after commit; the export no longer contains deleted rows; an old archive still restores.
 
 ### Task 12: Retention purge of hand-deleted content (P4)
+
+> **Deferred (2026-10-23):** superseded by a planned "Recently deleted" view with restore and purge on request (hand-deleted content stays soft-deleted until then). Do not build `data purge-deleted`.
 
 **Files:**
 - Create: `backend/src/app/modules/graph/application/purge_deleted_content.py` (or one use case per module if the module boundary demands it: graph owns nodes and edges, collections owns collections, media owns assets; compose them in an entrypoints-level command, never by cross-module imports), the CLI command `data purge-deleted`
