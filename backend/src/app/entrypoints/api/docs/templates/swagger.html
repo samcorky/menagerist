@@ -8,11 +8,8 @@
 <link rel="shortcut icon" href="$favicon_url">
 <title>$title</title>
 <style>
-/* Authorize cannot work (browsers cannot set a Cookie header), so it is hidden (the per-operation locks stay as indicators); the sign-in
-   state and actions are injected into Swagger's scheme bar by swagger-init.js. */
-.swagger-ui .auth-wrapper { display: none; }
-/* Per-operation locks stay as an indicator but cannot open the (useless) dialog. */
-.swagger-ui .opblock .authorization__btn { pointer-events: none; cursor: default; }
+/* Authorize takes a bearer token only: browsers cannot set a Cookie header, so swagger-init.js hides the cookie
+   scheme's block in the dialog. The sign-in state and actions are injected into Swagger's scheme bar by it too. */
 .swagger-ui .menagerist-session {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
   gap: 12px; width: 100%; box-sizing: border-box; padding: 10px 14px;
@@ -45,6 +42,8 @@
 .swagger-ui .menagerist-session-notice { flex-basis: 100%; color: #f93e3e; }
 .swagger-ui .menagerist-session .btn:focus-visible { outline: 3px solid #4990e2; outline-offset: 2px; }
 .swagger-ui .menagerist-logo { float: left; height: 44px; margin: 0 14px 8px 0; }
+.swagger-ui .menagerist-dialog-session { margin: 0 0 16px; }
+.swagger-ui .menagerist-dialog-session .menagerist-session { min-height: 0; }
 #swagger-ui > .menagerist-session { margin: 16px; width: auto; }
 </style>
 </head>

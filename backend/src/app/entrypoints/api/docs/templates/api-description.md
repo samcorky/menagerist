@@ -12,6 +12,19 @@ Run `POST /api/v1/auth/login` with "Try it out" on this page, or use the "Sign i
 
 ReDoc (`/api/redoc`) is read-only.
 
+## Using a token
+
+Scripts and tools can use a personal access token instead of a session. Create one under Settings, Account, then send it with every request:
+
+```
+curl -H 'Authorization: Bearer mnst_<id>_<secret>' https://menagerist.example.com/api/v1/collection
+```
+
+- The token acts as you, but only with the permissions you gave it. It needs no `Origin` header. It is shown once, when it is created, and expires on the date shown beside it.
+- On this page, use "Authorize" to paste a token. Reloading the page forgets it.
+- A request that carries a token is only ever judged on the token: a wrong or expired one is `401`, even if a session cookie is sent too.
+- Signing in, your account, managing tokens and administration always need the browser session; a token is refused there. Some operations call others, so they may need more permissions than the one listed.
+
 ## Permissions
 
 Every operation that needs a permission names it in a "Requires permission" line. Members hold the content permissions (items, collections, media and the like); administrators hold every permission, including those for shared structure such as item types and relationship types, accounts and backups. `GET /api/v1/auth/me/permissions` lists the permissions of the signed-in account.

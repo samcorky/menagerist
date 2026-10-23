@@ -10,6 +10,8 @@ from app.platform.config import get_identity_settings
 if TYPE_CHECKING:
     from fastapi import FastAPI
 
+# Every tag a route uses must be declared here, with "System" and "v1" last, so
+# Swagger lists them after the resource groups. A test pins both.
 OPENAPI_TAGS: list[dict[str, str]] = [
     {
         "name": "Nodes",
@@ -44,6 +46,14 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "Endpoints for managing collections of graphs.",
     },
     {
+        "name": "Backups",
+        "description": "Endpoints for whole-instance backups and restores.",
+    },
+    {
+        "name": "Personal backups",
+        "description": "Endpoints for exporting and importing your own data.",
+    },
+    {
         "name": "Authentication",
         "description": "Sign in and out, and manage your own account.",
     },
@@ -54,6 +64,10 @@ OPENAPI_TAGS: list[dict[str, str]] = [
     {
         "name": "Sessions",
         "description": "Endpoints for managing active user sessions and devices.",
+    },
+    {
+        "name": "API tokens",
+        "description": "Create, list, rotate and revoke personal access tokens.",
     },
     {
         "name": "System",

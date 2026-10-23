@@ -9,6 +9,7 @@ from app.entrypoints.api.shared.permission_aware_route import (
     _find_use_case_type,
 )
 from app.entrypoints.api.shared.permissions import ALL_PERMISSIONS
+from app.shared_kernel.access import OwnAccount
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -111,3 +112,27 @@ def test_documented_permission_matches_the_use_case() -> None:
             assert ("Requires permission" in description) == (expected is not None)
             checked += 1
     assert checked
+
+
+TOKEN_ROUTES = {
+    ("/api/v1/tokens", "get"),
+    ("/api/v1/tokens", "post"),
+    ("/api/v1/tokens/grants", "get"),
+    ("/api/v1/tokens/{token_id}", "delete"),
+    ("/api/v1/tokens/{token_id}/rotate", "post"),
+}
+
+
+def test_token_routes_are_own_account_and_document_no_permission() -> None:
+    """Token management is session-only: `OwnAccount`, so no permission is shown."""
+    live = _live_permissions()
+    found: set[tuple[str, str]] = set()
+    for path, route in _api_routes(create_app().routes):
+        use_case = _find_use_case_type(route.endpoint)
+        for method in route.methods or ():
+            key = (path, method.lower())
+            if key in TOKEN_ROUTES:
+                found.add(key)
+                assert isinstance(use_case.access, OwnAccount), key  # type: ignore[union-attr]
+                assert key not in live
+    assert found == TOKEN_ROUTES

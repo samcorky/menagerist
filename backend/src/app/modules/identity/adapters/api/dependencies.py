@@ -9,6 +9,10 @@ from fastapi import Depends
 from starlette.requests import Request
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
+from app.entrypoints.api.shared.authorisation import (
+    TOKEN_GRANTABLE_PERMISSIONS,
+    get_authorisation_port,
+)
 from app.entrypoints.api.shared.http.bearer import bearer_token
 from app.modules.identity.adapters.api.cookies import (
     session_cookie_name,
@@ -44,6 +48,7 @@ from app.modules.identity.adapters.security.session_token_generator import (
 from app.modules.identity.application.authenticate_api_token import AuthenticateApiToken
 from app.modules.identity.application.change_password import ChangePassword
 from app.modules.identity.application.client_device import ClientDevice
+from app.modules.identity.application.create_api_token import CreateApiToken
 from app.modules.identity.application.create_user import CreateUser
 from app.modules.identity.application.get_current_user import (
     GetCurrentUser,
@@ -52,13 +57,19 @@ from app.modules.identity.application.get_current_user import (
 )
 from app.modules.identity.application.get_setup_status import GetSetupStatus
 from app.modules.identity.application.has_administrator import HasAdministrator
+from app.modules.identity.application.list_grantable_permissions import (
+    ListGrantablePermissions,
+)
+from app.modules.identity.application.list_own_api_tokens import ListOwnApiTokens
 from app.modules.identity.application.list_own_sessions import ListOwnSessions
 from app.modules.identity.application.list_sessions import ListSessions
 from app.modules.identity.application.list_users import ListUsers
 from app.modules.identity.application.reset_password import ResetPassword
 from app.modules.identity.application.revoke_other_sessions import RevokeOtherSessions
+from app.modules.identity.application.revoke_own_api_token import RevokeOwnApiToken
 from app.modules.identity.application.revoke_own_session import RevokeOwnSession
 from app.modules.identity.application.revoke_session import RevokeSession
+from app.modules.identity.application.rotate_api_token import RotateApiToken
 from app.modules.identity.application.set_own_display_name import SetOwnDisplayName
 from app.modules.identity.application.setup_first_admin import SetupFirstAdmin
 from app.modules.identity.application.sign_in import SignIn
@@ -103,6 +114,11 @@ def _hasher() -> PasswordHasher:
 def _decoy_hash() -> str:
     """A hash made once per process, verified against for unknown usernames."""
     return _hasher().hash(secrets.token_urlsafe(16))
+
+
+def _grantable() -> frozenset[str]:
+    """The permission strings a token may be given."""
+    return frozenset(p.value for p in TOKEN_GRANTABLE_PERMISSIONS)
 
 
 def get_identity_settings_dep() -> IdentitySettings:
@@ -291,6 +307,71 @@ def get_authenticate_api_token_use_case(
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> AuthenticateApiToken:
     return AuthenticateApiToken(uow, guard, tokens)
+
+
+def get_create_api_token_use_case(
+    uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    hasher: Annotated[PasswordHasher, Depends(get_password_hasher)],
+    tokens: Annotated[ApiTokenGenerator, Depends(get_api_token_generator)],
+    throttle: Annotated[SignInThrottle, Depends(get_sign_in_throttle)],
+    settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> CreateApiToken:
+    return CreateApiToken(
+        uow,
+        guard,
+        hasher,
+        tokens,
+        throttle,
+        get_authorisation_port(),
+        grantable=_grantable(),
+        default_days=settings.api_token_default_days,
+        max_days=settings.api_token_max_days,
+        max_tokens=settings.api_tokens_per_user,
+    )
+
+
+def get_rotate_api_token_use_case(
+    uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    hasher: Annotated[PasswordHasher, Depends(get_password_hasher)],
+    tokens: Annotated[ApiTokenGenerator, Depends(get_api_token_generator)],
+    throttle: Annotated[SignInThrottle, Depends(get_sign_in_throttle)],
+    settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> RotateApiToken:
+    return RotateApiToken(
+        uow,
+        guard,
+        hasher,
+        tokens,
+        throttle,
+        get_authorisation_port(),
+        default_days=settings.api_token_default_days,
+        max_days=settings.api_token_max_days,
+    )
+
+
+def get_list_own_api_tokens_use_case(
+    repos: Annotated[IdentityRepos, Depends(get_identity_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> ListOwnApiTokens:
+    return ListOwnApiTokens(repos, guard)
+
+
+def get_revoke_own_api_token_use_case(
+    uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> RevokeOwnApiToken:
+    return RevokeOwnApiToken(uow, guard)
+
+
+def get_list_grantable_permissions_use_case(
+    repos: Annotated[IdentityRepos, Depends(get_identity_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> ListGrantablePermissions:
+    return ListGrantablePermissions(
+        repos, guard, get_authorisation_port(), grantable=_grantable()
+    )
 
 
 def get_get_setup_status_use_case(

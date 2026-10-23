@@ -40,6 +40,17 @@ router = APIRouter(
     status_code=201,
     response_model=BackupResponse,
     operation_id="export_user_data",
+    responses={
+        201: {
+            "links": {
+                "DownloadExport": {
+                    "operationId": "download_user_export",
+                    "parameters": {"backup_id": "$response.body#/id"},
+                    "description": "Download the archive that was just created.",
+                }
+            }
+        }
+    },
 )
 async def export_user_data(
     use_case: Annotated[ExportUserData, Depends(get_export_user_data)],

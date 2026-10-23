@@ -296,7 +296,13 @@ def test_openapi_has_summary_and_sectioned_description() -> None:
     assert info["summary"]
     assert info["summary"] not in description
     headings = re.findall(r"^## (.+)$", description, flags=re.MULTILINE)
-    assert headings == ["About", "Signing in", "Permissions", "Errors"]
+    assert headings == [
+        "About",
+        "Signing in",
+        "Using a token",
+        "Permissions",
+        "Errors",
+    ]
     settings = get_identity_settings()
     assert settings.cookie_name in description
     for word in ("node", "edge", "graph", "shelf"):
@@ -359,18 +365,44 @@ def test_openapi_throttled_response_documents_retry_after(path: str) -> None:
     assert headers["Retry-After"]["schema"] == {"type": "integer"}
 
 
-def test_swagger_security_is_unchanged() -> None:
-    """One cookie scheme; content and admin routes are locked, public ones not."""
+def test_swagger_security_schemes() -> None:
+    """Cookie and bearer are alternatives on content routes; the rest stay cookie."""
     schema = create_app().openapi()
-    assert schema["components"]["securitySchemes"] == {
-        "APIKeyCookie": {
-            "type": "apiKey",
-            "in": "cookie",
-            "name": get_identity_settings().cookie_name,
-        }
+    schemes = schema["components"]["securitySchemes"]
+    assert set(schemes) == {"APIKeyCookie", "HTTPBearer"}
+    assert schemes["APIKeyCookie"] == {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": get_identity_settings().cookie_name,
     }
+    assert schemes["HTTPBearer"]["type"] == "http"
+    assert schemes["HTTPBearer"]["scheme"] == "bearer"
     paths = schema["paths"]
+    # Two requirement objects: either credential is enough, neither is required.
+    either: list[dict[str, list[str]]] = [{"APIKeyCookie": []}, {"HTTPBearer": []}]
     cookie: list[dict[str, list[str]]] = [{"APIKeyCookie": []}]
-    assert paths["/api/v1/node"]["get"]["security"] == cookie
+    assert paths["/api/v1/node"]["get"]["security"] == either
+    # Administration is session-only: no token can hold its permission.
     assert paths["/api/v1/user"]["get"]["security"] == cookie
+    assert paths["/api/v1/session"]["get"]["security"] == cookie
+    for path, method in (
+        ("/api/v1/tokens", "get"),
+        ("/api/v1/tokens", "post"),
+        ("/api/v1/tokens/{token_id}", "delete"),
+        ("/api/v1/tokens/{token_id}/rotate", "post"),
+        ("/api/v1/tokens/grants", "get"),
+        ("/api/v1/auth/me", "get"),
+    ):
+        assert paths[path][method]["security"] == cookie, (path, method)
     assert "security" not in paths["/api/v1/auth/login"]["post"]
+
+
+def test_using_a_token_section_explains_bearer_tokens() -> None:
+    """The description tells scripts how to send a token and what needs a session."""
+    description = create_app().openapi()["info"]["description"]
+    section = description.split("## Using a token", 1)[1].split("\n## ", 1)[0]
+
+    assert "Authorization: Bearer mnst_" in section
+    assert "Settings" in section
+    assert "Account" in section
+    assert "browser session" in section

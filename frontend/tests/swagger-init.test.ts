@@ -61,6 +61,7 @@ type Init = {
 	safeLogoUrl(logo: unknown, origin?: string): string | null;
 	cookieSchemes(definitions: Record<string, { type?: string; in?: string }>): string[];
 	applyLocks(ui: unknown, names: string[], signedIn: boolean): void;
+	hideSchemeBlocks(container: unknown, names: string[]): number;
 	renderBanner(
 		doc: FakeDocument,
 		box: FakeNode,
@@ -210,6 +211,20 @@ describe('swagger-init session banner', () => {
 			})
 		).toEqual(['APIKeyCookie']);
 		expect(init.cookieSchemes({})).toEqual([]);
+	});
+
+	it('hides the named scheme blocks in the Authorize dialog and no others', () => {
+		const block = (title: string) => ({
+			hidden: false,
+			querySelector: () => ({ textContent: title })
+		});
+		const cookie = block('APIKeyCookie\u00a0(apiKey)');
+		const bearer = block('HTTPBearer (http, Bearer)');
+		const container = { querySelectorAll: () => [cookie, bearer] };
+		expect(init.hideSchemeBlocks(container, ['APIKeyCookie'])).toBe(1);
+		expect(cookie.hidden).toBe(true);
+		expect(bearer.hidden).toBe(false);
+		expect(init.hideSchemeBlocks(container, [])).toBe(0);
 	});
 
 	it('applies locks per scheme and survives a throwing Swagger', () => {

@@ -3,8 +3,9 @@ from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin, get_type
 
 from fastapi import Security
 from fastapi.routing import APIRoute
-from fastapi.security import APIKeyCookie
+from fastapi.security import APIKeyCookie, HTTPBearer
 
+from app.entrypoints.api.shared.authorisation import TOKEN_GRANTABLE_PERMISSIONS
 from app.platform.config import get_identity_settings
 from app.shared_kernel.access import Content, Requires
 from app.shared_kernel.cqrs import CommandHandler, UseCase
@@ -17,6 +18,20 @@ if TYPE_CHECKING:
 # request and the access guard enforces permissions.
 # The name is read once at import; the runtime lookup always uses live settings.
 cookie_scheme = APIKeyCookie(name=get_identity_settings().cookie_name, auto_error=False)
+
+# The personal access token, an alternative to the cookie on content routes. Also
+# documentation only: `get_current_actor` reads the header and decides.
+bearer_scheme = HTTPBearer(
+    auto_error=False,
+    bearerFormat="API token",
+    description=(
+        "A personal access token (`mnst_...`) created under Settings, Account. "
+        + "Send it as `Authorization: Bearer <token>`. It can use only the "
+        + "permissions it was given."
+    ),
+)
+
+_TOKEN_PERMISSIONS = frozenset(p.value for p in TOKEN_GRANTABLE_PERMISSIONS)
 
 
 def _find_use_case_type(endpoint: Callable[..., Any]) -> type[UseCase[Any, Any]] | None:
@@ -72,6 +87,9 @@ class PermissionAwareRoute(APIRoute):
         if permission is not None:
             dependencies = list(params.get("dependencies") or [])
             dependencies.append(Security(cookie_scheme))
+            # Only permissions a token can hold; administration is session-only.
+            if permission in _TOKEN_PERMISSIONS:
+                dependencies.append(Security(bearer_scheme))
             params["dependencies"] = dependencies
 
             openapi_extra = dict(params.get("openapi_extra") or {})

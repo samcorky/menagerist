@@ -4,15 +4,22 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.entrypoints.api.shared.permissions import Permission
 from app.modules.identity.application.change_password import ChangePasswordCommand
+from app.modules.identity.application.create_api_token import (
+    CreateApiTokenCommand,
+    CreatedApiToken,
+)
 from app.modules.identity.application.create_user import CreateUserCommand
 from app.modules.identity.application.reset_password import ResetPasswordCommand
+from app.modules.identity.application.rotate_api_token import RotateApiTokenCommand
 from app.modules.identity.application.set_own_display_name import (
     SetOwnDisplayNameCommand,
 )
 from app.modules.identity.application.setup_first_admin import SetupFirstAdminCommand
 from app.modules.identity.application.sign_in import SignInCommand
 from app.modules.identity.application.update_user import UpdateUserCommand
+from app.modules.identity.domain.api_token import MAX_TOKEN_NAME_LENGTH
 from app.modules.identity.domain.user import (
     MAX_DISPLAY_NAME_LENGTH,
     MAX_USERNAME_LENGTH,
@@ -26,6 +33,7 @@ if TYPE_CHECKING:
     from app.modules.identity.application.session_listing import SessionListing
     from app.modules.identity.application.setup_first_admin import SetupFirstAdminResult
     from app.modules.identity.application.user_listing import UserListing
+    from app.modules.identity.domain.api_token import ApiToken
     from app.modules.identity.domain.user import User
 
 # Generous bounds only stop absurd bodies; the domain applies the real password rules.
@@ -402,3 +410,135 @@ class RevokedSessionsResponse(BaseModel):
     model_config = ConfigDict(json_schema_extra={"examples": [{"ended": 2}]})
 
     ended: int
+
+
+_TOKEN_EXAMPLE: dict[str, Any] = {
+    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e60",
+    "name": "Backup script",
+    "grants": ["graph:item:read"],
+    "created_at": "2026-10-10T12:00:00.000000Z",
+    "expires_at": "2027-01-08T12:00:00.000000Z",
+    "last_used_at": None,
+}
+_MAX_TOKEN_GRANTS = 64
+
+
+class CreateApiTokenRequest(RequestModel):
+    """Request body for creating a personal access token."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "name": "Backup script",
+                    "password": "your current passphrase",
+                    "grants": ["graph:item:read"],
+                    "expires_in_days": 90,
+                }
+            ]
+        }
+    )
+
+    # Loose input guard only; the domain trims and applies the real name length.
+    name: str = Field(max_length=MAX_TOKEN_NAME_LENGTH * 4)
+    password: str = Field(max_length=_MAX_PASSWORD_INPUT)
+    grants: list[str] = Field(
+        max_length=_MAX_TOKEN_GRANTS,
+        description="Permissions the token holds; see the grants endpoint.",
+    )
+    expires_in_days: int | None = Field(
+        default=None,
+        description="Lifetime in days; the server default applies when omitted.",
+    )
+
+    def to_command(self, client_ip: str | None = None) -> CreateApiTokenCommand:
+        """Convert this request into a `CreateApiTokenCommand`."""
+        return CreateApiTokenCommand(
+            name=self.name,
+            password=self.password,
+            grants=frozenset(self.grants),
+            expires_in_days=self.expires_in_days,
+            client_ip=client_ip,
+        )
+
+
+class RotateApiTokenRequest(RequestModel):
+    """Request body for replacing a token with a fresh secret."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [{"password": "your current passphrase", "expires_in_days": 90}]
+        }
+    )
+
+    password: str = Field(max_length=_MAX_PASSWORD_INPUT)
+    expires_in_days: int | None = Field(
+        default=None,
+        description="Lifetime in days; the server default applies when omitted.",
+    )
+
+    def to_command(
+        self, token_id: uuid.UUID, client_ip: str | None = None
+    ) -> RotateApiTokenCommand:
+        """Convert this request into a `RotateApiTokenCommand`."""
+        return RotateApiTokenCommand(
+            token_id=token_id,
+            password=self.password,
+            expires_in_days=self.expires_in_days,
+            client_ip=client_ip,
+        )
+
+
+class ApiTokenResponse(BaseModel):
+    """A personal access token's details; never includes its secret."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [_TOKEN_EXAMPLE]})
+
+    id: uuid.UUID
+    name: str
+    grants: list[str]
+    created_at: datetime
+    expires_at: datetime
+    last_used_at: datetime | None = Field(
+        default=None, description="When the token was last used; null if never."
+    )
+
+    @classmethod
+    def from_domain(cls, token: ApiToken) -> ApiTokenResponse:
+        """Build a response from a token."""
+        return cls(
+            id=token.id,
+            name=token.name,
+            grants=sorted(token.grants),
+            created_at=token.created_at,
+            expires_at=token.expires_at,
+            last_used_at=token.last_used_at,
+        )
+
+
+class CreatedApiTokenResponse(ApiTokenResponse):
+    """A new token, with its plaintext value, which is shown only once."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [{**_TOKEN_EXAMPLE, "token": "mnst_<id>_<secret>"}]
+        }
+    )
+
+    token: str = Field(description="The token to send as a bearer credential.")
+
+    @classmethod
+    def from_created(cls, created: CreatedApiToken) -> CreatedApiTokenResponse:
+        """Build a response from a freshly issued token."""
+        base = ApiTokenResponse.from_domain(created.token)
+        return cls(**base.model_dump(), token=created.plaintext)
+
+
+class GrantablePermissionsResponse(BaseModel):
+    """The permissions the signed-in account may give a token."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"permissions": ["graph:item:read"]}]}
+    )
+
+    permissions: list[Permission]

@@ -47,6 +47,7 @@ from app.modules.identity.adapters.api.auth_router import (
 )
 from app.modules.identity.adapters.api.dependencies import get_existing_data_claim
 from app.modules.identity.adapters.api.session_router import router as session_router
+from app.modules.identity.adapters.api.token_router import router as token_router
 from app.modules.identity.adapters.api.user_router import router as user_router
 from app.modules.media.adapters.api.media.router import router as media_router
 from app.modules.presets.adapters.api.preset.router import router as preset_router
@@ -94,6 +95,7 @@ api_v1_router.include_router(auth_router)
 api_v1_router.include_router(permissions_router)
 api_v1_router.include_router(user_router)
 api_v1_router.include_router(session_router)
+api_v1_router.include_router(token_router)
 api_v1_router.include_router(system_router)
 
 api_router.include_router(api_v1_router)

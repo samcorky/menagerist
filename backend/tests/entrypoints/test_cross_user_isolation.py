@@ -15,7 +15,7 @@ import re
 import uuid
 from contextlib import ExitStack, nullcontext
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Annotated, Any
 
 import pytest
@@ -109,9 +109,11 @@ from app.modules.graph.adapters.persistence.unit_of_work import (
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.modules.identity.adapters.api.dependencies import (
     get_active_identity_actor,
+    get_decoy_hash,
     get_identity_actor,
     get_identity_repos,
     get_identity_uow,
+    get_password_hasher,
     get_signed_in_user,
 )
 from app.modules.identity.adapters.persistence.in_memory_api_token_repository import (
@@ -129,6 +131,10 @@ from app.modules.identity.adapters.persistence.in_memory_user_repository import 
 from app.modules.identity.adapters.persistence.unit_of_work import (
     create_in_memory_identity_uow,
 )
+from app.modules.identity.adapters.security.in_memory_password_hasher import (
+    InMemoryPasswordHasher,
+)
+from app.modules.identity.domain.api_token import ApiToken
 from app.modules.identity.domain.user import User
 from app.modules.identity.ports.unit_of_work import IdentityRepos
 from app.modules.media.adapters.api.dependencies import (
@@ -201,6 +207,7 @@ CANARIES = (
     "Alpha Collection",
     "Alpha Smart",
     "poster-alpha.jpg",
+    "Alpha script",
 )
 
 
@@ -292,6 +299,8 @@ ALLOWED: dict[Route, str] = {
     ("DELETE", "/api/v1/preset/{preset_id}"): PRESETS,
     ("POST", "/api/v1/node"): CREATES_OWN,
     ("POST", "/api/v1/collection"): CREATES_OWN,
+    ("POST", "/api/v1/tokens"): CREATES_OWN,
+    ("GET", "/api/v1/tokens/grants"): OWN_SESSION,
     ("POST", "/api/v1/media"): CREATES_OWN,
 }
 
@@ -315,6 +324,7 @@ class Seed:
     asset: str
     staged: str
     user: str
+    token: str
 
 
 PATH_PARAMS: dict[str, Callable[[Seed], str]] = {
@@ -326,6 +336,7 @@ PATH_PARAMS: dict[str, Callable[[Seed], str]] = {
     "collection_id": lambda s: s.collection,
     "asset_id": lambda s: s.asset,
     "user_id": lambda s: s.user,
+    "token_id": lambda s: s.token,
     "pack_id": lambda _: PACK_ID,
     "key": lambda _: "rating",
 }
@@ -387,6 +398,7 @@ BODIES: dict[str, Callable[[Seed], dict[str, Any]]] = {
     },
     "UpdateUserRequest": lambda s: {"json": {"display_name": "Renamed"}},
     "ResetPasswordRequest": lambda s: {"json": {"password": PASSWORD}},
+    "RotateApiTokenRequest": lambda s: {"json": {"password": PASSWORD}},
 }
 # Routes whose B-side answer is legitimately a success (B acts on B's own data).
 # Each check returns an error message or None; A's data is checked unchanged too.
@@ -480,6 +492,7 @@ class World:
         examples = ExampleRepos(installations=installations)
         catalogue = InMemoryPackCatalogue()
         catalogue.add(_pack(), name="Demo", description="Demo examples")
+        self.hasher = InMemoryPasswordHasher()
         self.identity = IdentityRepos(
             users=InMemoryUserRepository(),
             sessions=InMemorySessionRepository(),
@@ -531,6 +544,8 @@ class World:
         o[get_pack_catalogue] = lambda: catalogue
         o[get_identity_uow] = lambda: create_in_memory_identity_uow(self.identity)
         o[get_identity_repos] = lambda: self.identity
+        o[get_password_hasher] = lambda: self.hasher
+        o[get_decoy_hash] = lambda: self.hasher.hash("decoy")
         # The bridges run over the same in-memory repositories.
         o[get_attach_target_access] = lambda: GraphAttachTargetAccess(graph)
         o[get_choice_list_source] = lambda: PresetChoiceListSource(presets)
@@ -574,6 +589,7 @@ class World:
         )
         assert self.client.portal is not None
         self.client.portal.call(self.identity.users.add, user)
+        token = self._seed_token_owners()
         a = self.act_as(ALICE)
         film = _created(
             a.post("/api/v1/node-type", json={"slug": "film", "label": "F"})
@@ -663,7 +679,36 @@ class World:
             asset=asset["asset_id"],
             staged=staged["id"],
             user=str(user.id),
+            token=str(token),
         )
+
+    def _seed_token_owners(self) -> uuid.UUID:
+        """Give the acting A and B account rows and A one token; return its id.
+
+        Rotation checks the actor's password, so the actors need real accounts.
+        """
+        assert self.client.portal is not None
+        now = datetime.now(UTC)
+        for actor_id, name in ((ALICE, "alice-actor"), (BOB, "bob-actor")):
+            account = User.create(
+                username=name,
+                display_name=name,
+                password_hash=self.hasher.hash(PASSWORD),
+                now=now,
+            )
+            account.id = actor_id
+            self.client.portal.call(self.identity.users.add, account)
+        token = ApiToken.create(
+            token_id=uuid.uuid7(),
+            user_id=ALICE,
+            name="Alpha script",
+            secret_hash="not-a-real-hash",
+            grants={"graph:item:read"},
+            now=now,
+            expires_at=now + timedelta(days=30),
+        )
+        self.client.portal.call(self.identity.tokens.add, token)
+        return token.id
 
     def uninstall_pack(self) -> None:
         """Let A install the pack again."""

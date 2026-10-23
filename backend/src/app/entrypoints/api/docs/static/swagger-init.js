@@ -3,6 +3,7 @@
  *
  * - Sends same-origin cookies, so a session started with POST /auth/login works, and adds
  *   the server's own Origin to the generated curl snippets.
+ * - Leaves only the bearer-token scheme in the Authorize dialog (the cookie cannot be set by hand).
  * - Shows who is signed in (with sign-in actions) in Swagger's scheme bar, and the logo.
  *   The two sign-in requests start at once, but the banner is only put on the page when Swagger
  *   has finished rendering. It shows a "checking" state if the answer is still on its way.
@@ -122,6 +123,25 @@
 		});
 	}
 
+	/**
+	 * Hides the Authorize dialog's block for each named scheme. Swagger titles a block with the
+	 * scheme name, so a block is the one whose heading starts with it. Returns how many it hid.
+	 */
+	function hideSchemeBlocks(container, names) {
+		var hidden = 0;
+		container.querySelectorAll('.auth-container').forEach(function (block) {
+			var heading = block.querySelector('h4');
+			// Swagger puts a no-break space after the name.
+			var title = (heading ? heading.textContent : '').replace(/\u00a0/g, ' ').trim();
+			var match = names.some(function (name) {
+				return title === name || title.indexOf(name + ' ') === 0;
+			});
+			if (match && !block.hidden) block.hidden = true;
+			if (match) hidden++;
+		});
+		return hidden;
+	}
+
 	/** Closes or opens Swagger's locks; never throws (they are only an indicator). */
 	function applyLocks(ui, names, signedIn) {
 		names.forEach(function (name) {
@@ -219,6 +239,19 @@
 		box.setAttribute('role', 'status');
 		box.setAttribute('aria-live', 'polite');
 
+		// The same sign-in state inside the Authorize dialog, in place of Swagger's cookie block
+		// (whose Logout only clears the placeholder lock, never the real session).
+		var dialogSection = document.createElement('div');
+		dialogSection.className = 'menagerist-dialog-session';
+		var dialogHeading = document.createElement('h4');
+		dialogHeading.textContent = 'Session';
+		var dialogBox = document.createElement('div');
+		dialogBox.id = 'menagerist-session-dialog';
+		dialogBox.setAttribute('role', 'status');
+		dialogBox.setAttribute('aria-live', 'polite');
+		dialogSection.appendChild(dialogHeading);
+		dialogSection.appendChild(dialogBox);
+
 		function paint() {
 			var model = bannerModel(
 				state.status,
@@ -228,6 +261,7 @@
 				state.checking
 			);
 			renderBanner(document, box, model, signOut);
+			renderBanner(document, dialogBox, model, signOut);
 		}
 
 		function signOut() {
@@ -274,10 +308,26 @@
 			applyLocks(ui, names, signedIn);
 		}
 
+		function cookieSchemeNames() {
+			try {
+				return cookieSchemes(ui.specSelectors.securityDefinitions().toJS());
+			} catch (e) {
+				return [];
+			}
+		}
+
 		// Swagger re-renders with React, so (re)insert whatever has gone missing. If its scheme bar
 		// is missing (the spec failed to load) the banner sits at the top of the page instead.
 		function ensure() {
 			if (!state.checking) syncLocks();
+			var dialog = host.querySelector('.dialog-ux');
+			if (dialog) {
+				hideSchemeBlocks(dialog, cookieSchemeNames());
+				var content = dialog.querySelector('.modal-ux-content');
+				if (content && dialogSection.parentNode !== content) {
+					content.insertBefore(dialogSection, content.firstChild);
+				}
+			}
 			if (revealed) {
 				var slot =
 					host.querySelector('.scheme-container .schemes') ||
@@ -378,6 +428,7 @@
 		renderBanner: renderBanner,
 		cookieSchemes: cookieSchemes,
 		applyLocks: applyLocks,
+		hideSchemeBlocks: hideSchemeBlocks,
 		loginHref: loginHref,
 		safeLogoUrl: safeLogoUrl,
 		fetchJson: fetchJson

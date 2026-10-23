@@ -46,6 +46,8 @@ function freshContext(browser: Browser, baseURL: string | undefined) {
 }
 
 const banner = (page: Page) => page.locator('#menagerist-session');
+const authorizeButton = (page: Page) =>
+	page.locator('.swagger-ui .auth-wrapper').getByRole('button', { name: 'Authorize' });
 const logo = (page: Page) => page.locator('.swagger-ui .info .menagerist-logo');
 
 // Swagger re-renders and the banner is put back asynchronously, which is slow on a busy machine.
@@ -112,7 +114,7 @@ test('signs in through the app, uses the API and signs out from the banner', asy
 	const page = await context.newPage();
 	await page.goto('/api/docs');
 	await expectChrome(page, 'Not signed in');
-	await expect(page.getByRole('button', { name: 'Authorize' })).toBeHidden();
+	await expect(authorizeButton(page)).toBeVisible();
 
 	// /api/docs is a server route: signing in on the app's page must come back here.
 	await banner(page).getByRole('link', { name: 'Sign in' }).click();
@@ -188,7 +190,7 @@ test('shows required permissions and per-operation locks', async ({ browser, bas
 	const page = await context.newPage();
 	await page.goto('/api/docs');
 	await expectChrome(page, 'Not signed in');
-	await expect(page.getByRole('button', { name: 'Authorize' })).toBeHidden();
+	await expect(authorizeButton(page)).toBeVisible();
 
 	const admin = await openOperation(page, 'Node Types', 'Node_Types-delete_node_type');
 	await expect(admin.locator('.opblock-description-wrapper')).toContainText('Requires permission');
@@ -202,12 +204,21 @@ test('shows required permissions and per-operation locks', async ({ browser, bas
 	await expect(list.locator('.opblock-description-wrapper')).toContainText('Requires permission');
 	await expect(list.locator('.opblock-description-wrapper')).toContainText('graph:item:read');
 
-	// Protected operations keep a lock that cannot open the Authorize dialog.
+	// Protected operations keep a lock that opens the same dialog, which offers the bearer
+	// scheme only: the cookie scheme cannot be filled in by hand.
 	const lock = list.locator('.authorization__btn');
 	await expect(lock).toBeVisible();
-	await expect(lock).toHaveCSS('pointer-events', 'none');
-	await lock.click({ force: true });
-	await expect(page.locator('.dialog-ux')).toHaveCount(0);
+	await lock.click();
+	const dialog = page.locator('.dialog-ux');
+	await expect(dialog).toBeVisible();
+	await expect(dialog.locator('.auth-container:not([hidden])')).toHaveCount(1);
+	await expect(dialog.locator('.auth-container:not([hidden])')).toContainText('HTTPBearer');
+	await expect(dialog.locator('.auth-container[hidden]')).toContainText('APIKeyCookie');
+	// Swagger's own cookie block (and its Logout) is gone; the Session section is real.
+	await expect(dialog.locator('.auth-container:not([hidden]) input[type="text"]')).toHaveCount(1);
+	await expect(dialog.locator('#menagerist-session-dialog')).toContainText('Not signed in');
+	await dialog.getByRole('button', { name: 'Close' }).click();
+	await expect(dialog).toHaveCount(0);
 
 	// Public operations have no lock.
 	const version = await openOperation(page, 'System', 'System-get_version');
@@ -215,6 +226,8 @@ test('shows required permissions and per-operation locks', async ({ browser, bas
 	await context.close();
 });
 
+// The session lock is Swagger's indicator for the cookie scheme only; a pasted token never
+// changes it. This test is a known flake on a busy machine and passes when run alone.
 test('locks follow the real session without changing requests', async ({ browser, baseURL }) => {
 	const context = await freshContext(browser, baseURL);
 	const page = await context.newPage();
@@ -269,6 +282,40 @@ test('locks follow the real session without changing requests', async ({ browser
 	await banner(page).getByRole('button', { name: 'Sign out' }).click();
 	await expectChrome(page, 'Not signed in');
 	await openOperation(page, 'Nodes', 'Nodes-list_nodes');
+	await expect(lockIcon).toHaveClass('unlocked');
+	await context.close();
+});
+
+test('the Authorize dialog shows the real session and signs out from it', async ({
+	browser,
+	baseURL
+}) => {
+	// Its own session, so signing out cannot end the worker admin's.
+	const context = await freshContext(browser, baseURL);
+	const login = await context.request.post('/api/v1/auth/login', {
+		data: { username: E2E_ADMIN.username, password: E2E_ADMIN.password }
+	});
+	expect(login.ok()).toBe(true);
+	const page = await context.newPage();
+	await page.goto('/api/docs');
+	await expectChrome(page, 'Signed in as');
+	const list = await openOperation(page, 'Nodes', 'Nodes-list_nodes');
+	const lockIcon = list.locator('.authorization__btn svg');
+	await expect(lockIcon).toHaveClass('locked');
+
+	await authorizeButton(page).click();
+	const dialog = page.locator('.dialog-ux');
+	const session = dialog.locator('#menagerist-session-dialog');
+	await expect(session).toContainText(`Signed in as ${E2E_ADMIN.displayName}`);
+	// Only the bearer scheme's native block is left.
+	await expect(dialog.locator('.auth-container:not([hidden])')).toHaveCount(1);
+	await expect(dialog.locator('.auth-container:not([hidden])')).toContainText('HTTPBearer');
+	await expect(dialog.getByText('APIKeyCookie')).toBeHidden();
+
+	await session.getByRole('button', { name: 'Sign out' }).click();
+	await expect(session).toContainText('Not signed in');
+	await expect(banner(page)).toContainText('Not signed in', CHROME);
+	await dialog.getByRole('button', { name: 'Close' }).click();
 	await expect(lockIcon).toHaveClass('unlocked');
 	await context.close();
 });

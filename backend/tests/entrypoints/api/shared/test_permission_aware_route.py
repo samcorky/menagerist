@@ -8,6 +8,7 @@ from app.entrypoints.api.shared.permission_aware_route import (
     PermissionAwareRoute,
     _find_use_case_type,
 )
+from app.modules.identity.application.permissions import IdentityPermission
 from app.modules.media.application.permissions import MediaPermission
 from app.shared_kernel.access import (
     Access,
@@ -146,6 +147,7 @@ def test_openapi_documents_required_permission() -> None:
 
     assert operation["x-required-permission"] == "graph:read"
     assert "**Requires permission:** `graph:read`" in operation["description"]
+    # The dummy permission is not grantable to a token, so only the cookie applies.
     assert operation["security"] == [{"APIKeyCookie": []}]
     assert schema["components"]["securitySchemes"]["APIKeyCookie"] == {
         "type": "apiKey",
@@ -188,6 +190,35 @@ def test_openapi_documents_content_permission() -> None:
     operation = _schema(endpoint)["paths"]["/x"]["get"]
     assert operation["x-required-permission"] == "media:item:read"
     assert "**Requires permission:** `media:item:read`" in operation["description"]
+    # Two requirement objects: the cookie OR a bearer token, never both required.
+    assert operation["security"] == [{"APIKeyCookie": []}, {"HTTPBearer": []}]
+    schemes = _schema(endpoint)["components"]["securitySchemes"]
+    assert schemes["HTTPBearer"]["type"] == "http"
+    assert schemes["HTTPBearer"]["scheme"] == "bearer"
+
+
+def test_admin_only_permission_documents_the_cookie_alone() -> None:
+    """A permission no token can hold gets no bearer alternative."""
+
+    class AdminUseCase(UseCase[object, str]):
+        """Administrator use case."""
+
+        access: ClassVar[Access] = Requires(IdentityPermission.LIST_USERS)
+
+        async def _handle(self, request: object, actor: Actor) -> str:
+            return "ok"
+
+    def get_admin() -> AdminUseCase:
+        return AdminUseCase.__new__(AdminUseCase)
+
+    async def endpoint(
+        use_case: Annotated[AdminUseCase, Depends(get_admin)],
+    ) -> dict[str, str]:
+        """Admin endpoint."""
+        return {}
+
+    operation = _schema(endpoint)["paths"]["/x"]["get"]
+    assert operation["x-required-permission"] == "identity:user:list"
     assert operation["security"] == [{"APIKeyCookie": []}]
 
 
