@@ -1,5 +1,21 @@
 # API tokens (personal access tokens) Implementation Plan
 
+**Status:** done 2026-10-23, committed as `b77a920` (identity storage, use cases, bearer authentication), `a7c4105` (token endpoints, bearer scheme in the API docs, Swagger session section) and `a1f1318` (Tokens card, accurate error documentation, token-aware Swagger). Decisions are recorded in `docs/DECISIONS.md`, "Personal access tokens (2026-10-23)".
+
+**Deviations from this plan:**
+
+- Request and response fields are snake_case (`expires_in_days`, `created_at`, `last_used_at`), not camelCase.
+- Request `grants` is `list[str]`, so an unknown or unheld grant is a 400, not a 422; `GET /api/v1/tokens/grants` returns the grantable `Permission` list.
+- The bearer scheme is derived by `PermissionAwareRoute` from `get_current_actor` and `TOKEN_GRANTABLE_PERMISSIONS`, not flagged per permission; admin-only and token or account routes list the cookie scheme only.
+- Swagger's Authorize dialog has a "Browser session" block (Sign in, Set up, Sign out) above the bearer block; the page banner (no sign-in buttons) reports session, token, both, rejected or could-not-check, verifying a pasted token with `GET /api/v1/auth/me/permissions`.
+- Rotate: an expired token cannot be rotated (404), grants the owner no longer holds are dropped and none left is a 400, ownership and grant checks run after the password check, and refusals commit so the throttle settles.
+- Request validation runs before the throttle reservation, so malformed requests do not burn attempts.
+- `api_tokens` is `TableRule.SKIP` in the backup table rules (needed by the backup architecture test).
+- The role-flag guard-rail also allow-lists `entrypoints/api/shared/access_policy.py`; no CLI or identity file reads the flags.
+- Added beyond the plan: central 401, 403, 404, 422 and 500 `application/problem+json` components with named examples, a sweep fixing about 100 inaccurate examples, and `test_openapi_response_examples.py` enforcing that every example matches its status; `token_id` is also in the access log.
+- Token card UX: the sample command uses `/api/v1/auth/me/permissions`, the Name field takes focus on open, and the Advanced trigger has a chevron.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A signed-in person can create, list and revoke personal access tokens that act as them with a chosen subset of their permissions, usable from scripts and from Swagger, while sign-in and account management stay session-only.

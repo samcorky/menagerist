@@ -71,16 +71,21 @@ Architecture tests (`backend/tests/architecture/test_content_filter_rules.py`) r
 ### Request flow
 
 ```
-Browser ── session cookie (HttpOnly, SameSite=Strict, `__Host-Http-` prefix when Secure); Sec-Fetch-Site / Origin on unsafe methods
+Browser or script ── session cookie (HttpOnly, SameSite=Strict, `__Host-Http-` prefix when Secure); Sec-Fetch-Site / Origin on unsafe methods
   │
   ▼
 verify_csrf  →  get_current_actor  →  router  →  use case  →  repository(scope)
                  │                                │
-                 │ session token hash → GetCurrentUser → Actor(id, role)
+                 │ bearer: AuthenticateApiToken → Actor(id, role, grants)
+                 │ cookie: session token hash → GetCurrentUser → Actor(id, role)
                  └ 401 setup_required | 401 unauthenticated | 403 password_expired
 ```
 
-`get_current_actor` (`entrypoints/api/shared/dependencies.py`) reads the session cookie, resolves it through the identity module and returns the `Actor`; the router passes it to the use case, whose `access` stance the `AccessGuard` checks before it runs; content use cases then ask the guard for the scope. Identity routes (`/api/v1/auth/*`, `/api/v1/user*`) use identity's own actor dependency so a user whose password has expired can still reach them. `/auth/status`, `/auth/setup` and `/auth/login` are public and exempt from the same-origin check (they have their own `refuse_cross_site` guard), as are health, version, docs and the SPA shell. The `identity` module imports no other module, and no content module imports it; the architecture tests enforce both.
+`get_current_actor` (`entrypoints/api/shared/dependencies.py`) reads the session cookie, resolves it through the identity module and returns the `Actor`; the router passes it to the use case, whose `access` stance the `AccessGuard` checks before it runs; content use cases then ask the guard for the scope.
+
+**Credentials.** A request carries either the session cookie or an `Authorization: Bearer mnst_...` personal access token, never both: `get_current_actor` resolves a bearer first (an invalid, expired or unknown token is a 401 and never falls back to the cookie) and otherwise the cookie. `get_session_token` returns `None` beside a bearer header, so cookie-only routes (account, session and token management) refuse such a request, and `verify_csrf` skips bearer requests because no cookie is read. A token actor is `Actor(id, roles, grants)` with the token's grants; a session actor has `grants=None`. `RoleAuthorisationAdapter.effective_permissions` intersects the owner's expanded permissions with the expanded grants, and `RoleAccessGuard` refuses `OwnAccount` stances to any actor with grants, so the guard and use cases need no token knowledge. What a token may be granted is `TOKEN_GRANTABLE_PERMISSIONS` (`entrypoints/api/shared/authorisation.py`). Tokens belong to the `identity` module: `ApiToken` (domain), `ApiTokenRepository` and `ApiTokenGenerator` (ports), SQL and in-memory repositories, `secrets_api_token_generator`, the `api_tokens` migration and `token_router` (`/api/v1/tokens`). Only a hash is stored, deleting a user cascades to their tokens, and backups skip the `api_tokens` table. See DECISIONS, "Personal access tokens (2026-10-23)".
+
+Identity routes (`/api/v1/auth/*`, `/api/v1/user*`) use identity's own actor dependency so a user whose password has expired can still reach them. `/auth/status`, `/auth/setup` and `/auth/login` are public and exempt from the same-origin check (they have their own `refuse_cross_site` guard), as are health, version, docs and the SPA shell. The `identity` module imports no other module, and no content module imports it; the architecture tests enforce both.
 
 ## Frontend
 

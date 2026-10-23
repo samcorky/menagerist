@@ -1002,7 +1002,7 @@ A cookie-name mismatch between frontend and backend made every signed-in unsafe 
 - **Why not a token.** Go's `http.CrossOriginProtection` and Datasette take the same approach and OWASP names Fetch Metadata as the primary signal. Double-submit can be passed by anyone who can plant cookies (a sibling subdomain, plain HTTP). It also removes the cookie name that had to be agreed between stacks. A session-bound token can be added later as an extra layer if OIDC with `SameSite=Lax` or a cross-origin cookie SPA ever needs it.
 - **CORS plays no part.** CORS never carries credentials here, so a listed `MENAGERIST_CORS_ORIGINS` entry gets no extra trust for cookie requests (it still counts on the public sign-in and setup routes, which keep `refuse_cross_site`).
 - **Removed.** The CSRF cookie, `X-CSRF-Token`, `MENAGERIST_CSRF_COOKIE_NAME` (a leftover value is ignored) and their frontend and Swagger plumbing. The Swagger page still sends same-origin credentials and strips the placeholder `Cookie` header, and now adds `Origin` to generated curl snippets (a forbidden header name for `fetch`, so only the snippet shows it).
-- **Cost.** Scripts that use the session cookie must send `Origin: <the server's origin>`; API tokens (future) will avoid the cookie, and the check is then skipped for requests a bearer token authenticates.
+- **Cost.** Scripts that use the session cookie must send `Origin: <the server's origin>`; API tokens (future) will avoid the cookie, and the check is then skipped for requests a bearer token authenticates. *Built 2026-10-23: see "Personal access tokens (2026-10-23)".*
 - **Follow-ups.** A `__Host-Http-` session cookie with a strict reader and WebKit/Firefox e2e tests; tighter CORS lists and an open-CORS warning.
 
 ### Explicit CORS lists and an open-CORS warning (2026-10-21)
@@ -1053,7 +1053,7 @@ Over HTTPS (a `Secure` cookie) the session cookie is `__Host-Http-menagerist-ses
 
 **Choices worth keeping:**
 
-- **The strings are a public contract.** Permission strings appear in OpenAPI (`x-required-permission`), tests, and soon in stored token grants and roles. They are never renamed. A permission that proves too coarse is split by making the coarse one imply the finer ones, which needs no data migration.
+- **The strings are a public contract.** Permission strings appear in OpenAPI (`x-required-permission`), tests, and, since 2026-10-23, in stored token grants (see "Personal access tokens (2026-10-23)"), and soon in roles. They are never renamed. A permission that proves too coarse is split by making the coarse one imply the finer ones, which needs no data migration.
 - **Coarse first.** The vocabulary is user-facing (`graph:item:*`, `graph:type:*`, `media:item:*`, `collections:collection:*`, `presets:preset:*`, `examples:pack:read|install`, `backup:own_data:export|import`), one read and one write per resource. Existing admin strings such as `graph:node_type:delete` keep their names. Each write or install implies its read counterpart.
 - **Member grant equals the content set.** Members hold every content permission, so nothing changes for them; the permissions only bite once a token or a data-driven role holds fewer. Export, import and pack install are their own permissions so a "read only" token never includes them.
 - **`Content` is the only stance that may call `scope()`.**
@@ -1061,3 +1061,42 @@ Over HTTPS (a `Secure` cookie) the session cookie is `__Host-Http-menagerist-ses
 - **One allow-listed exception:** `install_example_pack.py` still compares ownership directly until sharing lands.
 
 **Tradeoff:** a permission per resource is a wide vocabulary to maintain, and a mapping pin means every new use case needs an edit in review. That friction is the point.
+
+---
+
+## Personal access tokens (2026-10-23)
+
+*Supersedes the Phase 4 sketch in `docs/superpowers/plans/2026-10-20-api-tokens-and-permissions.md`; the task plan is `docs/superpowers/plans/2026-10-23-api-tokens.md`.*
+
+**Decision:** a signed-in person can create personal access tokens (`mnst_<id>_<secret>`) that act as them with a chosen subset of their permissions, for scripts and for Swagger. Tokens live in the `identity` module (`ApiToken`, `ApiTokenRepository`, `ApiTokenGenerator`, use cases, SQL and in-memory adapters). The secret is shown once and stored as a hash. Personal access tokens were chosen over OAuth: a person issues a credential to themselves, which needs no authorisation server, consent screen or client registration. OAuth is added only if third-party apps appear; verification sits behind `get_current_actor`, so a second bearer format would not touch the guard.
+
+**Intersection model:** `Actor.grants` is `frozenset[str] | None`; `None` means a session with no ceiling. `RoleAuthorisationAdapter.effective_permissions` returns the owner's permissions intersected with the token's expanded grants, so a token never exceeds its owner, loses a permission the moment its owner does, and an administrator's token holds no admin permission unless one were grantable. The guard and every use case are unchanged. Grant strings that name no catalogue permission add nothing.
+
+**Session-only stances:** `OwnAccount` is refused for token actors (`RoleAccessGuard`), so a token cannot create, list, rotate or revoke tokens, change the password or manage devices. Those routes read only the cookie, so a request carrying a bearer header gets a 401 there. `Public` and `System` are unchanged.
+
+**Rulings (R1 to R12) and their costs:**
+
+- **R1 limits (settles Q5):** default lifetime 90 days, maximum 365, at most 20 active tokens per user, expiry mandatory, `last_used_at` written at most once a minute. Settings `api_token_default_days`, `api_token_max_days`, `api_tokens_per_user`. Cost: three values to tune.
+- **R2 grantable set:** the content permissions except `backup:own_data:export` and `backup:own_data:import` (`TOKEN_GRANTABLE_PERMISSIONS` in `entrypoints/api/shared/authorisation.py`); no admin permission. A leaked token cannot mass-export or overwrite an account. Cost: widening is a one-line edit and a changed pin.
+- **R3 revoke deletes:** the row is removed, as sessions are; a revoked and an unknown token are both a 401. Cost: no audit trail beyond log lines.
+- **R4 password events:** `ChangePassword` and `ResetPassword` delete the user's tokens, so a password change signs out everywhere, tokens included. Cost: scripts need a new token.
+- **R5 schemes:** only `Authorization: Bearer` is a token credential; another scheme is ignored and the cookie path runs. An empty or malformed bearer value is a 401.
+- **R6 bearer is authoritative:** with a bearer header the cookie is never read, and a bad token never falls back to it. This lives in `get_session_token`, which returns `None` beside a bearer header, so every cookie-only route refuses such a request; that is what makes skipping CSRF for bearer requests safe.
+- **R7 disabled or password-expired owner:** refused as for a session (401 `invalid_token` for a disabled owner, `password_expired` otherwise).
+- **R8 composites:** a composite use case needs every inner permission, pinned by a table test (`UploadAndAttachMedia`, `PromoteExtraSchemaField`, `ImportUserArchive`). Cost: a token with only `graph:type:write` cannot promote a field.
+- **R9 no `WWW-Authenticate`:** the error handler has no per-exception headers. Cost: strict RFC 6750 clients get no hint.
+- **R10 no admin view:** administrators cannot list or revoke others' tokens; disabling the user stops them. Cost: a later `identity:token:*` permission.
+- **R11 CORS:** `Authorization` is not in `CORS_REQUEST_HEADERS`; there is no cross-origin browser client. Cost: one list entry later.
+- **R12 rotation, no extension:** expiry is never extended. `RotateApiToken` keeps the name and grants, issues a new secret and expiry, and deletes the old row at once, so it does not count against the limit. As built, an expired token cannot be rotated (404), grants the owner no longer holds are dropped, and it is refused if none remain. Create and rotate need the password and share the sign-in-style throttle.
+
+**Changed in the build:** request and response fields are snake_case (`expires_in_days`, `last_used_at`), the repository convention; `grants` is `list[str]`, so an unknown or unheld grant is a 400 rather than a 422; `GET /api/v1/tokens/grants` lists what the caller may grant; the `api_tokens` table is skipped by backups (as `sessions`); and the access log carries `token_id`, never the header or secret.
+
+**Not done:** an admin view of others' tokens (R10), `WWW-Authenticate` (R9), the CORS `Authorization` header (R11), OAuth or refresh tokens unless third-party apps appear.
+
+**OpenAPI documentation:**
+
+- **Bearer is documented from behaviour.** `PermissionAwareRoute` derives the bearer scheme from `get_current_actor` and `TOKEN_GRANTABLE_PERMISSIONS`: a `Requires` or `Content` route accepts a token only if its permission is grantable, so admin-only, token-management and account routes list the cookie scheme alone. The planned per-permission flag was not needed. Swagger's Authorize dialog has a "Browser session" block and an API token block; the banner distinguishes session, token and both by calling `GET /api/v1/auth/me/permissions`.
+- **Central error components.** `entrypoints/api/openapi_responses.py` adds shared `ProblemDetail` and `ValidationProblem` schemas and `components.responses` for 401 (with `invalid_token` where a token is accepted), 403, 404, 422 and 500, all `application/problem+json` with named examples. A route's own `error_response(...)` entry always wins.
+- **Every error example must match its status** (`status` equals the response code, `type` from the exception's `problem_type`, a route-specific `instance`, no placeholders). `tests/entrypoints/api/test_openapi_response_examples.py` enforces it for every operation, so a new route needs accurate descriptions and examples.
+
+**Tradeoff:** a wider surface to guard (a second credential, a table of secrets) and a few accepted costs above. Bearer-authoritative and session-only stances keep that surface from reaching account management.
