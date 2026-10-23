@@ -26,6 +26,8 @@ PUBLIC_ROUTES = {
     ("POST", "/v1/auth/login"),
     # The backup restorer rechecks setup under the shared identity lock.
     ("POST", "/v1/backup/first-run-restore"),
+    # Name and version only; the build detail is on the authenticated router.
+    ("GET", "/v1/system/version"),
 }
 # Unauthenticated POSTs have no session cookie to check, so they refuse
 # cross-site calls.

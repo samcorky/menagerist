@@ -268,9 +268,9 @@ def check_version_lockstep(client: docker.DockerClient) -> None:
     if not label_version:
         raise SmokeTestError("image has no org.opencontainers.image.version label")
 
-    status, body = get("/api/version")
+    status, body = get("/api/v1/system/version")
     if status != 200:
-        raise SmokeTestError(f"/api/version returned {status}")
+        raise SmokeTestError(f"/api/v1/system/version returned {status}")
     reported_version = json.loads(body)["current_version"]
 
     if label_version != reported_version:

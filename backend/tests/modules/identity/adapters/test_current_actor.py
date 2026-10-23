@@ -208,10 +208,12 @@ def test_public_routes_need_no_session(world: World) -> None:
     """Public routes need no session."""
     client = _client(world)
     assert client.get("/api/v1/auth/status").status_code == 200
-    assert client.get("/api/version").status_code == 200
+    assert client.get("/api/v1/system/version").status_code == 200
 
 
-@pytest.mark.parametrize("path", ["/api/version/detail", "/api/health/ready/detail"])
+@pytest.mark.parametrize(
+    "path", ["/api/v1/system/version/detail", "/api/v1/system/health/ready/detail"]
+)
 async def test_diagnostic_detail_needs_a_session_then_the_permission(
     world: World, make_user: MakeUser, path: str
 ) -> None:

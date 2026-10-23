@@ -46,7 +46,13 @@ from app.modules.system.domain.readiness import (
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.errors import ForbiddenError
 
-router = APIRouter(tags=["System"], route_class=PermissionAwareRoute)
+# Probes keep their root paths (orchestrators and the Docker healthcheck call them
+# with no session); the rest sit under `/api/v1/system`.
+probes_router = APIRouter(tags=["System"], route_class=PermissionAwareRoute)
+public_router = APIRouter(
+    prefix="/system", tags=["System"], route_class=PermissionAwareRoute
+)
+router = APIRouter(prefix="/system", tags=["System"], route_class=PermissionAwareRoute)
 
 _EXAMPLE_ISO = "2026-01-01T00:00:00.000000+00:00"
 
@@ -361,7 +367,7 @@ _DETAIL_503: dict[str, object] = {
 }
 
 
-@router.get(
+@probes_router.get(
     "/health",
     summary="Liveness check",
     operation_id="get_health",
@@ -385,7 +391,7 @@ _PUBLIC_503: dict[str, object] = {
 }
 
 
-@router.get(
+@probes_router.get(
     "/health/ready",
     summary="Readiness check",
     operation_id="get_health_ready",
@@ -399,8 +405,8 @@ async def get_health_ready(
 ) -> ReadyResponse:
     """Report whether the required dependencies are reachable.
 
-    The answer is only pass (200) or fail (503); `/health/ready/detail` has the
-    measurements.
+    The answer is only pass (200) or fail (503); `/api/v1/system/health/ready/detail`
+    has the measurements.
     """
     response.headers["Cache-Control"] = "max-age=10"
     report = await use_case.handle(GetHealthReadyQuery(), SYSTEM_ACTOR)
@@ -436,7 +442,7 @@ async def get_health_ready_detail(
     return ReadyDetailResponse.from_domain(report)
 
 
-@router.get(
+@public_router.get(
     "/version",
     summary="Application version",
     operation_id="get_version",
@@ -533,7 +539,8 @@ class BrowserCheckResponse(BaseModel):
 
 
 # A POST on purpose: verify_csrf skips safe methods, and a request that lost the
-# browser's headers is refused there with `csrf_failed`, before this runs.
+# browser's headers is refused there with `csrf_failed`, before this runs. The
+# /api/v1 router applies it; the route repeats it so it holds if mounted elsewhere.
 @router.post(
     "/browser-check",
     summary="Browser header check",

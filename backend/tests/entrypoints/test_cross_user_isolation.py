@@ -247,7 +247,7 @@ ALLOWED: dict[Route, str] = {
     ): "two-user API and Postgres tests cover owner stamping and isolation",
     ("GET", "/api/health"): PUBLIC,
     ("GET", "/api/health/ready"): PUBLIC,
-    ("GET", "/api/version"): PUBLIC,
+    ("GET", "/api/v1/system/version"): PUBLIC,
     ("GET", "/api/favicon.ico"): PUBLIC,
     ("GET", "/api/docs/favicon.svg"): PUBLIC,
     ("GET", "/api/docs/logo.svg"): PUBLIC,

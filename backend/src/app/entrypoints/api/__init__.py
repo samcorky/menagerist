@@ -50,7 +50,11 @@ from app.modules.identity.adapters.api.session_router import router as session_r
 from app.modules.identity.adapters.api.user_router import router as user_router
 from app.modules.media.adapters.api.media.router import router as media_router
 from app.modules.presets.adapters.api.preset.router import router as preset_router
-from app.modules.system.adapters.api.router import router as system_router
+from app.modules.system.adapters.api.router import (
+    probes_router as system_probes_router,
+    public_router as public_system_router,
+    router as system_router,
+)
 from app.platform.app_info import load_app_info
 from app.platform.config import get_api_settings
 from app.platform.logging_config import configure_logging
@@ -61,7 +65,7 @@ configure_logging()
 # route_class here would never apply to them - every leaf router must be built
 # with permission_aware_router() instead (see permission_aware_route.py).
 api_router = APIRouter(prefix="/api")
-api_router.include_router(system_router)
+api_router.include_router(system_probes_router)
 api_router.include_router(docs_router)
 
 # Every unsafe cookie-authenticated request here must come from this site's own
@@ -75,6 +79,7 @@ api_v1_router = APIRouter(
 public_v1_router = APIRouter(prefix="/v1", tags=["v1"])
 public_v1_router.include_router(public_auth_router)
 public_v1_router.include_router(public_backup_router)
+public_v1_router.include_router(public_system_router)
 api_v1_router.include_router(backup_router)
 api_v1_router.include_router(user_backup_router)
 api_v1_router.include_router(graph_router)
@@ -89,6 +94,7 @@ api_v1_router.include_router(auth_router)
 api_v1_router.include_router(permissions_router)
 api_v1_router.include_router(user_router)
 api_v1_router.include_router(session_router)
+api_v1_router.include_router(system_router)
 
 api_router.include_router(api_v1_router)
 api_router.include_router(public_v1_router)

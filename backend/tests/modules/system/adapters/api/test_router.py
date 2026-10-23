@@ -126,7 +126,7 @@ def test_readiness_detail_needs_the_diagnostics_permission() -> None:
     engine = _make_mock_engine(checkedout=0, pool_size=5)
     with patch(_PATCH_GET_ENGINE, return_value=engine):
         response = TestClient(_app_with_failing_db("member")).get(
-            "/api/health/ready/detail"
+            "/api/v1/system/health/ready/detail"
         )
 
     assert response.status_code == 403
@@ -137,7 +137,9 @@ def test_readiness_check_failure_is_logged_not_returned() -> None:
     """The real error goes to the log with a fixed message in the payload."""
     engine = _make_mock_engine(checkedout=0, pool_size=5)
     with patch(_PATCH_GET_ENGINE, return_value=engine), capture_logs() as logs:
-        response = TestClient(_app_with_failing_db()).get("/api/health/ready/detail")
+        response = TestClient(_app_with_failing_db()).get(
+            "/api/v1/system/health/ready/detail"
+        )
 
     assert "connection refused" not in response.text
     failures = [e for e in logs if e["event"] == "readiness check failed"]
@@ -150,7 +152,7 @@ def test_readiness_503_when_db_unreachable() -> None:
     engine = _make_mock_engine(checkedout=0, pool_size=5)
     with patch(_PATCH_GET_ENGINE, return_value=engine):
         client = TestClient(_app_with_failing_db())
-        response = client.get("/api/health/ready/detail")
+        response = client.get("/api/v1/system/health/ready/detail")
 
     assert response.status_code == 503
     assert response.headers["content-type"].startswith("application/health+json")
@@ -174,7 +176,7 @@ def test_readiness_output_absent_on_passing_checks() -> None:
     engine = _make_mock_engine(checkedout=0, pool_size=5)
     with patch(_PATCH_GET_ENGINE, return_value=engine):
         client = TestClient(_app_with_failing_db())
-        response = client.get("/api/health/ready/detail")
+        response = client.get("/api/v1/system/health/ready/detail")
 
     data = response.json()
     pool_check = data["checks"]["database:poolUtilization"][0]
@@ -188,7 +190,7 @@ def test_pool_saturated_reports_fail_with_output() -> None:
     engine = _make_mock_engine(checkedout=5, pool_size=5)
     with patch(_PATCH_GET_ENGINE, return_value=engine):
         client = TestClient(_app_with_failing_db())
-        response = client.get("/api/health/ready/detail")
+        response = client.get("/api/v1/system/health/ready/detail")
 
     data = response.json()
     pool_check = data["checks"]["database:poolUtilization"][0]
@@ -202,7 +204,7 @@ def test_pool_healthy_omits_output() -> None:
     engine = _make_mock_engine(checkedout=1, pool_size=5)
     with patch(_PATCH_GET_ENGINE, return_value=engine):
         client = TestClient(_app_with_failing_db())
-        response = client.get("/api/health/ready/detail")
+        response = client.get("/api/v1/system/health/ready/detail")
 
     data = response.json()
     pool_check = data["checks"]["database:poolUtilization"][0]
@@ -249,7 +251,7 @@ def test_readiness_reports_warn_status_without_503(storage: str) -> None:
     client = TestClient(app)
 
     public = client.get("/api/health/ready")
-    response = client.get("/api/health/ready/detail")
+    response = client.get("/api/v1/system/health/ready/detail")
 
     assert public.status_code == 200
     assert public.headers["cache-control"] == "max-age=10"
@@ -340,7 +342,7 @@ def ready_client(postgres_url: str) -> Iterator[TestClient]:
 def test_readiness_passes_with_real_db(ready_client: TestClient) -> None:
     """GET /health/ready returns 200 and all checks pass against a live database."""
     public = ready_client.get("/api/health/ready")
-    response = ready_client.get("/api/health/ready/detail")
+    response = ready_client.get("/api/v1/system/health/ready/detail")
 
     assert public.status_code == 200
     assert public.json() == {"status": "pass"}
@@ -371,7 +373,7 @@ def test_readiness_passes_with_real_db(ready_client: TestClient) -> None:
 
 def test_public_version_has_only_name_and_version() -> None:
     """No commit, branch or migration head for an anonymous caller."""
-    data = TestClient(create_app()).get("/api/version").json()
+    data = TestClient(create_app()).get("/api/v1/system/version").json()
 
     assert set(data) == {"name", "current_version"}
 
@@ -381,14 +383,14 @@ def test_version_detail_for_admin_has_build_provenance() -> None:
     app = create_app()
     as_user(app, uuid.UUID(int=7), "admin")
 
-    data = TestClient(app).get("/api/version/detail").json()
+    data = TestClient(app).get("/api/v1/system/version/detail").json()
 
     assert {"name", "current_version", "migration_head"} <= set(data)
 
 
 def test_version_detail_is_forbidden_for_members() -> None:
     """A member gets 403 and no build metadata."""
-    response = TestClient(create_app()).get("/api/version/detail")
+    response = TestClient(create_app()).get("/api/v1/system/version/detail")
 
     assert response.status_code == 403
     assert "migration_head" not in response.json()
@@ -413,7 +415,7 @@ def _browser_client(role: str = "admin") -> TestClient:
 def test_browser_check_passes_for_intact_headers() -> None:
     """A browser's own headers reach the app and are reported back."""
     response = _browser_client().post(
-        "/api/browser-check", headers={**_BROWSER, **_SESSION}
+        "/api/v1/system/browser-check", headers={**_BROWSER, **_SESSION}
     )
 
     assert response.status_code == 200
@@ -431,7 +433,7 @@ def test_browser_check_warns_when_the_origin_differs() -> None:
     headers = {"Sec-Fetch-Site": "same-origin", "Origin": "https://public.example"}
     data = (
         _browser_client()
-        .post("/api/browser-check", headers={**headers, **_SESSION})
+        .post("/api/v1/system/browser-check", headers={**headers, **_SESSION})
         .json()
     )
 
@@ -443,7 +445,7 @@ def test_browser_check_warns_when_the_origin_differs() -> None:
 
 def test_browser_check_is_refused_when_the_headers_were_removed() -> None:
     """A signed-in request without Origin or Sec-Fetch-Site is a csrf_failed 403."""
-    response = _browser_client().post("/api/browser-check", headers=_SESSION)
+    response = _browser_client().post("/api/v1/system/browser-check", headers=_SESSION)
 
     assert response.status_code == 403
     assert response.json()["type"].endswith("csrf_failed")
@@ -452,8 +454,52 @@ def test_browser_check_is_refused_when_the_headers_were_removed() -> None:
 def test_browser_check_needs_the_diagnostics_permission() -> None:
     """A member is refused with the permission problem, not a CSRF one."""
     response = _browser_client("member").post(
-        "/api/browser-check", headers={**_BROWSER, **_SESSION}
+        "/api/v1/system/browser-check", headers={**_BROWSER, **_SESSION}
     )
 
     assert response.status_code == 403
     assert not response.json()["type"].endswith("csrf_failed")
+
+
+_MOVED = [
+    ("get", "/api/version"),
+    ("get", "/api/version/detail"),
+    ("get", "/api/health/ready/detail"),
+    ("post", "/api/browser-check"),
+]
+
+
+def test_public_version_needs_no_session_at_its_v1_path() -> None:
+    """The public version answers without a session."""
+    assert TestClient(create_app()).get("/api/v1/system/version").status_code == 200
+
+
+def test_root_probes_need_no_session() -> None:
+    """Liveness is not behind authentication."""
+    assert TestClient(create_app()).get("/api/health").status_code == 200
+
+
+@pytest.mark.parametrize(("method", "path"), _MOVED)
+def test_old_system_paths_are_gone(method: str, path: str) -> None:
+    """The pre-v1 paths no longer exist."""
+    response = TestClient(create_app()).request(method, path)
+    assert response.status_code in {404, 405}
+
+
+def test_system_operation_ids_are_unchanged() -> None:
+    """Moving the paths leaves the generated client's function names alone."""
+    schema = create_app().openapi()
+    ids = {
+        (path, method): op["operationId"]
+        for path, item in schema["paths"].items()
+        for method, op in item.items()
+        if "/system/" in path or path.startswith("/api/health")
+    }
+    assert ids == {
+        ("/api/health", "get"): "get_health",
+        ("/api/health/ready", "get"): "get_health_ready",
+        ("/api/v1/system/health/ready/detail", "get"): "get_health_ready_detail",
+        ("/api/v1/system/version", "get"): "get_version",
+        ("/api/v1/system/version/detail", "get"): "get_version_detail",
+        ("/api/v1/system/browser-check", "post"): "run_browser_check",
+    }

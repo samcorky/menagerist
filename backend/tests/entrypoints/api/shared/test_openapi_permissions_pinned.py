@@ -19,8 +19,8 @@ if TYPE_CHECKING:
 # Pinned before the access refactor: the operations documented as needing an
 # administrator-only permission must not change when use cases migrate.
 EXPECTED: dict[tuple[str, str], str] = {
-    ("/api/browser-check", "post"): "system:diagnostics:read",
-    ("/api/health/ready/detail", "get"): "system:diagnostics:read",
+    ("/api/v1/system/browser-check", "post"): "system:diagnostics:read",
+    ("/api/v1/system/health/ready/detail", "get"): "system:diagnostics:read",
     ("/api/v1/backup", "get"): "backup:archive:read",
     ("/api/v1/backup", "post"): "backup:archive:create",
     ("/api/v1/backup/prune", "post"): "backup:archive:delete",
@@ -43,7 +43,7 @@ EXPECTED: dict[tuple[str, str], str] = {
     ("/api/v1/user/{user_id}", "patch"): "identity:user:update",
     ("/api/v1/user/{user_id}/password", "post"): "identity:user:reset_password",
     ("/api/v1/user/{user_id}/unlock", "post"): "identity:user:unlock",
-    ("/api/version/detail", "get"): "system:diagnostics:read",
+    ("/api/v1/system/version/detail", "get"): "system:diagnostics:read",
 }
 
 
