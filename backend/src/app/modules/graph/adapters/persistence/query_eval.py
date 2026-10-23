@@ -18,6 +18,7 @@ from app.modules.graph.adapters.persistence.text_match import (
 )
 from app.modules.graph.domain.query import (
     COMPLEMENT_OPERATORS,
+    CollectionCondition,
     Condition,
     Cursor,
     DateCondition,
@@ -26,20 +27,25 @@ from app.modules.graph.domain.query import (
     FieldCondition,
     FieldReference,
     Group,
+    ManualTarget,
+    MediaCondition,
     Money,
     NameCondition,
     Operand,
     RelativeDate,
     ResolvedQuery,
     SearchHit,
+    SmartTarget,
     SortKey,
     SortValue,
+    StaleTarget,
     TagCondition,
     TextCondition,
     TypeCondition,
 )
 
 if TYPE_CHECKING:
+    from app.modules.graph.adapters.persistence.query_env import QueryEnv
     from app.modules.graph.domain.node import Node
 
 _NUMERIC = frozenset({"number", "duration", "rating"})
@@ -285,17 +291,69 @@ def _name_matches(node: Node, condition: NameCondition) -> bool:
     return fold(condition.value) == fold(node.name)
 
 
-def _condition(node: Node, condition: Condition, ctx: ResolvedQuery) -> bool:
+def _media_matches(node: Node, condition: MediaCondition, env: QueryEnv) -> bool:
+    if env.external is None:
+        return False
+    return env.external.media_matches(
+        node.id, condition.mode, condition.type, env.scope
+    )
+
+
+def _collection_matches(
+    node: Node, condition: CollectionCondition, ctx: ResolvedQuery, env: QueryEnv
+) -> bool:
+    """On any live target; `none` negates that, but all-stale matches nothing."""
+    live = [t for t in condition.targets if not isinstance(t, StaleTarget)]
+    if not live:
+        return False
+    manual = [t.id for t in live if isinstance(t, ManualTarget)]
+    on_manual = (
+        env.external is not None
+        and bool(manual)
+        and env.external.collection_matches(node.id, manual, env.scope)
+    )
+    on_smart = any(
+        t.where is None or matches(node, t.where, ctx, env)
+        for t in live
+        if isinstance(t, SmartTarget)
+    )
+    return (on_manual or on_smart) == (condition.mode == "any")
+
+
+def _item_condition(
+    node: Node, condition: Condition, ctx: ResolvedQuery, env: QueryEnv
+) -> bool:
+    """Type, favourite, and the conditions that need other modules' data."""
+    if isinstance(condition, TypeCondition):
+        return node.type in condition.slugs
+    if isinstance(condition, FavouriteCondition):
+        return node.favourite == condition.value
+    if isinstance(condition, MediaCondition):
+        return _media_matches(node, condition, env)
+    if isinstance(condition, CollectionCondition):
+        return _collection_matches(node, condition, ctx, env)
+    raise AssertionError(condition)
+
+
+_ITEM_CONDITIONS = (
+    TypeCondition,
+    FavouriteCondition,
+    MediaCondition,
+    CollectionCondition,
+)
+
+
+def _condition(
+    node: Node, condition: Condition, ctx: ResolvedQuery, env: QueryEnv
+) -> bool:
     if isinstance(condition, TextCondition):
         return text_matches(node, fold(condition.q), ctx.search_exclusions)
     if isinstance(condition, DescriptionCondition):
         return _description_matches(node, condition)
     if isinstance(condition, NameCondition):
         return _name_matches(node, condition)
-    if isinstance(condition, TypeCondition):
-        return node.type in condition.slugs
-    if isinstance(condition, FavouriteCondition):
-        return node.favourite == condition.value
+    if isinstance(condition, _ITEM_CONDITIONS):
+        return _item_condition(node, condition, ctx, env)
     if isinstance(condition, TagCondition):
         return _tag_matches(node, condition)
     if isinstance(condition, DateCondition):
@@ -303,12 +361,12 @@ def _condition(node: Node, condition: Condition, ctx: ResolvedQuery) -> bool:
     return _field_matches(node, condition, ctx)
 
 
-def matches(node: Node, group: Group, ctx: ResolvedQuery) -> bool:
+def matches(node: Node, group: Group, ctx: ResolvedQuery, env: QueryEnv) -> bool:
     """Whether `node` satisfies the filter tree."""
     results = (
-        matches(node, child, ctx)
+        matches(node, child, ctx, env)
         if isinstance(child, Group)
-        else _condition(node, child, ctx)
+        else _condition(node, child, ctx, env)
         for child in group.children
     )
     if group.op == "and":

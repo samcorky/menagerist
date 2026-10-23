@@ -33,6 +33,9 @@ from app.entrypoints.api.shared.bridges.choice_list_source import (
     PresetChoiceListSource,
     get_choice_list_source,
 )
+from app.entrypoints.api.shared.bridges.collection_conditions import (
+    CollectionsDefinitions,
+)
 from app.entrypoints.api.shared.bridges.collection_definitions import (
     GraphDefinitionChecker,
     get_definition_checker,
@@ -185,10 +188,14 @@ from app.shared_kernel.actor import Actor
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable, Iterator, Sequence
 
     from fastapi import FastAPI
     from httpx2 import Response
+
+    from app.modules.collections.ports.unit_of_work import CollectionsRepos
+    from app.modules.media.ports.unit_of_work import MediaRepos
+    from app.shared_kernel.content_filter import ContentFilter
 
 Route = tuple[str, str]
 
@@ -363,7 +370,12 @@ BODIES: dict[str, Callable[[Seed], dict[str, Any]]] = {
                 "v": 1,
                 "where": {
                     "op": "or",
-                    "children": [{"kind": "text", "q": "xenomorph"}],
+                    "children": [
+                        {"kind": "text", "q": "xenomorph"},
+                        {"kind": "collection", "mode": "any", "in": [s.collection]},
+                        {"kind": "collection", "mode": "none", "in": [s.smart]},
+                        {"kind": "media", "mode": "has"},
+                    ],
                 },
             }
         }
@@ -473,21 +485,84 @@ _PASSING_READINESS = ReadinessReport(
 )
 
 
+class WorldExternalConditions:
+    """Media and collection facts read from the world's in-memory repositories."""
+
+    def __init__(self, collections: CollectionsRepos, media: MediaRepos) -> None:
+        self._collections = collections
+        self._media = media
+
+    def media_predicate(self, *_args: object) -> object:
+        """Not used by the in-memory evaluator."""
+        raise NotImplementedError
+
+    def collection_predicate(self, *_args: object) -> object:
+        """Not used by the in-memory evaluator."""
+        raise NotImplementedError
+
+    def media_matches(
+        self,
+        node_id: uuid.UUID,
+        mode: str,
+        type: str | None,
+        scope: ContentFilter,
+    ) -> bool:
+        """Whether the item has ready media owned inside `scope`."""
+        assets = self._media.assets._assets  # type: ignore[attr-defined]
+        found = False
+        for attachment in self._media.attachments._store.values():  # type: ignore[attr-defined]
+            asset = assets.get(attachment.asset_id)
+            found = found or (
+                attachment.target_id == node_id
+                and asset is not None
+                and asset.status == "attached"
+                and scope.covers(asset.owner_id)
+                and (
+                    type is None
+                    or asset.content_type.startswith("image/") == (type == "image")
+                )
+            )
+        return found == (mode == "has")
+
+    def collection_matches(
+        self,
+        node_id: uuid.UUID,
+        collection_ids: Sequence[uuid.UUID],
+        scope: ContentFilter,
+    ) -> bool:
+        """Whether the item is on a live manual collection inside `scope`."""
+        stored = self._collections.collections._collections  # type: ignore[attr-defined]
+        members = self._collections.memberships._memberships  # type: ignore[attr-defined]
+        for collection_id in collection_ids:
+            collection = stored.get(collection_id)
+            if (
+                collection is not None
+                and not collection.is_deleted
+                and scope.covers(collection.owner_id)
+                and (collection_id, node_id) in members
+            ):
+                return True
+        return False
+
+
 class World:
     """The real app over in-memory repositories for every module."""
 
     def __init__(self, as_user: Callable[..., None]) -> None:
         self._as_user = as_user
         self.app: FastAPI = create_app()
-        graph = GraphRepos(
-            nodes=InMemoryNodeRepository(),
-            edges=InMemoryEdgeRepository(),
-            node_types=InMemoryNodeTypeRepository(),
-            edge_types=InMemoryEdgeTypeRepository(),
-        )
         presets = PresetRepos(presets=InMemoryPresetRepository())
         collections = build_in_memory_collections_repos()
         media = make_in_memory_repos()
+        external = WorldExternalConditions(collections, media)
+        graph = GraphRepos(
+            nodes=InMemoryNodeRepository(external),
+            edges=InMemoryEdgeRepository(),
+            node_types=InMemoryNodeTypeRepository(),
+            edge_types=InMemoryEdgeTypeRepository(),
+            external=external,
+            definitions=CollectionsDefinitions(collections),
+        )
         installations = InMemoryInstallationRepository()
         examples = ExampleRepos(installations=installations)
         catalogue = InMemoryPackCatalogue()
@@ -1043,7 +1118,9 @@ def _empty(body: object) -> bool:
     if isinstance(body, list):
         return not body
     if isinstance(body, dict):
-        return all(_empty(v) for v in body.values())
+        # Stale-condition warnings are not content; they are compared with an
+        # unknown id's in the collection-condition test below.
+        return all(_empty(v) for k, v in body.items() if k != "warnings")
     return body in (0, None, "", False)
 
 
@@ -1232,3 +1309,29 @@ def test_user_b_cannot_edit_a_smart_collections_membership(
     owner = call(world.act_as(ALICE), seed)
     assert owner.status_code == 409
     assert owner.json()["title"] == "CollectionKindError"
+
+
+def test_a_collection_condition_naming_a_foreign_collection_reads_like_an_unknown_one(
+    world: World,
+) -> None:
+    """B's smart collection naming A's collection (or A's smart one) reveals nothing."""
+    seed = world.seed()
+    bob = world.act_as(BOB)
+
+    def create(collection_id: str, mode: str) -> Response:
+        condition = {"kind": "collection", "mode": mode, "in": [collection_id]}
+        definition = {"v": 1, "where": {"op": "and", "children": [condition]}}
+        return bob.post(
+            "/api/v1/collection",
+            json={"name": f"Mine {mode}", "definition": definition},
+        )
+
+    for foreign in (seed.collection, seed.smart):
+        for mode in ("any", "none"):
+            mine = create(foreign, mode)
+            unknown = create(str(uuid.uuid7()), mode)
+            assert mine.status_code == unknown.status_code == 201, mine.text
+            assert mine.json()["warnings"] == unknown.json()["warnings"]
+            assert mine.json()["warnings"], "the stale id is reported"
+            count = bob.get(f"/api/v1/collection/{mine.json()['id']}/count")
+            assert count.json()["count"] == 0, count.text

@@ -46,6 +46,7 @@ from app.modules.graph.adapters.persistence.search_sql import (
 )
 from app.modules.graph.domain.query import (
     COMPLEMENT_OPERATORS,
+    CollectionCondition,
     Condition,
     Cursor,
     DateCondition,
@@ -54,12 +55,16 @@ from app.modules.graph.domain.query import (
     FieldCondition,
     FieldReference,
     Group,
+    ManualTarget,
+    MediaCondition,
     Money,
     NameCondition,
     Operand,
     RelativeDate,
     ResolvedQuery,
+    SmartTarget,
     SortKey,
+    StaleTarget,
     TagCondition,
     TextCondition,
     TypeCondition,
@@ -70,6 +75,8 @@ if TYPE_CHECKING:
 
     from sqlalchemy import SQLColumnExpression
     from sqlalchemy.sql.selectable import TableValuedAlias
+
+    from app.modules.graph.adapters.persistence.query_env import QueryEnv
 
 type _Expr = ColumnElement[Any]
 type _Bool = ColumnElement[bool]
@@ -379,7 +386,61 @@ def _name(condition: NameCondition) -> _Bool:
     return _folded(NodeModel.name) == _folded(literal(condition.value))
 
 
-def _condition(condition: Condition, ctx: ResolvedQuery) -> _Bool:
+def _media(condition: MediaCondition, env: QueryEnv) -> _Bool:
+    """Never NULL; with no external source nothing has media to match."""
+    if env.external is None:
+        return false()
+    predicate: _Bool = env.external.media_predicate(
+        condition.mode, condition.type, env.scope
+    )
+    return predicate
+
+
+def _collection(
+    condition: CollectionCondition, ctx: ResolvedQuery, env: QueryEnv
+) -> _Bool:
+    """On any live target (a smart one inlined); all-stale matches nothing.
+
+    `EXISTS` and the inlined leaves are never NULL, so `none` is a plain NOT.
+    """
+    live = [t for t in condition.targets if not isinstance(t, StaleTarget)]
+    if not live:
+        return false()
+    parts: list[_Bool] = []
+    manual = [t.id for t in live if isinstance(t, ManualTarget)]
+    if manual and env.external is not None:
+        parts.append(env.external.collection_predicate(manual, env.scope))
+    parts.extend(
+        true() if t.where is None else _group(t.where, ctx, env)
+        for t in live
+        if isinstance(t, SmartTarget)
+    )
+    any_of = or_(false(), *parts)
+    return any_of if condition.mode == "any" else not_(any_of)
+
+
+def _item_condition(condition: Condition, ctx: ResolvedQuery, env: QueryEnv) -> _Bool:
+    """Type, favourite, and the conditions that need other modules' data."""
+    if isinstance(condition, TypeCondition):
+        return _never_null(NodeModel.type.in_(condition.slugs))
+    if isinstance(condition, FavouriteCondition):
+        return _never_null(NodeModel.favourite == condition.value)
+    if isinstance(condition, MediaCondition):
+        return _media(condition, env)
+    if isinstance(condition, CollectionCondition):
+        return _collection(condition, ctx, env)
+    raise AssertionError(condition)
+
+
+_ITEM_CONDITIONS = (
+    TypeCondition,
+    FavouriteCondition,
+    MediaCondition,
+    CollectionCondition,
+)
+
+
+def _condition(condition: Condition, ctx: ResolvedQuery, env: QueryEnv) -> _Bool:
     """One leaf; never NULL."""
     if isinstance(condition, TextCondition):
         return search_clause(condition.q, ctx.search_exclusions)
@@ -387,10 +448,8 @@ def _condition(condition: Condition, ctx: ResolvedQuery) -> _Bool:
         return _description(condition)
     if isinstance(condition, NameCondition):
         return _name(condition)
-    if isinstance(condition, TypeCondition):
-        return _never_null(NodeModel.type.in_(condition.slugs))
-    if isinstance(condition, FavouriteCondition):
-        return _never_null(NodeModel.favourite == condition.value)
+    if isinstance(condition, _ITEM_CONDITIONS):
+        return _item_condition(condition, ctx, env)
     if isinstance(condition, TagCondition):
         return _tag(condition)
     if isinstance(condition, DateCondition):
@@ -398,9 +457,11 @@ def _condition(condition: Condition, ctx: ResolvedQuery) -> _Bool:
     return _field(condition, ctx)
 
 
-def _group(group: Group, ctx: ResolvedQuery) -> _Bool:
+def _group(group: Group, ctx: ResolvedQuery, env: QueryEnv) -> _Bool:
     parts = [
-        _group(child, ctx) if isinstance(child, Group) else _condition(child, ctx)
+        _group(child, ctx, env)
+        if isinstance(child, Group)
+        else _condition(child, ctx, env)
         for child in group.children
     ]
     if group.op == "and":
@@ -410,10 +471,10 @@ def _group(group: Group, ctx: ResolvedQuery) -> _Bool:
     return not_(parts[0])
 
 
-def compile_where(ctx: ResolvedQuery) -> _Bool | None:
+def compile_where(ctx: ResolvedQuery, env: QueryEnv) -> _Bool | None:
     """The filter as one boolean expression, or None for "everything"."""
     where = ctx.query.where
-    return None if where is None else _group(where, ctx)
+    return None if where is None else _group(where, ctx, env)
 
 
 def _field_sort_expression(key: SortKey, ctx: ResolvedQuery) -> _Expr:

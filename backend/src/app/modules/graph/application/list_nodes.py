@@ -128,7 +128,9 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
         longer validates matches nothing.
         """
         try:
-            resolved, _ = await prepare_query(self._repos, definition, self._today())
+            resolved, _ = await prepare_query(
+                self._repos, definition, self._today(), scope=scope
+            )
         except InvalidQueryError as exc:
             logger.info("smart collection query no longer valid", path=exc.path)
             return ListNodesResult(items=[], total=0)

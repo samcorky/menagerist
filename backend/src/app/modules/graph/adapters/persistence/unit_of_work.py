@@ -19,16 +19,30 @@ from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+    from app.modules.graph.ports.collection_definitions import CollectionDefinitions
+    from app.modules.graph.ports.external_conditions import ExternalConditions
     from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 
 
-def build_graph_repos(session: AsyncSession) -> GraphRepos:
-    """Build a `GraphRepos` bundle of SQLAlchemy repositories over `session`."""
+def build_graph_repos(
+    session: AsyncSession,
+    *,
+    external: ExternalConditions | None = None,
+    definitions: CollectionDefinitions | None = None,
+) -> GraphRepos:
+    """Build a `GraphRepos` bundle of SQLAlchemy repositories over `session`.
+
+    Searches that use media or collection conditions need `external` (and
+    `definitions` for smart collections); without them those conditions match
+    nothing.
+    """
     return GraphRepos(
-        nodes=SqlAlchemyNodeRepository(session),
+        nodes=SqlAlchemyNodeRepository(session, external),
         edges=SqlAlchemyEdgeRepository(session),
         node_types=SqlAlchemyNodeTypeRepository(session),
         edge_types=SqlAlchemyEdgeTypeRepository(session),
+        external=external,
+        definitions=definitions,
     )
 
 

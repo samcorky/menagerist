@@ -39,7 +39,11 @@ class _ForbiddenChecker:
     """Fails the test if the checker is reached."""
 
     async def check(
-        self, definition: Mapping[str, Any], scope: ContentFilter
+        self,
+        definition: Mapping[str, Any],
+        scope: ContentFilter,
+        *,
+        self_id: uuid.UUID | None = None,
     ) -> list[DefinitionWarning]:
         raise AssertionError("the checker must not be reached")
 

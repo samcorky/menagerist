@@ -846,7 +846,11 @@ class RejectingDefinitionChecker:
     """
 
     async def check(
-        self, definition: Mapping[str, Any], scope: ContentFilter
+        self,
+        definition: Mapping[str, Any],
+        scope: ContentFilter,
+        *,
+        self_id: uuid.UUID | None = None,
     ) -> list[DefinitionWarning]:
         """Always raise: no definition is expected here."""
         raise RuntimeError("Example packs do not create smart collections.")

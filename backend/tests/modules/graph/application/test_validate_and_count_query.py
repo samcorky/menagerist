@@ -82,7 +82,7 @@ def _rating_at_least(value: int, key: str = "rating") -> dict[str, Any]:
 
 async def _validate(repos: GraphRepos, query: dict[str, Any]) -> Any:  # noqa: ANN401
     return await ValidateQuery(repos, InMemoryAccessGuard()).handle(
-        ValidateQueryQuery(query=query), SYSTEM_ACTOR
+        ValidateQueryQuery(query=query, scope=ContentFilter.of(OWNER)), SYSTEM_ACTOR
     )
 
 

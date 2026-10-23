@@ -13,6 +13,9 @@ import sqlalchemy
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
+from app.entrypoints.api.shared.bridges.collection_conditions import (
+    CollectionsDefinitions,
+)
 from app.entrypoints.api.shared.bridges.collection_definitions import (
     GraphDefinitionChecker,
     get_definition_checker,
@@ -119,13 +122,14 @@ def _in_memory_app() -> tuple[
     Callable[[str, object], None],
 ]:
     app = create_app()
+    collections = build_in_memory_collections_repos()
     graph = GraphRepos(
         nodes=InMemoryNodeRepository(),
         edges=InMemoryEdgeRepository(),
         node_types=InMemoryNodeTypeRepository(),
         edge_types=InMemoryEdgeTypeRepository(),
+        definitions=CollectionsDefinitions(collections),
     )
-    collections = build_in_memory_collections_repos()
     o = app.dependency_overrides
     o[get_graph_uow] = lambda: create_in_memory_graph_uow(graph)
     o[get_graph_repos] = lambda: graph
@@ -758,3 +762,94 @@ def test_the_list_can_be_limited_to_one_kind(env: Env) -> None:
     assert names("?kind=dynamic") == ["Smart"]
     assert names("") == ["Shelf", "Smart"]
     assert a.get(f"{COLLECTIONS}?kind=nope").status_code == 422
+
+
+def _in(*ids: str) -> dict[str, Any]:
+    return {"kind": "collection", "mode": "any", "in": list(ids)}
+
+
+def test_a_smart_collection_can_be_built_on_another(env: Env) -> None:
+    """`in collection <smart>` inlines its filter, narrowed by the new one."""
+    _films(env)
+    best = env.smart(_where(_rating(">=", 4)), name="Best")
+    fav = {"kind": "favourite", "value": True}
+
+    child = env.smart(_where(_in(best["id"]), fav), name="Best and loved")
+
+    assert child["item_count"] == 1
+    listed = env.as_(ALICE).get(f"{NODES}?collection={child['id']}")
+    assert _names(listed) == {"Aliens"}
+
+
+def test_saving_a_collection_that_refers_to_itself_is_a_400_naming_the_path(
+    env: Env,
+) -> None:
+    """Directly and through another collection, the update is refused."""
+    _films(env)
+    first = env.smart(_where(_rating(">=", 4)), name="First")
+    second = env.smart(_where(_in(first["id"])), name="Second")
+    a = env.as_(ALICE)
+
+    direct = a.patch(
+        f"{COLLECTIONS}/{first['id']}", json={"definition": _where(_in(first["id"]))}
+    )
+    indirect = a.patch(
+        f"{COLLECTIONS}/{first['id']}", json={"definition": _where(_in(second["id"]))}
+    )
+
+    for response in (direct, indirect):
+        assert response.status_code == 400, response.text
+        assert "refer to itself" in response.text
+        assert "where.children[0].in[0]" in response.text
+    unchanged = a.get(f"{COLLECTIONS}/{first['id']}")
+    assert unchanged.json()["item_count"] == 3
+
+
+def test_a_cycle_made_later_degrades_instead_of_failing(env: Env) -> None:
+    """Rows that now form a loop read as empty, with warnings, never a 500."""
+    _films(env)
+    first = env.smart(_where(_rating(">=", 4)), name="First")
+    second = env.smart(_where(_in(first["id"])), name="Second")
+    env.store_definition(first["id"], _where(_in(second["id"])))
+    a = env.as_(ALICE)
+
+    listed = a.get(f"{NODES}?collection={second['id']}")
+    shown = a.get(f"{COLLECTIONS}/{second['id']}")
+
+    assert _names(listed) == set()
+    assert shown.status_code == 200, shown.text
+    assert shown.json()["item_count"] == 0
+    assert shown.json()["warnings"]
+
+
+def test_a_deleted_parent_makes_the_child_stale(env: Env) -> None:
+    """Deleting the collection a search refers to leaves a warning and no matches."""
+    _films(env)
+    parent = env.smart(_where(_rating(">=", 4)), name="Parent")
+    child = env.smart(_where(_in(parent["id"])), name="Child")
+    a = env.as_(ALICE)
+    assert a.get(f"{COLLECTIONS}/{child['id']}").json()["item_count"] == 3
+
+    assert a.delete(f"{COLLECTIONS}/{parent['id']}").status_code == 204
+
+    shown = a.get(f"{COLLECTIONS}/{child['id']}").json()
+    assert shown["item_count"] == 0
+    assert [w["message"] for w in shown["warnings"]] == [
+        "That collection no longer exists."
+    ]
+
+
+def test_another_persons_collection_named_in_a_definition_is_stale(env: Env) -> None:
+    """Bob cannot build on Alice's collection; it reads as one that is gone."""
+    _films(env)
+    alices = env.smart(_where(_rating(">=", 4)), name="Alice's")
+    env.as_(BOB)
+
+    mine = env.smart(_where(_in(alices["id"])), name="Bob's")
+    ghost = env.smart(_where(_in(str(uuid.uuid7()))), name="Bob's ghost")
+
+    assert mine["item_count"] == ghost["item_count"] == 0
+    assert mine["warnings"] == ghost["warnings"]
+    assert [w["message"] for w in mine["warnings"]] == [
+        "That collection no longer exists."
+    ]

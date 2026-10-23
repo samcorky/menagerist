@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any
 from app.modules.collections.domain.errors import InvalidDefinitionError
 
 if TYPE_CHECKING:
+    import uuid
     from collections.abc import Mapping
 
     from app.modules.collections.domain.definition_warning import DefinitionWarning
@@ -20,7 +21,11 @@ class InMemoryDefinitionChecker:
         self.warnings: list[DefinitionWarning] = list(warnings or ())
 
     async def check(
-        self, definition: Mapping[str, Any], scope: ContentFilter
+        self,
+        definition: Mapping[str, Any],
+        scope: ContentFilter,
+        *,
+        self_id: uuid.UUID | None = None,
     ) -> list[DefinitionWarning]:
         """Return the configured warnings, or raise if `where` is not an object."""
         where = definition.get("where")

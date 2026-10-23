@@ -5,9 +5,11 @@ from typing import TYPE_CHECKING, Annotated, Any
 from fastapi import Depends
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
+from app.entrypoints.api.shared.bridges.collection_conditions import (
+    build_search_graph_repos,
+)
 from app.modules.collections.domain.definition_warning import DefinitionWarning
 from app.modules.collections.domain.errors import InvalidDefinitionError
-from app.modules.graph.adapters.persistence.unit_of_work import build_graph_repos
 from app.modules.graph.application.validate_query import (
     ValidateQuery,
     ValidateQueryQuery,
@@ -17,6 +19,7 @@ from app.platform.database import get_session_factory
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 if TYPE_CHECKING:
+    import uuid
     from collections.abc import AsyncIterator, Mapping
 
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -35,12 +38,15 @@ class GraphDefinitionChecker:
         self,
         definition: Mapping[str, Any],
         scope: ContentFilter,
+        *,
+        self_id: uuid.UUID | None = None,
     ) -> list[DefinitionWarning]:
         """Return the stale-condition warnings, or raise `InvalidDefinitionError`."""
         try:
-            # Validation reads item types only, so the actor is immaterial.
+            # The actor is immaterial: the collections it may name follow `scope`.
             result = await ValidateQuery(self._repos, get_access_guard()).handle(
-                ValidateQueryQuery(query=definition), SYSTEM_ACTOR
+                ValidateQueryQuery(query=definition, scope=scope, self_id=self_id),
+                SYSTEM_ACTOR,
             )
         except InvalidQueryError as exc:
             message = str(exc).removeprefix(f"{exc.path}: ")
@@ -57,4 +63,4 @@ async def get_definition_checker(
 ) -> AsyncIterator[GraphDefinitionChecker]:
     """Yield the definition checker, backed by a read session on the graph tables."""
     async with session_factory() as session:
-        yield GraphDefinitionChecker(build_graph_repos(session))
+        yield GraphDefinitionChecker(build_search_graph_repos(session))

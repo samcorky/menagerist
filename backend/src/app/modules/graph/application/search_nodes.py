@@ -112,15 +112,15 @@ class SearchNodes(QueryHandler[GraphRepos, SearchNodesQuery, SearchNodesResult])
             raise InvalidQueryError(
                 f"The limit must be 1 to {MAX_LIMIT}.", path="limit"
             )
+        scope = self.scope(actor)
         resolved, warnings = await prepare_query(
-            self._repos, query.query, self._today()
+            self._repos, query.query, self._today(), scope=scope
         )
         parsed = resolved.query
         after: Cursor | None = None
         if query.cursor is not None:
             after = decode_cursor(query.cursor, sort_count=len(parsed.sort))
             _check_cursor_types(after, parsed.sort, resolved.field_kinds)
-        scope = self.scope(actor)
         hits = await self._repos.nodes.search(
             scope=scope, resolved=resolved, after=after, limit=query.limit + 1
         )

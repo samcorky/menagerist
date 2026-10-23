@@ -5,7 +5,9 @@ from typing import TYPE_CHECKING, Annotated, Any
 import structlog
 from fastapi import Depends
 
-from app.modules.graph.adapters.persistence.unit_of_work import build_graph_repos
+from app.entrypoints.api.shared.bridges.collection_conditions import (
+    build_search_graph_repos,
+)
 from app.modules.graph.application.prepare_query import count_matching
 from app.modules.graph.domain.query import InvalidQueryError
 from app.platform.database import get_session_factory
@@ -69,4 +71,4 @@ async def get_item_lookup(
 ) -> AsyncIterator[GraphItemLookup]:
     """Yield the item lookup, backed by a read session on the graph tables."""
     async with session_factory() as session:
-        yield GraphItemLookup(build_graph_repos(session))
+        yield GraphItemLookup(build_search_graph_repos(session))

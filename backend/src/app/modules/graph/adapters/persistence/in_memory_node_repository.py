@@ -1,6 +1,7 @@
 from functools import partial
 from typing import TYPE_CHECKING, cast
 
+from app.modules.graph.adapters.persistence.query_env import QueryEnv
 from app.modules.graph.adapters.persistence.query_eval import (
     is_after,
     matches,
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
 
     from app.modules.graph.domain.node import Node
     from app.modules.graph.domain.query import Cursor, ResolvedQuery
+    from app.modules.graph.ports.external_conditions import ExternalConditions
     from app.shared_kernel.content_filter import ContentFilter
 
 
@@ -36,8 +38,9 @@ def _label(key: str, titles: Mapping[str, int]) -> str:
 class InMemoryNodeRepository:
     """Dict-backed `NodeRepository` for tests and the in-memory adapter."""
 
-    def __init__(self) -> None:
+    def __init__(self, external: ExternalConditions | None = None) -> None:
         self._nodes: dict[uuid.UUID, Node] = {}
+        self._external = external
 
     def _visible(self, scope: ContentFilter) -> builtins.list[Node]:
         """The one visibility rule: live nodes the `scope` covers.
@@ -126,10 +129,11 @@ class InMemoryNodeRepository:
     ) -> builtins.list[SearchHit]:
         """Every matching node in the query's order (nulls last, then id)."""
         where = resolved.query.where
+        env = QueryEnv(scope=scope, external=self._external)
         hits = [
             SearchHit(node=node, sort_values=sort_values(node, resolved))
             for node in sorted(self._visible(scope), key=lambda n: n.id)
-            if where is None or matches(node, where, resolved)
+            if where is None or matches(node, where, resolved, env)
         ]
         # Stable passes from the last key to the first give the multi-key order.
         for index in reversed(range(len(resolved.query.sort))):

@@ -1,5 +1,6 @@
 """Check a condition tree without running it."""
 
+import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date  # noqa: TC003
@@ -11,6 +12,7 @@ from app.modules.graph.domain.query import QueryWarning
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.actor import Actor  # noqa: TC001
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
@@ -22,11 +24,14 @@ class ValidateQueryQuery:
     """A condition tree (as JSON) to check."""
 
     query: Mapping[str, Any]
+    scope: ContentFilter
+    # The smart collection being saved, so a reference back to it is refused.
+    self_id: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)
 class ValidateQueryResult:
-    """The conditions that name fields or types that no longer exist."""
+    """The conditions that name fields, types or collections that no longer exist."""
 
     warnings: list[QueryWarning]
 
@@ -53,5 +58,11 @@ class ValidateQuery(QueryHandler[GraphRepos, ValidateQueryQuery, ValidateQueryRe
         Raises:
             InvalidQueryError: With the path of the first bad condition.
         """
-        _, warnings = await prepare_query(self._repos, request.query, self._today())
+        _, warnings = await prepare_query(
+            self._repos,
+            request.query,
+            self._today(),
+            scope=request.scope,
+            self_id=request.self_id,
+        )
         return ValidateQueryResult(warnings=warnings)

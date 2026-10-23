@@ -103,7 +103,9 @@ class UpdateCollection(
             if command.definition is not None:
                 collection.ensure_dynamic()
                 ensure_definition_within_limits(command.definition)
-                await self._checker.check(command.definition, scope)
+                await self._checker.check(
+                    command.definition, scope, self_id=collection.id
+                )
             if command.name is not None:
                 collection.rename(command.name)
             if command.description is not None:

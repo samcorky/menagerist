@@ -4,8 +4,10 @@ from typing import TYPE_CHECKING
 from app.shared_kernel.unit_of_work import UnitOfWork
 
 if TYPE_CHECKING:
+    from app.modules.graph.ports.collection_definitions import CollectionDefinitions
     from app.modules.graph.ports.edge_repository import EdgeRepository
     from app.modules.graph.ports.edge_type_repository import EdgeTypeRepository
+    from app.modules.graph.ports.external_conditions import ExternalConditions
     from app.modules.graph.ports.node_repository import NodeRepository
     from app.modules.graph.ports.node_type_repository import NodeTypeRepository
 
@@ -18,6 +20,9 @@ class GraphRepos:
     edges: "EdgeRepository"
     node_types: "NodeTypeRepository"
     edge_types: "EdgeTypeRepository"
+    # Without these, media and collection conditions match nothing and warn.
+    external: "ExternalConditions | None" = None
+    definitions: "CollectionDefinitions | None" = None
 
 
 GraphUnitOfWork = UnitOfWork[GraphRepos]

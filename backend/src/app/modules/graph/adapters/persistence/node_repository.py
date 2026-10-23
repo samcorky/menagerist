@@ -19,6 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, aggregate_order_by
 
 from app.modules.graph.adapters.persistence.models import NodeModel
+from app.modules.graph.adapters.persistence.query_env import QueryEnv
 from app.modules.graph.adapters.persistence.query_sql import (
     after_clause,
     compile_where,
@@ -52,6 +53,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.modules.graph.domain.query import Cursor, ResolvedQuery
+    from app.modules.graph.ports.external_conditions import ExternalConditions
     from app.shared_kernel.content_filter import ContentFilter
 
 logger = structlog.get_logger()
@@ -120,8 +122,11 @@ async def _jit_off_for_text(session: AsyncSession, *, has_text: bool) -> None:
 class SqlAlchemyNodeRepository:
     """Postgres-backed `NodeRepository`, scoped to a single session/transaction."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self, session: AsyncSession, external: ExternalConditions | None = None
+    ) -> None:
         self._session = session
+        self._external = external
 
     async def add(self, node: Node) -> None:
         """Add a new node.
@@ -200,7 +205,7 @@ class SqlAlchemyNodeRepository:
         logger.debug("searching nodes", after=after, limit=limit)
         exprs = sort_expressions(resolved)
         stmt = select(NodeModel, *exprs).where(_in_scope(scope))
-        where = compile_where(resolved)
+        where = compile_where(resolved, QueryEnv(scope=scope, external=self._external))
         if where is not None:
             stmt = stmt.where(where)
         if after is not None:
@@ -222,7 +227,7 @@ class SqlAlchemyNodeRepository:
         """
         logger.debug("counting search results", limit=limit)
         matches = select(NodeModel.id).where(_in_scope(scope))
-        where = compile_where(resolved)
+        where = compile_where(resolved, QueryEnv(scope=scope, external=self._external))
         if where is not None:
             matches = matches.where(where)
         if limit is not None:

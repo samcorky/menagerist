@@ -7,14 +7,14 @@ from app.entrypoints.api.shared.bridges.choice_list_source import (
     PresetChoiceListSource,
     get_choice_list_source,
 )
+from app.entrypoints.api.shared.bridges.collection_conditions import (
+    build_search_graph_repos,
+)
 from app.entrypoints.api.shared.bridges.collection_members import (
     CollectionsMembers,
     get_collection_members,
 )
-from app.modules.graph.adapters.persistence.unit_of_work import (
-    build_graph_repos,
-    create_graph_uow,
-)
+from app.modules.graph.adapters.persistence.unit_of_work import create_graph_uow
 from app.modules.graph.application.count_edge_type_attribute_usage import (
     CountEdgeTypeAttributeUsage,
 )
@@ -80,7 +80,7 @@ async def get_graph_repos(
 ) -> AsyncIterator[GraphRepos]:
     """Return a read-only repository bundle over the graph tables, for queries."""
     async with session_factory() as session:
-        yield build_graph_repos(session)
+        yield build_search_graph_repos(session)
 
 
 def get_create_node_use_case(

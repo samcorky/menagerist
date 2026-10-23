@@ -47,6 +47,7 @@ COMPLEMENT_OPERATORS: Final[Mapping[str, str]] = {"!=": "=", "not_in": "in"}
 _DATE_OPERATORS: Final = frozenset({"=", ">", ">=", "<", "<=", "between"})
 _GROUP_OPS: Final = ("and", "or", "not")
 _SORT_BYS: Final = frozenset({"name", "created", "updated", "field"})
+_MEDIA_TYPES: Final = frozenset({"image", "document"})
 _BETWEEN_LENGTH: Final = 2
 _REL: Final = re.compile(r"([+-]?[0-9]{1,3})([dwmy])")
 _INF: Final = float("inf")
@@ -150,6 +151,56 @@ class TagCondition:
 
 
 @dataclass(frozen=True, kw_only=True)
+class MediaCondition:
+    """The item has (`has`) or lacks (`none`) ready media of the caller's own.
+
+    `type` narrows to images or to everything else (documents).
+    """
+
+    mode: Literal["has", "none"]
+    type: Literal["image", "document"] | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class ManualTarget:
+    """A manual collection, matched by its membership rows."""
+
+    id: uuid.UUID
+
+
+@dataclass(frozen=True, kw_only=True)
+class SmartTarget:
+    """A smart collection, inlined as its stored filter (None means everything)."""
+
+    id: uuid.UUID
+    where: Group | None
+
+
+@dataclass(frozen=True, kw_only=True)
+class StaleTarget:
+    """A collection that is gone, out of scope, cyclic or nested too deeply."""
+
+    id: uuid.UUID
+
+
+type CollectionTarget = ManualTarget | SmartTarget | StaleTarget
+
+
+@dataclass(frozen=True, kw_only=True)
+class CollectionCondition:
+    """The item is on any (`any`) or none (`none`) of these collections.
+
+    `targets` is not part of the wire form: query preparation fills it in with
+    what each id turned out to be. Unprepared, nothing is a target and the
+    condition matches nothing.
+    """
+
+    mode: Literal["any", "none"]
+    ids: tuple[uuid.UUID, ...]
+    targets: tuple[CollectionTarget, ...] = ()
+
+
+@dataclass(frozen=True, kw_only=True)
 class DateCondition:
     """Compare the day an item was created or last updated."""
 
@@ -182,6 +233,8 @@ type Condition = (
     | TypeCondition
     | FavouriteCondition
     | TagCondition
+    | MediaCondition
+    | CollectionCondition
     | DateCondition
     | FieldCondition
 )
@@ -280,6 +333,12 @@ def walk_conditions(
             yield from walk_conditions(child, child_path)
         else:
             yield child_path, child
+            if isinstance(child, CollectionCondition):
+                for number, target in enumerate(child.targets):
+                    if isinstance(target, SmartTarget):
+                        yield from walk_conditions(
+                            target.where, f"{child_path}.in[{number}]"
+                        )
 
 
 def _encodable(raw: str) -> bool:
@@ -452,6 +511,46 @@ def _tag(data: Mapping[str, object], path: str) -> TagCondition:
     )
 
 
+def _media(data: Mapping[str, object], path: str) -> MediaCondition:
+    mode = data.get("mode")
+    if not isinstance(mode, str) or mode not in {"has", "none"}:
+        msg = "'mode' must be has or none."
+        raise InvalidQueryError(msg, path=path)
+    kind = data.get("type")
+    if kind is not None and (not isinstance(kind, str) or kind not in _MEDIA_TYPES):
+        msg = "'type' must be image or document."
+        raise InvalidQueryError(msg, path=path)
+    return MediaCondition(
+        mode=cast("Literal['has', 'none']", mode),
+        type=cast("Literal['image', 'document'] | None", kind),
+    )
+
+
+def _collection_id(raw: object, path: str) -> uuid.UUID:
+    try:
+        if isinstance(raw, str):
+            return uuid.UUID(raw)
+    except ValueError:
+        pass
+    msg = "'in' must list collection ids."
+    raise InvalidQueryError(msg, path=path)
+
+
+def _collection(data: Mapping[str, object], path: str) -> CollectionCondition:
+    mode = data.get("mode")
+    if not isinstance(mode, str) or mode not in {"any", "none"}:
+        msg = "'mode' must be any or none."
+        raise InvalidQueryError(msg, path=path)
+    raw = data.get("in")
+    if not isinstance(raw, list) or not 1 <= len(raw) <= MAX_LIST_LENGTH:
+        msg = f"'in' must be a list of 1 to {MAX_LIST_LENGTH} collection ids."
+        raise InvalidQueryError(msg, path=path)
+    return CollectionCondition(
+        mode=cast("Literal['any', 'none']", mode),
+        ids=tuple(_collection_id(item, path) for item in raw),
+    )
+
+
 def _date(data: Mapping[str, object], path: str) -> DateCondition:
     on = data.get("on")
     op = data.get("op")
@@ -517,6 +616,8 @@ _CONDITION_KEYS: Final[Mapping[str, frozenset[str]]] = {
     "type": frozenset({"kind", "in"}),
     "favourite": frozenset({"kind", "value"}),
     "tag": frozenset({"kind", "mode", "tags"}),
+    "media": frozenset({"kind", "mode", "type"}),
+    "collection": frozenset({"kind", "mode", "in"}),
     "date": frozenset({"kind", "on", "op", "value"}),
     "field": frozenset({"kind", "type", "field_kind", "key", "sub_key", "op", "value"}),
 }
@@ -544,6 +645,8 @@ _CONDITION_PARSERS: Final[
     "type": _type,
     "favourite": _favourite,
     "tag": _tag,
+    "media": _media,
+    "collection": _collection,
     "date": _date,
     "field": _field,
 }
