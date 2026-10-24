@@ -6,27 +6,55 @@
 	import { tick, untrack } from 'svelte';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
-	import { createCollection, listCollections, type CollectionResponse } from '$lib/api/client';
+	import {
+		createCollection,
+		listCollections,
+		type CollectionResponse,
+		type NodeTypeResponse
+	} from '$lib/api/client';
 	import { networkAwareError } from '$lib/api/errors';
 	import {
 		MAX_COLLECTION_NAME_LENGTH,
 		collectionRouteParams,
 		collectionSaveErrorMessage,
+		fetchAllCollections,
 		validateCollectionName
 	} from '$lib/collections';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import QueryBuilder from '$lib/components/query-builder.svelte';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import { loadExampleIds } from '$lib/examples';
+	import { fetchItemFields, type ItemField } from '$lib/item-fields';
+	import { fetchAllNodeTypes } from '$lib/node-types';
+	import { buildCatalogue } from '$lib/query/fields';
+	import { emptyQuery } from '$lib/query/tree';
+	import type { Query } from '$lib/query/types';
 	import { normaliseQuery } from '$lib/search-palette';
-	import { describeCollectionCount, isSmart } from '$lib/smart-collections';
+	import {
+		SmartCollectionError,
+		canCreateSmart,
+		describeCollectionCount,
+		describeSaveError,
+		isSmart,
+		saveSmartCollection
+	} from '$lib/smart-collections';
 
 	const PAGE_SIZE = 50;
+
+	const kinds = [
+		{ value: 'manual', label: 'List you fill', hint: 'You choose which items go in.' },
+		{
+			value: 'smart',
+			label: 'Smart: matches conditions',
+			hint: 'Items that match are added automatically.'
+		}
+	] as const;
 
 	let collections = $state<CollectionResponse[]>([]);
 	let loading = $state(true);
@@ -45,6 +73,18 @@
 	let saveError = $state<string | null>(null);
 	let trigger: HTMLElement | null = null;
 
+	// 'manual' is a list the person fills; 'smart' saves a search (fixed once created).
+	let kind = $state<'manual' | 'smart'>('manual');
+	let smartQuery = $state<Query>(emptyQuery());
+	let builderLoaded = false;
+	let categories = $state<NodeTypeResponse[]>([]);
+	let categoriesLoaded = $state(false);
+	let itemFields = $state<ItemField[] | null>(null);
+	let pickerCollections = $state<{ id: string; name: string }[] | null>(null);
+	let collectionsFailed = $state(false);
+	const catalogue = $derived(buildCatalogue(categories, categoriesLoaded, itemFields));
+	const kindId = $props.id();
+
 	// §13a: don't flash a skeleton for loads under 300ms
 	const loadingDisplay = delayedLoading();
 	$effect(() => {
@@ -53,6 +93,11 @@
 
 	const nameHint = $derived(validateCollectionName(name));
 	const showNameHint = $derived(touched && nameHint !== null);
+	const smartReason = $derived(kind === 'smart' ? canCreateSmart(name, smartQuery) : null);
+	// The name's own hint already shows under the field once touched.
+	const showSmartReason = $derived(
+		smartReason !== null && !(showNameHint && smartReason === nameHint)
+	);
 
 	const showControls = $derived(
 		!loadFailed && (collections.length > 0 || loading || q !== '' || searchInput !== '')
@@ -137,27 +182,73 @@
 		};
 	}
 
-	function openDialog(event: MouseEvent) {
-		trigger = event.currentTarget as HTMLElement;
+	function resetDialog() {
 		name = '';
 		description = '';
 		touched = false;
 		saveError = null;
+		kind = 'manual';
+		smartQuery = emptyQuery();
+	}
+
+	function openDialog(event: MouseEvent) {
+		trigger = event.currentTarget as HTMLElement;
+		resetDialog();
 		dialogOpen = true;
+	}
+
+	async function loadCollectionChoices() {
+		collectionsFailed = false;
+		const all = await fetchAllCollections();
+		pickerCollections = all;
+		collectionsFailed = all === null;
+	}
+
+	// The builder's lists are read once, the first time Smart is chosen.
+	function loadBuilderData() {
+		if (builderLoaded) return;
+		builderLoaded = true;
+		void fetchAllNodeTypes().then((types) => {
+			if (types) categories = types;
+			categoriesLoaded = true;
+		});
+		void fetchItemFields().then((fields) => (itemFields = fields));
+		void loadCollectionChoices();
+	}
+
+	function chooseKind(next: 'manual' | 'smart') {
+		kind = next;
+		saveError = null;
+		if (next === 'smart') loadBuilderData();
 	}
 
 	function handleOpenChange(open: boolean) {
 		if (!open && saving) return;
 		dialogOpen = open;
-		if (!open) void tick().then(() => trigger?.focus());
+		if (!open) {
+			resetDialog();
+			void tick().then(() => trigger?.focus());
+		}
 	}
 
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
 		touched = true;
-		if (nameHint !== null || saving) return;
+		if (nameHint !== null || smartReason !== null || saving) return;
 		saving = true;
 		saveError = null;
+		if (kind === 'smart') {
+			try {
+				const created = await saveSmartCollection(name, smartQuery, description);
+				dialogOpen = false;
+				void goto(resolve('/collections/[id]', collectionRouteParams(created)));
+			} catch (e) {
+				saveError = e instanceof SmartCollectionError ? describeSaveError(e, smartQuery) : null;
+			} finally {
+				saving = false;
+			}
+			return;
+		}
 		const result = await createCollection({
 			body: { name: name.trim(), description: description.trim() || null }
 		});
@@ -293,7 +384,11 @@
 </main>
 
 <ResponsiveDialog.Root open={dialogOpen} onOpenChange={handleOpenChange}>
-	<ResponsiveDialog.Content title="New collection" size="md">
+	<ResponsiveDialog.Content
+		title="New collection"
+		size="md"
+		class={kind === 'smart' ? 'pb-0 sm:max-w-2xl' : undefined}
+	>
 		<form class="mt-4 space-y-4" onsubmit={handleSubmit} novalidate>
 			<div class="space-y-1.5">
 				<Label for="collection-name">Name</Label>
@@ -315,14 +410,65 @@
 				<Label for="collection-description">Description</Label>
 				<Textarea id="collection-description" bind:value={description} placeholder="Optional" />
 			</div>
+			<div role="radiogroup" aria-label="Kind of collection" class="grid gap-2 sm:grid-cols-2">
+				{#each kinds as option (option.value)}
+					<label
+						class="flex min-h-11 cursor-pointer items-start gap-3 rounded-md border border-input p-3 has-checked:border-primary has-checked:bg-accent/40 has-focus-visible:ring-1 has-focus-visible:ring-ring"
+					>
+						<input
+							type="radio"
+							name="collection-kind-{kindId}"
+							value={option.value}
+							checked={kind === option.value}
+							onchange={() => chooseKind(option.value)}
+							aria-labelledby="{kindId}-{option.value}-label"
+							aria-describedby="{kindId}-{option.value}-hint"
+							class="mt-0.5 size-4 shrink-0 accent-primary"
+						/>
+						<span class="min-w-0 text-sm">
+							<span id="{kindId}-{option.value}-label" class="block font-medium">
+								{option.label}
+							</span>
+							<span id="{kindId}-{option.value}-hint" class="block text-muted-foreground">
+								{option.hint}
+							</span>
+						</span>
+					</label>
+				{/each}
+			</div>
+			{#if kind === 'smart'}
+				<QueryBuilder
+					inline
+					query={smartQuery}
+					{catalogue}
+					collections={pickerCollections}
+					{collectionsFailed}
+					onretrycollections={() => void loadCollectionChoices()}
+					onchange={(next) => (smartQuery = next)}
+				/>
+			{/if}
 			{#if saveError}
 				<p role="alert" class="text-sm text-destructive">{saveError}</p>
 			{/if}
-			<div class="flex justify-end gap-2">
+			<div
+				class={[
+					'flex flex-wrap items-center justify-end gap-2',
+					kind === 'smart' && 'sticky bottom-0 -mx-6 border-t bg-background px-6 py-4'
+				]}
+			>
+				{#if showSmartReason}
+					<p id="{kindId}-reason" class="w-full text-sm text-muted-foreground sm:mr-auto sm:w-auto">
+						{smartReason}
+					</p>
+				{/if}
 				<Button type="button" variant="outline" onclick={() => handleOpenChange(false)}>
 					Cancel
 				</Button>
-				<Button type="submit" disabled={saving}>
+				<Button
+					type="submit"
+					disabled={saving || smartReason !== null}
+					aria-describedby={showSmartReason ? `${kindId}-reason` : undefined}
+				>
 					{saving ? 'Creating…' : 'Create collection'}
 				</Button>
 			</div>

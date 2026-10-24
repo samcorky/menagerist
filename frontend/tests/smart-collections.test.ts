@@ -17,6 +17,7 @@ vi.mock('$lib/api/client', () => ({
 
 import {
 	EXACT_COUNT_ERROR,
+	canCreateSmart,
 	ExactCountError,
 	SmartCollectionError,
 	countLabel,
@@ -30,6 +31,7 @@ import {
 	smartCollectionSummary,
 	updateDefinition
 } from '$lib/smart-collections';
+import { MAX_COLLECTION_NAME_LENGTH, validateCollectionName } from '$lib/collections';
 import { emptyQuery } from '$lib/query/tree';
 import type { Query } from '$lib/query/types';
 
@@ -68,6 +70,16 @@ describe('saveSmartCollection', () => {
 		createCollection.mockResolvedValue({ data: { id: 'c1' } });
 		expect(await saveSmartCollection('  Faves ', query)).toEqual({ id: 'c1' });
 		expect(createCollection).toHaveBeenCalledWith({ body: { name: 'Faves', definition: query } });
+	});
+
+	it('sends a trimmed description and leaves a blank one out', async () => {
+		createCollection.mockResolvedValue({ data: { id: 'c1' } });
+		await saveSmartCollection('Faves', query, '  Mine ');
+		expect(createCollection).toHaveBeenLastCalledWith({
+			body: { name: 'Faves', definition: query, description: 'Mine' }
+		});
+		await saveSmartCollection('Faves', query, '   ');
+		expect(createCollection.mock.calls.at(-1)?.[0].body).not.toHaveProperty('description');
 	});
 
 	it('surfaces a 400 with its path and message', async () => {
@@ -110,6 +122,27 @@ describe('saveSmartCollection', () => {
 	it('treats a response with no data as a failure', async () => {
 		createCollection.mockResolvedValue({ response: { status: 200 } });
 		expect((await failure(saveSmartCollection('x', query))).status).toBe(200);
+	});
+});
+
+describe('canCreateSmart', () => {
+	it('refuses a blank or over-long name before looking at conditions', () => {
+		expect(canCreateSmart('  ', emptyQuery())).toBe(validateCollectionName('  '));
+		expect(canCreateSmart('x'.repeat(MAX_COLLECTION_NAME_LENGTH + 1), query)).toBe(
+			validateCollectionName('x'.repeat(MAX_COLLECTION_NAME_LENGTH + 1))
+		);
+		expect(canCreateSmart('', query)).not.toBeNull();
+	});
+
+	it('asks for a condition when there are none', () => {
+		expect(canCreateSmart('Cheap parts', emptyQuery())).toBe('Add at least one condition.');
+		expect(
+			canCreateSmart('Cheap parts', { ...emptyQuery(), where: { op: 'and', children: [] } })
+		).toBe('Add at least one condition.');
+	});
+
+	it('allows a named collection with a condition', () => {
+		expect(canCreateSmart('Cheap parts', query)).toBeNull();
 	});
 });
 

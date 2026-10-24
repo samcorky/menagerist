@@ -10,11 +10,12 @@ import { chipModels, conditionNumbers, type Chip } from '$lib/query/builder';
 import { parseQuery } from '$lib/query/codec';
 import { formatCount } from '$lib/query/items-page';
 import { fitsLimits } from '$lib/query/limits';
+import { isFilterEmpty } from '$lib/query/tree';
 import { combineWithSaved, needsNarrowing, type NarrowBasics } from '$lib/query/narrow';
 import type { SummaryLookup } from '$lib/query/summary';
 import { runSearch, type SearchWarning } from '$lib/query/search';
 import type { Query } from '$lib/query/types';
-import { describeItemCount } from '$lib/collections';
+import { describeItemCount, validateCollectionName } from '$lib/collections';
 import { mapWarnings, parseQueryPath, pathKey, type QueryTarget } from '$lib/query/warnings';
 
 /** Shown in place of the conditions when a saved definition cannot be read. */
@@ -111,11 +112,27 @@ async function send(
 	return result.data;
 }
 
+/** Why a smart collection cannot be created yet (name rules first), or null when it can. */
+export function canCreateSmart(name: string, query: Query): string | null {
+	return (
+		validateCollectionName(name) ?? (isFilterEmpty(query) ? 'Add at least one condition.' : null)
+	);
+}
+
 /** Create a smart collection from a search. Rejects with a SmartCollectionError. */
-export function saveSmartCollection(name: string, query: Query): Promise<CollectionResponse> {
+export function saveSmartCollection(
+	name: string,
+	query: Query,
+	description?: string | null
+): Promise<CollectionResponse> {
+	const text = description?.trim();
 	return send(() =>
 		createCollection({
-			body: { name: name.trim(), definition: query as unknown as Record<string, unknown> }
+			body: {
+				name: name.trim(),
+				definition: query as unknown as Record<string, unknown>,
+				...(text ? { description: text } : {})
+			}
 		})
 	);
 }

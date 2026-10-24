@@ -48,6 +48,7 @@
 		title = 'Filters',
 		description = 'Show only the items that match. Changes apply as you go.',
 		saving = false,
+		inline = false,
 		onsave,
 		oncancel,
 		onchange
@@ -75,6 +76,8 @@
 		title?: string;
 		description?: string;
 		saving?: boolean;
+		/** Render the conditions in place instead of in a dialog of their own. */
+		inline?: boolean;
 		/** When `oncancel` is set, keep the draft until Save. */
 		onsave?: () => void;
 		oncancel?: () => void;
@@ -228,85 +231,98 @@
 	}
 </script>
 
-<ResponsiveDialog.Root bind:open>
-	<ResponsiveDialog.Content
-		{title}
-		bind:ref={contentEl}
-		{onOpenAutoFocus}
-		class="flex flex-col pb-0 max-sm:h-dvh max-sm:max-h-dvh max-sm:rounded-none max-sm:border-t-0 sm:max-h-[85dvh] sm:max-w-2xl"
-	>
-		<ResponsiveDialog.Description>
-			{description}
-		</ResponsiveDialog.Description>
+{#snippet panel()}
+	<div class={['flex flex-1 flex-col gap-4', !inline && 'mt-4']}>
+		{#if errorText}
+			<Alert.Root variant="destructive">
+				<TriangleAlert />
+				<Alert.Title>This filter can't be used</Alert.Title>
+				<Alert.Description>{errorText}</Alert.Description>
+			</Alert.Root>
+		{/if}
+		{#if notice}
+			<Alert.Root>
+				<TriangleAlert />
+				<Alert.Description>{notice}</Alert.Description>
+			</Alert.Root>
+		{/if}
 
-		<div class="mt-4 flex flex-1 flex-col gap-4">
-			{#if errorText}
-				<Alert.Root variant="destructive">
-					<TriangleAlert />
-					<Alert.Title>This filter can't be used</Alert.Title>
-					<Alert.Description>{errorText}</Alert.Description>
-				</Alert.Root>
-			{/if}
-			{#if notice}
-				<Alert.Root>
-					<TriangleAlert />
-					<Alert.Description>{notice}</Alert.Description>
-				</Alert.Root>
-			{/if}
+		{#if shown.where}
+			<QueryGroup group={shown.where} path={[]} {view} />
+		{/if}
 
-			{#if shown.where}
-				<QueryGroup group={shown.where} path={[]} {view} />
+		<div class="flex flex-col gap-2 border-t pt-4">
+			<span class="text-sm font-medium" id={sortLabelId}>Sort by</span>
+			<div class="flex flex-wrap gap-2" role="group" aria-labelledby={sortLabelId}>
+				<Combobox.Root
+					class="h-9 min-w-0 flex-1 basis-48"
+					aria-label="Sort by"
+					items={sortItems}
+					value={sortChoice}
+					searchPlaceholder="Search fields…"
+					emptyText="No matching fields"
+					onValueChange={(next) => builder.setSort(sortFromValue(next, sortDir))}
+				/>
+				<NativeSelect.Root
+					class="min-w-0 basis-36 [&_select]:h-9"
+					aria-label="Sort direction"
+					disabled={sortChoice === 'default'}
+					value={sortDir}
+					onchange={(e) =>
+						builder.setSort(
+							sortFromValue(sortChoice, e.currentTarget.value === 'desc' ? 'desc' : 'asc')
+						)}
+				>
+					<NativeSelect.Option value="asc">Ascending</NativeSelect.Option>
+					<NativeSelect.Option value="desc">Descending</NativeSelect.Option>
+				</NativeSelect.Root>
+			</div>
+			{#if sortWarned || staleSort}
+				<p class="flex items-start gap-1.5 text-sm">
+					<TriangleAlert class="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
+					<span>{STALE_SORT_MESSAGE}</span>
+				</p>
 			{/if}
+		</div>
+	</div>
 
-			<div class="flex flex-col gap-2 border-t pt-4">
-				<span class="text-sm font-medium" id={sortLabelId}>Sort by</span>
-				<div class="flex flex-wrap gap-2" role="group" aria-labelledby={sortLabelId}>
-					<Combobox.Root
-						class="h-9 min-w-0 flex-1 basis-48"
-						aria-label="Sort by"
-						items={sortItems}
-						value={sortChoice}
-						searchPlaceholder="Search fields…"
-						emptyText="No matching fields"
-						onValueChange={(next) => builder.setSort(sortFromValue(next, sortDir))}
-					/>
-					<NativeSelect.Root
-						class="min-w-0 basis-36 [&_select]:h-9"
-						aria-label="Sort direction"
-						disabled={sortChoice === 'default'}
-						value={sortDir}
-						onchange={(e) =>
-							builder.setSort(
-								sortFromValue(sortChoice, e.currentTarget.value === 'desc' ? 'desc' : 'asc')
-							)}
-					>
-						<NativeSelect.Option value="asc">Ascending</NativeSelect.Option>
-						<NativeSelect.Option value="desc">Descending</NativeSelect.Option>
-					</NativeSelect.Root>
-				</div>
-				{#if sortWarned || staleSort}
-					<p class="flex items-start gap-1.5 text-sm">
-						<TriangleAlert class="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
-						<span>{STALE_SORT_MESSAGE}</span>
-					</p>
+	<p class="sr-only" role="status" aria-live="polite">{announcement}</p>
+{/snippet}
+
+{#if inline}
+	<div bind:this={contentEl} class="flex flex-col gap-3">
+		{@render panel()}
+		<div class="flex justify-start">
+			<Button type="button" variant="ghost" onclick={clearAll}>Clear all</Button>
+		</div>
+	</div>
+{:else}
+	<ResponsiveDialog.Root bind:open>
+		<ResponsiveDialog.Content
+			{title}
+			bind:ref={contentEl}
+			{onOpenAutoFocus}
+			class="flex flex-col pb-0 max-sm:h-dvh max-sm:max-h-dvh max-sm:rounded-none max-sm:border-t-0 sm:max-h-[85dvh] sm:max-w-2xl"
+		>
+			<ResponsiveDialog.Description>
+				{description}
+			</ResponsiveDialog.Description>
+
+			{@render panel()}
+
+			<div
+				class="sticky bottom-0 -mx-6 mt-6 flex items-center justify-between gap-2 border-t bg-background px-6 py-4"
+			>
+				<Button variant="ghost" onclick={clearAll}>Clear all</Button>
+				{#if onsave && oncancel}
+					<div class="flex items-center gap-2">
+						<Button variant="outline" disabled={saving} onclick={oncancel}>Cancel</Button>
+						<Button disabled={saving} onclick={onsave}>{saving ? 'Saving…' : 'Save'}</Button>
+					</div>
+				{:else}
+					<Button onclick={() => (open = false)}>Done</Button>
 				{/if}
 			</div>
-		</div>
-
-		<p class="sr-only" role="status" aria-live="polite">{announcement}</p>
-
-		<div
-			class="sticky bottom-0 -mx-6 mt-6 flex items-center justify-between gap-2 border-t bg-background px-6 py-4"
-		>
-			<Button variant="ghost" onclick={clearAll}>Clear all</Button>
-			{#if onsave && oncancel}
-				<div class="flex items-center gap-2">
-					<Button variant="outline" disabled={saving} onclick={oncancel}>Cancel</Button>
-					<Button disabled={saving} onclick={onsave}>{saving ? 'Saving…' : 'Save'}</Button>
-				</div>
-			{:else}
-				<Button onclick={() => (open = false)}>Done</Button>
-			{/if}
-		</div>
-	</ResponsiveDialog.Content>
-</ResponsiveDialog.Root>
+		</ResponsiveDialog.Content>
+	</ResponsiveDialog.Root>
+{/if}

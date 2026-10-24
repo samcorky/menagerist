@@ -728,3 +728,150 @@ test('counts a really large smart collection exactly (E2E_BULK=1)', async ({ pag
 		}
 	}
 });
+
+// New collection: the kind choice (a list you fill, or a smart collection).
+const newCollectionDialog = (page: Page) => page.getByRole('dialog', { name: 'New collection' });
+const createButton = (page: Page) =>
+	newCollectionDialog(page).getByRole('button', { name: 'Create collection' });
+
+async function openNewCollection(page: Page) {
+	await page.goto('/collections');
+	await expect(page.getByRole('heading', { name: 'Collections', level: 1 })).toBeVisible();
+	await page.getByRole('button', { name: 'New collection' }).first().click();
+	await expect(newCollectionDialog(page)).toBeVisible();
+}
+
+/** Writes a screenshot of the open dialog when SHOTS_DIR is set (manual review only). */
+async function shot(page: Page, file: string) {
+	const dir = process.env.SHOTS_DIR;
+	if (dir) await page.waitForTimeout(400);
+	if (dir) await page.screenshot({ path: `${dir}/${file}.png` });
+}
+
+test.describe('New collection: kind choice', () => {
+	test('creates a smart collection from a condition and opens it with its items', async ({
+		page,
+		request
+	}) => {
+		const tool = await makeTool(request);
+		const names = await seedItems(request, tool);
+		const name = uniqueName('Cheap parts');
+		await openNewCollection(page);
+		const dialog = newCollectionDialog(page);
+
+		await expect(dialog.getByRole('radio', { name: 'List you fill', exact: true })).toBeChecked();
+		await expect(dialog.getByRole('combobox', { name: 'Condition 1, field' })).toHaveCount(0);
+		await shot(page, `manual-${test.info().project.name}`);
+
+		await dialog.getByRole('radio', { name: 'Smart: matches conditions', exact: true }).check();
+		await expect(dialog.getByRole('combobox', { name: 'Condition 1, field' })).toBeVisible();
+		await dialog.getByLabel('Name').fill(name);
+		await dialog.getByLabel('Description').fill('Heavy enough');
+
+		// No condition yet: refused, with the reason shown.
+		await expect(createButton(page)).toBeDisabled();
+		await expect(dialog.getByText('Add at least one condition.')).toBeVisible();
+		await shot(page, `smart-empty-${test.info().project.name}`);
+
+		await fillRow(page, dialog, 1, {
+			field: `${tool.label} › Weight`,
+			operator: 'is at least',
+			value: '5'
+		});
+		await expect(createButton(page)).toBeEnabled();
+		await expect(dialog.getByText('Add at least one condition.')).toHaveCount(0);
+		await shot(page, `smart-filled-${test.info().project.name}`);
+		await page.emulateMedia({ colorScheme: 'dark' });
+		await shot(page, `smart-filled-dark-${test.info().project.name}`);
+		await page.emulateMedia({ colorScheme: 'light' });
+		await createButton(page).click();
+
+		await page.waitForURL(/\/collections\/(?!$)[^/]+$/);
+		trackCollectionFromUrl(page);
+		await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
+		await expect(page.getByText('Smart', { exact: true })).toBeVisible();
+		await expect(page.getByText('Heavy enough')).toBeVisible();
+		await expect(itemLink(page, names.b)).toBeVisible();
+		await expect(itemLink(page, names.c)).toBeVisible();
+		await expect(itemLink(page, names.a)).toHaveCount(0);
+	});
+
+	test('refuses a smart collection with no condition, and a missing name first', async ({
+		page
+	}) => {
+		await openNewCollection(page);
+		const dialog = newCollectionDialog(page);
+		await dialog.getByRole('radio', { name: 'Smart: matches conditions' }).check();
+		await expect(createButton(page)).toBeDisabled();
+		await expect(dialog.getByText('Give the collection a name.')).toBeVisible();
+		await dialog.getByLabel('Name').fill(uniqueName('Nothing'));
+		await expect(dialog.getByText('Add at least one condition.')).toBeVisible();
+		await expect(createButton(page)).toBeDisabled();
+
+		// Cancel discards the choice and the name.
+		await dialog.getByRole('button', { name: 'Cancel' }).click();
+		await expect(dialog).toHaveCount(0);
+		await page.getByRole('button', { name: 'New collection' }).first().click();
+		await expect(dialog.getByRole('radio', { name: 'List you fill' })).toBeChecked();
+		await expect(dialog.getByLabel('Name')).toHaveValue('');
+	});
+
+	test('the list you fill still works as before', async ({ page }) => {
+		const name = uniqueName('Manual');
+		await openNewCollection(page);
+		const dialog = newCollectionDialog(page);
+		await dialog.getByLabel('Name').fill(name);
+		await createButton(page).click();
+		await page.waitForURL(/\/collections\/(?!$)[^/]+$/);
+		trackCollectionFromUrl(page);
+		await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
+		await expect(page.getByText('Smart', { exact: true })).toHaveCount(0);
+	});
+
+	test('works from the keyboard alone', async ({ page }) => {
+		await openNewCollection(page);
+		const dialog = newCollectionDialog(page);
+		// The dialog opens on its Close button; the next stop is the name.
+		await expect(dialog.getByRole('button', { name: 'Close' })).toBeFocused();
+		await page.keyboard.press('Tab');
+		await expect(dialog.getByLabel('Name')).toBeFocused();
+		await page.keyboard.type(uniqueName('Keys'));
+		await page.keyboard.press('Tab');
+		await expect(dialog.getByLabel('Description')).toBeFocused();
+		await page.keyboard.press('Tab');
+		await expect(dialog.getByRole('radio', { name: 'List you fill' })).toBeFocused();
+		await page.keyboard.press('ArrowDown');
+		await expect(dialog.getByRole('radio', { name: 'Smart: matches conditions' })).toBeChecked();
+		// The match toggle comes first, then the first condition.
+		const field = dialog.getByRole('combobox', { name: 'Condition 1, field' });
+		for (let i = 0; i < 4 && !(await field.evaluate((el) => el === document.activeElement)); i++) {
+			await page.keyboard.press('Tab');
+		}
+		await expect(field).toBeFocused();
+		await page.keyboard.press('Escape');
+		await expect(dialog).toHaveCount(0);
+		await expect(page.getByRole('button', { name: 'New collection' }).first()).toBeFocused();
+	});
+
+	test('fits a phone: no horizontal overflow, and the sheet scrolls inside', async ({ page }) => {
+		await page.setViewportSize({ width: 390, height: 844 });
+		await openNewCollection(page);
+		const dialog = newCollectionDialog(page);
+		await shot(page, 'manual-phone');
+		await dialog.getByRole('radio', { name: 'Smart: matches conditions' }).check();
+		await expect(dialog.getByRole('combobox', { name: 'Condition 1, field' })).toBeVisible();
+		await dialog.getByRole('button', { name: 'Add condition' }).first().click();
+		const overflow = await page.evaluate(() => {
+			const d = document.querySelector('[role="dialog"]') as HTMLElement;
+			return {
+				page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+				dialog: d.scrollWidth - d.clientWidth
+			};
+		});
+		expect(overflow).toEqual({ page: 0, dialog: 0 });
+		await expect(createButton(page)).toBeVisible();
+		await shot(page, 'smart-phone');
+		await page.emulateMedia({ colorScheme: 'dark' });
+		await shot(page, 'smart-phone-dark');
+	});
+});
