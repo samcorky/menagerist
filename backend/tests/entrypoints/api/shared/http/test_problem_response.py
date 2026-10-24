@@ -6,7 +6,11 @@ from starlette.testclient import TestClient
 from structlog.testing import capture_logs
 
 from app.entrypoints.api.shared.http.problem_response import register_exception_handlers
-from app.shared_kernel.errors import TooManyRequestsError, UnauthenticatedError
+from app.shared_kernel.errors import (
+    NotFoundError,
+    TooManyRequestsError,
+    UnauthenticatedError,
+)
 
 
 def _client(error: Exception) -> TestClient:
@@ -123,3 +127,74 @@ def test_malformed_json_does_not_echo_the_body() -> None:
 
     assert response.status_code == 422
     assert "hunter2" not in response.text
+
+
+def _routed_client() -> TestClient:
+    app = FastAPI()
+    register_exception_handlers(app)
+
+    @app.get("/api/v1/thing")
+    async def thing() -> dict[str, str]:
+        return {"ok": "yes"}
+
+    @app.get("/api/v1/missing")
+    async def missing() -> None:
+        raise NotFoundError("Thing 1 was not found.")
+
+    @app.get("/page")
+    async def page() -> dict[str, str]:
+        return {"ok": "yes"}
+
+    return TestClient(app)
+
+
+def test_unknown_api_path_is_a_problem_response() -> None:
+    """A path nothing serves under /api answers like any other 404."""
+    response = _routed_client().get("/api/v1/items")
+
+    assert response.status_code == 404
+    assert response.headers["content-type"] == "application/problem+json"
+    assert response.json() == {
+        "type": "about:blank",
+        "title": "NotFoundError",
+        "status": 404,
+        "detail": "No such API endpoint.",
+        "instance": "http://testserver/api/v1/items",
+    }
+
+
+def test_wrong_method_is_a_problem_response_with_allow() -> None:
+    """A known path with the wrong verb is a 405 problem that keeps Allow."""
+    response = _routed_client().post("/api/v1/thing")
+
+    assert response.status_code == 405
+    assert response.headers["content-type"] == "application/problem+json"
+    assert "GET" in response.headers["allow"]
+    assert response.json() == {
+        "type": "about:blank",
+        "title": "MethodNotAllowedError",
+        "status": 405,
+        "detail": "This endpoint does not accept POST.",
+        "instance": "http://testserver/api/v1/thing",
+    }
+
+
+def test_a_routes_own_404_is_unchanged() -> None:
+    """Domain 404s keep their own detail."""
+    response = _routed_client().get("/api/v1/missing")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Thing 1 was not found."
+
+
+def test_non_api_paths_keep_the_framework_default() -> None:
+    """Only /api is reshaped; elsewhere the default response stands."""
+    client = _routed_client()
+
+    not_found = client.get("/elsewhere")
+    wrong_method = client.post("/page")
+
+    assert not_found.status_code == 404
+    assert not_found.json() == {"detail": "Not Found"}
+    assert wrong_method.status_code == 405
+    assert wrong_method.json() == {"detail": "Method Not Allowed"}

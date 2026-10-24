@@ -17,6 +17,7 @@
 	import ApiTokensCard from '$lib/components/api-tokens-card.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
+	import PersonalExportsCard from '$lib/components/personal-exports-card.svelte';
 	import DeviceIcon from '$lib/components/device-icon.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -390,6 +391,10 @@
 			</section>
 
 			<ApiTokensCard />
+
+			{#if auth.can('backup:own_data:export')}
+				<PersonalExportsCard />
+			{/if}
 
 			<ConfirmDialog
 				open={confirmRevokeOthers}

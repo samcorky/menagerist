@@ -19,11 +19,13 @@ from app.shared_kernel.cqrs import UseCase
 EXPECTED_PERMISSIONS: dict[str, str] = {
     "backup.CreateBackup": "backup:archive:create",
     "backup.DeleteBackup": "backup:archive:delete",
+    "backup.DeleteUserExport": "backup:own_data:export",
     "backup.ExportUserData": "backup:own_data:export",
     "backup.ImportUserArchive": "backup:own_data:import",
     "backup.ImportUserData": "backup:own_data:import",
     "backup.ListBackups": "backup:archive:read",
     "backup.OpenBackup": "backup:archive:read",
+    "backup.ListUserExports": "backup:own_data:export",
     "backup.OpenUserExport": "backup:own_data:export",
     "backup.PruneBackups": "backup:archive:delete",
     "backup.RestoreBackup": "backup:archive:restore",

@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -7,6 +8,9 @@ from app.modules.backup.application.create_backup import CreateBackupCommand
 from app.modules.backup.application.prune_backups import PruneBackupsCommand
 from app.modules.backup.domain.verification import FindingKind
 from app.platform.request_model import RequestModel
+
+if TYPE_CHECKING:
+    from app.modules.backup.application.list_user_exports import UserExport
 
 
 class CreateBackupRequest(RequestModel):
@@ -45,6 +49,37 @@ class BackupResponse(BaseModel):
     created_at: datetime
     alembic_revision: str
     app_version: str
+
+
+class UserExportResponse(BaseModel):
+    """A personal export and when it expires."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "0199ec2d-f086-7000-8000-000000000001",
+                    "size": 1048576,
+                    "created_at": "2026-10-24T12:00:00Z",
+                    "expires_at": "2026-10-25T12:00:00Z",
+                }
+            ]
+        }
+    )
+    id: UUID
+    size: int
+    created_at: datetime
+    expires_at: datetime
+
+    @classmethod
+    def from_export(cls, export: UserExport) -> UserExportResponse:
+        """Build the response from a listed export."""
+        return cls(
+            id=export.summary.id,
+            size=export.summary.size,
+            created_at=export.summary.created_at,
+            expires_at=export.expires_at,
+        )
 
 
 class FindingResponse(BaseModel):

@@ -69,9 +69,11 @@ EXPECTED_OWN_ACCOUNT: frozenset[str] = frozenset(
 )
 EXPECTED_CONTENT: frozenset[str] = frozenset(
     {
+        "backup.DeleteUserExport",
         "backup.ExportUserData",
         "backup.ImportUserArchive",
         "backup.ImportUserData",
+        "backup.ListUserExports",
         "backup.OpenUserExport",
         "collections.AddItemsToCollection",
         "collections.CountCollectionItems",

@@ -1,9 +1,11 @@
 from app.modules.backup.application.create_backup import CreateBackup
 from app.modules.backup.application.delete_backup import DeleteBackup
+from app.modules.backup.application.delete_user_export import DeleteUserExport
 from app.modules.backup.application.export_user_data import ExportUserData
 from app.modules.backup.application.import_user_archive import ImportUserArchive
 from app.modules.backup.application.import_user_data import ImportUserData
 from app.modules.backup.application.list_backups import ListBackups
+from app.modules.backup.application.list_user_exports import ListUserExports
 from app.modules.backup.application.open_backup import OpenBackup
 from app.modules.backup.application.open_user_export import OpenUserExport
 from app.modules.backup.application.permissions import BackupPermission
@@ -29,11 +31,15 @@ def test_personal_archives_are_content() -> None:
     assert {
         ExportUserData: ExportUserData.access,
         OpenUserExport: OpenUserExport.access,
+        ListUserExports: ListUserExports.access,
+        DeleteUserExport: DeleteUserExport.access,
         ImportUserData: ImportUserData.access,
         ImportUserArchive: ImportUserArchive.access,
     } == {
         ExportUserData: EXPORT,
         OpenUserExport: EXPORT,
+        ListUserExports: EXPORT,
+        DeleteUserExport: EXPORT,
         ImportUserData: IMPORT,
         ImportUserArchive: IMPORT,
     }

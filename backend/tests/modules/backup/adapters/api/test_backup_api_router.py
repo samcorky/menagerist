@@ -234,3 +234,49 @@ def test_personal_export_download_isolation_and_import(client: TestClient) -> No
         == 409
     )
     assert stores[bob.id].summaries == {}
+
+
+def test_personal_exports_are_listed_and_deleted_per_account(
+    client: TestClient,
+) -> None:
+    """Each account lists and deletes only its own exports."""
+    assert isinstance(client.app, FastAPI)
+    alice, bob = Actor(id=uuid7()), Actor(id=uuid7())
+    current = alice
+    stores: dict[object, InMemoryBackupStore] = {}
+
+    def personal_store(
+        actor: Annotated[Actor, Depends(get_current_actor)],
+    ) -> BackupStore:
+        return stores.setdefault(actor.id, InMemoryBackupStore())
+
+    client.app.dependency_overrides.update(
+        {
+            get_current_actor: lambda: current,
+            get_user_backup_store: personal_store,
+            get_user_database_snapshot: lambda: InMemoryUserDatabaseSnapshot(
+                "revision", {}
+            ),
+            get_user_media_files: InMemoryMediaFiles,
+        }
+    )
+    assert client.get("/api/v1/me/exports").json() == []
+    first = client.post("/api/v1/me/export").json()["id"]
+    second = client.post("/api/v1/me/export").json()["id"]
+
+    listed = client.get("/api/v1/me/exports")
+    assert listed.status_code == 200
+    assert [row["id"] for row in listed.json()] == [second, first]
+    assert set(listed.json()[0]) == {"id", "size", "created_at", "expires_at"}
+
+    current = bob
+    assert client.get("/api/v1/me/exports").json() == []
+    other = client.delete(f"/api/v1/me/export/{first}")
+    assert other.status_code == 404
+    assert other.headers["content-type"] == "application/problem+json"
+
+    current = alice
+    assert client.delete(f"/api/v1/me/export/{first}").status_code == 204
+    assert [row["id"] for row in client.get("/api/v1/me/exports").json()] == [second]
+    assert client.get(f"/api/v1/me/export/{first}/download").status_code == 404
+    assert client.delete(f"/api/v1/me/export/{first}").status_code == 404

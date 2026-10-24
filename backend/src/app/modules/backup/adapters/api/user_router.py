@@ -11,11 +11,17 @@ from app.entrypoints.api.shared.http.upload_limit_middleware import (
 )
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.backup.adapters.api.router import ARCHIVE_BODY
-from app.modules.backup.adapters.api.schemas import BackupResponse
+from app.modules.backup.adapters.api.schemas import BackupResponse, UserExportResponse
 from app.modules.backup.adapters.api.user_dependencies import (
+    get_delete_user_export,
     get_export_user_data,
     get_import_user_archive,
+    get_list_user_exports,
     get_open_user_export,
+)
+from app.modules.backup.application.delete_user_export import (
+    DeleteUserExport,
+    DeleteUserExportCommand,
 )
 from app.modules.backup.application.export_user_data import (
     ExportUserData,
@@ -24,6 +30,10 @@ from app.modules.backup.application.export_user_data import (
 from app.modules.backup.application.import_user_archive import (
     ImportUserArchive,
     ImportUserArchiveCommand,
+)
+from app.modules.backup.application.list_user_exports import (
+    ListUserExports,
+    ListUserExportsQuery,
 )
 from app.modules.backup.application.open_user_export import (
     OpenUserExport,
@@ -68,6 +78,22 @@ async def export_user_data(
 
 
 @router.get(
+    "/exports",
+    response_model=list[UserExportResponse],
+    operation_id="list_user_exports",
+)
+async def list_user_exports(
+    use_case: Annotated[ListUserExports, Depends(get_list_user_exports)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> list[UserExportResponse]:
+    """List the caller's unexpired personal exports, newest first."""
+    return [
+        UserExportResponse.from_export(export)
+        for export in await use_case.handle(ListUserExportsQuery(), actor)
+    ]
+
+
+@router.get(
     "/export/{backup_id}/download",
     operation_id="download_user_export",
     responses={
@@ -100,6 +126,25 @@ async def download_user_export(
             "Cache-Control": "no-store",
         },
     )
+
+
+@router.delete(
+    "/export/{backup_id}",
+    status_code=204,
+    operation_id="delete_user_export",
+    responses=error_response(
+        BackupNotFoundError,
+        detail="Export 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40 was not found.",
+    ),
+)
+async def delete_user_export(
+    backup_id: UUID,
+    use_case: Annotated[DeleteUserExport, Depends(get_delete_user_export)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> Response:
+    """Delete one of the caller's personal exports."""
+    await use_case.handle(DeleteUserExportCommand(backup_id=backup_id), actor)
+    return Response(status_code=204)
 
 
 @router.post(

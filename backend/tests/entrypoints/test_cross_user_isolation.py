@@ -259,6 +259,14 @@ ALLOWED: dict[Route, str] = {
         "/api/v1/me/export/{backup_id}/download",
     ): "private owner namespace; API test checks foreign exports return 404",
     (
+        "GET",
+        "/api/v1/me/exports",
+    ): "private owner namespace; API test checks each account lists only its own",
+    (
+        "DELETE",
+        "/api/v1/me/export/{backup_id}",
+    ): "private owner namespace; API test checks foreign exports return 404",
+    (
         "POST",
         "/api/v1/me/import",
     ): "two-user API and Postgres tests cover owner stamping and isolation",

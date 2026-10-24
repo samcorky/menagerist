@@ -18,9 +18,11 @@ from app.modules.backup.adapters.persistence.user_database_snapshot import (
 from app.modules.backup.adapters.storage.local_backup_store import (
     LocalDirectoryBackupStore,
 )
+from app.modules.backup.application.delete_user_export import DeleteUserExport
 from app.modules.backup.application.export_user_data import ExportUserData
 from app.modules.backup.application.import_user_archive import ImportUserArchive
 from app.modules.backup.application.import_user_data import ImportUserData
+from app.modules.backup.application.list_user_exports import ListUserExports
 from app.modules.backup.application.open_user_export import OpenUserExport
 from app.platform.app_info import load_app_info
 from app.platform.config.backup import get_backup_settings
@@ -111,5 +113,25 @@ def get_open_user_export(
 ) -> OpenUserExport:
     """Compose downloads restricted to the caller's export namespace."""
     return OpenUserExport(
+        store, guard, ttl_hours=get_backup_settings().user_export_ttl_hours
+    )
+
+
+def get_list_user_exports(
+    store: Annotated[BackupStore, Depends(get_user_backup_store)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> ListUserExports:
+    """Compose the caller's export listing with private retention."""
+    return ListUserExports(
+        store, guard, ttl_hours=get_backup_settings().user_export_ttl_hours
+    )
+
+
+def get_delete_user_export(
+    store: Annotated[BackupStore, Depends(get_user_backup_store)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> DeleteUserExport:
+    """Compose deletion restricted to the caller's export namespace."""
+    return DeleteUserExport(
         store, guard, ttl_hours=get_backup_settings().user_export_ttl_hours
     )

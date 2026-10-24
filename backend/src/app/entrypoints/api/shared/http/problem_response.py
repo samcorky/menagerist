@@ -1,9 +1,11 @@
 from typing import TYPE_CHECKING, Any
 
 import structlog
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.shared_kernel.errors import (
     ConflictError,
@@ -17,6 +19,7 @@ from app.shared_kernel.errors import (
 
 if TYPE_CHECKING:
     from fastapi import FastAPI, Request
+    from starlette.responses import Response
 
 logger = structlog.get_logger()
 
@@ -215,8 +218,42 @@ def _validation_response(request: Request, exc: Exception) -> JSONResponse:
     )
 
 
+_ROUTING_PROBLEMS = {
+    404: ("NotFoundError", "No such API endpoint."),
+    405: ("MethodNotAllowedError", "This endpoint does not accept {method}."),
+}
+
+
+async def _routing_response(request: Request, exc: Exception) -> Response:
+    """Answer an unknown API path or wrong method with a problem response.
+
+    Anything outside `/api`, or any other status, keeps the framework default
+    so the SPA fallback and static files behave as before.
+    """
+    assert isinstance(exc, StarletteHTTPException)
+    path = request.url.path
+    if (path != "/api" and not path.startswith("/api/")) or (
+        exc.status_code not in _ROUTING_PROBLEMS
+    ):
+        return await http_exception_handler(request, exc)
+    title, detail = _ROUTING_PROBLEMS[exc.status_code]
+    return JSONResponse(
+        status_code=exc.status_code,
+        media_type=PROBLEM_JSON,
+        content={
+            "type": "about:blank",
+            "title": title,
+            "status": exc.status_code,
+            "detail": detail.format(method=request.method),
+            "instance": str(request.url),
+        },
+        headers=exc.headers,
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Map domain errors to RFC 9457 problem responses."""
+    app.add_exception_handler(StarletteHTTPException, _routing_response)
     app.add_exception_handler(RequestValidationError, _validation_response)
     for error_type in _STATUS_BY_DOMAIN_ERROR:
         app.add_exception_handler(error_type, _problem_response)

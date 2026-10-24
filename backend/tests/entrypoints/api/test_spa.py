@@ -173,3 +173,17 @@ def test_a_missing_dist_directory_fails_at_startup(
             create_app()
     finally:
         get_api_settings.cache_clear()
+
+
+def test_unknown_api_paths_are_problem_responses_but_assets_are_not(
+    app_client: TestClient,
+) -> None:
+    """The API prefix gets problem+json; a missing static asset keeps its 404."""
+    api = app_client.get("/api/v1/items")
+    asset = app_client.get("/missing.js")
+
+    assert api.status_code == 404
+    assert api.headers["content-type"] == "application/problem+json"
+    assert asset.status_code == 404
+    assert asset.headers["content-type"] != "application/problem+json"
+    assert app_client.get("/explore").text == _SHELL_HTML
