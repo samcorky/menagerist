@@ -1153,3 +1153,36 @@ Over HTTPS (a `Secure` cookie) the session cookie is `__Host-Http-menagerist-ses
 **Tests:** one scenario table (`test_node_search_external.py`) runs on both adapters; `tests/e2e/smart-collection-conditions.spec.ts` covers the builder, saving, stale references, both linked saves, the cycle message, isolation through a second user and the picker error state.
 
 **Known limits:** a chain of nested smart collections deeper than 3 is a warning, not a refusal; the picker loads all collections (paged, at most 20 pages of 50).
+
+## Connection conditions (2026-10-24)
+
+**Decision:** a `connection` condition joins the search and smart-collection tree, additively (`v` stays 1): `{"kind": "connection", "mode": "exists" | "none" | "to", "relationship"?: slug, "direction"?: "out" | "in" | "any", "item"?: uuid, "where"?: group}`. `exists` needs at least one live connection, matching `relationship` and `direction`, whose far item is live, in the caller's scope and satisfies `where` if given. `none` is the negation of the same test. `to` is `exists` with the far item equal to `item`, and takes no `where`. `exists` and `none` take no `item`. The far-end `where` may not contain another connection condition, and its conditions count towards the 50-condition limit. Connections are internal to `graph`, so unlike `collection` and `media` they need no external-predicate port: the SQL adapter compiles them to correlated `EXISTS` over `edges`, and the in-memory evaluator reads the in-memory edge store.
+
+**Rulings:**
+
+- **S2 (shape):** as above. Soft-deleted connections and far items never count, and neither does a connection outside the caller's scope.
+- **S3 (direction):** `out` means this item is the source and `in` that it is the target. For a relationship type declared non-directional the direction is ignored and either end matches. With no `relationship`, `out` and `in` apply to the stored source and target literally. `to` with a non-directional relationship also ignores direction. Cost: one more rule to explain in the builder.
+- **S4 (stale):** an unknown or deleted `relationship`, or a `to` item that is deleted or not visible, makes the whole condition false with a warning carrying its path, in every mode, so `none` over a stale relationship matches nothing rather than everything. The warning text is the same for deleted, foreign and unknown items, so it does not reveal existence. A stale field inside a far-end `where` is stale only inside that filter (nested warning path, such as `where.children[1].where.children[0]`): the filter matches no far item, so `exists` is false and `none` is true, because there is nothing to exclude. Under `not` the result inverts as for any stale leaf.
+- **S5 (in-memory parity):** `InMemoryNodeRepository` reads the same edge store that `InMemoryEdgeRepository` writes, wired once by `build_in_memory_graph_repos`; constructed without edges it behaves as before. One scenario table (47 scenarios, plus warnings, paging and a bare repository) runs against both adapters, the Postgres run being `integration`-marked.
+- **Far-end collections (Sam's decision):** a far-end `where` may use a `collection` condition, including a smart collection that itself has connection conditions. That gives a second connection level through the back door, but it is bounded by the existing nesting limit (3) and expansion cap (50), both adapters agree (tested), and conditions inside an inlined collection do not count towards the caller's 50, because the limit applies to each parsed definition.
+- **`to` and the far item:** `to` is checked at resolution (the item must be visible) and does not join the far node in SQL.
+
+**Performance (Postgres 18, 100,000 items, 300,000 edges, one owner, about 30% of items without edges, best of 3):**
+
+| condition | first page (51) | count capped at 1,001 | exact count |
+|---|---|---|---|
+| exists | 0.023 s | 0.049 s | 3.4 s |
+| exists, relationship, out | 0.020 s | 0.198 s | 0.39 s |
+| none | 0.030 s | 0.148 s | 0.79 s |
+| none, relationship | 0.030 s | 0.145 s | 0.67 s |
+| exists, far-end tag (14% of items) | 0.56 s | 0.70 s | 2.3 s |
+| exists, far-end type | 0.60 s | 0.61 s | 2.3 s |
+| exists, far-end name = (selective, 8 hits) | 1.6 s | 4.2 s | 4.3 s |
+
+`EXPLAIN` shows `ix_edges_source_id` and `ix_edges_target_id` used as nested loops for `exists`, and index-driven merge anti joins for the first page of `none`; no scan per item. A far-end filter that is not selective becomes a hashed sub-plan. The slow case is a selective far-end filter (`name =` matching 8 items): the planner sometimes starts from the 300,000 edges instead of the filtered far set, costing about 1.6 s for a first page. Partial composite indexes on `(source_id, target_id)` and `(target_id, source_id)` where `deleted_at IS NULL` changed no timing, so no index or migration was added. Typical libraries are far smaller.
+
+**Counting:** the exact, uncapped count for `exists` (3.4 s here) is slow, but the app never asks for it on the hot path: it uses the first page and the count capped at `TOTAL_CAP` (1,000), and fetches the exact figure in the background only for display. Revisit if an uncapped count is ever needed synchronously.
+
+**Frontend:** the builder gains a Connection row (relationship, direction, an item picker for "Is connected to", and "Where the linked item..." as a nested group that cannot hold another connection). The picker searches on the server (`GET /node?q=`) rather than loading every item. Chips and summaries read "Has a linked item via Directed by", "Has no linked item" and "Connected to Casablanca"; user-visible text says connection, linked item and relationship, never node or edge. `shared/contracts/query-shapes.json` carries 11 valid and 16 invalid connection cases for both parsers.
+
+**Tests:** `test_query_connection_scenarios.py` (both adapters), `test_query_connection.py`, `test_query_resolution_connection.py`, `frontend/tests/query-connections.test.ts`, and `tests/e2e/smart-collections-connections.spec.ts` (building and saving "films with no viewing", connected to an item, a far-end type filter, a deleted relationship type, and isolation through a second user).
