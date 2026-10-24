@@ -1054,3 +1054,34 @@ async def test_not_in_leaves_sorting_and_paging_alone(
         after = Cursor(sort_values=hits[-1].sort_values, id=hits[-1].node.id)
     assert paged == names
     assert await repository.search_count(scope=scope, resolved=resolved) == 4
+
+
+async def test_a_reference_to_a_removed_field_warns_and_matches_nothing(
+    repository: NodeRepository,
+) -> None:
+    """A stored `ref` whose target field was later removed is stale, not an error."""
+    await _seed(repository)
+    raw = _where(_f("part", "stock", "<=", {"ref": "reorder_at"}))
+    schemas = {
+        **SCHEMAS,
+        "part": {
+            "type": "object",
+            "properties": {"stock": {"type": "number"}},
+        },
+    }
+    query = parse_query(raw)
+    resolution = resolve_fields(query, schemas)
+    resolved = ResolvedQuery(
+        query=query,
+        field_kinds=resolution.kinds,
+        search_exclusions={},
+        today=TODAY,
+        stale=resolution.stale,
+    )
+
+    scope = ContentFilter.of(ALICE)
+    hits = await repository.search(scope=scope, resolved=resolved, after=None, limit=10)
+
+    assert [w.path for w in resolution.warnings] == ["where.children[0]"]
+    assert hits == []
+    assert await repository.search_count(scope=scope, resolved=resolved) == 0

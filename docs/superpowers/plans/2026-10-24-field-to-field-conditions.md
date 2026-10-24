@@ -1,3 +1,7 @@
+# Field-to-field conditions (SUPERSEDED)
+
+> **Superseded 2026-10-24.** Field-to-field comparison already exists as `value: {"ref": "<field key>"}` (`FieldReference`; `REF_KINDS` = number, duration, rating, money, date), in the backend, the frontend builder and `shared/contracts/query-shapes.json`. No new `other` shape is built. What remains is converting the Parts pack's *Running low* with the existing form, plus checking that a saved reference degrades to a stale warning when its field is removed or changes kind. Partial dates are not in `REF_KINDS` and stay unsupported. The text below is kept only as a record of the abandoned design.
+
 # Field-to-field conditions Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

@@ -5,6 +5,7 @@ import {
 	GAMES,
 	GAME_COLLECTIONS,
 	MOVIES,
+	PARTS,
 	collectionCard,
 	exampleData,
 	install,
@@ -190,5 +191,41 @@ test('a smart example collection lists its matching items, goes with the pack an
 	await expect(collectionCard(page, 'No poster yet')).toHaveCount(0);
 
 	await install(page, MOVIES);
+	await open();
+});
+
+test("Running low compares stock with each part's own reorder level and goes with the pack", async ({
+	page
+}) => {
+	const matching = [
+		'LM317 voltage regulator',
+		'10-turn trimmer potentiometer',
+		'Solder wire, 0.8 mm, 100 g reel'
+	];
+	const open = async () => {
+		await page.goto('/collections');
+		const card = collectionCard(page, 'Running low');
+		await expect(card).toBeVisible();
+		await expect(card.getByText('Smart', { exact: true })).toBeVisible();
+		await expect(card).toContainText('3 items');
+		await card.click();
+		await expect(page.getByRole('heading', { name: 'Running low', level: 1 })).toBeVisible();
+		await expect(page.getByText('Smart', { exact: true })).toBeVisible();
+		await expect(page.getByText('3 items', { exact: true })).toBeVisible();
+		for (const name of matching) {
+			await expect(page.getByRole('link', { name }).first()).toBeVisible();
+		}
+		await expect(page.getByRole('link', { name: '470 µF electrolytic capacitor' })).toHaveCount(0);
+	};
+
+	await install(page, PARTS);
+	await open();
+
+	await remove(page, PARTS);
+	await page.goto('/collections');
+	await expect(page.getByRole('heading', { name: 'Collections', level: 1 })).toBeVisible();
+	await expect(collectionCard(page, 'Running low')).toHaveCount(0);
+
+	await install(page, PARTS);
 	await open();
 });

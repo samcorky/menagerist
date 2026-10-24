@@ -37,6 +37,7 @@ _EVERYONE = ContentFilter.everyone()
 _SMART = [
     ("games", "Still to try"),
     ("movies", "No poster yet"),
+    ("parts", "Running low"),
 ]
 
 
@@ -159,6 +160,24 @@ async def test_films_without_a_poster_are_found_by_the_missing_connection(
     assert await rig.matches("No poster yet") == [
         "Marmalade",
         "The Night Bus Sessions",
+    ]
+
+
+async def test_running_low_compares_each_part_with_its_own_reorder_level(
+    make_world: MakeWorld,
+) -> None:
+    """Stock at or under `reorder_at` (a `ref`), so the solder reel (1 of 1) counts.
+
+    The old hand-built list also held the 470 uF capacitor (12 in stock, reorder
+    at 10), which is above its level and so no longer matches.
+    """
+    rig = await _rig(make_world, "parts")
+    await rig.install("parts")
+
+    assert await rig.matches("Running low") == [
+        "10-turn trimmer potentiometer",
+        "LM317 voltage regulator",
+        "Solder wire, 0.8 mm, 100 g reel",
     ]
 
 

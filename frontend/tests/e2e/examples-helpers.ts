@@ -3,6 +3,7 @@ import { ownedData, removeExamplePacks } from './helpers';
 
 export const MUSIC = /^Music/;
 export const MOVIES = /^Movies/;
+export const PARTS = /^Electronic parts/;
 export const GAMES = /^Board games/;
 export const GAMES_EXTRAS = /^Extra board games/;
 export const GAME_COLLECTIONS = [

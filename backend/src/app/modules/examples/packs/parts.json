@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 2,
+  "version": 6,
   "id": "parts",
   "relationship_types": [
     {
@@ -968,11 +968,29 @@
       "ref": "running-low",
       "name": "Running low",
       "description": "Parts to reorder soon.",
-      "items": [
-        "lm317-voltage-regulator",
-        "10-turn-trimmer-potentiometer",
-        "470-uf-electrolytic-capacitor"
-      ]
+      "definition": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "type",
+              "in": [
+                "parts-part"
+              ]
+            },
+            {
+              "kind": "field",
+              "type": "parts-part",
+              "key": "in_stock",
+              "op": "<=",
+              "value": {
+                "ref": "reorder_at"
+              }
+            }
+          ]
+        }
+      }
     },
     {
       "ref": "pico-reaction-game-build",
