@@ -29,7 +29,7 @@ logger = structlog.get_logger()
 _COVER_INDEX = "uq_media_attachment_cover"
 
 
-def _visible(scope: ContentFilter) -> Select[tuple[MediaAttachmentModel]]:
+def _visible(scope: ContentFilter) -> Select[MediaAttachmentModel]:
     """Select attachments whose asset is inside `scope`."""
     return (
         select(MediaAttachmentModel)

@@ -18,9 +18,7 @@ from app.modules.collections.domain.errors import (
     CollectionNotFoundError,
     InvalidCollectionError,
 )
-from app.modules.collections.ports.definition_checker import (
-    DefinitionChecker,  # noqa: TC001
-)
+from app.modules.collections.ports.definition_checker import DefinitionChecker  # noqa: TC001
 from app.modules.collections.ports.unit_of_work import CollectionsUnitOfWork
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import CommandHandler

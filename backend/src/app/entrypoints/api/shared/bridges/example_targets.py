@@ -130,9 +130,7 @@ from app.modules.media.application.upload_and_attach_media import (
 )
 from app.modules.media.domain.media_attachment import AttachmentKey, AttachmentTarget
 from app.modules.media.ports.attach_target_access import AttachTargetAccess
-from app.modules.media.ports.attachment_policy import (
-    AttachmentPolicyPort,  # noqa: TC001
-)
+from app.modules.media.ports.attachment_policy import AttachmentPolicyPort  # noqa: TC001
 from app.modules.media.ports.image_processor import ImageProcessorPort  # noqa: TC001
 from app.modules.media.ports.media_storage import MediaStoragePort  # noqa: TC001
 from app.modules.media.ports.unit_of_work import MediaRepos, MediaUnitOfWork

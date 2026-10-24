@@ -10,17 +10,13 @@ from app.modules.identity.application.api_token_issue import (
     resolve_lifetime,
     utc_now,
 )
-from app.modules.identity.application.sign_in_throttle import (
-    SignInThrottle,  # noqa: TC001
-)
+from app.modules.identity.application.sign_in_throttle import SignInThrottle  # noqa: TC001
 from app.modules.identity.domain.api_token import ApiToken
 from app.modules.identity.domain.errors import (
     ApiTokenLimitError,
     InvalidApiTokenRequestError,
 )
-from app.modules.identity.ports.api_token_generator import (  # noqa: TC001
-    ApiTokenGenerator,
-)
+from app.modules.identity.ports.api_token_generator import ApiTokenGenerator  # noqa: TC001
 from app.modules.identity.ports.password_hasher import PasswordHasher  # noqa: TC001
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
 from app.shared_kernel.access import Access, OwnAccount

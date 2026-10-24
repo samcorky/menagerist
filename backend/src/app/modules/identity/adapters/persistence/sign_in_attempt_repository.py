@@ -43,6 +43,7 @@ class SqlAlchemySignInAttemptRepository:
         return {
             ThrottleKey(kind=ThrottleKind(kind), digest=digest): until
             for kind, digest, until in (await self._session.execute(stmt)).all()
+            if until is not None
         }
 
     async def record_failure(

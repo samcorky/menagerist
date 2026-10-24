@@ -4,11 +4,7 @@ from pathlib import Path  # noqa: TC003 - pydantic resolves the annotation at ru
 from pydantic import Field
 
 from app.platform.config._base import MenageristBaseSettings
-from app.platform.config._types import (  # noqa: TC001 - pydantic resolves these at runtime
-    Origin,
-    ProxyAddress,
-    StarOrCSV,
-)
+from app.platform.config._types import Origin, ProxyAddress, StarOrCSV  # noqa: TC001 - pydantic resolves these at runtime
 
 CORS_OPEN_HINT = (
     "CORS allows any origin: any website can call this API from a visitor's browser,"

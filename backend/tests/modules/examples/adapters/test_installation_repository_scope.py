@@ -13,9 +13,7 @@ from app.modules.examples.adapters.persistence.installation_repository import (
     SqlAlchemyInstallationRepository,
 )
 from app.modules.examples.domain.installation import Installation
-from app.modules.examples.ports.installation_repository import (  # noqa: TC001
-    InstallationRepository,
-)
+from app.modules.examples.ports.installation_repository import InstallationRepository  # noqa: TC001
 from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:

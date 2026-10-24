@@ -14,10 +14,7 @@ from app.modules.identity.domain.errors import (
     UserNotFoundError,
 )
 from app.modules.identity.ports.password_hasher import PasswordHasher  # noqa: TC001
-from app.modules.identity.ports.unit_of_work import (  # noqa: TC001
-    IdentityRepos,
-    IdentityUnitOfWork,
-)
+from app.modules.identity.ports.unit_of_work import IdentityRepos, IdentityUnitOfWork  # noqa: TC001
 from app.shared_kernel.errors import ForbiddenError
 
 if TYPE_CHECKING:

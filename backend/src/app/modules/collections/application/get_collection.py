@@ -13,9 +13,7 @@ from app.modules.collections.domain.errors import (
 )
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
-from app.modules.collections.ports.definition_checker import (
-    DefinitionChecker,  # noqa: TC001
-)
+from app.modules.collections.ports.definition_checker import DefinitionChecker  # noqa: TC001
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.collections.ports.item_lookup import ItemLookup  # noqa: TC001

@@ -8,20 +8,12 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Connection
-from app.modules.collections.adapters.persistence import (  # noqa: F401
-    models as collection_models,
-)
-from app.modules.examples.adapters.persistence import (  # noqa: F401
-    models as example_models,
-)
+from app.modules.collections.adapters.persistence import models as collection_models  # noqa: F401
+from app.modules.examples.adapters.persistence import models as example_models  # noqa: F401
 from app.modules.graph.adapters.persistence import models as graph_models  # noqa: F401
-from app.modules.identity.adapters.persistence import (  # noqa: F401
-    models as identity_models,
-)
+from app.modules.identity.adapters.persistence import models as identity_models  # noqa: F401
 from app.modules.media.adapters.persistence import models as media_models  # noqa: F401
-from app.modules.presets.adapters.persistence import (  # noqa: F401
-    models as preset_models,
-)
+from app.modules.presets.adapters.persistence import models as preset_models  # noqa: F401
 from app.platform.config import get_database_settings
 from app.platform.database import Base
 

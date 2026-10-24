@@ -7,9 +7,7 @@ import structlog
 from app.modules.identity.application.api_token_issue import utc_now
 from app.modules.identity.application.get_current_user import LAST_SEEN_INTERVAL
 from app.modules.identity.domain.user import User
-from app.modules.identity.ports.api_token_generator import (  # noqa: TC001
-    ApiTokenGenerator,
-)
+from app.modules.identity.ports.api_token_generator import ApiTokenGenerator  # noqa: TC001
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
 from app.shared_kernel.access import Access, Public
 from app.shared_kernel.cqrs import CommandHandler

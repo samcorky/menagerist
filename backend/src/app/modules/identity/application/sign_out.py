@@ -3,9 +3,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
-from app.modules.identity.ports.session_token_generator import (  # noqa: TC001
-    SessionTokenGenerator,
-)
+from app.modules.identity.ports.session_token_generator import SessionTokenGenerator  # noqa: TC001
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
 from app.shared_kernel.access import Access, Public
 from app.shared_kernel.cqrs import CommandHandler

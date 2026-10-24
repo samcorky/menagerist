@@ -95,7 +95,7 @@ async def _explain(
     await session.execute(text("ANALYZE"))
     await session.execute(text("SET LOCAL enable_seqscan = off"))
     compiled = statement.compile(
-        dialect=session.bind.dialect,
+        dialect=session.get_bind().dialect,
         compile_kwargs={"literal_binds": True},
     )
     result = await session.execute(text(f"EXPLAIN {compiled}"))

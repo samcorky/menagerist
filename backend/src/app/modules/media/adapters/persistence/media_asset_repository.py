@@ -54,8 +54,8 @@ def _to_model(asset: MediaAsset) -> MediaAssetModel:
 
 
 def _scoped(
-    stmt: Select[tuple[MediaAssetModel]], scope: ContentFilter
-) -> Select[tuple[MediaAssetModel]]:
+    stmt: Select[MediaAssetModel], scope: ContentFilter
+) -> Select[MediaAssetModel]:
     """Restrict a media asset select to the rows inside `scope`."""
     return stmt.where(owned_by(MediaAssetModel, scope.user_id))
 

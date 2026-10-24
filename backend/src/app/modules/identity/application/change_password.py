@@ -20,9 +20,7 @@ from app.modules.identity.domain.errors import (
 )
 from app.modules.identity.domain.user import validate_password
 from app.modules.identity.ports.password_hasher import PasswordHasher  # noqa: TC001
-from app.modules.identity.ports.session_token_generator import (  # noqa: TC001
-    SessionTokenGenerator,
-)
+from app.modules.identity.ports.session_token_generator import SessionTokenGenerator  # noqa: TC001
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
 from app.shared_kernel.access import Access, OwnAccount
 from app.shared_kernel.cqrs import CommandHandler

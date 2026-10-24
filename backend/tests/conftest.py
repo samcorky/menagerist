@@ -16,7 +16,7 @@ from app.shared_kernel.actor import Actor
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable, Iterator
 
-    from anyio.abc import BlockingPortal
+    from anyio.from_thread import BlockingPortal
     from fastapi import FastAPI
 
 
