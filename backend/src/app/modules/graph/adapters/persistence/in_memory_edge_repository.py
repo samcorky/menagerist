@@ -8,11 +8,18 @@ if TYPE_CHECKING:
     from app.shared_kernel.content_filter import ContentFilter
 
 
-class InMemoryEdgeRepository:
-    """Dict-backed `EdgeRepository` for tests and the in-memory adapter."""
+type EdgeStore = dict[uuid.UUID, Edge]
 
-    def __init__(self) -> None:
-        self._edges: dict[uuid.UUID, Edge] = {}
+
+class InMemoryEdgeRepository:
+    """Dict-backed `EdgeRepository` for tests and the in-memory adapter.
+
+    Pass a `store` to share the edges with a reader such as the in-memory node
+    repository, which needs them to evaluate connection conditions.
+    """
+
+    def __init__(self, store: EdgeStore | None = None) -> None:
+        self._edges: EdgeStore = {} if store is None else store
 
     def _visible(self, scope: ContentFilter) -> builtins.list[Edge]:
         """The one visibility rule: live edges the `scope` covers.

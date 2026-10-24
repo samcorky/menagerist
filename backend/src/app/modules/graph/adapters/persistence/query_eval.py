@@ -20,6 +20,7 @@ from app.modules.graph.domain.query import (
     COMPLEMENT_OPERATORS,
     CollectionCondition,
     Condition,
+    ConnectionCondition,
     Cursor,
     DateCondition,
     DescriptionCondition,
@@ -46,6 +47,7 @@ from app.modules.graph.domain.query import (
 
 if TYPE_CHECKING:
     from app.modules.graph.adapters.persistence.query_env import QueryEnv
+    from app.modules.graph.domain.edge import Edge
     from app.modules.graph.domain.node import Node
 
 _NUMERIC = frozenset({"number", "duration", "rating"})
@@ -320,6 +322,41 @@ def _collection_matches(
     return (on_manual or on_smart) == (condition.mode == "any")
 
 
+def _direction_ok(
+    edge: Edge, node: Node, condition: ConnectionCondition, *, directional: bool
+) -> bool:
+    """Whether the edge touches `node` at the end the direction asks for."""
+    if condition.direction == "any" or not directional:
+        return True
+    near = edge.source_id if condition.direction == "out" else edge.target_id
+    return near == node.id
+
+
+def _connection_matches(
+    node: Node, condition: ConnectionCondition, ctx: ResolvedQuery, env: QueryEnv
+) -> bool:
+    """A live connection to a live far item in scope; stale matches nothing.
+
+    A relationship or item that no longer resolves makes the condition false,
+    for `none` as well.
+    """
+    slug = condition.relationship
+    info = None if slug is None else ctx.relationships.get(slug)
+    if slug is not None and info is None:
+        return False
+    if condition.mode == "to" and condition.item not in ctx.visible_items:
+        return False
+    directional = info is None or info.directional
+    found = env.links is not None and any(
+        (slug is None or edge.type == slug)
+        and _direction_ok(edge, node, condition, directional=directional)
+        and (condition.mode != "to" or far.id == condition.item)
+        and (condition.where is None or matches(far, condition.where, ctx, env))
+        for edge, far in env.links.connected(node.id, env.scope)
+    )
+    return found != (condition.mode == "none")
+
+
 def _item_condition(
     node: Node, condition: Condition, ctx: ResolvedQuery, env: QueryEnv
 ) -> bool:
@@ -332,6 +369,8 @@ def _item_condition(
         return _media_matches(node, condition, env)
     if isinstance(condition, CollectionCondition):
         return _collection_matches(node, condition, ctx, env)
+    if isinstance(condition, ConnectionCondition):
+        return _connection_matches(node, condition, ctx, env)
     raise AssertionError(condition)
 
 
@@ -340,6 +379,7 @@ _ITEM_CONDITIONS = (
     FavouriteCondition,
     MediaCondition,
     CollectionCondition,
+    ConnectionCondition,
 )
 
 

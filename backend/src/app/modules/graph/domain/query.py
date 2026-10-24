@@ -8,7 +8,7 @@ Checking fields against item types happens in the application layer.
 import re
 import uuid
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Final, Literal, cast
 
@@ -201,6 +201,23 @@ class CollectionCondition:
 
 
 @dataclass(frozen=True, kw_only=True)
+class ConnectionCondition:
+    """The item has (`exists`), lacks (`none`) or is linked to a given item (`to`).
+
+    A connection counts when it is live, matches `relationship` and `direction`
+    (`out`: this item is the source), and its far item is live, in the caller's
+    scope and satisfies `where`. `to` additionally needs the far item to be
+    `item`. For a non-directional relationship either end matches.
+    """
+
+    mode: Literal["exists", "none", "to"]
+    relationship: str | None
+    direction: Literal["out", "in", "any"]
+    item: uuid.UUID | None
+    where: Group | None
+
+
+@dataclass(frozen=True, kw_only=True)
 class DateCondition:
     """Compare the day an item was created or last updated."""
 
@@ -235,6 +252,7 @@ type Condition = (
     | TagCondition
     | MediaCondition
     | CollectionCondition
+    | ConnectionCondition
     | DateCondition
     | FieldCondition
 )
@@ -306,12 +324,24 @@ class SearchHit:
 
 
 @dataclass(frozen=True, kw_only=True)
+class RelationshipInfo:
+    """A relationship type a connection names, and whether it has a direction."""
+
+    slug: str
+    directional: bool
+
+
+@dataclass(frozen=True, kw_only=True)
 class ResolvedQuery:
     """A query plus everything adapters need to evaluate it.
 
     `field_kinds` holds only fields that still exist. A field condition whose
     key is absent, or that is in `stale` (its field or a field it references
     is gone), matches nothing.
+
+    `relationships` holds the live relationship types connection conditions name
+    and `visible_items` the `to` items that exist in scope. A connection naming
+    anything else is stale and matches nothing.
     """
 
     query: Query
@@ -319,6 +349,8 @@ class ResolvedQuery:
     search_exclusions: Mapping[str, Sequence[str]]
     today: date
     stale: frozenset[FieldCondition] = frozenset()
+    relationships: Mapping[str, RelationshipInfo] = field(default_factory=dict)
+    visible_items: frozenset[uuid.UUID] = frozenset()
 
 
 def walk_conditions(
@@ -339,6 +371,8 @@ def walk_conditions(
                         yield from walk_conditions(
                             target.where, f"{child_path}.in[{number}]"
                         )
+            elif isinstance(child, ConnectionCondition):
+                yield from walk_conditions(child.where, f"{child_path}.where")
 
 
 def _encodable(raw: str) -> bool:
@@ -551,6 +585,53 @@ def _collection(data: Mapping[str, object], path: str) -> CollectionCondition:
     )
 
 
+def _connection(
+    data: Mapping[str, object], path: str, where: Group | None
+) -> ConnectionCondition:
+    """Parse a connection; `where` is its already parsed far-end filter."""
+    mode = data.get("mode")
+    if not isinstance(mode, str) or mode not in {"exists", "none", "to"}:
+        msg = "'mode' must be exists, none or to."
+        raise InvalidQueryError(msg, path=path)
+    direction = data.get("direction", "any")
+    if not isinstance(direction, str) or direction not in {"out", "in", "any"}:
+        msg = "'direction' must be out, in or any."
+        raise InvalidQueryError(msg, path=path)
+    relationship = data.get("relationship")
+    item = data.get("item")
+    if mode == "to":
+        if where is not None:
+            msg = "A connection to an item takes no 'where'."
+            raise InvalidQueryError(msg, path=path)
+        item_id = _item_id(item, path)
+    elif item is not None:
+        msg = f"'{mode}' takes no 'item'."
+        raise InvalidQueryError(msg, path=path)
+    else:
+        item_id = None
+    return ConnectionCondition(
+        mode=cast("Literal['exists', 'none', 'to']", mode),
+        relationship=(
+            None
+            if relationship is None
+            else _string(relationship, path, name="relationship")
+        ),
+        direction=cast("Literal['out', 'in', 'any']", direction),
+        item=item_id,
+        where=where,
+    )
+
+
+def _item_id(raw: object, path: str) -> uuid.UUID:
+    try:
+        if isinstance(raw, str):
+            return uuid.UUID(raw)
+    except ValueError:
+        pass
+    msg = "'item' must be an item id."
+    raise InvalidQueryError(msg, path=path)
+
+
 def _date(data: Mapping[str, object], path: str) -> DateCondition:
     on = data.get("on")
     op = data.get("op")
@@ -618,6 +699,9 @@ _CONDITION_KEYS: Final[Mapping[str, frozenset[str]]] = {
     "tag": frozenset({"kind", "mode", "tags"}),
     "media": frozenset({"kind", "mode", "type"}),
     "collection": frozenset({"kind", "mode", "in"}),
+    "connection": frozenset(
+        {"kind", "mode", "relationship", "direction", "item", "where"}
+    ),
     "date": frozenset({"kind", "on", "op", "value"}),
     "field": frozenset({"kind", "type", "field_kind", "key", "sub_key", "op", "value"}),
 }
@@ -684,6 +768,7 @@ def _sort(raw: object) -> tuple[SortKey, ...]:
 class _Parser:
     def __init__(self) -> None:
         self._conditions = 0
+        self._far_end = False
 
     def group(self, data: object, path: str, depth: int) -> Group:
         if depth > MAX_DEPTH:
@@ -723,11 +808,27 @@ class _Parser:
             raise InvalidQueryError(msg, path=path)
         kind = data.get("kind")
         parser = _CONDITION_PARSERS.get(kind) if isinstance(kind, str) else None
-        if parser is None:
+        if parser is None and kind != "connection":
             msg = "Unknown condition kind."
             raise InvalidQueryError(msg, path=path)
         _only_known(data, _CONDITION_KEYS[cast("str", kind)], path)
+        if parser is None:
+            return self.connection(data, path)
         return parser(data, path)
+
+    def connection(self, data: Mapping[str, object], path: str) -> ConnectionCondition:
+        if self._far_end:
+            msg = "A filter on the far item cannot hold another connection."
+            raise InvalidQueryError(msg, path=path)
+        raw = data.get("where")
+        where = None
+        if raw is not None:
+            self._far_end = True
+            try:
+                where = self.group(raw, f"{path}.where", 1)
+            finally:
+                self._far_end = False
+        return _connection(data, path, where)
 
 
 def parse_query(data: object) -> Query:

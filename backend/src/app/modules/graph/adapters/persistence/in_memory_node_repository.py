@@ -18,6 +18,10 @@ if TYPE_CHECKING:
     import uuid
     from collections.abc import Mapping, Sequence
 
+    from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
+        EdgeStore,
+    )
+    from app.modules.graph.domain.edge import Edge
     from app.modules.graph.domain.node import Node
     from app.modules.graph.domain.query import Cursor, ResolvedQuery
     from app.modules.graph.ports.external_conditions import ExternalConditions
@@ -38,9 +42,34 @@ def _label(key: str, titles: Mapping[str, int]) -> str:
 class InMemoryNodeRepository:
     """Dict-backed `NodeRepository` for tests and the in-memory adapter."""
 
-    def __init__(self, external: ExternalConditions | None = None) -> None:
+    def __init__(
+        self,
+        external: ExternalConditions | None = None,
+        edges: EdgeStore | None = None,
+    ) -> None:
         self._nodes: dict[uuid.UUID, Node] = {}
         self._external = external
+        self._edges: EdgeStore = {} if edges is None else edges
+
+    def connected(
+        self, node_id: uuid.UUID, scope: ContentFilter
+    ) -> builtins.list[tuple[Edge, Node]]:
+        """Live connections in `scope` touching the item, each with its far item.
+
+        Reads the edge store shared with `InMemoryEdgeRepository`; the far item
+        must be live and in `scope`.
+        """
+        pairs: builtins.list[tuple[Edge, Node]] = []
+        for edge in self._edges.values():
+            if edge.is_deleted or not scope.covers(edge.owner_id):
+                continue
+            if node_id not in (edge.source_id, edge.target_id):
+                continue
+            far_id = edge.target_id if edge.source_id == node_id else edge.source_id
+            far = self._nodes.get(far_id)
+            if far is not None and not far.is_deleted and scope.covers(far.owner_id):
+                pairs.append((edge, far))
+        return pairs
 
     def _visible(self, scope: ContentFilter) -> builtins.list[Node]:
         """The one visibility rule: live nodes the `scope` covers.
@@ -129,7 +158,7 @@ class InMemoryNodeRepository:
     ) -> builtins.list[SearchHit]:
         """Every matching node in the query's order (nulls last, then id)."""
         where = resolved.query.where
-        env = QueryEnv(scope=scope, external=self._external)
+        env = QueryEnv(scope=scope, external=self._external, links=self)
         hits = [
             SearchHit(node=node, sort_values=sort_values(node, resolved))
             for node in sorted(self._visible(scope), key=lambda n: n.id)

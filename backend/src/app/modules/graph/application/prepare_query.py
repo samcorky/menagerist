@@ -4,11 +4,20 @@ from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Any
 
 from app.modules.graph.application.collection_expansion import expand_collections
-from app.modules.graph.application.query_resolution import resolve_fields
+from app.modules.graph.application.query_resolution import (
+    ConnectionResolution,
+    connection_references,
+    resolve_connections,
+    resolve_fields,
+)
 from app.modules.graph.application.schema_meta import search_excluded_keys
-from app.modules.graph.application.type_catalogue import load_node_types
+from app.modules.graph.application.type_catalogue import (
+    load_edge_types,
+    load_node_types,
+)
 from app.modules.graph.domain.query import (
     CollectionCondition,
+    Group,
     ManualTarget,
     MediaCondition,
     Query,
@@ -29,6 +38,27 @@ if TYPE_CHECKING:
 def utc_today() -> date:
     """Return today's date in UTC."""
     return datetime.now(UTC).date()
+
+
+async def _resolve_connections(
+    repos: GraphRepos, where: Group | None, scope: ContentFilter
+) -> ConnectionResolution:
+    """Resolve connection conditions with one read per kind of lookup."""
+    named = connection_references(where)
+    directional: dict[str, bool] = {}
+    if named.slugs:
+        directional = {
+            str(t.slug): t.directional
+            for t in await load_edge_types(repos)
+            if str(t.slug) in named.slugs
+        }
+    visible: set[uuid.UUID] = set()
+    if named.items:
+        found = await repos.nodes.list(
+            scope=scope, after=None, limit=len(named.items), ids=named.items
+        )
+        visible = {node.id for node in found}
+    return resolve_connections(where, directional=directional, visible=visible)
 
 
 async def prepare_query(
@@ -60,7 +90,8 @@ async def prepare_query(
         schemas=schemas,
         self_id=self_id,
     )
-    warnings = [*resolution.warnings, *expansion.warnings]
+    connections = await _resolve_connections(repos, expansion.where, scope)
+    warnings = [*resolution.warnings, *expansion.warnings, *connections.warnings]
     if repos.external is None:
         warnings.extend(
             QueryWarning(path, "That cannot be checked here.")
@@ -81,6 +112,8 @@ async def prepare_query(
         },
         today=today,
         stale=resolution.stale | expansion.stale,
+        relationships=connections.relationships,
+        visible_items=connections.visible_items,
     )
     return resolved, warnings
 

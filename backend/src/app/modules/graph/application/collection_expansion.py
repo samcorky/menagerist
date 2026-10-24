@@ -16,6 +16,7 @@ from app.modules.graph.application.query_resolution import resolve_fields
 from app.modules.graph.domain.query import (
     CollectionCondition,
     CollectionTarget,
+    ConnectionCondition,
     FieldCondition,
     FieldKey,
     Group,
@@ -75,6 +76,9 @@ class _Expander:
                     for n, cid in enumerate(child.ids)
                 ]
                 children.append(replace(child, targets=tuple(targets)))
+            elif isinstance(child, ConnectionCondition) and child.where is not None:
+                inner = await self.group(child.where, f"{child_path}.where", trail)
+                children.append(replace(child, where=inner))
             else:
                 children.append(child)
         return replace(group, children=tuple(children))

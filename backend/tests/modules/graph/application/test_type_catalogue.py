@@ -10,7 +10,11 @@ from app.modules.graph.adapters.persistence.in_memory_node_repository import (
 from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
     InMemoryNodeTypeRepository,
 )
-from app.modules.graph.application.type_catalogue import load_node_types
+from app.modules.graph.application.type_catalogue import (
+    load_edge_types,
+    load_node_types,
+)
+from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
 
@@ -48,3 +52,17 @@ async def test_loads_an_exact_page_multiple() -> None:
 async def test_loads_nothing_when_there_are_no_types() -> None:
     """An empty catalogue yields an empty list."""
     assert await load_node_types(_repos(InMemoryNodeTypeRepository())) == []
+
+
+async def test_loads_every_relationship_type_across_several_pages() -> None:
+    """Relationship types are read a page at a time, and none is skipped."""
+    edge_types = InMemoryEdgeTypeRepository()
+    for i in range(250):
+        await edge_types.add(EdgeType.create(slug=f"rel-{i}", label=f"Rel {i}"))
+    repos = _repos(InMemoryNodeTypeRepository())
+    repos.edge_types = edge_types
+
+    loaded = await load_edge_types(repos)
+
+    assert len({t.id for t in loaded}) == 250
+    assert await load_edge_types(_repos(InMemoryNodeTypeRepository())) == []

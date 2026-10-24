@@ -5,7 +5,9 @@ A wrong operator or value for a field that does exist is a 400.
 """
 
 import re
-from collections.abc import Callable, Mapping
+import uuid
+from collections.abc import Callable, Collection, Mapping
+from dataclasses import dataclass
 from datetime import date
 from typing import Any, Final
 
@@ -17,16 +19,19 @@ from app.modules.graph.application.field_kinds import (
 )
 from app.modules.graph.application.schema_meta import NAMESPACE
 from app.modules.graph.domain.query import (
+    ConnectionCondition,
     DateCondition,
     FieldCondition,
     FieldKey,
     FieldReference,
     FieldResolution,
+    Group,
     InvalidQueryError,
     Money,
     Operand,
     Query,
     QueryWarning,
+    RelationshipInfo,
     RelativeDate,
     walk_conditions,
 )
@@ -258,3 +263,73 @@ def resolve_fields(query: Query, schemas: _Schemas) -> FieldResolution:
         if key.by == "field" and key.type and key.key:
             _resolve_sort(schemas, kinds, warnings, index, key.type, key.key)
     return FieldResolution(kinds=kinds, warnings=warnings, stale=frozenset(stale))
+
+
+@dataclass(frozen=True)
+class ConnectionReferences:
+    """The relationship slugs and target items connection conditions name."""
+
+    slugs: frozenset[str]
+    items: frozenset[uuid.UUID]
+
+
+@dataclass(frozen=True)
+class ConnectionResolution:
+    """Live relationships and visible target items, and what went stale."""
+
+    relationships: Mapping[str, RelationshipInfo]
+    visible_items: frozenset[uuid.UUID]
+    warnings: list[QueryWarning]
+
+
+def connection_references(group: Group | None) -> ConnectionReferences:
+    """Collect what every connection condition under `group` names."""
+    slugs: set[str] = set()
+    items: set[uuid.UUID] = set()
+    for _, condition in walk_conditions(group):
+        if isinstance(condition, ConnectionCondition):
+            if condition.relationship is not None:
+                slugs.add(condition.relationship)
+            if condition.item is not None:
+                items.add(condition.item)
+    return ConnectionReferences(slugs=frozenset(slugs), items=frozenset(items))
+
+
+def resolve_connections(
+    group: Group | None,
+    *,
+    directional: Mapping[str, bool],
+    visible: Collection[uuid.UUID],
+) -> ConnectionResolution:
+    """Check connection conditions against live relationship types and items.
+
+    `directional` maps each live relationship slug to its direction flag and
+    `visible` holds the target items that exist in scope. A condition naming
+    anything else warns and, being absent from the result, matches nothing.
+    """
+    relationships: dict[str, RelationshipInfo] = {}
+    seen: set[uuid.UUID] = set()
+    warnings: list[QueryWarning] = []
+    for path, condition in walk_conditions(group):
+        if not isinstance(condition, ConnectionCondition):
+            continue
+        slug = condition.relationship
+        if slug is not None:
+            if slug in directional:
+                relationships[slug] = RelationshipInfo(
+                    slug=slug, directional=directional[slug]
+                )
+            else:
+                warnings.append(
+                    QueryWarning(path, f"The relationship '{slug}' no longer exists.")
+                )
+        if condition.item is not None:
+            if condition.item in visible:
+                seen.add(condition.item)
+            else:
+                warnings.append(QueryWarning(path, "That item no longer exists."))
+    return ConnectionResolution(
+        relationships=relationships,
+        visible_items=frozenset(seen),
+        warnings=warnings,
+    )

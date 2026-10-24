@@ -14,7 +14,7 @@ import json
 import operator
 import sys
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, Literal
 
 from sqlalchemy import (
     Float,
@@ -37,8 +37,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql.elements import ColumnElement
+from sqlalchemy.sql.util import ClauseAdapter
 
-from app.modules.graph.adapters.persistence.models import NodeModel
+from app.modules.graph.adapters.persistence.models import EdgeModel, NodeModel
 from app.modules.graph.adapters.persistence.search_sql import (
     like_pattern,
     search_clause,
@@ -48,6 +49,7 @@ from app.modules.graph.domain.query import (
     COMPLEMENT_OPERATORS,
     CollectionCondition,
     Condition,
+    ConnectionCondition,
     Cursor,
     DateCondition,
     DescriptionCondition,
@@ -69,6 +71,7 @@ from app.modules.graph.domain.query import (
     TextCondition,
     TypeCondition,
 )
+from app.platform.orm_mixins import owned_by
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -419,6 +422,73 @@ def _collection(
     return any_of if condition.mode == "any" else not_(any_of)
 
 
+def _linked(
+    condition: ConnectionCondition,
+    side: Literal["out", "in"],
+    ctx: ResolvedQuery,
+    env: QueryEnv,
+) -> _Bool:
+    """A live connection at one end of the item to a live far item in scope.
+
+    `out` means the item is the edge's source. Correlated on `edges.source_id`
+    or `target_id` (both indexed); the far item is joined by primary key and
+    its filter is the main tree rebound to the far row.
+    """
+    near, far_id = (
+        (EdgeModel.source_id, EdgeModel.target_id)
+        if side == "out"
+        else (EdgeModel.target_id, EdgeModel.source_id)
+    )
+    scope = env.scope
+    tests: list[_Bool] = [
+        near == NodeModel.id,
+        EdgeModel.deleted_at.is_(None),
+        owned_by(EdgeModel, scope.user_id),
+    ]
+    if condition.relationship is not None:
+        tests.append(EdgeModel.type == condition.relationship)
+    if condition.mode == "to":
+        tests.append(far_id == condition.item)
+        return exists(select(literal(1)).select_from(EdgeModel).where(*tests))
+    far = NodeModel.__table__.alias()
+    tests += [
+        far.c.deleted_at.is_(None),
+        true() if scope.user_id is None else far.c.owner_id == scope.user_id,
+    ]
+    if condition.where is not None:
+        tests.append(ClauseAdapter(far).traverse(_group(condition.where, ctx, env)))
+    return exists(
+        select(literal(1))
+        .select_from(EdgeModel)
+        .join(far, far.c.id == far_id)
+        .where(*tests)
+    )
+
+
+def _connection(
+    condition: ConnectionCondition, ctx: ResolvedQuery, env: QueryEnv
+) -> _Bool:
+    """Exists, none or to; never NULL. A stale relationship or item is false.
+
+    `none` is the conjunction of one NOT EXISTS per end, which the planner turns
+    into anti-joins over the edge indexes.
+    """
+    slug = condition.relationship
+    info = None if slug is None else ctx.relationships.get(slug)
+    if slug is not None and info is None:
+        return false()
+    if condition.mode == "to" and condition.item not in ctx.visible_items:
+        return false()
+    either = condition.direction == "any" or (info is not None and not info.directional)
+    sides: tuple[Literal["out", "in"], ...] = ("out", "in")
+    if not either:
+        sides = ("out",) if condition.direction == "out" else ("in",)
+    found = [_linked(condition, side, ctx, env) for side in sides]
+    if condition.mode == "none":
+        return and_(*(not_(each) for each in found))
+    return or_(*found)
+
+
 def _item_condition(condition: Condition, ctx: ResolvedQuery, env: QueryEnv) -> _Bool:
     """Type, favourite, and the conditions that need other modules' data."""
     if isinstance(condition, TypeCondition):
@@ -429,6 +499,8 @@ def _item_condition(condition: Condition, ctx: ResolvedQuery, env: QueryEnv) -> 
         return _media(condition, env)
     if isinstance(condition, CollectionCondition):
         return _collection(condition, ctx, env)
+    if isinstance(condition, ConnectionCondition):
+        return _connection(condition, ctx, env)
     raise AssertionError(condition)
 
 
@@ -437,6 +509,7 @@ _ITEM_CONDITIONS = (
     FavouriteCondition,
     MediaCondition,
     CollectionCondition,
+    ConnectionCondition,
 )
 
 
