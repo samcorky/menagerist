@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 3,
+  "version": 6,
   "id": "games",
   "relationship_types": [
     {
@@ -1047,11 +1047,32 @@
       "ref": "still-to-try",
       "name": "Still to try",
       "description": "Owned but not properly played yet.",
-      "items": [
-        "slow-parcel-panic",
-        "cobbled-streets-the-canal-expansion",
-        "thornfield-heist"
-      ]
+      "definition": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "type",
+              "in": [
+                "games-game"
+              ]
+            },
+            {
+              "kind": "field",
+              "type": "games-game",
+              "key": "condition",
+              "op": "not_empty"
+            },
+            {
+              "kind": "connection",
+              "mode": "none",
+              "relationship": "games-played-at",
+              "direction": "out"
+            }
+          ]
+        }
+      }
     }
   ]
 }

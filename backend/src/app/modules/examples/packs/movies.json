@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 3,
+  "version": 6,
   "id": "movies",
   "relationship_types": [
     {
@@ -781,6 +781,31 @@
         "cold-harbour-poster",
         "quiet-hours-poster"
       ]
+    },
+    {
+      "ref": "no-poster-yet",
+      "name": "No poster yet",
+      "description": "Films without a poster in the collection.",
+      "definition": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "type",
+              "in": [
+                "movies-film"
+              ]
+            },
+            {
+              "kind": "connection",
+              "mode": "none",
+              "relationship": "movies-memorabilia-for",
+              "direction": "in"
+            }
+          ]
+        }
+      }
     }
   ]
 }

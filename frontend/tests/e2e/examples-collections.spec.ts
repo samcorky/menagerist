@@ -4,6 +4,7 @@ import {
 	FAMILY_NIGHT_ITEMS,
 	GAMES,
 	GAME_COLLECTIONS,
+	MOVIES,
 	collectionCard,
 	exampleData,
 	install,
@@ -160,4 +161,34 @@ test('reinstalling after keeping items adopts them instead of duplicating', asyn
 	}
 	await page.goto('/collections');
 	await expect(collectionCard(page, renamed)).toHaveCount(1);
+});
+
+test('a smart example collection lists its matching items, goes with the pack and returns', async ({
+	page
+}) => {
+	const open = async () => {
+		await page.goto('/collections');
+		const card = collectionCard(page, 'No poster yet');
+		await expect(card).toBeVisible();
+		await expect(card.getByText('Smart', { exact: true })).toBeVisible();
+		await expect(card.getByText('Example', { exact: true })).toBeVisible();
+		await expect(card).toContainText('2 items');
+		await card.click();
+		await expect(page.getByRole('heading', { name: 'No poster yet', level: 1 })).toBeVisible();
+		await expect(page.getByText('Smart', { exact: true })).toBeVisible();
+		await expect(page.getByText('2 items', { exact: true })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Marmalade' }).first()).toBeVisible();
+		await expect(page.getByRole('link', { name: 'The Night Bus Sessions' }).first()).toBeVisible();
+	};
+
+	await install(page, MOVIES);
+	await open();
+
+	await remove(page, MOVIES);
+	await page.goto('/collections');
+	await expect(page.getByRole('heading', { name: 'Collections', level: 1 })).toBeVisible();
+	await expect(collectionCard(page, 'No poster yet')).toHaveCount(0);
+
+	await install(page, MOVIES);
+	await open();
 });

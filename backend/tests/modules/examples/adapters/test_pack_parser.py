@@ -53,7 +53,7 @@ def _mutated(data: dict[str, Any], path: list[str | int], value: object) -> obje
 
 _BAD: list[tuple[list[str | int], object]] = [
     (["format"], "other"),
-    (["version"], 6),
+    (["version"], 7),
     (["surprise"], 1),
     (["items"], "nope"),
     (["items", 0], "nope"),
@@ -462,3 +462,141 @@ def test_older_packs_still_parse_unchanged(pack_data: dict[str, Any]) -> None:
     """Versions 1 to 3 have no requires."""
     for version in (1, 2, 3):
         assert parse_pack({**pack_data, "version": version}).requires == ()
+
+
+_RULE = {
+    "v": 1,
+    "where": {"op": "and", "children": [{"kind": "favourite", "value": True}]},
+}
+
+
+def _v6_with_definition(pack_data: dict[str, Any], **extra: Any) -> dict[str, Any]:  # noqa: ANN401
+    collection = {"ref": "smart", "name": "Smart", "definition": _RULE, **extra}
+    return {**pack_data, "version": 6, "collections": [collection]}
+
+
+def test_parses_a_v6_smart_collection(pack_data: dict[str, Any]) -> None:
+    """A version 6 collection may carry a definition instead of items."""
+    pack = parse_pack(_v6_with_definition(pack_data))
+
+    [collection] = pack.collections
+    assert collection.definition == _RULE
+    assert collection.item_refs == ()
+    assert pack.counts.collections == 1
+
+
+def test_a_v6_pack_still_takes_manual_collections(pack_data: dict[str, Any]) -> None:
+    """Items stay valid at version 6."""
+    data = {
+        **pack_data,
+        "version": 6,
+        "collections": [{"ref": "a", "name": "A", "items": ["a"]}],
+    }
+
+    assert parse_pack(data).collections[0].definition is None
+
+
+def test_a_definition_before_v6_is_rejected(pack_data: dict[str, Any]) -> None:
+    """`definition` needs version 6."""
+    data = _v6_with_definition(pack_data)
+    data["version"] = 5
+
+    with pytest.raises(InvalidPackError, match="definition"):
+        parse_pack(data)
+
+
+def test_a_collection_with_items_and_a_definition_is_rejected(
+    pack_data: dict[str, Any],
+) -> None:
+    """One or the other, never both."""
+    with pytest.raises(InvalidPackError, match="both items and a definition"):
+        parse_pack(_v6_with_definition(pack_data, items=["a"]))
+
+
+def test_a_collection_with_neither_is_rejected(pack_data: dict[str, Any]) -> None:
+    """A collection needs items or a definition."""
+    data = _v6_with_definition(pack_data)
+    del data["collections"][0]["definition"]
+
+    with pytest.raises(InvalidPackError, match="no items or definition"):
+        parse_pack(data)
+
+
+@pytest.mark.parametrize("definition", [[], "x", 3, None])
+def test_a_non_object_definition_is_rejected(
+    pack_data: dict[str, Any], definition: object
+) -> None:
+    """The definition must be an object."""
+    with pytest.raises(InvalidPackError, match="definition"):
+        parse_pack(_v6_with_definition(pack_data, definition=definition))
+
+
+def test_a_collection_condition_is_rejected_with_its_path(
+    pack_data: dict[str, Any],
+) -> None:
+    """A pack cannot name another collection: it would need an id."""
+    rule = {
+        "v": 1,
+        "where": {
+            "op": "and",
+            "children": [
+                {"kind": "favourite", "value": True},
+                {"op": "not", "children": [{"kind": "collection", "mode": "any"}]},
+            ],
+        },
+    }
+
+    with pytest.raises(
+        InvalidPackError,
+        match=r"'smart' definition at 'where\.children\[1\]\.children\[0\]': "
+        + "a collection condition",
+    ):
+        parse_pack(_v6_with_definition(pack_data, definition=rule))
+
+
+@pytest.mark.parametrize("mode", ["to", "exists"])
+def test_a_connection_to_one_item_is_rejected_with_its_path(
+    pack_data: dict[str, Any], mode: str
+) -> None:
+    """A connection `item` is an id, even in a far-end `where`."""
+    item = {"kind": "connection", "mode": mode, "item": "0190-not-portable"}
+    rule = {
+        "v": 1,
+        "where": {
+            "op": "and",
+            "children": [
+                {
+                    "kind": "connection",
+                    "mode": "exists",
+                    "where": {"op": "and", "children": [item]},
+                }
+            ],
+        },
+    }
+
+    with pytest.raises(
+        InvalidPackError, match=r"where\.children\[0\]\.where\.children\[0\].*one item"
+    ):
+        parse_pack(_v6_with_definition(pack_data, definition=rule))
+
+
+def test_portable_connection_conditions_are_accepted(
+    pack_data: dict[str, Any],
+) -> None:
+    """`exists` and `none` by relationship slug are allowed."""
+    rule = {
+        "v": 1,
+        "where": {
+            "op": "and",
+            "children": [
+                {
+                    "kind": "connection",
+                    "mode": "none",
+                    "relationship": "by",
+                    "direction": "out",
+                }
+            ],
+        },
+    }
+
+    assert parse_pack(_v6_with_definition(pack_data, definition=rule)).collections

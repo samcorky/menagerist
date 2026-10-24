@@ -1,13 +1,11 @@
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from app.modules.examples.domain.errors import InvalidPackError
 from app.modules.examples.domain.installation import EntityKind
 from app.shared_kernel.slug import slugify
-
-if TYPE_CHECKING:
-    from collections.abc import Mapping
 
 PRESET_MARKER = "$preset"
 MAX_PRESETS = 50
@@ -163,12 +161,17 @@ class PackLink:
 
 @dataclass(kw_only=True, frozen=True, eq=False)
 class PackCollection:
-    """A manual collection of pack items."""
+    """A collection: a manual list of pack items, or a smart one with a `definition`.
+
+    Exactly one of `item_refs` and `definition` is given. A definition is a query
+    tree that names only things a pack can name stably.
+    """
 
     ref: str
     name: str
     description: str | None = None
     item_refs: tuple[str, ...] = ()
+    definition: Mapping[str, Any] | None = None
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
@@ -388,8 +391,17 @@ class ExamplePack:
                     + f"1 to {_MAX_COLLECTION_NAME} characters"
                 )
             refs = collection.item_refs
+            if collection.definition is not None:
+                if refs:
+                    raise InvalidPackError(
+                        f"collection '{collection.ref}' has both items and a "
+                        + "definition"
+                    )
+                continue
             if not refs:
-                raise InvalidPackError(f"collection '{collection.ref}' has no items")
+                raise InvalidPackError(
+                    f"collection '{collection.ref}' has no items or definition"
+                )
             if len(set(refs)) != len(refs):
                 raise InvalidPackError(
                     f"collection '{collection.ref}' lists an item twice"

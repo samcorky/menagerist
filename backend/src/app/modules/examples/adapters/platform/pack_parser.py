@@ -22,8 +22,9 @@ INDEX_FORMAT = "menagerist-examples-index"
 PACK_FORMAT = "menagerist-example-pack"
 FORMAT_VERSION = 1
 # v2 adds the optional `collections` section; v3 adds an item type's `cover`;
-# v4 adds `requires` and `pack:ref` references; v5 adds top-level `links`.
-PACK_VERSIONS = (1, 2, 3, 4, 5)
+# v4 adds `requires` and `pack:ref` references; v5 adds top-level `links`;
+# v6 lets a collection carry a `definition` instead of `items`.
+PACK_VERSIONS = (1, 2, 3, 4, 5, 6)
 
 # Same rule as the domain's pack id; ids become file names, so keep it strict.
 PACK_ID = re.compile(r"^[a-z0-9][a-z0-9-]*\Z")
@@ -261,18 +262,62 @@ def _parse_link(c: Mapping[str, Any]) -> PackLink:
     )
 
 
-def _parse_collection(c: Mapping[str, Any]) -> PackCollection:
+def _unportable(node: object, path: str) -> tuple[str, str] | None:
+    """Return the path and reason of the first condition a pack cannot carry.
+
+    Walks the JSON generically: `examples` cannot import the graph query model.
+    A `collection` condition and a connection `item` name ids a pack cannot know.
+    """
+    if isinstance(node, dict):
+        reason = _unportable_reason(node)
+        if reason is not None:
+            return path, reason
+        children = [(f"{path}.{k}" if path else str(k), v) for k, v in node.items()]
+    elif isinstance(node, list):
+        children = [(f"{path}[{i}]", v) for i, v in enumerate(node)]
+    else:
+        return None
+    for child_path, child in children:
+        found = _unportable(child, child_path)
+        if found is not None:
+            return found
+    return None
+
+
+def _unportable_reason(node: dict[str, Any]) -> str | None:
+    kind = node.get("kind")
+    if kind == "collection":
+        return "a collection condition cannot be in a pack"
+    if kind == "connection" and "item" in node:
+        return "a connection to one item cannot be in a pack"
+    return None
+
+
+def _parse_definition(raw: object, ref: str) -> dict[str, Any]:
+    definition = _dict(raw, "definition")
+    found = _unportable(definition, "")
+    if found is not None:
+        path, reason = found
+        raise InvalidPackError(f"collection '{ref}' definition at '{path}': {reason}")
+    return definition
+
+
+def _parse_collection(c: Mapping[str, Any], version: int) -> PackCollection:
     _check_keys(
         c,
-        required={"ref", "name", "items"},
-        optional={"description"},
+        required={"ref", "name"},
+        optional={"description", "items"} | ({"definition"} if version >= 6 else set()),
         where="a collection",
     )
+    ref = _str(c["ref"], "ref")
     return PackCollection(
-        ref=_str(c["ref"], "ref"),
+        ref=ref,
         name=_str(c["name"], "name"),
         description=_opt_str(c.get("description"), "description"),
-        item_refs=tuple(_str(r, "item") for r in _array(c["items"], "items")),
+        item_refs=tuple(_str(r, "item") for r in _array(c.get("items", []), "items")),
+        definition=(
+            _parse_definition(c["definition"], ref) if "definition" in c else None
+        ),
     )
 
 
@@ -307,7 +352,10 @@ def parse_pack(data: object) -> ExamplePack:
         item_types=_parse_all(root, "item_types", _parse_item_type),
         items=_parse_all(root, "items", _parse_item),
         connections=_parse_all(root, "connections", _parse_connection),
-        collections=_parse_all(root, "collections", _parse_collection),
+        collections=tuple(
+            _parse_collection(raw, root["version"])
+            for raw in _section(root, "collections")
+        ),
         links=_parse_all(root, "links", _parse_link),
         requires=tuple(
             _str(r, "requires entry")

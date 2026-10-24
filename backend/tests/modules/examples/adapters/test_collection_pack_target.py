@@ -5,17 +5,25 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from app.entrypoints.api.shared.bridges import example_targets
+from app.entrypoints.api.shared.bridges.collection_definitions import (
+    GraphDefinitionChecker,
+)
 from app.entrypoints.api.shared.bridges.example_targets import (
     CollectionPackTarget,
     GraphPackTarget,
-    RejectingDefinitionChecker,
     build_in_memory_collections_repos,
     in_memory_collection_stores,
     in_memory_graph_stores,
 )
+from app.modules.collections.domain.collection import CollectionKind
+from app.modules.collections.domain.errors import InvalidDefinitionError
 from app.modules.examples.domain.installation import EntityKind
 from app.modules.examples.domain.pack import PackCollection
 from app.modules.examples.ports.pack_targets import RemoveResult
+from app.modules.graph.adapters.persistence.unit_of_work import (
+    build_in_memory_graph_repos,
+)
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ValidationError
 
@@ -190,7 +198,63 @@ async def test_the_graph_target_rejects_kinds_it_does_not_handle(
         await rig.graph.remove(kind, uuid.uuid7())
 
 
-async def test_the_install_checker_rejects_any_definition() -> None:
-    """A definition reaching the install checker is a bug: packs are manual only."""
-    with pytest.raises(RuntimeError, match="smart collections"):
-        await RejectingDefinitionChecker().check({"v": 1}, ContentFilter.everyone())
+_SMART = PackCollection(
+    ref="s",
+    name="Records",
+    definition={
+        "v": 1,
+        "where": {"op": "and", "children": [{"kind": "type", "in": ["demo-record"]}]},
+    },
+)
+
+
+async def test_a_smart_collection_is_stored_with_its_definition(
+    make_world: MakeWorld, sample_pack: SamplePack
+) -> None:
+    """The stored collection is dynamic, has no members and shows the definition."""
+    rig = await _rig(make_world, sample_pack)
+
+    created = await rig.target.create_collection(_SMART, item_ids=[])
+
+    stored = await rig.repos.collections.get(
+        created.entity_id, scope=ContentFilter.everyone()
+    )
+    assert stored is not None
+    assert stored.kind is CollectionKind.DYNAMIC
+    assert stored.definition == _SMART.definition
+    assert created.content == {
+        "name": "Records",
+        "description": None,
+        "members": [],
+        "definition": _SMART.definition,
+    }
+    inspection = await rig.target.inspect(created.entity_id)
+    assert inspection is not None
+    assert inspection.content == created.content
+
+
+async def test_a_definition_the_collections_check_refuses_creates_nothing(
+    make_world: MakeWorld, sample_pack: SamplePack
+) -> None:
+    """The install path validates as `POST /collection` does."""
+    rig = await _rig(make_world, sample_pack)
+    bad = PackCollection(ref="s", name="Bad", definition={"v": 1, "where": {"op": "x"}})
+
+    with pytest.raises(InvalidDefinitionError):
+        await rig.target.create_collection(bad, item_ids=[])
+
+    assert (
+        await rig.repos.collections.list(
+            scope=ContentFilter.everyone(), after=None, limit=10
+        )
+        == []
+    )
+
+
+async def test_the_install_checker_is_the_one_the_collection_routes_use() -> None:
+    """The placeholder that refused every definition is gone; the real one is used."""
+    assert not hasattr(example_targets, "RejectingDefinitionChecker")
+    repos = build_in_memory_graph_repos()
+    stores = in_memory_collection_stores(build_in_memory_collections_repos(), repos)
+    async with stores.checker() as checker:
+        assert type(checker) is GraphDefinitionChecker

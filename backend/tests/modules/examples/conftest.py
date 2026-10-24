@@ -1,7 +1,7 @@
 """Shared fixtures: a sample pack and an all-in-memory world to install it into."""
 
 import uuid
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -37,17 +37,8 @@ from app.modules.examples.domain.pack import (
 )
 from app.modules.examples.ports.pack_targets import Created, Inspection, RemoveResult
 from app.modules.examples.ports.unit_of_work import ExampleRepos
-from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
-    InMemoryEdgeRepository,
-)
-from app.modules.graph.adapters.persistence.in_memory_edge_type_repository import (
-    InMemoryEdgeTypeRepository,
-)
-from app.modules.graph.adapters.persistence.in_memory_node_repository import (
-    InMemoryNodeRepository,
-)
-from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
-    InMemoryNodeTypeRepository,
+from app.modules.graph.adapters.persistence.unit_of_work import (
+    build_in_memory_graph_repos,
 )
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.modules.media.adapters.imaging.in_memory_image_processor import (
@@ -97,6 +88,7 @@ class FakeCollection:
     name: str
     description: str | None
     members: list[uuid.UUID]
+    definition: Mapping[str, Any] | None = None
 
 
 class InMemoryCollectionTarget:
@@ -132,6 +124,7 @@ class InMemoryCollectionTarget:
             name=spec.name,
             description=spec.description,
             members=list(item_ids),
+            definition=spec.definition,
         )
         self.collections[coll.id] = coll
         return Created(entity_id=coll.id, content=_collection_content(coll))
@@ -150,11 +143,14 @@ class InMemoryCollectionTarget:
 
 
 def _collection_content(coll: FakeCollection) -> dict[str, Any]:
-    return {
+    content: dict[str, Any] = {
         "name": coll.name,
         "description": coll.description,
         "members": sorted(str(m) for m in coll.members),
     }
+    if coll.definition is not None:
+        content["definition"] = dict(coll.definition)
+    return content
 
 
 class WorldGraphTarget(GraphPackTarget):
@@ -316,12 +312,7 @@ def _sample_pack(pack_id: str = "demo") -> ExamplePack:
 
 def _make_world(*packs: ExamplePack, actor: Actor = USER_A) -> World:
     """Build a world with `packs` in the catalogue (the demo pack by default)."""
-    graph_repos = GraphRepos(
-        nodes=InMemoryNodeRepository(),
-        edges=InMemoryEdgeRepository(),
-        node_types=InMemoryNodeTypeRepository(),
-        edge_types=InMemoryEdgeTypeRepository(),
-    )
+    graph_repos = build_in_memory_graph_repos()
     preset_repos = PresetRepos(presets=InMemoryPresetRepository())
     media_assets = InMemoryMediaAssetRepository()
     media_repos = MediaRepos(

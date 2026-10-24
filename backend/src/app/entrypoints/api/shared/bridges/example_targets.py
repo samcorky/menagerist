@@ -15,6 +15,12 @@ from app.entrypoints.api.shared.bridges.attach_target_access import (
     GraphAttachTargetAccess,
 )
 from app.entrypoints.api.shared.bridges.choice_list_source import PresetChoiceListSource
+from app.entrypoints.api.shared.bridges.collection_conditions import (
+    build_search_graph_repos,
+)
+from app.entrypoints.api.shared.bridges.collection_definitions import (
+    GraphDefinitionChecker,
+)
 from app.entrypoints.api.shared.bridges.collection_items import GraphItemLookup
 from app.entrypoints.api.shared.bridges.preset_usage import GraphPresetUsage
 from app.entrypoints.api.shared.dependencies import get_current_actor
@@ -45,6 +51,7 @@ from app.modules.collections.application.purge_item_memberships import (
     PurgeItemMemberships,
     PurgeItemMembershipsCommand,
 )
+from app.modules.collections.ports.definition_checker import DefinitionChecker
 from app.modules.collections.ports.item_lookup import ItemLookup
 from app.modules.collections.ports.unit_of_work import (
     CollectionsRepos,
@@ -166,7 +173,6 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-    from app.modules.collections.domain.definition_warning import DefinitionWarning
     from app.modules.examples.ports.cover_renderer import CoverRenderer
     from app.shared_kernel.access_guard import AccessGuard
 
@@ -213,6 +219,7 @@ class CollectionStores:
     uow: Callable[[], CollectionsUnitOfWork]
     read: Callable[[], AbstractAsyncContextManager[CollectionsRepos]]
     items: Callable[[], AbstractAsyncContextManager[ItemLookup]]
+    checker: Callable[[], AbstractAsyncContextManager[DefinitionChecker]]
 
 
 @dataclass(kw_only=True)
@@ -299,10 +306,15 @@ def in_memory_collection_stores(
     async def items() -> AsyncIterator[ItemLookup]:
         yield GraphItemLookup(graph_repos)
 
+    @asynccontextmanager
+    async def checker() -> AsyncIterator[DefinitionChecker]:
+        yield GraphDefinitionChecker(graph_repos)
+
     return CollectionStores(
         uow=lambda: create_in_memory_collections_uow(collection_repos),
         read=read,
         items=items,
+        checker=checker,
     )
 
 
@@ -396,10 +408,17 @@ def build_collection_stores(
         async with session_factory() as session:
             yield GraphItemLookup(build_graph_repos(session))
 
+    @asynccontextmanager
+    async def checker() -> AsyncIterator[DefinitionChecker]:
+        # The same checker, over the same repositories, as `POST /collection`.
+        async with session_factory() as session:
+            yield GraphDefinitionChecker(build_search_graph_repos(session))
+
     return CollectionStores(
         uow=lambda: create_collections_uow(session_factory),
         read=read,
         items=items,
+        checker=checker,
     )
 
 
@@ -477,13 +496,19 @@ def _edge_content(e: Edge) -> dict[str, Any]:
 
 
 def _collection_content(
-    name: str, description: str | None, members: Sequence[uuid.UUID]
+    name: str,
+    description: str | None,
+    members: Sequence[uuid.UUID],
+    definition: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return {
+    content: dict[str, Any] = {
         "name": name,
         "description": description,
         "members": sorted(str(m) for m in members),
     }
+    if definition is not None:
+        content["definition"] = dict(definition)
+    return content
 
 
 # A cover's file is named "<item name> (<style>).png", which is how `inspect`
@@ -837,23 +862,6 @@ class GraphPackTarget:
         return RemoveResult.REMOVED
 
 
-class RejectingDefinitionChecker:
-    """`DefinitionChecker` for installs, which never give a collection a definition.
-
-    Packs only create manual collections, so any use of this is a bug.
-    """
-
-    async def check(
-        self,
-        definition: Mapping[str, Any],
-        scope: ContentFilter,
-        *,
-        self_id: uuid.UUID | None = None,
-    ) -> list[DefinitionWarning]:
-        """Always raise: no definition is expected here."""
-        raise RuntimeError("Example packs do not create smart collections.")
-
-
 class CollectionPackTarget:
     """Implements `CollectionTarget` with the collections use cases, run as `actor`."""
 
@@ -873,22 +881,30 @@ class CollectionPackTarget:
         self, spec: PackCollection, *, item_ids: Sequence[uuid.UUID]
     ) -> Created:
         """Create the collection, put the items on it and return what was stored."""
-        collection = await CreateCollection(
-            self._stores.uow(), self._access, RejectingDefinitionChecker()
-        ).handle(
-            CreateCollectionCommand(name=spec.name, description=spec.description),
-            self._actor,
-        )
-        try:
-            async with self._stores.items() as items:
-                await AddItemsToCollection(
-                    self._stores.uow(), self._access, items
-                ).handle(
-                    AddItemsToCollectionCommand(
-                        collection_id=collection.id, item_ids=list(item_ids)
+        async with self._stores.checker() as checker:
+            collection = await CreateCollection(
+                self._stores.uow(), self._access, checker
+            ).handle(
+                CreateCollectionCommand(
+                    name=spec.name,
+                    description=spec.description,
+                    definition=(
+                        None if spec.definition is None else dict(spec.definition)
                     ),
-                    self._actor,
-                )
+                ),
+                self._actor,
+            )
+        try:
+            if spec.definition is None:
+                async with self._stores.items() as items:
+                    await AddItemsToCollection(
+                        self._stores.uow(), self._access, items
+                    ).handle(
+                        AddItemsToCollectionCommand(
+                            collection_id=collection.id, item_ids=list(item_ids)
+                        ),
+                        self._actor,
+                    )
             inspection = await self.inspect(collection.id)
         except Exception:
             # Not yet recorded by the install, so it would be orphaned.
@@ -912,7 +928,10 @@ class CollectionPackTarget:
             live = await items.live_ids(list(stored), self._scope)
         return Inspection(
             content=_collection_content(
-                collection.name, collection.description, list(live)
+                collection.name,
+                collection.description,
+                list(live),
+                collection.definition,
             )
         )
 

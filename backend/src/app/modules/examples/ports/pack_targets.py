@@ -123,6 +123,7 @@ class CollectionTarget(Protocol):
     For a collection, `Created.content` and `Inspection.content` are
     `{"name": ..., "description": ..., "members": [sorted UUID strings]}`, so the
     hash notices a rename, a description change and any change in membership.
+    A smart collection also has `"definition"` (as stored) and no members.
     `Inspection.has_user_data` and `still_in_use` stay false: a changed membership
     already counts as an edit.
     """
@@ -130,7 +131,10 @@ class CollectionTarget(Protocol):
     async def create_collection(
         self, spec: PackCollection, *, item_ids: Sequence[uuid.UUID]
     ) -> Created:
-        """Create the collection holding the created items `item_ids`, in order."""
+        """Create the collection holding the created items `item_ids`, in order.
+
+        A spec with a `definition` makes a smart collection and `item_ids` is empty.
+        """
         ...
 
     async def inspect(self, collection_id: uuid.UUID) -> Inspection | None:

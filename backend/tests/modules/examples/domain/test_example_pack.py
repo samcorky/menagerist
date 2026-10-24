@@ -238,6 +238,23 @@ def test_a_pack_counts_its_collections() -> None:
     assert _pack().counts.collections == 0
 
 
+def test_a_smart_collection_is_counted_and_needs_no_items() -> None:
+    """A definition stands in for items; both or neither is refused."""
+    smart = PackCollection(ref="s", name="S", definition={"v": 1})
+
+    assert _pack(collections=(smart,)).counts.collections == 1
+    with pytest.raises(InvalidPackError, match="both items and a definition"):
+        _pack(
+            collections=(
+                PackCollection(
+                    ref="s", name="S", item_refs=("a",), definition={"v": 1}
+                ),
+            )
+        )
+    with pytest.raises(InvalidPackError, match="no items or definition"):
+        _pack(collections=(PackCollection(ref="s", name="S"),))
+
+
 def _collection(**overrides: object) -> PackCollection:
     base: dict[str, object] = {"ref": "both", "name": "Both", "item_refs": ("a", "b")}
     base.update(overrides)

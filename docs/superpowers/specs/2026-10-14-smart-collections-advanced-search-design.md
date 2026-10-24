@@ -1,6 +1,6 @@
 # Smart collections and advanced search
 
-Status: phase 1, 1b and 2 implemented (`docs/superpowers/plans/2026-10-14-query-engine-advanced-search.md`, `docs/superpowers/plans/2026-10-16-smart-collections.md`); 2b, 2c and 3 implemented (phase 3 on 2026-10-24, see DECISIONS); 4 not started.
+Status: phase 1, 1b and 2 implemented (`docs/superpowers/plans/2026-10-14-query-engine-advanced-search.md`, `docs/superpowers/plans/2026-10-16-smart-collections.md`); 2b, 2c and 3 implemented (phase 3 on 2026-10-24, see DECISIONS); 4 backend implemented on 2026-10-24 (pack format 6; *Still to try* and the new *No poster yet* are smart; *Running low* and *Games for two* stay manual, see DECISIONS).
 
 ## Goal
 

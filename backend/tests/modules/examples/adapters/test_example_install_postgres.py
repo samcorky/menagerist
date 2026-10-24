@@ -508,6 +508,148 @@ def test_an_add_on_connects_to_its_base_and_blocks_its_removal(
     assert c.get("/api/v1/node?limit=100").json() == []
 
 
+_UNMADE = {
+    "v": 1,
+    "where": {
+        "op": "and",
+        "children": [
+            {"kind": "type", "in": ["thing"]},
+            {
+                "kind": "connection",
+                "mode": "none",
+                "relationship": "by",
+                "direction": "in",
+            },
+        ],
+    },
+}
+
+
+@pytest.fixture
+def smart_client(
+    postgres_url: str, postgres_sync_url: str, tmp_path: Path
+) -> Iterator[TestClient]:
+    """Like `client`, over a pack with a smart collection and one with a bad one."""
+    base: dict[str, Any] = {
+        "format": "menagerist-example-pack",
+        "version": 6,
+        "relationship_types": [
+            {"ref": "by", "slug": "by", "label": "By", "reverse_label": "Made"}
+        ],
+        "item_types": [{"ref": "thing", "slug": "thing", "label": "Thing"}],
+        "items": [
+            {"ref": "a", "type": "thing", "name": "A"},
+            {"ref": "b", "type": "thing", "name": "B"},
+            {"ref": "c", "type": "thing", "name": "C"},
+        ],
+        "connections": [{"from": "a", "to": "b", "type": "by"}],
+    }
+    packs = {
+        "smart": {
+            **base,
+            "id": "smart",
+            "collections": [
+                {"ref": "m", "name": "Manual", "items": ["a"]},
+                {"ref": "u", "name": "Unmade", "definition": _UNMADE},
+            ],
+        },
+        "badsmart": {
+            **base,
+            "id": "badsmart",
+            "collections": [
+                {"ref": "m", "name": "Manual", "items": ["a"]},
+                {
+                    "ref": "u",
+                    "name": "Bad",
+                    "definition": {"v": 1, "where": {"op": "x"}},
+                },
+            ],
+        },
+    }
+    index = {
+        "format": "menagerist-examples-index",
+        "version": 1,
+        "packs": [
+            {"id": "smart", "name": "Smart", "description": "A smart collection."},
+            {"id": "badsmart", "name": "Bad", "description": "A refused definition."},
+        ],
+    }
+    for pack_id, data in packs.items():
+        (tmp_path / f"{pack_id}.json").write_text(json.dumps(data), encoding="utf-8")
+    (tmp_path / "index.json").write_text(json.dumps(index), encoding="utf-8")
+    get_session_factory.cache_clear()
+    get_engine.cache_clear()
+    app = create_app()
+    app.dependency_overrides[get_current_actor] = lambda: MEMBER
+    app.dependency_overrides[get_pack_catalogue] = lambda: FilePackCatalogue(tmp_path)
+    try:
+        with TestClient(app) as c:
+            yield c
+    finally:
+        get_session_factory.cache_clear()
+        get_engine.cache_clear()
+        _wipe(postgres_sync_url)
+
+
+def _collections(c: TestClient) -> dict[str, Any]:
+    return {x["name"]: x for x in c.get("/api/v1/collection").json()}
+
+
+def test_a_pack_smart_collection_is_validated_stored_and_counted_on_postgres(
+    smart_client: TestClient,
+) -> None:
+    """Installed through the real checker, it is dynamic and matches the right items."""
+    c = smart_client
+
+    first = c.put("/api/v1/example/smart/installation")
+
+    assert first.status_code == 200, first.text
+    assert first.json()["created"]["collections"] == 2
+    found = _collections(c)
+    assert found["Unmade"]["kind"] == "dynamic"
+    assert found["Unmade"]["definition"] == _UNMADE
+    assert (found["Unmade"]["item_count"], found["Unmade"]["warnings"]) == (2, [])
+    assert found["Manual"]["kind"] == "manual"
+    # A second install is refused and changes nothing.
+    assert c.put("/api/v1/example/smart/installation").status_code == 409
+    assert len(_collections(c)) == 2
+
+
+def test_a_pack_smart_collection_is_removed_and_comes_back_on_postgres(
+    smart_client: TestClient, postgres_sync_url: str
+) -> None:
+    """Uninstall leaves no collection rows; reinstalling makes a fresh smart one."""
+    c = smart_client
+    assert c.put("/api/v1/example/smart/installation").status_code == 200
+    first_id = _collections(c)["Unmade"]["id"]
+
+    removed = c.delete("/api/v1/example/smart/installation")
+
+    assert removed.status_code == 200, removed.text
+    assert removed.json()["kept"] == []
+    assert _collections(c) == {}
+    assert _row_counts(postgres_sync_url)["collections"] == 0
+    assert c.put("/api/v1/example/smart/installation").status_code == 200
+    again = _collections(c)["Unmade"]
+    assert again["id"] != first_id
+    assert again["item_count"] == 2
+
+
+def test_a_refused_pack_definition_rolls_the_whole_install_back_on_postgres(
+    smart_client: TestClient, postgres_sync_url: str
+) -> None:
+    """A definition the collections check refuses leaves no rows behind."""
+    c = smart_client
+
+    with pytest.raises(InstallFailedError, match="Nothing was left behind"):
+        c.put("/api/v1/example/badsmart/installation")
+
+    assert c.get("/api/v1/node?limit=100").json() == []
+    assert c.get("/api/v1/node-type").json() == []
+    assert _collections(c) == {}
+    assert _row_counts(postgres_sync_url)["collections"] == 0
+
+
 @pytest.fixture
 def shipped_client(
     postgres_url: str, postgres_sync_url: str, media_dir: Path
@@ -562,3 +704,27 @@ def test_the_shipped_games_extras_add_on_end_to_end(
     assert c.get("/api/v1/node?limit=200").json() == []
     assert c.get("/api/v1/edge?limit=200").json() == []
     assert _media_state(postgres_sync_url, media_dir) == (0, 0, 0)
+
+
+def test_the_shipped_smart_collections_match_the_pack_data_on_postgres(
+    shipped_client: TestClient,
+) -> None:
+    """Still to try and No poster yet count on Postgres as the pack data implies."""
+    c = shipped_client
+    assert c.put("/api/v1/example/games/installation").status_code == 200
+    assert c.put("/api/v1/example/movies/installation").status_code == 200
+
+    found = _collections(c)
+
+    assert (found["Still to try"]["kind"], found["Still to try"]["item_count"]) == (
+        "dynamic",
+        3,
+    )
+    assert (found["No poster yet"]["kind"], found["No poster yet"]["item_count"]) == (
+        "dynamic",
+        2,
+    )
+    assert found["Still to try"]["warnings"] == []
+    assert found["No poster yet"]["warnings"] == []
+    assert c.delete("/api/v1/example/games/installation").json()["kept"] == []
+    assert c.delete("/api/v1/example/movies/installation").json()["kept"] == []
