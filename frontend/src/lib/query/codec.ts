@@ -6,6 +6,7 @@ import {
 	MAX_SORT_KEYS,
 	MAX_TEXT_LENGTH,
 	type Condition,
+	type ConnectionCondition,
 	type Group,
 	type Node,
 	type Operand,
@@ -198,6 +199,40 @@ function textCondition(data: Rec): Condition | null {
 	return value === null ? null : ({ kind, op, value } as Condition);
 }
 
+/**
+ * A connection's far-end filter is parsed with its own depth, and may not hold another
+ * connection (the server's rule). Its conditions share the budget of the whole query.
+ */
+function connectionCondition(data: Rec, budget: Budget, farEnd: boolean): Condition | null {
+	if (farEnd) return null;
+	const { mode } = data;
+	if (mode !== 'exists' && mode !== 'none' && mode !== 'to') return null;
+	const out: ConnectionCondition = { kind: 'connection', mode };
+	if (data.direction !== undefined) {
+		if (data.direction !== 'out' && data.direction !== 'in' && data.direction !== 'any')
+			return null;
+		out.direction = data.direction;
+	}
+	if (data.relationship !== undefined && data.relationship !== null) {
+		const relationship = str(data.relationship);
+		if (relationship === null) return null;
+		out.relationship = relationship;
+	}
+	const hasWhere = data.where !== undefined && data.where !== null;
+	if (mode === 'to') {
+		if (hasWhere || typeof data.item !== 'string' || !UUID.test(data.item)) return null;
+		out.item = data.item;
+		return out;
+	}
+	if (data.item !== undefined && data.item !== null) return null;
+	if (hasWhere) {
+		const where = group(data.where, 1, budget, true);
+		if (where === null) return null;
+		out.where = where;
+	}
+	return out;
+}
+
 function condition(data: Rec): Condition | null {
 	switch (data.kind) {
 		case 'text': {
@@ -269,7 +304,9 @@ function sortKey(data: unknown): SortKey | null {
  * Rebuilds a validated copy of a group, or returns null. Recursion is bounded
  * by MAX_DEPTH, which is checked before descending, so hostile input is safe.
  */
-function group(data: unknown, depth: number, budget: { conditions: number }): Group | null {
+type Budget = { conditions: number };
+
+function group(data: unknown, depth: number, budget: Budget, farEnd = false): Group | null {
 	if (depth > MAX_DEPTH || !isRec(data)) return null;
 	const op = data.op;
 	if (op !== 'and' && op !== 'or' && op !== 'not') return null;
@@ -281,9 +318,10 @@ function group(data: unknown, depth: number, budget: { conditions: number }): Gr
 		let child: Node | null;
 		if ('kind' in item) {
 			if (++budget.conditions > MAX_CONDITIONS) return null;
-			child = condition(item);
+			child =
+				item.kind === 'connection' ? connectionCondition(item, budget, farEnd) : condition(item);
 		} else {
-			child = group(item, depth + 1, budget);
+			child = group(item, depth + 1, budget, farEnd);
 		}
 		if (child === null) return null;
 		children.push(child);

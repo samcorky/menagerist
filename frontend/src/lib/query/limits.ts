@@ -1,5 +1,6 @@
 import { countConditions } from './tree';
 import {
+	FAR_END,
 	isGroup,
 	MAX_CONDITIONS,
 	MAX_DEPTH,
@@ -12,16 +13,25 @@ import {
 
 export { MAX_CONDITIONS, MAX_DEPTH, MAX_SORT_KEYS, MAX_TEXT_LENGTH };
 
-/** Depth of the group at `groupPath`; the root group is 1. */
+/** Depth of the group at `groupPath`; the root group is 1, and so is a far-end filter's. */
 export function groupDepthAt(groupPath: Path): number {
-	return groupPath.length + 1;
+	return groupPath.length - groupPath.lastIndexOf(FAR_END);
 }
 
+/** Each far-end filter is measured from its own root, as the server does. */
 function treeDepth(group: Group): number {
 	let deepest = 0;
-	for (const child of group.children)
+	for (const child of group.children) {
 		if (isGroup(child)) deepest = Math.max(deepest, treeDepth(child));
+		else if (child.kind === 'connection' && child.where)
+			deepest = Math.max(deepest, treeDepth(child.where) - 1);
+	}
 	return deepest + 1;
+}
+
+/** A connection cannot sit inside another connection's far-end filter. */
+export function canNestConnection(path: Path): boolean {
+	return !path.includes(FAR_END);
 }
 
 export function canAddCondition(query: Query): boolean {

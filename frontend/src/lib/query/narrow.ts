@@ -125,8 +125,8 @@ export function narrowedMarks(
 	adhoc: Query,
 	basics: NarrowBasics
 ): WarningMarks {
-	const marks: WarningMarks = { conditions: new Set(), sort: false };
-	for (const { path } of warnings) {
+	const marks: WarningMarks = { conditions: new Set(), messages: new Map(), sort: false };
+	for (const { path, message } of warnings) {
 		const target = parseQueryPath(path);
 		if (!target) continue;
 		if ('sort' in target) {
@@ -134,7 +134,10 @@ export function narrowedMarks(
 			continue;
 		}
 		const at = locateInCombined(target.where, saved, adhoc, basics);
-		if (at?.part === 'adhoc') marks.conditions.add(pathKey(at.path));
+		if (at?.part !== 'adhoc') continue;
+		marks.conditions.add(pathKey(at.path));
+		if (message && !marks.messages.has(pathKey(at.path)))
+			marks.messages.set(pathKey(at.path), message);
 	}
 	return marks;
 }

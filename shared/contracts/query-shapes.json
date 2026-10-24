@@ -1926,6 +1926,233 @@
         },
         "sort": []
       }
+    },
+    {
+      "name": "connection exists",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection none",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "none"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection exists by relationship and direction",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "relationship": "directed-by",
+              "direction": "out"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection direction in",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "none",
+              "relationship": "directed-by",
+              "direction": "in"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection direction any",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "direction": "any"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection to an item",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "to",
+              "item": "018f5c2e-7b1a-7c3e-9d4f-1a2b3c4d5e6f"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection to an item by relationship",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "to",
+              "item": "018f5c2e-7b1a-7c3e-9d4f-1a2b3c4d5e6f",
+              "relationship": "directed-by",
+              "direction": "in"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection with null optional parts",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "relationship": null,
+              "item": null,
+              "where": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection exists with a far-end filter",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "where": {
+                "op": "and",
+                "children": [
+                  {
+                    "kind": "favourite",
+                    "value": true
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection none with a far-end group",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "none",
+              "where": {
+                "op": "or",
+                "children": [
+                  {
+                    "kind": "favourite",
+                    "value": true
+                  },
+                  {
+                    "op": "not",
+                    "children": [
+                      {
+                        "kind": "text",
+                        "q": "x"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection far-end filter with a collection",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "where": {
+                "op": "and",
+                "children": [
+                  {
+                    "kind": "collection",
+                    "mode": "any",
+                    "in": [
+                      "018f5c2e-7b1a-7c3e-9d4f-1a2b3c4d5e6f"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
     }
   ],
   "invalid": [
@@ -6507,6 +6734,334 @@
               "in": [
                 5
               ]
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection mode is missing",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection mode unknown",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "some"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection direction unknown",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "direction": "up"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection direction is null",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "direction": null
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection relationship is empty",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "relationship": ""
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection relationship is a number",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "relationship": 3
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection to without an item",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "to"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection to with a bad item",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "to",
+              "item": "nope"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection to with a far-end filter",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "to",
+              "item": "018f5c2e-7b1a-7c3e-9d4f-1a2b3c4d5e6f",
+              "where": {
+                "op": "and",
+                "children": [
+                  {
+                    "kind": "favourite",
+                    "value": true
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection exists with an item",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "item": "018f5c2e-7b1a-7c3e-9d4f-1a2b3c4d5e6f"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection none with an item",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "none",
+              "item": "018f5c2e-7b1a-7c3e-9d4f-1a2b3c4d5e6f"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection where is a condition",
+      "path": "where.children[0].where",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "where": {
+                "kind": "favourite",
+                "value": true
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection where is empty",
+      "path": "where.children[0].where",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "where": {
+                "op": "and",
+                "children": []
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection inside a far-end filter",
+      "path": "where.children[0].where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "where": {
+                "op": "and",
+                "children": [
+                  {
+                    "kind": "connection",
+                    "mode": "exists"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection in a group in a far-end filter",
+      "path": "where.children[0].where.children[0].children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "where": {
+                "op": "and",
+                "children": [
+                  {
+                    "op": "or",
+                    "children": [
+                      {
+                        "kind": "connection",
+                        "mode": "none"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection far-end condition is malformed",
+      "path": "where.children[0].where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "where": {
+                "op": "and",
+                "children": [
+                  {
+                    "kind": "text",
+                    "q": ""
+                  }
+                ]
+              }
             }
           ]
         },

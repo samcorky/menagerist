@@ -32,6 +32,7 @@
 	import QueryChips from '$lib/components/query-chips.svelte';
 	import SaveSmartCollectionDialog from '$lib/components/save-smart-collection-dialog.svelte';
 	import { conditionNumbers, queryKey, type BuilderError } from '$lib/query/builder';
+	import { ConnectionLookups } from '$lib/query/connection-lookups.svelte';
 	import { buildCatalogue, summaryLookup } from '$lib/query/fields';
 	import {
 		combinePrefix,
@@ -91,7 +92,7 @@
 	let cursor = $state<string | null>(null);
 	let total = $state<number | null>(null);
 	let totalCapped = $state(false);
-	let marks = $state<WarningMarks>({ conditions: new Set(), sort: false });
+	let marks = $state<WarningMarks>({ conditions: new Set(), messages: new Map(), sort: false });
 	let filterError = $state<BuilderError | null>(null);
 	let tooMany = $state(false);
 	let filtersOpen = $state(false);
@@ -144,7 +145,11 @@
 		totalLine(total, totalCapped, { loading, appending: loading && items.length > 0 })
 	);
 	const catalogue = $derived(buildCatalogue(allCategories, categoriesLoaded, itemFields));
-	const lookup = $derived(summaryLookup(catalogue, collectionNameLookup(allCollections)));
+	const connections = new ConnectionLookups();
+	const lookup = $derived(
+		summaryLookup(catalogue, collectionNameLookup(allCollections), connections.summary)
+	);
+	$effect(() => connections.ensureFor(filter));
 	const filterErrorText = $derived.by(() => {
 		if (!filterError) return '';
 		const n = filterError.path
@@ -535,6 +540,7 @@
 					query={filter}
 					{lookup}
 					warned={marks.conditions}
+					warnedMessages={marks.messages}
 					{catalogue}
 					onopen={(path) => openFilters(path)}
 					onremove={removeFilter}
@@ -724,7 +730,9 @@
 	collections={allCollections}
 	{collectionsFailed}
 	onretrycollections={() => void loadCollections()}
+	{connections}
 	warned={marks.conditions}
+	warnedMessages={marks.messages}
 	sortWarned={marks.sort}
 	error={filterError}
 	notice={tooMany ? TOO_MANY_MESSAGE : null}

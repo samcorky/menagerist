@@ -3,6 +3,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Combobox from '$lib/components/ui/combobox/index.js';
 	import * as NativeSelect from '$lib/components/ui/native-select/index.js';
+	import QueryConnectionInput from '$lib/components/query-connection-input.svelte';
 	import QueryValueInput from '$lib/components/query-value-input.svelte';
 	import {
 		conditionProblem,
@@ -15,6 +16,8 @@
 		operatorLabel,
 		ARCHIVED_FIELD_MESSAGE,
 		COLLECTION_MODES,
+		CONNECTION_MODES,
+		withConnectionMode,
 		fieldStatus,
 		itemFieldPickerItems,
 		missingFieldMessage,
@@ -66,6 +69,8 @@
 			items.push({ value: subject, label: `${label}${suffix}` });
 		}
 		for (const general of GENERAL_SUBJECTS) {
+			// A connection cannot sit inside another connection's filter on the linked item.
+			if (general.value === 'connection' && !view.canNestConnection(path)) continue;
 			items.push({ value: general.value, label: general.label, group: general.group });
 		}
 		for (const group of fieldGroups) {
@@ -94,11 +99,29 @@
 			view.collections !== null &&
 			condition.in.some((id) => !view.collections?.some((c) => c.id === id))
 	);
+	// A relationship that is not among the loaded ones: known as soon as they are in.
+	const goneRelationship = $derived(
+		condition.kind === 'connection' &&
+			condition.relationship !== undefined &&
+			view.relationships !== null &&
+			!view.relationships.some((r) => r.slug === condition.relationship)
+	);
 	const warned = $derived(
-		view.warned.has(key) || status === 'missing' || status === 'archived' || goneCollection
+		view.warned.has(key) ||
+			status === 'missing' ||
+			status === 'archived' ||
+			goneCollection ||
+			goneRelationship
 	);
 	const warning = $derived(
-		status === 'archived' ? ARCHIVED_FIELD_MESSAGE : missingFieldMessage(condition)
+		status === 'archived'
+			? ARCHIVED_FIELD_MESSAGE
+			: condition.kind === 'connection'
+				? (view.warningMessages.get(key) ??
+					(goneRelationship
+						? `The relationship '${condition.relationship}' no longer exists.`
+						: missingFieldMessage(condition)))
+				: missingFieldMessage(condition)
 	);
 	const problem = $derived(
 		isBlank(condition) || status === 'loading' ? null : conditionProblem(condition, view.catalogue)
@@ -115,6 +138,7 @@
 		if (condition.kind === 'tag') return TAG_MODES.map((m) => ({ ...m }));
 		if (condition.kind === 'media') return MEDIA_MODES.map((m) => ({ ...m }));
 		if (condition.kind === 'collection') return COLLECTION_MODES.map((m) => ({ ...m }));
+		if (condition.kind === 'connection') return CONNECTION_MODES.map((m) => ({ ...m }));
 		if (condition.kind === 'description' || condition.kind === 'name') {
 			return operatorsForCondition(condition.kind).map((op) => ({
 				value: op,
@@ -136,7 +160,10 @@
 		return [{ value: condition.op, label: unsuitable }, ...options];
 	});
 	const operatorValue = $derived(
-		condition.kind === 'tag' || condition.kind === 'media' || condition.kind === 'collection'
+		condition.kind === 'tag' ||
+			condition.kind === 'media' ||
+			condition.kind === 'collection' ||
+			condition.kind === 'connection'
 			? condition.mode
 			: 'op' in condition
 				? condition.op
@@ -164,6 +191,11 @@
 			view.update(path, withMediaMode(condition, value === 'none' ? 'none' : 'has'));
 		} else if (condition.kind === 'collection') {
 			view.update(path, withCollectionMode(condition, value === 'none' ? 'none' : 'any'));
+		} else if (condition.kind === 'connection') {
+			view.update(
+				path,
+				withConnectionMode(condition, value === 'none' ? 'none' : value === 'to' ? 'to' : 'exists')
+			);
 		} else view.update(path, withOperator(condition, value, view.catalogue));
 	}
 </script>
@@ -217,12 +249,22 @@
 		<p class="mt-2 text-sm text-muted-foreground sm:pl-8">Loading fields…</p>
 	{:else if !isBlank(condition)}
 		<div class="mt-2 sm:pl-8">
-			<QueryValueInput
-				{condition}
-				{name}
-				{view}
-				onchange={(next, debounce) => view.update(path, next, { debounce })}
-			/>
+			{#if condition.kind === 'connection'}
+				<QueryConnectionInput
+					{condition}
+					{path}
+					{name}
+					{view}
+					onchange={(next) => view.update(path, next)}
+				/>
+			{:else}
+				<QueryValueInput
+					{condition}
+					{name}
+					{view}
+					onchange={(next, debounce) => view.update(path, next, { debounce })}
+				/>
+			{/if}
 		</div>
 	{/if}
 

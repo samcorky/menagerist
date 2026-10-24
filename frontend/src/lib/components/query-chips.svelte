@@ -10,6 +10,7 @@
 		query,
 		lookup,
 		warned = new Set<string>(),
+		warnedMessages = new Map<string, string>(),
 		catalogue,
 		onopen,
 		onremove,
@@ -18,6 +19,8 @@
 		query: Query;
 		lookup: SummaryLookup;
 		warned?: ReadonlySet<string>;
+		/** The server's words for flagged conditions, by the same keys. */
+		warnedMessages?: ReadonlyMap<string, string>;
 		/** Lets chips for per-item fields that no item has be flagged too. */
 		catalogue?: Catalogue;
 		/** Open the panel at a row. */
@@ -29,7 +32,7 @@
 	const allWarned = $derived(
 		catalogue ? new Set([...warned, ...missingItemFieldPaths(query, catalogue)]) : warned
 	);
-	const model = $derived(chipModels(query, lookup, allWarned));
+	const model = $derived(chipModels(query, lookup, allWarned, warnedMessages));
 	const notes = $derived([...new Set(model.chips.flatMap((c) => (c.message ? [c.message] : [])))]);
 	const noteId = $props.id();
 </script>

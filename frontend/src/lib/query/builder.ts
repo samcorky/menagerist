@@ -21,6 +21,7 @@ import {
 import { describeCondition, type SummaryLookup } from './summary';
 import { pathKey } from './warnings';
 import {
+	FAR_END,
 	isGroup,
 	MAX_COLLECTION_IDS,
 	MAX_TEXT_LENGTH,
@@ -55,6 +56,7 @@ export type Subject =
 	| 'created'
 	| 'updated'
 	| 'collection'
+	| 'connection'
 	| 'media'
 	| 'name'
 	| 'description';
@@ -67,6 +69,7 @@ const SUBJECT_LABELS: Record<Exclude<Subject, 'blank'>, string> = {
 	updated: 'Changed',
 	text: 'Text',
 	collection: 'In collection',
+	connection: 'Connection',
 	media: 'Media',
 	name: 'Name',
 	description: 'Description'
@@ -74,6 +77,7 @@ const SUBJECT_LABELS: Record<Exclude<Subject, 'blank'>, string> = {
 
 const CONTENT_SUBJECTS: ReadonlySet<string> = new Set([
 	'collection',
+	'connection',
 	'media',
 	'name',
 	'description'
@@ -158,6 +162,8 @@ export function conditionFor(subject: string, catalogue: Catalogue): Condition {
 			return { kind: 'media', mode: 'has' };
 		case 'collection':
 			return { kind: 'collection', mode: 'any', in: [] };
+		case 'connection':
+			return { kind: 'connection', mode: 'exists' };
 		case 'created':
 		case 'updated':
 			return { kind: 'date', on: subject, op: '>=', value: LAST_30_DAYS };
@@ -245,6 +251,87 @@ export function withMediaType(c: Condition, type: MediaType | null): Condition {
 	if (c.kind !== 'media') return c;
 	const { type: _old, ...rest } = c;
 	return type === null ? rest : { ...rest, type };
+}
+
+export const CONNECTION_MODES = [
+	{ value: 'exists', label: 'Has a connection' },
+	{ value: 'none', label: 'Has no connection' },
+	{ value: 'to', label: 'Is connected to' }
+] as const;
+
+export const ANY_RELATIONSHIP_LABEL = 'Any relationship';
+
+/** The relationship types a connection row can name (the fields of an edge type it needs). */
+export type RelationshipChoice = {
+	slug: string;
+	label: string;
+	reverse_label: string | null;
+	directional: boolean;
+};
+
+/** An item the "Is connected to" picker can offer. */
+export type ItemChoice = { id: string; name: string; type: string | null };
+
+type ConnectionRow = Extract<Condition, { kind: 'connection' }>;
+
+/**
+ * Change a connection row's mode. `to` needs an item and takes no far-end filter; the others
+ * take a filter and no item.
+ */
+export function withConnectionMode(c: Condition, mode: ConnectionRow['mode']): Condition {
+	if (c.kind !== 'connection' || c.mode === mode) return c;
+	const { item: _item, where: _where, ...rest } = c;
+	return mode === 'to'
+		? { ...rest, mode }
+		: { ...rest, mode, ...(c.where ? { where: c.where } : {}) };
+}
+
+/** Name a relationship (null for any); a non-directional one drops the direction. */
+export function withConnectionRelationship(
+	c: Condition,
+	relationship: RelationshipChoice | null
+): Condition {
+	if (c.kind !== 'connection') return c;
+	const { relationship: _old, direction, ...rest } = c;
+	if (!relationship) return direction === undefined ? rest : { ...rest, direction };
+	return relationship.directional && direction !== undefined
+		? { ...rest, relationship: relationship.slug, direction }
+		: { ...rest, relationship: relationship.slug };
+}
+
+/** `any` leaves out the condition's `direction`. */
+export function withConnectionDirection(c: Condition, direction: 'out' | 'in' | 'any'): Condition {
+	if (c.kind !== 'connection') return c;
+	const { direction: _old, ...rest } = c;
+	return direction === 'any' ? rest : { ...rest, direction };
+}
+
+export function withConnectionItem(c: Condition, item: string): Condition {
+	return c.kind === 'connection' ? { ...c, item } : c;
+}
+
+/** Start (or, with null, drop) the filter on the linked item. */
+export function withConnectionFilter(c: Condition, on: boolean): Condition {
+	if (c.kind !== 'connection') return c;
+	const { where: _old, ...rest } = c;
+	return on ? { ...rest, where: { op: 'and', children: [blankCondition()] } } : rest;
+}
+
+/** The direction choices; none for a relationship that has no direction. */
+export function directionChoices(
+	relationship: RelationshipChoice | null | undefined
+): { value: 'any' | 'out' | 'in'; label: string }[] {
+	if (relationship && !relationship.directional) return [];
+	return [
+		{ value: 'any', label: 'Either way' },
+		{ value: 'out', label: 'From this item' },
+		{ value: 'in', label: 'To this item' }
+	];
+}
+
+/** A relationship's option text: its label, and the reverse label when it has one. */
+export function relationshipOptionLabel(r: RelationshipChoice): string {
+	return r.directional && r.reverse_label ? `${r.label} / ${r.reverse_label}` : r.label;
 }
 
 export function withCollectionMode(c: Condition, mode: 'any' | 'none'): Condition {
@@ -483,6 +570,8 @@ export function conditionProblem(c: Condition, catalogue: Catalogue): string | n
 			}
 			case 'media':
 				return null;
+			case 'connection':
+				return c.mode === 'to' && !c.item ? 'Choose an item.' : null;
 			case 'collection': {
 				const count = Array.isArray(c.in) ? c.in.length : 0;
 				if (count === 0) return 'Choose at least one collection.';
@@ -523,6 +612,14 @@ export type AppliedDraft = {
 /** The draft without unfinished rows, and where each kept row ended up. */
 export function applyDraft(draft: Query, catalogue: Catalogue): AppliedDraft {
 	const toApplied = new Map<string, string>();
+	const keep = (c: Condition, from: Path, to: Path): Condition => {
+		if (c.kind !== 'connection' || !c.where) return c;
+		// Unfinished rows of the far-end filter go too; the connection itself stays.
+		const where = walk(c.where, [...from, FAR_END], [...to, FAR_END]);
+		if (where) return { ...c, where };
+		const { where: _gone, ...bare } = c;
+		return bare;
+	};
 	const walk = (group: Group, from: Path, to: Path): Group | null => {
 		const children: Node[] = [];
 		group.children.forEach((child, i) => {
@@ -536,7 +633,7 @@ export function applyDraft(draft: Query, catalogue: Catalogue): AppliedDraft {
 				}
 			} else if (conditionProblem(child, catalogue) === null) {
 				toApplied.set(pathKey(path), pathKey(target));
-				children.push(child);
+				children.push(keep(child, path, target));
 			}
 		});
 		if (children.length === 0) return null;
@@ -561,7 +658,10 @@ export function conditionNumbers(query: Query): Map<string, number> {
 		group.children.forEach((child, i) => {
 			const at = [...path, i];
 			if (isGroup(child)) walk(child, at);
-			else numbers.set(pathKey(at), numbers.size + 1);
+			else {
+				numbers.set(pathKey(at), numbers.size + 1);
+				if (child.kind === 'connection' && child.where) walk(child.where, [...at, FAR_END]);
+			}
 		});
 	if (query.where) walk(query.where, []);
 	return numbers;
@@ -585,23 +685,32 @@ export type Chip = {
 
 const GROUP_WORDS = { and: 'All of', or: 'Any of', not: 'Not' } as const;
 
-function conditionsIn(node: Node, path: Path): { condition: Condition; path: Path }[] {
-	if (!isGroup(node)) return [{ condition: node, path }];
-	return node.children.flatMap((child, i) => conditionsIn(child, [...path, i]));
+/** The conditions under `node`; `deep` also reads each connection's far-end filter. */
+function conditionsIn(
+	node: Node,
+	path: Path,
+	deep = false
+): { condition: Condition; path: Path }[] {
+	if (isGroup(node))
+		return node.children.flatMap((child, i) => conditionsIn(child, [...path, i], deep));
+	const own = { condition: node, path };
+	if (!deep || node.kind !== 'connection' || !node.where) return [own];
+	return [own, ...conditionsIn(node.where, [...path, FAR_END], deep)];
 }
 
 /** One chip per top-level row of the filter; a nested group becomes one chip. */
 export function chipModels(
 	query: Query,
 	lookup: SummaryLookup,
-	warned: ReadonlySet<string> = new Set()
+	warned: ReadonlySet<string> = new Set(),
+	messages: ReadonlyMap<string, string> = new Map()
 ): { lead: string | null; chips: Chip[] } {
 	const root = query.where;
 	if (!root) return { lead: null, chips: [] };
 	const chips = root.children.map((child, i): Chip => {
 		const path = [i];
 		const inside = conditionsIn(child, path);
-		const flagged = inside.find((c) => warned.has(pathKey(c.path)));
+		const flagged = conditionsIn(child, path, true).find((c) => warned.has(pathKey(c.path)));
 		const warning = flagged !== undefined;
 		const texts = inside.map((c) => describeCondition(c.condition, lookup));
 		const text = isGroup(child)
@@ -613,7 +722,11 @@ export function chipModels(
 			focus: firstConditionPath(child, path),
 			text,
 			warning,
-			message: flagged ? missingFieldMessage(flagged.condition) : null
+			message: flagged
+				? flagged.condition.kind === 'connection'
+					? (messages.get(pathKey(flagged.path)) ?? missingFieldMessage(flagged.condition))
+					: missingFieldMessage(flagged.condition)
+				: null
 		};
 	});
 	const lead =
@@ -661,6 +774,21 @@ export type BuilderView = {
 	/** Reading the collections failed; `retryCollections` reads them again. */
 	collectionsFailed: boolean;
 	retryCollections(): void;
+	/** The server's words for a flagged row, by draft path key. */
+	warningMessages: ReadonlyMap<string, string>;
+	/** Every relationship type (null while loading or if it could not be read). */
+	relationships: readonly RelationshipChoice[] | null;
+	/** Reading the relationships failed; `retryRelationships` reads them again. */
+	relationshipsFailed: boolean;
+	retryRelationships(): void;
+	/** Items matching what was typed, for "Is connected to". */
+	searchItems(text: string): Promise<ItemChoice[] | null>;
+	/** An item's name: null when it is gone, undefined until known. */
+	itemName(id: string): string | null | undefined;
+	/** Note a picked item's name so the row can show it. */
+	rememberItem(item: ItemChoice): void;
+	/** Whether a connection row may sit at `path` (not inside another connection's filter). */
+	canNestConnection(path: Path): boolean;
 	canAddCondition: boolean;
 	canAddGroup(groupPath: Path): boolean;
 	update(path: Path, condition: Condition, options?: { debounce?: boolean }): void;
@@ -695,6 +823,8 @@ export function stringList(value: unknown): string[] {
 export const STALE_FIELD_MESSAGE = 'This field no longer exists, so nothing matches.';
 export const STALE_COLLECTION_MESSAGE =
 	'A collection here no longer exists, so it matches nothing.';
+export const STALE_CONNECTION_MESSAGE =
+	'A relationship or item here no longer exists, so it matches nothing.';
 export const NO_ITEM_FIELD_MESSAGE = 'No item has this field.';
 /** The same wording, lower-cased for the field picker's trigger. */
 export const NO_ITEM_FIELD_NOTE = 'no item has this field';
@@ -702,6 +832,7 @@ export const NO_ITEM_FIELD_NOTE = 'no item has this field';
 /** What to say about a field row that cannot be matched. */
 export function missingFieldMessage(c: Condition): string {
 	if (c.kind === 'collection') return STALE_COLLECTION_MESSAGE;
+	if (c.kind === 'connection') return STALE_CONNECTION_MESSAGE;
 	return c.kind === 'field' && c.field_kind !== undefined
 		? NO_ITEM_FIELD_MESSAGE
 		: STALE_FIELD_MESSAGE;
@@ -710,7 +841,11 @@ export function missingFieldMessage(c: Condition): string {
 /** The group at `path`, or null when the path does not lead to one. */
 export function groupAt(query: Query, path: Path): Group | null {
 	let node: Node | undefined = query.where ?? undefined;
-	for (const index of path) node = node && isGroup(node) ? node.children[index] : undefined;
+	for (const index of path) {
+		if (!node) return null;
+		if (isGroup(node)) node = node.children[index];
+		else node = node.kind === 'connection' && index === FAR_END ? node.where : undefined;
+	}
 	return node && isGroup(node) ? node : null;
 }
 
@@ -777,7 +912,7 @@ export function itemFieldPickerItems(catalogue: Catalogue): ComboboxItem[] {
 export function missingItemFieldPaths(query: Query, catalogue: Catalogue): Set<string> {
 	const out = new Set<string>();
 	if (!query.where) return out;
-	for (const { condition, path } of conditionsIn(query.where, [])) {
+	for (const { condition, path } of conditionsIn(query.where, [], true)) {
 		if (
 			condition.kind === 'field' &&
 			condition.field_kind !== undefined &&
@@ -797,4 +932,28 @@ export function collectionLabel(
 ): string {
 	if (collections === null) return 'Collection';
 	return collections.find((c) => c.id === id)?.name ?? DELETED_COLLECTION_LABEL;
+}
+
+/** The relationship slugs and linked item ids a query names, for the caller to resolve. */
+export function connectionReferences(query: Query): {
+	relationships: string[];
+	items: string[];
+	any: boolean;
+} {
+	const relationships = new Set<string>();
+	const items = new Set<string>();
+	let any = false;
+	const walk = (group: Group) => {
+		for (const child of group.children) {
+			if (isGroup(child)) walk(child);
+			else if (child.kind === 'connection') {
+				any = true;
+				if (child.relationship) relationships.add(child.relationship);
+				if (child.item) items.add(child.item);
+				if (child.where) walk(child.where);
+			}
+		}
+	};
+	if (query.where) walk(query.where);
+	return { relationships: [...relationships], items: [...items], any };
 }

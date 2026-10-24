@@ -18,6 +18,7 @@ export type Condition =
 	| NameCondition
 	| MediaCondition
 	| CollectionCondition
+	| ConnectionCondition
 	| FieldCondition;
 
 /** `~` needs a value (1 to 200 characters); `empty` and `not_empty` take none. */
@@ -32,6 +33,20 @@ export type NameCondition = { kind: 'name'; op: '~' | '='; value: string };
 export type MediaCondition = { kind: 'media'; mode: 'has' | 'none'; type?: MediaType };
 /** In (`any`) or in none of (`none`) 1 to 50 collections, by id. */
 export type CollectionCondition = { kind: 'collection'; mode: 'any' | 'none'; in: string[] };
+/**
+ * Has (`exists`), lacks (`none`) or is linked to a given item (`to`). `direction` is `any`
+ * when absent; `out` means this item is the source. `exists` and `none` take no `item`,
+ * `to` needs one and takes no `where`. `where` filters the linked item and cannot hold
+ * another connection.
+ */
+export type ConnectionCondition = {
+	kind: 'connection';
+	mode: 'exists' | 'none' | 'to';
+	relationship?: string;
+	direction?: 'out' | 'in' | 'any';
+	item?: string;
+	where?: Group;
+};
 export type MediaType = 'image' | 'document';
 
 /**
@@ -61,8 +76,12 @@ export type SortKey = {
 
 export type Query = { v: 1; where: Group | null; sort: SortKey[] };
 
-/** Child indexes from the root group down. `[]` is the root. */
+/**
+ * Child indexes from the root group down. `[]` is the root. `FAR_END` steps from a
+ * connection condition into its `where` group (the filter on the linked item).
+ */
 export type Path = number[];
+export const FAR_END = -1;
 
 /** Limits the server enforces (backend graph/domain/query.py). */
 export const MAX_DEPTH = 4;

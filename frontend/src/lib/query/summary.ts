@@ -1,5 +1,11 @@
 import { OPERATOR_LABELS, operatorTakesValue } from './operators';
-import type { Condition, Operand, Value } from './types';
+import { isGroup, type Condition, type Group, type Operand, type Value } from './types';
+
+export type RelationshipInfo = {
+	label: string;
+	reverse_label: string | null;
+	directional: boolean;
+};
 
 export type SummaryLookup = {
 	typeLabel(slug: string): string;
@@ -15,6 +21,13 @@ export type SummaryLookup = {
 	 * collections are still loading (or when no lookup is given).
 	 */
 	collectionName?(id: string): string | null | undefined;
+	/**
+	 * A relationship type by slug: null when it no longer exists, undefined while the
+	 * relationships are still loading (or when no lookup is given).
+	 */
+	relationship?(slug: string): RelationshipInfo | null | undefined;
+	/** A linked item's name, with the same null / undefined meanings as `collectionName`. */
+	itemName?(id: string): string | null | undefined;
 	/** The field's kind, so date fields read like the Added / Changed conditions. */
 	fieldKind?(type: string, key: string, subKey: string | undefined): string | null;
 	/** Formats a plain field value (not a `rel` or `ref`); null leaves the default text. */
@@ -204,6 +217,48 @@ function describeCollection(
 	return `In ${none ? 'none' : 'any'} of ${names.join(', ')}`;
 }
 
+const GROUP_WORDS = { and: 'All of', or: 'Any of', not: 'Not' } as const;
+
+/** A group on one line: a lone condition as it is, otherwise "Any of: a; b". */
+export function describeGroup(group: Group, lookup: SummaryLookup): string {
+	const texts = group.children.map((child) =>
+		isGroup(child) ? describeGroup(child, lookup) : describe(child, lookup)
+	);
+	if (group.op === 'and' && texts.length === 1) return texts[0];
+	return `${GROUP_WORDS[group.op] ?? 'Any of'}: ${texts.join('; ')}`;
+}
+
+/** "via Directed by": the label that reads right for the direction asked about. */
+function relationshipText(
+	c: Extract<Condition, { kind: 'connection' }>,
+	lookup: SummaryLookup
+): { via: string; directionNote: string } {
+	const note =
+		c.direction === 'out' ? ' from this item' : c.direction === 'in' ? ' to this item' : '';
+	if (!c.relationship) return { via: '', directionNote: note };
+	const info = safe(() => lookup.relationship?.(c.relationship ?? ''));
+	if (info === undefined) return { via: ' via a relationship', directionNote: note };
+	if (info === null) return { via: ' via a relationship that no longer exists', directionNote: '' };
+	if (!info.directional) return { via: ` via ${info.label}`, directionNote: '' };
+	if (c.direction === 'in' && info.reverse_label)
+		return { via: ` via ${info.reverse_label}`, directionNote: '' };
+	return { via: ` via ${info.label}`, directionNote: note };
+}
+
+function describeConnection(
+	c: Extract<Condition, { kind: 'connection' }>,
+	lookup: SummaryLookup
+): string {
+	const { via, directionNote } = relationshipText(c, lookup);
+	if (c.mode === 'to') {
+		const name = safe(() => lookup.itemName?.(c.item ?? ''));
+		const who = name === undefined ? 'an item' : (name ?? 'an item that no longer exists');
+		return `Connected to ${who}${via}${directionNote}`;
+	}
+	const head = `${c.mode === 'none' ? 'Has no' : 'Has a'} linked item${via}${directionNote}`;
+	return c.where ? `${head} where ${describeGroup(c.where, lookup)}` : head;
+}
+
 function describe(c: Condition, lookup: SummaryLookup): string {
 	switch (c.kind) {
 		case 'field':
@@ -222,6 +277,8 @@ function describe(c: Condition, lookup: SummaryLookup): string {
 			return describeMedia(c);
 		case 'collection':
 			return describeCollection(c, lookup);
+		case 'connection':
+			return describeConnection(c, lookup);
 		case 'favourite':
 			return c.value ? 'Is a favourite' : 'Is not a favourite';
 		case 'tag': {

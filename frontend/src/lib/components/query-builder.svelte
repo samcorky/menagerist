@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 	import { TriangleAlert } from '@lucide/svelte';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -21,6 +22,8 @@
 		type BuilderView
 	} from '$lib/query/builder';
 	import { BuilderState } from '$lib/query/builder-state.svelte';
+	import { ConnectionLookups } from '$lib/query/connection-lookups.svelte';
+	import { canNestConnection } from '$lib/query/limits';
 	import {
 		fieldReferenceLabel,
 		findField,
@@ -40,7 +43,9 @@
 		excludeCollectionId = null,
 		collectionsFailed = false,
 		onretrycollections,
+		connections: sharedConnections = undefined,
 		warned = new Set<string>(),
+		warnedMessages = new Map<string, string>(),
 		sortWarned = false,
 		error = null,
 		notice = null,
@@ -64,8 +69,12 @@
 		/** Reading the collections failed. */
 		collectionsFailed?: boolean;
 		onretrycollections?: () => void;
+		/** Relationships and linked item names; share the page's so its chips agree. */
+		connections?: ConnectionLookups;
 		/** Filter path keys of conditions the server could not match. */
 		warned?: ReadonlySet<string>;
+		/** The server's words for those conditions, by the same keys. */
+		warnedMessages?: ReadonlyMap<string, string>;
 		sortWarned?: boolean;
 		/** The server's reason for refusing the filter. */
 		error?: BuilderError | null;
@@ -90,6 +99,7 @@
 		() => catalogue,
 		(next, options) => onchange(next, options)
 	);
+	const connections = untrack(() => sharedConnections) ?? new ConnectionLookups();
 	let announcement = $state('');
 	const sortLabelId = $props.id();
 	let contentEl = $state<HTMLElement | null>(null);
@@ -102,6 +112,12 @@
 
 	const shown = $derived(builder.shown);
 	const draft = $derived(builder.draft);
+
+	// Read the relationships and linked item names a connection row names.
+	$effect(() => {
+		const current = shown;
+		untrack(() => connections.ensureFor(current));
+	});
 	const applied = $derived(applyDraft(shown, catalogue));
 	const numbers = $derived(conditionNumbers(shown));
 
@@ -121,6 +137,14 @@
 				.filter((key): key is string => key !== null)
 		)
 	);
+	const warningMessages = $derived.by(() => {
+		const out = new SvelteMap<string, string>();
+		for (const [key, message] of warnedMessages) {
+			const draftKey = toDraftKey(key === '' ? [] : key.split('.').map(Number));
+			if (draftKey !== null) out.set(draftKey, message);
+		}
+		return out;
+	});
 	const errorKey = $derived(toDraftKey(error?.path ?? null));
 	const errorText = $derived.by(() => {
 		if (!error) return null;
@@ -148,6 +172,16 @@
 		},
 		numbers,
 		warned: warnedDraft,
+		warningMessages,
+		relationships: connections.relationships,
+		relationshipsFailed: connections.relationshipsFailed,
+		retryRelationships() {
+			connections.retryRelationships();
+		},
+		searchItems: (text: string) => connections.searchItems(text),
+		itemName: connections.itemName,
+		rememberItem: (item) => connections.rememberItem(item),
+		canNestConnection,
 		error: errorKey && error ? { key: errorKey, message: error.message } : null,
 		canAddCondition: canAddCondition(shown),
 		canAddGroup: (groupPath: Path) => canAddGroup(shown, groupPath),

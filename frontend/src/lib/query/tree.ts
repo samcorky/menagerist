@@ -1,4 +1,5 @@
 import {
+	FAR_END,
 	isGroup,
 	MAX_TEXT_LENGTH,
 	type Condition,
@@ -27,23 +28,37 @@ function isIndex(value: number): boolean {
 }
 
 /** Apply `edit` to the group at `path`; null when the path is not a group. */
-function editGroup(group: Group, path: Path, edit: (target: Group) => Group | null): Group | null {
-	if (path.length === 0) return edit(group);
+function editGroup(node: Node, path: Path, edit: (target: Group) => Group | null): Node | null {
+	if (path.length === 0) return isGroup(node) ? edit(node) : null;
 	const [index, ...rest] = path;
-	const child = isIndex(index) ? group.children[index] : undefined;
-	if (!child || !isGroup(child)) return null;
-	const next = editGroup(child, rest, edit);
-	if (!next) return null;
-	const children = group.children.slice();
-	children[index] = next;
-	return { op: group.op, children };
+	if (isGroup(node)) {
+		const child = isIndex(index) ? node.children[index] : undefined;
+		if (!child) return null;
+		const next = editGroup(child, rest, edit);
+		if (!next) return null;
+		const children = node.children.slice();
+		children[index] = next;
+		return { op: node.op, children };
+	}
+	if (node.kind !== 'connection' || index !== FAR_END || !node.where) return null;
+	const where = editGroup(node.where, rest, edit);
+	return where && isGroup(where) ? { ...node, where } : null;
+}
+
+/** A connection with its far-end filter pruned; the filter goes when nothing is left. */
+function pruneCondition(condition: Condition): Condition {
+	if (condition.kind !== 'connection' || !condition.where) return condition;
+	const where = prune(condition.where);
+	if (where) return { ...condition, where };
+	const { where: _gone, ...bare } = condition;
+	return bare;
 }
 
 /** Drop groups left with no children; null when nothing remains. */
 function prune(group: Group): Group | null {
 	const children: Node[] = [];
 	for (const child of group.children) {
-		if (!isGroup(child)) children.push(child);
+		if (!isGroup(child)) children.push(pruneCondition(child));
 		else {
 			const pruned = prune(child);
 			if (pruned) children.push(pruned);
@@ -60,7 +75,7 @@ function append(query: Query, groupPath: Path, node: Node, keepEmpty: boolean): 
 			? null
 			: { op: target.op, children: [...target.children, node] }
 	);
-	if (!edited) return query;
+	if (!edited || !isGroup(edited)) return query;
 	return { ...query, where: keepEmpty ? edited : prune(edited) };
 }
 
@@ -72,22 +87,43 @@ export function addGroup(query: Query, groupPath: Path, op: GroupOp): Query {
 	return append(query, groupPath, { op, children: [] }, true);
 }
 
+/**
+ * Replace (or, with null, remove) the node at `path` inside `node`; undefined when the path
+ * leads nowhere. A far-end filter is replaced by a group and removed by null.
+ */
+function changeIn(node: Node, path: Path, next: Node | null): Node | undefined {
+	const [index, ...rest] = path;
+	if (isGroup(node)) {
+		if (!isIndex(index) || index >= node.children.length) return undefined;
+		const children = node.children.slice();
+		if (rest.length === 0) {
+			if (next === null) children.splice(index, 1);
+			else children[index] = next;
+		} else {
+			const inner = changeIn(children[index], rest, next);
+			if (!inner) return undefined;
+			children[index] = inner;
+		}
+		return { op: node.op, children };
+	}
+	if (node.kind !== 'connection' || index !== FAR_END || !node.where) return undefined;
+	if (rest.length === 0) {
+		const { where: _old, ...bare } = node;
+		return next !== null && isGroup(next) ? { ...bare, where: next } : bare;
+	}
+	const inner = changeIn(node.where, rest, next);
+	return inner && isGroup(inner) ? { ...node, where: inner } : undefined;
+}
+
 /** Edit the child at `path` (replace with `node`, or remove when `node` is null). */
 function changeAt(query: Query, path: Path, node: Node | null): Query {
 	if (path.length === 0) {
 		if (node === null) return { ...query, where: null };
 		return isGroup(node) ? { ...query, where: prune(node) } : query;
 	}
-	const index = path[path.length - 1];
-	if (!query.where || !isIndex(index)) return query;
-	const edited = editGroup(query.where, path.slice(0, -1), (target) => {
-		if (index >= target.children.length) return null;
-		const children = target.children.slice();
-		if (node === null) children.splice(index, 1);
-		else children[index] = node;
-		return { op: target.op, children };
-	});
-	return edited ? { ...query, where: prune(edited) } : query;
+	if (!query.where) return query;
+	const edited = changeIn(query.where, path, node);
+	return edited && isGroup(edited) ? { ...query, where: prune(edited) } : query;
 }
 
 export function removeAt(query: Query, path: Path): Query {
@@ -98,9 +134,14 @@ export function replaceAt(query: Query, path: Path, node: Node): Query {
 	return changeAt(query, path, node);
 }
 
+/** Every condition counts, a connection's far-end filter ones included (the server's limit). */
 export function countConditions(query: Query): number {
 	const count = (g: Group): number =>
-		g.children.reduce((n, c) => n + (isGroup(c) ? count(c) : 1), 0);
+		g.children.reduce(
+			(n, c) =>
+				n + (isGroup(c) ? count(c) : c.kind === 'connection' && c.where ? 1 + count(c.where) : 1),
+			0
+		);
 	return query.where ? count(query.where) : 0;
 }
 

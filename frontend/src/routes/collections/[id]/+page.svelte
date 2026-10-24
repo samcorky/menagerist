@@ -42,6 +42,7 @@
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { conditionNumbers, queryKey, type BuilderError } from '$lib/query/builder';
 	import { parseQuery } from '$lib/query/codec';
+	import { ConnectionLookups } from '$lib/query/connection-lookups.svelte';
 	import { buildCatalogue, summaryLookup } from '$lib/query/fields';
 	import {
 		FILTER_PARAM,
@@ -155,6 +156,11 @@
 	const smart = $derived(collection ? isSmart(collection) : false);
 	const storedQuery = $derived(collection && smart ? parseQuery(collection.definition) : null);
 	const unreadable = $derived(smart && storedQuery === null);
+	// Read the relationships and linked item names the saved and extra conditions name.
+	$effect(() => {
+		connections.ensureFor(storedQuery);
+		connections.ensureFor(adhoc);
+	});
 	let smartCursor = $state<string | null>(null);
 	let smartWarnings = $state<SearchWarning[]>([]);
 	let typesLoaded = $state(false);
@@ -167,7 +173,10 @@
 	const catalogue = $derived(buildCatalogue(itemTypes, typesLoaded, itemFields));
 	let collectionsFailed = $state(false);
 	let allCollections = $state<CollectionResponse[] | null>(null);
-	const lookup = $derived(summaryLookup(catalogue, collectionNameLookup(allCollections)));
+	const connections = new ConnectionLookups();
+	const lookup = $derived(
+		summaryLookup(catalogue, collectionNameLookup(allCollections), connections.summary)
+	);
 	const builderQuery = $derived(draft ?? storedQuery ?? emptyQuery());
 
 	// Ad-hoc narrowing of a smart collection: filters (`?f=`), search (`?q=`) and type (`?type=`)
@@ -221,8 +230,9 @@
 	const adhocMarks = $derived(
 		narrowed && storedQuery
 			? narrowedMarks(searchWarnings, storedQuery, adhoc, basics)
-			: { conditions: new Set<string>(), sort: false }
+			: { conditions: new Set<string>(), messages: new Map<string, string>(), sort: false }
 	);
+	const savedMarks = $derived(mapWarnings(savedWarnings));
 	const barText = $derived(
 		narrowedBarText(narrowCount, tooLarge || adhocError ? null : narrowedTotal, {
 			count: collection?.item_count ?? 0,
@@ -1102,6 +1112,7 @@
 							query={adhoc}
 							{lookup}
 							warned={adhocMarks.conditions}
+							warnedMessages={adhocMarks.messages}
 							{catalogue}
 							onopen={(path) => openFilters(path)}
 							onremove={removeFilter}
@@ -1408,7 +1419,9 @@
 		{collectionsFailed}
 		onretrycollections={() => void loadCollections()}
 		excludeCollectionId={canonicalId}
-		warned={mapWarnings(savedWarnings).conditions}
+		{connections}
+		warned={savedMarks.conditions}
+		warnedMessages={savedMarks.messages}
 		{sortWarned}
 		error={conditionsError}
 		title="Edit conditions"
@@ -1426,7 +1439,9 @@
 		{collectionsFailed}
 		onretrycollections={() => void loadCollections()}
 		excludeCollectionId={canonicalId}
+		{connections}
 		warned={adhocMarks.conditions}
+		warnedMessages={adhocMarks.messages}
 		sortWarned={adhocMarks.sort}
 		error={adhocError}
 		notice={tooLarge ? NARROW_TOO_LARGE_MESSAGE : null}

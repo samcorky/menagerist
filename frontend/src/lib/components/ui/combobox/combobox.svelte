@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
@@ -19,6 +19,11 @@
 		searchPlaceholder?: string;
 		emptyText?: string;
 		onValueChange?: (value: string) => void;
+		/**
+		 * Search on the server: the typed text is passed on (and "" when the list opens), and
+		 * `items` is shown as given instead of being filtered here.
+		 */
+		onsearch?: (text: string) => void;
 		ref?: HTMLButtonElement | null;
 	};
 
@@ -29,6 +34,7 @@
 		searchPlaceholder = 'Search…',
 		emptyText = 'Nothing found',
 		onValueChange,
+		onsearch,
 		ref = $bindable(null),
 		class: className,
 		disabled = false,
@@ -41,7 +47,12 @@
 	const listId = $props.id();
 
 	const selected = $derived(selectedComboboxItem(items, value));
-	const groups = $derived(groupComboboxItems(filterComboboxItems(items, query)));
+	const groups = $derived(groupComboboxItems(onsearch ? items : filterComboboxItems(items, query)));
+
+	$effect(() => {
+		const text = query;
+		if (open) untrack(() => onsearch?.(text));
+	});
 
 	function setOpen(next: boolean) {
 		if (next) {

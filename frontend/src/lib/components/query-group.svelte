@@ -5,7 +5,7 @@
 	import QueryGroup from '$lib/components/query-group.svelte';
 	import { MAX_CONDITIONS, MAX_DEPTH } from '$lib/query/limits';
 	import { pathKey } from '$lib/query/warnings';
-	import { isGroup, type Group, type Path } from '$lib/query/types';
+	import { FAR_END, isGroup, type Group, type Path } from '$lib/query/types';
 	import { firstConditionPath, type BuilderView } from '$lib/query/builder';
 
 	let { group, path, view }: { group: Group; path: Path; view: BuilderView } = $props();
@@ -13,6 +13,8 @@
 	const hintId = $props.id();
 
 	const isRoot = $derived(path.length === 0);
+	// The filter on a connection's linked item: its own root, removed as a whole.
+	const isFarEnd = $derived(path.at(-1) === FAR_END);
 	const isNot = $derived(group.op === 'not');
 	const canAddCondition = $derived(view.canAddCondition && !(isNot && group.children.length > 0));
 	const canAddGroup = $derived(canAddCondition && view.canAddGroup(path));
@@ -26,7 +28,13 @@
 	);
 	const firstNumber = $derived(view.numbers.get(pathKey(firstConditionPath(group, path))));
 	const groupName = $derived(
-		isRoot ? 'All conditions' : firstNumber ? `Group from condition ${firstNumber}` : 'New group'
+		isRoot
+			? 'All conditions'
+			: isFarEnd
+				? `Filter on the linked item from condition ${firstNumber ?? ''}`.trim()
+				: firstNumber
+					? `Group from condition ${firstNumber}`
+					: 'New group'
 	);
 	const hint = $derived(!canAddCondition ? conditionHint : !canAddGroup ? groupHint : null);
 
@@ -42,7 +50,7 @@
 		{#if isNot}
 			<span class="font-medium">Must not match</span>
 		{:else}
-			<span>Match</span>
+			<span>{isFarEnd ? 'The linked item matches' : 'Match'}</span>
 			<div
 				role="group"
 				aria-label="{groupName}: match all or any"
@@ -69,7 +77,9 @@
 				variant="ghost"
 				size="icon"
 				class="ml-auto"
-				aria-label="Remove {groupName.toLowerCase()}"
+				aria-label={isFarEnd
+					? 'Remove the filter on the linked item'
+					: `Remove ${groupName.toLowerCase()}`}
 				onclick={() => view.remove(path)}
 			>
 				<X />

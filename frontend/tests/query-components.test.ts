@@ -755,7 +755,7 @@ describe('content rows: name, description, media and collection', () => {
 		const html = row({ kind: 'text', q: '' });
 		expect(html).toContain('aria-label="Condition 1, field"');
 		const items = GENERAL_SUBJECTS.filter((s) => s.group === 'Content').map((s) => s.label);
-		expect(items).toEqual(['In collection', 'Media', 'Name', 'Description']);
+		expect(items).toEqual(['In collection', 'Connection', 'Media', 'Name', 'Description']);
 	});
 
 	it('shows a contains/is empty operator and a text box for a description', () => {

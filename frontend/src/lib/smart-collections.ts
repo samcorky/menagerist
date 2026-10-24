@@ -243,7 +243,8 @@ export function smartCollectionSummary(
 ): { lead: string | null; chips: Chip[] } | null {
 	const query = parseQuery(definition);
 	if (!query) return null;
-	return chipModels(query, lookup, mapWarnings(warnings).conditions);
+	const marks = mapWarnings(warnings);
+	return chipModels(query, lookup, marks.conditions, marks.messages);
 }
 
 export const EXACT_COUNT_ERROR = "Couldn't count the items. Try again.";

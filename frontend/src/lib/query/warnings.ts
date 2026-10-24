@@ -1,12 +1,14 @@
-import type { Path } from './types';
+import { FAR_END, type Path } from './types';
 
 /** Where a server path points: a node in the condition tree, or a sort key. */
 export type QueryTarget = { where: Path } | { sort: number };
 
 // A warning inside a collection row names the id (`.in[n]`) or a rule of a smart collection
-// it inlines (`.in[n].children[m]`, nested further the same way); both belong to the row itself.
+// it inlines (`.in[n].children[m]`, nested further the same way, even through a connection's
+// `.where`); both belong to the row itself. A connection's own `.where` leads to the rows of
+// its far-end filter.
 const WHERE =
-	/^where((?:\.children\[\d{1,4}\])*)(?:\.in\[\d{1,4}\](?:\.(?:in|children)\[\d{1,4}\])*)?$/;
+	/^where((?:\.children\[\d{1,4}\]|\.where)*)(?:\.in\[\d{1,4}\](?:\.(?:in|children)\[\d{1,4}\]|\.where)*)?$/;
 const SORT = /^sort\[(\d{1,2})\]$/;
 
 /** Parse a server path such as `where.children[2].children[0]` or `sort[0]`; null when unknown. */
@@ -15,7 +17,8 @@ export function parseQueryPath(path: string): QueryTarget | null {
 	if (sort) return { sort: Number(sort[1]) };
 	const where = WHERE.exec(path);
 	if (!where) return null;
-	return { where: [...where[1].matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])) };
+	const steps = where[1].matchAll(/\.children\[(\d+)\]|\.where/g);
+	return { where: [...steps].map((m) => (m[1] === undefined ? FAR_END : Number(m[1]))) };
 }
 
 export function pathKey(path: Path): string {
@@ -35,13 +38,18 @@ export function toFilterPath(path: Path, prefix: Path): Path | null {
 export type WarningMarks = {
 	/** Filter paths (as `pathKey`) of conditions the server could not match. */
 	conditions: Set<string>;
+	/** The server's words for a flagged condition, by the same keys. */
+	messages: Map<string, string>;
 	/** True when a sort key names a field that no longer exists. */
 	sort: boolean;
 };
 
-export function mapWarnings(warnings: { path: string }[], prefix: Path = []): WarningMarks {
-	const marks: WarningMarks = { conditions: new Set(), sort: false };
-	for (const { path } of warnings) {
+export function mapWarnings(
+	warnings: { path: string; message?: string }[],
+	prefix: Path = []
+): WarningMarks {
+	const marks: WarningMarks = { conditions: new Set(), messages: new Map(), sort: false };
+	for (const { path, message } of warnings) {
 		const target = parseQueryPath(path);
 		if (!target) continue;
 		if ('sort' in target) {
@@ -49,7 +57,10 @@ export function mapWarnings(warnings: { path: string }[], prefix: Path = []): Wa
 			continue;
 		}
 		const inFilter = toFilterPath(target.where, prefix);
-		if (inFilter) marks.conditions.add(pathKey(inFilter));
+		if (!inFilter) continue;
+		marks.conditions.add(pathKey(inFilter));
+		if (message && !marks.messages.has(pathKey(inFilter)))
+			marks.messages.set(pathKey(inFilter), message);
 	}
 	return marks;
 }
