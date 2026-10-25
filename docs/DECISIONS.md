@@ -1257,4 +1257,3 @@ Over HTTPS (a `Secure` cookie) the session cookie is `__Host-Http-menagerist-ses
 - **Dry run** changes nothing and prints "Dry run: nothing was deleted". A second run is a no-op. The command prints the cutoff (UTC) and the counts for items, connections and collections.
 - **Media assets** have no `deleted_at`, so there is nothing to purge by age beyond what an item purge already removes (an asset and its file go only when no other attachment uses it). Orphaned and staged media keep their own TTL via `media cleanup`.
 - **Scheduler:** when the scheduler lands it calls the same use cases; nothing here is CLI-specific.
-
