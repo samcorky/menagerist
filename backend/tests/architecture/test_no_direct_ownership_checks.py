@@ -31,7 +31,7 @@ def _is_actor(node: ast.expr) -> bool:
 
 
 def _has_violation(path: Path) -> bool:
-    for node in ast.walk(ast.parse(path.read_text())):
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
         if not isinstance(node, ast.Compare):
             continue
         operands = [node.left, *node.comparators]
@@ -84,7 +84,7 @@ ROLE_FLAG_ALLOWED: frozenset[str] = frozenset(
 def _reads_role_flag(path: Path) -> bool:
     return any(
         isinstance(node, ast.Attribute) and node.attr in {"is_admin", "is_system"}
-        for node in ast.walk(ast.parse(path.read_text()))
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
     )
 
 

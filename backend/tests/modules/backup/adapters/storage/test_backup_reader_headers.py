@@ -6,7 +6,7 @@ import pytest
 
 from app.modules.backup.adapters.storage.local_backup_reader import (
     LocalBackupReader,
-    require_private_tar_hooks,
+    require_tar_parser_hooks,
 )
 from app.modules.backup.domain.errors import CorruptBackupError
 
@@ -87,17 +87,17 @@ async def test_rejects_old_gnu_sparse_format() -> None:
             pass
 
 
-def test_the_private_tar_hooks_exist_on_this_python() -> None:
-    """The reader bounds headers through hooks that tarfile does not document."""
-    require_private_tar_hooks(tarfile.TarInfo)
+def test_the_tar_parser_hooks_exist_on_this_python() -> None:
+    """The reader bounds headers through the tarfile parser methods."""
+    require_tar_parser_hooks(tarfile.TarInfo)
 
 
-def test_a_tarfile_without_the_hooks_fails_loudly() -> None:
+def test_a_tarfile_without_the_parser_hooks_fails_loudly() -> None:
     """On a Python that parses elsewhere the limits would never run: refuse to load."""
 
     class OldTarInfo:
         @classmethod
-        def frombuf(cls) -> None: ...
+        def fromtarfile(cls) -> None: ...
 
-    with pytest.raises(RuntimeError, match="_frombuf"):
-        require_private_tar_hooks(OldTarInfo)
+    with pytest.raises(RuntimeError, match="frombuf"):
+        require_tar_parser_hooks(OldTarInfo)
