@@ -80,6 +80,7 @@ def log_instance_settings() -> None:
                 "settings",
                 group=type(settings).__name__,
                 values=settings.model_dump(mode="json"),
+                sources=settings.sources(),
             )
         except Exception:
             logger.debug("settings logging skipped", exc_info=True)
