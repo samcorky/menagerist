@@ -71,6 +71,24 @@ export function totalLine(
 	return formatTotal(total, capped);
 }
 
+/** The count a list response reports, and whether the server stopped counting at its cap. */
+export function readListCount(headers: Headers | undefined): {
+	total: number | null;
+	capped: boolean;
+} {
+	const raw = headers?.get('Total-Count');
+	const total = raw && /^\d+$/.test(raw) ? Number(raw) : null;
+	return {
+		total,
+		capped: total !== null && headers?.get('Total-Count-Capped') === 'true'
+	};
+}
+
+/** The count line for a text search: "1,000+ items" while capped, "1,005 items" once exact. */
+export function searchCountLine(total: number, capped: boolean, exact: number | null): string {
+	return exact === null ? formatTotal(total, capped) : formatTotal(exact, false);
+}
+
 export type PageBasics = { type: string | null; q: string };
 
 /** Where the filter sits inside `combine(filter, basics)`, for mapping server paths back. */
@@ -94,7 +112,7 @@ export type ItemsPage =
 			hasMore: boolean;
 			/** Search cursor for the next page; null on the list path. */
 			cursor: string | null;
-			/** Null on the list path, which does not count. */
+			/** On the list path only set for a text search (possibly capped). */
 			total: number | null;
 			totalCapped: boolean;
 			warnings: SearchWarning[];
@@ -123,13 +141,15 @@ export async function loadItemsPage(args: {
 			query: { after: args.after, limit, type: type ?? undefined, q: q || undefined }
 		});
 		if (result.error || !result.data) return { status: 'failed', ...networkAwareError(result) };
+		// Only a text search reports a count here; the plain list stays quiet.
+		const counted = q ? readListCount(result.response?.headers) : { total: null, capped: false };
 		return {
 			status: 'ok',
 			items: result.data,
 			hasMore: /rel="next"/.test(result.response?.headers.get('link') ?? ''),
 			cursor: null,
-			total: null,
-			totalCapped: false,
+			total: counted.total,
+			totalCapped: counted.capped,
 			warnings: [],
 			prefix: []
 		};

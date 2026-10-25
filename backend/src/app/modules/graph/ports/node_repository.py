@@ -66,8 +66,12 @@ class NodeRepository(Protocol):
         favourite: bool | None = None,
         ids: collections.abc.Collection[uuid.UUID] | None = None,
         attribute_search_exclusions: Mapping[str, Sequence[str]] | None = None,
+        limit: int | None = None,
     ) -> int:
-        """Return the total number of non-deleted nodes matching the given filters."""
+        """Return the number of non-deleted nodes matching the given filters.
+
+        With `limit`, counting stops at that many matches.
+        """
         ...
 
     async def search(

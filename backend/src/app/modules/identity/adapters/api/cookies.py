@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from starlette.requests import Request
@@ -8,6 +8,45 @@ if TYPE_CHECKING:
 
 
 _SESSION_PREFIX = "__Host-Http-"
+
+_COOKIE_NOTE = (
+    "The name is the configured session cookie name (`menagerist-session` by"
+    + " default), prefixed `__Host-Http-` when the cookie is Secure. The cookie is"
+    + " `HttpOnly`, `SameSite=Strict` and `Path=/`, has no `Domain`, and is `Secure`"
+    + " over HTTPS or when `cookie_secure` is set."
+)
+
+
+def session_cookie_header(*, clears: bool = False) -> dict[str, Any]:
+    """Return the OpenAPI `Set-Cookie` header entry for a session cookie response.
+
+    Declared beside the route, so the docs follow the routes that call
+    `set_session_cookies` or `clear_session_cookies`.
+    """
+    if clears:
+        description = (
+            "Clears the session cookie with `Max-Age=0` when a session was ended."
+            + " "
+            + _COOKIE_NOTE
+        )
+        example = "menagerist-session=; Max-Age=0; Path=/; HttpOnly; SameSite=strict"
+    else:
+        description = (
+            "Sets the session cookie. Its value is an opaque token, not to be"
+            + " parsed, and it lasts for the configured session lifetime"
+            + " (`Max-Age`). "
+            + _COOKIE_NOTE
+        )
+        example = (
+            "menagerist-session=<opaque-token>; Max-Age=2592000; Path=/; HttpOnly;"
+            + " SameSite=strict"
+        )
+    return {
+        "Set-Cookie": {
+            "description": description,
+            "schema": {"type": "string", "examples": [example]},
+        }
+    }
 
 
 def _secure(request: Request, settings: IdentitySettings) -> bool:

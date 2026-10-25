@@ -48,6 +48,7 @@
 		withFilter,
 		FILTER_PARAM
 	} from '$lib/query/items-page';
+	import { createCountTracker } from '$lib/query/search-count';
 	import { combineWithSaved, narrowFilterCount, saveBlockReason } from '$lib/query/narrow';
 	import { countConditions, emptyQuery, removeAt } from '$lib/query/tree';
 	import {
@@ -88,6 +89,7 @@
 	let hasMore = $state(true);
 	let selectedType = $state<string | null>(null);
 	let fetchSeq = 0;
+	const counts = createCountTracker();
 	// Search paging: the next cursor, and the count the server reported.
 	let cursor = $state<string | null>(null);
 	let total = $state<number | null>(null);
@@ -280,6 +282,7 @@
 
 	async function fetchPage(more = false) {
 		const seq = ++fetchSeq;
+		if (!more) counts.cancel();
 		loading = true;
 		const basics = { type: selectedType, q };
 		const result = await loadItemsPage({
@@ -293,8 +296,17 @@
 			items = more ? [...items, ...result.items] : result.items;
 			hasMore = result.hasMore;
 			cursor = result.cursor;
-			total = result.total;
-			totalCapped = result.totalCapped;
+			// A further list page repeats the capped figure; keep the exact one already shown.
+			if (!more || searching) {
+				total = result.total;
+				totalCapped = result.totalCapped;
+			}
+			if (!more && !searching && result.totalCapped) {
+				void counts.run(basics, (exact) => {
+					total = exact;
+					totalCapped = false;
+				});
+			}
 			marks = mapWarnings(result.warnings, result.prefix);
 			filterError = null;
 			tooMany = false;
@@ -571,6 +583,8 @@
 					<p class="text-sm text-muted-foreground">{SEARCH_TOO_LONG_MESSAGE}</p>
 				{/if}
 			</div>
+		{:else if countLine}
+			<p class="text-sm text-muted-foreground">{countLine}</p>
 		{/if}
 		{#if canSave}
 			<div class="flex flex-col items-start gap-1.5">

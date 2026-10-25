@@ -1208,3 +1208,25 @@ Over HTTPS (a `Secure` cookie) the session cookie is `__Host-Http-menagerist-ses
 **Cleanup:** no new mechanism. Creating, downloading, listing and deleting an export all prune that account's expired archives first, and `backup prune` already removes expired exports across every account (`cleanup_user_exports`). An expired export is therefore never shown or served, even if nothing has pruned it yet. No scheduler was added.
 
 **Also:** unknown paths and wrong methods under `/api` now answer with the usual problem+json body (`NotFoundError`, `MethodNotAllowedError`; `Allow` is kept). Paths outside `/api` and the SPA fallback are unchanged, and these default responses are not added to every operation in OpenAPI.
+
+## OpenAPI links (2026-10-24)
+
+**Decision:** success responses that return an id carry OpenAPI `links` to the operations that take it, so a client or Swagger can follow an id from one call into the next.
+
+**Generated:** `entrypoints/api/openapi_links.py` runs in `configure_openapi()`. For a collection path (`/node`) and its item paths (`/node/{node_id}`, `/media/{asset_id}/promote`), every 2xx JSON response of an operation on the collection (create, list) or on the item itself (get, update) whose body has an `id` links to the other operations under the item path, mapping the path parameter to `$response.body#/id` (a list uses `#/0/id`, the first item). Links are named after the target's `operationId` (`GetNode`, `DeleteNode`). It skips paths with more than one path parameter, item paths with no collection to take an id from, and lists on the item path (`GET /media/for-node/{node_id}` returns assets, not nodes). A link a route declares is never overwritten, and a target the route already links to is not linked twice. The personal API token routes fall out of the convention.
+
+**Written on the routes:** the personal export routes, because the list lives at `/me/exports` while the item routes are under `/me/export`. `POST /me/export` and `GET /me/exports` link to `DownloadExport` and `DeleteExport`.
+
+**Swagger plugin:** `static/swagger-init.js` wraps Swagger UI's `operationLink` component (via `wrapComponents`) and adds an "Open `<operationId>`" button. Clicking it shows the target's tag and operation, turns on Try it out, fills the path parameters from the last response of the operation that offered the link (if that response has the link's status code), and scrolls to it. No dependency was added. Swagger UI is pinned at `swagger-ui-dist@5.33.0` (published 2026-09-16) with Subresource Integrity, as before; the plugin relies on the `operationLink` component name and the `layoutActions.show` / `specActions.changeParam` actions of that version, so check them when bumping it.
+
+**Limits:** only `$response.body#/json/pointer` expressions are evaluated, by the plugin and by the generator; the other runtime expressions are neither generated nor followed. A link that cannot be evaluated still opens its target, with the field empty. Only the first list item is offered. Links are documentation: nothing enforces that the id is accepted by the target.
+
+## Text search counts are capped (2026-10-24)
+
+**Decision:** `GET /node?q=...` counts at most 1,001 matches, as smart collections and `POST /node/search` already do. `Total-Count` is then at most 1000, and `Total-Count-Capped: true` is added when there were more; it is absent otherwise. This also covers `q` combined with `?collection=` for a smart collection. Lists without `q` keep an exact `Total-Count`. Both headers are documented on the operation and `Total-Count-Capped` is CORS-exposed.
+
+**Why:** for a very common term at 100,000 items the exact count behind `Total-Count` took about 0.9 s on every page, and the first page only needs the rows. The repository `count` takes the same optional `limit` as `search_count` (a `LIMIT` inside the counted subquery).
+
+**Exact count on demand:** `GET /node/count` takes the same filters as `GET /node` (one shared parameter model, no paging) and returns `{"count": n}` with no cap, under the same `Content(ITEM_READ)` stance and scope. It is the slow, cheap-to-skip read: a client shows the capped figure ("1,000+") first and swaps in the exact one when this returns. This supersedes the "flag header" follow-up in R22 for the `q` case only; `?collection=<smart>` without `q` is still exact.
+
+**Header convention:** no capped header existed (the other capped counts are body fields: `total_capped`, `item_count_capped`), so `Total-Count-Capped` is new, named after `Total-Count`.

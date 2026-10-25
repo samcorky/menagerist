@@ -1,5 +1,6 @@
 import uuid
-from typing import Annotated
+from dataclasses import dataclass
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
 from starlette.requests import Request
@@ -10,12 +11,12 @@ from app.entrypoints.api.shared.http.conditional_request import ConditionalReque
 from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
-    link_header_responses,
     link_next_header,
 )
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.graph.adapters.api.dependencies import (
+    get_count_nodes_use_case,
     get_create_node_use_case,
     get_delete_node_use_case,
     get_get_node_use_case,
@@ -28,12 +29,14 @@ from app.modules.graph.adapters.api.dependencies import (
 from app.modules.graph.adapters.api.node.schemas import (
     CreateNodeRequest,
     ItemFieldResponse,
+    NodeCountResponse,
     NodeResponse,
     NodeSearchRequest,
     NodeSearchResponse,
     PromoteExtraSchemaFieldRequest,
     UpdateNodeRequest,
 )
+from app.modules.graph.application.count_nodes import CountNodes
 from app.modules.graph.application.create_node import CreateNode
 from app.modules.graph.application.delete_node import DeleteNode, DeleteNodeCommand
 from app.modules.graph.application.get_node import GetNode, GetNodeQuery
@@ -60,10 +63,56 @@ from app.shared_kernel.errors import ValidationError
 
 router = APIRouter(prefix="/node", tags=["Nodes"], route_class=PermissionAwareRoute)
 
+_TOTAL_COUNT_HEADERS: dict[int | str, dict[str, Any]] = {
+    200: {
+        "headers": {
+            "Link": {
+                "description": "RFC 8288 next-page cursor. Absent on last page.",
+                "schema": {"type": "string"},
+            },
+            "Total-Count": {
+                "description": (
+                    "Items matching the filters. Exact, except with `q`, where it "
+                    + "stops at 1000 (see `Total-Count-Capped`)."
+                ),
+                "schema": {"type": "integer"},
+            },
+            "Total-Count-Capped": {
+                "description": (
+                    "`true` when `q` matched more than 1000 items, so `Total-Count` "
+                    + "is 1000 and a lower bound. Absent otherwise."
+                ),
+                "schema": {"type": "string", "enum": ["true"]},
+            },
+        }
+    }
+}
+
 _Q_DESCRIPTION = "Search text, matched case-insensitively."
 _Q_DESCRIPTION += " Looks in the name, the description and every text or number"
 _Q_DESCRIPTION += " value in the item's details. Field names, yes/no values, ratings,"
 _Q_DESCRIPTION += " removed fields and fields excluded from search are not searched."
+
+
+@dataclass
+class NodeFilters:
+    """Query parameters that choose which items a list or count covers."""
+
+    type: str | None = None
+    q: Annotated[str | None, Query(description=_Q_DESCRIPTION)] = None
+    favourite: bool | None = None
+    collection: Annotated[
+        uuid.UUID | None,
+        Query(
+            description=(
+                "Restrict the list to items on this collection. For a smart "
+                + "collection, the items matching its definition, still in id order."
+            )
+        ),
+    ] = None
+
+
+NodeFiltersDep = Annotated[NodeFilters, Depends()]
 
 
 @router.post(
@@ -133,6 +182,37 @@ async def list_item_fields(
 
 
 @router.get(
+    "/count",
+    response_model=NodeCountResponse,
+    operation_id="count_nodes",
+    responses=error_response(
+        CollectionNotFoundError,
+        detail="Collection 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10 not found",
+    ),
+)
+async def count_nodes(
+    use_case: Annotated[CountNodes, Depends(get_count_nodes_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+    filters: NodeFiltersDep,
+) -> NodeCountResponse:
+    """Count the items `GET /node` would list for the same filters, with no cap.
+
+    `Total-Count` on a search stops at 1000; this does not, so it can be slow
+    for a very common search term.
+    """
+    count = await use_case.handle(
+        ListNodesQuery(
+            type=filters.type,
+            q=filters.q,
+            favourite=filters.favourite,
+            collection=filters.collection,
+        ),
+        actor,
+    )
+    return NodeCountResponse(count=count)
+
+
+@router.get(
     "/{node_id}",
     response_model=NodeResponse,
     operation_id="get_node",
@@ -162,7 +242,7 @@ async def get_node(
     response_model=list[NodeResponse],
     operation_id="list_nodes",
     responses={
-        **link_header_responses(),
+        **_TOTAL_COUNT_HEADERS,
         **error_response(
             CollectionNotFoundError,
             detail="Collection 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10 not found",
@@ -174,30 +254,19 @@ async def list_nodes(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
+    filters: NodeFiltersDep,
     after: uuid.UUID | None = None,
     limit: int = 50,
-    type: str | None = None,
-    q: Annotated[str | None, Query(description=_Q_DESCRIPTION)] = None,
-    favourite: bool | None = None,
-    collection: Annotated[
-        uuid.UUID | None,
-        Query(
-            description=(
-                "Restrict the list to items on this collection. For a smart "
-                + "collection, the items matching its definition, still in id order."
-            )
-        ),
-    ] = None,
 ) -> list[NodeResponse]:
     """List node, paginated by id."""
     result = await use_case.handle(
         ListNodesQuery(
             after=after,
             limit=limit + 1,
-            type=type,
-            q=q,
-            favourite=favourite,
-            collection=collection,
+            type=filters.type,
+            q=filters.q,
+            favourite=filters.favourite,
+            collection=filters.collection,
         ),
         actor,
     )
@@ -206,6 +275,8 @@ async def list_nodes(
             request, str(result.items[limit - 1].id)
         )
     response.headers["Total-Count"] = str(result.total)
+    if result.total_capped:
+        response.headers["Total-Count-Capped"] = "true"
 
     return [NodeResponse.from_domain(node) for node in result.items[:limit]]
 

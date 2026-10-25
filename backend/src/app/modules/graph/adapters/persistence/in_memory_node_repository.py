@@ -137,8 +137,9 @@ class InMemoryNodeRepository:
         favourite: bool | None = None,
         ids: collections.abc.Collection[uuid.UUID] | None = None,
         attribute_search_exclusions: Mapping[str, Sequence[str]] | None = None,
+        limit: int | None = None,
     ) -> int:
-        """Return the total number of non-deleted nodes matching the given filters."""
+        """Return how many non-deleted nodes match the filters, up to `limit`."""
         nodes = self._visible(scope)
         if ids is not None:
             nodes = [n for n in nodes if n.id in ids]
@@ -151,7 +152,7 @@ class InMemoryNodeRepository:
             ]
         if favourite is not None:
             nodes = [n for n in nodes if n.favourite == favourite]
-        return len(nodes)
+        return len(nodes) if limit is None else min(len(nodes), limit)
 
     def _matching(
         self, scope: ContentFilter, resolved: ResolvedQuery

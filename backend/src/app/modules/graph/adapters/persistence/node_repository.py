@@ -256,20 +256,27 @@ class SqlAlchemyNodeRepository:
         favourite: bool | None = None,
         ids: collections.abc.Collection[uuid.UUID] | None = None,
         attribute_search_exclusions: Mapping[str, Sequence[str]] | None = None,
+        limit: int | None = None,
     ) -> int:
-        """Return the total number of non-deleted nodes matching the given filters."""
-        logger.debug("counting nodes", type=type)
+        """Return the number of non-deleted nodes matching the filters.
+
+        With `limit`, counting stops at that many matches.
+        """
+        logger.debug("counting nodes", type=type, limit=limit)
         if ids is not None and not ids:
             return 0
-        stmt = select(func.count()).select_from(NodeModel).where(_in_scope(scope))
+        matches = select(NodeModel.id).where(_in_scope(scope))
         if ids is not None:
-            stmt = stmt.where(_id_in(ids))
+            matches = matches.where(_id_in(ids))
         if type is not None:
-            stmt = stmt.where(NodeModel.type == type)
+            matches = matches.where(NodeModel.type == type)
         if q is not None:
-            stmt = stmt.where(search_clause(q, attribute_search_exclusions))
+            matches = matches.where(search_clause(q, attribute_search_exclusions))
         if favourite is not None:
-            stmt = stmt.where(NodeModel.favourite == favourite)
+            matches = matches.where(NodeModel.favourite == favourite)
+        if limit is not None:
+            matches = matches.limit(limit)
+        stmt = select(func.count()).select_from(matches.subquery())
         await _jit_off_for_text(self._session, has_text=q is not None)
         result = await self._session.execute(stmt)
         return result.scalar_one()

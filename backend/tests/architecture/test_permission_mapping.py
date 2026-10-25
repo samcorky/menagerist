@@ -65,6 +65,7 @@ EXPECTED_PERMISSIONS: dict[str, str] = {
     "graph.ListEdges": "graph:item:read",
     "graph.ListItemFields": "graph:item:read",
     "graph.ListNodeTypes": "graph:type:read",
+    "graph.CountNodes": "graph:item:read",
     "graph.ListNodes": "graph:item:read",
     "graph.PromoteExtraSchemaField": "graph:type:write",
     "graph.PurgeEdgeTypeAttribute": "graph:edge_type:purge_attribute",

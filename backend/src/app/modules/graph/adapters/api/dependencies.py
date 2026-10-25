@@ -21,6 +21,7 @@ from app.modules.graph.application.count_edge_type_attribute_usage import (
 from app.modules.graph.application.count_node_type_attribute_usage import (
     CountNodeTypeAttributeUsage,
 )
+from app.modules.graph.application.count_nodes import CountNodes
 from app.modules.graph.application.create_edge import CreateEdge
 from app.modules.graph.application.create_edge_type import CreateEdgeType
 from app.modules.graph.application.create_edges import CreateEdges
@@ -104,6 +105,14 @@ def get_list_nodes_use_case(
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ListNodes:
     return ListNodes(repos, guard, collection_members)
+
+
+def get_count_nodes_use_case(
+    list_nodes: Annotated[ListNodes, Depends(get_list_nodes_use_case)],
+    repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> CountNodes:
+    return CountNodes(repos, guard, list_nodes)
 
 
 def get_search_nodes_use_case(

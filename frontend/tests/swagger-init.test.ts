@@ -81,6 +81,12 @@ type Init = {
 		onSignOut: () => void
 	): FakeNode;
 	hideSchemeBlocks(container: unknown, names: string[]): number;
+	evaluateExpression(expression: string, body: unknown): string | undefined;
+	responseBody(response: unknown): unknown;
+	findOperation(
+		paths: Record<string, Record<string, { operationId?: string }>>,
+		operationId: string
+	): { path: string; method: string } | null;
 	renderBanner(
 		doc: FakeDocument,
 		box: FakeNode,
@@ -589,5 +595,39 @@ describe('swagger-init cookie header', () => {
 			expect(section.textContent).toContain('First run');
 			expect(all(section).find((n) => n.tag === 'a')?.attrs.href).toBe('/setup');
 		});
+	});
+});
+
+describe('swagger-init link helpers', () => {
+	it('evaluates $response.body pointers', () => {
+		const body = { id: 'a', items: [{ id: 'b' }], 'a/b': { 'c~d': 7 }, nested: { x: 1 } };
+		expect(init.evaluateExpression('$response.body#/id', body)).toBe('a');
+		expect(init.evaluateExpression('$response.body#/items/0/id', body)).toBe('b');
+		expect(init.evaluateExpression('$response.body#/a~1b/c~0d', body)).toBe('7');
+		expect(init.evaluateExpression('$response.body#/0/id', [{ id: 'z' }])).toBe('z');
+	});
+
+	it('gives undefined for anything else', () => {
+		const body = { id: 'a', nested: { x: 1 } };
+		expect(init.evaluateExpression('$response.body#/missing', body)).toBeUndefined();
+		expect(init.evaluateExpression('$response.body#/nested', body)).toBeUndefined();
+		expect(init.evaluateExpression('$request.path.id', body)).toBeUndefined();
+		expect(init.evaluateExpression('$response.body#/id', undefined)).toBeUndefined();
+	});
+
+	it('reads a response body from the parsed body or the text', () => {
+		expect(init.responseBody({ body: { id: 1 } })).toEqual({ id: 1 });
+		expect(init.responseBody({ text: '{"id":2}' })).toEqual({ id: 2 });
+		expect(init.responseBody({ text: 'not json' })).toBeUndefined();
+		expect(init.responseBody(undefined)).toBeUndefined();
+	});
+
+	it('finds an operation by its id', () => {
+		const paths = {
+			'/a': { get: { operationId: 'one' } },
+			'/b/{id}': { delete: { operationId: 'two' } }
+		};
+		expect(init.findOperation(paths, 'two')).toMatchObject({ path: '/b/{id}', method: 'delete' });
+		expect(init.findOperation(paths, 'nope')).toBeNull();
 	});
 });

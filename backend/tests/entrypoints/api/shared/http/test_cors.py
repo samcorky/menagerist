@@ -137,8 +137,8 @@ _SAFELISTED_RESPONSE = {
 }
 
 
-# Acted on by the browser itself; page script never reads it.
-_BROWSER_ONLY_RESPONSE = {"clear-site-data"}
+# Acted on by the browser itself; page script never reads them.
+_BROWSER_ONLY_RESPONSE = {"clear-site-data", "set-cookie"}
 
 
 def test_every_route_uses_a_listed_method() -> None:

@@ -92,6 +92,7 @@ EXPECTED_CONTENT: frozenset[str] = frozenset(
         "graph.CountNodeTypeAttributeUsage",
         "graph.CreateEdge",
         "graph.CreateEdges",
+        "graph.CountNodes",
         "graph.CreateNode",
         "graph.DeleteEdge",
         "graph.DeleteNode",

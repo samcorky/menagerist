@@ -497,3 +497,33 @@ test('a per-item condition on a field no item has says so', async ({ page }) => 
 	await openFilters(page);
 	await expect(filtersDialog(page).getByText('No item has this field.')).toBeVisible();
 });
+
+test('a text search past the cap shows 1,000+ and then the exact count', async ({
+	page,
+	request
+}) => {
+	test.setTimeout(240_000);
+	const term = `capterm${uniqueName('x').replace(/\W+/g, '')}`;
+	for (let start = 0; start < 1005; start += 50) {
+		await Promise.all(
+			Array.from({ length: Math.min(50, 1005 - start) }, (_, i) =>
+				makeItem(request, `${term} ${start + i}`)
+			)
+		);
+	}
+
+	// Hold the exact count back so the capped figure can be seen first.
+	let release!: () => void;
+	const gate = new Promise<void>((resolve) => (release = resolve));
+	await page.route('**/api/v1/node/count*', async (route) => {
+		await gate;
+		await route.continue();
+	});
+
+	await page.goto('/items');
+	await page.getByPlaceholder('Search your items…').fill(term);
+	await expect(page.getByText('1,000+ items', { exact: true })).toBeVisible();
+	release();
+	await expect(page.getByText('1,005 items', { exact: true })).toBeVisible();
+	await expect(page.getByText('1,000+ items', { exact: true })).toHaveCount(0);
+});

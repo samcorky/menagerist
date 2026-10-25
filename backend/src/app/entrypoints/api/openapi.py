@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi.openapi.utils import get_openapi
 
+from app.entrypoints.api.openapi_links import add_conventional_links
 from app.entrypoints.api.openapi_responses import add_error_responses
 from app.platform.config import get_identity_settings
 
@@ -161,6 +162,7 @@ def configure_openapi(app: FastAPI) -> None:
             "altText": f"{app.title} logo",
         }
         _normalise_openapi_schemas(openapi_schema)
+        add_conventional_links(openapi_schema)
         add_error_responses(openapi_schema)
         app.openapi_schema = openapi_schema
         return openapi_schema

@@ -21,6 +21,7 @@ from app.modules.graph.adapters.persistence.in_memory_node_repository import (
 from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
     InMemoryNodeTypeRepository,
 )
+from app.modules.graph.application.count_nodes import CountNodes
 from app.modules.graph.application.list_nodes import ListNodes, ListNodesQuery
 from app.modules.graph.domain.errors import CollectionNotFoundError
 from app.modules.graph.domain.node import Node
@@ -261,3 +262,41 @@ async def test_without_a_collection_q_still_uses_the_plain_list(world: World) ->
 
     assert {n.name for n in result.items} == {"Alien", "Alien Book"}
     assert result.total == 2
+
+
+async def test_smart_total_with_text_search_is_capped(world: World) -> None:
+    """With `q`, a smart collection's total stops at the cap; without, it is exact."""
+    capped = ListNodes(
+        world.repos,
+        InMemoryAccessGuard(),
+        world.members,
+        today=lambda: date(2026, 10, 17),
+        total_cap=3,
+    )
+    for i in range(5):
+        await world.item(f"Coin {i}", rating=5)
+    collection = world.smart(_query(_rating(">=", 4)))
+
+    searched = await capped.handle(
+        ListNodesQuery(collection=collection, q="coin", limit=2), AS_ALICE
+    )
+    plain = await capped.handle(ListNodesQuery(collection=collection), AS_ALICE)
+
+    assert (searched.total, searched.total_capped, len(searched.items)) == (3, True, 2)
+    assert (plain.total, plain.total_capped) == (5, False)
+
+
+async def test_count_exact_is_uncapped_and_scoped(world: World) -> None:
+    """CountNodes counts a smart collection's matches fully, for the caller only."""
+    counter = CountNodes(world.repos, InMemoryAccessGuard(), world.use_case)
+    for i in range(5):
+        await world.item(f"Coin {i}", rating=5)
+    await world.item("Coin Bob", owner=BOB, rating=5)
+    mine = world.smart(_query(_rating(">=", 4)))
+    stale = world.smart(_query(_rating("nonsense", 4)))
+
+    assert await counter.handle(ListNodesQuery(collection=mine), AS_ALICE) == 5
+    assert await counter.handle(ListNodesQuery(collection=mine, q="bob"), AS_ALICE) == 0
+    assert await counter.handle(ListNodesQuery(collection=stale), AS_ALICE) == 0
+    assert await counter.handle(ListNodesQuery(q="coin"), AS_ALICE) == 5
+    assert await counter.handle(ListNodesQuery(q="coin"), AS_BOB) == 1

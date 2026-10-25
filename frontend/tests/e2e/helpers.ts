@@ -207,7 +207,11 @@ export function ownedData() {
 		},
 		async cleanUp(request: APIRequestContext) {
 			for (const id of collectionIds) await request.delete(`/api/v1/collection/${id}`);
-			for (const id of itemIds) await request.delete(`/api/v1/node/${id}`);
+			for (let i = 0; i < itemIds.length; i += 50) {
+				await Promise.all(
+					itemIds.slice(i, i + 50).map((id) => request.delete(`/api/v1/node/${id}`))
+				);
+			}
 			for (const id of typeIds) await request.delete(`/api/v1/node-type/${id}`);
 			collectionIds = [];
 			itemIds = [];

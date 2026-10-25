@@ -1193,3 +1193,45 @@ async def test_sign_in_does_not_log_raw_user_agent_on_success(
     assert len(signed_in_logs) == 1
     assert "user_agent" not in signed_in_logs[0]
     assert unique_ua not in str(signed_in_logs[0])
+
+
+# --- documented Set-Cookie -------------------------------------------------
+
+
+def _documented_set_cookie(api: Api) -> set[tuple[str, str, str]]:
+    schema = api.app.openapi()
+    return {
+        (method, path, status)
+        for path, item in schema["paths"].items()
+        for method, operation in item.items()
+        if method in {"get", "put", "post", "delete", "patch"}
+        for status, response in operation["responses"].items()
+        if "Set-Cookie" in response.get("headers", {})
+    }
+
+
+async def test_set_cookie_is_documented_exactly_where_it_is_sent(
+    api: Api, make_user: MakeUser
+) -> None:
+    """Each documented route sends the cookie on the documented status."""
+    sent: set[tuple[str, str, str]] = set()
+
+    def record(path: str, response: Response) -> None:
+        if response.headers.get_list("set-cookie"):
+            sent.add(("post", path, str(response.status_code)))
+
+    record(f"{AUTH}/setup", api.setup())
+    await api.add_user(make_user, "alice")
+    client, login = api.sign_in()
+    record(f"{AUTH}/login", login)
+    record(
+        f"{AUTH}/password",
+        api.post(
+            client,
+            f"{AUTH}/password",
+            {"current_password": "password-123", "new_password": "a-much-better-one"},
+        ),
+    )
+    record(f"{AUTH}/logout", api.post(client, f"{AUTH}/logout"))
+
+    assert sent == _documented_set_cookie(api)

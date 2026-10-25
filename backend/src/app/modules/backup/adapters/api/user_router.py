@@ -62,7 +62,12 @@ router = APIRouter(
                     "operationId": "download_user_export",
                     "parameters": {"backup_id": "$response.body#/id"},
                     "description": "Download the archive that was just created.",
-                }
+                },
+                "DeleteExport": {
+                    "operationId": "delete_user_export",
+                    "parameters": {"backup_id": "$response.body#/id"},
+                    "description": "Delete the archive that was just created.",
+                },
             }
         }
     },
@@ -81,6 +86,22 @@ async def export_user_data(
     "/exports",
     response_model=list[UserExportResponse],
     operation_id="list_user_exports",
+    responses={
+        200: {
+            "links": {
+                "DownloadExport": {
+                    "operationId": "download_user_export",
+                    "parameters": {"backup_id": "$response.body#/0/id"},
+                    "description": "Download the newest export in this list.",
+                },
+                "DeleteExport": {
+                    "operationId": "delete_user_export",
+                    "parameters": {"backup_id": "$response.body#/0/id"},
+                    "description": "Delete the newest export in this list.",
+                },
+            }
+        }
+    },
 )
 async def list_user_exports(
     use_case: Annotated[ListUserExports, Depends(get_list_user_exports)],

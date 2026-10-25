@@ -10,6 +10,9 @@
  *   The two sign-in requests start at once, but the banner is only put on the page when Swagger
  *   has finished rendering. It shows a "checking" state if the answer is still on its way.
  *
+ * - Adds a button to each response link that opens the linked operation's Try it out form with its
+ *   path parameters filled from the last response (only `$response.body#/pointer` expressions).
+ *
  * The pure helpers are exposed on globalThis.MenageristSwaggerInit for tests.
  */
 (function (root) {
@@ -406,6 +409,148 @@
     });
   }
 
+  /**
+   * Evaluates the one runtime expression the generated links use, `$response.body#/json/pointer`,
+   * against a parsed response body. Anything else, or a missing field, gives undefined.
+   */
+  function evaluateExpression(expression, body) {
+    var match = /^\$response\.body#((?:\/[^/]*)+)$/.exec(String(expression));
+    if (!match) return undefined;
+    var value = body;
+    var steps = match[1].slice(1).split("/");
+    for (var i = 0; i < steps.length; i++) {
+      if (value === null || typeof value !== "object") return undefined;
+      value = value[steps[i].replace(/~1/g, "/").replace(/~0/g, "~")];
+    }
+    return value === undefined || value === null || typeof value === "object"
+      ? undefined
+      : String(value);
+  }
+
+  /** Reads the JSON body of the last response Swagger kept for an operation. */
+  function responseBody(response) {
+    if (!response) return undefined;
+    if (response.body && typeof response.body === "object") return response.body;
+    var text = typeof response.text === "string" ? response.text : response.data;
+    try {
+      return typeof text === "string" ? JSON.parse(text) : undefined;
+    } catch (e) {
+      return undefined;
+    }
+  }
+
+  /** Finds an operation by its operationId in the spec's paths. */
+  function findOperation(paths, operationId) {
+    var found = null;
+    Object.keys(paths || {}).some(function (path) {
+      return Object.keys(paths[path]).some(function (method) {
+        var op = paths[path][method];
+        if (!op || op.operationId !== operationId) return false;
+        found = { path: path, method: method, operation: op };
+        return true;
+      });
+    });
+    return found;
+  }
+
+  /**
+   * Opens a link's target and fills its parameters from the response that offered the link.
+   * `from` is the offering operation as { path, method, code }.
+   */
+  function followLink(system, link, from) {
+    var specJson = system.specSelectors.specJson();
+    var spec = specJson && specJson.toJS ? specJson.toJS() : {};
+    var target = findOperation(spec.paths, link.operationId);
+    if (!target) return;
+    // Every route also carries the catch-all "v1" tag, whose group is last and mostly collapsed.
+    var tags = target.operation.tags || ["default"];
+    var tag =
+      tags.filter(function (name) {
+        return name !== "v1";
+      })[0] || tags[0];
+    var response = system.specSelectors.responseFor(from.path, from.method);
+    response = response && response.toJS ? response.toJS() : response;
+    var current = !response || String(response.status) === String(from.code);
+    var body = current ? responseBody(response) : undefined;
+
+    system.layoutActions.show(["operations-tag", tag], true);
+    system.layoutActions.show(["operations", tag, link.operationId], true);
+    system.layoutActions.show(
+      ["operations", tag, link.operationId, "try-it-out"],
+      true,
+    );
+    Object.keys(link.parameters || {}).forEach(function (key) {
+      var value = evaluateExpression(link.parameters[key], body);
+      if (value === undefined) return;
+      var name = key.replace(/^(path|query|header|cookie)\./, "");
+      var declared = (target.operation.parameters || []).filter(function (p) {
+        return p.name === name;
+      })[0];
+      system.specActions.changeParam(
+        [target.path, target.method],
+        name,
+        declared ? declared.in : "path",
+        value,
+        false,
+      );
+    });
+    setTimeout(function () {
+      var block = document.querySelector(
+        '.opblock[id$="-' + link.operationId + '"]',
+      );
+      if (block && block.scrollIntoView) block.scrollIntoView({ block: "start" });
+    }, 50);
+  }
+
+  /** The offering operation of a rendered link, read from the surrounding DOM. */
+  function offeringOperation(node) {
+    var block = node.closest(".opblock");
+    var row = node.closest("tr.response");
+    var status = row && row.querySelector(".response-col_status");
+    var path = block && block.querySelector("[data-path]");
+    var method = block && /opblock-(\w+)/.exec(block.className);
+    if (!path || !method) return null;
+    return {
+      path: path.getAttribute("data-path"),
+      method: method[1],
+      code: status ? status.textContent.trim() : null,
+    };
+  }
+
+  /** Swagger UI plugin: each response link gets a button that follows it. */
+  function linksPlugin() {
+    return {
+      wrapComponents: {
+        operationLink: function (Original, system) {
+          var h = system.React.createElement;
+          return function LinkWithButton(props) {
+            var link = props.link && props.link.toJS ? props.link.toJS() : {};
+            function onClick(event) {
+              var from = offeringOperation(event.currentTarget);
+              if (from && link.operationId) followLink(system, link, from);
+            }
+            return h(
+              "div",
+              { className: "menagerist-link" },
+              h(Original, props),
+              link.operationId
+                ? h(
+                    "button",
+                    {
+                      type: "button",
+                      className: "btn menagerist-link-follow",
+                      onClick: onClick,
+                    },
+                    "Open " + link.operationId,
+                  )
+                : null,
+            );
+          };
+        },
+      },
+    };
+  }
+
   function init() {
     var script = document.currentScript;
     var openapiUrl = script.getAttribute("data-openapi-url");
@@ -645,6 +790,7 @@
       persistAuthorization: false,
       withCredentials: true,
       oauth2RedirectUrl: root.location.origin + oauth2Redirect,
+      plugins: [linksPlugin],
       presets: [
         root.SwaggerUIBundle.presets.apis,
         root.SwaggerUIBundle.SwaggerUIStandalonePreset,
@@ -687,6 +833,9 @@
     loginHref: loginHref,
     safeLogoUrl: safeLogoUrl,
     fetchJson: fetchJson,
+    evaluateExpression: evaluateExpression,
+    responseBody: responseBody,
+    findOperation: findOperation,
   };
 
   if (root.document && root.document.currentScript) init();

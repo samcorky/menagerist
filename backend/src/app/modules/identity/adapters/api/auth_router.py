@@ -14,6 +14,7 @@ from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.identity.adapters.api.cookies import (
     clear_session_cookies,
+    session_cookie_header,
     set_session_cookies,
 )
 from app.modules.identity.adapters.api.dependencies import (
@@ -144,6 +145,7 @@ async def get_auth_status(
     operation_id="setup_first_admin",
     dependencies=[Depends(refuse_cross_site)],
     responses={
+        201: {"headers": session_cookie_header()},
         **_CROSS_SITE,
         **error_response(
             SetupAlreadyDoneError, detail="Setup has already been completed."
@@ -179,6 +181,7 @@ async def setup_first_admin(
     operation_id="sign_in",
     dependencies=[Depends(refuse_cross_site)],
     responses={
+        200: {"headers": session_cookie_header()},
         **error_response(
             InvalidCredentialsError, detail="Incorrect username or password."
         ),
@@ -223,12 +226,13 @@ async def sign_in(
         204: {
             "description": "Signed out.",
             "headers": {
+                **session_cookie_header(clears=True),
                 "Clear-Site-Data": {
                     "description": (
                         "Clears the browser HTTP cache when a session was ended."
                     ),
                     "schema": {"type": "string", "examples": ['"cache"']},
-                }
+                },
             },
         }
     },
@@ -302,6 +306,7 @@ _CHANGE_PASSWORD_400[400]["description"] += (
     response_model=UserResponse,
     operation_id="change_password",
     responses={
+        200: {"headers": session_cookie_header()},
         **_UNAUTHENTICATED,
         **_CHANGE_PASSWORD_400,
         **_THROTTLED,

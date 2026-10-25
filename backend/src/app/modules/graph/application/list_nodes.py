@@ -9,6 +9,7 @@ import structlog
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.prepare_query import prepare_query, utc_today
 from app.modules.graph.application.schema_meta import search_excluded_keys
+from app.modules.graph.application.search_nodes import TOTAL_CAP
 from app.modules.graph.application.type_catalogue import load_node_types
 from app.modules.graph.domain.errors import CollectionNotFoundError
 from app.modules.graph.domain.node import Node
@@ -19,6 +20,7 @@ from app.modules.graph.domain.query import (
     Group,
     InvalidQueryError,
     Query,
+    ResolvedQuery,
     TextCondition,
     TypeCondition,
 )
@@ -61,6 +63,7 @@ class ListNodesResult:
 
     items: list[Node]
     total: int
+    total_capped: bool = False
 
 
 def _list_filters(query: ListNodesQuery) -> list[Condition]:
@@ -93,10 +96,23 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
         guard: AccessGuard,
         collection_members: CollectionMembers | None = None,
         today: Callable[[], date] = utc_today,
+        total_cap: int = TOTAL_CAP,
     ) -> None:
         super().__init__(repos, guard)
         self._collection_members = collection_members
         self._today = today
+        self._total_cap = total_cap
+
+    def _cap(self, query: ListNodesQuery) -> int | None:
+        """Text search counts stop at the cap; other lists count exactly."""
+        return None if query.q is None else self._total_cap
+
+    @staticmethod
+    def _capped(counted: int, cap: int | None) -> tuple[int, bool]:
+        """Clamp a count taken with one past `cap` and say whether it was clamped."""
+        if cap is None:
+            return counted, False
+        return min(counted, cap), counted > cap
 
     async def _resolve_collection(
         self, collection_id: uuid.UUID | None, scope: ContentFilter
@@ -116,6 +132,26 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
             raise CollectionNotFoundError(msg)
         return source
 
+    async def _smart_query(
+        self,
+        query: ListNodesQuery,
+        definition: Mapping[str, Any],
+        scope: ContentFilter,
+    ) -> ResolvedQuery | None:
+        """A smart collection's saved query ANDed with the list filters.
+
+        None when the definition no longer validates, which matches nothing.
+        """
+        try:
+            resolved, _ = await prepare_query(
+                self._repos, definition, self._today(), scope=scope
+            )
+        except InvalidQueryError as exc:
+            logger.info("smart collection query no longer valid", path=exc.path)
+            return None
+        where = _combine(resolved.query.where, _list_filters(query))
+        return replace(resolved, query=Query(where=where))
+
     async def _list_smart(
         self,
         query: ListNodesQuery,
@@ -124,24 +160,46 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
     ) -> ListNodesResult:
         """List a smart collection: its saved query AND the list filters, by id.
 
-        The saved sort is ignored so the id paging holds. A definition that no
-        longer validates matches nothing.
+        The saved sort is ignored so the id paging holds.
         """
-        try:
-            resolved, _ = await prepare_query(
-                self._repos, definition, self._today(), scope=scope
-            )
-        except InvalidQueryError as exc:
-            logger.info("smart collection query no longer valid", path=exc.path)
+        combined = await self._smart_query(query, definition, scope)
+        if combined is None:
             return ListNodesResult(items=[], total=0)
-        where = _combine(resolved.query.where, _list_filters(query))
-        combined = replace(resolved, query=Query(where=where))
         after = None if query.after is None else Cursor(sort_values=(), id=query.after)
         hits = await self._repos.nodes.search(
             scope=scope, resolved=combined, after=after, limit=query.limit
         )
-        total = await self._repos.nodes.search_count(scope=scope, resolved=combined)
-        return ListNodesResult(items=[hit.node for hit in hits], total=total)
+        cap = self._cap(query)
+        counted = await self._repos.nodes.search_count(
+            scope=scope,
+            resolved=combined,
+            limit=None if cap is None else cap + 1,
+        )
+        total, capped = self._capped(counted, cap)
+        return ListNodesResult(
+            items=[hit.node for hit in hits], total=total, total_capped=capped
+        )
+
+    async def count_exact(self, query: ListNodesQuery, scope: ContentFilter) -> int:
+        """Count what the list filters match, uncapped and without fetching rows.
+
+        The caller has already passed the access check.
+        """
+        source = await self._resolve_collection(query.collection, scope)
+        if isinstance(source, SmartSource):
+            combined = await self._smart_query(query, source.definition, scope)
+            if combined is None:
+                return 0
+            return await self._repos.nodes.search_count(scope=scope, resolved=combined)
+        exclusions = await self._search_exclusions() if query.q is not None else None
+        return await self._repos.nodes.count(
+            scope=scope,
+            type=query.type,
+            q=query.q,
+            favourite=query.favourite,
+            attribute_search_exclusions=exclusions,
+            ids=None if source is None else source.ids,
+        )
 
     async def _search_exclusions(self) -> dict[str, list[str]]:
         """Map each node type slug to the attribute keys a search must skip."""
@@ -172,14 +230,17 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
             attribute_search_exclusions=exclusions,
             ids=ids,
         )
-        total = await self._repos.nodes.count(
+        cap = self._cap(query)
+        counted = await self._repos.nodes.count(
             scope=scope,
             type=query.type,
             q=query.q,
             favourite=query.favourite,
             attribute_search_exclusions=exclusions,
             ids=ids,
+            limit=None if cap is None else cap + 1,
         )
-        result = ListNodesResult(items=items, total=total)
+        total, capped = self._capped(counted, cap)
+        result = ListNodesResult(items=items, total=total, total_capped=capped)
         logger.debug("nodes listed", count=len(result.items), total=result.total)
         return result

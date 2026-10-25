@@ -21,6 +21,7 @@ CORS_REQUEST_HEADERS = [
 CORS_RESPONSE_HEADERS = [
     "App-Version",
     "Total-Count",
+    "Total-Count-Capped",
     "Link",
     "ETag",
     "Request-Id",

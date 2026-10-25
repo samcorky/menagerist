@@ -280,6 +280,14 @@ class NodeSearchResponse(BaseModel):
         )
 
 
+class NodeCountResponse(BaseModel):
+    """The exact number of items matching a filter."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [{"count": 1234}]})
+
+    count: int = Field(description="Matching live items, with no cap.")
+
+
 class ItemFieldResponse(BaseModel):
     """A field individual items carry in their own overlay."""
 

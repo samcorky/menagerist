@@ -832,3 +832,18 @@ async def test_list_attribute_values_q_ignores_accents(
         )
         == expected
     )
+
+
+async def test_count_with_limit_stops_at_the_limit(db_session: AsyncSession) -> None:
+    """`limit` caps the count; without it the count is exact."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    for i in range(5):
+        await repository.add(
+            Node.create(owner_id=uuid.UUID(int=1), name=f"Coin {i}", type="coin")
+        )
+    scope = ContentFilter.everyone()
+
+    assert await repository.count(scope=scope, q="coin") == 5
+    assert await repository.count(scope=scope, q="coin", limit=3) == 3
+    assert await repository.count(scope=scope, q="coin", limit=9) == 5
+    assert await repository.count(scope=scope, type="coin", limit=2) == 2
