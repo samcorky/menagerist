@@ -49,3 +49,8 @@ class SoftDeletable(Timestamped):
         now = datetime.now(UTC)
         self.deleted_at = now
         self.updated_at = now
+
+    def restore(self) -> None:
+        """Clear the deletion mark, timestamping the lifecycle change."""
+        self.deleted_at = None
+        self.updated_at = datetime.now(UTC)

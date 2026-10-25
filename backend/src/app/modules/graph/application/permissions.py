@@ -7,11 +7,13 @@ class GraphPermission(PermissionEnum):
     """Permissions for graph operations.
 
     Item and type permissions are held by members; the rest affect every user's
-    content and are admin-only. Values read `<module>:<resource>:<action>`.
+    content and are admin-only. `ITEM_PURGE` is held by members but never
+    grantable to a token. Values read `<module>:<resource>:<action>`.
     """
 
     ITEM_READ = "graph:item:read"
     ITEM_WRITE = "graph:item:write"
+    ITEM_PURGE = "graph:item:purge"
     TYPE_READ = "graph:type:read"
     TYPE_WRITE = "graph:type:write"
     DELETE_NODE_TYPE = "graph:node_type:delete"

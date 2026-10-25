@@ -100,6 +100,22 @@ def test_conventional_links_are_named_after_the_target(schema: dict[str, Any]) -
     assert set(links) == {"GetNode", "UpdateNode", "DeleteNode"}
 
 
+def test_restore_and_purge_links_are_declared_on_the_deleted_lists_only(
+    schema: dict[str, Any],
+) -> None:
+    """A live response never suggests restore or purge; the deleted lists do."""
+    operations = _operations(schema)
+    for op_id in ("create_node", "list_nodes", "create_collection", "list_collections"):
+        for response in operations[op_id]["responses"].values():
+            names = set(response.get("links", {}))
+            assert not {n for n in names if n.startswith(("Restore", "Purge"))}
+    deleted = operations["list_deleted_nodes"]["responses"]["200"]["links"]
+    assert deleted["RestoreNode"]["operationId"] == "restore_node"
+    assert deleted["PurgeNode"]["parameters"] == {"node_id": "$response.body#/0/id"}
+    collections = operations["list_deleted_collections"]["responses"]["200"]["links"]
+    assert collections["RestoreCollection"]["operationId"] == "restore_collection"
+
+
 def test_list_responses_use_the_first_item(schema: dict[str, Any]) -> None:
     """List responses link through the first item."""
     list_links = next(

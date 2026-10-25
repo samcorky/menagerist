@@ -15,6 +15,8 @@ from typing import Any
 _ITEM_PATH = re.compile(r"^(?P<collection>.*)/\{(?P<param>\w+)\}(?P<rest>(/[\w-]+)*)$")
 _METHODS = ("get", "post", "put", "patch", "delete")
 _JSON = "application/json"
+# These act on a deleted resource, so a live response must not suggest them.
+_RECOVERY_ACTIONS = ("/restore", "/purge")
 
 
 def _resolve(openapi: dict[str, Any], node: dict[str, Any]) -> dict[str, Any]:
@@ -58,7 +60,11 @@ def add_conventional_links(openapi: dict[str, Any]) -> None:
     targets: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for path, item in paths.items():
         match = _ITEM_PATH.match(path)
-        if match and "{" not in match["collection"] + match["rest"]:
+        if (
+            match
+            and "{" not in match["collection"] + match["rest"]
+            and match["rest"] not in _RECOVERY_ACTIONS
+        ):
             key = (match["collection"], match["param"])
             targets.setdefault(key, []).extend(_operations(item))
 

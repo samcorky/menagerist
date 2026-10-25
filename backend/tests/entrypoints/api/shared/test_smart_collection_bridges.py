@@ -839,6 +839,46 @@ def test_a_deleted_parent_makes_the_child_stale(env: Env) -> None:
     ]
 
 
+def test_a_restored_parent_makes_the_child_evaluate_again(env: Env) -> None:
+    """Restoring the collection a search refers to brings its matches back."""
+    _films(env)
+    parent = env.smart(_where(_rating(">=", 4)), name="Parent")
+    child = env.smart(_where(_in(parent["id"])), name="Child")
+    a = env.as_(ALICE)
+    a.delete(f"{COLLECTIONS}/{parent['id']}")
+
+    restored = a.post(f"{COLLECTIONS}/{parent['id']}/restore")
+
+    assert restored.status_code == 200, restored.text
+    assert restored.json()["item_count"] == 3
+    shown = a.get(f"{COLLECTIONS}/{child['id']}").json()
+    assert shown["item_count"] == 3
+    assert shown["warnings"] == []
+
+
+def test_a_purged_parent_leaves_the_child_with_a_warning_not_an_error(
+    env: Env,
+) -> None:
+    """Purging the referred collection degrades the child like a deleted one."""
+    _films(env)
+    parent = env.smart(_where(_rating(">=", 4)), name="Parent")
+    child = env.smart(_where(_in(parent["id"])), name="Child")
+    a = env.as_(ALICE)
+    a.delete(f"{COLLECTIONS}/{parent['id']}")
+
+    assert a.delete(f"{COLLECTIONS}/{parent['id']}/purge").status_code == 204
+
+    shown = a.get(f"{COLLECTIONS}/{child['id']}")
+    assert shown.status_code == 200, shown.text
+    assert shown.json()["item_count"] == 0
+    assert [w["message"] for w in shown.json()["warnings"]] == [
+        "That collection no longer exists."
+    ]
+    listed = a.get(f"{NODES}?collection={child['id']}")
+    assert listed.status_code == 200
+    assert listed.json() == []
+
+
 def test_another_persons_collection_named_in_a_definition_is_stale(env: Env) -> None:
     """Bob cannot build on Alice's collection; it reads as one that is gone."""
     _films(env)

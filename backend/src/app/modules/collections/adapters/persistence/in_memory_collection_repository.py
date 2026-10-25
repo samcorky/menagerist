@@ -2,6 +2,7 @@ import unicodedata
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import builtins
     import uuid
 
     from app.modules.collections.domain.collection import Collection, CollectionKind
@@ -93,6 +94,40 @@ class InMemoryCollectionRepository:
             key=lambda c: c.id,
         )
         return live[:limit]
+
+    def _deleted_rows(self, scope: ContentFilter) -> builtins.list[Collection]:
+        """Soft-deleted collections in `scope`, newest deleted first (ties by id)."""
+        return sorted(
+            (
+                c
+                for c in self._collections.values()
+                if c.deleted_at is not None and scope.covers(c.owner_id)
+            ),
+            key=lambda c: (c.deleted_at, c.id),
+            reverse=True,
+        )
+
+    async def get_deleted(
+        self, collection_id: uuid.UUID, *, scope: ContentFilter
+    ) -> Collection | None:
+        """Return the soft-deleted collection with `collection_id`, or `None`."""
+        return next(
+            (c for c in self._deleted_rows(scope) if c.id == collection_id), None
+        )
+
+    async def list_deleted(
+        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[Collection]:
+        """List soft-deleted collections in `scope`, newest deleted first."""
+        rows = self._deleted_rows(scope)
+        if after is not None:
+            ids = [c.id for c in rows]
+            rows = rows[ids.index(after) + 1 :] if after in ids else []
+        return rows[:limit]
+
+    async def count_deleted(self, *, scope: ContentFilter) -> int:
+        """Return the number of soft-deleted collections in `scope`."""
+        return len(self._deleted_rows(scope))
 
     async def purge(self, collection_id: uuid.UUID) -> None:
         """Hard-delete the collection row, live or soft-deleted; unknown is a no-op."""

@@ -47,5 +47,9 @@ class NodeTypeInUseError(ConflictError):
     """Raised when removing an item type that items still use."""
 
 
+class NodeTypeDeletedError(ConflictError):
+    """Raised when undeleting an item whose item type has since been deleted."""
+
+
 class EdgeTypeInUseError(ConflictError):
     """Raised when deleting an edge type still referenced by existing edges."""

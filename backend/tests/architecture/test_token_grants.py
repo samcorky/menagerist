@@ -13,6 +13,8 @@ from app.entrypoints.api.shared.permissions import expand
 from app.modules.backup.application.import_user_archive import ImportUserArchive
 from app.modules.backup.application.import_user_data import ImportUserData
 from app.modules.backup.application.permissions import BackupPermission
+from app.modules.collections.application.permissions import CollectionPermission
+from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.promote_extra_schema_field import (
     PromoteExtraSchemaField,
 )
@@ -56,9 +58,20 @@ def test_grantable_set_is_member_content_minus_backups() -> None:
         - {
             BackupPermission.EXPORT_OWN_DATA,
             BackupPermission.IMPORT_OWN_DATA,
+            GraphPermission.ITEM_PURGE,
+            CollectionPermission.COLLECTION_PURGE,
         }
         == TOKEN_GRANTABLE_PERMISSIONS
     )
+
+
+def test_purges_are_held_by_members_but_never_grantable() -> None:
+    """Permanent deletion needs a signed-in session, not a token."""
+    purges = {GraphPermission.ITEM_PURGE, CollectionPermission.COLLECTION_PURGE}
+    assert purges <= MEMBER_PERMISSIONS
+    assert not purges & TOKEN_GRANTABLE_PERMISSIONS
+    for purge in purges:
+        assert purge.implied() == frozenset()
 
 
 def test_every_grantable_permission_implies_only_grantable_ones() -> None:

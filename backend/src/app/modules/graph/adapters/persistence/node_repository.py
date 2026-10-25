@@ -15,6 +15,7 @@ from sqlalchemy import (
     select,
     text,
     true,
+    tuple_,
     update,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID, aggregate_order_by
@@ -438,6 +439,52 @@ class SqlAlchemyNodeRepository:
             ItemFieldUse(key=key, kind=kind_, label=name or key, count=int(count))
             for key, kind_, count, name in result.all()
         ]
+
+    @staticmethod
+    def _deleted(scope: ContentFilter) -> ColumnElement[bool]:
+        """Soft-deleted rows the `scope` covers."""
+        return and_(
+            NodeModel.deleted_at.is_not(None), owned_by(NodeModel, scope.user_id)
+        )
+
+    async def get_deleted(
+        self, node_id: uuid.UUID, *, scope: ContentFilter
+    ) -> Node | None:
+        """Return the soft-deleted node with `node_id`, or `None` if live or unseen."""
+        stmt = (
+            select(NodeModel)
+            .where(self._deleted(scope), NodeModel.id == node_id)
+            .execution_options(populate_existing=True)
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return None if model is None else _to_domain(model)
+
+    async def list_deleted(
+        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[Node]:
+        """List soft-deleted nodes in `scope`, newest deleted first (ties by id)."""
+        stmt = (
+            select(NodeModel)
+            .where(self._deleted(scope))
+            .order_by(NodeModel.deleted_at.desc(), NodeModel.id.desc())
+            .limit(limit)
+        )
+        if after is not None:
+            last = (
+                select(NodeModel.deleted_at)
+                .where(NodeModel.id == after, self._deleted(scope))
+                .scalar_subquery()
+            )
+            stmt = stmt.where(
+                tuple_(NodeModel.deleted_at, NodeModel.id) < tuple_(last, after)
+            )
+        result = await self._session.execute(stmt)
+        return [_to_domain(model) for model in result.scalars()]
+
+    async def count_deleted(self, *, scope: ContentFilter) -> int:
+        """Return the number of soft-deleted nodes in `scope`."""
+        stmt = select(func.count()).select_from(NodeModel).where(self._deleted(scope))
+        return (await self._session.execute(stmt)).scalar_one()
 
     async def purge(self, node_id: uuid.UUID) -> None:
         """Hard-delete the node row, live or soft-deleted; an unknown id is a no-op."""

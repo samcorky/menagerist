@@ -27,6 +27,12 @@ from app.modules.collections.application.create_collection import CreateCollecti
 from app.modules.collections.application.delete_collection import DeleteCollection
 from app.modules.collections.application.get_collection import GetCollection
 from app.modules.collections.application.list_collections import ListCollections
+from app.modules.collections.application.list_deleted_collections import (
+    ListDeletedCollections,
+)
+from app.modules.collections.application.purge_deleted_collection import (
+    PurgeDeletedCollection,
+)
 from app.modules.collections.application.remove_item_from_collection import (
     RemoveItemFromCollection,
 )
@@ -34,6 +40,7 @@ from app.modules.collections.application.resolve_collection import (
     ResolveCollection,
     ResolveCollectionQuery,
 )
+from app.modules.collections.application.restore_collection import RestoreCollection
 from app.modules.collections.application.update_collection import UpdateCollection
 from app.modules.collections.ports.unit_of_work import (
     CollectionsRepos,
@@ -114,6 +121,27 @@ def get_delete_collection_use_case(
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> DeleteCollection:
     return DeleteCollection(uow, guard)
+
+
+def get_list_deleted_collections_use_case(
+    repos: Annotated[CollectionsRepos, Depends(get_collections_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> ListDeletedCollections:
+    return ListDeletedCollections(repos, guard)
+
+
+def get_restore_collection_use_case(
+    uow: Annotated[CollectionsUnitOfWork, Depends(get_collections_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> RestoreCollection:
+    return RestoreCollection(uow, guard)
+
+
+def get_purge_deleted_collection_use_case(
+    uow: Annotated[CollectionsUnitOfWork, Depends(get_collections_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> PurgeDeletedCollection:
+    return PurgeDeletedCollection(uow, guard)
 
 
 def get_add_items_to_collection_use_case(

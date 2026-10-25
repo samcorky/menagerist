@@ -14,6 +14,10 @@ from app.entrypoints.api.shared.bridges.collection_members import (
     CollectionsMembers,
     get_collection_members,
 )
+from app.entrypoints.api.shared.bridges.item_dependents import (
+    ItemDependentsPurger,
+    get_item_dependents,
+)
 from app.modules.graph.adapters.persistence.unit_of_work import create_graph_uow
 from app.modules.graph.application.count_edge_type_attribute_usage import (
     CountEdgeTypeAttributeUsage,
@@ -36,6 +40,7 @@ from app.modules.graph.application.get_edge_type import GetEdgeType
 from app.modules.graph.application.get_node import GetNode
 from app.modules.graph.application.get_node_type import GetNodeType
 from app.modules.graph.application.list_attribute_values import ListAttributeValues
+from app.modules.graph.application.list_deleted_nodes import ListDeletedNodes
 from app.modules.graph.application.list_edge_types import ListEdgeTypes
 from app.modules.graph.application.list_edges import ListEdges
 from app.modules.graph.application.list_item_fields import ListItemFields
@@ -44,12 +49,14 @@ from app.modules.graph.application.list_nodes import ListNodes
 from app.modules.graph.application.promote_extra_schema_field import (
     PromoteExtraSchemaField,
 )
+from app.modules.graph.application.purge_deleted_node import PurgeDeletedNode
 from app.modules.graph.application.purge_edge_type_attribute import (
     PurgeEdgeTypeAttribute,
 )
 from app.modules.graph.application.purge_node_type_attribute import (
     PurgeNodeTypeAttribute,
 )
+from app.modules.graph.application.restore_node import RestoreNode
 from app.modules.graph.application.search_nodes import SearchNodes
 from app.modules.graph.application.update_edge import UpdateEdge
 from app.modules.graph.application.update_edge_type import UpdateEdgeType
@@ -142,6 +149,28 @@ def get_delete_node_use_case(
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> DeleteNode:
     return DeleteNode(uow, guard)
+
+
+def get_list_deleted_nodes_use_case(
+    repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> ListDeletedNodes:
+    return ListDeletedNodes(repos, guard)
+
+
+def get_restore_node_use_case(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> RestoreNode:
+    return RestoreNode(uow, guard)
+
+
+def get_purge_deleted_node_use_case(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    dependents: Annotated[ItemDependentsPurger, Depends(get_item_dependents)],
+) -> PurgeDeletedNode:
+    return PurgeDeletedNode(uow, guard, dependents)
 
 
 def get_promote_extra_schema_field_use_case(

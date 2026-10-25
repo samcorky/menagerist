@@ -8,7 +8,8 @@
 		Activity,
 		Sparkles,
 		Shield,
-		UserRound
+		UserRound,
+		Trash2
 	} from '@lucide/svelte';
 	import { auth } from '$lib/auth.svelte.js';
 </script>
@@ -108,6 +109,29 @@
 							<p class="font-heading font-semibold">Examples</p>
 							<p class="mt-0.5 text-sm text-muted-foreground">
 								Explore Menagerist with ready-made example items.
+							</p>
+						</div>
+					</div>
+					<ChevronRight
+						class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+					/>
+				</div>
+			</a>
+
+			<a href={resolve('/recently-deleted')} class="group block">
+				<div
+					class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
+				>
+					<div class="flex items-start gap-4">
+						<div
+							class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
+						>
+							<Trash2 class="size-5" />
+						</div>
+						<div>
+							<p class="font-heading font-semibold">Recently deleted</p>
+							<p class="mt-0.5 text-sm text-muted-foreground">
+								Restore items and collections you deleted, or delete them for good.
 							</p>
 						</div>
 					</div>

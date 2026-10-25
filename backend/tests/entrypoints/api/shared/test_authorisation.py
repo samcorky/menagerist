@@ -24,12 +24,14 @@ CONTENT_VALUES = frozenset(
     {
         "graph:item:read",
         "graph:item:write",
+        "graph:item:purge",
         "graph:type:read",
         "graph:type:write",
         "media:item:read",
         "media:item:write",
         "collections:collection:read",
         "collections:collection:write",
+        "collections:collection:purge",
         "presets:preset:read",
         "presets:preset:write",
         "examples:pack:read",
@@ -46,7 +48,7 @@ def test_the_default_member_grant_is_the_content_set() -> None:
     assert frozenset(CONTENT_PERMISSIONS) == CONTENT_VALUES
     assert not CONTENT_PERMISSIONS & ADMIN_ONLY_ACTIONS
     assert ALL_PERMISSIONS - MEMBER_PERMISSIONS == ADMIN_ONLY_ACTIONS
-    assert len(ALL_PERMISSIONS) == 30
+    assert len(ALL_PERMISSIONS) == 32
 
 
 def test_the_admin_only_set_matches_the_catalogue() -> None:

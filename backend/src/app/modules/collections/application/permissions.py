@@ -8,6 +8,7 @@ class CollectionPermission(PermissionEnum):
 
     COLLECTION_READ = "collections:collection:read"
     COLLECTION_WRITE = "collections:collection:write"
+    COLLECTION_PURGE = "collections:collection:purge"
 
     def implied(self) -> frozenset[Self]:
         """Return what holding this permission also grants."""

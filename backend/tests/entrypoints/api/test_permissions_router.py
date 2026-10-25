@@ -14,10 +14,12 @@ URL = "/api/v1/auth/me/permissions"
 CONTENT = [
     "backup:own_data:export",
     "backup:own_data:import",
+    "collections:collection:purge",
     "collections:collection:read",
     "collections:collection:write",
     "examples:pack:install",
     "examples:pack:read",
+    "graph:item:purge",
     "graph:item:read",
     "graph:item:write",
     "graph:type:read",

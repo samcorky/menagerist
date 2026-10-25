@@ -13,11 +13,18 @@ from app.modules.collections.application.create_collection import CreateCollecti
 from app.modules.collections.application.delete_collection import DeleteCollection
 from app.modules.collections.application.get_collection import GetCollection
 from app.modules.collections.application.list_collections import ListCollections
+from app.modules.collections.application.list_deleted_collections import (
+    ListDeletedCollections,
+)
 from app.modules.collections.application.permissions import CollectionPermission
+from app.modules.collections.application.purge_deleted_collection import (
+    PurgeDeletedCollection,
+)
 from app.modules.collections.application.remove_item_from_collection import (
     RemoveItemFromCollection,
 )
 from app.modules.collections.application.resolve_collection import ResolveCollection
+from app.modules.collections.application.restore_collection import RestoreCollection
 from app.modules.collections.application.update_collection import UpdateCollection
 from app.shared_kernel.access import Access, Content, System
 
@@ -38,6 +45,9 @@ STANCES: dict[type[UseCase[Any, Any]], Access] = {
     DeleteCollection: WRITE,
     RemoveItemFromCollection: WRITE,
     UpdateCollection: WRITE,
+    ListDeletedCollections: READ,
+    RestoreCollection: WRITE,
+    PurgeDeletedCollection: Content(CollectionPermission.COLLECTION_PURGE),
 }
 
 

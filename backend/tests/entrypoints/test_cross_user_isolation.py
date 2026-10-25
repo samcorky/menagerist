@@ -226,7 +226,15 @@ VOCABULARY = "shared vocabulary: every member reads and edits item/relationship 
 PRESETS = "shared presets: not owned content (decision 6)"
 CREATES_OWN = "references no existing content; creates content owned by the caller"
 
+RECENTLY_DELETED = "own deleted rows only, empty in the seed; two-user router tests"
+
 ALLOWED: dict[Route, str] = {
+    ("GET", "/api/v1/node/deleted"): RECENTLY_DELETED,
+    ("POST", "/api/v1/node/{node_id}/restore"): RECENTLY_DELETED,
+    ("DELETE", "/api/v1/node/{node_id}/purge"): RECENTLY_DELETED,
+    ("GET", "/api/v1/collection/deleted"): RECENTLY_DELETED,
+    ("POST", "/api/v1/collection/{collection_id}/restore"): RECENTLY_DELETED,
+    ("DELETE", "/api/v1/collection/{collection_id}/purge"): RECENTLY_DELETED,
     (
         "POST",
         "/api/v1/backup",

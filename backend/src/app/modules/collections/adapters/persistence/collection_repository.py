@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 import structlog
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, tuple_
 from sqlalchemy.exc import IntegrityError
 
 from app.modules.collections.adapters.persistence.models import CollectionModel
@@ -15,6 +15,7 @@ from app.shared_kernel.errors import ConflictError
 from app.shared_kernel.slug import Slug
 
 if TYPE_CHECKING:
+    import builtins
     import uuid
 
     from sqlalchemy import ColumnElement
@@ -185,6 +186,56 @@ class SqlAlchemyCollectionRepository:
                 | _unaccent_ilike(CollectionModel.description, pattern)
             )
         return [_to_domain(m) for m in (await self._session.execute(stmt)).scalars()]
+
+    @staticmethod
+    def _deleted(scope: ContentFilter) -> ColumnElement[bool]:
+        """Soft-deleted collections whose owner is inside `scope`."""
+        return CollectionModel.deleted_at.is_not(None) & owned_by(
+            CollectionModel, scope.user_id
+        )
+
+    async def get_deleted(
+        self, collection_id: uuid.UUID, *, scope: ContentFilter
+    ) -> Collection | None:
+        """Return the soft-deleted collection with `collection_id`, or `None`."""
+        stmt = (
+            select(CollectionModel)
+            .where(self._deleted(scope), CollectionModel.id == collection_id)
+            .execution_options(populate_existing=True)
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return None if model is None else _to_domain(model)
+
+    async def list_deleted(
+        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[Collection]:
+        """List soft-deleted collections in `scope`, newest deleted first."""
+        stmt = (
+            select(CollectionModel)
+            .where(self._deleted(scope))
+            .order_by(CollectionModel.deleted_at.desc(), CollectionModel.id.desc())
+            .limit(limit)
+        )
+        if after is not None:
+            last = (
+                select(CollectionModel.deleted_at)
+                .where(CollectionModel.id == after, self._deleted(scope))
+                .scalar_subquery()
+            )
+            stmt = stmt.where(
+                tuple_(CollectionModel.deleted_at, CollectionModel.id)
+                < tuple_(last, after)
+            )
+        return [_to_domain(m) for m in (await self._session.execute(stmt)).scalars()]
+
+    async def count_deleted(self, *, scope: ContentFilter) -> int:
+        """Return the number of soft-deleted collections in `scope`."""
+        stmt = (
+            select(func.count())
+            .select_from(CollectionModel)
+            .where(self._deleted(scope))
+        )
+        return (await self._session.execute(stmt)).scalar_one()
 
     async def purge(self, collection_id: uuid.UUID) -> None:
         """Hard-delete the collection row, live or soft-deleted; unknown is a no-op."""

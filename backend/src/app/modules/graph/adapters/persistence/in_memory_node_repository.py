@@ -324,6 +324,38 @@ class InMemoryNodeRepository:
         rows.sort(key=lambda row: (-row.count, row.key, row.kind))
         return rows[:limit]
 
+    def _deleted_rows(self, scope: ContentFilter) -> builtins.list[Node]:
+        """Soft-deleted nodes in `scope`, newest deleted first (ties by id)."""
+        return sorted(
+            (
+                n
+                for n in self._nodes.values()
+                if n.deleted_at is not None and scope.covers(n.owner_id)
+            ),
+            key=lambda n: (n.deleted_at, n.id),
+            reverse=True,
+        )
+
+    async def get_deleted(
+        self, node_id: uuid.UUID, *, scope: ContentFilter
+    ) -> Node | None:
+        """Return the soft-deleted node with `node_id`, or `None` if live or unseen."""
+        return next((n for n in self._deleted_rows(scope) if n.id == node_id), None)
+
+    async def list_deleted(
+        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[Node]:
+        """List soft-deleted nodes in `scope`, newest deleted first (ties by id)."""
+        rows = self._deleted_rows(scope)
+        if after is not None:
+            ids = [n.id for n in rows]
+            rows = rows[ids.index(after) + 1 :] if after in ids else []
+        return rows[:limit]
+
+    async def count_deleted(self, *, scope: ContentFilter) -> int:
+        """Return the number of soft-deleted nodes in `scope`."""
+        return len(self._deleted_rows(scope))
+
     async def purge(self, node_id: uuid.UUID) -> None:
         """Hard-delete the node row, live or soft-deleted; an unknown id is a no-op."""
         self._nodes.pop(node_id, None)

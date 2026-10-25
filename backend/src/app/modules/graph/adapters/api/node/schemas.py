@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -181,6 +181,45 @@ class NodeResponse(BaseModel):
             extra_schema=node.extra_schema,
             created_at=node.created_at,
             updated_at=node.updated_at,
+        )
+
+
+class DeletedNodeResponse(BaseModel):
+    """A deleted item as listed in Recently deleted."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                    "name": "Alien",
+                    "type": "film",
+                    "deleted_at": "2026-10-25T09:30:12.104233Z",
+                },
+                {
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e11",
+                    "name": "Untitled capture",
+                    "type": None,
+                    "deleted_at": "2026-10-24T18:02:47.551920Z",
+                },
+            ]
+        }
+    )
+
+    id: uuid.UUID
+    name: str
+    type: str | None = Field(default=None)
+    deleted_at: datetime
+
+    @classmethod
+    def from_domain(cls, node: Node) -> DeletedNodeResponse:
+        """Build a response from a deleted domain `Node`."""
+        # The repository only lists deleted rows, so the mark is always set.
+        return cls(
+            id=node.id,
+            name=node.name,
+            type=node.type,
+            deleted_at=cast("datetime", node.deleted_at),
         )
 
 

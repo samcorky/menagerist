@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
+    import builtins
     import uuid
 
     from app.modules.collections.domain.collection import Collection, CollectionKind
@@ -47,6 +48,26 @@ class CollectionRepository(Protocol):
         A non-blank `q` keeps collections whose name or description contains it,
         ignoring case. A `kind` keeps only collections of that kind.
         """
+        ...
+
+    async def get_deleted(
+        self, collection_id: uuid.UUID, *, scope: ContentFilter
+    ) -> Collection | None:
+        """Return the soft-deleted collection with `collection_id`, or `None`."""
+        ...
+
+    async def list_deleted(
+        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[Collection]:
+        """List soft-deleted collections in `scope`, newest deleted first.
+
+        Ties break by id. `after` is the id of the last row of the previous
+        page; one no longer in Recently deleted yields an empty page.
+        """
+        ...
+
+    async def count_deleted(self, *, scope: ContentFilter) -> int:
+        """Return the number of soft-deleted collections in `scope`."""
         ...
 
     async def purge(self, collection_id: uuid.UUID) -> None:

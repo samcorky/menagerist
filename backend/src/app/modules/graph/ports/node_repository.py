@@ -171,6 +171,26 @@ class NodeRepository(Protocol):
         """
         ...
 
+    async def get_deleted(
+        self, node_id: uuid.UUID, *, scope: ContentFilter
+    ) -> Node | None:
+        """Return the soft-deleted node with `node_id`, or `None` if live or unseen."""
+        ...
+
+    async def list_deleted(
+        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[Node]:
+        """List soft-deleted nodes in `scope`, newest deleted first (ties by id).
+
+        `after` is the id of the last row of the previous page. An `after` that
+        is no longer in Recently deleted yields an empty page.
+        """
+        ...
+
+    async def count_deleted(self, *, scope: ContentFilter) -> int:
+        """Return the number of soft-deleted nodes in `scope`."""
+        ...
+
     async def purge(self, node_id: uuid.UUID) -> None:
         """Hard-delete the node row, live or soft-deleted; an unknown id is a no-op.
 

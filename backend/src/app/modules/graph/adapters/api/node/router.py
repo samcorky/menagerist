@@ -20,14 +20,18 @@ from app.modules.graph.adapters.api.dependencies import (
     get_create_node_use_case,
     get_delete_node_use_case,
     get_get_node_use_case,
+    get_list_deleted_nodes_use_case,
     get_list_item_fields_use_case,
     get_list_nodes_use_case,
     get_promote_extra_schema_field_use_case,
+    get_purge_deleted_node_use_case,
+    get_restore_node_use_case,
     get_search_nodes_use_case,
     get_update_node_use_case,
 )
 from app.modules.graph.adapters.api.node.schemas import (
     CreateNodeRequest,
+    DeletedNodeResponse,
     ItemFieldResponse,
     NodeCountResponse,
     NodeResponse,
@@ -40,6 +44,10 @@ from app.modules.graph.application.count_nodes import CountNodes
 from app.modules.graph.application.create_node import CreateNode
 from app.modules.graph.application.delete_node import DeleteNode, DeleteNodeCommand
 from app.modules.graph.application.get_node import GetNode, GetNodeQuery
+from app.modules.graph.application.list_deleted_nodes import (
+    ListDeletedNodes,
+    ListDeletedNodesQuery,
+)
 from app.modules.graph.application.list_item_fields import (
     ListItemFields,
     ListItemFieldsQuery,
@@ -49,12 +57,18 @@ from app.modules.graph.application.promote_extra_schema_field import (
     PromoteExtraSchemaField,
     PromoteExtraSchemaFieldCommand,
 )
+from app.modules.graph.application.purge_deleted_node import (
+    PurgeDeletedNode,
+    PurgeDeletedNodeCommand,
+)
+from app.modules.graph.application.restore_node import RestoreNode, RestoreNodeCommand
 from app.modules.graph.application.search_nodes import SearchNodes, SearchNodesQuery
 from app.modules.graph.application.update_node import UpdateNode
 from app.modules.graph.domain.errors import (
     CollectionNotFoundError,
     InvalidSchemaError,
     NodeNotFoundError,
+    NodeTypeDeletedError,
     NodeTypeNotFoundError,
 )
 from app.modules.graph.domain.query import InvalidQueryError
@@ -85,6 +99,33 @@ _TOTAL_COUNT_HEADERS: dict[int | str, dict[str, Any]] = {
                 "schema": {"type": "string", "enum": ["true"]},
             },
         }
+    }
+}
+
+_DELETED_HEADERS: dict[int | str, dict[str, Any]] = {
+    200: {
+        "headers": {
+            "Link": {
+                "description": "RFC 8288 next-page cursor. Absent on last page.",
+                "schema": {"type": "string"},
+            },
+            "Total-Count": {
+                "description": "Deleted items in total. Always exact.",
+                "schema": {"type": "integer"},
+            },
+        },
+        "links": {
+            "RestoreNode": {
+                "operationId": "restore_node",
+                "parameters": {"node_id": "$response.body#/0/id"},
+                "description": "Restore the most recently deleted one in this list.",
+            },
+            "PurgeNode": {
+                "operationId": "purge_node",
+                "parameters": {"node_id": "$response.body#/0/id"},
+                "description": "Permanently delete the most recently deleted one.",
+            },
+        },
     }
 }
 
@@ -179,6 +220,36 @@ async def list_item_fields(
     """
     fields = await use_case.handle(ListItemFieldsQuery(), actor)
     return [ItemFieldResponse.from_domain(field) for field in fields]
+
+
+@router.get(
+    "/deleted",
+    response_model=list[DeletedNodeResponse],
+    operation_id="list_deleted_nodes",
+    responses=_DELETED_HEADERS,
+)
+async def list_deleted_nodes(
+    use_case: Annotated[ListDeletedNodes, Depends(get_list_deleted_nodes_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+    request: Request,
+    response: Response,
+    after: uuid.UUID | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[DeletedNodeResponse]:
+    """List your deleted items, newest deleted first.
+
+    `after` is the id of the last row of the previous page (the `Link` header
+    carries it). An id that has since been restored or purged gives an empty page.
+    """
+    result = await use_case.handle(
+        ListDeletedNodesQuery(after=after, limit=limit + 1), actor
+    )
+    if len(result.items) > limit:
+        response.headers["Link"] = link_next_header(
+            request, str(result.items[limit - 1].id)
+        )
+    response.headers["Total-Count"] = str(result.total)
+    return [DeletedNodeResponse.from_domain(n) for n in result.items[:limit]]
 
 
 @router.get(
@@ -364,3 +435,59 @@ async def delete_node(
 ) -> None:
     """Soft-delete a node."""
     await use_case.handle(DeleteNodeCommand(node_id=node_id), actor)
+
+
+@router.post(
+    "/{node_id}/restore",
+    response_model=NodeResponse,
+    operation_id="restore_node",
+    responses={
+        **error_response(
+            NodeNotFoundError,
+            detail="Node 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10 not found",
+        ),
+        **error_response(
+            NodeTypeDeletedError,
+            detail=(
+                "The item type 'film' has been deleted. "
+                + "Create an item type with that slug, then try again."
+            ),
+        ),
+    },
+)
+async def restore_node(
+    node_id: uuid.UUID,
+    use_case: Annotated[RestoreNode, Depends(get_restore_node_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> NodeResponse:
+    """Bring a deleted item back.
+
+    Its connections and collections come back with it; a connection that was
+    deleted on its own stays deleted. If its item type has been deleted since,
+    this is a 409 until a type with that slug exists again.
+    """
+    node = await use_case.handle(RestoreNodeCommand(node_id=node_id), actor)
+    return NodeResponse.from_domain(node)
+
+
+@router.delete(
+    "/{node_id}/purge",
+    status_code=204,
+    operation_id="purge_node",
+    responses=error_response(
+        NodeNotFoundError,
+        detail="Node 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10 not found",
+    ),
+)
+async def purge_node(
+    node_id: uuid.UUID,
+    use_case: Annotated[PurgeDeletedNode, Depends(get_purge_deleted_node_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> None:
+    """Permanently delete an item that is in your deleted items. This cannot be undone.
+
+    Its connections, collection memberships and attachments go with it, and so
+    do media files only it used. An item that is not deleted is a 404. Needs a
+    signed-in session: a personal access token cannot purge.
+    """
+    await use_case.handle(PurgeDeletedNodeCommand(node_id=node_id), actor)

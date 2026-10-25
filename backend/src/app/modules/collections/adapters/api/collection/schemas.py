@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -23,6 +23,7 @@ from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
     from app.modules.collections.application.get_collection import CollectionSummary
+    from app.modules.collections.domain.collection import Collection
 
 _DEFINITION_EXAMPLE: dict[str, Any] = {
     "v": 1,
@@ -248,4 +249,43 @@ class CollectionResponse(BaseModel):
             warnings=warnings,
             created_at=collection.created_at,
             updated_at=collection.updated_at,
+        )
+
+
+class DeletedCollectionResponse(BaseModel):
+    """A deleted collection as listed in Recently deleted."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                    "name": "Weekend watchlist",
+                    "kind": "manual",
+                    "deleted_at": "2026-10-25T09:30:12.104233Z",
+                },
+                {
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e21",
+                    "name": "Highly rated films",
+                    "kind": "dynamic",
+                    "deleted_at": "2026-10-24T18:02:47.551920Z",
+                },
+            ]
+        }
+    )
+
+    id: uuid.UUID
+    name: str
+    kind: CollectionKind
+    deleted_at: datetime
+
+    @classmethod
+    def from_domain(cls, collection: Collection) -> DeletedCollectionResponse:
+        """Build a response from a deleted domain `Collection`."""
+        # The repository only lists deleted rows, so the mark is always set.
+        return cls(
+            id=collection.id,
+            name=collection.name,
+            kind=collection.kind,
+            deleted_at=cast("datetime", collection.deleted_at),
         )

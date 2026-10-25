@@ -37,6 +37,9 @@ EXPECTED_PERMISSIONS: dict[str, str] = {
     "collections.DeleteCollection": "collections:collection:write",
     "collections.GetCollection": "collections:collection:read",
     "collections.ListCollections": "collections:collection:read",
+    "collections.ListDeletedCollections": "collections:collection:read",
+    "collections.PurgeDeletedCollection": "collections:collection:purge",
+    "collections.RestoreCollection": "collections:collection:write",
     "collections.RemoveItemFromCollection": "collections:collection:write",
     "collections.ResolveCollection": "collections:collection:read",
     "collections.UpdateCollection": "collections:collection:write",
@@ -63,14 +66,17 @@ EXPECTED_PERMISSIONS: dict[str, str] = {
     "graph.ListAttributeValues": "graph:item:read",
     "graph.ListEdgeTypes": "graph:type:read",
     "graph.ListEdges": "graph:item:read",
+    "graph.ListDeletedNodes": "graph:item:read",
     "graph.ListItemFields": "graph:item:read",
     "graph.ListNodeTypes": "graph:type:read",
     "graph.CountNodes": "graph:item:read",
     "graph.ListNodes": "graph:item:read",
     "graph.PromoteExtraSchemaField": "graph:type:write",
+    "graph.PurgeDeletedNode": "graph:item:purge",
     "graph.PurgeEdgeTypeAttribute": "graph:edge_type:purge_attribute",
     "graph.PurgeNodeTypeAttribute": "graph:node_type:purge_attribute",
     "graph.SearchNodes": "graph:item:read",
+    "graph.RestoreNode": "graph:item:write",
     "graph.UpdateEdge": "graph:item:write",
     "graph.UpdateEdgeType": "graph:type:write",
     "graph.UpdateNode": "graph:item:write",
@@ -118,12 +124,14 @@ EXPECTED_CATALOGUE: frozenset[str] = frozenset(
         "backup:archive:restore",
         "backup:own_data:export",
         "backup:own_data:import",
+        "collections:collection:purge",
         "collections:collection:read",
         "collections:collection:write",
         "examples:pack:install",
         "examples:pack:read",
         "graph:edge_type:delete",
         "graph:edge_type:purge_attribute",
+        "graph:item:purge",
         "graph:item:read",
         "graph:item:write",
         "graph:node_type:delete",
@@ -182,6 +190,6 @@ def test_every_non_admin_permission_is_a_member_permission(name: str) -> None:
 
 
 def test_catalogue_is_pinned() -> None:
-    """The permission catalogue (16 admin, 14 member) only changes deliberately."""
+    """The permission catalogue (16 admin, 16 member) only changes deliberately."""
     assert {p.value for p in ALL_PERMISSIONS} == EXPECTED_CATALOGUE
-    assert len(EXPECTED_CATALOGUE) == 30
+    assert len(EXPECTED_CATALOGUE) == 32

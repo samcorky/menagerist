@@ -1,7 +1,7 @@
 import hashlib
 import json
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
 from starlette.requests import Request
@@ -23,6 +23,7 @@ from app.modules.collections.adapters.api.collection.schemas import (
     CollectionCountResponse,
     CollectionResponse,
     CreateCollectionRequest,
+    DeletedCollectionResponse,
     UpdateCollectionRequest,
 )
 from app.modules.collections.adapters.api.dependencies import (
@@ -33,7 +34,10 @@ from app.modules.collections.adapters.api.dependencies import (
     get_delete_collection_use_case,
     get_get_collection_use_case,
     get_list_collections_use_case,
+    get_list_deleted_collections_use_case,
+    get_purge_deleted_collection_use_case,
     get_remove_item_from_collection_use_case,
+    get_restore_collection_use_case,
     get_update_collection_use_case,
 )
 from app.modules.collections.application.add_items_to_collection import (
@@ -58,9 +62,21 @@ from app.modules.collections.application.list_collections import (
     ListCollections,
     ListCollectionsQuery,
 )
+from app.modules.collections.application.list_deleted_collections import (
+    ListDeletedCollections,
+    ListDeletedCollectionsQuery,
+)
+from app.modules.collections.application.purge_deleted_collection import (
+    PurgeDeletedCollection,
+    PurgeDeletedCollectionCommand,
+)
 from app.modules.collections.application.remove_item_from_collection import (
     RemoveItemFromCollection,
     RemoveItemFromCollectionCommand,
+)
+from app.modules.collections.application.restore_collection import (
+    RestoreCollection,
+    RestoreCollectionCommand,
 )
 from app.modules.collections.application.update_collection import UpdateCollection
 from app.modules.collections.domain.collection import Collection, CollectionKind
@@ -84,6 +100,34 @@ _SMART = error_response(
     CollectionKindError,
     detail="Items cannot be added to or removed from a smart collection.",
 )
+
+
+_DELETED_HEADERS: dict[int | str, dict[str, Any]] = {
+    200: {
+        "headers": {
+            "Link": {
+                "description": "RFC 8288 next-page cursor. Absent on last page.",
+                "schema": {"type": "string"},
+            },
+            "Total-Count": {
+                "description": "Deleted collections in total. Always exact.",
+                "schema": {"type": "integer"},
+            },
+        },
+        "links": {
+            "RestoreCollection": {
+                "operationId": "restore_collection",
+                "parameters": {"collection_id": "$response.body#/0/id"},
+                "description": "Restore the most recently deleted one in this list.",
+            },
+            "PurgeCollection": {
+                "operationId": "purge_collection",
+                "parameters": {"collection_id": "$response.body#/0/id"},
+                "description": "Permanently delete the most recently deleted one.",
+            },
+        },
+    }
+}
 
 
 def _is_smart(collection: Collection) -> bool:
@@ -185,6 +229,38 @@ async def list_collections(
             request, str(summaries[limit - 1].collection.id)
         )
     return [CollectionResponse.from_domain(s) for s in summaries[:limit]]
+
+
+@router.get(
+    "/deleted",
+    response_model=list[DeletedCollectionResponse],
+    operation_id="list_deleted_collections",
+    responses=_DELETED_HEADERS,
+)
+async def list_deleted_collections(
+    use_case: Annotated[
+        ListDeletedCollections, Depends(get_list_deleted_collections_use_case)
+    ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+    request: Request,
+    response: Response,
+    after: uuid.UUID | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[DeletedCollectionResponse]:
+    """List your deleted collections, newest deleted first.
+
+    `after` is the id of the last row of the previous page (the `Link` header
+    carries it). An id that has since been restored or purged gives an empty page.
+    """
+    result = await use_case.handle(
+        ListDeletedCollectionsQuery(after=after, limit=limit + 1), actor
+    )
+    if len(result.items) > limit:
+        response.headers["Link"] = link_next_header(
+            request, str(result.items[limit - 1].id)
+        )
+    response.headers["Total-Count"] = str(result.total)
+    return [DeletedCollectionResponse.from_domain(c) for c in result.items[:limit]]
 
 
 @router.get(
@@ -351,4 +427,62 @@ async def remove_item_from_collection(
     await use_case.handle(
         RemoveItemFromCollectionCommand(collection_id=collection_id, item_id=item_id),
         actor,
+    )
+
+
+@router.post(
+    "/{collection_id}/restore",
+    response_model=CollectionResponse,
+    operation_id="restore_collection",
+    responses={
+        **_NOT_FOUND,
+        **error_response(
+            ConflictError,
+            detail=(
+                "A collection with slug 'weekend-watchlist' already exists. "
+                + "Rename or delete it, then try again."
+            ),
+        ),
+    },
+)
+async def restore_collection(
+    collection_id: uuid.UUID,
+    use_case: Annotated[RestoreCollection, Depends(get_restore_collection_use_case)],
+    get_usecase: Annotated[GetCollection, Depends(get_get_collection_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> CollectionResponse:
+    """Bring a deleted collection back, with the items on it.
+
+    A smart collection comes back with its saved search. If a collection you
+    have since made or renamed uses its slug, this is a 409: rename or delete
+    that one first. Takes the collection's id only; a deleted collection's slug
+    does not resolve.
+    """
+    await use_case.handle(RestoreCollectionCommand(collection_id=collection_id), actor)
+    summary = await get_usecase.handle(
+        GetCollectionQuery(collection_id=collection_id), actor
+    )
+    return CollectionResponse.from_domain(summary)
+
+
+@router.delete(
+    "/{collection_id}/purge",
+    status_code=204,
+    operation_id="purge_collection",
+    responses=_NOT_FOUND,
+)
+async def purge_collection(
+    collection_id: uuid.UUID,
+    use_case: Annotated[
+        PurgeDeletedCollection, Depends(get_purge_deleted_collection_use_case)
+    ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> None:
+    """Permanently delete a collection that is in your deleted collections.
+
+    This cannot be undone. Its items stay. A collection that is not deleted is
+    a 404. Needs a signed-in session: a personal access token cannot purge.
+    """
+    await use_case.handle(
+        PurgeDeletedCollectionCommand(collection_id=collection_id), actor
     )
