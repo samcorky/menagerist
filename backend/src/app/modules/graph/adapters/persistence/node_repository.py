@@ -50,6 +50,7 @@ if TYPE_CHECKING:
     import collections.abc
     import uuid
     from collections.abc import Mapping, Sequence
+    from datetime import datetime
 
     from sqlalchemy import ColumnElement
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -490,6 +491,28 @@ class SqlAlchemyNodeRepository:
         """Hard-delete the node row, live or soft-deleted; an unknown id is a no-op."""
         await self._session.execute(delete(NodeModel).where(NodeModel.id == node_id))
         await self._session.flush()
+
+    async def list_deleted_before(
+        self, cutoff: datetime, *, limit: int
+    ) -> builtins.list[Node]:
+        """List items soft-deleted before `cutoff`, oldest first (ties by id)."""
+        stmt = (
+            select(NodeModel)
+            .where(NodeModel.deleted_at < cutoff)
+            .order_by(NodeModel.deleted_at, NodeModel.id)
+            .limit(limit)
+        )
+        result = await self._session.execute(stmt)
+        return [_to_domain(model) for model in result.scalars()]
+
+    async def count_deleted_before(self, cutoff: datetime) -> int:
+        """Return how many items were soft-deleted before `cutoff`, any owner."""
+        stmt = (
+            select(func.count())
+            .select_from(NodeModel)
+            .where(NodeModel.deleted_at < cutoff)
+        )
+        return (await self._session.execute(stmt)).scalar_one()
 
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]

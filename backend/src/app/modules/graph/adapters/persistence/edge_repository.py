@@ -11,6 +11,7 @@ from app.platform.orm_mixins import claim_rows, owned_by
 if TYPE_CHECKING:
     import builtins
     import uuid
+    from datetime import datetime
 
     from sqlalchemy import ColumnElement, SQLColumnExpression
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -221,6 +222,28 @@ class SqlAlchemyEdgeRepository:
             )
         )
         await self._session.flush()
+
+    async def list_deleted_before(
+        self, cutoff: datetime, *, limit: int
+    ) -> builtins.list[Edge]:
+        """List connections soft-deleted before `cutoff`, oldest first (ties by id)."""
+        stmt = (
+            select(EdgeModel)
+            .where(EdgeModel.deleted_at < cutoff)
+            .order_by(EdgeModel.deleted_at, EdgeModel.id)
+            .limit(limit)
+        )
+        result = await self._session.execute(stmt)
+        return [_to_domain(model) for model in result.scalars()]
+
+    async def count_deleted_before(self, cutoff: datetime) -> int:
+        """Return how many connections were soft-deleted before `cutoff`, any owner."""
+        stmt = (
+            select(func.count())
+            .select_from(EdgeModel)
+            .where(EdgeModel.deleted_at < cutoff)
+        )
+        return (await self._session.execute(stmt)).scalar_one()
 
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]

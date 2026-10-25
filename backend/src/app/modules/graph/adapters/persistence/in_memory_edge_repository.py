@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import builtins
     import uuid
+    from datetime import datetime
 
     from app.modules.graph.domain.edge import Edge
     from app.shared_kernel.content_filter import ContentFilter
@@ -155,6 +156,27 @@ class InMemoryEdgeRepository:
             e.id for e in self._edges.values() if node_id in (e.source_id, e.target_id)
         ]:
             del self._edges[edge_id]
+
+    async def list_deleted_before(
+        self, cutoff: datetime, *, limit: int
+    ) -> builtins.list[Edge]:
+        """List connections soft-deleted before `cutoff`, oldest first (ties by id)."""
+        return self._before(cutoff)[:limit]
+
+    async def count_deleted_before(self, cutoff: datetime) -> int:
+        """Return how many connections were soft-deleted before `cutoff`, any owner."""
+        return len(self._before(cutoff))
+
+    def _before(self, cutoff: datetime) -> builtins.list[Edge]:
+        """Rows soft-deleted before `cutoff`, oldest first (ties by id)."""
+        return sorted(
+            (
+                row
+                for row in self._edges.values()
+                if row.deleted_at is not None and row.deleted_at < cutoff
+            ),
+            key=lambda row: (row.deleted_at, row.id),
+        )
 
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]

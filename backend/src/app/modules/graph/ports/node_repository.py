@@ -5,6 +5,7 @@ if TYPE_CHECKING:
     import collections.abc
     import uuid
     from collections.abc import Mapping, Sequence
+    from datetime import datetime
 
     from app.modules.graph.domain.node import Node
     from app.modules.graph.domain.query import (
@@ -196,6 +197,19 @@ class NodeRepository(Protocol):
 
         The caller purges the node's connections first (`EdgeRepository`).
         """
+        ...
+
+    async def list_deleted_before(
+        self, cutoff: datetime, *, limit: int
+    ) -> builtins.list[Node]:
+        """List items soft-deleted before `cutoff`, oldest first (ties by id).
+
+        System-level and unscoped: every owner, for the retention purge.
+        """
+        ...
+
+    async def count_deleted_before(self, cutoff: datetime) -> int:
+        """Return how many items were soft-deleted before `cutoff`, any owner."""
         ...
 
     async def claim_orphaned(

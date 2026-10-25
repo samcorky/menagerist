@@ -42,10 +42,12 @@ EXPECTED_SYSTEM: frozenset[str] = frozenset(
     {
         "collections.ClaimLegacyCollections",
         "collections.PurgeCollection",
+        "collections.PurgeExpiredCollections",
         "collections.PurgeItemMemberships",
         "examples.ClaimOrphanedInstallations",
         "graph.ClaimOrphanedItems",
         "graph.PurgeEdge",
+        "graph.PurgeExpiredNodes",
         "graph.PurgeNode",
         "media.ClaimOrphanedMedia",
         "media.CleanupExpiredMedia",

@@ -99,6 +99,19 @@ uv run menagerist identity unlock --username sam         # lift a sign-in lockou
 
 **Forgotten administrator password:** run `reset-password` for that username against the same database (`DATABASE_URL`/`MENAGERIST_*` settings as the app), then sign in with the new password and change it. For the Docker stack, run it inside the container: `docker compose exec menagerist menagerist identity reset-password --username sam`.
 
+### Housekeeping commands
+
+Run these from cron (or another scheduler) against the same database and media volume as the app; each is safe to repeat.
+
+```sh
+uv run menagerist media cleanup                              # delete staged and orphaned media past their TTL
+uv run menagerist data purge-deleted                         # permanently delete content that was deleted over 30 days ago
+uv run menagerist data purge-deleted --older-than-days 60    # use another retention for this run (at least 1)
+uv run menagerist data purge-deleted --dry-run               # show what would be deleted and change nothing
+```
+
+`data purge-deleted` covers every person's items, connections and collections that have been in Recently deleted longer than `MENAGERIST_DELETED_RETENTION_DAYS` (default 30, minimum 1), with the memberships, attachments and stored files only they used. Live content, deleted item types, relationship types and presets are never touched. It prints the cutoff (UTC) and the counts per kind.
+
 ## Common tasks
 
 ```sh

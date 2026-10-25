@@ -80,3 +80,22 @@ async def test_restoring_over_a_live_slug_is_rejected_by_the_index(
     gone.restore()
     with pytest.raises(ConflictError):
         await repo.save(gone)
+
+
+async def test_deleted_before_lists_oldest_first_for_every_owner(
+    db_session: AsyncSession,
+) -> None:
+    """Collections deleted before the cutoff, any owner, oldest first."""
+    repo = SqlAlchemyCollectionRepository(db_session)
+    oldest = await _shelf(repo, "Oldest", deleted_ago=3 * 24 * 60)
+    older = await _shelf(repo, "Older", owner=BOB, deleted_ago=2 * 24 * 60)
+    await _shelf(repo, "Recent", deleted_ago=1)
+    await _shelf(repo, "Live")
+    cutoff = datetime.now(UTC) - timedelta(days=1)
+
+    first = await repo.list_deleted_before(cutoff, limit=1)
+    both = await repo.list_deleted_before(cutoff, limit=10)
+
+    assert [c.id for c in first] == [oldest.id]
+    assert [c.id for c in both] == [oldest.id, older.id]
+    assert await repo.count_deleted_before(cutoff) == 2

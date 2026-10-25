@@ -17,6 +17,7 @@ from app.shared_kernel.slug import Slug
 if TYPE_CHECKING:
     import builtins
     import uuid
+    from datetime import datetime
 
     from sqlalchemy import ColumnElement
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -243,6 +244,28 @@ class SqlAlchemyCollectionRepository:
             delete(CollectionModel).where(CollectionModel.id == collection_id)
         )
         await self._session.flush()
+
+    async def list_deleted_before(
+        self, cutoff: datetime, *, limit: int
+    ) -> builtins.list[Collection]:
+        """List collections soft-deleted before `cutoff`, oldest first (ties by id)."""
+        stmt = (
+            select(CollectionModel)
+            .where(CollectionModel.deleted_at < cutoff)
+            .order_by(CollectionModel.deleted_at, CollectionModel.id)
+            .limit(limit)
+        )
+        result = await self._session.execute(stmt)
+        return [_to_domain(model) for model in result.scalars()]
+
+    async def count_deleted_before(self, cutoff: datetime) -> int:
+        """Return how many collections were soft-deleted before `cutoff`, any owner."""
+        stmt = (
+            select(func.count())
+            .select_from(CollectionModel)
+            .where(CollectionModel.deleted_at < cutoff)
+        )
+        return (await self._session.execute(stmt)).scalar_one()
 
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]

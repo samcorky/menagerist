@@ -83,6 +83,7 @@ from app.shared_kernel.cqrs import UseCase
 _CLAIM = "system job that assigns owners to ownerless rows; reads no content"
 _ADD = "persists a new entity; the use case stamps the owner"
 _SAVE = "persists an entity already fetched through a scoped read"
+_RETENTION = "system-only retention purge reads every owner's rows by age"
 _PURGE = "system-only hard delete by id; the System use case reads no content"
 NO_SCOPE_NEEDED: dict[type, dict[str, str]] = {
     NodeRepository: {
@@ -90,12 +91,16 @@ NO_SCOPE_NEEDED: dict[type, dict[str, str]] = {
         "save": _SAVE,
         "claim_orphaned": _CLAIM,
         "purge": _PURGE,
+        "list_deleted_before": _RETENTION,
+        "count_deleted_before": _RETENTION,
     },
     EdgeRepository: {
         "add": _ADD,
         "save": _SAVE,
         "claim_orphaned": _CLAIM,
         "purge": _PURGE,
+        "list_deleted_before": _RETENTION,
+        "count_deleted_before": _RETENTION,
         "purge_for_node": _PURGE,
     },
     CollectionRepository: {
@@ -103,6 +108,8 @@ NO_SCOPE_NEEDED: dict[type, dict[str, str]] = {
         "save": _SAVE,
         "claim_orphaned": _CLAIM,
         "purge": _PURGE,
+        "list_deleted_before": _RETENTION,
+        "count_deleted_before": _RETENTION,
     },
     MembershipRepository: {
         "purge_for_collection": _PURGE,
@@ -236,6 +243,9 @@ UNSCOPED_USE_CASES = {
     "PurgeNode": "system purge",
     "PurgeEdge": "system purge",
     "PurgeCollection": "system purge",
+    # System-actor retention purge, run from the data CLI: sweeps all owners by age.
+    "PurgeExpiredNodes": "system retention purge",
+    "PurgeExpiredCollections": "system retention purge",
     "PurgeItemMemberships": "system purge",
     "PurgeAttachment": "system purge",
 }

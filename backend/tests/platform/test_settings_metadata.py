@@ -11,6 +11,7 @@ from app.platform.config import (
     IdentitySettings,
     LoggingSettings,
     MediaSettings,
+    RetentionSettings,
 )
 
 if TYPE_CHECKING:
@@ -24,6 +25,7 @@ _SETTINGS = (
     IdentitySettings,
     LoggingSettings,
     MediaSettings,
+    RetentionSettings,
 )
 
 

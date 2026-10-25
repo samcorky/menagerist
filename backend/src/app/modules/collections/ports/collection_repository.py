@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:
     import builtins
     import uuid
+    from datetime import datetime
 
     from app.modules.collections.domain.collection import Collection, CollectionKind
     from app.shared_kernel.content_filter import ContentFilter
@@ -75,6 +76,19 @@ class CollectionRepository(Protocol):
 
         The caller purges its memberships first (`MembershipRepository`).
         """
+        ...
+
+    async def list_deleted_before(
+        self, cutoff: datetime, *, limit: int
+    ) -> builtins.list[Collection]:
+        """List collections soft-deleted before `cutoff`, oldest first (ties by id).
+
+        System-level and unscoped: every owner, for the retention purge.
+        """
+        ...
+
+    async def count_deleted_before(self, cutoff: datetime) -> int:
+        """Return how many collections were soft-deleted before `cutoff`, any owner."""
         ...
 
     async def claim_orphaned(

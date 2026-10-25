@@ -142,6 +142,8 @@ One Alembic environment, one `alembic/versions/` directory, for the whole backen
 
 Backend tests, migrations, and quality checks run as `poe` tasks from the workspace root - `poe test-backend`, `poe test-backend-integration`, `poe migrate`, `poe lint-backend`, `poe typecheck-backend`, etc. Full task list in the root `pyproject.toml`.
 
+Scheduled housekeeping is a CLI command to run from cron: `menagerist media cleanup` (expired media) and `menagerist data purge-deleted [--older-than-days N] [--dry-run]` (retention purge of Recently deleted content; `MENAGERIST_DELETED_RETENTION_DAYS`, default 30, minimum 1). The purge is `PurgeExpiredNodes` (graph) and `PurgeExpiredCollections` (collections), both `System` use cases that read every owner's rows by age through `list_deleted_before` / `count_deleted_before`, composed in `entrypoints/cli/purge_deleted.py` as `PurgeDeletedContent`; a future scheduler adapter calls the same use cases.
+
 ## Unit of work: a shared Protocol, not a per-module subclass
 
 `shared_kernel/unit_of_work.py` defines `UnitOfWork[TRepos]` as a `Protocol` - `__aenter__() -> TRepos`, `__aexit__`, `commit()` - satisfied structurally by two implementations written once and reused by every module:

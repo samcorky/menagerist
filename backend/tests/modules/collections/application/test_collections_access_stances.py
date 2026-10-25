@@ -20,6 +20,9 @@ from app.modules.collections.application.permissions import CollectionPermission
 from app.modules.collections.application.purge_deleted_collection import (
     PurgeDeletedCollection,
 )
+from app.modules.collections.application.purge_expired_collections import (
+    PurgeExpiredCollections,
+)
 from app.modules.collections.application.remove_item_from_collection import (
     RemoveItemFromCollection,
 )
@@ -58,5 +61,5 @@ def test_collection_use_cases_need_the_collection_permissions() -> None:
 
 def test_claim_jobs_are_system_only() -> None:
     """Only the system actor hands pre-account content to the first owner."""
-    for use_case in (ClaimLegacyCollections,):
+    for use_case in (ClaimLegacyCollections, PurgeExpiredCollections):
         assert use_case.access == System()

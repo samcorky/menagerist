@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     import collections.abc
     import uuid
     from collections.abc import Mapping, Sequence
+    from datetime import datetime
 
     from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
         EdgeStore,
@@ -359,6 +360,27 @@ class InMemoryNodeRepository:
     async def purge(self, node_id: uuid.UUID) -> None:
         """Hard-delete the node row, live or soft-deleted; an unknown id is a no-op."""
         self._nodes.pop(node_id, None)
+
+    async def list_deleted_before(
+        self, cutoff: datetime, *, limit: int
+    ) -> builtins.list[Node]:
+        """List items soft-deleted before `cutoff`, oldest first (ties by id)."""
+        return self._before(cutoff)[:limit]
+
+    async def count_deleted_before(self, cutoff: datetime) -> int:
+        """Return how many items were soft-deleted before `cutoff`, any owner."""
+        return len(self._before(cutoff))
+
+    def _before(self, cutoff: datetime) -> builtins.list[Node]:
+        """Rows soft-deleted before `cutoff`, oldest first (ties by id)."""
+        return sorted(
+            (
+                row
+                for row in self._nodes.values()
+                if row.deleted_at is not None and row.deleted_at < cutoff
+            ),
+            key=lambda row: (row.deleted_at, row.id),
+        )
 
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]

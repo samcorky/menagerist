@@ -1243,3 +1243,18 @@ Over HTTPS (a `Secure` cookie) the session cookie is `__Host-Http-menagerist-ses
 - **T6 listing:** newest deleted first (ties by id descending), `limit` 1 to 100, `after` is the id of the last row of the previous page (a row no longer in Recently deleted gives an empty page), `Link` and an exact `Total-Count`. Rows are `DeletedNodeResponse` (`id`, `name`, `type`, `deleted_at`) and `DeletedCollectionResponse` (`id`, `name`, `kind`, `deleted_at`). **Deviation:** no `q` in version 1, so there is no capped count; the page filters in the browser. Restore returns the normal item or collection response; purge is 204.
 - **T7, T8:** no retention and no empty-all, as planned. Exports still ignore deleted rows.
 - **Smart collections:** one that refers to a purged (or deleted) collection reads as empty with the "That collection no longer exists." warning, never an error; restoring the referred collection makes it evaluate again.
+
+## Retention purge of deleted content (2026-10-25)
+
+**Decision (backend, as built):** deleted items, connections and collections are hard-deleted once they have been deleted for longer than a retention period, by `menagerist data purge-deleted [--older-than-days N] [--dry-run]`, meant to be run from cron. It completes the "no retention" gap left in Recently deleted (T7).
+
+- **Scope:** instance-wide, across all owners, because the CLI has no signed-in person. Rows with `deleted_at` before the cutoff only; live rows, and soft-deleted item types, relationship types and presets, are never touched.
+- **Setting:** `MENAGERIST_DELETED_RETENTION_DAYS`, default 30, minimum 1 (`RetentionSettings`, in `INSTANCE_SETTINGS`). `--older-than-days N` overrides it for one run; below 1 is refused with exit code 1.
+- **Use cases:** `PurgeExpiredNodes` (graph) and `PurgeExpiredCollections` (collections), `System` stance, pinned in the stance tests. Commands carry an aware `older_than` and `dry_run` (and a `batch_size`, default 100); results return counts. The new `list_deleted_before(cutoff, limit)` and `count_deleted_before(cutoff)` reads on the node, connection and collection repositories are unscoped and ordered oldest first (ties by id); the content-scope architecture test lists them as exemptions. Work runs in bounded batches until nothing is left, each row in its own transaction.
+- **Same path as a person's purge:** an item goes through `ItemDependents` (memberships, attachments, then assets and stored files only they used, files removed after their commit), then its connections (live or deleted), then the row. A row restored between listing and purging is re-checked and skipped. Collections remove their memberships with the row; items stay.
+- **Connections:** those deleted on their own and old enough go first and are the ones counted; connections that go with a purged item are not counted separately, so a dry run gives the same numbers as the real run.
+- **Composition:** `PurgeDeletedContent` in `entrypoints/cli/purge_deleted.py` runs the graph purge then the collections purge and sums the counts; the modules import nothing from each other.
+- **Dry run** changes nothing and prints "Dry run: nothing was deleted". A second run is a no-op. The command prints the cutoff (UTC) and the counts for items, connections and collections.
+- **Media assets** have no `deleted_at`, so there is nothing to purge by age beyond what an item purge already removes (an asset and its file go only when no other attachment uses it). Orphaned and staged media keep their own TTL via `media cleanup`.
+- **Scheduler:** when the scheduler lands it calls the same use cases; nothing here is CLI-specific.
+

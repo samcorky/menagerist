@@ -83,3 +83,23 @@ async def test_restoring_makes_the_row_live_again(db_session: AsyncSession) -> N
 
     assert await repo.get_deleted(node.id, scope=scope) is None
     assert await repo.get(node.id, scope=scope) is not None
+
+
+async def test_deleted_before_lists_oldest_first_for_every_owner(
+    db_session: AsyncSession,
+) -> None:
+    """Rows deleted before the cutoff, any owner, oldest first, bounded by limit."""
+    repo = SqlAlchemyNodeRepository(db_session)
+    oldest = await _node(repo, "oldest", deleted_ago=3 * 24 * 60)
+    older = await _node(repo, "older", owner=BOB, deleted_ago=2 * 24 * 60)
+    await _node(repo, "recent", deleted_ago=1)
+    await _node(repo, "live")
+    cutoff = datetime.now(UTC) - timedelta(days=1)
+
+    first = await repo.list_deleted_before(cutoff, limit=1)
+    both = await repo.list_deleted_before(cutoff, limit=10)
+
+    assert [n.id for n in first] == [oldest.id]
+    assert [n.id for n in both] == [oldest.id, older.id]
+    assert await repo.count_deleted_before(cutoff) == 2
+    assert await repo.count_deleted_before(oldest.deleted_at) == 0  # type: ignore[arg-type]

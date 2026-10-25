@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import builtins
     import uuid
+    from datetime import datetime
 
     from app.modules.collections.domain.collection import Collection, CollectionKind
     from app.shared_kernel.content_filter import ContentFilter
@@ -132,6 +133,27 @@ class InMemoryCollectionRepository:
     async def purge(self, collection_id: uuid.UUID) -> None:
         """Hard-delete the collection row, live or soft-deleted; unknown is a no-op."""
         self._collections.pop(collection_id, None)
+
+    async def list_deleted_before(
+        self, cutoff: datetime, *, limit: int
+    ) -> builtins.list[Collection]:
+        """List collections soft-deleted before `cutoff`, oldest first (ties by id)."""
+        return self._before(cutoff)[:limit]
+
+    async def count_deleted_before(self, cutoff: datetime) -> int:
+        """Return how many collections were soft-deleted before `cutoff`, any owner."""
+        return len(self._before(cutoff))
+
+    def _before(self, cutoff: datetime) -> builtins.list[Collection]:
+        """Rows soft-deleted before `cutoff`, oldest first (ties by id)."""
+        return sorted(
+            (
+                row
+                for row in self._collections.values()
+                if row.deleted_at is not None and row.deleted_at < cutoff
+            ),
+            key=lambda row: (row.deleted_at, row.id),
+        )
 
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]

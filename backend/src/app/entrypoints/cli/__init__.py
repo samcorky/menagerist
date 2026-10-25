@@ -14,6 +14,7 @@ from app.entrypoints.cli.backups import (
     import_user_data,
     restore_backup,
 )
+from app.entrypoints.cli.data import data_app
 from app.modules.backup.adapters.cli.backup_app import (
     backup_app,
     use_access_guard as use_backup_access_guard,
@@ -66,6 +67,7 @@ migrate_app = App(name="migrate", help="Manage database migrations.")
 app.command(migrate_app)
 
 app.command(media_app)
+app.command(data_app)
 use_backup_access_guard(get_access_guard())
 
 use_operations(

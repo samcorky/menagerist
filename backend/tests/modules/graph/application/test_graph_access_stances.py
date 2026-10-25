@@ -36,6 +36,7 @@ from app.modules.graph.application.purge_deleted_node import PurgeDeletedNode
 from app.modules.graph.application.purge_edge_type_attribute import (
     PurgeEdgeTypeAttribute,
 )
+from app.modules.graph.application.purge_expired_nodes import PurgeExpiredNodes
 from app.modules.graph.application.purge_node_type_attribute import (
     PurgeNodeTypeAttribute,
 )
@@ -95,7 +96,7 @@ def test_item_use_cases_need_the_item_permissions() -> None:
 
 def test_claim_jobs_are_system_only() -> None:
     """Only the system actor hands pre-account content to the first owner."""
-    for use_case in (ClaimOrphanedItems,):
+    for use_case in (ClaimOrphanedItems, PurgeExpiredNodes):
         assert use_case.access == System()
 
 
