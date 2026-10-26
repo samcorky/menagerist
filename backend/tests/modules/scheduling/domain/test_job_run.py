@@ -1,4 +1,4 @@
-"""Job definitions and immutable run transitions."""
+"""Job definitions and mutable run-entity transitions."""
 
 from datetime import UTC, datetime, timedelta
 from uuid import uuid7
@@ -41,73 +41,79 @@ def test_scheduled_deduplication_key_is_stable_across_timezones() -> None:
 def test_run_rejects_naive_schedule(bad: datetime) -> None:
     """Every queued occurrence identifies an absolute instant."""
     with pytest.raises(ValidationError):
-        JobRun(job_key="backup.create", scheduled_for=bad)
+        JobRun.create(job_key="backup.create", scheduled_for=bad)
 
 
 def test_manual_run_and_successful_lifecycle() -> None:
-    """Transitions preserve the queued snapshot and retain execution ownership."""
+    """Entity methods update execution state while retaining requester and identity."""
     requester = uuid7()
-    queued = JobRun(job_key="backup.create", scheduled_for=NOW, requested_by=requester)
-    running = queued.start("worker-a", NOW)
-    heartbeat = running.heartbeat("worker-a", NOW + timedelta(seconds=10))
-    finished = heartbeat.finish(
-        "worker-a", RunStatus.SUCCEEDED, NOW + timedelta(seconds=20)
+    run = JobRun.create(
+        job_key="backup.create", scheduled_for=NOW, requested_by=requester
     )
-    assert queued.status is RunStatus.QUEUED
-    assert queued.deduplication_key is None
-    assert running.started_at == NOW
-    assert running.worker_id == "worker-a"
-    assert heartbeat.heartbeat_at == NOW + timedelta(seconds=10)
-    assert finished.status is RunStatus.SUCCEEDED
-    assert finished.finished_at == NOW + timedelta(seconds=20)
-    assert finished.requested_by == requester
-    assert finished.error is None
+    run.start("worker-a", NOW)
+    assert (run.status, run.started_at, run.worker_id) == (
+        RunStatus.RUNNING,
+        NOW,
+        "worker-a",
+    )
+    assert run.deduplication_key is None
+    run.heartbeat("worker-a", NOW + timedelta(seconds=10))
+    assert run.heartbeat_at == NOW + timedelta(seconds=10)
+    run.finish("worker-a", RunStatus.SUCCEEDED, NOW + timedelta(seconds=20))
+    assert run.status is RunStatus.SUCCEEDED
+    assert run.finished_at == NOW + timedelta(seconds=20)
+    assert run.requested_by == requester
+    assert run.error is None
 
 
 @pytest.mark.parametrize("status", [RunStatus.FAILED, RunStatus.SKIPPED])
 def test_terminal_outcomes_preserve_the_reason(status: RunStatus) -> None:
     """Failures and skips retain their diagnostic reason."""
-    run = JobRun(job_key="x", scheduled_for=NOW).start("worker", NOW)
-    result = run.finish("worker", status, NOW, error="reason")
-    assert result.status is status
-    assert result.error == "reason"
+    run = JobRun.create(job_key="x", scheduled_for=NOW)
+    run.start("worker", NOW)
+    run.finish("worker", status, NOW, error="reason")
+    assert run.status is status
+    assert run.error == "reason"
 
 
 def test_abandoned_runs_are_terminal_and_stale_workers_cannot_finish() -> None:
     """Reaping fences a late completion without implicitly retrying the job."""
-    run = JobRun(job_key="x", scheduled_for=NOW).start("worker", NOW)
-    abandoned = run.abandon(NOW + timedelta(minutes=5))
-    assert abandoned.status is RunStatus.ABANDONED
-    assert abandoned.error == "heartbeat_expired"
+    run = JobRun.create(job_key="x", scheduled_for=NOW)
+    run.start("worker", NOW)
+    run.abandon(NOW + timedelta(minutes=5))
+    assert run.status is RunStatus.ABANDONED
+    assert run.error == "heartbeat_expired"
     with pytest.raises(LostClaimError):
-        abandoned.finish("worker", RunStatus.SUCCEEDED, NOW + timedelta(minutes=6))
+        run.finish("worker", RunStatus.SUCCEEDED, NOW + timedelta(minutes=6))
     with pytest.raises(LostClaimError):
-        abandoned.heartbeat("worker", NOW + timedelta(minutes=6))
+        run.heartbeat("worker", NOW + timedelta(minutes=6))
 
 
 def test_invalid_transitions_and_foreign_workers_are_rejected() -> None:
     """A queued run starts once, and only its claimant may update it."""
-    run = JobRun(job_key="x", scheduled_for=NOW)
+    run = JobRun.create(job_key="x", scheduled_for=NOW)
     with pytest.raises(InvalidRunTransitionError):
         run.start("worker", NOW - timedelta(seconds=1))
-    running = run.start("worker", NOW)
-    with pytest.raises(InvalidRunTransitionError):
-        running.start("worker", NOW)
-    for status in [RunStatus.QUEUED, RunStatus.RUNNING, RunStatus.ABANDONED]:
-        with pytest.raises(InvalidRunTransitionError):
-            running.finish("worker", status, NOW)
-    with pytest.raises(LostClaimError):
-        running.heartbeat("other", NOW)
-    with pytest.raises(LostClaimError):
-        running.finish("other", RunStatus.SUCCEEDED, NOW)
     with pytest.raises(InvalidRunTransitionError):
         run.abandon(NOW)
+    run.start("worker", NOW)
+    with pytest.raises(InvalidRunTransitionError):
+        run.start("worker", NOW)
+    for status in [RunStatus.QUEUED, RunStatus.RUNNING, RunStatus.ABANDONED]:
+        with pytest.raises(InvalidRunTransitionError):
+            run.finish("worker", status, NOW)
+    with pytest.raises(LostClaimError):
+        run.heartbeat("other", NOW)
+    with pytest.raises(LostClaimError):
+        run.finish("other", RunStatus.SUCCEEDED, NOW)
 
 
 def test_heartbeat_time_never_moves_backwards() -> None:
     """Clock skew must not make a healthy run appear older."""
-    run = JobRun(job_key="x", scheduled_for=NOW).start("worker", NOW)
-    assert run.heartbeat("worker", NOW - timedelta(minutes=1)).heartbeat_at == NOW
+    run = JobRun.create(job_key="x", scheduled_for=NOW)
+    run.start("worker", NOW)
+    run.heartbeat("worker", NOW - timedelta(minutes=1))
+    assert run.heartbeat_at == NOW
 
 
 @pytest.mark.parametrize(
@@ -132,3 +138,12 @@ def test_job_definition_defaults_and_policy_override() -> None:
     assert job.schedule_key == "backup.schedule"
     assert job.run_now_allowed
     assert job.needs_setup_complete
+
+
+def test_job_run_uses_the_shared_identity_mixin() -> None:
+    """Scheduler runs participate in the same identity contract as other entities."""
+    from app.shared_kernel.mixins import Identifiable
+
+    run = JobRun.create(job_key="x", scheduled_for=NOW)
+    assert isinstance(run, Identifiable)
+    assert run.id.version == 7

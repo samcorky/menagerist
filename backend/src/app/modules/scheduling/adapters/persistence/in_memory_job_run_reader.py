@@ -1,5 +1,6 @@
 """Read-side queries over in-memory scheduled work."""
 
+from copy import copy
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -30,9 +31,10 @@ class InMemoryJobRunReader:
     async def history(self, job_key: str, *, limit: int) -> list[JobRun]:
         """Return recent runs for the requested job only."""
         rows = (run for run in self._store.runs.values() if run.job_key == job_key)
-        return sorted(rows, key=lambda run: (run.created_at, run.id.int), reverse=True)[
-            :limit
-        ]
+        recent = sorted(
+            rows, key=lambda run: (run.created_at, run.id.int), reverse=True
+        )[:limit]
+        return [copy(run) for run in recent]
 
     async def last_scheduled_for(self, job_key: str) -> datetime | None:
         """Return the latest accepted scheduled fire, excluding manual work."""

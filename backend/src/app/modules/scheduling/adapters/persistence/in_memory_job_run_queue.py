@@ -39,8 +39,8 @@ class InMemoryJobRunQueue:
             self._store.active(run.job_key),
             deduplicate_active=deduplicate_active,
         )
-        self._store.runs[selected.id] = selected
-        return selected
+        self._store.save(selected)
+        return self._store.get(selected.id)
 
     async def claim(
         self, lanes: Collection[Lane], worker_id: str, now: datetime
@@ -49,6 +49,7 @@ class InMemoryJobRunQueue:
         selected = next_claim(self._store.runs.values(), lanes, now)
         if selected is None:
             return None
-        claimed = selected.start(worker_id, now)
-        self._store.runs[claimed.id] = claimed
+        claimed = self._store.get(selected.id)
+        claimed.start(worker_id, now)
+        self._store.save(claimed)
         return claimed

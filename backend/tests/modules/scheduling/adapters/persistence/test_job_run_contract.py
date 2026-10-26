@@ -82,14 +82,14 @@ async def test_overlap_and_serial_execution(
 ) -> None:
     """Skip drops overlap, coalesce keeps one waiter, queue retains all waiters."""
     first = await harness.queue.enqueue(
-        JobRun(job_key="x", scheduled_for=NOW, overlap=policy)
+        JobRun.create(job_key="x", scheduled_for=NOW, overlap=policy)
     )
     await harness.queue.claim([Lane.DEFAULT], "first", NOW)
     second = await harness.queue.enqueue(
-        JobRun(job_key="x", scheduled_for=NOW, overlap=policy)
+        JobRun.create(job_key="x", scheduled_for=NOW, overlap=policy)
     )
     third = await harness.queue.enqueue(
-        JobRun(job_key="x", scheduled_for=NOW, overlap=policy)
+        JobRun.create(job_key="x", scheduled_for=NOW, overlap=policy)
     )
     assert await harness.queue.claim([Lane.DEFAULT], "other", NOW) is None
     if policy is Overlap.SKIP:
@@ -113,11 +113,11 @@ async def test_run_now_reuses_active_work_even_for_queue_policy(
 ) -> None:
     """Repeated manual requests return the active run instead of stacking it."""
     first = await harness.queue.enqueue(
-        JobRun(job_key="x", scheduled_for=NOW, overlap=Overlap.QUEUE),
+        JobRun.create(job_key="x", scheduled_for=NOW, overlap=Overlap.QUEUE),
         deduplicate_active=True,
     )
     repeated = await harness.queue.enqueue(
-        JobRun(job_key="x", scheduled_for=NOW, overlap=Overlap.QUEUE),
+        JobRun.create(job_key="x", scheduled_for=NOW, overlap=Overlap.QUEUE),
         deduplicate_active=True,
     )
     assert repeated.id == first.id
@@ -126,11 +126,13 @@ async def test_run_now_reuses_active_work_even_for_queue_policy(
 async def test_lanes_due_times_and_two_workers(harness: QueueHarness) -> None:
     """A busy heavy job cannot block a due default job or be claimed twice."""
     heavy = await harness.queue.enqueue(
-        JobRun(job_key="heavy", scheduled_for=NOW, lane=Lane.HEAVY)
+        JobRun.create(job_key="heavy", scheduled_for=NOW, lane=Lane.HEAVY)
     )
-    normal = await harness.queue.enqueue(JobRun(job_key="normal", scheduled_for=NOW))
+    normal = await harness.queue.enqueue(
+        JobRun.create(job_key="normal", scheduled_for=NOW)
+    )
     await harness.queue.enqueue(
-        JobRun(job_key="future", scheduled_for=NOW + timedelta(hours=1))
+        JobRun.create(job_key="future", scheduled_for=NOW + timedelta(hours=1))
     )
     assert (
         run_id(await harness.queue.claim([Lane.HEAVY], "heavy-worker", NOW)) == heavy.id
@@ -145,9 +147,11 @@ async def test_lanes_due_times_and_two_workers(harness: QueueHarness) -> None:
 
 async def test_oldest_due_run_is_claimed_first(harness: QueueHarness) -> None:
     """Claim order follows scheduled time rather than insertion order."""
-    later = await harness.queue.enqueue(JobRun(job_key="later", scheduled_for=NOW))
+    later = await harness.queue.enqueue(
+        JobRun.create(job_key="later", scheduled_for=NOW)
+    )
     earlier = await harness.queue.enqueue(
-        JobRun(job_key="earlier", scheduled_for=NOW - timedelta(minutes=1))
+        JobRun.create(job_key="earlier", scheduled_for=NOW - timedelta(minutes=1))
     )
     assert run_id(await harness.queue.claim([Lane.DEFAULT], "one", NOW)) == earlier.id
     assert run_id(await harness.queue.claim([Lane.DEFAULT], "two", NOW)) == later.id
@@ -155,9 +159,15 @@ async def test_oldest_due_run_is_claimed_first(harness: QueueHarness) -> None:
 
 async def test_heartbeats_reaping_and_stale_completion(harness: QueueHarness) -> None:
     """Only expired running work is abandoned; a stale claimant cannot overwrite it."""
-    expired = await harness.queue.enqueue(JobRun(job_key="expired", scheduled_for=NOW))
-    healthy = await harness.queue.enqueue(JobRun(job_key="healthy", scheduled_for=NOW))
-    queued = await harness.queue.enqueue(JobRun(job_key="queued", scheduled_for=NOW))
+    expired = await harness.queue.enqueue(
+        JobRun.create(job_key="expired", scheduled_for=NOW)
+    )
+    healthy = await harness.queue.enqueue(
+        JobRun.create(job_key="healthy", scheduled_for=NOW)
+    )
+    queued = await harness.queue.enqueue(
+        JobRun.create(job_key="queued", scheduled_for=NOW)
+    )
     await harness.queue.claim([Lane.DEFAULT], "one", NOW)
     await harness.queue.claim([Lane.DEFAULT], "two", NOW)
     await harness.recorder.heartbeat(healthy.id, "two", NOW + timedelta(minutes=2))
@@ -199,13 +209,13 @@ async def test_reader_history_active_run_and_scheduled_watermark(
     scheduled = await harness.queue.enqueue(
         JobRun.for_schedule(JobDefinition(job_key="x"), NOW)
     )
-    await harness.queue.enqueue(JobRun(job_key="other", scheduled_for=NOW))
+    await harness.queue.enqueue(JobRun.create(job_key="other", scheduled_for=NOW))
     assert run_id(await harness.reader.active_run("x")) == scheduled.id
     assert await harness.reader.last_scheduled_for("x") == NOW
     await harness.queue.claim([Lane.DEFAULT], "worker", NOW)
     await harness.recorder.finish(scheduled.id, "worker", RunStatus.SUCCEEDED, NOW)
     manual = await harness.queue.enqueue(
-        JobRun(job_key="x", scheduled_for=NOW + timedelta(days=1))
+        JobRun.create(job_key="x", scheduled_for=NOW + timedelta(days=1))
     )
     assert await harness.reader.last_scheduled_for("x") == NOW
     history = await harness.reader.history("x", limit=1)
@@ -234,14 +244,86 @@ async def test_concurrent_coalescing_keeps_one_waiting_run(
     harness: QueueHarness,
 ) -> None:
     """A running job may have only one coalesced waiter, even under concurrent ticks."""
-    first = await harness.queue.enqueue(JobRun(job_key="x", scheduled_for=NOW))
+    first = await harness.queue.enqueue(JobRun.create(job_key="x", scheduled_for=NOW))
     await harness.queue.claim([Lane.DEFAULT], "worker", NOW)
     results = await asyncio.gather(
         *(
-            harness.queue.enqueue(JobRun(job_key="x", scheduled_for=NOW))
+            harness.queue.enqueue(JobRun.create(job_key="x", scheduled_for=NOW))
             for _ in range(3)
         )
     )
     assert len({run.id for run in results}) == 1
     assert results[0].id != first.id
     assert len(await harness.reader.history("x", limit=100)) == 2
+
+
+async def test_enqueued_input_and_returned_runs_are_detached(
+    harness: QueueHarness,
+) -> None:
+    """Mutating either side of enqueue cannot rewrite persisted queue state."""
+    submitted = JobRun.create(job_key="x", scheduled_for=NOW)
+    accepted = await harness.queue.enqueue(submitted)
+    submitted.scheduled_for = NOW + timedelta(days=1)
+    accepted.status = RunStatus.FAILED
+    stored = await harness.reader.get(accepted.id)
+    assert stored.scheduled_for == NOW
+    assert stored.status is RunStatus.QUEUED
+    assert (
+        run_id(await harness.queue.claim([Lane.DEFAULT], "worker", NOW)) == accepted.id
+    )
+
+
+async def test_every_reader_returns_detached_runs(harness: QueueHarness) -> None:
+    """Get, active-run and history results cannot mutate the stored entity."""
+    accepted = await harness.queue.enqueue(
+        JobRun.create(job_key="x", scheduled_for=NOW)
+    )
+    by_id = await harness.reader.get(accepted.id)
+    active = await harness.reader.active_run("x")
+    assert active is not None
+    history = await harness.reader.history("x", limit=1)
+    by_id.status = RunStatus.FAILED
+    active.worker_id = "wrong"
+    history[0].job_key = "changed"
+    stored = await harness.reader.get(accepted.id)
+    assert stored.status is RunStatus.QUEUED
+    assert stored.worker_id is None
+    assert stored.job_key == "x"
+
+
+async def test_claim_results_and_old_reads_do_not_alias_stored_transitions(
+    harness: QueueHarness,
+) -> None:
+    """Detached results preserve ownership checks and historical snapshots."""
+    accepted = await harness.queue.enqueue(
+        JobRun.create(job_key="x", scheduled_for=NOW)
+    )
+    claimed = await harness.queue.claim([Lane.DEFAULT], "worker", NOW)
+    assert claimed is not None
+    old = await harness.reader.get(accepted.id)
+    claimed.worker_id = "intruder"
+    await harness.recorder.heartbeat(accepted.id, "worker", NOW + timedelta(seconds=1))
+    await harness.recorder.finish(
+        accepted.id, "worker", RunStatus.SUCCEEDED, NOW + timedelta(seconds=2)
+    )
+    assert old.status is RunStatus.RUNNING
+    assert old.heartbeat_at == NOW
+    stored = await harness.reader.get(accepted.id)
+    assert stored.worker_id == "worker"
+    assert stored.status is RunStatus.SUCCEEDED
+
+
+async def test_deduplicated_enqueue_returns_a_detached_run(
+    harness: QueueHarness,
+) -> None:
+    """Reusing an accepted or coalesced run must not expose the stored instance."""
+    first = await harness.queue.enqueue(JobRun.create(job_key="x", scheduled_for=NOW))
+    same_id = await harness.queue.enqueue(first)
+    same_id.error = "changed"
+    coalesced = await harness.queue.enqueue(
+        JobRun.create(job_key="x", scheduled_for=NOW)
+    )
+    coalesced.status = RunStatus.SUCCEEDED
+    stored = await harness.reader.get(first.id)
+    assert stored.error is None
+    assert stored.status is RunStatus.QUEUED

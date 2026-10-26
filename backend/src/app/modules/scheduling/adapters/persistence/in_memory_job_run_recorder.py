@@ -15,14 +15,16 @@ if TYPE_CHECKING:
 
 
 class InMemoryJobRunRecorder:
-    """Record immutable transitions and independently track idle workers."""
+    """Persist entity transitions and independently track idle workers."""
 
     def __init__(self, store: InMemorySchedulingStore) -> None:
         self._store = store
 
     async def heartbeat(self, run_id: UUID, worker_id: str, now: datetime) -> None:
         """Renew a run owned by this worker."""
-        self._store.runs[run_id] = self._store.get(run_id).heartbeat(worker_id, now)
+        run = self._store.get(run_id)
+        run.heartbeat(worker_id, now)
+        self._store.save(run)
 
     async def finish(
         self,
@@ -34,17 +36,17 @@ class InMemoryJobRunRecorder:
         error: str | None = None,
     ) -> None:
         """Persist an owned terminal result."""
-        self._store.runs[run_id] = self._store.get(run_id).finish(
-            worker_id, status, now, error=error
-        )
+        run = self._store.get(run_id)
+        run.finish(worker_id, status, now, error=error)
+        self._store.save(run)
 
     async def reap_abandoned(self, older_than: datetime, now: datetime) -> int:
         """Abandon expired running jobs without requeueing them."""
         count = 0
-        for run_id, run in self._store.runs.items():
-            updated = run.abandon_if_stale(older_than, now)
-            if updated is not run:
-                self._store.runs[run_id] = updated
+        for run_id in self._store.runs:
+            run = self._store.get(run_id)
+            if run.abandon_if_stale(older_than, now):
+                self._store.save(run)
                 count += 1
         return count
 
