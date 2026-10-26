@@ -45,6 +45,12 @@ if TYPE_CHECKING:
 pytestmark = pytest.mark.integration
 
 
+@pytest.mark.parametrize("table", ["job_runs", "schedule_cursors", "worker_heartbeats"])
+def test_scheduler_runtime_state_is_not_restored(table: str) -> None:
+    """Restores cannot replay queued work or revive obsolete worker heartbeats."""
+    assert TABLE_RULES[table] is TableRule.SKIP
+
+
 async def test_snapshot_reflects_old_schema_and_keeps_one_read_only_snapshot(
     snapshot_database: str,
     monkeypatch: pytest.MonkeyPatch,

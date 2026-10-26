@@ -1,4 +1,4 @@
-"""Queue contracts shared with the future Postgres adapter."""
+"""Queue contracts shared by the in-memory and Postgres adapters."""
 
 import asyncio
 from dataclasses import dataclass
@@ -18,6 +18,9 @@ from app.modules.scheduling.adapters.persistence.in_memory_job_run_recorder impo
 )
 from app.modules.scheduling.adapters.persistence.in_memory_store import (
     InMemorySchedulingStore,
+)
+from app.modules.scheduling.adapters.persistence.unit_of_work import (
+    build_scheduling_repos,
 )
 from app.modules.scheduling.domain.errors import LostClaimError, UnknownRunError
 from app.modules.scheduling.domain.job_run import JobRun, RunStatus
@@ -46,7 +49,7 @@ class QueueHarness:
 
 
 @pytest.fixture
-def harness() -> QueueHarness:
+def memory_harness() -> QueueHarness:
     """Wire all three adapters to the same in-memory store."""
     store = InMemorySchedulingStore()
     return QueueHarness(
@@ -54,6 +57,19 @@ def harness() -> QueueHarness:
         reader=InMemoryJobRunReader(store),
         recorder=InMemoryJobRunRecorder(store),
     )
+
+
+@pytest.fixture(
+    params=["memory", pytest.param("postgres", marks=pytest.mark.integration)]
+)
+def harness(
+    request: pytest.FixtureRequest, memory_harness: QueueHarness
+) -> QueueHarness:
+    """Exercise the same contract against both session-scoped implementations."""
+    if request.param == "memory":
+        return memory_harness
+    repos = build_scheduling_repos(request.getfixturevalue("db_session"))
+    return QueueHarness(queue=repos.queue, reader=repos.reader, recorder=repos.recorder)
 
 
 @pytest.mark.parametrize("policy", [Overlap.SKIP, Overlap.COALESCE, Overlap.QUEUE])
@@ -137,10 +153,10 @@ async def test_lanes_due_times_and_two_workers(harness: QueueHarness) -> None:
     assert (
         run_id(await harness.queue.claim([Lane.HEAVY], "heavy-worker", NOW)) == heavy.id
     )
-    claims = await asyncio.gather(
-        harness.queue.claim([Lane.DEFAULT], "one", NOW),
-        harness.queue.claim([Lane.DEFAULT], "two", NOW),
-    )
+    claims = [
+        await harness.queue.claim([Lane.DEFAULT], "one", NOW),
+        await harness.queue.claim([Lane.DEFAULT], "two", NOW),
+    ]
     assert [run.id for run in claims if run is not None] == [normal.id]
     assert await harness.queue.claim([], "none", NOW) is None
 
@@ -229,9 +245,10 @@ async def test_reader_history_active_run_and_scheduled_watermark(
 
 
 async def test_concurrent_submissions_deduplicate_the_same_fire(
-    harness: QueueHarness,
+    memory_harness: QueueHarness,
 ) -> None:
     """Concurrent tick submissions create only one accepted scheduled occurrence."""
+    harness = memory_harness
     job = JobDefinition(job_key="x", overlap=Overlap.QUEUE)
     results = await asyncio.gather(
         *(harness.queue.enqueue(JobRun.for_schedule(job, NOW)) for _ in range(3))
@@ -241,9 +258,10 @@ async def test_concurrent_submissions_deduplicate_the_same_fire(
 
 
 async def test_concurrent_coalescing_keeps_one_waiting_run(
-    harness: QueueHarness,
+    memory_harness: QueueHarness,
 ) -> None:
     """A running job may have only one coalesced waiter, even under concurrent ticks."""
+    harness = memory_harness
     first = await harness.queue.enqueue(JobRun.create(job_key="x", scheduled_for=NOW))
     await harness.queue.claim([Lane.DEFAULT], "worker", NOW)
     results = await asyncio.gather(
@@ -327,3 +345,52 @@ async def test_deduplicated_enqueue_returns_a_detached_run(
     stored = await harness.reader.get(first.id)
     assert stored.error is None
     assert stored.status is RunStatus.QUEUED
+
+
+async def test_active_work_prefers_creation_order_then_running(
+    harness: QueueHarness,
+) -> None:
+    """The oldest queued request is active even when another is due sooner."""
+    first = JobRun.create(
+        job_key="x", scheduled_for=NOW + timedelta(days=1), overlap=Overlap.QUEUE
+    )
+    first.created_at = NOW - timedelta(minutes=1)
+    await harness.queue.enqueue(first)
+    next_run = JobRun.create(job_key="x", scheduled_for=NOW, overlap=Overlap.QUEUE)
+    next_run.created_at = NOW
+    second = await harness.queue.enqueue(next_run)
+    assert run_id(await harness.reader.active_run("x")) == first.id
+    assert (
+        run_id(
+            await harness.queue.enqueue(
+                JobRun.create(job_key="x", scheduled_for=NOW), deduplicate_active=True
+            )
+        )
+        == first.id
+    )
+    assert run_id(await harness.queue.claim([Lane.DEFAULT], "worker", NOW)) == second.id
+    assert run_id(await harness.reader.active_run("x")) == second.id
+
+
+@pytest.mark.parametrize(
+    "outcome", [RunStatus.SUCCEEDED, RunStatus.FAILED, RunStatus.SKIPPED]
+)
+async def test_terminal_outcomes_and_requester_round_trip(
+    harness: QueueHarness, outcome: RunStatus
+) -> None:
+    """Execution outcomes, audit identity and errors survive a storage round trip."""
+    requester = uuid7()
+    accepted = await harness.queue.enqueue(
+        JobRun.create(job_key="x", scheduled_for=NOW, requested_by=requester)
+    )
+    await harness.queue.claim([Lane.DEFAULT], "worker", NOW)
+    await harness.recorder.heartbeat(accepted.id, "worker", NOW - timedelta(minutes=1))
+    await harness.recorder.finish(
+        accepted.id, "worker", outcome, NOW + timedelta(seconds=1), error="reason"
+    )
+    stored = await harness.reader.get(accepted.id)
+    assert stored.requested_by == requester
+    assert stored.status is outcome
+    assert stored.started_at == stored.heartbeat_at == NOW
+    assert stored.finished_at == NOW + timedelta(seconds=1)
+    assert stored.error == "reason"

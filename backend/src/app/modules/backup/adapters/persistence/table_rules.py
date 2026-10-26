@@ -33,6 +33,9 @@ TABLE_RULES = {
     "api_tokens": TableRule.SKIP,
     "sessions": TableRule.SKIP,
     "sign_in_attempts": TableRule.SKIP,
+    "job_runs": TableRule.SKIP,
+    "schedule_cursors": TableRule.SKIP,
+    "worker_heartbeats": TableRule.SKIP,
     "alembic_version": TableRule.IGNORE,
 }
 
