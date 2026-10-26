@@ -6,8 +6,9 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from app.modules.scheduling.adapters.platform.cron import CronSchedule
-from app.modules.scheduling.domain.schedule import MissedRun, due_fire
+from app.modules.scheduling.domain.schedule import due_fire
 from app.shared_kernel.errors import ValidationError
+from app.shared_kernel.jobs import MissedRun
 
 
 def instant(value: str) -> datetime:

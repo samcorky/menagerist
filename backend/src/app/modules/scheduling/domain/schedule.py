@@ -1,16 +1,9 @@
 """Pure missed-run policy, independent of the cron parser and clock."""
 
 from datetime import UTC, datetime, timedelta
-from enum import StrEnum
 
 from app.shared_kernel.errors import ValidationError
-
-
-class MissedRun(StrEnum):
-    """Whether to catch up the latest missed occurrence."""
-
-    SKIP = "skip"
-    RUN_ONCE = "run_once"
+from app.shared_kernel.jobs import MissedRun
 
 
 def due_fire(
