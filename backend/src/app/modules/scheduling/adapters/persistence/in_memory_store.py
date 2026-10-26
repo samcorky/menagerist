@@ -7,6 +7,7 @@ from uuid import UUID
 
 from app.modules.scheduling.domain.errors import UnknownRunError
 from app.modules.scheduling.domain.job_run import JobRun, RunStatus
+from app.modules.scheduling.domain.schedule_cursor import ScheduleCursor
 
 
 @dataclass(kw_only=True, eq=False)
@@ -15,6 +16,7 @@ class InMemorySchedulingStore:
 
     runs: dict[UUID, JobRun] = field(default_factory=dict)
     workers: dict[str, datetime] = field(default_factory=dict)
+    cursors: dict[str, ScheduleCursor] = field(default_factory=dict)
 
     def get(self, run_id: UUID) -> JobRun:
         """Return a stored snapshot or raise the scheduler's not-found error."""

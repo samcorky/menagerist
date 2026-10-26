@@ -8,6 +8,7 @@ from app.modules.graph.application.permissions import GraphPermission
 from app.modules.identity.application.permissions import IdentityPermission
 from app.modules.media.application.permissions import MediaPermission
 from app.modules.presets.application.permissions import PresetPermission
+from app.modules.scheduling.application.permissions import SchedulingPermission
 from app.modules.system.application.permissions import SystemPermission
 from app.shared_kernel.permission import PermissionEnum
 
@@ -65,6 +66,7 @@ def test_the_real_catalogue_is_the_union_of_every_modules_enum() -> None:
         | frozenset(IdentityPermission)
         | frozenset(MediaPermission)
         | frozenset(PresetPermission)
+        | frozenset(SchedulingPermission)
         | frozenset(SystemPermission)
     ) == ALL_PERMISSIONS
 

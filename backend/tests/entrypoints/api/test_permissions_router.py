@@ -45,6 +45,8 @@ ADMIN = [
     "identity:user:reset_password",
     "identity:user:unlock",
     "identity:user:update",
+    "scheduling:job:read",
+    "scheduling:job:run",
     "system:diagnostics:read",
 ]
 ALL = sorted(ADMIN + CONTENT)

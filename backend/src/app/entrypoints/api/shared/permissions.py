@@ -8,6 +8,7 @@ from app.modules.graph.application.permissions import GraphPermission
 from app.modules.identity.application.permissions import IdentityPermission
 from app.modules.media.application.permissions import MediaPermission
 from app.modules.presets.application.permissions import PresetPermission
+from app.modules.scheduling.application.permissions import SchedulingPermission
 from app.modules.system.application.permissions import SystemPermission
 
 if TYPE_CHECKING:
@@ -24,6 +25,7 @@ Permission = (
     | MediaPermission
     | PresetPermission
     | SystemPermission
+    | SchedulingPermission
 )
 
 ALL_PERMISSIONS: frozenset[Permission] = frozenset(
@@ -36,6 +38,7 @@ ALL_PERMISSIONS: frozenset[Permission] = frozenset(
         MediaPermission,
         PresetPermission,
         SystemPermission,
+        SchedulingPermission,
     )
 )
 

@@ -21,3 +21,7 @@ class UnknownJobError(NotFoundError):
 
 class DuplicateJobError(ConflictError):
     """A job key was registered more than once."""
+
+
+class RunNowNotAllowedError(ConflictError):
+    """The registered job cannot be requested manually."""

@@ -53,6 +53,7 @@ EXPECTED_SYSTEM: frozenset[str] = frozenset(
         "media.CleanupExpiredMedia",
         "media.PurgeAttachment",
         "media.RegenerateThumbnails",
+        "scheduling.TickSchedules",
     }
 )
 EXPECTED_OWN_ACCOUNT: frozenset[str] = frozenset(
