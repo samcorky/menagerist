@@ -39,6 +39,59 @@ def run_id(run: JobRun | None) -> UUID:
 NOW = datetime(2026, 10, 26, 12, tzinfo=UTC)
 
 
+@pytest.mark.parametrize("keep", [1, 2, 10])
+@pytest.mark.parametrize("tied_timestamps", [True, False])
+async def test_pruning_keeps_completed_history_per_job_and_all_active_work(
+    harness: QueueHarness,
+    keep: int,
+    tied_timestamps: bool,
+) -> None:
+    """Terminal outcomes share a quota; queued and running work never consume it."""
+    retained = {}
+    for job_key in ("first", "second"):
+        for index, status in enumerate(
+            (
+                RunStatus.SUCCEEDED,
+                RunStatus.FAILED,
+                RunStatus.SKIPPED,
+                RunStatus.ABANDONED,
+            )
+        ):
+            run = JobRun(
+                id=UUID(int=index + 1 + (100 if job_key == "second" else 0)),
+                job_key=job_key,
+                created_at=NOW if tied_timestamps else NOW - timedelta(seconds=index),
+                scheduled_for=NOW,
+            )
+            await harness.queue.enqueue(run)
+            await harness.queue.claim([Lane.DEFAULT], "worker", NOW)
+            if status is RunStatus.ABANDONED:
+                await harness.recorder.reap_abandoned(NOW + timedelta(seconds=1), NOW)
+            else:
+                await harness.recorder.finish(run.id, "worker", status, NOW)
+    for job_key in ("first", "second"):
+        running = await harness.queue.enqueue(
+            JobRun.create(job_key=job_key, scheduled_for=NOW)
+        )
+        await harness.queue.claim([Lane.DEFAULT], "worker", NOW, run_id=running.id)
+        queued = await harness.queue.enqueue(
+            JobRun.create(job_key=job_key, scheduled_for=NOW)
+        )
+        retained[job_key] = {running.id, queued.id}
+        ordered = [4, 3, 2, 1] if tied_timestamps else [1, 2, 3, 4]
+        retained[job_key].update(
+            UUID(int=value + (100 if job_key == "second" else 0))
+            for value in ordered[:keep]
+        )
+
+    removed = await harness.recorder.prune_history(keep_per_job=keep)
+    assert removed == 2 * max(4 - keep, 0)
+    assert await harness.recorder.prune_history(keep_per_job=keep) == 0
+    for job_key, ids in retained.items():
+        history = await harness.reader.history(job_key, limit=100)
+        assert {run.id for run in history} == ids
+
+
 @dataclass(kw_only=True)
 class QueueHarness:
     """The contract exposes ports so another adapter can use the same tests."""

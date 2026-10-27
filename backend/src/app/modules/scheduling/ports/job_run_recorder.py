@@ -12,6 +12,10 @@ if TYPE_CHECKING:
 class JobRunRecorder(Protocol):
     """Engine-independent operations on job-run data."""
 
+    async def prune_history(self, *, keep_per_job: int) -> int:
+        """Keep the newest N terminal runs per job, ordered by creation and id."""
+        ...
+
     async def heartbeat(self, run_id: UUID, worker_id: str, now: datetime) -> None:
         """Renew a running job only for its current claimant."""
         ...

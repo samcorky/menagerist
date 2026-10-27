@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from app.modules.scheduling.adapters.persistence.job_run_mapping import (
@@ -28,6 +28,33 @@ class SqlAlchemyJobRunRecorder:
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    async def prune_history(self, *, keep_per_job: int) -> int:
+        """Delete excess terminal rows without touching queue or cursor state."""
+        ranked = (
+            select(
+                JobRunModel.id,
+                func.row_number()
+                .over(
+                    partition_by=JobRunModel.job_key,
+                    order_by=(JobRunModel.created_at.desc(), JobRunModel.id.desc()),
+                )
+                .label("position"),
+            )
+            .where(JobRunModel.status.not_in((RunStatus.QUEUED, RunStatus.RUNNING)))
+            .subquery()
+        )
+        removed = await self._session.scalars(
+            delete(JobRunModel)
+            .where(
+                JobRunModel.id.in_(
+                    select(ranked.c.id).where(ranked.c.position > keep_per_job)
+                )
+            )
+            .returning(JobRunModel.id)
+            .execution_options(synchronize_session=False)
+        )
+        return len(removed.all())
 
     async def _locked(self, run_id: UUID) -> JobRunModel:
         model = await self._session.scalar(
