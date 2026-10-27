@@ -72,10 +72,11 @@ class SqlAlchemyJobRunReader:
             )
         )
 
-    async def worker_alive(self, since: datetime) -> bool:
+    async def worker_alive(
+        self, since: datetime, *, worker_id: str | None = None
+    ) -> bool:
         """Check independent worker heartbeats, including idle workers."""
-        return bool(
-            await self._session.scalar(
-                select(exists().where(WorkerHeartbeatModel.heartbeat_at >= since))
-            )
-        )
+        condition = exists().where(WorkerHeartbeatModel.heartbeat_at >= since)
+        if worker_id is not None:
+            condition = condition.where(WorkerHeartbeatModel.worker_id == worker_id)
+        return bool(await self._session.scalar(select(condition)))

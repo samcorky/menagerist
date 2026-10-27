@@ -269,6 +269,18 @@ async def test_idle_worker_liveness_is_independent_of_job_runs(
     assert not await harness.reader.worker_alive(NOW + timedelta(seconds=1))
 
 
+async def test_worker_probe_cannot_be_masked_by_another_live_worker(
+    harness: QueueHarness,
+) -> None:
+    """An individual probe distinguishes stale, missing and healthy workers."""
+    await harness.recorder.worker_heartbeat("stale", NOW - timedelta(minutes=10))
+    await harness.recorder.worker_heartbeat("healthy", NOW)
+    assert await harness.reader.worker_alive(NOW)
+    assert await harness.reader.worker_alive(NOW, worker_id="healthy")
+    assert not await harness.reader.worker_alive(NOW, worker_id="stale")
+    assert not await harness.reader.worker_alive(NOW, worker_id="missing")
+
+
 async def test_reader_history_active_run_and_scheduled_watermark(
     harness: QueueHarness,
 ) -> None:

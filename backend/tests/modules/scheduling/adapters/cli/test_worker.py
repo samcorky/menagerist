@@ -65,7 +65,14 @@ class World:
     stop: asyncio.Event = field(default_factory=asyncio.Event)
     now: datetime = NOW
 
-    def worker(self, catalogue: JobCatalogue, *, grace: float = 1) -> Worker:
+    def worker(
+        self,
+        catalogue: JobCatalogue,
+        *,
+        grace: float = 1,
+        heartbeat_interval: float = 0.01,
+        tick_interval: float = 0.01,
+    ) -> Worker:
         """Build a fast worker with real recording and scheduling policy."""
         guard = get_access_guard()
 
@@ -96,7 +103,8 @@ class World:
             worker_id="worker",
             timezone="UTC",
             now=lambda: self.now,
-            tick_interval=0.01,
+            tick_interval=tick_interval,
+            heartbeat_interval=heartbeat_interval,
             poll_interval=0.001,
             shutdown_grace=grace,
         )
@@ -171,6 +179,36 @@ async def test_idle_worker_reaps_abandoned_work_and_reports_liveness() -> None:
     await asyncio.wait_for(task, timeout=3)
     assert world.store.get(stale.id).status is RunStatus.ABANDONED
     assert await repos.reader.worker_alive(world.now)
+
+
+async def test_worker_heartbeats_continue_between_schedule_ticks() -> None:
+    """Short heartbeat intervals do not accelerate schedule evaluation."""
+    world = World()
+
+    async def handler(actor: Actor) -> None:
+        pass
+
+    catalogue = JobCatalogue(
+        [
+            JobBinding(
+                definition=JobDefinition(job_key="x", schedule_key="x"),
+                handler=handler,
+            )
+        ]
+    )
+    worker = world.worker(catalogue, heartbeat_interval=0.001, tick_interval=3600)
+    task = asyncio.create_task(worker.run(world.stop))
+    try:
+        await until(
+            lambda: "x" in world.store.cursors and "worker" in world.store.workers
+        )
+        world.now = NOW + timedelta(minutes=2)
+        await until(lambda: world.store.workers["worker"] == world.now)
+        assert world.store.cursors["x"].checked_until == NOW
+        assert not world.store.runs
+    finally:
+        world.stop.set()
+        await asyncio.wait_for(task, timeout=3)
 
 
 async def test_shutdown_finishes_current_job_without_claiming_another() -> None:

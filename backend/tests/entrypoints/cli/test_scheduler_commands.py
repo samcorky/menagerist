@@ -17,6 +17,8 @@ from app.modules.scheduling.domain.job_run import JobRun
 from app.shared_kernel.jobs import JobDefinition
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 NOW = datetime(2026, 10, 27, 12, tzinfo=UTC)
@@ -117,7 +119,9 @@ async def test_signal_handlers_request_stop_and_restore_previous_handlers(
 
 @pytest.mark.parametrize("ready", [False, True])
 async def test_worker_entrypoint_waits_then_disposes_connections(
-    monkeypatch: pytest.MonkeyPatch, ready: bool
+    monkeypatch: pytest.MonkeyPatch,
+    ready: bool,
+    tmp_path: Path,
 ) -> None:
     """The entrypoint only starts a worker after the schema gate succeeds."""
     from contextlib import nullcontext
@@ -131,7 +135,17 @@ async def test_worker_entrypoint_waits_then_disposes_connections(
     monkeypatch.setattr(scheduling, "stop_on_signals", lambda stop: nullcontext())
     monkeypatch.setattr(scheduling, "wait_for_schema", AsyncMock(return_value=ready))
     monkeypatch.setattr(scheduling, "build_worker", build)
-    await scheduling.run_worker_cli()
+    identity_file = tmp_path / "worker-id"
+
+    async def run(stop: asyncio.Event) -> None:
+        assert (
+            identity_file.read_text(encoding="utf-8")
+            == build.call_args.kwargs["worker_id"]
+        )
+
+    worker.run.side_effect = run
+    await scheduling.run_worker_cli(identity_file=identity_file)
+    assert not identity_file.exists()
     assert worker.run.await_count == int(ready)
     engine.dispose.assert_awaited_once()
     assert build.call_count == int(ready)

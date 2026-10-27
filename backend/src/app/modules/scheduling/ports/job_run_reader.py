@@ -28,6 +28,8 @@ class JobRunReader(Protocol):
         """Return the latest accepted scheduled occurrence, excluding manual runs."""
         ...
 
-    async def worker_alive(self, since: datetime) -> bool:
-        """Whether any worker has independently reported liveness since the cutoff."""
+    async def worker_alive(
+        self, since: datetime, *, worker_id: str | None = None
+    ) -> bool:
+        """Check a specific worker, or any worker, for liveness since the cutoff."""
         ...

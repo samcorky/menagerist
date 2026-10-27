@@ -47,6 +47,12 @@ class InMemoryJobRunReader:
             default=None,
         )
 
-    async def worker_alive(self, since: datetime) -> bool:
+    async def worker_alive(
+        self, since: datetime, *, worker_id: str | None = None
+    ) -> bool:
         """Look at worker heartbeats rather than inferring liveness from jobs."""
-        return any(moment >= since for moment in self._store.workers.values())
+        return any(
+            moment >= since
+            for identity, moment in self._store.workers.items()
+            if worker_id is None or identity == worker_id
+        )

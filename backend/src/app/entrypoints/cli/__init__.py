@@ -16,7 +16,12 @@ from app.entrypoints.cli.backups import (
     restore_backup,
 )
 from app.entrypoints.cli.data import data_app
-from app.entrypoints.cli.scheduling import list_jobs_cli, run_job_cli, run_worker_cli
+from app.entrypoints.cli.scheduling import (
+    check_worker_health_cli,
+    list_jobs_cli,
+    run_job_cli,
+    run_worker_cli,
+)
 from app.modules.backup.adapters.cli.backup_app import (
     backup_app,
     use_access_guard as use_backup_access_guard,
@@ -89,9 +94,32 @@ app.command(backup_app)
 
 
 @app.command
-def worker() -> None:
-    """Run recurring and queued jobs until the process receives a stop signal."""
-    asyncio.run(run_worker_cli())
+def worker(*, identity_file: Path | None = None) -> None:
+    """Run recurring and queued jobs until the process receives a stop signal.
+
+    Args:
+        identity_file: Process identity shared with worker-health; defaults to /tmp
+            in the container. Use a separate path for each local worker.
+    """
+    if identity_file is None:
+        asyncio.run(run_worker_cli())
+    else:
+        asyncio.run(run_worker_cli(identity_file=identity_file))
+
+
+@app.command(name="worker-health")
+def worker_health(*, identity_file: Path | None = None) -> None:
+    """Check this worker process's heartbeat; exit with one when unhealthy.
+
+    Args:
+        identity_file: The identity file used by the worker being checked.
+    """
+    if not asyncio.run(check_worker_health_cli(identity_file=identity_file)):
+        app.error_console.print(
+            "Worker is unhealthy: no recent heartbeat for this process."
+        )
+        raise SystemExit(1)
+    app.console.print("Worker is healthy.")
 
 
 def _claim_existing_data(session: AsyncSession) -> ExistingDataClaim:

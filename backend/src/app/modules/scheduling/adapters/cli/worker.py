@@ -60,6 +60,7 @@ class Worker:
         timezone: str,
         now: Callable[[], datetime] = _utc_now,
         tick_interval: float = 60,
+        heartbeat_interval: float = 60,
         poll_interval: float = 1,
         shutdown_grace: float = 30,
         abandon_after: timedelta = DEFAULT_ABANDON_AFTER,
@@ -74,13 +75,17 @@ class Worker:
         self._timezone = timezone
         self._now = now
         self._tick_interval = tick_interval
+        self._heartbeat_interval = heartbeat_interval
         self._poll_interval = poll_interval
         self._shutdown_grace = shutdown_grace
         self._abandon_after = abandon_after
 
     async def run(self, stop: asyncio.Event) -> None:
         """Stop new claims on shutdown and bound the remaining execution time."""
-        tasks = [asyncio.create_task(self._maintenance(stop))]
+        tasks = [
+            asyncio.create_task(self._heartbeat(stop)),
+            asyncio.create_task(self._maintenance(stop)),
+        ]
         tasks.extend(asyncio.create_task(self._consume(lane, stop)) for lane in Lane)
         stopping = asyncio.create_task(stop.wait())
         try:
@@ -105,7 +110,7 @@ class Worker:
                 task.cancel()
             await asyncio.gather(stopping, *tasks, return_exceptions=True)
 
-    async def _maintenance(self, stop: asyncio.Event) -> None:
+    async def _heartbeat(self, stop: asyncio.Event) -> None:
         while not stop.is_set():
             now = self._now()
             await self._maintain().handle(
@@ -116,10 +121,14 @@ class Worker:
                 ),
                 SYSTEM_ACTOR,
             )
-            if not stop.is_set():
-                await self._tick().handle(
-                    TickSchedulesCommand(now=now, timezone=self._timezone), SYSTEM_ACTOR
-                )
+            await wait_or_stop(stop, self._heartbeat_interval)
+
+    async def _maintenance(self, stop: asyncio.Event) -> None:
+        while not stop.is_set():
+            await self._tick().handle(
+                TickSchedulesCommand(now=self._now(), timezone=self._timezone),
+                SYSTEM_ACTOR,
+            )
             await wait_or_stop(stop, self._tick_interval)
 
     async def _consume(self, lane: Lane, stop: asyncio.Event) -> None:

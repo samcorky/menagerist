@@ -70,16 +70,37 @@ services:
       dockerfile: Dockerfile
     command: ["serve", "--host", "0.0.0.0", "--migrate"]
     restart: unless-stopped
-    environment:
+    environment: &app-environment
+      TZ: ${TZ:-UTC}
       MENAGERIST_DATABASE_URL: postgresql+asyncpg://menagerist:menagerist@postgres:5432/menagerist
       # Behind a reverse proxy, set its subnet to preserve client IPs and allow HTTPS sign-in.
       # MENAGERIST_TRUSTED_PROXIES: 172.18.0.0/16
-    volumes:
+    volumes: &app-volumes
       # The backups bind mount must be owned by uid/gid 1000.
       - media-data:/data/media
       - ./backups:/data/backups
     ports:
       - "8080:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    <<: [*hardened, *logging]
+    container_name: menagerist-worker
+    image: menagerist:local
+    mem_limit: 512m
+    command: ["worker"]
+    healthcheck:
+      test: ["CMD", "menagerist", "worker-health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 90s
+      retries: 3
+    restart: unless-stopped
+    stop_grace_period: 45s
+    environment: *app-environment
+    volumes: *app-volumes
     depends_on:
       postgres:
         condition: service_healthy

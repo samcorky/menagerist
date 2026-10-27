@@ -2,8 +2,10 @@
 
 import asyncio
 import signal
-from contextlib import contextmanager
-from datetime import UTC, datetime
+from contextlib import contextmanager, suppress
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from tempfile import gettempdir
 from typing import TYPE_CHECKING
 from uuid import uuid7
 
@@ -17,6 +19,7 @@ from app.modules.identity.application.get_setup_status import (
 )
 from app.modules.scheduling.adapters.cli.catalogue import JobCatalogue
 from app.modules.scheduling.adapters.cli.execution import JobExecutor
+from app.modules.scheduling.adapters.cli.jobs import prune_runs_job
 from app.modules.scheduling.adapters.cli.worker import (
     DEFAULT_ABANDON_AFTER,
     Worker,
@@ -44,12 +47,17 @@ from app.modules.scheduling.application.claim_job_run import (
 )
 from app.modules.scheduling.application.finish_job_run import FinishJobRun
 from app.modules.scheduling.application.get_job_run import GetJobRun, GetJobRunQuery
+from app.modules.scheduling.application.get_worker_status import (
+    GetWorkerStatus,
+    GetWorkerStatusQuery,
+)
 from app.modules.scheduling.application.heartbeat_job_run import HeartbeatJobRun
 from app.modules.scheduling.application.list_jobs import ListJobs, ListJobsQuery
 from app.modules.scheduling.application.maintain_worker import (
     MaintainWorker,
     MaintainWorkerCommand,
 )
+from app.modules.scheduling.application.prune_job_runs import PruneJobRuns
 from app.modules.scheduling.application.run_job_now import RunJobNow, RunJobNowCommand
 from app.modules.scheduling.application.tick_schedules import TickSchedules
 from app.modules.scheduling.domain.job_run import RunStatus
@@ -70,6 +78,59 @@ if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
 
 logger = structlog.get_logger(__name__)
+
+
+def default_worker_identity_file() -> Path:
+    """Use the container's writable temporary filesystem for process identity."""
+    return Path(gettempdir()) / "menagerist-worker-id"
+
+
+@contextmanager
+def worker_identity(path: Path) -> Iterator[str]:
+    """Publish a fresh process id and remove only this process's identity on exit."""
+    worker_id = str(uuid7())
+    path.write_text(worker_id, encoding="utf-8")
+    try:
+        yield worker_id
+    finally:
+        with suppress(FileNotFoundError):
+            if path.read_text(encoding="utf-8") == worker_id:
+                path.unlink()
+
+
+async def check_worker_health_cli(*, identity_file: Path | None = None) -> bool:
+    """Probe the local worker's heartbeat through the guarded application query."""
+    from app.entrypoints.api.shared.access_guard import get_access_guard
+
+    try:
+        worker_id = (
+            (identity_file or default_worker_identity_file())
+            .read_text(encoding="utf-8")
+            .strip()
+        )
+    except OSError, UnicodeError:
+        return False
+    if not worker_id:
+        return False
+    try:
+        async with asyncio.timeout(5), get_session_factory()() as session:
+            return await GetWorkerStatus(
+                SqlAlchemyJobRunReader(session), get_access_guard()
+            ).handle(
+                GetWorkerStatusQuery(
+                    since=datetime.now(UTC)
+                    - timedelta(
+                        seconds=get_scheduler_settings().worker_heartbeat_timeout_seconds
+                    ),
+                    worker_id=worker_id,
+                ),
+                SYSTEM_ACTOR,
+            )
+    except TimeoutError, SQLAlchemyError, OSError:
+        logger.warning("worker health check failed")
+        return False
+    finally:
+        await get_engine().dispose()
 
 
 class SchedulingSetupState:
@@ -102,12 +163,23 @@ def build_job_executor(
 
 def build_catalogue() -> JobCatalogue:
     """Collect module job contributions at the composition root."""
-    return JobCatalogue(())
+    from app.entrypoints.api.shared.access_guard import get_access_guard
+
+    return JobCatalogue(
+        [
+            prune_runs_job(
+                lambda: PruneJobRuns(
+                    create_scheduling_uow(get_session_factory()), get_access_guard()
+                ),
+                keep_per_job=get_scheduler_settings().run_history_per_job,
+            )
+        ]
+    )
 
 
 def build_schedule_source() -> SettingsScheduleSource:
     """Collect deployment schedule values alongside their module contributions."""
-    return SettingsScheduleSource({})
+    return SettingsScheduleSource({"scheduling.prune_schedule": "0 4 * * *"})
 
 
 def build_worker(
@@ -115,6 +187,8 @@ def build_worker(
     guard: AccessGuard,
     catalogue: JobCatalogue,
     source: ScheduleSource,
+    *,
+    worker_id: str | None = None,
 ) -> Worker:
     """Give each worker operation its own guarded application transaction."""
     return Worker(
@@ -130,8 +204,9 @@ def build_worker(
         ),
         lambda: FinishJobRun(create_scheduling_uow(factory), guard),
         build_job_executor(factory, guard),
-        worker_id=str(uuid7()),
+        worker_id=worker_id if worker_id is not None else str(uuid7()),
         timezone=get_scheduler_settings().timezone.key,
+        heartbeat_interval=get_scheduler_settings().worker_heartbeat_interval_seconds,
     )
 
 
@@ -173,13 +248,18 @@ def stop_on_signals(stop: asyncio.Event) -> Iterator[None]:
             signal.signal(item, previous[item])
 
 
-async def run_worker_cli() -> None:
+async def run_worker_cli(*, identity_file: Path | None = None) -> None:
     """Wait for schema readiness, run until termination and close pooled connections."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
 
     stop = asyncio.Event()
     try:
-        with stop_on_signals(stop):
+        with (
+            worker_identity(
+                identity_file or default_worker_identity_file()
+            ) as worker_id,
+            stop_on_signals(stop),
+        ):
             factory = get_session_factory()
             if await wait_for_schema(factory, stop):
                 await build_worker(
@@ -187,6 +267,7 @@ async def run_worker_cli() -> None:
                     get_access_guard(),
                     build_catalogue(),
                     build_schedule_source(),
+                    worker_id=worker_id,
                 ).run(stop)
     finally:
         await get_engine().dispose()

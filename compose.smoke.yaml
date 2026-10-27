@@ -4,6 +4,9 @@ services:
   postgres:
     container_name: db
 
+  worker:
+    container_name: worker
+
   menagerist:
     container_name: app
     environment:

@@ -4,6 +4,9 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import Depends
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
+from app.entrypoints.api.shared.bridges.scheduler_worker_check import (
+    SchedulerWorkerCheck,
+)
 from app.modules.system.adapters.platform.app_info_adapter import PackageAppInfoAdapter
 from app.modules.system.adapters.platform.checks.cors_configuration_check import (
     CorsConfigurationCheck,
@@ -69,6 +72,7 @@ def _readiness_registry(
             ProxyConfigurationCheck(),
             CorsConfigurationCheck(get_api_settings().cors_origins),
             get_storage_check(),
+            SchedulerWorkerCheck(session_factory),
         ]
     )
 
