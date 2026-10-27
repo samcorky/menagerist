@@ -54,6 +54,9 @@ EXPECTED_SYSTEM: frozenset[str] = frozenset(
         "media.PurgeAttachment",
         "media.RegenerateThumbnails",
         "scheduling.TickSchedules",
+        "scheduling.CheckJobExecution",
+        "scheduling.HeartbeatJobRun",
+        "scheduling.FinishJobRun",
     }
 )
 EXPECTED_OWN_ACCOUNT: frozenset[str] = frozenset(

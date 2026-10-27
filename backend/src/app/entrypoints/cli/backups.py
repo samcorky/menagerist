@@ -109,6 +109,8 @@ def upgrade_with_backup(revision: str = "head", *, backup: bool = True) -> None:
 
 async def restore_backup(backup_id: UUID, *, replace: bool, guard: AccessGuard) -> None:
     """Select the setup gate when no accounts exist and run the restore."""
+    from sqlalchemy import func, select
+
     from app.modules.backup.adapters.persistence.database_restorer import (
         SqlAlchemyDatabaseRestorer,
     )
@@ -122,28 +124,39 @@ async def restore_backup(backup_id: UUID, *, replace: bool, guard: AccessGuard) 
         RestoreBackup,
         RestoreBackupCommand,
     )
-    from app.modules.identity.adapters.persistence.user_repository import (
-        SqlAlchemyUserRepository,
+    from app.modules.identity.adapters.persistence.unit_of_work import (
+        build_identity_repos,
     )
+    from app.modules.identity.application.get_setup_status import (
+        GetSetupStatus,
+        GetSetupStatusQuery,
+    )
+    from app.platform.advisory_locks import BACKUP_RESTORE_LOCK_KEY
     from app.shared_kernel.actor import SYSTEM_ACTOR
 
     factory = get_session_factory()
-    async with factory() as session:
-        setup_only = await SqlAlchemyUserRepository(session).count() == 0
-    settings = get_backup_settings()
-    async with media_files() as media:
-        await RestoreBackup(
-            LocalDirectoryBackupStore(settings.backup_path),
-            SqlAlchemyDatabaseRestorer(factory),
-            media,
-            LocalBackupWorkspace(settings.backup_path),
-            guard,
-        ).handle(
-            RestoreBackupCommand(
-                backup_id=backup_id, replace=replace, setup_only=setup_only
-            ),
-            SYSTEM_ACTOR,
+    async with factory() as lock_session, lock_session.begin():
+        await lock_session.execute(
+            select(func.pg_advisory_xact_lock(BACKUP_RESTORE_LOCK_KEY))
         )
+        async with factory() as session:
+            setup_only = await GetSetupStatus(
+                build_identity_repos(session), guard
+            ).handle(GetSetupStatusQuery(), SYSTEM_ACTOR)
+        settings = get_backup_settings()
+        async with media_files() as media:
+            await RestoreBackup(
+                LocalDirectoryBackupStore(settings.backup_path),
+                SqlAlchemyDatabaseRestorer(factory),
+                media,
+                LocalBackupWorkspace(settings.backup_path),
+                guard,
+            ).handle(
+                RestoreBackupCommand(
+                    backup_id=backup_id, replace=replace, setup_only=setup_only
+                ),
+                SYSTEM_ACTOR,
+            )
 
 
 async def export_user_data(user_id: UUID, output: Path) -> BackupSummary:
