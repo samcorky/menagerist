@@ -18,21 +18,31 @@ from app.modules.scheduling.adapters.persistence.unit_of_work import (
     build_in_memory_scheduling_repos,
     create_in_memory_scheduling_uow,
 )
+from app.modules.scheduling.adapters.platform.cron_evaluator import (
+    CronScheduleEvaluator,
+)
 from app.modules.scheduling.adapters.platform.in_memory_restore_guard import (
     InMemoryRestoreGuard,
+)
+from app.modules.scheduling.adapters.platform.in_memory_schedule_source import (
+    InMemoryScheduleSource,
 )
 from app.modules.scheduling.adapters.platform.in_memory_setup_state import (
     InMemorySetupState,
 )
 from app.modules.scheduling.application.check_job_execution import CheckJobExecution
 from app.modules.scheduling.application.finish_job_run import FinishJobRun
+from app.modules.scheduling.application.get_job_next_run import GetJobNextRun
 from app.modules.scheduling.application.heartbeat_job_run import HeartbeatJobRun
 from app.modules.scheduling.domain.errors import LostClaimError, UnknownRunError
 from app.modules.scheduling.domain.job_run import JobRun, RunStatus
+from app.modules.scheduling.domain.registry import JobRegistry
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.jobs import JobDefinition, Lane
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from app.modules.scheduling.ports.unit_of_work import SchedulingUnitOfWork
     from app.shared_kernel.actor import Actor
 
@@ -59,7 +69,9 @@ class Harness:
         uow.on_commit(notify)
         return uow
 
-    def executor(self) -> JobExecutor:
+    def executor(
+        self, next_run: Callable[[], GetJobNextRun] | None = None
+    ) -> JobExecutor:
         """Wire application commands and the eligibility query into the driver."""
         return JobExecutor(
             lambda: HeartbeatJobRun(self.uow(), get_access_guard()),
@@ -68,6 +80,7 @@ class Harness:
             self.restore,
             now=lambda: self.now,
             heartbeat_interval=0.01,
+            next_run=next_run,
         )
 
     async def claimed(self) -> JobRun:
@@ -375,3 +388,52 @@ async def test_concurrent_jobs_keep_isolated_log_context() -> None:
     for entry in logs:
         expected = first if entry["job_key"] == "x" else second
         assert entry["run_id"] == str(expected.id)
+
+
+async def test_finished_and_skipped_jobs_log_their_next_scheduled_time() -> None:
+    """Outcome lines say when the job fires next; a broken lookup cannot hide them."""
+    definition = JobDefinition(job_key="x", schedule_key="x.cron")
+    registry = JobRegistry([definition])
+    guard = get_access_guard()
+
+    def lookup() -> GetJobNextRun:
+        source = InMemoryScheduleSource({"x.cron": "0 15 * * *"})
+        return GetJobNextRun(registry, source, CronScheduleEvaluator(), guard)
+
+    def broken() -> GetJobNextRun:
+        source = InMemoryScheduleSource({})
+        return GetJobNextRun(registry, source, CronScheduleEvaluator(), guard)
+
+    async def handler(actor: Actor) -> None:
+        return None
+
+    upcoming = datetime(2026, 10, 26, 15, tzinfo=UTC).isoformat()
+    for factory, expected in ((lookup, upcoming), (broken, None)):
+        harness = Harness()
+        run = await harness.claimed()
+        with capture_logs(processors=[structlog.contextvars.merge_contextvars]) as logs:
+            await harness.executor(factory).execute(run, definition, handler)
+        finished = next(entry for entry in logs if entry["event"] == "job finished")
+        assert finished["next_run_at"] == expected
+        assert harness.store.get(run.id).status is RunStatus.SUCCEEDED
+
+    harness = Harness()
+    harness.setup.complete = False
+    run = await harness.claimed()
+    with capture_logs(processors=[structlog.contextvars.merge_contextvars]) as logs:
+        await harness.executor(lookup).execute(run, definition, handler)
+    assert logs[-1]["event"] == "job skipped"
+    assert logs[-1]["next_run_at"] == upcoming
+
+
+async def test_next_scheduled_time_is_absent_without_a_lookup() -> None:
+    """Run-now and unscheduled executors still log a null next run."""
+    harness = Harness()
+    run = await harness.claimed()
+
+    async def handler(actor: Actor) -> None:
+        return None
+
+    with capture_logs(processors=[structlog.contextvars.merge_contextvars]) as logs:
+        await harness.executor().execute(run, JobDefinition(job_key="x"), handler)
+    assert logs[-1]["next_run_at"] is None

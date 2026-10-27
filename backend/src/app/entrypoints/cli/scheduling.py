@@ -48,6 +48,7 @@ from app.modules.scheduling.application.claim_job_run import (
     ClaimJobRunCommand,
 )
 from app.modules.scheduling.application.finish_job_run import FinishJobRun
+from app.modules.scheduling.application.get_job_next_run import GetJobNextRun
 from app.modules.scheduling.application.get_job_run import GetJobRun, GetJobRunQuery
 from app.modules.scheduling.application.get_worker_status import (
     GetWorkerStatus,
@@ -161,7 +162,10 @@ class SchedulingSetupState:
 
 
 def build_job_executor(
-    factory: async_sessionmaker[AsyncSession], guard: AccessGuard
+    factory: async_sessionmaker[AsyncSession],
+    guard: AccessGuard,
+    catalogue: JobCatalogue,
+    source: ScheduleSource,
 ) -> JobExecutor:
     """Give each recording command its own transaction and a real access guard."""
     return JobExecutor(
@@ -169,6 +173,10 @@ def build_job_executor(
         lambda: FinishJobRun(create_scheduling_uow(factory), guard),
         CheckJobExecution(SchedulingSetupState(factory, guard), guard),
         SqlAlchemyRestoreGuard(factory),
+        next_run=lambda: GetJobNextRun(
+            catalogue.registry, source, CronScheduleEvaluator(), guard
+        ),
+        timezone=get_scheduler_settings().timezone.key,
     )
 
 
@@ -217,7 +225,7 @@ def build_worker(
             CronScheduleEvaluator(),
         ),
         lambda: FinishJobRun(create_scheduling_uow(factory), guard),
-        build_job_executor(factory, guard),
+        build_job_executor(factory, guard, catalogue, source),
         worker_id=worker_id if worker_id is not None else str(uuid7()),
         timezone=get_scheduler_settings().timezone.key,
         heartbeat_interval=get_scheduler_settings().worker_heartbeat_interval_seconds,
@@ -380,9 +388,9 @@ async def _drive_run(
                 SYSTEM_ACTOR,
             )
             if claimed is not None:
-                await build_job_executor(factory, guard).execute(
-                    claimed, job, catalogue.handler_for(job.job_key)
-                )
+                await build_job_executor(
+                    factory, guard, catalogue, build_schedule_source()
+                ).execute(claimed, job, catalogue.handler_for(job.job_key))
                 continue
         now = datetime.now(UTC)
         await MaintainWorker(create_scheduling_uow(factory), guard).handle(

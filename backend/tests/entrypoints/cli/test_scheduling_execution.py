@@ -17,6 +17,7 @@ from app.entrypoints.cli import backups
 from app.entrypoints.cli.scheduling import (
     SchedulingSetupState,
     build_job_executor,
+    build_schedule_source,
     list_registered_jobs,
     run_registered_job,
 )
@@ -458,9 +459,12 @@ async def test_composed_executor_uses_durable_application_commands(
         async def handler(actor: Actor) -> None:
             assert actor.is_system
 
-        await build_job_executor(factory, get_access_guard()).execute(
-            run, JobDefinition(job_key=key, needs_setup_complete=False), handler
-        )
+        await build_job_executor(
+            factory,
+            get_access_guard(),
+            JobCatalogue([]),
+            build_schedule_source(),
+        ).execute(run, JobDefinition(job_key=key, needs_setup_complete=False), handler)
         async with factory() as session:
             result = await build_scheduling_repos(session).reader.get(run.id)
             assert result.status is RunStatus.SUCCEEDED
