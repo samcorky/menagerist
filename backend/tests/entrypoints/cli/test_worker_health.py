@@ -1,5 +1,6 @@
 """A container health probe checks the current worker process only."""
 
+import logging
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
@@ -33,6 +34,20 @@ def test_worker_health_command_reports_status_and_exit_code(
         with pytest.raises(SystemExit, match="1"):
             cli.app(["worker-health"], result_action="return_value")
         assert "unhealthy" in capsys.readouterr().err
+
+
+def test_worker_health_output_stays_free_of_asyncio_debug_logs(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Docker stores probe output, so debug logging must not add a line to it."""
+
+    async def probe(*, identity_file: Path | None = None) -> bool:
+        return True
+
+    monkeypatch.setattr(cli, "check_worker_health_cli", probe)
+    caplog.set_level(logging.DEBUG)
+    cli.app(["worker-health"], result_action="return_value")
+    assert not [record for record in caplog.records if record.name == "asyncio"]
 
 
 @time_machine.travel(NOW, tick=False)

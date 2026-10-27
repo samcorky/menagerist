@@ -1,0 +1,114 @@
+"""Compose scheduled backup jobs from the backup use cases."""
+
+from datetime import timedelta
+from typing import TYPE_CHECKING
+
+from app.modules.scheduling.adapters.cli.catalogue import JobBinding
+from app.platform.config.backup import get_backup_settings
+from app.platform.config.media import get_media_settings
+from app.shared_kernel.jobs import JobDefinition, Lane, MissedRun
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from app.shared_kernel.actor import Actor
+
+type JobStep = Callable[[Actor], Awaitable[object]]
+
+
+def backup_schedules() -> dict[str, str]:
+    """Expose deployment schedules to the settings-backed schedule source."""
+    settings = get_backup_settings()
+    return {
+        "backup.schedule": settings.schedule,
+        "backup.prune_exports_schedule": settings.prune_exports_schedule,
+    }
+
+
+async def create_scheduled_backup(actor: Actor) -> object:
+    """Back up the shared volumes, refusing to archive a worker that lacks them."""
+    from app.entrypoints.cli.backups import create_backup
+
+    media_path = get_media_settings().media_storage_path
+    if not media_path.is_dir():
+        raise FileNotFoundError(
+            f"The media directory {media_path} is missing; "
+            + "mount the API's data volumes on the worker."
+        )
+    return await create_backup(label="scheduled", actor=actor)
+
+
+async def prune_scheduled_backups(actor: Actor) -> object:
+    """Apply the configured retention after a successful scheduled backup."""
+    from app.entrypoints.api.shared.access_guard import get_access_guard
+    from app.modules.backup.adapters.storage.local_backup_store import (
+        LocalDirectoryBackupStore,
+    )
+    from app.modules.backup.application.prune_backups import (
+        PruneBackups,
+        PruneBackupsCommand,
+    )
+
+    settings = get_backup_settings()
+    return await PruneBackups(
+        LocalDirectoryBackupStore(settings.backup_path),
+        get_access_guard(),
+        keep_last=settings.keep_last,
+        pre_migration_keep=settings.pre_migration_keep,
+        user_export_ttl_hours=settings.user_export_ttl_hours,
+    ).handle(PruneBackupsCommand(), actor)
+
+
+async def prune_expired_exports(actor: Actor) -> object:
+    """Expire user exports without applying backup retention."""
+    from app.entrypoints.api.shared.access_guard import get_access_guard
+    from app.modules.backup.adapters.storage.local_backup_store import (
+        LocalDirectoryBackupStore,
+    )
+    from app.modules.backup.application.prune_user_exports import (
+        PruneUserExports,
+        PruneUserExportsCommand,
+    )
+
+    settings = get_backup_settings()
+    return await PruneUserExports(
+        LocalDirectoryBackupStore(settings.backup_path),
+        get_access_guard(),
+        user_export_ttl_hours=settings.user_export_ttl_hours,
+    ).handle(PruneUserExportsCommand(), actor)
+
+
+def backup_job_bindings(
+    *,
+    create: JobStep = create_scheduled_backup,
+    prune: JobStep = prune_scheduled_backups,
+    prune_exports: JobStep = prune_expired_exports,
+) -> list[JobBinding]:
+    """Bind backups with retention after each success, and hourly export expiry."""
+
+    async def create_then_prune(actor: Actor) -> None:
+        await create(actor)
+        await prune(actor)
+
+    async def expire_exports(actor: Actor) -> None:
+        await prune_exports(actor)
+
+    return [
+        JobBinding(
+            definition=JobDefinition(
+                job_key="backup.create",
+                lane=Lane.HEAVY,
+                missed_run=MissedRun.RUN_ONCE,
+                max_lateness=timedelta(hours=12),
+                schedule_key="backup.schedule",
+            ),
+            handler=create_then_prune,
+        ),
+        JobBinding(
+            definition=JobDefinition(
+                job_key="backup.prune_exports",
+                schedule_key="backup.prune_exports_schedule",
+            ),
+            handler=expire_exports,
+        ),
+    ]

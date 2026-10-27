@@ -4,6 +4,7 @@ from pathlib import Path
 from pydantic import Field
 
 from app.platform.config._base import MenageristBaseSettings
+from app.platform.config._types import Cron  # noqa: TC001 - pydantic resolves this at runtime
 
 
 class BackupSettings(MenageristBaseSettings):
@@ -37,6 +38,22 @@ class BackupSettings(MenageristBaseSettings):
         ge=1,
         validation_alias="MENAGERIST_BACKUP_PRE_MIGRATION_KEEP",
         description="Minimum number of pre-migration backups to retain.",
+    )
+    schedule: Cron = Field(
+        default="0 3 * * *",
+        validation_alias="MENAGERIST_BACKUP_SCHEDULE",
+        description=(
+            "Cron expression for scheduled backups in the instance timezone. "
+            + "Empty disables scheduled backups; each success is followed by retention."
+        ),
+    )
+    prune_exports_schedule: Cron = Field(
+        default="0 * * * *",
+        validation_alias="MENAGERIST_BACKUP_PRUNE_EXPORTS_SCHEDULE",
+        description=(
+            "Cron expression for expiring downloadable data exports. "
+            + "Empty disables the job."
+        ),
     )
     max_upload_size: int = Field(
         default=8 * 1024 * 1024 * 1024,

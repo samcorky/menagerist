@@ -29,6 +29,7 @@ EXPECTED_PERMISSIONS: dict[str, str] = {
     "backup.ListUserExports": "backup:own_data:export",
     "backup.OpenUserExport": "backup:own_data:export",
     "backup.PruneBackups": "backup:archive:delete",
+    "backup.PruneUserExports": "backup:archive:delete",
     "backup.RestoreBackup": "backup:archive:restore",
     "backup.UploadBackup": "backup:archive:create",
     "backup.VerifyBackup": "backup:archive:read",

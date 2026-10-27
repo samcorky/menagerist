@@ -1,7 +1,9 @@
 """Validated setting value types; each is kept as the string the consumer needs."""
 
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 
+from cronsim import CronSim, CronSimError
 from pydantic import (
     AfterValidator,
     AnyHttpUrl,
@@ -48,3 +50,17 @@ def _origin(value: object) -> str:
 
 type Origin = Annotated[str, ValidateAs(AnyHttpUrl, _origin)]
 type ProxyAddress = Annotated[str, ValidateAs(IPvAnyAddress | IPvAnyNetwork, str)]
+
+
+def _cron(value: str) -> str:
+    """Accept a five-field cron expression; empty means the job is off."""
+    if value:
+        try:
+            CronSim(value, datetime(2000, 1, 1, tzinfo=UTC))
+        except CronSimError as exc:
+            msg = f"invalid cron schedule: {value}"
+            raise ValueError(msg) from exc
+    return value
+
+
+type Cron = Annotated[str, ValidateAs(str, _cron)]

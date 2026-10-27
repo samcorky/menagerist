@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from app.entrypoints.api.shared.backup_media_files import BackupMediaFiles
     from app.modules.backup.domain.backup import BackupSummary
     from app.shared_kernel.access_guard import AccessGuard
+    from app.shared_kernel.actor import Actor
     from app.shared_kernel.content_filter import ContentFilter
 
 
@@ -46,8 +47,9 @@ async def create_backup(
     label: str = "manual",
     from_revision: str | None = None,
     to_revision: str | None = None,
+    actor: Actor | None = None,
 ) -> BackupSummary:
-    """Build and run a verified backup as the system actor."""
+    """Build and run a verified backup, as the system actor unless given one."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
     from app.modules.backup.adapters.persistence.database_snapshot import (
         SqlAlchemyDatabaseSnapshot,
@@ -73,7 +75,7 @@ async def create_backup(
             CreateBackupCommand(
                 label=label, from_revision=from_revision, to_revision=to_revision
             ),
-            SYSTEM_ACTOR,
+            actor or SYSTEM_ACTOR,
         )
 
 

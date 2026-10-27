@@ -1,8 +1,7 @@
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    import pytest
+import pytest
+from pydantic import ValidationError
 
 from app.platform.config import BackupSettings, get_backup_settings
 
@@ -36,3 +35,25 @@ def test_reads_backup_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         assert settings is get_backup_settings()
     finally:
         get_backup_settings.cache_clear()
+
+
+def test_schedule_defaults_and_empty_means_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Backups run daily, exports expire hourly, and an empty value disables a job."""
+    defaults = BackupSettings()
+    assert defaults.schedule == "0 3 * * *"
+    assert defaults.prune_exports_schedule == "0 * * * *"
+    monkeypatch.setenv("MENAGERIST_BACKUP_SCHEDULE", "")
+    monkeypatch.setenv("MENAGERIST_BACKUP_PRUNE_EXPORTS_SCHEDULE", "30 * * * *")
+    settings = BackupSettings()
+    assert settings.schedule == ""
+    assert settings.prune_exports_schedule == "30 * * * *"
+
+
+@pytest.mark.parametrize("value", ["nonsense", "* * * *", "61 * * * *"])
+def test_invalid_schedule_fails_at_startup(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    """A malformed cron expression is a configuration error, not a silent no-op."""
+    monkeypatch.setenv("MENAGERIST_BACKUP_SCHEDULE", value)
+    with pytest.raises(ValidationError):
+        BackupSettings()

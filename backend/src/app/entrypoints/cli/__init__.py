@@ -114,6 +114,8 @@ def worker_health(*, identity_file: Path | None = None) -> None:
     Args:
         identity_file: The identity file used by the worker being checked.
     """
+    # Docker stores probe output; asyncio.run logs its event loop at DEBUG.
+    logging.getLogger("asyncio").setLevel(logging.INFO)
     if not asyncio.run(check_worker_health_cli(identity_file=identity_file)):
         app.error_console.print(
             "Worker is unhealthy: no recent heartbeat for this process."

@@ -13,6 +13,7 @@ from uuid import uuid7
 import structlog
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.entrypoints.cli.backup_jobs import backup_job_bindings, backup_schedules
 from app.modules.identity.adapters.persistence.unit_of_work import build_identity_repos
 from app.modules.identity.application.get_setup_status import (
     GetSetupStatus,
@@ -182,14 +183,17 @@ def build_catalogue() -> JobCatalogue:
                     create_scheduling_uow(get_session_factory()), get_access_guard()
                 ),
                 keep_per_job=get_scheduler_settings().run_history_per_job,
-            )
+            ),
+            *backup_job_bindings(),
         ]
     )
 
 
 def build_schedule_source() -> SettingsScheduleSource:
     """Collect deployment schedule values alongside their module contributions."""
-    return SettingsScheduleSource({"scheduling.prune_schedule": "0 4 * * *"})
+    return SettingsScheduleSource(
+        {"scheduling.prune_schedule": "0 4 * * *", **backup_schedules()}
+    )
 
 
 def build_worker(
