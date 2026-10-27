@@ -35,6 +35,7 @@
 	import {
 		Activity,
 		AlertTriangle,
+		CalendarClock,
 		CheckCircle2,
 		ChevronDown,
 		CircleX,
@@ -43,6 +44,7 @@
 		Globe,
 		GitBranch,
 		HardDrive,
+		HeartPulse,
 		LogIn,
 		Network,
 		PackageCheck,
@@ -104,6 +106,7 @@
 		if (key === 'migration') return GitBranch;
 		if (key === 'configuration' || key === 'proxy') return Network;
 		if (key === 'storage') return HardDrive;
+		if (key === 'scheduler') return CalendarClock;
 		return Server;
 	}
 
@@ -117,6 +120,7 @@
 		if (lower.includes('writable')) return Pencil;
 		if (lower.includes('version') || lower.includes('build')) return PackageCheck;
 		if (lower.includes('health') || lower.includes('status')) return ShieldCheck;
+		if (lower.includes('heartbeat')) return HeartPulse;
 		return Wrench;
 	}
 

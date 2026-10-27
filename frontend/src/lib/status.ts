@@ -56,6 +56,9 @@ export function formatObservedValue(value: unknown, unit: string | null | undefi
 		if (value === 'not-writable') return 'Not writable';
 		if (value === 'missing') return 'Missing';
 		if (value === 'writable') return 'Writable';
+		if (value === 'running') return 'Running';
+		if (value === 'stale') return 'No recent heartbeat';
+		if (value === 'unknown') return 'Unknown';
 	}
 	if (unit === 'open origins') return value === 0 ? 'Listed origins only' : 'Any origin allowed';
 	if (unit === 'flagged requests') {

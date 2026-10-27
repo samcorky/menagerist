@@ -352,11 +352,11 @@ def test_readiness_passes_with_real_db(ready_client: TestClient) -> None:
     data = response.json()
     assert data["status"] in {"pass", "warn"}
 
-    assert data["checks"]["scheduler:worker"][0]["status"] in {"pass", "warn"}
+    assert data["checks"]["scheduler:workerHeartbeat"][0]["status"] in {"pass", "warn"}
 
     for key, checks in data["checks"].items():
         for check in checks:
-            if key.startswith("storage:") or key == "scheduler:worker":
+            if key.startswith("storage:") or key == "scheduler:workerHeartbeat":
                 assert check["status"] in {"pass", "warn"}
             else:
                 assert check["status"] == "pass", (

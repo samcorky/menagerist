@@ -33,12 +33,15 @@ async def test_worker_check_uses_configured_window(
     get_scheduler_settings.cache_clear()
     factory.return_value.__aenter__.return_value.scalar = AsyncMock(return_value=alive)
     try:
-        result = (await SchedulerWorkerCheck(factory).run())["scheduler:worker"]
+        result = (await SchedulerWorkerCheck(factory).run())[
+            "scheduler:workerHeartbeat"
+        ]
     finally:
         get_scheduler_settings.cache_clear()
     assert result.status is (CheckStatus.PASS if alive else CheckStatus.WARN)
     assert result.time == NOW
-    assert result.observed_value == int(alive)
+    assert result.observed_value == ("running" if alive else "stale")
+    assert result.observed_unit == "state"
     statement = factory.return_value.__aenter__.return_value.scalar.call_args.args[0]
     assert NOW - timedelta(seconds=timeout) in statement.compile().params.values()
     if not alive:
@@ -74,7 +77,8 @@ async def test_absent_worker_keeps_public_readiness_healthy() -> None:
 async def test_worker_check_failure_warns_without_exposing_database_errors() -> None:
     """Diagnostics failures cannot fail readiness or disclose connection details."""
     factory = MagicMock(side_effect=OSError("private connection details"))
-    result = (await SchedulerWorkerCheck(factory).run())["scheduler:worker"]
+    result = (await SchedulerWorkerCheck(factory).run())["scheduler:workerHeartbeat"]
     assert result.status is CheckStatus.WARN
+    assert result.observed_value == "unknown"
     assert result.output is not None
     assert "private" not in result.output

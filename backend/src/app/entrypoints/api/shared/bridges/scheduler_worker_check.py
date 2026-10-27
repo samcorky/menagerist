@@ -46,17 +46,17 @@ class SchedulerWorkerCheck:
                 if alive
                 else f"No worker heartbeat in the last {self._timeout} seconds."
             )
-            observed_value: float | str = int(alive)
+            observed_value = "running" if alive else "stale"
         except Exception:
             logger.exception("worker readiness check failed")
             alive = False
             observed_value = "unknown"
             output = "Worker status could not be checked."
         return {
-            "scheduler:worker": CheckObservation(
+            "scheduler:workerHeartbeat": CheckObservation(
                 component_type="component",
                 observed_value=observed_value,
-                observed_unit="boolean",
+                observed_unit="state",
                 status=CheckStatus.PASS if alive else CheckStatus.WARN,
                 time=now,
                 output=output,

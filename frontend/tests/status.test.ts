@@ -77,6 +77,12 @@ describe('formatObservedValue', () => {
 		expect(formatObservedValue('missing', 'state')).toBe('Missing');
 	});
 
+	it('presents worker heartbeat states in plain language', () => {
+		expect(formatObservedValue('running', 'state')).toBe('Running');
+		expect(formatObservedValue('stale', 'state')).toBe('No recent heartbeat');
+		expect(formatObservedValue('unknown', 'state')).toBe('Unknown');
+	});
+
 	it('says nothing unusual rather than zero when no request was flagged', () => {
 		expect(formatObservedValue(0, 'flagged requests')).toBe('Nothing unusual in the last hour');
 	});
