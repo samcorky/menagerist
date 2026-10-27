@@ -17,7 +17,7 @@ from app.entrypoints.cli import scheduling
 from app.modules.scheduling.adapters.cli import job_app as commands
 from app.modules.scheduling.application.list_jobs import JobStatus
 from app.modules.scheduling.domain.job_run import JobRun
-from app.shared_kernel.jobs import JobDefinition
+from app.shared_kernel.jobs import JobDefinition, Lane
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -138,6 +138,7 @@ async def test_worker_entrypoint_waits_then_disposes_connections(
     monkeypatch.setattr(scheduling, "stop_on_signals", lambda stop: nullcontext())
     monkeypatch.setattr(scheduling, "wait_for_schema", AsyncMock(return_value=ready))
     monkeypatch.setattr(scheduling, "build_worker", build)
+    monkeypatch.setattr(scheduling, "log_job_schedules", AsyncMock())
     identity_file = tmp_path / "worker-id"
 
     async def run(stop: asyncio.Event) -> None:
@@ -175,6 +176,7 @@ async def test_worker_logs_bind_hostname_and_process_identity(
     monkeypatch.setattr(scheduling, "wait_for_schema", AsyncMock(return_value=True))
     build = Mock(return_value=worker)
     monkeypatch.setattr(scheduling, "build_worker", build)
+    monkeypatch.setattr(scheduling, "log_job_schedules", AsyncMock())
     with capture_logs(processors=[structlog.contextvars.merge_contextvars]) as logs:
         await scheduling.run_worker_cli(identity_file=tmp_path / "worker-id")
     worker_id = build.call_args.kwargs["worker_id"]
@@ -187,6 +189,41 @@ async def test_worker_logs_bind_hostname_and_process_identity(
     assert all(entry["log_level"] == "info" for entry in logs)
     assert all(entry["worker_id"] == worker_id for entry in logs)
     assert structlog.contextvars.get_contextvars() == {}
+
+
+async def test_worker_logs_each_jobs_effective_schedule(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Startup shows what will run, when next, and which jobs are switched off."""
+    from unittest.mock import Mock
+
+    statuses = [
+        JobStatus(
+            definition=JobDefinition(job_key="backup.create", lane=Lane.HEAVY),
+            expression="0 3 * * *",
+            next_run_at=NOW,
+            active_run=None,
+        ),
+        JobStatus(
+            definition=JobDefinition(job_key="backup.prune_exports"),
+            expression=None,
+            next_run_at=None,
+            active_run=None,
+        ),
+    ]
+    monkeypatch.setattr(
+        scheduling, "list_registered_jobs", AsyncMock(return_value=statuses)
+    )
+    with capture_logs() as logs:
+        await scheduling.log_job_schedules(Mock(), Mock(), Mock(), Mock())
+    assert [entry["event"] for entry in logs] == ["job schedule", "job schedule"]
+    assert all(entry["log_level"] == "info" for entry in logs)
+    assert logs[0]["job_key"] == "backup.create"
+    assert logs[0]["lane"] == "heavy"
+    assert logs[0]["schedule"] == "0 3 * * *"
+    assert logs[0]["next_run_at"] == NOW.isoformat()
+    assert logs[1]["schedule"] == "off"
+    assert logs[1]["next_run_at"] is None
 
 
 async def test_job_entrypoints_dispose_connections_on_success_and_failure(

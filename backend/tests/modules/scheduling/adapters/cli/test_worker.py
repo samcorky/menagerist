@@ -168,6 +168,35 @@ async def test_tick_observes_then_submits_a_future_fire() -> None:
     assert next(iter(world.store.runs.values())).scheduled_for == world.now
 
 
+async def test_tick_logs_each_submitted_run() -> None:
+    """A schedule fire is visible at INFO before any worker claims it."""
+    world = World()
+
+    async def handler(actor: Actor) -> None:
+        world.stop.set()
+
+    catalogue = JobCatalogue(
+        [
+            JobBinding(
+                definition=JobDefinition(job_key="x", schedule_key="x"), handler=handler
+            )
+        ]
+    )
+    with capture_logs() as logs:
+        task = asyncio.create_task(world.worker(catalogue).run(world.stop))
+        await until(lambda: "x" in world.store.cursors)
+        world.now += timedelta(minutes=1)
+        await asyncio.wait_for(task, timeout=3)
+    submitted = [entry for entry in logs if entry["event"] == "scheduled run submitted"]
+    assert len(submitted) == 1
+    run = next(iter(world.store.runs.values()))
+    assert submitted[0]["log_level"] == "info"
+    assert submitted[0]["job_key"] == "x"
+    assert submitted[0]["run_id"] == str(run.id)
+    assert submitted[0]["scheduled_for"] == run.scheduled_for.isoformat()
+    assert submitted[0]["status"] == "queued"
+
+
 async def test_idle_worker_reaps_abandoned_work_and_reports_liveness() -> None:
     """Maintenance runs even when there are no queued jobs to execute."""
     world = World(now=NOW + timedelta(minutes=6))

@@ -95,3 +95,51 @@ async def test_missing_media_directory_fails_loudly(
     )
     with pytest.raises(FileNotFoundError, match="media"):
         await backup_jobs.create_scheduled_backup(SYSTEM_ACTOR)
+
+
+@pytest.mark.parametrize(
+    ("value", "runs"), [("", 0), ("0 3 * * *", 1)], ids=["empty-is-off", "control"]
+)
+async def test_empty_environment_value_stops_the_job_ever_being_enqueued(
+    monkeypatch: pytest.MonkeyPatch, value: str, runs: int
+) -> None:
+    """From the environment to a real tick: empty enqueues nothing, a cron does."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.entrypoints.api.shared.access_guard import get_access_guard
+    from app.entrypoints.cli.scheduling import build_schedule_source
+    from app.modules.scheduling.adapters.cli.catalogue import JobCatalogue
+    from app.modules.scheduling.adapters.persistence.in_memory_store import (
+        InMemorySchedulingStore,
+    )
+    from app.modules.scheduling.adapters.persistence.unit_of_work import (
+        create_in_memory_scheduling_uow,
+    )
+    from app.modules.scheduling.adapters.platform.cron_evaluator import (
+        CronScheduleEvaluator,
+    )
+    from app.modules.scheduling.application.tick_schedules import (
+        TickSchedules,
+        TickSchedulesCommand,
+    )
+    from app.platform.config.backup import get_backup_settings
+
+    monkeypatch.setenv("MENAGERIST_BACKUP_SCHEDULE", value)
+    get_backup_settings.cache_clear()
+    try:
+        source = build_schedule_source()
+        assert await source.schedule_for("backup.schedule") == (value or None)
+        store = InMemorySchedulingStore()
+        catalogue = JobCatalogue(_bindings([]).values())
+        start = datetime(2026, 10, 27, 12, tzinfo=UTC)
+        for now in (start, start + timedelta(days=1)):
+            await TickSchedules(
+                create_in_memory_scheduling_uow(store),
+                get_access_guard(),
+                catalogue.registry,
+                source,
+                CronScheduleEvaluator(),
+            ).handle(TickSchedulesCommand(now=now, timezone="UTC"), SYSTEM_ACTOR)
+    finally:
+        get_backup_settings.cache_clear()
+    assert [run.job_key for run in store.runs.values()].count("backup.create") == runs

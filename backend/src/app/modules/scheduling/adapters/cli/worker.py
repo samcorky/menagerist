@@ -126,10 +126,18 @@ class Worker:
 
     async def _maintenance(self, stop: asyncio.Event) -> None:
         while not stop.is_set():
-            await self._tick().handle(
+            submitted = await self._tick().handle(
                 TickSchedulesCommand(now=self._now(), timezone=self._timezone),
                 SYSTEM_ACTOR,
             )
+            for run in submitted:
+                logger.info(
+                    "scheduled run submitted",
+                    job_key=run.job_key,
+                    run_id=str(run.id),
+                    scheduled_for=run.scheduled_for.isoformat(),
+                    status=run.status.value,
+                )
             logger.debug("schedule tick completed")
             await wait_or_stop(stop, self._tick_interval)
 

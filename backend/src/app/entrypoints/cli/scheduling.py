@@ -224,6 +224,23 @@ def build_worker(
     )
 
 
+async def log_job_schedules(
+    factory: async_sessionmaker[AsyncSession],
+    guard: AccessGuard,
+    catalogue: JobCatalogue,
+    source: ScheduleSource,
+) -> None:
+    """Record each job's effective schedule once, so a worker's plan is visible."""
+    for status in await list_registered_jobs(factory, guard, catalogue, source):
+        logger.info(
+            "job schedule",
+            job_key=status.definition.job_key,
+            lane=status.definition.lane.value,
+            schedule=status.expression or "off",
+            next_run_at=status.next_run_at.isoformat() if status.next_run_at else None,
+        )
+
+
 async def wait_for_schema(
     factory: async_sessionmaker[AsyncSession],
     stop: asyncio.Event,
@@ -279,12 +296,14 @@ async def run_worker_cli(*, identity_file: Path | None = None) -> None:
             factory = get_session_factory()
             if await wait_for_schema(factory, stop):
                 logger.info("worker started")
-                await build_worker(
-                    factory,
+                guard, catalogue, source = (
                     get_access_guard(),
                     build_catalogue(),
                     build_schedule_source(),
-                    worker_id=worker_id,
+                )
+                await log_job_schedules(factory, guard, catalogue, source)
+                await build_worker(
+                    factory, guard, catalogue, source, worker_id=worker_id
                 ).run(stop)
             logger.info("worker stopped")
     finally:
