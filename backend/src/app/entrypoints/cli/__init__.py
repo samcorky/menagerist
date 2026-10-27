@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from enum import StrEnum
@@ -15,6 +16,7 @@ from app.entrypoints.cli.backups import (
     restore_backup,
 )
 from app.entrypoints.cli.data import data_app
+from app.entrypoints.cli.scheduling import list_jobs_cli, run_job_cli, run_worker_cli
 from app.modules.backup.adapters.cli.backup_app import (
     backup_app,
     use_access_guard as use_backup_access_guard,
@@ -27,6 +29,10 @@ from app.modules.identity.adapters.cli.identity_app import (
     use_existing_data_claim,
 )
 from app.modules.media.adapters.cli.media_app import media_app
+from app.modules.scheduling.adapters.cli.job_app import (
+    job_app,
+    use_operations as use_job_operations,
+)
 from app.platform.app_info import load_app_info
 from app.platform.logging_config import configure_logging
 
@@ -68,6 +74,8 @@ app.command(migrate_app)
 
 app.command(media_app)
 app.command(data_app)
+use_job_operations(list_jobs_cli, run_job_cli)
+app.command(job_app)
 use_backup_access_guard(get_access_guard())
 
 use_operations(
@@ -78,6 +86,12 @@ use_operations(
 )
 use_user_operations(export_user_data, import_user_data)
 app.command(backup_app)
+
+
+@app.command
+def worker() -> None:
+    """Run recurring and queued jobs until the process receives a stop signal."""
+    asyncio.run(run_worker_cli())
 
 
 def _claim_existing_data(session: AsyncSession) -> ExistingDataClaim:

@@ -1,5 +1,6 @@
 """Scheduler composition queries setup and reserves the full CLI restore."""
 
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
@@ -11,15 +12,24 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.cli import backups
-from app.entrypoints.cli.scheduling import SchedulingSetupState, build_job_executor
+from app.entrypoints.cli.scheduling import (
+    SchedulingSetupState,
+    build_job_executor,
+    list_registered_jobs,
+    run_registered_job,
+)
 from app.modules.backup.adapters.media.in_memory_media_files import InMemoryMediaFiles
 from app.modules.backup.application.restore_backup import RestoreBackup
 from app.modules.identity.adapters.persistence.user_repository import (
     SqlAlchemyUserRepository,
 )
 from app.modules.identity.domain.user import User
+from app.modules.scheduling.adapters.cli.catalogue import JobBinding, JobCatalogue
 from app.modules.scheduling.adapters.persistence.unit_of_work import (
     build_scheduling_repos,
+)
+from app.modules.scheduling.adapters.platform.in_memory_schedule_source import (
+    InMemoryScheduleSource,
 )
 from app.modules.scheduling.domain.job_run import JobRun, RunStatus
 from app.platform.advisory_locks import BACKUP_RESTORE_LOCK_KEY
@@ -36,6 +46,258 @@ if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
 
 pytestmark = pytest.mark.integration
+
+
+async def test_production_worker_composition_executes_a_registered_job(
+    postgres_url: str,
+) -> None:
+    """The production builder wires every worker command to independent sessions."""
+    from sqlalchemy import delete
+
+    from app.entrypoints.cli.scheduling import build_worker
+    from app.modules.scheduling.adapters.persistence.models import (
+        JobRunModel,
+        WorkerHeartbeatModel,
+    )
+
+    engine = create_async_engine(postgres_url)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    key = f"test-{uuid7()}"
+    stop = asyncio.Event()
+    worker_ids: list[str] = []
+
+    async def handler(actor: Actor) -> None:
+        stop.set()
+
+    catalogue = JobCatalogue(
+        [
+            JobBinding(
+                definition=JobDefinition(
+                    job_key=key, needs_setup_complete=False, lane=Lane.HEAVY
+                ),
+                handler=handler,
+            )
+        ]
+    )
+    try:
+        async with factory.begin() as session:
+            queued = await build_scheduling_repos(session).queue.enqueue(
+                JobRun.create(
+                    job_key=key, scheduled_for=datetime.now(UTC), lane=Lane.HEAVY
+                )
+            )
+        await asyncio.wait_for(
+            build_worker(
+                factory, get_access_guard(), catalogue, InMemoryScheduleSource({})
+            ).run(stop),
+            timeout=5,
+        )
+        async with factory() as session:
+            result = await build_scheduling_repos(session).reader.get(queued.id)
+            assert result.status is RunStatus.SUCCEEDED
+            assert result.worker_id is not None
+            worker_ids.append(result.worker_id)
+    finally:
+        async with factory.begin() as session:
+            await session.execute(delete(JobRunModel).where(JobRunModel.job_key == key))
+            await session.execute(
+                delete(WorkerHeartbeatModel).where(
+                    WorkerHeartbeatModel.worker_id.in_(worker_ids)
+                )
+            )
+        await engine.dispose()
+
+
+async def test_synchronous_cli_retries_temporary_claim_contention(
+    postgres_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A contended targeted claim cannot leave cron work queued after a success exit."""
+    from sqlalchemy import delete
+
+    from app.modules.scheduling.adapters.persistence.job_lock import lock_job
+    from app.modules.scheduling.adapters.persistence.models import (
+        JobRunModel,
+        WorkerHeartbeatModel,
+    )
+    from app.modules.scheduling.application.claim_job_run import (
+        ClaimJobRun,
+        ClaimJobRunCommand,
+    )
+
+    engine = create_async_engine(postgres_url)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    key = f"test-{uuid7()}"
+    attempts = 0
+    called = False
+    original = ClaimJobRun.handle
+
+    async def handler(actor: Actor) -> None:
+        nonlocal called
+        called = True
+
+    async def contended(
+        self: ClaimJobRun, request: ClaimJobRunCommand, actor: Actor
+    ) -> JobRun | None:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            async with factory.begin() as session:
+                await lock_job(session, key)
+                return await original(self, request, actor)
+        return await original(self, request, actor)
+
+    monkeypatch.setattr(ClaimJobRun, "handle", contended)
+    catalogue = JobCatalogue(
+        [
+            JobBinding(
+                definition=JobDefinition(job_key=key, needs_setup_complete=False),
+                handler=handler,
+            )
+        ]
+    )
+    try:
+        result = await run_registered_job(
+            factory,
+            get_access_guard(),
+            catalogue,
+            key,
+            poll_interval=0.001,
+        )
+        assert attempts >= 2
+        assert called
+        assert result.status is RunStatus.SUCCEEDED
+    finally:
+        async with factory.begin() as session:
+            ids = await session.scalars(
+                select(JobRunModel.worker_id).where(JobRunModel.job_key == key)
+            )
+            await session.execute(
+                delete(WorkerHeartbeatModel).where(
+                    WorkerHeartbeatModel.worker_id.in_(list(ids))
+                )
+            )
+            await session.execute(
+                delete(WorkerHeartbeatModel).where(
+                    WorkerHeartbeatModel.worker_id.like("cli-%")
+                )
+            )
+            await session.execute(delete(JobRunModel).where(JobRunModel.job_key == key))
+        await engine.dispose()
+
+
+@pytest.mark.parametrize("already_running", [False, True])
+async def test_synchronous_job_targets_only_its_requested_run(
+    postgres_url: str, already_running: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CLI execution never steals an unrelated queued job or an existing claim."""
+    from sqlalchemy import delete
+
+    from app.modules.scheduling.adapters.persistence.models import (
+        JobRunModel,
+        WorkerHeartbeatModel,
+    )
+
+    engine = create_async_engine(postgres_url)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    key = f"test-{uuid7()}"
+    other_key = f"test-{uuid7()}"
+    called = False
+
+    async def handler(actor: Actor) -> None:
+        nonlocal called
+        called = True
+
+    catalogue = JobCatalogue(
+        [
+            JobBinding(
+                definition=JobDefinition(
+                    job_key=key, needs_setup_complete=False, schedule_key="custom"
+                ),
+                handler=handler,
+            )
+        ]
+    )
+    observed_running = asyncio.Event()
+    completions: list[asyncio.Task[None]] = []
+    from app.modules.scheduling.application.get_job_run import GetJobRun, GetJobRunQuery
+
+    original_read = GetJobRun.handle
+
+    async def observe(self: GetJobRun, query: GetJobRunQuery, actor: Actor) -> JobRun:
+        result = await original_read(self, query, actor)
+        if result.status is RunStatus.RUNNING:
+            observed_running.set()
+        return result
+
+    monkeypatch.setattr(GetJobRun, "handle", observe)
+    try:
+        async with factory.begin() as session:
+            repos = build_scheduling_repos(session)
+            unrelated = await repos.queue.enqueue(
+                JobRun.create(job_key=other_key, scheduled_for=datetime.now(UTC))
+            )
+            if already_running:
+                queued = await repos.queue.enqueue(
+                    JobRun.create(job_key=key, scheduled_for=datetime.now(UTC))
+                )
+                await repos.queue.claim(
+                    [Lane.DEFAULT], key, datetime.now(UTC), run_id=queued.id
+                )
+        if already_running:
+
+            async def complete_existing() -> None:
+                await observed_running.wait()
+                async with factory.begin() as session:
+                    await build_scheduling_repos(session).recorder.finish(
+                        queued.id, key, RunStatus.SUCCEEDED, datetime.now(UTC)
+                    )
+
+            completions.append(asyncio.create_task(complete_existing()))
+        result = await asyncio.wait_for(
+            run_registered_job(
+                factory,
+                get_access_guard(),
+                catalogue,
+                key,
+                poll_interval=0.001,
+            ),
+            timeout=5,
+        )
+        await asyncio.gather(*completions)
+        assert called is not already_running
+        assert result.status is RunStatus.SUCCEEDED
+        async with factory() as session:
+            assert (
+                await build_scheduling_repos(session).reader.get(unrelated.id)
+            ).status is RunStatus.QUEUED
+        statuses = await list_registered_jobs(
+            factory,
+            get_access_guard(),
+            catalogue,
+            InMemoryScheduleSource({"custom": "* * * * *"}),
+        )
+        assert len(statuses) == 1
+        assert statuses[0].expression == "* * * * *"
+        assert statuses[0].next_run_at is not None
+    finally:
+        for completion in completions:
+            completion.cancel()
+        await asyncio.gather(*completions, return_exceptions=True)
+        async with factory.begin() as session:
+            await session.execute(
+                delete(JobRunModel).where(JobRunModel.job_key.in_([key, other_key]))
+            )
+            await session.execute(
+                delete(WorkerHeartbeatModel).where(
+                    WorkerHeartbeatModel.worker_id == key
+                )
+            )
+            await session.execute(
+                delete(WorkerHeartbeatModel).where(
+                    WorkerHeartbeatModel.worker_id.like("cli-%")
+                )
+            )
+        await engine.dispose()
 
 
 async def test_setup_bridge_uses_existing_identity_query(

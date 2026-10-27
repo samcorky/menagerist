@@ -8,6 +8,7 @@ from app.shared_kernel.jobs import Overlap
 if TYPE_CHECKING:
     from collections.abc import Collection, Iterable, Sequence
     from datetime import datetime
+    from uuid import UUID
 
     from app.shared_kernel.jobs import Lane
 
@@ -36,7 +37,11 @@ def select_submission(
 
 
 def next_claim(
-    runs: Iterable[JobRun], lanes: Collection[Lane], now: datetime
+    runs: Iterable[JobRun],
+    lanes: Collection[Lane],
+    now: datetime,
+    *,
+    run_id: UUID | None = None,
 ) -> JobRun | None:
     """Select the oldest due run, keeping executions of each job sequential."""
     now = utc_instant(now)
@@ -49,6 +54,7 @@ def next_claim(
         and run.lane in lanes
         and run.scheduled_for <= now
         and run.job_key not in running
+        and (run_id is None or run.id == run_id)
     )
     return min(
         eligible,

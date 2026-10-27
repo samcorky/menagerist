@@ -17,6 +17,7 @@ from app.shared_kernel.access import Content, Requires
 from app.shared_kernel.cqrs import UseCase
 
 EXPECTED_PERMISSIONS: dict[str, str] = {
+    "scheduling.GetJobRun": "scheduling:job:read",
     "backup.CreateBackup": "backup:archive:create",
     "backup.DeleteBackup": "backup:archive:delete",
     "backup.DeleteUserExport": "backup:own_data:export",

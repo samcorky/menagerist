@@ -22,7 +22,6 @@ class SchedulerSettings(MenageristBaseSettings):
     run_history_per_job: int = Field(
         default=100,
         ge=1,
-        validation_alias="MENAGERIST_RUN_HISTORY_PER_JOB",
         description="Number of completed runs to retain for each job.",
     )
 

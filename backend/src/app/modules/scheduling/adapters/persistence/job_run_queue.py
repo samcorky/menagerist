@@ -3,7 +3,7 @@
 from copy import copy
 from typing import TYPE_CHECKING
 
-from sqlalchemy import exists, or_, select
+from sqlalchemy import exists, or_, select, true
 from sqlalchemy.orm import aliased
 
 from app.modules.scheduling.adapters.persistence.job_lock import lock_job, try_lock_job
@@ -19,6 +19,7 @@ from app.modules.scheduling.domain.queue_policy import select_submission
 if TYPE_CHECKING:
     from collections.abc import Collection
     from datetime import datetime
+    from uuid import UUID
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -66,7 +67,12 @@ class SqlAlchemyJobRunQueue:
         return copy(selected)
 
     async def claim(
-        self, lanes: Collection[Lane], worker_id: str, now: datetime
+        self,
+        lanes: Collection[Lane],
+        worker_id: str,
+        now: datetime,
+        *,
+        run_id: UUID | None = None,
     ) -> JobRun | None:
         """Skip locked rows and jobs, then recheck per-job exclusion after locking."""
         now = utc_instant(now)
@@ -77,6 +83,7 @@ class SqlAlchemyJobRunQueue:
                 select(JobRunModel)
                 .where(
                     JobRunModel.status == RunStatus.QUEUED,
+                    true() if run_id is None else JobRunModel.id == run_id,
                     JobRunModel.lane.in_(lanes),
                     JobRunModel.scheduled_for <= now,
                     JobRunModel.job_key.not_in(skipped),

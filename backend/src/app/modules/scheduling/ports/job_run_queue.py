@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:
     from collections.abc import Collection
     from datetime import datetime
+    from uuid import UUID
 
     from app.modules.scheduling.domain.job_run import JobRun
     from app.shared_kernel.jobs import Lane
@@ -18,7 +19,12 @@ class JobRunQueue(Protocol):
         ...
 
     async def claim(
-        self, lanes: Collection[Lane], worker_id: str, now: datetime
+        self,
+        lanes: Collection[Lane],
+        worker_id: str,
+        now: datetime,
+        *,
+        run_id: UUID | None = None,
     ) -> JobRun | None:
-        """Atomically claim the oldest eligible queued run for a worker."""
+        """Claim eligible work, optionally restricted to one requested run."""
         ...

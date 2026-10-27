@@ -1,28 +1,75 @@
 """Compose scheduler execution through application use cases."""
 
+import asyncio
+import signal
+from contextlib import contextmanager
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+from uuid import uuid7
+
+import structlog
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.modules.identity.adapters.persistence.unit_of_work import build_identity_repos
 from app.modules.identity.application.get_setup_status import (
     GetSetupStatus,
     GetSetupStatusQuery,
 )
+from app.modules.scheduling.adapters.cli.catalogue import JobCatalogue
 from app.modules.scheduling.adapters.cli.execution import JobExecutor
+from app.modules.scheduling.adapters.cli.worker import (
+    DEFAULT_ABANDON_AFTER,
+    Worker,
+    wait_or_stop,
+)
+from app.modules.scheduling.adapters.persistence.job_run_reader import (
+    SqlAlchemyJobRunReader,
+)
 from app.modules.scheduling.adapters.persistence.unit_of_work import (
     create_scheduling_uow,
+)
+from app.modules.scheduling.adapters.platform.cron_evaluator import (
+    CronScheduleEvaluator,
 )
 from app.modules.scheduling.adapters.platform.restore_guard import (
     SqlAlchemyRestoreGuard,
 )
+from app.modules.scheduling.adapters.platform.settings_schedule_source import (
+    SettingsScheduleSource,
+)
 from app.modules.scheduling.application.check_job_execution import CheckJobExecution
+from app.modules.scheduling.application.claim_job_run import (
+    ClaimJobRun,
+    ClaimJobRunCommand,
+)
 from app.modules.scheduling.application.finish_job_run import FinishJobRun
+from app.modules.scheduling.application.get_job_run import GetJobRun, GetJobRunQuery
 from app.modules.scheduling.application.heartbeat_job_run import HeartbeatJobRun
+from app.modules.scheduling.application.list_jobs import ListJobs, ListJobsQuery
+from app.modules.scheduling.application.maintain_worker import (
+    MaintainWorker,
+    MaintainWorkerCommand,
+)
+from app.modules.scheduling.application.run_job_now import RunJobNow, RunJobNowCommand
+from app.modules.scheduling.application.tick_schedules import TickSchedules
+from app.modules.scheduling.domain.job_run import RunStatus
+from app.platform.alembic_runner import code_head_revisions, db_current_revisions
+from app.platform.config.scheduler import get_scheduler_settings
+from app.platform.database import get_engine, get_session_factory
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from types import FrameType
+
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+    from app.modules.scheduling.application.list_jobs import JobStatus
+    from app.modules.scheduling.domain.job_run import JobRun
+    from app.modules.scheduling.ports.schedule_source import ScheduleSource
     from app.shared_kernel.access_guard import AccessGuard
+
+logger = structlog.get_logger(__name__)
 
 
 class SchedulingSetupState:
@@ -51,3 +98,191 @@ def build_job_executor(
         CheckJobExecution(SchedulingSetupState(factory, guard), guard),
         SqlAlchemyRestoreGuard(factory),
     )
+
+
+def build_catalogue() -> JobCatalogue:
+    """Collect module job contributions at the composition root."""
+    return JobCatalogue(())
+
+
+def build_schedule_source() -> SettingsScheduleSource:
+    """Collect deployment schedule values alongside their module contributions."""
+    return SettingsScheduleSource({})
+
+
+def build_worker(
+    factory: async_sessionmaker[AsyncSession],
+    guard: AccessGuard,
+    catalogue: JobCatalogue,
+    source: ScheduleSource,
+) -> Worker:
+    """Give each worker operation its own guarded application transaction."""
+    return Worker(
+        catalogue,
+        lambda: ClaimJobRun(create_scheduling_uow(factory), guard),
+        lambda: MaintainWorker(create_scheduling_uow(factory), guard),
+        lambda: TickSchedules(
+            create_scheduling_uow(factory),
+            guard,
+            catalogue.registry,
+            source,
+            CronScheduleEvaluator(),
+        ),
+        lambda: FinishJobRun(create_scheduling_uow(factory), guard),
+        build_job_executor(factory, guard),
+        worker_id=str(uuid7()),
+        timezone=get_scheduler_settings().timezone.key,
+    )
+
+
+async def wait_for_schema(
+    factory: async_sessionmaker[AsyncSession],
+    stop: asyncio.Event,
+    *,
+    retry_interval: float = 5,
+) -> bool:
+    """Wait for the API's migration to reach the packaged head without migrating."""
+    expected = set(code_head_revisions())
+    while not stop.is_set():
+        try:
+            if set(await db_current_revisions(factory)) == expected:
+                return True
+            logger.warning("worker waiting for database migrations")
+        except SQLAlchemyError, OSError:
+            logger.warning("worker waiting for database connection")
+        await wait_or_stop(stop, retry_interval)
+    return False
+
+
+@contextmanager
+def stop_on_signals(stop: asyncio.Event) -> Iterator[None]:
+    """Translate CLI termination signals into a cooperative worker stop request."""
+    loop = asyncio.get_running_loop()
+    signals = (signal.SIGINT, signal.SIGTERM)
+    previous = {item: signal.getsignal(item) for item in signals}
+
+    def request_stop(signum: int, frame: FrameType | None) -> None:
+        loop.call_soon_threadsafe(stop.set)
+
+    try:
+        for item in signals:
+            signal.signal(item, request_stop)
+        yield
+    finally:
+        for item in signals:
+            signal.signal(item, previous[item])
+
+
+async def run_worker_cli() -> None:
+    """Wait for schema readiness, run until termination and close pooled connections."""
+    from app.entrypoints.api.shared.access_guard import get_access_guard
+
+    stop = asyncio.Event()
+    try:
+        with stop_on_signals(stop):
+            factory = get_session_factory()
+            if await wait_for_schema(factory, stop):
+                await build_worker(
+                    factory,
+                    get_access_guard(),
+                    build_catalogue(),
+                    build_schedule_source(),
+                ).run(stop)
+    finally:
+        await get_engine().dispose()
+
+
+async def list_registered_jobs(
+    factory: async_sessionmaker[AsyncSession],
+    guard: AccessGuard,
+    catalogue: JobCatalogue,
+    source: ScheduleSource,
+) -> list[JobStatus]:
+    """Compose the existing read-only status query for a CLI operation."""
+    async with factory() as session:
+        query = ListJobs(
+            SqlAlchemyJobRunReader(session),
+            guard,
+            catalogue.registry,
+            source,
+            CronScheduleEvaluator(),
+        )
+        return await query.handle(
+            ListJobsQuery(
+                now=datetime.now(UTC), timezone=get_scheduler_settings().timezone.key
+            ),
+            SYSTEM_ACTOR,
+        )
+
+
+async def run_registered_job(
+    factory: async_sessionmaker[AsyncSession],
+    guard: AccessGuard,
+    catalogue: JobCatalogue,
+    job_key: str,
+    *,
+    poll_interval: float = 1,
+) -> JobRun:
+    """Submit and target only the requested run, then use the shared executor."""
+    job = catalogue.registry.get(job_key)
+    submitted = await RunJobNow(
+        create_scheduling_uow(factory), guard, catalogue.registry
+    ).handle(RunJobNowCommand(job_key=job_key, now=datetime.now(UTC)), SYSTEM_ACTOR)
+    worker_id = f"cli-{uuid7()}"
+    while True:
+        async with factory() as session:
+            current = await GetJobRun(SqlAlchemyJobRunReader(session), guard).handle(
+                GetJobRunQuery(run_id=submitted.id), SYSTEM_ACTOR
+            )
+        if current.status not in {RunStatus.QUEUED, RunStatus.RUNNING}:
+            return current
+        if current.status is RunStatus.QUEUED:
+            claimed = await ClaimJobRun(create_scheduling_uow(factory), guard).handle(
+                ClaimJobRunCommand(
+                    lanes=(job.lane,),
+                    worker_id=worker_id,
+                    now=datetime.now(UTC),
+                    run_id=submitted.id,
+                ),
+                SYSTEM_ACTOR,
+            )
+            if claimed is not None:
+                await build_job_executor(factory, guard).execute(
+                    claimed, job, catalogue.handler_for(job_key)
+                )
+                continue
+        now = datetime.now(UTC)
+        await MaintainWorker(create_scheduling_uow(factory), guard).handle(
+            MaintainWorkerCommand(
+                worker_id=worker_id, now=now, older_than=now - DEFAULT_ABANDON_AFTER
+            ),
+            SYSTEM_ACTOR,
+        )
+        await asyncio.sleep(poll_interval)
+
+
+async def list_jobs_cli() -> list[JobStatus]:
+    """List jobs and release the process-wide engine before its event loop closes."""
+    from app.entrypoints.api.shared.access_guard import get_access_guard
+
+    try:
+        return await list_registered_jobs(
+            get_session_factory(),
+            get_access_guard(),
+            build_catalogue(),
+            build_schedule_source(),
+        )
+    finally:
+        await get_engine().dispose()
+
+
+async def run_job_cli(job_key: str) -> JobRun:
+    """Run a job and release the process-wide engine on success or failure."""
+    from app.entrypoints.api.shared.access_guard import get_access_guard
+
+    try:
+        return await run_registered_job(
+            get_session_factory(), get_access_guard(), build_catalogue(), job_key
+        )
+    finally:
+        await get_engine().dispose()

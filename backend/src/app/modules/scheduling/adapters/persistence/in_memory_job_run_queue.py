@@ -7,6 +7,7 @@ from app.modules.scheduling.domain.queue_policy import next_claim, select_submis
 if TYPE_CHECKING:
     from collections.abc import Collection
     from datetime import datetime
+    from uuid import UUID
 
     from app.modules.scheduling.adapters.persistence.in_memory_store import (
         InMemorySchedulingStore,
@@ -43,10 +44,15 @@ class InMemoryJobRunQueue:
         return self._store.get(selected.id)
 
     async def claim(
-        self, lanes: Collection[Lane], worker_id: str, now: datetime
+        self,
+        lanes: Collection[Lane],
+        worker_id: str,
+        now: datetime,
+        *,
+        run_id: UUID | None = None,
     ) -> JobRun | None:
         """Select and start a due run without yielding between read and write."""
-        selected = next_claim(self._store.runs.values(), lanes, now)
+        selected = next_claim(self._store.runs.values(), lanes, now, run_id=run_id)
         if selected is None:
             return None
         claimed = self._store.get(selected.id)

@@ -394,3 +394,30 @@ async def test_terminal_outcomes_and_requester_round_trip(
     assert stored.started_at == stored.heartbeat_at == NOW
     assert stored.finished_at == NOW + timedelta(seconds=1)
     assert stored.error == "reason"
+
+
+async def test_targeted_claim_cannot_take_another_run_or_overlap(
+    harness: QueueHarness,
+) -> None:
+    """Synchronous CLI execution claims only its requested queued occurrence."""
+    first = await harness.queue.enqueue(
+        JobRun.create(job_key="first", scheduled_for=NOW)
+    )
+    target = await harness.queue.enqueue(
+        JobRun.create(job_key="target", scheduled_for=NOW, overlap=Overlap.QUEUE)
+    )
+    waiting = await harness.queue.enqueue(
+        JobRun.create(job_key="target", scheduled_for=NOW, overlap=Overlap.QUEUE)
+    )
+    assert (
+        run_id(await harness.queue.claim([Lane.DEFAULT], "cli", NOW, run_id=target.id))
+        == target.id
+    )
+    assert (
+        await harness.queue.claim([Lane.DEFAULT], "other", NOW, run_id=waiting.id)
+        is None
+    )
+    assert (
+        await harness.queue.claim([Lane.DEFAULT], "other", NOW, run_id=uuid7()) is None
+    )
+    assert (await harness.reader.get(first.id)).status is RunStatus.QUEUED
