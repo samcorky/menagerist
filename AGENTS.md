@@ -78,6 +78,12 @@ poe migrate                   # apply Alembic migrations
 poe generate-frontend-client  # regenerate typed API client from OpenAPI schema
 ```
 
+Output modes: the test, lint, typecheck and `check-changed` tasks take `--mode agent|human|verbose`.
+
+- Agents must run `poe <task> --mode agent`: it prints a one-line `PASS`/`FAIL` summary (failing tests/errors on failure) and keeps the exit code of the real tool.
+- Humans can set a persistent default with `MENAGERIST_OUTPUT` or the one-word file `~/.config/menagerist/output` (precedence: flag, env var, file, then `human`).
+- `human` mode runs the tool directly on the terminal (no capture, no log). `agent` and `verbose` modes save full output in `.agent-logs/<run>/` (gitignored, newest 20 runs kept); read it rather than re-running a task.
+
 ## Backend conventions
 
 Read [backend/README.md](backend/README.md) in full before writing backend code. Key rules:

@@ -43,3 +43,6 @@ backups/
 
 # Node Stuff
 node_modules/
+
+# Agent run logs (scripts/poe_run.py)
+.agent-logs/

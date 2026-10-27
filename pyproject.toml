@@ -112,8 +112,10 @@ cwd = "backend"
 help = "Format backend Python files with Ruff"
 
 [tool.poe.groups.quality.tasks.lint-backend]
-cmd = "ruff check . ../scripts"
-cwd = "backend"
+script = "scripts.poe_run:main('lint-backend', mode=mode)"
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+]
 help = "Lint backend Python files with Ruff"
 
 [tool.poe.groups.quality.tasks.lint-backend-fix]
@@ -127,8 +129,10 @@ cwd = "backend"
 help = "Lint backend Python files with Ruff and apply safe and unsafe fixes"
 
 [tool.poe.groups.quality.tasks.typecheck-backend]
-cmd = "mypy"
-cwd = "backend"
+script = "scripts.poe_run:main('typecheck-backend', mode=mode)"
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+]
 help = "Type-check backend Python files with mypy"
 
 [tool.poe.groups.quality.tasks._coverage-erase]
@@ -137,25 +141,26 @@ cwd = "backend"
 help = "Clear the backend coverage dataset before running unit tests"
 
 [tool.poe.groups.quality.tasks.test-backend]
-cmd = "pytest -m 'not integration' -n ${workers} --dist loadscope --cov=app --cov-branch --cov-report="
-cwd = "backend"
+script = "scripts.poe_run:main('test-backend', mode=mode, workers=workers)"
 deps = ["_coverage-erase"]
 args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
   { name = "workers", options = ["-w", "--workers"], default = "auto", help = "pytest-xdist workers: a number, auto (one per CPU) or 0 for serial" },
 ]
 help = "Run backend unit tests in parallel (pytest-xdist, one worker per CPU unless --workers) from a clean coverage dataset"
 
 [tool.poe.groups.quality.tasks.test-backend-integration]
-cmd = "pytest -m integration -n ${workers} --dist loadscope --cov=app --cov-append --cov-branch --cov-report="
-cwd = "backend"
+script = "scripts.poe_run:main('test-backend-integration', mode=mode, workers=workers)"
 args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
   { name = "workers", options = ["-w", "--workers"], default = "auto", help = "pytest-xdist workers: a number, auto (one per CPU) or 0 for serial" },
 ]
 help = "Run backend integration tests in parallel (one Postgres container per worker), appending to unit test coverage"
 
 [tool.poe.groups.quality.tasks.test-backend-all]
-sequence = ["test-backend --workers ${workers}", "test-backend-integration --workers ${workers}"]
+sequence = ["test-backend --workers ${workers} ${mode:+--mode ${mode}}", "test-backend-integration --workers ${workers} ${mode:+--mode ${mode}}"]
 args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
   { name = "workers", options = ["-w", "--workers"], default = "auto", help = "pytest-xdist workers: a number, auto (one per CPU) or 0 for serial" },
 ]
 help = "Run unit + integration backend tests with combined coverage data"
@@ -201,8 +206,9 @@ cwd = "backend"
 help = "Fail CI when any component is below its Codecov threshold"
 
 [tool.poe.groups.quality.tasks.test-and-status]
-sequence = ["test-backend-all --workers ${workers}", "coverage-status"]
+sequence = ["test-backend-all --workers ${workers} ${mode:+--mode ${mode}}", "coverage-status"]
 args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
   { name = "workers", options = ["-w", "--workers"], default = "auto", help = "pytest-xdist workers: a number, auto (one per CPU) or 0 for serial" },
 ]
 help = "Run all backend tests and print per-component coverage status without failing"
@@ -214,8 +220,9 @@ cwd = "backend"
 help = "Write the combined coverage.xml for Codecov upload"
 
 [tool.poe.groups.quality.tasks.coverage]
-sequence = ["test-backend-all --workers ${workers}", "coverage-check", "coverage-report"]
+sequence = ["test-backend-all --workers ${workers} ${mode:+--mode ${mode}}", "coverage-check", "coverage-report"]
 args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
   { name = "workers", options = ["-w", "--workers"], default = "auto", help = "pytest-xdist workers: a number, auto (one per CPU) or 0 for serial" },
 ]
 help = "Run full backend test suite and enforce per-layer coverage thresholds"
@@ -227,9 +234,10 @@ cwd = "frontend"
 help = "Format frontend files with Prettier"
 
 [tool.poe.groups.quality.tasks.lint-frontend]
-shell = "npm run lint"
-interpreter = ["powershell", "posix"]
-cwd = "frontend"
+script = "scripts.poe_run:main('lint-frontend', mode=mode)"
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+]
 help = "Lint frontend files with Prettier and ESLint"
 
 [tool.poe.groups.quality.tasks.lint-frontend-fix]
@@ -239,15 +247,16 @@ cwd = "frontend"
 help = "Lint frontend files with ESLint and apply safe fixes"
 
 [tool.poe.groups.quality.tasks.typecheck-frontend]
-shell = "npm run check"
-interpreter = ["powershell", "posix"]
-cwd = "frontend"
+script = "scripts.poe_run:main('typecheck-frontend', mode=mode)"
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+]
 help = "Type-check frontend files with svelte-check"
 
 [tool.poe.groups.quality.tasks.test-frontend]
-cmd = "node ./node_modules/vitest/vitest.mjs run ${workers:+--maxWorkers=${workers}}"
-cwd = "frontend"
+script = "scripts.poe_run:main('test-frontend', mode=mode, workers=workers)"
 args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
   { name = "workers", options = ["-w", "--workers"], default = "", help = "Vitest workers (--maxWorkers): a number or a percentage; vitest's default if omitted" },
 ]
 help = "Run frontend unit tests (vitest)"
@@ -257,11 +266,17 @@ sequence = ["format-backend", "format-frontend"]
 help = "Format all project code"
 
 [tool.poe.groups.quality.tasks.lint]
-sequence = ["lint-backend", "lint-frontend"]
+sequence = ["lint-backend ${mode:+--mode ${mode}}", "lint-frontend ${mode:+--mode ${mode}}"]
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+]
 help = "Lint all project code"
 
 [tool.poe.groups.quality.tasks.typecheck]
-sequence = ["typecheck-backend", "typecheck-frontend"]
+sequence = ["typecheck-backend ${mode:+--mode ${mode}}", "typecheck-frontend ${mode:+--mode ${mode}}"]
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+]
 help = "Type-check all project code"
 
 [tool.poe.groups.quality.tasks._check-hooks]
@@ -288,7 +303,10 @@ help = "Run the repository checks and enforce the backend coverage gate"
 deps = ["sync"]
 
 [tool.poe.groups.quality.tasks.check-changed]
-cmd = "prek run"
+script = "scripts.poe_run:main('check-changed', mode=mode)"
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+]
 help = "Run pre-commit checks on changed files only"
 
 [tool.poe.groups.quality.tasks.validate-compose]
@@ -304,8 +322,9 @@ cmd = "docker compose -f compose.yaml -f compose.e2e.yaml config --quiet"
 help = "Validate compose.yaml merged with the e2e-test override"
 
 [tool.poe.groups.quality.tasks.test]
-parallel = ["test-backend ${workers:+--workers ${workers}}", "test-frontend ${workers:+--workers ${workers}}"]
+parallel = ["test-backend ${workers:+--workers ${workers}} ${mode:+--mode ${mode}}", "test-frontend ${workers:+--workers ${workers}} ${mode:+--mode ${mode}}"]
 args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
   { name = "workers", options = ["-w", "--workers"], default = "", help = "Parallel workers: a number, auto (one per CPU) or 0 for serial (frontend: its own default if omitted)" },
 ]
 help = "Run backend and frontend unit tests concurrently"
