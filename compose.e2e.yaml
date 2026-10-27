@@ -3,6 +3,7 @@ name: menagerist-e2e
 services:
   worker:
     container_name: menagerist-e2e-worker
+    hostname: menagerist-e2e-worker
 
   postgres:
     container_name: menagerist-e2e-db

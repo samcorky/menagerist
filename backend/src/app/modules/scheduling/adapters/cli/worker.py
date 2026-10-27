@@ -121,6 +121,7 @@ class Worker:
                 ),
                 SYSTEM_ACTOR,
             )
+            logger.debug("worker heartbeat recorded")
             await wait_or_stop(stop, self._heartbeat_interval)
 
     async def _maintenance(self, stop: asyncio.Event) -> None:
@@ -129,6 +130,7 @@ class Worker:
                 TickSchedulesCommand(now=self._now(), timezone=self._timezone),
                 SYSTEM_ACTOR,
             )
+            logger.debug("schedule tick completed")
             await wait_or_stop(stop, self._tick_interval)
 
     async def _consume(self, lane: Lane, stop: asyncio.Event) -> None:

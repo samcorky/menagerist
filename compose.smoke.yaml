@@ -6,6 +6,7 @@ services:
 
   worker:
     container_name: worker
+    hostname: menagerist-smoke-worker
 
   menagerist:
     container_name: app

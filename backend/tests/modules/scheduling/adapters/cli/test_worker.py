@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import pytest
+from structlog.testing import capture_logs
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.scheduling.adapters.cli.catalogue import JobBinding, JobCatalogue
@@ -209,6 +210,23 @@ async def test_worker_heartbeats_continue_between_schedule_ticks() -> None:
     finally:
         world.stop.set()
         await asyncio.wait_for(task, timeout=3)
+
+
+async def test_heartbeat_and_tick_activity_is_debug_only() -> None:
+    """Routine liveness never reaches the INFO stream."""
+    world = World()
+    worker = world.worker(JobCatalogue([]), heartbeat_interval=0.001)
+    with capture_logs() as logs:
+        task = asyncio.create_task(worker.run(world.stop))
+        try:
+            await until(lambda: "worker" in world.store.workers)
+            await asyncio.sleep(0.01)
+        finally:
+            world.stop.set()
+            await asyncio.wait_for(task, timeout=3)
+    events = {entry["event"]: entry["log_level"] for entry in logs}
+    assert events["worker heartbeat recorded"] == "debug"
+    assert events["schedule tick completed"] == "debug"
 
 
 async def test_shutdown_finishes_current_job_without_claiming_another() -> None:

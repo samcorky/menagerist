@@ -1,6 +1,7 @@
 """Invoke registered handlers with guards and independent execution recording."""
 
 import asyncio
+import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -11,7 +12,7 @@ from app.modules.scheduling.application.check_job_execution import (
 )
 from app.modules.scheduling.application.finish_job_run import FinishJobRunCommand
 from app.modules.scheduling.application.heartbeat_job_run import HeartbeatJobRunCommand
-from app.modules.scheduling.domain.errors import LostClaimError
+from app.modules.scheduling.domain.errors import LostClaimError, UnknownRunError
 from app.modules.scheduling.domain.job_run import RunStatus
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
@@ -34,6 +35,10 @@ logger = structlog.get_logger(__name__)
 
 def _utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+def _elapsed(started: float) -> float:
+    return round(time.monotonic() - started, 3)
 
 
 class JobExecutor:
@@ -63,17 +68,49 @@ class JobExecutor:
         if run.worker_id is None:
             raise LostClaimError("An unclaimed job cannot execute")
         worker_id = run.worker_id
-        await self._heartbeat(run.id, worker_id)
+        with structlog.contextvars.bound_contextvars(
+            job_key=run.job_key,
+            run_id=str(run.id),
+            lane=job.lane.value,
+            worker_id=worker_id,
+        ):
+            started = time.monotonic()
+            logger.info("job started")
+            try:
+                status, error = await self._record(run.id, worker_id, job, handler)
+            except asyncio.CancelledError:
+                logger.warning("job cancelled", duration_seconds=_elapsed(started))
+                raise
+            except LostClaimError, UnknownRunError:
+                logger.warning("job claim lost", duration_seconds=_elapsed(started))
+                raise
+            if status is RunStatus.SKIPPED:
+                logger.info(
+                    "job skipped", reason=error, duration_seconds=_elapsed(started)
+                )
+            else:
+                log = logger.info if status is RunStatus.SUCCEEDED else logger.warning
+                log(
+                    "job finished",
+                    status=status.value,
+                    duration_seconds=_elapsed(started),
+                )
+
+    async def _record(
+        self, run_id: UUID, worker_id: str, job: JobDefinition, handler: JobHandler
+    ) -> tuple[RunStatus, str | None]:
+        await self._heartbeat(run_id, worker_id)
         async with self._restore.try_hold() as acquired:
             reason = await self._eligibility.handle(
                 CheckJobExecutionQuery(job=job, restore_available=acquired),
                 SYSTEM_ACTOR,
             )
             if reason is not None:
-                await self._finish(run.id, worker_id, RunStatus.SKIPPED, reason)
-                return
-            status, error = await self._run_with_heartbeats(run.id, worker_id, handler)
-            await self._finish(run.id, worker_id, status, error)
+                await self._finish(run_id, worker_id, RunStatus.SKIPPED, reason)
+                return RunStatus.SKIPPED, reason
+            status, error = await self._run_with_heartbeats(run_id, worker_id, handler)
+            await self._finish(run_id, worker_id, status, error)
+            return status, error
 
     async def _heartbeat(self, run_id: UUID, worker_id: str) -> None:
         await self._heartbeat_factory().handle(

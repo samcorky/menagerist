@@ -2,6 +2,7 @@
 
 import asyncio
 import signal
+import socket
 from contextlib import contextmanager, suppress
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -68,6 +69,7 @@ from app.shared_kernel.actor import SYSTEM_ACTOR
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from contextlib import AbstractContextManager
     from types import FrameType
 
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -76,6 +78,7 @@ if TYPE_CHECKING:
     from app.modules.scheduling.domain.job_run import JobRun
     from app.modules.scheduling.ports.schedule_source import ScheduleSource
     from app.shared_kernel.access_guard import AccessGuard
+    from app.shared_kernel.jobs import JobDefinition
 
 logger = structlog.get_logger(__name__)
 
@@ -83,6 +86,13 @@ logger = structlog.get_logger(__name__)
 def default_worker_identity_file() -> Path:
     """Use the container's writable temporary filesystem for process identity."""
     return Path(gettempdir()) / "menagerist-worker-id"
+
+
+def worker_log_context(worker_id: str) -> AbstractContextManager[None]:
+    """Bind host and process identity to every log line emitted beneath it."""
+    return structlog.contextvars.bound_contextvars(
+        hostname=socket.gethostname(), worker_id=worker_id
+    )
 
 
 @contextmanager
@@ -259,9 +269,12 @@ async def run_worker_cli(*, identity_file: Path | None = None) -> None:
                 identity_file or default_worker_identity_file()
             ) as worker_id,
             stop_on_signals(stop),
+            worker_log_context(worker_id),
         ):
+            logger.info("worker starting")
             factory = get_session_factory()
             if await wait_for_schema(factory, stop):
+                logger.info("worker started")
                 await build_worker(
                     factory,
                     get_access_guard(),
@@ -269,6 +282,7 @@ async def run_worker_cli(*, identity_file: Path | None = None) -> None:
                     build_schedule_source(),
                     worker_id=worker_id,
                 ).run(stop)
+            logger.info("worker stopped")
     finally:
         await get_engine().dispose()
 
@@ -310,6 +324,21 @@ async def run_registered_job(
         create_scheduling_uow(factory), guard, catalogue.registry
     ).handle(RunJobNowCommand(job_key=job_key, now=datetime.now(UTC)), SYSTEM_ACTOR)
     worker_id = f"cli-{uuid7()}"
+    with worker_log_context(worker_id):
+        return await _drive_run(
+            factory, guard, catalogue, job, submitted, worker_id, poll_interval
+        )
+
+
+async def _drive_run(
+    factory: async_sessionmaker[AsyncSession],
+    guard: AccessGuard,
+    catalogue: JobCatalogue,
+    job: JobDefinition,
+    submitted: JobRun,
+    worker_id: str,
+    poll_interval: float,
+) -> JobRun:
     while True:
         async with factory() as session:
             current = await GetJobRun(SqlAlchemyJobRunReader(session), guard).handle(
@@ -329,7 +358,7 @@ async def run_registered_job(
             )
             if claimed is not None:
                 await build_job_executor(factory, guard).execute(
-                    claimed, job, catalogue.handler_for(job_key)
+                    claimed, job, catalogue.handler_for(job.job_key)
                 )
                 continue
         now = datetime.now(UTC)

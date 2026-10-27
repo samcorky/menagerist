@@ -6,6 +6,8 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import pytest
+import structlog
+from structlog.testing import capture_logs
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.scheduling.adapters.cli.execution import JobExecutor
@@ -254,3 +256,122 @@ async def test_unclaimed_run_is_rejected() -> None:
 
     with pytest.raises(LostClaimError):
         await harness.executor().execute(run, JobDefinition(job_key="x"), handler)
+
+
+async def test_successful_job_logs_start_and_outcome_with_context() -> None:
+    """Lifecycle logs carry identity and a monotonic duration without leaking."""
+    harness = Harness()
+    run = await harness.claimed()
+
+    async def handler(actor: Actor) -> None:
+        return None
+
+    with capture_logs(processors=[structlog.contextvars.merge_contextvars]) as logs:
+        await harness.executor().execute(
+            run, JobDefinition(job_key="x", lane=Lane.DEFAULT), handler
+        )
+    started, finished = logs
+    assert started["event"] == "job started"
+    assert started["log_level"] == "info"
+    assert finished["event"] == "job finished"
+    assert finished["log_level"] == "info"
+    assert finished["status"] == "succeeded"
+    assert isinstance(finished["duration_seconds"], float)
+    for entry in logs:
+        assert entry["job_key"] == "x"
+        assert entry["run_id"] == str(run.id)
+        assert entry["lane"] == "default"
+        assert entry["worker_id"] == "worker"
+    assert structlog.contextvars.get_contextvars() == {}
+
+
+async def test_skipped_and_failed_jobs_log_their_outcome() -> None:
+    """Skips keep their reason and failures keep the traceback log."""
+    harness = Harness()
+    harness.setup.complete = False
+    skipped = await harness.claimed()
+
+    async def handler(actor: Actor) -> None:
+        raise ValueError("job failed")
+
+    with capture_logs(processors=[structlog.contextvars.merge_contextvars]) as logs:
+        await harness.executor().execute(skipped, JobDefinition(job_key="x"), handler)
+    assert logs[-1]["event"] == "job skipped"
+    assert logs[-1]["reason"] == "setup_incomplete"
+
+    harness = Harness()
+    failed = await harness.claimed()
+    with capture_logs(processors=[structlog.contextvars.merge_contextvars]) as logs:
+        await harness.executor().execute(failed, JobDefinition(job_key="x"), handler)
+    assert [entry["event"] for entry in logs] == [
+        "job started",
+        "scheduled job failed",
+        "job finished",
+    ]
+    assert logs[1]["exc_info"] is True
+    assert logs[2]["status"] == "failed"
+    assert logs[2]["log_level"] == "warning"
+
+
+async def test_cancelled_and_lost_claims_are_not_logged_as_finished() -> None:
+    """Only recorded outcomes use the finished event."""
+    harness = Harness()
+    run = await harness.claimed()
+    started = asyncio.Event()
+
+    async def handler(actor: Actor) -> None:
+        started.set()
+        await asyncio.Event().wait()
+
+    with capture_logs(processors=[structlog.contextvars.merge_contextvars]) as logs:
+        task = asyncio.create_task(
+            harness.executor().execute(run, JobDefinition(job_key="x"), handler)
+        )
+        await asyncio.wait_for(started.wait(), timeout=2)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    assert [entry["event"] for entry in logs] == ["job started", "job cancelled"]
+    assert logs[-1]["log_level"] == "warning"
+    assert "duration_seconds" in logs[-1]
+
+    harness = Harness()
+    run = await harness.claimed()
+    await build_in_memory_scheduling_repos(harness.store).recorder.finish(
+        run.id, "worker", RunStatus.SUCCEEDED, NOW
+    )
+    with (
+        capture_logs(processors=[structlog.contextvars.merge_contextvars]) as logs,
+        pytest.raises(LostClaimError),
+    ):
+        await harness.executor().execute(run, JobDefinition(job_key="x"), handler)
+    assert "job finished" not in [entry["event"] for entry in logs]
+    assert logs[-1]["event"] == "job claim lost"
+
+
+async def test_concurrent_jobs_keep_isolated_log_context() -> None:
+    """Each lane task binds its own identity."""
+    harness = Harness()
+    first = await harness.claimed()
+    repos = build_in_memory_scheduling_repos(harness.store)
+    await repos.queue.enqueue(JobRun.create(job_key="y", scheduled_for=NOW))
+    second = await repos.queue.claim([Lane.DEFAULT], "worker", NOW)
+    assert second is not None
+    gate = asyncio.Event()
+
+    async def handler(actor: Actor) -> None:
+        await gate.wait()
+
+    with capture_logs(processors=[structlog.contextvars.merge_contextvars]) as logs:
+        tasks = [
+            asyncio.create_task(
+                harness.executor().execute(run, JobDefinition(job_key=key), handler)
+            )
+            for run, key in ((first, "x"), (second, "y"))
+        ]
+        await asyncio.sleep(0.05)
+        gate.set()
+        await asyncio.gather(*tasks)
+    for entry in logs:
+        expected = first if entry["job_key"] == "x" else second
+        assert entry["run_id"] == str(expected.id)

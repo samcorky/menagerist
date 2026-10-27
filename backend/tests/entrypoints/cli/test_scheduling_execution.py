@@ -9,6 +9,8 @@ from uuid import uuid7
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from structlog.contextvars import merge_contextvars
+from structlog.testing import capture_logs
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.cli import backups
@@ -137,13 +139,18 @@ async def test_registered_maintenance_prunes_through_the_real_executor(
             )
             == "0 4 * * *"
         )
-        result = await run_registered_job(
-            factory,
-            get_access_guard(),
-            catalogue,
-            definition.job_key,
-        )
+        with capture_logs(processors=[merge_contextvars]) as logs:
+            result = await run_registered_job(
+                factory,
+                get_access_guard(),
+                catalogue,
+                definition.job_key,
+            )
         assert result.status is RunStatus.SUCCEEDED
+        finished = next(item for item in logs if item["event"] == "job finished")
+        assert str(finished["worker_id"]).startswith("cli-")
+        assert finished["hostname"]
+        assert finished["run_id"] == str(result.id)
         async with factory() as session:
             history = await build_scheduling_repos(session).reader.history(
                 key, limit=10

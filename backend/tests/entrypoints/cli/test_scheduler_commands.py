@@ -3,11 +3,14 @@
 import asyncio
 import json
 import signal
+import socket
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock
 
 import pytest
+import structlog
+from structlog.testing import capture_logs
 
 from app.entrypoints import cli
 from app.entrypoints.cli import scheduling
@@ -149,6 +152,41 @@ async def test_worker_entrypoint_waits_then_disposes_connections(
     assert worker.run.await_count == int(ready)
     engine.dispose.assert_awaited_once()
     assert build.call_count == int(ready)
+
+
+async def test_worker_logs_bind_hostname_and_process_identity(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Lifecycle logs carry the host and fresh worker id, then release the context."""
+    from contextlib import nullcontext
+    from unittest.mock import Mock
+
+    seen: dict[str, object] = {}
+    worker = Mock(run=AsyncMock())
+
+    async def run(stop: asyncio.Event) -> None:
+        seen.update(structlog.contextvars.get_contextvars())
+
+    worker.run.side_effect = run
+    monkeypatch.setattr(socket, "gethostname", lambda: "menagerist-worker")
+    monkeypatch.setattr(scheduling, "get_engine", lambda: AsyncMock())
+    monkeypatch.setattr(scheduling, "get_session_factory", Mock())
+    monkeypatch.setattr(scheduling, "stop_on_signals", lambda stop: nullcontext())
+    monkeypatch.setattr(scheduling, "wait_for_schema", AsyncMock(return_value=True))
+    build = Mock(return_value=worker)
+    monkeypatch.setattr(scheduling, "build_worker", build)
+    with capture_logs(processors=[structlog.contextvars.merge_contextvars]) as logs:
+        await scheduling.run_worker_cli(identity_file=tmp_path / "worker-id")
+    worker_id = build.call_args.kwargs["worker_id"]
+    assert seen == {"hostname": "menagerist-worker", "worker_id": worker_id}
+    assert [entry["event"] for entry in logs] == [
+        "worker starting",
+        "worker started",
+        "worker stopped",
+    ]
+    assert all(entry["log_level"] == "info" for entry in logs)
+    assert all(entry["worker_id"] == worker_id for entry in logs)
+    assert structlog.contextvars.get_contextvars() == {}
 
 
 async def test_job_entrypoints_dispose_connections_on_success_and_failure(
