@@ -29,6 +29,16 @@ export function readyDetailOf(result: CallResult): ReadyDetailResponse | null {
 	return null;
 }
 
+/**
+ * Whether a detail call failed because the service cannot serve signed-in requests (a 503
+ * without a report, or no answer at all); null stands for a call that threw.
+ */
+export function detailUnavailable(result: CallResult | null): boolean {
+	if (result === null) return true;
+	if (readyDetailOf(result) !== null) return false;
+	return !result.response || result.response.status === 503;
+}
+
 export interface StatusCounts {
 	total: number;
 	pass: number;

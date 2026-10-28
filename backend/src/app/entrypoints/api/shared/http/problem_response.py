@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.platform.database import DATABASE_OUTAGE_ERRORS
 from app.shared_kernel.errors import (
     ConflictError,
     DomainError,
@@ -194,6 +195,31 @@ def _problem_response(request: Request, exc: Exception) -> JSONResponse:
     )
 
 
+_DATABASE_RETRY_AFTER = 5
+
+
+def _database_unavailable_response(request: Request, exc: Exception) -> JSONResponse:
+    """Answer a lost database with 503 rather than an unexpected-error traceback."""
+    logger.warning(
+        "database unavailable",
+        error=type(exc).__name__,
+        method=request.method,
+        path=request.url.path,
+    )
+    return JSONResponse(
+        status_code=503,
+        media_type=PROBLEM_JSON,
+        content={
+            "type": "about:blank",
+            "title": "Service Unavailable",
+            "status": 503,
+            "detail": "The service is temporarily unavailable. Try again shortly.",
+            "instance": str(request.url),
+        },
+        headers={"Retry-After": str(_DATABASE_RETRY_AFTER)},
+    )
+
+
 def _validation_response(request: Request, exc: Exception) -> JSONResponse:
     """Answer a malformed request with 422, without echoing what was submitted.
 
@@ -257,6 +283,9 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, _validation_response)
     for error_type in _STATUS_BY_DOMAIN_ERROR:
         app.add_exception_handler(error_type, _problem_response)
+
+    for outage_type in DATABASE_OUTAGE_ERRORS:
+        app.add_exception_handler(outage_type, _database_unavailable_response)
 
     # Catch-all for any unhandled exception, returning a 500 problem response.
     app.add_exception_handler(Exception, _problem_response)

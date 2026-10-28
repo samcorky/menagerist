@@ -84,3 +84,24 @@ async def test_worker_check_failure_warns_without_exposing_database_errors() -> 
     assert result.observed_value == "unknown"
     assert result.output is not None
     assert "private" not in result.output
+
+
+async def test_worker_check_logs_a_database_outage_without_a_traceback() -> None:
+    """An unreachable database is a one-line warning; other failures keep the trace."""
+    import socket
+
+    from structlog.testing import capture_logs
+
+    factory = MagicMock()
+    factory.return_value.__aenter__.return_value.scalar = AsyncMock(
+        side_effect=socket.gaierror(-2, "unknown host")
+    )
+    with capture_logs() as logs:
+        result = (await SchedulerWorkerCheck(factory).run())[
+            "scheduler:workerHeartbeat"
+        ]
+
+    assert result.observed_value == "unknown"
+    (entry,) = [e for e in logs if e["event"] == "worker readiness check failed"]
+    assert entry["log_level"] == "warning"
+    assert "exc_info" not in entry

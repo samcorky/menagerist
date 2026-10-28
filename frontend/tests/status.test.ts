@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	browserCheckOf,
 	countStatuses,
+	detailUnavailable,
 	formatObservedValue,
 	readinessOf,
 	readyDetailOf
@@ -36,6 +37,27 @@ describe('readyDetailOf', () => {
 
 	it('ignores a problem body', () => {
 		expect(readyDetailOf({ error: { detail: 'Forbidden' } })).toBeNull();
+	});
+});
+
+describe('detailUnavailable', () => {
+	it('is true when the call threw or got no response', () => {
+		expect(detailUnavailable(null)).toBe(true);
+		expect(detailUnavailable({ error: undefined })).toBe(true);
+	});
+
+	it('is true for a 503 without a report', () => {
+		expect(detailUnavailable({ error: { status: 503 }, response: res(503) })).toBe(true);
+	});
+
+	it('is false for a report, including a failing one', () => {
+		const report = { status: 'fail', checks: {} };
+		expect(detailUnavailable({ data: report, response: res(200) })).toBe(false);
+		expect(detailUnavailable({ error: report, response: res(503) })).toBe(false);
+	});
+
+	it('is false for other refusals', () => {
+		expect(detailUnavailable({ error: { detail: 'x' }, response: res(401) })).toBe(false);
 	});
 });
 

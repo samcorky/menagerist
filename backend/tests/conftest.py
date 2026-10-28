@@ -27,6 +27,16 @@ if TYPE_CHECKING:
     from fastapi import FastAPI
 
 
+@pytest.fixture(autouse=True)
+def _no_colour(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep structlog off colorama.
+
+    On Windows colorama swaps `sys.stdout` for the real stream the first time logging
+    is configured, which defeats `capsys` for a test run on its own.
+    """
+    monkeypatch.setenv("NO_COLOR", "1")
+
+
 @pytest.fixture(scope="session")
 def monkeypatch_session() -> Iterator[pytest.MonkeyPatch]:
     """Session-scoped equivalent of the built-in function-scoped `monkeypatch`."""

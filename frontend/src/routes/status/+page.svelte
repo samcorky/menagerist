@@ -21,6 +21,7 @@
 	import {
 		browserCheckOf,
 		countStatuses,
+		detailUnavailable,
 		formatObservedValue,
 		readinessOf,
 		readyDetailOf,
@@ -276,7 +277,10 @@
 	let lastCheckTime = $state<Date | null>(null);
 	let refreshing = $state(false);
 	let autoRefreshEnabled = $state(true);
+	let databaseUnreachable = $state(false);
 	const autoRefreshMs = 30000;
+	const retryMs = 5000;
+	const refreshMs = $derived(databaseUnreachable ? retryMs : autoRefreshMs);
 
 	const groups = $derived.by(
 		(): SvelteMap<string, Array<{ label: string; obs: CheckObservation }>> => {
@@ -318,6 +322,14 @@
 		return countStatuses(Object.values(detail.checks).flat());
 	});
 
+	async function settle<T>(call: () => Promise<T>): Promise<T | null> {
+		try {
+			return await call();
+		} catch {
+			return null;
+		}
+	}
+
 	async function checkBrowser(): Promise<Parameters<typeof browserCheckOf>[0]> {
 		try {
 			return await runBrowserCheck();
@@ -341,9 +353,9 @@
 			const [readyRes, versionRes, detailRes, buildRes, browserRes] = await Promise.all([
 				getHealthReady(),
 				getVersion(),
-				withDetail ? getHealthReadyDetail() : null,
-				withDetail ? getVersionDetail() : null,
-				withDetail ? checkBrowser() : null
+				withDetail ? settle(() => getHealthReadyDetail()) : undefined,
+				withDetail ? settle(() => getVersionDetail()) : undefined,
+				withDetail ? checkBrowser() : undefined
 			]);
 
 			const state = readinessOf(readyRes);
@@ -352,9 +364,10 @@
 			}
 			readiness = state;
 			version = versionRes.data;
+			databaseUnreachable = withDetail && detailUnavailable(detailRes ?? null);
 			detail = detailRes ? readyDetailOf(detailRes) : null;
 			buildInfo = buildRes?.data ?? null;
-			browserCheck = browserRes ? browserCheckOf(browserRes) : null;
+			browserCheck = browserRes && !databaseUnreachable ? browserCheckOf(browserRes) : null;
 			lastCheckTime = (detail && latestObservationTime(detail)) || new Date();
 			syncOpenGroups(groups);
 			if (!initialHashHandled) {
@@ -377,7 +390,7 @@
 		if (!autoRefreshEnabled) return;
 		const timer = window.setInterval(() => {
 			void load(true);
-		}, autoRefreshMs);
+		}, refreshMs);
 		return () => window.clearInterval(timer);
 	});
 
@@ -428,7 +441,9 @@
 					</p>
 				{/if}
 				<p class="mt-1 text-xs text-muted-foreground">
-					{autoRefreshEnabled ? 'Auto-refreshing every 30s' : 'Auto-refresh paused'}
+					{autoRefreshEnabled
+						? `Auto-refreshing every ${refreshMs / 1000}s`
+						: 'Auto-refresh paused'}
 				</p>
 			</div>
 			<div class="flex items-center gap-2">
@@ -487,7 +502,7 @@
 				</Card.Content>
 			</Card.Root>
 		{:else if readiness}
-			{@const displayStatus = detail?.status ?? readiness}
+			{@const displayStatus = databaseUnreachable ? 'fail' : (detail?.status ?? readiness)}
 			{@const isPass = displayStatus === 'pass'}
 			{@const isWarning = displayStatus === 'warn'}
 			{@const StatusIcon = statusIcon(displayStatus)}
@@ -518,11 +533,13 @@
 										: 'Service degraded'}
 							</p>
 							<p class="text-xs text-muted-foreground">
-								{isPass
-									? 'Everything Menagerist needs is working.'
-									: isWarning
-										? 'The service is ready, but one or more checks reported a warning.'
-										: 'Something Menagerist needs is not working.'}
+								{databaseUnreachable
+									? "Menagerist cannot reach its database, so details can't be loaded until it is back. This page keeps retrying."
+									: isPass
+										? 'Everything Menagerist needs is working.'
+										: isWarning
+											? 'The service is ready, but one or more checks reported a warning.'
+											: 'Something Menagerist needs is not working.'}
 							</p>
 						</div>
 					</div>

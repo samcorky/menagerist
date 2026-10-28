@@ -66,7 +66,7 @@ def test_to_data_turns_results_into_plain_json_data() -> None:
                 "tags": ["b", "a"],
             }
         ],
-        "path": "/data/x",
+        "path": str(Path("/data/x")),
         "ids": ["a", "b"],
     }
     assert to_data(("a", 1)) == ["a", 1]

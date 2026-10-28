@@ -73,6 +73,7 @@ class World:
         grace: float = 1,
         heartbeat_interval: float = 0.01,
         tick_interval: float = 0.01,
+        transient_errors: tuple[type[Exception], ...] = (),
     ) -> Worker:
         """Build a fast worker with real recording and scheduling policy."""
         guard = get_access_guard()
@@ -108,6 +109,8 @@ class World:
             heartbeat_interval=heartbeat_interval,
             poll_interval=0.001,
             shutdown_grace=grace,
+            transient_errors=transient_errors,
+            retry_interval=0.001,
         )
 
 
@@ -381,3 +384,39 @@ async def test_child_timeout_is_not_misreported_as_shutdown_grace(
     monkeypatch.setattr(Worker, "_consume", consume)
     with pytest.raises(TimeoutError, match="claim timed out"):
         await world.worker(JobCatalogue([])).run(world.stop)
+
+
+async def test_transient_errors_are_retried_until_stopped() -> None:
+    """A lost database is logged and retried instead of crashing the worker."""
+    world = World()
+    calls = 0
+    catalogue = JobCatalogue([])
+    worker = world.worker(catalogue, transient_errors=(ConnectionError,))
+    real_claim = worker._claim
+
+    def flaky_claim() -> ClaimJobRun:
+        nonlocal calls
+        calls += 1
+        if calls <= 2:
+            raise ConnectionError("connection is closed")
+        world.stop.set()
+        return real_claim()
+
+    worker._claim = flaky_claim
+    with capture_logs() as logs:
+        await asyncio.wait_for(worker.run(world.stop), timeout=3)
+    assert calls == 3
+    assert [e["event"] for e in logs].count("worker database unavailable") >= 2
+
+
+async def test_unlisted_errors_still_crash_the_worker() -> None:
+    """Only the configured transient errors are retried."""
+    world = World()
+    worker = world.worker(JobCatalogue([]))
+
+    def broken() -> ClaimJobRun:
+        raise ConnectionError("boom")
+
+    worker._claim = broken
+    with pytest.raises(ConnectionError):
+        await asyncio.wait_for(worker.run(world.stop), timeout=3)

@@ -1,88 +1,45 @@
 # Agent Instructions
 
-Menagerist is a self-hostable collection management platform - a SvelteKit SPA frontend, a FastAPI backend, and a PostgreSQL database, deployed via Docker Compose. This file contains working instructions for AI coding agents.
+Menagerist is a self-hostable collection management platform: a SvelteKit SPA, FastAPI backend and PostgreSQL database, deployed with Docker Compose. This is the shared source of truth for coding agents; `CLAUDE.md` imports it and adds only Claude-specific tooling instructions.
 
-## Docs map
+## Read what the task needs
 
-| Document | Contents |
-|---|---|
-| [README.md](README.md) | Project overview and quickstart |
-| [ROADMAP.md](ROADMAP.md) | Product direction and UX philosophy |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, commands, and testing |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System topology and data model |
-| [docs/DECISIONS.md](docs/DECISIONS.md) | Why significant decisions were made |
-| [backend/README.md](backend/README.md) | Backend architecture, patterns, conventions |
-| [frontend/README.md](frontend/README.md) | Frontend stack, patterns, dev workflow |
-| [frontend/DESIGN_GUIDELINES.md](frontend/DESIGN_GUIDELINES.md) | Frontend UX/UI rules |
-| [shared/README.md](shared/README.md) | Files read by both backend and frontend (runtime data and cross-stack test contracts), and what does not belong there |
+| Task                       | Guidance                                                                                                              |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Setup, commands or testing | [CONTRIBUTING.md](CONTRIBUTING.md); task definitions in `pyproject.toml`                                              |
+| Backend code               | Read [backend/README.md](backend/README.md) before editing                                                            |
+| Frontend code              | Read Stack, Key patterns and the relevant testing/feature sections of [frontend/README.md](frontend/README.md)        |
+| UI behaviour or appearance | Read §§1–3 and §24 of [DESIGN_GUIDELINES.md](frontend/DESIGN_GUIDELINES.md), then follow its task-based reading guide |
+| System/data-model changes  | [ARCHITECTURE.md](docs/ARCHITECTURE.md) and relevant [DECISIONS.md](docs/DECISIONS.md) entries                        |
+| Product direction          | [ROADMAP.md](ROADMAP.md); overview and quickstart in [README.md](README.md)                                           |
+| Cross-stack data/contracts | [shared/README.md](shared/README.md)                                                                                  |
+| Dependency changes         | `.github/renovate.json` and the dependency policy below                                                               |
 
-## Repository layout
+Load relevant sections, not every linked document. Keep rules in their owning document; link rather than duplicate. Document facts verified against the code, not temporary task notes.
 
-```
-backend/src/app/
-├── modules/            # bounded contexts: graph, media, …
-│   └── <context>/
-│       ├── domain/     # entities, value objects - no framework imports
-│       ├── application/# use cases - no ports here, no adapter imports
-│       ├── ports/      # Protocol interfaces defining what use cases need
-│       └── adapters/
-│           ├── api/            # FastAPI router (driving)
-│           ├── cli/            # Cyclopts commands (driving)
-│           └── persistence/    # SQLAlchemy + in-memory adapters (driven)
-├── shared_kernel/      # Actor, error base types, UoW protocol, CQRS protocols
-├── platform/           # database engine, session factory, logging config
-└── entrypoints/        # FastAPI app factory, composition root
+## Commands and verification
 
-frontend/src/
-├── routes/             # SvelteKit file-based routes (client-rendered - no +page.server.ts)
-└── lib/
-    ├── api/
-    │   └── generated/  # auto-generated - never edit by hand
-    └── …
-```
+Run tasks with `poe` from the repository root; consult `pyproject.toml` rather than inventing commands. Common entry points:
 
-## Commands
+| Purpose                                       | Task                                                                                       |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| First-time setup / dependency sync            | `poe init` / `poe sync`                                                                    |
+| Both dev servers / one server                 | `poe serve` / `poe serve-backend` / `poe serve-frontend`                                   |
+| Backend unit/router tests (no infrastructure) | `poe test-backend`                                                                         |
+| Backend integration tests (live Postgres)     | `poe test-backend-integration`                                                             |
+| Frontend unit tests                           | `poe test-frontend`                                                                        |
+| Lint / typecheck                              | `poe lint-backend`, `poe lint-frontend`, `poe typecheck-backend`, `poe typecheck-frontend` |
+| Backend coverage gate                         | `poe coverage`                                                                             |
+| Checks for changed files                      | `poe check-changed`                                                                        |
+| Database start / stop / migrations            | `poe db-up` / `poe db-down` / `poe migrate`                                                |
+| Regenerate API client                         | `poe generate-frontend-client`                                                             |
 
-All tasks run via `poe` from the repo root. Do not invent commands - read `pyproject.toml`.
-
-```sh
-poe init                      # first-time setup: sync all deps + install git hooks
-poe sync                      # sync all deps and regenerate API client
-
-poe serve                     # backend + frontend dev servers together
-poe serve-backend             # FastAPI at localhost:8000 (--reload)
-poe serve-frontend            # SvelteKit at localhost:5173
-
-poe test                      # all unit tests (backend + frontend)
-poe test-backend              # backend unit + router tests - no infrastructure required
-poe test-backend-integration  # integration tests - requires live Postgres
-poe test-backend-all          # unit + integration with combined coverage
-poe test-frontend             # Vitest unit tests
-
-poe coverage                  # full backend test suite + enforce all coverage thresholds
-poe test-and-status           # full backend test suite + per-component coverage %, non-failing
-poe typecheck                 # mypy + svelte-check (TS checking included)
-poe typecheck-backend
-poe typecheck-frontend
-poe lint                      # ruff + prettier + eslint
-poe lint-backend
-poe lint-frontend
-poe format                    # ruff format + prettier (auto-fix formatting)
-poe check                     # full pre-commit hooks + coverage gate (re-syncs deps first)
-poe check-changed             # run pre-commit checks on changed files only
-
-poe db-up                     # start local Postgres container
-poe db-down                   # stop Postgres container
-poe migrate                   # apply Alembic migrations
-
-poe generate-frontend-client  # regenerate typed API client from OpenAPI schema
-```
-
-Output modes: the test, lint, typecheck and `check-changed` tasks take `--mode agent|human|verbose`.
-
-- Agents must run `poe <task> --mode agent`: it prints a one-line `PASS`/`FAIL` summary (failing tests/errors on failure) and keeps the exit code of the real tool.
-- Humans can set a persistent default with `MENAGERIST_OUTPUT` or the one-word file `~/.config/menagerist/output` (precedence: flag, env var, file, then `human`).
-- `human` mode runs the tool directly on the terminal (no capture, no log). `agent` and `verbose` modes save full output in `.agent-logs/<run>/` (gitignored, newest 20 runs kept); read it rather than re-running a task.
+- For test, lint, typecheck and `check-changed` tasks, use `--mode agent`. This preserves the tool's exit code and prints a compact summary; read full logs in `.agent-logs/<run>/` instead of rerunning for output (newest 20 runs retained).
+- `human` runs directly without capture; `verbose` captures and streams output. Default precedence is flag, `MENAGERIST_OUTPUT`, `~/.config/menagerist/output`, then `human`.
+- Use targeted tests during iteration. Before completion, run relevant lint, typecheck and tests for the touched code; do not run backend checks for frontend-only work or code checks for prose-only edits. Check documentation links and formatting for documentation changes.
+- Backend changes must pass strict mypy (`poe typecheck-backend`) and the full `poe coverage` gate before completion; this is intentionally heavier than the iteration loop. Frontend changes must pass strict TypeScript/Svelte checking (`poe typecheck-frontend`).
+- `poe check` is a broad final gate (pre-commit hooks plus coverage, resyncing dependencies), not a default iteration command. Other tasks, including end-to-end tests and formatting, are documented in CONTRIBUTING and `pyproject.toml`.
+- Do not start duplicate suites against shared resources. Inspect existing logs/processes before retrying stalled or failed checks, and report blockers rather than claiming success.
 
 ## Backend conventions
 
@@ -104,14 +61,14 @@ Read [backend/README.md](backend/README.md) in full before writing backend code.
 
 **Coverage floors** (enforced by `poe coverage` and Codecov):
 
-| Component | Threshold |
-|---|---|
-| domain | 100% |
-| ports | tracked, no fixed floor |
-| application | 100% |
-| shared_kernel | 100% |
-| adapters | 80% |
-| platform | 70% |
+| Component     | Threshold               |
+| ------------- | ----------------------- |
+| domain        | 100%                    |
+| ports         | tracked, no fixed floor |
+| application   | 100%                    |
+| shared_kernel | 100%                    |
+| adapters      | 80%                     |
+| platform      | 70%                     |
 
 `poe coverage` is a full verification step, not a quick iteration command: it runs the full backend test suite and fails if any layer drops below the thresholds above. Use targeted backend tests while developing, then run `poe coverage` before considering backend work complete. It is intentionally heavier than `poe test-backend` and is the source of truth for the repository's coverage gate.
 
@@ -119,27 +76,18 @@ Read [backend/README.md](backend/README.md) in full before writing backend code.
 
 ## Frontend conventions
 
-Read [frontend/README.md](frontend/README.md) and [frontend/DESIGN_GUIDELINES.md](frontend/DESIGN_GUIDELINES.md) before writing frontend code.
+Engineering details live in [frontend/README.md](frontend/README.md); product rules live in [DESIGN_GUIDELINES.md](frontend/DESIGN_GUIDELINES.md). Keep implementation instructions in the former and UX decisions in the latter.
 
-- **Svelte 5 runes** - use `$state`, `$derived`, `$effect` throughout. No Svelte 4 stores except the two existing singleton controllers (`src/lib/theme.svelte.ts`, `src/lib/capture.svelte.ts`).
-- **Generated API client** - `src/lib/api/generated/` is auto-generated by `@hey-api/openapi-ts`. Never edit those files. Import all API calls through `src/lib/api/client.ts`.
-- **No SSR** - no `+page.server.ts`. Data is fetched client-side inside components.
-- **Internal hrefs** - always use `resolve()` from `$app/paths`.
-- **Design system** - shadcn-svelte + Tailwind CSS v4 + Lucide icons. Reuse existing patterns before creating new components. Prefer a shadcn-svelte/bits-ui component over a native HTML element where one exists and fits - see [frontend/README.md](frontend/README.md#key-patterns) for how to add one and when native is still the right call.
-- **UX rules** - [frontend/DESIGN_GUIDELINES.md](frontend/DESIGN_GUIDELINES.md) is binding. Graph terminology (node, edge, graph) must not appear in any user-visible text. Read it before implementing UI.
+- Use Svelte 5 runes; existing singleton controllers and their exceptions are documented in the frontend README.
+- The app is client-rendered: no `+page.server.ts`. Fetch through `src/lib/api/client.ts`; never hand-edit `src/lib/api/generated/`.
+- Use `resolve()` from `$app/paths` for internal hrefs.
+- Reuse the shadcn-svelte/bits-ui, Tailwind v4 and Lucide system. Fixed-choice value inputs default to `ui/native-select`; see design §15 for exceptions.
+- Use collector-facing terms from design §24. Standard UI never exposes node/edge/graph terminology; the deliberately advanced Explore exception is defined in §17.
 
 ## General rules
 
-- Use British English for project copy, comments, and user-facing docs unless a library, API, or existing convention explicitly requires a different spelling. This applies across both backend and frontend work.
-- Keep code comments short, factual, and concise. Only add a comment when the intent would otherwise be unclear.
-- Only add or update dependencies when they are strictly necessary or clearly recommended for the task. Prefer the smallest, most targeted dependency that solves the problem and avoid adding libraries that duplicate existing functionality or increase the runtime surface area without a clear benefit.
-- Before adding or updating dependencies, review `.github/renovate.json` and keep the change aligned with the repository's Renovate rules and review policy (grouping, schedule, automerge, and manual review for majors/runtime dependencies).
-- When evaluating a dependency, estimate the impact on the final Docker image size and runtime footprint, and favour lighter or more maintainable options when trade-offs are similar.
-- Do not add error handling, validation, or abstractions beyond what the task requires.
-- Do not create documentation files unless asked.
-- Never create, amend, squash, stage, or push any git commit or anything that would commit code on the user's behalf. Do not run `git commit`, `git add`, or any auto-commit workflow.
-- If a commit is needed, ask the user explicitly whether they want to commit, and let them handle the actual commit command themselves.
-- Backend: Python 3.14+. `poe typecheck-backend` (`mypy --strict`) must pass on any backend change.
-- Frontend: TypeScript strict mode. `poe typecheck-frontend` must pass on any frontend change.
-- For docstring conventions and backend-specific typing rules, see [backend/README.md](backend/README.md).
-- Follow the repository's DDD/hexagonal architecture: keep business logic in `domain/` and `application/`, place ports in `ports/`, keep adapters in `adapters/`, and ensure dependency direction remains `entrypoints → adapters → application → domain`. The architecture tests in `backend/tests/architecture/test_architecture.py` enforce these boundaries.
+- Use British English for copy, comments and documentation unless an API, library or established convention requires otherwise. Comments should explain otherwise-unclear intent, briefly and factually.
+- Keep changes focused. Do not add error handling, validation or abstractions beyond the task. Do not create documentation files unless asked.
+- Add/update dependencies only when necessary or clearly justified. Check Renovate grouping, schedules, automerge and review rules first; majors/runtime dependencies follow its manual-review policy. Prefer targeted, maintainable options and consider Docker image size, runtime footprint and overlap with existing libraries.
+- Backend requires Python 3.14+; backend typing/docstring conventions are in its README.
+- **Never stage, create, amend, squash or push commits, or run an auto-commit workflow on the user's behalf.** Do not run `git add` or `git commit`. If a commit is needed, let the user run it themselves.

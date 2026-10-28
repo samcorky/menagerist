@@ -1,5 +1,7 @@
+import socket
 from functools import lru_cache
 
+from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -9,6 +11,14 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 
 from app.platform.config import get_database_settings
+
+# Errors that mean the database is unreachable rather than the code being wrong.
+DATABASE_OUTAGE_ERRORS = (
+    InterfaceError,
+    OperationalError,
+    ConnectionError,
+    socket.gaierror,
+)
 
 
 class Base(DeclarativeBase):

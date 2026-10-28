@@ -242,6 +242,7 @@ def build_worker(
         worker_id=worker_id if worker_id is not None else str(uuid7()),
         timezone=get_scheduler_settings().timezone.key,
         heartbeat_interval=get_scheduler_settings().worker_heartbeat_interval_seconds,
+        transient_errors=(SQLAlchemyError, OSError),
     )
 
 

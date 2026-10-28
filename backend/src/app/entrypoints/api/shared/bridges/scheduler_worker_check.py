@@ -15,6 +15,7 @@ from app.modules.scheduling.application.get_worker_status import (
 )
 from app.modules.system.domain.readiness import CheckObservation, CheckStatus
 from app.platform.config.scheduler import get_scheduler_settings
+from app.platform.database import DATABASE_OUTAGE_ERRORS
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 if TYPE_CHECKING:
@@ -47,8 +48,13 @@ class SchedulerWorkerCheck:
                 else f"No worker heartbeat in the last {self._timeout} seconds."
             )
             observed_value = "running" if alive else "stale"
-        except Exception:
-            logger.exception("worker readiness check failed")
+        except Exception as error:
+            if isinstance(error, DATABASE_OUTAGE_ERRORS):
+                logger.warning(
+                    "worker readiness check failed", error=type(error).__name__
+                )
+            else:
+                logger.exception("worker readiness check failed")
             alive = False
             observed_value = "unknown"
             output = "Worker status could not be checked."

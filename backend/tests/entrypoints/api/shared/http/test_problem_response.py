@@ -1,7 +1,11 @@
 """Problem mapping for authentication-related domain errors."""
 
+import socket
+
+import pytest
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import InterfaceError, OperationalError
 from starlette.testclient import TestClient
 from structlog.testing import capture_logs
 
@@ -198,3 +202,27 @@ def test_non_api_paths_keep_the_framework_default() -> None:
     assert not_found.json() == {"detail": "Not Found"}
     assert wrong_method.status_code == 405
     assert wrong_method.json() == {"detail": "Method Not Allowed"}
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        InterfaceError("SELECT 1", None, Exception("connection is closed")),
+        OperationalError("SELECT 1", None, Exception("server closed")),
+        ConnectionRefusedError("refused"),
+        socket.gaierror(-2, "Name or service not known"),
+    ],
+)
+def test_database_outage_is_a_503_without_a_traceback(error: Exception) -> None:
+    """A lost database answers 503 with Retry-After and logs one warning."""
+    with capture_logs() as logs:
+        response = _client(error).get("/boom")
+
+    assert response.status_code == 503
+    assert response.headers["content-type"] == "application/problem+json"
+    assert response.headers["retry-after"] == "5"
+    assert response.json()["title"] == "Service Unavailable"
+    assert "SELECT" not in response.text
+    (entry,) = [e for e in logs if e["event"] == "database unavailable"]
+    assert entry["log_level"] == "warning"
+    assert "exc_info" not in entry

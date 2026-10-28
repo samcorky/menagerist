@@ -3,6 +3,7 @@
 import asyncio
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from typing import TYPE_CHECKING
 
 import structlog
@@ -21,7 +22,7 @@ from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.jobs import Lane
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Awaitable, Callable
 
     from app.modules.scheduling.adapters.cli.catalogue import JobCatalogue
     from app.modules.scheduling.adapters.cli.execution import JobExecutor
@@ -64,6 +65,8 @@ class Worker:
         poll_interval: float = 1,
         shutdown_grace: float = 30,
         abandon_after: timedelta = DEFAULT_ABANDON_AFTER,
+        transient_errors: tuple[type[Exception], ...] = (),
+        retry_interval: float = 5,
     ) -> None:
         self._catalogue = catalogue
         self._claim = claim
@@ -79,14 +82,19 @@ class Worker:
         self._poll_interval = poll_interval
         self._shutdown_grace = shutdown_grace
         self._abandon_after = abandon_after
+        self._transient_errors = transient_errors
+        self._retry_interval = retry_interval
 
     async def run(self, stop: asyncio.Event) -> None:
         """Stop new claims on shutdown and bound the remaining execution time."""
         tasks = [
-            asyncio.create_task(self._heartbeat(stop)),
-            asyncio.create_task(self._maintenance(stop)),
+            asyncio.create_task(self._retrying(stop, self._heartbeat)),
+            asyncio.create_task(self._retrying(stop, self._maintenance)),
         ]
-        tasks.extend(asyncio.create_task(self._consume(lane, stop)) for lane in Lane)
+        tasks.extend(
+            asyncio.create_task(self._retrying(stop, partial(self._consume, lane)))
+            for lane in Lane
+        )
         stopping = asyncio.create_task(stop.wait())
         try:
             done, _ = await asyncio.wait(
@@ -110,69 +118,81 @@ class Worker:
                 task.cancel()
             await asyncio.gather(stopping, *tasks, return_exceptions=True)
 
-    async def _heartbeat(self, stop: asyncio.Event) -> None:
+    async def _retrying(
+        self, stop: asyncio.Event, step: Callable[[asyncio.Event], Awaitable[None]]
+    ) -> None:
+        """Repeat a step until stopped, riding out transient infrastructure errors."""
         while not stop.is_set():
-            now = self._now()
-            await self._maintain().handle(
-                MaintainWorkerCommand(
+            try:
+                await step(stop)
+            except self._transient_errors as error:
+                logger.warning(
+                    "worker database unavailable",
                     worker_id=self._worker_id,
-                    now=now,
-                    older_than=now - self._abandon_after,
-                ),
-                SYSTEM_ACTOR,
-            )
-            logger.debug("worker heartbeat recorded")
-            await wait_or_stop(stop, self._heartbeat_interval)
+                    error=type(error).__name__,
+                )
+                await wait_or_stop(stop, self._retry_interval)
+
+    async def _heartbeat(self, stop: asyncio.Event) -> None:
+        now = self._now()
+        await self._maintain().handle(
+            MaintainWorkerCommand(
+                worker_id=self._worker_id,
+                now=now,
+                older_than=now - self._abandon_after,
+            ),
+            SYSTEM_ACTOR,
+        )
+        logger.debug("worker heartbeat recorded")
+        await wait_or_stop(stop, self._heartbeat_interval)
 
     async def _maintenance(self, stop: asyncio.Event) -> None:
-        while not stop.is_set():
-            submitted = await self._tick().handle(
-                TickSchedulesCommand(now=self._now(), timezone=self._timezone),
-                SYSTEM_ACTOR,
+        submitted = await self._tick().handle(
+            TickSchedulesCommand(now=self._now(), timezone=self._timezone),
+            SYSTEM_ACTOR,
+        )
+        for run in submitted:
+            logger.info(
+                "scheduled run submitted",
+                job_key=run.job_key,
+                run_id=str(run.id),
+                scheduled_for=run.scheduled_for.isoformat(),
+                status=run.status.value,
             )
-            for run in submitted:
-                logger.info(
-                    "scheduled run submitted",
-                    job_key=run.job_key,
-                    run_id=str(run.id),
-                    scheduled_for=run.scheduled_for.isoformat(),
-                    status=run.status.value,
-                )
-            logger.debug("schedule tick completed")
-            await wait_or_stop(stop, self._tick_interval)
+        logger.debug("schedule tick completed")
+        await wait_or_stop(stop, self._tick_interval)
 
     async def _consume(self, lane: Lane, stop: asyncio.Event) -> None:
-        while not stop.is_set():
-            run = await self._claim().handle(
-                ClaimJobRunCommand(
-                    lanes=(lane,), worker_id=self._worker_id, now=self._now()
-                ),
-                SYSTEM_ACTOR,
-            )
-            if run is None:
-                await wait_or_stop(stop, self._poll_interval)
-                continue
+        run = await self._claim().handle(
+            ClaimJobRunCommand(
+                lanes=(lane,), worker_id=self._worker_id, now=self._now()
+            ),
+            SYSTEM_ACTOR,
+        )
+        if run is None:
+            await wait_or_stop(stop, self._poll_interval)
+            return
+        try:
             try:
-                try:
-                    handler = self._catalogue.handler_for(run.job_key)
-                except UnknownJobError:
-                    await self._finish().handle(
-                        FinishJobRunCommand(
-                            run_id=run.id,
-                            worker_id=self._worker_id,
-                            status=RunStatus.SKIPPED,
-                            now=self._now(),
-                            error="unknown_job",
-                        ),
-                        SYSTEM_ACTOR,
-                    )
-                    continue
-                await self._executor.execute(
-                    run, self._catalogue.registry.get(run.job_key), handler
+                handler = self._catalogue.handler_for(run.job_key)
+            except UnknownJobError:
+                await self._finish().handle(
+                    FinishJobRunCommand(
+                        run_id=run.id,
+                        worker_id=self._worker_id,
+                        status=RunStatus.SKIPPED,
+                        now=self._now(),
+                        error="unknown_job",
+                    ),
+                    SYSTEM_ACTOR,
                 )
-            except LostClaimError, UnknownRunError:
-                logger.warning(
-                    "worker execution claim lost",
-                    run_id=run.id,
-                    worker_id=self._worker_id,
-                )
+                return
+            await self._executor.execute(
+                run, self._catalogue.registry.get(run.job_key), handler
+            )
+        except LostClaimError, UnknownRunError:
+            logger.warning(
+                "worker execution claim lost",
+                run_id=run.id,
+                worker_id=self._worker_id,
+            )
