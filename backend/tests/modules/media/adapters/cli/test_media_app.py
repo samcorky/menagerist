@@ -62,9 +62,10 @@ def test_cleanup_wires_the_use_case_and_deletes_expired_assets(
         lambda: object(),
     )
 
-    cleanup()
+    result = cleanup()
 
     assert asyncio.run(repo.get(expired.id, scope=ContentFilter.everyone())) is None
+    assert result == {"message": "Media cleanup complete", "deleted": 1}
 
 
 def test_regenerate_thumbnails_wires_the_use_case_and_regenerates(
@@ -108,6 +109,8 @@ def test_regenerate_thumbnails_wires_the_use_case_and_regenerates(
         lambda: object(),
     )
 
-    regenerate_thumbnails()
+    result = regenerate_thumbnails()
 
     assert storage._thumbnails[(asset.id, "attached")] == b"fake-webp-thumbnail"
+    assert result["regenerated"] == 1
+    assert result["max_dimension"] == 320

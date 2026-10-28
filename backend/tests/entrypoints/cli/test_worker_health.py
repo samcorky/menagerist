@@ -28,12 +28,12 @@ def test_worker_health_command_reports_status_and_exit_code(
     operation = AsyncMock(return_value=healthy)
     monkeypatch.setattr(cli, "check_worker_health_cli", operation)
     if healthy:
-        cli.app(["worker-health"], result_action="return_value")
+        cli.app(["worker-health"])
         assert "healthy" in capsys.readouterr().out
     else:
         with pytest.raises(SystemExit, match="1"):
-            cli.app(["worker-health"], result_action="return_value")
-        assert "unhealthy" in capsys.readouterr().err
+            cli.app(["worker-health"])
+        assert "unhealthy" in capsys.readouterr().out
 
 
 def test_worker_health_output_stays_free_of_asyncio_debug_logs(
@@ -46,7 +46,7 @@ def test_worker_health_output_stays_free_of_asyncio_debug_logs(
 
     monkeypatch.setattr(cli, "check_worker_health_cli", probe)
     caplog.set_level(logging.DEBUG)
-    cli.app(["worker-health"], result_action="return_value")
+    cli.app(["worker-health"])
     assert not [record for record in caplog.records if record.name == "asyncio"]
 
 
@@ -138,7 +138,7 @@ def test_worker_commands_accept_a_shared_identity_path(
     checking = AsyncMock(return_value=True)
     monkeypatch.setattr(cli, "run_worker_cli", running)
     monkeypatch.setattr(cli, "check_worker_health_cli", checking)
-    cli.app(["worker", "--identity-file", str(path)], result_action="return_value")
+    cli.app(["worker", "--identity-file", str(path)])
     cli.app(
         ["worker-health", "--identity-file", str(path)], result_action="return_value"
     )

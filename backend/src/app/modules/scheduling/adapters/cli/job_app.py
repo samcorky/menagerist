@@ -1,18 +1,17 @@
 """Thin Cyclopts adapters for registered jobs."""
 
 import asyncio
-import json
 import logging
 import sys
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING
 
-from cyclopts import App, Parameter
+from cyclopts import App
 from rich.console import Console
-from rich.table import Table
 from rich.text import Text
 
 from app.modules.scheduling.domain.job_run import RunStatus
+from app.platform.cli_output import Report
 from app.shared_kernel.errors import DomainError
 
 if TYPE_CHECKING:
@@ -51,88 +50,38 @@ def use_operations(
 
 
 @job_app.command(name="list")
-def list_jobs(
-    *, json_output: Annotated[bool, Parameter(name="--json", negative="")] = False
-) -> None:
-    """List registered jobs, effective schedules and active runs.
-
-    Args:
-        json_output: Print machine-readable JSON instead of a table.
-    """
-    statuses = _run_operation(_list_jobs())
-    if json_output:
-        _json(
-            [
-                {
-                    "job_key": status.definition.job_key,
-                    "lane": status.definition.lane.value,
-                    "schedule": status.expression,
-                    "next_run_at": status.next_run_at.isoformat()
-                    if status.next_run_at
-                    else None,
-                    "active_run_id": str(status.active_run.id)
-                    if status.active_run
-                    else None,
-                }
-                for status in statuses
-            ]
-        )
-        return
-    if not statuses:
-        job_app.console.print("No jobs are registered.")
-        return
-    table = Table("Job", "Lane", "Schedule", "Next run", "Active run", title="Jobs")
-    for status in statuses:
-        table.add_row(
-            Text(status.definition.job_key),
-            Text(status.definition.lane.value),
-            Text(status.expression or "off"),
-            Text(
-                status.next_run_at.strftime("%Y-%m-%d %H:%M %Z")
-                if status.next_run_at
-                else "—"
-            ),
-            Text(
-                f"{status.active_run.status.value} ({status.active_run.id})"
-                if status.active_run
-                else "—"
-            ),
-        )
-    job_app.console.print(table)
+def list_jobs() -> Report:
+    """List registered jobs, effective schedules and active runs."""
+    rows = [
+        {
+            "job_key": status.definition.job_key,
+            "lane": status.definition.lane.value,
+            "schedule": status.expression,
+            "next_run_at": status.next_run_at,
+            "active_run_id": status.active_run.id if status.active_run else None,
+        }
+        for status in _run_operation(_list_jobs())
+    ]
+    return Report(value=rows, title="Jobs", empty="No jobs are registered.")
 
 
 @job_app.command
-def run(
-    job_key: str,
-    *,
-    json_output: Annotated[bool, Parameter(name="--json", negative="")] = False,
-) -> None:
+def run(job_key: str) -> Report:
     """Run a registered job synchronously, reusing any existing active request.
 
     Args:
         job_key: Registered job to run.
-        json_output: Print machine-readable JSON instead of a table.
     """
     result = _run_operation(_run_job(job_key))
-    if json_output:
-        payload = {
-            "run_id": str(result.id),
-            "job_key": result.job_key,
-            "status": result.status.value,
-        }
-        if result.error is not None:
-            payload["error"] = result.error
-        _json(payload)
-    else:
-        table = Table("Field", "Value", title="Job run")
-        table.add_row("Job", Text(result.job_key))
-        table.add_row("Run ID", Text(str(result.id)))
-        table.add_row("Status", Text(result.status.value))
-        if result.error is not None:
-            table.add_row("Reason", Text(result.error))
-        job_app.console.print(table)
-    if result.status in {RunStatus.FAILED, RunStatus.ABANDONED}:
-        raise SystemExit(1)
+    value: dict[str, object] = {
+        "run_id": result.id,
+        "job_key": result.job_key,
+        "status": result.status.value,
+    }
+    if result.error is not None:
+        value["error"] = result.error
+    failed = result.status in {RunStatus.FAILED, RunStatus.ABANDONED}
+    return Report(value=value, title="Job run", exit_code=1 if failed else 0)
 
 
 def _run_operation[T](operation: Awaitable[T]) -> T:
@@ -159,9 +108,3 @@ def _logs_to_stderr() -> Iterator[None]:
         for handler, stream in zip(handlers, streams, strict=True):
             if stream is not None:
                 handler.setStream(stream)
-
-
-def _json(value: object) -> None:
-    job_app.console.print(
-        json.dumps(value, indent=2), markup=False, highlight=False, soft_wrap=True
-    )

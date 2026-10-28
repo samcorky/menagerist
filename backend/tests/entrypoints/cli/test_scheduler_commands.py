@@ -45,7 +45,7 @@ def test_job_commands_translate_operations_to_json(
     running = AsyncMock(return_value=run)
     monkeypatch.setattr(commands, "_list_jobs", listing)
     monkeypatch.setattr(commands, "_run_job", running)
-    cli.app(["job", "list", "--json"], result_action="return_value")
+    cli.app.meta(["--json", "job", "list"])
     assert json.loads(capsys.readouterr().out) == [
         {
             "job_key": "x",
@@ -55,7 +55,7 @@ def test_job_commands_translate_operations_to_json(
             "active_run_id": str(run.id),
         }
     ]
-    cli.app(["job", "run", "x", "--json"], result_action="return_value")
+    cli.app.meta(["--json", "job", "run", "x"])
     assert json.loads(capsys.readouterr().out) == {
         "run_id": str(run.id),
         "job_key": "x",
@@ -68,7 +68,7 @@ def test_worker_command_calls_async_entrypoint(monkeypatch: pytest.MonkeyPatch) 
     """The worker entrypoint is registered on the existing root CLI."""
     operation = AsyncMock()
     monkeypatch.setattr(cli, "run_worker_cli", operation)
-    cli.app(["worker"], result_action="return_value")
+    cli.app(["worker"])
     operation.assert_awaited_once_with()
 
 
@@ -245,7 +245,7 @@ async def test_job_entrypoints_dispose_connections_on_success_and_failure(
     assert engine.dispose.await_count == 2
 
 
-def test_job_commands_default_to_rich_tables(
+def test_job_commands_default_to_plain_columns_when_piped(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Human-readable output follows the account-list command's Rich convention."""
@@ -265,16 +265,15 @@ def test_job_commands_default_to_rich_tables(
         ),
     )
     monkeypatch.setattr(commands, "_run_job", AsyncMock(return_value=run))
-    cli.app(["job", "list"], result_action="return_value")
+    cli.app(["job", "list"])
     output = capsys.readouterr().out
-    assert "Job" in output
-    assert "Lane" in output
+    assert "JOB_KEY" in output
+    assert "LANE" in output
     assert "backup.create" in output
     assert "0 3 * * *" in output
-    cli.app(["job", "run", "backup.create"], result_action="return_value")
+    cli.app(["job", "run", "backup.create"])
     output = capsys.readouterr().out
-    assert "Job run" in output
-    assert str(run.id) in output
+    assert f"run_id: {run.id}" in output
     assert "queued" in output
 
 
@@ -283,9 +282,9 @@ def test_empty_job_catalogue_has_clear_output(
 ) -> None:
     """An unwired catalogue explains its empty state and remains JSON-compatible."""
     monkeypatch.setattr(commands, "_list_jobs", AsyncMock(return_value=[]))
-    cli.app(["job", "list"], result_action="return_value")
+    cli.app(["job", "list"])
     assert "No jobs are registered" in capsys.readouterr().out
-    cli.app(["job", "list", "--json"], result_action="return_value")
+    cli.app.meta(["--json", "job", "list"])
     assert json.loads(capsys.readouterr().out) == []
 
 
@@ -316,7 +315,7 @@ def test_failed_job_reports_its_error_and_exits_nonzero(
     run.error = "job failed"
     monkeypatch.setattr(commands, "_run_job", AsyncMock(return_value=run))
     with pytest.raises(SystemExit, match="1"):
-        cli.app(["job", "run", "x", "--json"])
+        cli.app.meta(["--json", "job", "run", "x"])
     assert json.loads(capsys.readouterr().out)["error"] == "job failed"
 
 
@@ -337,7 +336,7 @@ def test_json_output_stays_parseable_when_a_job_logs(
 
     monkeypatch.setattr(commands, "_run_job", operation)
     try:
-        cli.app(["job", "run", "x", "--json"], result_action="return_value")
+        cli.app.meta(["--json", "job", "run", "x"])
         captured = capsys.readouterr()
         assert json.loads(captured.out)["job_key"] == "x"
         assert "job diagnostic" in captured.err

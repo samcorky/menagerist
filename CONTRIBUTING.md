@@ -72,10 +72,12 @@ The `menagerist identity` commands manage accounts without the UI:
 uv run menagerist identity create-admin --username sam   # first admin (claims existing data) or an extra admin
 uv run menagerist identity reset-password --username sam # new initial password, ends the account's sessions
 uv run menagerist identity list                          # table: username, display name, role, status, last sign-in
-uv run menagerist identity list --json                   # the same as JSON, for scripts
+uv run menagerist --json identity list                   # the same as JSON, for scripts
 uv run menagerist identity set-display-name --username sam --display-name "Sam C"
 uv run menagerist identity unlock --username sam         # lift a sign-in lockout (does not enable a disabled account)
 ```
+
+Every command except `serve` and `worker` shows a result on stdout: Rich tables on a terminal, plain lines when piped or redirected, and JSON only when asked with `--json` (or `--format rich|text|json`), given before the command. Logs and errors go to stderr, and `-q` shows only errors. On a terminal, long steps show a spinner, `backup download` and `backup upload` show a progress bar, and destructive commands (`backup delete`, `backup restore --replace`, `data purge-deleted`, `migrate downgrade`) ask first; `--yes` skips the question. None of that appears when output is piped, so scripts and cron are never prompted.
 
 `create-admin` reads the password from the settings (below) or, if none is set, asks for it (hidden, confirmed twice). `reset-password` always asks, so a bootstrap password left in the environment or a secret file is never applied to someone's account by accident; pass `--from-settings` to read the configured password instead (for scripts). The password is never printed or logged. It must be 10 to 128 characters and not the username. The account must change it at next sign-in.
 

@@ -1,9 +1,13 @@
 import asyncio
 import sys
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
 import structlog
-from cyclopts import App
+from cyclopts import App, Parameter
+
+from app.platform.cli_output import Report
+from app.platform.cli_progress import activity, confirm
 
 logger = structlog.get_logger(__name__)
 
@@ -11,7 +15,12 @@ data_app = App(name="data", help="Manage stored content.")
 
 
 @data_app.command
-def purge_deleted(*, older_than_days: int | None = None, dry_run: bool = False) -> None:
+def purge_deleted(
+    *,
+    older_than_days: int | None = None,
+    dry_run: bool = False,
+    yes: Annotated[bool, Parameter(name=["--yes", "-y"])] = False,
+) -> Report:
     """Permanently delete content that has been in Recently deleted long enough.
 
     Covers every person's items, connections and collections, with the
@@ -22,6 +31,7 @@ def purge_deleted(*, older_than_days: int | None = None, dry_run: bool = False) 
         older_than_days: Purge what was deleted more than this many days ago, at
             least 1. Defaults to `MENAGERIST_RETENTION_DELETED_DAYS` (30).
         dry_run: Report what would be deleted and change nothing.
+        yes: Do not ask for confirmation.
     """
     from app.entrypoints.cli.purge_deleted import (
         PurgeDeletedContentCommand,
@@ -39,23 +49,35 @@ def purge_deleted(*, older_than_days: int | None = None, dry_run: bool = False) 
     cutoff = datetime.now(UTC) - timedelta(days=older_than_days)
     logger.debug("starting deleted-content purge", cutoff=cutoff, dry_run=dry_run)
 
-    result = asyncio.run(
-        build_purge_deleted_content().handle(
-            PurgeDeletedContentCommand(older_than=cutoff, dry_run=dry_run),
-            SYSTEM_ACTOR,
+    if not dry_run:
+        confirm(
+            f"Delete for good what was removed before {cutoff:%Y-%m-%d %H:%M} UTC?",
+            assume_yes=yes,
         )
-    )
-    print(f"Cutoff (UTC): {cutoff:%Y-%m-%d %H:%M}")
-    print(f"{'Would delete' if dry_run else 'Deleted'}:")
-    print(f"  Items:       {result.items}")
-    print(f"  Connections: {result.connections}")
-    print(f"  Collections: {result.collections}")
-    if dry_run:
-        print("Dry run: nothing was deleted")
+    with activity("Looking through Recently deleted"):
+        result = asyncio.run(
+            build_purge_deleted_content().handle(
+                PurgeDeletedContentCommand(older_than=cutoff, dry_run=dry_run),
+                SYSTEM_ACTOR,
+            )
+        )
     logger.info(
         "deleted-content purge complete",
         dry_run=dry_run,
         items=result.items,
         connections=result.connections,
         collections=result.collections,
+    )
+    return Report(
+        value={
+            "message": "Dry run: nothing was deleted"
+            if dry_run
+            else "Deleted content purged",
+            "cutoff": cutoff,
+            "dry_run": dry_run,
+            "items": result.items,
+            "connections": result.connections,
+            "collections": result.collections,
+        },
+        title="Deleted-content purge",
     )

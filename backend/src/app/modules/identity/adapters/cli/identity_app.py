@@ -1,6 +1,5 @@
 import asyncio
 import getpass
-import json
 import sys
 from collections.abc import Callable, Coroutine
 from datetime import datetime, timedelta
@@ -8,12 +7,11 @@ from typing import TYPE_CHECKING, Annotated, Any, NoReturn
 
 import structlog
 from cyclopts import App, Parameter
-from rich.console import Console
-from rich.table import Table
 
 from app.modules.identity.adapters.claim.unwired_existing_data_claim import (
     UnwiredExistingDataClaim,
 )
+from app.platform.cli_output import Report
 from app.platform.config import get_identity_cli_settings
 from app.shared_kernel.access_guard import DenyAllAccessGuard
 from app.shared_kernel.errors import DomainError
@@ -96,7 +94,9 @@ def _hasher() -> PasswordHasher:
 
 
 @identity_app.command
-def create_admin(*, username: str, display_name: str | None = None) -> None:
+def create_admin(
+    *, username: str, display_name: str | None = None
+) -> dict[str, object]:
     """Create an administrator account.
 
     With no accounts yet this is first-run setup: it also hands existing content
@@ -169,7 +169,7 @@ def create_admin(*, username: str, display_name: str | None = None) -> None:
             suffix = f" They now own: {claimed}." if claimed else ""
             return f"Created administrator '{result.user.username}'.{suffix}"
 
-    print(_run(_create()))
+    return {"message": _run(_create())}
 
 
 @identity_app.command
@@ -179,7 +179,7 @@ def reset_password(
     from_settings: Annotated[
         bool, Parameter(name="--from-settings", negative="")
     ] = False,
-) -> None:
+) -> dict[str, object]:
     """Give an account a new initial password and end its sessions.
 
     Always asks for the password (hidden, confirmed) unless `--from-settings`
@@ -221,7 +221,7 @@ def reset_password(
                 + "They must change it at next sign-in."
             )
 
-    print(_run(_reset()))
+    return {"message": _run(_reset())}
 
 
 async def _find_user(uow: IdentityUnitOfWork, username: str) -> User:
@@ -235,7 +235,7 @@ async def _find_user(uow: IdentityUnitOfWork, username: str) -> User:
 
 
 @identity_app.command
-def set_display_name(*, username: str, display_name: str) -> None:
+def set_display_name(*, username: str, display_name: str) -> dict[str, object]:
     """Change the name an account is shown as.
 
     Args:
@@ -264,11 +264,11 @@ def set_display_name(*, username: str, display_name: str) -> None:
             name = updated.user.display_name
             return f"Display name for '{user.username}' is now '{name}'."
 
-    print(_run(_rename()))
+    return {"message": _run(_rename())}
 
 
 @identity_app.command
-def unlock(*, username: str) -> None:
+def unlock(*, username: str) -> dict[str, object]:
     """Lift an account's sign-in lockout (it stays enabled or disabled as it was).
 
     Args:
@@ -294,7 +294,7 @@ def unlock(*, username: str) -> None:
             )
             return f"Sign-in lockout cleared for '{user.username}'."
 
-    print(_run(_unlock()))
+    return {"message": _run(_unlock())}
 
 
 def _local(moment: datetime | None) -> str:
@@ -306,14 +306,8 @@ def _iso(moment: datetime | None) -> str | None:
 
 
 @identity_app.command(name="list")
-def list_accounts(
-    *, json_output: Annotated[bool, Parameter(name="--json", negative="")] = False
-) -> None:
-    """List every account: username, display name, role, status and last sign-in.
-
-    Args:
-        json_output: Print machine-readable JSON instead of a table.
-    """
+def list_accounts() -> Report:
+    """List every account: username, display name, role, status and last sign-in."""
 
     async def _list() -> list[UserListing]:
         from app.modules.identity.adapters.persistence.unit_of_work import (
@@ -331,37 +325,16 @@ def list_accounts(
                 ListUsersQuery(), SYSTEM_ACTOR
             )
 
-    listings = _run(_list())
-    if json_output:
-        print(
-            json.dumps(
-                [
-                    {
-                        "id": str(item.user.id),
-                        "username": item.user.username,
-                        "display_name": item.user.display_name,
-                        "role": item.user.role.value,
-                        "status": "disabled" if item.user.disabled else "active",
-                        "last_login_at": _iso(item.user.last_login_at),
-                        "locked_until": _iso(item.locked_until),
-                    }
-                    for item in listings
-                ],
-                indent=2,
-            )
-        )
-        return
-    table = Table("Username", "Display name", "Role", "Status", "Last sign-in")
-    for item in listings:
-        user = item.user
-        status = "disabled" if user.disabled else "active"
-        if item.locked_until is not None:
-            status += " (locked)"
-        table.add_row(
-            user.username,
-            user.display_name,
-            user.role.value,
-            status,
-            _local(user.last_login_at),
-        )
-    Console(soft_wrap=True).print(table)
+    rows = [
+        {
+            "username": item.user.username,
+            "display_name": item.user.display_name,
+            "role": item.user.role.value,
+            "status": "disabled" if item.user.disabled else "active",
+            "last_login_at": item.user.last_login_at,
+            "locked_until": item.locked_until,
+            "id": item.user.id,
+        }
+        for item in _run(_list())
+    ]
+    return Report(value=rows, title="Accounts", empty="No accounts yet.")

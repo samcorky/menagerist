@@ -51,23 +51,23 @@ def _age_in_days(command: PurgeDeletedContentCommand) -> float:
     return (datetime.now(UTC) - command.older_than) / timedelta(days=1)
 
 
-def test_uses_the_configured_retention_and_prints_the_counts(
-    purge: _Purge, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_uses_the_configured_retention_and_reports_the_counts(purge: _Purge) -> None:
     """Without a flag the retention setting decides the cutoff."""
-    purge_deleted()
+    report = purge_deleted()
 
     (command,) = purge.commands
     assert command.dry_run is False
     assert 13.99 < _age_in_days(command) < 14.01
     assert purge.actors == [SYSTEM_ACTOR]
-    out = capsys.readouterr().out
-    assert f"Cutoff (UTC): {command.older_than:%Y-%m-%d %H:%M}" in out
-    assert "Deleted:" in out
-    assert "Items:       3" in out
-    assert "Connections: 5" in out
-    assert "Collections: 1" in out
-    assert "Dry run" not in out
+    assert report.title == "Deleted-content purge"
+    assert report.value == {
+        "message": "Deleted content purged",
+        "cutoff": command.older_than,
+        "dry_run": False,
+        "items": 3,
+        "connections": 5,
+        "collections": 1,
+    }
 
 
 def test_older_than_days_overrides_the_setting(purge: _Purge) -> None:
@@ -77,16 +77,13 @@ def test_older_than_days_overrides_the_setting(purge: _Purge) -> None:
     assert 1.99 < _age_in_days(purge.commands[0]) < 2.01
 
 
-def test_dry_run_says_nothing_was_deleted(
-    purge: _Purge, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_dry_run_says_nothing_was_deleted(purge: _Purge) -> None:
     """A dry run passes the flag on and states that nothing changed."""
-    purge_deleted(dry_run=True)
+    report = purge_deleted(dry_run=True)
 
     assert purge.commands[0].dry_run is True
-    out = capsys.readouterr().out
-    assert "Would delete:" in out
-    assert "Dry run: nothing was deleted" in out
+    assert report.value["message"] == "Dry run: nothing was deleted"  # type: ignore[index]
+    assert report.value["dry_run"] is True  # type: ignore[index]
 
 
 @pytest.mark.parametrize("days", [0, -3])

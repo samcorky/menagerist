@@ -27,11 +27,13 @@ from app.modules.identity.domain.session import Session
 from app.modules.identity.domain.user import Role, User
 from app.modules.identity.ports.existing_data_claim import ClaimReport
 from app.modules.identity.ports.unit_of_work import IdentityRepos
+from app.platform.cli_output import OutputFormat, emit_result, set_format
 from app.platform.config import IdentityCliSettings, IdentitySettings
 from app.shared_kernel.access_guard import DenyAllAccessGuard
 
 if TYPE_CHECKING:
     import uuid
+    from collections.abc import Iterator
 
     from tests.modules.identity.conftest import MakeUser, World
 
@@ -64,6 +66,14 @@ def claim(monkeypatch: pytest.MonkeyPatch) -> _SpyClaim:
     spy = _SpyClaim()
     monkeypatch.setattr(identity_app, "_claim_builder", lambda _session: spy)
     return spy
+
+
+@pytest.fixture(autouse=True)
+def _automatic_format() -> Iterator[None]:
+    """Leave the output format as the test found it."""
+    set_format(OutputFormat.AUTO)
+    yield
+    set_format(OutputFormat.AUTO)
 
 
 @pytest.fixture(autouse=True)
@@ -112,12 +122,11 @@ def test_first_admin_goes_through_setup_and_claims_existing_data(
     world: World,
     claim: _SpyClaim,
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """With no accounts it is first-run setup: an admin, and the claim runs."""
     asked = _prompts(monkeypatch, PASSWORD, PASSWORD)
 
-    create_admin(username="Sam")
+    result = create_admin(username="Sam")
 
     admin = next(iter(world.users._users.values()))
     assert (admin.username, admin.role, admin.password_expired) == (
@@ -127,9 +136,8 @@ def test_first_admin_goes_through_setup_and_claims_existing_data(
     )
     assert claim.owners == [admin.id]
     assert asked == ["Password: ", "Confirm password: "]
-    out = capsys.readouterr()
-    assert "Created administrator 'sam'" in out.out
-    assert "3 items, 1 examples" in out.out
+    assert "Created administrator 'sam'" in str(result["message"])
+    assert "3 items, 1 examples" in str(result["message"])
     assert world.uow.committed
 
 
@@ -143,11 +151,11 @@ def test_password_is_never_echoed_or_stored_in_clear(
     """Neither the password nor its hash appears in output or logs."""
     _prompts(monkeypatch, PASSWORD, PASSWORD)
 
-    create_admin(username="sam")
+    result = create_admin(username="sam")
 
     stored = next(iter(world.users._users.values())).password_hash
     out = capsys.readouterr()
-    everything = out.out + out.err + caplog.text
+    everything = out.out + out.err + caplog.text + str(result)
     assert PASSWORD not in everything
     assert stored not in everything
     assert stored != PASSWORD
@@ -211,19 +219,18 @@ def test_a_further_admin_has_an_expired_password_and_claims_nothing(
     make_user: MakeUser,
     claim: _SpyClaim,
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """On a server with accounts it adds an admin who must change the password."""
     existing = make_user("alice")
     world.users._users[existing.id] = existing
     monkeypatch.setenv(PASSWORD_ENV_VAR, PASSWORD)
 
-    create_admin(username="bob")
+    result = create_admin(username="bob")
 
     bob = next(u for u in world.users._users.values() if u.username == "bob")
     assert (bob.role, bob.password_expired) == (Role.ADMIN, True)
     assert claim.owners == []
-    assert "must change the password" in capsys.readouterr().out
+    assert "must change the password" in str(result["message"])
 
 
 def test_a_taken_username_is_refused(
@@ -264,14 +271,14 @@ def test_reset_password_sets_an_expired_password_and_ends_sessions(
     world.sessions._sessions[session.id] = session
     _prompts(monkeypatch, PASSWORD, PASSWORD)
 
-    reset_password(username="ALICE")
+    result = reset_password(username="ALICE")
 
     assert alice.password_hash != old_hash
     assert alice.password_expired is True
     assert world.sessions._sessions == {}
     out = capsys.readouterr()
-    assert "Password reset for 'alice'" in out.out
-    assert PASSWORD not in out.out + out.err
+    assert "Password reset for 'alice'" in str(result["message"])
+    assert PASSWORD not in out.out + out.err + str(result)
 
 
 def test_reset_password_prompts_even_when_a_bootstrap_password_is_configured(
@@ -376,32 +383,31 @@ def _seed(world: World, make_user: MakeUser) -> tuple[User, User]:
     return alice, bob
 
 
-def test_list_prints_a_table_but_never_hashes(
-    world: World, make_user: MakeUser, capsys: pytest.CaptureFixture[str]
+def test_list_returns_accounts_but_never_hashes(
+    world: World, make_user: MakeUser
 ) -> None:
     """Username, name, role, status and last sign-in; no secrets."""
     alice, bob = _seed(world, make_user)
 
-    list_accounts()
+    report = list_accounts()
 
-    out = capsys.readouterr().out
-    assert "Last sign-in" in out
-    alice_row = next(line for line in out.splitlines() if "alice" in line)
-    bob_row = next(line for line in out.splitlines() if "bob" in line)
-    assert "admin" in alice_row
-    assert "active" in alice_row
-    assert "2026-10-1" in alice_row
-    assert "member" in bob_row
-    assert "disabled" in bob_row
-    assert "never" in bob_row
-    assert alice.password_hash not in out
-    assert bob.password_hash not in out
+    assert (report.title, report.empty) == ("Accounts", "No accounts yet.")
+    rows = {row["username"]: row for row in report.value}  # type: ignore[attr-defined]
+    assert rows["alice"]["role"] == "admin"
+    assert rows["alice"]["status"] == "active"
+    assert rows["alice"]["last_login_at"] == datetime(2026, 10, 11, 8, 30, tzinfo=UTC)
+    assert rows["bob"]["role"] == "member"
+    assert rows["bob"]["status"] == "disabled"
+    assert rows["bob"]["last_login_at"] is None
+    assert rows["bob"]["locked_until"] is None
+    shown = str(report.value)
+    assert alice.password_hash not in shown
+    assert bob.password_hash not in shown
+    assert "hash" not in shown
 
 
-def test_list_marks_a_locked_username(
-    world: World, make_user: MakeUser, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """A username that is locked out shows as locked in the table."""
+def test_list_marks_a_locked_username(world: World, make_user: MakeUser) -> None:
+    """A username that is locked out carries the time its lock ends."""
     _seed(world, make_user)
     now = datetime.now(UTC)
     for _ in range(5):
@@ -411,42 +417,44 @@ def test_list_marks_a_locked_username(
             )
         )
 
-    list_accounts()
+    rows = {row["username"]: row for row in list_accounts().value}  # type: ignore[attr-defined]
 
-    assert "(locked)" in capsys.readouterr().out
+    assert rows["bob"]["locked_until"] is not None
+    assert rows["alice"]["locked_until"] is None
 
 
-def test_list_json_is_machine_readable_and_has_no_table(
+def test_list_renders_as_plain_columns_and_as_json(
     world: World, make_user: MakeUser, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`--json` prints only a JSON array, without password material."""
+    """Piped output is aligned text; `--json` is a parseable array."""
     alice, _bob = _seed(world, make_user)
+    report = list_accounts()
 
-    list_accounts(json_output=True)
+    emit_result(report)
+    plain = capsys.readouterr().out
+    assert plain.splitlines()[0].startswith("USERNAME")
+    assert "alice" in plain
+    assert "-" in next(line for line in plain.splitlines() if "bob" in line)
 
+    set_format(OutputFormat.JSON)
+    emit_result(report)
     out = capsys.readouterr().out
     rows = {row["username"]: row for row in json.loads(out)}
-    assert rows["alice"]["role"] == "admin"
-    assert rows["alice"]["status"] == "active"
     assert rows["alice"]["last_login_at"] == "2026-10-11T08:30:00+00:00"
-    assert rows["bob"]["status"] == "disabled"
-    assert rows["bob"]["last_login_at"] is None
-    assert rows["bob"]["locked_until"] is None
-    assert "hash" not in out
     assert alice.password_hash not in out
 
 
 def test_set_display_name_renames_the_account(
-    world: World, make_user: MakeUser, capsys: pytest.CaptureFixture[str]
+    world: World, make_user: MakeUser
 ) -> None:
     """The system actor renames an account by username."""
     alice = make_user("alice")
     world.users._users[alice.id] = alice
 
-    set_display_name(username="ALICE", display_name="  Alice Example ")
+    result = set_display_name(username="ALICE", display_name="  Alice Example ")
 
     assert alice.display_name == "Alice Example"
-    assert "Alice Example" in capsys.readouterr().out
+    assert "Alice Example" in str(result["message"])
 
 
 def test_set_display_name_reports_unknown_accounts_and_bad_names(
@@ -465,7 +473,7 @@ def test_set_display_name_reports_unknown_accounts_and_bad_names(
 
 
 def test_unlock_clears_the_username_lock_only(
-    world: World, make_user: MakeUser, capsys: pytest.CaptureFixture[str]
+    world: World, make_user: MakeUser
 ) -> None:
     """Unlocking lifts the username counter and leaves the address one alone."""
     alice = make_user("alice")
@@ -480,12 +488,12 @@ def test_unlock_clears_the_username_lock_only(
             )
         )
 
-    unlock(username="Alice")
+    result = unlock(username="Alice")
 
     assert username_key("alice") not in world.attempts.windows
     assert ip in world.attempts.windows
     assert alice.disabled is True
-    assert "cleared for 'alice'" in capsys.readouterr().out
+    assert "cleared for 'alice'" in str(result["message"])
 
 
 def test_unlock_for_an_unknown_account_fails(

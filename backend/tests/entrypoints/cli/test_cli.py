@@ -1,12 +1,16 @@
+import inspect
 import json
 import logging
-from typing import TYPE_CHECKING
+import sys
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
     from pathlib import Path
 
-    import pytest
 
+import pytest
 from cyclopts import App
 
 from app.entrypoints import cli
@@ -53,6 +57,33 @@ def test_main_with_verbose_forces_debug_level(monkeypatch: pytest.MonkeyPatch) -
     cli.main(verbose=True)
 
     assert configure_logging_calls == [{"level": logging.DEBUG}]
+
+
+def test_main_with_quiet_shows_only_errors_on_stderr(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`-q` keeps stdout for a command's own output: errors only, and on stderr."""
+    configure_logging_calls = []
+    monkeypatch.setattr(
+        cli,
+        "configure_logging",
+        lambda **kwargs: configure_logging_calls.append(kwargs),
+    )
+    monkeypatch.setattr(cli, "app", lambda tokens: None)
+
+    cli.main(quiet=True)
+
+    assert configure_logging_calls == [{"level": logging.ERROR, "stream": sys.stderr}]
+
+
+def test_main_refuses_verbose_and_quiet_together(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The two flags contradict each other, so the CLI says so rather than picking."""
+    monkeypatch.setattr(cli, "app", lambda tokens: pytest.fail("must not run"))
+
+    with pytest.raises(SystemExit, match="cannot be used together"):
+        cli.main(verbose=True, quiet=True)
 
 
 def test_shell_starts_the_interactive_shell(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -175,10 +206,43 @@ def test_migrate_upgrade_enables_migration_logs_and_delegates(
     )
     logging.getLogger("alembic.runtime.migration").setLevel(logging.WARNING)
 
-    cli.upgrade("abc123", backup=False)
+    result = cli.upgrade("abc123", backup=False)
 
     assert calls == ["abc123"]
+    assert result == {
+        "message": "Database upgraded",
+        "revision": "abc123",
+        "backup": False,
+    }
     assert logging.getLogger("alembic.runtime.migration").level == logging.INFO
+
+
+def test_migrate_upgrade_stays_quiet_under_quiet_and_shows_a_spinner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With `-q` the step lines stay hidden and a spinner covers the wait."""
+    from app.entrypoints.cli import backups
+    from app.platform import alembic_runner
+
+    shown: list[str] = []
+
+    @contextmanager
+    def spinner(description: str) -> Iterator[None]:
+        shown.append(description)
+        yield
+
+    monkeypatch.setattr(cli, "activity", spinner)
+    monkeypatch.setattr(alembic_runner, "upgrade", lambda _revision: None)
+    monkeypatch.setattr(backups, "upgrade_with_backup", lambda *_a, **_k: None)
+    migration_logs = logging.getLogger("alembic.runtime.migration")
+    migration_logs.setLevel(logging.WARNING)
+    root = logging.getLogger()
+    monkeypatch.setattr(root, "level", logging.ERROR)
+
+    cli.upgrade("head", backup=False)
+
+    assert shown == ["Upgrading the database"]
+    assert migration_logs.level == logging.WARNING
 
 
 def test_migrate_downgrade_enables_migration_logs_and_delegates(
@@ -193,9 +257,10 @@ def test_migrate_downgrade_enables_migration_logs_and_delegates(
     )
     logging.getLogger("alembic.runtime.migration").setLevel(logging.WARNING)
 
-    cli.downgrade("abc123")
+    result = cli.downgrade("abc123")
 
     assert calls == ["abc123"]
+    assert result["revision"] == "abc123"
     assert logging.getLogger("alembic.runtime.migration").level == logging.INFO
 
 
@@ -210,9 +275,10 @@ def test_migrate_revision_delegates_to_alembic(monkeypatch: pytest.MonkeyPatch) 
         lambda message, *, autogenerate: calls.append((message, autogenerate)),
     )
 
-    cli.revision("add widgets table", autogenerate=False)
+    result = cli.revision("add widgets table", autogenerate=False)
 
     assert calls == [("add widgets table", False)]
+    assert result["description"] == "add widgets table"
 
 
 def test_schema_dump_writes_the_openapi_schema(
@@ -233,9 +299,11 @@ def test_schema_dump_writes_the_openapi_schema(
     monkeypatch.setattr(api, "create_app", lambda: FakeApp())
     output = tmp_path / "openapi.json"
 
-    cli.dump(output=output)
+    result = cli.dump(output=output)
 
     assert json.loads(output.read_text()) == schema
+    assert result["output"] == output
+    assert result["size"] == output.stat().st_size
 
 
 def test_identity_commands_are_registered_with_the_real_claim_wired() -> None:
@@ -257,3 +325,34 @@ def test_cli_wires_the_real_claim_bridge() -> None:
     from app.modules.identity.adapters.cli import identity_app
 
     assert identity_app._claim_builder is cli._claim_existing_data
+
+
+# Long-running or interactive: they run until stopped and have no result to show.
+_NO_RESULT = {"serve", "worker", "help"}
+
+
+def _leaf_commands(
+    app: Any,  # noqa: ANN401 - cyclopts keeps its command registry untyped
+    prefix: str = "",
+) -> Iterator[tuple[str, Callable[..., object]]]:
+    for name, sub in sorted(app._commands.items()):
+        if name.startswith("-"):
+            continue
+        path = f"{prefix} {name}".strip()
+        if any(not child.startswith("-") for child in sub._commands):
+            yield from _leaf_commands(sub, path)
+        elif sub.default_command is not None:
+            yield path, sub.default_command
+
+
+def test_every_command_returns_a_result_for_the_root_app_to_show() -> None:
+    """A command that only logs is invisible to people; its result is shown for it."""
+    commands = dict(_leaf_commands(cli.app))
+    assert commands, "no commands were found"
+    silent = [
+        name
+        for name, command in commands.items()
+        if name not in _NO_RESULT
+        and inspect.signature(command).return_annotation in {None, "None"}
+    ]
+    assert silent == [], f"these commands return nothing to show: {silent}"

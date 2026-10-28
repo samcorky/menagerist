@@ -71,7 +71,7 @@ async def create_node(
     return NodeResponse.from_domain(node)
 ```
 
-The router depends on the use case, not on the repository the use case happens to use - that dependency is resolved once, at the composition root, and injected down. CLI commands follow the identical shape: a Cyclopts command is a driving adapter calling the same use case a router would, just triggered from a terminal. A use case never needs a second implementation to be reachable from a second entrypoint.
+The router depends on the use case, not on the repository the use case happens to use - that dependency is resolved once, at the composition root, and injected down. CLI commands follow the identical shape: a Cyclopts command is a driving adapter calling the same use case a router would, just triggered from a terminal. A command returns its result (a dict, a list of dicts, or a `Report` from `platform/cli_output.py` that adds a title, an empty-list message and an exit status) and never prints it: the root app's `result_action` shows it as Rich tables on a terminal, plain lines when piped, or JSON with `--json`. An architecture-style test in `tests/entrypoints/cli/test_cli.py` fails any command except `serve`, `worker` and `help` that returns nothing. A use case never needs a second implementation to be reachable from a second entrypoint.
 
 ## Request bodies: named Pydantic models, not `Form()` fields
 
@@ -183,6 +183,8 @@ The backend uses **structlog** (configured in `platform/logging_config.py`) with
 | `DEBUG` | Trace-level detail: repository method calls, SQL queries (via SQLAlchemy's stdlib logger), file operations, thumbnail generation steps. Application logs require `MENAGERIST_LOG_LEVEL=DEBUG`; SQL queries require `MENAGERIST_LOG_SQLALCHEMY_LEVEL=DEBUG`. |
 | `WARNING` | Recoverable anomalies that need attention (content-type mismatch, degraded trust level). |
 | `ERROR` | Unhandled exceptions, caught by the global exception handler. |
+
+**Third-party noise** - `configure_logging` pins `alembic.runtime.*` and `markdown_it` (rich's Markdown parser, which logs every rule at DEBUG) to WARNING, so `MENAGERIST_LOG_LEVEL=DEBUG` shows the application's own lines.
 
 **SQL query logging** is controlled independently of application logging. SQLAlchemy emits statements through Python's `logging.getLogger("sqlalchemy.engine")`, which structlog's stdlib bridge picks up. Set `MENAGERIST_LOG_SQLALCHEMY_LEVEL=INFO` for statements, or `DEBUG` to include result-fetching details. No parameters are logged.
 

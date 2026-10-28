@@ -1,6 +1,8 @@
 import asyncio
 import json
 import logging
+import sys
+from contextlib import nullcontext
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
@@ -9,6 +11,7 @@ import structlog
 from cyclopts import App, Parameter
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
+from app.entrypoints.api.shared.settings_reader import get_settings_reader
 from app.entrypoints.cli.backups import (
     create_backup,
     export_user_data,
@@ -26,6 +29,7 @@ from app.modules.backup.adapters.cli.backup_app import (
     backup_app,
     use_access_guard as use_backup_access_guard,
     use_operations,
+    use_settings_reader as use_backup_settings_reader,
     use_user_operations,
 )
 from app.modules.identity.adapters.cli.identity_app import (
@@ -39,6 +43,8 @@ from app.modules.scheduling.adapters.cli.job_app import (
     use_operations as use_job_operations,
 )
 from app.platform.app_info import load_app_info
+from app.platform.cli_output import RESULT_ACTION, OutputFormat, Report, set_format
+from app.platform.cli_progress import activity, confirm
 from app.platform.logging_config import configure_logging
 
 if TYPE_CHECKING:
@@ -55,23 +61,43 @@ BACKEND_SRC_PATH = Path(__file__).resolve().parents[3]
 app = App(
     name=app_info.name,
     version=app_info.version,
+    result_action=RESULT_ACTION,
 )
+
+
+app.meta.result_action = RESULT_ACTION
 
 
 @app.meta.default
 def main(
     *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
     verbose: Annotated[bool, Parameter(name=["--verbose", "-v"])] = False,
-) -> None:
+    quiet: Annotated[bool, Parameter(name=["--quiet", "-q"])] = False,
+    output_format: Annotated[
+        OutputFormat, Parameter(name="--format")
+    ] = OutputFormat.AUTO,
+    json_output: Annotated[bool, Parameter(name="--json", negative="")] = False,
+) -> object:
     """Menagerist CLI.
 
     Args:
         tokens: Remaining command-line tokens, forwarded to the command apps.
         verbose: Log at DEBUG level, overriding `LOG_LEVEL`.
+        quiet: Show only errors, on stderr, so stdout carries just a command's output.
+        output_format: How results are shown: `rich` (tables, the default on a
+            terminal), `text` (plain lines, the default when piped) or `json`.
+        json_output: Show results as JSON; the same as `--format json`.
     """
+    if verbose and quiet:
+        raise SystemExit("--verbose and --quiet cannot be used together.")
+    if json_output and output_format not in (OutputFormat.AUTO, OutputFormat.JSON):
+        raise SystemExit("--json cannot be combined with --format other than json.")
+    set_format(OutputFormat.JSON if json_output else output_format)
     if verbose:
         configure_logging(level=logging.DEBUG)
-    app(tokens)
+    elif quiet:
+        configure_logging(level=logging.ERROR, stream=sys.stderr)
+    return app(tokens)
 
 
 migrate_app = App(name="migrate", help="Manage database migrations.")
@@ -82,6 +108,7 @@ app.command(data_app)
 use_job_operations(list_jobs_cli, run_job_cli)
 app.command(job_app)
 use_backup_access_guard(get_access_guard())
+use_backup_settings_reader(get_settings_reader)
 
 use_operations(
     lambda label: create_backup(label=label),
@@ -108,7 +135,7 @@ def worker(*, identity_file: Path | None = None) -> None:
 
 
 @app.command(name="worker-health")
-def worker_health(*, identity_file: Path | None = None) -> None:
+def worker_health(*, identity_file: Path | None = None) -> Report:
     """Check this worker process's heartbeat; exit with one when unhealthy.
 
     Args:
@@ -116,12 +143,19 @@ def worker_health(*, identity_file: Path | None = None) -> None:
     """
     # Docker stores probe output; asyncio.run logs its event loop at DEBUG.
     logging.getLogger("asyncio").setLevel(logging.INFO)
-    if not asyncio.run(check_worker_health_cli(identity_file=identity_file)):
-        app.error_console.print(
-            "Worker is unhealthy: no recent heartbeat for this process."
+    if asyncio.run(check_worker_health_cli(identity_file=identity_file)):
+        return Report(
+            value={"message": "Worker is healthy.", "healthy": True},
+            title="Worker health",
         )
-        raise SystemExit(1)
-    app.console.print("Worker is healthy.")
+    return Report(
+        value={
+            "message": "Worker is unhealthy: no recent heartbeat for this process.",
+            "healthy": False,
+        },
+        title="Worker health",
+        exit_code=1,
+    )
 
 
 def _claim_existing_data(session: AsyncSession) -> ExistingDataClaim:
@@ -228,43 +262,55 @@ def serve(
     server.serve()
 
 
-def _enable_migration_logs() -> None:
+def _enable_migration_logs() -> bool:
+    """Show alembic's step lines unless `-q` asked for quiet; say whether they show."""
+    if logging.getLogger().getEffectiveLevel() > logging.INFO:
+        return False
     logging.getLogger("alembic.runtime.migration").setLevel(logging.INFO)
+    return True
 
 
 @migrate_app.command
-def upgrade(revision: str = "head", *, backup: bool = True) -> None:
+def upgrade(revision: str = "head", *, backup: bool = True) -> dict[str, object]:
     """Upgrade the database to `revision`.
 
     Args:
         revision: Target revision, or "head" for the latest.
         backup: Honour the configured pre-migration backup policy.
     """
-    _enable_migration_logs()
+    steps_shown = _enable_migration_logs()
     logger.debug("starting database upgrade", revision=revision)
     from app.entrypoints.cli.backups import upgrade_with_backup
 
-    upgrade_with_backup(revision, backup=backup)
+    # With the step lines hidden, a spinner shows that something is happening.
+    with nullcontext() if steps_shown else activity("Upgrading the database"):
+        upgrade_with_backup(revision, backup=backup)
     logger.info("database upgrade complete", revision=revision)
+    return {"message": "Database upgraded", "revision": revision, "backup": backup}
 
 
 @migrate_app.command
-def downgrade(revision: str) -> None:
+def downgrade(
+    revision: str, *, yes: Annotated[bool, Parameter(name=["--yes", "-y"])] = False
+) -> dict[str, object]:
     """Downgrade the database to `revision`.
 
     Args:
         revision: Target revision.
+        yes: Do not ask for confirmation.
     """
     from app.platform import alembic_runner
 
+    confirm(f"Downgrade the database to {revision}? Data may be lost.", assume_yes=yes)
     _enable_migration_logs()
     logger.debug("starting database downgrade", revision=revision)
     alembic_runner.downgrade(revision)
     logger.info("database downgrade complete", revision=revision)
+    return {"message": "Database downgraded", "revision": revision}
 
 
 @migrate_app.command
-def revision(message: str, *, autogenerate: bool = True) -> None:
+def revision(message: str, *, autogenerate: bool = True) -> dict[str, object]:
     """Create a new migration script.
 
     Args:
@@ -278,10 +324,15 @@ def revision(message: str, *, autogenerate: bool = True) -> None:
     )
     alembic_runner.make_revision(message, autogenerate=autogenerate)
     logger.info("migration revision complete", message=message)
+    return {
+        "message": "Migration created",
+        "description": message,
+        "autogenerate": autogenerate,
+    }
 
 
 @schema_app.command
-def dump(*, output: Path = Path("openapi.json")) -> None:
+def dump(*, output: Path = Path("openapi.json")) -> dict[str, object]:
     """Write the API's OpenAPI schema to a file.
 
     Args:
@@ -292,6 +343,11 @@ def dump(*, output: Path = Path("openapi.json")) -> None:
     logger.debug("dumping API schema", output=str(output))
     output.write_text(json.dumps(create_app().openapi(), indent=2))
     logger.info("schema dump complete", output=str(output))
+    return {
+        "message": "OpenAPI schema written",
+        "output": output,
+        "size": output.stat().st_size,
+    }
 
 
 if __name__ == "__main__":

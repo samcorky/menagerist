@@ -4,13 +4,15 @@ from datetime import UTC, datetime, timedelta
 import structlog
 from cyclopts import App
 
+from app.platform.cli_progress import activity
+
 logger = structlog.get_logger(__name__)
 
 media_app = App(name="media", help="Manage media assets.")
 
 
 @media_app.command
-def cleanup() -> None:
+def cleanup() -> dict[str, object]:
     """Hard-delete staged and orphaned media assets that have passed their TTL."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
     from app.modules.media.adapters.persistence.unit_of_work import create_media_uow
@@ -41,12 +43,14 @@ def cleanup() -> None:
             SYSTEM_ACTOR,
         )
 
-    count = asyncio.run(_run())
+    with activity("Removing expired media"):
+        count = asyncio.run(_run())
     logger.info("media cleanup complete", deleted=count)
+    return {"message": "Media cleanup complete", "deleted": count}
 
 
 @media_app.command
-def regenerate_thumbnails(*, max_dimension: int = 320) -> None:
+def regenerate_thumbnails(*, max_dimension: int = 320) -> dict[str, object]:
     """Regenerate thumbnails for all attached, thumbnailable media assets.
 
     Args:
@@ -79,5 +83,11 @@ def regenerate_thumbnails(*, max_dimension: int = 320) -> None:
             RegenerateThumbnailsCommand(max_dimension=max_dimension), SYSTEM_ACTOR
         )
 
-    count = asyncio.run(_run())
+    with activity("Regenerating thumbnails"):
+        count = asyncio.run(_run())
     logger.info("thumbnail regeneration complete", regenerated=count)
+    return {
+        "message": "Thumbnails regenerated",
+        "regenerated": count,
+        "max_dimension": max_dimension,
+    }
