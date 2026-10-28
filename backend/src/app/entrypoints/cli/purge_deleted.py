@@ -102,5 +102,5 @@ def build_purge_deleted_content() -> PurgeDeletedContent:
     from app.platform.config.media import get_media_settings
     from app.platform.database import get_session_factory
 
-    storage = LocalFilesystemMediaStorage(get_media_settings().media_storage_path)
+    storage = LocalFilesystemMediaStorage(get_media_settings().storage_path)
     return build_purge_deleted_content_on(get_session_factory(), storage)

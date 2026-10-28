@@ -274,12 +274,12 @@ async def test_storage_check_includes_configured_backup_directory(
     monkeypatch.setattr(
         dependencies,
         "get_media_settings",
-        lambda: SimpleNamespace(media_storage_path=media_path),
+        lambda: SimpleNamespace(storage_path=media_path),
     )
     monkeypatch.setattr(
         dependencies,
         "get_backup_settings",
-        lambda: SimpleNamespace(backup_path=backup_path),
+        lambda: SimpleNamespace(path=backup_path),
     )
 
     def probe(path: Path) -> DirectoryProbe:
@@ -442,7 +442,7 @@ def test_browser_check_warns_when_the_origin_differs() -> None:
     assert data["status"] == "warn"
     assert data["origin"] == "https://public.example"
     assert data["seen_origin"] == "http://testserver"
-    assert "MENAGERIST_TRUSTED_PROXIES" in data["output"]
+    assert "MENAGERIST_API_TRUSTED_PROXIES" in data["output"]
 
 
 def test_browser_check_is_refused_when_the_headers_were_removed() -> None:

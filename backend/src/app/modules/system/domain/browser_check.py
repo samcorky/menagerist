@@ -40,7 +40,7 @@ def assess(request: BrowserRequest) -> BrowserCheckResult:
         status = CheckStatus.WARN
         output = (
             "The browser's origin differs from the one the app rebuilt; check "
-            + "MENAGERIST_TRUSTED_PROXIES and the proxy's Host header."
+            + "MENAGERIST_API_TRUSTED_PROXIES and the proxy's Host header."
         )
     elif matches:
         status = CheckStatus.WARN

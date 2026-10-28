@@ -32,7 +32,7 @@ async def refuse_cross_site(request: Request) -> None:
 
     A `same-origin` request whose `Origin` differs from the origin the app
     rebuilt from the request is let through but noted: it means a proxy's
-    scheme or host is not reaching the app (see `MENAGERIST_TRUSTED_PROXIES`).
+    scheme or host is not reaching the app (see `MENAGERIST_API_TRUSTED_PROXIES`).
 
     Raises:
         CrossSiteRequestError: If the request is cross-site.

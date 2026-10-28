@@ -12,7 +12,7 @@ async def test_warns_when_any_origin_is_allowed() -> None:
     assert obs.status is CheckStatus.WARN
     assert obs.observed_value == 1
     assert obs.output == CORS_OPEN_HINT
-    assert "MENAGERIST_CORS_ORIGINS" in CORS_OPEN_HINT
+    assert "MENAGERIST_API_CORS_ORIGINS" in CORS_OPEN_HINT
 
 
 async def test_warns_when_a_wildcard_sits_among_listed_origins() -> None:

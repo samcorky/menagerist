@@ -9,7 +9,7 @@ from app.platform.config import BackupSettings, get_backup_settings
 def test_defaults() -> None:
     """Backup defaults use the volume and take a backup before migrations."""
     settings = BackupSettings()
-    assert settings.backup_path == Path("/data/backups")
+    assert settings.path == Path("/data/backups")
     assert settings.before_migrate is True
     assert settings.keep_last == 7
     assert settings.pre_migration_keep == 3
@@ -23,11 +23,11 @@ def test_reads_backup_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MENAGERIST_BACKUP_KEEP_LAST", "5")
     monkeypatch.setenv("MENAGERIST_BACKUP_PRE_MIGRATION_KEEP", "2")
     monkeypatch.setenv("MENAGERIST_BACKUP_MAX_UPLOAD_SIZE", "12345")
-    monkeypatch.setenv("MENAGERIST_MAX_UPLOAD_SIZE", "42")
+    monkeypatch.setenv("MENAGERIST_MEDIA_MAX_UPLOAD_SIZE", "42")
     get_backup_settings.cache_clear()
     try:
         settings = get_backup_settings()
-        assert settings.backup_path == Path("backups")
+        assert settings.path == Path("backups")
         assert settings.before_migrate is False
         assert settings.keep_last == 5
         assert settings.pre_migration_keep == 2

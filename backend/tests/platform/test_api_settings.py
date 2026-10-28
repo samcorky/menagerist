@@ -6,13 +6,13 @@ from app.platform.config.api import ApiSettings
 
 def _settings(monkeypatch: pytest.MonkeyPatch, value: str | None) -> ApiSettings:
     if value is not None:
-        monkeypatch.setenv("MENAGERIST_TRUSTED_PROXIES", value)
+        monkeypatch.setenv("MENAGERIST_API_TRUSTED_PROXIES", value)
     return ApiSettings()
 
 
 def test_default_trusts_only_loopback(monkeypatch: pytest.MonkeyPatch) -> None:
     """Without configuration only the local proxy is believed."""
-    monkeypatch.delenv("MENAGERIST_TRUSTED_PROXIES", raising=False)
+    monkeypatch.delenv("MENAGERIST_API_TRUSTED_PROXIES", raising=False)
     assert _settings(monkeypatch, None).trusted_proxies == ["127.0.0.1"]
 
 
@@ -40,7 +40,7 @@ def test_invalid_entries_are_rejected(
 
 def test_cors_is_same_origin_only_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """No origin is allowed unless one is listed."""
-    monkeypatch.delenv("MENAGERIST_CORS_ORIGINS", raising=False)
+    monkeypatch.delenv("MENAGERIST_API_CORS_ORIGINS", raising=False)
     assert ApiSettings().cors_origins == []
 
 
@@ -63,7 +63,7 @@ def test_cors_origins_are_normalised_to_browser_form(
     monkeypatch: pytest.MonkeyPatch, raw: str, expected: list[str]
 ) -> None:
     """Origins lose trailing slashes and default ports, as browsers send them."""
-    monkeypatch.setenv("MENAGERIST_CORS_ORIGINS", raw)
+    monkeypatch.setenv("MENAGERIST_API_CORS_ORIGINS", raw)
     assert ApiSettings().cors_origins == expected
 
 
@@ -82,6 +82,6 @@ def test_cors_origins_reject_non_origins(
     monkeypatch: pytest.MonkeyPatch, bad: str
 ) -> None:
     """Paths, queries, credentials, other schemes and mixed wildcards fail fast."""
-    monkeypatch.setenv("MENAGERIST_CORS_ORIGINS", bad)
+    monkeypatch.setenv("MENAGERIST_API_CORS_ORIGINS", bad)
     with pytest.raises(ValidationError):
         ApiSettings()

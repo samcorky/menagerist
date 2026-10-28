@@ -10,14 +10,14 @@ def test_worker_heartbeat_timeout_default_and_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Liveness expiry is positive, source-tracked and configurable in seconds."""
-    name = "MENAGERIST_WORKER_HEARTBEAT_TIMEOUT_SECONDS"
+    name = "MENAGERIST_SCHEDULER_WORKER_HEARTBEAT_TIMEOUT_SECONDS"
     monkeypatch.delenv(name, raising=False)
     defaults = SchedulerSettings()
     assert defaults.worker_heartbeat_timeout_seconds == 300
     assert defaults.worker_heartbeat_interval_seconds == 60
     assert defaults.source_of("worker_heartbeat_timeout_seconds") == "default"
     monkeypatch.setenv(name, "120")
-    monkeypatch.setenv("MENAGERIST_WORKER_HEARTBEAT_INTERVAL_SECONDS", "30")
+    monkeypatch.setenv("MENAGERIST_SCHEDULER_WORKER_HEARTBEAT_INTERVAL_SECONDS", "30")
     configured = SchedulerSettings()
     assert configured.worker_heartbeat_timeout_seconds == 120
     assert configured.worker_heartbeat_interval_seconds == 30
@@ -31,7 +31,7 @@ def test_worker_heartbeat_timeout_rejects_invalid_values(
     value: str,
 ) -> None:
     """Invalid expiry values fail during startup settings validation."""
-    monkeypatch.setenv("MENAGERIST_WORKER_HEARTBEAT_TIMEOUT_SECONDS", value)
+    monkeypatch.setenv("MENAGERIST_SCHEDULER_WORKER_HEARTBEAT_TIMEOUT_SECONDS", value)
     with pytest.raises(ValidationError):
         SchedulerSettings()
 
@@ -91,7 +91,7 @@ def test_invalid_timezone_is_a_validation_error(
 
 def test_history_limit_and_cached_getter(monkeypatch: pytest.MonkeyPatch) -> None:
     """History is configurable, positive and cached consistently with other groups."""
-    monkeypatch.setenv("MENAGERIST_RUN_HISTORY_PER_JOB", "12")
+    monkeypatch.setenv("MENAGERIST_SCHEDULER_RUN_HISTORY_PER_JOB", "12")
     get_scheduler_settings.cache_clear()
     try:
         settings = get_scheduler_settings()
@@ -100,14 +100,14 @@ def test_history_limit_and_cached_getter(monkeypatch: pytest.MonkeyPatch) -> Non
         assert get_scheduler_settings() is settings
     finally:
         get_scheduler_settings.cache_clear()
-    monkeypatch.setenv("MENAGERIST_RUN_HISTORY_PER_JOB", "0")
+    monkeypatch.setenv("MENAGERIST_SCHEDULER_RUN_HISTORY_PER_JOB", "0")
     with pytest.raises(ValidationError):
         SchedulerSettings()
 
 
 def test_default_history_and_frozen_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     """Defaults are logged as defaults, and settings remain frozen."""
-    monkeypatch.delenv("MENAGERIST_RUN_HISTORY_PER_JOB", raising=False)
+    monkeypatch.delenv("MENAGERIST_SCHEDULER_RUN_HISTORY_PER_JOB", raising=False)
     settings = SchedulerSettings()
     assert settings.run_history_per_job == 100
     assert settings.source_of("run_history_per_job") == "default"

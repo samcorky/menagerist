@@ -18,7 +18,7 @@ class Base(DeclarativeBase):
 @lru_cache(maxsize=1)
 def get_engine() -> AsyncEngine:
     """Return the process-wide async database engine."""
-    return create_async_engine(str(get_database_settings().database_url))
+    return create_async_engine(str(get_database_settings().url))
 
 
 @lru_cache(maxsize=1)

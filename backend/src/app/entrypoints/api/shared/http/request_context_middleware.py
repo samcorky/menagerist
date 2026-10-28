@@ -75,7 +75,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
     @staticmethod
     def _log(request: Request, status: int, started: float) -> None:
         path = _loggable_path(request.scope)
-        if not get_logging_settings().access_log or not _is_logged(path):
+        if not get_logging_settings().access or not _is_logged(path):
             return
         method = request.method
         fields: dict[str, object] = {

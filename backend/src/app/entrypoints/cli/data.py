@@ -20,7 +20,7 @@ def purge_deleted(*, older_than_days: int | None = None, dry_run: bool = False) 
 
     Args:
         older_than_days: Purge what was deleted more than this many days ago, at
-            least 1. Defaults to `MENAGERIST_DELETED_RETENTION_DAYS` (30).
+            least 1. Defaults to `MENAGERIST_RETENTION_DELETED_DAYS` (30).
         dry_run: Report what would be deleted and change nothing.
     """
     from app.entrypoints.cli.purge_deleted import (
@@ -31,7 +31,7 @@ def purge_deleted(*, older_than_days: int | None = None, dry_run: bool = False) 
     from app.shared_kernel.actor import SYSTEM_ACTOR
 
     if older_than_days is None:
-        older_than_days = get_retention_settings().deleted_retention_days
+        older_than_days = get_retention_settings().deleted_days
     elif older_than_days < 1:
         print("--older-than-days must be at least 1.", file=sys.stderr)
         raise SystemExit(1)

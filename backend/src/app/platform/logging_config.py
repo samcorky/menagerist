@@ -68,7 +68,7 @@ def configure_logging(*, level: int | str | None = None) -> None:
     _configured = True
 
     settings = get_logging_settings()
-    effective_level = level if level is not None else settings.log_level
+    effective_level = level if level is not None else settings.level
     shared_processors: list[structlog.types.Processor] = [
         structlog.contextvars.merge_contextvars,
         _serialise_uuids,
@@ -88,7 +88,7 @@ def configure_logging(*, level: int | str | None = None) -> None:
         cache_logger_on_first_use=True,
     )
 
-    if settings.log_json:
+    if settings.json_output:
         renderer: structlog.types.Processor = structlog.processors.JSONRenderer()
     else:
         # https://no-color.org/
@@ -118,7 +118,7 @@ def configure_logging(*, level: int | str | None = None) -> None:
     logging.getLogger("alembic.runtime.migration").setLevel(logging.WARNING)
     logging.getLogger("alembic.runtime.plugins").setLevel(logging.WARNING)
 
-    logging.getLogger("sqlalchemy.engine").setLevel(settings.sqlalchemy_log_level.value)
+    logging.getLogger("sqlalchemy.engine").setLevel(settings.sqlalchemy_level.value)
 
 
 # Propagate Granian loggers to root so they render via structlog.
@@ -143,7 +143,7 @@ def granian_log_dictconfig() -> dict[str, dict[str, LoggerConfig]]:
             "_granian": {"level": "INFO", "handlers": [], "propagate": True},
             "granian.access": {"level": "INFO", "handlers": [], "propagate": True},
             "sqlalchemy.engine": {
-                "level": settings.sqlalchemy_log_level.value,
+                "level": settings.sqlalchemy_level.value,
                 "handlers": [],
                 "propagate": True,
             },

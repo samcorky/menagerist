@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from tests.modules.identity.conftest import MakeUser, World
 
 PASSWORD = "a very secret passphrase"
-PASSWORD_ENV_VAR = "MENAGERIST_INITIAL_PASSWORD"
+PASSWORD_ENV_VAR = "MENAGERIST_IDENTITY_INITIAL_PASSWORD"
 
 
 class _Session:
@@ -159,7 +159,7 @@ def test_password_can_come_from_the_environment(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """`MENAGERIST_INITIAL_PASSWORD` skips the prompt and is not echoed."""
+    """`MENAGERIST_IDENTITY_INITIAL_PASSWORD` skips the prompt and is not echoed."""
     monkeypatch.setenv(PASSWORD_ENV_VAR, PASSWORD)
     monkeypatch.setattr(getpass, "getpass", lambda _p="": pytest.fail("prompted"))
 
@@ -330,8 +330,8 @@ def test_password_can_come_from_a_secret_file(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """A `menagerist_initial_password` file in the secrets directory is read."""
-    (tmp_path / "menagerist_initial_password").write_text(PASSWORD)
+    """A `menagerist_identity_initial_password` secrets-directory file is read."""
+    (tmp_path / "menagerist_identity_initial_password").write_text(PASSWORD)
     monkeypatch.setattr("app.platform.config.identity_cli.SECRETS_DIR", tmp_path)
     monkeypatch.setattr(getpass, "getpass", lambda _p="": pytest.fail("prompted"))
 

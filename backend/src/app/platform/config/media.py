@@ -6,10 +6,10 @@ from pydantic import Field
 from app.platform.config._base import MenageristBaseSettings
 
 
-class MediaSettings(MenageristBaseSettings):
+class MediaSettings(MenageristBaseSettings, group="media"):
     """Configuration for the media module."""
 
-    media_storage_path: Path = Field(
+    storage_path: Path = Field(
         default=Path("/data/media"),
         description="Directory used to store uploaded media and generated assets.",
     )

@@ -91,7 +91,7 @@ async def test_missing_media_directory_fails_loudly(
     monkeypatch.setattr(
         backup_jobs,
         "get_media_settings",
-        Mock(return_value=Mock(media_storage_path=tmp_path / "absent")),
+        Mock(return_value=Mock(storage_path=tmp_path / "absent")),
     )
     with pytest.raises(FileNotFoundError, match="media"):
         await backup_jobs.create_scheduled_backup(SYSTEM_ACTOR)

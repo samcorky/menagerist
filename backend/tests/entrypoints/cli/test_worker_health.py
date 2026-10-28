@@ -63,7 +63,7 @@ async def test_health_probe_uses_identity_timeout_and_closes_connections(
     engine = MagicMock(dispose=AsyncMock())
     monkeypatch.setattr(scheduling, "get_session_factory", lambda: factory)
     monkeypatch.setattr(scheduling, "get_engine", lambda: engine)
-    monkeypatch.setenv("MENAGERIST_WORKER_HEARTBEAT_TIMEOUT_SECONDS", "120")
+    monkeypatch.setenv("MENAGERIST_SCHEDULER_WORKER_HEARTBEAT_TIMEOUT_SECONDS", "120")
     get_scheduler_settings.cache_clear()
     try:
         assert await scheduling.check_worker_health_cli(identity_file=identity)

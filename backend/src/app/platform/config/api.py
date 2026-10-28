@@ -8,12 +8,13 @@ from app.platform.config._types import Origin, ProxyAddress, StarOrCSV  # noqa: 
 
 CORS_OPEN_HINT = (
     "CORS allows any origin: any website can call this API from a visitor's browser,"
-    + " without their cookies. Set MENAGERIST_CORS_ORIGINS to the origins that need it,"
+    + " without their cookies. Set MENAGERIST_API_CORS_ORIGINS to the origins"
+    + " that need it,"
     + " or leave it empty for same-origin only."
 )
 
 
-class ApiSettings(MenageristBaseSettings):
+class ApiSettings(MenageristBaseSettings, group="api"):
     """API entrypoint settings."""
 
     cors_origins: StarOrCSV[Origin] = Field(

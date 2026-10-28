@@ -188,7 +188,8 @@ def reset_password(
 
     Args:
         username: Username of the account to reset.
-        from_settings: Read the password from MENAGERIST_INITIAL_PASSWORD or the
+        from_settings: Read the password from
+            MENAGERIST_IDENTITY_INITIAL_PASSWORD or the
             secret file instead of prompting.
     """
     password = _read_password(use_settings=from_settings)

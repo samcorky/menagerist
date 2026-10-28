@@ -153,7 +153,7 @@ def get_client_ip(request: Request) -> str | None:
     """Return the client address as the server sees it.
 
     The ASGI wrapper in `entrypoints/api/__init__.py` has already applied
-    X-Forwarded-For from `MENAGERIST_TRUSTED_PROXIES` peers only, so this is
+    X-Forwarded-For from `MENAGERIST_API_TRUSTED_PROXIES` peers only, so this is
     `request.client.host`.
     """
     return None if request.client is None else request.client.host

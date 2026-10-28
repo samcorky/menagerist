@@ -206,7 +206,7 @@ def test_cookie_is_host_prefixed_over_https(world: World) -> None:
 
 @pytest.mark.parametrize("secure", [True, False])
 def test_cookie_secure_setting_overrides_the_scheme(world: World, secure: bool) -> None:
-    """MENAGERIST_COOKIE_SECURE wins over the request scheme, and so does the prefix."""
+    """MENAGERIST_IDENTITY_COOKIE_SECURE wins over the request scheme and prefix."""
     api = Api(world, settings=IdentitySettings(cookie_secure=secure))
 
     cookies = _cookie_headers(api.setup())

@@ -496,7 +496,7 @@ async def test_cli_restore_holds_exclusive_lock_through_use_case(
     factory = async_sessionmaker(engine, expire_on_commit=False)
     monkeypatch.setattr(backups, "get_session_factory", lambda: factory)
     monkeypatch.setattr(
-        backups, "get_backup_settings", lambda: BackupSettings(backup_path=tmp_path)
+        backups, "get_backup_settings", lambda: BackupSettings(path=tmp_path)
     )
 
     @asynccontextmanager

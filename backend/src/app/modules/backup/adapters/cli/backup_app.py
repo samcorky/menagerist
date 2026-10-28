@@ -74,7 +74,7 @@ def use_operations(
 
 
 def _store() -> LocalDirectoryBackupStore:
-    return LocalDirectoryBackupStore(get_backup_settings().backup_path)
+    return LocalDirectoryBackupStore(get_backup_settings().path)
 
 
 def _run[T](operation: Coroutine[Any, Any, T]) -> T:
@@ -204,7 +204,7 @@ def upload(archive: Path) -> None:
     summary = _run(
         UploadBackup(
             _store(),
-            LocalBackupWorkspace(settings.backup_path),
+            LocalBackupWorkspace(settings.path),
             _guard,
             max_upload_size=settings.max_upload_size,
         ).handle(UploadBackupCommand(stream=chunks()), SYSTEM_ACTOR)

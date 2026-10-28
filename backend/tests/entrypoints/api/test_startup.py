@@ -135,12 +135,12 @@ async def test_warns_when_storage_cannot_be_used(
     monkeypatch.setattr(
         startup,
         "get_media_settings",
-        lambda: SimpleNamespace(media_storage_path=tmp_path / "media"),
+        lambda: SimpleNamespace(storage_path=tmp_path / "media"),
     )
     monkeypatch.setattr(
         startup,
         "get_backup_settings",
-        lambda: SimpleNamespace(backup_path=tmp_path / "backup"),
+        lambda: SimpleNamespace(path=tmp_path / "backup"),
     )
 
     def probe(path: Path) -> DirectoryProbe:
@@ -173,12 +173,12 @@ async def test_stays_quiet_when_media_storage_is_writable(
     monkeypatch.setattr(
         startup,
         "get_media_settings",
-        lambda: SimpleNamespace(media_storage_path=tmp_path),
+        lambda: SimpleNamespace(storage_path=tmp_path),
     )
     monkeypatch.setattr(
         startup,
         "get_backup_settings",
-        lambda: SimpleNamespace(backup_path=tmp_path),
+        lambda: SimpleNamespace(path=tmp_path),
     )
 
     with capture_logs() as logs:
@@ -198,7 +198,7 @@ async def test_probe_errors_are_skipped_at_debug_level(
     monkeypatch.setattr(
         startup,
         "get_media_settings",
-        lambda: SimpleNamespace(media_storage_path=tmp_path),
+        lambda: SimpleNamespace(storage_path=tmp_path),
     )
     monkeypatch.setattr(startup, "probe_directory", broken)
 

@@ -29,7 +29,9 @@ async def test_worker_check_uses_configured_window(
     factory = MagicMock()
     from app.platform.config.scheduler import get_scheduler_settings
 
-    monkeypatch.setenv("MENAGERIST_WORKER_HEARTBEAT_TIMEOUT_SECONDS", str(timeout))
+    monkeypatch.setenv(
+        "MENAGERIST_SCHEDULER_WORKER_HEARTBEAT_TIMEOUT_SECONDS", str(timeout)
+    )
     get_scheduler_settings.cache_clear()
     factory.return_value.__aenter__.return_value.scalar = AsyncMock(return_value=alive)
     try:

@@ -31,7 +31,7 @@ def test_same_origin_with_a_different_origin_warns_about_the_proxy() -> None:
 
     assert result.status is CheckStatus.WARN
     assert result.output is not None
-    assert "MENAGERIST_TRUSTED_PROXIES" in result.output
+    assert "MENAGERIST_API_TRUSTED_PROXIES" in result.output
 
 
 def test_origin_alone_warns() -> None:

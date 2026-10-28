@@ -34,7 +34,7 @@ async def test_archive_uploads_use_backup_limit(
     monkeypatch.setattr(
         upload_limit_middleware,
         "get_backup_settings",
-        lambda: BackupSettings(MENAGERIST_BACKUP_MAX_UPLOAD_SIZE=20),
+        lambda: BackupSettings(max_upload_size=20),
     )
     sent, reads = await _call("POST", path, [(b"content-length", b"21")], [b"x"])
     assert sent[0]["status"] == 413

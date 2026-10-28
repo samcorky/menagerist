@@ -37,7 +37,7 @@ async def media_files(
     async with get_session_factory()() as session:
         yield BackupMediaFiles(
             SqlAlchemyMediaAssetRepository(session),
-            LocalFilesystemMediaStorage(get_media_settings().media_storage_path),
+            LocalFilesystemMediaStorage(get_media_settings().storage_path),
             scope=scope,
         )
 
@@ -66,7 +66,7 @@ async def create_backup(
 
     async with media_files() as media:
         return await CreateBackup(
-            LocalDirectoryBackupStore(get_backup_settings().backup_path),
+            LocalDirectoryBackupStore(get_backup_settings().path),
             SqlAlchemyDatabaseSnapshot(get_session_factory()),
             media,
             get_access_guard(),
@@ -148,10 +148,10 @@ async def restore_backup(backup_id: UUID, *, replace: bool, guard: AccessGuard) 
         settings = get_backup_settings()
         async with media_files() as media:
             await RestoreBackup(
-                LocalDirectoryBackupStore(settings.backup_path),
+                LocalDirectoryBackupStore(settings.path),
                 SqlAlchemyDatabaseRestorer(factory),
                 media,
-                LocalBackupWorkspace(settings.backup_path),
+                LocalBackupWorkspace(settings.path),
                 guard,
             ).handle(
                 RestoreBackupCommand(
@@ -180,7 +180,7 @@ async def export_user_data(user_id: UUID, output: Path) -> BackupSummary:
 
     actor = Actor(id=user_id, roles=frozenset({"member"}))
     store = LocalDirectoryBackupStore(
-        get_backup_settings().backup_path / "users" / str(user_id)
+        get_backup_settings().path / "users" / str(user_id)
     )
     async with media_files(scope=ContentFilter.of(user_id)) as media:
         summary = await ExportUserData(
@@ -226,7 +226,7 @@ async def import_user_data(user_id: UUID, archive: Path) -> None:
                 yield chunk
 
     settings = get_backup_settings()
-    path = settings.backup_path / "users" / str(user_id)
+    path = settings.path / "users" / str(user_id)
     store = LocalDirectoryBackupStore(path)
     workspace = LocalBackupWorkspace(path)
     summary = await upload_verified_backup(

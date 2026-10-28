@@ -29,7 +29,7 @@ async def create_scheduled_backup(actor: Actor) -> object:
     """Back up the shared volumes, refusing to archive a worker that lacks them."""
     from app.entrypoints.cli.backups import create_backup
 
-    media_path = get_media_settings().media_storage_path
+    media_path = get_media_settings().storage_path
     if not media_path.is_dir():
         raise FileNotFoundError(
             f"The media directory {media_path} is missing; "
@@ -51,7 +51,7 @@ async def prune_scheduled_backups(actor: Actor) -> object:
 
     settings = get_backup_settings()
     return await PruneBackups(
-        LocalDirectoryBackupStore(settings.backup_path),
+        LocalDirectoryBackupStore(settings.path),
         get_access_guard(),
         keep_last=settings.keep_last,
         pre_migration_keep=settings.pre_migration_keep,
@@ -72,7 +72,7 @@ async def prune_expired_exports(actor: Actor) -> object:
 
     settings = get_backup_settings()
     return await PruneUserExports(
-        LocalDirectoryBackupStore(settings.backup_path),
+        LocalDirectoryBackupStore(settings.path),
         get_access_guard(),
         user_export_ttl_hours=settings.user_export_ttl_hours,
     ).handle(PruneUserExportsCommand(), actor)

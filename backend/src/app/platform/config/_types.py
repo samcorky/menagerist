@@ -8,11 +8,14 @@ from pydantic import (
     AfterValidator,
     AnyHttpUrl,
     BeforeValidator,
+    Field,
     IPvAnyAddress,
     IPvAnyNetwork,
     ValidateAs,
 )
 from pydantic_settings import NoDecode
+
+from app.platform.config._markers import UIMeta
 
 _DEFAULT_PORTS = {"http": 80, "https": 443}
 
@@ -63,4 +66,5 @@ def _cron(value: str) -> str:
     return value
 
 
-type Cron = Annotated[str, ValidateAs(str, _cron)]
+type Cron = Annotated[str, ValidateAs(str, _cron), UIMeta(kind="cron")]
+type Hours = Annotated[int, Field(gt=0), UIMeta(unit="hours")]

@@ -31,12 +31,12 @@ if TYPE_CHECKING:
 @pytest.fixture
 def archive(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> BackupSummary:
     """Store a real archive so command tests exercise integrity and streaming."""
-    settings = BackupSettings(backup_path=tmp_path / "backups")
+    settings = BackupSettings(path=tmp_path / "backups")
     monkeypatch.setattr(commands, "get_backup_settings", lambda: settings)
     monkeypatch.setattr(commands, "_guard", get_access_guard())
     return asyncio.run(
         CreateBackup(
-            LocalDirectoryBackupStore(settings.backup_path),
+            LocalDirectoryBackupStore(settings.path),
             InMemoryDatabaseSnapshot("old", {"data/users.ndjson": b"{}\n"}),
             InMemoryMediaFiles(),
             get_access_guard(),

@@ -1,15 +1,17 @@
 """Deployment settings for recurring background jobs."""
 
 from functools import lru_cache
+from typing import Annotated
 from zoneinfo import ZoneInfo
 
 from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from app.platform.config._base import MenageristBaseSettings
+from app.platform.config._markers import Tunable
 
 
-class SchedulerSettings(MenageristBaseSettings):
+class SchedulerSettings(MenageristBaseSettings, group="scheduler"):
     """Instance timezone, worker liveness and job history retention."""
 
     model_config = SettingsConfigDict(extra="ignore", env_ignore_empty=True)
@@ -19,9 +21,10 @@ class SchedulerSettings(MenageristBaseSettings):
         validation_alias=AliasChoices("MENAGERIST_TIMEZONE", "TZ"),
         description="Timezone used to interpret recurring job schedules.",
     )
-    run_history_per_job: int = Field(
+    run_history_per_job: Annotated[int, Tunable()] = Field(
         default=100,
         ge=1,
+        title="Runs kept per task",
         description="Number of completed runs to retain for each job.",
     )
     worker_heartbeat_timeout_seconds: int = Field(

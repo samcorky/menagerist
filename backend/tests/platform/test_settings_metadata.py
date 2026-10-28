@@ -49,13 +49,13 @@ def test_each_setting_has_a_field_description(
 @pytest.mark.parametrize(
     ("settings_type", "env_var", "invalid"),
     [
-        (MediaSettings, "MENAGERIST_STAGED_TTL_HOURS", "0"),
-        (MediaSettings, "MENAGERIST_ORPHANED_TTL_HOURS", "-1"),
-        (MediaSettings, "MENAGERIST_MAX_UPLOAD_SIZE", "0"),
+        (MediaSettings, "MENAGERIST_MEDIA_STAGED_TTL_HOURS", "0"),
+        (MediaSettings, "MENAGERIST_MEDIA_ORPHANED_TTL_HOURS", "-1"),
+        (MediaSettings, "MENAGERIST_MEDIA_MAX_UPLOAD_SIZE", "0"),
         (BackupSettings, "MENAGERIST_BACKUP_KEEP_LAST", "0"),
         (BackupSettings, "MENAGERIST_BACKUP_PRE_MIGRATION_KEEP", "0"),
         (BackupSettings, "MENAGERIST_BACKUP_MAX_UPLOAD_SIZE", "0"),
-        (IdentityCliSettings, "MENAGERIST_INITIAL_PASSWORD", ""),
+        (IdentityCliSettings, "MENAGERIST_IDENTITY_INITIAL_PASSWORD", ""),
     ],
 )
 def test_settings_reject_invalid_boundaries(
@@ -107,7 +107,7 @@ def test_environment_guard_allows_shared_timezone_fallback(
     from pydantic import AliasChoices
 
     monkeypatch.setattr(
-        LoggingSettings.model_fields["log_level"],
+        LoggingSettings.model_fields["level"],
         "validation_alias",
         AliasChoices("MENAGERIST_LOG_LEVEL", "tZ"),
     )
@@ -122,7 +122,7 @@ def test_environment_guard_rejects_other_shared_names(
     from pydantic import AliasChoices
 
     monkeypatch.setattr(
-        LoggingSettings.model_fields["log_level"],
+        LoggingSettings.model_fields["level"],
         "validation_alias",
         AliasChoices("TZ", alias),
     )

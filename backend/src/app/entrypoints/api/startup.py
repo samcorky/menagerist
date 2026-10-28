@@ -51,8 +51,8 @@ async def warn_if_no_administrator() -> None:
 async def warn_if_storage_not_writable() -> None:
     """Log a warning for each configured storage directory that cannot be used."""
     directories = {
-        "media": get_media_settings().media_storage_path,
-        "backup": get_backup_settings().backup_path,
+        "media": get_media_settings().storage_path,
+        "backup": get_backup_settings().path,
     }
     for path in directories.values():
         try:
@@ -66,7 +66,7 @@ async def warn_if_storage_not_writable() -> None:
 
 
 async def warn_if_cors_open() -> None:
-    """Log one warning when `MENAGERIST_CORS_ORIGINS` allows any origin."""
+    """Log one warning when `MENAGERIST_API_CORS_ORIGINS` allows any origin."""
     if "*" in get_api_settings().cors_origins:
         logger.warning(CORS_OPEN_HINT)
 

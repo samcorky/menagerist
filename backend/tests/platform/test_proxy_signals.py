@@ -64,7 +64,7 @@ def test_the_first_sighting_in_a_window_is_logged_once_with_the_fix() -> None:
         "untrusted_forwarding",
         "origin_mismatch",
     ]
-    assert "MENAGERIST_TRUSTED_PROXIES" in warnings[0]["hint"]
+    assert "MENAGERIST_API_TRUSTED_PROXIES" in warnings[0]["hint"]
 
 
 def test_a_signal_is_logged_again_after_the_window() -> None:

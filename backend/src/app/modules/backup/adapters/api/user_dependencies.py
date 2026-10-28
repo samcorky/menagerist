@@ -45,7 +45,7 @@ def get_user_backup_store(
 ) -> BackupStore:
     """Build a private archive namespace for the signed-in account."""
     return LocalDirectoryBackupStore(
-        get_backup_settings().backup_path / "users" / str(actor.id)
+        get_backup_settings().path / "users" / str(actor.id)
     )
 
 

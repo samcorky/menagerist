@@ -192,7 +192,7 @@ def serve(
         reload: Restart workers when application code changes.
         access_log: Also write Granian's own access line. Off by default because
             the API logs one access line per request itself (with the user and
-            session ids); `MENAGERIST_ACCESS_LOG=false` turns that one off.
+            session ids); `MENAGERIST_LOG_ACCESS=false` turns that one off.
         log_level: Minimum level for Granian's own server logs.
         backup: Honour the configured pre-migration backup policy.
         migrate: Apply pending database migrations before starting. Meant for

@@ -39,7 +39,7 @@ def client(dist: Path) -> TestClient:
 @pytest.fixture
 def app_client(dist: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     """The real `create_app()` with the SPA enabled through its setting."""
-    monkeypatch.setenv("MENAGERIST_FRONTEND_DIST_PATH", str(dist))
+    monkeypatch.setenv("MENAGERIST_API_FRONTEND_DIST_PATH", str(dist))
     get_api_settings.cache_clear()
     yield TestClient(create_app())
     get_api_settings.cache_clear()
@@ -136,7 +136,7 @@ def test_only_get_and_head_are_allowed(client: TestClient) -> None:
 
 def test_the_spa_is_off_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """Without the setting the process is API-only: no shell, just 404s."""
-    monkeypatch.delenv("MENAGERIST_FRONTEND_DIST_PATH", raising=False)
+    monkeypatch.delenv("MENAGERIST_API_FRONTEND_DIST_PATH", raising=False)
     get_api_settings.cache_clear()
     try:
         resp = TestClient(create_app()).get("/")
@@ -166,7 +166,7 @@ def test_a_missing_dist_directory_fails_at_startup(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A wrong path is a deployment error: fail immediately, not on first request."""
-    monkeypatch.setenv("MENAGERIST_FRONTEND_DIST_PATH", str(tmp_path / "nope"))
+    monkeypatch.setenv("MENAGERIST_API_FRONTEND_DIST_PATH", str(tmp_path / "nope"))
     get_api_settings.cache_clear()
     try:
         with pytest.raises(RuntimeError, match="does not exist"):

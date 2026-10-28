@@ -11,7 +11,7 @@ logger = structlog.get_logger()
 class ProxySignal(StrEnum):
     """Something seen on a request that points at the reverse-proxy setup."""
 
-    # Forwarding headers from a peer outside `MENAGERIST_TRUSTED_PROXIES`.
+    # Forwarding headers from a peer outside `MENAGERIST_API_TRUSTED_PROXIES`.
     UNTRUSTED_FORWARDING = "untrusted_forwarding"
     # A browser said same-origin, but its Origin is not the origin the app saw.
     ORIGIN_MISMATCH = "origin_mismatch"
@@ -20,12 +20,12 @@ class ProxySignal(StrEnum):
 HINTS = {
     ProxySignal.UNTRUSTED_FORWARDING: (
         "Requests carry forwarding headers from a peer that is not trusted, so"
-        + " every visitor looks like the proxy. Set MENAGERIST_TRUSTED_PROXIES to"
+        + " every visitor looks like the proxy. Set MENAGERIST_API_TRUSTED_PROXIES to"
         + " the proxy's address or network."
     ),
     ProxySignal.ORIGIN_MISMATCH: (
         "A browser's origin differs from the one the app saw, so the proxy's"
-        + " scheme or host is not reaching it. Check MENAGERIST_TRUSTED_PROXIES"
+        + " scheme or host is not reaching it. Check MENAGERIST_API_TRUSTED_PROXIES"
         + " and that the proxy passes Host and X-Forwarded-Proto."
     ),
 }

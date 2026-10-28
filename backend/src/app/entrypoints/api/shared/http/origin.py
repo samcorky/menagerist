@@ -41,7 +41,7 @@ def note_origin_mismatch(origin: str | None, own: str) -> None:
     """Record a `same-origin` request whose `Origin` differs from the app's own.
 
     It means a proxy's scheme or host is not reaching the app (see
-    `MENAGERIST_TRUSTED_PROXIES`).
+    `MENAGERIST_API_TRUSTED_PROXIES`).
     """
     if origin is None or claimed_origin(origin) == own:
         return
@@ -50,7 +50,7 @@ def note_origin_mismatch(origin: str | None, own: str) -> None:
         "same-origin request has a different origin than the app saw",
         claimed_origin=loggable(origin),
         seen_origin=own,
-        hint="check MENAGERIST_TRUSTED_PROXIES and the proxy's Host header",
+        hint="check MENAGERIST_API_TRUSTED_PROXIES and the proxy's Host header",
     )
 
 

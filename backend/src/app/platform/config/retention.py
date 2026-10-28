@@ -5,10 +5,10 @@ from pydantic import Field
 from app.platform.config._base import MenageristBaseSettings
 
 
-class RetentionSettings(MenageristBaseSettings):
+class RetentionSettings(MenageristBaseSettings, group="retention"):
     """How long deleted content stays recoverable before it is purged."""
 
-    deleted_retention_days: int = Field(
+    deleted_days: int = Field(
         default=30,
         ge=1,
         description="Days deleted content stays recoverable before it is purged.",

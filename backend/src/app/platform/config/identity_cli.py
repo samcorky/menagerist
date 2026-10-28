@@ -8,11 +8,11 @@ from app.platform.config._base import MenageristBaseSettings
 SECRETS_DIR = Path("/run/secrets")
 
 
-class IdentityCliSettings(MenageristBaseSettings):
+class IdentityCliSettings(MenageristBaseSettings, group="identity"):
     """Settings read only by the `menagerist identity` CLI, never by the server.
 
-    `initial_password` comes from `MENAGERIST_INITIAL_PASSWORD` or, preferably,
-    a `menagerist_initial_password` file in the secrets directory: environment
+    `initial_password` comes from `MENAGERIST_IDENTITY_INITIAL_PASSWORD` or, preferably,
+    a `menagerist_identity_initial_password` file in the secrets directory: environment
     variables show up in `docker inspect` and process listings.
     """
 

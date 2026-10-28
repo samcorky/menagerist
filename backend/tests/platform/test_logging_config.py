@@ -86,7 +86,7 @@ def test_sqlalchemy_level_is_independent_of_application_level(
     monkeypatch.setattr(
         logging_config,
         "get_logging_settings",
-        lambda: LoggingSettings(sqlalchemy_log_level=sqlalchemy_level),
+        lambda: LoggingSettings(sqlalchemy_level=sqlalchemy_level),
     )
 
     configure_logging()
@@ -104,7 +104,7 @@ def test_granian_uses_configured_sqlalchemy_level(
     monkeypatch.setattr(
         logging_config,
         "get_logging_settings",
-        lambda: LoggingSettings(sqlalchemy_log_level=sqlalchemy_level),
+        lambda: LoggingSettings(sqlalchemy_level=sqlalchemy_level),
     )
 
     loggers = logging_config.granian_log_dictconfig()["loggers"]
@@ -122,9 +122,9 @@ def test_logging_settings_accept_uppercase_and_lowercase_values(
 ) -> None:
     """Both logging settings accept either casing for enum values."""
     settings = LoggingSettings(
-        log_level=log_level,
-        sqlalchemy_log_level=sqlalchemy_log_level,
+        level=log_level,
+        sqlalchemy_level=sqlalchemy_log_level,
     )
 
-    assert settings.log_level is LogLevel.DEBUG
-    assert settings.sqlalchemy_log_level is LogLevel.INFO
+    assert settings.level is LogLevel.DEBUG
+    assert settings.sqlalchemy_level is LogLevel.INFO

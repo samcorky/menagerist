@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 class CorsConfigurationCheck:
-    """Warns when `MENAGERIST_CORS_ORIGINS` allows any origin.
+    """Warns when `MENAGERIST_API_CORS_ORIGINS` allows any origin.
 
     Pure inspection of a setting, no I/O. It only ever warns: a configuration choice
     must not take the instance out of rotation.

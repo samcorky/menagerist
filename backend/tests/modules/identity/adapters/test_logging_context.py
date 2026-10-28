@@ -475,11 +475,11 @@ def test_a_client_error_is_logged_at_info(api: Api, events: list[EventDict]) -> 
 def test_the_access_line_can_be_switched_off(
     api: Api, events: list[EventDict], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`MENAGERIST_ACCESS_LOG=false` silences it."""
+    """`MENAGERIST_LOG_ACCESS=false` silences it."""
     monkeypatch.setattr(
         request_context_middleware,
         "get_logging_settings",
-        lambda: LoggingSettings(access_log=False),
+        lambda: LoggingSettings(access=False),
     )
 
     api.new_client().get("/api/v1/_open")

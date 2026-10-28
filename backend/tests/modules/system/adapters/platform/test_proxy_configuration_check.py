@@ -49,7 +49,7 @@ async def test_warns_with_a_hint_for_each_signal(
     assert obs.observed_value == 1
     assert obs.output is not None
     assert words in obs.output
-    assert "MENAGERIST_TRUSTED_PROXIES" in obs.output
+    assert "MENAGERIST_API_TRUSTED_PROXIES" in obs.output
     others = [o for k, o in result.items() if k != key]
     assert all(o.status is CheckStatus.PASS for o in others)
 

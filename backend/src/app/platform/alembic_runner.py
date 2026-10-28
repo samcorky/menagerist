@@ -19,7 +19,7 @@ def build_config() -> Config:
     """Build an Alembic Config pointed at backend migrations and database."""
     config = Config()
     config.set_main_option("script_location", str(_MIGRATIONS_PATH))
-    config.set_main_option("sqlalchemy.url", str(get_database_settings().database_url))
+    config.set_main_option("sqlalchemy.url", str(get_database_settings().url))
     return config
 
 

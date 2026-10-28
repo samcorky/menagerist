@@ -62,7 +62,7 @@ async def get_media_repos(
 def get_media_storage(
     settings: Annotated[MediaSettings, Depends(get_media_settings)],
 ) -> MediaStoragePort:
-    return LocalFilesystemMediaStorage(settings.media_storage_path)
+    return LocalFilesystemMediaStorage(settings.storage_path)
 
 
 def get_attachment_policy() -> AttachmentPolicyPort:

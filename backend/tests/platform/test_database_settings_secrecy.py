@@ -26,7 +26,7 @@ CLI_ONLY = {"get_identity_cli_settings"}
 @pytest.fixture
 def settings() -> DatabaseSettings:
     """Settings built from a DSN with a known password."""
-    return DatabaseSettings(database_url=DSN)
+    return DatabaseSettings(url=DSN)
 
 
 def test_password_is_absent_from_every_rendering(settings: DatabaseSettings) -> None:
@@ -45,14 +45,14 @@ def test_attribute_access_still_returns_the_real_dsn(
     settings: DatabaseSettings,
 ) -> None:
     """Connecting needs the real value."""
-    assert PASSWORD in str(settings.database_url)
+    assert PASSWORD in str(settings.url)
 
 
 def test_invalid_dsn_error_does_not_echo_the_password() -> None:
     """A validation error hides the offending input."""
     bad = f"mysql://menagerist:{PASSWORD}@db/menagerist"
     with pytest.raises(ValidationError) as caught:
-        DatabaseSettings(database_url=bad)
+        DatabaseSettings(url=bad)
     assert PASSWORD not in str(caught.value)
 
 

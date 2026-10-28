@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 pytestmark = pytest.mark.integration
 
-PASSWORD_ENV_VAR = "MENAGERIST_INITIAL_PASSWORD"
+PASSWORD_ENV_VAR = "MENAGERIST_IDENTITY_INITIAL_PASSWORD"
 
 PASSWORD = "a very secret passphrase"
 

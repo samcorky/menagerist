@@ -33,7 +33,7 @@ async def get_media_files(
     async with factory() as session:
         yield BackupMediaFiles(
             SqlAlchemyMediaAssetRepository(session),
-            LocalFilesystemMediaStorage(get_media_settings().media_storage_path),
+            LocalFilesystemMediaStorage(get_media_settings().storage_path),
         )
 
 
@@ -45,6 +45,6 @@ async def get_user_media_files(
     async with factory() as session:
         yield BackupMediaFiles(
             SqlAlchemyMediaAssetRepository(session),
-            LocalFilesystemMediaStorage(get_media_settings().media_storage_path),
+            LocalFilesystemMediaStorage(get_media_settings().storage_path),
             scope=ContentFilter.of(actor.id),
         )

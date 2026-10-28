@@ -42,7 +42,7 @@ def purge(monkeypatch: pytest.MonkeyPatch) -> _Purge:
     )
     monkeypatch.setattr(
         "app.platform.config.retention.get_retention_settings",
-        lambda: RetentionSettings(deleted_retention_days=14),
+        lambda: RetentionSettings(deleted_days=14),
     )
     return recorder
 

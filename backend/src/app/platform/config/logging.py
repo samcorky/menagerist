@@ -23,22 +23,22 @@ class LogLevel(StrEnum):
         return None
 
 
-class LoggingSettings(MenageristBaseSettings):
+class LoggingSettings(MenageristBaseSettings, group="log"):
     """Logging settings."""
 
-    log_level: LogLevel = Field(
+    level: LogLevel = Field(
         default=LogLevel.INFO,
         description="Minimum severity emitted by Menagerist application loggers.",
     )
-    sqlalchemy_log_level: LogLevel = Field(
+    sqlalchemy_level: LogLevel = Field(
         default=LogLevel.WARNING,
         description="Minimum severity emitted by SQLAlchemy's engine logger.",
     )
-    log_json: bool = Field(
+    json_output: bool = Field(
         default=False,
         description="Emit structured logs as JSON instead of the development format.",
     )
-    access_log: bool = Field(
+    access: bool = Field(
         default=True,
         description="Emit HTTP access log entries for application requests.",
     )

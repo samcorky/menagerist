@@ -55,8 +55,8 @@ def get_storage_check() -> StorageCheck:
     """Return the process-wide storage check and its cached probe results."""
     return StorageCheck(
         {
-            "media": get_media_settings().media_storage_path,
-            "backup": get_backup_settings().backup_path,
+            "media": get_media_settings().storage_path,
+            "backup": get_backup_settings().path,
         }
     )
 

@@ -6,7 +6,7 @@ from pydantic import Field, model_validator
 from app.platform.config._base import MenageristBaseSettings
 
 
-class IdentitySettings(MenageristBaseSettings):
+class IdentitySettings(MenageristBaseSettings, group="identity"):
     """Configuration for the identity module."""
 
     session_ttl_hours: int = Field(

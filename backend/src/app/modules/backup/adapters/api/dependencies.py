@@ -42,12 +42,12 @@ from app.shared_kernel.access_guard import AccessGuard
 
 def get_backup_store() -> BackupStore:
     """Use the configured volume for committed instance archives."""
-    return LocalDirectoryBackupStore(get_backup_settings().backup_path)
+    return LocalDirectoryBackupStore(get_backup_settings().path)
 
 
 def get_backup_workspace() -> BackupWorkspace:
     """Stage uploads and media rollback copies on the backup volume."""
-    return LocalBackupWorkspace(get_backup_settings().backup_path)
+    return LocalBackupWorkspace(get_backup_settings().path)
 
 
 def get_database_snapshot(

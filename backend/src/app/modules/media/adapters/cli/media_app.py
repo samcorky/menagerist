@@ -31,7 +31,7 @@ def cleanup() -> None:
 
     async def _run() -> int:
         uow = create_media_uow(get_session_factory())
-        storage = LocalFilesystemMediaStorage(settings.media_storage_path)
+        storage = LocalFilesystemMediaStorage(settings.storage_path)
         use_case = CleanupExpiredMedia(uow, get_access_guard(), storage)
         return await use_case.handle(
             CleanupExpiredMediaCommand(
@@ -71,7 +71,7 @@ def regenerate_thumbnails(*, max_dimension: int = 320) -> None:
 
     async def _run() -> int:
         uow = create_media_uow(get_session_factory())
-        storage = LocalFilesystemMediaStorage(settings.media_storage_path)
+        storage = LocalFilesystemMediaStorage(settings.storage_path)
         use_case = RegenerateThumbnails(
             uow, get_access_guard(), storage, PillowImageProcessor()
         )

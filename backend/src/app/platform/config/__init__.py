@@ -25,8 +25,12 @@ INSTANCE_SETTINGS = (
     get_scheduler_settings,
 )
 
+# Settings classes searched for tunable and public fields.
+SETTING_GROUPS = (BackupSettings, SchedulerSettings)
+
 __all__ = [
     "INSTANCE_SETTINGS",
+    "SETTING_GROUPS",
     "ApiSettings",
     "BackupSettings",
     "DatabaseSettings",

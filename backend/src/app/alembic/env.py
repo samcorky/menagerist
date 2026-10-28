@@ -25,7 +25,7 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", str(get_database_settings().database_url))
+config.set_main_option("sqlalchemy.url", str(get_database_settings().url))
 
 # `graph_models`/`media_models` above register their tables on `Base.metadata`
 # before autogenerate runs - every future module's persistence models get the
