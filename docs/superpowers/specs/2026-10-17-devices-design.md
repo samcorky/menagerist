@@ -43,7 +43,7 @@ What is missing:
 | D2 | The API returns the raw user agent plus the Client Hints captured at sign-in. The frontend derives the label ("Firefox on Linux") with `bowser`. | No parsing dependency in the backend image. |
 | D11 | Use `bowser` (MIT) for user agent parsing. Do not use `ua-parser-js`: its 2.x releases are AGPL-3.0-or-later, which does not fit Menagerist's Apache 2.0 licence, and its MIT 1.x line is the superseded branch. | Licence compatibility. |
 | D12 | Capture the low-entropy Client Hints `Sec-CH-UA-Platform` and `Sec-CH-UA-Mobile` at sign-in, and prefer them over the user agent for the system and phone-or-desktop part of the label. Browsers that send none (Firefox, Safari) fall back to the user agent. | Chromium freezes the user agent's OS details; the hints are the accurate source. They are sent by default over HTTPS and on localhost, so no `Accept-CH` opt-in is needed. |
-| D3 | A device is "active" when it is neither expired nor idle (`Session.is_expired` / `is_idle`, using `MENAGERIST_SESSION_IDLE_HOURS`). | Matches what `GetCurrentUser` accepts. |
+| D3 | A device is "active" when it is neither expired nor idle (`Session.is_expired` / `is_idle`, using `MENAGERIST_IDENTITY_SESSION_IDLE_HOURS`). | Matches what `GetCurrentUser` accepts. |
 | D4 | Responses expose the session row id only. Never the token or its hash. | The row id cannot authenticate (README, "Request log context"). |
 | D5 | Ending your own current device through the devices API is refused with 409. Use sign-out. The same applies to administrators ending their own current device. | Sign-out also clears cookies; one path for that. |
 | D6 | Ending another person's device as a non-administrator, or an unknown id, is 404. | Existence must not leak ("Access scope"). |
@@ -209,6 +209,6 @@ Steps 1 to 5 are the backend and can ship before the frontend. Nothing is commit
 
 - **Move of `/settings/users`:** bookmarks break by design (no redirects). All in-repo references are listed in 5.1; a grep for `settings/users` must come back empty.
 - **Client Hints coverage:** only Chromium browsers send them, and only over HTTPS or on localhost. Elsewhere the label comes from the user agent alone. A proxy that strips `Sec-CH-*` headers has the same effect.
-- **Reverse proxies:** `client_ip` is only meaningful with `MENAGERIST_TRUSTED_PROXIES` set correctly; the UI should treat it as informational.
+- **Reverse proxies:** `client_ip` is only meaningful with `MENAGERIST_API_TRUSTED_PROXIES` set correctly; the UI should treat it as informational.
 - **Old sessions:** pre-existing rows have no device info and show "Unknown device" until they expire.
 - **Lock-out:** D5 stops administrators ending their own current device by accident; they can still end their other devices.

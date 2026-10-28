@@ -1,8 +1,8 @@
 # Scheduler: background jobs for backups, update checks, purging and expiry: plan
 
-Status: proposal, nothing implemented. Rewritten 2026-10-23 after reading the repo (branch `feature/initial-implementation`, commit a6cb581), replacing the 2026-10-22 version. It folds in the answers Sam gave on 2026-10-22 (decisions list) and corrects several things the earlier version got wrong (see "What the repo changed").
+Status (2026-10-28): Phases 0-3 are implemented (queue, worker, `job` CLI, readiness check, scheduled backups); Phases 4-6 are not. Permissions are `scheduling:job:read` and `scheduling:job:run`. Rewritten 2026-10-23 after reading the repo (branch `feature/initial-implementation`, commit a6cb581), replacing the 2026-10-22 version. It folds in the answers Sam gave on 2026-10-22 (decisions list) and corrects several things the earlier version got wrong (see "What the repo changed").
 
-This document includes the code sketches (Appendix A) and the event and outbox candidate catalogue (Appendix B) that used to be separate files. Related: `settings-and-config-plan.md` (where schedules and other tunables come from; the scheduler only sees `ScheduleSource`).
+This document includes the code sketches (Appendix A) and the event and outbox candidate catalogue (Appendix B) that used to be separate files. Related: `2026-10-25-settings-and-config.md` (where schedules and other tunables come from; the scheduler only sees `ScheduleSource`).
 
 Working rules (`AGENTS.md`, `CLAUDE.md`): never create, stage or push commits (ask Sam to commit); British English; `.svelte` files go through `svelte-file-editor`; run only relevant `poe` checks (`lint-backend`, `typecheck-backend`, `test-backend`, `coverage` before calling backend work done); coverage floors domain/application/shared_kernel 100%, adapters 80%, platform 70%; every port has an in-memory sibling; dependencies only when strictly necessary, checked against `.github/renovate.json` and image size; no abstractions beyond the task; do not create docs unless asked.
 
@@ -71,7 +71,7 @@ Placement: the value types (`JobDefinition`, `Lane`, `Overlap`, `MissedRun`) liv
 ### Ports (application layer; each has an in-memory sibling)
 - `JobRunQueue` (driven): `enqueue(run)` idempotent on run id; `claim(lanes, worker_id)` returns the next queued run; `heartbeat(run_id)`; `finish(run_id, outcome)`; `reap_abandoned(older_than)`. Keyed by `job_key` string.
 - `JobRunReader` (query side): last run, history, next planned run per job, worker liveness.
-- `ScheduleSource` (driven): `schedule_for(job_key) -> str | None`, the one question the scheduler asks. Where the answer comes from (deployment env, admin UI, per-user overrides) is `settings-and-config-plan.md`'s business, not the scheduler's; its Phase F wires `ScheduleSource` to `SettingsReader`. Until that plan exists the adapter reads the module's env settings (for example `BackupSettings.schedule`), and the adapter is the only thing that changes when layered settings arrive.
+- `ScheduleSource` (driven): `schedule_for(job_key) -> str | None`, the one question the scheduler asks. Where the answer comes from (deployment env, admin UI, per-user overrides) is `2026-10-25-settings-and-config.md`'s business, not the scheduler's; its Phase F wires `ScheduleSource` to `SettingsReader`. Until that plan exists the adapter reads the module's env settings (for example `BackupSettings.schedule`), and the adapter is the only thing that changes when layered settings arrive.
 - `JobRunRecorder`: started, succeeded, failed, skipped, abandoned. In the in-house adapter it writes the same row the queue uses; with another engine it writes our `job_runs` table so history never depends on engine tables.
 - **Not ports:** the worker loop (driving adapter under `adapters/cli`), the registry (inbound), any clock.
 
@@ -100,7 +100,7 @@ class SchedulerSettings(MenageristBaseSettings):
         validation_alias=AliasChoices("TZ", "MENAGERIST_TIMEZONE"),
     )
     run_history_per_job: int = Field(
-        default=100, ge=1, validation_alias="MENAGERIST_RUN_HISTORY_PER_JOB"
+        default=100, ge=1, validation_alias="MENAGERIST_SCHEDULER_RUN_HISTORY_PER_JOB"
     )
 ```
 
@@ -156,9 +156,9 @@ Rules that keep the later stages cheap: use cases enqueue through `JobRunQueue` 
 
 **Phase 5: housekeeping jobs.** `media.cleanup` (with batching), session and API-token purge, and the optional purge jobs (off by default). Decide on removing the sign-in sweep.
 
-**Phase 6: run now, history and status UI.** Routes under the system router (`/api/v1/system/jobs`, `.../runs`, `POST .../run` returning 202 with the run id), permissions (`system:job:read`, `system:job:run`, admin-only, not token-grantable except via the Admin preset), generated client, admin page (via `svelte-file-editor`).
+**Phase 6: run now, history and status UI.** Routes under the system router (`/api/v1/system/jobs`, `.../runs`, `POST .../run` returning 202 with the run id), permissions (`scheduling:job:read`, `scheduling:job:run`, admin-only, not token-grantable except via the Admin preset), generated client, admin page (via `svelte-file-editor`).
 
-**Later.** Admin-editable schedules, via `settings-and-config-plan.md` Phase F (only the `ScheduleSource` adapter changes); a second engine adapter if ever wanted; event stages 1-4 as triggered.
+**Later.** Admin-editable schedules, via `2026-10-25-settings-and-config.md` Phase F (only the `ScheduleSource` adapter changes); a second engine adapter if ever wanted; event stages 1-4 as triggered.
 
 ## Risks
 
@@ -172,7 +172,7 @@ Rules that keep the later stages cheap: use cases enqueue through `JobRunQueue` 
 
 ## Still open for Sam
 
-0. Layered settings now have their own plan (`settings-and-config-plan.md`). The scheduler only needs `ScheduleSource` from it; schedules tunable in the UI arrive with that plan's Phase F.
+0. Layered settings now have their own plan (`2026-10-25-settings-and-config.md`). The scheduler only needs `ScheduleSource` from it; schedules tunable in the UI arrive with that plan's Phase F.
 
 1. Engine: in-house asyncpg adapter (recommended) or Procrastinate; and confirm Option B (tick-driven).
 2. Timezone fallback order (`TZ`, `MENAGERIST_TIMEZONE`, UTC) and the default history of 100 runs per job.
@@ -189,7 +189,7 @@ Sketches only except section 3 (cron logic), which is tested: 10 pytest cases in
 ```
 env: TZ, MENAGERIST_BACKUP_SCHEDULE, ...
   -> settings groups (SchedulerSettings, BackupSettings)
-  -> SettingsReader / ScheduleSource  (settings-and-config-plan.md Phase F; env pin > admin value > code default)
+  -> SettingsReader / ScheduleSource  (2026-10-25-settings-and-config.md Phase F; env pin > admin value > code default)
   -> worker (driving adapter, tick every 60 s)
        -> for each scheduled job: schedule_for(job_key) -> due_fire(...) -> queue.enqueue(run)   [idempotent on run id]
        -> claim(lanes) -> execute wrapper -> use case as SYSTEM_ACTOR -> recorder
@@ -442,9 +442,9 @@ class SchedulerSettings(MenageristBaseSettings):
     timezone: ZoneInfo = Field(default_factory=lambda: ZoneInfo("UTC"),
                                validation_alias=AliasChoices("TZ", "MENAGERIST_TIMEZONE"))
     run_history_per_job: Annotated[int, Tunable()] = Field(
-        default=100, ge=1, title="Run history per job", validation_alias="MENAGERIST_RUN_HISTORY_PER_JOB")
+        default=100, ge=1, title="Run history per job", validation_alias="MENAGERIST_SCHEDULER_RUN_HISTORY_PER_JOB")
 
-# platform/config/backup.py  (existing group; one new field, annotation from settings-and-config-plan.md)
+# platform/config/backup.py  (existing group; one new field, annotation from 2026-10-25-settings-and-config.md)
     schedule: Annotated[CronSchedule, Tunable()] = Field(
         default="0 3 * * *", title="Backup schedule", validation_alias="MENAGERIST_BACKUP_SCHEDULE")
 ```
@@ -458,7 +458,7 @@ class SettingsScheduleSource:
     async def schedule_for(self, schedule_key: str) -> str | None:
         return self._values[schedule_key] or None
 
-# Phase F of settings-and-config-plan.md: same port, backed by SettingsReader (env pin > admin value > default)
+# Phase F of 2026-10-25-settings-and-config.md: same port, backed by SettingsReader (env pin > admin value > default)
 class ReaderScheduleSource:
     def __init__(self, reader: SettingsReader) -> None: self._reader = reader
     async def schedule_for(self, schedule_key: str) -> str | None:

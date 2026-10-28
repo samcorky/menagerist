@@ -48,7 +48,7 @@ In the UI and API docs, say "scopes" (industry word); in code, say `grants`, bec
 ## Decisions to confirm
 
 - **D1** (recommended): permissions are the single primitive; token grants and roles are both sets of permissions. Needs Sam's confirmation.
-- **D2:** do the access model refactor (`access-model-refactor-plan.md`) before content permissions and tokens.
+- **D2:** do the access model refactor (`2026-10-20-access-model-refactor.md`) before content permissions and tokens.
 - **D3:** staged delivery, below.
 
 ## Phases (each shippable on its own; stop at the checkpoints)

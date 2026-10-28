@@ -2,7 +2,7 @@
 
 # Part 1: layered settings (deployment, instance and user)
 
-Status: proposal, nothing implemented. Written 2026-10-23 from a design discussion with Sam. This document also contains the earlier settings handoff plan (startup logging, route restructure, public config) as Part 2; its old Phase 4 "settings module" is replaced by Part 1. The scheduler plan (`scheduler-plan.md` (the scheduler document)) is the first consumer, through its `ScheduleSource` port.
+Status (2026-10-28): Part 2 prerequisite Phase 1 (source tracking, `INSTANCE_SETTINGS`, startup logging) and Phase 2 (route restructure) are implemented, and the scheduler's Phases 0-3 are implemented (its `ScheduleSource` adapter, `SettingsScheduleSource`, still reads a snapshot of the env settings). Part 1 Phase B (markers and discovery) is implemented; Phases C-G (frontend core, settings module, form, wiring, user scope) are a proposal. Written 2026-10-23 from a design discussion with Sam. This document also contains the earlier settings handoff plan (startup logging, route restructure, public config) as Part 2; its old Phase 4 "settings module" is replaced by Part 1. The scheduler plan (`2026-10-25-scheduler.md`) is the first consumer, through its `ScheduleSource` port.
 
 Facts about the repo come from reading `platform/config/*` (`MenageristBaseSettings`: `env_prefix="MENAGERIST_"`, frozen, `validate_default`; `BackupSettings` with full-name `validation_alias`es; the `INSTANCE_SETTINGS` tuple of cached getters), `shared_kernel/access.py` and the frontend field-type registry (`frontend/src/lib/field-types/registry.ts`, `schema-meta.ts`, `schema-types.ts`). Not read in detail: the frontend settings routes, the query builder's use of the registry, and the number of registry call sites. Phase C counts them first.
 
@@ -64,7 +64,7 @@ Effective value, highest first: env pin, user row, instance row, code default. B
   The adapter resolves a key as: pinned by the deployment (`is_pinned`, from the tracked settings) returns the env value; else an instance row, validated on read; else the field default. A stored value that no longer validates falls back to the default and logs which key was invalid. Demo results for `keep_last`: nothing set returns 7; admin saved 12 returns 12; stored 0 (violates `ge=1`) returns 7 with a log line; `MENAGERIST_BACKUP_KEEP_LAST=30` returns 30 even when a row says 12.
   - **Constraint-loss trap:** `TypeAdapter(field.annotation)` drops `Field(ge=1)` and similar, so a bad stored value passes. Validate with `TypeAdapter(Annotated[(field.annotation, *field.metadata)])`. Keep a test for a stored value that violates a constraint.
   - Boot-only settings keep using the `get_*_settings()` getters and never go through the reader. An operation that reads several settings reads once and passes a small snapshot; the reader's short cache covers the rest. The adapter holds the group instances (for pins) and the repository (for rows), so use cases only see the port.
-- **Audit:** every write records `updated_by` and `updated_at` and emits a structured log event. A durable audit trail waits for the events work in `scheduler-plan.md` (the scheduler document) (stage 2).
+- **Audit:** every write records `updated_by` and `updated_at` and emits a structured log event. A durable audit trail waits for the events work in `2026-10-25-scheduler.md` (stage 2).
 
 ### API (indicative; the route restructure is done, so mount under the new `/api/v1/system` layout)
 - `GET /api/v1/settings/instance`: for each tunable, `{key, group, scope, value, source, locked, env_name?, restart_required, schema}`. The schema carries `x-menagerist` hints only; state (`source`, `locked`, value) is computed server-side and kept out of it.
@@ -106,7 +106,7 @@ Steps, each behaviour-neutral with existing tests green:
 
 **Phase A: prerequisite (Part 2, prerequisite Phase 1).** Source tracking (`source_map`), `INSTANCE_SETTINGS` logging, secret masking. Needed to know what is pinned.
 
-**Phase B: markers and discovery (backend).** `UIMeta`, `Tunable`, `Public`, the reusable aliases, group registration, descriptor building, registration tests (flat primitives only, no secrets, kinds in `field-kinds.json`). Annotate the first fields: `BackupSettings.schedule`, `keep_last`, `user_export_ttl_hours`; add `SchedulerSettings.run_history_per_job`. No behaviour change yet.
+**Phase B: markers and discovery (backend). DONE 2026-10-28.** Deviations: the markers live in `platform/config/_markers.py` (an architecture test keeps `shared_kernel` free of framework imports); a field is flat when its generated JSON Schema is one scalar or a list of strings, so `ZoneInfo` qualifies; the frontend test for `field-kinds.json` moves to Phase E with the `cron` kind. Discovery is `platform/config/_discovery.py` (`discover`, `SettingSpec`, `SETTING_GROUPS`). Env naming (B.1): `MenageristBaseSettings` owns the `MENAGERIST_` prefix; a subclass declared with `group="backup"` reads `MENAGERIST_BACKUP_<FIELD>` and is keyed `backup.<field>`, so fields need no `validation_alias` (only `TZ`/`MENAGERIST_TIMEZONE` keeps one). Every settings class now has a group (`api`, `backup`, `database`, `identity`, `log`, `media`, `retention`, `scheduler`) and the variables were renamed to match. `UIMeta`, `Tunable`, `Public`, the reusable aliases, group registration, descriptor building, registration tests (flat primitives only, no secrets, kinds in `field-kinds.json`). Annotate the first fields: `BackupSettings.schedule`, `keep_last`, `user_export_ttl_hours`; add `SchedulerSettings.run_history_per_job`. No behaviour change yet.
 
 **Phase C: frontend core extraction.** Steps 1-3 above, plus `field-kinds.json` and its two tests. Independent of A and B and worth doing even if the settings UI slips.
 
@@ -141,6 +141,11 @@ Steps, each behaviour-neutral with existing tests green:
 4. Which settings beyond the first four should be tunable (session TTLs, upload limit, update-check switch)? Several overlap with public config.
 5. User settings first picks, and the user-deletion mechanism (Part 2 Q9).
 6. Does the admin page live under Settings with the existing admin sections, and what is it called in the UI?
+7. Where do `SettingsReader` and `SettingKey` live? Other modules' use cases must read settings and modules do not import each other, so the port belongs in `shared_kernel` (implementation in `modules/settings`, wired in the composition root).
+8. Scope rule: each key has exactly one scope, so the chain is env pin, DB row, default. Confirm, and drop "user row above instance row".
+9. Partial `PATCH` validates the patch merged into the group's current effective values, so model-level validators run.
+10. Policy for `updated_by` on user deletion, and whether `setting_value` is included in backups and restores.
+11. Permission name: follow the `scheduling:job:*` convention (for example `settings:instance:write`), and settle the route prefix (`/api/v1/settings/...` versus under `/api/v1/system`).
 
 ## Order across both documents
 
@@ -150,7 +155,7 @@ Steps, each behaviour-neutral with existing tests green:
 4. Phase C of this plan (frontend field-type extraction) any time; Phases B, D and E after Part 2 Phase 1.
 5. Scheduler Phases 4-6 and Phase F of this plan once the pieces exist.
 
-Other plans: `access-model-refactor-plan.md` (its Q4 is answered by the existing `System` stance) and `api-tokens-and-permissions-plan.md` (expired-token purge is a scheduler job; the admin permissions for jobs and settings join its catalogue).
+Other plans: `2026-10-20-access-model-refactor.md` (its Q4 is answered by the existing `System` stance) and `2026-10-20-api-tokens-and-permissions.md` (expired-token purge is a scheduler job; the admin permissions for jobs and settings join its catalogue).
 
 # Part 2: prerequisites (from the earlier settings handoff plan)
 
@@ -167,7 +172,7 @@ Startup logging of deployment config, the system route restructure and public co
 
 ## Findings that shape the plan
 
-1. **CSRF cookie name mismatch: superseded.** The backend default was `menagerist-csrf` and the frontend used `menagerist_csrf`, so signed-in unsafe requests got `csrf_failed`. `csrf-header-protection-plan.md` (PR 1) removes the CSRF cookie, header and `csrf_cookie_name` setting, so there is nothing left to align or to publish through public config. Do not add a CSRF field to public config.
+1. **CSRF cookie name mismatch: superseded.** The backend default was `menagerist-csrf` and the frontend used `menagerist_csrf`, so signed-in unsafe requests got `csrf_failed`. `2026-10-20-csrf-origin-protection.md` (PR 1) removes the CSRF cookie, header and `csrf_cookie_name` setting, so there is nothing left to align or to publish through public config. Do not add a CSRF field to public config.
 2. **`DatabaseSettings.database_url` is a `PostgresDsn` whose default contains a password.** Logging the group as is would leak it. `SecretStr` would break call sites that use it as a URL.
 3. **Route mounting today** (`entrypoints/api/__init__.py`): `/api` holds `system_router` (health, version) and `docs_router` unversioned; `api_v1_router` (`/api/v1`) is authenticated; `public_v1_router` (`/api/v1`) is unauthenticated and holds only `public_auth_router`. `/health` is used by the Docker `HEALTHCHECK`; `/health/ready` and `/health/ready/detail` are used by `frontend/src/lib/status.ts`.
 4. `MenageristBaseSettings` is `frozen=True, validate_default=True` with `env_prefix="MENAGERIST_"`. `BackupSettings` uses full-name `validation_alias`es, so any tracking must translate aliases back to field names.

@@ -210,7 +210,7 @@ def session_cookie_value(request: Request, name: str) -> str | None:
 ```
 
 - `clear_session_cookies` uses `session_cookie_name`; the readers (`dependencies.get_session_token`, `entrypoints/api/shared/http/csrf.py`) call `session_cookie_value(request, session_cookie_name(request, settings))`.
-- The name follows the same `_secure()` detection as the `Secure` flag: behind a TLS proxy it needs `MENAGERIST_TRUSTED_PROXIES` (or `MENAGERIST_COOKIE_SECURE=true`) so the app sees HTTPS; otherwise it stays plain, as today.
+- The name follows the same `_secure()` detection as the `Secure` flag: behind a TLS proxy it needs `MENAGERIST_API_TRUSTED_PROXIES` (or `MENAGERIST_IDENTITY_COOKIE_SECURE=true`) so the app sees HTTPS; otherwise it stays plain, as today.
 - `APIKeyCookie(name=settings.cookie_name)` in `permission_aware_route.py` only feeds the OpenAPI document and can keep the plain name (mention the prefix in the docs text).
 - A disguised or duplicate cookie means "no session": a tossed cookie can log someone out (cookie tossing can always do that) but cannot give the attacker a session.
 - Someone switching between HTTP and HTTPS has to sign in again.
@@ -223,7 +223,7 @@ def session_cookie_value(request: Request, name: str) -> str | None:
 
 Today there are only Chromium projects over plain HTTP, so none of this would run. Layout:
 
-- **New backend and database.** A `cookies` backend (own database, e.g. `menagerist_cookies`) started with `MENAGERIST_COOKIE_SECURE=true`, fronted by a small dependency-free TLS proxy (a Node script using `node:https` and `node:http`, self-signed certificate generated at start-up) added to `webServer`; projects use `ignoreHTTPSErrors: true`. The backend is also reachable over plain HTTP on its own port for the HTTP-fallback test. `auth.spec.ts` stays Chromium-only on its existing serial `auth` project: it shares the empty auth database, so adding engines there would collide.
+- **New backend and database.** A `cookies` backend (own database, e.g. `menagerist_cookies`) started with `MENAGERIST_IDENTITY_COOKIE_SECURE=true`, fronted by a small dependency-free TLS proxy (a Node script using `node:https` and `node:http`, self-signed certificate generated at start-up) added to `webServer`; projects use `ignoreHTTPSErrors: true`. The backend is also reachable over plain HTTP on its own port for the HTTP-fallback test. `auth.spec.ts` stays Chromium-only on its existing serial `auth` project: it shares the empty auth database, so adding engines there would collide.
 - **Projects.** A `cookies-setup` project (`cookies.setup.ts`) creates the first admin once. Three projects depend on it and run `cookies.spec.ts` only: `cookies-chromium`, `cookies-webkit` (`devices['Desktop Safari']`) and `cookies-firefox` (`devices['Desktop Firefox']`). Each engine creates its own user through the admin API with the project name in the username (the existing `createUserViaApi` helper), so the three run concurrently on the shared backend and in parallel with the rest of the suite.
 - **CI.** Install with `npx playwright install --with-deps webkit firefox` and cache `~/.cache/ms-playwright`.
 - **Tests in `cookies.spec.ts`** (all three engines unless noted):
@@ -287,7 +287,7 @@ fastapi_app.add_middleware(
 - **`Authorization` is not allowed yet.** Add it in the PR that introduces API tokens.
 - `refuse_cross_site` (the public sign-in and setup routes) is unaffected: it still ignores `*` and uses listed origins as its allowlist.
 
-### Warning when `MENAGERIST_CORS_ORIGINS` contains `*`
+### Warning when `MENAGERIST_API_CORS_ORIGINS` contains `*`
 
 `*` is safe with credentials off, so the wording is "any website can call the API without cookies", not "vulnerable". Both patterns from "What the code does today", item 11:
 
@@ -298,7 +298,7 @@ The runtime `ProxySignal` mechanism is not used: it records things observed on r
 
 One constant holds the text so the log line and the check output match (e.g. `CORS_OPEN_HINT` under `platform/`, beside `ApiSettings`):
 
-> CORS allows any origin: any website can call this API from a visitor's browser, without their cookies. Set MENAGERIST_CORS_ORIGINS to the origins that need it, or leave it empty for same-origin only.
+> CORS allows any origin: any website can call this API from a visitor's browser, without their cookies. Set MENAGERIST_API_CORS_ORIGINS to the origins that need it, or leave it empty for same-origin only.
 
 ### Tests
 
@@ -320,7 +320,7 @@ If a reverse proxy strips `Origin` and `Sec-Fetch-Site`, every sign-in and chang
 
 ### Shape (same layering as the other system use cases)
 
-- **Domain** (`modules/system/domain/browser_check.py`). Frozen `BrowserRequest(sec_fetch_site, origin, seen_origin)` of plain strings (no Starlette types) and `BrowserCheckResult(status: CheckStatus, sec_fetch_site, origin, seen_origin, output)`. A pure function `assess(request) -> BrowserCheckResult`: `pass` when `Sec-Fetch-Site` is `same-origin`, or `Origin` equals `seen_origin`; `warn` when `Sec-Fetch-Site` is `same-origin` but `Origin` is absent or differs (host or scheme is changed on the way in; `MENAGERIST_TRUSTED_PROXIES` and the proxy's `Host`); `warn` when only `Origin` arrived (plain HTTP to a non-localhost host, where browsers send no `Sec-Fetch-*`; the check still works). `output` is the human hint, set only on `warn`. Neither header present never reaches it: `verify_csrf` refuses first, which is the failure the check exists to expose.
+- **Domain** (`modules/system/domain/browser_check.py`). Frozen `BrowserRequest(sec_fetch_site, origin, seen_origin)` of plain strings (no Starlette types) and `BrowserCheckResult(status: CheckStatus, sec_fetch_site, origin, seen_origin, output)`. A pure function `assess(request) -> BrowserCheckResult`: `pass` when `Sec-Fetch-Site` is `same-origin`, or `Origin` equals `seen_origin`; `warn` when `Sec-Fetch-Site` is `same-origin` but `Origin` is absent or differs (host or scheme is changed on the way in; `MENAGERIST_API_TRUSTED_PROXIES` and the proxy's `Host`); `warn` when only `Origin` arrived (plain HTTP to a non-localhost host, where browsers send no `Sec-Fetch-*`; the check still works). `output` is the human hint, set only on `warn`. Neither header present never reaches it: `verify_csrf` refuses first, which is the failure the check exists to expose.
 - **Application** (`modules/system/application/run_browser_check.py`). `RunBrowserCheckQuery(request: BrowserRequest)` and `RunBrowserCheck`, an `AuthorisedUseCase` needing `SystemPermission.READ_DIAGNOSTICS` (no new permission). It has no port: it only calls `assess`, so there is nothing to put behind an interface and no in-memory sibling to add. It is a query (no commit), though the route is `POST`.
 - **Adapters/API** (`modules/system/adapters/api/router.py`, `dependencies.py`). `POST /api/browser-check`, `operation_id="run_browser_check"`, `Cache-Control: no-store`. The router builds `BrowserRequest` from the headers and `own_origin(request)` (the header reading is HTTP, so it belongs here, as `verify_csrf` does today) and maps the result to a `BrowserCheckResponse` Pydantic model. No `try/except`; `403` documented with `error_response(ForbiddenError, ...)`, covering both the permission and the CSRF refusal. Wired like `get_get_version_detail_use_case`.
 - **POST on purpose.** `verify_csrf` ignores safe methods, so a `GET` would pass even with the headers stripped and prove nothing. Because the route is unsafe, a stripped request is refused by the existing dependency with `csrf_failed` and never reaches the use case.
