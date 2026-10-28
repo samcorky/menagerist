@@ -105,4 +105,4 @@ A second Playwright project, `mobile` (Pixel 5 emulation at 360x740, touch enabl
 npm run build
 ```
 
-Output goes to `build/`. In production this is copied into the `menagerist` image by the root `Dockerfile` and served by the backend process itself (`MENAGERIST_FRONTEND_DIST_PATH`).
+Output goes to `build/`. In production this is copied into the `menagerist` image by the root `Dockerfile` and served by the backend process itself (`MENAGERIST_API_FRONTEND_DIST_PATH`).

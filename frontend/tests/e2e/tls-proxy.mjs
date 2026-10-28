@@ -5,7 +5,7 @@
 // It serves HTTPS on <listen-port> with a self-signed certificate made at start-up (needs the
 // `openssl` command) and forwards to http://127.0.0.1:<target-port>, passing the browser's
 // headers through and adding X-Forwarded-For and X-Forwarded-Proto: https. The backend must list 127.0.0.1 in
-// MENAGERIST_TRUSTED_PROXIES so it sees the HTTPS request, as behind a real proxy.
+// MENAGERIST_API_TRUSTED_PROXIES so it sees the HTTPS request, as behind a real proxy.
 // With --strip-browser-headers it also removes Origin and Sec-Fetch-*, as a badly configured
 // proxy would, so the browser check on the status page can be shown to notice it.
 import { execFileSync } from 'node:child_process';

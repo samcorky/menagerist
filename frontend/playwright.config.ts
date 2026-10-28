@@ -39,7 +39,7 @@ function backend(port: number, name: string, extraEnv: Record<string, string> = 
 		cwd: '..',
 		env: {
 			MENAGERIST_DATABASE_URL: `postgresql+asyncpg://menagerist:menagerist@localhost:55433/menagerist_${name}`,
-			MENAGERIST_FRONTEND_DIST_PATH: FRONTEND_DIST,
+			MENAGERIST_API_FRONTEND_DIST_PATH: FRONTEND_DIST,
 			// Example covers are stored as media, so each backend needs a writable directory.
 			MENAGERIST_MEDIA_STORAGE_PATH: join(tmpdir(), `menagerist-e2e-media-${name}`),
 			MENAGERIST_BACKUP_PATH: backupPath,
@@ -56,7 +56,7 @@ function backend(port: number, name: string, extraEnv: Record<string, string> = 
 // the proxy's address makes the app see the proxied requests as HTTPS, so one backend issues
 // both the `__Host-Http-` and the plain cookie name.
 const cookieServers = [
-	backend(COOKIES_BACKEND_PORT, 'cookies', { MENAGERIST_TRUSTED_PROXIES: '127.0.0.1' }),
+	backend(COOKIES_BACKEND_PORT, 'cookies', { MENAGERIST_API_TRUSTED_PROXIES: '127.0.0.1' }),
 	{
 		command: `node tests/e2e/tls-proxy.mjs ${COOKIES_TLS_PORT} ${COOKIES_BACKEND_PORT}`,
 		url: `https://localhost:${COOKIES_TLS_PORT}/api/health/ready`,

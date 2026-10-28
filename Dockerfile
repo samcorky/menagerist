@@ -200,7 +200,7 @@ ENV \
     PATH="/opt/python/bin:/app/.venv/bin" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    MENAGERIST_FRONTEND_DIST_PATH=/app/frontend \
+    MENAGERIST_API_FRONTEND_DIST_PATH=/app/frontend \
     MENAGERIST_SHARED_DIR=/app/shared
 
 COPY --from=backend-builder /opt/python /opt/python

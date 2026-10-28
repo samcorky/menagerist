@@ -74,7 +74,7 @@ services:
       TZ: ${TZ:-UTC}
       MENAGERIST_DATABASE_URL: postgresql+asyncpg://menagerist:menagerist@postgres:5432/menagerist
       # Behind a reverse proxy, set its subnet to preserve client IPs and allow HTTPS sign-in.
-      # MENAGERIST_TRUSTED_PROXIES: 172.18.0.0/16
+      # MENAGERIST_API_TRUSTED_PROXIES: 172.18.0.0/16
     volumes: &app-volumes
       # The backups bind mount must be owned by uid/gid 1000.
       - media-data:/data/media
