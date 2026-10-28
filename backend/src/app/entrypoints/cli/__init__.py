@@ -11,9 +11,9 @@ import structlog
 from cyclopts import App, Parameter
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
+from app.entrypoints.api.shared.backup_operations import create_backup
 from app.entrypoints.api.shared.settings_reader import get_settings_reader
 from app.entrypoints.cli.backups import (
-    create_backup,
     export_user_data,
     import_user_data,
     restore_backup,

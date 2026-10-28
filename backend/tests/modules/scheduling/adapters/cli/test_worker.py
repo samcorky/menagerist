@@ -9,7 +9,7 @@ import pytest
 from structlog.testing import capture_logs
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
-from app.modules.scheduling.adapters.cli.catalogue import JobBinding, JobCatalogue
+from app.modules.scheduling.adapters.cli.catalogue import JobCatalogue
 from app.modules.scheduling.adapters.cli.execution import JobExecutor
 from app.modules.scheduling.adapters.cli.worker import Worker
 from app.modules.scheduling.adapters.persistence.in_memory_store import (
@@ -40,7 +40,7 @@ from app.modules.scheduling.application.tick_schedules import TickSchedules
 from app.modules.scheduling.domain.errors import DuplicateJobError, UnknownJobError
 from app.modules.scheduling.domain.job_run import JobRun, RunStatus
 from app.shared_kernel.actor import SYSTEM_ACTOR
-from app.shared_kernel.jobs import JobDefinition, Lane, Overlap
+from app.shared_kernel.jobs import JobBinding, JobDefinition, Lane, Overlap
 
 if TYPE_CHECKING:
     from collections.abc import Callable

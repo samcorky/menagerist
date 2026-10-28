@@ -2,9 +2,8 @@
 
 from typing import TYPE_CHECKING
 
-from app.modules.scheduling.adapters.cli.catalogue import JobBinding
 from app.modules.scheduling.application.prune_job_runs import PruneJobRunsCommand
-from app.shared_kernel.jobs import JobDefinition
+from app.shared_kernel.jobs import JobBinding, JobDefinition
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -29,6 +28,8 @@ def prune_runs_job(
             job_key="scheduling.prune_runs",
             schedule_key="scheduling.prune_schedule",
             needs_setup_complete=False,
+            title="Tidy task history",
+            description="Forgets the oldest results so this list stays short.",
         ),
         handler=handler,
     )

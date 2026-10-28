@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from app.entrypoints.cli import backup_jobs
+from app.modules.backup.adapters.scheduling import jobs as backup_jobs
 from app.modules.settings.domain.setting import SettingScope, StoredSetting
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.jobs import Lane, MissedRun, Overlap
@@ -13,10 +13,10 @@ from app.shared_kernel.jobs import Lane, MissedRun, Overlap
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from app.modules.scheduling.adapters.cli.catalogue import JobBinding
     from app.modules.settings.adapters.persistence.in_memory_setting_value_repository import (  # noqa: E501
         InMemorySettingValueRepository,
     )
+    from app.shared_kernel.jobs import JobBinding
 
 
 def _bindings(calls: list[str]) -> dict[str, JobBinding]:
@@ -111,7 +111,7 @@ async def test_empty_environment_value_stops_the_job_ever_being_enqueued(
     from datetime import UTC, datetime, timedelta
 
     from app.entrypoints.api.shared.access_guard import get_access_guard
-    from app.entrypoints.cli.scheduling import build_schedule_source
+    from app.entrypoints.api.shared.job_catalogue import build_schedule_source
     from app.modules.scheduling.adapters.cli.catalogue import JobCatalogue
     from app.modules.scheduling.adapters.persistence.in_memory_store import (
         InMemorySchedulingStore,

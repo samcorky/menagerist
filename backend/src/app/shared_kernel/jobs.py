@@ -1,9 +1,11 @@
 """Portable job metadata contributed by each owning module."""
 
-from dataclasses import dataclass
+from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import StrEnum
 
+from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ValidationError
 
 
@@ -41,6 +43,9 @@ class JobDefinition:
     schedule_key: str | None = None
     run_now_allowed: bool = True
     needs_setup_complete: bool = True
+    # Plain-language copy for administrators; the job key is for developers.
+    title: str = ""
+    description: str = ""
 
     def __post_init__(self) -> None:
         """Reject unusable keys and catch-up windows."""
@@ -48,3 +53,27 @@ class JobDefinition:
             raise ValidationError("A job key is required")
         if self.max_lateness < timedelta():
             raise ValidationError("Maximum lateness cannot be negative")
+
+
+type JobHandler = Callable[[Actor], Awaitable[None]]
+
+
+@dataclass(frozen=True, kw_only=True)
+class JobBinding:
+    """A module-contributed handler and its portable scheduling policy."""
+
+    definition: JobDefinition
+    handler: JobHandler
+
+
+@dataclass(frozen=True, kw_only=True)
+class JobContribution:
+    """What one module adds to the job catalogue and the schedule source.
+
+    Callables defer reading deployment settings until the catalogue is built.
+    """
+
+    bindings: Callable[[], list[JobBinding]]
+    schedules: Callable[[], Mapping[str, str]] = field(default=dict)
+    # Schedule keys an administrator may change; the rest stay deployment values.
+    live_schedules: frozenset[str] = frozenset()

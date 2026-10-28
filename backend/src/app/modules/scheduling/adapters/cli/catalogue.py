@@ -1,22 +1,13 @@
 """Inbound handler bindings alongside the metadata-only job registry."""
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from app.modules.scheduling.adapters.cli.execution import JobHandler
 from app.modules.scheduling.domain.registry import JobRegistry
-from app.shared_kernel.jobs import JobDefinition
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-
-@dataclass(frozen=True, kw_only=True)
-class JobBinding:
-    """A module-contributed handler and its portable scheduling policy."""
-
-    definition: JobDefinition
-    handler: JobHandler
+    from app.shared_kernel.jobs import JobBinding, JobHandler
 
 
 class JobCatalogue:

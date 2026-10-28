@@ -1,14 +1,19 @@
-"""Compose scheduled backup jobs from the backup use cases."""
+"""Scheduled backup jobs, composed from the backup use cases."""
 
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from app.entrypoints.api.shared.settings_reader import get_settings_reader
 from app.modules.backup.application.setting_keys import KEEP_LAST, USER_EXPORT_TTL_HOURS
-from app.modules.scheduling.adapters.cli.catalogue import JobBinding
 from app.platform.config.backup import get_backup_settings
 from app.platform.config.media import get_media_settings
-from app.shared_kernel.jobs import JobDefinition, Lane, MissedRun
+from app.shared_kernel.jobs import (
+    JobBinding,
+    JobContribution,
+    JobDefinition,
+    Lane,
+    MissedRun,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -33,7 +38,7 @@ def backup_schedules() -> dict[str, str]:
 
 async def create_scheduled_backup(actor: Actor) -> object:
     """Back up the shared volumes, refusing to archive a worker that lacks them."""
-    from app.entrypoints.cli.backups import create_backup
+    from app.entrypoints.api.shared.backup_operations import create_backup
 
     media_path = get_media_settings().storage_path
     if not media_path.is_dir():
@@ -108,6 +113,8 @@ def backup_job_bindings(
                 missed_run=MissedRun.RUN_ONCE,
                 max_lateness=timedelta(hours=12),
                 schedule_key="backup.schedule",
+                title="Back up everything",
+                description="Saves a full copy of your collection, keeping the newest.",
             ),
             handler=create_then_prune,
         ),
@@ -115,7 +122,18 @@ def backup_job_bindings(
             definition=JobDefinition(
                 job_key="backup.prune_exports",
                 schedule_key="backup.prune_exports_schedule",
+                title="Clear expired exports",
+                description="Removes personal exports once they have expired.",
             ),
             handler=expire_exports,
         ),
     ]
+
+
+def backup_job_contribution() -> JobContribution:
+    """The backup module's jobs, schedules and the one an administrator may change."""
+    return JobContribution(
+        bindings=backup_job_bindings,
+        schedules=backup_schedules,
+        live_schedules=LIVE_SCHEDULES,
+    )

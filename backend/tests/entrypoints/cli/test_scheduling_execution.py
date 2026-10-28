@@ -13,11 +13,14 @@ from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
+from app.entrypoints.api.shared.job_catalogue import (
+    build_catalogue,
+    build_schedule_source,
+)
 from app.entrypoints.cli import backups
 from app.entrypoints.cli.scheduling import (
     SchedulingSetupState,
     build_job_executor,
-    build_schedule_source,
     list_registered_jobs,
     run_registered_job,
 )
@@ -27,7 +30,7 @@ from app.modules.identity.adapters.persistence.user_repository import (
     SqlAlchemyUserRepository,
 )
 from app.modules.identity.domain.user import User
-from app.modules.scheduling.adapters.cli.catalogue import JobBinding, JobCatalogue
+from app.modules.scheduling.adapters.cli.catalogue import JobCatalogue
 from app.modules.scheduling.adapters.persistence.unit_of_work import (
     build_scheduling_repos,
 )
@@ -37,7 +40,7 @@ from app.modules.scheduling.adapters.platform.in_memory_schedule_source import (
 from app.modules.scheduling.domain.job_run import JobRun, RunStatus
 from app.platform.advisory_locks import BACKUP_RESTORE_LOCK_KEY
 from app.platform.config.backup import BackupSettings
-from app.shared_kernel.jobs import JobDefinition, Lane
+from app.shared_kernel.jobs import JobBinding, JobDefinition, Lane
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -147,11 +150,11 @@ async def test_registered_maintenance_prunes_through_the_real_executor(
                 )
                 await repos.queue.claim([Lane.DEFAULT], "seed", now, run_id=run.id)
                 await repos.recorder.finish(run.id, "seed", RunStatus.SUCCEEDED, now)
-        catalogue = scheduling.build_catalogue()
+        catalogue = build_catalogue()
         definition = catalogue.registry.get("scheduling.prune_runs")
         assert definition.schedule_key is not None
         assert (
-            await scheduling.build_schedule_source().schedule_for(
+            await build_schedule_source().schedule_for(
                 definition.schedule_key
             )
             == "0 4 * * *"

@@ -13,20 +13,16 @@ from uuid import uuid7
 import structlog
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.entrypoints.api.shared.settings_reader import get_settings_reader
-from app.entrypoints.cli.backup_jobs import (
-    LIVE_SCHEDULES,
-    backup_job_bindings,
-    backup_schedules,
+from app.entrypoints.api.shared.job_catalogue import (
+    build_catalogue,
+    build_schedule_source,
 )
 from app.modules.identity.adapters.persistence.unit_of_work import build_identity_repos
 from app.modules.identity.application.get_setup_status import (
     GetSetupStatus,
     GetSetupStatusQuery,
 )
-from app.modules.scheduling.adapters.cli.catalogue import JobCatalogue
 from app.modules.scheduling.adapters.cli.execution import JobExecutor
-from app.modules.scheduling.adapters.cli.jobs import prune_runs_job
 from app.modules.scheduling.adapters.cli.worker import (
     DEFAULT_ABANDON_AFTER,
     Worker,
@@ -40,9 +36,6 @@ from app.modules.scheduling.adapters.persistence.unit_of_work import (
 )
 from app.modules.scheduling.adapters.platform.cron_evaluator import (
     CronScheduleEvaluator,
-)
-from app.modules.scheduling.adapters.platform.reader_schedule_source import (
-    ReaderScheduleSource,
 )
 from app.modules.scheduling.adapters.platform.restore_guard import (
     SqlAlchemyRestoreGuard,
@@ -65,9 +58,7 @@ from app.modules.scheduling.application.maintain_worker import (
     MaintainWorker,
     MaintainWorkerCommand,
 )
-from app.modules.scheduling.application.prune_job_runs import PruneJobRuns
 from app.modules.scheduling.application.run_job_now import RunJobNow, RunJobNowCommand
-from app.modules.scheduling.application.setting_keys import RUN_HISTORY_PER_JOB
 from app.modules.scheduling.application.tick_schedules import TickSchedules
 from app.modules.scheduling.domain.job_run import RunStatus
 from app.platform.alembic_runner import code_head_revisions, db_current_revisions
@@ -82,6 +73,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+    from app.modules.scheduling.adapters.cli.catalogue import JobCatalogue
     from app.modules.scheduling.application.list_jobs import JobStatus
     from app.modules.scheduling.domain.job_run import JobRun
     from app.modules.scheduling.ports.schedule_source import ScheduleSource
@@ -183,37 +175,6 @@ def build_job_executor(
             catalogue.registry, source, CronScheduleEvaluator(), guard
         ),
         timezone=get_scheduler_settings().timezone.key,
-    )
-
-
-async def run_history_per_job() -> int:
-    """The current quota of completed runs kept per job."""
-    return await get_settings_reader().get(RUN_HISTORY_PER_JOB)
-
-
-def build_catalogue() -> JobCatalogue:
-    """Collect module job contributions at the composition root."""
-    from app.entrypoints.api.shared.access_guard import get_access_guard
-
-    return JobCatalogue(
-        [
-            prune_runs_job(
-                lambda: PruneJobRuns(
-                    create_scheduling_uow(get_session_factory()), get_access_guard()
-                ),
-                keep_per_job=run_history_per_job,
-            ),
-            *backup_job_bindings(),
-        ]
-    )
-
-
-def build_schedule_source() -> ReaderScheduleSource:
-    """Resolve editable schedules through the settings reader, the rest from env."""
-    return ReaderScheduleSource(
-        get_settings_reader(),
-        live=LIVE_SCHEDULES,
-        static={"scheduling.prune_schedule": "0 4 * * *", **backup_schedules()},
     )
 
 

@@ -18,7 +18,7 @@ from app.modules.scheduling.domain.job_run import RunStatus
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import Callable
     from uuid import UUID
 
     from app.modules.scheduling.application.check_job_execution import CheckJobExecution
@@ -27,10 +27,8 @@ if TYPE_CHECKING:
     from app.modules.scheduling.application.heartbeat_job_run import HeartbeatJobRun
     from app.modules.scheduling.domain.job_run import JobRun
     from app.modules.scheduling.ports.restore_guard import RestoreGuard
-    from app.shared_kernel.actor import Actor
-    from app.shared_kernel.jobs import JobDefinition
+    from app.shared_kernel.jobs import JobDefinition, JobHandler
 
-type JobHandler = Callable[[Actor], Awaitable[None]]
 
 logger = structlog.get_logger(__name__)
 
