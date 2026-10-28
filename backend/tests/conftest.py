@@ -8,7 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from starlette.testclient import TestClient
 from testcontainers.community.postgres import PostgresContainer
 
+from app.entrypoints.api.shared import settings_reader
 from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.modules.settings.adapters.persistence.in_memory_setting_value_repository import (  # noqa: E501
+    InMemorySettingValueRepository,
+)
+from app.modules.settings.adapters.persistence.unit_of_work import (
+    create_in_memory_settings_uow,
+)
 from app.platform import alembic_runner
 from app.platform.config import get_database_settings
 from app.shared_kernel.actor import Actor
@@ -169,3 +176,26 @@ def _default_actor_for_test_clients(
 def _as_user_fixture() -> Callable[..., None]:
     """Return `as_user(app, user_id, role="member")` for multi-user router tests."""
     return as_user
+
+
+@pytest.fixture(autouse=True)
+def _in_memory_settings(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[None]:
+    """Give each test its own empty settings store, so none reaches for Postgres.
+
+    Integration tests keep the real database. The catalogue is rebuilt per test
+    because it reads the deployment's environment, which tests change.
+    """
+    if request.node.get_closest_marker("integration") is not None:
+        yield
+        return
+    repo = InMemorySettingValueRepository()
+    monkeypatch.setattr(
+        settings_reader, "settings_uow", lambda: create_in_memory_settings_uow(repo)
+    )
+    settings_reader.get_settings_catalogue.cache_clear()
+    settings_reader.get_settings_reader.cache_clear()
+    yield
+    settings_reader.get_settings_catalogue.cache_clear()
+    settings_reader.get_settings_reader.cache_clear()

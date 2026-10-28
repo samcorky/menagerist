@@ -105,25 +105,41 @@ async def test_registered_maintenance_prunes_through_the_real_executor(
     postgres_url: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Production registration honours deployment retention and records its run."""
+    """Production registration honours the configured quota and records its run."""
     from sqlalchemy import delete
 
+    from app.entrypoints.api.shared import settings_reader
     from app.entrypoints.cli import scheduling
     from app.modules.scheduling.adapters.persistence.models import JobRunModel
-    from app.platform.config.scheduler import SchedulerSettings
+    from app.modules.settings.adapters.persistence.models import SettingValueModel
+    from app.modules.settings.adapters.persistence.unit_of_work import (
+        build_settings_repos,
+        create_settings_uow,
+    )
+    from app.modules.settings.domain.setting import SettingScope, StoredSetting
 
     engine = create_async_engine(postgres_url)
     factory = async_sessionmaker(engine, expire_on_commit=False)
     monkeypatch.setattr(scheduling, "get_session_factory", lambda: factory)
     monkeypatch.setattr(
-        scheduling,
-        "get_scheduler_settings",
-        lambda: SchedulerSettings(run_history_per_job=1),
+        settings_reader, "settings_uow", lambda: create_settings_uow(factory)
     )
+    settings_reader.get_settings_catalogue.cache_clear()
+    settings_reader.get_settings_reader.cache_clear()
     key = f"retention-{uuid7()}"
     now = datetime.now(UTC)
     try:
         async with factory.begin() as session:
+            # An administrator has set the quota to one run per job.
+            await build_settings_repos(session).values.save(
+                StoredSetting.create(
+                    scope=SettingScope.INSTANCE,
+                    owner_id=None,
+                    key="scheduler.run_history_per_job",
+                    value=1,
+                    updated_by=None,
+                )
+            )
             repos = build_scheduling_repos(session)
             for _ in range(3):
                 run = await repos.queue.enqueue(
@@ -164,6 +180,8 @@ async def test_registered_maintenance_prunes_through_the_real_executor(
                     JobRunModel.job_key.in_((key, "scheduling.prune_runs"))
                 )
             )
+            await session.execute(delete(SettingValueModel))
+        settings_reader.get_settings_reader.cache_clear()
         await engine.dispose()
 
 

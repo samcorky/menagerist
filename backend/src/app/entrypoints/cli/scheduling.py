@@ -13,7 +13,12 @@ from uuid import uuid7
 import structlog
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.entrypoints.cli.backup_jobs import backup_job_bindings, backup_schedules
+from app.entrypoints.api.shared.settings_reader import get_settings_reader
+from app.entrypoints.cli.backup_jobs import (
+    LIVE_SCHEDULES,
+    backup_job_bindings,
+    backup_schedules,
+)
 from app.modules.identity.adapters.persistence.unit_of_work import build_identity_repos
 from app.modules.identity.application.get_setup_status import (
     GetSetupStatus,
@@ -36,11 +41,11 @@ from app.modules.scheduling.adapters.persistence.unit_of_work import (
 from app.modules.scheduling.adapters.platform.cron_evaluator import (
     CronScheduleEvaluator,
 )
+from app.modules.scheduling.adapters.platform.reader_schedule_source import (
+    ReaderScheduleSource,
+)
 from app.modules.scheduling.adapters.platform.restore_guard import (
     SqlAlchemyRestoreGuard,
-)
-from app.modules.scheduling.adapters.platform.settings_schedule_source import (
-    SettingsScheduleSource,
 )
 from app.modules.scheduling.application.check_job_execution import CheckJobExecution
 from app.modules.scheduling.application.claim_job_run import (
@@ -62,6 +67,7 @@ from app.modules.scheduling.application.maintain_worker import (
 )
 from app.modules.scheduling.application.prune_job_runs import PruneJobRuns
 from app.modules.scheduling.application.run_job_now import RunJobNow, RunJobNowCommand
+from app.modules.scheduling.application.setting_keys import RUN_HISTORY_PER_JOB
 from app.modules.scheduling.application.tick_schedules import TickSchedules
 from app.modules.scheduling.domain.job_run import RunStatus
 from app.platform.alembic_runner import code_head_revisions, db_current_revisions
@@ -180,6 +186,11 @@ def build_job_executor(
     )
 
 
+async def run_history_per_job() -> int:
+    """The current quota of completed runs kept per job."""
+    return await get_settings_reader().get(RUN_HISTORY_PER_JOB)
+
+
 def build_catalogue() -> JobCatalogue:
     """Collect module job contributions at the composition root."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
@@ -190,17 +201,19 @@ def build_catalogue() -> JobCatalogue:
                 lambda: PruneJobRuns(
                     create_scheduling_uow(get_session_factory()), get_access_guard()
                 ),
-                keep_per_job=get_scheduler_settings().run_history_per_job,
+                keep_per_job=run_history_per_job,
             ),
             *backup_job_bindings(),
         ]
     )
 
 
-def build_schedule_source() -> SettingsScheduleSource:
-    """Collect deployment schedule values alongside their module contributions."""
-    return SettingsScheduleSource(
-        {"scheduling.prune_schedule": "0 4 * * *", **backup_schedules()}
+def build_schedule_source() -> ReaderScheduleSource:
+    """Resolve editable schedules through the settings reader, the rest from env."""
+    return ReaderScheduleSource(
+        get_settings_reader(),
+        live=LIVE_SCHEDULES,
+        static={"scheduling.prune_schedule": "0 4 * * *", **backup_schedules()},
     )
 
 

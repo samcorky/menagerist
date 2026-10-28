@@ -7,19 +7,22 @@ from app.modules.scheduling.application.prune_job_runs import PruneJobRunsComman
 from app.shared_kernel.jobs import JobDefinition
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Awaitable, Callable
 
     from app.modules.scheduling.application.prune_job_runs import PruneJobRuns
     from app.shared_kernel.actor import Actor
 
 
 def prune_runs_job(
-    command: Callable[[], PruneJobRuns], *, keep_per_job: int
+    command: Callable[[], PruneJobRuns],
+    *,
+    keep_per_job: Callable[[], Awaitable[int]],
 ) -> JobBinding:
-    """Bind operational maintenance to a fresh command for every execution."""
+    """Bind operational maintenance to a fresh command and the current quota."""
 
     async def handler(actor: Actor) -> None:
-        await command().handle(PruneJobRunsCommand(keep_per_job=keep_per_job), actor)
+        quota = PruneJobRunsCommand(keep_per_job=await keep_per_job())
+        await command().handle(quota, actor)
 
     return JobBinding(
         definition=JobDefinition(

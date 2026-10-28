@@ -1,22 +1,21 @@
 """Wire the settings use cases to the database and the deployment's settings."""
 
-from functools import lru_cache
 from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
+from app.entrypoints.api.shared.settings_reader import (
+    get_settings_catalogue,
+    get_settings_reader,
+)
 from app.modules.settings.adapters.persistence.unit_of_work import (
     build_settings_repos,
     create_settings_uow,
 )
-from app.modules.settings.adapters.platform.deployment_catalogue import (
-    deployment_catalogue,
-)
 from app.modules.settings.application.get_settings_schema import GetSettingsSchema
 from app.modules.settings.application.list_settings import ListSettings
 from app.modules.settings.application.reset_setting import ResetSetting
-from app.modules.settings.application.settings_reader import CachedSettingsReader
 from app.modules.settings.application.update_settings import UpdateSettings
 from app.modules.settings.ports.setting_value_repository import SettingValueRepository
 from app.modules.settings.ports.settings_catalogue import SettingsCatalogue
@@ -28,20 +27,6 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from app.shared_kernel.access_guard import AccessGuard
-
-
-@lru_cache(maxsize=1)
-def get_settings_catalogue() -> SettingsCatalogue:
-    """The process-wide catalogue: discovered fields and the deployment's pins."""
-    return deployment_catalogue()
-
-
-@lru_cache(maxsize=1)
-def get_settings_reader() -> CachedSettingsReader:
-    """The process-wide reader other code resolves effective settings through."""
-    return CachedSettingsReader(
-        get_settings_catalogue(), lambda: create_settings_uow(get_session_factory())
-    )
 
 
 def _invalidate_reader() -> None:

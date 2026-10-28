@@ -217,8 +217,6 @@ def test_registered_groups_pass_registration_guards() -> None:
     specs = discover(SETTING_GROUPS, kinds=frozenset(contract["kinds"]))
     assert {spec.key for spec in specs} >= {
         "backup.schedule",
-        "backup.keep_last",
-        "backup.user_export_ttl_hours",
         "scheduler.run_history_per_job",
     }
     assert all(spec.title for spec in specs)
