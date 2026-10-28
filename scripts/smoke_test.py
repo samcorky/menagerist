@@ -20,6 +20,10 @@ parsing `docker inspect` Go-template output.
 Checks:
 - the stack comes up and the menagerist service reports healthy (proves
   `serve --migrate` applied migrations and reached the database)
+- the worker service reports healthy too, and its `worker-health` probe, run
+  the way the healthcheck runs it, finishes well inside the healthcheck's own
+  timeout (a CLI that imports too much times out and the worker is marked
+  unhealthy while working perfectly)
 - the running container actually honours compose.yaml's hardening
   (read-only rootfs, uid 1000, dropped capabilities, no-new-privileges)
 - the granian worker's own boot (import + app construction) stays fast,
@@ -38,6 +42,7 @@ it, only exercises it.
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -60,6 +65,7 @@ COMPOSE_OVERRIDE_FILE = REPO_ROOT / "compose.smoke.yaml"
 PROJECT_NAME = "menagerist-smoke"
 BASE_URL = "http://localhost:18080"
 SERVICE = "menagerist"
+WORKER_SERVICE = "worker"
 IMAGE = "menagerist:local"
 
 
@@ -116,11 +122,11 @@ def get(path: str) -> tuple[int, bytes]:
         return exc.code, exc.read()
 
 
-def get_container(client: docker.DockerClient) -> Container:
-    """Return the running `menagerist` service container."""
-    container_id = compose("ps", "-q", SERVICE).stdout.strip()
+def get_container(client: docker.DockerClient, service: str = SERVICE) -> Container:
+    """Return the running container for a compose service."""
+    container_id = compose("ps", "-q", service).stdout.strip()
     if not container_id:
-        raise SmokeTestError(f"no running container for service {SERVICE!r}")
+        raise SmokeTestError(f"no running container for service {service!r}")
     try:
         return client.containers.get(container_id)
     except NotFound as exc:
@@ -138,10 +144,12 @@ def require_image_built(client: docker.DockerClient) -> None:
         ) from exc
 
 
-def wait_healthy(client: docker.DockerClient, timeout: float = 90.0) -> None:
-    """Poll the service's Docker healthcheck until it reports healthy."""
-    print(f"waiting up to {timeout:.0f}s for {SERVICE} to report healthy...")
-    container = get_container(client)
+def wait_healthy(
+    client: docker.DockerClient, service: str = SERVICE, timeout: float = 90.0
+) -> None:
+    """Poll a service's Docker healthcheck until it reports healthy."""
+    print(f"waiting up to {timeout:.0f}s for {service} to report healthy...")
+    container = get_container(client, service)
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         container.reload()
@@ -149,9 +157,9 @@ def wait_healthy(client: docker.DockerClient, timeout: float = 90.0) -> None:
         if status == "healthy":
             return
         if status == "unhealthy":
-            raise SmokeTestError(f"{SERVICE} reported unhealthy")
+            raise SmokeTestError(f"{service} reported unhealthy")
         time.sleep(2)
-    raise SmokeTestError(f"{SERVICE} did not become healthy within {timeout:.0f}s")
+    raise SmokeTestError(f"{service} did not become healthy within {timeout:.0f}s")
 
 
 def check_hardening(client: docker.DockerClient) -> None:
@@ -200,7 +208,10 @@ _LOG_TIMESTAMP = re.compile(r"^(\S+Z)")
 # wide enough to absorb slow CI/NAS-class hardware, tight enough to still
 # catch a regression like jsonschema[format-nongpl] silently adding ~1s of
 # regex-compilation import cost (see backend/pyproject.toml history).
-_MAX_WORKER_STARTUP_SECONDS = 5.0
+# Set SMOKE_MAX_WORKER_STARTUP_SECONDS to loosen it on a slow host.
+_MAX_WORKER_STARTUP_SECONDS = float(
+    os.environ.get("SMOKE_MAX_WORKER_STARTUP_SECONDS", "5.0")
+)
 
 
 def _log_line_timestamp(logs: str, marker: str) -> float:
@@ -256,6 +267,56 @@ def check_startup_time(client: docker.DockerClient) -> None:
             f"worker took {duration:.2f}s to start "
             + f"(limit {_MAX_WORKER_STARTUP_SECONDS:.2f}s) - "
             + "check for a heavy import pulled in at module scope"
+        )
+
+
+# The healthcheck kills a probe at its timeout (10s in compose.yaml). Half of that
+# leaves room for a busy host, where a probe that only just fits will start flapping.
+_PROBE_BUDGET_FRACTION = 0.5
+
+
+def _timed_exec(container: Container, command: list[str]) -> tuple[int, float, str]:
+    """Run a command in the container and return (exit code, seconds, output)."""
+    started = time.monotonic()
+    result = container.exec_run(command, demux=False)
+    seconds = time.monotonic() - started
+    output = result.output if isinstance(result.output, bytes) else b""
+    exit_code = -1 if result.exit_code is None else result.exit_code
+    return exit_code, seconds, output.decode(errors="replace")
+
+
+def check_cli_probe_time(client: docker.DockerClient) -> None:
+    """Confirm the worker's health probe finishes well inside its healthcheck timeout.
+
+    Runs `menagerist worker-health` in the worker container, exactly as the
+    healthcheck does, and compares it with the timeout compose.yaml gives it.
+    `--version` is timed too: it does the same CLI import without touching the
+    database, so a slow probe can be told apart as an import regression or a
+    slow check.
+    """
+    print("checking the CLI health probe is fast enough for its healthcheck...")
+    container = get_container(client, WORKER_SERVICE)
+    healthcheck = container.attrs["Config"].get("Healthcheck") or {}
+    timeout = healthcheck.get("Timeout", 10_000_000_000) / 1e9
+    budget = timeout * _PROBE_BUDGET_FRACTION
+
+    code, import_seconds, _ = _timed_exec(container, ["menagerist", "--version"])
+    if code != 0:
+        raise SmokeTestError(f"`menagerist --version` failed (exit {code})")
+    code, probe_seconds, output = _timed_exec(
+        container, ["menagerist", "worker-health"]
+    )
+
+    print(f"  CLI import (--version): {import_seconds:.2f}s")
+    print(f"  worker-health probe:    {probe_seconds:.2f}s")
+    print(f"  healthcheck timeout:    {timeout:.0f}s (limit {budget:.1f}s)")
+    if code != 0:
+        raise SmokeTestError(f"`worker-health` exited {code}: {output.strip()}")
+    if probe_seconds > budget:
+        raise SmokeTestError(
+            f"the health probe took {probe_seconds:.2f}s, over {budget:.1f}s of the "
+            + f"{timeout:.0f}s healthcheck timeout - check for a heavy import "
+            + "pulled in at module scope in the CLI"
         )
 
 
@@ -339,6 +400,8 @@ def main() -> int:
         compose("up", "-d")
 
         wait_healthy(client)
+        wait_healthy(client, WORKER_SERVICE, timeout=150.0)
+        check_cli_probe_time(client)
         check_hardening(client)
         check_startup_time(client)
         check_version_lockstep(client)
