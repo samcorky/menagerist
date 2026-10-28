@@ -256,7 +256,7 @@ def serve(
         upgrade(backup=backup)
 
     server = Granian(
-        target="app.entrypoints.api:app",
+        target="app.entrypoints.api.application:app",
         address=host,
         port=port,
         interface=Interfaces.ASGI,

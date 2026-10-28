@@ -65,7 +65,9 @@ def test_create_app_with_license_url() -> None:
             commit_sha="abcdef1",
         ),
     )
-    with patch("app.entrypoints.api.load_app_info", return_value=mock_app_info):
+    with patch(
+        "app.entrypoints.api.application.load_app_info", return_value=mock_app_info
+    ):
         app = create_app()
         schema = app.openapi()
         assert schema["info"]["license"] == {
@@ -80,7 +82,9 @@ def test_create_app_without_license_url() -> None:
         project=ProjectInfo(name="menagerist", version="1.0.0", license="Apache-2.0"),
         build=BuildInfo(repository_url=None, commit_sha=None),
     )
-    with patch("app.entrypoints.api.load_app_info", return_value=mock_app_info):
+    with patch(
+        "app.entrypoints.api.application.load_app_info", return_value=mock_app_info
+    ):
         app = create_app()
         schema = app.openapi()
         assert schema["info"]["license"] == {
@@ -94,7 +98,9 @@ def test_create_app_without_license_name() -> None:
         project=ProjectInfo(name="menagerist", version="1.0.0", license=None),
         build=BuildInfo(repository_url=None, commit_sha=None),
     )
-    with patch("app.entrypoints.api.load_app_info", return_value=mock_app_info):
+    with patch(
+        "app.entrypoints.api.application.load_app_info", return_value=mock_app_info
+    ):
         app = create_app()
         schema = app.openapi()
         assert "license" not in schema["info"]

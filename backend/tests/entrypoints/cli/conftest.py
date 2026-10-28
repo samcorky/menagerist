@@ -12,9 +12,17 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 def _plain_text_output() -> Iterator[None]:
-    """Each test starts in automatic format, which is plain text under capture."""
+    """Each test starts in automatic format, which is plain text under capture.
+
+    `main` configures logging for the command it runs, so the logging set up by the
+    application's import is put back afterwards for the tests that follow.
+    """
     set_format(OutputFormat.AUTO)
+    structlog_config = structlog.get_config()
+    root = logging.getLogger()
+    handlers, level = list(root.handlers), root.level
     yield
     set_format(OutputFormat.AUTO)
-    structlog.reset_defaults()  # `main` configures logging; cached loggers hide capture
-    logging.getLogger().handlers.clear()
+    structlog.configure(**structlog_config)
+    root.handlers[:] = handlers
+    root.setLevel(level)

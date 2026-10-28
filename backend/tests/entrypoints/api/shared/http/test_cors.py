@@ -21,7 +21,7 @@ LIVENESS = "/api/health"
 def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     """A client for an app that lists one cross-origin site."""
     monkeypatch.setattr(
-        "app.entrypoints.api.get_api_settings",
+        "app.entrypoints.api.application.get_api_settings",
         lambda: ApiSettings(cors_origins=[ALLOWED]),
     )
     return TestClient(create_app())
