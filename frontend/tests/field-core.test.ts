@@ -8,19 +8,14 @@ import {
 	registerCore,
 	type FieldCore
 } from '../src/lib/field-types/core';
-import {
-	allDescriptors,
-	descriptorForProp,
-	getDescriptor,
-	register
-} from '../src/lib/field-types/registry';
+import { allDescriptors, descriptorForProp, getDescriptor } from '../src/lib/field-types/registry';
 import type { JsonSchemaProperty } from '../src/lib/json-schema';
 
 const StubWidget = {} as FieldCore['InputWidget'];
 
 /** A kind with no schema-editor half, chosen only by an explicit `kind`. */
 const cronCore: FieldCore = {
-	kind: 'cron',
+	kind: 'test-schedule',
 	label: 'Schedule',
 	matches: (prop) => prop.type === 'string',
 	rank: () => 0,
@@ -28,16 +23,16 @@ const cronCore: FieldCore = {
 };
 
 // Other test files share the registry when isolation is off: restore it afterwards.
-let original: ReturnType<typeof allDescriptors> = [];
+let originalCores: FieldCore[] = [];
 beforeAll(() => {
-	original = allDescriptors();
+	originalCores = allCores();
 });
 beforeEach(() => {
 	registerCore(cronCore);
 });
 afterAll(() => {
 	_clearCores();
-	original.forEach(register);
+	originalCores.forEach(registerCore);
 });
 
 describe('core and authoring registrations', () => {
@@ -58,9 +53,9 @@ describe('core and authoring registrations', () => {
 	});
 
 	it('lists a core-only kind in the core but not in the schema editor', () => {
-		expect(allCores().map((c) => c.kind)).toContain('cron');
-		expect(getDescriptor('cron')).toBeUndefined();
-		expect(allDescriptors().map((d) => d.kind)).not.toContain('cron');
+		expect(allCores().map((c) => c.kind)).toContain('test-schedule');
+		expect(getDescriptor('test-schedule')).toBeUndefined();
+		expect(allDescriptors().map((d) => d.kind)).not.toContain('test-schedule');
 	});
 });
 
@@ -69,11 +64,11 @@ describe('matching', () => {
 	const cron: JsonSchemaProperty = {
 		title: 'Schedule',
 		type: 'string',
-		'x-menagerist': { kind: 'cron' }
+		'x-menagerist': { kind: 'test-schedule' }
 	};
 
 	it('picks a core-only kind by its explicit kind', () => {
-		expect(coreForProp(cron)?.kind).toBe('cron');
+		expect(coreForProp(cron)?.kind).toBe('test-schedule');
 	});
 
 	it('never lets a rank-0 kind win an unkinded property', () => {
@@ -91,7 +86,7 @@ describe('matching', () => {
 	});
 
 	it('requires an explicit kind to still match the shape', () => {
-		const wrongShape = { title: 'S', type: 'number', 'x-menagerist': { kind: 'cron' } };
+		const wrongShape = { title: 'S', type: 'number', 'x-menagerist': { kind: 'test-schedule' } };
 		expect(coreForProp(wrongShape as JsonSchemaProperty)).toBeUndefined();
 	});
 });

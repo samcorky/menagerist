@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { Users, Laptop, Archive, ChevronRight } from '@lucide/svelte';
+	import { Users, Laptop, Archive, SlidersHorizontal, ChevronRight } from '@lucide/svelte';
 	import { auth } from '$lib/auth.svelte.js';
 	import BackButton from '$lib/components/back-button.svelte';
 	import * as Alert from '$lib/components/ui/alert/index.js';
@@ -8,7 +8,8 @@
 	const canUsers = $derived(auth.can('identity:user:list'));
 	const canDevices = $derived(auth.can('identity:session:list'));
 	const canBackups = $derived(auth.can('backup:archive:read'));
-	const canAny = $derived(canUsers || canDevices || canBackups);
+	const canSettings = $derived(auth.can('settings:instance:read'));
+	const canAny = $derived(canUsers || canDevices || canBackups || canSettings);
 </script>
 
 <svelte:head>
@@ -21,7 +22,7 @@
 		<div>
 			<h1 class="font-heading text-3xl font-semibold tracking-tight">Administration</h1>
 			<p class="mt-1 text-muted-foreground">
-				Manage users, active devices and backups across this Menagerist.
+				Manage users, active devices, backups and settings across this Menagerist.
 			</p>
 		</div>
 
@@ -95,6 +96,31 @@
 									<p class="font-heading font-semibold">Devices</p>
 									<p class="mt-0.5 text-sm text-muted-foreground">
 										See everyone's active devices and sign them out.
+									</p>
+								</div>
+							</div>
+							<ChevronRight
+								class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+							/>
+						</div>
+					</a>
+				{/if}
+
+				{#if canSettings}
+					<a href={resolve('/admin/settings')} class="group block">
+						<div
+							class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
+						>
+							<div class="flex items-start gap-4">
+								<div
+									class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
+								>
+									<SlidersHorizontal class="size-5" />
+								</div>
+								<div>
+									<p class="font-heading font-semibold">Settings</p>
+									<p class="mt-0.5 text-sm text-muted-foreground">
+										Change schedules and how long things are kept.
 									</p>
 								</div>
 							</div>

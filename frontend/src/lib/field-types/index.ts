@@ -20,6 +20,8 @@ import './money/money';
 import './list/list';
 import './checklist/checklist';
 import './opaque/opaque';
+// Core-only kinds have no schema-editor half.
+import './cron/cron';
 
 export {
 	register,

@@ -7,6 +7,7 @@ import {
 	_clearRegistry,
 	type FieldTypeDescriptor
 } from '../src/lib/field-types/registry';
+import { allCores, registerCore, type FieldCore } from '../src/lib/field-types/core';
 import type { JsonSchemaProperty } from '../src/lib/schema-types';
 
 // Minimal stub - Component type is complex; cast to satisfy the interface in tests.
@@ -35,11 +36,14 @@ const numberDesc: FieldTypeDescriptor = {
 };
 
 // The registry is module state shared with other files when test isolation is off:
-// put back whatever was registered before this file cleared it.
+// put back whatever was registered before this file cleared it, including kinds that have
+// no schema-editor half.
 let original: FieldTypeDescriptor[] = [];
+let originalCores: FieldCore[] = [];
 
 beforeAll(() => {
 	original = allDescriptors();
+	originalCores = allCores();
 });
 
 beforeEach(() => {
@@ -49,6 +53,7 @@ beforeEach(() => {
 afterAll(() => {
 	_clearRegistry();
 	original.forEach(register);
+	originalCores.forEach(registerCore);
 });
 
 describe('register / getDescriptor', () => {

@@ -8,6 +8,7 @@ import type {
 	MediaPermission,
 	PresetPermission,
 	SchedulingPermission,
+	SettingsPermission,
 	SystemPermission
 } from '$lib/api/generated/types.gen';
 
@@ -21,6 +22,7 @@ export type Permission =
 	| MediaPermission
 	| PresetPermission
 	| SchedulingPermission
+	| SettingsPermission
 	| SystemPermission;
 
 export const LOGIN_PATH = '/login';
