@@ -16,36 +16,46 @@ class BackupSettings(MenageristBaseSettings, group="backup"):
         default=Path("/data/backups"),
         description="Directory used to store instance backup archives.",
     )
-    user_export_ttl_hours: Annotated[Hours, Tunable()] = Field(
-        default=24,
-        title="Data export lifetime",
-        description="Hours to retain a person's downloadable data export.",
-    )
+    user_export_ttl_hours: Annotated[
+        Hours,
+        Field(
+            title="Data export lifetime",
+            description="Hours to retain a person's downloadable data export.",
+        ),
+        Tunable(),
+    ] = 24
     before_migrate: bool = Field(
         default=True,
         description=(
             "Create a backup before applying database migrations. Enabled by default."
         ),
     )
-    keep_last: Annotated[int, Tunable()] = Field(
-        default=7,
-        ge=1,
-        title="Backups to keep",
-        description="Minimum number of ordinary backups to retain.",
-    )
+    keep_last: Annotated[
+        int,
+        Field(
+            ge=1,
+            title="Backups to keep",
+            description="Minimum number of ordinary backups to retain.",
+        ),
+        Tunable(),
+    ] = 7
     pre_migration_keep: int = Field(
         default=3,
         ge=1,
         description="Minimum number of pre-migration backups to retain.",
     )
-    schedule: Annotated[Cron, Tunable()] = Field(
-        default="0 3 * * *",
-        title="Backup schedule",
-        description=(
-            "Cron expression for scheduled backups in the instance timezone. "
-            + "Empty disables scheduled backups; each success is followed by retention."
+    schedule: Annotated[
+        Cron,
+        Field(
+            title="Backup schedule",
+            description=(
+                "Cron expression for scheduled backups in the instance timezone. "
+                + "Empty disables scheduled backups; "
+                + "each success is followed by retention."
+            ),
         ),
-    )
+        Tunable(),
+    ] = "0 3 * * *"
     prune_exports_schedule: Cron = Field(
         default="0 * * * *",
         description=(

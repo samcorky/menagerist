@@ -21,12 +21,15 @@ class SchedulerSettings(MenageristBaseSettings, group="scheduler"):
         validation_alias=AliasChoices("MENAGERIST_TIMEZONE", "TZ"),
         description="Timezone used to interpret recurring job schedules.",
     )
-    run_history_per_job: Annotated[int, Tunable()] = Field(
-        default=100,
-        ge=1,
-        title="Runs kept per task",
-        description="Number of completed runs to retain for each job.",
-    )
+    run_history_per_job: Annotated[
+        int,
+        Field(
+            ge=1,
+            title="Runs kept per task",
+            description="Number of completed runs to retain for each job.",
+        ),
+        Tunable(),
+    ] = 100
     worker_heartbeat_timeout_seconds: int = Field(
         default=300,
         gt=0,
