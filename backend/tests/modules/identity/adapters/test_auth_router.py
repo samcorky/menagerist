@@ -811,7 +811,10 @@ async def test_unknown_names_throttle_like_known_ones(
     _, alice = api.sign_in("alice", "password-123")
 
     assert ghost.status_code == alice.status_code == 429
-    assert ghost.headers["retry-after"] == alice.headers["retry-after"]
+    # Each lock counts down from its own last failure; on a slow machine the two can
+    # fall either side of a clock second.
+    waits = (int(ghost.headers["retry-after"]), int(alice.headers["retry-after"]))
+    assert abs(waits[0] - waits[1]) <= 1
     assert ghost.json()["detail"] == alice.json()["detail"]
 
 

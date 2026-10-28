@@ -3,6 +3,8 @@
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
+from app.entrypoints.api.shared.settings_reader import get_settings_reader
+from app.modules.backup.application.setting_keys import KEEP_LAST, USER_EXPORT_TTL_HOURS
 from app.modules.scheduling.adapters.cli.catalogue import JobBinding
 from app.platform.config.backup import get_backup_settings
 from app.platform.config.media import get_media_settings
@@ -54,12 +56,13 @@ async def prune_scheduled_backups(actor: Actor) -> object:
     )
 
     settings = get_backup_settings()
+    reader = get_settings_reader()
     return await PruneBackups(
         LocalDirectoryBackupStore(settings.path),
         get_access_guard(),
-        keep_last=settings.keep_last,
+        keep_last=await reader.get(KEEP_LAST),
         pre_migration_keep=settings.pre_migration_keep,
-        user_export_ttl_hours=settings.user_export_ttl_hours,
+        user_export_ttl_hours=await reader.get(USER_EXPORT_TTL_HOURS),
     ).handle(PruneBackupsCommand(), actor)
 
 
@@ -78,7 +81,7 @@ async def prune_expired_exports(actor: Actor) -> object:
     return await PruneUserExports(
         LocalDirectoryBackupStore(settings.path),
         get_access_guard(),
-        user_export_ttl_hours=settings.user_export_ttl_hours,
+        user_export_ttl_hours=await get_settings_reader().get(USER_EXPORT_TTL_HOURS),
     ).handle(PruneUserExportsCommand(), actor)
 
 

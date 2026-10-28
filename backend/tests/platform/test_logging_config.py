@@ -1,4 +1,5 @@
 import logging
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
 _NAMED_LOGGERS = (
     "alembic.runtime.migration",
     "alembic.runtime.plugins",
+    "markdown_it",
     "sqlalchemy.engine",
 )
 
@@ -128,3 +130,36 @@ def test_logging_settings_accept_uppercase_and_lowercase_values(
 
     assert settings.level is LogLevel.DEBUG
     assert settings.sqlalchemy_level is LogLevel.INFO
+
+
+def test_markdown_it_stays_quiet_even_when_the_application_logs_debug() -> None:
+    """Its per-rule debug lines would drown real output, whatever the app level is."""
+    configure_logging(level="DEBUG")
+    assert logging.getLogger().isEnabledFor(logging.DEBUG)
+    for name in ("markdown_it", "markdown_it.rules_block.paragraph"):
+        logger = logging.getLogger(name)
+        assert not logger.isEnabledFor(logging.DEBUG)
+        assert logger.isEnabledFor(logging.WARNING)
+
+
+def test_logs_can_be_sent_to_stderr_to_keep_stdout_for_output(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A CLI that prints data asks for stderr, so `command | jq` stays valid."""
+    configure_logging(level="ERROR", stream=sys.stderr)
+    logger = structlog.get_logger("test")
+    logger.info("quiet progress")
+    logger.error("something failed")
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "something failed" in captured.err
+    assert "quiet progress" not in captured.err
+
+
+def test_logs_go_to_stdout_by_default(capsys: pytest.CaptureFixture[str]) -> None:
+    """The server's logs stay on stdout, where a container collects them."""
+    configure_logging(level="INFO")
+    structlog.get_logger("test").info("hello")
+    captured = capsys.readouterr()
+    assert "hello" in captured.out
+    assert captured.err == ""

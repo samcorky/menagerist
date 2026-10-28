@@ -16,7 +16,7 @@ class BackupSettings(MenageristBaseSettings, group="backup"):
         default=Path("/data/backups"),
         description="Directory used to store instance backup archives.",
     )
-    user_export_ttl_hours: Hours = Field(
+    user_export_ttl_hours: Annotated[Hours, Tunable()] = Field(
         default=24,
         title="Data export lifetime",
         description="Hours to retain a person's downloadable data export.",
@@ -27,7 +27,7 @@ class BackupSettings(MenageristBaseSettings, group="backup"):
             "Create a backup before applying database migrations. Enabled by default."
         ),
     )
-    keep_last: int = Field(
+    keep_last: Annotated[int, Tunable()] = Field(
         default=7,
         ge=1,
         title="Backups to keep",

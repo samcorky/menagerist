@@ -178,9 +178,17 @@ def _as_user_fixture() -> Callable[..., None]:
     return as_user
 
 
+@pytest.fixture
+def settings_store() -> InMemorySettingValueRepository:
+    """The saved settings values of this test; the reader and the API see the same."""
+    return InMemorySettingValueRepository()
+
+
 @pytest.fixture(autouse=True)
 def _in_memory_settings(
-    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+    settings_store: InMemorySettingValueRepository,
 ) -> Iterator[None]:
     """Give each test its own empty settings store, so none reaches for Postgres.
 
@@ -190,9 +198,10 @@ def _in_memory_settings(
     if request.node.get_closest_marker("integration") is not None:
         yield
         return
-    repo = InMemorySettingValueRepository()
     monkeypatch.setattr(
-        settings_reader, "settings_uow", lambda: create_in_memory_settings_uow(repo)
+        settings_reader,
+        "settings_uow",
+        lambda: create_in_memory_settings_uow(settings_store),
     )
     settings_reader.get_settings_catalogue.cache_clear()
     settings_reader.get_settings_reader.cache_clear()

@@ -14,6 +14,8 @@ class ScheduleCursor:
     expression: str | None
     timezone: str
     checked_until: datetime
+    # Set by `observe` when it replaced a different schedule; never stored.
+    changed_from: ScheduleCursor | None = None
 
     def __post_init__(self) -> None:
         """Store the observation boundary as an absolute UTC instant."""
@@ -30,8 +32,9 @@ class ScheduleCursor:
                 expression=expression,
                 timezone=timezone,
                 checked_until=max(self.checked_until, now),
+                changed_from=self,
             )
-        return self
+        return self if self.changed_from is None else replace(self, changed_from=None)
 
     def advance(self, now: datetime) -> ScheduleCursor:
         """Advance monotonically even if the worker clock moves backwards."""

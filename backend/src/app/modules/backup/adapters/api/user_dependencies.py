@@ -8,6 +8,7 @@ from app.entrypoints.api.shared.bridges.backup_user_validator import (
     BackupUserImportValidator,
 )
 from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.entrypoints.api.shared.settings_reader import get_settings_reader
 from app.modules.backup.adapters.api.dependencies import get_backup_workspace
 from app.modules.backup.adapters.persistence.user_database_restorer import (
     SqlAlchemyUserDatabaseRestorer,
@@ -24,6 +25,7 @@ from app.modules.backup.application.import_user_archive import ImportUserArchive
 from app.modules.backup.application.import_user_data import ImportUserData
 from app.modules.backup.application.list_user_exports import ListUserExports
 from app.modules.backup.application.open_user_export import OpenUserExport
+from app.modules.backup.application.setting_keys import USER_EXPORT_TTL_HOURS
 from app.platform.app_info import load_app_info
 from app.platform.config.backup import get_backup_settings
 from app.platform.database import get_session_factory
@@ -38,6 +40,7 @@ if TYPE_CHECKING:
     from app.modules.backup.ports.user_database_snapshot import UserDatabaseSnapshot
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.settings import SettingsReader
 
 
 def get_user_backup_store(
@@ -63,11 +66,12 @@ def get_user_database_restorer(
     return SqlAlchemyUserDatabaseRestorer(factory, BackupUserImportValidator())
 
 
-def get_export_user_data(
+async def get_export_user_data(
     store: Annotated[BackupStore, Depends(get_user_backup_store)],
     snapshot: Annotated[UserDatabaseSnapshot, Depends(get_user_database_snapshot)],
     media: Annotated[MediaFiles, Depends(get_user_media_files)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    reader: Annotated[SettingsReader, Depends(get_settings_reader)],
 ) -> ExportUserData:
     """Compose verified personal exports with private retention."""
     return ExportUserData(
@@ -76,7 +80,7 @@ def get_export_user_data(
         media,
         guard,
         app_version=load_app_info().version,
-        ttl_hours=get_backup_settings().user_export_ttl_hours,
+        ttl_hours=await reader.get(USER_EXPORT_TTL_HOURS),
     )
 
 
@@ -107,31 +111,34 @@ def get_import_user_archive(
     )
 
 
-def get_open_user_export(
+async def get_open_user_export(
     store: Annotated[BackupStore, Depends(get_user_backup_store)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    reader: Annotated[SettingsReader, Depends(get_settings_reader)],
 ) -> OpenUserExport:
     """Compose downloads restricted to the caller's export namespace."""
     return OpenUserExport(
-        store, guard, ttl_hours=get_backup_settings().user_export_ttl_hours
+        store, guard, ttl_hours=await reader.get(USER_EXPORT_TTL_HOURS)
     )
 
 
-def get_list_user_exports(
+async def get_list_user_exports(
     store: Annotated[BackupStore, Depends(get_user_backup_store)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    reader: Annotated[SettingsReader, Depends(get_settings_reader)],
 ) -> ListUserExports:
     """Compose the caller's export listing with private retention."""
     return ListUserExports(
-        store, guard, ttl_hours=get_backup_settings().user_export_ttl_hours
+        store, guard, ttl_hours=await reader.get(USER_EXPORT_TTL_HOURS)
     )
 
 
-def get_delete_user_export(
+async def get_delete_user_export(
     store: Annotated[BackupStore, Depends(get_user_backup_store)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    reader: Annotated[SettingsReader, Depends(get_settings_reader)],
 ) -> DeleteUserExport:
     """Compose deletion restricted to the caller's export namespace."""
     return DeleteUserExport(
-        store, guard, ttl_hours=get_backup_settings().user_export_ttl_hours
+        store, guard, ttl_hours=await reader.get(USER_EXPORT_TTL_HOURS)
     )

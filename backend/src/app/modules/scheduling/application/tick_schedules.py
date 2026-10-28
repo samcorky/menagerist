@@ -4,19 +4,26 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, ClassVar
 
+import structlog
+
 from app.modules.scheduling.domain.job_run import JobRun, utc_instant
 from app.modules.scheduling.domain.schedule import due_fire
 from app.modules.scheduling.ports.unit_of_work import SchedulingUnitOfWork
 from app.shared_kernel.access import Access, System
 from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.errors import ValidationError
 from app.shared_kernel.jobs import MissedRun
 
 if TYPE_CHECKING:
     from app.modules.scheduling.domain.registry import JobRegistry
+    from app.modules.scheduling.domain.schedule_cursor import ScheduleCursor
     from app.modules.scheduling.ports.schedule_evaluator import ScheduleEvaluator
     from app.modules.scheduling.ports.schedule_source import ScheduleSource
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
+
+
+logger = structlog.get_logger()
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -52,6 +59,7 @@ class TickSchedules(
     ) -> list[JobRun]:
         now = utc_instant(request.now)
         submitted: list[JobRun] = []
+        changed: list[tuple[ScheduleCursor, ScheduleCursor]] = []
         async with self._uow as repos:
             for job in sorted(self._registry.all(), key=lambda item: item.job_key):
                 if job.schedule_key is None:
@@ -65,6 +73,8 @@ class TickSchedules(
                     timezone=request.timezone,
                     now=now,
                 )
+                if cursor.changed_from is not None:
+                    changed.append((cursor.changed_from, cursor))
                 if expression and cursor.checked_until < now:
                     grace = (
                         job.max_lateness
@@ -90,4 +100,29 @@ class TickSchedules(
                         )
                 await repos.cursors.advance(job.job_key, now)
             await self._uow.commit()
+        for previous, cursor in changed:
+            await self._log_change(previous, cursor, now)
         return submitted
+
+    async def _log_change(
+        self, previous: ScheduleCursor, cursor: ScheduleCursor, now: datetime
+    ) -> None:
+        """Record that a job's schedule or timezone changed, and when it runs next."""
+        next_run = None
+        if cursor.expression:
+            try:
+                fire = await self._evaluator.next_fire(
+                    cursor.expression, cursor.timezone, after=now
+                )
+            except ValidationError:
+                fire = None
+            next_run = fire.isoformat() if fire else None
+        logger.info(
+            "job schedule changed",
+            job_key=cursor.job_key,
+            previous_schedule=previous.expression,
+            schedule=cursor.expression,
+            previous_timezone=previous.timezone,
+            timezone=cursor.timezone,
+            next_run=next_run,
+        )

@@ -2,10 +2,14 @@ import logging
 import os
 import sys
 import uuid
+from typing import TYPE_CHECKING
 
 import structlog
 
 from app.platform.config import get_logging_settings
+
+if TYPE_CHECKING:
+    from typing import TextIO
 
 
 def _serialise_uuids(
@@ -53,7 +57,9 @@ def _expand_access_log_fields(
 _configured = False
 
 
-def configure_logging(*, level: int | str | None = None) -> None:
+def configure_logging(
+    *, level: int | str | None = None, stream: TextIO | None = None
+) -> None:
     """Sets up logging with structlog.
 
     A no-op on repeat calls unless `level` is given explicitly. Both entrypoint
@@ -61,6 +67,9 @@ def configure_logging(*, level: int | str | None = None) -> None:
     command can lazily import `api` after the CLI has already configured
     logging (e.g. via `--verbose`); without this guard, that later import-time
     call would silently reset the level back to `LOG_LEVEL`.
+
+    Logs go to stdout, which is where a container collects them. A CLI that prints
+    data passes `stream=sys.stderr` (with an explicit `level`) to keep stdout clean.
     """
     global _configured
     if _configured and level is None:
@@ -104,7 +113,7 @@ def configure_logging(*, level: int | str | None = None) -> None:
         pass_foreign_args=True,
     )
 
-    handler = logging.StreamHandler(sys.stdout)
+    handler = logging.StreamHandler(stream if stream is not None else sys.stdout)
     handler.setFormatter(formatter)
     root_logger = logging.getLogger()
     root_logger.handlers.clear()  # avoid duplicate lines if this ever runs twice
@@ -117,6 +126,9 @@ def configure_logging(*, level: int | str | None = None) -> None:
     # Suppress verbose Alembic migration and plugin-registration logs.
     logging.getLogger("alembic.runtime.migration").setLevel(logging.WARNING)
     logging.getLogger("alembic.runtime.plugins").setLevel(logging.WARNING)
+
+    # markdown-it (pulled in by rich for CLI help) logs every parsing rule at DEBUG.
+    logging.getLogger("markdown_it").setLevel(logging.WARNING)
 
     logging.getLogger("sqlalchemy.engine").setLevel(settings.sqlalchemy_level.value)
 

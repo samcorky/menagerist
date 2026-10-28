@@ -70,3 +70,25 @@ async def test_cursor_changes_reset_without_regressing(
         now=later + timedelta(hours=2),
     )
     assert enabled.checked_until == later + timedelta(hours=2)
+
+
+async def test_a_changed_schedule_remembers_what_it_replaced(
+    cursors: ScheduleCursorStore,
+) -> None:
+    """Only a real change carries the old schedule, so the tick can log it."""
+    first = await cursors.observe("x", expression="0 3 * * *", timezone="UTC", now=NOW)
+    assert first.changed_from is None
+    same = await cursors.observe("x", expression="0 3 * * *", timezone="UTC", now=NOW)
+    assert same.changed_from is None
+    changed = await cursors.observe(
+        "x", expression="0 4 * * *", timezone="Europe/London", now=NOW
+    )
+    assert changed.changed_from is not None
+    assert (changed.changed_from.expression, changed.changed_from.timezone) == (
+        "0 3 * * *",
+        "UTC",
+    )
+    again = await cursors.observe(
+        "x", expression="0 4 * * *", timezone="Europe/London", now=NOW
+    )
+    assert again.changed_from is None

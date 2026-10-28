@@ -1,8 +1,11 @@
 """Schedule observation, catch-up and deployment changes at fixed instants."""
 
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 import pytest
+from structlog.contextvars import merge_contextvars
+from structlog.testing import capture_logs
 
 from app.modules.scheduling.adapters.persistence.in_memory_store import (
     InMemorySchedulingStore,
@@ -24,8 +27,11 @@ from app.modules.scheduling.application.tick_schedules import (
 from app.modules.scheduling.domain.registry import JobRegistry
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
-from app.shared_kernel.errors import ForbiddenError
+from app.shared_kernel.errors import ForbiddenError, ValidationError
 from app.shared_kernel.jobs import JobDefinition, MissedRun, Overlap
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 NOW = datetime(2026, 10, 26, 3, tzinfo=UTC)
 
@@ -212,3 +218,91 @@ async def test_cursor_survives_removed_run_history() -> None:
     store.runs.clear()
     await tick(store, source, jobs, NOW + timedelta(days=1))
     assert not store.runs
+
+
+def changes(logs: Sequence[Mapping[str, object]]) -> list[Mapping[str, object]]:
+    """The schedule-change log lines among captured output."""
+    return [line for line in logs if line["event"] == "job schedule changed"]
+
+
+async def test_a_changed_schedule_is_logged_with_when_it_runs_next() -> None:
+    """A first sighting is quiet; an edit logs the old and new schedule and next run."""
+    store = InMemorySchedulingStore()
+    job = JobDefinition(job_key="backup.create", schedule_key="backup.schedule")
+    source = InMemoryScheduleSource({"backup.schedule": "0 3 * * *"})
+    with capture_logs(processors=[merge_contextvars]) as first:
+        await tick(store, source, [job], NOW)
+    assert changes(first) == []
+
+    source.values["backup.schedule"] = "0 4 * * *"
+    with capture_logs(processors=[merge_contextvars]) as second:
+        await tick(store, source, [job], NOW + timedelta(minutes=1))
+    (line,) = changes(second)
+    assert line["job_key"] == "backup.create"
+    assert (line["previous_schedule"], line["schedule"]) == ("0 3 * * *", "0 4 * * *")
+    assert (line["previous_timezone"], line["timezone"]) == ("UTC", "UTC")
+    assert line["next_run"] == "2026-10-26T04:00:00+00:00"
+    assert line["log_level"] == "info"
+
+    with capture_logs(processors=[merge_contextvars]) as third:
+        await tick(store, source, [job], NOW + timedelta(minutes=2))
+    assert changes(third) == []
+
+
+async def test_turning_a_schedule_off_and_changing_the_zone_are_logged() -> None:
+    """An empty schedule has no next run; a new instance zone is a change too."""
+    store = InMemorySchedulingStore()
+    job = JobDefinition(job_key="backup.create", schedule_key="backup.schedule")
+    source = InMemoryScheduleSource({"backup.schedule": "0 3 * * *"})
+    await tick(store, source, [job], NOW)
+
+    source.values["backup.schedule"] = ""
+    with capture_logs(processors=[merge_contextvars]) as off:
+        await tick(store, source, [job], NOW + timedelta(minutes=1))
+    (line,) = changes(off)
+    assert (line["schedule"], line["next_run"]) == (None, None)
+    assert line["previous_schedule"] == "0 3 * * *"
+
+    source.values["backup.schedule"] = "0 3 * * *"
+    await tick(store, source, [job], NOW + timedelta(minutes=2))
+    with capture_logs(processors=[merge_contextvars]) as zone:
+        await tick(
+            store, source, [job], NOW + timedelta(minutes=3), timezone="Asia/Tokyo"
+        )
+    (line,) = changes(zone)
+    assert (line["previous_timezone"], line["timezone"]) == ("UTC", "Asia/Tokyo")
+    assert line["next_run"] == "2026-10-26T18:00:00+00:00"  # 03:00 in Tokyo
+
+
+async def test_an_unreadable_schedule_is_logged_without_a_next_run() -> None:
+    """A change is still reported when the evaluator cannot say when it next runs."""
+
+    class Refuses:
+        async def next_fire(
+            self, expression: str, timezone: str, *, after: datetime
+        ) -> datetime | None:
+            raise ValidationError("Invalid cron schedule")
+
+        async def latest_fire(
+            self, expression: str, timezone: str, *, after: datetime, until: datetime
+        ) -> datetime | None:
+            return None
+
+    store = InMemorySchedulingStore()
+    job = JobDefinition(job_key="backup.create", schedule_key="backup.schedule")
+    source = InMemoryScheduleSource({"backup.schedule": "0 3 * * *"})
+    uow = create_in_memory_scheduling_uow(store)
+    guard = InMemoryAccessGuard()
+    registry = JobRegistry([job])
+
+    async def run(now: datetime) -> None:
+        await TickSchedules(uow, guard, registry, source, Refuses()).handle(
+            TickSchedulesCommand(now=now, timezone="UTC"), SYSTEM_ACTOR
+        )
+
+    await run(NOW)
+    source.values["backup.schedule"] = "nonsense"
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await run(NOW + timedelta(minutes=1))
+    (line,) = changes(logs)
+    assert (line["schedule"], line["next_run"]) == ("nonsense", None)

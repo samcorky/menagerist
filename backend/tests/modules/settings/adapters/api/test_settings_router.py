@@ -66,7 +66,12 @@ def test_list_returns_every_tunable_with_its_source(as_user: AsUser) -> None:
     response = client.get("/api/v1/settings/instance")
     assert response.status_code == 200
     by_key = {item["key"]: item for item in response.json()}
-    assert set(by_key) == {"scheduler.run_history_per_job", "backup.schedule"}
+    assert set(by_key) == {
+        "scheduler.run_history_per_job",
+        "backup.schedule",
+        "backup.keep_last",
+        "backup.user_export_ttl_hours",
+    }
     keep = by_key["scheduler.run_history_per_job"]
     assert keep["value"] == 100
     assert keep["source"] == "default"

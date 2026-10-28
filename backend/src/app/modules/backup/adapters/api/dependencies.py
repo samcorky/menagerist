@@ -8,6 +8,7 @@ from app.entrypoints.api.shared.backup_dependencies import (
     get_media_files,
     get_setup_gate,
 )
+from app.entrypoints.api.shared.settings_reader import get_settings_reader
 from app.modules.backup.adapters.persistence.database_restorer import (
     SqlAlchemyDatabaseRestorer,
 )
@@ -26,6 +27,7 @@ from app.modules.backup.application.list_backups import ListBackups
 from app.modules.backup.application.open_backup import OpenBackup
 from app.modules.backup.application.prune_backups import PruneBackups
 from app.modules.backup.application.restore_on_first_run import RestoreOnFirstRun
+from app.modules.backup.application.setting_keys import KEEP_LAST, USER_EXPORT_TTL_HOURS
 from app.modules.backup.application.upload_backup import UploadBackup
 from app.modules.backup.application.verify_backup import VerifyBackup
 from app.modules.backup.ports.backup_store import BackupStore
@@ -38,6 +40,7 @@ from app.platform.app_info import load_app_info
 from app.platform.config.backup import get_backup_settings
 from app.platform.database import get_session_factory
 from app.shared_kernel.access_guard import AccessGuard
+from app.shared_kernel.settings import SettingsReader
 
 
 def get_backup_store() -> BackupStore:
@@ -108,18 +111,18 @@ def get_delete_backup(
     return DeleteBackup(store, guard)
 
 
-def get_prune_backups(
+async def get_prune_backups(
     store: Annotated[BackupStore, Depends(get_backup_store)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    reader: Annotated[SettingsReader, Depends(get_settings_reader)],
 ) -> PruneBackups:
-    """Apply configured instance retention and personal-export expiry."""
-    settings = get_backup_settings()
+    """Apply the current instance retention and personal-export expiry."""
     return PruneBackups(
         store,
         guard,
-        keep_last=settings.keep_last,
-        pre_migration_keep=settings.pre_migration_keep,
-        user_export_ttl_hours=settings.user_export_ttl_hours,
+        keep_last=await reader.get(KEEP_LAST),
+        pre_migration_keep=get_backup_settings().pre_migration_keep,
+        user_export_ttl_hours=await reader.get(USER_EXPORT_TTL_HOURS),
     )
 
 

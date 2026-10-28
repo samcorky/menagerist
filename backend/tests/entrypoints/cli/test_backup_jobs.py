@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from app.entrypoints.cli import backup_jobs
+from app.modules.settings.domain.setting import SettingScope, StoredSetting
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.jobs import Lane, MissedRun, Overlap
 
@@ -13,6 +14,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from app.modules.scheduling.adapters.cli.catalogue import JobBinding
+    from app.modules.settings.adapters.persistence.in_memory_setting_value_repository import (  # noqa: E501
+        InMemorySettingValueRepository,
+    )
 
 
 def _bindings(calls: list[str]) -> dict[str, JobBinding]:
@@ -143,3 +147,63 @@ async def test_empty_environment_value_stops_the_job_ever_being_enqueued(
     finally:
         get_backup_settings.cache_clear()
     assert [run.job_key for run in store.runs.values()].count("backup.create") == runs
+
+
+async def _save(store: InMemorySettingValueRepository, key: str, value: int) -> None:
+    await store.save(
+        StoredSetting.create(
+            scope=SettingScope.INSTANCE,
+            owner_id=None,
+            key=key,
+            value=value,
+            updated_by=None,
+        )
+    )
+
+
+class _SpyPrune:
+    """Stands in for a prune use case and records how it was built."""
+
+    built: dict[str, int]
+
+    def __init__(self, store: object, guard: object, **options: int) -> None:
+        type(self).built = options
+
+    async def handle(self, request: object, actor: object) -> None:
+        return None
+
+
+@pytest.mark.parametrize(
+    ("saved", "keep_last", "ttl"),
+    [({}, 7, 24), ({"keep_last": 4, "user_export_ttl_hours": 48}, 4, 48)],
+    ids=["defaults", "saved-by-an-administrator"],
+)
+async def test_scheduled_retention_reads_the_current_settings(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    settings_store: InMemorySettingValueRepository,
+    saved: dict[str, int],
+    keep_last: int,
+    ttl: int,
+) -> None:
+    """The worker takes retention from settings, so an edit applies to its next run."""
+    from app.modules.backup.application import prune_backups, prune_user_exports
+
+    for field, value in saved.items():
+        await _save(settings_store, f"backup.{field}", value)
+    monkeypatch.setattr(
+        backup_jobs,
+        "get_backup_settings",
+        Mock(return_value=Mock(path=tmp_path, pre_migration_keep=3)),
+    )
+    monkeypatch.setattr(prune_backups, "PruneBackups", _SpyPrune)
+    await backup_jobs.prune_scheduled_backups(SYSTEM_ACTOR)
+    assert _SpyPrune.built == {
+        "keep_last": keep_last,
+        "pre_migration_keep": 3,
+        "user_export_ttl_hours": ttl,
+    }
+
+    monkeypatch.setattr(prune_user_exports, "PruneUserExports", _SpyPrune)
+    await backup_jobs.prune_expired_exports(SYSTEM_ACTOR)
+    assert _SpyPrune.built == {"user_export_ttl_hours": ttl}

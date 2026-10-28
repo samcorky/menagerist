@@ -1,11 +1,17 @@
 """Every setting the code reads live must be a tunable the settings module serves."""
 
 from app.entrypoints.cli.backup_jobs import LIVE_SCHEDULES
+from app.modules.backup.application.setting_keys import KEEP_LAST, USER_EXPORT_TTL_HOURS
 from app.modules.scheduling.application.setting_keys import RUN_HISTORY_PER_JOB
 from app.platform.config import SETTING_GROUPS
 from app.platform.config._discovery import discover
 
-CODE_KEYS = {RUN_HISTORY_PER_JOB.key, *LIVE_SCHEDULES}
+CODE_KEYS = {
+    RUN_HISTORY_PER_JOB.key,
+    KEEP_LAST.key,
+    USER_EXPORT_TTL_HOURS.key,
+    *LIVE_SCHEDULES,
+}
 
 
 def test_every_key_the_code_reads_is_a_tunable_setting() -> None:
