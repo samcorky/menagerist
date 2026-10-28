@@ -30,6 +30,26 @@ describe('explainCron', () => {
 		expect(explainCron(expression)).toEqual({ ok: true, text });
 	});
 
+	it.each([
+		['*/5 14,18 * * *', 'Every 5 minutes, during the 14:00 and 18:00 hours'],
+		['* 14,18 * * *', 'Every minute, during the 14:00 and 18:00 hours'],
+		['0,30 14,18 * * *', 'At 0 and 30 minutes past the hour, during the 14:00 and 18:00 hours'],
+		[
+			'*/15 8,12,16 * * 1-5',
+			'Every 15 minutes, during the 08:00, 12:00, and 16:00 hours, Monday through Friday'
+		]
+	])('says the hours that several minutes fall in, for %s', (expression, text) => {
+		expect(explainCron(expression)).toEqual({ ok: true, text });
+	});
+
+	it.each([
+		['0 14,18 * * *', 'At 14:00 and 18:00'],
+		['*/5 14 * * *', 'Every 5 minutes, between 14:00 and 14:59'],
+		['*/5 14-18 * * *', 'Every 5 minutes, between 14:00 and 18:59']
+	])('leaves %s alone, which cronstrue already reads correctly', (expression, text) => {
+		expect(explainCron(expression)).toEqual({ ok: true, text });
+	});
+
 	it('treats an empty schedule as off, as the server does', () => {
 		expect(explainCron('')).toEqual({ ok: true, text: 'Never runs (off)' });
 		expect(explainCron('   ')).toEqual({ ok: true, text: 'Never runs (off)' });
@@ -37,6 +57,23 @@ describe('explainCron', () => {
 
 	it('refuses a seconds part, which the scheduler does not run', () => {
 		expect(explainCron('0 0 3 * * *').ok).toBe(false);
+	});
+
+	it('offers the five-part form of a Quartz or AWS schedule', () => {
+		expect(explainCron('0 0/5 14,18 * * ?')).toEqual({
+			ok: false,
+			reason: expect.stringContaining('leave it out: 0/5 14,18 * * *')
+		});
+		expect(explainCron('0 0 3 * * *')).toEqual({
+			ok: false,
+			reason: expect.stringContaining('leave it out: 0 3 * * *')
+		});
+	});
+
+	it('does not guess when a six-part schedule does not start with 0', () => {
+		const result = explainCron('30 0 3 * * *');
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.reason).not.toContain('leave it out');
 	});
 
 	it('says why an expression cannot be read', () => {

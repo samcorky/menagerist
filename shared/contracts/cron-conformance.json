@@ -55,6 +55,22 @@
     {
       "expression": "0 3\t* * *",
       "explained": "At 03:00"
+    },
+    {
+      "expression": "*/5 14,18 * * *",
+      "explained": "Every 5 minutes, during the 14:00 and 18:00 hours"
+    },
+    {
+      "expression": "0,30 14,18 * * *",
+      "explained": "At 0 and 30 minutes past the hour, during the 14:00 and 18:00 hours"
+    },
+    {
+      "expression": "0 14,18 * * *",
+      "explained": "At 14:00 and 18:00"
+    },
+    {
+      "expression": "*/5 14-18 * * *",
+      "explained": "Every 5 minutes, between 14:00 and 18:59"
     }
   ],
   "invalid": [
@@ -76,7 +92,11 @@
     "0 0 3 * * *",
     "*/10 * * * * *"
   ],
-  "server_rejects_only": ["0 3 31 2 *", "0 3 30 2 *", "5-1 * * * *"],
+  "server_rejects_only": [
+    "0 3 31 2 *",
+    "0 3 30 2 *",
+    "5-1 * * * *"
+  ],
   "sentences": [
     {
       "sentence": {

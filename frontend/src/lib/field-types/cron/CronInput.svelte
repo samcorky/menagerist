@@ -3,6 +3,7 @@
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import { TimeField } from '$lib/components/ui/time-field/index.js';
 	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select/index.js';
 	import type { JsonSchemaProperty } from '$lib/json-schema';
 	import {
@@ -68,13 +69,10 @@
 </script>
 
 {#snippet timeInput(s: Timed)}
-	<Input
-		type="time"
-		step="60"
+	<TimeField
 		value={formatTime(s.hour, s.minute)}
-		oninput={(e) => changeTime(s, e.currentTarget.value)}
-		onblur={() => (touched = true)}
-		class="min-h-11 w-auto"
+		onValueChange={(v) => v && changeTime(s, v)}
+		onfocusout={() => (touched = true)}
 		aria-label="{ariaLabel}: time"
 	/>
 {/snippet}
