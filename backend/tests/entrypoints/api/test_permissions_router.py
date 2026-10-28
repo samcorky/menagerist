@@ -47,6 +47,8 @@ ADMIN = [
     "identity:user:update",
     "scheduling:job:read",
     "scheduling:job:run",
+    "settings:instance:read",
+    "settings:instance:write",
     "system:diagnostics:read",
 ]
 ALL = sorted(ADMIN + CONTENT)

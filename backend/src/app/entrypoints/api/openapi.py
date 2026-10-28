@@ -72,6 +72,10 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "Create, list, rotate and revoke personal access tokens.",
     },
     {
+        "name": "Settings",
+        "description": "Read and change instance settings, and fetch their schema.",
+    },
+    {
         "name": "System",
         "description": "System-level endpoints for health checks and diagnostics.",
     },

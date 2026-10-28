@@ -105,24 +105,41 @@ def test_no_reference_dangles(schema: dict[str, Any]) -> None:
             target = target[part]
 
 
-def test_shared_responses_use_problem_json_schema(schema: dict[str, Any]) -> None:
-    """Shared responses use problem json schema."""
-    for response in schema["components"]["responses"].values():
-        content = response["content"]["application/problem+json"]
-        assert content["schema"] == {"$ref": "#/components/schemas/ProblemDetail"}
+def test_common_error_responses_use_problem_json_schema(
+    schema: dict[str, Any],
+) -> None:
+    """Every operation's 401, 403, 404 and 500 are problem+json."""
+    for method, path, operation in _operations(schema):
+        for code in ("401", "403", "404", "500"):
+            response = operation["responses"].get(code)
+            if response is None:
+                continue
+            content = response["content"]["application/problem+json"]
+            assert content["schema"] == {
+                "$ref": "#/components/schemas/ProblemDetail"
+            }, f"{method.upper()} {path} {code}"
+
+
+def test_operations_carry_their_own_error_responses(schema: dict[str, Any]) -> None:
+    """Responses are inlined per operation, so each example cites its own route."""
+    assert "responses" not in schema["components"]
+    refs = [
+        f"{m.upper()} {p} {code}"
+        for m, p, o in _operations(schema)
+        for code, response in o["responses"].items()
+        if "$ref" in response
+    ]
+    assert refs == []
 
 
 def test_route_specific_entries_are_not_overwritten(schema: dict[str, Any]) -> None:
     """Route specific entries are not overwritten."""
     login = schema["paths"]["/api/v1/auth/login"]["post"]["responses"]
-    for code in ("401", "403", "429"):
-        assert "$ref" not in login[code]
     assert "another site" in login["403"]["description"]
     revoke = schema["paths"]["/api/v1/auth/sessions/{session_id}"]["delete"][
         "responses"
     ]
-    assert "$ref" not in revoke["401"]
-    assert "$ref" not in revoke["404"]
+    assert not revoke["404"]["description"].startswith("Not found, or not yours")
     patch = schema["paths"]["/api/v1/node/{node_id}"]["patch"]["responses"]
     assert patch["412"]["description"].startswith("Precondition failed")
 
@@ -130,7 +147,7 @@ def test_route_specific_entries_are_not_overwritten(schema: dict[str, Any]) -> N
 def test_bearer_operations_mention_invalid_token(schema: dict[str, Any]) -> None:
     """Bearer operations mention invalid token."""
     node = schema["paths"]["/api/v1/node"]["post"]["responses"]
-    assert node["401"] == {"$ref": "#/components/responses/UnauthenticatedToken"}
-    assert node["403"] == {"$ref": "#/components/responses/ForbiddenUnsafe"}
+    assert "invalid_token" in node["401"]["description"]
+    assert "csrf_failed" in node["403"]["description"]
     cookie_only = schema["paths"]["/api/v1/backup"]["get"]["responses"]
-    assert cookie_only["401"] == {"$ref": "#/components/responses/Unauthenticated"}
+    assert "invalid_token" not in cookie_only["401"]["description"]

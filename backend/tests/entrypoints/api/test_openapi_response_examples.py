@@ -1,7 +1,6 @@
 """Every documented response has an accurate description and example."""
 
 import re
-from collections import defaultdict
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -132,44 +131,39 @@ def test_problem_example_instances_fit_their_route(schema: dict[str, Any]) -> No
     assert bad == []
 
 
-def test_shared_responses_are_not_reused_across_statuses(
-    schema: dict[str, Any],
-) -> None:
-    """A shared response is only referenced under its own status code."""
-    statuses: dict[str, set[str]] = defaultdict(set)
-    for item in schema["paths"].values():
-        for m, operation in item.items():
-            if m not in _METHODS:
-                continue
-            for code, response in operation["responses"].items():
-                if "$ref" in response:
-                    statuses[response["$ref"]].add(code)
-    assert all(len(codes) == 1 for codes in statuses.values()), statuses
-    for ref, codes in statuses.items():
-        name = ref.rsplit("/", 1)[-1]
-        shared = schema["components"]["responses"][name]
-        assert {str(b["status"]) for b in _problem_bodies(shared)} == codes
+def test_common_401_and_403_name_each_problem_type(schema: dict[str, Any]) -> None:
+    """The common responses show one named example per problem type."""
 
+    def types(path: str, method: str, code: str) -> set[str]:
+        responses = schema["paths"][path][method]["responses"]
+        return {b["type"] for b in _problem_bodies(responses[code])}
 
-def test_shared_401_and_403_name_each_problem_type(schema: dict[str, Any]) -> None:
-    """The shared responses show one named example per problem type."""
-    components = schema["components"]["responses"]
-
-    def types(name: str) -> set[str]:
-        return {b["type"] for b in _problem_bodies(components[name])}
-
-    assert types("UnauthenticatedToken") == {
+    assert types("/api/v1/node", "post", "401") == {
         "unauthenticated",
         "setup_required",
         "invalid_token",
     }
-    assert types("Unauthenticated") == {"unauthenticated", "setup_required"}
-    assert types("ForbiddenUnsafe") == {
+    assert types("/api/v1/backup", "get", "401") == {
+        "unauthenticated",
+        "setup_required",
+    }
+    assert types("/api/v1/node", "post", "403") == {
         "about:blank",
         "csrf_failed",
         "password_expired",
     }
-    assert types("Forbidden") == {"about:blank", "password_expired"}
+    assert types("/api/v1/node", "get", "403") == {"about:blank", "password_expired"}
+
+
+def test_common_error_examples_cite_the_operations_own_url(
+    schema: dict[str, Any],
+) -> None:
+    """A 401 or 500 on /settings shows /settings, not some other route."""
+    for path in ("/api/v1/settings/instance", "/api/v1/settings/schema"):
+        for operation in schema["paths"][path].values():
+            for code in ("401", "500"):
+                for body in _problem_bodies(operation["responses"][code]):
+                    assert urlsplit(body["instance"]).path == path
 
 
 def test_problem_examples_validate_against_problem_detail(
@@ -198,15 +192,4 @@ def test_error_response_types_match_the_exception_class(schema: dict[str, Any]) 
     login = schema["paths"]["/api/v1/auth/login"]["post"]["responses"]
     assert _problem_bodies(login["403"])[0]["type"] == "account_disabled"
     token = schema["paths"]["/api/v1/node"]["post"]["responses"]["401"]
-    assert "$ref" in token
-
-
-def test_references_to_shared_responses_resolve(schema: dict[str, Any]) -> None:
-    """Every response reference resolves to a component."""
-    for item in schema["paths"].values():
-        for m, operation in item.items():
-            if m not in _METHODS:
-                continue
-            for response in operation["responses"].values():
-                if "$ref" in response:
-                    assert _resolve(schema, response)["description"]
+    assert "invalid_token" in {b["type"] for b in _problem_bodies(token)}

@@ -45,6 +45,10 @@ EXPECTED: dict[tuple[str, str], str] = {
     ("/api/v1/user/{user_id}/password", "post"): "identity:user:reset_password",
     ("/api/v1/user/{user_id}/unlock", "post"): "identity:user:unlock",
     ("/api/v1/system/version/detail", "get"): "system:diagnostics:read",
+    ("/api/v1/settings/schema", "get"): "settings:instance:read",
+    ("/api/v1/settings/instance", "get"): "settings:instance:read",
+    ("/api/v1/settings/instance", "patch"): "settings:instance:write",
+    ("/api/v1/settings/instance/{key}", "delete"): "settings:instance:write",
 }
 
 

@@ -227,8 +227,13 @@ PRESETS = "shared presets: not owned content (decision 6)"
 CREATES_OWN = "references no existing content; creates content owned by the caller"
 
 RECENTLY_DELETED = "own deleted rows only, empty in the seed; two-user router tests"
+SETTINGS = "administrator-only instance settings, not owned content; router tests"
 
 ALLOWED: dict[Route, str] = {
+    ("GET", "/api/v1/settings/schema"): SETTINGS,
+    ("GET", "/api/v1/settings/instance"): SETTINGS,
+    ("PATCH", "/api/v1/settings/instance"): SETTINGS,
+    ("DELETE", "/api/v1/settings/instance/{key}"): SETTINGS,
     ("GET", "/api/v1/node/deleted"): RECENTLY_DELETED,
     ("POST", "/api/v1/node/{node_id}/restore"): RECENTLY_DELETED,
     ("DELETE", "/api/v1/node/{node_id}/purge"): RECENTLY_DELETED,

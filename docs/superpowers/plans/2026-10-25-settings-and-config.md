@@ -67,8 +67,9 @@ Effective value, highest first: env pin, user row, instance row, code default. B
 - **Audit:** every write records `updated_by` and `updated_at` and emits a structured log event. A durable audit trail waits for the events work in `2026-10-25-scheduler.md` (stage 2).
 
 ### API (indicative; the route restructure is done, so mount under the new `/api/v1/system` layout)
+- `GET /api/v1/settings/schema`: one JSON Schema document, properties keyed by setting key, with an `ETag`.
 - `GET /api/v1/settings/instance`: for each tunable, `{key, group, scope, value, source, locked, env_name?, restart_required, schema}`. The schema carries `x-menagerist` hints only; state (`source`, `locked`, value) is computed server-side and kept out of it.
-- `PATCH /api/v1/settings/instance`: partial `{key: value}` body; 409/422 mapped through the existing exception handlers for locked or invalid values (no try/except in routers).
+- `PATCH /api/v1/settings/instance`: partial `{"values": {key: value}}` body; 404 unknown, 409 locked and 400 invalid, mapped through the existing exception handlers (no try/except in routers).
 - `DELETE /api/v1/settings/instance/{key}`: reset to the next layer.
 - `GET`/`PATCH /api/v1/settings/me` for user scope (later phase).
 - Public config (Part 2 Phase 3) reads fields marked `Public`, independent of this module.
@@ -110,7 +111,9 @@ Steps, each behaviour-neutral with existing tests green:
 
 **Phase C: frontend core extraction. DONE 2026-10-28** (steps 1-3; the `field-kinds.json` frontend test moves to Phase E with the `cron` kind). `lib/prop-meta.ts` and `lib/json-schema.ts` hold the neutral accessors and types (old paths re-export them); `field-types/core.ts` holds `FieldCore`, the single matcher `pickCore` and `coreForProp`/`getCore`/`allCores`/`registerCore`; `registry.ts` keeps the schema-editor half and `register()` registers both, so the 18 field types are unchanged. Render-only callers use `coreForProp`; `GroupInput.svelte`, the schema editor and the kind row stay on the descriptor. Steps 1-3 above, plus `field-kinds.json` and its two tests. Independent of A and B and worth doing even if the settings UI slips.
 
-**Phase D: settings module backend.** Domain, ports, in-memory siblings, migration, use cases, `SettingsReader`, API routes, contract-style tests for the repository (in-memory and Postgres), router tests, locked and invalid cases, cache behaviour.
+**Phase D: settings module backend. DONE 2026-10-28** (instance scope; user-scoped routes and use cases stay in Phase G, but the repository, reader and resolution are already scope-aware). Built in four slices: D1 domain, ports, in-memory adapters and `CachedSettingsReader` with the `SettingKey`/`SettingsReader` port in `shared_kernel` (question 7); D2 `setting_values` table (`KEEP` in backups), SQL upsert repository and `build_catalogue` from `discover()` plus the live settings instances (pins); D3 `ListSettings`, `GetSettingsSchema`, `UpdateSettings`, `ResetSetting` and the admin-only `settings:instance:read`/`write` permissions; D4 the API. Deviations: a domain `ValidationError` is a 400, not 422; the PATCH body is `{"values": {key: value}}` because request models must be `RequestModel`s with named fields; cross-field validation of a patch (question 9) is deferred until a tunable group has a constraint spanning two tunable fields; the common error responses are now inlined per operation so each example cites its own URL.
+
+Original scope: Domain, ports, in-memory siblings, migration, use cases, `SettingsReader`, API routes, contract-style tests for the repository (in-memory and Postgres), router tests, locked and invalid cases, cache behaviour.
 
 **Phase E: settings form and `cron` kind (frontend).** Admin instance page, source badges, reset, per-field save, the `cron` core kind.
 

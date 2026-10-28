@@ -48,7 +48,7 @@ def test_the_default_member_grant_is_the_content_set() -> None:
     assert frozenset(CONTENT_PERMISSIONS) == CONTENT_VALUES
     assert not CONTENT_PERMISSIONS & ADMIN_ONLY_ACTIONS
     assert ALL_PERMISSIONS - MEMBER_PERMISSIONS == ADMIN_ONLY_ACTIONS
-    assert len(ALL_PERMISSIONS) == 34
+    assert len(ALL_PERMISSIONS) == 36
 
 
 def test_the_admin_only_set_matches_the_catalogue() -> None:
@@ -70,6 +70,8 @@ def test_the_admin_only_set_matches_the_catalogue() -> None:
                 "system:diagnostics:read",
                 "scheduling:job:read",
                 "scheduling:job:run",
+                "settings:instance:read",
+                "settings:instance:write",
                 "backup:archive:create",
                 "backup:archive:read",
                 "backup:archive:restore",

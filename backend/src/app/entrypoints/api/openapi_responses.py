@@ -2,8 +2,9 @@
 
 Routes document only what is specific to them. The statuses the app adds
 everywhere (authentication, permission, CSRF, missing resources, unhandled
-errors) are attached here as shared `components.responses`, and only where the
-operation has not already documented that status itself.
+errors) are attached here, and only where the operation has not already
+documented that status itself. Each operation gets its own copy, so its
+examples cite its own URL as the `instance`, not one shared route.
 """
 
 import copy
@@ -192,9 +193,7 @@ _RESPONSES: dict[str, dict[str, Any]] = {
         {
             "not_found": (
                 "Resource not found",
-                problem_example(
-                    404, "NodeNotFoundError", f"Node {_EXAMPLE_ID} not found"
-                ),
+                problem_example(404, "NotFoundError", "The resource was not found."),
             )
         },
     ),
@@ -210,23 +209,10 @@ _RESPONSES: dict[str, dict[str, Any]] = {
         },
     ),
 }
-# The shared 401 and 403 examples cite one representative route each.
-_SHARED_INSTANCE_PATH = {
-    "Unauthenticated": "/api/v1/auth/me",
-    "UnauthenticatedToken": "/api/v1/node",
-    "Forbidden": "/api/v1/user",
-    "ForbiddenUnsafe": "/api/v1/node",
-    "NotFound": f"/api/v1/node/{_EXAMPLE_ID}",
-    "InternalError": "/api/v1/node",
-}
-
-
-def _ref(name: str) -> dict[str, str]:
-    return {"$ref": f"#/components/responses/{name}"}
 
 
 def _add_missing(operation: dict[str, Any], status: int, name: str) -> None:
-    operation["responses"].setdefault(str(status), _ref(name))
+    operation["responses"].setdefault(str(status), copy.deepcopy(_RESPONSES[name]))
 
 
 def _example_path(path: str, operation: dict[str, Any]) -> str:
@@ -280,7 +266,7 @@ def _document_operation(path: str, method: str, operation: dict[str, Any]) -> No
 
 
 def add_error_responses(openapi_schema: dict[str, Any]) -> None:
-    """Attach shared error responses to every `/api/v1` operation, keeping its own.
+    """Attach the common error responses to every `/api/v1` operation, keeping its own.
 
     Also gives every problem+json example an `instance` that fits its route and
     replaces FastAPI's 422 entry with the problem+json body the app really sends.
@@ -289,10 +275,6 @@ def add_error_responses(openapi_schema: dict[str, Any]) -> None:
     schemas = components.setdefault("schemas", {})
     schemas.setdefault("ProblemDetail", ProblemDetail.model_json_schema())
     schemas["ValidationProblem"] = _validation_problem_schema()
-    shared = copy.deepcopy(_RESPONSES)
-    for name, response in shared.items():
-        _fill_instance(response, "", _SHARED_INSTANCE_PATH[name])
-    components["responses"] = shared
     for path, item in openapi_schema.get("paths", {}).items():
         if not path.startswith(_API_PREFIX):
             continue
