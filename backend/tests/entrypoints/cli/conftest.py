@@ -1,6 +1,8 @@
+import logging
 from typing import TYPE_CHECKING
 
 import pytest
+import structlog
 
 from app.platform.cli_output import OutputFormat, set_format
 
@@ -14,3 +16,5 @@ def _plain_text_output() -> Iterator[None]:
     set_format(OutputFormat.AUTO)
     yield
     set_format(OutputFormat.AUTO)
+    structlog.reset_defaults()  # `main` configures logging; cached loggers hide capture
+    logging.getLogger().handlers.clear()

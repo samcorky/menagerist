@@ -62,17 +62,17 @@ def configure_logging(
 ) -> None:
     """Sets up logging with structlog.
 
-    A no-op on repeat calls unless `level` is given explicitly. Both entrypoint
+    A no-op on repeat calls unless `level` or `stream` is given. Both entrypoint
     modules (`api`, `cli`) call this unconditionally at import time, and a CLI
     command can lazily import `api` after the CLI has already configured
     logging (e.g. via `--verbose`); without this guard, that later import-time
     call would silently reset the level back to `LOG_LEVEL`.
 
     Logs go to stdout, which is where a container collects them. A CLI that prints
-    data passes `stream=sys.stderr` (with an explicit `level`) to keep stdout clean.
+    data passes `stream=sys.stderr` to keep stdout clean.
     """
     global _configured
-    if _configured and level is None:
+    if _configured and level is None and stream is None:
         return
     _configured = True
 

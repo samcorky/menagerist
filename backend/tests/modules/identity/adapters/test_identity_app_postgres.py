@@ -75,22 +75,20 @@ def _rows(sync_url: str, sql: str) -> list[tuple[object, ...]]:
     return rows
 
 
-def test_create_admin_reset_password_and_list(
-    database: str, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_create_admin_reset_password_and_list(database: str) -> None:
     """First admin claims existing data; a second does not; reset forces a change."""
-    create_admin(username="sam")
+    created = create_admin(username="sam")
     first = _rows(database, "SELECT id, role, password_expired FROM users")
     assert [(row[1], row[2]) for row in first] == [("admin", False)]
     assert _rows(database, "SELECT owner_id FROM nodes") == [(first[0][0],)]
-    assert "1 items" in capsys.readouterr().out
+    assert "1 items" in str(created["message"])
 
     _fresh_engine()
     create_admin(username="bob")
     _fresh_engine()
     reset_password(username="bob", from_settings=True)
     _fresh_engine()
-    list_accounts()
+    listing = list_accounts()
 
     bob = _rows(
         database,
@@ -98,8 +96,7 @@ def test_create_admin_reset_password_and_list(
     )
     assert bob == [("admin", True)]
     assert _rows(database, "SELECT owner_id FROM nodes") == [(first[0][0],)]
-    out = capsys.readouterr().out
-    rows = out.splitlines()
-    assert any("sam" in r and "admin" in r and "active" in r for r in rows)
-    assert any("bob" in r and "admin" in r and "active" in r for r in rows)
-    assert "scrypt$" not in out
+    rows = {row["username"]: row for row in listing.value}  # type: ignore[attr-defined]
+    for name in ("sam", "bob"):
+        assert (rows[name]["role"], rows[name]["status"]) == ("admin", "active")
+    assert "scrypt$" not in str(listing.value)

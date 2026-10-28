@@ -322,24 +322,17 @@ def test_failed_job_reports_its_error_and_exits_nonzero(
 def test_json_output_stays_parseable_when_a_job_logs(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Application logs belong on stderr while a command owns stdout."""
+    """The entry point sends logs to stderr, so stdout carries only the result."""
     import logging
-    import sys
-
-    handler = logging.StreamHandler(sys.stdout)
-    root = logging.getLogger()
-    root.addHandler(handler)
 
     async def operation(job_key: str) -> JobRun:
         logging.getLogger("test.job").warning("job diagnostic")
         return JobRun.create(job_key=job_key, scheduled_for=NOW)
 
     monkeypatch.setattr(commands, "_run_job", operation)
-    try:
-        cli.app.meta(["--json", "job", "run", "x"])
-        captured = capsys.readouterr()
-        assert json.loads(captured.out)["job_key"] == "x"
-        assert "job diagnostic" in captured.err
-        assert handler.stream is sys.stdout
-    finally:
-        root.removeHandler(handler)
+
+    cli.app.meta(["--json", "job", "run", "x"])
+
+    captured = capsys.readouterr()
+    assert json.loads(captured.out)["job_key"] == "x"
+    assert "job diagnostic" in captured.err

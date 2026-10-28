@@ -68,6 +68,16 @@ app = App(
 app.meta.result_action = RESULT_ACTION
 
 
+def _runs_until_stopped(tokens: tuple[str, ...]) -> bool:
+    remaining = iter(tokens)
+    for token in remaining:
+        if token == "--format":
+            next(remaining, None)  # its value is not the command
+        elif not token.startswith("-"):
+            return token in {"serve", "worker"}
+    return False
+
+
 @app.meta.default
 def main(
     *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
@@ -83,7 +93,7 @@ def main(
     Args:
         tokens: Remaining command-line tokens, forwarded to the command apps.
         verbose: Log at DEBUG level, overriding `LOG_LEVEL`.
-        quiet: Show only errors, on stderr, so stdout carries just a command's output.
+        quiet: Log only errors.
         output_format: How results are shown: `rich` (tables, the default on a
             terminal), `text` (plain lines, the default when piped) or `json`.
         json_output: Show results as JSON; the same as `--format json`.
@@ -93,10 +103,10 @@ def main(
     if json_output and output_format not in (OutputFormat.AUTO, OutputFormat.JSON):
         raise SystemExit("--json cannot be combined with --format other than json.")
     set_format(OutputFormat.JSON if json_output else output_format)
-    if verbose:
-        configure_logging(level=logging.DEBUG)
-    elif quiet:
-        configure_logging(level=logging.ERROR, stream=sys.stderr)
+    # Results own stdout. Only the commands a container runs keep logging there.
+    stream = sys.stdout if _runs_until_stopped(tokens) else sys.stderr
+    level = logging.DEBUG if verbose else logging.ERROR if quiet else None
+    configure_logging(level=level, stream=stream)
     return app(tokens)
 
 

@@ -1,9 +1,6 @@
 """Thin Cyclopts adapters for registered jobs."""
 
 import asyncio
-import logging
-import sys
-from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from cyclopts import App
@@ -15,7 +12,7 @@ from app.platform.cli_output import Report
 from app.shared_kernel.errors import DomainError
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Iterator
+    from collections.abc import Awaitable, Callable
 
     from app.modules.scheduling.application.list_jobs import JobStatus
     from app.modules.scheduling.domain.job_run import JobRun
@@ -86,25 +83,7 @@ def run(job_key: str) -> Report:
 
 def _run_operation[T](operation: Awaitable[T]) -> T:
     try:
-        with _logs_to_stderr():
-            return asyncio.run(operation)
+        return asyncio.run(operation)
     except DomainError as error:
         job_app.error_console.print(Text(str(error)), style="red")
         raise SystemExit(1) from error
-
-
-@contextmanager
-def _logs_to_stderr() -> Iterator[None]:
-    handlers = [
-        handler
-        for handler in logging.getLogger().handlers
-        if isinstance(handler, logging.StreamHandler)
-        and (handler.stream is sys.stdout or handler.stream is sys.__stdout__)
-    ]
-    streams = [handler.setStream(sys.stderr) for handler in handlers]
-    try:
-        yield
-    finally:
-        for handler, stream in zip(handlers, streams, strict=True):
-            if stream is not None:
-                handler.setStream(stream)

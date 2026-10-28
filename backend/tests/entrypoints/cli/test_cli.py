@@ -27,10 +27,10 @@ def test_main_forwards_tokens_to_the_app(monkeypatch: pytest.MonkeyPatch) -> Non
     assert calls == [("schema", "dump")]
 
 
-def test_main_without_verbose_leaves_the_log_level_untouched(
+def test_main_without_a_level_flag_leaves_the_log_level_to_the_setting(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Without `-v`, the log level configured at import time is left alone."""
+    """Without `-v` or `-q`, `LOG_LEVEL` decides; only the stream is chosen."""
     configure_logging_calls = []
     monkeypatch.setattr(
         cli,
@@ -41,7 +41,7 @@ def test_main_without_verbose_leaves_the_log_level_untouched(
 
     cli.main(verbose=False)
 
-    assert configure_logging_calls == []
+    assert configure_logging_calls == [{"level": None, "stream": sys.stderr}]
 
 
 def test_main_with_verbose_forces_debug_level(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -56,7 +56,7 @@ def test_main_with_verbose_forces_debug_level(monkeypatch: pytest.MonkeyPatch) -
 
     cli.main(verbose=True)
 
-    assert configure_logging_calls == [{"level": logging.DEBUG}]
+    assert configure_logging_calls == [{"level": logging.DEBUG, "stream": sys.stderr}]
 
 
 def test_main_with_quiet_shows_only_errors_on_stderr(
@@ -74,6 +74,30 @@ def test_main_with_quiet_shows_only_errors_on_stderr(
     cli.main(quiet=True)
 
     assert configure_logging_calls == [{"level": logging.ERROR, "stream": sys.stderr}]
+
+
+@pytest.mark.parametrize(
+    ("tokens", "stream"),
+    [
+        (("worker",), sys.stdout),
+        (("--format", "json", "worker"), sys.stdout),
+        (("-v", "--format", "json", "backup", "list"), sys.stderr),
+        (("serve", "--port", "1"), sys.stdout),
+        (("backup", "list"), sys.stderr),
+        ((), sys.stderr),
+    ],
+)
+def test_logs_go_to_stderr_except_for_the_commands_a_container_runs(
+    monkeypatch: pytest.MonkeyPatch, tokens: tuple[str, ...], stream: object
+) -> None:
+    """Results own stdout; `serve` and `worker` keep logging there for containers."""
+    calls = []
+    monkeypatch.setattr(cli, "configure_logging", lambda **kw: calls.append(kw))
+    monkeypatch.setattr(cli, "app", lambda _tokens: None)
+
+    cli.main(*tokens)
+
+    assert calls[0]["stream"] is stream
 
 
 def test_main_refuses_verbose_and_quiet_together(
