@@ -72,6 +72,10 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "Create, list, rotate and revoke personal access tokens.",
     },
     {
+        "name": "Scheduling",
+        "description": "Preview when a recurring schedule would next run.",
+    },
+    {
         "name": "Settings",
         "description": "Read and change instance settings, and fetch their schema.",
     },

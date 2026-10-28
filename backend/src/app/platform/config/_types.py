@@ -56,8 +56,15 @@ type ProxyAddress = Annotated[str, ValidateAs(IPvAnyAddress | IPvAnyNetwork, str
 
 
 def _cron(value: str) -> str:
-    """Accept a five-field cron expression; empty means the job is off."""
+    """Accept a five-part cron expression; empty means the job is off.
+
+    The scheduler evaluates exactly five parts, so the seconds-first six-part form that
+    `cronsim` also reads is refused here rather than failing on the worker.
+    """
     if value:
+        if len(value.split()) != 5:
+            msg = f"invalid cron schedule: {value} (a schedule has five parts)"
+            raise ValueError(msg)
         try:
             CronSim(value, datetime(2000, 1, 1, tzinfo=UTC))
         except CronSimError as exc:

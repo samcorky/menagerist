@@ -228,8 +228,10 @@ CREATES_OWN = "references no existing content; creates content owned by the call
 
 RECENTLY_DELETED = "own deleted rows only, empty in the seed; two-user router tests"
 SETTINGS = "administrator-only instance settings, not owned content; router tests"
+SCHEDULING = "administrator-only schedule preview, reads no content; router tests"
 
 ALLOWED: dict[Route, str] = {
+    ("GET", "/api/v1/scheduling/schedule-preview"): SCHEDULING,
     ("GET", "/api/v1/settings/schema"): SETTINGS,
     ("GET", "/api/v1/settings/instance"): SETTINGS,
     ("PATCH", "/api/v1/settings/instance"): SETTINGS,

@@ -112,6 +112,7 @@ EXPECTED_PERMISSIONS: dict[str, str] = {
     "presets.UpdatePreset": "presets:preset:write",
     "scheduling.RunJobNow": "scheduling:job:run",
     "scheduling.ListJobs": "scheduling:job:read",
+    "scheduling.PreviewSchedule": "scheduling:job:read",
     "scheduling.GetJobHistory": "scheduling:job:read",
     "settings.GetSettingsSchema": "settings:instance:read",
     "settings.ListSettings": "settings:instance:read",
