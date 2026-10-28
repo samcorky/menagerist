@@ -6,7 +6,7 @@ from uuid import UUID
 
 import structlog
 
-from app.modules.settings.domain.errors import InvalidSettingValueError
+from app.modules.settings.application.resolution import is_valid
 from app.modules.settings.domain.setting import SettingScope, resolve
 
 if TYPE_CHECKING:
@@ -60,7 +60,7 @@ class CachedSettingsReader:
             raise ValueError(msg)
         owner = user_id if descriptor.scope is SettingScope.USER else None
         stored = (await self._rows((descriptor.scope, owner))).get(key.key)
-        valid = stored is not None and self._is_valid(key.key, stored)
+        valid = stored is not None and is_valid(self._catalogue, key.key, stored)
         if stored is not None and not valid:
             logger.warning("stored setting is invalid; using the default", key=key.key)
         resolved = resolve(
@@ -70,13 +70,6 @@ class CachedSettingsReader:
             is_valid=lambda _: valid,
         )
         return cast("T", self._catalogue.to_python(key.key, resolved.value))
-
-    def _is_valid(self, key: str, value: SettingValue) -> bool:
-        try:
-            self._catalogue.normalise(key, value)
-        except InvalidSettingValueError:
-            return False
-        return True
 
     async def _rows(self, address: Address) -> dict[str, SettingValue]:
         cached = self._cache.get(address)

@@ -113,6 +113,10 @@ EXPECTED_PERMISSIONS: dict[str, str] = {
     "scheduling.RunJobNow": "scheduling:job:run",
     "scheduling.ListJobs": "scheduling:job:read",
     "scheduling.GetJobHistory": "scheduling:job:read",
+    "settings.GetSettingsSchema": "settings:instance:read",
+    "settings.ListSettings": "settings:instance:read",
+    "settings.ResetSetting": "settings:instance:write",
+    "settings.UpdateSettings": "settings:instance:write",
     "system.GetHealthReadyDetail": "system:diagnostics:read",
     "system.GetVersionDetail": "system:diagnostics:read",
     "system.RunBrowserCheck": "system:diagnostics:read",
@@ -157,6 +161,8 @@ EXPECTED_CATALOGUE: frozenset[str] = frozenset(
         "system:diagnostics:read",
         "scheduling:job:read",
         "scheduling:job:run",
+        "settings:instance:read",
+        "settings:instance:write",
     }
 )
 
@@ -197,6 +203,6 @@ def test_every_non_admin_permission_is_a_member_permission(name: str) -> None:
 
 
 def test_catalogue_is_pinned() -> None:
-    """The permission catalogue (18 admin, 16 member) only changes deliberately."""
+    """The permission catalogue (20 admin, 16 member) only changes deliberately."""
     assert {p.value for p in ALL_PERMISSIONS} == EXPECTED_CATALOGUE
-    assert len(EXPECTED_CATALOGUE) == 34
+    assert len(EXPECTED_CATALOGUE) == 36
