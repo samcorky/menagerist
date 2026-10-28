@@ -73,6 +73,7 @@ from app.modules.media.ports.media_asset_repository import MediaAssetRepository
 from app.modules.media.ports.media_attachment_repository import (
     MediaAttachmentRepository,
 )
+from app.modules.settings.adapters.persistence.models import SettingValueModel
 from app.platform.database import Base
 from app.platform.orm_mixins import OwnedMixin
 from app.shared_kernel.access import Content, Requires
@@ -300,6 +301,9 @@ OWNED_MODELS = (NodeModel, EdgeModel, MediaAssetModel, ExampleInstallationModel)
 # `CollectionModel.owner_id` is NOT NULL (every collection has an owner from the
 # start), so it declares its own column instead of the nullable mixin.
 OWNER_COLUMN_WITHOUT_MIXIN = (CollectionModel,)
+# A setting value is not content: its `owner_id` is part of the row's address (NULL
+# means instance-wide) and the repository always filters on scope, owner and key.
+OWNER_IN_ADDRESS_NOT_CONTENT = (SettingValueModel,)
 
 
 @pytest.mark.parametrize("model", OWNED_MODELS, ids=lambda m: m.__name__)
@@ -316,5 +320,6 @@ def test_every_model_with_an_owner_column_is_known() -> None:
         if "owner_id" in mapper.columns
         and not issubclass(mapper.class_, OwnedMixin)
         and mapper.class_ not in OWNER_COLUMN_WITHOUT_MIXIN
+        and mapper.class_ not in OWNER_IN_ADDRESS_NOT_CONTENT
     )
     assert unknown == []
