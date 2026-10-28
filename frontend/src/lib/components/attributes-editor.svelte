@@ -12,7 +12,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { normalise, isSectionItem } from '$lib/layout';
-	import { descriptorForProp } from '$lib/field-types';
+	import { coreForProp } from '$lib/field-types';
 	import { describeConstraints, parseConstraints } from '$lib/field-types/text/constraints';
 	import { createSafeValidator } from '$lib/safe-validator';
 	import { friendlyClientError, topLevelKey } from '$lib/validation-messages';
@@ -259,7 +259,7 @@
 {#snippet fieldEntry(key: string, prop: JsonSchemaProperty, overlay: boolean = false)}
 	{@const isRequired = requiredKeys.includes(key)}
 	{@const error = fieldErrors[key]}
-	{@const desc = descriptorForProp(prop)}
+	{@const desc = coreForProp(prop)}
 	{@const Widget = desc?.InputWidget}
 	{@const parsed =
 		prop.type === 'string'

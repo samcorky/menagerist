@@ -29,3 +29,5 @@ export {
 	fieldFromProperty,
 	propertyFromField
 } from './registry';
+export { registerCore, getCore, allCores, coreForProp } from './core';
+export type { FieldCore } from './core';

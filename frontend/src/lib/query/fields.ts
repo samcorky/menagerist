@@ -1,4 +1,4 @@
-import { descriptorForProp, getDescriptor } from '$lib/field-types';
+import { coreForProp, getDescriptor } from '$lib/field-types';
 import { readPropMeta, withPropMeta } from '$lib/schema-meta';
 import type { JsonSchemaProperty } from '$lib/schema-types';
 import type { ItemField } from '$lib/item-fields';
@@ -72,7 +72,7 @@ function isRec(value: unknown): value is Record<string, unknown> {
 
 function kindOf(prop: JsonSchemaProperty): string | null {
 	try {
-		return descriptorForProp(prop)?.kind ?? null;
+		return coreForProp(prop)?.kind ?? null;
 	} catch {
 		return null;
 	}
@@ -263,7 +263,7 @@ export function formatFieldValue(field: FieldInfo, value: unknown): string | nul
 	if (field.kind === 'rating' && typeof value === 'number')
 		return `${value} ${value === 1 ? 'star' : 'stars'}`;
 	if (field.kind === 'boolean' && typeof value === 'boolean') return value ? 'yes' : 'no';
-	const text = descriptorForProp(field.prop)?.formatSummary?.(value, field.prop);
+	const text = coreForProp(field.prop)?.formatSummary?.(value, field.prop);
 	return typeof text === 'string' && text !== '' ? text : null;
 }
 

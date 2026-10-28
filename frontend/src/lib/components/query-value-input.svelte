@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { X } from '@lucide/svelte';
-	import { descriptorForProp } from '$lib/field-types';
+	import { coreForProp } from '$lib/field-types';
 	import DateInput from '$lib/field-types/date/DateInput.svelte';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Combobox from '$lib/components/ui/combobox/index.js';
@@ -253,7 +253,7 @@
 			{/each}
 		</NativeSelect.Root>
 		{#if mode === 'date'}
-			{@const Widget = f ? descriptorForProp(f.prop)?.InputWidget : undefined}
+			{@const Widget = f ? coreForProp(f.prop)?.InputWidget : undefined}
 			<div class="min-w-40 flex-1">
 				{#if f && f.kind === 'partialdate' && Widget}
 					<Widget
@@ -279,7 +279,7 @@
 	{#if f.kind === 'date' || f.kind === 'partialdate'}
 		{@render dateOperand(operand, ariaLabel, set, f)}
 	{:else}
-		{@const Widget = descriptorForProp(f.prop)?.InputWidget}
+		{@const Widget = coreForProp(f.prop)?.InputWidget}
 		{#if Widget}
 			<div class="flex min-w-0 flex-1">
 				<Widget

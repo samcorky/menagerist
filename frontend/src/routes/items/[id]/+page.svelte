@@ -28,7 +28,7 @@
 	import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
 	import { archivedKeys, mergeAttributeSchemas, readSchemaMeta } from '$lib/schema-meta';
 	import { normalise, isSectionItem } from '$lib/layout';
-	import { descriptorForProp } from '$lib/field-types';
+	import { coreForProp } from '$lib/field-types';
 	import { formatDateTime, formatRelativeTime } from '$lib/format-date';
 	import { slugify } from '$lib/utils.js';
 	import { loadExampleIds } from '$lib/examples';
@@ -692,7 +692,7 @@
 								{#snippet attrField(key: string, prop: JsonSchemaProperty)}
 									{@const rawValue = attributeRows.find((r) => r.key === key)?.value}
 									{#if rawValue !== undefined}
-										{@const desc = descriptorForProp(prop)}
+										{@const desc = coreForProp(prop)}
 										{@const ViewWidget = desc?.ViewWidget}
 										<div
 											class="flex gap-2 {prop.type === 'array' ? 'items-start' : 'items-center'}"

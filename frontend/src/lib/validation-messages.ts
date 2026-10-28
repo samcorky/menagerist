@@ -1,4 +1,4 @@
-import { descriptorForProp } from '$lib/field-types';
+import { coreForProp } from '$lib/field-types';
 import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
 
 type Node = Record<string, unknown>;
@@ -40,7 +40,7 @@ export function friendlyClientError(
 	error: { keyword: string; keywordLocation: string; error: string }
 ): string {
 	const { prop, value } = locate(schema, error.keywordLocation);
-	const friendly = prop && descriptorForProp(prop)?.formatError?.(error.keyword, value);
+	const friendly = prop && coreForProp(prop)?.formatError?.(error.keyword, value);
 	return friendly || error.error || 'Invalid value';
 }
 
@@ -64,9 +64,7 @@ export function friendlyServerError(
 ): string {
 	const prop = schema && error.path ? propAtPath(schema, error.path) : undefined;
 	const friendly =
-		prop && error.keyword
-			? descriptorForProp(prop)?.formatError?.(error.keyword, error.value)
-			: null;
+		prop && error.keyword ? coreForProp(prop)?.formatError?.(error.keyword, error.value) : null;
 	return friendly || error.message || 'Invalid value';
 }
 

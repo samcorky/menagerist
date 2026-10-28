@@ -2,7 +2,7 @@
 	import type { PresetResponse } from '$lib/api/client';
 	import AttributesEditor from '$lib/components/attributes-editor.svelte';
 	import { attributesToRows, rowsToAttributes, type AttributeRow } from '$lib/attribute-rows';
-	import { descriptorForProp } from '$lib/field-types';
+	import { coreForProp } from '$lib/field-types';
 	import { normalise, orderedKeys } from '$lib/layout';
 	import { presetExampleSchema } from '$lib/preset-packs';
 	import { readSchemaMeta } from '$lib/schema-meta';
@@ -32,7 +32,7 @@
 		{#each previewKeys as key (key)}
 			{@const prop = schema.properties[key]}
 			{@const value = previewValues[key] ?? ''}
-			{@const ViewWidget = descriptorForProp(prop)?.ViewWidget}
+			{@const ViewWidget = coreForProp(prop)?.ViewWidget}
 			<div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-2">
 				<span class="pt-0.5 text-sm text-muted-foreground sm:w-32 sm:shrink-0">
 					{prop.title || key}

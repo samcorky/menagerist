@@ -92,7 +92,12 @@ describe('archived properties', () => {
 
 describe('single accessor', () => {
 	const srcDir = fileURLToPath(new URL('../src', import.meta.url));
-	const allowed = new Set(['lib/schema-meta.ts', 'lib/schema-types.ts']);
+	const allowed = new Set([
+		'lib/prop-meta.ts',
+		'lib/schema-meta.ts',
+		'lib/json-schema.ts',
+		'lib/schema-types.ts'
+	]);
 	const rel = (file: string) => relative(srcDir, file).replaceAll('\\', '/');
 
 	function sourceFiles(dir: string): string[] {
