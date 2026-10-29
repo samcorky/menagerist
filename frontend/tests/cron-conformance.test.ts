@@ -18,14 +18,6 @@ describe('cron conformance fixture', () => {
 		}
 	);
 
-	// Known limit: the browser cannot tell that these never fire or are backwards.
-	it.each(contract.server_rejects_only)(
-		'cannot see why the server refuses %j, so the server says',
-		(expression) => {
-			expect(explainCron(expression).ok).toBe(true);
-		}
-	);
-
 	it.each(contract.sentences)('says $cron as a sentence and back', ({ sentence, cron }) => {
 		expect(buildCron(sentence as Sentence)).toBe(cron);
 		expect(parseCron(cron)).toEqual(sentence);

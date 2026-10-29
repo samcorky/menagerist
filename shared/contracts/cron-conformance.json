@@ -74,7 +74,47 @@
     },
     {
       "expression": "7-59/13,*/17,2 1-23/5,0,12-18/2 */9,29-31 2,*/5,JAN-MAR 1-5,0",
-      "explained": "Every 13 minutes, minutes 7 through 59 past the hour, every 17 minutes, and at 2 minutes past the hour, every 5 hours, between 01:00 and 23:59, at 00:00, and every 2 hours, between 12:00 and 18:00, every 9 days in a month and 29 through 31, and on Monday through Friday and Sunday, only in February, every 5 months, and January through March"
+      "explained": "Minute: every 13 minutes from 7 to 59, every 17 minutes and 2\nHour: every 5 hours from 1 to 23, 0 and every 2 hours from 12 to 18\nDay of month: every 9 days and 29 to 31\nMonth: February, every 5 months and January to March\nDay of week: Monday to Friday and Sunday\nA day counts if it fits the day of the month or the day of the week."
+    },
+    {
+      "expression": "*/20,5 * * * *",
+      "explained": "Minute: every 20 minutes and 5"
+    },
+    {
+      "expression": "5/15,50 * * * *",
+      "explained": "Minute: every 15 minutes (starting at 5) and 50"
+    },
+    {
+      "expression": "0,30 9-17/2,20 * * mon-fri,sat",
+      "explained": "Minute: 0 and 30\nHour: every 2 hours from 9 to 17 and 20\nDay of week: Monday to Friday and Saturday"
+    },
+    {
+      "expression": "0 0 1-7,15 * 1,3-5",
+      "explained": "Minute: 0\nHour: 0\nDay of month: 1 to 7 and 15\nDay of week: Monday and Wednesday to Friday\nA day counts if it fits the day of the month or the day of the week."
+    },
+    {
+      "expression": "0 0 * jan-mar,6 *",
+      "explained": "Minute: 0\nHour: 0\nMonth: January to March and June"
+    },
+    {
+      "expression": "0 0 * * 0-2,7",
+      "explained": "Minute: 0\nHour: 0\nDay of week: Sunday to Tuesday and Sunday"
+    },
+    {
+      "expression": "0 0 1-5/1,10 * *",
+      "explained": "Minute: 0\nHour: 0\nDay of month: every day from 1 to 5 and 10"
+    },
+    {
+      "expression": "0 0 29 2 *",
+      "explained": "At 00:00, on day 29 of the month, only in February"
+    },
+    {
+      "expression": "0 0 31 2-3 *",
+      "explained": "At 00:00, on day 31 of the month, February through March"
+    },
+    {
+      "expression": "0 0 31 */2 *",
+      "explained": "At 00:00, on day 31 of the month, every 2 months"
     }
   ],
   "invalid": [
@@ -94,12 +134,17 @@
     "0 3 15W * *",
     "H 3 * * *",
     "0 0 3 * * *",
-    "*/10 * * * * *"
-  ],
-  "server_rejects_only": [
+    "*/10 * * * * *",
     "0 3 31 2 *",
     "0 3 30 2 *",
-    "5-1 * * * *"
+    "0 3 31 4,6 *",
+    "0 3 30-31 2 *",
+    "0 3 31 2 1",
+    "5-1 * * * *",
+    "0 22-2 * * *",
+    "0 0 * 11-2 *",
+    "0 0 * * FRI-MON",
+    "0 0 * * SAT-SUN"
   ],
   "sentences": [
     {

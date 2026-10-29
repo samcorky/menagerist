@@ -19,9 +19,9 @@
 		<span>Off</span>
 	{:else if cronMode.value === 'cron'}
 		<code class="font-mono text-sm break-all">{text}</code>
-		<span class="text-xs text-muted-foreground">{reading.text}</span>
+		<span class="text-xs whitespace-pre-line text-muted-foreground">{reading.text}</span>
 	{:else}
-		<span>{reading.text}</span>
+		<span class="whitespace-pre-line">{reading.text}</span>
 		<code class="font-mono text-xs break-all text-muted-foreground">{text}</code>
 	{/if}
 	{#if preview.state.status === 'ready' && preview.state.runs}

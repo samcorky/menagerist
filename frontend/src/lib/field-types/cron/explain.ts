@@ -1,4 +1,6 @@
 import cronstrue from 'cronstrue';
+import { breakdownCron } from './breakdown';
+import { unreachableReason } from './unreachable';
 
 /** Plain-English reading of a cron expression, or why it cannot be read. */
 export type CronExplanation = { ok: true; text: string } | { ok: false; reason: string };
@@ -41,13 +43,14 @@ function clarifyHours(text: string, minute: string, hour: string): string {
 }
 
 /**
- * Explain a cron expression in words, using 24-hour times.
+ * Explain a cron expression in words, using 24-hour times. A list that mixes ranges or steps is
+ * explained part by part, one line each, so show the text with `whitespace-pre-line`.
  *
  * An empty expression means the job is off, as it does on the server, and anything but
  * five parts is refused, as the scheduler does. The server's grammar is narrower than cronstrue's, so the forms it refuses
- * that cronstrue would still read (`?` and `W`) are turned away here too. A schedule
- * that is well formed but can never fire (31 February) is only the server's to catch;
- * `shared/contracts/cron-conformance.json` records that limit.
+ * that cronstrue would still read (`?` and `W`) are turned away here too, as are ranges that run
+ * backwards and days no chosen month has (31 February); see `unreachable.ts`.
+ * `shared/contracts/cron-conformance.json` pins all of this against the server.
  */
 export function explainCron(expression: string): CronExplanation {
 	const trimmed = expression.trim();
@@ -59,15 +62,11 @@ export function explainCron(expression: string): CronExplanation {
 		return { ok: false, reason: notSupported('"W" (nearest weekday)') };
 	}
 	try {
-		return {
-			ok: true,
-			// cronstrue splits on single spaces, the server on any whitespace.
-			text: clarifyHours(
-				cronstrue.toString(parts.join(' '), { use24HourTimeFormat: true }),
-				parts[0],
-				parts[1]
-			)
-		};
+		// cronstrue splits on single spaces, the server on any whitespace.
+		const sentence = cronstrue.toString(parts.join(' '), { use24HourTimeFormat: true });
+		const unreachable = unreachableReason(parts);
+		if (unreachable) return { ok: false, reason: unreachable };
+		return { ok: true, text: breakdownCron(parts) ?? clarifyHours(sentence, parts[0], parts[1]) };
 	} catch (error) {
 		return { ok: false, reason: reasonFrom(error) };
 	}

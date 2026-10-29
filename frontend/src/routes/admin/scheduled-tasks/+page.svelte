@@ -650,7 +650,7 @@
 									{/if}
 								</Table.Head>
 								<Table.Cell>
-									<div>{scheduleLabel(job, explain)}</div>
+									<div class="whitespace-pre-line">{scheduleLabel(job, explain)}</div>
 									{#if setting?.locked}
 										<div class="mt-0.5 text-xs text-muted-foreground">{lockedNote(setting)}</div>
 									{/if}
@@ -683,7 +683,7 @@
 										</div>
 										<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
 											<dt class="text-muted-foreground">Schedule</dt>
-											<dd>{scheduleLabel(job, explain)}</dd>
+											<dd class="whitespace-pre-line">{scheduleLabel(job, explain)}</dd>
 											<dt class="text-muted-foreground">Next run</dt>
 											<dd>{nextRunLabel(job, formatWhen)}</dd>
 											<dt class="text-muted-foreground">Last run</dt>

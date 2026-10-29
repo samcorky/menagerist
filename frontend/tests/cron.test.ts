@@ -249,3 +249,72 @@ describe('switchKind', () => {
 		expect(switchKind(null, 'weekly')).toEqual(defaultSentence('weekly'));
 	});
 });
+
+describe('explainCron on lists that mix ranges and steps', () => {
+	it('reads each part on its own line', () => {
+		expect(explainCron('7-59/13,*/17,2 1-23/5,0 * * 1-5,0')).toEqual({
+			ok: true,
+			text: [
+				'Minute: every 13 minutes from 7 to 59, every 17 minutes and 2',
+				'Hour: every 5 hours from 1 to 23 and 0',
+				'Day of week: Monday to Friday and Sunday'
+			].join('\n')
+		});
+	});
+
+	it('names months and weekdays, from numbers or three-letter names', () => {
+		expect(explainCron('0 3 * JAN-MAR,6 MON-FRI,SUN')).toEqual({
+			ok: true,
+			text: [
+				'Minute: 0',
+				'Hour: 3',
+				'Month: January to March and June',
+				'Day of week: Monday to Friday and Sunday'
+			].join('\n')
+		});
+	});
+
+	it('warns that a date and a weekday together match on either', () => {
+		const reading = explainCron('0 3 1-7,15 * 1,3-5');
+		expect(reading.ok && reading.text.split('\n').at(-1)).toBe(
+			'A day counts if it fits the day of the month or the day of the week.'
+		);
+	});
+
+	it('keeps cronstrue wording for plain lists, single ranges and single steps', () => {
+		expect(explainCron('0 3 * * 1,3')).toEqual({
+			ok: true,
+			text: 'At 03:00, only on Monday and Wednesday'
+		});
+		expect(explainCron('0 9 * * 1-5')).toEqual({
+			ok: true,
+			text: 'At 09:00, Monday through Friday'
+		});
+		expect(explainCron('*/15 * * * *')).toEqual({ ok: true, text: 'Every 15 minutes' });
+	});
+
+	it('still refuses what cronstrue refuses', () => {
+		expect(explainCron('99-100/3,5 * * * *').ok).toBe(false);
+	});
+});
+
+describe('explainCron on schedules the server refuses', () => {
+	it.each([
+		['5-1 * * * *', /"5-1" runs backwards in the minute/],
+		['0 0 * * FRI-MON', /"FRI-MON" runs backwards in the day of the week/],
+		['0 0 * 11-2 *', /runs backwards in the month/],
+		['0 3 31 2 *', /No month in this schedule has that day of the month/],
+		['0 3 31 4,6 *', /No month in this schedule has that day of the month/]
+	])('says why %s cannot run', (expression, reason) => {
+		const reading = explainCron(expression);
+		expect(reading.ok).toBe(false);
+		expect(!reading.ok && reading.reason).toMatch(reason);
+	});
+
+	it.each(['0 0 29 2 *', '0 0 31 2-3 *', '0 0 L * *', '0 0 * * 1#2', '0 0 * * 0-7'])(
+		'still reads %s',
+		(expression) => {
+			expect(explainCron(expression).ok).toBe(true);
+		}
+	);
+});

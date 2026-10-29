@@ -178,7 +178,7 @@
 			>
 				<p class="font-medium text-foreground">This schedule is custom.</p>
 				<p>
-					{reading.ok ? reading.text : reading.reason}
+					<span class="whitespace-pre-line">{reading.ok ? reading.text : reading.reason}</span>
 					<code class="font-mono text-xs break-all">{text}</code>
 				</p>
 				<Button
@@ -210,7 +210,7 @@
 	<div aria-live="polite" class="flex flex-col gap-1 text-sm">
 		<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
 			{#if reading.ok}
-				<span>{reading.text}</span>
+				<span class="whitespace-pre-line">{reading.text}</span>
 				{#if text.trim() !== ''}
 					<code class="font-mono text-xs break-all text-muted-foreground">{text}</code>
 				{/if}
