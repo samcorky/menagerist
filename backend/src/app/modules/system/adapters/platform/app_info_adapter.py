@@ -17,6 +17,7 @@ class PackageAppInfoAdapter:
             short_sha=build.short_sha,
             branch=build.branch,
             dirty=build.dirty,
+            repository_url=build.repository_url,
             build_timestamp=build.build_timestamp,
             migration_head=code_head_revisions(),
         )

@@ -45,6 +45,19 @@ from app.modules.identity.domain.api_token import ApiToken
 from app.modules.identity.domain.session import Session
 from app.modules.identity.domain.user import Role
 from app.modules.identity.ports.unit_of_work import IdentityRepos
+from app.modules.system.adapters.api.dependencies import (
+    get_release_channel,
+    get_version_detail_sources,
+)
+from app.modules.system.adapters.persistence.in_memory_update_check_store import (
+    InMemoryUpdateCheckStore,
+)
+from app.modules.system.adapters.platform.in_memory_app_info_adapter import (
+    InMemoryAppInfoAdapter,
+)
+from app.modules.system.application.get_version_detail import VersionDetailSources
+from app.modules.system.domain.app_info import AppInfo
+from app.modules.system.domain.release import ReleaseChannel
 from app.shared_kernel.actor import Actor  # noqa: TC001
 
 if TYPE_CHECKING:
@@ -78,6 +91,15 @@ def _client(world: World) -> TestClient:
     )
     app.dependency_overrides[get_graph_uow] = lambda: create_in_memory_graph_uow(graph)
     app.dependency_overrides[get_graph_repos] = lambda: graph
+    # The version detail reads a stored release check; keep it off the database.
+    sources = VersionDetailSources(
+        app_info=InMemoryAppInfoAdapter(
+            AppInfo(name="menagerist", version="1.2.3", migration_head=())
+        ),
+        updates=InMemoryUpdateCheckStore(),
+    )
+    app.dependency_overrides[get_version_detail_sources] = lambda: sources
+    app.dependency_overrides[get_release_channel] = lambda: ReleaseChannel.STABLE
 
     @app.get(PATH)
     async def probe(

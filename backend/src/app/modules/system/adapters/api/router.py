@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -12,12 +12,18 @@ from app.entrypoints.api.shared.http.origin import own_origin
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.system.adapters.api.dependencies import (
+    get_check_for_updates_use_case,
     get_get_health_ready_detail_use_case,
     get_get_health_ready_use_case,
     get_get_health_use_case,
     get_get_version_detail_use_case,
     get_get_version_use_case,
+    get_release_channel,
     get_run_browser_check_use_case,
+)
+from app.modules.system.application.check_for_updates import (
+    CheckForUpdates,
+    CheckForUpdatesCommand,
 )
 from app.modules.system.application.get_health import GetHealth, GetHealthQuery
 from app.modules.system.application.get_health_ready import (
@@ -43,6 +49,7 @@ from app.modules.system.domain.readiness import (
     CheckStatus,
     ReadinessReport,
 )
+from app.modules.system.domain.release import ReleaseChannel, ReleaseStatus
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.errors import ForbiddenError
 
@@ -236,6 +243,100 @@ class VersionResponse(BaseModel):
     ]
 
 
+class ReleaseResponse(BaseModel):
+    """What is known about newer releases, from the last stored check."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "channel": "stable",
+                    "provider": "github",
+                    "status": "update_available",
+                    "latest_version": "0.2026.11.0",
+                    "url": "https://github.com/example/menagerist/releases/tag/0.2026.11.0",
+                    "published_at": _EXAMPLE_ISO,
+                    "prerelease": False,
+                    "checked_at": _EXAMPLE_ISO,
+                    "last_attempt_at": _EXAMPLE_ISO,
+                }
+            ]
+        }
+    )
+
+    channel: Annotated[
+        Literal["stable", "preview"],
+        Field(description="The release channel this instance follows."),
+    ]
+    provider: Annotated[
+        Literal["github"], Field(description="Where releases are looked up.")
+    ]
+    status: Annotated[
+        Literal[
+            "update_available",
+            "up_to_date",
+            "ahead",
+            "development",
+            "no_release",
+            "unknown",
+        ],
+        Field(
+            description=(
+                "How this build compares with the newest release on the channel. "
+                + "`development` is a development or uncommitted build, which cannot "
+                + "be compared; `unknown` means no check has succeeded yet."
+            )
+        ),
+    ]
+    latest_version: Annotated[
+        str | None,
+        Field(description="Newest release on the channel, when one was found."),
+    ] = None
+    url: Annotated[
+        str | None, Field(description="Where to read that release's notes.")
+    ] = None
+    published_at: Annotated[
+        datetime | None, Field(description="When that release was published.")
+    ] = None
+    prerelease: Annotated[
+        bool | None, Field(description="Whether that release is a prerelease.")
+    ] = None
+    checked_at: Annotated[
+        datetime | None,
+        Field(description="When a check last read the release source successfully."),
+    ] = None
+    last_attempt_at: Annotated[
+        datetime | None, Field(description="When a check was last attempted.")
+    ] = None
+    failure: Annotated[
+        Literal["network", "timeout", "rate_limited", "not_found", "bad_response"]
+        | None,
+        Field(
+            description=(
+                "Why the last attempt failed, if it did. The last good answer is "
+                + "kept and still shown."
+            )
+        ),
+    ] = None
+
+    @classmethod
+    def from_domain(cls, status: ReleaseStatus) -> ReleaseResponse:
+        """Build the API schema from the domain status."""
+        latest = status.latest
+        return cls(
+            channel=status.channel.value,
+            provider="github",
+            status=status.status.value,
+            latest_version=None if latest is None else latest.version,
+            url=None if latest is None else latest.url,
+            published_at=None if latest is None else latest.published_at,
+            prerelease=None if latest is None else latest.prerelease,
+            checked_at=status.checked_at,
+            last_attempt_at=status.last_attempt_at,
+            failure=None if status.failure is None else status.failure.value,
+        )
+
+
 class VersionDetailResponse(VersionResponse):
     """Build and version metadata, for administrators."""
 
@@ -303,6 +404,16 @@ class VersionDetailResponse(VersionResponse):
             examples=[["a1b2c3d4e5f6"]],
         ),
     ]
+    release: Annotated[
+        ReleaseResponse | None,
+        Field(
+            default=None,
+            description=(
+                "Update status from the last stored check. Absent when this build "
+                + "names no GitHub repository, so there is nothing to check."
+            ),
+        ),
+    ] = None
 
 
 def _check_ex(
@@ -464,10 +575,15 @@ async def get_version(
 )
 async def get_version_detail(
     use_case: Annotated[GetVersionDetail, Depends(get_get_version_detail_use_case)],
+    channel: Annotated[ReleaseChannel, Depends(get_release_channel)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> VersionDetailResponse:
-    """Report version and build provenance (administrators)."""
-    app_info = await use_case.handle(GetVersionDetailQuery(), actor)
+    """Report version, build provenance and update status (administrators).
+
+    The update status is the last stored check; reading it contacts nothing.
+    """
+    detail = await use_case.handle(GetVersionDetailQuery(channel=channel), actor)
+    app_info = detail.app_info
     return VersionDetailResponse(
         name=app_info.name,
         current_version=app_info.version,
@@ -477,7 +593,37 @@ async def get_version_detail(
         dirty=app_info.dirty,
         build_timestamp=app_info.build_timestamp,
         migration_head=list(app_info.migration_head),
+        release=(
+            None
+            if detail.release is None
+            else ReleaseResponse.from_domain(detail.release)
+        ),
     )
+
+
+@router.post(
+    "/version/check",
+    summary="Check for a newer release",
+    operation_id="check_for_updates",
+    status_code=204,
+    dependencies=[Depends(verify_csrf)],
+    responses=error_response(ForbiddenError, detail=_FORBIDDEN),
+)
+async def check_for_updates(
+    use_case: Annotated[CheckForUpdates, Depends(get_check_for_updates_use_case)],
+    channel: Annotated[ReleaseChannel, Depends(get_release_channel)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> Response:
+    """Look for a newer release now (administrators).
+
+    The result is stored: read it from `GET /system/version/detail`. A failed
+    check is recorded there, not raised. A repeat within a minute answers from the
+    stored result without contacting GitHub again.
+    """
+    await use_case.handle(
+        CheckForUpdatesCommand(channel=channel, now=datetime.now(UTC)), actor
+    )
+    return Response(status_code=204)
 
 
 class BrowserCheckResponse(BaseModel):

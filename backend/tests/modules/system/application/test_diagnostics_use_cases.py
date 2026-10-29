@@ -5,6 +5,9 @@ import pytest
 from app.entrypoints.api.shared.access_guard import RoleAccessGuard
 from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
+from app.modules.system.adapters.persistence.in_memory_update_check_store import (
+    InMemoryUpdateCheckStore,
+)
 from app.modules.system.adapters.platform.in_memory_app_info_adapter import (
     InMemoryAppInfoAdapter,
 )
@@ -18,6 +21,7 @@ from app.modules.system.application.get_health_ready_detail import (
 from app.modules.system.application.get_version_detail import (
     GetVersionDetail,
     GetVersionDetailQuery,
+    VersionDetailSources,
 )
 from app.modules.system.application.permissions import SystemPermission
 from app.modules.system.application.run_browser_check import (
@@ -45,14 +49,29 @@ def test_permission_value_follows_the_naming_pattern() -> None:
 @pytest.mark.parametrize("actor", [ADMIN, SYSTEM_ACTOR])
 async def test_admin_and_system_read_version_detail(actor: Actor) -> None:
     """Holders of the permission get the full build metadata."""
-    use_case = GetVersionDetail(InMemoryAppInfoAdapter(APP_INFO), GUARD)
+    use_case = GetVersionDetail(
+        VersionDetailSources(
+            app_info=InMemoryAppInfoAdapter(APP_INFO),
+            updates=InMemoryUpdateCheckStore(),
+        ),
+        GUARD,
+    )
 
-    assert await use_case.handle(GetVersionDetailQuery(), actor) is APP_INFO
+    detail = await use_case.handle(GetVersionDetailQuery(), actor)
+
+    assert detail.app_info is APP_INFO
+    assert detail.release is None
 
 
 async def test_member_cannot_read_version_detail() -> None:
     """Members hold no diagnostics permission."""
-    use_case = GetVersionDetail(InMemoryAppInfoAdapter(APP_INFO), GUARD)
+    use_case = GetVersionDetail(
+        VersionDetailSources(
+            app_info=InMemoryAppInfoAdapter(APP_INFO),
+            updates=InMemoryUpdateCheckStore(),
+        ),
+        GUARD,
+    )
 
     with pytest.raises(ForbiddenError):
         await use_case.handle(GetVersionDetailQuery(), MEMBER)

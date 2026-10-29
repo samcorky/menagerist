@@ -76,6 +76,7 @@ def test_startup_log_does_not_contain_the_password(
         "IdentitySettings",
         "LoggingSettings",
         "MediaSettings",
+        "ReleaseSettings",
         "RetentionSettings",
         "SchedulerSettings",
     ]

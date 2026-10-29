@@ -8,3 +8,4 @@ class SystemPermission(PermissionEnum):
     """
 
     READ_DIAGNOSTICS = "system:diagnostics:read"
+    CHECK_FOR_UPDATES = "system:release:check"

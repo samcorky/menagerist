@@ -130,3 +130,66 @@ test('selecting a check highlights it until the page is clicked elsewhere', asyn
 		.toBe(false);
 	await expect(detail).toHaveCSS('outline-style', 'none');
 });
+
+test('an administrator sees the update card and nothing contacts GitHub until asked', async ({
+	page
+}) => {
+	const checks: string[] = [];
+	page.on('request', (req) => {
+		if (req.method() === 'POST' && req.url().includes('/system/version/check')) {
+			checks.push(req.url());
+		}
+	});
+
+	await page.goto('/status');
+	await expect(page.getByText('Updates', { exact: true })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Check now' })).toBeVisible();
+
+	await page.getByRole('button', { name: 'Refresh status' }).click();
+	await expect(page.getByText('Updates', { exact: true })).toBeVisible();
+
+	// Viewing and refreshing only read the stored result.
+	expect(checks).toEqual([]);
+});
+
+test('Check now asks for a check and then shows the stored answer', async ({ page }) => {
+	// The real answer is stood in for, so the test never reaches the network.
+	let checked = false;
+	await page.route('**/api/v1/system/version/check', async (route) => {
+		checked = true;
+		await route.fulfill({ status: 204 });
+	});
+	await page.route('**/api/v1/system/version/detail', async (route) => {
+		const response = await route.fetch();
+		const body = await response.json();
+		await route.fulfill({
+			response,
+			json: {
+				...body,
+				release: checked
+					? {
+							channel: 'stable',
+							provider: 'github',
+							status: 'update_available',
+							latest_version: '9.2099.1.0',
+							url: 'https://github.com/o/r/releases/tag/9.2099.1.0',
+							checked_at: '2099-01-02T03:00:00Z',
+							last_attempt_at: '2099-01-02T03:00:00Z'
+						}
+					: { channel: 'stable', provider: 'github', status: 'unknown' }
+			}
+		});
+	});
+
+	await page.goto('/status');
+	await expect(page.getByText('Not checked yet')).toBeVisible();
+
+	await page.getByRole('button', { name: 'Check now' }).click();
+
+	await expect(page.getByText('Update available')).toBeVisible();
+	await expect(page.getByText('Version 9.2099.1.0 is available.')).toBeVisible();
+	await expect(page.getByRole('link', { name: /Release notes/ })).toHaveAttribute(
+		'href',
+		'https://github.com/o/r/releases/tag/9.2099.1.0'
+	);
+});

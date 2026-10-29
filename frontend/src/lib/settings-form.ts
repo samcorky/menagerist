@@ -6,6 +6,10 @@ export type SettingValue = boolean | number | string | string[];
 
 const GROUP_LABELS: Record<string, string> = {
 	backup: 'Backups',
+	identity: 'Sign-in',
+	media: 'Media',
+	release: 'Updates',
+	retention: 'Deleted items',
 	scheduler: 'Scheduled tasks'
 };
 
@@ -44,6 +48,11 @@ export function formProp(schemaProperty: unknown): JsonSchemaProperty {
 		prop.multipleOf = 1;
 	}
 	return prop as unknown as JsonSchemaProperty;
+}
+
+/** The options of a fixed-choice setting (a string with an `enum`), or null for any other. */
+export function choicesOf(prop: JsonSchemaProperty): string[] | null {
+	return prop.type === 'string' && 'enum' in prop ? prop.enum : null;
 }
 
 /** The properties of the settings schema document, by setting key. */
@@ -103,6 +112,12 @@ export function coerce(prop: JsonSchemaProperty, raw: unknown): Coerced {
 		return check(prop, value);
 	}
 	if (prop.type === 'string') {
+		const choices = choicesOf(prop);
+		if (choices !== null) {
+			return typeof raw === 'string' && choices.includes(raw)
+				? { ok: true, value: raw }
+				: { ok: false, message: 'Choose one of the options.' };
+		}
 		return typeof raw === 'string'
 			? { ok: true, value: raw.trim() }
 			: { ok: false, message: 'Enter some text.' };

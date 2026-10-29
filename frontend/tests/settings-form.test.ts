@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { SettingResponse } from '../src/lib/api/client';
+import { coreForProp } from '../src/lib/field-types';
 import {
+	choicesOf,
 	coerce,
 	formProp,
 	groupLabel,
@@ -119,6 +121,20 @@ describe('coerce', () => {
 		expect(coerce(schedule, ' 0 3 * * * ')).toEqual({ ok: true, value: '0 3 * * *' });
 		expect(coerce(schedule, '')).toEqual({ ok: true, value: '' });
 		expect(coerce(schedule, 5).ok).toBe(false);
+	});
+
+	it("accepts only one of a choice setting's options", () => {
+		const channel = formProp({ type: 'string', enum: ['stable', 'preview'], title: 'Channel' });
+		expect(coerce(channel, 'preview')).toEqual({ ok: true, value: 'preview' });
+		expect(coerce(channel, 'nightly')).toEqual({
+			ok: false,
+			message: 'Choose one of the options.'
+		});
+		expect(coerce(channel, '').ok).toBe(false);
+		expect(choicesOf(channel)).toEqual(['stable', 'preview']);
+		// The page needs no widget of its own: the existing choice field renders it.
+		expect(coreForProp(channel)?.kind).toBe('choice');
+		expect(choicesOf(schedule)).toBeNull();
 	});
 
 	it('passes booleans and lists of strings through', () => {

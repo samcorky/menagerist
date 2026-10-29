@@ -7,6 +7,7 @@
 		getHealthReady,
 		getHealthReadyDetail,
 		getVersion,
+		checkForUpdates,
 		getVersionDetail,
 		runBrowserCheck
 	} from '$lib/api/client';
@@ -16,6 +17,7 @@
 		VersionDetailResponse,
 		VersionResponse
 	} from '$lib/api/client';
+	import { networkAwareError } from '$lib/api/errors';
 	import { auth } from '$lib/auth.svelte.js';
 	import { LOGIN_PATH, STATUS_PATH } from '$lib/auth';
 	import {
@@ -28,6 +30,7 @@
 		type BrowserCheck,
 		type Readiness
 	} from '$lib/status';
+	import ReleaseCard from '$lib/components/release-card.svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -327,6 +330,30 @@
 			return await call();
 		} catch {
 			return null;
+		}
+	}
+
+	let checkingUpdates = $state(false);
+	let updateCheckError = $state<string | null>(null);
+
+	// Asks the server to look for a release, then re-reads the stored result. The
+	// 30-second refresh only ever re-reads it.
+	async function checkNow(): Promise<void> {
+		if (checkingUpdates) return;
+		checkingUpdates = true;
+		updateCheckError = null;
+		try {
+			const checked = await checkForUpdates();
+			if (checked.error !== undefined) {
+				updateCheckError = networkAwareError(checked).title;
+				return;
+			}
+			const detailRes = await getVersionDetail();
+			if (detailRes.data) buildInfo = detailRes.data;
+		} catch {
+			updateCheckError = 'The check could not be run.';
+		} finally {
+			checkingUpdates = false;
 		}
 	}
 
@@ -759,6 +786,16 @@
 						{/if}
 					</Card.Content>
 				</Card.Root>
+			{/if}
+
+			{#if buildInfo?.release}
+				<ReleaseCard
+					release={buildInfo.release}
+					canCheck={auth.can('system:release:check')}
+					checking={checkingUpdates}
+					checkError={updateCheckError}
+					onCheck={() => void checkNow()}
+				/>
 			{/if}
 
 			{#if buildInfo}

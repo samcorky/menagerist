@@ -27,6 +27,7 @@ from app.modules.scheduling.adapters.platform.reader_schedule_source import (
 from app.modules.scheduling.application.prune_job_runs import PruneJobRuns
 from app.modules.scheduling.application.setting_keys import RUN_HISTORY_PER_JOB
 from app.modules.settings.domain.setting import SettingScope
+from app.modules.system.adapters.scheduling.jobs import system_job_contribution
 from app.platform.database import get_session_factory
 from app.shared_kernel.jobs import JobBinding, JobContribution
 
@@ -56,6 +57,7 @@ CONTRIBUTIONS: tuple[JobContribution, ...] = (
     identity_job_contribution(),
     media_job_contribution(),
     data_job_contribution(),
+    system_job_contribution(),
 )
 
 

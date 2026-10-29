@@ -16,6 +16,7 @@ from app.modules.media.adapters.persistence import models as media_models  # noq
 from app.modules.presets.adapters.persistence import models as preset_models  # noqa: F401
 from app.modules.scheduling.adapters.persistence import models as scheduling_models  # noqa: F401
 from app.modules.settings.adapters.persistence import models as settings_models  # noqa: F401
+from app.modules.system.adapters.persistence import models as system_models  # noqa: F401
 from app.platform.config import get_database_settings
 from app.platform.database import Base
 

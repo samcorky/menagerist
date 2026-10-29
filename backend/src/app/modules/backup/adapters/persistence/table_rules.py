@@ -36,6 +36,7 @@ TABLE_RULES = {
     "sign_in_attempts": TableRule.SKIP,
     "job_runs": TableRule.SKIP,
     "schedule_cursors": TableRule.SKIP,
+    "update_checks": TableRule.SKIP,
     "worker_heartbeats": TableRule.SKIP,
     "alembic_version": TableRule.IGNORE,
 }

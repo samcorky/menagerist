@@ -10,24 +10,48 @@ from starlette.testclient import TestClient
 from structlog.testing import capture_logs
 
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared.access_guard import get_access_guard
+from app.entrypoints.api.shared.access_guard import RoleAccessGuard, get_access_guard
+from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
+from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.system.adapters.api import dependencies
 from app.modules.system.adapters.api.dependencies import (
+    get_check_for_updates_use_case,
     get_get_health_ready_detail_use_case,
     get_get_health_ready_use_case,
+    get_get_version_detail_use_case,
+    get_release_channel,
+)
+from app.modules.system.adapters.persistence.in_memory_update_check_store import (
+    InMemoryUpdateCheckStore,
+)
+from app.modules.system.adapters.persistence.unit_of_work import (
+    create_in_memory_system_uow,
 )
 from app.modules.system.adapters.platform.checks import database_pool_utilization_check
+from app.modules.system.adapters.platform.in_memory_app_info_adapter import (
+    InMemoryAppInfoAdapter,
+)
 from app.modules.system.adapters.platform.in_memory_health_check_adapter import (
     InMemoryHealthCheckAdapter,
 )
+from app.modules.system.adapters.platform.in_memory_release_provider import (
+    InMemoryReleaseProvider,
+)
+from app.modules.system.application.check_for_updates import CheckForUpdates
 from app.modules.system.application.get_health_ready import GetHealthReady
 from app.modules.system.application.get_health_ready_detail import GetHealthReadyDetail
+from app.modules.system.application.get_version_detail import (
+    GetVersionDetail,
+    VersionDetailSources,
+)
+from app.modules.system.domain.app_info import AppInfo
 from app.modules.system.domain.readiness import (
     CheckObservation,
     CheckStatus,
     ReadinessReport,
 )
+from app.modules.system.domain.release import CheckFailure, Release, ReleaseChannel
 from app.platform.config import get_identity_settings
 from app.platform.database import get_session_factory
 from app.platform.storage_probe import DirectoryProbe
@@ -380,19 +404,121 @@ def test_public_version_has_only_name_and_version() -> None:
     assert set(data) == {"name", "current_version"}
 
 
+def _app_with_updates(
+    *,
+    repository_url: str | None = "https://github.com/o/r",
+    releases: list[Release] | None = None,
+    failure: CheckFailure | None = None,
+    channel: ReleaseChannel = ReleaseChannel.STABLE,
+    role: str = "admin",
+) -> tuple[FastAPI, InMemoryUpdateCheckStore, InMemoryReleaseProvider]:
+    """An app whose release source, store and channel are in memory."""
+    app = create_app()
+    as_user(app, uuid.UUID(int=7), role)
+    guard = RoleAccessGuard(RoleAuthorisationAdapter(), OwnerAccessPolicy())
+    info = InMemoryAppInfoAdapter(
+        AppInfo(
+            name="menagerist",
+            version="0.2026.10.0",
+            dirty=False,
+            repository_url=repository_url,
+            migration_head=("abc",),
+        )
+    )
+    store = InMemoryUpdateCheckStore()
+    provider = InMemoryReleaseProvider(releases, failure=failure)
+    app.dependency_overrides[get_release_channel] = lambda: channel
+    app.dependency_overrides[get_get_version_detail_use_case] = lambda: (
+        GetVersionDetail(VersionDetailSources(app_info=info, updates=store), guard)
+    )
+    app.dependency_overrides[get_check_for_updates_use_case] = lambda: CheckForUpdates(
+        create_in_memory_system_uow(store), guard, app_info=info, provider=provider
+    )
+    return app, store, provider
+
+
 def test_version_detail_for_admin_has_build_provenance() -> None:
     """Administrators get the full payload."""
-    app = create_app()
-    as_user(app, uuid.UUID(int=7), "admin")
+    app, _, _ = _app_with_updates()
 
     data = TestClient(app).get("/api/v1/system/version/detail").json()
 
     assert {"name", "current_version", "migration_head"} <= set(data)
 
 
+def test_version_detail_reports_an_unchecked_release_status_without_a_request() -> None:
+    """Before any check, the status is unknown and GitHub is never contacted."""
+    app, _, provider = _app_with_updates()
+
+    data = TestClient(app).get("/api/v1/system/version/detail").json()
+
+    assert data["release"] == {
+        "channel": "stable",
+        "provider": "github",
+        "status": "unknown",
+    }
+    assert provider.calls == []
+
+
+def test_version_detail_omits_release_when_the_build_names_no_repository() -> None:
+    """With nothing to check against, there is no release object at all."""
+    app, _, _ = _app_with_updates(repository_url=None)
+
+    data = TestClient(app).get("/api/v1/system/version/detail").json()
+
+    assert "release" not in data
+
+
+def test_check_now_stores_a_result_the_detail_then_reports() -> None:
+    """POST checks and stores; the next GET shows the newer release."""
+    newer = Release(
+        version="0.2026.11.0", url="https://github.com/o/r/releases/tag/0.2026.11.0"
+    )
+    app, _, provider = _app_with_updates(releases=[newer])
+    client = TestClient(app)
+
+    checked = client.post("/api/v1/system/version/check")
+    data = client.get("/api/v1/system/version/detail").json()
+
+    assert checked.status_code == 204
+    assert len(provider.calls) == 1
+    release = data["release"]
+    assert release["status"] == "update_available"
+    assert release["latest_version"] == "0.2026.11.0"
+    assert release["url"] == "https://github.com/o/r/releases/tag/0.2026.11.0"
+    assert release["checked_at"] is not None
+    assert "failure" not in release
+
+
+def test_a_failed_check_is_reported_and_not_an_error() -> None:
+    """The route succeeds; the failure shows in the detail as a fixed code."""
+    app, _, _ = _app_with_updates(failure=CheckFailure.RATE_LIMITED)
+    client = TestClient(app)
+
+    checked = client.post("/api/v1/system/version/check")
+    release = client.get("/api/v1/system/version/detail").json()["release"]
+
+    assert checked.status_code == 204
+    assert release["status"] == "unknown"
+    assert release["failure"] == "rate_limited"
+    assert "checked_at" not in release
+
+
+def test_check_now_is_forbidden_for_members() -> None:
+    """Only holders of the check permission can make the server call out."""
+    app, _, provider = _app_with_updates(role="member")
+
+    response = TestClient(app).post("/api/v1/system/version/check")
+
+    assert response.status_code == 403
+    assert provider.calls == []
+
+
 def test_version_detail_is_forbidden_for_members() -> None:
     """A member gets 403 and no build metadata."""
-    response = TestClient(create_app()).get("/api/v1/system/version/detail")
+    app, _, _ = _app_with_updates(role="member")
+
+    response = TestClient(app).get("/api/v1/system/version/detail")
 
     assert response.status_code == 403
     assert "migration_head" not in response.json()
@@ -503,5 +629,6 @@ def test_system_operation_ids_are_unchanged() -> None:
         ("/api/v1/system/health/ready/detail", "get"): "get_health_ready_detail",
         ("/api/v1/system/version", "get"): "get_version",
         ("/api/v1/system/version/detail", "get"): "get_version_detail",
+        ("/api/v1/system/version/check", "post"): "check_for_updates",
         ("/api/v1/system/browser-check", "post"): "run_browser_check",
     }

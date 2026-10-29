@@ -12,5 +12,6 @@ class AppInfo:
     short_sha: str | None = None
     branch: str | None = None
     dirty: bool | None = None
+    repository_url: str | None = None
     build_timestamp: datetime | None = None
     migration_head: tuple[str, ...]

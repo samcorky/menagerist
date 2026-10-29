@@ -50,6 +50,7 @@ ADMIN = [
     "settings:instance:read",
     "settings:instance:write",
     "system:diagnostics:read",
+    "system:release:check",
 ]
 ALL = sorted(ADMIN + CONTENT)
 

@@ -6,10 +6,12 @@ from pathlib import Path
 import app
 from app.modules.backup.application.setting_keys import KEEP_LAST, USER_EXPORT_TTL_HOURS
 from app.modules.scheduling.application.setting_keys import RUN_HISTORY_PER_JOB
+from app.modules.system.application.setting_keys import RELEASE_CHANNEL
 from app.platform.config import SETTING_GROUPS
 from app.platform.config._discovery import discover
 
 CODE_KEYS = {
+    RELEASE_CHANNEL.key,
     RUN_HISTORY_PER_JOB.key,
     KEEP_LAST.key,
     USER_EXPORT_TTL_HOURS.key,

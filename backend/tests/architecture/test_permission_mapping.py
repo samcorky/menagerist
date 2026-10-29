@@ -121,6 +121,7 @@ EXPECTED_PERMISSIONS: dict[str, str] = {
     "system.GetHealthReadyDetail": "system:diagnostics:read",
     "system.GetVersionDetail": "system:diagnostics:read",
     "system.RunBrowserCheck": "system:diagnostics:read",
+    "system.CheckForUpdates": "system:release:check",
 }
 
 # Permissions are never renamed: a grant stored under a name must keep meaning
@@ -159,11 +160,12 @@ EXPECTED_CATALOGUE: frozenset[str] = frozenset(
         "media:item:write",
         "presets:preset:read",
         "presets:preset:write",
-        "system:diagnostics:read",
         "scheduling:job:read",
         "scheduling:job:run",
         "settings:instance:read",
         "settings:instance:write",
+        "system:diagnostics:read",
+        "system:release:check",
     }
 )
 
@@ -204,6 +206,6 @@ def test_every_non_admin_permission_is_a_member_permission(name: str) -> None:
 
 
 def test_catalogue_is_pinned() -> None:
-    """The permission catalogue (20 admin, 16 member) only changes deliberately."""
+    """The permission catalogue (21 admin, 16 member) only changes deliberately."""
     assert {p.value for p in ALL_PERMISSIONS} == EXPECTED_CATALOGUE
-    assert len(EXPECTED_CATALOGUE) == 36
+    assert len(EXPECTED_CATALOGUE) == 37

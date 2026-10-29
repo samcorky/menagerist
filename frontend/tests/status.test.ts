@@ -5,8 +5,11 @@ import {
 	detailUnavailable,
 	formatObservedValue,
 	readinessOf,
-	readyDetailOf
+	readyDetailOf,
+	releaseViewOf,
+	safeNotesUrl
 } from '../src/lib/status';
+import type { ReleaseResponse } from '../src/lib/api/client';
 import { FILE_TOO_LARGE_MESSAGE, uploadErrorMessage } from '../src/lib/api/errors';
 
 const res = (status: number) => new Response(null, { status });
@@ -187,5 +190,100 @@ describe('formatObservedValue for CORS', () => {
 	it('reads the open-origins flag as words', () => {
 		expect(formatObservedValue(0, 'open origins')).toBe('Listed origins only');
 		expect(formatObservedValue(1, 'open origins')).toBe('Any origin allowed');
+	});
+});
+
+describe('releaseViewOf', () => {
+	const base: ReleaseResponse = { channel: 'stable', provider: 'github', status: 'unknown' };
+	const newer: ReleaseResponse = {
+		...base,
+		status: 'update_available',
+		latest_version: '0.2026.11.0',
+		url: 'https://github.com/o/r/releases/tag/0.2026.11.0',
+		published_at: '2026-11-01T12:00:00Z',
+		checked_at: '2026-11-02T03:00:00Z',
+		last_attempt_at: '2026-11-02T03:00:00Z'
+	};
+
+	it('calls out an available update and links the release notes', () => {
+		const view = releaseViewOf(newer);
+		expect(view.tone).toBe('attention');
+		expect(view.badge).toBe('Update available');
+		expect(view.summary).toContain('0.2026.11.0');
+		expect(view.notesUrl).toBe(newer.url);
+		expect(view.rows.map((row) => row.label)).toEqual([
+			'Channel',
+			'Latest release',
+			'Published',
+			'Last checked'
+		]);
+		expect(view.failureNote).toBeNull();
+	});
+
+	it('says up to date only when a check confirmed it', () => {
+		expect(releaseViewOf({ ...newer, status: 'up_to_date' }).tone).toBe('ok');
+		const never = releaseViewOf(base);
+		expect(never.badge).toBe('Not checked yet');
+		expect(never.tone).toBe('neutral');
+		expect(never.notesUrl).toBeNull();
+	});
+
+	it('does not call a development build out of date', () => {
+		const view = releaseViewOf({ ...newer, status: 'development' });
+		expect(view.badge).toBe('Development build');
+		expect(view.tone).toBe('neutral');
+		expect(view.summary).toContain('cannot be compared');
+	});
+
+	it('describes a build that is ahead and a channel with no release', () => {
+		expect(releaseViewOf({ ...newer, status: 'ahead' }).badge).toBe(
+			'Newer than the latest release'
+		);
+		expect(releaseViewOf({ ...base, status: 'no_release' }).badge).toBe('No releases yet');
+	});
+
+	it('shows a failure beside the last good result, with the attempt time', () => {
+		const view = releaseViewOf({
+			...newer,
+			last_attempt_at: '2026-11-03T03:00:00Z',
+			failure: 'rate_limited'
+		});
+		expect(view.badge).toBe('Update available');
+		expect(view.failureNote).toMatch(/limiting requests/);
+		expect(view.rows.map((row) => row.label)).toContain('Last attempt');
+	});
+
+	it('reports a first check that failed as failed, not as unchecked', () => {
+		const view = releaseViewOf({
+			...base,
+			last_attempt_at: '2026-11-03T03:00:00Z',
+			failure: 'network'
+		});
+		expect(view.badge).toBe('Check failed');
+		expect(view.failureNote).toBe('GitHub could not be reached.');
+	});
+
+	it('marks a prerelease and shows the channel in words', () => {
+		const view = releaseViewOf({
+			...newer,
+			channel: 'preview',
+			latest_version: '0.2026.12.0rc1',
+			prerelease: true
+		});
+		expect(view.rows[0]).toEqual({ label: 'Channel', value: 'Preview' });
+		expect(view.rows[1]?.value).toBe('0.2026.12.0rc1 (prerelease)');
+	});
+});
+
+describe('safeNotesUrl', () => {
+	it('allows only GitHub pages', () => {
+		expect(safeNotesUrl('https://github.com/o/r/releases/tag/1')).toBe(
+			'https://github.com/o/r/releases/tag/1'
+		);
+		expect(safeNotesUrl('https://evil.example/x')).toBeNull();
+		expect(safeNotesUrl('javascript:alert(1)')).toBeNull();
+		expect(safeNotesUrl('http://github.com/o/r')).toBeNull();
+		expect(safeNotesUrl(null)).toBeNull();
+		expect(safeNotesUrl(undefined)).toBeNull();
 	});
 });

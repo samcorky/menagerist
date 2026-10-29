@@ -229,8 +229,13 @@ CREATES_OWN = "references no existing content; creates content owned by the call
 RECENTLY_DELETED = "own deleted rows only, empty in the seed; two-user router tests"
 SETTINGS = "administrator-only instance settings, not owned content; router tests"
 SCHEDULING = "administrator-only scheduler views and run-now, no content; router tests"
+DIAGNOSTICS = (
+    "administrator-only build and update status, not owned content; router tests"
+)
 
 ALLOWED: dict[Route, str] = {
+    ("GET", "/api/v1/system/version/detail"): DIAGNOSTICS,
+    ("POST", "/api/v1/system/version/check"): DIAGNOSTICS,
     ("GET", "/api/v1/scheduling/schedule-preview"): SCHEDULING,
     ("GET", "/api/v1/scheduling/jobs"): SCHEDULING,
     ("GET", "/api/v1/scheduling/jobs/{job_key}/runs"): SCHEDULING,
