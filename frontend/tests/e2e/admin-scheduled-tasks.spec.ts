@@ -2,48 +2,61 @@ import { expect, request, apiSessionOptions, test } from './fixtures';
 import { asUser, createUserViaApi } from './helpers';
 
 /**
- * Scheduled tasks: an administrator sees what runs in the background and starts a task by
- * hand. The e2e backend has no worker, so a started run stays waiting for its turn.
+ * Scheduled tasks: an administrator sees what runs in the background, starts a task by hand
+ * and watches the worker carry it out. Every e2e backend has a worker beside it.
  */
 test.describe.configure({ mode: 'serial' });
 
-test('an administrator starts a task and sees it waiting, once, in its history', async ({
-	page
-}) => {
+const TASK = 'Clear expired sign-ins';
+
+test('an administrator starts a task and sees the worker finish it', async ({ page }) => {
 	await page.goto('/admin');
 	await page.locator('a[href="/admin/scheduled-tasks"]').click();
 	await expect(page.getByRole('heading', { name: 'Scheduled tasks', exact: true })).toBeVisible();
 
 	const card = page.locator('li').filter({
-		has: page.getByRole('heading', { name: 'Back up everything', exact: true })
+		has: page.getByRole('heading', { name: TASK, exact: true })
 	});
-	await expect(card.getByText('Saves a full copy', { exact: false })).toBeVisible();
+	await expect(
+		card.getByText('Removes sessions and access tokens that have expired.')
+	).toBeVisible();
 
-	await card.getByRole('button', { name: 'Run Back up everything now' }).click();
+	await card.getByRole('button', { name: `Run ${TASK} now` }).click();
 	await expect(
 		page.getByText("Started. It will run as soon as it's this task's turn.")
 	).toBeVisible();
-	await expect(card.getByText('Waiting for a turn', { exact: true })).toBeVisible();
 
-	// A task already in progress cannot be stacked.
-	const button = card.getByRole('button', { name: 'Run Back up everything now' });
-	await expect(button).toBeDisabled();
-	await expect(button).toHaveText(/Waiting/);
-
+	// The worker picks it up and finishes it; the page follows without a reload.
 	await card.getByText('Recent runs', { exact: true }).click();
-	const runs = card.getByRole('list', { name: 'Recent runs of Back up everything' });
+	const runs = card.getByRole('list', { name: `Recent runs of ${TASK}` });
+	await expect(runs.getByText('Finished', { exact: true })).toBeVisible({ timeout: 30_000 });
 	await expect(runs.getByRole('listitem')).toHaveCount(1);
-	await expect(runs.getByText('Waiting for a turn')).toBeVisible();
 	await expect(runs.getByText('Started by an administrator')).toBeVisible();
 
-	// The waiting run survives a reload.
+	// Nothing is left running, so the task can be started again.
+	await expect(card.getByRole('button', { name: `Run ${TASK} now` })).toBeEnabled();
+
+	// The finished run survives a reload.
 	await page.reload();
+	const reloaded = page.locator('li').filter({
+		has: page.getByRole('heading', { name: TASK, exact: true })
+	});
+	await reloaded.getByText('Recent runs', { exact: true }).click();
 	await expect(
-		page
-			.locator('li')
-			.filter({ has: page.getByRole('heading', { name: 'Back up everything', exact: true }) })
-			.getByText('Waiting for a turn', { exact: true })
+		reloaded
+			.getByRole('list', { name: `Recent runs of ${TASK}` })
+			.getByText('Finished', { exact: true })
 	).toBeVisible();
+});
+
+test('a task that is only ever scheduled has no Run now', async ({ page }) => {
+	await page.goto('/admin/scheduled-tasks');
+	const card = page.locator('li').filter({
+		has: page.getByRole('heading', { name: 'Permanently remove old deleted items', exact: true })
+	});
+	await expect(card).toBeVisible();
+	await expect(card.getByText('Not scheduled', { exact: true })).toBeVisible();
+	await expect(card.getByRole('button', { name: /Run .* now/ })).toHaveCount(0);
 });
 
 test('the page keeps internal wording out of sight', async ({ page }) => {

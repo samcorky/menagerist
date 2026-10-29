@@ -169,7 +169,7 @@ Each integration worker starts its own Postgres container (`postgres:18-alpine`,
 `poe sync` (and so `poe init`) downloads the Chromium build Playwright drives (`poe install-e2e-browser`). On Linux, Chromium also needs a few system libraries; if the suite fails with `error while loading shared libraries`, run `poe install-e2e-deps` for the one-off command that fixes it (it needs `sudo` and a real terminal, so it prints the command rather than running it).
 
 ```sh
-poe test-e2e                      # one worker per CPU core
+poe test-e2e                      # one worker per two CPU cores (each runs a backend, a scheduler worker and a browser)
 poe test-e2e --workers 2          # or -w 2; --workers 1 runs serially
 poe test-e2e --skip-build         # reuse frontend/build - only when it is current
 poe test-e2e status.spec.ts       # only these spec files (several allowed; `file.ts:78` runs one test)

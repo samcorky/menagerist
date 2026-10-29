@@ -23,31 +23,59 @@ const WORKERS = Number(process.env.E2E_WORKERS) || availableParallelism();
 // Use the production build served by each backend.
 const FRONTEND_DIST = fileURLToPath(new URL('./build', import.meta.url));
 
+// `E2E_SERVER_LOGS=1` shows what the backends and workers log, to explain a 500 or a stall.
+const serverLogs = process.env.E2E_SERVER_LOGS ? 'pipe' : 'ignore';
+
 // A slow-motion run is easier to watch, so extend the timeout too.
 const slowMo = process.env.PW_SLOWMO ? Number(process.env.PW_SLOWMO) : undefined;
+
+/**
+ * The environment of the instance on database menagerist_{name}; a backend and its worker
+ * share it, as the Compose services do.
+ */
+function instanceEnv(name: string, extraEnv: Record<string, string> = {}) {
+	const backupPath = join(tmpdir(), `menagerist-e2e-backups-${name}`);
+	mkdirSync(backupPath, { recursive: true });
+
+	return {
+		MENAGERIST_DATABASE_URL: `postgresql+asyncpg://menagerist:menagerist@localhost:55433/menagerist_${name}`,
+		MENAGERIST_API_FRONTEND_DIST_PATH: FRONTEND_DIST,
+		// Example covers are stored as media, so each backend needs a writable directory.
+		MENAGERIST_MEDIA_STORAGE_PATH: join(tmpdir(), `menagerist-e2e-media-${name}`),
+		MENAGERIST_BACKUP_PATH: backupPath,
+		MENAGERIST_BACKUP_BEFORE_MIGRATE: 'false',
+		...extraEnv
+	};
+}
 
 /**
  * A backend on `port` serving the built SPA from the database menagerist_{name}.
  * `--no-sync` avoids Windows lock clashes while backends start together.
  */
 function backend(port: number, name: string, extraEnv: Record<string, string> = {}) {
-	const backupPath = join(tmpdir(), `menagerist-e2e-backups-${name}`);
-	mkdirSync(backupPath, { recursive: true });
-
 	return {
 		command: `uv run --no-sync menagerist serve --host 127.0.0.1 --port ${port}`,
 		cwd: '..',
-		env: {
-			MENAGERIST_DATABASE_URL: `postgresql+asyncpg://menagerist:menagerist@localhost:55433/menagerist_${name}`,
-			MENAGERIST_API_FRONTEND_DIST_PATH: FRONTEND_DIST,
-			// Example covers are stored as media, so each backend needs a writable directory.
-			MENAGERIST_MEDIA_STORAGE_PATH: join(tmpdir(), `menagerist-e2e-media-${name}`),
-			MENAGERIST_BACKUP_PATH: backupPath,
-			MENAGERIST_BACKUP_BEFORE_MIGRATE: 'false',
-			...extraEnv
-		},
+		env: instanceEnv(name, extraEnv),
+		stdout: serverLogs,
 		url: `http://localhost:${port}/api/health/ready`,
 		reuseExistingServer: !process.env.CI,
+		timeout: 60_000
+	};
+}
+
+/**
+ * The scheduler worker for the same instance. It has no HTTP port, so it counts as started
+ * once it logs that it is running; the status page's worker check and every queued run
+ * depend on it. Each worker needs its own identity file, as they share one machine.
+ */
+function worker(name: string) {
+	return {
+		command: `uv run --no-sync menagerist worker --identity-file ${join(tmpdir(), `menagerist-e2e-worker-${name}`)}`,
+		cwd: '..',
+		env: instanceEnv(name),
+		stdout: serverLogs,
+		wait: { stdout: /worker started/ },
 		timeout: 60_000
 	};
 }
@@ -152,7 +180,10 @@ export default defineConfig({
 	webServer: COOKIES
 		? cookieServers
 		: [
-				...Array.from({ length: WORKERS }, (_, i) => backend(BACKEND_PORT + i, `w${i}`)),
+				...Array.from({ length: WORKERS }, (_, i) => [
+					backend(BACKEND_PORT + i, `w${i}`),
+					worker(`w${i}`)
+				]).flat(),
 				backend(AUTH_BACKEND_PORT, 'auth')
 			]
 });

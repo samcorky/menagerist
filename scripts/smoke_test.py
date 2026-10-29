@@ -320,6 +320,67 @@ def check_cli_probe_time(client: docker.DockerClient) -> None:
         )
 
 
+# Jobs the image must register; extra ones are fine, so a new job needs no change here.
+EXPECTED_JOBS = frozenset(
+    {
+        "scheduling.prune_runs",
+        "backup.create",
+        "backup.prune_exports",
+        "identity.purge_expired",
+        "media.cleanup",
+        "media.remove_stray_files",
+        "data.purge_deleted",
+    }
+)
+
+
+def _exec_json(container: Container, command: list[str]) -> object:
+    """Run a CLI command in the container and parse what it prints on stdout.
+
+    Logs go to stderr, so the streams are kept apart rather than merged.
+    """
+    result = container.exec_run(command, demux=True)
+    stdout, stderr = result.output or (b"", b"")
+    if result.exit_code != 0:
+        raise SmokeTestError(
+            f"`{' '.join(command)}` exited {result.exit_code}: "
+            + f"{(stdout or b'').decode(errors='replace')}"
+            + f"{(stderr or b'').decode(errors='replace')}".strip()
+        )
+    try:
+        return json.loads((stdout or b"").decode())
+    except json.JSONDecodeError as error:
+        raise SmokeTestError(
+            f"`{' '.join(command)}` did not print JSON: {stdout!r}"
+        ) from error
+
+
+def check_worker_jobs(client: docker.DockerClient) -> None:
+    """Confirm the worker image registers every job and can run one end to end.
+
+    A job's settings, wiring and storage access all come together only in the
+    real container, which is read-only and non-root, so list the catalogue and
+    run one job that needs no setup to completion.
+    """
+    print("checking the worker's jobs register and one runs to completion...")
+    container = get_container(client, WORKER_SERVICE)
+    listed = _exec_json(container, ["menagerist", "job", "list", "--json"])
+    if not isinstance(listed, list):
+        raise SmokeTestError(f"`job list` did not print a list: {listed!r}")
+    registered = {item["job_key"] for item in listed}
+    if missing := EXPECTED_JOBS - registered:
+        raise SmokeTestError(f"the worker does not register: {sorted(missing)}")
+
+    ran = _exec_json(
+        container, ["menagerist", "job", "run", "scheduling.prune_runs", "--json"]
+    )
+    if not isinstance(ran, dict) or ran.get("status") != "succeeded":
+        raise SmokeTestError(
+            f"`job run scheduling.prune_runs` did not succeed: {ran!r}"
+        )
+    print(f"  {len(registered)} jobs registered; scheduling.prune_runs succeeded")
+
+
 def check_version_lockstep(client: docker.DockerClient) -> None:
     """Confirm the image's version label matches the running app's own report."""
     print("checking the image label and the running app report the same version...")
@@ -402,6 +463,7 @@ def main() -> int:
         wait_healthy(client)
         wait_healthy(client, WORKER_SERVICE, timeout=150.0)
         check_cli_probe_time(client)
+        check_worker_jobs(client)
         check_hardening(client)
         check_startup_time(client)
         check_version_lockstep(client)

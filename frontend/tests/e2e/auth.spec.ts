@@ -82,7 +82,11 @@ test('first visit goes to setup, creates the administrator and signs them in', a
 	await expect(
 		page.getByText('This backup could not be verified.', { exact: false })
 	).toBeVisible();
-	await expect(page.getByLabel('Backup file')).toBeFocused();
+	// Focus returns to the drop zone, the control a keyboard user operates; the file input
+	// inside it is a hidden overlay.
+	await expect(
+		page.locator('div[role="button"]').filter({ has: page.locator('#setup-backup') })
+	).toBeFocused();
 	await page.getByRole('button', { name: 'Create an account instead' }).click();
 
 	await page.getByLabel('Your name').fill(ADMIN.name);

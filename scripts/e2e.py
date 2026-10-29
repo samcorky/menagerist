@@ -24,9 +24,14 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def default_workers() -> int:
-    """CPU cores available to this process."""
+    """Half the CPU cores available to this process, at least one.
+
+    Each worker is a whole instance (backend, scheduler worker and browser), so one per
+    core oversubscribes the machine and specs time out.
+    """
     affinity = getattr(os, "sched_getaffinity", None)  # Linux only
-    return len(affinity(0)) if affinity else os.cpu_count() or 1
+    cores = len(affinity(0)) if affinity else os.cpu_count() or 1
+    return max(1, cores // 2)
 
 
 def poe(task: str) -> int:
