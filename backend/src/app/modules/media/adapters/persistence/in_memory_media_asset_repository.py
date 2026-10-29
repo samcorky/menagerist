@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import uuid
+    from collections.abc import Collection
     from datetime import datetime
 
     from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
@@ -40,13 +41,24 @@ class InMemoryMediaAssetRepository:
         status: MediaStatus,
         before: datetime,
         scope: ContentFilter,
+        limit: int | None = None,
     ) -> list[MediaAsset]:
         """Return assets in `scope` and `status` last updated before `before`."""
-        return [
-            a
-            for a in self._assets.values()
-            if a.status is status and a.updated_at < before and scope.covers(a.owner_id)
-        ]
+        expired = sorted(
+            (
+                a
+                for a in self._assets.values()
+                if a.status is status
+                and a.updated_at < before
+                and scope.covers(a.owner_id)
+            ),
+            key=lambda a: a.updated_at,
+        )
+        return expired if limit is None else expired[:limit]
+
+    async def existing_ids(self, asset_ids: Collection[uuid.UUID]) -> set[uuid.UUID]:
+        """Return which of `asset_ids` have a row, for any owner."""
+        return {asset_id for asset_id in asset_ids if asset_id in self._assets}
 
     async def list_by_status(
         self, *, status: MediaStatus, scope: ContentFilter

@@ -1,6 +1,10 @@
 """Every job a module contributes explains itself to administrators."""
 
-from app.entrypoints.api.shared.job_catalogue import CONTRIBUTIONS, build_catalogue
+from app.entrypoints.api.shared.job_catalogue import (
+    CONTRIBUTIONS,
+    build_catalogue,
+    tunable_schedule_keys,
+)
 
 
 def test_every_contributed_job_has_a_title_and_description() -> None:
@@ -21,3 +25,24 @@ def test_each_contribution_adds_jobs_with_distinct_keys() -> None:
         for binding in contribution.bindings()
     ]
     assert len(keys) == len(set(keys)) > 0
+
+
+def test_every_job_schedule_key_resolves_to_a_setting_or_a_supplied_value() -> None:
+    """A key nobody supplies would only fail on the worker's first tick."""
+    supplied = {
+        key for contribution in CONTRIBUTIONS for key in contribution.schedules()
+    }
+    unresolved = [
+        job.schedule_key
+        for job in build_catalogue().registry.scheduled()
+        if job.schedule_key not in supplied | tunable_schedule_keys()
+    ]
+    assert not unresolved, f"Schedule keys with no value: {unresolved}"
+
+
+def test_only_tunable_settings_are_live() -> None:
+    """The backup schedule is editable at runtime; deployment-only ones are not."""
+    live = tunable_schedule_keys()
+    assert "backup.schedule" in live
+    assert "identity.purge_expired_schedule" not in live
+    assert "media.cleanup_schedule" not in live

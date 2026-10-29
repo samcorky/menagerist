@@ -9,6 +9,7 @@ from app.platform.orm_mixins import claim_rows, owned_by
 
 if TYPE_CHECKING:
     import uuid
+    from collections.abc import Collection
     from datetime import datetime
 
     from sqlalchemy import Select
@@ -95,18 +96,33 @@ class SqlAlchemyMediaAssetRepository:
         status: MediaStatus,
         before: datetime,
         scope: ContentFilter,
+        limit: int | None = None,
     ) -> list[MediaAsset]:
         """Return assets in `scope` and `status` last updated before `before`."""
-        logger.debug("listing expired media assets", status=status.value)
+        logger.debug("listing expired media assets", status=status.value, limit=limit)
         stmt = _scoped(
-            select(MediaAssetModel).where(
+            select(MediaAssetModel)
+            .where(
                 MediaAssetModel.status == status.value,
                 MediaAssetModel.updated_at < before,
-            ),
+            )
+            .order_by(MediaAssetModel.updated_at, MediaAssetModel.id),
             scope,
         )
+        if limit is not None:
+            stmt = stmt.limit(limit)
         result = await self._session.execute(stmt)
         return [_to_domain(m) for m in result.scalars()]
+
+    async def existing_ids(self, asset_ids: Collection[uuid.UUID]) -> set[uuid.UUID]:
+        """Return which of `asset_ids` have a row, for any owner."""
+        if not asset_ids:
+            return set()
+        logger.debug("checking which media assets exist", count=len(asset_ids))
+        result = await self._session.execute(
+            select(MediaAssetModel.id).where(MediaAssetModel.id.in_(asset_ids))
+        )
+        return set(result.scalars())
 
     async def list_by_status(
         self, *, status: MediaStatus, scope: ContentFilter

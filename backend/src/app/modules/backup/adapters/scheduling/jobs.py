@@ -23,10 +23,6 @@ if TYPE_CHECKING:
 type JobStep = Callable[[Actor], Awaitable[object]]
 
 
-# Schedules an administrator may change; the others stay deployment values.
-LIVE_SCHEDULES = frozenset({"backup.schedule"})
-
-
 def backup_schedules() -> dict[str, str]:
     """Expose deployment schedules to the settings-backed schedule source."""
     settings = get_backup_settings()
@@ -131,9 +127,5 @@ def backup_job_bindings(
 
 
 def backup_job_contribution() -> JobContribution:
-    """The backup module's jobs, schedules and the one an administrator may change."""
-    return JobContribution(
-        bindings=backup_job_bindings,
-        schedules=backup_schedules,
-        live_schedules=LIVE_SCHEDULES,
-    )
+    """The backup module's jobs and their deployment schedules."""
+    return JobContribution(bindings=backup_job_bindings, schedules=backup_schedules)

@@ -4,11 +4,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.cli.data import purge_deleted
-from app.entrypoints.cli.purge_deleted import (
+from app.entrypoints.api.shared.purge_deleted import (
     PurgeDeletedContentCommand,
     PurgeDeletedContentResult,
 )
+from app.entrypoints.cli.data import purge_deleted
 from app.platform.config.retention import RetentionSettings
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
@@ -37,7 +37,7 @@ def purge(monkeypatch: pytest.MonkeyPatch) -> _Purge:
     """Stub the composition and pin the retention setting at 14 days."""
     recorder = _Purge()
     monkeypatch.setattr(
-        "app.entrypoints.cli.purge_deleted.build_purge_deleted_content",
+        "app.entrypoints.api.shared.purge_deleted.build_purge_deleted_content",
         lambda: recorder,
     )
     monkeypatch.setattr(

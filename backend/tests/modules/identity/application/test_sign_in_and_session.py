@@ -20,7 +20,6 @@ from app.modules.identity.domain.errors import (
     InvalidCredentialsError,
     SignInThrottledError,
 )
-from app.modules.identity.domain.session import Session
 from app.shared_kernel.actor import ANONYMOUS_ACTOR
 
 if TYPE_CHECKING:
@@ -89,26 +88,6 @@ async def test_sign_in_stores_device_details_on_created_session(
     assert stored.client_ip == "192.0.2.1"
     assert stored.client_platform == "Linux"
     assert stored.client_mobile is False
-
-
-@time_machine.travel(NOW, tick=False)
-async def test_sign_in_sweeps_expired_sessions(
-    cases: Cases, world: World, make_user: MakeUser
-) -> None:
-    """A successful sign-in removes sessions that have already expired."""
-    user = make_user("alice")
-    await world.users.add(user)
-    stale = Session.create(
-        user_id=user.id, token_hash="stale", now=NOW - 2 * TTL, ttl=TTL
-    )
-    live = Session.create(user_id=user.id, token_hash="live", now=NOW, ttl=TTL)
-    await world.sessions.add(stale)
-    await world.sessions.add(live)
-
-    await _sign_in(cases)
-
-    assert await world.sessions.get_by_token_hash("stale") is None
-    assert await world.sessions.get_by_token_hash("live") is not None
 
 
 @time_machine.travel(NOW, tick=False)

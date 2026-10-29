@@ -66,6 +66,27 @@ class JobBinding:
     handler: JobHandler
 
 
+_DEFINITION_ATTRIBUTE = "__job_definition__"
+
+
+def job(definition: JobDefinition) -> Callable[[JobHandler], JobHandler]:
+    """Attach a job's policy to its handler without registering it anywhere."""
+
+    def attach(handler: JobHandler) -> JobHandler:
+        setattr(handler, _DEFINITION_ATTRIBUTE, definition)
+        return handler
+
+    return attach
+
+
+def _binding_for(handler: JobHandler) -> JobBinding:
+    definition = getattr(handler, _DEFINITION_ATTRIBUTE, None)
+    if not isinstance(definition, JobDefinition):
+        name = getattr(handler, "__name__", repr(handler))
+        raise ValidationError(f"{name} is not decorated with @job")
+    return JobBinding(definition=definition, handler=handler)
+
+
 @dataclass(frozen=True, kw_only=True)
 class JobContribution:
     """What one module adds to the job catalogue and the schedule source.
@@ -75,5 +96,15 @@ class JobContribution:
 
     bindings: Callable[[], list[JobBinding]]
     schedules: Callable[[], Mapping[str, str]] = field(default=dict)
-    # Schedule keys an administrator may change; the rest stay deployment values.
-    live_schedules: frozenset[str] = frozenset()
+
+    @classmethod
+    def from_handlers(
+        cls,
+        *handlers: JobHandler,
+        schedules: Callable[[], Mapping[str, str]] = dict,
+    ) -> JobContribution:
+        """Contribute `@job`-decorated handlers; each carries its own definition."""
+        return cls(
+            bindings=lambda: [_binding_for(handler) for handler in handlers],
+            schedules=schedules,
+        )

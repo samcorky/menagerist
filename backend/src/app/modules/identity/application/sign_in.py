@@ -139,8 +139,6 @@ class SignIn(CommandHandler[IdentityUnitOfWork, SignInCommand, SignedInResult]):
             user.record_sign_in(now)
             await repos.users.save(user)
             await self._throttle.settle_success(repos.attempts, reservation)
-            # Sign-in is the only recurring writer here, so it also sweeps old rows.
-            await repos.sessions.delete_expired(now)
             started = await start_session(
                 repos,
                 self._tokens,

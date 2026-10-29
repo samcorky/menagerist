@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from app.platform.config._base import MenageristBaseSettings
+from app.platform.config._types import Cron  # noqa: TC001 - pydantic resolves this at runtime
 
 
 class IdentitySettings(MenageristBaseSettings, group="identity"):
@@ -18,6 +19,13 @@ class IdentitySettings(MenageristBaseSettings, group="identity"):
         default=0,
         ge=0,
         description="Idle timeout in hours; 0 disables this limit.",
+    )
+    purge_expired_schedule: Cron = Field(
+        default="15 4 * * *",
+        description=(
+            "Cron expression for removing expired sessions and API tokens in the "
+            + "instance timezone. Empty disables the job."
+        ),
     )
     cookie_name: str = Field(
         default="menagerist-session",

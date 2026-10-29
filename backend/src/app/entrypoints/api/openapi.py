@@ -73,7 +73,7 @@ OPENAPI_TAGS: list[dict[str, str]] = [
     },
     {
         "name": "Scheduling",
-        "description": "Preview when a recurring schedule would next run.",
+        "description": "See, run and preview the background jobs.",
     },
     {
         "name": "Settings",

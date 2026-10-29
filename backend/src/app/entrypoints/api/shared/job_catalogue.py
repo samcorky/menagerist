@@ -8,8 +8,14 @@ contributing a `JobContribution` to `CONTRIBUTIONS`.
 from functools import lru_cache
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
-from app.entrypoints.api.shared.settings_reader import get_settings_reader
+from app.entrypoints.api.shared.data_jobs import data_job_contribution
+from app.entrypoints.api.shared.settings_reader import (
+    get_settings_catalogue,
+    get_settings_reader,
+)
 from app.modules.backup.adapters.scheduling.jobs import backup_job_contribution
+from app.modules.identity.adapters.scheduling.jobs import identity_job_contribution
+from app.modules.media.adapters.scheduling.jobs import media_job_contribution
 from app.modules.scheduling.adapters.cli.catalogue import JobCatalogue
 from app.modules.scheduling.adapters.cli.jobs import prune_runs_job
 from app.modules.scheduling.adapters.persistence.unit_of_work import (
@@ -20,6 +26,7 @@ from app.modules.scheduling.adapters.platform.reader_schedule_source import (
 )
 from app.modules.scheduling.application.prune_job_runs import PruneJobRuns
 from app.modules.scheduling.application.setting_keys import RUN_HISTORY_PER_JOB
+from app.modules.settings.domain.setting import SettingScope
 from app.platform.database import get_session_factory
 from app.shared_kernel.jobs import JobBinding, JobContribution
 
@@ -46,6 +53,9 @@ CONTRIBUTIONS: tuple[JobContribution, ...] = (
         schedules=lambda: {"scheduling.prune_schedule": "0 4 * * *"},
     ),
     backup_job_contribution(),
+    identity_job_contribution(),
+    media_job_contribution(),
+    data_job_contribution(),
 )
 
 
@@ -56,11 +66,19 @@ def build_catalogue() -> JobCatalogue:
     )
 
 
+def tunable_schedule_keys() -> frozenset[str]:
+    """Settings an administrator may change, which a schedule key can name."""
+    return frozenset(
+        descriptor.key
+        for descriptor in get_settings_catalogue().descriptors(SettingScope.INSTANCE)
+    )
+
+
 def build_schedule_source() -> ReaderScheduleSource:
-    """Resolve editable schedules through the settings reader, the rest from env."""
+    """Resolve tunable schedules through the settings reader, the rest from env."""
     return ReaderScheduleSource(
         get_settings_reader(),
-        live=frozenset().union(*(item.live_schedules for item in CONTRIBUTIONS)),
+        live=tunable_schedule_keys(),
         static={
             key: value
             for item in CONTRIBUTIONS

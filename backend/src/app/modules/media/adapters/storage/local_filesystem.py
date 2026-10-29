@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import os
+import uuid
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
@@ -8,13 +9,13 @@ import aiofiles
 import structlog
 
 from app.modules.media.domain.errors import MediaFileTooLargeError
+from app.modules.media.domain.media_asset import MediaStatus
+from app.modules.media.ports.media_storage import StoredFile
 
 if TYPE_CHECKING:
-    import uuid
     from collections.abc import AsyncGenerator, AsyncIterator
+    from datetime import datetime
     from pathlib import Path
-
-    from app.modules.media.domain.media_asset import MediaStatus
 
 logger = structlog.get_logger()
 
@@ -110,6 +111,9 @@ class LocalFilesystemMediaStorage:
         thumb = self._thumb_path(asset_id, status)
         with suppress(FileNotFoundError):
             await asyncio.to_thread(thumb.unlink)
+        # An interrupted upload leaves its half-written file behind.
+        with suppress(FileNotFoundError):
+            await asyncio.to_thread(path.with_suffix(".tmp").unlink)
 
     async def store_thumbnail(
         self,
@@ -147,3 +151,38 @@ class LocalFilesystemMediaStorage:
         async with aiofiles.open(path, "rb") as f:
             while chunk := await f.read(_CHUNK_SIZE):
                 yield chunk
+
+    async def list_files(self, *, older_than: datetime) -> AsyncIterator[StoredFile]:
+        """Yield each stored asset last modified before `older_than`, once."""
+        cutoff = older_than.timestamp()
+        for status in MediaStatus:
+            bucket = self._base / status.value
+            shards = await asyncio.to_thread(_subdirectories, bucket)
+            for shard in shards:
+                for asset_id in await asyncio.to_thread(_old_asset_ids, shard, cutoff):
+                    yield StoredFile(asset_id=asset_id, status=status)
+
+
+def _subdirectories(folder: Path) -> list[Path]:
+    """Return the directories inside `folder`, or none if it does not exist."""
+    try:
+        return sorted(entry for entry in folder.iterdir() if entry.is_dir())
+    except FileNotFoundError:
+        return []
+
+
+def _old_asset_ids(shard: Path, cutoff: float) -> list[uuid.UUID]:
+    """Return ids of assets in `shard` with a file last modified before `cutoff`.
+
+    A file counts for its asset whether it is the original, the thumbnail or a
+    half-written upload; names that are not an asset id are ignored.
+    """
+    found: dict[uuid.UUID, None] = {}
+    for entry in shard.iterdir():
+        try:
+            asset_id = uuid.UUID(entry.name.partition(".")[0])
+        except ValueError:
+            continue
+        if entry.is_file() and entry.stat().st_mtime < cutoff:
+            found[asset_id] = None
+    return list(found)

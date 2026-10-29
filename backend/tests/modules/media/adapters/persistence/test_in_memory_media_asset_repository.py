@@ -125,3 +125,33 @@ async def test_list_expired_filters_by_status() -> None:
 
     assert staged in result
     assert attached not in result
+
+
+async def test_list_expired_returns_the_oldest_first_up_to_the_limit() -> None:
+    """A limit takes the longest-expired assets, so repeated batches make progress."""
+    repo = InMemoryMediaAssetRepository()
+    now = datetime.now(UTC)
+    oldest, middle, newest = _make_asset(), _make_asset(), _make_asset()
+    for hours, asset in ((50, oldest), (40, middle), (30, newest)):
+        asset.updated_at = now - timedelta(hours=hours)
+        await repo.add(asset)
+
+    result = await repo.list_expired(
+        status=MediaStatus.STAGED,
+        before=datetime.now(UTC),
+        scope=ContentFilter.everyone(),
+        limit=2,
+    )
+
+    assert result == [oldest, middle]
+
+
+async def test_existing_ids_reports_only_rows_that_exist() -> None:
+    """existing_ids() answers for any owner and ignores ids with no row."""
+    repo = InMemoryMediaAssetRepository()
+    kept = _make_asset()
+    await repo.add(kept)
+    missing = uuid.uuid4()
+
+    assert await repo.existing_ids({kept.id, missing}) == {kept.id}
+    assert await repo.existing_ids(set()) == set()

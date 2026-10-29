@@ -9,7 +9,7 @@ import pytest_asyncio
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.entrypoints.cli.purge_deleted import (
+from app.entrypoints.api.shared.purge_deleted import (
     PurgeDeletedContentCommand,
     PurgeDeletedContentResult,
     build_purge_deleted_content_on,

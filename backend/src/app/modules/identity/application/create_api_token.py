@@ -134,7 +134,6 @@ class CreateApiToken(
         reservation = await self._gate.reserve(actor, command.client_ip, now)
         async with self._uow as repos:
             await self._gate.verify(repos, actor, command.password, reservation)
-            await repos.tokens.delete_expired(now)
             if await repos.tokens.count_active(actor.id, now=now) >= self._max_tokens:
                 await self._uow.commit()
                 raise ApiTokenLimitError(

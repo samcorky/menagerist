@@ -124,6 +124,7 @@ NO_SCOPE_NEEDED: dict[type, dict[str, str]] = {
         "save": _SAVE,
         "delete": "removes an asset the use case already fetched through a scope",
         "claim_orphaned": _CLAIM,
+        "existing_ids": "system-only existence check by id for the stray-file sweep",
     },
     MediaAttachmentRepository: {
         "lock_target": "takes a lock and returns nothing",
@@ -239,6 +240,7 @@ UNSCOPED_USE_CASES = {
     "ClaimOrphanedInstallations": "first-admin claim",
     # System-actor maintenance jobs, run from the media CLI: they sweep all content.
     "CleanupExpiredMedia": "system maintenance job",
+    "RemoveStrayMediaFiles": "system maintenance job",
     "RegenerateThumbnails": "system maintenance job",
     # System-actor hard deletes run by example-pack removal, by id.
     "PurgeNode": "system purge",

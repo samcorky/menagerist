@@ -200,3 +200,31 @@ async def test_null_owner_is_invisible_to_a_person(db_session: AsyncSession) -> 
     hidden = await attachments.list_for_target(AttachmentTarget.NODE, node_id, scope=A)
     assert hidden == []
     assert len(await attachments.list_for_asset(asset.id, scope=ALL)) == 1
+
+
+async def test_list_expired_limit_takes_the_oldest_first(repos: Repos) -> None:
+    """The limit bounds a batch and keeps the longest-expired assets."""
+    first, second, third = _asset(ALICE), _asset(ALICE), _asset(ALICE)
+    for age, asset in enumerate((first, second, third)):
+        asset.updated_at = datetime.now(UTC) - timedelta(hours=10 - age)
+        await repos.assets.add(asset)
+    later = datetime.now(UTC) + timedelta(hours=1)
+
+    batch = await repos.assets.list_expired(
+        status=STAGED, before=later, scope=ALL, limit=2
+    )
+
+    assert [a.id for a in batch] == [first.id, second.id]
+
+
+async def test_existing_ids_is_unscoped_and_ignores_unknown_ids(repos: Repos) -> None:
+    """The stray-file check asks about every owner's rows."""
+    mine, theirs = _asset(ALICE), _asset(BOB)
+    await repos.assets.add(mine)
+    await repos.assets.add(theirs)
+    unknown = uuid.uuid4()
+
+    found = await repos.assets.existing_ids({mine.id, theirs.id, unknown})
+
+    assert found == {mine.id, theirs.id}
+    assert await repos.assets.existing_ids(set()) == set()

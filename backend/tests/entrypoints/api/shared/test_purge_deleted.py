@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.bridges.item_dependents import ItemDependentsPurger
-from app.entrypoints.cli.purge_deleted import (
+from app.entrypoints.api.shared.purge_deleted import (
     PurgeDeletedContent,
     PurgeDeletedContentCommand,
     PurgeDeletedContentResult,

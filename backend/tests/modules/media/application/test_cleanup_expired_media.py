@@ -18,11 +18,11 @@ from app.modules.media.application.cleanup_expired_media import (
     CleanupExpiredMedia,
     CleanupExpiredMediaCommand,
 )
-from app.modules.media.domain.media_asset import MediaAsset
+from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
 from app.shared_kernel.access_guard import AccessGuard, InMemoryAccessGuard
 from app.shared_kernel.actor import ANONYMOUS_ACTOR, SYSTEM_ACTOR, Actor
 from app.shared_kernel.content_filter import ContentFilter
-from app.shared_kernel.errors import ForbiddenError
+from app.shared_kernel.errors import ForbiddenError, ValidationError
 
 
 def _make_use_case(
@@ -36,12 +36,13 @@ def _make_use_case(
 
 
 def _command(
-    *, staged_hours: int = 24, orphaned_hours: int = 72
+    *, staged_hours: int = 24, orphaned_hours: int = 72, batch_size: int = 100
 ) -> CleanupExpiredMediaCommand:
     now = datetime.now(UTC)
     return CleanupExpiredMediaCommand(
         staged_before=now - timedelta(hours=staged_hours),
         orphaned_before=now - timedelta(hours=orphaned_hours),
+        batch_size=batch_size,
     )
 
 
@@ -162,3 +163,75 @@ async def test_cleanup_is_refused_to_anyone_but_the_system_actor() -> None:
             await use_case.handle(_command(), actor)
 
     assert await repo.get(expired.id, scope=ContentFilter.everyone()) is expired
+
+
+class _UnpluggedStorage(InMemoryMediaStorage):
+    """Storage whose deletes always fail."""
+
+    async def delete(self, asset_id: uuid.UUID, status: MediaStatus) -> None:
+        raise OSError("disk unplugged")
+
+
+class _CountingUnitOfWork:
+    """Wrap a unit of work to count commits."""
+
+    def __init__(self, inner: object) -> None:
+        self._inner = inner
+        self.commits = 0
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._inner, name)
+
+    async def __aenter__(self) -> object:
+        return await self._inner.__aenter__()  # type: ignore[attr-defined]
+
+    async def __aexit__(self, *exc: object) -> None:
+        await self._inner.__aexit__(*exc)  # type: ignore[attr-defined]
+
+    async def commit(self) -> None:
+        self.commits += 1
+        await self._inner.commit()  # type: ignore[attr-defined]
+
+
+async def test_cleanup_works_through_a_backlog_in_batches() -> None:
+    """Five expired assets with a batch of two take three commits, not five."""
+    repo = InMemoryMediaAssetRepository()
+    storage = InMemoryMediaStorage()
+    uow = _CountingUnitOfWork(
+        create_in_memory_media_uow(make_in_memory_repos(assets=repo))
+    )
+    use_case = CleanupExpiredMedia(uow, InMemoryAccessGuard(), storage)  # type: ignore[arg-type]
+    assets = [await _add_expired_staged(repo, storage) for _ in range(5)]
+
+    count = await use_case.handle(_command(batch_size=2), SYSTEM_ACTOR)
+
+    assert count == 5
+    assert uow.commits == 3
+    for asset in assets:
+        assert await repo.get(asset.id, scope=ContentFilter.everyone()) is None
+        assert (asset.id, "staged") not in storage._files
+
+
+async def test_files_go_only_after_their_rows_are_committed() -> None:
+    """A failing file delete leaves a stray file, never a row pointing at nothing."""
+    repo = InMemoryMediaAssetRepository()
+    storage = _UnpluggedStorage()
+    uow = create_in_memory_media_uow(make_in_memory_repos(assets=repo))
+    use_case = CleanupExpiredMedia(uow, InMemoryAccessGuard(), storage)
+    expired = await _add_expired_staged(repo, storage)
+
+    with pytest.raises(OSError, match="disk unplugged"):
+        await use_case.handle(_command(), SYSTEM_ACTOR)
+
+    assert await repo.get(expired.id, scope=ContentFilter.everyone()) is None
+
+
+@pytest.mark.parametrize("size", [0, -1])
+def test_the_batch_size_must_be_positive(size: int) -> None:
+    """A zero batch would loop forever."""
+    with pytest.raises(ValidationError):
+        CleanupExpiredMediaCommand(
+            staged_before=datetime.now(UTC),
+            orphaned_before=datetime.now(UTC),
+            batch_size=size,
+        )

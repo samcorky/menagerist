@@ -257,10 +257,10 @@ async def test_the_twenty_first_active_token_is_refused(
 
 
 @time_machine.travel(NOW, tick=False)
-async def test_expired_tokens_are_purged_and_do_not_count(
+async def test_expired_tokens_do_not_count_towards_the_limit(
     issue_token: IssueToken, make_user: MakeUser, world: World
 ) -> None:
-    """Creating removes expired rows, so they never block the limit."""
+    """Expired tokens stay for the purge job but never block the limit."""
     user = make_user()
     await world.users.add(user)
     first = await issue_token(user, days=1)
@@ -269,7 +269,7 @@ async def test_expired_tokens_are_purged_and_do_not_count(
     with time_machine.travel(NOW + timedelta(days=2), tick=False):
         again = await issue_token(user)
 
-    assert await world.tokens.get(first.token.id) is None
+    assert await world.tokens.get(first.token.id) is not None
     assert await world.tokens.get(again.token.id) is not None
 
 

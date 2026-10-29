@@ -33,7 +33,7 @@ def purge_deleted(
         dry_run: Report what would be deleted and change nothing.
         yes: Do not ask for confirmation.
     """
-    from app.entrypoints.cli.purge_deleted import (
+    from app.entrypoints.api.shared.purge_deleted import (
         PurgeDeletedContentCommand,
         build_purge_deleted_content,
     )

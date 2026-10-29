@@ -1,10 +1,20 @@
+import uuid
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
-if TYPE_CHECKING:
-    import uuid
-    from collections.abc import AsyncGenerator, AsyncIterator
+from app.modules.media.domain.media_asset import MediaStatus
 
-    from app.modules.media.domain.media_asset import MediaStatus
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, AsyncIterator
+    from datetime import datetime
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class StoredFile:
+    """One asset's file as found in storage, whether or not a row still exists."""
+
+    asset_id: uuid.UUID
+    status: MediaStatus
 
 
 class MediaStoragePort(Protocol):
@@ -65,4 +75,12 @@ class MediaStoragePort(Protocol):
         status: MediaStatus,
     ) -> AsyncGenerator[bytes]:
         """Return an async generator that streams the thumbnail bytes."""
+        ...
+
+    def list_files(self, *, older_than: datetime) -> AsyncIterator[StoredFile]:
+        """Yield each stored asset last modified before `older_than`, once.
+
+        Thumbnails and half-written uploads belong to their asset and do not
+        appear separately. Files that are not named for an asset are ignored.
+        """
         ...

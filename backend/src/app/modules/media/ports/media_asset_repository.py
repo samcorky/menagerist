@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     import uuid
+    from collections.abc import Collection
     from datetime import datetime
 
     from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
@@ -31,8 +32,13 @@ class MediaAssetRepository(Protocol):
         status: MediaStatus,
         before: datetime,
         scope: ContentFilter,
+        limit: int | None = None,
     ) -> list[MediaAsset]:
-        """Return assets in `scope` and `status` last updated before `before`."""
+        """Return assets in `scope` and `status` last updated before `before`.
+
+        Oldest first, so a caller that deletes what it receives and asks again makes
+        progress; `limit` bounds one batch.
+        """
         ...
 
     async def list_by_status(
@@ -43,6 +49,13 @@ class MediaAssetRepository(Protocol):
 
     async def delete(self, asset_id: uuid.UUID) -> None:
         """Hard-delete the asset record."""
+        ...
+
+    async def existing_ids(self, asset_ids: Collection[uuid.UUID]) -> set[uuid.UUID]:
+        """Return which of `asset_ids` have a row, for any owner.
+
+        System-level and unscoped; the stray-file sweep asks it about stored files.
+        """
         ...
 
     async def claim_orphaned(
