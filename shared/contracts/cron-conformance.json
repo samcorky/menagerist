@@ -71,6 +71,10 @@
     {
       "expression": "*/5 14-18 * * *",
       "explained": "Every 5 minutes, between 14:00 and 18:59"
+    },
+    {
+      "expression": "7-59/13,*/17,2 1-23/5,0,12-18/2 */9,29-31 2,*/5,JAN-MAR 1-5,0",
+      "explained": "Every 13 minutes, minutes 7 through 59 past the hour, every 17 minutes, and at 2 minutes past the hour, every 5 hours, between 01:00 and 23:59, at 00:00, and every 2 hours, between 12:00 and 18:00, every 9 days in a month and 29 through 31, and on Monday through Friday and Sunday, only in February, every 5 months, and January through March"
     }
   ],
   "invalid": [
