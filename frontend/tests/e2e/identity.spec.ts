@@ -9,10 +9,7 @@ import { asUser, createUserViaApi, type E2EUser } from './helpers';
 test.describe.configure({ mode: 'serial' });
 
 const userRow = (page: Page, user: E2EUser) =>
-	page
-		.getByRole('list', { name: 'Users' })
-		.getByRole('listitem')
-		.filter({ hasText: user.username });
+	page.getByRole('table', { name: 'Users' }).getByRole('row').filter({ hasText: user.username });
 
 async function signInThroughForm(page: Page, username: string, password: string) {
 	await page.getByLabel('Username').fill(username);
@@ -30,8 +27,9 @@ test('an administrator sees when a user last signed in', async ({
 	await adminApi.dispose();
 
 	await page.goto('/admin/users');
-	await expect(userRow(page, user)).toContainText('Last sign-in:');
-	await expect(userRow(page, user)).not.toContainText('Last sign-in: Never');
+	// The table's own "Last sign-in" column holds the value; someone who has just signed in is not "Never".
+	await expect(page.getByRole('table', { name: 'Users' })).toContainText('Last sign-in');
+	await expect(userRow(page, user)).not.toContainText('Never');
 });
 
 test('a display-name change shows in the user menu at once', async ({

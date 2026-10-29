@@ -63,6 +63,8 @@ Design for touch from the start: generous hit areas, short forms, little typing 
 | Tablet   | Collapsed icon rail, toggle or drawer; do not reproduce the full desktop sidebar              |
 | Mobile   | Compact header and bottom navigation; redesign for the viewport rather than shrinking desktop |
 
+Uniform, scannable lists in settings and admin (users, devices, backups, scheduled tasks, recently deleted) are tables from the `md` breakpoint up and stacked cards below it. Use `DataTable` with `wide` from `$lib/viewport.svelte` so only one layout exists in the DOM; keep every row's action reachable by the same accessible name in both.
+
 ## 6. Navigation
 
 Core destinations are **Collection**, **Search** and **Explore**. Keep “Add item” easy to find at every breakpoint. Settings stay visually secondary; occasional features appear contextually rather than becoming navigation destinations.

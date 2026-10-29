@@ -52,8 +52,8 @@ test('an administrator can view and revoke devices from the users page dialog', 
 
 	await page.goto('/admin/users');
 	const userRow = page
-		.getByRole('list', { name: 'Users' })
-		.getByRole('listitem')
+		.getByRole('table', { name: 'Users' })
+		.getByRole('row')
 		.filter({ hasText: member.username });
 
 	await userRow.getByRole('button', { name: 'Devices' }).click();

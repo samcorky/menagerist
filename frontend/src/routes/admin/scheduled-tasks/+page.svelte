@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { MediaQuery } from 'svelte/reactivity';
 	import { resolve } from '$app/paths';
 	import { toast } from 'svelte-sonner';
 	import { Check, ChevronDown, RotateCcw } from '@lucide/svelte';
@@ -19,6 +18,7 @@
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { auth } from '$lib/auth.svelte.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
+	import { wide } from '$lib/viewport.svelte';
 	import { coreForProp } from '$lib/field-types';
 	import { explainCron } from '$lib/field-types/cron/explain';
 	import { formatDateTime } from '$lib/format-date';
@@ -43,6 +43,7 @@
 		type SettingValue
 	} from '$lib/settings-form';
 	import BackButton from '$lib/components/back-button.svelte';
+	import DataTable from '$lib/components/data-table.svelte';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Badge, type BadgeVariant } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -50,6 +51,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
+	import * as Table from '$lib/components/ui/table/index.js';
 
 	type Panel = 'runs';
 
@@ -79,9 +81,6 @@
 	let drafts = $state<Record<string, unknown>>({});
 	let draftErrors = $state<Record<string, string>>({});
 	let saving = $state<string | null>(null);
-
-	// One layout at a time, so the schedule editor never exists twice in the page.
-	const wide = new MediaQuery('min-width: 768px');
 
 	const loadingDisplay = delayedLoading();
 	$effect(() => {
@@ -626,48 +625,49 @@
 				{/if}
 			{:else}
 				{#if wide.current}
-					<div class="rounded-xl border bg-card">
-						<table class="w-full text-left text-sm" aria-label="Scheduled tasks">
-							<thead class="border-b bg-muted/40 text-xs text-muted-foreground uppercase">
-								<tr>
-									<th scope="col" class="px-4 py-3 font-medium">Task</th>
-									<th scope="col" class="px-4 py-3 font-medium">Schedule</th>
-									<th scope="col" class="px-4 py-3 font-medium">Next run</th>
-									<th scope="col" class="px-4 py-3 font-medium">Last run</th>
-									<th scope="col" class="px-4 py-3 text-right font-medium">Actions</th>
-								</tr>
-							</thead>
-							<tbody class="divide-y">
-								{#each jobs as job (job.job_key)}
-									{@const setting = scheduleSetting(job)}
-									<tr class="align-top transition-colors hover:bg-muted/30">
-										<th scope="row" class="max-w-xs px-4 py-3 text-left font-normal">
-											<div class="font-medium">{job.title}</div>
-											{#if job.description}
-												<div class="mt-0.5 text-xs text-muted-foreground">{job.description}</div>
-											{/if}
-										</th>
-										<td class="px-4 py-3">
-											<div>{scheduleLabel(job, explain)}</div>
-											{#if setting?.locked}
-												<div class="mt-0.5 text-xs text-muted-foreground">
-													{lockedNote(setting)}
-												</div>
-											{/if}
-										</td>
-										<td class="px-4 py-3 text-muted-foreground">{nextRunLabel(job, formatWhen)}</td>
-										<td class="px-4 py-3">{@render lastRun(job)}</td>
-										<td class="px-4 py-3">{@render actions(job, true)}</td>
-									</tr>
-									{#if panels[job.job_key]}
-										<tr class="bg-muted/20">
-											<td colspan="5" class="px-4 py-4">{@render detail(job)}</td>
-										</tr>
+					<DataTable
+						label="Scheduled tasks"
+						columns={[
+							{ label: 'Task' },
+							{ label: 'Schedule' },
+							{ label: 'Next run' },
+							{ label: 'Last run' },
+							{ label: 'Actions', end: true }
+						]}
+					>
+						{#each jobs as job (job.job_key)}
+							{@const setting = scheduleSetting(job)}
+							<Table.Row>
+								<Table.Head
+									scope="row"
+									class="h-auto max-w-xs px-4 py-3 align-top whitespace-normal"
+								>
+									<div class="font-medium">{job.title}</div>
+									{#if job.description}
+										<div class="mt-0.5 text-xs font-normal text-muted-foreground">
+											{job.description}
+										</div>
 									{/if}
-								{/each}
-							</tbody>
-						</table>
-					</div>
+								</Table.Head>
+								<Table.Cell>
+									<div>{scheduleLabel(job, explain)}</div>
+									{#if setting?.locked}
+										<div class="mt-0.5 text-xs text-muted-foreground">{lockedNote(setting)}</div>
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-muted-foreground"
+									>{nextRunLabel(job, formatWhen)}</Table.Cell
+								>
+								<Table.Cell>{@render lastRun(job)}</Table.Cell>
+								<Table.Cell>{@render actions(job, true)}</Table.Cell>
+							</Table.Row>
+							{#if panels[job.job_key]}
+								<Table.Row class="bg-muted/20 hover:bg-muted/20">
+									<Table.Cell colspan={5} class="py-4">{@render detail(job)}</Table.Cell>
+								</Table.Row>
+							{/if}
+						{/each}
+					</DataTable>
 				{:else}
 					<ul class="space-y-3" aria-label="Scheduled tasks">
 						{#each jobs as job (job.job_key)}

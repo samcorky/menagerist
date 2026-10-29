@@ -25,9 +25,11 @@ test('an administrator creates, verifies, downloads, uploads and deletes a backu
 			.click();
 		const archive = await (await created).json();
 		ids.push(archive.id);
+		// A table on desktop, a list of cards on a phone.
 		const row = page
-			.getByRole('list', { name: 'Backups', exact: true })
-			.getByRole('listitem')
+			.getByRole('table', { name: 'Backups', exact: true })
+			.getByRole('row')
+			.or(page.getByRole('list', { name: 'Backups', exact: true }).getByRole('listitem'))
 			.filter({ hasText: label });
 		await expect(row).toBeVisible();
 		await row.getByRole('button', { name: 'Verify', exact: true }).click();

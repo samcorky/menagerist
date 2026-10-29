@@ -25,7 +25,10 @@
 		deletedActionError,
 		type DeletedTab
 	} from '$lib/recently-deleted';
+	import { formatDateTime } from '$lib/format-date';
+	import { wide } from '$lib/viewport.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
+	import DataTable from '$lib/components/data-table.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -33,6 +36,7 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
+	import * as Table from '$lib/components/ui/table/index.js';
 
 	type Row = {
 		id: string;
@@ -210,8 +214,49 @@
 	<title>Recently deleted - Menagerist</title>
 </svelte:head>
 
+{#snippet collectionBadge(row: Row)}
+	{#if row.badge === 'Smart'}
+		<Badge variant="secondary" class="shrink-0">Smart</Badge>
+	{:else if row.badge === 'List'}
+		<Badge variant="outline" class="shrink-0">List</Badge>
+	{/if}
+{/snippet}
+
+{#snippet rowActions(row: Row, compact: boolean)}
+	{#if canRestore}
+		<Button
+			type="button"
+			variant="outline"
+			class={compact ? 'h-9' : 'h-11 flex-1 sm:flex-none'}
+			disabled={busyId !== null}
+			aria-label="Restore {row.name}"
+			onclick={() => void handleRestore(row)}
+		>
+			{#if busyId === row.id && purgeTarget === null}
+				<Spinner class="size-4" />
+			{:else}
+				<RotateCcw class="size-4" aria-hidden="true" />
+			{/if}
+			Restore
+		</Button>
+	{/if}
+	{#if canPurge}
+		<Button
+			type="button"
+			variant="outline"
+			class={compact ? 'h-9' : 'h-11 flex-1 sm:flex-none'}
+			disabled={busyId !== null}
+			aria-label="Purge {row.name}"
+			onclick={() => (purgeTarget = { tab, row })}
+		>
+			<Trash2 class="size-4" aria-hidden="true" />
+			Purge
+		</Button>
+	{/if}
+{/snippet}
+
 <main class="flex-1 px-4 py-8 sm:px-6">
-	<div class="mx-auto flex max-w-2xl flex-col gap-6">
+	<div class="mx-auto flex max-w-4xl flex-col gap-6">
 		<BackButton fallback={resolve('/settings')} />
 		<div>
 			<h1 class="font-heading text-3xl font-semibold tracking-tight">Recently deleted</h1>
@@ -257,75 +302,85 @@
 				{NOTHING_DELETED_MESSAGE}
 			</p>
 		{:else}
-			<ul
-				class="space-y-3 outline-none"
-				aria-label={tab === 'items' ? 'Deleted items' : 'Deleted collections'}
-				bind:this={listEl}
-				tabindex="-1"
-			>
-				{#each pane.rows as row (row.id)}
-					{@const type = deletedItemType(row.type, typeLabels)}
-					<li>
-						<Card.Root>
-							<Card.Content
-								class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
-							>
-								<div class="min-w-0 space-y-1">
+			<div class="outline-none" bind:this={listEl} tabindex="-1">
+				{#if wide.current}
+					<DataTable
+						label={tab === 'items' ? 'Deleted items' : 'Deleted collections'}
+						columns={[
+							{ label: 'Name' },
+							...(tab === 'items' ? [{ label: 'Type' }] : []),
+							{ label: 'When' },
+							...(canRestore || canPurge ? [{ label: 'Actions', end: true }] : [])
+						]}
+					>
+						{#each pane.rows as row (row.id)}
+							<Table.Row>
+								<Table.Cell class="max-w-sm">
 									<div class="flex items-center gap-2">
 										<p class="truncate font-medium" title={row.name}>{row.name}</p>
-										{#if row.badge === 'Smart'}
-											<Badge variant="secondary" class="shrink-0">Smart</Badge>
-										{:else if row.badge === 'List'}
-											<Badge variant="outline" class="shrink-0">List</Badge>
-										{/if}
+										{@render collectionBadge(row)}
 									</div>
-									<p class="text-xs text-muted-foreground">
-										{#if type}{type} &middot;{/if}
-										{describeDeleted(row.deletedAt, now)}
-									</p>
 									{#if actionError?.id === row.id}
-										<p class="text-sm text-destructive" role="alert">{actionError.message}</p>
+										<p class="mt-1 text-sm text-destructive" role="alert">{actionError.message}</p>
 									{/if}
-								</div>
-								{#if canRestore || canPurge}
-									<div class="flex shrink-0 gap-2">
-										{#if canRestore}
-											<Button
-												type="button"
-												variant="outline"
-												class="h-11 flex-1 sm:flex-none"
-												disabled={busyId !== null}
-												aria-label="Restore {row.name}"
-												onclick={() => void handleRestore(row)}
-											>
-												{#if busyId === row.id && purgeTarget === null}
-													<Spinner class="size-4" />
-												{:else}
-													<RotateCcw class="size-4" aria-hidden="true" />
-												{/if}
-												Restore
-											</Button>
-										{/if}
-										{#if canPurge}
-											<Button
-												type="button"
-												variant="outline"
-												class="h-11 flex-1 sm:flex-none"
-												disabled={busyId !== null}
-												aria-label="Purge {row.name}"
-												onclick={() => (purgeTarget = { tab, row })}
-											>
-												<Trash2 class="size-4" aria-hidden="true" />
-												Purge
-											</Button>
-										{/if}
-									</div>
+								</Table.Cell>
+								{#if tab === 'items'}
+									<Table.Cell class="text-muted-foreground">
+										{deletedItemType(row.type, typeLabels) ?? '—'}
+									</Table.Cell>
 								{/if}
-							</Card.Content>
-						</Card.Root>
-					</li>
-				{/each}
-			</ul>
+								<Table.Cell class="text-muted-foreground">
+									<time datetime={row.deletedAt} title={formatDateTime(row.deletedAt).local}>
+										{describeDeleted(row.deletedAt, now)}
+									</time>
+								</Table.Cell>
+								{#if canRestore || canPurge}
+									<Table.Cell>
+										<div class="flex justify-end gap-2">
+											{@render rowActions(row, true)}
+										</div>
+									</Table.Cell>
+								{/if}
+							</Table.Row>
+						{/each}
+					</DataTable>
+				{:else}
+					<ul
+						class="space-y-3"
+						aria-label={tab === 'items' ? 'Deleted items' : 'Deleted collections'}
+					>
+						{#each pane.rows as row (row.id)}
+							{@const type = deletedItemType(row.type, typeLabels)}
+							<li>
+								<Card.Root>
+									<Card.Content
+										class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+									>
+										<div class="min-w-0 space-y-1">
+											<div class="flex items-center gap-2">
+												<p class="truncate font-medium" title={row.name}>{row.name}</p>
+												{@render collectionBadge(row)}
+											</div>
+											<p class="text-xs text-muted-foreground">
+												{#if type}{type} &middot;{/if}
+												{describeDeleted(row.deletedAt, now)}
+											</p>
+											{#if actionError?.id === row.id}
+												<p class="text-sm text-destructive" role="alert">{actionError.message}</p>
+											{/if}
+										</div>
+										{#if canRestore || canPurge}
+											<div class="flex shrink-0 gap-2">
+												{@render rowActions(row, false)}
+											</div>
+										{/if}
+									</Card.Content>
+								</Card.Root>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</div>
 			{#if pane.cursor}
 				<Button
 					type="button"

@@ -33,7 +33,7 @@ async function openRecentlyDeleted(page: Page, tab: 'Items' | 'Collections') {
 }
 
 const row = (page: Page, name: string) =>
-	page.getByRole('listitem').filter({ has: page.getByText(name, { exact: true }) });
+	page.getByRole('row').filter({ has: page.getByText(name, { exact: true }) });
 
 test('restores a deleted item with its connection', async ({ page, request }) => {
 	const suffix = uniqueName('r');

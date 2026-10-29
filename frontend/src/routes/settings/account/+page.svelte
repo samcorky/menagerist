@@ -7,6 +7,7 @@
 	import { DISPLAY_NAME_MAX_LENGTH, displayNameProblem, PASSWORD_MIN_LENGTH } from '$lib/auth';
 	import { describeDevice, formatRelativeTime } from '$lib/devices';
 	import { formatIsoDate } from '$lib/format-date';
+	import { wide } from '$lib/viewport.svelte';
 	import {
 		listOwnSessions,
 		revokeOwnSession,
@@ -17,6 +18,7 @@
 	import ApiTokensCard from '$lib/components/api-tokens-card.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
+	import DataTable from '$lib/components/data-table.svelte';
 	import PersonalExportsCard from '$lib/components/personal-exports-card.svelte';
 	import DeviceIcon from '$lib/components/device-icon.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -27,6 +29,7 @@
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
+	import * as Table from '$lib/components/ui/table/index.js';
 
 	let current = $state('');
 	let next = $state('');
@@ -162,7 +165,7 @@
 </svelte:head>
 
 <main class="flex-1 px-4 py-8 sm:px-6">
-	<div class="mx-auto flex max-w-md flex-col gap-6">
+	<div class="mx-auto flex max-w-3xl flex-col gap-6">
 		{#if !forced}
 			<BackButton fallback={resolve('/settings')} />
 		{/if}
@@ -186,7 +189,7 @@
 		{/if}
 
 		{#if !forced}
-			<form class="space-y-4" onsubmit={handleRename}>
+			<form class="max-w-md space-y-4" onsubmit={handleRename}>
 				<h2 class="font-heading text-lg font-semibold">Display name</h2>
 
 				<div class="space-y-1.5">
@@ -229,7 +232,7 @@
 			</form>
 		{/if}
 
-		<form class="space-y-4" onsubmit={handleSubmit}>
+		<form class="max-w-md space-y-4" onsubmit={handleSubmit}>
 			<h2 class="font-heading text-lg font-semibold">Change password</h2>
 
 			{#if error}
@@ -331,48 +334,51 @@
 				{:else if sessions.length === 0}
 					<p class="text-sm text-muted-foreground">No active devices.</p>
 				{:else}
-					<ul class="space-y-3" aria-label="Active devices">
-						{#each sessions as session (session.id)}
-							{@const described = describeDevice({
-								userAgent: session.user_agent,
-								platform: session.client_platform,
-								mobile: session.client_mobile
-							})}
-							<li>
-								<Card.Root>
-									<Card.Content
-										class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"
-									>
-										<div class="flex items-start gap-3">
-											<div
-												class="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+					{#if wide.current}
+						<DataTable
+							label="Active devices"
+							columns={[
+								{ label: 'Device' },
+								{ label: 'Address' },
+								{ label: 'Signed in' },
+								{ label: 'Last active' },
+								{ label: 'Action', end: true }
+							]}
+						>
+							{#each sessions as session (session.id)}
+								{@const described = describeDevice({
+									userAgent: session.user_agent,
+									platform: session.client_platform,
+									mobile: session.client_mobile
+								})}
+								<Table.Row>
+									<Table.Cell>
+										<div class="flex items-center gap-2">
+											<DeviceIcon
+												kind={described.kind}
+												class="size-4 shrink-0 text-muted-foreground"
+											/>
+											<span class="font-medium" title={session.user_agent ?? undefined}
+												>{described.label}</span
 											>
-												<DeviceIcon kind={described.kind} class="size-5" />
-											</div>
-											<div class="space-y-1">
-												<div class="flex flex-wrap items-center gap-2">
-													<p class="font-medium" title={session.user_agent ?? undefined}>
-														{described.label}
-													</p>
-													{#if session.current}
-														<Badge variant="secondary">This device</Badge>
-													{/if}
-												</div>
-												<p class="text-xs text-muted-foreground">
-													{#if session.client_ip}
-														{session.client_ip} &middot;
-													{/if}
-													Signed in {formatIsoDate(session.created_at.slice(0, 10), 'short')} &middot;
-													Last active {formatRelativeTime(session.last_seen_at)}
-												</p>
-											</div>
+											{#if session.current}
+												<Badge variant="secondary">This device</Badge>
+											{/if}
 										</div>
-
+									</Table.Cell>
+									<Table.Cell class="text-muted-foreground">{session.client_ip ?? '—'}</Table.Cell>
+									<Table.Cell class="text-muted-foreground">
+										{formatIsoDate(session.created_at.slice(0, 10), 'short')}
+									</Table.Cell>
+									<Table.Cell class="text-muted-foreground">
+										{formatRelativeTime(session.last_seen_at)}
+									</Table.Cell>
+									<Table.Cell class="text-right">
 										{#if !session.current}
 											<Button
 												type="button"
 												variant="outline"
-												class="h-11 shrink-0"
+												class="h-9 px-3"
 												disabled={sessionBusy === session.id}
 												onclick={() => handleRevokeSession(session.id)}
 											>
@@ -382,11 +388,68 @@
 												Sign out
 											</Button>
 										{/if}
-									</Card.Content>
-								</Card.Root>
-							</li>
-						{/each}
-					</ul>
+									</Table.Cell>
+								</Table.Row>
+							{/each}
+						</DataTable>
+					{:else}
+						<ul class="space-y-3" aria-label="Active devices">
+							{#each sessions as session (session.id)}
+								{@const described = describeDevice({
+									userAgent: session.user_agent,
+									platform: session.client_platform,
+									mobile: session.client_mobile
+								})}
+								<li>
+									<Card.Root>
+										<Card.Content
+											class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"
+										>
+											<div class="flex items-start gap-3">
+												<div
+													class="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+												>
+													<DeviceIcon kind={described.kind} class="size-5" />
+												</div>
+												<div class="space-y-1">
+													<div class="flex flex-wrap items-center gap-2">
+														<p class="font-medium" title={session.user_agent ?? undefined}>
+															{described.label}
+														</p>
+														{#if session.current}
+															<Badge variant="secondary">This device</Badge>
+														{/if}
+													</div>
+													<p class="text-xs text-muted-foreground">
+														{#if session.client_ip}
+															{session.client_ip} &middot;
+														{/if}
+														Signed in {formatIsoDate(session.created_at.slice(0, 10), 'short')} &middot;
+														Last active {formatRelativeTime(session.last_seen_at)}
+													</p>
+												</div>
+											</div>
+
+											{#if !session.current}
+												<Button
+													type="button"
+													variant="outline"
+													class="h-11 shrink-0"
+													disabled={sessionBusy === session.id}
+													onclick={() => handleRevokeSession(session.id)}
+												>
+													{#if sessionBusy === session.id}
+														<Spinner class="size-4" />
+													{/if}
+													Sign out
+												</Button>
+											{/if}
+										</Card.Content>
+									</Card.Root>
+								</li>
+							{/each}
+						</ul>
+					{/if}
 				{/if}
 			</section>
 

@@ -163,7 +163,7 @@ test('an administrator can add a member who then has to choose a password at fir
 	await form.getByLabel('Username').fill(username);
 	await form.getByLabel('Starting password').fill(startingPassword);
 	await form.getByRole('button', { name: 'Add user' }).click();
-	await expect(page.getByRole('list', { name: 'Users' })).toContainText(username);
+	await expect(page.getByRole('table', { name: 'Users' })).toContainText(username);
 
 	// The new account signs in (and has to choose its own password first).
 	// Explicit empty state: new contexts otherwise inherit the worker administrator's session.

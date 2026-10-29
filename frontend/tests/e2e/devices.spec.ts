@@ -27,8 +27,8 @@ test('a user sees their devices and signs out another device', async ({
 	await first.page.goto('/settings/account');
 	await expect(first.page.getByRole('heading', { name: 'Devices' })).toBeVisible();
 
-	const deviceList = first.page.getByRole('list', { name: 'Active devices' });
-	const items = deviceList.getByRole('listitem');
+	const deviceTable = first.page.getByRole('table', { name: 'Active devices' });
+	const items = deviceTable.getByRole('row').filter({ has: first.page.getByRole('cell') });
 	await expect(items).toHaveCount(2);
 
 	// The current device is marked "This device" and has no Sign out button
@@ -72,7 +72,10 @@ test('a user can sign out all other devices at once', async ({
 	const thirdPage = await thirdContext.newPage();
 
 	await first.page.goto('/settings/account');
-	const items = first.page.getByRole('list', { name: 'Active devices' }).getByRole('listitem');
+	const items = first.page
+		.getByRole('table', { name: 'Active devices' })
+		.getByRole('row')
+		.filter({ has: first.page.getByRole('cell') });
 	await expect(items).toHaveCount(3);
 
 	await first.page.getByRole('button', { name: 'Sign out all other devices' }).click();

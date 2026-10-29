@@ -222,7 +222,7 @@ test('an administrator sees the Users page', async ({ page }) => {
 	await expect(page).toHaveURL(/\/admin$/);
 	await page.getByRole('link', { name: /Users/ }).click();
 	await expect(page).toHaveURL(/\/admin\/users$/);
-	await expect(page.getByRole('list', { name: 'Users' })).toContainText(member.username);
+	await expect(page.getByRole('table', { name: 'Users' })).toContainText(member.username);
 });
 
 test('signing out ends the session: the protected page asks you to sign in again', async ({

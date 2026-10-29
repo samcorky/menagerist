@@ -29,8 +29,10 @@
 	import { describeDevice, formatRelativeTime } from '$lib/devices';
 	import { formatIsoDate } from '$lib/format-date';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
+	import { wide } from '$lib/viewport.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
+	import DataTable from '$lib/components/data-table.svelte';
 	import DeviceIcon from '$lib/components/device-icon.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -42,6 +44,7 @@
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
+	import * as Table from '$lib/components/ui/table/index.js';
 
 	let users = $state<UserResponse[]>([]);
 	let loading = $state(true);
@@ -330,8 +333,156 @@
 	<title>Users - Menagerist</title>
 </svelte:head>
 
+{#snippet nameEditor(user: UserResponse, compact: boolean)}
+	{#if editing?.id === user.id}
+		<form
+			class="flex flex-col gap-1.5"
+			onsubmit={(e) => {
+				e.preventDefault();
+				void saveEdit(user);
+			}}
+		>
+			<div class="flex items-center gap-2">
+				<Input
+					type="text"
+					class={compact ? 'h-9' : 'h-11'}
+					bind:value={editing.draft}
+					bind:ref={editInput}
+					disabled={editing.busy}
+					maxlength={DISPLAY_NAME_MAX_LENGTH}
+					aria-label="Display name for {user.username}"
+					onkeydown={(e) => {
+						if (e.key === 'Escape') {
+							e.preventDefault();
+							void stopEdit(user.id);
+						}
+					}}
+				/>
+				<Button
+					type="submit"
+					class={compact ? 'h-9' : 'h-11'}
+					disabled={editing.busy}
+					aria-label="Save display name for {user.username}"
+				>
+					{#if editing.busy}
+						<Spinner />
+					{/if}
+					Save
+				</Button>
+				<Button
+					type="button"
+					variant="ghost"
+					size="icon"
+					class="shrink-0 {compact ? 'size-9' : 'size-11'}"
+					disabled={editing.busy}
+					aria-label="Cancel editing name for {user.username}"
+					onclick={() => stopEdit(user.id)}
+				>
+					<X class="size-4" />
+				</Button>
+			</div>
+			{#if editing.error}
+				<p class="text-sm text-destructive" role="alert">{editing.error}</p>
+			{/if}
+		</form>
+	{:else}
+		<div class="flex items-center gap-1.5">
+			<p class="font-heading font-semibold tracking-tight">{user.display_name}</p>
+			{#if canUpdate}
+				<Button
+					type="button"
+					variant="ghost"
+					size="icon"
+					class="shrink-0 {compact ? 'size-9' : 'size-11'}"
+					bind:ref={editButton}
+					aria-label="Edit display name for {user.username}"
+					onclick={() => startEdit(user)}
+				>
+					<Pencil class="size-4" />
+				</Button>
+			{/if}
+		</div>
+	{/if}
+{/snippet}
+
+<!-- The table has a Role column of its own, so it leaves the Admin badge out. -->
+{#snippet statusBadges(user: UserResponse, isMe: boolean, locked: boolean, showRole: boolean)}
+	{#if isMe}
+		<Badge variant="outline">You</Badge>
+	{/if}
+	{#if showRole && user.role === 'admin'}
+		<Badge variant="secondary">Admin</Badge>
+	{/if}
+	{#if user.disabled}
+		<Badge variant="destructive">Disabled</Badge>
+	{/if}
+	{#if user.password_expired}
+		<Badge variant="outline">Must change password</Badge>
+	{/if}
+	{#if locked && user.locked_until}
+		<Badge variant="destructive">{lockedLabel(user.locked_until)}</Badge>
+	{/if}
+{/snippet}
+
+<!-- Table rows keep the labelled Disable button and fold the rest into icon buttons. -->
+{#snippet rowActions(user: UserResponse, isMe: boolean, locked: boolean, compact: boolean)}
+	{@const size = compact ? 'size-9' : 'h-11'}
+	{#if canUpdate}
+		<Button
+			variant="outline"
+			class={compact ? 'h-9' : 'h-11'}
+			disabled={rowBusy === user.id || isMe}
+			onclick={() => (user.disabled ? patch(user, { disabled: false }) : (disableTarget = user))}
+		>
+			{user.disabled ? 'Enable' : 'Disable'}
+		</Button>
+	{/if}
+	{#if canReset}
+		<Button
+			variant="outline"
+			size={compact ? 'icon' : 'default'}
+			class={size}
+			title="Reset password"
+			aria-label={compact ? 'Reset password' : undefined}
+			disabled={rowBusy === user.id}
+			onclick={() => (confirmResetTarget = user)}
+		>
+			<KeyRound class="size-4" />
+			{#if !compact}Reset password{/if}
+		</Button>
+	{/if}
+	{#if canUnlock && locked}
+		<Button
+			variant="outline"
+			size={compact ? 'icon' : 'default'}
+			class={size}
+			title="Unlock"
+			aria-label={compact ? 'Unlock' : undefined}
+			disabled={rowBusy === user.id}
+			onclick={() => handleUnlock(user)}
+		>
+			<LockOpen class="size-4" />
+			{#if !compact}Unlock{/if}
+		</Button>
+	{/if}
+	{#if canListSessions}
+		<Button
+			variant="outline"
+			size={compact ? 'icon' : 'default'}
+			class={size}
+			title="Devices"
+			aria-label={compact ? 'Devices' : undefined}
+			disabled={rowBusy === user.id}
+			onclick={() => openDevices(user)}
+		>
+			<Laptop class="size-4" />
+			{#if !compact}Devices{/if}
+		</Button>
+	{/if}
+{/snippet}
+
 <main class="flex-1 px-4 py-8 sm:px-6">
-	<div class="mx-auto flex max-w-2xl flex-col gap-6">
+	<div class="mx-auto flex max-w-5xl flex-col gap-6">
 		<BackButton fallback={resolve('/admin')} />
 		<div class="flex flex-wrap items-start justify-between gap-3">
 			<div>
@@ -381,7 +532,7 @@
 			{/if}
 
 			{#if showCreate}
-				<Card.Root>
+				<Card.Root class="max-w-2xl">
 					<Card.Header>
 						<Card.Title>Add user</Card.Title>
 						<Card.Description>
@@ -490,194 +641,128 @@
 					<Alert.Description>{loadError}</Alert.Description>
 				</Alert.Root>
 			{:else}
-				<ul class="flex flex-col gap-3" aria-label="Users">
-					{#each users as user (user.id)}
-						{@const isMe = user.id === auth.user?.id}
-						{@const locked = isLocked(user.locked_until)}
-						<li>
-							<Card.Root>
-								<Card.Content class="flex flex-col gap-3 p-4 sm:p-5">
-									<div class="flex flex-wrap items-start justify-between gap-2">
-										<div class="min-w-0 flex-1">
-											{#if editing?.id === user.id}
-												<form
-													class="flex flex-col gap-1.5"
-													onsubmit={(e) => {
-														e.preventDefault();
-														void saveEdit(user);
-													}}
-												>
-													<div class="flex items-center gap-2">
-														<Input
-															type="text"
-															class="h-11"
-															bind:value={editing.draft}
-															bind:ref={editInput}
-															disabled={editing.busy}
-															maxlength={DISPLAY_NAME_MAX_LENGTH}
-															aria-label="Display name for {user.username}"
-															onkeydown={(e) => {
-																if (e.key === 'Escape') {
-																	e.preventDefault();
-																	void stopEdit(user.id);
-																}
-															}}
-														/>
-														<Button
-															type="submit"
-															class="h-11"
-															disabled={editing.busy}
-															aria-label="Save display name for {user.username}"
-														>
-															{#if editing.busy}
-																<Spinner />
-															{/if}
-															Save
-														</Button>
-														<Button
-															type="button"
-															variant="ghost"
-															size="icon"
-															class="size-11 shrink-0"
-															disabled={editing.busy}
-															aria-label="Cancel editing name for {user.username}"
-															onclick={() => stopEdit(user.id)}
-														>
-															<X class="size-4" />
-														</Button>
-													</div>
-													{#if editing.error}
-														<p class="text-sm text-destructive" role="alert">
-															{editing.error}
-														</p>
-													{/if}
-												</form>
-											{:else}
-												<div class="flex items-center gap-1.5">
-													<p class="font-heading font-semibold tracking-tight">
-														{user.display_name}
-													</p>
-													{#if canUpdate}
-														<Button
-															type="button"
-															variant="ghost"
-															size="icon"
-															class="size-11 shrink-0"
-															bind:ref={editButton}
-															aria-label="Edit display name for {user.username}"
-															onclick={() => startEdit(user)}
-														>
-															<Pencil class="size-4" />
-														</Button>
-													{/if}
-												</div>
-											{/if}
-											<p class="text-sm text-muted-foreground">{user.username}</p>
-										</div>
-										<div class="flex flex-wrap items-center gap-1.5">
-											{#if isMe}
-												<Badge variant="outline">You</Badge>
-											{/if}
-											{#if user.role === 'admin'}
-												<Badge variant="secondary">Admin</Badge>
-											{/if}
-											{#if user.disabled}
-												<Badge variant="destructive">Disabled</Badge>
-											{/if}
-											{#if user.password_expired}
-												<Badge variant="outline">Must change password</Badge>
-											{/if}
-											{#if locked && user.locked_until}
-												<Badge variant="destructive">
-													{lockedLabel(user.locked_until)}
-												</Badge>
-											{/if}
-										</div>
-									</div>
-
-									<p class="text-xs text-muted-foreground">
-										Last sign-in: <span title={lastSignIn(user.last_login_at).title}
-											>{lastSignIn(user.last_login_at).text}</span
-										>
-									</p>
-
-									{#if canUpdate || canReset || canUnlock || canListSessions}
-										<div class="flex flex-wrap items-center gap-2 pt-1">
-											{#if canUpdate}
-												<div class="w-36">
-													<NativeSelect
-														class="[&_select]:min-h-11"
-														aria-label="Role for {user.username}"
-														disabled={rowBusy === user.id || isMe}
-														value={user.role}
-														onchange={(e) => patch(user, { role: e.currentTarget.value as Role })}
-													>
-														<option value="member">Member</option>
-														<option value="admin">Administrator</option>
-													</NativeSelect>
-												</div>
-												<Button
-													variant="outline"
-													class="h-11"
-													disabled={rowBusy === user.id || isMe}
-													onclick={() =>
-														user.disabled
-															? patch(user, { disabled: false })
-															: (disableTarget = user)}
-												>
-													{user.disabled ? 'Enable' : 'Disable'}
-												</Button>
-											{/if}
-											{#if canReset}
-												<Button
-													variant="outline"
-													class="h-11"
-													disabled={rowBusy === user.id}
-													onclick={() => (confirmResetTarget = user)}
-												>
-													<KeyRound class="size-4" />
-													Reset password
-												</Button>
-											{/if}
-											{#if canUnlock && locked}
-												<Button
-													variant="outline"
-													class="h-11"
-													disabled={rowBusy === user.id}
-													onclick={() => handleUnlock(user)}
-												>
-													<LockOpen class="size-4" />
-													Unlock
-												</Button>
-											{/if}
-											{#if canListSessions}
-												<Button
-													variant="outline"
-													class="h-11"
-													disabled={rowBusy === user.id}
-													onclick={() => openDevices(user)}
-												>
-													<Laptop class="size-4" />
-													Devices
-												</Button>
-											{/if}
-										</div>
-									{/if}
-
-									{#if isMe && canUpdate}
-										<p class="text-xs text-muted-foreground">
-											You can't change your own role or disable yourself.
-										</p>
-									{/if}
-
+				{#if wide.current}
+					<DataTable
+						label="Users"
+						columns={[
+							{ label: 'Person' },
+							{ label: 'Role' },
+							{ label: 'Status' },
+							{ label: 'Last sign-in' },
+							{ label: 'Actions', end: true }
+						]}
+					>
+						{#each users as user (user.id)}
+							{@const isMe = user.id === auth.user?.id}
+							{@const locked = isLocked(user.locked_until)}
+							<Table.Row>
+								<Table.Cell>
+									{@render nameEditor(user, true)}
+									<p class="text-sm text-muted-foreground">{user.username}</p>
 									{#if rowError?.id === user.id}
-										<p class="text-sm text-destructive" role="alert">{rowError.message}</p>
+										<p class="mt-1 text-sm text-destructive" role="alert">{rowError.message}</p>
 									{/if}
-								</Card.Content>
-							</Card.Root>
-						</li>
-					{/each}
-				</ul>
+								</Table.Cell>
+								<Table.Cell>
+									{#if canUpdate}
+										<div class="w-36">
+											<NativeSelect
+												class="[&_select]:min-h-9"
+												aria-label="Role for {user.username}"
+												disabled={rowBusy === user.id || isMe}
+												value={user.role}
+												onchange={(e) => patch(user, { role: e.currentTarget.value as Role })}
+											>
+												<option value="member">Member</option>
+												<option value="admin">Administrator</option>
+											</NativeSelect>
+										</div>
+										{#if isMe}
+											<p class="mt-1 text-xs text-muted-foreground">
+												You can't change your own role or disable yourself.
+											</p>
+										{/if}
+									{:else}
+										{user.role === 'admin' ? 'Administrator' : 'Member'}
+									{/if}
+								</Table.Cell>
+								<Table.Cell>
+									<div class="flex flex-wrap items-center gap-1.5">
+										{@render statusBadges(user, isMe, locked, false)}
+									</div>
+								</Table.Cell>
+								<Table.Cell class="text-muted-foreground">
+									<span title={lastSignIn(user.last_login_at).title}
+										>{lastSignIn(user.last_login_at).text}</span
+									>
+								</Table.Cell>
+								<Table.Cell>
+									<div class="flex flex-wrap items-center justify-end gap-1.5">
+										{@render rowActions(user, isMe, locked, true)}
+									</div>
+								</Table.Cell>
+							</Table.Row>
+						{/each}
+					</DataTable>
+				{:else}
+					<ul class="flex flex-col gap-3" aria-label="Users">
+						{#each users as user (user.id)}
+							{@const isMe = user.id === auth.user?.id}
+							{@const locked = isLocked(user.locked_until)}
+							<li>
+								<Card.Root>
+									<Card.Content class="flex flex-col gap-3 p-4 sm:p-5">
+										<div class="flex flex-wrap items-start justify-between gap-2">
+											<div class="min-w-0 flex-1">
+												{@render nameEditor(user, false)}
+												<p class="text-sm text-muted-foreground">{user.username}</p>
+											</div>
+											<div class="flex flex-wrap items-center gap-1.5">
+												{@render statusBadges(user, isMe, locked, true)}
+											</div>
+										</div>
+
+										<p class="text-xs text-muted-foreground">
+											Last sign-in: <span title={lastSignIn(user.last_login_at).title}
+												>{lastSignIn(user.last_login_at).text}</span
+											>
+										</p>
+
+										{#if canUpdate || canReset || canUnlock || canListSessions}
+											<div class="flex flex-wrap items-center gap-2 pt-1">
+												{#if canUpdate}
+													<div class="w-36">
+														<NativeSelect
+															class="[&_select]:min-h-11"
+															aria-label="Role for {user.username}"
+															disabled={rowBusy === user.id || isMe}
+															value={user.role}
+															onchange={(e) => patch(user, { role: e.currentTarget.value as Role })}
+														>
+															<option value="member">Member</option>
+															<option value="admin">Administrator</option>
+														</NativeSelect>
+													</div>
+												{/if}
+												{@render rowActions(user, isMe, locked, false)}
+											</div>
+										{/if}
+
+										{#if isMe && canUpdate}
+											<p class="text-xs text-muted-foreground">
+												You can't change your own role or disable yourself.
+											</p>
+										{/if}
+
+										{#if rowError?.id === user.id}
+											<p class="text-sm text-destructive" role="alert">{rowError.message}</p>
+										{/if}
+									</Card.Content>
+								</Card.Root>
+							</li>
+						{/each}
+					</ul>
+				{/if}
 			{/if}
 		{/if}
 	</div>
