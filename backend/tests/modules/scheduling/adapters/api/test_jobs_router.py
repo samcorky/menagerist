@@ -51,7 +51,9 @@ def build(
                 title="Back up everything",
                 description="Saves a full copy.",
             ),
-            JobDefinition(job_key="manual.only", run_now_allowed=False),
+            JobDefinition(
+                job_key="manual.only", run_now_allowed=False, confirm_required=True
+            ),
         ]
     )
     store = InMemorySchedulingStore()
@@ -99,6 +101,37 @@ def test_it_shows_work_in_progress(as_user: AsUser) -> None:
         job for job in client.get(BASE).json() if job["job_key"] == "backup.create"
     )["active_run"]
     assert (active["id"], active["status"]) == (str(run.id), "queued")
+
+
+def test_it_names_the_setting_behind_each_schedule(as_user: AsUser) -> None:
+    """A job points at the setting that holds its schedule, when it has one."""
+    client, _ = build(as_user)
+    jobs = {job["job_key"]: job for job in client.get(BASE).json()}
+    assert jobs["backup.create"]["schedule_key"] == "backup.schedule"
+    assert jobs["manual.only"]["schedule_key"] is None
+
+
+def test_it_says_which_jobs_want_a_confirmation(as_user: AsUser) -> None:
+    """The interface is told which jobs to ask about before running by hand."""
+    client, _ = build(as_user)
+    jobs = {job["job_key"]: job for job in client.get(BASE).json()}
+    assert jobs["manual.only"]["confirm_required"] is True
+    assert jobs["backup.create"]["confirm_required"] is False
+
+
+def test_it_reports_the_latest_run_of_each_job(as_user: AsUser) -> None:
+    """The newest run is returned whatever its outcome; a job never run has none."""
+    client, store = build(as_user)
+    for minute, status in enumerate([RunStatus.SUCCEEDED, RunStatus.FAILED]):
+        run = JobRun.create(
+            job_key="backup.create",
+            scheduled_for=datetime(2026, 10, 28, 3, minute, tzinfo=UTC),
+        )
+        run.status = status
+        store.runs[run.id] = run
+    jobs = {job["job_key"]: job for job in client.get(BASE).json()}
+    assert jobs["backup.create"]["last_run"]["status"] == "failed"
+    assert jobs["manual.only"]["last_run"] is None
 
 
 def test_history_is_limited_and_newest_first(as_user: AsUser) -> None:

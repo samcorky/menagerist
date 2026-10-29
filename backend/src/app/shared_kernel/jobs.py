@@ -43,6 +43,9 @@ class JobDefinition:
     schedule_key: str | None = None
     run_now_allowed: bool = True
     needs_setup_complete: bool = True
+    # Asks the administrator to confirm before running by hand; for heavy or
+    # disruptive work. It guides the interface and is not an access check.
+    confirm_required: bool = False
     # Plain-language copy for administrators; the job key is for developers.
     title: str = ""
     description: str = ""

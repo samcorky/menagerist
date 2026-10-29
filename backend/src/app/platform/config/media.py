@@ -1,9 +1,11 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import Field
 
 from app.platform.config._base import MenageristBaseSettings
+from app.platform.config._markers import Tunable
 from app.platform.config._types import Cron  # noqa: TC001 - pydantic resolves this at runtime
 
 
@@ -14,20 +16,28 @@ class MediaSettings(MenageristBaseSettings, group="media"):
         default=Path("/data/media"),
         description="Directory used to store uploaded media and generated assets.",
     )
-    cleanup_schedule: Cron = Field(
-        default="30 * * * *",
-        description=(
-            "Cron expression for removing expired unattached and unreferenced "
-            + "media in the instance timezone. Empty disables the job."
+    cleanup_schedule: Annotated[
+        Cron,
+        Field(
+            title="Unused uploads clean-up schedule",
+            description=(
+                "Cron expression for removing expired unattached and unreferenced "
+                + "media in the instance timezone. Empty disables the job."
+            ),
         ),
-    )
-    stray_files_schedule: Cron = Field(
-        default="45 3 * * 0",
-        description=(
-            "Cron expression for removing stored files that no upload refers to, "
-            + "in the instance timezone. Empty disables the job."
+        Tunable(),
+    ] = "30 * * * *"
+    stray_files_schedule: Annotated[
+        Cron,
+        Field(
+            title="Leftover files clean-up schedule",
+            description=(
+                "Cron expression for removing stored files that no upload refers to, "
+                + "in the instance timezone. Empty disables the job."
+            ),
         ),
-    )
+        Tunable(),
+    ] = "45 3 * * 0"
     staged_ttl_hours: int = Field(
         default=24,
         ge=1,

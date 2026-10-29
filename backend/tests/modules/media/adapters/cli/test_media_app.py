@@ -1,9 +1,7 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    import pytest
+import pytest
 
 from app.modules.media.adapters.cli.media_app import cleanup, regenerate_thumbnails
 from app.modules.media.adapters.imaging.in_memory_image_processor import (
@@ -114,3 +112,20 @@ def test_regenerate_thumbnails_wires_the_use_case_and_regenerates(
     assert storage._thumbnails[(asset.id, "attached")] == b"fake-webp-thumbnail"
     assert result["regenerated"] == 1
     assert result["max_dimension"] == 320
+
+
+def test_regenerate_thumbnails_asks_first_unless_told_not_to(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A refusal stops before any work starts, and `--yes` skips the question."""
+    answers: list[bool] = []
+
+    def refuse(_question: str, *, assume_yes: bool = False) -> None:
+        answers.append(assume_yes)
+        if not assume_yes:
+            raise SystemExit("Cancelled.")
+
+    monkeypatch.setattr("app.modules.media.adapters.cli.media_app.confirm", refuse)
+    with pytest.raises(SystemExit, match="Cancelled"):
+        regenerate_thumbnails()
+    assert answers == [False]

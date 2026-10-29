@@ -1,10 +1,11 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
 import structlog
-from cyclopts import App
+from cyclopts import App, Parameter
 
-from app.platform.cli_progress import activity
+from app.platform.cli_progress import activity, confirm
 
 logger = structlog.get_logger(__name__)
 
@@ -50,11 +51,16 @@ def cleanup() -> dict[str, object]:
 
 
 @media_app.command
-def regenerate_thumbnails(*, max_dimension: int = 320) -> dict[str, object]:
+def regenerate_thumbnails(
+    *,
+    max_dimension: int = 320,
+    yes: Annotated[bool, Parameter(name=["--yes", "-y"])] = False,
+) -> dict[str, object]:
     """Regenerate thumbnails for all attached, thumbnailable media assets.
 
     Args:
         max_dimension: Longest edge, in pixels, for regenerated thumbnails.
+        yes: Do not ask for confirmation.
     """
     from app.entrypoints.api.shared.access_guard import get_access_guard
     from app.modules.media.adapters.imaging.pillow_processor import PillowImageProcessor
@@ -70,6 +76,10 @@ def regenerate_thumbnails(*, max_dimension: int = 320) -> dict[str, object]:
     from app.platform.database import get_session_factory
     from app.shared_kernel.actor import SYSTEM_ACTOR
 
+    confirm(
+        "Rebuild every thumbnail from its original file? This can take a while.",
+        assume_yes=yes,
+    )
     logger.debug("starting thumbnail regeneration", max_dimension=max_dimension)
     settings = get_media_settings()
 

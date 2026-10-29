@@ -116,13 +116,16 @@ class JobResponse(BaseModel):
                     "overlap": "coalesce",
                     "missed_run": "run_once",
                     "run_now_allowed": True,
+                    "confirm_required": False,
                     "schedule": "0 3 * * *",
+                    "schedule_key": "backup.schedule",
                     "next_run_at": "2026-10-29T03:00:00Z",
                     "active_run": {
                         **RUN_EXAMPLE,
                         "status": "running",
                         "finished_at": None,
                     },
+                    "last_run": RUN_EXAMPLE,
                 }
             ]
         }
@@ -135,14 +138,23 @@ class JobResponse(BaseModel):
     overlap: Overlap
     missed_run: MissedRun
     run_now_allowed: bool
+    confirm_required: bool = Field(
+        description="Whether the interface should ask before running it by hand."
+    )
     schedule: str | None = Field(
         description="The effective cron expression, or null when off or unscheduled."
+    )
+    schedule_key: str | None = Field(
+        description="The setting that holds the schedule, or null when it has none."
     )
     next_run_at: datetime | None = Field(
         description="When it next fires, or null when it has no schedule."
     )
     active_run: JobRunResponse | None = Field(
         description="The run in progress, or the oldest one waiting."
+    )
+    last_run: JobRunResponse | None = Field(
+        description="The most recent run of any kind, or null if it has never run."
     )
 
     @classmethod
@@ -157,11 +169,16 @@ class JobResponse(BaseModel):
             overlap=job.overlap,
             missed_run=job.missed_run,
             run_now_allowed=job.run_now_allowed,
+            confirm_required=job.confirm_required,
             schedule=status.expression,
+            schedule_key=job.schedule_key,
             next_run_at=status.next_run_at,
             active_run=(
                 JobRunResponse.from_domain(status.active_run)
                 if status.active_run
                 else None
+            ),
+            last_run=(
+                JobRunResponse.from_domain(status.last_run) if status.last_run else None
             ),
         )

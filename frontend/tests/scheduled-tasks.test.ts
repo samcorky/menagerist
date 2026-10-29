@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { JobResponse } from '$lib/api/client';
 import {
 	isActive,
+	lastRunLabel,
 	nextRunLabel,
 	runDuration,
 	runStatusLabel,
 	runTone,
+	scheduleLabel,
 	startedByHand
 } from '$lib/scheduled-tasks';
 
@@ -17,9 +19,12 @@ const job = (over: Partial<JobResponse> = {}): JobResponse => ({
 	overlap: 'coalesce',
 	missed_run: 'run_once',
 	run_now_allowed: true,
+	confirm_required: false,
 	schedule: '0 3 * * *',
+	schedule_key: 'backup.schedule',
 	next_run_at: '2026-10-29T03:00:00Z',
 	active_run: null,
+	last_run: null,
 	...over
 });
 
@@ -85,5 +90,37 @@ describe('run details', () => {
 	it('knows a person started a run', () => {
 		expect(startedByHand({ requested_by: 'u1' })).toBe(true);
 		expect(startedByHand({ requested_by: null })).toBe(false);
+	});
+});
+
+describe('schedule label', () => {
+	const explain = (expression: string) =>
+		expression === '0 3 * * *' ? 'Every day at 03:00' : null;
+
+	it('puts a schedule in words, falling back to the expression itself', () => {
+		expect(scheduleLabel(job(), explain)).toBe('Every day at 03:00');
+		expect(scheduleLabel(job({ schedule: '5 4 * * 1' }), explain)).toBe('5 4 * * 1');
+	});
+
+	it('says Off for a schedulable task with none, and otherwise how it runs', () => {
+		expect(scheduleLabel(job({ schedule: null }), explain)).toBe('Off');
+		expect(scheduleLabel(job({ schedule: null, schedule_key: null }), explain)).toBe(
+			'Only when started'
+		);
+		expect(
+			scheduleLabel(job({ schedule: null, schedule_key: null, run_now_allowed: false }), explain)
+		).toBe('Not scheduled');
+	});
+});
+
+describe('last run label', () => {
+	it('uses when it started, or when it was due if it never did', () => {
+		const format = (iso: string) => `at ${iso}`;
+		expect(lastRunLabel({ started_at: '2026-10-28T03:00:02Z', scheduled_for: 'x' }, format)).toBe(
+			'at 2026-10-28T03:00:02Z'
+		);
+		expect(lastRunLabel({ started_at: null, scheduled_for: '2026-10-28T03:00:00Z' }, format)).toBe(
+			'at 2026-10-28T03:00:00Z'
+		);
 	});
 });

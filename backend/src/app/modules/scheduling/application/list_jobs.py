@@ -35,6 +35,7 @@ class JobStatus:
     expression: str | None
     next_run_at: datetime | None
     active_run: JobRun | None
+    last_run: JobRun | None = None
 
 
 class ListJobs(QueryHandler[JobRunReader, ListJobsQuery, list[JobStatus]]):
@@ -69,12 +70,14 @@ class ListJobs(QueryHandler[JobRunReader, ListJobsQuery, list[JobStatus]]):
                 if expression
                 else None
             )
+            recent = await self._repos.history(job.job_key, limit=1)
             statuses.append(
                 JobStatus(
                     definition=job,
                     expression=expression,
                     next_run_at=next_run,
                     active_run=await self._repos.active_run(job.job_key),
+                    last_run=recent[0] if recent else None,
                 )
             )
         return statuses

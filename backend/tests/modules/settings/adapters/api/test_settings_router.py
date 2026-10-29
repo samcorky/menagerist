@@ -69,6 +69,7 @@ def test_list_returns_every_tunable_with_its_source(as_user: AsUser) -> None:
     assert set(by_key) == {
         "scheduler.run_history_per_job",
         "backup.schedule",
+        "backup.prune_exports_schedule",
         "backup.keep_last",
         "backup.user_export_ttl_hours",
     }

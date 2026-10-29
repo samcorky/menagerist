@@ -1,9 +1,10 @@
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
 from app.platform.config._base import MenageristBaseSettings
+from app.platform.config._markers import Tunable
 from app.platform.config._types import Cron  # noqa: TC001 - pydantic resolves this at runtime
 
 
@@ -20,13 +21,17 @@ class IdentitySettings(MenageristBaseSettings, group="identity"):
         ge=0,
         description="Idle timeout in hours; 0 disables this limit.",
     )
-    purge_expired_schedule: Cron = Field(
-        default="15 4 * * *",
-        description=(
-            "Cron expression for removing expired sessions and API tokens in the "
-            + "instance timezone. Empty disables the job."
+    purge_expired_schedule: Annotated[
+        Cron,
+        Field(
+            title="Sign-in clean-up schedule",
+            description=(
+                "Cron expression for removing expired sessions and API tokens in the "
+                + "instance timezone. Empty disables the job."
+            ),
         ),
-    )
+        Tunable(),
+    ] = "15 4 * * *"
     cookie_name: str = Field(
         default="menagerist-session",
         min_length=1,

@@ -41,8 +41,13 @@ def test_every_job_schedule_key_resolves_to_a_setting_or_a_supplied_value() -> N
 
 
 def test_only_tunable_settings_are_live() -> None:
-    """The backup schedule is editable at runtime; deployment-only ones are not."""
+    """Every task's own schedule is editable at runtime; the scheduler's own is not."""
     live = tunable_schedule_keys()
-    assert "backup.schedule" in live
-    assert "identity.purge_expired_schedule" not in live
-    assert "media.cleanup_schedule" not in live
+    for key in (
+        "backup.schedule",
+        "identity.purge_expired_schedule",
+        "media.cleanup_schedule",
+        "retention.purge_schedule",
+    ):
+        assert key in live
+    assert "scheduling.prune_schedule" not in live

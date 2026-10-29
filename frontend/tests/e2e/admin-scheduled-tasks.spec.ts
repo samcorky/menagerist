@@ -14,49 +14,102 @@ test('an administrator starts a task and sees the worker finish it', async ({ pa
 	await page.locator('a[href="/admin/scheduled-tasks"]').click();
 	await expect(page.getByRole('heading', { name: 'Scheduled tasks', exact: true })).toBeVisible();
 
-	const card = page.locator('li').filter({
-		has: page.getByRole('heading', { name: TASK, exact: true })
+	const table = page.getByRole('table', { name: 'Scheduled tasks' });
+	const row = table.getByRole('row').filter({
+		has: page.getByRole('rowheader', { name: TASK })
 	});
 	await expect(
-		card.getByText('Removes sessions and access tokens that have expired.')
+		row.getByText('Removes sessions and access tokens that have expired.')
 	).toBeVisible();
 
-	await card.getByRole('button', { name: `Run ${TASK} now` }).click();
+	await row.getByRole('button', { name: `Run ${TASK} now` }).click();
 	await expect(
 		page.getByText("Started. It will run as soon as it's this task's turn.")
 	).toBeVisible();
 
-	// The worker picks it up and finishes it; the page follows without a reload.
-	await card.getByText('Recent runs', { exact: true }).click();
-	const runs = card.getByRole('list', { name: `Recent runs of ${TASK}` });
-	await expect(runs.getByText('Finished', { exact: true })).toBeVisible({ timeout: 30_000 });
+	// The worker picks it up and finishes it; the page follows without a reload, and the
+	// row's last run shows the outcome.
+	await expect(row.getByText('Finished', { exact: true })).toBeVisible({ timeout: 30_000 });
+	await row.getByRole('button', { name: `Recent runs of ${TASK}` }).click();
+	const runs = page.getByRole('list', { name: `Recent runs of ${TASK}` });
 	await expect(runs.getByRole('listitem')).toHaveCount(1);
 	await expect(runs.getByText('Started by an administrator')).toBeVisible();
 
 	// Nothing is left running, so the task can be started again.
-	await expect(card.getByRole('button', { name: `Run ${TASK} now` })).toBeEnabled();
+	await expect(row.getByRole('button', { name: `Run ${TASK} now` })).toBeEnabled();
 
 	// The finished run survives a reload.
 	await page.reload();
-	const reloaded = page.locator('li').filter({
-		has: page.getByRole('heading', { name: TASK, exact: true })
-	});
-	await reloaded.getByText('Recent runs', { exact: true }).click();
 	await expect(
-		reloaded
-			.getByRole('list', { name: `Recent runs of ${TASK}` })
+		table
+			.getByRole('row')
+			.filter({ has: page.getByRole('rowheader', { name: TASK }) })
 			.getByText('Finished', { exact: true })
 	).toBeVisible();
 });
 
+test('an administrator changes a schedule from the table and puts it back', async ({ page }) => {
+	await page.goto('/admin/scheduled-tasks');
+	const table = page.getByRole('table', { name: 'Scheduled tasks' });
+	const row = table.getByRole('row').filter({
+		has: page.getByRole('rowheader', { name: TASK })
+	});
+
+	await row.getByRole('button', { name: `Change schedule of ${TASK}` }).click();
+	await expect(page.getByRole('dialog', { name: 'Change schedule' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Save schedule' })).toBeDisabled();
+
+	await page.getByRole('button', { name: 'Cron', exact: true }).click();
+	await page.getByRole('textbox', { name: `Schedule for ${TASK}`, exact: true }).fill('17 4 * * *');
+	await page.getByRole('button', { name: 'Save schedule' }).click();
+	await expect(page.getByText('Schedule saved')).toBeVisible();
+	await expect(row.getByText(/04:17/)).toBeVisible();
+
+	// Putting it back to the default removes the override.
+	await row.getByRole('button', { name: `Change schedule of ${TASK}` }).click();
+	await page.getByRole('button', { name: 'Reset to default' }).click();
+	await expect(page.getByText('Schedule reset to its default')).toBeVisible();
+	await expect(row.getByText(/04:17/)).toHaveCount(0);
+});
+
+test('a heavy task asks before it runs and is never scheduled', async ({ page }) => {
+	const heavy = 'Rebuild thumbnails';
+	await page.goto('/admin/scheduled-tasks');
+	const row = page
+		.getByRole('table', { name: 'Scheduled tasks' })
+		.getByRole('row')
+		.filter({ has: page.getByRole('rowheader', { name: heavy }) });
+	await expect(row.getByText('Only when started', { exact: true })).toBeVisible();
+	await expect(row.getByRole('button', { name: `Change schedule of ${heavy}` })).toHaveCount(0);
+
+	// Cancelling leaves it alone.
+	await row.getByRole('button', { name: `Run ${heavy} now` }).click();
+	const dialog = page.getByRole('dialog', { name: `Run "${heavy}" now?` });
+	await expect(dialog).toBeVisible();
+	await dialog.getByRole('button', { name: 'Cancel' }).click();
+	await expect(dialog).toHaveCount(0);
+	await expect(row.getByText('Never run', { exact: true })).toBeVisible();
+
+	// Confirming starts it and the worker finishes it.
+	await row.getByRole('button', { name: `Run ${heavy} now` }).click();
+	await page
+		.getByRole('dialog', { name: `Run "${heavy}" now?` })
+		.getByRole('button', { name: 'Run now' })
+		.click();
+	await expect(row.getByText('Finished', { exact: true })).toBeVisible({ timeout: 30_000 });
+});
+
 test('a task that is only ever scheduled has no Run now', async ({ page }) => {
 	await page.goto('/admin/scheduled-tasks');
-	const card = page.locator('li').filter({
-		has: page.getByRole('heading', { name: 'Permanently remove old deleted items', exact: true })
-	});
-	await expect(card).toBeVisible();
-	await expect(card.getByText('Not scheduled', { exact: true })).toBeVisible();
-	await expect(card.getByRole('button', { name: /Run .* now/ })).toHaveCount(0);
+	const row = page
+		.getByRole('table', { name: 'Scheduled tasks' })
+		.getByRole('row')
+		.filter({
+			has: page.getByRole('rowheader', { name: 'Permanently remove old deleted items' })
+		});
+	await expect(row).toBeVisible();
+	await expect(row.getByText('Not scheduled', { exact: true })).toBeVisible();
+	await expect(row.getByRole('button', { name: /Run .* now/ })).toHaveCount(0);
 });
 
 test('the page keeps internal wording out of sight', async ({ page }) => {

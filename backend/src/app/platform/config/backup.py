@@ -56,13 +56,17 @@ class BackupSettings(MenageristBaseSettings, group="backup"):
         ),
         Tunable(),
     ] = "0 3 * * *"
-    prune_exports_schedule: Cron = Field(
-        default="0 * * * *",
-        description=(
-            "Cron expression for expiring downloadable data exports. "
-            + "Empty disables the job."
+    prune_exports_schedule: Annotated[
+        Cron,
+        Field(
+            title="Export clean-up schedule",
+            description=(
+                "Cron expression for expiring downloadable data exports. "
+                + "Empty disables the job."
+            ),
         ),
-    )
+        Tunable(),
+    ] = "0 * * * *"
     max_upload_size: int = Field(
         default=8 * 1024 * 1024 * 1024,
         gt=0,

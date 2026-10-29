@@ -60,3 +60,21 @@ export function runDuration(
 export function startedByHand(run: Pick<JobRunResponse, 'requested_by'>): boolean {
 	return run.requested_by != null;
 }
+
+/** A task's schedule in words: "Off" when it can be scheduled but is not, "Only when started" otherwise. */
+export function scheduleLabel(
+	job: Pick<JobResponse, 'schedule' | 'schedule_key' | 'run_now_allowed'>,
+	explain: (expression: string) => string | null
+): string {
+	if (job.schedule) return explain(job.schedule) ?? job.schedule;
+	if (job.schedule_key) return 'Off';
+	return job.run_now_allowed ? 'Only when started' : 'Not scheduled';
+}
+
+/** When a run last happened, using the moment it started and falling back to when it was due. */
+export function lastRunLabel(
+	run: Pick<JobRunResponse, 'started_at' | 'scheduled_for'>,
+	format: (iso: string) => string
+): string {
+	return format(run.started_at ?? run.scheduled_for);
+}
