@@ -33,6 +33,7 @@
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import DataTable from '$lib/components/data-table.svelte';
+	import HiddenUsername from '$lib/components/hidden-username.svelte';
 	import DeviceIcon from '$lib/components/device-icon.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -896,6 +897,7 @@
 			everywhere and must change it at their next sign-in.
 		</ResponsiveDialog.Description>
 		<form class="mt-4 space-y-4" onsubmit={handleReset}>
+			<HiddenUsername username={resetTarget?.username ?? ''} autocomplete="off" />
 			{#if resetError}
 				<Alert.Root variant="destructive">
 					<Alert.Description>{resetError}</Alert.Description>

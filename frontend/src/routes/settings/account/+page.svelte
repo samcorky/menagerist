@@ -18,6 +18,7 @@
 	import ApiTokensCard from '$lib/components/api-tokens-card.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
+	import HiddenUsername from '$lib/components/hidden-username.svelte';
 	import DataTable from '$lib/components/data-table.svelte';
 	import PersonalExportsCard from '$lib/components/personal-exports-card.svelte';
 	import DeviceIcon from '$lib/components/device-icon.svelte';
@@ -234,6 +235,7 @@
 
 		<form class="max-w-md space-y-4" onsubmit={handleSubmit}>
 			<h2 class="font-heading text-lg font-semibold">Change password</h2>
+			<HiddenUsername username={auth.user?.username ?? ''} />
 
 			{#if error}
 				<Alert.Root variant="destructive">

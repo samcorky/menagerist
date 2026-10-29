@@ -257,8 +257,8 @@ test.describe('API tokens card', () => {
 
 	function row(page: Page, name: string) {
 		return page
-			.getByRole('list', { name: 'Personal access tokens' })
-			.getByRole('listitem')
+			.getByRole('table', { name: 'Personal access tokens' })
+			.getByRole('row')
 			.filter({ hasText: name });
 	}
 
