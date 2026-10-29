@@ -53,9 +53,7 @@ class RemoveStrayMediaFiles(
         super().__init__(uow, guard)
         self._storage = storage
 
-    async def _handle(
-        self, command: RemoveStrayMediaFilesCommand, actor: Actor
-    ) -> int:
+    async def _handle(self, command: RemoveStrayMediaFilesCommand, actor: Actor) -> int:
         """Delete every stray file older than the cutoff and return how many."""
         removed = 0
         batch: list[StoredFile] = []

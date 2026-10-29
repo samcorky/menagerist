@@ -60,7 +60,7 @@ class InMemoryMediaStorage:
         """Move the bytes to the new lifecycle bucket."""
         data = self._files.pop((asset_id, from_status.value))
         self._files[(asset_id, to_status.value)] = data
-        if (modified := self.modified_at.pop((asset_id, from_status.value), None)):
+        if modified := self.modified_at.pop((asset_id, from_status.value), None):
             self.modified_at[(asset_id, to_status.value)] = modified
         if (asset_id, from_status.value) in self._thumbnails:
             self._thumbnails[(asset_id, to_status.value)] = self._thumbnails.pop(

@@ -51,7 +51,7 @@ import urllib.error
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import docker
 from docker.errors import DockerException, NotFound
@@ -340,15 +340,18 @@ def _exec_json(container: Container, command: list[str]) -> object:
     Logs go to stderr, so the streams are kept apart rather than merged.
     """
     result = container.exec_run(command, demux=True)
-    stdout, stderr = result.output or (b"", b"")
+    # The stubs type `output` for every `demux` mode; with `demux=True` it is a pair.
+    stdout, stderr = cast("tuple[bytes | None, bytes | None]", result.output)
+    stdout = stdout or b""
+    stderr = stderr or b""
     if result.exit_code != 0:
         raise SmokeTestError(
             f"`{' '.join(command)}` exited {result.exit_code}: "
-            + f"{(stdout or b'').decode(errors='replace')}"
-            + f"{(stderr or b'').decode(errors='replace')}".strip()
+            + f"{stdout.decode(errors='replace')}"
+            + f"{stderr.decode(errors='replace')}".strip()
         )
     try:
-        return json.loads((stdout or b"").decode())
+        return json.loads(stdout.decode())
     except json.JSONDecodeError as error:
         raise SmokeTestError(
             f"`{' '.join(command)}` did not print JSON: {stdout!r}"

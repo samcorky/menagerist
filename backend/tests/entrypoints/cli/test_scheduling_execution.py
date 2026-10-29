@@ -154,9 +154,7 @@ async def test_registered_maintenance_prunes_through_the_real_executor(
         definition = catalogue.registry.get("scheduling.prune_runs")
         assert definition.schedule_key is not None
         assert (
-            await build_schedule_source().schedule_for(
-                definition.schedule_key
-            )
+            await build_schedule_source().schedule_for(definition.schedule_key)
             == "0 4 * * *"
         )
         with capture_logs(processors=[merge_contextvars]) as logs:
