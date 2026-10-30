@@ -1288,3 +1288,37 @@ Two more jobs finish the picture. `media.remove_stray_files` (`RemoveStrayMediaF
 **Prerequisite:** the project has no GitHub Releases yet (no tags), so until one is published a check finishes with `no_release`. A release workflow that publishes the GHCR image should also create the GitHub Release, tagged as the CalVer version.
 
 **Not built:** notifications, a banner outside the Status page, GHCR or digest comparison, conditional requests (ETag), paging past 30 releases.
+
+## Changing and clearing an item's type (2026-10-29)
+
+**Decision:** an item's type can be changed or removed after it is set. In `PATCH /api/v1/node/{id}`, `type` set to a slug sets or changes it, `null` removes it, and leaving it out keeps it; a blank string is an error. The attribute values are never touched by a type change.
+
+- **Null means clear, absent means keep.** The request tells them apart with `model_fields_set` and passes `clear_type` on the command; `Node.clear_type()` is a separate domain method, so `Node.update(type=None)` still means unchanged and a blank string is still refused. (The type `icon` and `colour` clear with an empty string; they predate this and could move to `null` the same way.)
+- **Values are kept.** Deleting an item type already clears it from items and keeps their values, so an item with values no schema describes is an existing, supported state, and the attribute editor already shows them as free-form rows. Retyping reuses that rather than converting or deleting anything.
+- **The client decides whether to ask.** `retypeImpact` (frontend) lists values with no field in the new type or the item's own fields; only then is there a confirmation. A name that is both an item field and a field of the new type cannot be merged (`merge_attribute_schemas` rejects it), so that change is refused with an explanation.
+- **A new type name still creates the type** on the way through, as setting a first type does.
+
+**Alternatives rejected:** refusing a change when values would not fit (strands people on a wrong type); deleting or converting values (loses data); an empty string to clear (an easy accident, and `null` is the standard JSON Merge Patch way).
+
+## Item type icon and colour, and a random item (2026-10-29)
+
+**Decision:** an item type has an optional `icon` and `colour`. The server checks only their shape: `colour` must be one of nine palette names (the list is `shared/contracts/type-colours.json`, read by a backend and a frontend test), and `icon` must look like a Lucide name (lower-case words joined by dashes, at most 64 characters). It does not know which icons exist. `GET /api/v1/node/random` takes the list's `type`, `favourite` and `collection` filters and returns one matching item, or 404.
+
+- **Icon names live only in the frontend.** Which icons can be drawn is a bundle-size decision (`frontend/src/lib/type-icons.ts` imports a curated set), so a shared list the server enforced would add a second source of truth and make a frontend upgrade a backend change. A frontend test checks every name exists in the installed `@lucide/svelte`, and a name the frontend cannot draw shows the generic icon.
+- **Palette names, not hex values,** so dark mode and contrast stay a frontend decision.
+- **Update semantics.** An omitted field is unchanged and `null` removes it (a blank string is an error, as for an item's type), so a client can tell "leave it" from "remove it".
+- **Random is a repository method,** not a client-side pick: the list pages by cursor and cannot jump to the n-th item. `ORDER BY random() LIMIT 1` reads every match, which is fine for a personal collection and keeps the choice uniform. `q` is ignored: a random pick from a text search is not wanted.
+
+**Alternatives rejected:** an icon list shared with and enforced by the backend (above); free hex colours; picking client-side after fetching a page (biased and heavy).
+
+## Counting many searches and items per type (2026-10-29)
+
+**Decision:** the Home dashboard's numbers come from two read-only endpoints, not from loading items. `POST /api/v1/node/search/counts` takes up to 20 named condition trees and returns `{counts: {name: {total, total_capped, warnings}}}`; `GET /api/v1/node/count/types` returns `[{type, count}]` for the item types the caller has items in, with `type: null` for untyped items. Both are `Content(ITEM_READ)` and scoped to the caller like every other content read.
+
+- **Same query language, same resolver.** `SearchNodeCounts` runs each tree through `prepare_query` and `NodeRepository.search_count`, the path `POST /node/search` uses, so a count can never disagree with the list a search for that query returns, and a saved dashboard filter links to the Items page with the same `?f=` token. Sort keys are validated but ignored.
+- **Exact, with a ceiling.** `GET /node/count` is exact but only knows the simple filters, and `POST /node/search` counts to 1,000 (`TOTAL_CAP`). These counts are exact up to `COUNT_CAP` (100,000); past it `total_capped` is true. The repository stops counting one past the cap so "exactly the cap" is told from "more".
+- **Per-type counts are grouped in the database.** `NodeRepository.count_by_type` is one `GROUP BY type` (ordered by count descending, then slug with `C` collation, NULL last), with an in-memory twin; both run the same scenarios. Only types with at least one of the caller's items appear, so the shared type catalogue cannot inflate numbers, and there is no per-type request loop or type cap.
+- **Errors name the query.** A malformed tree is a 400 whose `detail` starts `queries.<name>:` (and a bad batch `queries:`), so a client knows which count failed. Names are 1 to 64 letters, digits, dots, dashes or underscores.
+- **Shapes follow the neighbours.** One structure per endpoint: an object keyed by name (like search's wrapper object), and a bare array of rows (like `GET /node/item-fields`). No hyphens in the paths.
+
+**Alternatives rejected:** a dedicated `GET /node/stats` with hard-coded definitions (the definitions would drift from the Items filters); `?group=type` on `GET /node/count` (one URL, two response shapes); looping `GET /node/count?type=` per type (many requests, and a cap on how many types are looked at); uncapped counting with no ceiling (an unbounded scan on a very large library).

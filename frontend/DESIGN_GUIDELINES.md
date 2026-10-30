@@ -53,21 +53,25 @@ The empty collection is the onboarding: show a warm “Add your first item” ac
 
 ## 4. Mobile First
 
-Design for touch from the start: generous hit areas, short forms, little typing and no horizontal scrolling for normal content. Use responsive image grids and the interaction patterns in §23.
+Design for touch from the start: short forms, little typing and no horizontal scrolling for normal content. Generous 44px hit areas and visible text labels apply to coarse pointers (`pointer-coarse:`); with a mouse or trackpad the compact sizes apply (§21). Use responsive image grids and the interaction patterns in §23.
 
 ## 5. Responsive Layout
 
-| Viewport | Navigation and layout                                                                         |
-| -------- | --------------------------------------------------------------------------------------------- |
-| Desktop  | Persistent sidebar where appropriate; content remains dominant                                |
-| Tablet   | Collapsed icon rail, toggle or drawer; do not reproduce the full desktop sidebar              |
-| Mobile   | Compact header and bottom navigation; redesign for the viewport rather than shrinking desktop |
+| Viewport | Navigation and layout                                                                   |
+| -------- | --------------------------------------------------------------------------------------- |
+| Desktop  | App sidebar, expanded from 1280px; the burger collapses it to an icon rail              |
+| Tablet   | Icon rail from 768px; do not reproduce the full desktop sidebar                         |
+| Mobile   | Compact header with a burger that opens the sidebar as a drawer, plus bottom navigation |
+
+Pages choose one of four widths: `fluid` for grids, tables and dashboards (capped at 2200px and centred beyond it), `reading` (64rem) for item detail and list-style settings, `form` (48rem) for short forms and `narrow` (24rem) for sign-in and setup. Tile grids add columns as the screen widens instead of stretching tiles. The app sidebar holds Home, Items, Collections and Explore, then collapsible Library, Account and System groups (Administration entries only for accounts with the permission), with Settings and API docs at the bottom. Its state is remembered per device; phones keep the bottom bar as well. Rail items have tooltips and the same accessible names as the expanded labels.
+
+**Home** is a dashboard: totals (exact counts from the server, "1,000+" never needed below 100,000), Newly added (the true newest items), Tidy up (No photo, No description, Not in any collection, No item type; each opens the Items page with exactly that filter) and blocks for collections, item types in use and recently edited items. Every figure comes from a server count or a server-sorted list, never from a partly loaded one, and counts only item types the person actually uses. **The item page** shows the cover in a sticky left column from 1024px, with the details beside it and, from 1536px, a side panel for connections, collections and files; below 1024px it is one column with the cover first. An item with no cover keeps the column, holding the type placeholder and "Add a photo" (§7b). **Surprise me** (a shuffle icon button on Home and on a collection's header) opens a random item: any of yours on Home, only that collection's on a collection page, and says "Nothing to pick from yet" instead of navigating when there is none.
 
 Uniform, scannable lists in settings and admin (users, devices, backups, scheduled tasks, recently deleted) are tables from the `md` breakpoint up and stacked cards below it. Use `DataTable` with `wide` from `$lib/viewport.svelte` so only one layout exists in the DOM; keep every row's action reachable by the same accessible name in both.
 
 ## 6. Navigation
 
-Core destinations are **Collection**, **Search** and **Explore**. Keep “Add item” easy to find at every breakpoint. Settings stay visually secondary; occasional features appear contextually rather than becoming navigation destinations.
+Core destinations are **Collection**, **Search** and **Explore**. Keep “Add item” easy to find at every breakpoint. Settings stay visually secondary (the bottom of the sidebar); occasional features appear contextually rather than becoming navigation destinations. The top bar holds the burger, the logo, the search field, New item, the theme toggle and the account menu.
 
 ## 7. Collection View
 
@@ -86,7 +90,8 @@ An item type may choose up to **three highlighted fields**, excluding long text.
 ### 7b. Image Handling
 
 - Keep one aspect ratio within each collection grid. Default to **2:3**; category types may specify another ratio (for example 16:9 or 1:1).
-- Missing, loading and broken images use a full-size muted placeholder with a category icon, or a generic item icon. Never collapse the card or show a broken-image icon.
+- Missing, loading and broken images use a full-size placeholder showing the item type's icon in its colour (a type with none, or an untyped item, shows the generic package icon in the neutral tone). Never collapse the card or show a broken-image icon.
+- On the item page the placeholder fills the cover column and carries an "Add a photo" drop-or-browse area that uploads and sets the cover, so a missing cover is an invitation rather than a gap.
 - Lazy-load images without blocking cards. Fade loaded images in over **150 ms**, or show instantly for reduced motion.
 - Placeholders must work in both themes.
 
@@ -110,6 +115,8 @@ Bulk deletion follows §14 (“X items deleted → Undo”). On mobile use a bot
 
 ## 8. Search
 
+With a mouse on a screen at least 768px wide, search is the field in the top bar and its results open in a dropdown beneath it: `/` focuses it, arrows and Enter choose, Escape clears the text and then closes it. Touch devices and phones keep the full-screen search sheet.
+
 Search is fast, forgiving and natural-language friendly: examples include “matrix”, “signed items”, “things from 1999”, “keanu reeves” and “recently added”. Never require query syntax; offer useful fuzzy/browsable results where possible.
 
 Search the name, description and every text/number detail, including fields absent from cards. Explain hidden-field matches in one muted line, for example “Matched in Director: Ridley Scott”. Group result kinds where useful using collector-facing names (Items, People, Collections, Tags).
@@ -120,11 +127,15 @@ Start with an item name and Continue, not a large form. Infer the type, suggest/
 
 ### 9a. Item Type Detection
 
+Choosing a type is one searchable picker everywhere (new item, Quick capture, and the item page while it has no type): the types you have items in come first under "In use" with their counts, the rest under "Other item types", and typing a name that matches nothing offers `Create "name"`, which creates and selects it in one step. Each type can have an icon and a colour (a fixed palette), set in the type editor with a search over the available icons, a name shown on hover or focus, and a dice button that picks both at random.
+
 Detect from the name on a best-effort basis. Prefill confident matches; show ambiguous suggestions inline for correction; fall back to a generic item when detection fails. Always allow changes and use category names, not internal identifiers. Detection never blocks progress.
 
 Incomplete data is better than blocking a save. Only information truly necessary for a record to exist (for example its name) may block creation; category “required” fields are advisory (§16a).
 
 ## 10. Editing Items
+
+An item's type can be changed or removed at any time from the picker under its name (the same picker as §9a, with "No item type"). Values are never deleted by a type change. When the new type has no field for some of the item's values, a confirmation lists them and says they stay on the item as plain fields; otherwise the change applies at once with an Undo in the toast (§14). If the item has a field of its own with the same name as a field of the new type, the change is refused with an explanation instead of guessing which wins.
 
 Put important information first. Group advanced or rarely used information into expandable sections; do not show a wall of empty fields. Keep the experience consistent across item types.
 
@@ -167,6 +178,8 @@ Removing a saved category field archives it and preserves its values. Restore it
 ## 15. Forms
 
 Use clear labels, useful explanations, sensible defaults and few required fields. Preserve input after validation failures. Validate at useful moments rather than every keystroke, with helpful copy.
+
+Heavy create and edit forms (a type with its fields, for example) open in a large dialog from a compact list, rather than expanding inline; on phones the dialog is a full-screen sheet. Closing an editor with unsaved changes asks "Discard changes?" first. Content that is grouped on a page (sections of presets, groups of settings, sections on Home) sits under a collapsible heading whose open state is remembered.
 
 Fixed-choice value pickers default to **native `<select>`** (`ui/native-select`) for mobile and accessibility support. Exceptions:
 
@@ -252,7 +265,7 @@ Bare letters do not fire in fields, contenteditable areas or overlays (dialogs, 
 
 ## 21. Visual Design
 
-Keep chrome calm, clean, modern, compact and consistent. Let collection images and titles provide visual interest. Avoid excessive gradients, shadows, decorative animation, oversized headings/buttons, cards, badges and dense metadata.
+Keep chrome calm, clean, modern, compact and consistent. On a mouse, controls are 28-32px high with tight gaps and navigation, toolbar and row actions are icon-only with a tooltip and the same accessible name; touch devices show the label beside the icon at 44px. Buttons that commit or cancel a decision (Save, Cancel, Delete, Sign in) and empty-state calls to action keep their text. Let collection images and titles provide visual interest. Avoid excessive gradients, shadows, decorative animation, oversized headings/buttons, cards, badges and dense metadata.
 
 ### 21a. Dark Mode
 

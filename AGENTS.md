@@ -26,6 +26,7 @@ Run tasks with `poe` from the repository root; consult `pyproject.toml` rather t
 | First-time setup / dependency sync            | `poe init` / `poe sync`                                                                    |
 | Both dev servers / one server                 | `poe serve` / `poe serve-backend` / `poe serve-frontend`                                   |
 | Backend unit/router tests (no infrastructure) | `poe test-backend`                                                                         |
+| Backend fast tests (about 20 seconds)         | `poe test-backend-fast`                                                                    |
 | Backend integration tests (live Postgres)     | `poe test-backend-integration`                                                             |
 | Frontend unit tests                           | `poe test-frontend`                                                                        |
 | Lint / typecheck                              | `poe lint-backend`, `poe lint-frontend`, `poe typecheck-backend`, `poe typecheck-frontend` |
@@ -36,7 +37,7 @@ Run tasks with `poe` from the repository root; consult `pyproject.toml` rather t
 
 - For test, lint, typecheck and `check-changed` tasks, use `--mode agent`. This preserves the tool's exit code and prints a compact summary; read full logs in `.agent-logs/<run>/` instead of rerunning for output (newest 20 runs retained).
 - `human` runs directly without capture; `verbose` captures and streams output. Default precedence is flag, `MENAGERIST_OUTPUT`, `~/.config/menagerist/output`, then `human`.
-- Use targeted tests during iteration. Before completion, run relevant lint, typecheck and tests for the touched code; do not run backend checks for frontend-only work or code checks for prose-only edits. Check documentation links and formatting for documentation changes.
+- Use targeted tests during iteration. For backend work, `poe test-backend-fast` (about 20 seconds: domain, application, shared kernel, architecture and platform tests, the `fast` marker) is the cheap check between targeted runs; the router, adapter and integration tests are the slow bulk, so run those when you touch that code and rely on `poe coverage` for the full run. Before completion, run relevant lint, typecheck and tests for the touched code; do not run backend checks for frontend-only work or code checks for prose-only edits. Check documentation links and formatting for documentation changes.
 - Backend changes must pass strict mypy (`poe typecheck-backend`) and the full `poe coverage` gate before completion; this is intentionally heavier than the iteration loop. Frontend changes must pass strict TypeScript/Svelte checking (`poe typecheck-frontend`).
 - `poe check` is a broad final gate (pre-commit hooks plus coverage, resyncing dependencies), not a default iteration command. Other tasks, including end-to-end tests and formatting, are documented in CONTRIBUTING and `pyproject.toml`.
 - Do not start duplicate suites against shared resources. Inspect existing logs/processes before retrying stalled or failed checks, and report blockers rather than claiming success.

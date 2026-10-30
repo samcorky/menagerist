@@ -29,13 +29,26 @@ without ever being forced to think in terms of graph theory.
 Versioning follows CalVer. The project is currently on a `0.`-prefixed scheme (`0.YYYY.MM.PATCH`) to signal pre-stable - but the bar for the first merge to `main` is lower than it might seem.
 
 **Merge to `main` (`0.x`)** - target once the following are done:
-- UI polish pass: tighten spacing, typography, empty states, loading states, and interaction feedback across all existing screens
-- Playwright end-to-end test suite covering the core happy paths (create a node, set a type, add a relationship, use quick capture, manage types)
+- UI polish pass: tighten spacing, typography, empty states, loading states, and interaction feedback across all existing screens. *Well advanced: compact wide layout, app shell with sidebar, dashboard, item page, type picker, mobile fixes. Remaining work is a final walk-through on desktop and phone.*
+- Playwright end-to-end test suite covering the core happy paths (create a node, set a type, add a relationship, use quick capture, manage types). *Done, and now covers far more than the happy paths, on desktop and mobile.*
 
 The `0.` prefix signals that the API, data model, and features are still evolving - no need to wait for the full feature backlog. The merge bar is "solid enough to self-host without embarrassment."
 
 **Public image on GHCR** - publish `ghcr.io/…/menagerist` on every merge to `main` via CI. Tagged as `0.YYYY.MM.DD` and `latest`. Makes self-hosting a one-liner without needing to build from source.
 
 **Stable release (`YYYY.MM.PATCH`)** - drop the `0.` prefix once the core feature set is complete and the data model is unlikely to have breaking migrations. At that point CalVer without the leading zero becomes the normal scheme and `latest` tracks it.
+
+---
+
+## Direction
+
+Themes for what comes after the merge bar, in rough order. Each gets its own design document in `docs/superpowers/specs/` before it is built.
+
+- **Sign-in and accounts.** Local accounts, per-person privacy, scoped API tokens, sign-in throttling and signed-in device lists are in place. Next: **passkeys** as an opt-in second way to sign in, off until the operator sets a relying-party domain (see the passkeys design). Further out: external sign-in (OIDC) and email, only if self-hosters ask for them.
+- **Shared item types.** Types are one shared catalogue today. Reconsider whether they should be per person or curated, before the data model settles.
+- **Release automation.** Release notes grouped by pull request label, a pull request template, and the GHCR image above.
+- **Self-hosting polish.** Documented overrides and tuning, backups and restore checks, and clear warnings when the proxy or database setup looks wrong.
+
+---
 
 The feature backlog itself is tracked outside this repo (project board), not maintained here - this document covers direction and philosophy, not the live task list.
