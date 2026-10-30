@@ -11,6 +11,17 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(autouse=True)
+def _no_database_for_serve(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`serve` asks Postgres for its connection limit; these tests have no database."""
+    from app.platform import connection_budget
+
+    async def unreachable() -> None:
+        return None
+
+    monkeypatch.setattr(connection_budget, "fetch_max_connections", unreachable)
+
+
+@pytest.fixture(autouse=True)
 def _plain_text_output() -> Iterator[None]:
     """Each test starts in automatic format, which is plain text under capture.
 

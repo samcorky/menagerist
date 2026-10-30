@@ -26,6 +26,37 @@ if TYPE_CHECKING:
     from anyio.from_thread import BlockingPortal
     from fastapi import FastAPI
 
+# Areas whose tests are all in-memory and quick (about 20 seconds in total), so a
+# pre-commit hook can run them: `pytest -m fast`. Marked by location, so a new test in
+# one of these folders is included without remembering a decorator.
+_FAST_LAYERS = frozenset({"domain", "application"})
+_FAST_TOP_LEVEL = frozenset({"shared_kernel", "architecture", "platform"})
+
+
+def _is_fast(parts: tuple[str, ...], *, integration: bool) -> bool:
+    if integration or "tests" not in parts:
+        return False
+    below = parts[parts.index("tests") + 1 :]
+    if below[0] in _FAST_TOP_LEVEL:
+        return True
+    return below[0] == "modules" and len(below) > 3 and below[2] in _FAST_LAYERS
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Mark quick in-memory areas `fast`, and tests that start a container `docker`.
+
+    A test needs Docker when it uses the `postgres_container` fixture (directly or
+    through `db_session`) or is `integration`: those fetch `db_session` at run time
+    with `request.getfixturevalue`, which fixture inspection cannot see.
+    """
+    for item in items:
+        uses_container = "postgres_container" in getattr(item, "fixturenames", ())
+        if uses_container or item.get_closest_marker("integration") is not None:
+            item.add_marker(pytest.mark.docker)
+        integration = item.get_closest_marker("integration") is not None
+        if _is_fast(item.path.parts, integration=integration):
+            item.add_marker(pytest.mark.fast)
+
 
 @pytest.fixture(autouse=True)
 def _no_colour(monkeypatch: pytest.MonkeyPatch) -> None:

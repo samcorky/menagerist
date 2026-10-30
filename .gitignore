@@ -46,3 +46,6 @@ node_modules/
 
 # Agent run logs (scripts/poe_run.py)
 .agent-logs/
+
+# Brainstorming visual companion mockups
+.superpowers/

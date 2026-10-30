@@ -149,6 +149,10 @@ args = [
 ]
 help = "Run backend unit tests in parallel (pytest-xdist, one worker per CPU unless --workers) from a clean coverage dataset"
 
+[tool.poe.groups.quality.tasks.test-backend-fast]
+cmd = "uv run --directory backend pytest -m fast -n 4 -q -p no:cacheprovider --no-cov"
+help = "Run only the quick in-memory backend tests (domain, application, shared kernel, architecture, platform); what pre-commit runs"
+
 [tool.poe.groups.quality.tasks.test-backend-integration]
 script = "scripts.poe_run:main('test-backend-integration', mode=mode, workers=workers)"
 args = [

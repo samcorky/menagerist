@@ -215,6 +215,8 @@ asyncio_mode = "auto"
 addopts = "--cov=app --cov-branch --cov-report=xml"
 markers = [
     "integration: exercises a real adapter (database, network) instead of an in-memory fake",
+    "docker: starts a Docker container through testcontainers (needs a running Docker daemon), added from the fixtures a test uses in conftest.py",
+    "fast: quick in-memory tests (domain, application, shared kernel, architecture, platform), added by location in conftest.py; what the pre-commit hook runs",
     "real_actor: keep the real get_current_actor instead of the default member override",
 ]
 

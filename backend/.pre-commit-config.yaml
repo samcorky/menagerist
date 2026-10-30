@@ -39,8 +39,8 @@ repos:
         pass_filenames: false
 
       - id: pytest
-        name: run non-integration tests (pytest)
-        entry: uv run poe test-backend
+        name: run fast tests (pytest -m fast)
+        entry: uv run poe test-backend-fast
         language: system
         types_or:
           - python
