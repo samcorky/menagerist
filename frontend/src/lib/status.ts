@@ -57,6 +57,8 @@ export function countStatuses(observations: ReadonlyArray<{ status: string }>): 
 
 /** Renders an observed value with its unit. */
 export function formatObservedValue(value: unknown, unit: string | null | undefined): string {
+	// A check that could not run reports the word `unknown` in its own unit.
+	if (value === 'unknown') return 'Unknown';
 	if (unit === 'percent') return `${value}%`;
 	if (unit === 'ms') return `${value} ms`;
 	if (unit === 'GiB' && typeof value === 'number' && Number.isFinite(value)) {

@@ -193,3 +193,26 @@ test('Check now asks for a check and then shows the stored answer', async ({ pag
 		'https://github.com/o/r/releases/tag/9.2099.1.0'
 	);
 });
+
+const groupBars = (page: Page) =>
+	page.getByRole('group', { name: /checks; select a segment to view its details/ });
+
+test('the checks lay out in columns on a wide screen', async ({ page }) => {
+	await page.setViewportSize({ width: 2048, height: 1152 });
+	await page.goto('/status');
+	await expect(groupBars(page).nth(1)).toBeVisible();
+	const first = await groupBars(page).nth(0).boundingBox();
+	const second = await groupBars(page).nth(1).boundingBox();
+	expect(second!.x).toBeGreaterThan(first!.x + first!.width / 2);
+	expect(Math.abs(second!.y - first!.y)).toBeLessThan(8);
+});
+
+test('the checks stack in one column on a narrow screen', async ({ page }) => {
+	await page.setViewportSize({ width: 900, height: 1000 });
+	await page.goto('/status');
+	await expect(groupBars(page).nth(1)).toBeVisible();
+	const first = await groupBars(page).nth(0).boundingBox();
+	const second = await groupBars(page).nth(1).boundingBox();
+	expect(Math.abs(second!.x - first!.x)).toBeLessThan(8);
+	expect(second!.y).toBeGreaterThan(first!.y);
+});

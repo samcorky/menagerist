@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Page from '$lib/components/page.svelte';
 	import type { Component } from 'svelte';
 	import { onMount, tick } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
@@ -30,6 +31,7 @@
 		type BrowserCheck,
 		type Readiness
 	} from '$lib/status';
+	import { formatGroup, formatLabel, groupIcon, metricIcon } from '$lib/status-display';
 	import ReleaseCard from '$lib/components/release-card.svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -39,37 +41,15 @@
 	import {
 		Activity,
 		AlertTriangle,
-		CalendarClock,
 		CheckCircle2,
 		ChevronDown,
 		CircleX,
-		Database,
-		Gauge,
 		Globe,
-		GitBranch,
-		HardDrive,
-		HeartPulse,
 		LogIn,
-		Network,
 		PackageCheck,
-		Pencil,
 		RefreshCw,
-		Server,
-		ShieldCheck,
-		TriangleAlert,
-		Wrench
+		TriangleAlert
 	} from '@lucide/svelte';
-
-	function formatLabel(camel: string): string {
-		return camel
-			.replace(/([A-Z])/g, ' $1')
-			.replace(/^./, (s) => s.toUpperCase())
-			.replace(/\bCors\b/g, 'CORS');
-	}
-
-	function formatGroup(key: string): string {
-		return key.charAt(0).toUpperCase() + key.slice(1);
-	}
 
 	function formatValue(obs: CheckObservation): string {
 		return formatObservedValue(obs.observedValue, obs.observedUnit);
@@ -101,31 +81,6 @@
 		if (status === 'pass') return CheckCircle2;
 		if (status === 'fail') return CircleX;
 		return TriangleAlert;
-	}
-
-	function groupIcon(key: string): Component {
-		if (key === 'database') return Database;
-		if (key === 'system') return Activity;
-		if (key === 'pool') return Gauge;
-		if (key === 'migration') return GitBranch;
-		if (key === 'configuration' || key === 'proxy') return Network;
-		if (key === 'storage') return HardDrive;
-		if (key === 'scheduler') return CalendarClock;
-		return Server;
-	}
-
-	function metricIcon(label: string): Component {
-		const lower = label.toLowerCase();
-		if (lower.includes('proxy') || lower.includes('cors')) return Network;
-		if (lower.includes('database') || lower.includes('db')) return Database;
-		if (lower.includes('migration') || lower.includes('schema')) return GitBranch;
-		if (lower.includes('pool') || lower.includes('connection')) return Gauge;
-		if (lower.includes('storage') || lower.includes('space')) return HardDrive;
-		if (lower.includes('writable')) return Pencil;
-		if (lower.includes('version') || lower.includes('build')) return PackageCheck;
-		if (lower.includes('health') || lower.includes('status')) return ShieldCheck;
-		if (lower.includes('heartbeat')) return HeartPulse;
-		return Wrench;
 	}
 
 	function groupStatus(checks: Array<{ obs: CheckObservation }>): CheckObservation['status'] {
@@ -422,7 +377,7 @@
 	});
 
 	const triggerClass =
-		'relative -mb-(--card-spacing) flex min-h-11 w-full items-center justify-center gap-2 border-t border-border/70 px-5 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none';
+		'relative -mb-(--card-spacing) flex min-h-9 pointer-coarse:min-h-11 w-full items-center justify-center gap-2 border-t border-border/70 px-5 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none';
 
 	function formatTime(date: Date): string {
 		return date.toLocaleString(undefined, {
@@ -447,400 +402,404 @@
 	<title>System status - Menagerist</title>
 </svelte:head>
 
-<main class="flex-1 px-4 py-8 sm:px-6">
-	<div class="mx-auto flex max-w-5xl flex-col gap-6">
-		<div
-			class="flex items-start justify-between gap-4 rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur-sm"
-		>
-			<div>
-				<p class="mb-2 text-xs font-medium tracking-[0.18em] text-muted-foreground uppercase">
-					Operations
+<Page width="fluid">
+	<div
+		class="flex items-start justify-between gap-4 rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur-sm"
+	>
+		<div>
+			<p class="mb-2 text-xs font-medium tracking-[0.18em] text-muted-foreground uppercase">
+				Operations
+			</p>
+			<h1 class="font-heading text-3xl font-semibold tracking-tight">System status</h1>
+			{#if lastCheckTime}
+				<p class="mt-1 text-sm text-muted-foreground">
+					Last checked at {formatTime(lastCheckTime)}
 				</p>
-				<h1 class="font-heading text-3xl font-semibold tracking-tight">System status</h1>
-				{#if lastCheckTime}
-					<p class="mt-1 text-sm text-muted-foreground">
-						Last checked at {formatTime(lastCheckTime)}
-					</p>
-				{/if}
-				{#if version}
-					<p class="mt-1 text-sm text-muted-foreground">
-						{version.name} v{version.current_version}
-					</p>
-				{/if}
-				<p class="mt-1 text-xs text-muted-foreground">
-					{autoRefreshEnabled
-						? `Auto-refreshing every ${refreshMs / 1000}s`
-						: 'Auto-refresh paused'}
+			{/if}
+			{#if version}
+				<p class="mt-1 text-sm text-muted-foreground">
+					{version.name} v{version.current_version}
 				</p>
-			</div>
-			<div class="flex items-center gap-2">
-				{#if !auth.signedIn}
-					<Button variant="outline" class="h-11" href={signInHref}>
-						<LogIn class="size-4" />
-						Sign in
-					</Button>
-				{/if}
-				<Button
-					variant="outline"
-					size="icon"
-					class="size-11"
-					onclick={() => load(true)}
-					disabled={refreshing || loading}
-					aria-label="Refresh status"
-					title="Refresh status"
-				>
-					<RefreshCw class="size-4 {refreshing ? 'animate-spin' : ''}" />
-				</Button>
-				<Button
-					variant={autoRefreshEnabled ? 'default' : 'outline'}
-					size="sm"
-					onclick={() => (autoRefreshEnabled = !autoRefreshEnabled)}
-					aria-label={autoRefreshEnabled ? 'Pause auto refresh' : 'Resume auto refresh'}
-					title={autoRefreshEnabled ? 'Pause auto refresh' : 'Resume auto refresh'}
-					class="min-h-11 gap-2 rounded-full"
-				>
-					<Activity class="size-4" />
-					<span class="inline-flex items-center gap-1.5">
-						<span
-							class={autoRefreshEnabled
-								? 'size-2 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,0.2)]'
-								: 'size-2 rounded-full bg-muted-foreground'}
-						></span>
-						{autoRefreshEnabled ? 'Live' : 'Paused'}
-					</span>
-				</Button>
-			</div>
+			{/if}
+			<p class="mt-1 text-xs text-muted-foreground">
+				{autoRefreshEnabled ? `Auto-refreshing every ${refreshMs / 1000}s` : 'Auto-refresh paused'}
+			</p>
 		</div>
-
-		{#if loading}
-			<div class="flex flex-col gap-4">
-				<div class="h-16 animate-pulse rounded-2xl bg-muted"></div>
-				<div class="h-40 animate-pulse rounded-2xl bg-muted"></div>
-				<div class="h-48 animate-pulse rounded-2xl bg-muted"></div>
-			</div>
-		{:else if loadError}
-			<Card.Root class="border-destructive/50 bg-destructive/5 shadow-sm">
-				<Card.Content class="px-5 py-4">
-					<div class="flex items-center gap-2 text-destructive">
-						<AlertTriangle class="size-4" />
-						<p class="text-sm font-medium">Failed to load status</p>
-					</div>
-					<p class="mt-2 text-sm text-muted-foreground">{loadError}</p>
-				</Card.Content>
-			</Card.Root>
-		{:else if readiness}
-			{@const displayStatus = databaseUnreachable ? 'fail' : (detail?.status ?? readiness)}
-			{@const isPass = displayStatus === 'pass'}
-			{@const isWarning = displayStatus === 'warn'}
-			{@const StatusIcon = statusIcon(displayStatus)}
-			<Card.Root
-				class={isPass
-					? 'border-emerald-500/30 bg-emerald-500/5 shadow-sm'
-					: isWarning
-						? 'border-amber-500/30 bg-amber-500/5 shadow-sm'
-						: 'border-destructive/30 bg-destructive/5 shadow-sm'}
+		<div class="flex items-center gap-2">
+			{#if !auth.signedIn}
+				<Button variant="outline" class="pointer-coarse:h-11" href={signInHref}>
+					<LogIn class="size-4" />
+					Sign in
+				</Button>
+			{/if}
+			<Button
+				variant="outline"
+				size="icon"
+				class="pointer-coarse:size-11"
+				onclick={() => load(true)}
+				disabled={refreshing || loading}
+				aria-label="Refresh status"
+				title="Refresh status"
 			>
-				<Card.Content class="flex items-center justify-between gap-3 px-5 py-4">
-					<div class="flex items-center gap-3">
-						<div
-							class="flex size-8 items-center justify-center rounded-full {isPass
-								? 'bg-emerald-500/10 text-emerald-600'
-								: isWarning
-									? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
-									: 'bg-destructive/10 text-destructive'}"
-						>
-							<StatusIcon class="size-4" />
-						</div>
-						<div>
-							<p class="font-medium">
-								{isPass
-									? 'All systems operational'
-									: isWarning
-										? 'Some checks need attention'
-										: 'Service degraded'}
-							</p>
-							<p class="text-xs text-muted-foreground">
-								{databaseUnreachable
-									? "Menagerist cannot reach its database, so details can't be loaded until it is back. This page keeps retrying."
-									: isPass
-										? 'Everything Menagerist needs is working.'
-										: isWarning
-											? 'The service is ready, but one or more checks reported a warning.'
-											: 'Something Menagerist needs is not working.'}
-							</p>
-						</div>
-					</div>
-					<Badge class={statusTone(displayStatus)}>
-						<StatusIcon class="size-3" />
-						{statusLabel(displayStatus)}
-					</Badge>
-				</Card.Content>
-			</Card.Root>
+				<RefreshCw class="size-4 {refreshing ? 'animate-spin' : ''}" />
+			</Button>
+			<Button
+				variant={autoRefreshEnabled ? 'default' : 'outline'}
+				size="sm"
+				onclick={() => (autoRefreshEnabled = !autoRefreshEnabled)}
+				aria-label={autoRefreshEnabled ? 'Pause auto refresh' : 'Resume auto refresh'}
+				title={autoRefreshEnabled ? 'Pause auto refresh' : 'Resume auto refresh'}
+				class="gap-2 rounded-full pointer-coarse:min-h-11"
+			>
+				<Activity class="size-4" />
+				<span class="inline-flex items-center gap-1.5">
+					<span
+						class={autoRefreshEnabled
+							? 'size-2 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,0.2)]'
+							: 'size-2 rounded-full bg-muted-foreground'}
+					></span>
+					{autoRefreshEnabled ? 'Live' : 'Paused'}
+				</span>
+			</Button>
+		</div>
+	</div>
 
-			{#if detail}
-				<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-					<div class="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-						<p class="text-xs tracking-[0.18em] text-muted-foreground uppercase">Checks</p>
-						<div class="mt-2 flex items-baseline gap-2">
-							<span class="font-heading text-2xl font-semibold">{healthSummary.total}</span>
-							<span class="text-sm text-muted-foreground">total</span>
-						</div>
+	{#if loading}
+		<div class="flex flex-col gap-4">
+			<div class="h-16 animate-pulse rounded-2xl bg-muted"></div>
+			<div class="h-40 animate-pulse rounded-2xl bg-muted"></div>
+			<div class="h-48 animate-pulse rounded-2xl bg-muted"></div>
+		</div>
+	{:else if loadError}
+		<Card.Root class="border-destructive/50 bg-destructive/5 shadow-sm">
+			<Card.Content class="px-4 py-3">
+				<div class="flex items-center gap-2 text-destructive">
+					<AlertTriangle class="size-4" />
+					<p class="text-sm font-medium">Failed to load status</p>
+				</div>
+				<p class="mt-2 text-sm text-muted-foreground">{loadError}</p>
+			</Card.Content>
+		</Card.Root>
+	{:else if readiness}
+		{@const displayStatus = databaseUnreachable ? 'fail' : (detail?.status ?? readiness)}
+		{@const isPass = displayStatus === 'pass'}
+		{@const isWarning = displayStatus === 'warn'}
+		{@const StatusIcon = statusIcon(displayStatus)}
+		<Card.Root
+			class={isPass
+				? 'border-emerald-500/30 bg-emerald-500/5 shadow-sm'
+				: isWarning
+					? 'border-amber-500/30 bg-amber-500/5 shadow-sm'
+					: 'border-destructive/30 bg-destructive/5 shadow-sm'}
+		>
+			<Card.Content class="flex items-center justify-between gap-3 px-4 py-3">
+				<div class="flex items-center gap-3">
+					<div
+						class="flex size-8 items-center justify-center rounded-full {isPass
+							? 'bg-emerald-500/10 text-emerald-600'
+							: isWarning
+								? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+								: 'bg-destructive/10 text-destructive'}"
+					>
+						<StatusIcon class="size-4" />
 					</div>
-					<div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 shadow-sm">
-						<p class="text-xs tracking-[0.18em] text-emerald-700 uppercase dark:text-emerald-400">
-							Healthy
+					<div>
+						<p class="font-medium">
+							{isPass
+								? 'All systems operational'
+								: isWarning
+									? 'Some checks need attention'
+									: 'Service degraded'}
 						</p>
-						<div class="mt-2 flex items-baseline gap-2 text-emerald-600 dark:text-emerald-400">
-							<span class="font-heading text-2xl font-semibold">{healthSummary.pass}</span>
-							<span class="text-sm">operational</span>
-						</div>
-					</div>
-					<div class="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 shadow-sm">
-						<p class="text-xs tracking-[0.18em] text-amber-700 uppercase dark:text-amber-400">
-							Warnings
+						<p class="text-xs text-muted-foreground">
+							{databaseUnreachable
+								? "Menagerist cannot reach its database, so details can't be loaded until it is back. This page keeps retrying."
+								: isPass
+									? 'Everything Menagerist needs is working.'
+									: isWarning
+										? 'The service is ready, but one or more checks reported a warning.'
+										: 'Something Menagerist needs is not working.'}
 						</p>
-						<div class="mt-2 flex items-baseline gap-2 text-amber-600 dark:text-amber-400">
-							<span class="font-heading text-2xl font-semibold">{healthSummary.warn}</span>
-							<span class="text-sm">warning</span>
-						</div>
-					</div>
-					<div class="rounded-2xl border border-destructive/20 bg-destructive/5 p-4 shadow-sm">
-						<p class="text-xs tracking-[0.18em] text-destructive uppercase">Alerts</p>
-						<div class="mt-2 flex items-baseline gap-2 text-destructive">
-							<span class="font-heading text-2xl font-semibold">{healthSummary.fail}</span>
-							<span class="text-sm">failing</span>
-						</div>
 					</div>
 				</div>
-			{/if}
+				<Badge class={statusTone(displayStatus)}>
+					<StatusIcon class="size-3" />
+					{statusLabel(displayStatus)}
+				</Badge>
+			</Card.Content>
+		</Card.Root>
 
-			{#each groups as [groupKey, checks] (groupKey)}
-				{@const anchorIds = checkAnchorIds(groupKey, checks)}
-				{@const GroupIcon = groupIcon(groupKey)}
-				{@const groupHealth = groupStatus(checks)}
-				{@const GroupStatusIcon = statusIcon(groupHealth)}
-				{@const isOpen = openGroups.get(groupKey) ?? false}
-				<Card.Root class="overflow-hidden border-border/70 bg-card shadow-sm">
-					<Collapsible.Root
-						open={isOpen}
-						onOpenChange={(value) => openGroups.set(groupKey, value)}
-						class="flex flex-col gap-(--card-spacing)"
+		{#if detail}
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+				<div class="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+					<p class="text-xs tracking-[0.18em] text-muted-foreground uppercase">Checks</p>
+					<div class="mt-2 flex items-baseline gap-2">
+						<span class="font-heading text-2xl font-semibold">{healthSummary.total}</span>
+						<span class="text-sm text-muted-foreground">total</span>
+					</div>
+				</div>
+				<div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 shadow-sm">
+					<p class="text-xs tracking-[0.18em] text-emerald-700 uppercase dark:text-emerald-400">
+						Healthy
+					</p>
+					<div class="mt-2 flex items-baseline gap-2 text-emerald-600 dark:text-emerald-400">
+						<span class="font-heading text-2xl font-semibold">{healthSummary.pass}</span>
+						<span class="text-sm">operational</span>
+					</div>
+				</div>
+				<div class="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 shadow-sm">
+					<p class="text-xs tracking-[0.18em] text-amber-700 uppercase dark:text-amber-400">
+						Warnings
+					</p>
+					<div class="mt-2 flex items-baseline gap-2 text-amber-600 dark:text-amber-400">
+						<span class="font-heading text-2xl font-semibold">{healthSummary.warn}</span>
+						<span class="text-sm">warning</span>
+					</div>
+				</div>
+				<div class="rounded-2xl border border-destructive/20 bg-destructive/5 p-4 shadow-sm">
+					<p class="text-xs tracking-[0.18em] text-destructive uppercase">Alerts</p>
+					<div class="mt-2 flex items-baseline gap-2 text-destructive">
+						<span class="font-heading text-2xl font-semibold">{healthSummary.fail}</span>
+						<span class="text-sm">failing</span>
+					</div>
+				</div>
+			</div>
+		{/if}
+
+		{@const hasSide = (showDetail && browserCheck) || buildInfo?.release || buildInfo}
+		<div class={['grid items-start gap-4', hasSide && '2xl:grid-cols-[minmax(0,1fr)_22rem]']}>
+			<div class="grid items-start gap-4 xl:grid-cols-2">
+				{#each groups as [groupKey, checks] (groupKey)}
+					{@const anchorIds = checkAnchorIds(groupKey, checks)}
+					{@const GroupIcon = groupIcon(groupKey)}
+					{@const groupHealth = groupStatus(checks)}
+					{@const GroupStatusIcon = statusIcon(groupHealth)}
+					{@const isOpen = openGroups.get(groupKey) ?? false}
+					<Card.Root class="overflow-hidden border-border/70 bg-card shadow-sm">
+						<Collapsible.Root
+							open={isOpen}
+							onOpenChange={(value) => openGroups.set(groupKey, value)}
+							class="flex flex-col gap-(--card-spacing)"
+						>
+							<Card.Header class="px-4 pt-4 pb-0">
+								<div class="flex items-center justify-between gap-3">
+									<div class="flex items-center gap-2.5">
+										<div
+											class="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+										>
+											<GroupIcon class="size-4" />
+										</div>
+										<Card.Title class="text-base">{formatGroup(groupKey)}</Card.Title>
+									</div>
+									<Badge class={statusTone(groupHealth)}>
+										<GroupStatusIcon class="size-3" />
+										{statusLabel(groupHealth)}
+									</Badge>
+								</div>
+							</Card.Header>
+							<div class="space-y-2 px-5 pt-3 pb-0">
+								<div
+									class="flex h-3 gap-1"
+									role="group"
+									aria-label={`${formatGroup(groupKey)} checks; select a segment to view its details`}
+								>
+									{#each checks as { label, obs }, index (`${label}-${index}`)}
+										<PopoverTooltip.Root>
+											<PopoverTooltip.Trigger>
+												{#snippet child({ props })}
+													<a
+														{...props}
+														data-status-check-link
+														href={`#${anchorIds[index]}`}
+														onclick={(event) => openCheckLink(event, groupKey, anchorIds[index])}
+														class="min-w-0 flex-1 rounded-full {statusBarTone(
+															obs.status
+														)} transition-[filter] duration-150 hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none"
+														aria-label={`${formatLabel(label)}: ${statusLabel(obs.status)}. ${formatValue(obs)}${obs.output ? `. ${obs.output}` : ''}`}
+													></a>
+												{/snippet}
+											</PopoverTooltip.Trigger>
+											<PopoverTooltip.Content class="text-left whitespace-normal">
+												{formatLabel(label)}: {statusLabel(obs.status)}. {formatValue(obs)}
+												{#if obs.output}
+													. {obs.output}
+												{/if}
+											</PopoverTooltip.Content>
+										</PopoverTooltip.Root>
+									{/each}
+								</div>
+								<p class="text-center text-xs font-medium text-muted-foreground">
+									{groupSummary(checks)}
+								</p>
+							</div>
+							<Collapsible.Content>
+								<Card.Content class="space-y-3 p-4">
+									{#each checks as { label, obs }, index (`${label}-${index}`)}
+										{@const MetricIcon = metricIcon(label)}
+										{@const MetricStatusIcon = statusIcon(obs.status)}
+										<div
+											id={anchorIds[index]}
+											tabindex="-1"
+											class="status-check-detail flex scroll-mt-24 items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-3 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring {highlightedCheckId ===
+											anchorIds[index]
+												? 'status-check-highlighted'
+												: ''}"
+										>
+											<div
+												class="flex size-8 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground ring-1 ring-border/80"
+											>
+												<MetricIcon class="size-4" />
+											</div>
+											<div class="min-w-0 flex-1">
+												<div class="flex items-center justify-between gap-3">
+													<span class="text-sm font-medium">{formatLabel(label)}</span>
+													<Badge class={statusTone(obs.status)}>
+														<MetricStatusIcon class="size-3" />
+														{statusLabel(obs.status)}
+													</Badge>
+												</div>
+												<p class="mt-1 font-mono text-xs text-muted-foreground">
+													{formatValue(obs)}
+												</p>
+												{#if obs.output}
+													<p
+														class={obs.status === 'warn'
+															? 'mt-2 text-sm leading-relaxed break-words text-amber-700 dark:text-amber-400'
+															: 'mt-2 text-sm leading-relaxed break-words text-destructive'}
+													>
+														{obs.output}
+													</p>
+												{/if}
+											</div>
+										</div>
+									{/each}
+								</Card.Content>
+							</Collapsible.Content>
+							<Collapsible.Trigger class={triggerClass}>
+								<ChevronDown
+									class="size-4 transition-transform motion-reduce:transition-none {isOpen
+										? 'rotate-180'
+										: ''}"
+								/>
+								{isOpen ? 'Hide details' : 'Show details'}
+								<span class="sr-only"> for {formatGroup(groupKey)}</span>
+							</Collapsible.Trigger>
+						</Collapsible.Root>
+					</Card.Root>
+				{/each}
+			</div>
+			<div class="flex flex-col gap-4">
+				{#if showDetail && browserCheck}
+					{@const check = browserCheck}
+					<Card.Root
+						class="overflow-hidden border-border/70 bg-card shadow-sm"
+						data-testid="browser-check"
+						data-state={check.state}
 					>
-						<Card.Header class="px-5 pt-5 pb-0">
+						<Card.Header class="px-4 pt-4 pb-0">
 							<div class="flex items-center justify-between gap-3">
 								<div class="flex items-center gap-2.5">
 									<div
 										class="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground"
 									>
-										<GroupIcon class="size-4" />
+										<Globe class="size-4" />
 									</div>
-									<Card.Title class="text-base">{formatGroup(groupKey)}</Card.Title>
+									<Card.Title class="text-base">Browser check</Card.Title>
 								</div>
-								<Badge class={statusTone(groupHealth)}>
-									<GroupStatusIcon class="size-3" />
-									{statusLabel(groupHealth)}
-								</Badge>
+								{#if check.state === 'pass' || check.state === 'warn' || check.state === 'fail'}
+									{@const BrowserStatusIcon = statusIcon(check.state)}
+									<Badge class={statusTone(check.state)}>
+										<BrowserStatusIcon class="size-3" />
+										{statusLabel(check.state)}
+									</Badge>
+								{/if}
 							</div>
 						</Card.Header>
-						<div class="space-y-2 px-5 pt-3 pb-0">
-							<div
-								class="flex h-3 gap-1"
-								role="group"
-								aria-label={`${formatGroup(groupKey)} checks; select a segment to view its details`}
-							>
-								{#each checks as { label, obs }, index (`${label}-${index}`)}
-									<PopoverTooltip.Root>
-										<PopoverTooltip.Trigger>
-											{#snippet child({ props })}
-												<a
-													{...props}
-													data-status-check-link
-													href={`#${anchorIds[index]}`}
-													onclick={(event) => openCheckLink(event, groupKey, anchorIds[index])}
-													class="min-w-0 flex-1 rounded-full {statusBarTone(
-														obs.status
-													)} transition-[filter] duration-150 hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none"
-													aria-label={`${formatLabel(label)}: ${statusLabel(obs.status)}. ${formatValue(obs)}${obs.output ? `. ${obs.output}` : ''}`}
-												></a>
-											{/snippet}
-										</PopoverTooltip.Trigger>
-										<PopoverTooltip.Content class="text-left whitespace-normal">
-											{formatLabel(label)}: {statusLabel(obs.status)}. {formatValue(obs)}
-											{#if obs.output}
-												. {obs.output}
-											{/if}
-										</PopoverTooltip.Content>
-									</PopoverTooltip.Root>
-								{/each}
-							</div>
-							<p class="text-center text-xs font-medium text-muted-foreground">
-								{groupSummary(checks)}
-							</p>
-						</div>
-						<Collapsible.Content>
-							<Card.Content class="space-y-3 p-4">
-								{#each checks as { label, obs }, index (`${label}-${index}`)}
-									{@const MetricIcon = metricIcon(label)}
-									{@const MetricStatusIcon = statusIcon(obs.status)}
-									<div
-										id={anchorIds[index]}
-										tabindex="-1"
-										class="status-check-detail flex scroll-mt-24 items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-3 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring {highlightedCheckId ===
-										anchorIds[index]
-											? 'status-check-highlighted'
-											: ''}"
-									>
-										<div
-											class="flex size-8 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground ring-1 ring-border/80"
-										>
-											<MetricIcon class="size-4" />
-										</div>
-										<div class="min-w-0 flex-1">
-											<div class="flex items-center justify-between gap-3">
-												<span class="text-sm font-medium">{formatLabel(label)}</span>
-												<Badge class={statusTone(obs.status)}>
-													<MetricStatusIcon class="size-3" />
-													{statusLabel(obs.status)}
-												</Badge>
-											</div>
-											<p class="mt-1 font-mono text-xs text-muted-foreground">{formatValue(obs)}</p>
-											{#if obs.output}
-												<p
-													class={obs.status === 'warn'
-														? 'mt-2 text-sm leading-relaxed break-words text-amber-700 dark:text-amber-400'
-														: 'mt-2 text-sm leading-relaxed break-words text-destructive'}
-												>
-													{obs.output}
-												</p>
-											{/if}
-										</div>
-									</div>
-								{/each}
-							</Card.Content>
-						</Collapsible.Content>
-						<Collapsible.Trigger class={triggerClass}>
-							<ChevronDown
-								class="size-4 transition-transform motion-reduce:transition-none {isOpen
-									? 'rotate-180'
-									: ''}"
-							/>
-							{isOpen ? 'Hide details' : 'Show details'}
-							<span class="sr-only"> for {formatGroup(groupKey)}</span>
-						</Collapsible.Trigger>
-					</Collapsible.Root>
-				</Card.Root>
-			{/each}
-
-			{#if showDetail && browserCheck}
-				{@const check = browserCheck}
-				<Card.Root
-					class="overflow-hidden border-border/70 bg-card shadow-sm"
-					data-testid="browser-check"
-					data-state={check.state}
-				>
-					<Card.Header class="px-5 pt-5 pb-0">
-						<div class="flex items-center justify-between gap-3">
-							<div class="flex items-center gap-2.5">
-								<div
-									class="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground"
-								>
-									<Globe class="size-4" />
-								</div>
-								<Card.Title class="text-base">Browser check</Card.Title>
-							</div>
-							{#if check.state === 'pass' || check.state === 'warn' || check.state === 'fail'}
-								{@const BrowserStatusIcon = statusIcon(check.state)}
-								<Badge class={statusTone(check.state)}>
-									<BrowserStatusIcon class="size-3" />
-									{statusLabel(check.state)}
-								</Badge>
-							{/if}
-						</div>
-					</Card.Header>
-					<Card.Content class="space-y-0 p-0">
-						{#if check.state === 'pass'}
-							<p class="px-5 py-3 text-sm text-emerald-700 dark:text-emerald-400">
-								Your browser's headers reach Menagerist intact.
-							</p>
-						{:else if check.state === 'warn' || check.state === 'fail'}
-							{#if check.output}
-								<p
-									class="px-5 py-3 text-sm leading-relaxed break-words {check.state === 'warn'
-										? 'text-amber-700 dark:text-amber-400'
-										: 'text-destructive'}"
-								>
-									{check.output}
+						<Card.Content class="space-y-0 p-0">
+							{#if check.state === 'pass'}
+								<p class="px-5 py-3 text-sm text-emerald-700 dark:text-emerald-400">
+									Your browser's headers reach Menagerist intact.
 								</p>
-							{/if}
-							{@render browserRow('Your browser sent', check.origin ?? 'Nothing')}
-							{@render browserRow('Menagerist saw', check.seenOrigin)}
-						{:else if check.state === 'stripped'}
-							<p class="px-5 py-3 text-sm leading-relaxed break-words text-destructive">
-								Something between your browser and Menagerist is removing the Origin and
-								Sec-Fetch-Site headers, so changes made from the app will be refused. Check that
-								your reverse proxy passes request headers through.
-							</p>
-							{@render browserRow('This page', window.location.origin)}
-						{:else}
-							<p class="px-5 py-3 text-sm text-muted-foreground">The check could not be run.</p>
-						{/if}
-					</Card.Content>
-				</Card.Root>
-			{/if}
-
-			{#if buildInfo?.release}
-				<ReleaseCard
-					release={buildInfo.release}
-					canCheck={auth.can('system:release:check')}
-					checking={checkingUpdates}
-					checkError={updateCheckError}
-					onCheck={() => void checkNow()}
-				/>
-			{/if}
-
-			{#if buildInfo}
-				<Card.Root class="overflow-hidden border-border/70 bg-card shadow-sm">
-					<Collapsible.Root bind:open={buildOpen} class="flex flex-col gap-(--card-spacing)">
-						<Card.Header class="px-5 pt-5 pb-0">
-							<div class="flex items-center gap-2.5">
-								<div
-									class="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground"
-								>
-									<PackageCheck class="size-4" />
-								</div>
-								<Card.Title class="text-base">Build info</Card.Title>
-							</div>
-						</Card.Header>
-						<Collapsible.Content>
-							<Card.Content class="space-y-0 p-0">
-								{#each versionRows as { label, value }, i (label)}
-									<div
-										class="flex items-center justify-between gap-4 px-5 py-3 {i !==
-										versionRows.length - 1
-											? 'border-b border-border/80'
-											: ''}"
+							{:else if check.state === 'warn' || check.state === 'fail'}
+								{#if check.output}
+									<p
+										class="px-5 py-3 text-sm leading-relaxed break-words {check.state === 'warn'
+											? 'text-amber-700 dark:text-amber-400'
+											: 'text-destructive'}"
 									>
-										<span class="text-sm text-muted-foreground">{label}</span>
-										<span class="max-w-[60%] truncate text-right font-mono text-sm">{value}</span>
+										{check.output}
+									</p>
+								{/if}
+								{@render browserRow('Your browser sent', check.origin ?? 'Nothing')}
+								{@render browserRow('Menagerist saw', check.seenOrigin)}
+							{:else if check.state === 'stripped'}
+								<p class="px-5 py-3 text-sm leading-relaxed break-words text-destructive">
+									Something between your browser and Menagerist is removing the Origin and
+									Sec-Fetch-Site headers, so changes made from the app will be refused. Check that
+									your reverse proxy passes request headers through.
+								</p>
+								{@render browserRow('This page', window.location.origin)}
+							{:else}
+								<p class="px-5 py-3 text-sm text-muted-foreground">The check could not be run.</p>
+							{/if}
+						</Card.Content>
+					</Card.Root>
+				{/if}
+
+				{#if buildInfo?.release}
+					<ReleaseCard
+						release={buildInfo.release}
+						canCheck={auth.can('system:release:check')}
+						checking={checkingUpdates}
+						checkError={updateCheckError}
+						onCheck={() => void checkNow()}
+					/>
+				{/if}
+
+				{#if buildInfo}
+					<Card.Root class="overflow-hidden border-border/70 bg-card shadow-sm">
+						<Collapsible.Root bind:open={buildOpen} class="flex flex-col gap-(--card-spacing)">
+							<Card.Header class="px-4 pt-4 pb-0">
+								<div class="flex items-center gap-2.5">
+									<div
+										class="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+									>
+										<PackageCheck class="size-4" />
 									</div>
-								{/each}
-							</Card.Content>
-						</Collapsible.Content>
-						<Collapsible.Trigger class={triggerClass}>
-							<ChevronDown
-								class="size-4 transition-transform motion-reduce:transition-none {buildOpen
-									? 'rotate-180'
-									: ''}"
-							/>
-							{buildOpen ? 'Hide details' : 'Show details'}
-							<span class="sr-only"> for build info</span>
-						</Collapsible.Trigger>
-					</Collapsible.Root>
-				</Card.Root>
-			{/if}
-		{/if}
-	</div>
-</main>
+									<Card.Title class="text-base">Build info</Card.Title>
+								</div>
+							</Card.Header>
+							<Collapsible.Content>
+								<Card.Content class="space-y-0 p-0">
+									{#each versionRows as { label, value }, i (label)}
+										<div
+											class="flex items-center justify-between gap-4 px-5 py-3 {i !==
+											versionRows.length - 1
+												? 'border-b border-border/80'
+												: ''}"
+										>
+											<span class="text-sm text-muted-foreground">{label}</span>
+											<span class="max-w-[60%] truncate text-right font-mono text-sm">{value}</span>
+										</div>
+									{/each}
+								</Card.Content>
+							</Collapsible.Content>
+							<Collapsible.Trigger class={triggerClass}>
+								<ChevronDown
+									class="size-4 transition-transform motion-reduce:transition-none {buildOpen
+										? 'rotate-180'
+										: ''}"
+								/>
+								{buildOpen ? 'Hide details' : 'Show details'}
+								<span class="sr-only"> for build info</span>
+							</Collapsible.Trigger>
+						</Collapsible.Root>
+					</Card.Root>
+				{/if}
+			</div>
+		</div>
+	{/if}
+</Page>
 
 <style>
 	.status-check-detail.status-check-highlighted {

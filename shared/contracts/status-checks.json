@@ -1,0 +1,19 @@
+{
+  "description": "Every readiness check key the backend can report, with its unit and a sample value. `*` stands for a part the backend fills in (a storage area name). `plain_units` are shown as the raw value on purpose. `states` are the words sent with the `state` unit.",
+  "plain_units": ["version", "revision"],
+  "checks": [
+    { "key": "database:responseTime", "unit": "ms", "sample": 12.5 },
+    { "key": "database:version", "unit": "version", "sample": "PostgreSQL 17.2" },
+    { "key": "database:migrationRevision", "unit": "revision", "sample": "x5a6b7c8d9e0" },
+    { "key": "database:poolUtilization", "unit": "percent", "sample": 40 },
+    { "key": "configuration:corsOrigins", "unit": "open origins", "sample": 1 },
+    { "key": "configuration:proxyUntrustedForwarding", "unit": "flagged requests", "sample": 2 },
+    { "key": "configuration:proxyOriginMismatch", "unit": "flagged requests", "sample": 2 },
+    { "key": "configuration:proxyPublicOriginMismatch", "unit": "flagged requests", "sample": 2 },
+    { "key": "configuration:proxyInsecureOrigin", "unit": "flagged requests", "sample": 2 },
+    { "key": "storage:*Writable", "unit": "state", "sample": "not-writable" },
+    { "key": "storage:*FreeSpace", "unit": "GiB", "sample": 12.5 },
+    { "key": "scheduler:workerHeartbeat", "unit": "state", "sample": "stale" }
+  ],
+  "states": ["writable", "not-writable", "missing", "running", "stale", "unknown"]
+}
