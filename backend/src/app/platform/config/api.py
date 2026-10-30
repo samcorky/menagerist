@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path  # noqa: TC003 - pydantic resolves the annotation at runtime
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from app.platform.config._base import MenageristBaseSettings
 from app.platform.config._types import Origin, ProxyAddress, StarOrCSV  # noqa: TC001 - pydantic resolves these at runtime
@@ -16,6 +16,21 @@ CORS_OPEN_HINT = (
 
 class ApiSettings(MenageristBaseSettings, group="api"):
     """API entrypoint settings."""
+
+    public_origin: Origin | None = Field(
+        default=None,
+        description=(
+            "The address people reach the app at, for example"
+            + " https://menagerist.example.com. Other settings default from it;"
+            + " each can still be set explicitly."
+        ),
+    )
+
+    @field_validator("public_origin", mode="before")
+    @classmethod
+    def _blank_is_unset(cls, value: object) -> object:
+        """Treat an empty value (as Compose passes for an unset variable) as unset."""
+        return None if value == "" else value
 
     cors_origins: StarOrCSV[Origin] = Field(
         default=[],

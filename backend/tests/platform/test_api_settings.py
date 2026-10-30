@@ -85,3 +85,38 @@ def test_cors_origins_reject_non_origins(
     monkeypatch.setenv("MENAGERIST_API_CORS_ORIGINS", bad)
     with pytest.raises(ValidationError):
         ApiSettings()
+
+
+def test_public_origin_is_unset_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Nothing is assumed about the address people reach the app at."""
+    monkeypatch.delenv("MENAGERIST_API_PUBLIC_ORIGIN", raising=False)
+    assert ApiSettings().public_origin is None
+
+
+def test_public_origin_is_normalised_like_a_browser_origin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A trailing slash, capitals and the default port are tidied away."""
+    monkeypatch.setenv(
+        "MENAGERIST_API_PUBLIC_ORIGIN", "https://Menagerist.example.com:443/"
+    )
+    assert ApiSettings().public_origin == "https://menagerist.example.com"
+
+
+@pytest.mark.parametrize(
+    "bad",
+    ["menagerist.example.com", "ftp://a.example", "https://a.example/app", "*"],
+)
+def test_public_origin_rejects_anything_but_one_origin(
+    monkeypatch: pytest.MonkeyPatch, bad: str
+) -> None:
+    """A path, another scheme, a bare host or a wildcard stops start-up."""
+    monkeypatch.setenv("MENAGERIST_API_PUBLIC_ORIGIN", bad)
+    with pytest.raises(ValidationError):
+        ApiSettings()
+
+
+def test_an_empty_public_origin_means_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Compose passes an empty value when the operator has not set one."""
+    monkeypatch.setenv("MENAGERIST_API_PUBLIC_ORIGIN", "")
+    assert ApiSettings().public_origin is None

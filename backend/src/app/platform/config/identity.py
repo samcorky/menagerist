@@ -6,6 +6,8 @@ from pydantic import Field, model_validator
 from app.platform.config._base import MenageristBaseSettings
 from app.platform.config._markers import Tunable
 from app.platform.config._types import Cron  # noqa: TC001 - pydantic resolves this at runtime
+from app.platform.config.api import get_api_settings
+from app.platform.config.public_origin import public_is_https
 
 
 class IdentitySettings(MenageristBaseSettings, group="identity"):
@@ -38,9 +40,12 @@ class IdentitySettings(MenageristBaseSettings, group="identity"):
         pattern=r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$",
         description="Name of the HTTP-only session cookie.",
     )
-    cookie_secure: bool | None = Field(
-        default=None,
-        description="Secure session cookies; unset detects HTTPS from requests.",
+    cookie_secure: Literal["auto", "origin", "always", "never"] = Field(
+        default="auto",
+        description=(
+            "Secure session cookies: auto detects HTTPS from each request, origin"
+            + " follows the scheme of api.public_origin, always and never force it."
+        ),
     )
     password_hasher: Literal["scrypt"] = Field(
         default="scrypt",
@@ -95,5 +100,19 @@ class IdentitySettings(MenageristBaseSettings, group="identity"):
 
 @lru_cache(maxsize=1)
 def get_identity_settings() -> IdentitySettings:
-    """Return the cached identity settings."""
-    return IdentitySettings()
+    """Return the cached identity settings.
+
+    `cookie_secure = origin` is resolved here to `always` or `never` from the scheme
+    of `api.public_origin`, so the cookie code only sees the three plain modes.
+
+    Raises:
+        ValueError: If `origin` is chosen but no public origin is set.
+    """
+    settings = IdentitySettings()
+    if settings.cookie_secure != "origin":
+        return settings
+    https = public_is_https(get_api_settings())
+    if https is None:
+        msg = "COOKIE_SECURE=origin needs MENAGERIST_API_PUBLIC_ORIGIN to be set"
+        raise ValueError(msg)
+    return settings.model_copy(update={"cookie_secure": "always" if https else "never"})

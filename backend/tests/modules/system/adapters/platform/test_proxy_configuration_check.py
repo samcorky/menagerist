@@ -15,13 +15,15 @@ def _clean() -> None:
 
 UNTRUSTED = "configuration:proxyUntrustedForwarding"
 MISMATCH = "configuration:proxyOriginMismatch"
+PUBLIC_MISMATCH = "configuration:proxyPublicOriginMismatch"
+INSECURE = "configuration:proxyInsecureOrigin"
 
 
 async def test_passes_when_nothing_suspicious_was_seen() -> None:
     """No signals: one passing observation per signal."""
     result = await ProxyConfigurationCheck().run()
 
-    assert set(result) == {UNTRUSTED, MISMATCH}
+    assert set(result) == {UNTRUSTED, MISMATCH, PUBLIC_MISMATCH, INSECURE}
     for obs in result.values():
         assert obs.status is CheckStatus.PASS
         assert obs.observed_value == 0
@@ -34,6 +36,12 @@ async def test_passes_when_nothing_suspicious_was_seen() -> None:
     [
         (ProxySignal.UNTRUSTED_FORWARDING, UNTRUSTED, "forwarding headers"),
         (ProxySignal.ORIGIN_MISMATCH, MISMATCH, "origin differs"),
+        (
+            ProxySignal.PUBLIC_ORIGIN_MISMATCH,
+            PUBLIC_MISMATCH,
+            "MENAGERIST_API_PUBLIC_ORIGIN",
+        ),
+        (ProxySignal.INSECURE_ORIGIN, INSECURE, "plain http"),
     ],
 )
 async def test_warns_with_a_hint_for_each_signal(

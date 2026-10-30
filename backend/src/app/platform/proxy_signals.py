@@ -15,6 +15,10 @@ class ProxySignal(StrEnum):
     UNTRUSTED_FORWARDING = "untrusted_forwarding"
     # A browser said same-origin, but its Origin is not the origin the app saw.
     ORIGIN_MISMATCH = "origin_mismatch"
+    # Requests reach the app at an address other than `MENAGERIST_API_PUBLIC_ORIGIN`.
+    PUBLIC_ORIGIN_MISMATCH = "public_origin_mismatch"
+    # The public origin is https, but requests arrive over plain http.
+    INSECURE_ORIGIN = "insecure_origin"
 
 
 HINTS = {
@@ -27,6 +31,17 @@ HINTS = {
         "A browser's origin differs from the one the app saw, so the proxy's"
         + " scheme or host is not reaching it. Check MENAGERIST_API_TRUSTED_PROXIES"
         + " and that the proxy passes Host and X-Forwarded-Proto."
+    ),
+    ProxySignal.PUBLIC_ORIGIN_MISMATCH: (
+        "Requests reach the app at an address other than MENAGERIST_API_PUBLIC_ORIGIN."
+        + " Use that address, correct the setting, or check that the proxy passes"
+        + " Host and is listed in MENAGERIST_API_TRUSTED_PROXIES."
+    ),
+    ProxySignal.INSECURE_ORIGIN: (
+        "MENAGERIST_API_PUBLIC_ORIGIN is https but requests arrive over plain http,"
+        + " so a password and session cookie may travel unencrypted. Use the https"
+        + " address, or check that the proxy sends X-Forwarded-Proto and is listed in"
+        + " MENAGERIST_API_TRUSTED_PROXIES."
     ),
 }
 

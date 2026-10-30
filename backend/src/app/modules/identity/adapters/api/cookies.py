@@ -13,7 +13,7 @@ _COOKIE_NOTE = (
     "The name is the configured session cookie name (`menagerist-session` by"
     + " default), prefixed `__Host-Http-` when the cookie is Secure. The cookie is"
     + " `HttpOnly`, `SameSite=Strict` and `Path=/`, has no `Domain`, and is `Secure`"
-    + " over HTTPS or when `cookie_secure` is set."
+    + " over HTTPS or when `cookie_secure` is `always`."
 )
 
 
@@ -50,8 +50,8 @@ def session_cookie_header(*, clears: bool = False) -> dict[str, Any]:
 
 
 def _secure(request: Request, settings: IdentitySettings) -> bool:
-    if settings.cookie_secure is not None:
-        return settings.cookie_secure
+    if settings.cookie_secure in ("always", "never"):
+        return settings.cookie_secure == "always"
     return request.url.scheme == "https"
 
 

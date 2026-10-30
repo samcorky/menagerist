@@ -3,7 +3,7 @@
 import logging
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import pytest
 import time_machine
@@ -204,10 +204,12 @@ def test_cookie_is_host_prefixed_over_https(world: World) -> None:
     assert "domain" not in session
 
 
-@pytest.mark.parametrize("secure", [True, False])
-def test_cookie_secure_setting_overrides_the_scheme(world: World, secure: bool) -> None:
+@pytest.mark.parametrize(("mode", "secure"), [("always", True), ("never", False)])
+def test_cookie_secure_setting_overrides_the_scheme(
+    world: World, mode: Literal["always", "never"], secure: bool
+) -> None:
     """MENAGERIST_IDENTITY_COOKIE_SECURE wins over the request scheme and prefix."""
-    api = Api(world, settings=IdentitySettings(cookie_secure=secure))
+    api = Api(world, settings=IdentitySettings(cookie_secure=mode))
 
     cookies = _cookie_headers(api.setup())
 

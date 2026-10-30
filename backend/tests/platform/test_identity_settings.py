@@ -10,16 +10,16 @@ def test_defaults() -> None:
     assert settings.session_ttl_hours == 168
     assert settings.session_idle_hours == 0
     assert settings.cookie_name == "menagerist-session"
-    assert settings.cookie_secure is None
+    assert settings.cookie_secure == "auto"
     assert settings.password_hasher == "scrypt"
 
 
 def test_reads_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     """Values come from `MENAGERIST_`-prefixed variables."""
-    monkeypatch.setenv("MENAGERIST_IDENTITY_COOKIE_SECURE", "true")
+    monkeypatch.setenv("MENAGERIST_IDENTITY_COOKIE_SECURE", "always")
     monkeypatch.setenv("MENAGERIST_IDENTITY_SESSION_TTL_HOURS", "2")
     settings = IdentitySettings()
-    assert settings.cookie_secure is True
+    assert settings.cookie_secure == "always"
     assert settings.session_ttl_hours == 2
 
 

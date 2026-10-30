@@ -17,6 +17,7 @@ from app.entrypoints.api.shared.http.cors import (
 from app.entrypoints.api.shared.http.csrf import verify_csrf
 from app.entrypoints.api.shared.http.problem_response import register_exception_handlers
 from app.entrypoints.api.shared.http.proxy_header_observer import ProxyHeaderObserver
+from app.entrypoints.api.shared.http.public_origin_observer import PublicOriginObserver
 from app.entrypoints.api.shared.http.request_context_middleware import (
     RequestContextMiddleware,
 )
@@ -147,6 +148,8 @@ def create_app() -> FastAPI:
     fastapi_app.add_middleware(
         RequestContextMiddleware,
     )
+    if (public_origin := get_api_settings().public_origin) is not None:
+        fastapi_app.add_middleware(PublicOriginObserver, public_origin=public_origin)
 
     # Identity cannot import the other modules; this bridge supplies the claim.
     fastapi_app.dependency_overrides[get_existing_data_claim] = get_claim_existing_data
