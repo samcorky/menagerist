@@ -201,7 +201,8 @@ ENV \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     MENAGERIST_API_FRONTEND_DIST_PATH=/app/frontend \
-    MENAGERIST_SHARED_DIR=/app/shared
+    MENAGERIST_SHARED_DIR=/app/shared \
+    MENAGERIST_SERVER_IN_CONTAINER=1
 
 COPY --from=backend-builder /opt/python /opt/python
 COPY --from=backend-builder /app/.venv /app/.venv

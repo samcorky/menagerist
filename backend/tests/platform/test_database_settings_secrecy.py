@@ -79,6 +79,7 @@ def test_startup_log_does_not_contain_the_password(
         "ReleaseSettings",
         "RetentionSettings",
         "SchedulerSettings",
+        "ServerSettings",
     ]
     assert all(entry["log_level"] == "info" for entry in logs)
 

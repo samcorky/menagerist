@@ -5,7 +5,7 @@ import sys
 from contextlib import nullcontext
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Literal
 
 import structlog
 from cyclopts import App, Parameter
@@ -215,12 +215,35 @@ class ServeLogLevel(StrEnum):
     notset = "notset"
 
 
+def _check_workers(_type: type, value: int | str) -> None:
+    """Cyclopts validator: `auto`, or a worker count inside the supported range."""
+    from app.platform.connection_budget import validate_workers
+
+    if value is not None and value != "auto":
+        validate_workers(int(value))
+
+
+def _warn_if_connections_exceed_limit(workers: int) -> None:
+    """Log a warning when the pools could outgrow Postgres' `max_connections`."""
+    from app.platform import connection_budget
+
+    limit = asyncio.run(connection_budget.fetch_max_connections())
+    if limit is None:
+        return
+    if message := connection_budget.connection_warning(
+        workers=workers, max_connections=limit
+    ):
+        logger.warning(message)
+
+
 @app.command
 def serve(
     *,
     host: str = "127.0.0.1",
     port: int = 8000,
-    workers: int = 1,
+    workers: Annotated[
+        int | Literal["auto"] | None, Parameter(validator=_check_workers)
+    ] = None,
     reload: bool = False,
     access_log: bool = False,
     log_level: ServeLogLevel = ServeLogLevel.info,
@@ -232,7 +255,9 @@ def serve(
     Args:
         host: Address to bind the server to.
         port: Port to bind the server to.
-        workers: Number of worker processes.
+        workers: Number of worker processes, 1 to 16, or `auto` for one per CPU
+            core on a host and one in a container or when reloading. Defaults to
+            the `server.workers` setting (`MENAGERIST_SERVER_WORKERS`, `auto`).
         reload: Restart workers when application code changes.
         access_log: Also write Granian's own access line. Off by default because
             the API logs one access line per request itself (with the user and
@@ -254,6 +279,16 @@ def serve(
 
     if migrate:
         upgrade(backup=backup)
+    from app.platform import worker_count
+    from app.platform.config import get_server_settings
+
+    server_settings = get_server_settings()
+    workers = worker_count.resolve_workers(
+        server_settings.workers if workers is None else workers,
+        container=reload or worker_count.in_container(server_settings.in_container),
+        cpus=worker_count.available_cpus(),
+    )
+    _warn_if_connections_exceed_limit(workers)
 
     server = Granian(
         target="app.entrypoints.api.application:app",

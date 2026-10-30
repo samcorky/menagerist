@@ -29,7 +29,18 @@ services:
     image: postgres:18-alpine
     container_name: menagerist-db
     restart: unless-stopped
-    mem_limit: 512m
+    mem_limit: ${POSTGRES_MEM_LIMIT:-512m}
+    # Memory settings sized for the default limit above; see "Database memory tuning" in the README.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=${POSTGRES_SHARED_BUFFERS:-128MB}
+      - -c
+      - effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-256MB}
+      - -c
+      - work_mem=${POSTGRES_WORK_MEM:-4MB}
+      - -c
+      - max_connections=${POSTGRES_MAX_CONNECTIONS:-100}
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -72,7 +83,11 @@ services:
     restart: unless-stopped
     environment: &app-environment
       TZ: ${TZ:-UTC}
+      # Web server processes: a number from 1 to 16, or auto (one per container); see the README.
+      MENAGERIST_SERVER_WORKERS: ${MENAGERIST_SERVER_WORKERS:-auto}
       MENAGERIST_DATABASE_URL: postgresql+asyncpg://menagerist:menagerist@postgres:5432/menagerist
+      # The address people reach the app at, e.g. https://menagerist.example.com. An https address makes the session cookie Secure.
+      MENAGERIST_API_PUBLIC_ORIGIN: ${MENAGERIST_API_PUBLIC_ORIGIN:-}
       # Behind a reverse proxy, set its subnet to preserve client IPs and allow HTTPS sign-in.
       # MENAGERIST_API_TRUSTED_PROXIES: 172.18.0.0/16
     volumes: &app-volumes
