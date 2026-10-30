@@ -177,3 +177,9 @@
 		@apply font-heading;
 	}
 }
+
+/* The page area scrolls, not the body: a modal freezes it so the page cannot drag behind.
+   Outside the layers on purpose: the element's own overflow-y-auto utility would win otherwise. */
+html[data-scroll-locked] #main-scroll {
+	overflow-y: hidden;
+}

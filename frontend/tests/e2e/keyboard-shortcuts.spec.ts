@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { createItem, createItemType, uniqueName } from './helpers';
+import { createItem, createItemType, searchPopup, uniqueName, chooseItemType } from './helpers';
 
 test('g c / g s / g e navigate between the main sections', async ({ page }) => {
 	await page.goto('/');
@@ -50,7 +50,7 @@ test('an abandoned g-sequence does not block typing a literal "g"', async ({ pag
 test('/ opens the search popup on the items and home pages, and Esc returns focus', async ({
 	page
 }) => {
-	const popup = page.getByRole('dialog', { name: 'Search', exact: true });
+	const popup = searchPopup(page);
 
 	await page.goto('/items');
 	await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
@@ -140,6 +140,7 @@ test('arrow keys move between text cells in a table field, without breaking mid-
 }) => {
 	const typeLabel = uniqueName('Shortcut table type');
 	await page.goto('/settings/item-types');
+	await page.getByRole('button', { name: 'New item type', exact: true }).click();
 	const form = page
 		.locator('form')
 		.filter({ has: page.getByRole('button', { name: 'Add item type' }) });
@@ -156,8 +157,7 @@ test('arrow keys move between text cells in a table field, without breaking mid-
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Shortcut table item'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	await page.getByRole('button', { name: 'Add row' }).click();
 	await page.getByRole('button', { name: 'Add row' }).click();
@@ -244,7 +244,7 @@ test('/ opens the search popup from an item page without leaving it', async ({ p
 	const edit = page.getByRole('button', { name: 'Edit', exact: true });
 	await edit.focus();
 	await page.keyboard.press('/');
-	const popup = page.getByRole('dialog', { name: 'Search', exact: true });
+	const popup = searchPopup(page);
 	await expect(popup).toBeVisible();
 	await expect(page).toHaveURL(url);
 	await page.keyboard.press('Escape');
@@ -261,7 +261,7 @@ test('Back returns to the previous page after the search popup opened an item', 
 	await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
 	await page.keyboard.press('/');
-	const popup = page.getByRole('dialog', { name: 'Search', exact: true });
+	const popup = searchPopup(page);
 	await popup.getByPlaceholder('Search everything…').fill(name);
 	await popup.getByRole('option', { name: new RegExp(name) }).click();
 	await expect(page).toHaveURL(/\/items\/(?!new$)[^/]+$/);

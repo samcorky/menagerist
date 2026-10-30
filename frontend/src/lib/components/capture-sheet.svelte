@@ -6,7 +6,7 @@
 	import { captureController, type StagedPhoto } from '$lib/capture.svelte.js';
 	import { createNode, stageMedia, attachMedia } from '$lib/api/client';
 	import { errorMessage, uploadErrorMessage } from '$lib/api/errors';
-	import CategorySelect from '$lib/components/category-select.svelte';
+	import TypePicker from '$lib/components/type-picker.svelte';
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -139,7 +139,7 @@
 			<!-- Item type -->
 			<div class="space-y-1.5">
 				<Label class="text-xs text-muted-foreground">Item type</Label>
-				<CategorySelect bind:value={selectedType} />
+				<TypePicker bind:value={selectedType} />
 			</div>
 
 			<!-- Footer -->

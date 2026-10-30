@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Page from '$lib/components/page.svelte';
 	import { untrack } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { toast } from 'svelte-sonner';
@@ -369,7 +370,7 @@
 
 {#snippet actions(job: JobResponse, inTable: boolean)}
 	{@const active = activeRun(job)}
-	{@const size = inTable ? 'h-9 w-full px-3' : 'h-11 flex-1'}
+	{@const size = inTable ? 'h-9 w-full px-3' : 'pointer-coarse:h-11 flex-1'}
 	<div
 		class={inTable ? 'grid grid-cols-[6.5rem_9rem_9rem] justify-end gap-1' : 'flex flex-wrap gap-2'}
 	>
@@ -460,7 +461,7 @@
 			{/if}
 			<div class="flex flex-wrap gap-2">
 				<Button
-					class="h-11"
+					class="pointer-coarse:h-11"
 					disabled={isSaving || !draftChanged(setting)}
 					onclick={() => saveSchedule(job)}
 				>
@@ -473,14 +474,19 @@
 				{#if setting.source === 'instance'}
 					<Button
 						variant="ghost"
-						class="h-11"
+						class="pointer-coarse:h-11"
 						disabled={isSaving}
 						onclick={() => resetSchedule(job)}
 					>
 						<RotateCcw class="size-4" aria-hidden="true" />Reset to default
 					</Button>
 				{/if}
-				<Button variant="ghost" class="h-11" disabled={isSaving} onclick={() => (editing = null)}>
+				<Button
+					variant="ghost"
+					class="pointer-coarse:h-11"
+					disabled={isSaving}
+					onclick={() => (editing = null)}
+				>
 					Cancel
 				</Button>
 			</div>
@@ -548,9 +554,11 @@
 			Only start it when you need to.
 		</ResponsiveDialog.Description>
 		<div class="mt-4 flex justify-end gap-2">
-			<Button variant="outline" class="h-11" onclick={() => (confirming = null)}>Cancel</Button>
+			<Button variant="outline" class="pointer-coarse:h-11" onclick={() => (confirming = null)}
+				>Cancel</Button
+			>
 			<Button
-				class="h-11"
+				class="pointer-coarse:h-11"
 				onclick={() => {
 					const job = confirming;
 					confirming = null;
@@ -583,126 +591,121 @@
 	<title>Scheduled tasks - Administration - Menagerist</title>
 </svelte:head>
 
-<main class="flex-1 px-4 py-8 sm:px-6">
-	<div class="mx-auto flex max-w-5xl flex-col gap-8">
-		<BackButton fallback={resolve('/admin')} />
-		<div>
-			<h1 class="font-heading text-3xl font-semibold tracking-tight">Scheduled tasks</h1>
-			<p class="mt-1 text-muted-foreground">
-				Background jobs that keep this Menagerist tidy and backed up.
-			</p>
-		</div>
+<Page width="fluid" class="gap-6">
+	<BackButton fallback={resolve('/admin')} />
+	<div>
+		<h1 class="font-heading text-3xl font-semibold tracking-tight">Scheduled tasks</h1>
+		<p class="mt-1 text-muted-foreground">
+			Background jobs that keep this Menagerist tidy and backed up.
+		</p>
+	</div>
 
-		<div class="sr-only" aria-live="polite" aria-atomic="true">{announcement}</div>
+	<div class="sr-only" aria-live="polite" aria-atomic="true">{announcement}</div>
 
-		{#if !canRead}
-			<Alert.Root>
-				<Alert.Description>Only administrators can access this area.</Alert.Description>
+	{#if !canRead}
+		<Alert.Root>
+			<Alert.Description>Only administrators can access this area.</Alert.Description>
+		</Alert.Root>
+	{:else}
+		{#if error}
+			<Alert.Root variant="destructive">
+				<Alert.Description>{error}</Alert.Description>
 			</Alert.Root>
-		{:else}
-			{#if error}
-				<Alert.Root variant="destructive">
-					<Alert.Description>{error}</Alert.Description>
-				</Alert.Root>
-				<Button variant="outline" class="h-11 w-full sm:w-auto" onclick={() => void loadJobs(true)}>
-					Retry
-				</Button>
-			{/if}
+			<Button
+				variant="outline"
+				class="w-full sm:w-auto pointer-coarse:h-11"
+				onclick={() => void loadJobs(true)}
+			>
+				Retry
+			</Button>
+		{/if}
 
-			{#if loading && jobs.length === 0}
-				{#if loadingDisplay.show}
-					<div class="space-y-3" aria-hidden="true">
-						<Skeleton class="h-16 w-full rounded-xl" />
-						<Skeleton class="h-16 w-full rounded-xl" />
-						<Skeleton class="h-16 w-full rounded-xl" />
-					</div>
-				{/if}
-			{:else if jobs.length === 0}
-				{#if !error}
-					<p class="text-sm text-muted-foreground">
-						Nothing is set up to run in the background yet.
-					</p>
-				{/if}
-			{:else}
-				{#if wide.current}
-					<DataTable
-						label="Scheduled tasks"
-						columns={[
-							{ label: 'Task' },
-							{ label: 'Schedule' },
-							{ label: 'Next run' },
-							{ label: 'Last run' },
-							{ label: 'Actions', end: true }
-						]}
-					>
-						{#each jobs as job (job.job_key)}
-							{@const setting = scheduleSetting(job)}
-							<Table.Row>
-								<Table.Head
-									scope="row"
-									class="h-auto max-w-xs px-4 py-3 align-top whitespace-normal"
-								>
-									<div class="font-medium">{job.title}</div>
-									{#if job.description}
-										<div class="mt-0.5 text-xs font-normal text-muted-foreground">
-											{job.description}
-										</div>
-									{/if}
-								</Table.Head>
-								<Table.Cell>
-									<div class="whitespace-pre-line">{scheduleLabel(job, explain)}</div>
-									{#if setting?.locked}
-										<div class="mt-0.5 text-xs text-muted-foreground">{lockedNote(setting)}</div>
-									{/if}
-								</Table.Cell>
-								<Table.Cell class="text-muted-foreground"
-									>{nextRunLabel(job, formatWhen)}</Table.Cell
-								>
-								<Table.Cell>{@render lastRun(job)}</Table.Cell>
-								<Table.Cell>{@render actions(job, true)}</Table.Cell>
+		{#if loading && jobs.length === 0}
+			{#if loadingDisplay.show}
+				<div class="space-y-3" aria-hidden="true">
+					<Skeleton class="h-16 w-full rounded-xl" />
+					<Skeleton class="h-16 w-full rounded-xl" />
+					<Skeleton class="h-16 w-full rounded-xl" />
+				</div>
+			{/if}
+		{:else if jobs.length === 0}
+			{#if !error}
+				<p class="text-sm text-muted-foreground">Nothing is set up to run in the background yet.</p>
+			{/if}
+		{:else}
+			{#if wide.current}
+				<DataTable
+					label="Scheduled tasks"
+					columns={[
+						{ label: 'Task' },
+						{ label: 'Schedule' },
+						{ label: 'Next run' },
+						{ label: 'Last run' },
+						{ label: 'Actions', end: true }
+					]}
+				>
+					{#each jobs as job (job.job_key)}
+						{@const setting = scheduleSetting(job)}
+						<Table.Row>
+							<Table.Head scope="row" class="h-auto max-w-xs px-4 py-3 align-top whitespace-normal">
+								<div class="font-medium">{job.title}</div>
+								{#if job.description}
+									<div class="mt-0.5 text-xs font-normal text-muted-foreground">
+										{job.description}
+									</div>
+								{/if}
+							</Table.Head>
+							<Table.Cell>
+								<div class="whitespace-pre-line">{scheduleLabel(job, explain)}</div>
+								{#if setting?.locked}
+									<div class="mt-0.5 text-xs text-muted-foreground">{lockedNote(setting)}</div>
+								{/if}
+							</Table.Cell>
+							<Table.Cell class="text-muted-foreground">{nextRunLabel(job, formatWhen)}</Table.Cell>
+							<Table.Cell>{@render lastRun(job)}</Table.Cell>
+							<Table.Cell>{@render actions(job, true)}</Table.Cell>
+						</Table.Row>
+						{#if panels[job.job_key]}
+							<Table.Row class="bg-muted/20 hover:bg-muted/20">
+								<Table.Cell colspan={5} class="py-4">{@render detail(job)}</Table.Cell>
 							</Table.Row>
-							{#if panels[job.job_key]}
-								<Table.Row class="bg-muted/20 hover:bg-muted/20">
-									<Table.Cell colspan={5} class="py-4">{@render detail(job)}</Table.Cell>
-								</Table.Row>
-							{/if}
-						{/each}
-					</DataTable>
-				{:else}
-					<ul class="space-y-3" aria-label="Scheduled tasks">
-						{#each jobs as job (job.job_key)}
-							{@const setting = scheduleSetting(job)}
-							<li>
-								<Card.Root>
-									<Card.Content class="flex flex-col gap-3 p-4">
-										<div class="space-y-0.5">
-											<h2 class="font-medium">{job.title}</h2>
-											{#if job.description}
-												<p class="text-xs text-muted-foreground">{job.description}</p>
-											{/if}
-										</div>
-										<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-											<dt class="text-muted-foreground">Schedule</dt>
-											<dd class="whitespace-pre-line">{scheduleLabel(job, explain)}</dd>
-											<dt class="text-muted-foreground">Next run</dt>
-											<dd>{nextRunLabel(job, formatWhen)}</dd>
-											<dt class="text-muted-foreground">Last run</dt>
-											<dd>{@render lastRun(job)}</dd>
-										</dl>
-										{#if setting?.locked}
-											<p class="text-xs text-muted-foreground">{lockedNote(setting)}</p>
+						{/if}
+					{/each}
+				</DataTable>
+			{:else}
+				<ul class="space-y-3" aria-label="Scheduled tasks">
+					{#each jobs as job (job.job_key)}
+						{@const setting = scheduleSetting(job)}
+						<li>
+							<Card.Root>
+								<Card.Content class="flex flex-col gap-3 p-4">
+									<div class="space-y-0.5">
+										<h2 class="font-medium">{job.title}</h2>
+										{#if job.description}
+											<p class="text-xs text-muted-foreground">{job.description}</p>
 										{/if}
-										{@render actions(job, false)}
-										{#if panels[job.job_key]}
-											<div class="border-t pt-3">{@render detail(job)}</div>
-										{/if}
-									</Card.Content>
-								</Card.Root>
-							</li>
-						{/each}
-					</ul>
-				{/if}
+									</div>
+									<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+										<dt class="text-muted-foreground">Schedule</dt>
+										<dd class="whitespace-pre-line">{scheduleLabel(job, explain)}</dd>
+										<dt class="text-muted-foreground">Next run</dt>
+										<dd>{nextRunLabel(job, formatWhen)}</dd>
+										<dt class="text-muted-foreground">Last run</dt>
+										<dd>{@render lastRun(job)}</dd>
+									</dl>
+									{#if setting?.locked}
+										<p class="text-xs text-muted-foreground">{lockedNote(setting)}</p>
+									{/if}
+									{@render actions(job, false)}
+									{#if panels[job.job_key]}
+										<div class="border-t pt-3">{@render detail(job)}</div>
+									{/if}
+								</Card.Content>
+							</Card.Root>
+						</li>
+					{/each}
+				</ul>
 			{/if}
 		{/if}
-	</div>
-</main>
+	{/if}
+</Page>

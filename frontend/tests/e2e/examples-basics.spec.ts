@@ -50,7 +50,10 @@ test('installs a pack, shows the Home line, and keeps it dismissed after reload'
 	await expect(line).toHaveCount(0);
 
 	await page.reload();
-	await expect(page.getByRole('heading', { name: 'My items' })).toBeVisible();
+	// Home opens with a greeting now.
+	await expect(
+		page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })
+	).toBeVisible();
 	await expect(line).toHaveCount(0);
 });
 
@@ -168,6 +171,8 @@ test('the empty-state link opens the examples page, and only shows with no items
 
 	await install(page, MUSIC);
 	await page.goto('/');
-	await expect(page.getByRole('heading', { name: 'My items' })).toBeVisible();
+	await expect(
+		page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })
+	).toBeVisible();
 	await expect(link).toHaveCount(0);
 });

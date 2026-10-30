@@ -7,6 +7,7 @@
 		accept,
 		disabled = false,
 		id,
+		label,
 		ref = $bindable(null)
 	}: {
 		onFiles: (files: FileList | File[]) => void;
@@ -14,6 +15,8 @@
 		accept?: string;
 		disabled?: boolean;
 		id?: string;
+		/** Replaces the default "Drop files here or browse" wording. */
+		label?: string;
 		ref?: HTMLDivElement | null;
 	} = $props();
 
@@ -54,8 +57,12 @@
 >
 	<Upload class="size-5 text-muted-foreground" />
 	<span class="text-muted-foreground">
-		Drop {multiple ? 'files' : 'a file'} here or
-		<span class="text-foreground underline underline-offset-2">browse</span>
+		{#if label}
+			<span class="text-foreground underline underline-offset-2">{label}</span>
+		{:else}
+			Drop {multiple ? 'files' : 'a file'} here or
+			<span class="text-foreground underline underline-offset-2">browse</span>
+		{/if}
 	</span>
 	<input
 		bind:this={fileInputEl}

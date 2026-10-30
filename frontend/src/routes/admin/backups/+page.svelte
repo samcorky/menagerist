@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Page from '$lib/components/page.svelte';
 	import { resolve } from '$app/paths';
 	import { tick, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -188,7 +189,7 @@
 {/snippet}
 
 {#snippet backupActions(backup: BackupResponse, compact: boolean)}
-	{@const height = compact ? 'h-9' : 'h-11'}
+	{@const height = compact ? 'h-9' : 'pointer-coarse:h-11'}
 	<Button href={downloadUrl(backup.id)} download variant="default" class={height}>
 		<Download class="size-4" aria-hidden="true" />Download
 	</Button>
@@ -243,152 +244,151 @@
 	{/if}
 {/snippet}
 
-<main class="flex-1 px-4 py-8 sm:px-6">
-	<div class="mx-auto flex max-w-5xl flex-col gap-6">
-		<BackButton fallback={resolve('/admin')} />
-		<div>
-			<h1 class="font-heading text-3xl font-semibold tracking-tight">Backups</h1>
-			<p class="mt-1 text-muted-foreground">
-				Keep a complete copy of this Menagerist, including accounts, collection content and images.
-			</p>
-		</div>
-		{#if !canRead}
-			<Alert.Root
-				><Alert.Description>Only administrators can manage backups.</Alert.Description></Alert.Root
-			>
-		{:else}
-			<div class="flex flex-wrap gap-2">
-				{#if canCreate}<Button
-						bind:ref={createButton}
-						class="h-11"
-						disabled={loading || busy !== null}
-						onclick={() => {
-							label = 'manual';
-							createError = null;
-							createOpen = true;
-						}}><Plus class="size-4" aria-hidden="true" />Create backup</Button
-					>{/if}
-				{#if canCreate}<Button
-						variant="outline"
-						class="h-11"
-						disabled={loading || busy !== null}
-						onclick={() => {
-							uploadError = null;
-							uploadOpen = true;
-						}}><Upload class="size-4" aria-hidden="true" />Upload backup</Button
-					>{/if}
-				<Button variant="outline" class="h-11" disabled={loading || busy !== null} onclick={load}
-					><RefreshCw class="size-4" aria-hidden="true" />Refresh</Button
-				>
-			</div>
-			{#if error}<Alert.Root variant="destructive"
-					><Alert.Description>{error}</Alert.Description><Button
-						variant="outline"
-						class="mt-2 h-11"
-						disabled={loading || busy !== null}
-						onclick={load}><RefreshCw class="size-4" aria-hidden="true" />Retry</Button
-					></Alert.Root
+<Page width="fluid">
+	<BackButton fallback={resolve('/admin')} />
+	<div>
+		<h1 class="font-heading text-3xl font-semibold tracking-tight">Backups</h1>
+		<p class="mt-1 text-muted-foreground">
+			Keep a complete copy of this Menagerist, including accounts, collection content and images.
+		</p>
+	</div>
+	{#if !canRead}
+		<Alert.Root
+			><Alert.Description>Only administrators can manage backups.</Alert.Description></Alert.Root
+		>
+	{:else}
+		<div class="flex flex-wrap gap-2">
+			{#if canCreate}<Button
+					bind:ref={createButton}
+					class="pointer-coarse:h-11"
+					disabled={loading || busy !== null}
+					onclick={() => {
+						label = 'manual';
+						createError = null;
+						createOpen = true;
+					}}><Plus class="size-4" aria-hidden="true" />Create backup</Button
 				>{/if}
-			{#if loadingDisplay.show}
-				<div role="status" aria-label="Loading backups" class="space-y-3">
-					<Skeleton class="h-40 w-full" /><Skeleton class="h-40 w-full" />
-				</div>
-			{:else if !loading && !error && backups.length === 0}
-				<p class="rounded-xl border p-6 text-muted-foreground">
-					No backups yet. Create a backup to keep a copy of this Menagerist.
-				</p>
-			{/if}
-			{#if backups.length > 0}
-				{#if wide.current}
-					<div aria-busy={loading}>
-						<DataTable
-							label="Backups"
-							columns={[
-								{ label: 'Backup' },
-								{ label: 'Created' },
-								{ label: 'Size' },
-								{ label: 'Versions' },
-								{ label: 'Actions', end: true }
-							]}
-						>
-							{#each backups as backup (backup.id)}
-								<Table.Row>
-									<Table.Cell class="max-w-xs">
-										<div class="flex flex-wrap items-center gap-2">
-											<span class="font-medium break-words">{backup.label}</span>
-											{@render verifyBadge(backup)}
-										</div>
+			{#if canCreate}<Button
+					variant="outline"
+					class="pointer-coarse:h-11"
+					disabled={loading || busy !== null}
+					onclick={() => {
+						uploadError = null;
+						uploadOpen = true;
+					}}><Upload class="size-4" aria-hidden="true" />Upload backup</Button
+				>{/if}
+			<Button
+				variant="outline"
+				class="pointer-coarse:h-11"
+				disabled={loading || busy !== null}
+				onclick={load}><RefreshCw class="size-4" aria-hidden="true" />Refresh</Button
+			>
+		</div>
+		{#if error}<Alert.Root variant="destructive"
+				><Alert.Description>{error}</Alert.Description><Button
+					variant="outline"
+					class="mt-2 pointer-coarse:h-11"
+					disabled={loading || busy !== null}
+					onclick={load}><RefreshCw class="size-4" aria-hidden="true" />Retry</Button
+				></Alert.Root
+			>{/if}
+		{#if loadingDisplay.show}
+			<div role="status" aria-label="Loading backups" class="space-y-3">
+				<Skeleton class="h-40 w-full" /><Skeleton class="h-40 w-full" />
+			</div>
+		{:else if !loading && !error && backups.length === 0}
+			<p class="rounded-xl border p-6 text-muted-foreground">
+				No backups yet. Create a backup to keep a copy of this Menagerist.
+			</p>
+		{/if}
+		{#if backups.length > 0}
+			{#if wide.current}
+				<div aria-busy={loading}>
+					<DataTable
+						label="Backups"
+						columns={[
+							{ label: 'Backup' },
+							{ label: 'Created' },
+							{ label: 'Size' },
+							{ label: 'Versions' },
+							{ label: 'Actions', end: true }
+						]}
+					>
+						{#each backups as backup (backup.id)}
+							<Table.Row>
+								<Table.Cell class="max-w-xs">
+									<div class="flex flex-wrap items-center gap-2">
+										<span class="font-medium break-words">{backup.label}</span>
+										{@render verifyBadge(backup)}
+									</div>
+								</Table.Cell>
+								<Table.Cell class="text-muted-foreground">
+									<time datetime={backup.created_at} title={formatDateTime(backup.created_at).utc}
+										>{formatDateTime(backup.created_at).local}</time
+									>
+								</Table.Cell>
+								<Table.Cell class="text-muted-foreground">{size(backup.size)}</Table.Cell>
+								<Table.Cell class="max-w-48 text-xs text-muted-foreground">
+									<div class="break-all">App {backup.app_version}</div>
+									<div class="break-all">Database {backup.alembic_revision}</div>
+								</Table.Cell>
+								<Table.Cell>
+									<div class="flex flex-wrap justify-end gap-2">
+										{@render backupActions(backup, true)}
+									</div>
+								</Table.Cell>
+							</Table.Row>
+							{#if rowErrors[backup.id] || reports[backup.id]?.findings.length}
+								<Table.Row class="hover:bg-transparent">
+									<Table.Cell colspan={5} class="pt-0">
+										{@render verifyDetails(backup)}
 									</Table.Cell>
-									<Table.Cell class="text-muted-foreground">
+								</Table.Row>
+							{/if}
+						{/each}
+					</DataTable>
+				</div>
+			{:else}
+				<ul aria-label="Backups" class="space-y-4" aria-busy={loading}>
+					{#each backups as backup (backup.id)}
+						<li>
+							<Card.Root>
+								<Card.Header>
+									<div class="flex flex-wrap items-center gap-2">
+										<Card.Title class="min-w-0 break-words">{backup.label}</Card.Title>
+										{@render verifyBadge(backup)}
+									</div>
+									<Card.Description>
 										<time datetime={backup.created_at} title={formatDateTime(backup.created_at).utc}
 											>{formatDateTime(backup.created_at).local}</time
 										>
-									</Table.Cell>
-									<Table.Cell class="text-muted-foreground">{size(backup.size)}</Table.Cell>
-									<Table.Cell class="max-w-48 text-xs text-muted-foreground">
-										<div class="break-all">App {backup.app_version}</div>
-										<div class="break-all">Database {backup.alembic_revision}</div>
-									</Table.Cell>
-									<Table.Cell>
-										<div class="flex flex-wrap justify-end gap-2">
-											{@render backupActions(backup, true)}
+										- {size(backup.size)}
+									</Card.Description>
+								</Card.Header>
+								<Card.Content class="space-y-4">
+									<dl class="grid gap-2 text-sm sm:grid-cols-2">
+										<div>
+											<dt class="text-muted-foreground">App version</dt>
+											<dd class="break-all">{backup.app_version}</dd>
 										</div>
-									</Table.Cell>
-								</Table.Row>
-								{#if rowErrors[backup.id] || reports[backup.id]?.findings.length}
-									<Table.Row class="hover:bg-transparent">
-										<Table.Cell colspan={5} class="pt-0">
-											{@render verifyDetails(backup)}
-										</Table.Cell>
-									</Table.Row>
-								{/if}
-							{/each}
-						</DataTable>
-					</div>
-				{:else}
-					<ul aria-label="Backups" class="space-y-4" aria-busy={loading}>
-						{#each backups as backup (backup.id)}
-							<li>
-								<Card.Root>
-									<Card.Header>
-										<div class="flex flex-wrap items-center gap-2">
-											<Card.Title class="min-w-0 break-words">{backup.label}</Card.Title>
-											{@render verifyBadge(backup)}
+										<div>
+											<dt class="text-muted-foreground">Database version</dt>
+											<dd class="break-all">{backup.alembic_revision}</dd>
 										</div>
-										<Card.Description>
-											<time
-												datetime={backup.created_at}
-												title={formatDateTime(backup.created_at).utc}
-												>{formatDateTime(backup.created_at).local}</time
-											>
-											- {size(backup.size)}
-										</Card.Description>
-									</Card.Header>
-									<Card.Content class="space-y-4">
-										<dl class="grid gap-2 text-sm sm:grid-cols-2">
-											<div>
-												<dt class="text-muted-foreground">App version</dt>
-												<dd class="break-all">{backup.app_version}</dd>
-											</div>
-											<div>
-												<dt class="text-muted-foreground">Database version</dt>
-												<dd class="break-all">{backup.alembic_revision}</dd>
-											</div>
-										</dl>
-										<div class="flex flex-wrap gap-2">
-											{@render backupActions(backup, false)}
-										</div>
-										{@render verifyDetails(backup)}
-									</Card.Content>
-								</Card.Root>
-							</li>
-						{/each}
-					</ul>
-				{/if}
+									</dl>
+									<div class="flex flex-wrap gap-2">
+										{@render backupActions(backup, false)}
+									</div>
+									{@render verifyDetails(backup)}
+								</Card.Content>
+							</Card.Root>
+						</li>
+					{/each}
+				</ul>
 			{/if}
 		{/if}
-	</div>
-</main>
+	{/if}
+</Page>
 
 <ResponsiveDialog.Root
 	open={uploadOpen}
@@ -418,10 +418,10 @@
 			<div class="flex justify-end gap-2">
 				<Button
 					variant="outline"
-					class="h-11"
+					class="pointer-coarse:h-11"
 					disabled={loading || busy !== null}
 					onclick={() => (uploadOpen = false)}><X class="size-4" aria-hidden="true" />Cancel</Button
-				><Button type="submit" class="h-11" disabled={!file || busy !== null}
+				><Button type="submit" class="pointer-coarse:h-11" disabled={!file || busy !== null}
 					>{#if busy === 'upload'}<Spinner
 							class="motion-reduce:animate-none"
 							aria-hidden="true"
@@ -449,12 +449,12 @@
 		<div class="mt-4 flex justify-end gap-2">
 			<Button
 				variant="outline"
-				class="h-11"
+				class="pointer-coarse:h-11"
 				disabled={loading || busy !== null}
 				onclick={() => (deleteTarget = null)}><X class="size-4" aria-hidden="true" />Cancel</Button
 			><Button
 				variant="destructive"
-				class="h-11"
+				class="pointer-coarse:h-11"
 				disabled={loading || busy !== null}
 				onclick={remove}
 				>{#if busy === 'delete'}<Spinner
@@ -486,7 +486,7 @@
 					id="backup-label"
 					bind:value={label}
 					maxlength={120}
-					class="h-11"
+					class="pointer-coarse:h-11"
 					disabled={busy !== null}
 				/>
 			</div>
@@ -496,10 +496,10 @@
 			<div class="flex justify-end gap-2">
 				<Button
 					variant="outline"
-					class="h-11"
+					class="pointer-coarse:h-11"
 					disabled={busy !== null}
 					onclick={() => (createOpen = false)}><X class="size-4" aria-hidden="true" />Cancel</Button
-				><Button type="submit" class="h-11" disabled={busy !== null}
+				><Button type="submit" class="pointer-coarse:h-11" disabled={busy !== null}
 					>{#if busy === 'create'}<Spinner
 							class="motion-reduce:animate-none"
 							aria-hidden="true"

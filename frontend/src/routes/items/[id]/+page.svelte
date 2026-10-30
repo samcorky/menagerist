@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Page from '$lib/components/page.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -50,20 +51,30 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Tooltip from '$lib/components/ui/popover-tooltip/index.js';
 	import { serverErrorsToFields } from '$lib/validation-messages';
+	import TypePicker from '$lib/components/type-picker.svelte';
+	import { retypeImpact } from '$lib/retype';
 	import ItemCollections from '$lib/components/item-collections.svelte';
 	import MediaGallery from '$lib/components/media-gallery.svelte';
+	import CoverPlaceholder from '$lib/components/cover-placeholder.svelte';
 	import NodeCover from '$lib/components/node-cover.svelte';
 	import NodeSummary from '$lib/components/node-summary.svelte';
 	import { registerShortcut } from '$lib/shortcuts.svelte';
 
 	let nodeId = $derived(page.params.id!);
+	// Bumped when a cover is added from the placeholder, so the cover and the Files card reload.
+	let coverVersion = $state(0);
 
 	let node = $state<NodeResponse | null>(null);
 	let edges = $state<EdgeResponse[]>([]);
 	let otherNodes = $state<NodeResponse[]>([]);
 	let edgeTypes = $state<EdgeTypeResponse[]>([]);
 	let nodeTypes = $state<NodeTypeResponse[]>([]);
+	const typeOfNode = $derived(nodeTypes.find((nt) => nt.slug === node?.type));
 	let settingType = $state(false);
+	// A type change waiting for a yes, because some values would have no field to show them.
+	let pendingType = $state<{ slug: string | null; orphaned: string[] } | null>(null);
+	// Remounts the picker so it shows the saved type again after a cancelled or refused change.
+	let typePickerKey = $state(0);
 	let nodesById = $derived(new Map(otherNodes.map((candidate) => [candidate.id, candidate])));
 	let edgeTypesById = $derived(new Map(edgeTypes.map((et) => [et.slug, et])));
 	let nodeSchema = $derived(
@@ -211,20 +222,67 @@
 		return edge.source_id === nodeId ? edge.target_id : edge.source_id;
 	}
 
-	async function handleSetType(slug: string) {
+	function labelOf(key: string): string {
+		const merged = mergeAttributeSchemas(nodeSchema, extraSchema);
+		return merged?.properties?.[key]?.title ?? key;
+	}
+
+	// Changing the type never deletes values; this only decides whether to ask first.
+	function requestType(slug: string | null) {
+		if (!node || slug === (node.type ?? null)) return;
+		const impact = retypeImpact(
+			rowsToAttributes(attributeRows, mergeAttributeSchemas(nodeSchema, extraSchema)),
+			slug ? schemaOfType(slug) : null,
+			extraSchema
+		);
+		if (impact.clashes.length > 0) {
+			const names = impact.clashes.map(labelOf).join(', ');
+			toast.error("Can't change the type", {
+				description: `This item already has its own field called ${names}, which the new type also defines. Remove or rename that field first.`
+			});
+			typePickerKey++;
+			return;
+		}
+		if (impact.orphaned.length > 0) {
+			pendingType = { slug, orphaned: impact.orphaned.map(labelOf) };
+			return;
+		}
+		void applyType(slug);
+	}
+
+	function cancelType() {
+		pendingType = null;
+		typePickerKey++;
+	}
+
+	async function applyType(slug: string | null, undoing = false) {
+		if (!node) return;
+		const previous = node.type ?? null;
 		settingType = true;
 		const result = await updateNode({ path: { node_id: nodeId }, body: { type: slug } });
+		settingType = false;
+		pendingType = null;
+		typePickerKey++;
 		if (result.response?.status === 412) {
 			toast.error('Edit conflict', {
 				description: 'This item was updated elsewhere - refresh to see the latest version.'
 			});
-		} else if (result.error || !result.data) {
-			toast.error("Couldn't set item type", { description: errorMessage(result.error) });
-		} else {
-			node = result.data;
-			toast.success('Item type set');
+			return;
 		}
-		settingType = false;
+		if (result.error || !result.data) {
+			toast.error("Couldn't change item type", { description: errorMessage(result.error) });
+			return;
+		}
+		// Keep any unsaved edits: read them back with the old schema, show them with the new one.
+		const edited = rowsToAttributes(attributeRows, mergeAttributeSchemas(nodeSchema, extraSchema));
+		node = result.data;
+		attributeRows = attributesToRows(
+			{ ...result.data.attributes, ...edited },
+			mergeAttributeSchemas(schemaOfType(result.data.type), extraSchema)
+		);
+		toast.success(undoing ? 'Item type restored' : 'Item type changed', {
+			action: undoing ? undefined : { label: 'Undo', onClick: () => void applyType(previous, true) }
+		});
 	}
 
 	async function handleSave(event: SubmitEvent) {
@@ -544,491 +602,518 @@
 	<title>{node?.name ?? 'Item'} - Menagerist</title>
 </svelte:head>
 
-<main class="flex-1 px-4 py-6 sm:px-6">
-	<div class="mx-auto flex max-w-2xl flex-col gap-6">
-		<BackButton fallback={resolve('/items')} />
+<Page width="fluid">
+	<BackButton fallback={resolve('/items')} />
 
-		{#if notFound}
-			<NotFound backHref={resolve('/items')} />
-		{:else}
-			<Shimmer {loading}>
-				<Card.Root class="overflow-hidden">
+	{#if notFound}
+		<NotFound backHref={resolve('/items')} />
+	{:else}
+		<Shimmer {loading}>
+			<!-- Cover on the left (sticky), details in the middle, a side panel from 1400px. -->
+			<div
+				class="grid w-full max-w-[96rem] items-start gap-4 lg:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)] 2xl:grid-cols-[18rem_minmax(0,1fr)_minmax(18rem,22rem)]"
+			>
+				<div
+					data-testid="item-cover"
+					class="lg:sticky lg:top-4 lg:col-start-1 lg:row-span-2 lg:row-start-1"
+				>
 					{#if node}
-						<NodeCover nodeId={node.id} class="w-full rounded-none" hiRes />
-					{/if}
-					<Card.Header class="flex flex-row items-start justify-between gap-4 space-y-0">
-						<div class="min-w-0 flex-1">
-							<ShimmerSlot {loading} class="h-6 w-40">
-								<div class="flex flex-wrap items-center gap-2">
-									<Card.Title class="font-heading text-xl">{node?.name ?? ''}</Card.Title>
-									{#if isExample}
-										<Badge variant="outline" class="text-muted-foreground">Example</Badge>
-									{/if}
-								</div>
-							</ShimmerSlot>
-							<ShimmerSlot {loading} class="mt-1 h-4 w-56">
-								{#if node?.type}
-									{@const typeLabel = nodeTypes.find((nt) => nt.slug === node!.type)?.label}
-									<Card.Description>
-										{#if typeLabel}
-											{typeLabel}
-										{:else}
-											<span
-												class="font-mono text-xs text-muted-foreground/60 italic"
-												title="This item type no longer exists">{node.type}</span
-											>
-										{/if}
-									</Card.Description>
-								{:else if !loading && nodeTypes.length > 0}
-									<div class="mt-2 space-y-1.5">
-										<p class="text-xs text-muted-foreground">No item type - pick one:</p>
-										<div class="flex flex-wrap gap-1.5">
-											{#each nodeTypes as nt (nt.slug)}
-												<button
-													type="button"
-													onclick={() => handleSetType(nt.slug)}
-													disabled={settingType}
-													class="relative rounded-full border border-border bg-background px-2.5 py-1 text-xs transition-colors after:absolute after:-inset-1 after:content-[''] hover:border-primary/50 hover:bg-muted disabled:opacity-50"
-												>
-													{nt.label}
-												</button>
-											{/each}
-										</div>
-									</div>
-								{/if}
-							</ShimmerSlot>
-						</div>
-						{#if !loading}
-							<div class="flex shrink-0 items-center gap-1">
-								<Toggle
-									pressed={node?.favourite ?? false}
-									onPressedChange={handleToggleFavourite}
-									aria-label={node?.favourite ? 'Remove from favourites' : 'Add to favourites'}
-								>
-									<Star class="size-4 {node?.favourite ? 'fill-current' : ''}" />
-								</Toggle>
-								{#if mode === 'read'}
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										onclick={() => (mode = 'edit')}
-										aria-label="Edit"
-									>
-										<Pencil class="size-4" />
-									</Button>
-								{/if}
-							</div>
-						{/if}
-					</Card.Header>
-					<Card.Content>
-						{#if mode === 'edit'}
-							<form class="space-y-4" bind:this={editFormEl} onsubmit={handleSave}>
-								<div class="space-y-2">
-									<ShimmerSlot {loading} class="h-4 w-12">
-										<Label for="name">Name</Label>
-									</ShimmerSlot>
-									<Input id="name" bind:value={name} required bind:ref={nameInputEl} />
-								</div>
-
-								<div class="space-y-2">
-									<ShimmerSlot {loading} class="h-4 w-24">
-										<Label for="description">Description</Label>
-									</ShimmerSlot>
-									<Textarea id="description" bind:value={description} />
-								</div>
-
-								<TagsInput bind:tags />
-
-								<AttributesEditor
-									bind:rows={attributeRows}
-									bind:extraSchema
-									schema={nodeSchema}
-									supportsExtraFields={true}
-									nodeId={node?.id}
-									nodeTypeId={nodeTypes.find((nt) => nt.slug === node?.type)?.id}
-									nodeCandidates={otherNodes.map((n) => ({ id: n.id, name: n.name }))}
-									onLinkItem={handleLinkAttributeValue}
-									serverErrors={attributeServerErrors}
-									onPromoted={load}
+						{#key coverVersion}
+							<NodeCover
+								nodeId={node.id}
+								class="w-full overflow-hidden rounded-xl border bg-card"
+								hiRes
+							>
+								<CoverPlaceholder
+									nodeId={node.id}
+									icon={typeOfNode?.icon}
+									colour={typeOfNode?.colour}
+									onuploaded={() => coverVersion++}
 								/>
+							</NodeCover>
+						{/key}
+					{/if}
+				</div>
 
-								<div class="flex flex-wrap items-center justify-between gap-2">
-									{#if !loading}
-										<Button
-											type="button"
-											variant="destructive"
-											disabled={deletingNode}
-											onclick={() => (confirmDeleteNode = true)}
-										>
-											<Trash2 class="size-4" />
-											Delete
-										</Button>
-									{/if}
-									<div class="ml-auto flex items-center gap-2">
-										<Button type="button" variant="outline" onclick={handleCancelEdit}>
-											Cancel
-										</Button>
-										<Button type="submit" disabled={saving || loading}>
-											{saving ? 'Saving…' : 'Save changes'}
-										</Button>
+				<div data-testid="item-main" class="min-w-0 space-y-4 lg:col-start-2 lg:row-start-1">
+					<Card.Root class="overflow-hidden">
+						<Card.Header class="flex flex-row items-start justify-between gap-4 space-y-0">
+							<div class="min-w-0 flex-1">
+								<ShimmerSlot {loading} class="h-6 w-40">
+									<div class="flex flex-wrap items-center gap-2">
+										<Card.Title class="font-heading text-xl">{node?.name ?? ''}</Card.Title>
+										{#if isExample}
+											<Badge variant="outline" class="text-muted-foreground">Example</Badge>
+										{/if}
 									</div>
-								</div>
-							</form>
-						{:else}
-							<div class="space-y-4">
-								<ShimmerSlot {loading} class="h-4 w-full">
-									{#if node?.description}
-										<p class="text-sm whitespace-pre-wrap">{node.description}</p>
-									{:else}
-										<p class="text-sm text-muted-foreground italic">No description.</p>
+								</ShimmerSlot>
+								<ShimmerSlot {loading} class="mt-1 h-4 w-56">
+									{#if !loading}
+										<div class="mt-2 max-w-xs space-y-1.5">
+											{#if !node?.type}
+												<p class="text-xs text-muted-foreground">
+													No item type - pick or create one:
+												</p>
+											{/if}
+											{#key typePickerKey}
+												<TypePicker
+													value={node?.type ?? null}
+													{nodeTypes}
+													allowClear={!!node?.type}
+													disabled={settingType}
+													oncreate={(type) => (nodeTypes = [...nodeTypes, type])}
+													onchange={requestType}
+												/>
+											{/key}
+										</div>
 									{/if}
 								</ShimmerSlot>
-
-								{#if !loading && node}
-									<TagList tags={node.tags} />
-								{/if}
-
-								{#snippet attrField(key: string, prop: JsonSchemaProperty)}
-									{@const rawValue = attributeRows.find((r) => r.key === key)?.value}
-									{#if rawValue !== undefined}
-										{@const desc = coreForProp(prop)}
-										{@const ViewWidget = desc?.ViewWidget}
-										<div
-											class="flex gap-2 {prop.type === 'array' ? 'items-start' : 'items-center'}"
+							</div>
+							{#if !loading}
+								<div class="flex shrink-0 items-center gap-1">
+									<Toggle
+										pressed={node?.favourite ?? false}
+										onPressedChange={handleToggleFavourite}
+										aria-label={node?.favourite ? 'Remove from favourites' : 'Add to favourites'}
+									>
+										<Star class="size-4 {node?.favourite ? 'fill-current' : ''}" />
+									</Toggle>
+									{#if mode === 'read'}
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon"
+											onclick={() => (mode = 'edit')}
+											aria-label="Edit"
 										>
-											<span class="w-32 shrink-0 pt-0.5 text-sm text-muted-foreground">
-												{prop.title || key}
-											</span>
-											<div class="flex-1 text-sm">
-												{#if ViewWidget}
-													<ViewWidget value={rawValue} {prop} />
-												{:else}
-													{String(rawValue)}
-												{/if}
+											<Pencil class="size-4" />
+										</Button>
+									{/if}
+								</div>
+							{/if}
+						</Card.Header>
+						<Card.Content>
+							{#if mode === 'edit'}
+								<form class="space-y-4" bind:this={editFormEl} onsubmit={handleSave}>
+									<div class="space-y-2">
+										<ShimmerSlot {loading} class="h-4 w-12">
+											<Label for="name">Name</Label>
+										</ShimmerSlot>
+										<Input id="name" bind:value={name} required bind:ref={nameInputEl} />
+									</div>
+
+									<div class="space-y-2">
+										<ShimmerSlot {loading} class="h-4 w-24">
+											<Label for="description">Description</Label>
+										</ShimmerSlot>
+										<Textarea id="description" bind:value={description} />
+									</div>
+
+									<TagsInput bind:tags />
+
+									<AttributesEditor
+										bind:rows={attributeRows}
+										bind:extraSchema
+										schema={nodeSchema}
+										supportsExtraFields={true}
+										nodeId={node?.id}
+										nodeTypeId={nodeTypes.find((nt) => nt.slug === node?.type)?.id}
+										nodeCandidates={otherNodes.map((n) => ({ id: n.id, name: n.name }))}
+										onLinkItem={handleLinkAttributeValue}
+										serverErrors={attributeServerErrors}
+										onPromoted={load}
+									/>
+
+									<div class="flex flex-wrap items-center justify-between gap-2">
+										{#if !loading}
+											<Button
+												type="button"
+												variant="destructive"
+												disabled={deletingNode}
+												onclick={() => (confirmDeleteNode = true)}
+											>
+												<Trash2 class="size-4" />
+												Delete
+											</Button>
+										{/if}
+										<div class="ml-auto flex items-center gap-2">
+											<Button type="button" variant="outline" onclick={handleCancelEdit}
+												>Cancel</Button
+											>
+											<Button type="submit" disabled={saving || loading}>
+												{saving ? 'Saving…' : 'Save changes'}
+											</Button>
+										</div>
+									</div>
+								</form>
+							{:else}
+								<div class="space-y-4">
+									<ShimmerSlot {loading} class="h-4 w-full">
+										{#if node?.description}
+											<p class="text-sm whitespace-pre-wrap">{node.description}</p>
+										{:else}
+											<p class="text-sm text-muted-foreground italic">No description.</p>
+										{/if}
+									</ShimmerSlot>
+
+									{#if !loading && node}
+										<TagList tags={node.tags} />
+									{/if}
+
+									{#snippet attrField(key: string, prop: JsonSchemaProperty)}
+										{@const rawValue = attributeRows.find((r) => r.key === key)?.value}
+										{#if rawValue !== undefined}
+											{@const desc = coreForProp(prop)}
+											{@const ViewWidget = desc?.ViewWidget}
+											<div
+												class="flex gap-2 {prop.type === 'array' ? 'items-start' : 'items-center'}"
+											>
+												<span class="w-32 shrink-0 pt-0.5 text-sm text-muted-foreground">
+													{prop.title || key}
+												</span>
+												<div class="flex-1 text-sm">
+													{#if ViewWidget}
+														<ViewWidget value={rawValue} {prop} />
+													{:else}
+														{String(rawValue)}
+													{/if}
+												</div>
 											</div>
+										{/if}
+									{/snippet}
+
+									{#if !loading && (schemaLayout.length > 0 || extraLayout.length > 0)}
+										<div class="space-y-2">
+											{#if nodeSchema && schemaLayout.length > 0}
+												{#each schemaLayout as layoutItem (isSectionItem(layoutItem) ? layoutItem.id : layoutItem.key)}
+													{#if isSectionItem(layoutItem)}
+														<div class="space-y-1.5 pt-1">
+															<p
+																class="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+															>
+																{layoutItem.section}
+															</p>
+															<div
+																class="space-y-1.5 rounded-md border border-input/60 bg-muted/20 p-3"
+															>
+																{#each layoutItem.items as { key } (key)}
+																	{#if key in nodeSchema.properties}
+																		{@render attrField(key, nodeSchema.properties[key])}
+																	{/if}
+																{/each}
+															</div>
+														</div>
+													{:else if layoutItem.key in nodeSchema.properties}
+														{@render attrField(
+															layoutItem.key,
+															nodeSchema.properties[layoutItem.key]
+														)}
+													{/if}
+												{/each}
+											{/if}
+
+											{#if extraSchema && extraLayout.length > 0}
+												{#each extraLayout as layoutItem (isSectionItem(layoutItem) ? layoutItem.id : layoutItem.key)}
+													{#if !isSectionItem(layoutItem) && layoutItem.key in extraSchema.properties}
+														{@render attrField(
+															layoutItem.key,
+															extraSchema.properties[layoutItem.key]
+														)}
+													{/if}
+												{/each}
+											{/if}
 										</div>
 									{/if}
-								{/snippet}
 
-								{#if !loading && (schemaLayout.length > 0 || extraLayout.length > 0)}
-									<div class="space-y-2">
-										{#if nodeSchema && schemaLayout.length > 0}
-											{#each schemaLayout as layoutItem (isSectionItem(layoutItem) ? layoutItem.id : layoutItem.key)}
-												{#if isSectionItem(layoutItem)}
-													<div class="space-y-1.5 pt-1">
-														<p
-															class="text-xs font-medium tracking-wide text-muted-foreground uppercase"
-														>
-															{layoutItem.section}
-														</p>
-														<div
-															class="space-y-1.5 rounded-md border border-input/60 bg-muted/20 p-3"
-														>
-															{#each layoutItem.items as { key } (key)}
-																{#if key in nodeSchema.properties}
-																	{@render attrField(key, nodeSchema.properties[key])}
-																{/if}
-															{/each}
-														</div>
-													</div>
-												{:else if layoutItem.key in nodeSchema.properties}
-													{@render attrField(layoutItem.key, nodeSchema.properties[layoutItem.key])}
-												{/if}
-											{/each}
-										{/if}
-
-										{#if extraSchema && extraLayout.length > 0}
-											{#each extraLayout as layoutItem (isSectionItem(layoutItem) ? layoutItem.id : layoutItem.key)}
-												{#if !isSectionItem(layoutItem) && layoutItem.key in extraSchema.properties}
-													{@render attrField(
-														layoutItem.key,
-														extraSchema.properties[layoutItem.key]
-													)}
-												{/if}
-											{/each}
-										{/if}
-									</div>
-								{/if}
-
-								{#if !loading && createdAt && updatedAt}
-									<p class="border-t border-input/60 pt-3 text-xs text-muted-foreground">
-										<Tooltip.Root>
-											<Tooltip.Trigger>
-												{#snippet child({ props })}
-													<span {...props} tabindex="-1">Added {createdAt.relative}</span>
-												{/snippet}
-											</Tooltip.Trigger>
-											<Tooltip.Content>{createdAt.utc}</Tooltip.Content>
-										</Tooltip.Root>
-										{#if wasEdited}
-											·
+									{#if !loading && createdAt && updatedAt}
+										<p class="border-t border-input/60 pt-3 text-xs text-muted-foreground">
 											<Tooltip.Root>
 												<Tooltip.Trigger>
 													{#snippet child({ props })}
-														<span {...props} tabindex="-1">Updated {updatedAt.relative}</span>
+														<span {...props} tabindex="-1">Added {createdAt.relative}</span>
 													{/snippet}
 												</Tooltip.Trigger>
-												<Tooltip.Content>{updatedAt.utc}</Tooltip.Content>
+												<Tooltip.Content>{createdAt.utc}</Tooltip.Content>
 											</Tooltip.Root>
-										{/if}
-									</p>
-								{/if}
-							</div>
-						{/if}
-					</Card.Content>
-				</Card.Root>
+											{#if wasEdited}
+												·
+												<Tooltip.Root>
+													<Tooltip.Trigger>
+														{#snippet child({ props })}
+															<span {...props} tabindex="-1">Updated {updatedAt.relative}</span>
+														{/snippet}
+													</Tooltip.Trigger>
+													<Tooltip.Content>{updatedAt.utc}</Tooltip.Content>
+												</Tooltip.Root>
+											{/if}
+										</p>
+									{/if}
+								</div>
+							{/if}
+						</Card.Content>
+					</Card.Root>
+				</div>
 
-				<Card.Root>
-					<Card.Header>
-						<Card.Title class="font-heading">Connected to</Card.Title>
-					</Card.Header>
-					<Card.Content class="space-y-4">
-						{#if edges.length === 0}
-							<p class="text-sm text-muted-foreground">No connections yet.</p>
-						{:else}
-							<ul class="space-y-2">
-								{#each edges as edge (edge.id)}
-									{@const et = edgeTypesById.get(edge.type)}
-									{@const isOutgoing = edge.source_id === nodeId}
-									{@const relationLabel = et
-										? isOutgoing
-											? et.label
-											: (et.reverse_label ?? et.label)
-										: edge.type}
-									{@const other = nodesById.get(otherNodeId(edge))}
-									{@const rowSchema = edgeTypeSchemaOf(edge)}
-									<li>
-										<Item.Root variant="outline">
-											<Item.Content class="text-sm">
-												<Item.Title class="truncate">{relationLabel}</Item.Title>
-												<div class="flex min-w-0 items-center gap-2">
-													<a
-														href={resolve('/items/[id]', { id: otherNodeId(edge) })}
-														class="truncate text-muted-foreground underline"
-													>
-														{other?.name ?? 'View item'}
-													</a>
-													{#if other}
-														<NodeSummary
-															attributes={other.attributes}
-															schema={schemaOfType(other.type)}
-															surface="row"
-															size="sm"
-														/>
-													{/if}
-												</div>
-												{#if rowSchema}
-													<div class="truncate">
-														<NodeSummary
-															attributes={edge.attributes}
-															schema={rowSchema}
-															surface="connection"
-															size="sm"
-														/>
+				<div
+					data-testid="item-side"
+					class="min-w-0 space-y-4 lg:col-start-2 lg:row-start-2 2xl:col-start-3 2xl:row-start-1"
+				>
+					<Card.Root>
+						<Card.Header>
+							<Card.Title class="font-heading">Connected to</Card.Title>
+						</Card.Header>
+						<Card.Content class="space-y-4">
+							{#if edges.length === 0}
+								<p class="text-sm text-muted-foreground">No connections yet.</p>
+							{:else}
+								<ul class="space-y-2">
+									{#each edges as edge (edge.id)}
+										{@const et = edgeTypesById.get(edge.type)}
+										{@const isOutgoing = edge.source_id === nodeId}
+										{@const relationLabel = et
+											? isOutgoing
+												? et.label
+												: (et.reverse_label ?? et.label)
+											: edge.type}
+										{@const other = nodesById.get(otherNodeId(edge))}
+										{@const rowSchema = edgeTypeSchemaOf(edge)}
+										<li>
+											<Item.Root variant="outline">
+												<Item.Content class="text-sm">
+													<Item.Title class="truncate">{relationLabel}</Item.Title>
+													<div class="flex min-w-0 items-center gap-2">
+														<a
+															href={resolve('/items/[id]', { id: otherNodeId(edge) })}
+															class="truncate text-muted-foreground underline"
+														>
+															{other?.name ?? 'View item'}
+														</a>
+														{#if other}
+															<NodeSummary
+																attributes={other.attributes}
+																schema={schemaOfType(other.type)}
+																surface="row"
+																size="sm"
+															/>
+														{/if}
 													</div>
-												{/if}
-											</Item.Content>
-											<Item.Actions>
-												{#if isEdgeEditable(edge)}
+													{#if rowSchema}
+														<div class="truncate">
+															<NodeSummary
+																attributes={edge.attributes}
+																schema={rowSchema}
+																surface="connection"
+																size="sm"
+															/>
+														</div>
+													{/if}
+												</Item.Content>
+												<Item.Actions>
+													{#if isEdgeEditable(edge)}
+														<Button
+															type="button"
+															variant="ghost"
+															size="icon"
+															onclick={(e) => openEditEdge(edge, e.currentTarget)}
+															aria-label="Edit connection"
+														>
+															<Pencil class="size-4" />
+														</Button>
+													{/if}
 													<Button
 														type="button"
 														variant="ghost"
 														size="icon"
-														onclick={(e) => openEditEdge(edge, e.currentTarget)}
-														aria-label="Edit connection"
+														onclick={() => handleDeleteEdge(edge)}
+														aria-label="Remove connection"
 													>
-														<Pencil class="size-4" />
+														<Trash2 class="size-4" />
 													</Button>
-												{/if}
-												<Button
-													type="button"
-													variant="ghost"
-													size="icon"
-													onclick={() => handleDeleteEdge(edge)}
-													aria-label="Remove connection"
-												>
-													<Trash2 class="size-4" />
-												</Button>
-											</Item.Actions>
-										</Item.Root>
-									</li>
-								{/each}
-							</ul>
-						{/if}
-
-						<Separator />
-
-						<form class="space-y-3" onsubmit={handleCreateEdge}>
-							<div class="space-y-2">
-								<ShimmerSlot {loading} class="h-4 w-32">
-									<Label for="edge-type">Connection</Label>
-								</ShimmerSlot>
-								<div class="relative">
-									<Input
-										id="edge-type"
-										value={edgeTypeOpen ? edgeTypeSearch : newEdgeType}
-										placeholder="e.g. Directed by"
-										autocomplete="off"
-										oninput={(e) => {
-											edgeTypeSearch = (e.target as HTMLInputElement).value;
-											newEdgeType = edgeTypeSearch;
-											newEdgeRows = [];
-											edgeTypeOpen = true;
-										}}
-										onfocus={() => {
-											edgeTypeOpen = true;
-											edgeTypeSearch = newEdgeType;
-										}}
-										onblur={() => setTimeout(() => (edgeTypeOpen = false), 150)}
-									/>
-									{#if edgeTypeOpen && filteredEdgeTypes.length > 0}
-										<div
-											class="fixed inset-0 z-40 bg-black/40 sm:hidden"
-											onmousedown={() => (edgeTypeOpen = false)}
-											aria-hidden="true"
-										></div>
-										<ul
-											class="fixed inset-x-0 bottom-0 z-50 max-h-[60dvh] overflow-auto rounded-t-2xl border-t bg-popover p-2 shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:mt-1 sm:max-h-40 sm:w-full sm:rounded-md sm:border sm:p-1 sm:shadow-md"
-										>
-											<li class="mx-auto mb-2 h-1.5 w-12 rounded-full bg-muted sm:hidden"></li>
-											{#each filteredEdgeTypes as et (et.slug)}
-												<li>
-													<button
-														type="button"
-														class="flex w-full items-center justify-between rounded px-2 py-2.5 text-sm hover:bg-accent sm:py-1.5"
-														onmousedown={() => {
-															newEdgeType = et.slug;
-															edgeTypeSearch = et.label;
-															newEdgeRows = [];
-															edgeTypeOpen = false;
-														}}
-													>
-														<span>{et.label}</span>
-														{#if et.reverse_label}
-															<span class="text-xs text-muted-foreground">↔ {et.reverse_label}</span
-															>
-														{/if}
-													</button>
-												</li>
-											{/each}
-										</ul>
-									{/if}
-								</div>
-							</div>
-
-							<div class="space-y-2">
-								<ShimmerSlot {loading} class="h-4 w-24">
-									<Label for="edge-target">{selectedTargets.length > 1 ? 'Items' : 'Item'}</Label>
-								</ShimmerSlot>
-								{#if selectedTargets.length > 0}
-									<ul class="flex flex-wrap gap-1.5">
-										{#each selectedTargets as target (target.id)}
-											<li>
-												<Badge variant="secondary" class="pr-1">
-													<span class="max-w-40 truncate" title={target.name}>{target.name}</span>
-													<button
-														type="button"
-														onclick={() => removeSelectedTarget(target.id)}
-														aria-label="Remove {target.name}"
-														class="relative rounded-full p-0.5 after:absolute after:-inset-2 after:content-[''] hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-													>
-														<X class="size-3" />
-													</button>
-												</Badge>
-											</li>
-										{/each}
-									</ul>
-								{/if}
-								<div class="relative">
-									<Input
-										id="edge-target"
-										bind:value={edgeTargetSearch}
-										placeholder="Search items…"
-										autocomplete="off"
-										onfocus={() => (edgeTargetOpen = true)}
-										onblur={() => setTimeout(() => (edgeTargetOpen = false), 150)}
-									/>
-									{#if edgeTargetOpen && filteredNodes.length > 0}
-										<div
-											class="fixed inset-0 z-40 bg-black/40 sm:hidden"
-											onmousedown={() => (edgeTargetOpen = false)}
-											aria-hidden="true"
-										></div>
-										<ul
-											class="fixed inset-x-0 bottom-0 z-50 max-h-[60dvh] overflow-auto rounded-t-2xl border-t bg-popover p-2 shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:mt-1 sm:max-h-52 sm:w-full sm:rounded-md sm:border sm:p-1 sm:shadow-md"
-										>
-											<li class="mx-auto mb-2 h-1.5 w-12 rounded-full bg-muted sm:hidden"></li>
-											{#each filteredNodes as candidate (candidate.id)}
-												<li>
-													<button
-														type="button"
-														class="flex w-full items-center justify-between rounded px-2 py-2.5 text-sm hover:bg-accent sm:py-1.5"
-														onmousedown={(e) => {
-															e.preventDefault();
-															addSelectedTarget(candidate);
-														}}
-													>
-														<span class="flex min-w-0 items-center gap-2">
-															<span class="shrink-0">{candidate.name}</span>
-															<NodeSummary
-																attributes={candidate.attributes}
-																schema={schemaOfType(candidate.type)}
-																surface="picker"
-																size="sm"
-															/>
-														</span>
-														<span class="ml-2 shrink-0 text-xs text-muted-foreground"
-															>{candidate.type ?? ''}</span
-														>
-													</button>
-												</li>
-											{/each}
-										</ul>
-									{/if}
-								</div>
-							</div>
-
-							{#if edgeTypesById.get(newEdgeType)?.attributes_schema}
-								<div class="space-y-2">
-									<p class="text-xs text-muted-foreground">Applies to every connection you add.</p>
-									<AttributesEditor
-										bind:rows={newEdgeRows}
-										schema={edgeTypesById.get(newEdgeType)
-											?.attributes_schema as AttributesSchema | null}
-									/>
-								</div>
+												</Item.Actions>
+											</Item.Root>
+										</li>
+									{/each}
+								</ul>
 							{/if}
 
-							<div class="flex justify-end">
-								<Button type="submit" disabled={creatingEdge}>
-									{creatingEdge
-										? 'Connecting…'
-										: selectedTargets.length > 1
-											? 'Connect items'
-											: 'Connect item'}
-								</Button>
-							</div>
-						</form>
-					</Card.Content>
-				</Card.Root>
+							<Separator />
 
-				{#if !loading}
-					<ItemCollections itemId={nodeId} />
+							<form class="space-y-3" onsubmit={handleCreateEdge}>
+								<div class="space-y-2">
+									<ShimmerSlot {loading} class="h-4 w-32">
+										<Label for="edge-type">Connection</Label>
+									</ShimmerSlot>
+									<div class="relative">
+										<Input
+											id="edge-type"
+											value={edgeTypeOpen ? edgeTypeSearch : newEdgeType}
+											placeholder="e.g. Directed by"
+											autocomplete="off"
+											oninput={(e) => {
+												edgeTypeSearch = (e.target as HTMLInputElement).value;
+												newEdgeType = edgeTypeSearch;
+												newEdgeRows = [];
+												edgeTypeOpen = true;
+											}}
+											onfocus={() => {
+												edgeTypeOpen = true;
+												edgeTypeSearch = newEdgeType;
+											}}
+											onblur={() => setTimeout(() => (edgeTypeOpen = false), 150)}
+										/>
+										{#if edgeTypeOpen && filteredEdgeTypes.length > 0}
+											<div
+												class="fixed inset-0 z-40 bg-black/40 sm:hidden"
+												onmousedown={() => (edgeTypeOpen = false)}
+												aria-hidden="true"
+											></div>
+											<ul
+												class="fixed inset-x-0 bottom-0 z-50 max-h-[60dvh] overflow-auto rounded-t-2xl border-t bg-popover p-2 shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:mt-1 sm:max-h-40 sm:w-full sm:rounded-md sm:border sm:p-1 sm:shadow-md"
+											>
+												<li class="mx-auto mb-2 h-1.5 w-12 rounded-full bg-muted sm:hidden"></li>
+												{#each filteredEdgeTypes as et (et.slug)}
+													<li>
+														<button
+															type="button"
+															class="flex w-full items-center justify-between rounded px-2 py-2.5 text-sm hover:bg-accent sm:py-1.5"
+															onmousedown={() => {
+																newEdgeType = et.slug;
+																edgeTypeSearch = et.label;
+																newEdgeRows = [];
+																edgeTypeOpen = false;
+															}}
+														>
+															<span>{et.label}</span>
+															{#if et.reverse_label}
+																<span class="text-xs text-muted-foreground"
+																	>↔ {et.reverse_label}</span
+																>
+															{/if}
+														</button>
+													</li>
+												{/each}
+											</ul>
+										{/if}
+									</div>
+								</div>
 
-					<Card.Root>
-						<Card.Header>
-							<Card.Title class="font-heading">Files</Card.Title>
-						</Card.Header>
-						<Card.Content>
-							<MediaGallery {nodeId} />
+								<div class="space-y-2">
+									<ShimmerSlot {loading} class="h-4 w-24">
+										<Label for="edge-target">{selectedTargets.length > 1 ? 'Items' : 'Item'}</Label>
+									</ShimmerSlot>
+									{#if selectedTargets.length > 0}
+										<ul class="flex flex-wrap gap-1.5">
+											{#each selectedTargets as target (target.id)}
+												<li>
+													<Badge variant="secondary" class="pr-1">
+														<span class="max-w-40 truncate" title={target.name}>{target.name}</span>
+														<button
+															type="button"
+															onclick={() => removeSelectedTarget(target.id)}
+															aria-label="Remove {target.name}"
+															class="relative rounded-full p-0.5 after:absolute after:-inset-2 after:content-[''] hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+														>
+															<X class="size-3" />
+														</button>
+													</Badge>
+												</li>
+											{/each}
+										</ul>
+									{/if}
+									<div class="relative">
+										<Input
+											id="edge-target"
+											bind:value={edgeTargetSearch}
+											placeholder="Search items…"
+											autocomplete="off"
+											onfocus={() => (edgeTargetOpen = true)}
+											onblur={() => setTimeout(() => (edgeTargetOpen = false), 150)}
+										/>
+										{#if edgeTargetOpen && filteredNodes.length > 0}
+											<div
+												class="fixed inset-0 z-40 bg-black/40 sm:hidden"
+												onmousedown={() => (edgeTargetOpen = false)}
+												aria-hidden="true"
+											></div>
+											<ul
+												class="fixed inset-x-0 bottom-0 z-50 max-h-[60dvh] overflow-auto rounded-t-2xl border-t bg-popover p-2 shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:mt-1 sm:max-h-52 sm:w-full sm:rounded-md sm:border sm:p-1 sm:shadow-md"
+											>
+												<li class="mx-auto mb-2 h-1.5 w-12 rounded-full bg-muted sm:hidden"></li>
+												{#each filteredNodes as candidate (candidate.id)}
+													<li>
+														<button
+															type="button"
+															class="flex w-full items-center justify-between rounded px-2 py-2.5 text-sm hover:bg-accent sm:py-1.5"
+															onmousedown={(e) => {
+																e.preventDefault();
+																addSelectedTarget(candidate);
+															}}
+														>
+															<span class="flex min-w-0 items-center gap-2">
+																<span class="shrink-0">{candidate.name}</span>
+																<NodeSummary
+																	attributes={candidate.attributes}
+																	schema={schemaOfType(candidate.type)}
+																	surface="picker"
+																	size="sm"
+																/>
+															</span>
+															<span class="ml-2 shrink-0 text-xs text-muted-foreground"
+																>{candidate.type ?? ''}</span
+															>
+														</button>
+													</li>
+												{/each}
+											</ul>
+										{/if}
+									</div>
+								</div>
+
+								{#if edgeTypesById.get(newEdgeType)?.attributes_schema}
+									<div class="space-y-2">
+										<p class="text-xs text-muted-foreground">
+											Applies to every connection you add.
+										</p>
+										<AttributesEditor
+											bind:rows={newEdgeRows}
+											schema={edgeTypesById.get(newEdgeType)
+												?.attributes_schema as AttributesSchema | null}
+										/>
+									</div>
+								{/if}
+
+								<div class="flex justify-end">
+									<Button type="submit" disabled={creatingEdge}>
+										{creatingEdge
+											? 'Connecting…'
+											: selectedTargets.length > 1
+												? 'Connect items'
+												: 'Connect item'}
+									</Button>
+								</div>
+							</form>
 						</Card.Content>
 					</Card.Root>
-				{/if}
-			</Shimmer>
-		{/if}
-	</div>
-</main>
+
+					{#if !loading}
+						<ItemCollections itemId={nodeId} />
+
+						<Card.Root>
+							<Card.Header>
+								<Card.Title class="font-heading">Files</Card.Title>
+							</Card.Header>
+							<Card.Content>
+								{#key coverVersion}
+									<MediaGallery {nodeId} />
+								{/key}
+							</Card.Content>
+						</Card.Root>
+					{/if}
+				</div>
+			</div>
+		</Shimmer>
+	{/if}
+</Page>
 
 <ResponsiveDialog.Root
 	open={editingEdge !== null}
@@ -1067,6 +1152,23 @@
 		{/if}
 	</ResponsiveDialog.Content>
 </ResponsiveDialog.Root>
+
+<ConfirmDialog
+	open={pendingType !== null}
+	title="Change item type?"
+	destructive={false}
+	busy={settingType}
+	busyLabel="Changing…"
+	confirmLabel="Change type"
+	onOpenChange={(v) => !v && cancelType()}
+	onConfirm={() => pendingType && applyType(pendingType.slug)}
+>
+	{#snippet description()}
+		Some values have no field in {pendingType?.slug ? 'the new type' : 'a typeless item'}:
+		<strong>{pendingType?.orphaned.join(', ')}</strong>. They stay on the item and show as plain
+		fields, and nothing is deleted.
+	{/snippet}
+</ConfirmDialog>
 
 <ConfirmDialog
 	open={confirmDeleteNode}

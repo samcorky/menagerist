@@ -1,17 +1,17 @@
 <script lang="ts">
+	import Page from '$lib/components/page.svelte';
 	import { resolve } from '$app/paths';
 	import {
 		Bookmark,
 		ChevronDown,
 		Copy,
 		Download,
-		Eye,
-		EyeOff,
 		Layers,
 		ListChecks,
 		Pencil,
 		Trash2,
-		Upload
+		Upload,
+		Ellipsis
 	} from '@lucide/svelte';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -25,7 +25,9 @@
 	} from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import * as Card from '$lib/components/ui/card/index.js';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import CollapsibleSection from '$lib/components/collapsible-section.svelte';
+	import IconButton from '$lib/components/icon-button.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import EditListDialog from '$lib/components/edit-list-dialog.svelte';
@@ -425,483 +427,365 @@
 	<title>Saved fields - Menagerist</title>
 </svelte:head>
 
-{#snippet sectionHeader(title: string, kind: PackSectionKind)}
-	<div class="flex flex-wrap items-center justify-between gap-2">
-		<h2 class="font-heading text-lg font-semibold">{title}</h2>
-		<div class="flex flex-wrap gap-2">
-			<input
-				bind:this={sectionImportInputs[kind]}
-				type="file"
-				accept="application/json,.json"
-				class="hidden"
-				onchange={(event) => handleSectionImport(kind, event)}
-			/>
-			<Button
-				type="button"
-				variant="outline"
-				size="sm"
-				disabled={sectionBusy}
-				onclick={() => sectionImportInputs[kind]?.click()}
-			>
-				<Upload class="size-4" />
-				Import
-			</Button>
-			<Button
-				type="button"
-				variant="outline"
-				size="sm"
-				disabled={sectionBusy}
-				onclick={() => handleSectionExport(kind)}
-			>
-				<Download class="size-4" />
-				Export
-			</Button>
-		</div>
+{#snippet sectionActions(title: string, kind: PackSectionKind)}
+	<div class="flex items-center gap-1">
+		<input
+			bind:this={sectionImportInputs[kind]}
+			type="file"
+			accept="application/json,.json"
+			class="hidden"
+			onchange={(event) => handleSectionImport(kind, event)}
+		/>
+		<IconButton
+			labelOnTouch={false}
+			label={`Import ${title.toLowerCase()}`}
+			disabled={sectionBusy}
+			onclick={() => sectionImportInputs[kind]?.click()}
+		>
+			<Upload />
+		</IconButton>
+		<IconButton
+			labelOnTouch={false}
+			label={`Export ${title.toLowerCase()}`}
+			disabled={sectionBusy}
+			onclick={() => handleSectionExport(kind)}
+		>
+			<Download />
+		</IconButton>
 	</div>
 {/snippet}
 
-<main class="flex-1 px-4 py-6 sm:px-6">
-	<div class="mx-auto flex max-w-4xl flex-col gap-8">
-		<BackButton fallback={resolve('/settings')} />
+{#snippet presetRow(
+	preset: PresetResponse,
+	deleteKey: 'fields' | 'lists' | 'fieldSets',
+	deleteLabel: string,
+	meta?: string
+)}
+	<li class="px-3 py-2">
+		<div class="flex items-center gap-1">
+			<div class="min-w-0 flex-1">
+				<div class="flex flex-wrap items-center gap-2">
+					<span class="truncate font-medium">{preset.label}</span>
+					{#if preset.builtin}
+						<Badge variant="secondary">Built-in</Badge>
+					{/if}
+					{#if meta}
+						<span class="text-xs text-muted-foreground">{meta}</span>
+					{/if}
+				</div>
+				{#if preset.description}
+					<p class="truncate text-sm text-muted-foreground">{preset.description}</p>
+				{/if}
+			</div>
+			<IconButton
+				labelOnTouch={false}
+				label="Try it"
+				aria-expanded={openExamples.has(preset.id)}
+				aria-controls="example-{preset.id}"
+				onclick={() => toggleExample(preset.id)}
+			>
+				<ChevronDown
+					class="transition-transform duration-150 {openExamples.has(preset.id)
+						? 'rotate-180'
+						: ''}"
+				/>
+			</IconButton>
+			{#if canEditOptions(preset)}
+				<IconButton
+					labelOnTouch={false}
+					label="Edit {preset.label}"
+					onclick={() => openEdit(preset)}
+				>
+					<Pencil />
+				</IconButton>
+			{/if}
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger>
+					{#snippet child({ props })}
+						<Button
+							{...props}
+							type="button"
+							variant="ghost"
+							size="icon"
+							class="pointer-coarse:size-11"
+							aria-label="More actions for {preset.label}"
+						>
+							<Ellipsis class="size-4" />
+						</Button>
+					{/snippet}
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content align="end">
+					<DropdownMenu.Item
+						class="pointer-coarse:min-h-11"
+						disabled={sectionBusy}
+						onSelect={() => handlePresetExport(preset)}
+					>
+						<Download class="size-4" />
+						Export
+					</DropdownMenu.Item>
+					<DropdownMenu.Item
+						class="pointer-coarse:min-h-11"
+						disabled={copying}
+						onSelect={() => copyPreset(preset)}
+					>
+						<Copy class="size-4" />
+						Copy
+					</DropdownMenu.Item>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
+			<IconButton
+				labelOnTouch={false}
+				label={deleteLabel}
+				disabled={preset.builtin}
+				title={preset.builtin ? "Built-in items can't be deleted" : undefined}
+				onclick={() => handleDelete(preset, deleteKey)}
+			>
+				<Trash2 />
+			</IconButton>
+		</div>
+		{#if openExamples.has(preset.id)}
+			<div id="example-{preset.id}" class="pt-2">
+				<PresetExample {preset} />
+			</div>
+		{/if}
+	</li>
+{/snippet}
 
+<Page width="reading" class="gap-6">
+	<BackButton fallback={resolve('/settings')} />
+
+	<div class="flex items-start justify-between gap-4">
 		<div>
 			<h1 class="font-heading text-3xl font-semibold tracking-tight">Saved fields</h1>
 			<p class="mt-1 text-muted-foreground">
 				Reuse a field or a list of choices across item types instead of rebuilding it each time.
 			</p>
-			<div class="mt-4 flex flex-wrap gap-2">
-				<input
-					bind:this={importInput}
-					type="file"
-					accept="application/json,.json"
-					class="hidden"
-					onchange={handleImportFile}
-				/>
-				<Button
-					type="button"
-					variant="outline"
+		</div>
+		<input
+			bind:this={importInput}
+			type="file"
+			accept="application/json,.json"
+			class="hidden"
+			onchange={handleImportFile}
+		/>
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger>
+				{#snippet child({ props })}
+					<Button
+						{...props}
+						type="button"
+						variant="outline"
+						size="icon"
+						class="pointer-coarse:size-11"
+						aria-label="More actions"
+					>
+						<Ellipsis class="size-4" />
+					</Button>
+				{/snippet}
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content align="end" class="min-w-52">
+				<DropdownMenu.Item
+					class="pointer-coarse:min-h-11"
 					disabled={busy}
-					onclick={() => importInput?.click()}
+					onSelect={() => importInput?.click()}
 				>
 					<Upload class="size-4" />
 					Import
-				</Button>
-				<Button type="button" variant="outline" disabled={busy} onclick={handleExport}>
+				</DropdownMenu.Item>
+				<DropdownMenu.Item class="pointer-coarse:min-h-11" disabled={busy} onSelect={handleExport}>
 					<Download class="size-4" />
 					Export all
-				</Button>
-				<Button
-					type="button"
-					variant={showBuiltins ? 'default' : 'outline'}
-					aria-pressed={showBuiltins}
-					title={showBuiltins
-						? 'Click to hide built-in fields, lists and groups'
-						: 'Click to show built-in fields, lists and groups'}
-					onclick={() => setShowBuiltins(!showBuiltins)}
+				</DropdownMenu.Item>
+				<DropdownMenu.Separator />
+				<DropdownMenu.CheckboxItem
+					class="pointer-coarse:min-h-11"
+					checked={showBuiltins}
+					onCheckedChange={(value) => setShowBuiltins(value)}
 				>
-					{#if showBuiltins}
-						<Eye class="size-4" />
-						Built-in shown
-					{:else}
-						<EyeOff class="size-4" />
-						Built-in hidden
-					{/if}
-				</Button>
-			</div>
-		</div>
-
-		<div class="flex flex-col gap-3">
-			{@render sectionHeader('Fields', 'field')}
-
-			{#if fieldsLoading && fields.length === 0}
-				<Shimmer loading={true}>
-					<div class="grid gap-3">
-						{#each loadingSkeletons as s (s)}
-							<div class="rounded-lg border p-4">
-								<div class="space-y-1">
-									<div class="h-5 w-48 rounded bg-muted"></div>
-									<div class="h-4 w-32 rounded-full bg-muted"></div>
-								</div>
-							</div>
-						{/each}
-					</div>
-				</Shimmer>
-			{:else}
-				<div class="grid gap-3">
-					{#each visibleFields as preset (preset.id)}
-						<Card.Root>
-							<Card.Header
-								class="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
-							>
-								<div class="min-w-0 flex-1">
-									<div class="flex flex-wrap items-center gap-2">
-										<Card.Title>{preset.label}</Card.Title>
-										{#if preset.builtin}
-											<Badge variant="secondary">Built-in</Badge>
-										{/if}
-									</div>
-									{#if preset.description}
-										<Card.Description>{preset.description}</Card.Description>
-									{/if}
-								</div>
-								<div class="flex flex-wrap items-center gap-1 sm:shrink-0">
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										onclick={() => toggleExample(preset.id)}
-										aria-expanded={openExamples.has(preset.id)}
-										aria-controls="example-{preset.id}"
-									>
-										<ChevronDown
-											class="size-4 transition-transform duration-150 {openExamples.has(preset.id)
-												? 'rotate-180'
-												: ''}"
-										/>
-										Try it
-									</Button>
-									{#if canEditOptions(preset)}
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon"
-											onclick={() => openEdit(preset)}
-											aria-label="Edit {preset.label}"
-										>
-											<Pencil class="size-4" />
-										</Button>
-									{/if}
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										onclick={() => handlePresetExport(preset)}
-										aria-label="Export {preset.label}"
-										disabled={sectionBusy}
-									>
-										<Download class="size-4" />
-									</Button>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										onclick={() => copyPreset(preset)}
-										aria-label="Copy {preset.label}"
-										disabled={copying}
-									>
-										<Copy class="size-4" />
-									</Button>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										disabled={preset.builtin}
-										title={preset.builtin ? "Built-in fields can't be deleted" : undefined}
-										onclick={() => handleDelete(preset, 'fields')}
-										aria-label="Delete field"
-									>
-										<Trash2 class="size-4" />
-									</Button>
-								</div>
-							</Card.Header>
-							{#if openExamples.has(preset.id)}
-								<Card.Content id="example-{preset.id}">
-									<PresetExample {preset} />
-								</Card.Content>
-							{/if}
-						</Card.Root>
-					{/each}
-				</div>
-
-				{#if visibleFields.length === 0 && !fieldsLoading}
-					<div class="flex flex-col items-center gap-3 py-10 text-center">
-						<Bookmark class="size-10 text-muted-foreground/50" />
-						{#if fields.length > 0}
-							<p class="text-sm text-muted-foreground">Built-in items are hidden</p>
-						{:else}
-							<p class="font-medium">No saved fields yet</p>
-						{/if}
-					</div>
-				{/if}
-			{/if}
-
-			{#if fieldsHasMore}
-				<div use:fieldsSentinel class="flex justify-center py-2" aria-hidden="true">
-					{#if fieldsLoading}
-						<div
-							class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
-						></div>
-					{/if}
-				</div>
-			{/if}
-		</div>
-
-		<div class="flex flex-col gap-3">
-			{@render sectionHeader('Lists', 'choice_list')}
-
-			{#if listsLoading && lists.length === 0}
-				<Shimmer loading={true}>
-					<div class="grid gap-3">
-						{#each loadingSkeletons as s (s)}
-							<div class="rounded-lg border p-4">
-								<div class="space-y-1">
-									<div class="h-5 w-48 rounded bg-muted"></div>
-									<div class="h-4 w-32 rounded-full bg-muted"></div>
-								</div>
-							</div>
-						{/each}
-					</div>
-				</Shimmer>
-			{:else}
-				<div class="grid gap-3">
-					{#each visibleLists as preset (preset.id)}
-						{@const optionCount = listOptionCount(preset)}
-						<Card.Root>
-							<Card.Header
-								class="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
-							>
-								<div class="min-w-0 flex-1">
-									<div class="flex flex-wrap items-center gap-2">
-										<Card.Title>{preset.label}</Card.Title>
-										{#if preset.builtin}
-											<Badge variant="secondary">Built-in</Badge>
-										{/if}
-									</div>
-									{#if preset.description}
-										<Card.Description>{preset.description}</Card.Description>
-									{/if}
-									{#if optionCount !== undefined}
-										<p class="mt-0.5 text-xs text-muted-foreground">
-											{optionCount}
-											{optionCount === 1 ? 'option' : 'options'}
-										</p>
-									{/if}
-								</div>
-								<div class="flex flex-wrap items-center gap-1 sm:shrink-0">
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										onclick={() => toggleExample(preset.id)}
-										aria-expanded={openExamples.has(preset.id)}
-										aria-controls="example-{preset.id}"
-									>
-										<ChevronDown
-											class="size-4 transition-transform duration-150 {openExamples.has(preset.id)
-												? 'rotate-180'
-												: ''}"
-										/>
-										Try it
-									</Button>
-									{#if canEditOptions(preset)}
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon"
-											onclick={() => openEdit(preset)}
-											aria-label="Edit {preset.label}"
-										>
-											<Pencil class="size-4" />
-										</Button>
-									{/if}
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										onclick={() => handlePresetExport(preset)}
-										aria-label="Export {preset.label}"
-										disabled={sectionBusy}
-									>
-										<Download class="size-4" />
-									</Button>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										onclick={() => copyPreset(preset)}
-										aria-label="Copy {preset.label}"
-										disabled={copying}
-									>
-										<Copy class="size-4" />
-									</Button>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										disabled={preset.builtin}
-										title={preset.builtin ? "Built-in fields can't be deleted" : undefined}
-										onclick={() => handleDelete(preset, 'lists')}
-										aria-label="Delete list"
-									>
-										<Trash2 class="size-4" />
-									</Button>
-								</div>
-							</Card.Header>
-							{#if openExamples.has(preset.id)}
-								<Card.Content id="example-{preset.id}">
-									<PresetExample {preset} />
-								</Card.Content>
-							{/if}
-						</Card.Root>
-					{/each}
-				</div>
-
-				{#if visibleLists.length === 0 && !listsLoading}
-					<div class="flex flex-col items-center gap-3 py-10 text-center">
-						<ListChecks class="size-10 text-muted-foreground/50" />
-						{#if lists.length > 0}
-							<p class="text-sm text-muted-foreground">Built-in items are hidden</p>
-						{:else}
-							<p class="font-medium">No saved lists yet</p>
-						{/if}
-					</div>
-				{/if}
-			{/if}
-
-			{#if listsHasMore}
-				<div use:listsSentinel class="flex justify-center py-2" aria-hidden="true">
-					{#if listsLoading}
-						<div
-							class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
-						></div>
-					{/if}
-				</div>
-			{/if}
-		</div>
-
-		<div class="flex flex-col gap-3">
-			{@render sectionHeader('Field groups', 'field_set')}
-
-			{#if fieldSetsLoading && fieldSets.length === 0}
-				<Shimmer loading={true}>
-					<div class="grid gap-3">
-						{#each loadingSkeletons as s (s)}
-							<div class="rounded-lg border p-4">
-								<div class="space-y-1">
-									<div class="h-5 w-48 rounded bg-muted"></div>
-									<div class="h-4 w-32 rounded-full bg-muted"></div>
-								</div>
-							</div>
-						{/each}
-					</div>
-				</Shimmer>
-			{:else}
-				<div class="grid gap-3">
-					{#each visibleFieldSets as preset (preset.id)}
-						{@const propertyCount = fieldSetPropertyCount(preset)}
-						<Card.Root>
-							<Card.Header
-								class="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
-							>
-								<div class="min-w-0 flex-1">
-									<div class="flex flex-wrap items-center gap-2">
-										<Card.Title>{preset.label}</Card.Title>
-										{#if preset.builtin}
-											<Badge variant="secondary">Built-in</Badge>
-										{/if}
-									</div>
-									{#if preset.description}
-										<Card.Description>{preset.description}</Card.Description>
-									{/if}
-									{#if propertyCount !== undefined}
-										<p class="mt-0.5 text-xs text-muted-foreground">
-											{propertyCount}
-											{propertyCount === 1 ? 'field' : 'fields'}
-										</p>
-									{/if}
-								</div>
-								<div class="flex flex-wrap items-center gap-1 sm:shrink-0">
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										onclick={() => toggleExample(preset.id)}
-										aria-expanded={openExamples.has(preset.id)}
-										aria-controls="example-{preset.id}"
-									>
-										<ChevronDown
-											class="size-4 transition-transform duration-150 {openExamples.has(preset.id)
-												? 'rotate-180'
-												: ''}"
-										/>
-										Try it
-									</Button>
-									{#if canEditOptions(preset)}
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon"
-											onclick={() => openEdit(preset)}
-											aria-label="Edit {preset.label}"
-										>
-											<Pencil class="size-4" />
-										</Button>
-									{/if}
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										onclick={() => handlePresetExport(preset)}
-										aria-label="Export {preset.label}"
-										disabled={sectionBusy}
-									>
-										<Download class="size-4" />
-									</Button>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										onclick={() => copyPreset(preset)}
-										aria-label="Copy {preset.label}"
-										disabled={copying}
-									>
-										<Copy class="size-4" />
-									</Button>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										disabled={preset.builtin}
-										title={preset.builtin ? "Built-in field groups can't be deleted" : undefined}
-										onclick={() => handleDelete(preset, 'fieldSets')}
-										aria-label="Delete field group"
-									>
-										<Trash2 class="size-4" />
-									</Button>
-								</div>
-							</Card.Header>
-							{#if openExamples.has(preset.id)}
-								<Card.Content id="example-{preset.id}">
-									<PresetExample {preset} />
-								</Card.Content>
-							{/if}
-						</Card.Root>
-					{/each}
-				</div>
-
-				{#if visibleFieldSets.length === 0 && !fieldSetsLoading}
-					<div class="flex flex-col items-center gap-3 py-10 text-center">
-						<Layers class="size-10 text-muted-foreground/50" />
-						{#if fieldSets.length > 0}
-							<p class="text-sm text-muted-foreground">Built-in items are hidden</p>
-						{:else}
-							<p class="font-medium">No saved field groups yet</p>
-						{/if}
-					</div>
-				{/if}
-			{/if}
-
-			{#if fieldSetsHasMore}
-				<div use:fieldSetsSentinel class="flex justify-center py-2" aria-hidden="true">
-					{#if fieldSetsLoading}
-						<div
-							class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
-						></div>
-					{/if}
-				</div>
-			{/if}
-		</div>
+					Show built-in fields, lists and groups
+				</DropdownMenu.CheckboxItem>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
 	</div>
+
+	<CollapsibleSection
+		id="saved-fields-fields"
+		title="Fields"
+		count={visibleFields.length}
+		class="gap-3"
+	>
+		{#snippet actions()}
+			{@render sectionActions('Fields', 'field')}
+		{/snippet}
+
+		{#if fieldsLoading && fields.length === 0}
+			<Shimmer loading={true}>
+				<div class="grid gap-3">
+					{#each loadingSkeletons as s (s)}
+						<div class="rounded-lg border p-4">
+							<div class="space-y-1">
+								<div class="h-5 w-48 rounded bg-muted"></div>
+								<div class="h-4 w-32 rounded-full bg-muted"></div>
+							</div>
+						</div>
+					{/each}
+				</div>
+			</Shimmer>
+		{:else}
+			<ul class="divide-y rounded-xl border bg-card">
+				{#each visibleFields as preset (preset.id)}
+					{@render presetRow(preset, 'fields', 'Delete field')}
+				{/each}
+			</ul>
+
+			{#if visibleFields.length === 0 && !fieldsLoading}
+				<div class="flex flex-col items-center gap-3 py-10 text-center">
+					<Bookmark class="size-10 text-muted-foreground/50" />
+					{#if fields.length > 0}
+						<p class="text-sm text-muted-foreground">Built-in items are hidden</p>
+					{:else}
+						<p class="font-medium">No saved fields yet</p>
+					{/if}
+				</div>
+			{/if}
+		{/if}
+
+		{#if fieldsHasMore}
+			<div use:fieldsSentinel class="flex justify-center py-2" aria-hidden="true">
+				{#if fieldsLoading}
+					<div
+						class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
+					></div>
+				{/if}
+			</div>
+		{/if}
+	</CollapsibleSection>
+
+	<CollapsibleSection
+		id="saved-fields-lists"
+		title="Lists"
+		count={visibleLists.length}
+		class="gap-3"
+	>
+		{#snippet actions()}
+			{@render sectionActions('Lists', 'choice_list')}
+		{/snippet}
+
+		{#if listsLoading && lists.length === 0}
+			<Shimmer loading={true}>
+				<div class="grid gap-3">
+					{#each loadingSkeletons as s (s)}
+						<div class="rounded-lg border p-4">
+							<div class="space-y-1">
+								<div class="h-5 w-48 rounded bg-muted"></div>
+								<div class="h-4 w-32 rounded-full bg-muted"></div>
+							</div>
+						</div>
+					{/each}
+				</div>
+			</Shimmer>
+		{:else}
+			<ul class="divide-y rounded-xl border bg-card">
+				{#each visibleLists as preset (preset.id)}
+					{@const optionCount = listOptionCount(preset)}
+					{@render presetRow(
+						preset,
+						'lists',
+						'Delete list',
+						optionCount === undefined
+							? undefined
+							: optionCount === 1
+								? '1 option'
+								: `${optionCount} options`
+					)}
+				{/each}
+			</ul>
+
+			{#if visibleLists.length === 0 && !listsLoading}
+				<div class="flex flex-col items-center gap-3 py-10 text-center">
+					<ListChecks class="size-10 text-muted-foreground/50" />
+					{#if lists.length > 0}
+						<p class="text-sm text-muted-foreground">Built-in items are hidden</p>
+					{:else}
+						<p class="font-medium">No saved lists yet</p>
+					{/if}
+				</div>
+			{/if}
+		{/if}
+
+		{#if listsHasMore}
+			<div use:listsSentinel class="flex justify-center py-2" aria-hidden="true">
+				{#if listsLoading}
+					<div
+						class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
+					></div>
+				{/if}
+			</div>
+		{/if}
+	</CollapsibleSection>
+
+	<CollapsibleSection
+		id="saved-fields-field-groups"
+		title="Field groups"
+		count={visibleFieldSets.length}
+		class="gap-3"
+	>
+		{#snippet actions()}
+			{@render sectionActions('Field groups', 'field_set')}
+		{/snippet}
+
+		{#if fieldSetsLoading && fieldSets.length === 0}
+			<Shimmer loading={true}>
+				<div class="grid gap-3">
+					{#each loadingSkeletons as s (s)}
+						<div class="rounded-lg border p-4">
+							<div class="space-y-1">
+								<div class="h-5 w-48 rounded bg-muted"></div>
+								<div class="h-4 w-32 rounded-full bg-muted"></div>
+							</div>
+						</div>
+					{/each}
+				</div>
+			</Shimmer>
+		{:else}
+			<ul class="divide-y rounded-xl border bg-card">
+				{#each visibleFieldSets as preset (preset.id)}
+					{@const propertyCount = fieldSetPropertyCount(preset)}
+					{@render presetRow(
+						preset,
+						'fieldSets',
+						'Delete field group',
+						propertyCount === undefined
+							? undefined
+							: propertyCount === 1
+								? '1 field'
+								: `${propertyCount} fields`
+					)}
+				{/each}
+			</ul>
+
+			{#if visibleFieldSets.length === 0 && !fieldSetsLoading}
+				<div class="flex flex-col items-center gap-3 py-10 text-center">
+					<Layers class="size-10 text-muted-foreground/50" />
+					{#if fieldSets.length > 0}
+						<p class="text-sm text-muted-foreground">Built-in items are hidden</p>
+					{:else}
+						<p class="font-medium">No saved field groups yet</p>
+					{/if}
+				</div>
+			{/if}
+		{/if}
+
+		{#if fieldSetsHasMore}
+			<div use:fieldSetsSentinel class="flex justify-center py-2" aria-hidden="true">
+				{#if fieldSetsLoading}
+					<div
+						class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
+					></div>
+				{/if}
+			</div>
+		{/if}
+	</CollapsibleSection>
 	{#if editingList}
 		{#key editSession}
 			<EditListDialog
@@ -912,4 +796,4 @@
 			/>
 		{/key}
 	{/if}
-</main>
+</Page>

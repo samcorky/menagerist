@@ -1,6 +1,7 @@
 <script lang="ts">
+	import Page from '$lib/components/page.svelte';
 	import { resolve } from '$app/paths';
-	import { ArrowLeftRight, Pencil, Trash2, X } from '@lucide/svelte';
+	import { ArrowLeftRight, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import { toast } from 'svelte-sonner';
 	import {
@@ -14,12 +15,12 @@
 	import { slugify } from '$lib/utils.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { auth } from '$lib/auth.svelte.js';
-	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
-	import * as Card from '$lib/components/ui/card/index.js';
 	import BackButton from '$lib/components/back-button.svelte';
+	import IconButton from '$lib/components/icon-button.svelte';
+	import TypeEditorDialog from '$lib/components/type-editor-dialog.svelte';
 	import SchemaEditor from '$lib/components/schema-editor.svelte';
 	import type { AttributesSchema } from '$lib/schema-types';
 
@@ -30,20 +31,15 @@
 	let loading = $state(false);
 	let hasMore = $state(true);
 
+	// One editor serves both creating (editingId null) and editing.
+	let editorOpen = $state(false);
+	let editingId = $state<string | null>(null);
 	let label = $state('');
 	let reverseLabel = $state('');
 	let description = $state('');
 	let directional = $state(true);
-	let submitting = $state(false);
-	let createSchema = $state<AttributesSchema | null>(null);
-
-	let editingId = $state<string | null>(null);
-	let editLabel = $state('');
-	let editReverseLabel = $state('');
-	let editDescription = $state('');
-	let editDirectional = $state(true);
-	let editSchema = $state<AttributesSchema | null>(null);
-	let savingId = $state<string | null>(null);
+	let schema = $state<AttributesSchema | null>(null);
+	let saving = $state(false);
 
 	async function fetchPage(after?: string) {
 		loading = true;
@@ -72,74 +68,75 @@
 		};
 	}
 
+	function openCreate() {
+		editingId = null;
+		label = '';
+		reverseLabel = '';
+		description = '';
+		directional = true;
+		schema = null;
+		editorOpen = true;
+	}
+
+	function openEdit(et: EdgeTypeResponse) {
+		editingId = et.id;
+		label = et.label;
+		reverseLabel = et.reverse_label ?? '';
+		description = et.description ?? '';
+		directional = et.directional;
+		schema = (et.attributes_schema as AttributesSchema | null) ?? null;
+		editorOpen = true;
+	}
+
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
-		submitting = true;
-		const result = await createEdgeType({
-			body: {
-				slug: slugify(label),
-				label,
-				reverse_label: reverseLabel || undefined,
-				description: description || undefined,
-				directional,
-				attributes_schema: createSchema
+		saving = true;
+		if (editingId) {
+			const id = editingId;
+			const result = await updateEdgeType({
+				path: { edge_type_id: id },
+				body: {
+					label,
+					reverse_label: reverseLabel || null,
+					description: description || null,
+					directional,
+					attributes_schema: schema
+				}
+			});
+			if (result.error || !result.data) {
+				toast.error("Couldn't save changes", { description: errorMessage(result.error) });
+			} else {
+				relTypes = relTypes.map((et) => (et.id === id ? result.data! : et));
+				editorOpen = false;
+				toast.success('Saved');
 			}
-		});
-		if (result.error || !result.data) {
-			toast.error("Couldn't create relationship type", { description: errorMessage(result.error) });
 		} else {
-			relTypes = [result.data, ...relTypes];
-			label = '';
-			reverseLabel = '';
-			description = '';
-			directional = true;
-			createSchema = null;
-			toast.success('Relationship type created');
-		}
-		submitting = false;
-	}
-
-	function startEdit(et: EdgeTypeResponse) {
-		editingId = et.id;
-		editLabel = et.label;
-		editReverseLabel = et.reverse_label ?? '';
-		editDescription = et.description ?? '';
-		editDirectional = et.directional;
-		editSchema = (et.attributes_schema as AttributesSchema | null) ?? null;
-	}
-
-	function cancelEdit() {
-		editingId = null;
-		editSchema = null;
-	}
-
-	async function handleUpdate(event: SubmitEvent, id: string) {
-		event.preventDefault();
-		savingId = id;
-		const result = await updateEdgeType({
-			path: { edge_type_id: id },
-			body: {
-				label: editLabel,
-				reverse_label: editReverseLabel || null,
-				description: editDescription || null,
-				directional: editDirectional,
-				attributes_schema: editSchema
+			const result = await createEdgeType({
+				body: {
+					slug: slugify(label),
+					label,
+					reverse_label: reverseLabel || undefined,
+					description: description || undefined,
+					directional,
+					attributes_schema: schema
+				}
+			});
+			if (result.error || !result.data) {
+				toast.error("Couldn't create relationship type", {
+					description: errorMessage(result.error)
+				});
+			} else {
+				relTypes = [result.data, ...relTypes];
+				editorOpen = false;
+				toast.success('Relationship type created');
 			}
-		});
-		if (result.error || !result.data) {
-			toast.error("Couldn't save changes", { description: errorMessage(result.error) });
-		} else {
-			relTypes = relTypes.map((et) => (et.id === id ? result.data! : et));
-			editingId = null;
-			toast.success('Saved');
 		}
-		savingId = null;
+		saving = false;
 	}
 
 	function handleDelete(et: EdgeTypeResponse) {
 		// Optimistically remove with undo window; restore if the server rejects (e.g. 409 in use)
 		relTypes = relTypes.filter((r) => r.id !== et.id);
-		editingId = null;
 
 		let undone = false;
 		const timerId = setTimeout(async () => {
@@ -180,207 +177,151 @@
 	<title>Relationship types - Menagerist</title>
 </svelte:head>
 
-<main class="flex-1 px-4 py-6 sm:px-6">
-	<div class="mx-auto flex max-w-4xl flex-col gap-6">
-		<BackButton fallback={resolve('/settings')} />
+<Page width="reading">
+	<BackButton fallback={resolve('/settings')} />
 
+	<div class="flex items-start justify-between gap-4">
 		<div>
 			<h1 class="font-heading text-3xl font-semibold tracking-tight">Relationship types</h1>
 			<p class="mt-1 text-muted-foreground">
 				Define how items connect - "Directed by", "Signed by", "Part of".
 			</p>
 		</div>
+		<IconButton label="New relationship type" variant="default" onclick={openCreate}>
+			<Plus />
+		</IconButton>
+	</div>
 
-		<Card.Root>
-			<Card.Header>
-				<Card.Title class="font-heading">New relationship type</Card.Title>
-			</Card.Header>
-			<Card.Content>
-				<form class="space-y-4" onsubmit={handleSubmit}>
-					<div class="space-y-1.5">
-						<Label for="rel-label">Label</Label>
-						<Input
-							id="rel-label"
-							bind:value={label}
-							type="text"
-							placeholder="e.g. Directed by, Related to"
-							required
-						/>
-					</div>
-					<div class="space-y-1.5">
-						<Label for="rel-reverse">Reverse label</Label>
-						<Input
-							id="rel-reverse"
-							bind:value={reverseLabel}
-							type="text"
-							placeholder="e.g. Director of (optional)"
-						/>
-					</div>
-					<div class="space-y-1.5">
-						<Label for="rel-description">Description</Label>
-						<Textarea
-							id="rel-description"
-							bind:value={description}
-							placeholder="Optional description"
-						/>
-					</div>
-					<div class="flex items-center gap-2">
-						<input
-							id="rel-directional"
-							type="checkbox"
-							bind:checked={directional}
-							class="h-4 w-4 rounded border-input accent-primary"
-						/>
-						<div>
-							<Label for="rel-directional">Directional</Label>
-							<p class="text-xs text-muted-foreground">Uncheck for symmetric (A ↔ B)</p>
-						</div>
-					</div>
-					<SchemaEditor bind:schema={createSchema} highlights highlightList="connection" />
-					<div class="flex justify-end">
-						<Button type="submit" disabled={submitting}>
-							{submitting ? 'Adding…' : 'Add relationship type'}
-						</Button>
-					</div>
-				</form>
-			</Card.Content>
-		</Card.Root>
-
-		{#if loading && relTypes.length === 0}
-			<Shimmer loading={true}>
-				<div class="grid gap-3">
-					{#each loadingSkeletons as s (s)}
-						<div class="rounded-lg border p-4">
-							<div class="flex items-center justify-between gap-4">
-								<div class="space-y-1">
-									<div class="h-5 w-48 rounded bg-muted"></div>
-									<div class="h-4 w-32 rounded-full bg-muted"></div>
-								</div>
-							</div>
-						</div>
-					{/each}
-				</div>
-			</Shimmer>
-		{:else}
+	{#if loading && relTypes.length === 0}
+		<Shimmer loading={true}>
 			<div class="grid gap-3">
-				{#each relTypes as et (et.id)}
-					<Card.Root>
-						<Card.Header
-							class="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
-						>
-							<div class="min-w-0 flex-1">
-								<Card.Title>{et.label}</Card.Title>
-								{#if et.reverse_label}
-									<p class="mt-0.5 text-sm text-muted-foreground">← {et.reverse_label}</p>
-								{/if}
-								{#if et.description}
-									<Card.Description>{et.description}</Card.Description>
-								{/if}
+				{#each loadingSkeletons as s (s)}
+					<div class="rounded-lg border p-4">
+						<div class="flex items-center justify-between gap-4">
+							<div class="space-y-1">
+								<div class="h-5 w-48 rounded bg-muted"></div>
+								<div class="h-4 w-32 rounded-full bg-muted"></div>
 							</div>
-							<div class="flex flex-wrap items-center gap-1 sm:shrink-0">
-								<Badge variant="secondary">{et.slug}</Badge>
-								<Badge variant="outline">
-									{et.directional ? 'Directional →' : 'Symmetric ↔'}
-								</Badge>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon"
-									onclick={() => startEdit(et)}
-									aria-label="Edit relationship type"
-								>
-									<Pencil class="size-4" />
-								</Button>
-								{#if auth.can('graph:edge_type:delete')}
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										onclick={() => handleDelete(et)}
-										aria-label="Delete relationship type"
-									>
-										<Trash2 class="size-4" />
-									</Button>
-								{/if}
-							</div>
-						</Card.Header>
-
-						{#if editingId === et.id}
-							<Card.Content class="border-t pt-4">
-								<form class="space-y-3" onsubmit={(e) => handleUpdate(e, et.id)}>
-									<div class="space-y-1.5">
-										<Label for="edit-label-{et.id}">Label</Label>
-										<Input id="edit-label-{et.id}" bind:value={editLabel} required />
-									</div>
-									<div class="space-y-1.5">
-										<Label for="edit-reverse-{et.id}">Reverse label</Label>
-										<Input
-											id="edit-reverse-{et.id}"
-											bind:value={editReverseLabel}
-											placeholder="Optional"
-										/>
-									</div>
-									<div class="space-y-1.5">
-										<Label for="edit-desc-{et.id}">Description</Label>
-										<Textarea
-											id="edit-desc-{et.id}"
-											bind:value={editDescription}
-											placeholder="Optional description"
-										/>
-									</div>
-									<div class="flex items-center gap-2">
-										<input
-											id="edit-directional-{et.id}"
-											type="checkbox"
-											bind:checked={editDirectional}
-											class="h-4 w-4 rounded border-input accent-primary"
-										/>
-										<Label for="edit-directional-{et.id}">Directional</Label>
-									</div>
-									<SchemaEditor
-										bind:schema={editSchema}
-										typeId={et.id}
-										typeKind="edge"
-										highlights
-										highlightList="connection"
-									/>
-									<div class="flex justify-end gap-2">
-										<Button type="button" variant="ghost" size="sm" onclick={cancelEdit}>
-											<X class="size-4" />
-											Cancel
-										</Button>
-										<Button type="submit" size="sm" disabled={savingId === et.id}>
-											{savingId === et.id ? 'Saving…' : 'Save'}
-										</Button>
-									</div>
-								</form>
-							</Card.Content>
-						{/if}
-					</Card.Root>
+						</div>
+					</div>
 				{/each}
 			</div>
-
-			{#if relTypes.length === 0 && !loading}
-				<div class="flex flex-col items-center gap-3 py-12 text-center">
-					<ArrowLeftRight class="size-10 text-muted-foreground/50" />
-					<div>
-						<p class="font-medium">No relationship types yet</p>
-						<p class="text-sm text-muted-foreground">
-							Connections still work - relationship types just add labels and meaning.
-						</p>
-					</div>
-				</div>
-			{/if}
+		</Shimmer>
+	{:else}
+		{#if relTypes.length > 0}
+			<ul class="divide-y rounded-xl border bg-card">
+				{#each relTypes as et (et.id)}
+					<li class="flex items-center gap-3 px-3 py-2">
+						<div class="min-w-0 flex-1">
+							<div class="flex items-center gap-2">
+								<span class="truncate font-medium">{et.label}</span>
+								{#if et.reverse_label}
+									<span class="truncate text-sm text-muted-foreground">← {et.reverse_label}</span>
+								{/if}
+								<span class="shrink-0 font-mono text-xs text-muted-foreground">{et.slug}</span>
+							</div>
+							{#if et.description}
+								<p class="truncate text-sm text-muted-foreground">{et.description}</p>
+							{/if}
+						</div>
+						<Badge variant="outline" class="hidden shrink-0 sm:inline-flex">
+							{et.directional ? 'Directional →' : 'Symmetric ↔'}
+						</Badge>
+						<IconButton
+							labelOnTouch={false}
+							label="Edit relationship type"
+							onclick={() => openEdit(et)}
+						>
+							<Pencil />
+						</IconButton>
+						{#if auth.can('graph:edge_type:delete')}
+							<IconButton
+								labelOnTouch={false}
+								label="Delete relationship type"
+								onclick={() => handleDelete(et)}
+							>
+								<Trash2 />
+							</IconButton>
+						{/if}
+					</li>
+				{/each}
+			</ul>
 		{/if}
 
-		{#if hasMore}
-			<div use:sentinel class="flex justify-center py-4" aria-hidden="true">
-				{#if loading}
-					<div
-						class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
-					></div>
-				{/if}
+		{#if relTypes.length === 0 && !loading}
+			<div class="flex flex-col items-center gap-3 py-12 text-center">
+				<ArrowLeftRight class="size-10 text-muted-foreground/50" />
+				<div>
+					<p class="font-medium">No relationship types yet</p>
+					<p class="text-sm text-muted-foreground">
+						Connections still work - relationship types just add labels and meaning.
+					</p>
+				</div>
 			</div>
 		{/if}
+	{/if}
+
+	{#if hasMore}
+		<div use:sentinel class="flex justify-center py-4" aria-hidden="true">
+			{#if loading}
+				<div
+					class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
+				></div>
+			{/if}
+		</div>
+	{/if}
+</Page>
+
+<TypeEditorDialog
+	open={editorOpen}
+	title={editingId ? 'Edit relationship type' : 'New relationship type'}
+	submitLabel={editingId ? 'Save' : 'Add relationship type'}
+	busyLabel={editingId ? 'Saving…' : 'Adding…'}
+	busy={saving}
+	value={{ label, reverseLabel, description, directional, schema }}
+	onSubmit={handleSubmit}
+	onClose={() => (editorOpen = false)}
+>
+	<div class="space-y-1.5">
+		<Label for="rel-label">Label</Label>
+		<Input
+			id="rel-label"
+			bind:value={label}
+			type="text"
+			placeholder="e.g. Directed by, Related to"
+			required
+		/>
 	</div>
-</main>
+	<div class="space-y-1.5">
+		<Label for="rel-reverse">Reverse label</Label>
+		<Input
+			id="rel-reverse"
+			bind:value={reverseLabel}
+			type="text"
+			placeholder="e.g. Director of (optional)"
+		/>
+	</div>
+	<div class="space-y-1.5">
+		<Label for="rel-description">Description</Label>
+		<Textarea id="rel-description" bind:value={description} placeholder="Optional description" />
+	</div>
+	<div class="flex items-center gap-2">
+		<input
+			id="rel-directional"
+			type="checkbox"
+			bind:checked={directional}
+			class="h-4 w-4 rounded border-input accent-primary"
+		/>
+		<div>
+			<Label for="rel-directional">Directional</Label>
+			<p class="text-xs text-muted-foreground">Uncheck for symmetric (A ↔ B)</p>
+		</div>
+	</div>
+	<SchemaEditor
+		bind:schema
+		typeId={editingId ?? undefined}
+		typeKind={editingId ? 'edge' : undefined}
+		highlights
+		highlightList="connection"
+	/>
+</TypeEditorDialog>

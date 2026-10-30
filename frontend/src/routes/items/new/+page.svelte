@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Page from '$lib/components/page.svelte';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -17,7 +18,7 @@
 	import AttributesEditor from '$lib/components/attributes-editor.svelte';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import BackButton from '$lib/components/back-button.svelte';
-	import CategorySelect from '$lib/components/category-select.svelte';
+	import TypePicker from '$lib/components/type-picker.svelte';
 	import TagsInput from '$lib/components/tags-input.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -137,80 +138,78 @@
 	<title>New item - Menagerist</title>
 </svelte:head>
 
-<main class="flex-1 px-4 py-6 sm:px-6">
-	<div class="mx-auto flex max-w-2xl flex-col gap-6">
-		<BackButton fallback={resolve('/items')} />
+<Page width="form">
+	<BackButton fallback={resolve('/items')} />
 
-		<Card.Root>
-			<Card.Header>
-				<Card.Title class="font-heading text-xl">New item</Card.Title>
-			</Card.Header>
-			<Card.Content>
-				<form class="space-y-4" onsubmit={handleSubmit}>
-					<!-- Photo -->
-					{#if photoPreview}
-						<div class="relative">
-							<img
-								src={photoPreview}
-								alt="Cover preview"
-								class="max-h-48 w-full rounded-lg object-cover"
-							/>
-							<button
-								type="button"
-								onclick={clearPhoto}
-								aria-label="Remove photo"
-								class="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 text-white after:absolute after:-inset-2 after:content-[''] hover:bg-black/70"
-							>
-								<X class="size-3.5" />
-							</button>
-						</div>
-					{:else}
-						<label
-							class="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="font-heading text-xl">New item</Card.Title>
+		</Card.Header>
+		<Card.Content>
+			<form class="space-y-4" onsubmit={handleSubmit}>
+				<!-- Photo -->
+				{#if photoPreview}
+					<div class="relative">
+						<img
+							src={photoPreview}
+							alt="Cover preview"
+							class="max-h-48 w-full rounded-lg object-cover"
+						/>
+						<button
+							type="button"
+							onclick={clearPhoto}
+							aria-label="Remove photo"
+							class="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 text-white after:absolute after:-inset-2 after:content-[''] hover:bg-black/70"
 						>
-							<ImagePlus class="size-4" />
-							Add cover photo
-							<input type="file" accept="image/*" class="sr-only" onchange={handlePhotoChange} />
-						</label>
-					{/if}
-
-					<!-- Name -->
-					<div class="space-y-2">
-						<Label for="name">Name</Label>
-						<Input id="name" bind:value={name} required autofocus />
+							<X class="size-3.5" />
+						</button>
 					</div>
+				{:else}
+					<label
+						class="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+					>
+						<ImagePlus class="size-4" />
+						Add cover photo
+						<input type="file" accept="image/*" class="sr-only" onchange={handlePhotoChange} />
+					</label>
+				{/if}
 
-					<!-- Item type -->
-					<div class="space-y-2">
-						<Label>Item type</Label>
-						<CategorySelect bind:value={selectedType} />
-					</div>
+				<!-- Name -->
+				<div class="space-y-2">
+					<Label for="name">Name</Label>
+					<Input id="name" bind:value={name} required autofocus />
+				</div>
 
-					<!-- Description -->
-					<div class="space-y-2">
-						<Label for="description">Description</Label>
-						<Textarea id="description" bind:value={description} />
-					</div>
+				<!-- Item type -->
+				<div class="space-y-2">
+					<Label>Item type</Label>
+					<TypePicker bind:value={selectedType} />
+				</div>
 
-					<TagsInput bind:tags />
+				<!-- Description -->
+				<div class="space-y-2">
+					<Label for="description">Description</Label>
+					<Textarea id="description" bind:value={description} />
+				</div>
 
-					<!-- Attributes (schema-aware when item type selected) -->
-					<AttributesEditor
-						bind:rows={attrRows}
-						bind:extraSchema
-						schema={nodeSchema}
-						supportsExtraFields={true}
-						nodeTypeId={nodeTypes.find((nt) => nt.slug === selectedType)?.id}
-						serverErrors={attrServerErrors}
-					/>
+				<TagsInput bind:tags />
 
-					<div class="flex justify-end">
-						<Button type="submit" disabled={!name.trim() || saving}>
-							{saving ? 'Saving…' : 'Save'}
-						</Button>
-					</div>
-				</form>
-			</Card.Content>
-		</Card.Root>
-	</div>
-</main>
+				<!-- Attributes (schema-aware when item type selected) -->
+				<AttributesEditor
+					bind:rows={attrRows}
+					bind:extraSchema
+					schema={nodeSchema}
+					supportsExtraFields={true}
+					nodeTypeId={nodeTypes.find((nt) => nt.slug === selectedType)?.id}
+					serverErrors={attrServerErrors}
+				/>
+
+				<div class="flex justify-end">
+					<Button type="submit" disabled={!name.trim() || saving}>
+						{saving ? 'Saving…' : 'Save'}
+					</Button>
+				</div>
+			</form>
+		</Card.Content>
+	</Card.Root>
+</Page>

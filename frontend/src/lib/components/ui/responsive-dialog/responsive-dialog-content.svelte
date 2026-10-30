@@ -6,12 +6,13 @@
 	 * centered dialog at the `sm` breakpoint - the app's one modal shape, per DESIGN_GUIDELINES §23.
 	 */
 	export const responsiveDialogContentVariants = tv({
-		base: 'fixed right-0 bottom-0 left-0 z-50 max-h-[90dvh] overflow-y-auto rounded-t-2xl border-t bg-background p-6 shadow-xl sm:inset-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-full sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border',
+		base: 'fixed right-0 bottom-0 left-0 z-50 max-h-[90dvh] overflow-x-hidden overflow-y-auto overscroll-contain rounded-t-2xl border-t bg-background p-6 shadow-xl sm:inset-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-full sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border',
 		variants: {
 			size: {
 				sm: 'sm:max-w-sm',
 				md: 'sm:max-w-md',
-				lg: 'sm:max-w-lg'
+				lg: 'sm:max-w-lg',
+				xl: 'sm:max-w-3xl'
 			}
 		},
 		defaultVariants: {
@@ -29,6 +30,7 @@
 	import { X } from '@lucide/svelte';
 	import { cn, type WithoutChildrenOrChild } from '$lib/utils.js';
 	import type { ComponentProps } from 'svelte';
+	import PageScrollLock from '$lib/components/page-scroll-lock.svelte';
 	import ResponsiveDialogPortal from './responsive-dialog-portal.svelte';
 	import ResponsiveDialogOverlay from './responsive-dialog-overlay.svelte';
 
@@ -59,6 +61,7 @@
 		class={cn(responsiveDialogContentVariants({ size }), className)}
 		{...restProps}
 	>
+		<PageScrollLock />
 		<div class="mx-auto mb-5 h-1.5 w-12 rounded-full bg-muted sm:hidden"></div>
 		<div class="flex items-center justify-between">
 			<DialogPrimitive.Title class="text-lg font-semibold">{title}</DialogPrimitive.Title>

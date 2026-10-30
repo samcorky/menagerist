@@ -3,19 +3,18 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { onNavigate, goto } from '$app/navigation';
-	import {
-		CirclePlus,
-		LayoutGrid,
-		House,
-		Settings,
-		BookOpen,
-		Library,
-		Search
-	} from '@lucide/svelte';
-	import { onMount } from 'svelte';
+	import { CirclePlus, LayoutGrid, House, Settings, Library, Menu, Search } from '@lucide/svelte';
+	import { onMount, setContext } from 'svelte';
 	import { Toaster } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { TooltipProvider } from '$lib/components/ui/tooltip/index.js';
+	import AppSidebar from '$lib/components/app-sidebar.svelte';
+	import { sidebar } from '$lib/sidebar.svelte';
+	import { isTextEntry } from '$lib/text-entry';
+	import { MediaQuery } from 'svelte/reactivity';
+	import { PAGE_ALIGN, type PageAlignSource } from '$lib/page-context';
+	import { inlineSearch } from '$lib/viewport.svelte.js';
+	import IconButton from '$lib/components/icon-button.svelte';
 	import ThemeToggle from '$lib/components/theme-toggle.svelte';
 	import UserMenu from '$lib/components/user-menu.svelte';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
@@ -29,6 +28,23 @@
 	import CaptureSheet from '$lib/components/capture-sheet.svelte';
 	import { registerShortcut, attachShortcuts } from '$lib/shortcuts.svelte';
 	import ShortcutsHelpDialog from '$lib/components/shortcuts-help-dialog.svelte';
+
+	// On a phone the keyboard takes half the screen, so the bottom bar steps aside while a text
+	// field has focus instead of riding above the keyboard.
+	const touch = new MediaQuery('any-hover: none', false);
+	let fieldFocused = $state(false);
+	const keyboardUp = $derived(touch.current && fieldFocused);
+	// The bar comes back a moment after focus leaves the field, not at once: it changes the page's
+	// height, and doing that between pressing and lifting a finger on Save loses the tap.
+	let restoreTimer: ReturnType<typeof setTimeout> | undefined;
+	function trackFocus(event: FocusEvent) {
+		clearTimeout(restoreTimer);
+		if (event.type === 'focusin' && isTextEntry(event.target as HTMLElement | null)) {
+			fieldFocused = true;
+		} else {
+			restoreTimer = setTimeout(() => (fieldFocused = false), 300);
+		}
+	}
 
 	let { children } = $props();
 
@@ -86,6 +102,14 @@
 			void goto(decision.to, { replaceState: true });
 		}
 	});
+
+	// Pages sit against the sidebar when there is one, and centre on the signed-out screens.
+	const pageAlign: PageAlignSource = {
+		get current() {
+			return showNav ? 'start' : 'center';
+		}
+	};
+	setContext(PAGE_ALIGN, pageAlign);
 
 	const homeActive = $derived(pathname === resolve('/'));
 	const itemsActive = $derived(pathname.startsWith(resolve('/items')));
@@ -175,118 +199,119 @@
 	$effect(() => attachShortcuts(window));
 </script>
 
+<svelte:window
+	onresize={() => sidebar.setWidth(window.innerWidth)}
+	onfocusin={trackFocus}
+	onfocusout={trackFocus}
+/>
+
 <svelte:head>
 	<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </svelte:head>
 
 <Toaster richColors position="top-right" offset={{ top: '76px' }} mobileOffset={{ top: '68px' }} />
 <CaptureSheet />
-<SearchPalette />
+{#if !inlineSearch.current}
+	<SearchPalette />
+{/if}
 <ShortcutsHelpDialog open={helpOpen} onOpenChange={(v) => (helpOpen = v)} />
 
 <TooltipProvider>
 	<div class="flex h-dvh flex-col">
 		<header
 			style="view-transition-name: site-header"
-			class="sticky top-0 z-50 border-b bg-background/95 backdrop-blur"
+			class="sticky top-0 z-30 border-b bg-background/95 backdrop-blur"
 		>
-			<div class="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
+			<div class="flex items-center gap-2 px-3 py-1.5">
+				{#if showNav}
+					<IconButton
+						label="Menu"
+						labelOnTouch={false}
+						aria-controls="app-sidebar"
+						aria-expanded={sidebar.mode === 'drawer'
+							? sidebar.drawerOpen
+							: sidebar.mode === 'expanded'}
+						onclick={() => sidebar.toggle()}
+					>
+						<Menu />
+					</IconButton>
+				{/if}
 				<a
 					href={resolve('/')}
 					class="flex items-center gap-2 text-base font-semibold tracking-tight"
 				>
 					<span
 						aria-hidden="true"
-						class="size-7 shrink-0 bg-foreground"
+						class="size-6 shrink-0 bg-foreground"
 						style="mask-image: url(/logo.svg); mask-size: contain; mask-repeat: no-repeat; mask-position: center; -webkit-mask-image: url(/logo.svg); -webkit-mask-size: contain; -webkit-mask-repeat: no-repeat; -webkit-mask-position: center;"
 					></span>
 					Menagerist
 				</a>
 
-				<nav class="hidden items-center gap-1 md:flex">
-					{#if showNav}
-						<Button variant={homeActive ? 'secondary' : 'ghost'} size="sm" href={resolve('/')}>
-							<House class="size-4" />
-							Home
-						</Button>
-						<Button
-							variant={itemsActive ? 'secondary' : 'ghost'}
-							size="sm"
-							href={resolve('/items')}
-						>
-							<LayoutGrid class="size-4" />
-							Items
-						</Button>
-						<Button
-							variant={collectionsActive ? 'secondary' : 'ghost'}
-							size="sm"
-							href={resolve('/collections')}
-						>
-							<Library class="size-4" />
-							Collections
-						</Button>
-						<Button size="sm" onclick={() => goto(resolve('/items/new'))}>
-							<CirclePlus class="size-4" />
-							New item
-						</Button>
-						<Button
-							variant="ghost"
-							size="icon"
-							href="/api/docs"
-							target="_blank"
-							aria-label="API docs"
-						>
-							<BookOpen class="size-4" />
-						</Button>
-						<Button
-							variant={settingsActive ? 'secondary' : 'ghost'}
-							size="icon"
-							href={resolve('/settings')}
-							aria-label="Settings"
-						>
-							<Settings class="size-4" />
-						</Button>
-						<Button
-							variant="ghost"
-							size="icon"
-							class="size-11"
-							aria-label="Search"
+				{#if showNav && inlineSearch.current}
+					<div class="flex-1 px-2">
+						<div class="mx-auto w-full max-w-xl">
+							<SearchPalette inline />
+						</div>
+					</div>
+				{:else}
+					<div class="flex-1"></div>
+				{/if}
+
+				{#if showNav}
+					{#if !inlineSearch.current}
+						<IconButton
+							label="Search"
+							shortcut="/"
+							labelOnTouch={false}
+							class="max-md:hidden"
 							onclick={() => searchPaletteController.show()}
 						>
-							<Search class="size-4" />
-						</Button>
+							<Search />
+						</IconButton>
 					{/if}
-					<ThemeToggle />
-					<UserMenu />
-				</nav>
-
-				<div class="flex items-center gap-1 md:hidden">
-					<ThemeToggle />
-					<UserMenu />
-				</div>
+					<IconButton
+						label="New item"
+						shortcut="N"
+						variant="default"
+						class="max-md:hidden"
+						onclick={() => goto(resolve('/items/new'))}
+					>
+						<CirclePlus />
+					</IconButton>
+				{/if}
+				<ThemeToggle />
+				<UserMenu />
 			</div>
 		</header>
 
-		<div id="main-scroll" class="flex-1 overflow-y-auto">
-			{#if showPage}
-				{@render children()}
-			{:else if auth.loadFailed}
-				<main class="flex flex-1 flex-col items-center gap-3 px-4 py-16 text-center">
-					<h1 class="font-heading text-xl font-semibold">Can't reach Menagerist</h1>
-					<p class="text-muted-foreground">Check your connection, then try again.</p>
-					<Button class="h-11" onclick={() => auth.init()}>Try again</Button>
-				</main>
-			{:else}
-				<div class="flex justify-center py-16">
-					<Spinner class="size-6" />
-				</div>
+		<div class="flex min-h-0 flex-1">
+			{#if showNav}
+				<AppSidebar />
 			{/if}
+			<div id="main-scroll" class="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
+				{#if showPage}
+					{@render children()}
+				{:else if auth.loadFailed}
+					<main class="flex flex-1 flex-col items-center gap-3 px-4 py-16 text-center">
+						<h1 class="font-heading text-xl font-semibold">Can't reach Menagerist</h1>
+						<p class="text-muted-foreground">Check your connection, then try again.</p>
+						<Button class="pointer-coarse:h-11" onclick={() => auth.init()}>Try again</Button>
+					</main>
+				{:else}
+					<div class="flex justify-center py-16">
+						<Spinner class="size-6" />
+					</div>
+				{/if}
+			</div>
 		</div>
 
 		{#if showNav}
 			<nav
 				style="view-transition-name: site-nav; padding-bottom: env(safe-area-inset-bottom)"
-				class="shrink-0 border-t bg-background/95 backdrop-blur md:hidden"
+				class="shrink-0 border-t bg-background/95 backdrop-blur md:hidden {keyboardUp
+					? 'h-0 overflow-hidden border-t-0 p-0 opacity-0'
+					: ''}"
 			>
 				<div class="flex items-center px-0 py-1">
 					<a

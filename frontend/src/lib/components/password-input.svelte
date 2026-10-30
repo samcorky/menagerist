@@ -16,7 +16,10 @@
 	let visible = $state(false);
 </script>
 
-<InputGroup.Root class={cn('h-11', className)} data-disabled={disabled ? 'true' : undefined}>
+<InputGroup.Root
+	class={cn('pointer-coarse:h-11', className)}
+	data-disabled={disabled ? 'true' : undefined}
+>
 	<InputGroup.Input
 		bind:ref
 		bind:value
@@ -28,7 +31,7 @@
 	<InputGroup.Addon align="inline-end">
 		<InputGroup.Button
 			size="icon-sm"
-			class="size-11"
+			class="pointer-coarse:size-11"
 			{disabled}
 			aria-label={visible ? 'Hide password' : 'Show password'}
 			aria-pressed={visible}

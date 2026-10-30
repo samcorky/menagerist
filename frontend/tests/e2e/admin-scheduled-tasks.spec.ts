@@ -11,7 +11,7 @@ const TASK = 'Clear expired sign-ins';
 
 test('an administrator starts a task and sees the worker finish it', async ({ page }) => {
 	await page.goto('/admin');
-	await page.locator('a[href="/admin/scheduled-tasks"]').click();
+	await page.locator('main a[href="/admin/scheduled-tasks"]').click();
 	await expect(page.getByRole('heading', { name: 'Scheduled tasks', exact: true })).toBeVisible();
 
 	const table = page.getByRole('table', { name: 'Scheduled tasks' });

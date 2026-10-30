@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Page from '$lib/components/page.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { Check } from '@lucide/svelte';
@@ -133,107 +134,105 @@
 	<title>Examples - Menagerist</title>
 </svelte:head>
 
-<main class="flex-1 px-4 py-8 sm:px-6">
-	<div class="mx-auto flex max-w-2xl flex-col gap-8">
-		<div>
-			<BackButton fallback={resolve('/settings')} />
-			<h1 class="mt-2 font-heading text-3xl font-semibold tracking-tight">Examples</h1>
-			<p class="mt-1 text-muted-foreground">
-				Try Menagerist with some ready-made items. Remove them whenever you like.
-			</p>
-		</div>
-
-		{#if loadingDisplay.show}
-			<div class="grid gap-4">
-				{#each [1, 2] as s (s)}
-					<div class="h-32 animate-pulse rounded-xl bg-muted"></div>
-				{/each}
-			</div>
-		{:else if !loading && loadFailed}
-			<div class="flex flex-col items-start gap-3 rounded-xl border border-dashed p-5">
-				<p class="text-sm text-muted-foreground">Couldn't load the examples.</p>
-				<Button variant="outline" onclick={() => void load()}>Try again</Button>
-			</div>
-		{:else if !loading && packs.length === 0}
-			<p class="text-sm text-muted-foreground">There are no examples available right now.</p>
-		{:else if !loading}
-			<div class="grid gap-4">
-				{#each packs as pack (pack.id)}
-					{@const installed = isInstalled(pack)}
-					{@const busy = busyId === pack.id}
-					{@const note = addOnNote(pack)}
-					{@const linksLine = linksNote(pack)}
-					{@const blocked = installed ? removeBlockedReason(pack) : addBlockedReason(pack, packs)}
-					<Card.Root>
-						<Card.Header>
-							<Card.Title>{pack.name}</Card.Title>
-							<Card.Description>{pack.description}</Card.Description>
-						</Card.Header>
-						<Card.Content class="text-sm text-muted-foreground">
-							{#if note}
-								<p class="mb-1">{note}</p>
-							{/if}
-							{#if linksLine}
-								<p class="mb-1">{linksLine}</p>
-							{/if}
-							{describeCounts(pack.counts)}
-							{#if keptNotes[pack.id]}
-								<ul class="mt-3 list-disc space-y-1 pl-5">
-									{#each keptNotes[pack.id] as kept (kept.reason)}
-										<li>
-											{kept.count}
-											{kept.count === 1 ? 'item was' : 'items were'} kept because {reasonLabel(
-												kept.reason
-											)}.
-										</li>
-									{/each}
-								</ul>
-							{/if}
-						</Card.Content>
-						<Card.Footer class="flex flex-wrap items-center gap-3">
-							{#if installed}
-								<span class="flex items-center gap-1 text-sm text-muted-foreground">
-									<Check class="size-4" />
-									Added
-								</span>
-								<Button
-									variant="outline"
-									disabled={busy || blocked !== null}
-									class="min-h-11"
-									aria-describedby={blocked ? `blocked-${pack.id}` : undefined}
-									aria-label="Remove {pack.name}"
-									bind:ref={() => buttons[pack.id] ?? null, (el) => (buttons[pack.id] = el)}
-									onclick={() => (confirmPack = pack)}
-								>
-									Remove
-								</Button>
-							{:else}
-								<Button
-									disabled={busy || blocked !== null}
-									class="min-h-11"
-									aria-describedby={blocked ? `blocked-${pack.id}` : undefined}
-									aria-label="Add {pack.name}"
-									bind:ref={() => buttons[pack.id] ?? null, (el) => (buttons[pack.id] = el)}
-									onclick={() => void install(pack)}
-								>
-									{#if busy}
-										<Spinner class="size-4" />
-										Adding...
-									{:else}
-										Add examples
-									{/if}
-								</Button>
-							{/if}
-							{#if blocked}
-								<p id="blocked-{pack.id}" class="text-sm text-muted-foreground">{blocked}</p>
-							{/if}
-						</Card.Footer>
-					</Card.Root>
-				{/each}
-			</div>
-		{/if}
+<Page width="form" class="gap-6">
+	<div>
+		<BackButton fallback={resolve('/settings')} />
+		<h1 class="mt-2 font-heading text-3xl font-semibold tracking-tight">Examples</h1>
+		<p class="mt-1 text-muted-foreground">
+			Try Menagerist with some ready-made items. Remove them whenever you like.
+		</p>
 	</div>
-</main>
+
+	{#if loadingDisplay.show}
+		<div class="grid gap-4">
+			{#each [1, 2] as s (s)}
+				<div class="h-32 animate-pulse rounded-xl bg-muted"></div>
+			{/each}
+		</div>
+	{:else if !loading && loadFailed}
+		<div class="flex flex-col items-start gap-3 rounded-xl border border-dashed p-5">
+			<p class="text-sm text-muted-foreground">Couldn't load the examples.</p>
+			<Button variant="outline" onclick={() => void load()}>Try again</Button>
+		</div>
+	{:else if !loading && packs.length === 0}
+		<p class="text-sm text-muted-foreground">There are no examples available right now.</p>
+	{:else if !loading}
+		<div class="grid gap-4">
+			{#each packs as pack (pack.id)}
+				{@const installed = isInstalled(pack)}
+				{@const busy = busyId === pack.id}
+				{@const note = addOnNote(pack)}
+				{@const linksLine = linksNote(pack)}
+				{@const blocked = installed ? removeBlockedReason(pack) : addBlockedReason(pack, packs)}
+				<Card.Root>
+					<Card.Header>
+						<Card.Title>{pack.name}</Card.Title>
+						<Card.Description>{pack.description}</Card.Description>
+					</Card.Header>
+					<Card.Content class="text-sm text-muted-foreground">
+						{#if note}
+							<p class="mb-1">{note}</p>
+						{/if}
+						{#if linksLine}
+							<p class="mb-1">{linksLine}</p>
+						{/if}
+						{describeCounts(pack.counts)}
+						{#if keptNotes[pack.id]}
+							<ul class="mt-3 list-disc space-y-1 pl-5">
+								{#each keptNotes[pack.id] as kept (kept.reason)}
+									<li>
+										{kept.count}
+										{kept.count === 1 ? 'item was' : 'items were'} kept because {reasonLabel(
+											kept.reason
+										)}.
+									</li>
+								{/each}
+							</ul>
+						{/if}
+					</Card.Content>
+					<Card.Footer class="flex flex-wrap items-center gap-3">
+						{#if installed}
+							<span class="flex items-center gap-1 text-sm text-muted-foreground">
+								<Check class="size-4" />
+								Added
+							</span>
+							<Button
+								variant="outline"
+								disabled={busy || blocked !== null}
+								class="pointer-coarse:min-h-11"
+								aria-describedby={blocked ? `blocked-${pack.id}` : undefined}
+								aria-label="Remove {pack.name}"
+								bind:ref={() => buttons[pack.id] ?? null, (el) => (buttons[pack.id] = el)}
+								onclick={() => (confirmPack = pack)}
+							>
+								Remove
+							</Button>
+						{:else}
+							<Button
+								disabled={busy || blocked !== null}
+								class="pointer-coarse:min-h-11"
+								aria-describedby={blocked ? `blocked-${pack.id}` : undefined}
+								aria-label="Add {pack.name}"
+								bind:ref={() => buttons[pack.id] ?? null, (el) => (buttons[pack.id] = el)}
+								onclick={() => void install(pack)}
+							>
+								{#if busy}
+									<Spinner class="size-4" />
+									Adding...
+								{:else}
+									Add examples
+								{/if}
+							</Button>
+						{/if}
+						{#if blocked}
+							<p id="blocked-{pack.id}" class="text-sm text-muted-foreground">{blocked}</p>
+						{/if}
+					</Card.Footer>
+				</Card.Root>
+			{/each}
+		</div>
+	{/if}
+</Page>
 
 <ConfirmDialog
 	open={confirmPack !== null}

@@ -11,7 +11,10 @@ test('an administrator creates, verifies, downloads, uploads and deletes a backu
 	const ids: string[] = [];
 	try {
 		await page.goto('/admin');
-		await page.getByRole('link', { name: /Backups/ }).click();
+		await page
+			.getByRole('main')
+			.getByRole('link', { name: /Backups/ })
+			.click();
 		await expect(page.getByRole('heading', { name: 'Backups', exact: true })).toBeVisible();
 		await expect(page.getByLabel('Backup label')).toHaveCount(0);
 		await page.getByRole('button', { name: 'Create backup', exact: true }).click();

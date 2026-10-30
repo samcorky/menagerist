@@ -1,4 +1,6 @@
 <script lang="ts">
+	import IconButton from '$lib/components/icon-button.svelte';
+	import Page from '$lib/components/page.svelte';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { resolve } from '$app/paths';
@@ -95,6 +97,7 @@
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import NodeCard from '$lib/components/node-card.svelte';
 	import NodeGridCard from '$lib/components/node-grid-card.svelte';
+	import SurpriseButton from '$lib/components/surprise-button.svelte';
 	import NotFound from '$lib/components/not-found.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -940,405 +943,406 @@
 	<title>{collection ? `${collection.name} - Menagerist` : 'Collection - Menagerist'}</title>
 </svelte:head>
 
-<main class="flex-1 px-4 py-6 sm:px-6">
-	<div class="mx-auto flex max-w-4xl flex-col gap-6">
-		<BackButton fallback={resolve('/collections')} />
+<Page width="fluid">
+	<BackButton fallback={resolve('/collections')} />
 
-		{#if notFound}
-			<NotFound
-				heading="Collection not found"
-				description="This collection no longer exists."
-				backHref={resolve('/collections')}
-				backLabel="Back to Collections"
-			/>
-		{:else if loadFailed}
-			<div class="flex flex-col items-start gap-3 rounded-xl border border-dashed p-5">
-				<p class="text-sm text-muted-foreground">Couldn't load this collection.</p>
-				<Button variant="outline" onclick={() => void loadCollection(collectionId)}>
-					Try again
-				</Button>
-			</div>
-		{:else}
-			{#if collection}
-				<div class="flex flex-wrap items-start justify-between gap-3">
-					<div class="min-w-0">
-						<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-							<h1 class="font-heading text-3xl font-semibold tracking-tight break-words">
-								{collection.name}
-							</h1>
-							{#if smart}
-								<Badge variant="secondary" class="shrink-0">Smart</Badge>
-							{/if}
-							{#if exampleCollectionIds.has(collection.id)}
-								<Badge variant="outline" class="shrink-0 text-muted-foreground">Example</Badge>
-							{/if}
-						</div>
-						{#if collection.description}
-							<p class="mt-1 whitespace-pre-line text-muted-foreground">
-								{collection.description}
-							</p>
-						{/if}
-						<CollectionCount {collection} ready={firstPageLoaded} />
-					</div>
-					<div class="flex flex-wrap items-center gap-2">
+	{#if notFound}
+		<NotFound
+			heading="Collection not found"
+			description="This collection no longer exists."
+			backHref={resolve('/collections')}
+			backLabel="Back to Collections"
+		/>
+	{:else if loadFailed}
+		<div class="flex flex-col items-start gap-3 rounded-xl border border-dashed p-5">
+			<p class="text-sm text-muted-foreground">Couldn't load this collection.</p>
+			<Button variant="outline" onclick={() => void loadCollection(collectionId)}>Try again</Button>
+		</div>
+	{:else}
+		{#if collection}
+			<div class="flex flex-wrap items-start justify-between gap-3">
+				<div class="min-w-0">
+					<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+						<h1 class="font-heading text-3xl font-semibold tracking-tight break-words">
+							{collection.name}
+						</h1>
 						{#if smart}
-							{#if !unreadable}
-								<Button bind:ref={headerAddButton} onclick={openConditions}>
-									<SlidersHorizontal class="size-4" />
-									Edit conditions
-								</Button>
-							{/if}
-						{:else}
-							<Button bind:ref={headerAddButton} onclick={openAdd}>
-								<Plus class="size-4" />
-								Add items
-							</Button>
+							<Badge variant="secondary" class="shrink-0">Smart</Badge>
 						{/if}
-						<Button variant="outline" onclick={openEdit}>
-							<Pencil class="size-4" />
-							Edit
-						</Button>
-						<Button variant="outline" onclick={openDelete}>
-							<Trash2 class="size-4" />
-							Delete
-						</Button>
+						{#if exampleCollectionIds.has(collection.id)}
+							<Badge variant="outline" class="shrink-0 text-muted-foreground">Example</Badge>
+						{/if}
 					</div>
+					{#if collection.description}
+						<p class="mt-1 whitespace-pre-line text-muted-foreground">
+							{collection.description}
+						</p>
+					{/if}
+					<CollectionCount {collection} ready={firstPageLoaded} />
 				</div>
-			{:else if loadingDisplay.show}
-				<div class="h-16 animate-pulse rounded-xl bg-muted" aria-hidden="true"></div>
-			{/if}
-
-			{#if collection && smart}
-				<div class="flex flex-col gap-3">
-					<SmartConditions
-						definition={collection.definition}
-						{lookup}
-						warnings={savedWarnings}
-						locked
-					/>
-					<p class="text-sm text-muted-foreground">{SMART_EXPLANATION}</p>
-				</div>
-			{/if}
-
-			<div class="flex flex-wrap items-center gap-2">
-				{#if !unreadable}
-					<input
-						bind:value={searchInput}
-						type="search"
-						placeholder="Search this collection…"
-						aria-label="Search this collection"
-						class="flex h-9 min-w-0 flex-1 basis-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:max-w-sm sm:basis-auto"
-					/>
-				{/if}
-				<div class="ml-auto flex items-center gap-2">
-					{#if smart && !unreadable}
-						<Button
-							variant="outline"
-							class="max-sm:h-11"
-							aria-haspopup="dialog"
-							onclick={() => openFilters(null)}
+				<div class="flex flex-wrap items-center gap-2">
+					{#if smart}
+						{#if !unreadable}
+							<IconButton
+								bind:ref={headerAddButton}
+								label="Edit conditions"
+								variant="default"
+								onclick={openConditions}
+							>
+								<SlidersHorizontal />
+							</IconButton>
+						{/if}
+					{:else}
+						<IconButton
+							bind:ref={headerAddButton}
+							label="Add items"
+							variant="default"
+							onclick={openAdd}
 						>
-							<SlidersHorizontal />
-							Filter
-							{#if adhocCount > 0}
-								<Badge class="ml-0.5 h-5 min-w-5 px-1.5 tabular-nums">
-									{adhocCount}<span class="sr-only">
-										{adhocCount === 1 ? 'condition' : 'conditions'}</span
-									>
-								</Badge>
-							{/if}
-						</Button>
+							<Plus />
+						</IconButton>
 					{/if}
-					{#if showTypeFilter && !unreadable}
-						<NativeSelect.Root
-							size="sm"
-							class="max-sm:[&_select[data-size]]:h-11"
-							aria-label="Item type"
-							value={selectedType}
-							onchange={(e) => selectType(e.currentTarget.value)}
-						>
-							<NativeSelect.Option value="">All types</NativeSelect.Option>
-							{#each itemTypes as type (type.slug)}
-								<NativeSelect.Option value={type.slug}>{type.label}</NativeSelect.Option>
-							{/each}
-						</NativeSelect.Root>
-					{/if}
-					{#if showExampleFilter}
-						<NativeSelect.Root
-							size="sm"
-							class="max-sm:[&_select[data-size]]:h-11"
-							aria-label="Examples"
-							value={exampleFilter}
-							onchange={(e) => setExampleFilter(e.currentTarget.value as ExampleFilter)}
-						>
-							{#each exampleFilters as filter (filter)}
-								<NativeSelect.Option value={filter}>
-									{EXAMPLE_FILTER_LABELS[filter]}
-								</NativeSelect.Option>
-							{/each}
-						</NativeSelect.Root>
-					{/if}
-					<div class="flex items-center gap-1">
-						<button
-							onclick={() => (viewMode = 'list')}
-							class="relative rounded-md p-1.5 transition-colors after:absolute after:-inset-2.5 after:content-[''] {viewMode ===
-							'list'
-								? 'bg-muted text-foreground'
-								: 'text-muted-foreground hover:text-foreground'}"
-							aria-label="List view"
-							aria-pressed={viewMode === 'list'}
-						>
-							<List class="size-4" />
-						</button>
-						<button
-							onclick={() => (viewMode = 'grid')}
-							class="relative rounded-md p-1.5 transition-colors after:absolute after:-inset-2.5 after:content-[''] {viewMode ===
-							'grid'
-								? 'bg-muted text-foreground'
-								: 'text-muted-foreground hover:text-foreground'}"
-							aria-label="Grid view"
-							aria-pressed={viewMode === 'grid'}
-						>
-							<LayoutGrid class="size-4" />
-						</button>
-					</div>
+					<SurpriseButton collection={collection.id} />
+					<IconButton label="Edit" variant="outline" onclick={openEdit}>
+						<Pencil />
+					</IconButton>
+					<IconButton label="Delete" variant="outline" onclick={openDelete}>
+						<Trash2 />
+					</IconButton>
 				</div>
 			</div>
+		{:else if loadingDisplay.show}
+			<div class="h-16 animate-pulse rounded-xl bg-muted" aria-hidden="true"></div>
+		{/if}
 
-			{#if smart && !unreadable && (adhocCount > 0 || narrowed)}
-				<div class="flex flex-col gap-3">
-					{#if adhocCount > 0}
-						<QueryChips
-							query={adhoc}
-							{lookup}
-							warned={adhocMarks.conditions}
-							warnedMessages={adhocMarks.messages}
-							{catalogue}
-							onopen={(path) => openFilters(path)}
-							onremove={removeFilter}
-							onclear={clearAdhocFilters}
-						/>
-					{/if}
-					{#if narrowed}
-						<NarrowedBar
-							text={barText}
-							{blockReason}
-							{updating}
-							linkedBlockReason={linkedReason}
-							onsave={() => (saveOpen = true)}
-							onlinked={() => (linkedOpen = true)}
-							onupdate={openUpdate}
-							onclear={clearNarrowing}
-						/>
-					{/if}
-					{#if adhocError}
-						<Alert.Root variant="destructive">
-							<TriangleAlert />
-							<Alert.Title>This filter can't be used</Alert.Title>
-							<Alert.Description>
-								{adhocErrorText}
-								<Button
-									variant="link"
-									class="h-auto p-0"
-									onclick={() => openFilters(adhocError?.path ?? null)}>Edit filters</Button
-								>
-							</Alert.Description>
-						</Alert.Root>
-					{:else if tooLarge}
-						<Alert.Root>
-							<TriangleAlert />
-							<Alert.Description>{NARROW_TOO_LARGE_MESSAGE}</Alert.Description>
-						</Alert.Root>
-					{/if}
-				</div>
-			{/if}
-			{#if manualNarrowed}
-				<NarrowedBar
-					text={manualBarText}
-					blockReason={null}
-					linkedBlockReason={linkedReason}
-					onlinked={() => (linkedOpen = true)}
-					onclear={clearManualNarrowing}
+		{#if collection && smart}
+			<div class="flex flex-col gap-3">
+				<SmartConditions
+					definition={collection.definition}
+					{lookup}
+					warnings={savedWarnings}
+					locked
+				/>
+				<p class="text-sm text-muted-foreground">{SMART_EXPLANATION}</p>
+			</div>
+		{/if}
+
+		<div class="flex flex-wrap items-center gap-2">
+			{#if !unreadable}
+				<input
+					bind:value={searchInput}
+					type="search"
+					placeholder="Search this collection…"
+					aria-label="Search this collection"
+					class="flex h-9 min-w-0 flex-1 basis-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:max-w-sm sm:basis-auto"
 				/>
 			{/if}
-			<p class="sr-only" role="status" aria-live="polite">{filterAnnouncement}</p>
+			<div class="ml-auto flex items-center gap-2">
+				{#if smart && !unreadable}
+					<Button
+						variant="outline"
+						class="max-sm:h-11"
+						aria-haspopup="dialog"
+						onclick={() => openFilters(null)}
+					>
+						<SlidersHorizontal />
+						Filter
+						{#if adhocCount > 0}
+							<Badge class="ml-0.5 h-5 min-w-5 px-1.5 tabular-nums">
+								{adhocCount}<span class="sr-only">
+									{adhocCount === 1 ? 'condition' : 'conditions'}</span
+								>
+							</Badge>
+						{/if}
+					</Button>
+				{/if}
+				{#if showTypeFilter && !unreadable}
+					<NativeSelect.Root
+						size="sm"
+						class="max-sm:[&_select[data-size]]:h-11"
+						aria-label="Item type"
+						value={selectedType}
+						onchange={(e) => selectType(e.currentTarget.value)}
+					>
+						<NativeSelect.Option value="">All types</NativeSelect.Option>
+						{#each itemTypes as type (type.slug)}
+							<NativeSelect.Option value={type.slug}>{type.label}</NativeSelect.Option>
+						{/each}
+					</NativeSelect.Root>
+				{/if}
+				{#if showExampleFilter}
+					<NativeSelect.Root
+						size="sm"
+						class="max-sm:[&_select[data-size]]:h-11"
+						aria-label="Examples"
+						value={exampleFilter}
+						onchange={(e) => setExampleFilter(e.currentTarget.value as ExampleFilter)}
+					>
+						{#each exampleFilters as filter (filter)}
+							<NativeSelect.Option value={filter}>
+								{EXAMPLE_FILTER_LABELS[filter]}
+							</NativeSelect.Option>
+						{/each}
+					</NativeSelect.Root>
+				{/if}
+				<div class="flex items-center gap-1">
+					<button
+						onclick={() => (viewMode = 'list')}
+						class="relative rounded-md p-1.5 transition-colors after:absolute after:-inset-2.5 after:content-[''] {viewMode ===
+						'list'
+							? 'bg-muted text-foreground'
+							: 'text-muted-foreground hover:text-foreground'}"
+						aria-label="List view"
+						aria-pressed={viewMode === 'list'}
+					>
+						<List class="size-4" />
+					</button>
+					<button
+						onclick={() => (viewMode = 'grid')}
+						class="relative rounded-md p-1.5 transition-colors after:absolute after:-inset-2.5 after:content-[''] {viewMode ===
+						'grid'
+							? 'bg-muted text-foreground'
+							: 'text-muted-foreground hover:text-foreground'}"
+						aria-label="Grid view"
+						aria-pressed={viewMode === 'grid'}
+					>
+						<LayoutGrid class="size-4" />
+					</button>
+				</div>
+			</div>
+		</div>
 
-			{#if loadingDisplay.show && shownItems.length === 0}
-				<Shimmer loading={true}>
-					{#if viewMode === 'grid'}
-						<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-							{#each loadingSkeletons as skeleton (skeleton)}
-								<div class="aspect-[3/4] animate-pulse rounded-xl bg-muted"></div>
-							{/each}
-						</div>
-					{:else}
-						<div class="grid gap-3">
-							{#each loadingSkeletons as skeleton (skeleton)}
-								<div class="rounded-lg border p-4">
-									<div class="space-y-1">
-										<div class="h-5 w-48 rounded bg-muted"></div>
-										<div class="h-4 w-72 rounded bg-muted"></div>
-									</div>
+		{#if smart && !unreadable && (adhocCount > 0 || narrowed)}
+			<div class="flex flex-col gap-3">
+				{#if adhocCount > 0}
+					<QueryChips
+						query={adhoc}
+						{lookup}
+						warned={adhocMarks.conditions}
+						warnedMessages={adhocMarks.messages}
+						{catalogue}
+						onopen={(path) => openFilters(path)}
+						onremove={removeFilter}
+						onclear={clearAdhocFilters}
+					/>
+				{/if}
+				{#if narrowed}
+					<NarrowedBar
+						text={barText}
+						{blockReason}
+						{updating}
+						linkedBlockReason={linkedReason}
+						onsave={() => (saveOpen = true)}
+						onlinked={() => (linkedOpen = true)}
+						onupdate={openUpdate}
+						onclear={clearNarrowing}
+					/>
+				{/if}
+				{#if adhocError}
+					<Alert.Root variant="destructive">
+						<TriangleAlert />
+						<Alert.Title>This filter can't be used</Alert.Title>
+						<Alert.Description>
+							{adhocErrorText}
+							<Button
+								variant="link"
+								class="h-auto p-0"
+								onclick={() => openFilters(adhocError?.path ?? null)}>Edit filters</Button
+							>
+						</Alert.Description>
+					</Alert.Root>
+				{:else if tooLarge}
+					<Alert.Root>
+						<TriangleAlert />
+						<Alert.Description>{NARROW_TOO_LARGE_MESSAGE}</Alert.Description>
+					</Alert.Root>
+				{/if}
+			</div>
+		{/if}
+		{#if manualNarrowed}
+			<NarrowedBar
+				text={manualBarText}
+				blockReason={null}
+				linkedBlockReason={linkedReason}
+				onlinked={() => (linkedOpen = true)}
+				onclear={clearManualNarrowing}
+			/>
+		{/if}
+		<p class="sr-only" role="status" aria-live="polite">{filterAnnouncement}</p>
+
+		{#if loadingDisplay.show && shownItems.length === 0}
+			<Shimmer loading={true}>
+				{#if viewMode === 'grid'}
+					<div class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2">
+						{#each loadingSkeletons as skeleton (skeleton)}
+							<div class="aspect-[3/4] animate-pulse rounded-xl bg-muted"></div>
+						{/each}
+					</div>
+				{:else}
+					<div class="grid gap-3">
+						{#each loadingSkeletons as skeleton (skeleton)}
+							<div class="rounded-lg border p-4">
+								<div class="space-y-1">
+									<div class="h-5 w-48 rounded bg-muted"></div>
+									<div class="h-4 w-72 rounded bg-muted"></div>
 								</div>
-							{/each}
-						</div>
-					{/if}
-				</Shimmer>
-			{:else if viewMode === 'grid'}
-				<div
-					data-slot="node-grid"
-					class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
-				>
-					{#each shownItems as item (item.id)}
-						<div class="relative">
-							<NodeGridCard
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</Shimmer>
+		{:else if viewMode === 'grid'}
+			<div data-slot="node-grid" class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2">
+				{#each shownItems as item (item.id)}
+					<div class="relative">
+						<NodeGridCard
+							{item}
+							schema={schemaOf(item.type)}
+							categoryLabel={itemTypes.find((t) => t.slug === item.type)?.label}
+							typeIcon={itemTypes.find((t) => t.slug === item.type)?.icon}
+							typeColour={itemTypes.find((t) => t.slug === item.type)?.colour}
+							match={q ? matchContext(item, schemaOf(item.type), q) : null}
+							isExample={exampleItemIds.has(item.id)}
+						/>
+						{#if !smart}
+							<button
+								type="button"
+								onclick={() => void handleRemove(item)}
+								disabled={removingId === item.id}
+								data-remove-id={item.id}
+								aria-label="Remove {item.name} from this collection"
+								title="Remove from collection"
+								class="absolute top-2 right-2 rounded-full bg-background/90 p-1.5 text-muted-foreground shadow-sm transition-colors after:absolute after:-inset-2.5 after:content-[''] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+							>
+								<X class="size-4" />
+							</button>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		{:else}
+			<Item.Group class="max-w-5xl">
+				{#each shownItems as item (item.id)}
+					<div role="listitem" class="flex items-stretch gap-2">
+						<div class="min-w-0 flex-1">
+							<NodeCard
 								{item}
 								schema={schemaOf(item.type)}
 								categoryLabel={itemTypes.find((t) => t.slug === item.type)?.label}
+								typeIcon={itemTypes.find((t) => t.slug === item.type)?.icon}
+								typeColour={itemTypes.find((t) => t.slug === item.type)?.colour}
 								match={q ? matchContext(item, schemaOf(item.type), q) : null}
 								isExample={exampleItemIds.has(item.id)}
 							/>
-							{#if !smart}
-								<button
-									type="button"
-									onclick={() => void handleRemove(item)}
-									disabled={removingId === item.id}
-									data-remove-id={item.id}
-									aria-label="Remove {item.name} from this collection"
-									title="Remove from collection"
-									class="absolute top-2 right-2 rounded-full bg-background/90 p-1.5 text-muted-foreground shadow-sm transition-colors after:absolute after:-inset-2.5 after:content-[''] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-								>
-									<X class="size-4" />
-								</button>
-							{/if}
 						</div>
-					{/each}
-				</div>
-			{:else}
-				<Item.Group>
-					{#each shownItems as item (item.id)}
-						<div role="listitem" class="flex items-stretch gap-2">
-							<div class="min-w-0 flex-1">
-								<NodeCard
-									{item}
-									schema={schemaOf(item.type)}
-									categoryLabel={itemTypes.find((t) => t.slug === item.type)?.label}
-									match={q ? matchContext(item, schemaOf(item.type), q) : null}
-									isExample={exampleItemIds.has(item.id)}
-								/>
-							</div>
-							{#if !smart}
-								<button
-									type="button"
-									onclick={() => void handleRemove(item)}
-									disabled={removingId === item.id}
-									data-remove-id={item.id}
-									aria-label="Remove {item.name} from this collection"
-									title="Remove from collection"
-									class="relative shrink-0 self-center rounded-md p-2 text-muted-foreground transition-colors after:absolute after:-inset-2 after:content-[''] hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-								>
-									<X class="size-4" />
-								</button>
-							{/if}
-						</div>
-					{/each}
-				</Item.Group>
-			{/if}
-
-			{#if itemsFailed}
-				<div class="flex flex-col items-start gap-3 rounded-xl border border-dashed p-5">
-					<p class="text-sm text-muted-foreground">Couldn't load the items in this collection.</p>
-					<Button
-						variant="outline"
-						onclick={() =>
-							smart ? void fetchSmart() : void fetchPage(canonicalId, q, selectedType)}
-					>
-						Try again
-					</Button>
-				</div>
-			{:else if items.length > 0 && shownItems.length === 0 && !loading && !hasMore}
-				<div class="flex flex-col items-center gap-3 py-12 text-center">
-					<EyeOff class="size-10 text-muted-foreground/50" />
-					<p class="text-sm text-muted-foreground">
-						{#if exampleFilter === 'only'}
-							No example items match.
-						{:else}
-							Everything here is a hidden example. Choose All items to see them.
+						{#if !smart}
+							<button
+								type="button"
+								onclick={() => void handleRemove(item)}
+								disabled={removingId === item.id}
+								data-remove-id={item.id}
+								aria-label="Remove {item.name} from this collection"
+								title="Remove from collection"
+								class="relative shrink-0 self-center rounded-md p-2 text-muted-foreground transition-colors after:absolute after:-inset-2 after:content-[''] hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+							>
+								<X class="size-4" />
+							</button>
 						{/if}
-					</p>
-					<Button variant="outline" size="sm" onclick={() => setExampleFilter('all')}>
-						Show all items
-					</Button>
-				</div>
-			{:else if items.length === 0 && !loading && !headerLoading && (adhocError || tooLarge)}
-				<!-- The notice above says why; there is nothing to list. -->
-			{:else if items.length === 0 && !loading && !headerLoading && unreadable}
-				<!-- The conditions message above says why; there is nothing to list. -->
-			{:else if items.length === 0 && !loading && !headerLoading}
-				<div class="flex flex-col items-center gap-3 py-12 text-center">
-					{#if narrowed}
-						<SearchX class="size-10 text-muted-foreground/50" />
-						<div>
-							<p class="font-medium">No items match your filters</p>
-							<p class="text-sm text-muted-foreground">
-								Change a filter, or clear them to see the whole collection.
-							</p>
-						</div>
-						<Button variant="ghost" size="sm" onclick={clearNarrowing}>Clear</Button>
-					{:else if smart}
-						<SearchX class="size-10 text-muted-foreground/50" />
-						<div>
-							<p class="font-medium">No items match these conditions</p>
-							<p class="text-sm text-muted-foreground">Items appear here as soon as they match.</p>
-						</div>
-						<Button variant="outline" onclick={openConditions}>
-							<SlidersHorizontal class="size-4" />
-							Edit conditions
-						</Button>
-					{:else if q}
-						<SearchX class="size-10 text-muted-foreground/50" />
-						<div>
-							<p class="font-medium">Nothing matched "{q}"</p>
-							<p class="text-sm text-muted-foreground">Try a different search term</p>
-						</div>
-						<Button variant="ghost" size="sm" onclick={() => (searchInput = '')}>
-							Clear search
-						</Button>
-					{:else if selectedType}
-						<SearchX class="size-10 text-muted-foreground/50" />
-						<div>
-							<p class="font-medium">Nothing matched this type</p>
-							<p class="text-sm text-muted-foreground">
-								No {typeLabels[selectedType] ?? selectedType} items in this collection
-							</p>
-						</div>
-						<Button variant="ghost" size="sm" onclick={() => selectType('')}>Show all types</Button>
-					{:else}
-						<Library class="size-10 text-muted-foreground/50" />
-						<div>
-							<p class="font-medium">Nothing in this collection yet.</p>
-							<p class="text-sm text-muted-foreground">Add items here, or from any item's page.</p>
-						</div>
-						<Button onclick={openAdd}>
-							<Plus class="size-4" />
-							Add items
-						</Button>
-					{/if}
-				</div>
-			{/if}
-
-			{#if hasMore}
-				<div use:sentinel class="flex justify-center py-4" aria-hidden="true">
-					{#if loading}
-						<div
-							class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
-						></div>
-					{/if}
-				</div>
-			{/if}
+					</div>
+				{/each}
+			</Item.Group>
 		{/if}
-	</div>
-</main>
+
+		{#if itemsFailed}
+			<div class="flex flex-col items-start gap-3 rounded-xl border border-dashed p-5">
+				<p class="text-sm text-muted-foreground">Couldn't load the items in this collection.</p>
+				<Button
+					variant="outline"
+					onclick={() => (smart ? void fetchSmart() : void fetchPage(canonicalId, q, selectedType))}
+				>
+					Try again
+				</Button>
+			</div>
+		{:else if items.length > 0 && shownItems.length === 0 && !loading && !hasMore}
+			<div class="flex flex-col items-center gap-3 py-12 text-center">
+				<EyeOff class="size-10 text-muted-foreground/50" />
+				<p class="text-sm text-muted-foreground">
+					{#if exampleFilter === 'only'}
+						No example items match.
+					{:else}
+						Everything here is a hidden example. Choose All items to see them.
+					{/if}
+				</p>
+				<Button variant="outline" size="sm" onclick={() => setExampleFilter('all')}>
+					Show all items
+				</Button>
+			</div>
+		{:else if items.length === 0 && !loading && !headerLoading && (adhocError || tooLarge)}
+			<!-- The notice above says why; there is nothing to list. -->
+		{:else if items.length === 0 && !loading && !headerLoading && unreadable}
+			<!-- The conditions message above says why; there is nothing to list. -->
+		{:else if items.length === 0 && !loading && !headerLoading}
+			<div class="flex flex-col items-center gap-3 py-12 text-center">
+				{#if narrowed}
+					<SearchX class="size-10 text-muted-foreground/50" />
+					<div>
+						<p class="font-medium">No items match your filters</p>
+						<p class="text-sm text-muted-foreground">
+							Change a filter, or clear them to see the whole collection.
+						</p>
+					</div>
+					<Button variant="ghost" size="sm" onclick={clearNarrowing}>Clear</Button>
+				{:else if smart}
+					<SearchX class="size-10 text-muted-foreground/50" />
+					<div>
+						<p class="font-medium">No items match these conditions</p>
+						<p class="text-sm text-muted-foreground">Items appear here as soon as they match.</p>
+					</div>
+					<Button variant="outline" onclick={openConditions}>
+						<SlidersHorizontal class="size-4" />
+						Edit conditions
+					</Button>
+				{:else if q}
+					<SearchX class="size-10 text-muted-foreground/50" />
+					<div>
+						<p class="font-medium">Nothing matched "{q}"</p>
+						<p class="text-sm text-muted-foreground">Try a different search term</p>
+					</div>
+					<Button variant="ghost" size="sm" onclick={() => (searchInput = '')}>Clear search</Button>
+				{:else if selectedType}
+					<SearchX class="size-10 text-muted-foreground/50" />
+					<div>
+						<p class="font-medium">Nothing matched this type</p>
+						<p class="text-sm text-muted-foreground">
+							No {typeLabels[selectedType] ?? selectedType} items in this collection
+						</p>
+					</div>
+					<Button variant="ghost" size="sm" onclick={() => selectType('')}>Show all types</Button>
+				{:else}
+					<Library class="size-10 text-muted-foreground/50" />
+					<div>
+						<p class="font-medium">Nothing in this collection yet.</p>
+						<p class="text-sm text-muted-foreground">Add items here, or from any item's page.</p>
+					</div>
+					<Button onclick={openAdd}>
+						<Plus class="size-4" />
+						Add items
+					</Button>
+				{/if}
+			</div>
+		{/if}
+
+		{#if hasMore}
+			<div use:sentinel class="flex justify-center py-4" aria-hidden="true">
+				{#if loading}
+					<div
+						class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
+					></div>
+				{/if}
+			</div>
+		{/if}
+	{/if}
+</Page>
 
 <ResponsiveDialog.Root open={editOpen} onOpenChange={handleEditOpenChange}>
 	<ResponsiveDialog.Content title="Edit collection" size="md">

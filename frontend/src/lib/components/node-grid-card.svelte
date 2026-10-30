@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { Package } from '@lucide/svelte';
 	import type { NodeResponse } from '$lib/api/client';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import type { MatchContext } from '$lib/search-context';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import NodeCover from './node-cover.svelte';
+	import TypeIcon from './type-icon.svelte';
 	import NodeSummary from './node-summary.svelte';
 	import TagList from './tag-list.svelte';
 	import { nextCardIndex } from './card-grid-nav';
@@ -14,12 +14,17 @@
 		item,
 		schema,
 		categoryLabel,
+		typeIcon,
+		typeColour,
 		match,
 		isExample = false
 	}: {
 		item: NodeResponse;
 		schema: AttributesSchema | null;
 		categoryLabel?: string | null;
+		/** The item type's icon and colour, for the tile shown when there is no cover. */
+		typeIcon?: string | null;
+		typeColour?: string | null;
 		match?: MatchContext | null;
 		isExample?: boolean;
 	} = $props();
@@ -53,11 +58,16 @@
 	<div
 		class="flex aspect-[3/4] flex-col overflow-hidden rounded-xl border bg-muted/30 transition-colors group-hover:bg-muted/60"
 	>
-		<!-- Cover image or generic placeholder (§7b: muted background + category icon) -->
+		<!-- Cover image, or the item type's icon and colour (§7b) -->
 		<div class="min-h-0 flex-1 overflow-hidden">
 			<NodeCover nodeId={item.id} class="h-full w-full">
 				<div class="flex h-full w-full items-center justify-center bg-muted">
-					<Package class="size-8 text-muted-foreground/40" />
+					<TypeIcon
+						icon={typeIcon}
+						colour={typeColour}
+						boxed
+						class="size-14 rounded-2xl text-3xl"
+					/>
 				</div>
 			</NodeCover>
 		</div>

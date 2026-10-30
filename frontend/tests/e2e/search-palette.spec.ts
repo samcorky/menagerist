@@ -2,9 +2,11 @@ import { test, expect, type APIRequestContext, type Page } from './fixtures';
 import { GROUP_CAPS } from '../../src/lib/palette-search';
 import {
 	failCollectionSearch,
+	openSearch,
 	ownedData,
 	removeExamplePacks,
-	searchButton,
+	searchField,
+	searchPopup,
 	uniqueName
 } from './helpers';
 
@@ -16,7 +18,7 @@ test.afterEach(async ({ request }) => {
 	await removeExamplePacks(request);
 });
 
-const popup = (page: Page) => page.getByRole('dialog', { name: 'Search', exact: true });
+const popup = searchPopup;
 const input = (page: Page) => popup(page).getByPlaceholder('Search everything…');
 
 /** The collection page shows its slug in the address. */
@@ -124,15 +126,37 @@ test('Esc closes the popup and returns focus to where it was', async ({ page }) 
 	await expect(before).toBeFocused();
 });
 
-test('the desktop header Search button opens the popup', async ({ page }) => {
+test('the top-bar search field opens the hint when clicked', async ({ page }) => {
 	await page.goto('/');
-	const button = searchButton(page);
-	await button.click();
+	const box = await searchField(page).boundingBox();
+	expect(box!.y).toBeLessThan(60);
+	expect(box!.width).toBeGreaterThan(300);
+	await searchField(page).click();
 	await expect(popup(page)).toBeVisible();
 	await expect(input(page)).toBeFocused();
+	await expect(
+		popup(page).getByText('Type to search items, collections, item types and pages')
+	).toBeVisible();
 	await page.keyboard.press('Escape');
 	await expect(popup(page)).toBeHidden();
-	await expect(button).toBeFocused();
+});
+
+test('Escape clears what was typed first, then closes', async ({ page }) => {
+	await openWithSlash(page);
+	await input(page).fill('abc');
+	await page.keyboard.press('Escape');
+	await expect(input(page)).toHaveValue('');
+	await expect(popup(page)).toBeVisible();
+	await page.keyboard.press('Escape');
+	await expect(popup(page)).toBeHidden();
+});
+
+test('clicking outside the field closes the results', async ({ page }) => {
+	await openWithSlash(page);
+	await input(page).fill('abc');
+	await expect(popup(page)).toBeVisible();
+	await page.locator('main').click({ position: { x: 10, y: 400 } });
+	await expect(popup(page)).toBeHidden();
 });
 
 test('example items carry the Example badge in results', async ({ page, request }) => {
@@ -151,6 +175,8 @@ test('n still opens quick capture, and / typed in the input is a character', asy
 	await input(page).pressSequentially('a/b');
 	await expect(input(page)).toHaveValue('a/b');
 	await expect(popup(page)).toBeVisible();
+	// The first Escape clears the text, the second closes the results.
+	await page.keyboard.press('Escape');
 	await page.keyboard.press('Escape');
 	await expect(popup(page)).toBeHidden();
 
@@ -431,4 +457,22 @@ test('a group below its cap has no See all collections row', async ({ page, requ
 		popup(page).getByRole('option', { name: new RegExp(collection.name) })
 	).toBeVisible();
 	await expect(popup(page).getByRole('option', { name: 'See all collections' })).toHaveCount(0);
+});
+
+test('after opening a result, typing in the same top-bar field searches again', async ({
+	page,
+	request
+}) => {
+	const first = await makeItem(request, uniqueName('Reopen first'));
+	const second = await makeItem(request, uniqueName('Reopen second'));
+	await page.goto('/');
+	await openSearch(page);
+	await searchField(page).fill(first.name);
+	await page.getByRole('option', { name: new RegExp(first.name) }).click();
+	await expect(page).toHaveURL(new RegExp(`/items/${first.id}$`));
+
+	// The mouse never left the field, so it still has focus; typing must bring results back.
+	await searchField(page).focus();
+	await searchField(page).fill(second.name);
+	await expect(page.getByRole('option', { name: new RegExp(second.name) })).toBeVisible();
 });

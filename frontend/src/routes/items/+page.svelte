@@ -1,4 +1,6 @@
 <script lang="ts">
+	import IconButton from '$lib/components/icon-button.svelte';
+	import Page from '$lib/components/page.svelte';
 	import { resolve } from '$app/paths';
 	import {
 		collectionNameLookup,
@@ -446,294 +448,290 @@
 	<title>My items - Menagerist</title>
 </svelte:head>
 
-<main class="flex-1 px-4 py-6 sm:px-6">
-	<div class="mx-auto flex max-w-4xl flex-col gap-6">
-		<div class="flex items-center justify-between gap-4">
-			<h1 class="font-heading text-3xl font-semibold tracking-tight">My items</h1>
-			<Button onclick={() => goto(resolve('/items/new'))}>
-				<Plus class="size-4" />
-				New item
+<Page width="fluid">
+	<div class="flex items-center justify-between gap-4">
+		<h1 class="font-heading text-3xl font-semibold tracking-tight">My items</h1>
+		<IconButton label="New item" variant="default" onclick={() => goto(resolve('/items/new'))}>
+			<Plus />
+		</IconButton>
+	</div>
+
+	<div class="flex flex-wrap items-center gap-2">
+		<input
+			use:focusRef
+			onfocus={() => (searchFocused = true)}
+			onblur={() => (searchFocused = false)}
+			bind:value={searchInput}
+			type="search"
+			placeholder="Search your items…"
+			class="flex h-9 min-w-0 flex-1 basis-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:max-w-sm sm:basis-auto"
+		/>
+		<div class="ml-auto flex items-center gap-2">
+			<Button
+				variant="outline"
+				class="max-sm:h-11"
+				aria-haspopup="dialog"
+				onclick={() => openFilters(null)}
+			>
+				<SlidersHorizontal />
+				Filters
+				{#if conditionCount > 0}
+					<Badge class="ml-0.5 h-5 min-w-5 px-1.5 tabular-nums">
+						{conditionCount}<span class="sr-only">
+							{conditionCount === 1 ? 'condition' : 'conditions'}</span
+						>
+					</Badge>
+				{/if}
+			</Button>
+			{#if showExampleFilter}
+				<NativeSelect.Root
+					size="sm"
+					class="max-sm:[&_select[data-size]]:h-11"
+					aria-label="Examples"
+					value={exampleFilter}
+					onchange={(e) => setExampleFilter(e.currentTarget.value as ExampleFilter)}
+				>
+					{#each exampleFilters as filter (filter)}
+						<NativeSelect.Option value={filter}>
+							{EXAMPLE_FILTER_LABELS[filter]}
+						</NativeSelect.Option>
+					{/each}
+				</NativeSelect.Root>
+			{/if}
+			<div class="flex items-center gap-1">
+				<button
+					onclick={() => (viewMode = 'list')}
+					class="relative rounded-md p-1.5 transition-colors after:absolute after:-inset-1.5 after:content-[''] {viewMode ===
+					'list'
+						? 'bg-muted text-foreground'
+						: 'text-muted-foreground hover:text-foreground'}"
+					aria-label="List view"
+					aria-pressed={viewMode === 'list'}
+				>
+					<List class="size-4" />
+				</button>
+				<button
+					onclick={() => (viewMode = 'grid')}
+					class="relative rounded-md p-1.5 transition-colors after:absolute after:-inset-1.5 after:content-[''] {viewMode ===
+					'grid'
+						? 'bg-muted text-foreground'
+						: 'text-muted-foreground hover:text-foreground'}"
+					aria-label="Grid view"
+					aria-pressed={viewMode === 'grid'}
+				>
+					<LayoutGrid class="size-4" />
+				</button>
+			</div>
+		</div>
+	</div>
+
+	{#if allCategories.length > 1}
+		<div class="flex flex-wrap gap-2">
+			<Badge
+				variant={selectedType === null ? 'default' : 'outline'}
+				class="cursor-pointer"
+				onclick={() => selectType(null)}
+			>
+				All
+			</Badge>
+			{#each allCategories as cat (cat.slug)}
+				<Badge
+					variant={selectedType === cat.slug ? 'default' : 'outline'}
+					class="cursor-pointer"
+					onclick={() => selectType(cat.slug)}
+				>
+					{cat.label}
+				</Badge>
+			{/each}
+		</div>
+	{/if}
+
+	{#if conditionCount > 0 || searching}
+		<div class="flex flex-col gap-3">
+			<QueryChips
+				query={filter}
+				{lookup}
+				warned={marks.conditions}
+				warnedMessages={marks.messages}
+				{catalogue}
+				onopen={(path) => openFilters(path)}
+				onremove={removeFilter}
+				onclear={clearFilters}
+			/>
+			{#if filterError}
+				<Alert.Root variant="destructive">
+					<TriangleAlert />
+					<Alert.Title>This filter can't be used</Alert.Title>
+					<Alert.Description>
+						{filterErrorText}
+						<Button
+							variant="link"
+							class="h-auto p-0"
+							onclick={() => openFilters(filterError?.path ?? null)}>Edit filters</Button
+						>
+					</Alert.Description>
+				</Alert.Root>
+			{:else if tooMany}
+				<Alert.Root>
+					<TriangleAlert />
+					<Alert.Description>{TOO_MANY_MESSAGE}</Alert.Description>
+				</Alert.Root>
+			{:else if countLine}
+				<p class="text-sm text-muted-foreground">{countLine}</p>
+			{/if}
+			{#if searchTextIgnored(filter, q)}
+				<p class="text-sm text-muted-foreground">{SEARCH_TOO_LONG_MESSAGE}</p>
+			{/if}
+		</div>
+	{:else if countLine}
+		<p class="text-sm text-muted-foreground">{countLine}</p>
+	{/if}
+	{#if canSave}
+		<div class="flex flex-col items-start gap-1.5">
+			<IconButton
+				label="Save as smart collection"
+				variant="outline"
+				aria-haspopup="dialog"
+				disabled={saveReason !== null}
+				aria-describedby={saveReason ? 'save-smart-reason' : undefined}
+				onclick={() => (saveOpen = true)}
+			>
+				<BookmarkPlus />
+			</IconButton>
+			{#if saveReason}
+				<p id="save-smart-reason" class="text-sm text-muted-foreground">{saveReason}</p>
+			{/if}
+		</div>
+	{/if}
+	<p class="sr-only" role="status" aria-live="polite">{filterAnnouncement}</p>
+
+	{#if loadingDisplay.show && shownItems.length === 0}
+		<Shimmer loading={true}>
+			{#if viewMode === 'grid'}
+				<div class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2">
+					{#each loadingSkeletons as skeleton (skeleton)}
+						<div class="aspect-[3/4] animate-pulse rounded-xl bg-muted"></div>
+					{/each}
+				</div>
+			{:else}
+				<div class="grid gap-3">
+					{#each loadingSkeletons as skeleton (skeleton)}
+						<div class="rounded-lg border p-4">
+							<div class="flex items-center justify-between gap-4">
+								<div class="space-y-1">
+									<div class="h-5 w-48 rounded bg-muted"></div>
+									<div class="h-4 w-72 rounded bg-muted"></div>
+								</div>
+								<div class="h-6 w-16 rounded-full bg-muted"></div>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</Shimmer>
+	{:else if viewMode === 'grid'}
+		<div data-slot="node-grid" class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2">
+			{#each shownItems as item (item.id)}
+				<NodeGridCard
+					{item}
+					schema={schemaOf(item.type)}
+					categoryLabel={allCategories.find((c) => c.slug === item.type)?.label}
+					typeIcon={allCategories.find((c) => c.slug === item.type)?.icon}
+					typeColour={allCategories.find((c) => c.slug === item.type)?.colour}
+					match={q ? matchContext(item, schemaOf(item.type), q) : null}
+					isExample={exampleItemIds.has(item.id)}
+				/>
+			{/each}
+		</div>
+	{:else}
+		<Item.Group class="max-w-5xl">
+			{#each shownItems as item (item.id)}
+				<NodeCard
+					{item}
+					schema={schemaOf(item.type)}
+					categoryLabel={allCategories.find((c) => c.slug === item.type)?.label}
+					typeIcon={allCategories.find((c) => c.slug === item.type)?.icon}
+					typeColour={allCategories.find((c) => c.slug === item.type)?.colour}
+					match={q ? matchContext(item, schemaOf(item.type), q) : null}
+					isExample={exampleItemIds.has(item.id)}
+				/>
+			{/each}
+		</Item.Group>
+	{/if}
+
+	{#if items.length > 0 && shownItems.length === 0 && !loading && !hasMore}
+		<div class="flex flex-col items-center gap-3 py-12 text-center">
+			<EyeOff class="size-10 text-muted-foreground/50" />
+			<p class="text-sm text-muted-foreground">
+				{#if exampleFilter === 'only'}
+					No example items match.
+				{:else}
+					{q || selectedType
+						? 'Everything that matched is a hidden example.'
+						: 'All your items are hidden examples.'} Choose All items to see them.
+				{/if}
+			</p>
+			<Button variant="outline" size="sm" onclick={() => setExampleFilter('all')}>
+				Show all items
 			</Button>
 		</div>
-
-		<div class="flex flex-wrap items-center gap-2">
-			<input
-				use:focusRef
-				onfocus={() => (searchFocused = true)}
-				onblur={() => (searchFocused = false)}
-				bind:value={searchInput}
-				type="search"
-				placeholder="Search your items…"
-				class="flex h-9 min-w-0 flex-1 basis-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:max-w-sm sm:basis-auto"
-			/>
-			<div class="ml-auto flex items-center gap-2">
-				<Button
-					variant="outline"
-					class="max-sm:h-11"
-					aria-haspopup="dialog"
-					onclick={() => openFilters(null)}
-				>
-					<SlidersHorizontal />
-					Filters
-					{#if conditionCount > 0}
-						<Badge class="ml-0.5 h-5 min-w-5 px-1.5 tabular-nums">
-							{conditionCount}<span class="sr-only">
-								{conditionCount === 1 ? 'condition' : 'conditions'}</span
-							>
-						</Badge>
-					{/if}
-				</Button>
-				{#if showExampleFilter}
-					<NativeSelect.Root
-						size="sm"
-						class="max-sm:[&_select[data-size]]:h-11"
-						aria-label="Examples"
-						value={exampleFilter}
-						onchange={(e) => setExampleFilter(e.currentTarget.value as ExampleFilter)}
-					>
-						{#each exampleFilters as filter (filter)}
-							<NativeSelect.Option value={filter}>
-								{EXAMPLE_FILTER_LABELS[filter]}
-							</NativeSelect.Option>
-						{/each}
-					</NativeSelect.Root>
-				{/if}
-				<div class="flex items-center gap-1">
-					<button
-						onclick={() => (viewMode = 'list')}
-						class="relative rounded-md p-1.5 transition-colors after:absolute after:-inset-1.5 after:content-[''] {viewMode ===
-						'list'
-							? 'bg-muted text-foreground'
-							: 'text-muted-foreground hover:text-foreground'}"
-						aria-label="List view"
-						aria-pressed={viewMode === 'list'}
-					>
-						<List class="size-4" />
-					</button>
-					<button
-						onclick={() => (viewMode = 'grid')}
-						class="relative rounded-md p-1.5 transition-colors after:absolute after:-inset-1.5 after:content-[''] {viewMode ===
-						'grid'
-							? 'bg-muted text-foreground'
-							: 'text-muted-foreground hover:text-foreground'}"
-						aria-label="Grid view"
-						aria-pressed={viewMode === 'grid'}
-					>
-						<LayoutGrid class="size-4" />
-					</button>
+	{:else if items.length === 0 && !loading && !filterError && !tooMany}
+		<div class="flex flex-col items-center gap-3 py-12 text-center">
+			{#if searching && conditionCount > 0}
+				<SearchX class="size-10 text-muted-foreground/50" />
+				<div>
+					<p class="font-medium">No items match these filters</p>
+					<p class="text-sm text-muted-foreground">
+						Change a condition, or clear the filters to see everything.
+					</p>
 				</div>
-			</div>
+				<Button variant="ghost" size="sm" onclick={clearFilters}>Clear filters</Button>
+			{:else if q}
+				<SearchX class="size-10 text-muted-foreground/50" />
+				<div>
+					<p class="font-medium">Nothing matched "{q}"</p>
+					<p class="text-sm text-muted-foreground">Try a different search term</p>
+				</div>
+				<Button variant="ghost" size="sm" onclick={() => (searchInput = '')}>Clear search</Button>
+			{:else if selectedType}
+				<LayoutGrid class="size-10 text-muted-foreground/50" />
+				<div>
+					<p class="font-medium">No {selectedTypeLabel} items yet</p>
+					<p class="text-sm text-muted-foreground">
+						Add one, or <button
+							class="underline underline-offset-2 hover:text-foreground"
+							onclick={() => selectType(null)}>clear this filter</button
+						> to see everything.
+					</p>
+				</div>
+				<Button size="sm" onclick={() => goto(resolve('/items/new'))}>
+					<Plus class="size-4" />
+					New item
+				</Button>
+			{:else}
+				<LayoutGrid class="size-10 text-muted-foreground/50" />
+				<div>
+					<p class="font-medium">Nothing here yet</p>
+					<p class="text-sm text-muted-foreground">Add your first item to get started</p>
+				</div>
+				<Button onclick={() => goto(resolve('/items/new'))}>
+					<Plus class="size-4" />
+					Add your first item
+				</Button>
+			{/if}
 		</div>
+	{/if}
 
-		{#if allCategories.length > 1}
-			<div class="flex flex-wrap gap-2">
-				<Badge
-					variant={selectedType === null ? 'default' : 'outline'}
-					class="cursor-pointer"
-					onclick={() => selectType(null)}
-				>
-					All
-				</Badge>
-				{#each allCategories as cat (cat.slug)}
-					<Badge
-						variant={selectedType === cat.slug ? 'default' : 'outline'}
-						class="cursor-pointer"
-						onclick={() => selectType(cat.slug)}
-					>
-						{cat.label}
-					</Badge>
-				{/each}
-			</div>
-		{/if}
-
-		{#if conditionCount > 0 || searching}
-			<div class="flex flex-col gap-3">
-				<QueryChips
-					query={filter}
-					{lookup}
-					warned={marks.conditions}
-					warnedMessages={marks.messages}
-					{catalogue}
-					onopen={(path) => openFilters(path)}
-					onremove={removeFilter}
-					onclear={clearFilters}
-				/>
-				{#if filterError}
-					<Alert.Root variant="destructive">
-						<TriangleAlert />
-						<Alert.Title>This filter can't be used</Alert.Title>
-						<Alert.Description>
-							{filterErrorText}
-							<Button
-								variant="link"
-								class="h-auto p-0"
-								onclick={() => openFilters(filterError?.path ?? null)}>Edit filters</Button
-							>
-						</Alert.Description>
-					</Alert.Root>
-				{:else if tooMany}
-					<Alert.Root>
-						<TriangleAlert />
-						<Alert.Description>{TOO_MANY_MESSAGE}</Alert.Description>
-					</Alert.Root>
-				{:else if countLine}
-					<p class="text-sm text-muted-foreground">{countLine}</p>
-				{/if}
-				{#if searchTextIgnored(filter, q)}
-					<p class="text-sm text-muted-foreground">{SEARCH_TOO_LONG_MESSAGE}</p>
-				{/if}
-			</div>
-		{:else if countLine}
-			<p class="text-sm text-muted-foreground">{countLine}</p>
-		{/if}
-		{#if canSave}
-			<div class="flex flex-col items-start gap-1.5">
-				<Button
-					variant="outline"
-					size="sm"
-					class="max-sm:h-11"
-					aria-haspopup="dialog"
-					disabled={saveReason !== null}
-					aria-describedby={saveReason ? 'save-smart-reason' : undefined}
-					onclick={() => (saveOpen = true)}
-				>
-					<BookmarkPlus />
-					Save as smart collection
-				</Button>
-				{#if saveReason}
-					<p id="save-smart-reason" class="text-sm text-muted-foreground">{saveReason}</p>
-				{/if}
-			</div>
-		{/if}
-		<p class="sr-only" role="status" aria-live="polite">{filterAnnouncement}</p>
-
-		{#if loadingDisplay.show && shownItems.length === 0}
-			<Shimmer loading={true}>
-				{#if viewMode === 'grid'}
-					<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-						{#each loadingSkeletons as skeleton (skeleton)}
-							<div class="aspect-[3/4] animate-pulse rounded-xl bg-muted"></div>
-						{/each}
-					</div>
-				{:else}
-					<div class="grid gap-3">
-						{#each loadingSkeletons as skeleton (skeleton)}
-							<div class="rounded-lg border p-4">
-								<div class="flex items-center justify-between gap-4">
-									<div class="space-y-1">
-										<div class="h-5 w-48 rounded bg-muted"></div>
-										<div class="h-4 w-72 rounded bg-muted"></div>
-									</div>
-									<div class="h-6 w-16 rounded-full bg-muted"></div>
-								</div>
-							</div>
-						{/each}
-					</div>
-				{/if}
-			</Shimmer>
-		{:else if viewMode === 'grid'}
-			<div
-				data-slot="node-grid"
-				class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
-			>
-				{#each shownItems as item (item.id)}
-					<NodeGridCard
-						{item}
-						schema={schemaOf(item.type)}
-						categoryLabel={allCategories.find((c) => c.slug === item.type)?.label}
-						match={q ? matchContext(item, schemaOf(item.type), q) : null}
-						isExample={exampleItemIds.has(item.id)}
-					/>
-				{/each}
-			</div>
-		{:else}
-			<Item.Group>
-				{#each shownItems as item (item.id)}
-					<NodeCard
-						{item}
-						schema={schemaOf(item.type)}
-						categoryLabel={allCategories.find((c) => c.slug === item.type)?.label}
-						match={q ? matchContext(item, schemaOf(item.type), q) : null}
-						isExample={exampleItemIds.has(item.id)}
-					/>
-				{/each}
-			</Item.Group>
-		{/if}
-
-		{#if items.length > 0 && shownItems.length === 0 && !loading && !hasMore}
-			<div class="flex flex-col items-center gap-3 py-12 text-center">
-				<EyeOff class="size-10 text-muted-foreground/50" />
-				<p class="text-sm text-muted-foreground">
-					{#if exampleFilter === 'only'}
-						No example items match.
-					{:else}
-						{q || selectedType
-							? 'Everything that matched is a hidden example.'
-							: 'All your items are hidden examples.'} Choose All items to see them.
-					{/if}
-				</p>
-				<Button variant="outline" size="sm" onclick={() => setExampleFilter('all')}>
-					Show all items
-				</Button>
-			</div>
-		{:else if items.length === 0 && !loading && !filterError && !tooMany}
-			<div class="flex flex-col items-center gap-3 py-12 text-center">
-				{#if searching && conditionCount > 0}
-					<SearchX class="size-10 text-muted-foreground/50" />
-					<div>
-						<p class="font-medium">No items match these filters</p>
-						<p class="text-sm text-muted-foreground">
-							Change a condition, or clear the filters to see everything.
-						</p>
-					</div>
-					<Button variant="ghost" size="sm" onclick={clearFilters}>Clear filters</Button>
-				{:else if q}
-					<SearchX class="size-10 text-muted-foreground/50" />
-					<div>
-						<p class="font-medium">Nothing matched "{q}"</p>
-						<p class="text-sm text-muted-foreground">Try a different search term</p>
-					</div>
-					<Button variant="ghost" size="sm" onclick={() => (searchInput = '')}>Clear search</Button>
-				{:else if selectedType}
-					<LayoutGrid class="size-10 text-muted-foreground/50" />
-					<div>
-						<p class="font-medium">No {selectedTypeLabel} items yet</p>
-						<p class="text-sm text-muted-foreground">
-							Add one, or <button
-								class="underline underline-offset-2 hover:text-foreground"
-								onclick={() => selectType(null)}>clear this filter</button
-							> to see everything.
-						</p>
-					</div>
-					<Button size="sm" onclick={() => goto(resolve('/items/new'))}>
-						<Plus class="size-4" />
-						New item
-					</Button>
-				{:else}
-					<LayoutGrid class="size-10 text-muted-foreground/50" />
-					<div>
-						<p class="font-medium">Nothing here yet</p>
-						<p class="text-sm text-muted-foreground">Add your first item to get started</p>
-					</div>
-					<Button onclick={() => goto(resolve('/items/new'))}>
-						<Plus class="size-4" />
-						Add your first item
-					</Button>
-				{/if}
-			</div>
-		{/if}
-
-		{#if hasMore}
-			<div use:sentinel class="flex justify-center py-4" aria-hidden="true">
-				{#if loading}
-					<div
-						class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
-					></div>
-				{/if}
-			</div>
-		{/if}
-	</div>
-</main>
+	{#if hasMore}
+		<div use:sentinel class="flex justify-center py-4" aria-hidden="true">
+			{#if loading}
+				<div
+					class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
+				></div>
+			{/if}
+		</div>
+	{/if}
+</Page>
 
 <SaveSmartCollectionDialog bind:open={saveOpen} query={saveQuery} onsaved={savedAsSmart} />
 

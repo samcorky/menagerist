@@ -8,6 +8,8 @@ export type ComboboxItem = {
 	group?: string;
 	/** Shown on the trigger when selected, if different from `label`. */
 	selectedLabel?: string;
+	/** Muted text on the right of the row, such as a count. */
+	description?: string;
 	disabled?: boolean;
 };
 

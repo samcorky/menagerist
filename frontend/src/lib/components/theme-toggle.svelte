@@ -1,20 +1,15 @@
 <script lang="ts">
 	import { Monitor, Sun, Moon } from '@lucide/svelte';
-	import { Button } from '$lib/components/ui/button/index.js';
+	import IconButton from '$lib/components/icon-button.svelte';
 	import { themeController } from '$lib/theme.svelte.js';
 </script>
 
-<Button
-	variant="ghost"
-	size="icon"
-	onclick={() => themeController.cycle()}
-	aria-label="Toggle theme"
->
+<IconButton label="Toggle theme" labelOnTouch={false} onclick={() => themeController.cycle()}>
 	{#if themeController.theme === 'dark'}
-		<Moon class="size-4" />
+		<Moon />
 	{:else if themeController.theme === 'light'}
-		<Sun class="size-4" />
+		<Sun />
 	{:else}
-		<Monitor class="size-4" />
+		<Monitor />
 	{/if}
-</Button>
+</IconButton>

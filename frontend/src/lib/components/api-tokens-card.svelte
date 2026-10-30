@@ -289,7 +289,7 @@
 <section class="space-y-4" aria-labelledby="tokens-heading">
 	<div class="flex flex-wrap items-center justify-between gap-2">
 		<h2 id="tokens-heading" class="font-heading text-lg font-semibold">Personal access tokens</h2>
-		<Button type="button" variant="outline" class="h-11" onclick={openCreate}>
+		<Button type="button" variant="outline" class="pointer-coarse:h-11" onclick={openCreate}>
 			<Plus class="size-4" />
 			New token
 		</Button>
@@ -311,7 +311,12 @@
 		<Alert.Root variant="destructive">
 			<Alert.Description>{tokensError}</Alert.Description>
 		</Alert.Root>
-		<Button type="button" variant="outline" class="h-11" onclick={() => void loadTokens()}>
+		<Button
+			type="button"
+			variant="outline"
+			class="pointer-coarse:h-11"
+			onclick={() => void loadTokens()}
+		>
 			Retry
 		</Button>
 	{:else if tokensLoading && tokens.length === 0}
@@ -416,7 +421,7 @@
 									<Button
 										type="button"
 										variant="outline"
-										class="h-11"
+										class="pointer-coarse:h-11"
 										aria-label={`Regenerate ${token.name}`}
 										onclick={() => openRotate(token)}
 									>
@@ -425,7 +430,7 @@
 									<Button
 										type="button"
 										variant="outline"
-										class="h-11"
+										class="pointer-coarse:h-11"
 										aria-label={`Revoke ${token.name}`}
 										onclick={() => (revokeTarget = token)}
 									>
@@ -473,7 +478,7 @@
 					id="token-name"
 					bind:ref={nameEl}
 					name="token_name"
-					class="h-11"
+					class="pointer-coarse:h-11"
 					autocomplete="off"
 					required
 					placeholder="For example, Home server"
@@ -500,7 +505,7 @@
 				<legend class="text-sm font-medium">Access</legend>
 				{#each Object.entries(TOKEN_PRESETS) as [key, label] (key)}
 					<label
-						class="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-3 has-[:checked]:border-primary"
+						class="flex cursor-pointer items-center gap-3 rounded-xl border px-3 has-[:checked]:border-primary pointer-coarse:min-h-11"
 					>
 						<input
 							type="radio"
@@ -520,7 +525,7 @@
 
 			<Collapsible.Root bind:open={advancedOpen}>
 				<Collapsible.Trigger
-					class="group flex min-h-11 items-center gap-1 text-sm font-medium underline-offset-4 hover:underline"
+					class="group flex items-center gap-1 text-sm font-medium underline-offset-4 hover:underline pointer-coarse:min-h-11"
 				>
 					Advanced
 					<ChevronDown
@@ -533,7 +538,7 @@
 							<Label for={`token-area-${area.id}`}>{area.label}</Label>
 							<NativeSelect
 								id={`token-area-${area.id}`}
-								class="[&_select]:h-11"
+								class="pointer-coarse:[&_select]:h-11"
 								aria-label={accessLabel(area.id)}
 								disabled={creating}
 								value={selection[area.id] ?? 'none'}
@@ -557,7 +562,7 @@
 				<Label for="token-expiry">Expires after</Label>
 				<NativeSelect
 					id="token-expiry"
-					class="w-full [&_select]:h-11"
+					class="w-full pointer-coarse:[&_select]:h-11"
 					disabled={creating}
 					bind:value={expiryDays}
 				>
@@ -575,13 +580,13 @@
 				<Button
 					type="button"
 					variant="outline"
-					class="h-11"
+					class="pointer-coarse:h-11"
 					disabled={creating}
 					onclick={closeCreate}
 				>
 					Cancel
 				</Button>
-				<Button type="submit" class="h-11" disabled={creating || !canSubmit}>
+				<Button type="submit" class="pointer-coarse:h-11" disabled={creating || !canSubmit}>
 					{#if creating}
 						<Spinner class="size-4" />
 						Creating…
@@ -638,7 +643,7 @@
 				<Label for="rotate-expiry">Expires after</Label>
 				<NativeSelect
 					id="rotate-expiry"
-					class="w-full [&_select]:h-11"
+					class="w-full pointer-coarse:[&_select]:h-11"
 					disabled={rotating}
 					bind:value={rotateExpiryDays}
 				>
@@ -652,13 +657,17 @@
 				<Button
 					type="button"
 					variant="outline"
-					class="h-11"
+					class="pointer-coarse:h-11"
 					disabled={rotating}
 					onclick={closeRotate}
 				>
 					Cancel
 				</Button>
-				<Button type="submit" class="h-11" disabled={rotating || rotatePassword === ''}>
+				<Button
+					type="submit"
+					class="pointer-coarse:h-11"
+					disabled={rotating || rotatePassword === ''}
+				>
 					{#if rotating}
 						<Spinner class="size-4" />
 						Generating…
@@ -694,12 +703,17 @@
 						<Input
 							id="token-value"
 							bind:ref={tokenField}
-							class="h-11 font-mono text-xs"
+							class="font-mono text-xs pointer-coarse:h-11"
 							readonly
 							value={secret.token}
 							onfocus={(e) => e.currentTarget.select()}
 						/>
-						<Button type="button" variant="outline" class="h-11 shrink-0" onclick={copyToken}>
+						<Button
+							type="button"
+							variant="outline"
+							class="shrink-0 pointer-coarse:h-11"
+							onclick={copyToken}
+						>
 							{#if copied}
 								<Check class="size-4" />
 								Copied
@@ -724,7 +738,7 @@
 				</div>
 
 				<div class="flex justify-end">
-					<Button type="button" class="h-11" onclick={closeSecret}>Done</Button>
+					<Button type="button" class="pointer-coarse:h-11" onclick={closeSecret}>Done</Button>
 				</div>
 			</div>
 		{/if}

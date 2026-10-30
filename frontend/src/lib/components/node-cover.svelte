@@ -7,7 +7,12 @@
 		class: cls = '',
 		hiRes = false,
 		children
-	}: { nodeId: string; class?: string; hiRes?: boolean; children?: Snippet } = $props();
+	}: {
+		nodeId: string;
+		class?: string;
+		hiRes?: boolean;
+		children?: Snippet;
+	} = $props();
 
 	const mediaPromise = $derived(
 		listNodeMedia({ path: { node_id: nodeId } }).then(({ data }) => {

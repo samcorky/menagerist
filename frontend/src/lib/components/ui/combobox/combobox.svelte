@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick, untrack } from 'svelte';
+	import { tick, untrack, type Snippet } from 'svelte';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
@@ -24,6 +24,10 @@
 		 * `items` is shown as given instead of being filtered here.
 		 */
 		onsearch?: (text: string) => void;
+		/** Drawn before the label in each row and on the trigger, such as an icon. */
+		leading?: Snippet<[ComboboxItem]>;
+		/** Shown on the trigger when `value` is not among `items` (for example, filtered out by a search). */
+		selectedItem?: ComboboxItem;
 		ref?: HTMLButtonElement | null;
 	};
 
@@ -35,6 +39,8 @@
 		emptyText = 'Nothing found',
 		onValueChange,
 		onsearch,
+		leading,
+		selectedItem,
 		ref = $bindable(null),
 		class: className,
 		disabled = false,
@@ -46,7 +52,7 @@
 	let highlighted = $state('');
 	const listId = $props.id();
 
-	const selected = $derived(selectedComboboxItem(items, value));
+	const selected = $derived(selectedComboboxItem(items, value) ?? selectedItem);
 	const groups = $derived(groupComboboxItems(onsearch ? items : filterComboboxItems(items, query)));
 
 	$effect(() => {
@@ -96,6 +102,7 @@
 	onkeydown={onTriggerKeydown}
 	{...restProps}
 >
+	{#if selected && leading}{@render leading(selected)}{/if}
 	<span class={cn('min-w-0 flex-1 truncate', !selected && 'text-muted-foreground')}>
 		{selected ? (selected.selectedLabel ?? selected.label) : placeholder}
 	</span>
@@ -148,7 +155,11 @@
 			class="min-h-9"
 			onSelect={() => choose(item)}
 		>
+			{#if leading}{@render leading(item)}{/if}
 			<span class="min-w-0 flex-1 truncate">{item.label}</span>
+			{#if item.description}
+				<span class="shrink-0 text-xs text-muted-foreground tabular-nums">{item.description}</span>
+			{/if}
 		</Command.Item>
 	{/each}
 {/snippet}

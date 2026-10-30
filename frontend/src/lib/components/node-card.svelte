@@ -5,7 +5,9 @@
 	import type { MatchContext } from '$lib/search-context';
 	import * as Item from '$lib/components/ui/item/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
+	import NodeCover from './node-cover.svelte';
 	import NodeSummary from './node-summary.svelte';
+	import TypeIcon from './type-icon.svelte';
 	import TagList from './tag-list.svelte';
 	import { nextCardIndex } from './card-grid-nav';
 
@@ -13,12 +15,17 @@
 		item,
 		schema,
 		categoryLabel,
+		typeIcon,
+		typeColour,
 		match,
 		isExample = false
 	}: {
 		item: NodeResponse;
 		schema: AttributesSchema | null;
 		categoryLabel?: string | null;
+		/** The item type's icon and colour, shown when the item has no cover. */
+		typeIcon?: string | null;
+		typeColour?: string | null;
 		match?: MatchContext | null;
 		isExample?: boolean;
 	} = $props();
@@ -48,8 +55,14 @@
 <Item.Root variant="outline">
 	{#snippet child({ props })}
 		<a {...props} href={resolve('/items/[id]', { id: item.id })} onkeydown={handleKeydown}>
-			<Item.Content class="gap-1.5">
-				<Item.Title class="font-heading text-base">
+			<!-- A small cover, or the item type's icon and colour when there is none. -->
+			<div class="size-12 shrink-0 overflow-hidden rounded-lg">
+				<NodeCover nodeId={item.id} class="size-12">
+					<TypeIcon icon={typeIcon} colour={typeColour} boxed class="size-12 rounded-lg text-2xl" />
+				</NodeCover>
+			</div>
+			<Item.Content class="min-w-0 gap-1.5">
+				<Item.Title class="font-heading text-base [overflow-wrap:anywhere]">
 					{item.name}
 					{#if isExample}
 						<Badge variant="outline" class="shrink-0 text-muted-foreground">Example</Badge>

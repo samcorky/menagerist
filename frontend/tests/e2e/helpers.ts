@@ -29,6 +29,7 @@ export async function createItemType(
 	options: { label: string; description?: string; fields?: FieldSpec[] }
 ): Promise<{ label: string }> {
 	await page.goto('/settings/item-types');
+	await page.getByRole('button', { name: 'New item type', exact: true }).click();
 
 	const form = page
 		.locator('form')
@@ -54,11 +55,10 @@ export async function createItemType(
 }
 
 /**
- * Adds a field to the item type edit form that is currently open on the Item
- * types page. Must be called right after `createItemType`, with no
- * navigation in between: newly created types are prepended to the top of
- * the (client-only) list, so `.first()` reliably targets the one just
- * created regardless of what other tests are doing to the shared database.
+ * Adds a field to an item type through its edit dialog on the Item types page. Must be called
+ * right after `createItemType`, with no navigation in between: newly created types are prepended
+ * to the top of the (client-only) list, so `.first()` reliably targets the one just created
+ * regardless of what other tests are doing to the shared database.
  */
 export async function addFieldToItemType(page: Page, field: FieldSpec): Promise<void> {
 	await page.getByRole('button', { name: 'Edit item type' }).first().click();
@@ -72,6 +72,16 @@ export async function addFieldToItemType(page: Page, field: FieldSpec): Promise<
 	await expect(page.getByText('Item type updated')).toBeVisible();
 }
 
+/** Picks an item type in the type picker: opens it, searches, and chooses the matching row. */
+export async function chooseItemType(page: Page, label: string): Promise<void> {
+	await page.getByRole('combobox', { name: 'Item type' }).click();
+	await page.getByPlaceholder('Search item types…').fill(label);
+	await page
+		.getByRole('option', { name: new RegExp(label) })
+		.first()
+		.click();
+}
+
 /** Creates an item from the full "New item" form and returns the resulting item detail URL. */
 export async function createItem(
 	page: Page,
@@ -81,8 +91,7 @@ export async function createItem(
 	await page.getByLabel('Name').fill(options.name);
 
 	if (options.type) {
-		await page.getByPlaceholder('Search item types…').fill(options.type);
-		await page.getByRole('button', { name: options.type, exact: true }).click();
+		await chooseItemType(page, options.type);
 	}
 
 	await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -116,10 +125,9 @@ export async function connectToItem(
 export type NavEntry = 'Home' | 'Items' | 'Collections' | 'Settings';
 
 /**
- * Follows a main navigation link using whichever bar is visible for the current viewport (the
- * top bar on desktop, the bottom bar on a phone). Hidden links are ignored by role queries, so
- * `.first()` picks the visible one. The Settings link is an icon-only button in the top bar,
- * labelled "Settings".
+ * Follows a main navigation link using whichever navigation is visible for the current viewport
+ * (the sidebar on desktop, the bottom bar on a phone). Hidden links are ignored by role queries,
+ * so `.first()` picks the visible one.
  */
 export async function openNav(page: Page, entry: NavEntry): Promise<void> {
 	const link = page.getByRole('link', { name: entry, exact: true }).first();
@@ -127,17 +135,34 @@ export async function openNav(page: Page, entry: NavEntry): Promise<void> {
 	await link.click();
 }
 
-/** The visible Search button: the bottom-bar one on a phone, the header one on desktop. */
+/** The visible Search button: the bottom-bar one on a phone (and the top-bar one on touch tablets). */
 export const searchButton = (page: Page) =>
 	page.getByRole('button', { name: 'Search', exact: true });
 
-/** Opens the search popup through that button (a tap on touch devices). */
+/** The top-bar search field, which stands in for the button with a mouse. */
+export const searchField = (page: Page) =>
+	page.getByRole('combobox', { name: 'Search', exact: true });
+
+/**
+ * The open search surface: the full-screen sheet on touch devices, or the top-bar field with its
+ * results dropdown with a mouse. Hidden while the search is closed.
+ */
+export const searchPopup = (page: Page) =>
+	page
+		.getByRole('dialog', { name: 'Search', exact: true })
+		.or(page.locator('[data-search-inline][data-state="open"]'));
+
+/** Opens search: a tap on the button on touch devices, a click into the field with a mouse. */
 export async function openSearch(page: Page): Promise<void> {
-	const button = searchButton(page);
-	await expect(button).toBeVisible();
-	if (await page.evaluate(() => matchMedia('(pointer: coarse)').matches)) await button.tap();
-	else await button.click();
-	await expect(page.getByRole('dialog', { name: 'Search', exact: true })).toBeVisible();
+	if (await page.evaluate(() => matchMedia('(pointer: coarse)').matches)) {
+		const button = searchButton(page);
+		await expect(button).toBeVisible();
+		await button.tap();
+	} else {
+		await expect(searchField(page)).toBeVisible();
+		await searchField(page).click();
+	}
+	await expect(searchPopup(page)).toBeVisible();
 }
 
 /**

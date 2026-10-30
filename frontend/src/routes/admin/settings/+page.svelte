@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Page from '$lib/components/page.svelte';
 	import { resolve } from '$app/paths';
 	import { tick, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -31,6 +32,8 @@
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import CollapsibleSection from '$lib/components/collapsible-section.svelte';
+	import IconButton from '$lib/components/icon-button.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 
@@ -222,42 +225,49 @@
 
 <svelte:head><title>Settings - Menagerist</title></svelte:head>
 
-<main class="flex-1 px-4 py-8 sm:px-6">
-	<div class="mx-auto flex max-w-2xl flex-col gap-6">
-		<BackButton fallback={resolve('/admin')} />
-		<div>
-			<h1 class="font-heading text-3xl font-semibold tracking-tight">Settings</h1>
-			<p class="mt-1 text-muted-foreground">Change how this Menagerist runs.</p>
-		</div>
+<Page width="reading">
+	<BackButton fallback={resolve('/admin')} />
+	<div>
+		<h1 class="font-heading text-3xl font-semibold tracking-tight">Settings</h1>
+		<p class="mt-1 text-muted-foreground">Change how this Menagerist runs.</p>
+	</div>
 
-		{#if !canRead}
-			<Alert.Root>
-				<Alert.Description>Only administrators can change settings.</Alert.Description>
+	{#if !canRead}
+		<Alert.Root>
+			<Alert.Description>Only administrators can change settings.</Alert.Description>
+		</Alert.Root>
+	{:else}
+		{#if error}
+			<Alert.Root variant="destructive">
+				<Alert.Description>{error}</Alert.Description>
+				<Button
+					variant="outline"
+					class="mt-2 pointer-coarse:h-11"
+					disabled={loading}
+					onclick={() => load()}
+				>
+					<RefreshCw class="size-4" aria-hidden="true" />Retry
+				</Button>
 			</Alert.Root>
-		{:else}
-			{#if error}
-				<Alert.Root variant="destructive">
-					<Alert.Description>{error}</Alert.Description>
-					<Button variant="outline" class="mt-2 h-11" disabled={loading} onclick={() => load()}>
-						<RefreshCw class="size-4" aria-hidden="true" />Retry
-					</Button>
-				</Alert.Root>
-			{/if}
-			{#if loadingDisplay.show}
-				<div role="status" aria-label="Loading settings" class="space-y-3">
-					<Skeleton class="h-40 w-full" /><Skeleton class="h-40 w-full" />
-				</div>
-			{:else if !loading && !error && items.length === 0}
-				<p class="rounded-xl border p-6 text-muted-foreground">
-					There are no settings to change yet.
-				</p>
-			{/if}
+		{/if}
+		{#if loadingDisplay.show}
+			<div role="status" aria-label="Loading settings" class="space-y-3">
+				<Skeleton class="h-40 w-full" /><Skeleton class="h-40 w-full" />
+			</div>
+		{:else if !loading && !error && items.length === 0}
+			<p class="rounded-xl border p-6 text-muted-foreground">
+				There are no settings to change yet.
+			</p>
+		{/if}
 
-			{#each groups as group (group.group)}
-				<section aria-labelledby="group-{group.group}" class="space-y-4" aria-busy={loading}>
-					<h2 id="group-{group.group}" class="font-heading text-xl font-semibold">
-						{group.label}
-					</h2>
+		{#each groups as group (group.group)}
+			<CollapsibleSection
+				id="admin-settings-{group.group}"
+				title={group.label}
+				count={group.items.length}
+				class="gap-2"
+			>
+				<ul class="divide-y rounded-xl border bg-card" aria-busy={loading}>
 					{#each group.items as item (item.key)}
 						{@const widget = widgetFor(item)}
 						{@const editable = canWrite && !item.locked && widget !== null}
@@ -265,7 +275,7 @@
 						{@const locked = lockedNote(item)}
 						{@const restart = restartNote(item)}
 						{@const stale = staleNote(item)}
-						<div class="space-y-3 rounded-xl border bg-card p-5">
+						<li class="grid gap-x-8 gap-y-2 px-4 py-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
 							<div class="space-y-1">
 								<div class="flex flex-wrap items-center gap-2">
 									<h3
@@ -289,68 +299,67 @@
 								{#if item.description}
 									<p class="text-sm text-muted-foreground">{item.description}</p>
 								{/if}
+								{#if locked}<p class="text-sm text-muted-foreground">{locked}</p>{/if}
+								{#if restart}<p class="text-sm text-muted-foreground">{restart}</p>{/if}
+								{#if stale}<p class="text-sm text-muted-foreground">{stale}</p>{/if}
 							</div>
 
-							{#if editable && widget}
-								{@const Input = widget.core.InputWidget}
-								<div class:opacity-60={isSaving}>
-									<Input
-										value={drafts[item.key]}
-										onChange={(value) => setDraft(item.key, value)}
-										ariaLabel={item.title}
-										prop={widget.prop}
-									/>
-								</div>
-							{:else if widget?.core.ViewWidget}
-								{@const View = widget.core.ViewWidget}
-								<View value={item.value} prop={widget.prop} />
-							{:else}
-								<p class="text-sm">{plainText(item.value)}</p>
-							{/if}
+							<div class="space-y-2">
+								{#if editable && widget}
+									{@const Input = widget.core.InputWidget}
+									<div class:opacity-60={isSaving}>
+										<Input
+											value={drafts[item.key]}
+											onChange={(value) => setDraft(item.key, value)}
+											ariaLabel={item.title}
+											prop={widget.prop}
+										/>
+									</div>
+								{:else if widget?.core.ViewWidget}
+									{@const View = widget.core.ViewWidget}
+									<View value={item.value} prop={widget.prop} />
+								{:else}
+									<p class="text-sm">{plainText(item.value)}</p>
+								{/if}
 
-							{#if fieldErrors[item.key]}
-								<p role="alert" class="text-sm text-destructive">{fieldErrors[item.key]}</p>
-							{/if}
+								{#if fieldErrors[item.key]}
+									<p role="alert" class="text-sm text-destructive">{fieldErrors[item.key]}</p>
+								{/if}
 
-							{#if locked}<p class="text-sm text-muted-foreground">{locked}</p>{/if}
-							{#if restart}<p class="text-sm text-muted-foreground">{restart}</p>{/if}
-							{#if stale}<p class="text-sm text-muted-foreground">{stale}</p>{/if}
-
-							{#if editable}
-								<div class="flex flex-wrap gap-2">
-									{#if changed(item)}
-										<Button class="h-11" disabled={isSaving} onclick={() => save(item)}>
-											{#if isSaving}<Spinner
-													class="motion-reduce:animate-none"
-													aria-hidden="true"
-												/>{:else}<Check class="size-4" aria-hidden="true" />{/if}
-											{isSaving ? 'Saving...' : 'Save'}
-										</Button>
-										<Button
-											variant="ghost"
-											class="h-11"
-											disabled={isSaving}
-											onclick={() => discard(item)}
-										>
-											<X class="size-4" aria-hidden="true" />Discard
-										</Button>
-									{/if}
-									{#if item.source === 'instance'}
-										<Button
-											variant="ghost"
-											class="h-11"
-											disabled={isSaving}
-											onclick={() => reset(item)}
-										>
-											<RotateCcw class="size-4" aria-hidden="true" />Reset to default
-										</Button>
-									{/if}
-								</div>
-							{/if}
-						</div>
+								{#if editable && (changed(item) || item.source === 'instance')}
+									<div class="flex flex-wrap items-center gap-2">
+										{#if changed(item)}
+											<Button
+												class="pointer-coarse:h-11"
+												disabled={isSaving}
+												onclick={() => save(item)}
+											>
+												{#if isSaving}<Spinner
+														class="motion-reduce:animate-none"
+														aria-hidden="true"
+													/>{:else}<Check class="size-4" aria-hidden="true" />{/if}
+												{isSaving ? 'Saving...' : 'Save'}
+											</Button>
+											<IconButton label="Discard" disabled={isSaving} onclick={() => discard(item)}>
+												<X />
+											</IconButton>
+										{/if}
+										{#if item.source === 'instance'}
+											<IconButton
+												label="Reset to default"
+												disabled={isSaving}
+												onclick={() => reset(item)}
+											>
+												<RotateCcw />
+											</IconButton>
+										{/if}
+									</div>
+								{/if}
+							</div>
+						</li>
 					{/each}
-				</section>
-			{/each}
-		{/if}
-	</div>
-</main>
+				</ul>
+			</CollapsibleSection>
+		{/each}
+	{/if}
+</Page>

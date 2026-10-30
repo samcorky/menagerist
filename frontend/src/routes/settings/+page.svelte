@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Page from '$lib/components/page.svelte';
 	import { resolve } from '$app/paths';
 	import {
 		Tag,
@@ -18,195 +19,193 @@
 	<title>Settings - Menagerist</title>
 </svelte:head>
 
-<main class="flex-1 px-4 py-8 sm:px-6">
-	<div class="mx-auto flex max-w-2xl flex-col gap-8">
-		<div>
-			<h1 class="font-heading text-3xl font-semibold tracking-tight">Settings</h1>
-			<p class="mt-1 text-muted-foreground">Manage your item structure.</p>
-		</div>
-
-		<div class="grid gap-4">
-			<a href={resolve('/settings/item-types')} class="group block">
-				<div
-					class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
-				>
-					<div class="flex items-start gap-4">
-						<div
-							class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
-						>
-							<Tag class="size-5" />
-						</div>
-						<div>
-							<p class="font-heading font-semibold">Item types</p>
-							<p class="mt-0.5 text-sm text-muted-foreground">
-								Organise your items with types like "Film", "Person", or "Event".
-							</p>
-						</div>
-					</div>
-					<ChevronRight
-						class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-					/>
-				</div>
-			</a>
-
-			<a href={resolve('/settings/relationships')} class="group block">
-				<div
-					class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
-				>
-					<div class="flex items-start gap-4">
-						<div
-							class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
-						>
-							<ArrowLeftRight class="size-5" />
-						</div>
-						<div>
-							<p class="font-heading font-semibold">Relationship types</p>
-							<p class="mt-0.5 text-sm text-muted-foreground">
-								Define how items connect - "Directed by", "Signed by", "Part of".
-							</p>
-						</div>
-					</div>
-					<ChevronRight
-						class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-					/>
-				</div>
-			</a>
-
-			<a href={resolve('/settings/saved-fields')} class="group block">
-				<div
-					class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
-				>
-					<div class="flex items-start gap-4">
-						<div
-							class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
-						>
-							<Bookmark class="size-5" />
-						</div>
-						<div>
-							<p class="font-heading font-semibold">Saved fields</p>
-							<p class="mt-0.5 text-sm text-muted-foreground">
-								Reuse a field or a list of choices across item types.
-							</p>
-						</div>
-					</div>
-					<ChevronRight
-						class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-					/>
-				</div>
-			</a>
-
-			<a href={resolve('/settings/examples')} class="group block">
-				<div
-					class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
-				>
-					<div class="flex items-start gap-4">
-						<div
-							class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
-						>
-							<Sparkles class="size-5" />
-						</div>
-						<div>
-							<p class="font-heading font-semibold">Examples</p>
-							<p class="mt-0.5 text-sm text-muted-foreground">
-								Explore Menagerist with ready-made example items.
-							</p>
-						</div>
-					</div>
-					<ChevronRight
-						class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-					/>
-				</div>
-			</a>
-
-			<a href={resolve('/recently-deleted')} class="group block">
-				<div
-					class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
-				>
-					<div class="flex items-start gap-4">
-						<div
-							class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
-						>
-							<Trash2 class="size-5" />
-						</div>
-						<div>
-							<p class="font-heading font-semibold">Recently deleted</p>
-							<p class="mt-0.5 text-sm text-muted-foreground">
-								Restore items and collections you deleted, or delete them for good.
-							</p>
-						</div>
-					</div>
-					<ChevronRight
-						class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-					/>
-				</div>
-			</a>
-
-			{#if auth.isAdmin}
-				<a href={resolve('/admin')} class="group block">
-					<div
-						class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
-					>
-						<div class="flex items-start gap-4">
-							<div
-								class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
-							>
-								<Shield class="size-5" />
-							</div>
-							<div>
-								<p class="font-heading font-semibold">Administration</p>
-								<p class="mt-0.5 text-sm text-muted-foreground">Manage users and active devices.</p>
-							</div>
-						</div>
-						<ChevronRight
-							class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-						/>
-					</div>
-				</a>
-			{/if}
-
-			<a href={resolve('/settings/account')} class="group block">
-				<div
-					class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
-				>
-					<div class="flex items-start gap-4">
-						<div
-							class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
-						>
-							<UserRound class="size-5" />
-						</div>
-						<div>
-							<p class="font-heading font-semibold">Account</p>
-							<p class="mt-0.5 text-sm text-muted-foreground">Change your password.</p>
-						</div>
-					</div>
-					<ChevronRight
-						class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-					/>
-				</div>
-			</a>
-
-			<a href={resolve('/status')} class="group block">
-				<div
-					class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
-				>
-					<div class="flex items-start gap-4">
-						<div
-							class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
-						>
-							<Activity class="size-5" />
-						</div>
-						<div>
-							<p class="font-heading font-semibold">System status</p>
-							<p class="mt-0.5 text-sm text-muted-foreground">
-								Health checks, database connectivity, and build info.
-							</p>
-						</div>
-					</div>
-					<ChevronRight
-						class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-					/>
-				</div>
-			</a>
-		</div>
+<Page width="fluid" class="gap-6">
+	<div>
+		<h1 class="font-heading text-3xl font-semibold tracking-tight">Settings</h1>
+		<p class="mt-1 text-muted-foreground">Manage your item structure.</p>
 	</div>
-</main>
+
+	<div class="grid gap-3 sm:grid-cols-[repeat(auto-fill,minmax(20rem,1fr))]">
+		<a href={resolve('/settings/item-types')} class="group block">
+			<div
+				class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
+			>
+				<div class="flex items-start gap-4">
+					<div
+						class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
+					>
+						<Tag class="size-5" />
+					</div>
+					<div>
+						<p class="font-heading font-semibold">Item types</p>
+						<p class="mt-0.5 text-sm text-muted-foreground">
+							Organise your items with types like "Film", "Person", or "Event".
+						</p>
+					</div>
+				</div>
+				<ChevronRight
+					class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+				/>
+			</div>
+		</a>
+
+		<a href={resolve('/settings/relationships')} class="group block">
+			<div
+				class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
+			>
+				<div class="flex items-start gap-4">
+					<div
+						class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
+					>
+						<ArrowLeftRight class="size-5" />
+					</div>
+					<div>
+						<p class="font-heading font-semibold">Relationship types</p>
+						<p class="mt-0.5 text-sm text-muted-foreground">
+							Define how items connect - "Directed by", "Signed by", "Part of".
+						</p>
+					</div>
+				</div>
+				<ChevronRight
+					class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+				/>
+			</div>
+		</a>
+
+		<a href={resolve('/settings/saved-fields')} class="group block">
+			<div
+				class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
+			>
+				<div class="flex items-start gap-4">
+					<div
+						class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
+					>
+						<Bookmark class="size-5" />
+					</div>
+					<div>
+						<p class="font-heading font-semibold">Saved fields</p>
+						<p class="mt-0.5 text-sm text-muted-foreground">
+							Reuse a field or a list of choices across item types.
+						</p>
+					</div>
+				</div>
+				<ChevronRight
+					class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+				/>
+			</div>
+		</a>
+
+		<a href={resolve('/settings/examples')} class="group block">
+			<div
+				class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
+			>
+				<div class="flex items-start gap-4">
+					<div
+						class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
+					>
+						<Sparkles class="size-5" />
+					</div>
+					<div>
+						<p class="font-heading font-semibold">Examples</p>
+						<p class="mt-0.5 text-sm text-muted-foreground">
+							Explore Menagerist with ready-made example items.
+						</p>
+					</div>
+				</div>
+				<ChevronRight
+					class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+				/>
+			</div>
+		</a>
+
+		<a href={resolve('/recently-deleted')} class="group block">
+			<div
+				class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
+			>
+				<div class="flex items-start gap-4">
+					<div
+						class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
+					>
+						<Trash2 class="size-5" />
+					</div>
+					<div>
+						<p class="font-heading font-semibold">Recently deleted</p>
+						<p class="mt-0.5 text-sm text-muted-foreground">
+							Restore items and collections you deleted, or delete them for good.
+						</p>
+					</div>
+				</div>
+				<ChevronRight
+					class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+				/>
+			</div>
+		</a>
+
+		{#if auth.isAdmin}
+			<a href={resolve('/admin')} class="group block">
+				<div
+					class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
+				>
+					<div class="flex items-start gap-4">
+						<div
+							class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
+						>
+							<Shield class="size-5" />
+						</div>
+						<div>
+							<p class="font-heading font-semibold">Administration</p>
+							<p class="mt-0.5 text-sm text-muted-foreground">Manage users and active devices.</p>
+						</div>
+					</div>
+					<ChevronRight
+						class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+					/>
+				</div>
+			</a>
+		{/if}
+
+		<a href={resolve('/settings/account')} class="group block">
+			<div
+				class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
+			>
+				<div class="flex items-start gap-4">
+					<div
+						class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
+					>
+						<UserRound class="size-5" />
+					</div>
+					<div>
+						<p class="font-heading font-semibold">Account</p>
+						<p class="mt-0.5 text-sm text-muted-foreground">Change your password.</p>
+					</div>
+				</div>
+				<ChevronRight
+					class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+				/>
+			</div>
+		</a>
+
+		<a href={resolve('/status')} class="group block">
+			<div
+				class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
+			>
+				<div class="flex items-start gap-4">
+					<div
+						class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
+					>
+						<Activity class="size-5" />
+					</div>
+					<div>
+						<p class="font-heading font-semibold">System status</p>
+						<p class="mt-0.5 text-sm text-muted-foreground">
+							Health checks, database connectivity, and build info.
+						</p>
+					</div>
+				</div>
+				<ChevronRight
+					class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+				/>
+			</div>
+		</a>
+	</div>
+</Page>

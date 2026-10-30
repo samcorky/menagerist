@@ -565,7 +565,7 @@
 		{/if}
 	{/each}
 
-	<div class="flex gap-2">
+	<div class="flex flex-wrap gap-2">
 		<Button type="button" variant="outline" size="sm" onclick={addField}>
 			<Plus class="size-4" />
 			Add field

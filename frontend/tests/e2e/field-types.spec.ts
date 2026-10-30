@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { createItemType, uniqueName } from './helpers';
+import { createItemType, uniqueName, chooseItemType } from './helpers';
 
 /**
  * Input, validation and view coverage for the field-type kinds, driven through the real UI
@@ -12,8 +12,7 @@ test('text field: input and view', async ({ page }) => {
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Dune'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 	await page.getByLabel('Author').fill('Frank Herbert');
 	await page.getByRole('button', { name: 'Save', exact: true }).click();
 	await page.waitForURL(/\/items\/(?!new$)[^/]+$/);
@@ -29,8 +28,7 @@ test('number field: input, validation and view', async ({ page }) => {
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Widget'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	// A plain number input has no `step="any"`, so a non-integer value fails the browser's
 	// native step validation and silently blocks the submit - use a whole number here.
@@ -50,8 +48,7 @@ test('boolean field: input and view', async ({ page }) => {
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Rumours'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	await page.getByRole('switch', { name: 'Signed' }).click();
 	await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -73,8 +70,7 @@ test('money field: input and view (symbol-known and no-symbol currencies)', asyn
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Vase'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	await page.getByLabel('Purchase price amount').fill('45');
 	await page.getByLabel('Purchase price currency').selectOption('GBP');
@@ -95,8 +91,7 @@ test('money field: partial value (amount only) is kept, and empty is omitted', a
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Coin'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	await page.getByLabel('Value amount').fill('12');
 	await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -111,8 +106,7 @@ test('url field: input, view link, and empty renders "-"', async ({ page }) => {
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('The Menagerie'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	await page.getByLabel('Website').fill('https://example.com/band');
 	await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -134,8 +128,7 @@ test('email field: input and mailto: view link', async ({ page }) => {
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Acme Corp'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	await page.getByLabel('Contact email').fill('sales@example.com');
 	await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -155,8 +148,7 @@ test('phone field: input and tel: view link', async ({ page }) => {
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Repair shop'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	await page.getByLabel('Phone number').fill('+1 (555) 123-4567');
 	await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -178,8 +170,7 @@ test('phone field: an invalid value shows a client-side validation error on blur
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Bad number'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	const phoneInput = page.getByLabel('Phone number');
 	await phoneInput.fill('call me maybe!!');
@@ -200,8 +191,7 @@ test('date field: input via the calendar and view', async ({ page }) => {
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Alien'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	await page.getByRole('button', { name: 'Released' }).click();
 	const now = new Date();
@@ -221,6 +211,7 @@ test('choice field: input via the dropdown, options set in the schema editor, an
 }) => {
 	const typeLabel = uniqueName('Record');
 	await page.goto('/settings/item-types');
+	await page.getByRole('button', { name: 'New item type', exact: true }).click();
 	const form = page
 		.locator('form')
 		.filter({ has: page.getByRole('button', { name: 'Add item type' }) });
@@ -237,8 +228,7 @@ test('choice field: input via the dropdown, options set in the schema editor, an
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Bookends'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	await page.getByRole('button', { name: 'Format' }).click();
 	await page.getByRole('option', { name: 'LP', exact: true }).click();
@@ -259,8 +249,7 @@ test('rating field: input via stars and view', async ({ page }) => {
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('OK Computer'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	await page
 		.getByRole('radiogroup', { name: 'My rating' })
@@ -280,8 +269,7 @@ test('quantity field: input (value + unit) and view', async ({ page }) => {
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Bolt'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	await page.getByLabel('Weight value').fill('180');
 	await page.getByLabel('Weight unit').fill('g');
@@ -296,6 +284,7 @@ test('quantity field: input (value + unit) and view', async ({ page }) => {
 test('group (table) field: add a sub-field, input a row, and view', async ({ page }) => {
 	const typeLabel = uniqueName('Movie');
 	await page.goto('/settings/item-types');
+	await page.getByRole('button', { name: 'New item type', exact: true }).click();
 	const form = page
 		.locator('form')
 		.filter({ has: page.getByRole('button', { name: 'Add item type' }) });
@@ -310,8 +299,7 @@ test('group (table) field: add a sub-field, input a row, and view', async ({ pag
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Alien'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	await page.getByRole('button', { name: 'Add row' }).click();
 	await page.getByLabel('Actor').fill('Sigourney Weaver');
@@ -332,8 +320,7 @@ test('ordered list field: add items and view as a numbered list', async ({ page 
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Toast'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	await page.getByRole('button', { name: 'Add item' }).click();
 	await page.getByLabel('Instructions item 1').fill('Toast the bread');
@@ -356,8 +343,7 @@ test('checklist field: add an item, tick it, and view its persisted tick', async
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Weekend away'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	await page.getByRole('button', { name: 'Add item' }).click();
 	await page.getByLabel('Packing list item 1', { exact: true }).fill('Passport');
@@ -377,8 +363,7 @@ test('longtext field: input and view', async ({ page }) => {
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Rumours'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	await page.getByLabel('Notes').fill('Bought at a car boot sale.');
 	await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -394,6 +379,7 @@ test('multiple choice field: options set in the schema editor, tick several, and
 }) => {
 	const typeLabel = uniqueName('Release');
 	await page.goto('/settings/item-types');
+	await page.getByRole('button', { name: 'New item type', exact: true }).click();
 	const form = page
 		.locator('form')
 		.filter({ has: page.getByRole('button', { name: 'Add item type' }) });
@@ -410,8 +396,7 @@ test('multiple choice field: options set in the schema editor, tick several, and
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Kind of Blue'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	const group = page.getByRole('group', { name: 'Formats' });
 	await group.getByRole('button', { name: 'Vinyl', exact: true }).click();
@@ -446,8 +431,7 @@ test('partial date field: placeholder, live preview, and view at the precision e
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Blue'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	const input = page.getByLabel('Pressed');
 	await expect(input).toHaveAttribute('placeholder', 'YYYY, YYYY-MM or YYYY-MM-DD');
@@ -473,8 +457,7 @@ test('partial date field: a year alone is kept as a year, and a bad value shows 
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Rumours'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	const input = page.getByLabel('Pressed');
 	await input.fill('1973-13');
@@ -500,8 +483,7 @@ test('duration field: m:ss entry, tidied on blur, and shown as a clock', async (
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Abbey Road'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	const input = page.getByLabel('Running time');
 	await input.fill('1h 2m 3s');
@@ -531,8 +513,7 @@ test('duration field: unreadable text shows an error and the save is rejected un
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Revolver'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	const input = page.getByLabel('Running time');
 	await input.fill('about three minutes');

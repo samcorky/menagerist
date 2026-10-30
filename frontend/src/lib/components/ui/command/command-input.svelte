@@ -8,12 +8,13 @@
 		ref = $bindable(null),
 		class: className,
 		value = $bindable(''),
+		wrapperClass,
 		...restProps
-	}: CommandPrimitive.InputProps = $props();
+	}: CommandPrimitive.InputProps & { wrapperClass?: string } = $props();
 </script>
 
-<div data-slot="command-input-wrapper" class="p-1 pb-0">
-	<InputGroup.Root class="h-11! bg-input/50">
+<div data-slot="command-input-wrapper" class={cn('p-1 pb-0', wrapperClass)}>
+	<InputGroup.Root class="bg-input/50 pointer-coarse:h-11!">
 		<CommandPrimitive.Input
 			{value}
 			data-slot="command-input"

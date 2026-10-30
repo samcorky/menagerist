@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Page from '$lib/components/page.svelte';
 	import PasswordInput from '$lib/components/password-input.svelte';
 	import { tick } from 'svelte';
 	import { auth } from '$lib/auth.svelte.js';
@@ -37,56 +38,58 @@
 	<title>Sign in - Menagerist</title>
 </svelte:head>
 
-<main class="flex-1 px-4 py-10 sm:px-6">
-	<div class="mx-auto flex max-w-sm flex-col gap-6">
-		<div>
-			<h1 class="font-heading text-3xl font-semibold tracking-tight">Sign in</h1>
-			<p class="mt-1 text-muted-foreground">Welcome back to your collection.</p>
+<Page width="narrow" class="pt-8">
+	<div>
+		<h1 class="font-heading text-3xl font-semibold tracking-tight">Sign in</h1>
+		<p class="mt-1 text-muted-foreground">Welcome back to your collection.</p>
+	</div>
+
+	<form class="space-y-4" onsubmit={handleSubmit}>
+		{#if error}
+			<Alert.Root variant="destructive">
+				<Alert.Description>{error}</Alert.Description>
+			</Alert.Root>
+		{/if}
+
+		<div class="space-y-1.5">
+			<Label for="login-username">Username</Label>
+			<Input
+				id="login-username"
+				name="username"
+				class="pointer-coarse:h-11"
+				autocomplete="username"
+				autocapitalize="none"
+				spellcheck={false}
+				required
+				disabled={busy}
+				bind:value={username}
+			/>
 		</div>
 
-		<form class="space-y-4" onsubmit={handleSubmit}>
-			{#if error}
-				<Alert.Root variant="destructive">
-					<Alert.Description>{error}</Alert.Description>
-				</Alert.Root>
+		<div class="space-y-1.5">
+			<Label for="login-password">Password</Label>
+			<PasswordInput
+				id="login-password"
+				bind:ref={passwordInput}
+				name="password"
+				autocomplete="current-password"
+				required
+				disabled={busy}
+				bind:value={password}
+			/>
+		</div>
+
+		<Button
+			type="submit"
+			class="w-full pointer-coarse:h-11"
+			disabled={busy || !username.trim() || !password}
+		>
+			{#if busy}
+				<Spinner class="size-4" />
+				Signing in…
+			{:else}
+				Sign in
 			{/if}
-
-			<div class="space-y-1.5">
-				<Label for="login-username">Username</Label>
-				<Input
-					id="login-username"
-					name="username"
-					class="h-11"
-					autocomplete="username"
-					autocapitalize="none"
-					spellcheck={false}
-					required
-					disabled={busy}
-					bind:value={username}
-				/>
-			</div>
-
-			<div class="space-y-1.5">
-				<Label for="login-password">Password</Label>
-				<PasswordInput
-					id="login-password"
-					bind:ref={passwordInput}
-					name="password"
-					autocomplete="current-password"
-					required
-					disabled={busy}
-					bind:value={password}
-				/>
-			</div>
-
-			<Button type="submit" class="h-11 w-full" disabled={busy || !username.trim() || !password}>
-				{#if busy}
-					<Spinner class="size-4" />
-					Signing in…
-				{:else}
-					Sign in
-				{/if}
-			</Button>
-		</form>
-	</div>
-</main>
+		</Button>
+	</form>
+</Page>

@@ -71,7 +71,12 @@
 		{#if view.notesUrl || canCheck}
 			<div class="flex flex-wrap gap-2 border-t border-border/80 px-5 py-4">
 				{#if canCheck}
-					<Button variant="outline" class="h-11" disabled={checking} onclick={onCheck}>
+					<Button
+						variant="outline"
+						class="pointer-coarse:h-11"
+						disabled={checking}
+						onclick={onCheck}
+					>
 						<RefreshCw class="size-4 {checking ? 'animate-spin motion-reduce:animate-none' : ''}" />
 						{checking ? 'Checking...' : 'Check now'}
 					</Button>
@@ -79,7 +84,7 @@
 				{#if view.notesUrl}
 					<Button
 						variant="ghost"
-						class="h-11"
+						class="pointer-coarse:h-11"
 						href={view.notesUrl}
 						target="_blank"
 						rel="noopener noreferrer"

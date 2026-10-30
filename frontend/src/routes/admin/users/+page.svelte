@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Page from '$lib/components/page.svelte';
 	import PasswordInput from '$lib/components/password-input.svelte';
 	import { resolve } from '$app/paths';
 	import { Copy, Check, KeyRound, Laptop, LockOpen, Plus, Dices, Pencil, X } from '@lucide/svelte';
@@ -346,7 +347,7 @@
 			<div class="flex items-center gap-2">
 				<Input
 					type="text"
-					class={compact ? 'h-9' : 'h-11'}
+					class={compact ? 'h-9' : 'pointer-coarse:h-11'}
 					bind:value={editing.draft}
 					bind:ref={editInput}
 					disabled={editing.busy}
@@ -361,7 +362,7 @@
 				/>
 				<Button
 					type="submit"
-					class={compact ? 'h-9' : 'h-11'}
+					class={compact ? 'h-9' : 'pointer-coarse:h-11'}
 					disabled={editing.busy}
 					aria-label="Save display name for {user.username}"
 				>
@@ -374,7 +375,7 @@
 					type="button"
 					variant="ghost"
 					size="icon"
-					class="shrink-0 {compact ? 'size-9' : 'size-11'}"
+					class="shrink-0 {compact ? 'size-9' : 'pointer-coarse:size-11'}"
 					disabled={editing.busy}
 					aria-label="Cancel editing name for {user.username}"
 					onclick={() => stopEdit(user.id)}
@@ -394,7 +395,7 @@
 					type="button"
 					variant="ghost"
 					size="icon"
-					class="shrink-0 {compact ? 'size-9' : 'size-11'}"
+					class="shrink-0 {compact ? 'size-9' : 'pointer-coarse:size-11'}"
 					bind:ref={editButton}
 					aria-label="Edit display name for {user.username}"
 					onclick={() => startEdit(user)}
@@ -427,11 +428,11 @@
 
 <!-- Table rows keep the labelled Disable button and fold the rest into icon buttons. -->
 {#snippet rowActions(user: UserResponse, isMe: boolean, locked: boolean, compact: boolean)}
-	{@const size = compact ? 'size-9' : 'h-11'}
+	{@const size = compact ? 'size-9' : 'pointer-coarse:h-11'}
 	{#if canUpdate}
 		<Button
 			variant="outline"
-			class={compact ? 'h-9' : 'h-11'}
+			class={compact ? 'h-9' : 'pointer-coarse:h-11'}
 			disabled={rowBusy === user.id || isMe}
 			onclick={() => (user.disabled ? patch(user, { disabled: false }) : (disableTarget = user))}
 		>
@@ -482,292 +483,296 @@
 	{/if}
 {/snippet}
 
-<main class="flex-1 px-4 py-8 sm:px-6">
-	<div class="mx-auto flex max-w-5xl flex-col gap-6">
-		<BackButton fallback={resolve('/admin')} />
-		<div class="flex flex-wrap items-start justify-between gap-3">
-			<div>
-				<h1 class="font-heading text-3xl font-semibold tracking-tight">Users</h1>
-				<p class="mt-1 text-muted-foreground">Everyone who can sign in to this Menagerist.</p>
-			</div>
-			{#if canCreate && !showCreate}
-				<Button class="h-11" onclick={() => (showCreate = true)}>
-					<Plus class="size-4" />
-					Add user
-				</Button>
-			{/if}
+<Page width="fluid">
+	<BackButton fallback={resolve('/admin')} />
+	<div class="flex flex-wrap items-start justify-between gap-3">
+		<div>
+			<h1 class="font-heading text-3xl font-semibold tracking-tight">Users</h1>
+			<p class="mt-1 text-muted-foreground">Everyone who can sign in to this Menagerist.</p>
 		</div>
+		{#if canCreate && !showCreate}
+			<Button class="pointer-coarse:h-11" onclick={() => (showCreate = true)}>
+				<Plus class="size-4" />
+				Add user
+			</Button>
+		{/if}
+	</div>
 
-		{#if !canList}
+	{#if !canList}
+		<Alert.Root>
+			<Alert.Description>Only administrators can manage users.</Alert.Description>
+		</Alert.Root>
+	{:else}
+		{#if issued}
 			<Alert.Root>
-				<Alert.Description>Only administrators can manage users.</Alert.Description>
-			</Alert.Root>
-		{:else}
-			{#if issued}
-				<Alert.Root>
-					<Alert.Title>Password for {issued.name}</Alert.Title>
-					<Alert.Description>
-						<p>
-							Give this to {issued.username} now. It is only shown once, and they must change it the first
-							time they sign in.
-						</p>
-						<div class="mt-3 flex flex-wrap items-center gap-2">
-							<code
-								class="rounded-md border bg-muted px-2.5 py-1 font-mono text-sm font-semibold tracking-wider"
-							>
-								{issued.password}
-							</code>
-							<Button variant="outline" class="h-11" onclick={copyPassword}>
-								{#if copied}
-									<Check class="size-4" />
-									Copied
-								{:else}
-									<Copy class="size-4" />
-									Copy password
-								{/if}
-							</Button>
-							<Button variant="ghost" class="h-11" onclick={() => (issued = null)}>Done</Button>
-						</div>
-					</Alert.Description>
-				</Alert.Root>
-			{/if}
-
-			{#if showCreate}
-				<Card.Root class="max-w-2xl">
-					<Card.Header>
-						<Card.Title>Add user</Card.Title>
-						<Card.Description>
-							Create a starting account. They'll choose a new password the first time they sign in.
-						</Card.Description>
-					</Card.Header>
-					<Card.Content>
-						<form class="space-y-4" onsubmit={handleCreate}>
-							{#if createError}
-								<Alert.Root variant="destructive">
-									<Alert.Description>{createError}</Alert.Description>
-								</Alert.Root>
+				<Alert.Title>Password for {issued.name}</Alert.Title>
+				<Alert.Description>
+					<p>
+						Give this to {issued.username} now. It is only shown once, and they must change it the first
+						time they sign in.
+					</p>
+					<div class="mt-3 flex flex-wrap items-center gap-2">
+						<code
+							class="rounded-md border bg-muted px-2.5 py-1 font-mono text-sm font-semibold tracking-wider"
+						>
+							{issued.password}
+						</code>
+						<Button variant="outline" class="pointer-coarse:h-11" onclick={copyPassword}>
+							{#if copied}
+								<Check class="size-4" />
+								Copied
+							{:else}
+								<Copy class="size-4" />
+								Copy password
 							{/if}
-							<div class="space-y-1.5">
-								<Label for="new-name">Name</Label>
-								<Input
-									id="new-name"
-									required
-									maxlength={DISPLAY_NAME_MAX_LENGTH}
-									disabled={creating}
-									bind:value={newDisplayName}
-								/>
-							</div>
-							<div class="space-y-1.5">
-								<Label for="new-username">Username</Label>
-								<Input
-									id="new-username"
+						</Button>
+						<Button variant="ghost" class="pointer-coarse:h-11" onclick={() => (issued = null)}
+							>Done</Button
+						>
+					</div>
+				</Alert.Description>
+			</Alert.Root>
+		{/if}
+
+		{#if showCreate}
+			<Card.Root class="max-w-2xl">
+				<Card.Header>
+					<Card.Title>Add user</Card.Title>
+					<Card.Description>
+						Create a starting account. They'll choose a new password the first time they sign in.
+					</Card.Description>
+				</Card.Header>
+				<Card.Content>
+					<form class="space-y-4" onsubmit={handleCreate}>
+						{#if createError}
+							<Alert.Root variant="destructive">
+								<Alert.Description>{createError}</Alert.Description>
+							</Alert.Root>
+						{/if}
+						<div class="space-y-1.5">
+							<Label for="new-name">Name</Label>
+							<Input
+								id="new-name"
+								required
+								maxlength={DISPLAY_NAME_MAX_LENGTH}
+								disabled={creating}
+								bind:value={newDisplayName}
+							/>
+						</div>
+						<div class="space-y-1.5">
+							<Label for="new-username">Username</Label>
+							<Input
+								id="new-username"
+								autocomplete="off"
+								autocapitalize="none"
+								spellcheck={false}
+								required
+								disabled={creating}
+								bind:value={newUsername}
+							/>
+						</div>
+						<div class="space-y-1.5">
+							<Label for="new-password">Starting password</Label>
+							<div class="flex gap-2">
+								<PasswordInput
+									id="new-password"
 									autocomplete="off"
 									autocapitalize="none"
 									spellcheck={false}
 									required
 									disabled={creating}
-									bind:value={newUsername}
+									bind:value={newPassword}
 								/>
-							</div>
-							<div class="space-y-1.5">
-								<Label for="new-password">Starting password</Label>
-								<div class="flex gap-2">
-									<PasswordInput
-										id="new-password"
-										autocomplete="off"
-										autocapitalize="none"
-										spellcheck={false}
-										required
-										disabled={creating}
-										bind:value={newPassword}
-									/>
-									<Button
-										type="button"
-										variant="outline"
-										class="h-11 shrink-0"
-										disabled={creating}
-										onclick={() => (newPassword = generatePassword())}
-									>
-										<Dices class="size-4" />
-										Randomise
-									</Button>
-								</div>
-								<p class="text-xs text-muted-foreground">
-									At least {PASSWORD_MIN_LENGTH} characters.
-								</p>
-							</div>
-							<div class="space-y-1.5">
-								<Label for="new-role">Role</Label>
-								<NativeSelect
-									id="new-role"
-									disabled={creating}
-									value={newRole}
-									onchange={(e) => (newRole = e.currentTarget.value as Role)}
-								>
-									<option value="member">Member</option>
-									<option value="admin">Administrator</option>
-								</NativeSelect>
-							</div>
-							<div class="flex gap-2 pt-2">
-								<Button type="submit" class="h-11" disabled={creating || !newPasswordValid}>
-									{#if creating}
-										<Spinner />
-									{/if}
-									Add user
-								</Button>
 								<Button
 									type="button"
 									variant="outline"
-									class="h-11"
+									class="shrink-0 pointer-coarse:h-11"
 									disabled={creating}
-									onclick={() => (showCreate = false)}
+									onclick={() => (newPassword = generatePassword())}
 								>
-									Cancel
+									<Dices class="size-4" />
+									Randomise
 								</Button>
 							</div>
-						</form>
-					</Card.Content>
-				</Card.Root>
+							<p class="text-xs text-muted-foreground">
+								At least {PASSWORD_MIN_LENGTH} characters.
+							</p>
+						</div>
+						<div class="space-y-1.5">
+							<Label for="new-role">Role</Label>
+							<NativeSelect
+								id="new-role"
+								disabled={creating}
+								value={newRole}
+								onchange={(e) => (newRole = e.currentTarget.value as Role)}
+							>
+								<option value="member">Member</option>
+								<option value="admin">Administrator</option>
+							</NativeSelect>
+						</div>
+						<div class="flex gap-2 pt-2">
+							<Button
+								type="submit"
+								class="pointer-coarse:h-11"
+								disabled={creating || !newPasswordValid}
+							>
+								{#if creating}
+									<Spinner />
+								{/if}
+								Add user
+							</Button>
+							<Button
+								type="button"
+								variant="outline"
+								class="pointer-coarse:h-11"
+								disabled={creating}
+								onclick={() => (showCreate = false)}
+							>
+								Cancel
+							</Button>
+						</div>
+					</form>
+				</Card.Content>
+			</Card.Root>
+		{/if}
+
+		{#if loading}
+			{#if loadingDisplay.show}
+				<div class="space-y-3" role="status" aria-label="Loading accounts">
+					<Skeleton class="h-28 w-full rounded-xl" />
+					<Skeleton class="h-28 w-full rounded-xl" />
+				</div>
 			{/if}
-
-			{#if loading}
-				{#if loadingDisplay.show}
-					<div class="space-y-3" role="status" aria-label="Loading accounts">
-						<Skeleton class="h-28 w-full rounded-xl" />
-						<Skeleton class="h-28 w-full rounded-xl" />
-					</div>
-				{/if}
-			{:else if loadError}
-				<Alert.Root variant="destructive">
-					<Alert.Description>{loadError}</Alert.Description>
-				</Alert.Root>
-			{:else}
-				{#if wide.current}
-					<DataTable
-						label="Users"
-						columns={[
-							{ label: 'Person' },
-							{ label: 'Role' },
-							{ label: 'Status' },
-							{ label: 'Last sign-in' },
-							{ label: 'Actions', end: true }
-						]}
-					>
-						{#each users as user (user.id)}
-							{@const isMe = user.id === auth.user?.id}
-							{@const locked = isLocked(user.locked_until)}
-							<Table.Row>
-								<Table.Cell>
-									{@render nameEditor(user, true)}
-									<p class="text-sm text-muted-foreground">{user.username}</p>
-									{#if rowError?.id === user.id}
-										<p class="mt-1 text-sm text-destructive" role="alert">{rowError.message}</p>
-									{/if}
-								</Table.Cell>
-								<Table.Cell>
-									{#if canUpdate}
-										<div class="w-36">
-											<NativeSelect
-												class="[&_select]:min-h-9"
-												aria-label="Role for {user.username}"
-												disabled={rowBusy === user.id || isMe}
-												value={user.role}
-												onchange={(e) => patch(user, { role: e.currentTarget.value as Role })}
-											>
-												<option value="member">Member</option>
-												<option value="admin">Administrator</option>
-											</NativeSelect>
-										</div>
-										{#if isMe}
-											<p class="mt-1 text-xs text-muted-foreground">
-												You can't change your own role or disable yourself.
-											</p>
-										{/if}
-									{:else}
-										{user.role === 'admin' ? 'Administrator' : 'Member'}
-									{/if}
-								</Table.Cell>
-								<Table.Cell>
-									<div class="flex flex-wrap items-center gap-1.5">
-										{@render statusBadges(user, isMe, locked, false)}
+		{:else if loadError}
+			<Alert.Root variant="destructive">
+				<Alert.Description>{loadError}</Alert.Description>
+			</Alert.Root>
+		{:else}
+			{#if wide.current}
+				<DataTable
+					label="Users"
+					columns={[
+						{ label: 'Person' },
+						{ label: 'Role' },
+						{ label: 'Status' },
+						{ label: 'Last sign-in' },
+						{ label: 'Actions', end: true }
+					]}
+				>
+					{#each users as user (user.id)}
+						{@const isMe = user.id === auth.user?.id}
+						{@const locked = isLocked(user.locked_until)}
+						<Table.Row>
+							<Table.Cell>
+								{@render nameEditor(user, true)}
+								<p class="text-sm text-muted-foreground">{user.username}</p>
+								{#if rowError?.id === user.id}
+									<p class="mt-1 text-sm text-destructive" role="alert">{rowError.message}</p>
+								{/if}
+							</Table.Cell>
+							<Table.Cell>
+								{#if canUpdate}
+									<div class="w-36">
+										<NativeSelect
+											class="[&_select]:min-h-9"
+											aria-label="Role for {user.username}"
+											disabled={rowBusy === user.id || isMe}
+											value={user.role}
+											onchange={(e) => patch(user, { role: e.currentTarget.value as Role })}
+										>
+											<option value="member">Member</option>
+											<option value="admin">Administrator</option>
+										</NativeSelect>
 									</div>
-								</Table.Cell>
-								<Table.Cell class="text-muted-foreground">
-									<span title={lastSignIn(user.last_login_at).title}
-										>{lastSignIn(user.last_login_at).text}</span
-									>
-								</Table.Cell>
-								<Table.Cell>
-									<div class="flex flex-wrap items-center justify-end gap-1.5">
-										{@render rowActions(user, isMe, locked, true)}
-									</div>
-								</Table.Cell>
-							</Table.Row>
-						{/each}
-					</DataTable>
-				{:else}
-					<ul class="flex flex-col gap-3" aria-label="Users">
-						{#each users as user (user.id)}
-							{@const isMe = user.id === auth.user?.id}
-							{@const locked = isLocked(user.locked_until)}
-							<li>
-								<Card.Root>
-									<Card.Content class="flex flex-col gap-3 p-4 sm:p-5">
-										<div class="flex flex-wrap items-start justify-between gap-2">
-											<div class="min-w-0 flex-1">
-												{@render nameEditor(user, false)}
-												<p class="text-sm text-muted-foreground">{user.username}</p>
-											</div>
-											<div class="flex flex-wrap items-center gap-1.5">
-												{@render statusBadges(user, isMe, locked, true)}
-											</div>
-										</div>
-
-										<p class="text-xs text-muted-foreground">
-											Last sign-in: <span title={lastSignIn(user.last_login_at).title}
-												>{lastSignIn(user.last_login_at).text}</span
-											>
+									{#if isMe}
+										<p class="mt-1 text-xs text-muted-foreground">
+											You can't change your own role or disable yourself.
 										</p>
+									{/if}
+								{:else}
+									{user.role === 'admin' ? 'Administrator' : 'Member'}
+								{/if}
+							</Table.Cell>
+							<Table.Cell>
+								<div class="flex flex-wrap items-center gap-1.5">
+									{@render statusBadges(user, isMe, locked, false)}
+								</div>
+							</Table.Cell>
+							<Table.Cell class="text-muted-foreground">
+								<span title={lastSignIn(user.last_login_at).title}
+									>{lastSignIn(user.last_login_at).text}</span
+								>
+							</Table.Cell>
+							<Table.Cell>
+								<div class="flex flex-wrap items-center justify-end gap-1.5">
+									{@render rowActions(user, isMe, locked, true)}
+								</div>
+							</Table.Cell>
+						</Table.Row>
+					{/each}
+				</DataTable>
+			{:else}
+				<ul class="flex flex-col gap-3" aria-label="Users">
+					{#each users as user (user.id)}
+						{@const isMe = user.id === auth.user?.id}
+						{@const locked = isLocked(user.locked_until)}
+						<li>
+							<Card.Root>
+								<Card.Content class="flex flex-col gap-3 p-4 sm:p-5">
+									<div class="flex flex-wrap items-start justify-between gap-2">
+										<div class="min-w-0 flex-1">
+											{@render nameEditor(user, false)}
+											<p class="text-sm text-muted-foreground">{user.username}</p>
+										</div>
+										<div class="flex flex-wrap items-center gap-1.5">
+											{@render statusBadges(user, isMe, locked, true)}
+										</div>
+									</div>
 
-										{#if canUpdate || canReset || canUnlock || canListSessions}
-											<div class="flex flex-wrap items-center gap-2 pt-1">
-												{#if canUpdate}
-													<div class="w-36">
-														<NativeSelect
-															class="[&_select]:min-h-11"
-															aria-label="Role for {user.username}"
-															disabled={rowBusy === user.id || isMe}
-															value={user.role}
-															onchange={(e) => patch(user, { role: e.currentTarget.value as Role })}
-														>
-															<option value="member">Member</option>
-															<option value="admin">Administrator</option>
-														</NativeSelect>
-													</div>
-												{/if}
-												{@render rowActions(user, isMe, locked, false)}
-											</div>
-										{/if}
+									<p class="text-xs text-muted-foreground">
+										Last sign-in: <span title={lastSignIn(user.last_login_at).title}
+											>{lastSignIn(user.last_login_at).text}</span
+										>
+									</p>
 
-										{#if isMe && canUpdate}
-											<p class="text-xs text-muted-foreground">
-												You can't change your own role or disable yourself.
-											</p>
-										{/if}
+									{#if canUpdate || canReset || canUnlock || canListSessions}
+										<div class="flex flex-wrap items-center gap-2 pt-1">
+											{#if canUpdate}
+												<div class="w-36">
+													<NativeSelect
+														class="pointer-coarse:[&_select]:min-h-11"
+														aria-label="Role for {user.username}"
+														disabled={rowBusy === user.id || isMe}
+														value={user.role}
+														onchange={(e) => patch(user, { role: e.currentTarget.value as Role })}
+													>
+														<option value="member">Member</option>
+														<option value="admin">Administrator</option>
+													</NativeSelect>
+												</div>
+											{/if}
+											{@render rowActions(user, isMe, locked, false)}
+										</div>
+									{/if}
 
-										{#if rowError?.id === user.id}
-											<p class="text-sm text-destructive" role="alert">{rowError.message}</p>
-										{/if}
-									</Card.Content>
-								</Card.Root>
-							</li>
-						{/each}
-					</ul>
-				{/if}
+									{#if isMe && canUpdate}
+										<p class="text-xs text-muted-foreground">
+											You can't change your own role or disable yourself.
+										</p>
+									{/if}
+
+									{#if rowError?.id === user.id}
+										<p class="text-sm text-destructive" role="alert">{rowError.message}</p>
+									{/if}
+								</Card.Content>
+							</Card.Root>
+						</li>
+					{/each}
+				</ul>
 			{/if}
 		{/if}
-	</div>
-</main>
+	{/if}
+</Page>
 
 <ConfirmDialog
 	open={disableTarget !== null}
@@ -811,7 +816,7 @@
 				</Alert.Root>
 				<Button
 					variant="outline"
-					class="h-11"
+					class="pointer-coarse:h-11"
 					onclick={() => devicesTarget && void loadUserDevices(devicesTarget.id)}
 				>
 					Retry
@@ -865,7 +870,7 @@
 										<Button
 											type="button"
 											variant="outline"
-											class="h-11 shrink-0"
+											class="shrink-0 pointer-coarse:h-11"
 											disabled={revokingDeviceId === dev.id}
 											onclick={() => handleRevokeUserDevice(dev.id)}
 										>
@@ -918,7 +923,7 @@
 					<Button
 						type="button"
 						variant="outline"
-						class="h-11 shrink-0"
+						class="shrink-0 pointer-coarse:h-11"
 						disabled={resetting}
 						onclick={() => (resetPassword = generatePassword())}
 					>
@@ -931,7 +936,7 @@
 			<div class="flex gap-2 pt-2">
 				<Button
 					type="submit"
-					class="h-11"
+					class="pointer-coarse:h-11"
 					disabled={resetting || resetPassword.length < PASSWORD_MIN_LENGTH}
 				>
 					{#if resetting}
@@ -942,7 +947,7 @@
 				<Button
 					type="button"
 					variant="outline"
-					class="h-11"
+					class="pointer-coarse:h-11"
 					disabled={resetting}
 					onclick={() => (resetTarget = null)}
 				>

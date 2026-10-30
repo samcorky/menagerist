@@ -106,7 +106,13 @@
 <section class="space-y-4" aria-labelledby="exports-heading">
 	<div class="flex flex-wrap items-center justify-between gap-2">
 		<h2 id="exports-heading" class="font-heading text-lg font-semibold">Your data</h2>
-		<Button type="button" variant="outline" class="h-11" disabled={creating} onclick={handleCreate}>
+		<Button
+			type="button"
+			variant="outline"
+			class="pointer-coarse:h-11"
+			disabled={creating}
+			onclick={handleCreate}
+		>
 			{#if creating}
 				<Spinner class="size-4" />
 				Creating…
@@ -130,7 +136,9 @@
 		<Alert.Root variant="destructive">
 			<Alert.Description>{loadError}</Alert.Description>
 		</Alert.Root>
-		<Button type="button" variant="outline" class="h-11" onclick={() => void load()}>Retry</Button>
+		<Button type="button" variant="outline" class="pointer-coarse:h-11" onclick={() => void load()}
+			>Retry</Button
+		>
 	{:else if loading && exports.length === 0}
 		<Skeleton class="h-20 w-full rounded-xl" />
 	{:else if exports.length === 0}
@@ -195,7 +203,7 @@
 										href={downloadUrl(item.id)}
 										download
 										variant="outline"
-										class="h-11 flex-1 sm:flex-none"
+										class="flex-1 sm:flex-none pointer-coarse:h-11"
 									>
 										<Download class="size-4" aria-hidden="true" />
 										Download
@@ -203,7 +211,7 @@
 									<Button
 										type="button"
 										variant="outline"
-										class="h-11 flex-1 sm:flex-none"
+										class="flex-1 sm:flex-none pointer-coarse:h-11"
 										onclick={() => (deleteTarget = item)}
 									>
 										<Trash2 class="size-4" aria-hidden="true" />

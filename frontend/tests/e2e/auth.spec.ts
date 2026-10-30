@@ -220,7 +220,7 @@ test('an administrator sees the Users page', async ({ page }) => {
 	await accountMenu(page, ADMIN.name).click();
 	await page.getByRole('menuitem', { name: 'Administration' }).click();
 	await expect(page).toHaveURL(/\/admin$/);
-	await page.getByRole('link', { name: /Users/ }).click();
+	await page.getByRole('main').getByRole('link', { name: /Users/ }).click();
 	await expect(page).toHaveURL(/\/admin\/users$/);
 	await expect(page.getByRole('table', { name: 'Users' })).toContainText(member.username);
 });

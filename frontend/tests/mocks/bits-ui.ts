@@ -16,3 +16,5 @@ export const Separator = proxy;
 export const Toggle = proxy;
 export const Popover = proxy;
 export const Command = proxy;
+// Handler chaining is bits-ui's concern; tests only need the merged props to be spreadable.
+export const mergeProps = (...sources: object[]) => Object.assign({}, ...sources);

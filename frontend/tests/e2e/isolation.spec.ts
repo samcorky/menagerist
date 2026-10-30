@@ -4,6 +4,7 @@ import {
 	createUserViaApi,
 	openSearch,
 	removeExamplePacks,
+	searchPopup,
 	uniqueName,
 	type E2EUser
 } from './helpers';
@@ -110,7 +111,7 @@ test("B's search palette finds B's content but never A's", async ({ browser }) =
 	const b = await asUser(browser, userB);
 	await b.page.goto('/');
 	await openSearch(b.page);
-	const dialog = b.page.getByRole('dialog', { name: 'Search', exact: true });
+	const dialog = searchPopup(b.page);
 	await dialog.getByRole('combobox').fill(token);
 	await expect(dialog.getByText(`${token} bravo item`)).toBeVisible();
 	await expect(dialog.getByText(`${token} bravo collection`)).toBeVisible();

@@ -43,7 +43,7 @@
 			<Button
 				type="button"
 				variant="outline"
-				class="h-11"
+				class="pointer-coarse:h-11"
 				disabled={busy}
 				onclick={() => onOpenChange(false)}
 			>
@@ -51,7 +51,7 @@
 			</Button>
 			<Button
 				type="button"
-				class="h-11"
+				class="pointer-coarse:h-11"
 				variant={destructive ? 'destructive' : 'default'}
 				disabled={busy}
 				onclick={onConfirm}

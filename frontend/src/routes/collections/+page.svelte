@@ -1,4 +1,6 @@
 <script lang="ts">
+	import IconButton from '$lib/components/icon-button.svelte';
+	import Page from '$lib/components/page.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -273,115 +275,112 @@
 	<title>Collections - Menagerist</title>
 </svelte:head>
 
-<main class="flex-1 px-4 py-8 sm:px-6">
-	<div class="mx-auto flex max-w-4xl flex-col gap-6">
-		<div class="flex flex-wrap items-start justify-between gap-3">
-			<div>
-				<h1 class="font-heading text-3xl font-semibold tracking-tight">Collections</h1>
-				<p class="mt-1 text-muted-foreground">Group your items into named collections.</p>
-			</div>
-			{#if showControls}
-				<Button onclick={openDialog}>
-					<Plus class="size-4" />
-					New collection
-				</Button>
-			{/if}
+<Page width="fluid">
+	<div class="flex flex-wrap items-start justify-between gap-3">
+		<div>
+			<h1 class="font-heading text-3xl font-semibold tracking-tight">Collections</h1>
+			<p class="mt-1 text-muted-foreground">Group your items into named collections.</p>
 		</div>
-
 		{#if showControls}
-			<input
-				bind:value={searchInput}
-				type="search"
-				placeholder="Search your collections…"
-				aria-label="Search your collections"
-				class="flex h-11 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:h-9 sm:max-w-sm sm:text-sm"
-			/>
-		{/if}
-
-		{#if loadingDisplay.show && collections.length === 0}
-			<div class="grid gap-4 sm:grid-cols-2" aria-hidden="true">
-				{#each [1, 2, 3, 4] as s (s)}
-					<div class="h-28 animate-pulse rounded-xl bg-muted"></div>
-				{/each}
-			</div>
-		{:else if loadFailed}
-			<div class="flex flex-col items-start gap-3 rounded-xl border border-dashed p-5">
-				<p class="text-sm text-muted-foreground">Couldn't load your collections.</p>
-				<Button variant="outline" onclick={() => void fetchPage()}>Try again</Button>
-			</div>
-		{:else if collections.length > 0}
-			<ul class="grid gap-4 sm:grid-cols-2">
-				{#each collections as collection (collection.id)}
-					<li>
-						<a
-							href={resolve('/collections/[id]', collectionRouteParams(collection))}
-							class="block h-full rounded-xl focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-						>
-							<Card.Root class="h-full transition-colors hover:bg-muted/50">
-								<Card.Header>
-									<Card.Title class="flex items-center gap-2">
-										<span class="min-w-0 truncate">{collection.name}</span>
-										{#if isSmart(collection)}
-											<Badge variant="secondary" class="shrink-0">Smart</Badge>
-										{/if}
-										{#if exampleCollectionIds.has(collection.id)}
-											<Badge variant="outline" class="shrink-0 text-muted-foreground">Example</Badge
-											>
-										{/if}
-									</Card.Title>
-									{#if collection.description}
-										<Card.Description class="line-clamp-2"
-											>{collection.description}</Card.Description
-										>
-									{/if}
-								</Card.Header>
-								<Card.Content class="text-sm text-muted-foreground">
-									{describeCollectionCount(collection)}
-								</Card.Content>
-							</Card.Root>
-						</a>
-					</li>
-				{/each}
-			</ul>
-		{:else if !loading && q}
-			<div class="flex flex-col items-center gap-3 py-12 text-center">
-				<SearchX class="size-10 text-muted-foreground/50" aria-hidden="true" />
-				<div>
-					<p class="font-medium">Nothing matched "{q}"</p>
-					<p class="text-sm text-muted-foreground">Try a different search term</p>
-				</div>
-				<Button variant="ghost" class="min-h-11 sm:min-h-8" onclick={() => (searchInput = '')}>
-					Clear search
-				</Button>
-			</div>
-		{:else if !loading}
-			<div
-				class="flex flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-12 text-center"
-			>
-				<Library class="size-10 text-muted-foreground" aria-hidden="true" />
-				<h2 class="text-lg font-medium">No collections yet</h2>
-				<p class="max-w-sm text-sm text-muted-foreground">
-					A collection groups items together. Make one for your vinyl, your Funkos, or films to
-					watch.
-				</p>
-				<Button onclick={openDialog}>
-					<Plus class="size-4" />
-					New collection
-				</Button>
-			</div>
-		{/if}
-
-		{#if hasMore}
-			<div use:sentinel class="flex justify-center py-4" aria-hidden="true">
-				{#if loading}
-					<div
-						class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
-					></div>
-				{/if}
-			</div>
+			<IconButton label="New collection" variant="default" onclick={openDialog}>
+				<Plus />
+			</IconButton>
 		{/if}
 	</div>
-</main>
+
+	{#if showControls}
+		<input
+			bind:value={searchInput}
+			type="search"
+			placeholder="Search your collections…"
+			aria-label="Search your collections"
+			class="flex h-8 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:h-8 sm:max-w-sm sm:text-sm pointer-coarse:h-11"
+		/>
+	{/if}
+
+	{#if loadingDisplay.show && collections.length === 0}
+		<div class="grid gap-3 sm:grid-cols-[repeat(auto-fill,minmax(20rem,1fr))]" aria-hidden="true">
+			{#each [1, 2, 3, 4] as s (s)}
+				<div class="h-28 animate-pulse rounded-xl bg-muted"></div>
+			{/each}
+		</div>
+	{:else if loadFailed}
+		<div class="flex flex-col items-start gap-3 rounded-xl border border-dashed p-5">
+			<p class="text-sm text-muted-foreground">Couldn't load your collections.</p>
+			<Button variant="outline" onclick={() => void fetchPage()}>Try again</Button>
+		</div>
+	{:else if collections.length > 0}
+		<ul class="grid gap-3 sm:grid-cols-[repeat(auto-fill,minmax(20rem,1fr))]">
+			{#each collections as collection (collection.id)}
+				<li>
+					<a
+						href={resolve('/collections/[id]', collectionRouteParams(collection))}
+						class="block h-full rounded-xl focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+					>
+						<Card.Root class="h-full transition-colors hover:bg-muted/50">
+							<Card.Header>
+								<Card.Title class="flex items-center gap-2">
+									<span class="min-w-0 truncate">{collection.name}</span>
+									{#if isSmart(collection)}
+										<Badge variant="secondary" class="shrink-0">Smart</Badge>
+									{/if}
+									{#if exampleCollectionIds.has(collection.id)}
+										<Badge variant="outline" class="shrink-0 text-muted-foreground">Example</Badge>
+									{/if}
+								</Card.Title>
+								{#if collection.description}
+									<Card.Description class="line-clamp-2">{collection.description}</Card.Description>
+								{/if}
+							</Card.Header>
+							<Card.Content class="text-sm text-muted-foreground">
+								{describeCollectionCount(collection)}
+							</Card.Content>
+						</Card.Root>
+					</a>
+				</li>
+			{/each}
+		</ul>
+	{:else if !loading && q}
+		<div class="flex flex-col items-center gap-3 py-12 text-center">
+			<SearchX class="size-10 text-muted-foreground/50" aria-hidden="true" />
+			<div>
+				<p class="font-medium">Nothing matched "{q}"</p>
+				<p class="text-sm text-muted-foreground">Try a different search term</p>
+			</div>
+			<Button
+				variant="ghost"
+				class="sm:min-h-8 pointer-coarse:min-h-11"
+				onclick={() => (searchInput = '')}
+			>
+				Clear search
+			</Button>
+		</div>
+	{:else if !loading}
+		<div
+			class="flex flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-12 text-center"
+		>
+			<Library class="size-10 text-muted-foreground" aria-hidden="true" />
+			<h2 class="text-lg font-medium">No collections yet</h2>
+			<p class="max-w-sm text-sm text-muted-foreground">
+				A collection groups items together. Make one for your vinyl, your Funkos, or films to watch.
+			</p>
+			<Button onclick={openDialog}>
+				<Plus class="size-4" />
+				New collection
+			</Button>
+		</div>
+	{/if}
+
+	{#if hasMore}
+		<div use:sentinel class="flex justify-center py-4" aria-hidden="true">
+			{#if loading}
+				<div
+					class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
+				></div>
+			{/if}
+		</div>
+	{/if}
+</Page>
 
 <ResponsiveDialog.Root open={dialogOpen} onOpenChange={handleOpenChange}>
 	<ResponsiveDialog.Content
@@ -413,7 +412,7 @@
 			<div role="radiogroup" aria-label="Kind of collection" class="grid gap-2 sm:grid-cols-2">
 				{#each kinds as option (option.value)}
 					<label
-						class="flex min-h-11 cursor-pointer items-start gap-3 rounded-md border border-input p-3 has-checked:border-primary has-checked:bg-accent/40 has-focus-visible:ring-1 has-focus-visible:ring-ring"
+						class="flex cursor-pointer items-start gap-3 rounded-md border border-input p-3 has-checked:border-primary has-checked:bg-accent/40 has-focus-visible:ring-1 has-focus-visible:ring-ring pointer-coarse:min-h-11"
 					>
 						<input
 							type="radio"

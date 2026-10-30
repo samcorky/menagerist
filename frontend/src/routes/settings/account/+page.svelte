@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Page from '$lib/components/page.svelte';
 	import PasswordInput from '$lib/components/password-input.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -165,222 +166,290 @@
 	<title>Account - Menagerist</title>
 </svelte:head>
 
-<main class="flex-1 px-4 py-8 sm:px-6">
-	<div class="mx-auto flex max-w-3xl flex-col gap-6">
-		{#if !forced}
-			<BackButton fallback={resolve('/settings')} />
+<Page width="reading">
+	{#if !forced}
+		<BackButton fallback={resolve('/settings')} />
+	{/if}
+	<div>
+		<h1 class="font-heading text-3xl font-semibold tracking-tight">Account</h1>
+		{#if auth.user}
+			<p class="mt-1 text-muted-foreground">
+				{auth.user.display_name} ({auth.user.username}) &middot;
+				{auth.user.role === 'admin' ? 'Administrator' : 'Member'}
+			</p>
 		{/if}
-		<div>
-			<h1 class="font-heading text-3xl font-semibold tracking-tight">Account</h1>
-			{#if auth.user}
-				<p class="mt-1 text-muted-foreground">
-					{auth.user.display_name} ({auth.user.username}) &middot;
-					{auth.user.role === 'admin' ? 'Administrator' : 'Member'}
+	</div>
+
+	{#if forced}
+		<Alert.Root>
+			<Alert.Title>Choose a new password</Alert.Title>
+			<Alert.Description>
+				Your password was set by an administrator, so you need to replace it before you carry on.
+			</Alert.Description>
+		</Alert.Root>
+	{/if}
+
+	{#if !forced}
+		<form class="max-w-md space-y-4" onsubmit={handleRename}>
+			<h2 class="font-heading text-lg font-semibold">Display name</h2>
+
+			<div class="space-y-1.5">
+				<Label for="account-display-name">Name</Label>
+				<Input
+					id="account-display-name"
+					name="display_name"
+					class="pointer-coarse:h-11"
+					autocomplete="name"
+					required
+					aria-invalid={nameProblem !== null || nameError !== null}
+					aria-describedby="account-display-name-error"
+					disabled={nameBusy}
+					bind:value={displayName}
+					oninput={() => {
+						nameTouched = true;
+						nameError = null;
+					}}
+				/>
+				<p
+					id="account-display-name-error"
+					class="text-xs text-destructive"
+					role={nameProblem || nameError ? 'alert' : undefined}
+				>
+					{nameProblem ?? nameError ?? ''}
 				</p>
-			{/if}
-		</div>
-
-		{#if forced}
-			<Alert.Root>
-				<Alert.Title>Choose a new password</Alert.Title>
-				<Alert.Description>
-					Your password was set by an administrator, so you need to replace it before you carry on.
-				</Alert.Description>
-			</Alert.Root>
-		{/if}
-
-		{#if !forced}
-			<form class="max-w-md space-y-4" onsubmit={handleRename}>
-				<h2 class="font-heading text-lg font-semibold">Display name</h2>
-
-				<div class="space-y-1.5">
-					<Label for="account-display-name">Name</Label>
-					<Input
-						id="account-display-name"
-						name="display_name"
-						class="h-11"
-						autocomplete="name"
-						required
-						aria-invalid={nameProblem !== null || nameError !== null}
-						aria-describedby="account-display-name-error"
-						disabled={nameBusy}
-						bind:value={displayName}
-						oninput={() => {
-							nameTouched = true;
-							nameError = null;
-						}}
-					/>
-					<p
-						id="account-display-name-error"
-						class="text-xs text-destructive"
-						role={nameProblem || nameError ? 'alert' : undefined}
-					>
-						{nameProblem ?? nameError ?? ''}
-					</p>
-					<p class="text-xs text-muted-foreground">
-						Up to {DISPLAY_NAME_MAX_LENGTH} characters. This is the name shown in the menu.
-					</p>
-				</div>
-
-				<Button type="submit" class="h-11 w-full sm:w-auto" disabled={nameBusy || nameUnchanged}>
-					{#if nameBusy}
-						<Spinner class="size-4" />
-						Saving…
-					{:else}
-						Save name
-					{/if}
-				</Button>
-			</form>
-		{/if}
-
-		<form class="max-w-md space-y-4" onsubmit={handleSubmit}>
-			<h2 class="font-heading text-lg font-semibold">Change password</h2>
-			<HiddenUsername username={auth.user?.username ?? ''} />
-
-			{#if error}
-				<Alert.Root variant="destructive">
-					<Alert.Description>{error}</Alert.Description>
-				</Alert.Root>
-			{/if}
-
-			<div class="space-y-1.5">
-				<Label for="account-current">Current password</Label>
-				<PasswordInput
-					id="account-current"
-					name="current_password"
-					autocomplete="current-password"
-					required
-					disabled={busy}
-					bind:value={current}
-				/>
-			</div>
-
-			<div class="space-y-1.5">
-				<Label for="account-new">New password</Label>
-				<PasswordInput
-					id="account-new"
-					name="new_password"
-					autocomplete="new-password"
-					required
-					aria-invalid={tooShort || newError !== null}
-					aria-describedby="account-new-hint account-new-error"
-					disabled={busy}
-					bind:value={next}
-				/>
-				<p id="account-new-hint" class="text-xs text-muted-foreground">
-					At least {PASSWORD_MIN_LENGTH} characters. Other devices will be signed out.
+				<p class="text-xs text-muted-foreground">
+					Up to {DISPLAY_NAME_MAX_LENGTH} characters. This is the name shown in the menu.
 				</p>
-				{#if newError}
-					<p id="account-new-error" class="text-xs text-destructive" role="alert">{newError}</p>
-				{/if}
 			</div>
 
-			<div class="space-y-1.5">
-				<Label for="account-confirm">Confirm new password</Label>
-				<PasswordInput
-					id="account-confirm"
-					name="confirm_password"
-					autocomplete="new-password"
-					required
-					aria-invalid={mismatch}
-					disabled={busy}
-					bind:value={confirm}
-				/>
-				{#if mismatch}
-					<p class="text-xs text-destructive">The passwords do not match.</p>
-				{/if}
-			</div>
-
-			<Button type="submit" class="h-11 w-full sm:w-auto" disabled={busy || !canSubmit}>
-				{#if busy}
+			<Button
+				type="submit"
+				class="w-full sm:w-auto pointer-coarse:h-11"
+				disabled={nameBusy || nameUnchanged}
+			>
+				{#if nameBusy}
 					<Spinner class="size-4" />
 					Saving…
 				{:else}
-					Change password
+					Save name
 				{/if}
 			</Button>
 		</form>
+	{/if}
 
-		{#if !forced}
-			<section class="space-y-4" aria-labelledby="devices-heading">
-				<div class="flex items-center justify-between">
-					<h2 id="devices-heading" class="font-heading text-lg font-semibold">Devices</h2>
-					{#if hasOtherDevices}
-						<Button
-							type="button"
-							variant="outline"
-							class="h-11"
-							disabled={revokingOthers}
-							onclick={() => (confirmRevokeOthers = true)}
-						>
-							{#if revokingOthers}
-								<Spinner class="size-4" />
-							{/if}
-							Sign out all other devices
-						</Button>
-					{/if}
-				</div>
+	<form class="max-w-md space-y-4" onsubmit={handleSubmit}>
+		<h2 class="font-heading text-lg font-semibold">Change password</h2>
+		<HiddenUsername username={auth.user?.username ?? ''} />
 
-				{#if sessionsError}
-					<Alert.Root variant="destructive">
-						<Alert.Description>{sessionsError}</Alert.Description>
-					</Alert.Root>
-					<Button type="button" variant="outline" class="h-11" onclick={() => void loadSessions()}>
-						Retry
+		{#if error}
+			<Alert.Root variant="destructive">
+				<Alert.Description>{error}</Alert.Description>
+			</Alert.Root>
+		{/if}
+
+		<div class="space-y-1.5">
+			<Label for="account-current">Current password</Label>
+			<PasswordInput
+				id="account-current"
+				name="current_password"
+				autocomplete="current-password"
+				required
+				disabled={busy}
+				bind:value={current}
+			/>
+		</div>
+
+		<div class="space-y-1.5">
+			<Label for="account-new">New password</Label>
+			<PasswordInput
+				id="account-new"
+				name="new_password"
+				autocomplete="new-password"
+				required
+				aria-invalid={tooShort || newError !== null}
+				aria-describedby="account-new-hint account-new-error"
+				disabled={busy}
+				bind:value={next}
+			/>
+			<p id="account-new-hint" class="text-xs text-muted-foreground">
+				At least {PASSWORD_MIN_LENGTH} characters. Other devices will be signed out.
+			</p>
+			{#if newError}
+				<p id="account-new-error" class="text-xs text-destructive" role="alert">{newError}</p>
+			{/if}
+		</div>
+
+		<div class="space-y-1.5">
+			<Label for="account-confirm">Confirm new password</Label>
+			<PasswordInput
+				id="account-confirm"
+				name="confirm_password"
+				autocomplete="new-password"
+				required
+				aria-invalid={mismatch}
+				disabled={busy}
+				bind:value={confirm}
+			/>
+			{#if mismatch}
+				<p class="text-xs text-destructive">The passwords do not match.</p>
+			{/if}
+		</div>
+
+		<Button
+			type="submit"
+			class="w-full sm:w-auto pointer-coarse:h-11"
+			disabled={busy || !canSubmit}
+		>
+			{#if busy}
+				<Spinner class="size-4" />
+				Saving…
+			{:else}
+				Change password
+			{/if}
+		</Button>
+	</form>
+
+	{#if !forced}
+		<section class="space-y-4" aria-labelledby="devices-heading">
+			<div class="flex items-center justify-between">
+				<h2 id="devices-heading" class="font-heading text-lg font-semibold">Devices</h2>
+				{#if hasOtherDevices}
+					<Button
+						type="button"
+						variant="outline"
+						class="pointer-coarse:h-11"
+						disabled={revokingOthers}
+						onclick={() => (confirmRevokeOthers = true)}
+					>
+						{#if revokingOthers}
+							<Spinner class="size-4" />
+						{/if}
+						Sign out all other devices
 					</Button>
-				{:else if sessionsLoading}
-					<div class="space-y-3">
-						<Skeleton class="h-20 w-full rounded-xl" />
-						<Skeleton class="h-20 w-full rounded-xl" />
-					</div>
-				{:else if sessions.length === 0}
-					<p class="text-sm text-muted-foreground">No active devices.</p>
-				{:else}
-					{#if wide.current}
-						<DataTable
-							label="Active devices"
-							columns={[
-								{ label: 'Device' },
-								{ label: 'Address' },
-								{ label: 'Signed in' },
-								{ label: 'Last active' },
-								{ label: 'Action', end: true }
-							]}
-						>
-							{#each sessions as session (session.id)}
-								{@const described = describeDevice({
-									userAgent: session.user_agent,
-									platform: session.client_platform,
-									mobile: session.client_mobile
-								})}
-								<Table.Row>
-									<Table.Cell>
-										<div class="flex items-center gap-2">
-											<DeviceIcon
-												kind={described.kind}
-												class="size-4 shrink-0 text-muted-foreground"
-											/>
-											<span class="font-medium" title={session.user_agent ?? undefined}
-												>{described.label}</span
-											>
-											{#if session.current}
-												<Badge variant="secondary">This device</Badge>
+				{/if}
+			</div>
+
+			{#if sessionsError}
+				<Alert.Root variant="destructive">
+					<Alert.Description>{sessionsError}</Alert.Description>
+				</Alert.Root>
+				<Button
+					type="button"
+					variant="outline"
+					class="pointer-coarse:h-11"
+					onclick={() => void loadSessions()}
+				>
+					Retry
+				</Button>
+			{:else if sessionsLoading}
+				<div class="space-y-3">
+					<Skeleton class="h-20 w-full rounded-xl" />
+					<Skeleton class="h-20 w-full rounded-xl" />
+				</div>
+			{:else if sessions.length === 0}
+				<p class="text-sm text-muted-foreground">No active devices.</p>
+			{:else}
+				{#if wide.current}
+					<DataTable
+						label="Active devices"
+						columns={[
+							{ label: 'Device' },
+							{ label: 'Address' },
+							{ label: 'Signed in' },
+							{ label: 'Last active' },
+							{ label: 'Action', end: true }
+						]}
+					>
+						{#each sessions as session (session.id)}
+							{@const described = describeDevice({
+								userAgent: session.user_agent,
+								platform: session.client_platform,
+								mobile: session.client_mobile
+							})}
+							<Table.Row>
+								<Table.Cell>
+									<div class="flex items-center gap-2">
+										<DeviceIcon
+											kind={described.kind}
+											class="size-4 shrink-0 text-muted-foreground"
+										/>
+										<span class="font-medium" title={session.user_agent ?? undefined}
+											>{described.label}</span
+										>
+										{#if session.current}
+											<Badge variant="secondary">This device</Badge>
+										{/if}
+									</div>
+								</Table.Cell>
+								<Table.Cell class="text-muted-foreground">{session.client_ip ?? '—'}</Table.Cell>
+								<Table.Cell class="text-muted-foreground">
+									{formatIsoDate(session.created_at.slice(0, 10), 'short')}
+								</Table.Cell>
+								<Table.Cell class="text-muted-foreground">
+									{formatRelativeTime(session.last_seen_at)}
+								</Table.Cell>
+								<Table.Cell class="text-right">
+									{#if !session.current}
+										<Button
+											type="button"
+											variant="outline"
+											class="h-9 px-3"
+											disabled={sessionBusy === session.id}
+											onclick={() => handleRevokeSession(session.id)}
+										>
+											{#if sessionBusy === session.id}
+												<Spinner class="size-4" />
 											{/if}
+											Sign out
+										</Button>
+									{/if}
+								</Table.Cell>
+							</Table.Row>
+						{/each}
+					</DataTable>
+				{:else}
+					<ul class="space-y-3" aria-label="Active devices">
+						{#each sessions as session (session.id)}
+							{@const described = describeDevice({
+								userAgent: session.user_agent,
+								platform: session.client_platform,
+								mobile: session.client_mobile
+							})}
+							<li>
+								<Card.Root>
+									<Card.Content
+										class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"
+									>
+										<div class="flex items-start gap-3">
+											<div
+												class="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+											>
+												<DeviceIcon kind={described.kind} class="size-5" />
+											</div>
+											<div class="space-y-1">
+												<div class="flex flex-wrap items-center gap-2">
+													<p class="font-medium" title={session.user_agent ?? undefined}>
+														{described.label}
+													</p>
+													{#if session.current}
+														<Badge variant="secondary">This device</Badge>
+													{/if}
+												</div>
+												<p class="text-xs text-muted-foreground">
+													{#if session.client_ip}
+														{session.client_ip} &middot;
+													{/if}
+													Signed in {formatIsoDate(session.created_at.slice(0, 10), 'short')} &middot;
+													Last active {formatRelativeTime(session.last_seen_at)}
+												</p>
+											</div>
 										</div>
-									</Table.Cell>
-									<Table.Cell class="text-muted-foreground">{session.client_ip ?? '—'}</Table.Cell>
-									<Table.Cell class="text-muted-foreground">
-										{formatIsoDate(session.created_at.slice(0, 10), 'short')}
-									</Table.Cell>
-									<Table.Cell class="text-muted-foreground">
-										{formatRelativeTime(session.last_seen_at)}
-									</Table.Cell>
-									<Table.Cell class="text-right">
+
 										{#if !session.current}
 											<Button
 												type="button"
 												variant="outline"
-												class="h-9 px-3"
+												class="shrink-0 pointer-coarse:h-11"
 												disabled={sessionBusy === session.id}
 												onclick={() => handleRevokeSession(session.id)}
 											>
@@ -390,89 +459,32 @@
 												Sign out
 											</Button>
 										{/if}
-									</Table.Cell>
-								</Table.Row>
-							{/each}
-						</DataTable>
-					{:else}
-						<ul class="space-y-3" aria-label="Active devices">
-							{#each sessions as session (session.id)}
-								{@const described = describeDevice({
-									userAgent: session.user_agent,
-									platform: session.client_platform,
-									mobile: session.client_mobile
-								})}
-								<li>
-									<Card.Root>
-										<Card.Content
-											class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"
-										>
-											<div class="flex items-start gap-3">
-												<div
-													class="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
-												>
-													<DeviceIcon kind={described.kind} class="size-5" />
-												</div>
-												<div class="space-y-1">
-													<div class="flex flex-wrap items-center gap-2">
-														<p class="font-medium" title={session.user_agent ?? undefined}>
-															{described.label}
-														</p>
-														{#if session.current}
-															<Badge variant="secondary">This device</Badge>
-														{/if}
-													</div>
-													<p class="text-xs text-muted-foreground">
-														{#if session.client_ip}
-															{session.client_ip} &middot;
-														{/if}
-														Signed in {formatIsoDate(session.created_at.slice(0, 10), 'short')} &middot;
-														Last active {formatRelativeTime(session.last_seen_at)}
-													</p>
-												</div>
-											</div>
-
-											{#if !session.current}
-												<Button
-													type="button"
-													variant="outline"
-													class="h-11 shrink-0"
-													disabled={sessionBusy === session.id}
-													onclick={() => handleRevokeSession(session.id)}
-												>
-													{#if sessionBusy === session.id}
-														<Spinner class="size-4" />
-													{/if}
-													Sign out
-												</Button>
-											{/if}
-										</Card.Content>
-									</Card.Root>
-								</li>
-							{/each}
-						</ul>
-					{/if}
+									</Card.Content>
+								</Card.Root>
+							</li>
+						{/each}
+					</ul>
 				{/if}
-			</section>
-
-			<ApiTokensCard />
-
-			{#if auth.can('backup:own_data:export')}
-				<PersonalExportsCard />
 			{/if}
+		</section>
 
-			<ConfirmDialog
-				open={confirmRevokeOthers}
-				title="Sign out all other devices?"
-				description="You will stay signed in on this device, but any other sessions will end."
-				confirmLabel="Sign out other devices"
-				busyLabel="Signing out…"
-				busy={revokingOthers}
-				onOpenChange={(open) => {
-					if (!open) confirmRevokeOthers = false;
-				}}
-				onConfirm={() => void handleRevokeOtherSessions()}
-			/>
+		<ApiTokensCard />
+
+		{#if auth.can('backup:own_data:export')}
+			<PersonalExportsCard />
 		{/if}
-	</div>
-</main>
+
+		<ConfirmDialog
+			open={confirmRevokeOthers}
+			title="Sign out all other devices?"
+			description="You will stay signed in on this device, but any other sessions will end."
+			confirmLabel="Sign out other devices"
+			busyLabel="Signing out…"
+			busy={revokingOthers}
+			onOpenChange={(open) => {
+				if (!open) confirmRevokeOthers = false;
+			}}
+			onConfirm={() => void handleRevokeOtherSessions()}
+		/>
+	{/if}
+</Page>

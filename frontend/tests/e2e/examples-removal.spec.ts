@@ -18,7 +18,7 @@ test('removing a pack removes its items and item types', async ({ page }) => {
 
 	await page.goto('/settings/item-types');
 	const typeCard = (text: string) =>
-		page.locator('[data-slot="card"]').filter({ has: page.getByText(text, { exact: true }) });
+		page.getByRole('listitem').filter({ has: page.getByText(text, { exact: true }) });
 	const exampleCard = typeCard('music-record');
 	await expect(exampleCard).toBeVisible();
 	await expect(exampleCard.getByText('Example', { exact: true })).toBeVisible();

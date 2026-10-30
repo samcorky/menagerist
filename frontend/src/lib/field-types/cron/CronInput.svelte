@@ -83,7 +83,7 @@
 			type="button"
 			variant={cronMode.value === 'words' ? 'secondary' : 'outline'}
 			size="sm"
-			class="min-h-11"
+			class="pointer-coarse:min-h-11"
 			aria-pressed={cronMode.value === 'words'}
 			onclick={() => cronMode.set('words')}>In words</Button
 		>
@@ -91,7 +91,7 @@
 			type="button"
 			variant={cronMode.value === 'cron' ? 'secondary' : 'outline'}
 			size="sm"
-			class="min-h-11"
+			class="pointer-coarse:min-h-11"
 			aria-pressed={cronMode.value === 'cron'}
 			onclick={() => cronMode.set('cron')}>Cron</Button
 		>
@@ -104,7 +104,7 @@
 					value={sentence.kind}
 					onchange={(e) => changeKind(e.currentTarget.value as SentenceKind)}
 					onblur={() => (touched = true)}
-					class="min-h-11 w-auto"
+					class="w-auto pointer-coarse:min-h-11"
 					aria-label="{ariaLabel}: how often"
 				>
 					{#each SENTENCE_KINDS as k (k.kind)}
@@ -118,7 +118,7 @@
 						value={String(s.every)}
 						onchange={(e) => emit({ ...s, every: Number(e.currentTarget.value) as typeof s.every })}
 						onblur={() => (touched = true)}
-						class="min-h-11 w-auto"
+						class="w-auto pointer-coarse:min-h-11"
 						aria-label="{ariaLabel}: minutes between runs"
 					>
 						{#each MINUTE_STEPS as n (n)}
@@ -131,7 +131,7 @@
 						value={String(s.minute)}
 						onchange={(e) => emit({ ...s, minute: Number(e.currentTarget.value) })}
 						onblur={() => (touched = true)}
-						class="min-h-11 w-auto"
+						class="w-auto pointer-coarse:min-h-11"
 						aria-label="{ariaLabel}: minute of the hour"
 					>
 						{#each MINUTES as n (n)}
@@ -148,7 +148,7 @@
 						value={String(s.day)}
 						onchange={(e) => emit({ ...s, day: Number(e.currentTarget.value) })}
 						onblur={() => (touched = true)}
-						class="min-h-11 w-auto"
+						class="w-auto pointer-coarse:min-h-11"
 						aria-label="{ariaLabel}: day of the week"
 					>
 						{#each WEEKDAYS as d (d.value)}
@@ -162,7 +162,7 @@
 						value={String(s.dayOfMonth)}
 						onchange={(e) => emit({ ...s, dayOfMonth: Number(e.currentTarget.value) })}
 						onblur={() => (touched = true)}
-						class="min-h-11 w-auto"
+						class="w-auto pointer-coarse:min-h-11"
 						aria-label="{ariaLabel}: day of the month"
 					>
 						{#each MONTH_DAYS as n (n)}
@@ -185,7 +185,7 @@
 					type="button"
 					variant="outline"
 					size="sm"
-					class="min-h-11"
+					class="pointer-coarse:min-h-11"
 					onclick={() => cronMode.set('cron')}>Edit as cron</Button
 				>
 			</div>
@@ -195,7 +195,7 @@
 			value={text}
 			oninput={(e) => onChange(e.currentTarget.value)}
 			onblur={() => (touched = true)}
-			class="min-h-11 font-mono"
+			class="font-mono pointer-coarse:min-h-11"
 			autocomplete="off"
 			spellcheck={false}
 			placeholder="0 3 * * *"

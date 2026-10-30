@@ -7,7 +7,7 @@ import {
 	type Locator,
 	type Page
 } from './fixtures';
-import { asUser, createUserViaApi, ownedData, uniqueName } from './helpers';
+import { asUser, createUserViaApi, ownedData, searchPopup, uniqueName } from './helpers';
 
 /**
  * Smart collections: saving a search, the collection page, editing, narrowing, slugs and the
@@ -391,7 +391,7 @@ test('smart collections are not offered as places to add an item, and links use 
 	await page.goto('/');
 	await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
 	await page.keyboard.press('/');
-	const popup = page.getByRole('dialog', { name: 'Search', exact: true });
+	const popup = searchPopup(page);
 	await expect(popup).toBeVisible();
 	await popup.getByPlaceholder('Search everything…').fill(smart.name);
 	await popup.getByRole('option', { name: new RegExp(smart.name) }).click();

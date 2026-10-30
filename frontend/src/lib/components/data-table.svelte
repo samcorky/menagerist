@@ -27,14 +27,14 @@
 <div class="overflow-hidden rounded-xl border bg-card">
 	<Table.Root
 		aria-label={label}
-		class="text-left [&_td]:px-4 [&_td]:py-3 [&_td]:align-top [&_td]:whitespace-normal"
+		class="text-left [&_td]:px-4 [&_td]:py-2 [&_td]:align-top [&_td]:whitespace-normal"
 	>
 		<Table.Header class="bg-muted/40">
 			<Table.Row class="hover:bg-transparent">
 				{#each columns as column (column.label)}
 					<Table.Head
 						scope="col"
-						class="h-auto px-4 py-3 text-xs font-medium text-muted-foreground uppercase {column.end
+						class="h-auto px-4 py-2 text-xs font-medium text-muted-foreground uppercase {column.end
 							? 'text-right'
 							: ''}">{column.label}</Table.Head
 					>
