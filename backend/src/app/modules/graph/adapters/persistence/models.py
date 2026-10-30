@@ -37,6 +37,8 @@ class NodeTypeModel(IdentifiableMixin, SoftDeletableMixin, Base):
     attributes_schema: Mapped[dict[str, Any] | None] = mapped_column(
         JSONB, nullable=True
     )
+    icon: Mapped[str | None]
+    colour: Mapped[str | None]
 
 
 class NodeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):

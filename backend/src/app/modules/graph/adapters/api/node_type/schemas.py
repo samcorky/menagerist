@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.graph.application.create_node_type import CreateNodeTypeCommand
 from app.modules.graph.application.update_node_type import UpdateNodeTypeCommand
+from app.modules.graph.domain.node_type import TYPE_COLOURS
 from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
@@ -17,9 +18,20 @@ _NODE_TYPE_EXAMPLE: dict[str, Any] = {
     "label": "Film",
     "description": "A motion picture.",
     "attributes_schema": None,
+    "icon": "clapperboard",
+    "colour": "red",
     "created_at": "2026-08-23T10:14:44.465954Z",
     "updated_at": "2026-08-23T10:14:44.465954Z",
 }
+
+
+_ICON_DESCRIPTION = (
+    "A Lucide icon name in lower-case words joined by dashes, such as `film`."
+)
+_COLOUR_DESCRIPTION = (
+    f"One of: {', '.join(TYPE_COLOURS)}. A colour name, not a free colour, so "
+    + "every client can draw it with the right contrast."
+)
 
 
 class CreateNodeTypeRequest(RequestModel):
@@ -32,6 +44,8 @@ class CreateNodeTypeRequest(RequestModel):
                     "slug": "film",
                     "label": "Film",
                     "description": "A motion picture.",
+                    "icon": "clapperboard",
+                    "colour": "red",
                 }
             ]
         }
@@ -41,6 +55,8 @@ class CreateNodeTypeRequest(RequestModel):
     label: str
     description: str | None = Field(default=None)
     attributes_schema: dict[str, Any] | None = Field(default=None)
+    icon: str | None = Field(default=None, description=_ICON_DESCRIPTION)
+    colour: str | None = Field(default=None, description=_COLOUR_DESCRIPTION)
 
     def to_command(self) -> CreateNodeTypeCommand:
         """Convert this request into a `CreateNodeTypeCommand`."""
@@ -49,13 +65,16 @@ class CreateNodeTypeRequest(RequestModel):
             label=self.label,
             description=self.description,
             attributes_schema=self.attributes_schema,
+            icon=self.icon,
+            colour=self.colour,
         )
 
 
 class UpdateNodeTypeRequest(RequestModel):
     """Request body for updating a node type.
 
-    `slug` is immutable. Omitted fields are left unchanged.
+    `slug` is immutable. Omitted fields are left unchanged. Send `null` for
+    `icon` or `colour` to remove it.
     """
 
     model_config = ConfigDict(
@@ -72,6 +91,8 @@ class UpdateNodeTypeRequest(RequestModel):
     label: str | None = Field(default=None)
     description: str | None = Field(default=None)
     attributes_schema: dict[str, Any] | None = Field(default=None)
+    icon: str | None = Field(default=None, description=_ICON_DESCRIPTION)
+    colour: str | None = Field(default=None, description=_COLOUR_DESCRIPTION)
 
     def to_command(self, node_type_id: uuid.UUID) -> UpdateNodeTypeCommand:
         """Convert this request into an `UpdateNodeTypeCommand` for `node_type_id`."""
@@ -80,6 +101,10 @@ class UpdateNodeTypeRequest(RequestModel):
             label=self.label,
             description=self.description,
             attributes_schema=self.attributes_schema,
+            icon=self.icon,
+            colour=self.colour,
+            clear_icon="icon" in self.model_fields_set and self.icon is None,
+            clear_colour="colour" in self.model_fields_set and self.colour is None,
         )
 
 
@@ -93,6 +118,8 @@ class NodeTypeResponse(BaseModel):
     label: str
     description: str | None = Field(default=None)
     attributes_schema: dict[str, Any] | None = Field(default=None)
+    icon: str | None = Field(default=None, description=_ICON_DESCRIPTION)
+    colour: str | None = Field(default=None, description=_COLOUR_DESCRIPTION)
     created_at: datetime
     updated_at: datetime
 
@@ -105,6 +132,8 @@ class NodeTypeResponse(BaseModel):
             label=node_type.label,
             description=node_type.description,
             attributes_schema=node_type.attributes_schema,
+            icon=node_type.icon,
+            colour=node_type.colour,
             created_at=node_type.created_at,
             updated_at=node_type.updated_at,
         )

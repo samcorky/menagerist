@@ -32,6 +32,10 @@ class UpdateNodeTypeCommand:
     label: str | None = field(default=None)
     description: str | None = field(default=None)
     attributes_schema: dict[str, Any] | None = field(default=None)
+    icon: str | None = field(default=None)
+    colour: str | None = field(default=None)
+    clear_icon: bool = field(default=False)
+    clear_colour: bool = field(default=False)
 
 
 class UpdateNodeType(CommandHandler[GraphUnitOfWork, UpdateNodeTypeCommand, NodeType]):
@@ -73,7 +77,13 @@ class UpdateNodeType(CommandHandler[GraphUnitOfWork, UpdateNodeTypeCommand, Node
                 label=command.label,
                 description=command.description,
                 attributes_schema=attributes_schema,
+                icon=command.icon,
+                colour=command.colour,
             )
+            if command.clear_icon:
+                node_type.clear_icon()
+            if command.clear_colour:
+                node_type.clear_colour()
 
             await repos.node_types.save(node_type)
             await self._uow.commit()

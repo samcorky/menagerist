@@ -70,3 +70,30 @@ async def test_live_node_types_cannot_share_a_slug(db_session: AsyncSession) -> 
 
     with pytest.raises(IntegrityError):
         await repository.add(NodeType.create(slug="record", label="Duplicate"))
+
+
+async def test_icon_and_colour_round_trip_and_can_be_cleared(
+    db_session: AsyncSession,
+) -> None:
+    """A type's icon and colour are stored, changed and cleared."""
+    repository = SqlAlchemyNodeTypeRepository(db_session)
+    node_type = NodeType.create(
+        slug="record", label="Record", icon="disc-3", colour="violet"
+    )
+    await repository.add(node_type)
+    await db_session.flush()
+    db_session.expire_all()
+
+    stored = await repository.get(node_type.id)
+    assert stored is not None
+    assert (stored.icon, stored.colour) == ("disc-3", "violet")
+
+    stored.update(icon="music")
+    stored.clear_colour()
+    await repository.save(stored)
+    await db_session.flush()
+    db_session.expire_all()
+
+    changed = await repository.get(node_type.id)
+    assert changed is not None
+    assert (changed.icon, changed.colour) == ("music", None)

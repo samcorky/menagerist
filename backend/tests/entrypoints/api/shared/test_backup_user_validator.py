@@ -34,6 +34,10 @@ from app.modules.backup.domain.errors import CorruptBackupError
         ),
         ("node_types", {"slug": "book", "label": "Book", "attributes_schema": []}),
         ("node_types", {"slug": "book", "label": "Book", "description": 3}),
+        ("node_types", {"slug": "book", "label": "Book", "colour": "purple"}),
+        ("node_types", {"slug": "book", "label": "Book", "colour": 3}),
+        ("node_types", {"slug": "book", "label": "Book", "icon": "Not An Icon"}),
+        ("node_types", {"slug": "book", "label": "Book", "icon": ["book"]}),
         ("edge_types", {"slug": "owns", "label": "Owns", "directional": "yes"}),
         (
             "edge_types",
@@ -62,6 +66,11 @@ async def test_rejects_invalid_user_rows(table: str, row: dict[str, object]) -> 
             "node_types",
             {"slug": "book", "label": "Book", "attributes_schema": {"type": "object"}},
         ),
+        (
+            "node_types",
+            {"slug": "book", "label": "Book", "icon": "book-open", "colour": "teal"},
+        ),
+        ("node_types", {"slug": "book", "label": "Book", "icon": None, "colour": None}),
         ("edge_types", {"slug": "owns", "label": "Owns", "directional": True}),
         ("media_assets", {"status": "orphaned", "filename": "original.pdf"}),
         ("nodes", {"extra_schema": None}),

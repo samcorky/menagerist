@@ -272,3 +272,85 @@ def test_list_attribute_values_returns_404_for_missing_type() -> None:
     base = f"/api/v1/node-type/{uuid.uuid4()}/attribute/status/values"
 
     assert client.get(base).status_code == 404
+
+
+def test_icon_and_colour_can_be_set_changed_and_cleared() -> None:
+    """A type's icon and colour are in every response and can be cleared with ''."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    created = client.post(
+        "/api/v1/node-type",
+        json={"slug": "film", "label": "Film", "icon": "clapperboard", "colour": "red"},
+    )
+    assert created.status_code == 201
+    assert (created.json()["icon"], created.json()["colour"]) == ("clapperboard", "red")
+    type_id = created.json()["id"]
+
+    changed = client.patch(f"/api/v1/node-type/{type_id}", json={"colour": "blue"})
+    assert (changed.json()["icon"], changed.json()["colour"]) == (
+        "clapperboard",
+        "blue",
+    )
+
+    cleared = client.patch(
+        f"/api/v1/node-type/{type_id}", json={"icon": None, "colour": None}
+    )
+    assert (cleared.json()["icon"], cleared.json()["colour"]) == (None, None)
+
+
+def test_a_blank_icon_or_colour_is_refused_not_treated_as_a_clear() -> None:
+    """An empty string is an error; null is how an icon or colour is removed."""
+    client = TestClient(_app_with_in_memory_graph())
+    created = client.post(
+        "/api/v1/node-type",
+        json={"slug": "film", "label": "Film", "icon": "film", "colour": "red"},
+    ).json()
+
+    for body in ({"icon": ""}, {"colour": ""}):
+        response = client.patch(f"/api/v1/node-type/{created['id']}", json=body)
+        assert response.status_code == 400
+
+    kept = client.get(f"/api/v1/node-type/{created['id']}").json()
+    assert (kept["icon"], kept["colour"]) == ("film", "red")
+
+
+def test_leaving_icon_and_colour_out_keeps_them() -> None:
+    """Omitted is not null: only an explicit null removes the value."""
+    client = TestClient(_app_with_in_memory_graph())
+    created = client.post(
+        "/api/v1/node-type",
+        json={"slug": "film", "label": "Film", "icon": "film", "colour": "red"},
+    ).json()
+
+    changed = client.patch(
+        f"/api/v1/node-type/{created['id']}", json={"label": "Movie"}
+    )
+
+    assert (changed.json()["icon"], changed.json()["colour"]) == ("film", "red")
+
+
+def test_a_type_without_an_icon_or_colour_reports_nulls() -> None:
+    """Both fields are always present, null when unset."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    created = client.post("/api/v1/node-type", json={"slug": "book", "label": "Book"})
+
+    assert created.json()["icon"] is None
+    assert created.json()["colour"] is None
+
+
+def test_an_invalid_icon_or_colour_is_a_400() -> None:
+    """A bad icon name or a colour outside the palette is refused."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    bad_icon = client.post(
+        "/api/v1/node-type", json={"slug": "a", "label": "A", "icon": "Not An Icon"}
+    )
+    bad_colour = client.post(
+        "/api/v1/node-type", json={"slug": "b", "label": "B", "colour": "purple"}
+    )
+
+    assert bad_icon.status_code == 400
+    assert "icon must be" in bad_icon.json()["detail"]
+    assert bad_colour.status_code == 400
+    assert "colour must be one of" in bad_colour.json()["detail"]

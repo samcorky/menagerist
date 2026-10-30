@@ -57,6 +57,8 @@ def _validate_type(table: str, row: Mapping[str, object]) -> None:
             label=label,
             description=description,
             attributes_schema=schema,
+            icon=_optional_text(row, "icon"),
+            colour=_optional_text(row, "colour"),
         )
     else:
         directional = row["directional"]

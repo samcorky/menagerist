@@ -165,3 +165,19 @@ async def test_create_node_type_rejects_highlight_of_unknown_field() -> None:
             ),
             SYSTEM_ACTOR,
         )
+
+
+async def test_create_node_type_keeps_an_icon_and_colour() -> None:
+    """CreateNodeType stores the icon and colour it is given."""
+    uow, repos = _make_uow()
+
+    nt = await CreateNodeType(uow, InMemoryAccessGuard()).handle(
+        CreateNodeTypeCommand(
+            slug="film", label="Film", icon="clapperboard", colour="red"
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    stored = await repos.node_types.get(nt.id)
+    assert stored is not None
+    assert (stored.icon, stored.colour) == ("clapperboard", "red")

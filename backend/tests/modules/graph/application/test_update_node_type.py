@@ -107,3 +107,23 @@ async def test_update_node_type_raises_when_missing() -> None:
             UpdateNodeTypeCommand(node_type_id=uuid.uuid4(), label="Ghost"),
             SYSTEM_ACTOR,
         )
+
+
+async def test_update_node_type_sets_and_clears_icon_and_colour() -> None:
+    """UpdateNodeType sets an icon and colour, and the clear flags remove them."""
+    uow, repos = _make_uow()
+    nt = NodeType.create(slug="film", label="Film")
+    await repos.node_types.add(nt)
+    use_case = UpdateNodeType(uow, InMemoryAccessGuard())
+
+    result = await use_case.handle(
+        UpdateNodeTypeCommand(node_type_id=nt.id, icon="film", colour="blue"),
+        SYSTEM_ACTOR,
+    )
+    assert (result.icon, result.colour) == ("film", "blue")
+
+    cleared = await use_case.handle(
+        UpdateNodeTypeCommand(node_type_id=nt.id, clear_icon=True, clear_colour=True),
+        SYSTEM_ACTOR,
+    )
+    assert (cleared.icon, cleared.colour) == (None, None)

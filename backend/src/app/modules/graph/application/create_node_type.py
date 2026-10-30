@@ -34,6 +34,8 @@ class CreateNodeTypeCommand:
     label: str
     description: str | None = field(default=None)
     attributes_schema: dict[str, Any] | None = field(default=None)
+    icon: str | None = field(default=None)
+    colour: str | None = field(default=None)
 
 
 class CreateNodeType(CommandHandler[GraphUnitOfWork, CreateNodeTypeCommand, NodeType]):
@@ -74,6 +76,8 @@ class CreateNodeType(CommandHandler[GraphUnitOfWork, CreateNodeTypeCommand, Node
                 label=command.label,
                 description=command.description,
                 attributes_schema=attributes_schema,
+                icon=command.icon,
+                colour=command.colour,
             )
             await repos.node_types.add(node_type)
             await self._uow.commit()

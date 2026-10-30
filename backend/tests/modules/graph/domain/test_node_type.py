@@ -101,3 +101,81 @@ def test_update_rejects_empty_or_blank_label(label: str) -> None:
 
     with pytest.raises(ValidationError, match="label must be provided"):
         nt.update(label=label)
+
+
+def test_create_defaults_icon_and_colour_to_none() -> None:
+    """NodeType.create without an icon or colour leaves both unset."""
+    nt = NodeType.create(slug="film", label="Film")
+
+    assert nt.icon is None
+    assert nt.colour is None
+
+
+def test_create_stores_an_icon_and_colour() -> None:
+    """NodeType.create keeps a valid icon name and palette colour."""
+    nt = NodeType.create(slug="film", label="Film", icon="clapperboard", colour="red")
+
+    assert nt.icon == "clapperboard"
+    assert nt.colour == "red"
+
+
+def test_create_treats_a_blank_icon_or_colour_as_unset() -> None:
+    """A blank icon or colour is the same as none."""
+    nt = NodeType.create(slug="film", label="Film", icon="  ", colour="")
+
+    assert nt.icon is None
+    assert nt.colour is None
+
+
+@pytest.mark.parametrize(
+    "icon", ["Film", "my icon", "-film", "film-", "film--roll", "1film", "x" * 65]
+)
+def test_create_rejects_an_icon_that_is_not_a_lucide_name(icon: str) -> None:
+    """Icons are kebab-case Lucide names of at most 64 characters."""
+    with pytest.raises(ValidationError, match="icon must be"):
+        NodeType.create(slug="film", label="Film", icon=icon)
+
+
+@pytest.mark.parametrize("colour", ["purple", "#ff0000", "Red"])
+def test_create_rejects_a_colour_outside_the_palette(colour: str) -> None:
+    """Colours are palette keys, not free values."""
+    with pytest.raises(ValidationError, match="colour must be one of"):
+        NodeType.create(slug="film", label="Film", colour=colour)
+
+
+def test_update_sets_changes_and_clears_icon_and_colour() -> None:
+    """update() sets an icon and colour and keeps them when omitted; clear_* removes."""
+    nt = NodeType.create(slug="film", label="Film")
+
+    nt.update(icon="film", colour="blue")
+    assert (nt.icon, nt.colour) == ("film", "blue")
+
+    nt.update(label="Movie")
+    assert (nt.icon, nt.colour) == ("film", "blue")
+
+    nt.clear_icon()
+    nt.clear_colour()
+    assert (nt.icon, nt.colour) == (None, None)
+
+
+@pytest.mark.parametrize("blank", ["", "   "])
+def test_update_rejects_a_blank_icon_or_colour_instead_of_clearing(blank: str) -> None:
+    """A blank string is an error; clearing is clear_icon() and clear_colour()."""
+    nt = NodeType.create(slug="film", label="Film", icon="film", colour="blue")
+
+    with pytest.raises(ValidationError, match="icon must be"):
+        nt.update(icon=blank)
+    with pytest.raises(ValidationError, match="colour must be"):
+        nt.update(colour=blank)
+
+    assert (nt.icon, nt.colour) == ("film", "blue")
+
+
+def test_update_validates_icon_and_colour() -> None:
+    """update() rejects the same bad values create() does."""
+    nt = NodeType.create(slug="film", label="Film")
+
+    with pytest.raises(ValidationError, match="icon must be"):
+        nt.update(icon="Not An Icon")
+    with pytest.raises(ValidationError, match="colour must be one of"):
+        nt.update(colour="purple")
