@@ -28,8 +28,9 @@ def assess(request: BrowserRequest) -> BrowserCheckResult:
 
     `same-origin` with a matching (or absent) `Origin` is intact. A differing
     `Origin` means the proxy changes the scheme or host. `Origin` alone is
-    accepted but normal only over plain HTTP, where browsers send no
-    `Sec-Fetch-*`. Neither is a failure: the app would refuse the request.
+    accepted, and expected only over plain HTTP, where browsers send no
+    `Sec-Fetch-*`, so there it passes; over HTTPS it is a warning. Neither is a
+    failure: the app would refuse the request.
     """
     origin = request.origin
     matches = origin == request.seen_origin
@@ -42,12 +43,17 @@ def assess(request: BrowserRequest) -> BrowserCheckResult:
             "The browser's origin differs from the one the app rebuilt; check "
             + "MENAGERIST_API_TRUSTED_PROXIES and the proxy's Host header."
         )
+    elif matches and request.seen_origin.startswith("http://"):
+        status = CheckStatus.PASS
+        output = (
+            "Browsers send no Sec-Fetch-Site over plain HTTP, so the Origin "
+            + "header was used instead. This is normal."
+        )
     elif matches:
         status = CheckStatus.WARN
         output = (
-            "Sec-Fetch-Site did not arrive; the Origin header was used instead. "
-            + "This is normal over plain HTTP to a non-localhost address; behind "
-            + "HTTPS a proxy may be removing it."
+            "Sec-Fetch-Site did not arrive over HTTPS; the Origin header was "
+            + "used instead. A proxy may be removing it."
         )
     else:
         status = CheckStatus.FAIL

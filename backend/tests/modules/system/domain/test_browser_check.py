@@ -34,13 +34,27 @@ def test_same_origin_with_a_different_origin_warns_about_the_proxy() -> None:
     assert "MENAGERIST_API_TRUSTED_PROXIES" in result.output
 
 
-def test_origin_alone_warns() -> None:
-    """Normal over plain HTTP; the Origin header carried the check."""
+@pytest.mark.parametrize(
+    "seen", ["http://192.168.1.198:8080", "http://nas.local", "http://localhost:8000"]
+)
+def test_origin_alone_over_plain_http_passes(seen: str) -> None:
+    """Browsers send no Sec-Fetch-Site over plain HTTP, so Origin alone is normal."""
+    result = assess(BrowserRequest(sec_fetch_site=None, origin=seen, seen_origin=seen))
+
+    assert result.status is CheckStatus.PASS
+    assert result.output is not None
+    assert "plain HTTP" in result.output
+    assert "Origin" in result.output
+
+
+def test_origin_alone_over_https_warns() -> None:
+    """Over HTTPS the header should arrive, so a proxy may be removing it."""
     result = assess(BrowserRequest(sec_fetch_site=None, origin=SEEN, seen_origin=SEEN))
 
     assert result.status is CheckStatus.WARN
     assert result.output is not None
     assert "Sec-Fetch-Site did not arrive" in result.output
+    assert "proxy" in result.output
 
 
 @pytest.mark.parametrize(
