@@ -74,12 +74,15 @@ class Node(Identifiable, Owned, SoftDeletable):
                 setattr(self, attr, val)
 
     def _apply_type(self, type: str) -> None:
-        if self.type is not None:
-            raise ValidationError("type cannot be changed after it is set")
         normalised = slugify(type)
         if normalised == "":
             raise ValidationError("type must be a non-empty string when provided")
         self.type = normalised
+
+    def clear_type(self) -> None:
+        """Remove the type. The attribute values are kept."""
+        self.type = None
+        self.touch()
 
     def update(
         self,
@@ -96,6 +99,9 @@ class Node(Identifiable, Owned, SoftDeletable):
 
         `extra_schema` follows the same convention as `attributes_schema` on a
         node type: `None` leaves it unchanged (there is no way to clear it yet).
+        `type` is replaced by a slug and left alone when `None`; use
+        `clear_type` to remove it. The attributes are never touched by a type
+        change.
         """
         if name is not None:
             if name.strip() == "":

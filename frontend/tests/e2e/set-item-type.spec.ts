@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { createItemType, uniqueName } from './helpers';
+import { createItemType, uniqueName, chooseItemType } from './helpers';
 
 test('creates an item type with a field and uses it on a new item', async ({ page }) => {
 	const typeLabel = uniqueName('Film');
@@ -8,8 +8,7 @@ test('creates an item type with a field and uses it on a new item', async ({ pag
 
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Back to the Future'));
-	await page.getByPlaceholder('Search item types…').fill(typeLabel);
-	await page.getByRole('button', { name: typeLabel, exact: true }).click();
+	await chooseItemType(page, typeLabel);
 
 	const directorInput = page.getByLabel('Director');
 	await expect(directorInput).toBeVisible();

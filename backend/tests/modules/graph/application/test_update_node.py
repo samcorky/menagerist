@@ -342,3 +342,174 @@ async def test_update_node_sets_extra_schema_and_leaves_it_when_not_given() -> N
     )
 
     assert result.extra_schema == schema
+
+
+async def _world(node: Node) -> tuple[GraphRepos, UpdateNode]:
+    repos = GraphRepos(
+        nodes=InMemoryNodeRepository(),
+        edges=InMemoryEdgeRepository(),
+        node_types=InMemoryNodeTypeRepository(),
+        edge_types=InMemoryEdgeTypeRepository(),
+    )
+    await repos.nodes.add(node)
+    return repos, UpdateNode(InMemoryUnitOfWork(repos), InMemoryAccessGuard())
+
+
+async def test_update_node_changes_the_type_and_keeps_the_attributes() -> None:
+    """Retyping keeps every attribute value, including ones the new type lacks."""
+    node = Node.create(
+        owner_id=uuid.UUID(int=1),
+        name="Alien",
+        type="film",
+        attributes={"year": 1979, "runtime": 117},
+    )
+    repos, use_case = await _world(node)
+    await repos.node_types.add(
+        NodeType.create(
+            slug="book",
+            label="Book",
+            attributes_schema={
+                "type": "object",
+                "properties": {"year": {"type": "number"}},
+            },
+        )
+    )
+
+    result = await use_case.handle(
+        UpdateNodeCommand(node_id=node.id, type="book"), SYSTEM_ACTOR
+    )
+
+    assert result.type == "book"
+    assert result.attributes == {"year": 1979, "runtime": 117}
+
+
+async def test_update_node_clears_the_type_without_creating_one() -> None:
+    """clear_type removes the type, keeps the attributes and adds no type."""
+    node = Node.create(
+        owner_id=uuid.UUID(int=1), name="Alien", type="film", attributes={"year": 1979}
+    )
+    repos, use_case = await _world(node)
+
+    result = await use_case.handle(
+        UpdateNodeCommand(node_id=node.id, clear_type=True), SYSTEM_ACTOR
+    )
+
+    assert result.type is None
+    assert result.attributes == {"year": 1979}
+    assert await repos.node_types.list(after=None, limit=10) == []
+    stored = await repos.nodes.get(node.id, scope=ContentFilter.everyone())
+    assert stored is not None
+    assert stored.type is None
+
+
+async def test_update_node_retype_creates_the_new_type_when_unknown() -> None:
+    """Changing to a name with no type yet creates it, as setting a first type does."""
+    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
+    repos, use_case = await _world(node)
+
+    await use_case.handle(
+        UpdateNodeCommand(node_id=node.id, type="Space Opera"), SYSTEM_ACTOR
+    )
+
+    created = await repos.node_types.get_by_slug("space-opera")
+    assert created is not None
+    assert created.label == "Space Opera"
+
+
+def _schema(**types: str) -> dict[str, object]:
+    """A type schema with one typed property per keyword (`year="number"`)."""
+    return {
+        "type": "object",
+        "properties": {key: {"type": kind} for key, kind in types.items()},
+    }
+
+
+async def test_update_node_refuses_a_type_that_clashes_with_the_items_own_field() -> (
+    None
+):
+    """A field of the item's own that the new type also defines cannot be combined."""
+    node = Node.create(
+        owner_id=uuid.UUID(int=1),
+        name="Alien",
+        type="film",
+        extra_schema=_schema(rating="number"),
+    )
+    repos, use_case = await _world(node)
+    await repos.node_types.add(
+        NodeType.create(
+            slug="book", label="Book", attributes_schema=_schema(rating="number")
+        )
+    )
+
+    with pytest.raises(InvalidSchemaError, match="rating"):
+        await use_case.handle(
+            UpdateNodeCommand(node_id=node.id, type="book"), SYSTEM_ACTOR
+        )
+
+    stored = await repos.nodes.get(node.id, scope=ContentFilter.everyone())
+    assert stored is not None
+    assert stored.type == "film"
+
+
+async def test_update_node_checks_attributes_against_the_type_it_is_changing_to() -> (
+    None
+):
+    """One PATCH that retypes and sends attributes validates against the new type."""
+    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
+    repos, use_case = await _world(node)
+    await repos.node_types.add(
+        NodeType.create(
+            slug="film", label="Film", attributes_schema=_schema(year="string")
+        )
+    )
+    await repos.node_types.add(
+        NodeType.create(
+            slug="book", label="Book", attributes_schema=_schema(year="number")
+        )
+    )
+
+    result = await use_case.handle(
+        UpdateNodeCommand(node_id=node.id, type="book", attributes={"year": 1979}),
+        SYSTEM_ACTOR,
+    )
+
+    assert result.type == "book"
+    assert result.attributes == {"year": 1979}
+
+
+async def test_update_node_rejects_attributes_that_do_not_fit_the_new_type() -> None:
+    """The old type accepted this value; the type being changed to does not."""
+    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
+    repos, use_case = await _world(node)
+    await repos.node_types.add(
+        NodeType.create(
+            slug="film", label="Film", attributes_schema=_schema(year="string")
+        )
+    )
+    await repos.node_types.add(
+        NodeType.create(
+            slug="book", label="Book", attributes_schema=_schema(year="number")
+        )
+    )
+
+    with pytest.raises(InvalidAttributesError):
+        await use_case.handle(
+            UpdateNodeCommand(
+                node_id=node.id, type="book", attributes={"year": "1979"}
+            ),
+            SYSTEM_ACTOR,
+        )
+
+
+async def test_update_node_clear_type_wins_over_a_type_in_the_same_command() -> None:
+    """The command documents that clearing wins, so it does, whatever else is set."""
+    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
+    repos, use_case = await _world(node)
+
+    result = await use_case.handle(
+        UpdateNodeCommand(node_id=node.id, type="book", clear_type=True),
+        SYSTEM_ACTOR,
+    )
+
+    assert result.type is None
+    assert await repos.node_types.list(after=None, limit=10) == []

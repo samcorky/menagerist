@@ -145,23 +145,65 @@ def test_update_slugifies_type_on_assignment() -> None:
     assert node.type == "science-fiction-film"
 
 
-def test_update_rejects_type_change_once_set() -> None:
-    """update() raises ValidationError when trying to change an existing type."""
+def test_update_changes_an_existing_type() -> None:
+    """update() replaces the type, slugified, and leaves the attributes alone."""
+    node = Node.create(
+        owner_id=uuid.UUID(int=1),
+        name="Alien",
+        type="film",
+        attributes={"year": 1979},
+    )
+
+    node.update(type="Science Fiction")
+
+    assert node.type == "science-fiction"
+    assert node.attributes == {"year": 1979}
+
+
+def test_clear_type_removes_it_and_keeps_the_attributes() -> None:
+    """clear_type() unsets the type without touching the attribute values."""
+    node = Node.create(
+        owner_id=uuid.UUID(int=1),
+        name="Alien",
+        type="film",
+        attributes={"year": 1979},
+    )
+
+    node.clear_type()
+
+    assert node.type is None
+    assert node.attributes == {"year": 1979}
+
+
+def test_clear_type_on_an_untyped_node_is_a_no_op() -> None:
+    """Clearing a type that is not set leaves it unset."""
+    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien")
+
+    node.clear_type()
+
+    assert node.type is None
+
+
+def test_update_without_type_leaves_it_unchanged() -> None:
+    """An omitted type is not a clear."""
     node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
 
-    with pytest.raises(ValidationError, match="type cannot be changed after it is set"):
-        node.update(type="book")
+    node.update(name="Aliens")
+
+    assert node.type == "film"
 
 
 @pytest.mark.parametrize("type_", ["", "   ", "!!!"])
-def test_update_rejects_type_that_slugifies_to_empty(type_: str) -> None:
-    """update() raises when the provided type slugifies to an empty string."""
-    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien")
+def test_update_rejects_a_type_that_slugifies_to_empty(type_: str) -> None:
+    """A blank or punctuation-only type is an error, never a clear."""
+    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
 
     with pytest.raises(
         ValidationError, match="type must be a non-empty string when provided"
     ):
         node.update(type=type_)
+
+    assert node.type == "film"
 
 
 def test_create_defaults_favourite_to_false() -> None:

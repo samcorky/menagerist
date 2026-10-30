@@ -36,13 +36,15 @@ logger = structlog.get_logger()
 class UpdateNodeCommand:
     """Request to update a node's editable fields.
 
-    A field left as `None` is unchanged. `type` is one-time-settable - it can
-    be assigned when currently `None` but cannot be changed once set.
+    A field left as `None` is unchanged. `type` can be set or changed, and
+    `clear_type` removes it (it wins over `type`); the node's attributes are kept
+    either way.
     """
 
     node_id: uuid.UUID
     name: str | None = field(default=None)
     type: str | None = field(default=None)
+    clear_type: bool = field(default=False)
     description: str | None = field(default=None)
     attributes: dict[str, Any] | None = field(default=None)
     favourite: bool | None = field(default=None)
@@ -79,12 +81,18 @@ class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
                     command.extra_schema, previous=node.extra_schema
                 )
 
-            if command.attributes is not None:
-                await self._validate(repos, node, command.attributes, command)
+            # The type the item will have once this command is applied: clearing wins
+            # over a type in the same command, and it is what the checks below use.
+            new_type = None if command.clear_type else command.type
+            target_type = self._target_type(node, new_type, command.clear_type)
+            if command.attributes is not None or target_type != node.type:
+                await self._validate(repos, node, target_type, command)
 
+            if command.clear_type:
+                node.clear_type()
             node.update(
                 name=command.name,
-                type=command.type,
+                type=new_type,
                 description=command.description,
                 attributes=command.attributes,
                 favourite=command.favourite,
@@ -92,14 +100,14 @@ class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
                 extra_schema=command.extra_schema,
             )
 
-            if command.type is not None:
-                slug = slugify(command.type)
+            if node.type is not None and new_type is not None:
+                slug = node.type
                 if (
                     await repos.node_types.get_by_slug(slug, guard_item_write=True)
                     is None
                 ):
                     await repos.node_types.add(
-                        NodeType.create(slug=slug, label=command.type)
+                        NodeType.create(slug=slug, label=new_type)
                     )
 
             await repos.nodes.save(node)
@@ -107,25 +115,44 @@ class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
         logger.info("node updated", node_id=command.node_id)
         return node
 
+    @staticmethod
+    def _target_type(node: Node, new_type: str | None, clearing: bool) -> str | None:
+        """The slug the node will have after the command, without changing the node.
+
+        A blank or unusable type is left for the domain to refuse when it is applied.
+        """
+        if clearing:
+            return None
+        if new_type is None:
+            return node.type
+        return slugify(new_type) or None
+
     async def _validate(
         self,
         repos: GraphRepos,
         node: Node,
-        attributes: dict[str, Any],
+        type_slug: str | None,
         command: UpdateNodeCommand,
     ) -> None:
-        """Validate `attributes` against the type's schema plus overlay."""
+        """Check the item's fields against the type it will have.
+
+        Merging the type's schema with the item's own fields refuses a name both
+        define, which a type change could otherwise introduce. Values are only
+        validated when the command sends them: changing the type keeps the
+        existing ones, whether or not the new type has a field for them.
+        """
         type_schema: dict[str, Any] | None = None
-        if node.type is not None:
-            node_type = await repos.node_types.get_by_slug(slugify(node.type))
+        if type_slug is not None:
+            node_type = await repos.node_types.get_by_slug(type_slug)
             type_schema = node_type.attributes_schema if node_type else None
         extra_schema = (
             command.extra_schema
             if command.extra_schema is not None
             else node.extra_schema
         )
-        schema = await resolve_choice_lists(
-            merge_attribute_schemas(type_schema, extra_schema), self._choice_lists
-        )
+        merged = merge_attribute_schemas(type_schema, extra_schema)
+        if command.attributes is None:
+            return
+        schema = await resolve_choice_lists(merged, self._choice_lists)
         if schema is not None:
-            validate_attributes(schema, attributes, previous=node.attributes)
+            validate_attributes(schema, command.attributes, previous=node.attributes)
