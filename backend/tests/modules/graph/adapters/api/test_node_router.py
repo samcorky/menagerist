@@ -588,3 +588,55 @@ def test_list_nodes_search_ignores_accents() -> None:
     response = client.get("/api/v1/node?q=cafe")
 
     assert [n["name"] for n in response.json()] == ["Café"]
+
+
+def test_update_node_changes_the_type_and_keeps_the_attributes() -> None:
+    """PATCH type replaces the type; the attribute values stay."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post(
+        "/api/v1/node",
+        json={"name": "Alien", "type": "film", "attributes": {"year": 1979}},
+    ).json()
+
+    response = client.patch(f"/api/v1/node/{node['id']}", json={"type": "book"})
+
+    assert response.status_code == 200
+    assert response.json()["type"] == "book"
+    assert response.json()["attributes"] == {"year": 1979}
+
+
+def test_update_node_clears_the_type_with_null() -> None:
+    """PATCH type null removes the type and keeps the attributes."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post(
+        "/api/v1/node",
+        json={"name": "Alien", "type": "film", "attributes": {"year": 1979}},
+    ).json()
+
+    response = client.patch(f"/api/v1/node/{node['id']}", json={"type": None})
+
+    assert response.status_code == 200
+    assert response.json()["type"] is None
+    assert response.json()["attributes"] == {"year": 1979}
+    assert client.get(f"/api/v1/node/{node['id']}").json()["type"] is None
+
+
+def test_update_node_without_type_leaves_it_alone() -> None:
+    """Omitting type is not a clear."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
+
+    response = client.patch(f"/api/v1/node/{node['id']}", json={"favourite": True})
+
+    assert response.json()["type"] == "film"
+
+
+def test_update_node_rejects_a_blank_type() -> None:
+    """A blank string is an error, not a way to clear the type."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
+
+    response = client.patch(f"/api/v1/node/{node['id']}", json={"type": ""})
+
+    assert response.status_code == 400
+    assert client.get(f"/api/v1/node/{node['id']}").json()["type"] == "film"

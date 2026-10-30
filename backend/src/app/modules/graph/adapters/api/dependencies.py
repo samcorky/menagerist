@@ -25,6 +25,7 @@ from app.modules.graph.application.count_edge_type_attribute_usage import (
 from app.modules.graph.application.count_node_type_attribute_usage import (
     CountNodeTypeAttributeUsage,
 )
+from app.modules.graph.application.count_node_types import CountNodeTypes
 from app.modules.graph.application.count_nodes import CountNodes
 from app.modules.graph.application.create_edge import CreateEdge
 from app.modules.graph.application.create_edge_type import CreateEdgeType
@@ -56,7 +57,9 @@ from app.modules.graph.application.purge_edge_type_attribute import (
 from app.modules.graph.application.purge_node_type_attribute import (
     PurgeNodeTypeAttribute,
 )
+from app.modules.graph.application.random_node import RandomNode
 from app.modules.graph.application.restore_node import RestoreNode
+from app.modules.graph.application.search_node_counts import SearchNodeCounts
 from app.modules.graph.application.search_nodes import SearchNodes
 from app.modules.graph.application.update_edge import UpdateEdge
 from app.modules.graph.application.update_edge_type import UpdateEdgeType
@@ -114,6 +117,14 @@ def get_list_nodes_use_case(
     return ListNodes(repos, guard, collection_members)
 
 
+def get_random_node_use_case(
+    list_nodes: Annotated[ListNodes, Depends(get_list_nodes_use_case)],
+    repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> RandomNode:
+    return RandomNode(repos, guard, list_nodes)
+
+
 def get_count_nodes_use_case(
     list_nodes: Annotated[ListNodes, Depends(get_list_nodes_use_case)],
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
@@ -127,6 +138,20 @@ def get_search_nodes_use_case(
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> SearchNodes:
     return SearchNodes(repos, guard)
+
+
+def get_search_node_counts_use_case(
+    repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> SearchNodeCounts:
+    return SearchNodeCounts(repos, guard)
+
+
+def get_count_node_types_use_case(
+    repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> CountNodeTypes:
+    return CountNodeTypes(repos, guard)
 
 
 def get_list_item_fields_use_case(

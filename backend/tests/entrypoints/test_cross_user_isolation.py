@@ -411,6 +411,25 @@ BODIES: dict[str, Callable[[Seed], dict[str, Any]]] = {
             }
         }
     },
+    "NodeSearchCountsRequest": lambda s: {
+        "json": {
+            "queries": {
+                "everything": {"v": 1, "where": None, "sort": []},
+                "mine": {
+                    "v": 1,
+                    "where": {
+                        "op": "or",
+                        "children": [
+                            {"kind": "text", "q": "xenomorph"},
+                            {"kind": "collection", "mode": "any", "in": [s.collection]},
+                            {"kind": "collection", "mode": "none", "in": [s.smart]},
+                            {"kind": "media", "mode": "has"},
+                        ],
+                    },
+                },
+            }
+        }
+    },
     "CreateEdgeRequest": lambda s: {
         "json": {"source_id": s.item, "target_id": s.item2, "type": "owns"}
     },

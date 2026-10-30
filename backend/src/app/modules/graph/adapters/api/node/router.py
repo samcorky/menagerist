@@ -16,6 +16,7 @@ from app.entrypoints.api.shared.http.http_headers import (
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.graph.adapters.api.dependencies import (
+    get_count_node_types_use_case,
     get_count_nodes_use_case,
     get_create_node_use_case,
     get_delete_node_use_case,
@@ -25,7 +26,9 @@ from app.modules.graph.adapters.api.dependencies import (
     get_list_nodes_use_case,
     get_promote_extra_schema_field_use_case,
     get_purge_deleted_node_use_case,
+    get_random_node_use_case,
     get_restore_node_use_case,
+    get_search_node_counts_use_case,
     get_search_nodes_use_case,
     get_update_node_use_case,
 )
@@ -35,10 +38,17 @@ from app.modules.graph.adapters.api.node.schemas import (
     ItemFieldResponse,
     NodeCountResponse,
     NodeResponse,
+    NodeSearchCountsRequest,
+    NodeSearchCountsResponse,
     NodeSearchRequest,
     NodeSearchResponse,
+    NodeTypeCountResponse,
     PromoteExtraSchemaFieldRequest,
     UpdateNodeRequest,
+)
+from app.modules.graph.application.count_node_types import (
+    CountNodeTypes,
+    CountNodeTypesQuery,
 )
 from app.modules.graph.application.count_nodes import CountNodes
 from app.modules.graph.application.create_node import CreateNode
@@ -61,7 +71,12 @@ from app.modules.graph.application.purge_deleted_node import (
     PurgeDeletedNode,
     PurgeDeletedNodeCommand,
 )
+from app.modules.graph.application.random_node import RandomNode
 from app.modules.graph.application.restore_node import RestoreNode, RestoreNodeCommand
+from app.modules.graph.application.search_node_counts import (
+    SearchNodeCounts,
+    SearchNodeCountsQuery,
+)
 from app.modules.graph.application.search_nodes import SearchNodes, SearchNodesQuery
 from app.modules.graph.application.update_node import UpdateNode
 from app.modules.graph.domain.errors import (
@@ -203,6 +218,33 @@ async def search_nodes(
     return NodeSearchResponse.from_result(result)
 
 
+@router.post(
+    "/search/counts",
+    response_model=NodeSearchCountsResponse,
+    operation_id="count_node_searches",
+    responses=error_response(
+        InvalidQueryError,
+        detail="queries.no_photo: where.children[0]: Unknown condition kind.",
+    ),
+)
+async def count_node_searches(
+    body: NodeSearchCountsRequest,
+    use_case: Annotated[SearchNodeCounts, Depends(get_search_node_counts_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> NodeSearchCountsResponse:
+    """Count the items several condition trees match, in one call.
+
+    Each entry in `queries` is a condition tree like the `query` of
+    `POST /node/search`, and is parsed and resolved the same way, so a count
+    always agrees with the list a search for that query returns. Sort keys are
+    checked but do not change a count. `total` is exact up to 100,000, then
+    `total_capped` is true. A malformed query is a 400 whose `detail` starts
+    `queries.<name>`.
+    """
+    result = await use_case.handle(SearchNodeCountsQuery(queries=body.queries), actor)
+    return NodeSearchCountsResponse.from_result(result)
+
+
 @router.get(
     "/item-fields",
     response_model=list[ItemFieldResponse],
@@ -253,6 +295,33 @@ async def list_deleted_nodes(
 
 
 @router.get(
+    "/random",
+    response_model=NodeResponse,
+    operation_id="get_random_node",
+    responses=error_response(NodeNotFoundError, detail="No item matches"),
+)
+async def get_random_node(
+    use_case: Annotated[RandomNode, Depends(get_random_node_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+    filters: NodeFiltersDep,
+) -> NodeResponse:
+    """Fetch one of your items at random, for a "surprise me" button.
+
+    Takes the same `type`, `favourite` and `collection` filters as `GET /node`
+    and picks from what they match; `q` is ignored. 404 when nothing matches.
+    """
+    node = await use_case.handle(
+        ListNodesQuery(
+            type=filters.type,
+            favourite=filters.favourite,
+            collection=filters.collection,
+        ),
+        actor,
+    )
+    return NodeResponse.from_domain(node)
+
+
+@router.get(
     "/count",
     response_model=NodeCountResponse,
     operation_id="count_nodes",
@@ -281,6 +350,25 @@ async def count_nodes(
         actor,
     )
     return NodeCountResponse(count=count)
+
+
+@router.get(
+    "/count/types",
+    response_model=list[NodeTypeCountResponse],
+    operation_id="count_node_types",
+)
+async def count_node_types(
+    use_case: Annotated[CountNodeTypes, Depends(get_count_node_types_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> list[NodeTypeCountResponse]:
+    """Count your items per item type, biggest first.
+
+    Only item types that have at least one of your items appear, so the shared
+    list of item types never inflates the numbers. Items with no type are one
+    row whose `type` is null. Counts are exact.
+    """
+    rows = await use_case.handle(CountNodeTypesQuery(), actor)
+    return [NodeTypeCountResponse.from_domain(row) for row in rows]
 
 
 @router.get(

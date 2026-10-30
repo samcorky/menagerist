@@ -1,13 +1,17 @@
 import { countNodes } from '$lib/api/client';
 
 /** The filters the list and `GET /node/count` share. */
-export type CountFilters = { q: string; type: string | null };
+export type CountFilters = { q: string; type: string | null; favourite?: boolean };
 
 /** The exact number of matches, or null when the count could not be fetched. */
 export async function fetchExactCount(filters: CountFilters): Promise<number | null> {
 	try {
 		const result = await countNodes({
-			query: { q: filters.q || undefined, type: filters.type ?? undefined }
+			query: {
+				q: filters.q || undefined,
+				type: filters.type ?? undefined,
+				favourite: filters.favourite
+			}
 		});
 		return result.error || !result.data ? null : result.data.count;
 	} catch {

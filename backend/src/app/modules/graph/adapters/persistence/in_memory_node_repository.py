@@ -1,3 +1,4 @@
+import random
 from functools import partial
 from typing import TYPE_CHECKING, cast
 
@@ -10,7 +11,7 @@ from app.modules.graph.adapters.persistence.query_eval import (
 from app.modules.graph.adapters.persistence.text_match import fold, text_matches
 from app.modules.graph.application.field_kinds import KIND_OPERATORS
 from app.modules.graph.application.schema_meta import NAMESPACE
-from app.modules.graph.domain.query import ItemFieldUse, SearchHit
+from app.modules.graph.domain.query import ItemFieldUse, SearchHit, TypeCount
 
 if TYPE_CHECKING:
     import builtins
@@ -196,6 +197,29 @@ class InMemoryNodeRepository:
         count = len(self._matching(scope, resolved))
         return count if limit is None else min(count, limit)
 
+    async def random(
+        self,
+        *,
+        scope: ContentFilter,
+        resolved: ResolvedQuery | None = None,
+        type: str | None = None,
+        favourite: bool | None = None,
+        ids: collections.abc.Collection[uuid.UUID] | None = None,
+    ) -> Node | None:
+        """Return one matching live node at random, or `None`."""
+        if resolved is None:
+            nodes = self._visible(scope)
+        else:
+            nodes = [hit.node for hit in self._matching(scope, resolved)]
+        if ids is not None:
+            nodes = [n for n in nodes if n.id in ids]
+        if type is not None:
+            nodes = [n for n in nodes if n.type == type]
+        if favourite is not None:
+            nodes = [n for n in nodes if n.favourite == favourite]
+        # Not security-sensitive: this only picks an item to show.
+        return random.choice(nodes) if nodes else None
+
     async def clear_type(self, type_slug: str, *, scope: ContentFilter) -> None:
         """Set `type` to None on all non-deleted nodes if type matches `type_slug`."""
         for node in self._visible(scope):
@@ -324,6 +348,15 @@ class InMemoryNodeRepository:
         ]
         rows.sort(key=lambda row: (-row.count, row.key, row.kind))
         return rows[:limit]
+
+    async def count_by_type(self, *, scope: ContentFilter) -> builtins.list[TypeCount]:
+        """Count live nodes in `scope` per item type; untyped is one `None` row."""
+        counts: dict[str | None, int] = {}
+        for node in self._visible(scope):
+            counts[node.type] = counts.get(node.type, 0) + 1
+        rows = [TypeCount(type=slug, count=n) for slug, n in counts.items()]
+        rows.sort(key=lambda row: (-row.count, row.type is None, row.type or ""))
+        return rows
 
     def _deleted_rows(self, scope: ContentFilter) -> builtins.list[Node]:
         """Soft-deleted nodes in `scope`, newest deleted first (ties by id)."""

@@ -41,6 +41,7 @@ from app.modules.graph.domain.query import (
     ItemFieldUse,
     SearchHit,
     TextCondition,
+    TypeCount,
     walk_conditions,
 )
 from app.platform.orm_mixins import claim_rows, owned_by
@@ -282,6 +283,57 @@ class SqlAlchemyNodeRepository:
         await _jit_off_for_text(self._session, has_text=q is not None)
         result = await self._session.execute(stmt)
         return result.scalar_one()
+
+    async def random(
+        self,
+        *,
+        scope: ContentFilter,
+        resolved: ResolvedQuery | None = None,
+        type: str | None = None,
+        favourite: bool | None = None,
+        ids: collections.abc.Collection[uuid.UUID] | None = None,
+    ) -> Node | None:
+        """Return one matching live node at random, or `None`.
+
+        Sorts the matches by `random()` and keeps one, which reads every match:
+        fine for a personal collection, and it keeps the choice uniform.
+        """
+        logger.debug("picking a random node", type=type)
+        if ids is not None and not ids:
+            return None
+        stmt = select(NodeModel).where(_in_scope(scope))
+        if ids is not None:
+            stmt = stmt.where(_id_in(ids))
+        if type is not None:
+            stmt = stmt.where(NodeModel.type == type)
+        if favourite is not None:
+            stmt = stmt.where(NodeModel.favourite == favourite)
+        if resolved is not None:
+            where = compile_where(
+                resolved, QueryEnv(scope=scope, external=self._external)
+            )
+            if where is not None:
+                stmt = stmt.where(where)
+        await _jit_off_for_text(
+            self._session, has_text=resolved is not None and _has_text(resolved)
+        )
+        model = (
+            await self._session.execute(stmt.order_by(func.random()).limit(1))
+        ).scalar_one_or_none()
+        return None if model is None else _to_domain(model)
+
+    async def count_by_type(self, *, scope: ContentFilter) -> builtins.list[TypeCount]:
+        """Count live nodes in `scope` per item type; untyped is one NULL row."""
+        logger.debug("counting nodes by type")
+        total = func.count()
+        stmt = (
+            select(NodeModel.type, total)
+            .where(_in_scope(scope))
+            .group_by(NodeModel.type)
+            .order_by(total.desc(), NodeModel.type.collate("C").asc().nulls_last())
+        )
+        result = await self._session.execute(stmt)
+        return [TypeCount(type=slug, count=int(n)) for slug, n in result.all()]
 
     async def clear_type(self, type_slug: str, *, scope: ContentFilter) -> None:
         """Set `type` to NULL on all non-deleted nodes if type matches `type_slug`."""

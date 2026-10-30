@@ -6,10 +6,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.modules.graph.application.create_node import CreateNodeCommand
 from app.modules.graph.application.update_node import UpdateNodeCommand
-from app.modules.graph.domain.query import ItemFieldUse  # noqa: TC001
+from app.modules.graph.domain.query import ItemFieldUse, TypeCount  # noqa: TC001
 from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
+    from app.modules.graph.application.search_node_counts import SearchCount
     from app.modules.graph.application.search_nodes import SearchNodesResult
     from app.modules.graph.domain.node import Node
 
@@ -92,7 +93,10 @@ class CreateNodeRequest(RequestModel):
 class UpdateNodeRequest(RequestModel):
     """Request body for updating a node. Omitted fields are left unchanged.
 
-    `type` may only be set once - if the node already has a type this field is ignored.
+    `type` sets or changes the item type, and `null` removes it (leave it out to
+    keep it). The
+    item keeps its attribute values either way; ones the new type has no field for
+    simply have no field to show them.
     """
 
     model_config = ConfigDict(
@@ -115,20 +119,13 @@ class UpdateNodeRequest(RequestModel):
     tags: list[str] | None = Field(default=None)
     extra_schema: dict[str, Any] | None = Field(default=None)
 
-    @field_validator("type", mode="before")
-    @classmethod
-    def coerce_empty_type_to_none(cls, v: object) -> object:
-        """Treat an empty or whitespace-only type string as absent."""
-        if isinstance(v, str) and not v.strip():
-            return None
-        return v
-
     def to_command(self, node_id: uuid.UUID) -> UpdateNodeCommand:
         """Convert this request into an `UpdateNodeCommand` for `node_id`."""
         return UpdateNodeCommand(
             node_id=node_id,
             name=self.name,
             type=self.type,
+            clear_type="type" in self.model_fields_set and self.type is None,
             description=self.description,
             attributes=self.attributes,
             favourite=self.favourite,
@@ -319,12 +316,122 @@ class NodeSearchResponse(BaseModel):
         )
 
 
+class NodeSearchCountsRequest(RequestModel):
+    """Request body for counting the items several condition trees match."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "queries": {
+                        "everything": {"v": 1, "where": None, "sort": []},
+                        "no_photo": {
+                            "v": 1,
+                            "where": {
+                                "op": "and",
+                                "children": [{"kind": "media", "mode": "none"}],
+                            },
+                            "sort": [],
+                        },
+                    }
+                }
+            ]
+        }
+    )
+
+    queries: dict[str, dict[str, Any]] = Field(
+        description=(
+            "Named condition trees (`v`, an optional `where` group and `sort`), "
+            + "1 to 20 of them. A name is 1 to 64 letters, digits, dots, dashes "
+            + "or underscores."
+        )
+    )
+
+
+class NodeSearchCountResponse(BaseModel):
+    """The number of items one query matches."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [{"total": 232, "total_capped": False, "warnings": []}]
+        }
+    )
+
+    total: int
+    total_capped: bool = Field(
+        description="True when `total` is a lower bound, not the exact count."
+    )
+    warnings: list[QueryWarningResponse]
+
+
+class NodeSearchCountsResponse(BaseModel):
+    """The match count for each named query."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "counts": {
+                        "everything": {
+                            "total": 1284,
+                            "total_capped": False,
+                            "warnings": [],
+                        },
+                        "no_photo": {
+                            "total": 232,
+                            "total_capped": False,
+                            "warnings": [],
+                        },
+                    }
+                }
+            ]
+        }
+    )
+
+    counts: dict[str, NodeSearchCountResponse]
+
+    @classmethod
+    def from_result(cls, result: dict[str, SearchCount]) -> NodeSearchCountsResponse:
+        """Build a response from the counts a `SearchNodeCounts` returned."""
+        return cls(
+            counts={
+                name: NodeSearchCountResponse(
+                    total=count.total,
+                    total_capped=count.capped,
+                    warnings=[
+                        QueryWarningResponse(path=w.path, message=w.message)
+                        for w in count.warnings
+                    ],
+                )
+                for name, count in result.items()
+            }
+        )
+
+
 class NodeCountResponse(BaseModel):
     """The exact number of items matching a filter."""
 
     model_config = ConfigDict(json_schema_extra={"examples": [{"count": 1234}]})
 
     count: int = Field(description="Matching live items, with no cap.")
+
+
+class NodeTypeCountResponse(BaseModel):
+    """How many of your items have an item type."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"type": "film", "count": 12}]}
+    )
+
+    type: str | None = Field(
+        description="The item type's slug, or null for items with no type."
+    )
+    count: int = Field(description="Your live items of that type.")
+
+    @classmethod
+    def from_domain(cls, row: TypeCount) -> NodeTypeCountResponse:
+        """Build a response from a `TypeCount`."""
+        return cls(type=row.type, count=row.count)
 
 
 class ItemFieldResponse(BaseModel):

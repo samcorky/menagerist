@@ -860,3 +860,11 @@ class ItemFieldUse:
     kind: str
     label: str
     count: int
+
+
+@dataclass(frozen=True, kw_only=True)
+class TypeCount:
+    """How many live items have an item type; `type` is `None` for untyped items."""
+
+    type: str | None
+    count: int

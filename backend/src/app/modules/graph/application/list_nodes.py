@@ -201,6 +201,27 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
             ids=None if source is None else source.ids,
         )
 
+    async def random_node(
+        self, query: ListNodesQuery, scope: ContentFilter
+    ) -> Node | None:
+        """Pick one item the list filters match at random, or None if there is none.
+
+        The caller has already passed the access check. `q` is not applied: a
+        random pick from a text search is not wanted.
+        """
+        source = await self._resolve_collection(query.collection, scope)
+        if isinstance(source, SmartSource):
+            combined = await self._smart_query(query, source.definition, scope)
+            if combined is None:
+                return None
+            return await self._repos.nodes.random(scope=scope, resolved=combined)
+        return await self._repos.nodes.random(
+            scope=scope,
+            type=query.type,
+            favourite=query.favourite,
+            ids=None if source is None else source.ids,
+        )
+
     async def _search_exclusions(self) -> dict[str, list[str]]:
         """Map each node type slug to the attribute keys a search must skip."""
         exclusions: dict[str, list[str]] = {}

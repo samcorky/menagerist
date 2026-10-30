@@ -13,6 +13,7 @@ if TYPE_CHECKING:
         ItemFieldUse,
         ResolvedQuery,
         SearchHit,
+        TypeCount,
     )
     from app.shared_kernel.content_filter import ContentFilter
 
@@ -111,6 +112,30 @@ class NodeRepository(Protocol):
         not archived count. Rows group by (key, kind); `label` is the most common
         non-empty `title` in the group (ties by title), else the key. Ordered by
         count descending then key then kind; at most `limit` rows.
+        """
+        ...
+
+    async def random(
+        self,
+        *,
+        scope: ContentFilter,
+        resolved: ResolvedQuery | None = None,
+        type: str | None = None,
+        favourite: bool | None = None,
+        ids: collections.abc.Collection[uuid.UUID] | None = None,
+    ) -> Node | None:
+        """Return one live node in `scope` chosen at random, or `None` if none match.
+
+        `resolved` narrows by a query (a smart collection), `type`, `favourite`
+        and `ids` as `list` does; an empty `ids` matches nothing.
+        """
+        ...
+
+    async def count_by_type(self, *, scope: ContentFilter) -> builtins.list[TypeCount]:
+        """Count the live nodes in `scope` per item type, one row per type in use.
+
+        Untyped nodes are one row with `type` `None`. Rows are ordered by count
+        descending, then type ascending with the untyped row last.
         """
         ...
 
