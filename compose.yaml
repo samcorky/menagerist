@@ -1,4 +1,7 @@
-x-hardened: &hardened
+x-app: &app
+  image: ${MENAGERIST_IMAGE:-ghcr.io/samcorky/menagerist:latest}
+  mem_limit: 512m
+  restart: unless-stopped
   read_only: true
   security_opt:
     - no-new-privileges:true
@@ -7,7 +10,6 @@ x-hardened: &hardened
   cap_add:
     - NET_BIND_SERVICE
   tmpfs:
-    # Restrict tmpfs use and pin ownership to uid/gid 1000.
     - /tmp:mode=1700,size=512M,noexec,nosuid,nodev,uid=1000,gid=1000
     - /var/run:mode=1700,size=16M,noexec,nosuid,nodev,uid=1000,gid=1000
   user: "1000:1000"
@@ -16,13 +18,19 @@ x-hardened: &hardened
   env_file:
     - path: .env
       required: false
-
-x-logging: &logging
+  environment:
+    MENAGERIST_DATABASE_URL: postgresql+asyncpg://menagerist:menagerist@postgres:5432/menagerist
+  volumes:
+    - media-data:/data/media
+    - ./backups:/data/backups
   logging:
     driver: "json-file"
     options:
       max-size: "10m"
       max-file: "3"
+  depends_on:
+    postgres:
+      condition: service_healthy
 
 services:
   postgres:
@@ -30,7 +38,6 @@ services:
     container_name: menagerist-db
     restart: unless-stopped
     mem_limit: ${POSTGRES_MEM_LIMIT:-512m}
-    # Memory settings sized for the default limit above; see "Database memory tuning" in the README.
     command:
       - postgres
       - -c
@@ -52,7 +59,6 @@ services:
       - DAC_OVERRIDE
     read_only: false
     tmpfs:
-      # The entrypoint chowns these paths before dropping privileges.
       - /tmp:mode=1777,size=256M,noexec,nosuid,nodev
       - /var/run:mode=1777,size=16M,noexec,nosuid,nodev
       - /run/postgresql:mode=1777,size=16M,noexec,nosuid,nodev
@@ -72,40 +78,16 @@ services:
       - menagerist
 
   menagerist:
-    <<: [*hardened, *logging]
+    <<: *app
     container_name: menagerist
-    image: menagerist:local
-    mem_limit: 512m
-    build:
-      context: .
-      dockerfile: Dockerfile
     command: ["serve", "--host", "0.0.0.0", "--migrate"]
-    restart: unless-stopped
-    environment: &app-environment
-      TZ: ${TZ:-UTC}
-      # Web server processes: a number from 1 to 16, or auto (one per container); see the README.
-      MENAGERIST_SERVER_WORKERS: ${MENAGERIST_SERVER_WORKERS:-auto}
-      MENAGERIST_DATABASE_URL: postgresql+asyncpg://menagerist:menagerist@postgres:5432/menagerist
-      # The address people reach the app at, e.g. https://menagerist.example.com. An https address makes the session cookie Secure.
-      MENAGERIST_API_PUBLIC_ORIGIN: ${MENAGERIST_API_PUBLIC_ORIGIN:-}
-      # Behind a reverse proxy, set its subnet to preserve client IPs and allow HTTPS sign-in.
-      # MENAGERIST_API_TRUSTED_PROXIES: 172.18.0.0/16
-    volumes: &app-volumes
-      # The backups bind mount must be owned by uid/gid 1000.
-      - media-data:/data/media
-      - ./backups:/data/backups
     ports:
       - "8080:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
 
   worker:
-    <<: [*hardened, *logging]
+    <<: *app
     container_name: menagerist-worker
     hostname: menagerist-worker
-    image: menagerist:local
-    mem_limit: 512m
     command: ["worker"]
     healthcheck:
       test: ["CMD", "menagerist", "worker-health"]
@@ -113,13 +95,7 @@ services:
       timeout: 10s
       start_period: 90s
       retries: 3
-    restart: unless-stopped
     stop_grace_period: 45s
-    environment: *app-environment
-    volumes: *app-volumes
-    depends_on:
-      postgres:
-        condition: service_healthy
 
 volumes:
   postgres-data:

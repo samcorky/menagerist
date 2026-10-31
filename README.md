@@ -152,8 +152,10 @@ uv run poe docker-up       # start Postgres + Menagerist, detached
 
 ```sh
 docker buildx bake -f docker-bake.hcl local
-docker compose up -d --force-recreate
+MENAGERIST_IMAGE=menagerist:local docker compose up -d --force-recreate
 ```
+
+`compose.yaml` pulls the published image unless `MENAGERIST_IMAGE` says otherwise, so `poe docker-up` and the line above point it at the image you just built. On PowerShell, set the variable first: `$env:MENAGERIST_IMAGE = "menagerist:local"`.
 
 `uv run` syncs and resolves the backend package on its own - no separate install step. If you've activated the project's venv instead (see [CONTRIBUTING.md](CONTRIBUTING.md)), drop the `uv run` prefix and call `menagerist` directly.
 

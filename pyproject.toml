@@ -465,7 +465,8 @@ help = "Print the fully merged Docker Compose config (base + override applied)"
 
 [tool.poe.groups.run.tasks.docker-up]
 cmd = "docker compose up -d --force-recreate"
-help = "Build and (re)start the stack detached"
+env = { MENAGERIST_IMAGE = "menagerist:local" }
+help = "Build the image locally and (re)start the stack detached on it"
 deps = ["docker-build"]
 
 [tool.poe.groups.run.tasks.docker-down]

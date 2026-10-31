@@ -7,9 +7,11 @@ services:
   worker:
     container_name: worker
     hostname: menagerist-smoke-worker
+    image: menagerist:local
 
   menagerist:
     container_name: app
+    image: menagerist:local
     environment:
       # A fresh database skips the pre-migration backup anyway; opting out keeps the
       # smoke run independent of the host ./backups bind mount's ownership.
