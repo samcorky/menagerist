@@ -60,6 +60,19 @@ def resolve_workers(value: Workers, *, container: bool, cpus: int | None) -> int
     return max(1, min(cpus, MAX_WORKERS))
 
 
+def explain_workers(
+    value: Workers, *, reload: bool, container: bool, workers: int
+) -> str:
+    """Say in a few words why the server runs `workers` processes."""
+    if value != "auto":
+        return "set explicitly"
+    if reload:
+        return "auto: reload runs one worker (pass --workers for more)"
+    if container:
+        return "auto: a container runs one worker"
+    return f"auto: one worker per CPU core ({workers})"
+
+
 def available_cpus() -> int | None:
     """The cores this process may use, or `None` if Python cannot tell."""
     return os.process_cpu_count()

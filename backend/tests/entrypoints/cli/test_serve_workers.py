@@ -6,11 +6,11 @@ import pytest
 import structlog
 
 from app.entrypoints import cli
-from app.platform import connection_budget
+from app.platform import connection_budget, worker_count
 from app.platform.config import get_server_settings
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterator, Mapping, Sequence
 
 
 class _FakeGranian:
@@ -194,3 +194,67 @@ def test_reload_does_not_override_an_explicit_count(
         _serve_and_read_workers(monkeypatch, lambda: cli.serve(reload=True, workers=3))
         == 3
     )
+
+
+def _worker_log(logs: Sequence[Mapping[str, object]]) -> Mapping[str, object]:
+    found = [log for log in logs if log["event"] == "web server workers"]
+    assert len(found) == 1
+    return found[0]
+
+
+def test_says_why_auto_runs_one_worker_when_reloading(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`serve --reload` with `auto` logs the single worker and the reason."""
+    _limit(monkeypatch, 100)
+    monkeypatch.setattr(worker_count, "available_cpus", lambda: 8)
+
+    with structlog.testing.capture_logs() as logs:
+        cli.serve(workers="auto", reload=True)
+
+    entry = _worker_log(logs)
+    assert entry["workers"] == 1
+    assert "reload" in str(entry["reason"])
+    assert entry["log_level"] == "info"
+
+
+def test_says_one_per_core_for_auto_on_a_plain_host(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Off a container and without reload, `auto` logs the core count it used."""
+    _limit(monkeypatch, 1000)
+    monkeypatch.setattr(worker_count, "available_cpus", lambda: 4)
+    monkeypatch.setattr(worker_count, "in_container", lambda configured: False)
+
+    with structlog.testing.capture_logs() as logs:
+        cli.serve(workers="auto", reload=False)
+
+    entry = _worker_log(logs)
+    assert entry["workers"] == 4
+    assert "core" in str(entry["reason"])
+
+
+def test_says_when_the_container_decides(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`auto` inside a container logs that the container sets one worker."""
+    _limit(monkeypatch, 100)
+    monkeypatch.setattr(worker_count, "available_cpus", lambda: 8)
+    monkeypatch.setattr(worker_count, "in_container", lambda configured: True)
+
+    with structlog.testing.capture_logs() as logs:
+        cli.serve(workers="auto", reload=False)
+
+    entry = _worker_log(logs)
+    assert entry["workers"] == 1
+    assert "container" in str(entry["reason"])
+
+
+def test_says_a_number_was_asked_for(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A number is used as given, even with reload, and the log says so."""
+    _limit(monkeypatch, 1000)
+
+    with structlog.testing.capture_logs() as logs:
+        cli.serve(workers=3, reload=True)
+
+    entry = _worker_log(logs)
+    assert entry["workers"] == 3
+    assert "set" in str(entry["reason"])

@@ -283,10 +283,18 @@ def serve(
     from app.platform.config import get_server_settings
 
     server_settings = get_server_settings()
+    requested = server_settings.workers if workers is None else workers
+    container = worker_count.in_container(server_settings.in_container)
+    cpus = worker_count.available_cpus()
     workers = worker_count.resolve_workers(
-        server_settings.workers if workers is None else workers,
-        container=reload or worker_count.in_container(server_settings.in_container),
-        cpus=worker_count.available_cpus(),
+        requested, container=reload or container, cpus=cpus
+    )
+    logger.info(
+        "web server workers",
+        workers=workers,
+        reason=worker_count.explain_workers(
+            requested, reload=reload, container=container, workers=workers
+        ),
     )
     _warn_if_connections_exceed_limit(workers)
 

@@ -423,7 +423,10 @@ help = "Build backend and frontend"
 
 [tool.poe.groups.run.tasks.serve-backend]
 deps = ["ensure-editable-backend"]
-cmd = "menagerist serve --host 0.0.0.0 --reload"
+cmd = "menagerist serve --host 0.0.0.0 --reload ${workers:+--workers ${workers}}"
+args = [
+  { name = "workers", options = ["-w", "--workers", "--worker"], help = "Server worker processes: 1 to 16, or auto; defaults to the server setting" },
+]
 help = "Run the backend API server with auto-reload for development"
 
 [tool.poe.groups.run.tasks.ensure-editable-backend]
@@ -437,7 +440,10 @@ cwd = "frontend"
 help = "Run the frontend dev server with hot reload"
 
 [tool.poe.groups.run.tasks.serve]
-parallel = ["serve-backend", "serve-frontend"]
+parallel = ["serve-backend ${workers:+--workers ${workers}}", "serve-frontend"]
+args = [
+  { name = "workers", options = ["-w", "--workers", "--worker"], help = "Backend server worker processes: 1 to 16, or auto; defaults to the server setting" },
+]
 help = "Run the app for local development"
 # Ctrl+C exits the server non-zero; without this poe reports it as a failed task.
 ignore_fail = true

@@ -3,7 +3,12 @@
 import pytest
 
 from app.platform.config.server import MAX_WORKERS
-from app.platform.worker_count import in_container, resolve_workers
+from app.platform.worker_count import (
+    Workers,
+    explain_workers,
+    in_container,
+    resolve_workers,
+)
 
 
 def _detect(
@@ -84,3 +89,21 @@ def test_a_number_out_of_range_is_still_refused() -> None:
     """Resolution does not bypass the range check."""
     with pytest.raises(ValueError, match="between 1 and"):
         resolve_workers(0, container=False, cpus=4)
+
+
+@pytest.mark.parametrize(
+    ("value", "reload", "container", "workers", "words"),
+    [
+        (4, True, True, 4, "explicitly"),
+        ("auto", True, False, 1, "reload"),
+        ("auto", False, True, 1, "container"),
+        ("auto", False, False, 6, "6"),
+    ],
+)
+def test_explains_the_count(
+    value: Workers, *, reload: bool, container: bool, workers: int, words: str
+) -> None:
+    """A short reason for each way the count can be reached."""
+    assert words in explain_workers(
+        value, reload=reload, container=container, workers=workers
+    )
