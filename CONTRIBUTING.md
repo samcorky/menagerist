@@ -254,6 +254,20 @@ Swagger UI is at `/api/docs` on the backend (`http://localhost:8000/api/docs` in
 - `poe check` must pass, and `poe coverage` for backend changes.
 - Coverage floors must not drop.
 - One focused change per PR.
+- The `Build` workflow builds the image and runs the smoke test on every pull request.
+
+## Releases
+
+Versions are CalVer, `0.YYYY.MM.PATCH` while pre-stable (for example `0.2026.11.0`), and come from the git tag through hatch-vcs. The `0.` prefix is dropped once the data model and API are stable.
+
+| Trigger | Image tags on GHCR |
+|---|---|
+| A published GitHub release | the version, `sha-<commit>` and `latest` |
+| A push to `main` | `edge` and `sha-<commit>` |
+| `Publish` run by hand with "push" ticked | `sha-<commit>`, plus `edge` from `main` |
+| A pull request, or `Publish` run by hand with "push" unticked | nothing is pushed |
+
+To release: tag `main` with the version and publish a GitHub release for that tag (mark it a pre-release while the version starts with `0.`). The `Publish` workflow fails if the tag and the version built from it disagree, smoke tests the image, builds `linux/amd64` and `linux/arm64` on native runners, and tags the combined image. Run `Publish` by hand with "push" unticked to try the builds without pushing anything; the run summary lists the tags it would have used.
 
 ## Architecture
 

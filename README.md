@@ -17,7 +17,7 @@ A lightweight, self-hostable platform for organising the things you care about.
 
 Menagerist is a flexible collection manager built on a graph model. Records can represent anything - items, people, events, places - and can be connected to each other in whatever way makes sense for your collection.
 
-The graph model is deliberately hidden from the user. You interact with familiar concepts like items and relationships; Menagerist handles the structure underneath.
+The graph model is deliberately hidden from the user. You interact with familiar concepts like items and relationships; Menagerist handles the structure underneath. Features are generic and reusable rather than built around one kind of collection: the same mechanisms that record a signed poster, who signed it and where can record a loan, a purchase or a membership.
 
 ---
 
@@ -161,17 +161,10 @@ MENAGERIST_IMAGE=menagerist:local docker compose up -d --force-recreate
 
 ---
 
-## Roadmap
-
-See [ROADMAP.md](ROADMAP.md) for the product direction and release strategy.
-
----
-
 ## Documentation
 
 | Document | Contents |
 |---|---|
-| [ROADMAP.md](ROADMAP.md) | Product direction and UX philosophy |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, commands, and testing |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System topology and data model |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Significant technical decisions and rationale |

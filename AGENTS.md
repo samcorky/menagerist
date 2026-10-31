@@ -11,7 +11,7 @@ Menagerist is a self-hostable collection management platform: a SvelteKit SPA, F
 | Frontend code              | Read Stack, Key patterns and the relevant testing/feature sections of [frontend/README.md](frontend/README.md)        |
 | UI behaviour or appearance | Read §§1–3 and §24 of [DESIGN_GUIDELINES.md](frontend/DESIGN_GUIDELINES.md), then follow its task-based reading guide |
 | System/data-model changes  | [ARCHITECTURE.md](docs/ARCHITECTURE.md) and relevant [DECISIONS.md](docs/DECISIONS.md) entries                        |
-| Product direction          | [ROADMAP.md](ROADMAP.md); overview and quickstart in [README.md](README.md)                                           |
+| Product direction          | Overview and quickstart in [README.md](README.md); the backlog is tracked outside the repository                      |
 | Cross-stack data/contracts | [shared/README.md](shared/README.md)                                                                                  |
 | Dependency changes         | `.github/renovate.json` and the dependency policy below                                                               |
 
