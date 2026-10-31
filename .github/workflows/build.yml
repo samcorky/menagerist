@@ -34,12 +34,15 @@ jobs:
           COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
+          version="$(cd backend && uv run --with hatch hatch --no-interactive version)"
+          timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           {
-            echo "version=$(cd backend && uv run --with hatch hatch --no-interactive version)"
+            echo "version=${version}"
             echo "commit=${COMMIT_SHA}"
             echo "branch=${BRANCH}"
-            echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          } >> "$GITHUB_OUTPUT"
+            echo "timestamp=${timestamp}"
+          } | tee -a "$GITHUB_OUTPUT"
+          echo "No tags: this image is built as menagerist:local and not pushed."
 
       - name: Build the image
         uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0

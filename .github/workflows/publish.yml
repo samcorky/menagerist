@@ -52,10 +52,12 @@ jobs:
       - name: Read the version from the tags
         id: version
         run: |
+          version="$(cd backend && uv run --with hatch hatch --no-interactive version)"
+          timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           {
-            echo "version=$(cd backend && uv run --with hatch hatch --no-interactive version)"
-            echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          } >> "$GITHUB_OUTPUT"
+            echo "version=${version}"
+            echo "timestamp=${timestamp}"
+          } | tee -a "$GITHUB_OUTPUT"
 
       # A release is built from its tag, so the two must agree.
       - name: Check the release tag
@@ -94,6 +96,9 @@ jobs:
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
         run: |
+          echo "Event: ${GITHUB_EVENT_NAME}, ref: ${GITHUB_REF}, pushed: ${PUSH}"
+          echo "Tags:"
+          echo "$TAGS"
           {
             echo "### Image tags (pushed: ${PUSH})"
             echo
@@ -143,6 +148,34 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Show the build arguments
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          BUILD_TIMESTAMP: ${{ needs.version.outputs.timestamp }}
+          PLATFORM: ${{ matrix.platform }}
+          COMMIT_SHA: ${{ github.sha }}
+          BRANCH: ${{ github.ref_name }}
+          REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          args="$(printf '%s\n' \
+            "platform=${PLATFORM}" \
+            "image=${REGISTRY_IMAGE}" \
+            "pushing=${PUSH}" \
+            "VERSION=${VERSION}" \
+            "COMMIT_SHA=${COMMIT_SHA}" \
+            "BRANCH=${BRANCH}" \
+            "REPOSITORY_URL=${REPOSITORY_URL}" \
+            "BUILD_TIMESTAMP=${BUILD_TIMESTAMP}" \
+            "DIRTY=false")"
+          echo "$args"
+          {
+            echo "### Build arguments (${PLATFORM})"
+            echo
+            echo '```'
+            echo "$args"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # Pushed by digest with no tag; the publish job below puts the tags on the
       # combined multi-platform image.
@@ -223,8 +256,12 @@ jobs:
           while IFS= read -r tag; do
             [[ -n "$tag" ]] && tag_args+=(-t "$tag")
           done <<< "$TAGS"
-          docker buildx imagetools create "${tag_args[@]}" \
-            $(printf "${REGISTRY_IMAGE}@sha256:%s " *)
+          sources=()
+          for digest in *; do
+            sources+=("${REGISTRY_IMAGE}@sha256:${digest}")
+          done
+          echo "Combining ${#sources[@]} platform image(s) into: ${tag_args[*]}"
+          docker buildx imagetools create "${tag_args[@]}" "${sources[@]}"
 
       - name: Inspect the image
         env:
