@@ -143,7 +143,9 @@ export default defineConfig({
 	workers: WORKERS,
 	forbidOnly: !!process.env.CI,
 	retries: process.env.CI ? 1 : 0,
-	reporter: 'list',
+	// CI also annotates failures on the pull request and writes a blob report per shard, which
+	// the report job merges into one HTML report and job summary.
+	reporter: process.env.CI ? [['list'], ['github'], ['blob']] : 'list',
 	// Backends restart every run and workers share the CPU, so
 	// multi-step specs need more than Playwright's 30s default.
 	timeout: slowMo ? 90_000 : 60_000,
