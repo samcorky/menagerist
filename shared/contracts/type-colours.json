@@ -1,3 +1,13 @@
 {
-	"colours": ["gray", "red", "orange", "amber", "green", "teal", "blue", "violet", "pink"]
+  "colours": [
+    "gray",
+    "red",
+    "orange",
+    "amber",
+    "green",
+    "teal",
+    "blue",
+    "violet",
+    "pink"
+  ]
 }
