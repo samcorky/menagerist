@@ -264,10 +264,7 @@ describe('summaryItems', () => {
 describe('example fixture', () => {
 	it('carries card highlights that are all valid', () => {
 		const schema = JSON.parse(
-			readFileSync(
-				new URL('./fixtures/example-node-type-schema.json', import.meta.url),
-				'utf-8'
-			)
+			readFileSync(new URL('./fixtures/example-node-type-schema.json', import.meta.url), 'utf-8')
 		) as AttributesSchema;
 		const stored = readHighlights(schema);
 		expect(stored.length).toBeGreaterThan(0);

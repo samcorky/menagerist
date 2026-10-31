@@ -267,9 +267,7 @@ describe('explicit kind and metadata', () => {
 describe('example schema contract fixture', () => {
 	const fixture = JSON.parse(
 		readFileSync(
-			fileURLToPath(
-				new URL('./fixtures/example-node-type-schema.json', import.meta.url)
-			),
+			fileURLToPath(new URL('./fixtures/example-node-type-schema.json', import.meta.url)),
 			'utf8'
 		)
 	) as { properties: Record<string, JsonSchemaProperty> };
