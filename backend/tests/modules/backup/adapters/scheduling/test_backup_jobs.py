@@ -19,23 +19,33 @@ if TYPE_CHECKING:
     from app.shared_kernel.jobs import JobBinding
 
 
-def _bindings(calls: list[str]) -> dict[str, JobBinding]:
+def _bindings() -> dict[str, JobBinding]:
+    return {
+        binding.definition.job_key: binding
+        for binding in backup_jobs.backup_job_contribution().bindings()
+    }
+
+
+def _steps(
+    monkeypatch: pytest.MonkeyPatch,
+    calls: list[str],
+    *,
+    create: AsyncMock | None = None,
+) -> None:
+    """Replace the backup and retention steps with recorders."""
+
     def recorder(name: str) -> AsyncMock:
         return AsyncMock(side_effect=lambda actor: calls.append(name))
 
-    return {
-        binding.definition.job_key: binding
-        for binding in backup_jobs.backup_job_bindings(
-            create=recorder("create"),
-            prune=recorder("prune"),
-            prune_exports=recorder("prune_exports"),
-        )
-    }
+    monkeypatch.setattr(
+        backup_jobs, "create_scheduled_backup", create or recorder("create")
+    )
+    monkeypatch.setattr(backup_jobs, "prune_scheduled_backups", recorder("prune"))
 
 
 def test_job_policies() -> None:
     """Backups are heavy and catch up once; export expiry is light."""
-    jobs = _bindings([])
+    jobs = _bindings()
     create = jobs["backup.create"].definition
     assert create.lane is Lane.HEAVY
     assert create.overlap is Overlap.COALESCE
@@ -47,32 +57,27 @@ def test_job_policies() -> None:
     assert set(jobs) == {"backup.create", "backup.prune_exports"}
 
 
-async def test_retention_prunes_only_after_a_backup_completes() -> None:
+async def test_retention_prunes_only_after_a_backup_completes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Retention follows a successful backup; a failed backup prunes nothing."""
     calls: list[str] = []
-    jobs = _bindings(calls)
-    await jobs["backup.create"].handler(SYSTEM_ACTOR)
+    _steps(monkeypatch, calls)
+    await backup_jobs.create_then_prune_backups(SYSTEM_ACTOR)
     assert calls == ["create", "prune"]
 
-    failing = AsyncMock(side_effect=RuntimeError("disk full"))
-    prune = AsyncMock()
-    binding = next(
-        item
-        for item in backup_jobs.backup_job_bindings(
-            create=failing, prune=prune, prune_exports=AsyncMock()
-        )
-        if item.definition.job_key == "backup.create"
-    )
+    calls.clear()
+    _steps(monkeypatch, calls, create=AsyncMock(side_effect=RuntimeError("disk full")))
     with pytest.raises(RuntimeError):
-        await binding.handler(SYSTEM_ACTOR)
-    prune.assert_not_awaited()
+        await backup_jobs.create_then_prune_backups(SYSTEM_ACTOR)
+    assert calls == []
 
 
-async def test_export_expiry_never_prunes_backups() -> None:
-    """The hourly job only expires exports."""
-    calls: list[str] = []
-    await _bindings(calls)["backup.prune_exports"].handler(SYSTEM_ACTOR)
-    assert calls == ["prune_exports"]
+def test_export_expiry_is_its_own_job() -> None:
+    """The hourly job is the export step alone, never the backup-and-prune job."""
+    jobs = _bindings()
+    assert jobs["backup.prune_exports"].handler is backup_jobs.prune_expired_exports
+    assert jobs["backup.create"].handler is backup_jobs.create_then_prune_backups
 
 
 def test_schedule_values_come_from_settings(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -134,7 +139,7 @@ async def test_empty_environment_value_stops_the_job_ever_being_enqueued(
         source = build_schedule_source()
         assert await source.schedule_for("backup.schedule") == (value or None)
         store = InMemorySchedulingStore()
-        catalogue = JobCatalogue(_bindings([]).values())
+        catalogue = JobCatalogue(_bindings().values())
         start = datetime(2026, 10, 27, 12, tzinfo=UTC)
         for now in (start, start + timedelta(days=1)):
             await TickSchedules(
