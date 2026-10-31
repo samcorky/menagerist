@@ -56,6 +56,16 @@ class SqlAlchemyJobRunRecorder:
         )
         return len(removed.all())
 
+    async def prune_worker_heartbeats(self, *, before: datetime) -> int:
+        """Delete heartbeat rows left behind by workers that have stopped."""
+        removed = await self._session.scalars(
+            delete(WorkerHeartbeatModel)
+            .where(WorkerHeartbeatModel.heartbeat_at < utc_instant(before))
+            .returning(WorkerHeartbeatModel.worker_id)
+            .execution_options(synchronize_session=False)
+        )
+        return len(removed.all())
+
     async def _locked(self, run_id: UUID) -> JobRunModel:
         model = await self._session.scalar(
             select(JobRunModel)

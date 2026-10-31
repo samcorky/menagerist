@@ -36,6 +36,14 @@ class InMemoryJobRunRecorder:
                 removed += 1
         return removed
 
+    async def prune_worker_heartbeats(self, *, before: datetime) -> int:
+        """Forget workers whose last heartbeat is older than `before`."""
+        before = utc_instant(before)
+        stale = [id_ for id_, moment in self._store.workers.items() if moment < before]
+        for worker_id in stale:
+            del self._store.workers[worker_id]
+        return len(stale)
+
     async def heartbeat(self, run_id: UUID, worker_id: str, now: datetime) -> None:
         """Renew a run owned by this worker."""
         run = self._store.get(run_id)

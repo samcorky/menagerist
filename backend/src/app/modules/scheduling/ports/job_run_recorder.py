@@ -16,6 +16,10 @@ class JobRunRecorder(Protocol):
         """Keep the newest N terminal runs per job, ordered by creation and id."""
         ...
 
+    async def prune_worker_heartbeats(self, *, before: datetime) -> int:
+        """Forget workers whose last heartbeat is older than `before`."""
+        ...
+
     async def heartbeat(self, run_id: UUID, worker_id: str, now: datetime) -> None:
         """Renew a running job only for its current claimant."""
         ...

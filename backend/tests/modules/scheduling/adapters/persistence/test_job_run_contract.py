@@ -92,6 +92,23 @@ async def test_pruning_keeps_completed_history_per_job_and_all_active_work(
         assert {run.id for run in history} == ids
 
 
+async def test_pruning_forgets_only_workers_silent_since_the_cutoff(
+    harness: QueueHarness,
+) -> None:
+    """Old worker ids go; a worker that checked in since the cutoff stays."""
+    cutoff = NOW - timedelta(days=7)
+    await harness.recorder.worker_heartbeat("gone", cutoff - timedelta(seconds=1))
+    await harness.recorder.worker_heartbeat("edge", cutoff)
+    await harness.recorder.worker_heartbeat("live", NOW)
+
+    assert await harness.recorder.prune_worker_heartbeats(before=cutoff) == 1
+    assert await harness.recorder.prune_worker_heartbeats(before=cutoff) == 0
+    since = NOW - timedelta(days=30)
+    assert not await harness.reader.worker_alive(since, worker_id="gone")
+    assert await harness.reader.worker_alive(since, worker_id="edge")
+    assert await harness.reader.worker_alive(since, worker_id="live")
+
+
 @dataclass(kw_only=True)
 class QueueHarness:
     """The contract exposes ports so another adapter can use the same tests."""

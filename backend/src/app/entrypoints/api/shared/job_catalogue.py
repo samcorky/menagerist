@@ -6,8 +6,8 @@ contributing a `JobContribution` to `CONTRIBUTIONS`.
 """
 
 from functools import lru_cache
+from typing import TYPE_CHECKING
 
-from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.data_jobs import data_job_contribution
 from app.entrypoints.api.shared.settings_reader import (
     get_settings_catalogue,
@@ -17,42 +17,18 @@ from app.modules.backup.adapters.scheduling.jobs import backup_job_contribution
 from app.modules.identity.adapters.scheduling.jobs import identity_job_contribution
 from app.modules.media.adapters.scheduling.jobs import media_job_contribution
 from app.modules.scheduling.adapters.cli.catalogue import JobCatalogue
-from app.modules.scheduling.adapters.cli.jobs import prune_runs_job
-from app.modules.scheduling.adapters.persistence.unit_of_work import (
-    create_scheduling_uow,
-)
 from app.modules.scheduling.adapters.platform.reader_schedule_source import (
     ReaderScheduleSource,
 )
-from app.modules.scheduling.application.prune_job_runs import PruneJobRuns
-from app.modules.scheduling.application.setting_keys import RUN_HISTORY_PER_JOB
+from app.modules.scheduling.adapters.scheduling.jobs import scheduling_job_contribution
 from app.modules.settings.domain.setting import SettingScope
 from app.modules.system.adapters.scheduling.jobs import system_job_contribution
-from app.platform.database import get_session_factory
-from app.shared_kernel.jobs import JobBinding, JobContribution
 
-
-async def run_history_per_job() -> int:
-    """The current quota of completed runs kept per job."""
-    return await get_settings_reader().get(RUN_HISTORY_PER_JOB)
-
-
-def _scheduling_bindings() -> list[JobBinding]:
-    return [
-        prune_runs_job(
-            lambda: PruneJobRuns(
-                create_scheduling_uow(get_session_factory()), get_access_guard()
-            ),
-            keep_per_job=run_history_per_job,
-        )
-    ]
-
+if TYPE_CHECKING:
+    from app.shared_kernel.jobs import JobContribution
 
 CONTRIBUTIONS: tuple[JobContribution, ...] = (
-    JobContribution(
-        bindings=_scheduling_bindings,
-        schedules=lambda: {"scheduling.prune_schedule": "0 4 * * *"},
-    ),
+    scheduling_job_contribution(),
     backup_job_contribution(),
     identity_job_contribution(),
     media_job_contribution(),
