@@ -146,6 +146,28 @@ def print_missing_details(
         print()
 
 
+def summary_markdown(results: list[tuple[str, float, float]]) -> str:
+    """Return a Markdown table of each component's coverage against its target."""
+    lines = [
+        "### Backend coverage",
+        "",
+        "| Component | Coverage | Target | Result |",
+        "| --- | ---: | ---: | --- |",
+    ]
+    for name, percent, target in results:
+        result = "Pass" if percent >= target else "**Below target**"
+        lines.append(f"| {name} | {percent:.2f}% | {target:.0f}% | {result} |")
+    return "\n".join(lines) + "\n"
+
+
+def write_step_summary(results: list[tuple[str, float, float]]) -> None:
+    """Append the results to the GitHub Actions job summary, when there is one."""
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if path:
+        with open(path, "a", encoding="utf-8") as summary:
+            summary.write(summary_markdown(results))
+
+
 def main() -> int:
     """Display component percentages and optionally fail on their targets."""
     args = parse_args()
@@ -164,6 +186,7 @@ def main() -> int:
         print("No components with a fixed (non-auto) target to check.")
         return 0
 
+    write_step_summary(results)
     width = max(len(name) for name, _, _ in results)
     failures = [name for name, percent, target in results if percent < target]
 
