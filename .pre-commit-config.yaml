@@ -43,6 +43,18 @@ repos:
         args: [--strict]
         files: ^\.github/renovate\.json$
 
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.39.0
+    hooks:
+      - id: check-github-workflows
+      - id: check-github-actions
+      - id: check-codecov
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+
   - repo: local
     hooks:
       - id: validate-compose
