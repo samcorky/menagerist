@@ -97,13 +97,13 @@ An item type may choose up to **three highlighted fields**, excluding long text.
 
 ### 7c. Truncation Rules
 
-| Content                                                         | Treatment                                                |
-| --------------------------------------------------------------- | -------------------------------------------------------- |
-| Card/list titles, card secondary information, connection labels | One line with end ellipsis                               |
-| Detail titles                                                   | Wrap fully; never truncate                               |
-| Card descriptions/long text                                     | Omit                                                     |
-| Detail descriptions/long text                                   | Full text, or “Show more” beyond roughly five lines      |
-| Tags/chips                                                      | Fixed maximum width, ellipsis, full label on hover/focus |
+| Content                                         | Treatment                                                |
+| ----------------------------------------------- | -------------------------------------------------------- |
+| Card/list titles, card secondary information    | One line with end ellipsis                               |
+| Detail titles, connection rows on the item page | Wrap fully; never truncate                               |
+| Card descriptions/long text                     | Omit                                                     |
+| Detail descriptions/long text                   | Full text, or “Show more” beyond roughly five lines      |
+| Tags/chips                                      | Fixed maximum width, ellipsis, full label on hover/focus |
 
 Break at word boundaries before the ellipsis. Make full truncated content available on hover/focus, tap/long-press, or the detail view.
 

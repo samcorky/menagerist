@@ -880,11 +880,11 @@
 										<li>
 											<Item.Root variant="outline">
 												<Item.Content class="text-sm">
-													<Item.Title class="truncate">{relationLabel}</Item.Title>
-													<div class="flex min-w-0 items-center gap-2">
+													<Item.Title class="min-w-0 break-words">{relationLabel}</Item.Title>
+													<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
 														<a
 															href={resolve('/items/[id]', { id: otherNodeId(edge) })}
-															class="truncate text-muted-foreground underline"
+															class="min-w-0 break-words text-muted-foreground underline"
 														>
 															{other?.name ?? 'View item'}
 														</a>
@@ -894,18 +894,18 @@
 																schema={schemaOfType(other.type)}
 																surface="row"
 																size="sm"
+																wrap
 															/>
 														{/if}
 													</div>
 													{#if rowSchema}
-														<div class="truncate">
-															<NodeSummary
-																attributes={edge.attributes}
-																schema={rowSchema}
-																surface="connection"
-																size="sm"
-															/>
-														</div>
+														<NodeSummary
+															attributes={edge.attributes}
+															schema={rowSchema}
+															surface="connection"
+															size="sm"
+															wrap
+														/>
 													{/if}
 												</Item.Content>
 												<Item.Actions>

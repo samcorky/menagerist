@@ -79,3 +79,28 @@ test('without a cover, a laptop shows the placeholder left of the details', asyn
 	expect(Math.abs(side.x - main.x)).toBeLessThan(8);
 	expect(side.y).toBeGreaterThan(main.y);
 });
+
+test('a long connected item name wraps in the connections panel instead of truncating', async ({
+	page,
+	request
+}) => {
+	const item = await makeItem(request, uniqueName('Poster'));
+	const other = await makeItem(
+		request,
+		uniqueName(`${'Michael Example signing the maxi poster at a convention '.repeat(4)}`.trim())
+	);
+	const res = await request.post('/api/v1/edge', {
+		data: { source_id: other.id, target_id: item.id, type: 'related-to' }
+	});
+	expect(res.status()).toBe(201);
+
+	await page.setViewportSize({ width: 1200, height: 1100 });
+	await page.goto(`/items/${item.id}`);
+
+	const link = page.getByTestId('item-side').getByRole('link', { name: other.name });
+	await expect(link).toBeVisible();
+	const lineHeight = await link.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
+	const box = (await link.boundingBox())!;
+	expect(box.height).toBeGreaterThan(lineHeight * 1.5);
+	expect(await link.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+});
