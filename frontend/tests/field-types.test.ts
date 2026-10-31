@@ -268,7 +268,7 @@ describe('example schema contract fixture', () => {
 	const fixture = JSON.parse(
 		readFileSync(
 			fileURLToPath(
-				new URL('../../docs/field-types-spec/example-node-type-schema.json', import.meta.url)
+				new URL('./fixtures/example-node-type-schema.json', import.meta.url)
 			),
 			'utf8'
 		)

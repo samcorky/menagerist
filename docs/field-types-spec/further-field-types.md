@@ -1,8 +1,8 @@
 # Further field types and the location kind
 
-> Part of the field-types spec. Read `00-INDEX.md` and `01-context-and-conventions.md` first (skip the second if this is that file).
+> Part of the field-types spec. The finished work items and reference files are in git history.
 > **Type:** reference file of candidate kinds. Measurement, Ordered list, Checklist, Money, URL/Email/Phone and Multi-choice (kind `multichoice`) Partial date (kind `partialdate`) and Duration (kind `duration`) have since been promoted and implemented (see their rows below). The rest remain candidates only. The location kind depends on WI-14 and WI-20.
-> "WI-n" refers to `wi-*.md` files listed in `00-INDEX.md`; "open question N" refers to `open-questions.md`.
+> "WI-n" refers to `wi-*.md` files (finished ones are in git history); "open question N" refers to `open-questions.md`.
 
 
 Each row marked **Done** or **Scheduled** has its own `wi-*.md` file with the real implementation (or planned) details; treat this file as historical context for those, not the source of truth. Everything else remains not scheduled. Each follows the registry pattern (one directory with descriptor, input, optional view and editor extras, one import line in `index.ts`). Check `fromSchema` precedence for each one.
@@ -13,8 +13,8 @@ Each row marked **Done** or **Scheduled** has its own `wi-*.md` file with the re
 | Money | number (+ optional currency code in the schema) | Done | Two-decimal handling, currency shown in view. For purchase price and value. See `wi-26-money-field-type.md` (kind `money`). |
 | URL / Email / Phone | string with `format: uri` / `email` and a pattern for phone | Done | Cheap. URL is already sketched in `docs/field-types.md`. See `wi-27-url-email-phone-field-types.md` (kinds `url`, `email`, `phone`). |
 | Multi-choice | array of strings with `items.enum` | Done | Tick several options, from a fixed set. **Collision:** `group.fromSchema` currently matches any `type: 'array'`. Register multi-choice before group, and make group require `items.type === 'object'` (WI-4). |
-| Ordered list | array of strings, no `enum` | Done | Free-text items, order matters, no per-item structure - aliases, ingredients without quantities, instruction steps. Distinct from multi-choice (items are open text, not picked from a fixed set) and from `group`/Table (one dimension, no sub-fields; a table with a single "value" column is the wrong tool for a plain list). See `wi-25-ordered-list-and-checklist-field-types.md` (kind `list`). |
-| Checklist | array of `{text, done}` | Done | A list where each item also has its own persisted tick - packing lists, shopping lists. Not a display variant of Ordered list (numbered/bulleted are cosmetic only; a tick is real per-item data, so it needed its own kind and its own stored shape). See `wi-25-ordered-list-and-checklist-field-types.md` (kind `checklist`). |
+| Ordered list | array of strings, no `enum` | Done | Free-text items, order matters, no per-item structure - aliases, ingredients without quantities, instruction steps. Distinct from multi-choice (items are open text, not picked from a fixed set) and from `group`/Table (one dimension, no sub-fields; a table with a single "value" column is the wrong tool for a plain list). See the git history (kind `list`). |
+| Checklist | array of `{text, done}` | Done | A list where each item also has its own persisted tick - packing lists, shopping lists. Not a display variant of Ordered list (numbered/bulleted are cosmetic only; a tick is real per-item data, so it needed its own kind and its own stored shape). See the git history (kind `checklist`). |
 | Identifier | string with `pattern` | | ISBN, catalogue number, barcode. Builds on the WI-15 pattern and friendly-error machinery. Later a hook for enrichment lookups (TMDB, MusicBrainz, books). |
 | Duration | number of seconds, or string | Done | Entered as `mm:ss` / `h:mm:ss`. Track and film lengths. |
 | Measurement | number with a unit stored in the schema | Done | Dimensions, weight, duration, page count. See `wi-24-quantity-field-type.md` (kind `quantity`). |
@@ -25,7 +25,7 @@ Each row marked **Done** or **Scheduled** has its own `wi-*.md` file with the re
 
 Not proposed: a "link to another item" field. Edges already model that.
 
-## Ordered list kind (done - see `wi-25-ordered-list-and-checklist-field-types.md`)
+## Ordered list kind (done)
 
 A `list` kind: an ordered array of plain text items, each editable, addable and removable, with the same up/down reordering WI-23 gives table columns. Unlike `group`, there is no per-item structure - one string per entry, not a row of sub-fields. Unlike `choice`, entries are free text the user types, not picked from a fixed option set.
 
@@ -44,14 +44,14 @@ Column-order-style problem does **not** apply here: `x-menagerist.columns` exist
 
 **Sequence number display (WI-11 "Show as" pattern).** The list is always ordered (that is the point of the kind - items reorder the same way WI-23 gives table columns), but whether the *sequence number itself* is shown is a presentation choice, separate from the ordering: `displayOptions: [{ key: 'display', choices: ['numbered', 'bulleted'], default: 'numbered' }]`. Numbered ("1. Preheat the oven", "2. Mix the flour and sugar") suits instructions, where the position is meaningful. Bulleted (a plain dash or dot, no number) suits aliases, ingredients or other lists where the order only exists for the user's own tidiness, not because position 3 means something. Both read and edit views respect it - the data-entry rows show the same prefix style as the read view, not just the read view. Storage is unaffected either way (still a plain array of strings); this is display-only metadata, same as boolean's switch/checkbox/buttons.
 
-**Resolved on implementation** (see `wi-25-ordered-list-and-checklist-field-types.md` for the full session notes):
+**Resolved on implementation** (see git history for the full session notes):
 - Value type: strings only, as proposed. No pluggable sub-kind was added.
 - `canBeSubField`: `false`, as proposed.
 - Highlightable: `false`, as proposed (no truncated "+N more" summary was built).
 - Search: works for free, as proposed - the existing recursive scalar scan already walks into the array.
 - Checklist (not anticipated by this candidate write-up, added the same session on request): a list where the tick itself is real per-item data could not be a `display` variant of `list` (display options are cosmetic-only, storage-unaffected, by this file's own design) - it needed its own kind and its own stored shape (`array of {text, done}` rather than `array of string`), registered separately as `checklist`.
 
-**Scheduled and implemented.** See `wi-25-ordered-list-and-checklist-field-types.md`.
+**Scheduled and implemented.** Notes are in git history.
 
 ## Location kind (candidate, any item type)
 

@@ -1,8 +1,8 @@
 # WI-21: Value suggestions, turn repeated text into connections or choices
 
-> Part of the field-types spec. Read `00-INDEX.md` and `01-context-and-conventions.md` first (skip the second if this is that file).
+> Part of the field-types spec. The finished work items and reference files are in git history.
 > **Depends on:** WI-18c (custom names), WI-10 (text to choice), WI-14 (`suggest` member). Later.
-> "WI-n" refers to `wi-*.md` files listed in `00-INDEX.md`; "open question N" refers to `open-questions.md`.
+> "WI-n" refers to `wi-*.md` files (finished ones are in git history); "open question N" refers to `open-questions.md`.
 > **Status:** WI-21a (the "Prevention" type-ahead below) implemented, committed (0418eac). The rest of this file - the detector, clustering, the connect/turn-into-choice actions, the Tips strip, dismissal guardrails - is not started: it depended on WI-18c, which was dropped entirely (see `wi-18-per-item-custom-fields.md`'s "Revised design"), so it needs rescoping before it can be picked up. See `PROGRESS.md`'s "WI-21a session notes".
 
 

@@ -1,8 +1,8 @@
 # Considered and not adopted: JSON Forms
 
-> Part of the field-types spec. Read `00-INDEX.md` and `01-context-and-conventions.md` first (skip the second if this is that file).
+> Part of the field-types spec. The finished work items and reference files are in git history.
 > **Type:** reference file (no work to do).
-> "WI-n" refers to `wi-*.md` files listed in `00-INDEX.md`; "open question N" refers to `open-questions.md`.
+> "WI-n" refers to `wi-*.md` files (finished ones are in git history); "open question N" refers to `open-questions.md`.
 
 
 Reviewed September 2026. Do not re-litigate this without a new driver.

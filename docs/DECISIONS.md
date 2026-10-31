@@ -414,7 +414,7 @@ Separately, `field-kind-row.svelte`/`GroupExtras.svelte`'s three dropdowns (fiel
 
 **Rationale:** The owner asked directly for an ordered-list kind (already a documented but unscheduled candidate in `further-field-types.md`), then separately asked for a checklist while discussing list display styles. A first instinct to fold checklist in as a third `display` value on `list` was rejected: that option only ever controls presentation in this codebase (boolean's switch/checkbox/buttons behave identically), and overloading it with a storage-shape change would break that invariant for every future reader of the code. `attributesToRows` must check the schema's declared `checklist` kind before its existing generic array-of-objects fallback (shared with `group`'s untyped-key catch-all) - otherwise a checklist's boolean `done` silently degrades through the group cell coercion path built for arbitrary string-typed table columns, always producing `false`. A regression test locks this ordering in (`attributes-editor.test.ts`).
 
-See `docs/field-types-spec/wi-25-ordered-list-and-checklist-field-types.md` for full implementation notes.
+The implementation notes for this work item are in git history (`docs/field-types-spec/`).
 
 ---
 

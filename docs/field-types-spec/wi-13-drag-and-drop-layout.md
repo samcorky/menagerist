@@ -1,8 +1,8 @@
 # WI-13: Drag-and-drop layout editor (stretch)
 
-> Part of the field-types spec. Read `00-INDEX.md` and `01-context-and-conventions.md` first (skip the second if this is that file).
+> Part of the field-types spec. The finished work items and reference files are in git history.
 > **Depends on:** WI-8 (layout must skip archived) and WI-14 (`layout`); benefits from WI-11. Stretch.
-> "WI-n" refers to `wi-*.md` files listed in `00-INDEX.md`; "open question N" refers to `open-questions.md`.
+> "WI-n" refers to `wi-*.md` files (finished ones are in git history); "open question N" refers to `open-questions.md`.
 
 
 **Prior art (borrowed idea 3 of 3).** JSON Forms describes layout with a small vocabulary: vertical layout (default), horizontal layout (fields side by side), group (labelled box) and categorization (tabs or a stepper). This item adopts that vocabulary for the layout tree (`x-layout` today, `x-menagerist.layout` after WI-14), and adds drag-and-drop editing on top. Layout stays inside the single schema (no separate UI schema).

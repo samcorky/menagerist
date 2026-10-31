@@ -265,7 +265,7 @@ describe('example fixture', () => {
 	it('carries card highlights that are all valid', () => {
 		const schema = JSON.parse(
 			readFileSync(
-				new URL('../../docs/field-types-spec/example-node-type-schema.json', import.meta.url),
+				new URL('./fixtures/example-node-type-schema.json', import.meta.url),
 				'utf-8'
 			)
 		) as AttributesSchema;

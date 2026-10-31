@@ -1,8 +1,8 @@
 # WI-19a to WI-19c: Reusable presets (saved fields, field groups, lists)
 
-> Part of the field-types spec. Read `00-INDEX.md` and `01-context-and-conventions.md` first (skip the second if this is that file).
+> Part of the field-types spec. The finished work items and reference files are in git history.
 > **Depends on:** WI-14 and WI-20; WI-10 (in-use warning when updating options). WI-19d is a separate file.
-> "WI-n" refers to `wi-*.md` files listed in `00-INDEX.md`; "open question N" refers to `open-questions.md`.
+> "WI-n" refers to `wi-*.md` files (finished ones are in git history); "open question N" refers to `open-questions.md`.
 
 
 **Goal.** Let users save field definitions once and reuse them: single fields, named sets of fields (for example "Purchase details": price, date, shop, condition) and choice lists. A saved item can be added to a node type or, later, to a single item, and can be exported and imported as a pack. Partly modelled on Koillection's templates.
@@ -47,7 +47,7 @@ Stored as JSON definitions. Common columns: `id` (uuid7), `kind`, `label`, `desc
 - **Persistence:** a new `preset` table with an Alembic migration (this is the first migration in this spec), a SQLAlchemy adapter and an in-memory sibling.
 - **Save for reuse** ("Save as preset" in code and this spec): from a field in the schema editor (a `field`), from a choice field's options (a `choice_list`), and from a per-item custom detail (WI-18; kind inferred from the value's shape). Saved copies drop keys, `origin`, highlights and layout positions.
 - **Add from saved fields:** in the schema editor, "Add from saved fields..." with search, kind filter and preview; a choice field gets "Use a saved list", which copies the options in and records `origin`. The choice field shows "From list X (v3), update available" when the preset's version is newer, with an "Update options" action that warns about in-use values (WI-10).
-- **Management page:** "Saved fields" at `settings/saved-fields`, next to the existing item type and relationships pages (the item type page is still `settings/categories` until the rename in `01-context-and-conventions.md` happens).
+- **Management page:** "Saved fields" at `settings/saved-fields`, next to the existing item type and relationships pages (the item type page is still `settings/categories` until the rename in the git history happens).
 - **Relabel the Group kind as Table** in the schema editor's kind picker and any docs (`group.ts` descriptor `label`; the code name stays `group`).
 
 ## WI-19b: field sets, ad hoc use and copying details

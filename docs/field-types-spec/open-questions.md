@@ -1,8 +1,8 @@
 # Open questions
 
-> Part of the field-types spec. Read `00-INDEX.md` and `01-context-and-conventions.md` first (skip the second if this is that file).
+> Part of the field-types spec. The finished work items and reference files are in git history.
 > **Type:** reference file. Each open question has a default; closed ones state the decision.
-> "WI-n" refers to `wi-*.md` files listed in `00-INDEX.md`; "open question N" refers to `open-questions.md`.
+> "WI-n" refers to `wi-*.md` files (finished ones are in git history); "open question N" refers to `open-questions.md`.
 
 
 1. **Closed:** checked in the code: the Save button is disabled only while saving or loading, so client-side errors never block it; the server rejects malformed values with a 422, which the editor maps back onto fields. WI-6 only has to keep `required` away from both validators.
