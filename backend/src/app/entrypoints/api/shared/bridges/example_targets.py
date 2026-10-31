@@ -455,12 +455,18 @@ def _preset_content(p: Preset) -> dict[str, Any]:
 
 
 def _node_type_content(t: NodeType) -> dict[str, Any]:
-    return {
+    content: dict[str, Any] = {
         "slug": str(t.slug),
         "label": t.label,
         "description": t.description,
         "attributes_schema": copy.deepcopy(t.attributes_schema),
     }
+    # Only when set, so types installed before packs had icons keep their hash.
+    if t.icon is not None:
+        content["icon"] = t.icon
+    if t.colour is not None:
+        content["colour"] = t.colour
+    return content
 
 
 def _edge_type_content(t: EdgeType) -> dict[str, Any]:
@@ -664,6 +670,8 @@ class GraphPackTarget:
             label=spec.label,
             description=spec.description,
             attributes_schema=_resolved(spec.attributes_schema, presets),
+            icon=spec.icon,
+            colour=spec.colour,
         )
         async with self._stores.choice_lists() as source:
             node_type = await CreateNodeType(

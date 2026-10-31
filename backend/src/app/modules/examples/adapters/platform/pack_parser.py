@@ -23,8 +23,9 @@ PACK_FORMAT = "menagerist-example-pack"
 FORMAT_VERSION = 1
 # v2 adds the optional `collections` section; v3 adds an item type's `cover`;
 # v4 adds `requires` and `pack:ref` references; v5 adds top-level `links`;
-# v6 lets a collection carry a `definition` instead of `items`.
-PACK_VERSIONS = (1, 2, 3, 4, 5, 6)
+# v6 lets a collection carry a `definition` instead of `items`; v7 lets an item
+# type carry an `icon` and a `colour`.
+PACK_VERSIONS = (1, 2, 3, 4, 5, 6, 7)
 
 # Same rule as the domain's pack id; ids become file names, so keep it strict.
 PACK_ID = re.compile(r"^[a-z0-9][a-z0-9-]*\Z")
@@ -200,7 +201,7 @@ def _parse_item_type(t: Mapping[str, Any]) -> PackItemType:
     _check_keys(
         t,
         required={"ref", "slug", "label"},
-        optional={"description", "attributes_schema", "cover"},
+        optional={"description", "attributes_schema", "cover", "icon", "colour"},
         where="an item type",
     )
     return PackItemType(
@@ -210,6 +211,8 @@ def _parse_item_type(t: Mapping[str, Any]) -> PackItemType:
         description=_opt_str(t.get("description"), "description"),
         attributes_schema=_opt_object(t.get("attributes_schema"), "attributes_schema"),
         cover=None if t.get("cover") is None else _parse_cover(t["cover"]),
+        icon=_opt_str(t.get("icon"), "icon"),
+        colour=_opt_str(t.get("colour"), "colour"),
     )
 
 

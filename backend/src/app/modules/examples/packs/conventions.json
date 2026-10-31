@@ -1,0 +1,1028 @@
+{
+  "format": "menagerist-example-pack",
+  "version": 7,
+  "id": "conventions",
+  "relationship_types": [
+    {
+      "ref": "on",
+      "slug": "conventions-on",
+      "label": "On",
+      "reverse_label": "Signatures",
+      "description": "Which collectable a signature is on.",
+      "directional": true
+    },
+    {
+      "ref": "signed-by",
+      "slug": "conventions-signed-by",
+      "label": "Signed by",
+      "reverse_label": "Signatures",
+      "description": "Who made a signature.",
+      "directional": true
+    },
+    {
+      "ref": "at",
+      "slug": "conventions-at",
+      "label": "At",
+      "reverse_label": "Hosted",
+      "description": "The event where a signature, photo or print came from.",
+      "directional": true
+    },
+    {
+      "ref": "with",
+      "slug": "conventions-with",
+      "label": "Shows",
+      "reverse_label": "Appears in",
+      "description": "Who is in a photo or on a print.",
+      "directional": true
+    }
+  ],
+  "item_types": [
+    {
+      "ref": "collectable",
+      "slug": "conventions-collectable",
+      "icon": "image",
+      "colour": "amber",
+      "label": "Collectable",
+      "description": "A poster, print or programme you have collected, signed or not.",
+      "cover": {
+        "style": "poster"
+      },
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string",
+            "enum": [
+              "Poster",
+              "Photo print",
+              "Programme",
+              "Ticket"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "size": {
+            "title": "Size",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "condition": {
+            "title": "Condition",
+            "type": "string",
+            "enum": [
+              "Mint",
+              "Near Mint",
+              "Very Good",
+              "Good",
+              "Fair",
+              "Poor"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "framed": {
+            "title": "Framed",
+            "type": "boolean",
+            "x-menagerist": {
+              "kind": "boolean"
+            }
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "longtext"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "kind"
+            },
+            {
+              "key": "size"
+            },
+            {
+              "key": "condition"
+            },
+            {
+              "key": "framed"
+            },
+            {
+              "key": "notes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "kind"
+              },
+              {
+                "key": "condition"
+              },
+              {
+                "key": "framed"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "person",
+      "slug": "conventions-person",
+      "icon": "user",
+      "colour": "blue",
+      "label": "Person",
+      "description": "A guest you have met, or someone who came along with you, such as family and friends.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "known_for": {
+            "title": "Known for",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "known_for"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "known_for"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "event",
+      "slug": "conventions-event",
+      "icon": "tickets",
+      "colour": "teal",
+      "label": "Event",
+      "description": "A convention, fair or signing session.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string",
+            "format": "date",
+            "x-menagerist": {
+              "kind": "date"
+            }
+          },
+          "city": {
+            "title": "City",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string",
+            "enum": [
+              "Convention",
+              "Collectors fair",
+              "Signing session"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "date"
+            },
+            {
+              "key": "city"
+            },
+            {
+              "key": "kind"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "date"
+              },
+              {
+                "key": "city"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "photo",
+      "slug": "conventions-photo",
+      "icon": "camera",
+      "colour": "pink",
+      "label": "Photo",
+      "description": "A selfie, photo op or photoshoot with a guest.",
+      "cover": {
+        "style": "card"
+      },
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string",
+            "enum": [
+              "Selfie",
+              "Photo op",
+              "Photoshoot",
+              "Group photo"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "taken_on": {
+            "title": "Taken on",
+            "type": "string",
+            "format": "date",
+            "x-menagerist": {
+              "kind": "date"
+            }
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "longtext"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "kind"
+            },
+            {
+              "key": "taken_on"
+            },
+            {
+              "key": "notes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "kind"
+              },
+              {
+                "key": "taken_on"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "signature",
+      "slug": "conventions-signature",
+      "icon": "pen-tool",
+      "colour": "violet",
+      "label": "Signature",
+      "description": "One signature on one collectable. It links to the collectable, the person who signed and the event, so a piece signed by many people at many events keeps each story apart.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "signed_on": {
+            "title": "Signed on",
+            "type": "string",
+            "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+            "x-menagerist": {
+              "kind": "partialdate"
+            }
+          },
+          "position": {
+            "title": "Position and pen",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "authenticated": {
+            "title": "Authenticated",
+            "type": "boolean",
+            "x-menagerist": {
+              "kind": "boolean"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "signed_on"
+            },
+            {
+              "key": "position"
+            },
+            {
+              "key": "authenticated"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "signed_on"
+              },
+              {
+                "key": "authenticated"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "items": [
+    {
+      "ref": "harbour-comic-con-2018",
+      "type": "event",
+      "name": "Harbour Comic Con 2018",
+      "attributes": {
+        "date": "2018-05-19",
+        "city": "Hull",
+        "kind": "Convention"
+      }
+    },
+    {
+      "ref": "northern-fan-fair-2019",
+      "type": "event",
+      "name": "Northern Fan Fair 2019",
+      "attributes": {
+        "date": "2019-09-14",
+        "city": "Leeds",
+        "kind": "Convention"
+      }
+    },
+    {
+      "ref": "midlands-sci-fi-weekender-2022",
+      "type": "event",
+      "name": "Midlands Sci-Fi Weekender 2022",
+      "attributes": {
+        "date": "2022-06-04",
+        "city": "Birmingham",
+        "kind": "Convention"
+      }
+    },
+    {
+      "ref": "capital-fan-expo-2023",
+      "type": "event",
+      "name": "Capital Fan Expo 2023",
+      "attributes": {
+        "date": "2023-10-28",
+        "city": "London",
+        "kind": "Convention"
+      }
+    },
+    {
+      "ref": "quill-and-ink-signing-2024",
+      "type": "event",
+      "name": "Quill and Ink Books signing",
+      "attributes": {
+        "date": "2024-03-09",
+        "city": "Manchester",
+        "kind": "Signing session"
+      }
+    },
+    {
+      "ref": "dockside-collectors-fair-2025",
+      "type": "event",
+      "name": "Dockside Collectors Fair 2025",
+      "attributes": {
+        "date": "2025-04-12",
+        "city": "Liverpool",
+        "kind": "Collectors fair"
+      }
+    },
+    {
+      "ref": "tobias-wren",
+      "type": "person",
+      "name": "Tobias Wren",
+      "attributes": {
+        "known_for": "Lead in Chronicle Drive"
+      }
+    },
+    {
+      "ref": "raymond-ashby",
+      "type": "person",
+      "name": "Raymond Ashby",
+      "attributes": {
+        "known_for": "The inventor in Chronicle Drive"
+      }
+    },
+    {
+      "ref": "philippa-lane",
+      "type": "person",
+      "name": "Philippa Lane",
+      "attributes": {
+        "known_for": "Chronicle Drive, The Wandering Archivist"
+      }
+    },
+    {
+      "ref": "odette-marsh",
+      "type": "person",
+      "name": "Odette Marsh",
+      "attributes": {
+        "known_for": "Chronicle Drive"
+      }
+    },
+    {
+      "ref": "marcus-dell",
+      "type": "person",
+      "name": "Marcus Dell",
+      "attributes": {
+        "known_for": "Chronicle Drive and The Wandering Archivist"
+      }
+    },
+    {
+      "ref": "julian-vance",
+      "type": "person",
+      "name": "Julian Vance",
+      "attributes": {
+        "known_for": "The Wandering Archivist"
+      }
+    },
+    {
+      "ref": "priya-raman",
+      "type": "person",
+      "name": "Priya Raman",
+      "attributes": {
+        "known_for": "The Wandering Archivist"
+      }
+    },
+    {
+      "ref": "delphine-okafor",
+      "type": "person",
+      "name": "Delphine Okafor",
+      "attributes": {
+        "known_for": "The Wandering Archivist"
+      }
+    },
+    {
+      "ref": "me",
+      "type": "person",
+      "name": "Me"
+    },
+    {
+      "ref": "dad",
+      "type": "person",
+      "name": "Dad"
+    },
+    {
+      "ref": "chronicle-drive-poster",
+      "type": "collectable",
+      "name": "Chronicle Drive maxi poster",
+      "description": "Signed over several years at conventions across the country.",
+      "attributes": {
+        "kind": "Poster",
+        "size": "Maxi (61 x 91.5 cm)",
+        "condition": "Very Good",
+        "framed": true,
+        "notes": "Left space round the edge on purpose. Bottom right is still free."
+      },
+      "tags": [
+        "chronicle-drive"
+      ]
+    },
+    {
+      "ref": "wandering-archivist-poster",
+      "type": "collectable",
+      "name": "The Wandering Archivist cast poster",
+      "attributes": {
+        "kind": "Poster",
+        "size": "A1",
+        "condition": "Good",
+        "framed": false,
+        "notes": "Rolled in a tube between conventions."
+      },
+      "tags": [
+        "wandering-archivist"
+      ]
+    },
+    {
+      "ref": "delphine-okafor-print",
+      "type": "collectable",
+      "name": "Delphine Okafor photoshoot print",
+      "attributes": {
+        "kind": "Photo print",
+        "size": "10 x 8 in",
+        "condition": "Mint",
+        "framed": false
+      },
+      "tags": [
+        "wandering-archivist"
+      ]
+    },
+    {
+      "ref": "fan-fair-programme",
+      "type": "collectable",
+      "name": "Northern Fan Fair 2019 programme",
+      "description": "Not signed yet.",
+      "attributes": {
+        "kind": "Programme",
+        "condition": "Near Mint",
+        "framed": false
+      }
+    },
+    {
+      "ref": "wren-on-chronicle-drive",
+      "type": "signature",
+      "name": "Tobias Wren on Chronicle Drive maxi poster",
+      "attributes": {
+        "signed_on": "2018-05-19",
+        "position": "Top left, silver pen",
+        "authenticated": true
+      }
+    },
+    {
+      "ref": "ashby-on-chronicle-drive",
+      "type": "signature",
+      "name": "Raymond Ashby on Chronicle Drive maxi poster",
+      "attributes": {
+        "signed_on": "2019-09-14",
+        "position": "Centre, black marker",
+        "authenticated": true
+      }
+    },
+    {
+      "ref": "lane-on-chronicle-drive",
+      "type": "signature",
+      "name": "Philippa Lane on Chronicle Drive maxi poster",
+      "attributes": {
+        "signed_on": "2022-06",
+        "position": "Lower left, gold pen",
+        "authenticated": false
+      }
+    },
+    {
+      "ref": "marsh-on-chronicle-drive",
+      "type": "signature",
+      "name": "Odette Marsh on Chronicle Drive maxi poster",
+      "attributes": {
+        "signed_on": "2023-10-28",
+        "position": "Right edge, blue pen",
+        "authenticated": true
+      }
+    },
+    {
+      "ref": "dell-on-chronicle-drive",
+      "type": "signature",
+      "name": "Marcus Dell on Chronicle Drive maxi poster",
+      "attributes": {
+        "signed_on": "2023-10-28",
+        "position": "Under the title, black marker",
+        "authenticated": true
+      }
+    },
+    {
+      "ref": "vance-on-archivist",
+      "type": "signature",
+      "name": "Julian Vance on The Wandering Archivist cast poster",
+      "attributes": {
+        "signed_on": "2019-09-14",
+        "position": "Front row, silver pen",
+        "authenticated": true
+      }
+    },
+    {
+      "ref": "raman-on-archivist",
+      "type": "signature",
+      "name": "Priya Raman on The Wandering Archivist cast poster",
+      "attributes": {
+        "signed_on": "2019-09-14",
+        "position": "Front row, silver pen",
+        "authenticated": true
+      }
+    },
+    {
+      "ref": "dell-on-archivist",
+      "type": "signature",
+      "name": "Marcus Dell on The Wandering Archivist cast poster",
+      "attributes": {
+        "signed_on": "2024-03-09",
+        "position": "Back row, black marker",
+        "authenticated": true
+      }
+    },
+    {
+      "ref": "okafor-on-archivist",
+      "type": "signature",
+      "name": "Delphine Okafor on The Wandering Archivist cast poster",
+      "attributes": {
+        "signed_on": "2025-04-12",
+        "position": "Top right, gold pen",
+        "authenticated": true
+      }
+    },
+    {
+      "ref": "okafor-on-print",
+      "type": "signature",
+      "name": "Delphine Okafor on Delphine Okafor photoshoot print",
+      "attributes": {
+        "signed_on": "2025-04-12",
+        "position": "Bottom margin, black marker",
+        "authenticated": true
+      }
+    },
+    {
+      "ref": "selfie-tobias-wren",
+      "type": "photo",
+      "name": "Selfie with Tobias Wren",
+      "attributes": {
+        "kind": "Selfie",
+        "taken_on": "2018-05-19",
+        "notes": "Queue was two hours. Worth it."
+      }
+    },
+    {
+      "ref": "photo-op-raymond-ashby",
+      "type": "photo",
+      "name": "Photo op with Raymond Ashby",
+      "attributes": {
+        "kind": "Photo op",
+        "taken_on": "2019-09-14"
+      }
+    },
+    {
+      "ref": "selfie-marcus-dell",
+      "type": "photo",
+      "name": "Selfie with Marcus Dell",
+      "attributes": {
+        "kind": "Selfie",
+        "taken_on": "2024-03-09"
+      }
+    },
+    {
+      "ref": "photoshoot-delphine-okafor",
+      "type": "photo",
+      "name": "Photoshoot with Delphine Okafor",
+      "attributes": {
+        "kind": "Photoshoot",
+        "taken_on": "2025-04-12",
+        "notes": "The print of this one is signed."
+      }
+    },
+    {
+      "ref": "group-photo-archivist-cast",
+      "type": "photo",
+      "name": "Group photo with Julian Vance and Priya Raman",
+      "attributes": {
+        "kind": "Group photo",
+        "taken_on": "2019-09-14",
+        "notes": "Squeezed in at the end of the queue."
+      }
+    },
+    {
+      "ref": "photo-op-delphine-okafor-and-dad",
+      "type": "photo",
+      "name": "Photo op with Delphine Okafor and Dad",
+      "attributes": {
+        "kind": "Photo op",
+        "taken_on": "2025-04-12",
+        "notes": "Dad's first convention."
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "wren-on-chronicle-drive",
+      "to": "chronicle-drive-poster",
+      "type": "on"
+    },
+    {
+      "from": "wren-on-chronicle-drive",
+      "to": "tobias-wren",
+      "type": "signed-by"
+    },
+    {
+      "from": "wren-on-chronicle-drive",
+      "to": "harbour-comic-con-2018",
+      "type": "at"
+    },
+    {
+      "from": "ashby-on-chronicle-drive",
+      "to": "chronicle-drive-poster",
+      "type": "on"
+    },
+    {
+      "from": "ashby-on-chronicle-drive",
+      "to": "raymond-ashby",
+      "type": "signed-by"
+    },
+    {
+      "from": "ashby-on-chronicle-drive",
+      "to": "northern-fan-fair-2019",
+      "type": "at"
+    },
+    {
+      "from": "lane-on-chronicle-drive",
+      "to": "chronicle-drive-poster",
+      "type": "on"
+    },
+    {
+      "from": "lane-on-chronicle-drive",
+      "to": "philippa-lane",
+      "type": "signed-by"
+    },
+    {
+      "from": "lane-on-chronicle-drive",
+      "to": "midlands-sci-fi-weekender-2022",
+      "type": "at"
+    },
+    {
+      "from": "marsh-on-chronicle-drive",
+      "to": "chronicle-drive-poster",
+      "type": "on"
+    },
+    {
+      "from": "marsh-on-chronicle-drive",
+      "to": "odette-marsh",
+      "type": "signed-by"
+    },
+    {
+      "from": "marsh-on-chronicle-drive",
+      "to": "capital-fan-expo-2023",
+      "type": "at"
+    },
+    {
+      "from": "dell-on-chronicle-drive",
+      "to": "chronicle-drive-poster",
+      "type": "on"
+    },
+    {
+      "from": "dell-on-chronicle-drive",
+      "to": "marcus-dell",
+      "type": "signed-by"
+    },
+    {
+      "from": "dell-on-chronicle-drive",
+      "to": "capital-fan-expo-2023",
+      "type": "at"
+    },
+    {
+      "from": "vance-on-archivist",
+      "to": "wandering-archivist-poster",
+      "type": "on"
+    },
+    {
+      "from": "vance-on-archivist",
+      "to": "julian-vance",
+      "type": "signed-by"
+    },
+    {
+      "from": "vance-on-archivist",
+      "to": "northern-fan-fair-2019",
+      "type": "at"
+    },
+    {
+      "from": "raman-on-archivist",
+      "to": "wandering-archivist-poster",
+      "type": "on"
+    },
+    {
+      "from": "raman-on-archivist",
+      "to": "priya-raman",
+      "type": "signed-by"
+    },
+    {
+      "from": "raman-on-archivist",
+      "to": "northern-fan-fair-2019",
+      "type": "at"
+    },
+    {
+      "from": "dell-on-archivist",
+      "to": "wandering-archivist-poster",
+      "type": "on"
+    },
+    {
+      "from": "dell-on-archivist",
+      "to": "marcus-dell",
+      "type": "signed-by"
+    },
+    {
+      "from": "dell-on-archivist",
+      "to": "quill-and-ink-signing-2024",
+      "type": "at"
+    },
+    {
+      "from": "okafor-on-archivist",
+      "to": "wandering-archivist-poster",
+      "type": "on"
+    },
+    {
+      "from": "okafor-on-archivist",
+      "to": "delphine-okafor",
+      "type": "signed-by"
+    },
+    {
+      "from": "okafor-on-archivist",
+      "to": "dockside-collectors-fair-2025",
+      "type": "at"
+    },
+    {
+      "from": "okafor-on-print",
+      "to": "delphine-okafor-print",
+      "type": "on"
+    },
+    {
+      "from": "okafor-on-print",
+      "to": "delphine-okafor",
+      "type": "signed-by"
+    },
+    {
+      "from": "okafor-on-print",
+      "to": "dockside-collectors-fair-2025",
+      "type": "at"
+    },
+    {
+      "from": "selfie-tobias-wren",
+      "to": "tobias-wren",
+      "type": "with"
+    },
+    {
+      "from": "selfie-tobias-wren",
+      "to": "harbour-comic-con-2018",
+      "type": "at"
+    },
+    {
+      "from": "photo-op-raymond-ashby",
+      "to": "raymond-ashby",
+      "type": "with"
+    },
+    {
+      "from": "photo-op-raymond-ashby",
+      "to": "northern-fan-fair-2019",
+      "type": "at"
+    },
+    {
+      "from": "selfie-marcus-dell",
+      "to": "marcus-dell",
+      "type": "with"
+    },
+    {
+      "from": "selfie-marcus-dell",
+      "to": "quill-and-ink-signing-2024",
+      "type": "at"
+    },
+    {
+      "from": "photoshoot-delphine-okafor",
+      "to": "delphine-okafor",
+      "type": "with"
+    },
+    {
+      "from": "photoshoot-delphine-okafor",
+      "to": "dockside-collectors-fair-2025",
+      "type": "at"
+    },
+    {
+      "from": "group-photo-archivist-cast",
+      "to": "julian-vance",
+      "type": "with"
+    },
+    {
+      "from": "group-photo-archivist-cast",
+      "to": "priya-raman",
+      "type": "with"
+    },
+    {
+      "from": "group-photo-archivist-cast",
+      "to": "me",
+      "type": "with"
+    },
+    {
+      "from": "group-photo-archivist-cast",
+      "to": "northern-fan-fair-2019",
+      "type": "at"
+    },
+    {
+      "from": "photo-op-delphine-okafor-and-dad",
+      "to": "delphine-okafor",
+      "type": "with"
+    },
+    {
+      "from": "photo-op-delphine-okafor-and-dad",
+      "to": "me",
+      "type": "with"
+    },
+    {
+      "from": "photo-op-delphine-okafor-and-dad",
+      "to": "dad",
+      "type": "with"
+    },
+    {
+      "from": "photo-op-delphine-okafor-and-dad",
+      "to": "dockside-collectors-fair-2025",
+      "type": "at"
+    },
+    {
+      "from": "delphine-okafor-print",
+      "to": "delphine-okafor",
+      "type": "with"
+    },
+    {
+      "from": "delphine-okafor-print",
+      "to": "dockside-collectors-fair-2025",
+      "type": "at"
+    },
+    {
+      "from": "fan-fair-programme",
+      "to": "northern-fan-fair-2019",
+      "type": "at"
+    }
+  ],
+  "collections": [
+    {
+      "ref": "signed-wall",
+      "name": "Signed wall",
+      "description": "Everything with at least one signature.",
+      "items": [
+        "chronicle-drive-poster",
+        "wandering-archivist-poster",
+        "delphine-okafor-print"
+      ]
+    },
+    {
+      "ref": "all-signatures",
+      "name": "Signatures",
+      "description": "Every signature, whichever collectable it is on.",
+      "definition": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "type",
+              "in": [
+                "conventions-signature"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "ref": "not-signed-yet",
+      "name": "Not signed yet",
+      "description": "Collectables with no signature on them.",
+      "definition": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "type",
+              "in": [
+                "conventions-collectable"
+              ]
+            },
+            {
+              "kind": "connection",
+              "mode": "none",
+              "relationship": "conventions-on",
+              "direction": "in"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

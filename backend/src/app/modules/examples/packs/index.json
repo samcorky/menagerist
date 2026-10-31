@@ -18,6 +18,11 @@
       "description": "Films you have watched, where and with whom, plus the posters you have collected and who signed them."
     },
     {
+      "id": "conventions",
+      "name": "Comic con: signed posters and photo ops",
+      "description": "Posters and prints signed by many people at many events, with each signature kept as its own entry, plus the selfies and photo ops from the same days."
+    },
+    {
       "id": "parts",
       "name": "Electronic parts",
       "description": "A small parts drawer: what is in stock, what is running low, what each build uses and who sells it."

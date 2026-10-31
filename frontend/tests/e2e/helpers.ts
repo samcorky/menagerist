@@ -246,8 +246,16 @@ export function ownedData() {
 }
 
 // Add-ons first: removing a base pack is refused while an add-on that needs it is installed.
-export const EXAMPLE_PACK_IDS = ['games-extras', 'music', 'recipes', 'movies', 'parts', 'games'];
-export const EXAMPLE_SLUG_PREFIXES = /^(music|recipes|movies|parts|games)-/;
+export const EXAMPLE_PACK_IDS = [
+	'games-extras',
+	'music',
+	'recipes',
+	'movies',
+	'conventions',
+	'parts',
+	'games'
+];
+export const EXAMPLE_SLUG_PREFIXES = /^(music|recipes|movies|conventions|parts|games)-/;
 
 /**
  * DELETE that retries up to 3 times when the connection drops (`socket hang up` / `ECONNRESET`,

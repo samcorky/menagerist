@@ -110,6 +110,8 @@ class PackItemType:
     description: str | None = None
     attributes_schema: dict[str, Any] | None = None
     cover: PackCover | None = None
+    icon: str | None = None
+    colour: str | None = None
 
     def __post_init__(self) -> None:
         """Reject a cover style outside the closed set."""

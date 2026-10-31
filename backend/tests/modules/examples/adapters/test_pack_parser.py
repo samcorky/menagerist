@@ -53,7 +53,7 @@ def _mutated(data: dict[str, Any], path: list[str | int], value: object) -> obje
 
 _BAD: list[tuple[list[str | int], object]] = [
     (["format"], "other"),
-    (["version"], 7),
+    (["version"], 8),
     (["surprise"], 1),
     (["items"], "nope"),
     (["items", 0], "nope"),
@@ -275,6 +275,37 @@ def test_a_v3_pack_parses_item_type_covers(pack_data: dict[str, Any]) -> None:
         "connections": 1,
         "collections": 0,
     }
+
+
+def test_a_v7_pack_parses_item_type_icons_and_colours(
+    pack_data: dict[str, Any],
+) -> None:
+    """A version 7 item type may carry an icon and a colour."""
+    pack_data["version"] = 7
+    pack_data["item_types"][0]["icon"] = "camera"
+    pack_data["item_types"][0]["colour"] = "pink"
+
+    item_type = parse_pack(pack_data).item_types[0]
+
+    assert (item_type.icon, item_type.colour) == ("camera", "pink")
+
+
+def test_an_icon_and_colour_are_optional(pack_data: dict[str, Any]) -> None:
+    """Item types without an icon or colour parse with both unset."""
+    item_type = parse_pack(pack_data).item_types[0]
+
+    assert (item_type.icon, item_type.colour) == (None, None)
+
+
+@pytest.mark.parametrize("key", ["icon", "colour"])
+def test_a_non_string_icon_or_colour_is_rejected(
+    pack_data: dict[str, Any], key: str
+) -> None:
+    """The icon and colour must be strings."""
+    pack_data["item_types"][0][key] = 5
+
+    with pytest.raises(InvalidPackError):
+        parse_pack(pack_data)
 
 
 def test_a_cover_is_optional(pack_data: dict[str, Any]) -> None:
