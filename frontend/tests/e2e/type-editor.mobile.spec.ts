@@ -6,8 +6,12 @@ const { makeItemType, cleanUp } = ownedData();
 
 test.afterEach(({ request }) => cleanUp(request));
 
-async function setUp(page: Page, request: Parameters<typeof makeItemType>[0]) {
-	const type = await makeItemType(request, uniqueName('Phone type'));
+async function setUp(
+	page: Page,
+	request: Parameters<typeof makeItemType>[0],
+	label = 'Phone type'
+) {
+	const type = await makeItemType(request, uniqueName(label));
 	await request.patch(`/api/v1/node-type/${type.id}`, { data: { icon: 'film', colour: 'red' } });
 	await page.goto('/settings/item-types');
 	return type;
@@ -25,6 +29,22 @@ test('the list row fits the screen, with its actions inside it', async ({ page, 
 	expect(box.x + box.width).toBeLessThanOrEqual(viewportWidth(page));
 	expect(box.width).toBeGreaterThanOrEqual(44);
 	expect(box.height).toBeGreaterThanOrEqual(44);
+	const overflow = await page
+		.locator('#main-scroll')
+		.evaluate((el) => el.scrollWidth - el.clientWidth);
+	expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test('a long type name shrinks inside the row instead of widening the page', async ({
+	page,
+	request
+}) => {
+	const type = await setUp(page, request, 'A rather long item type name for a phone');
+	const edit = row(page, type.label).getByRole('button', { name: 'Edit item type' });
+	await expect(edit).toBeVisible();
+
+	const box = (await edit.boundingBox())!;
+	expect(box.x + box.width).toBeLessThanOrEqual(viewportWidth(page));
 	const overflow = await page
 		.locator('#main-scroll')
 		.evaluate((el) => el.scrollWidth - el.clientWidth);

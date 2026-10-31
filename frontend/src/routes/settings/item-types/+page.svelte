@@ -268,7 +268,9 @@
 								{#if exampleTypeIds.has(cat.id)}
 									<Badge variant="outline" class="shrink-0 text-muted-foreground">Example</Badge>
 								{/if}
-								<span class="shrink-0 font-mono text-xs text-muted-foreground">{cat.slug}</span>
+								<span class="min-w-0 truncate font-mono text-xs text-muted-foreground"
+									>{cat.slug}</span
+								>
 							</div>
 							{#if cat.description}
 								<p class="truncate text-sm text-muted-foreground">{cat.description}</p>
