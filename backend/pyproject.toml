@@ -212,7 +212,8 @@ pretty = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "--cov=app --cov-branch --cov-report=xml"
+# No --cov here: only the poe test tasks pass it, so an ad-hoc pytest run never
+# overwrites the combined .coverage data the coverage gate reads.
 markers = [
     "integration: exercises a real adapter (database, network) instead of an in-memory fake",
     "docker: starts a Docker container through testcontainers (needs a running Docker daemon), added from the fixtures a test uses in conftest.py",

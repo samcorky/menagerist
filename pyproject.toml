@@ -302,8 +302,8 @@ sequence = ["validate-renovate", "_renovate-local"]
 help = "Validate Renovate config, then run Renovate locally in dry-run mode"
 
 [tool.poe.groups.quality.tasks.check]
-sequence = ["_check-hooks", "coverage-check"]
-help = "Run the repository checks and enforce the backend coverage gate"
+sequence = ["_check-hooks"]
+help = "Run every pre-commit check, including the fast backend tests, against the whole repository"
 deps = ["sync"]
 
 [tool.poe.groups.quality.tasks.check-changed]

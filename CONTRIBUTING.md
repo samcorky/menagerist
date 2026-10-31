@@ -129,9 +129,11 @@ poe db-up / poe db-down       # start/stop the local Postgres container
 poe typecheck   # mypy --strict + svelte-check + tsc
 poe lint        # ruff check + prettier + eslint
 poe format      # ruff format + prettier (writes in place)
-poe check       # full pre-commit hooks + coverage gate (re-syncs deps first - this is what CI runs)
+poe check       # every pre-commit hook, including the fast backend tests (re-syncs deps first)
 poe check-changed # run pre-commit checks on changed files only
 ```
+
+`poe check` runs the pre-commit hooks, which include the fast backend tests (`poe test-backend-fast`), but no coverage. The coverage gate is `poe coverage`, which runs the full suite. A plain `pytest` run does not write coverage data, so targeted runs never affect that gate.
 
 ## Testing
 
@@ -248,7 +250,7 @@ Swagger UI is at `/api/docs` on the backend (`http://localhost:8000/api/docs` in
 ## Pull requests
 
 - Target the `feature/initial-implementation` branch (pre-`main` merge) or `main` once it's open.
-- `poe check` must pass.
+- `poe check` must pass, and `poe coverage` for backend changes.
 - Coverage floors must not drop.
 - One focused change per PR.
 
