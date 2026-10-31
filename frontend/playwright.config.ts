@@ -36,12 +36,15 @@ const slowMo = process.env.PW_SLOWMO ? Number(process.env.PW_SLOWMO) : undefined
 function instanceEnv(name: string, extraEnv: Record<string, string> = {}) {
 	const backupPath = join(tmpdir(), `menagerist-e2e-backups-${name}`);
 	mkdirSync(backupPath, { recursive: true });
+	// Example covers are stored as media, so each backend needs a writable directory. It
+	// must exist before the first upload, or the status page reports a storage warning.
+	const mediaPath = join(tmpdir(), `menagerist-e2e-media-${name}`);
+	mkdirSync(mediaPath, { recursive: true });
 
 	return {
 		MENAGERIST_DATABASE_URL: `postgresql+asyncpg://menagerist:menagerist@localhost:55433/menagerist_${name}`,
 		MENAGERIST_API_FRONTEND_DIST_PATH: FRONTEND_DIST,
-		// Example covers are stored as media, so each backend needs a writable directory.
-		MENAGERIST_MEDIA_STORAGE_PATH: join(tmpdir(), `menagerist-e2e-media-${name}`),
+		MENAGERIST_MEDIA_STORAGE_PATH: mediaPath,
 		MENAGERIST_BACKUP_PATH: backupPath,
 		MENAGERIST_BACKUP_BEFORE_MIGRATE: 'false',
 		...extraEnv
