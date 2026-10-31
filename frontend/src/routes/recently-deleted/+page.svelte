@@ -257,7 +257,7 @@
 {/snippet}
 
 <Page width="fluid">
-	<BackButton fallback={resolve('/settings')} />
+	<BackButton peer fallback={resolve('/settings')} />
 	<div>
 		<h1 class="font-heading text-3xl font-semibold tracking-tight">Recently deleted</h1>
 		<p class="mt-1 text-muted-foreground">Restore something you deleted, or delete it for good.</p>

@@ -136,7 +136,7 @@
 
 <Page width="form" class="gap-6">
 	<div>
-		<BackButton fallback={resolve('/settings')} />
+		<BackButton peer fallback={resolve('/settings')} />
 		<h1 class="mt-2 font-heading text-3xl font-semibold tracking-tight">Examples</h1>
 		<p class="mt-1 text-muted-foreground">
 			Try Menagerist with some ready-made items. Remove them whenever you like.

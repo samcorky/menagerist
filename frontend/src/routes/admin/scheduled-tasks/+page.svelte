@@ -592,7 +592,7 @@
 </svelte:head>
 
 <Page width="fluid" class="gap-6">
-	<BackButton fallback={resolve('/admin')} />
+	<BackButton peer fallback={resolve('/admin')} />
 	<div>
 		<h1 class="font-heading text-3xl font-semibold tracking-tight">Scheduled tasks</h1>
 		<p class="mt-1 text-muted-foreground">

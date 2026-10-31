@@ -26,7 +26,7 @@
 </svelte:head>
 
 <Page width="fluid" class="gap-6">
-	<BackButton fallback={resolve('/settings')} />
+	<BackButton peer fallback={resolve('/settings')} />
 	<div>
 		<h1 class="font-heading text-3xl font-semibold tracking-tight">Administration</h1>
 		<p class="mt-1 text-muted-foreground">

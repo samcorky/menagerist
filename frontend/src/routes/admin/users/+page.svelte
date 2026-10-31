@@ -484,7 +484,7 @@
 {/snippet}
 
 <Page width="fluid">
-	<BackButton fallback={resolve('/admin')} />
+	<BackButton peer fallback={resolve('/admin')} />
 	<div class="flex flex-wrap items-start justify-between gap-3">
 		<div>
 			<h1 class="font-heading text-3xl font-semibold tracking-tight">Users</h1>

@@ -118,7 +118,7 @@
 </svelte:head>
 
 <Page width="fluid" class="gap-6">
-	<BackButton fallback={resolve('/admin')} />
+	<BackButton peer fallback={resolve('/admin')} />
 	<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 		<div>
 			<h1 class="font-heading text-3xl font-semibold tracking-tight">Devices</h1>

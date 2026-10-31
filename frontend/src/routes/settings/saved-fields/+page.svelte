@@ -552,7 +552,7 @@
 {/snippet}
 
 <Page width="reading" class="gap-6">
-	<BackButton fallback={resolve('/settings')} />
+	<BackButton peer fallback={resolve('/settings')} />
 
 	<div class="flex items-start justify-between gap-4">
 		<div>

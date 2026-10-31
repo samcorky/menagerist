@@ -168,7 +168,7 @@
 
 <Page width="reading">
 	{#if !forced}
-		<BackButton fallback={resolve('/settings')} />
+		<BackButton peer fallback={resolve('/settings')} />
 	{/if}
 	<div>
 		<h1 class="font-heading text-3xl font-semibold tracking-tight">Account</h1>
