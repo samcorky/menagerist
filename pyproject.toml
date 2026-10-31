@@ -334,11 +334,12 @@ args = [
 help = "Run backend and frontend unit tests concurrently"
 
 [tool.poe.groups.quality.tasks.test-e2e]
-script = "scripts.e2e:main(workers=workers, skip_build=skip_build, files=files)"
+script = "scripts.e2e:main(workers=workers, skip_build=skip_build, files=files, shard=shard)"
 deps = ["generate-frontend-client"]
 args = [
   { name = "workers", options = ["-w", "--workers"], type = "integer", help = "Parallel workers, each with its own database and backend (default: CPU cores)" },
   { name = "skip_build", options = ["--skip-build"], type = "boolean", help = "Reuse the existing frontend/build (only when it is current)" },
+  { name = "shard", options = ["--shard"], help = "Run one shard of the suite, as CURRENT/TOTAL (e.g. 2/3); CI runs the shards as separate jobs" },
   { name = "files", positional = true, multiple = true, help = "Spec files to run, as Playwright takes them (e.g. tests/e2e/status.spec.ts or status.spec.ts:78); all specs if none" },
 ]
 help = "Run the Playwright e2e suite in parallel against a throwaway Postgres, building the frontend first and tearing the database down afterwards (requires Docker)"

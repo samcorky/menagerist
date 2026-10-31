@@ -1,0 +1,37 @@
+name: Postgres image
+description: >-
+  Restore the Postgres image from the Actions cache, or pull it once and save it, so
+  runs neither wait on nor depend on Docker Hub. The image is the one compose.yaml uses.
+
+runs:
+  using: composite
+  steps:
+    - name: Find the image
+      id: image
+      shell: bash
+      run: |
+        image="$(grep -oP '^\s+image: \Kpostgres:\S+' compose.yaml | head -n 1)"
+        echo "name=${image}" >> "$GITHUB_OUTPUT"
+        echo "slug=${image//[^A-Za-z0-9._-]/-}" >> "$GITHUB_OUTPUT"
+
+    - name: Restore the image archive
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/docker-images
+        key: docker-image-${{ steps.image.outputs.slug }}
+
+    - name: Load the cached image
+      if: steps.cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: docker load --input ~/.cache/docker-images/image.tar
+
+    - name: Pull and save the image
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        IMAGE: ${{ steps.image.outputs.name }}
+      run: |
+        docker pull "$IMAGE"
+        mkdir -p ~/.cache/docker-images
+        docker save --output ~/.cache/docker-images/image.tar "$IMAGE"

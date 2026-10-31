@@ -15,6 +15,7 @@ migrate script and ``playwright.config.ts``.
 """
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -34,6 +35,16 @@ def default_workers() -> int:
     return max(1, cores // 2)
 
 
+def shard_args(shard: str | None) -> list[str]:
+    """Return the Playwright flag for one shard, written CURRENT/TOTAL (say 2/3)."""
+    if shard is None:
+        return []
+    match = re.fullmatch(r"([1-9]\d*)/([1-9]\d*)", shard)
+    if match is None or int(match[1]) > int(match[2]):
+        sys.exit(f"--shard must be CURRENT/TOTAL, CURRENT at most TOTAL: {shard!r}")
+    return [f"--shard={shard}"]
+
+
 def poe(task: str) -> int:
     """Run a poe task and return its exit code."""
     return subprocess.call([sys.executable, "-m", "poethepoet", task], cwd=ROOT)
@@ -44,14 +55,16 @@ def main(
     skip_build: bool = False,
     mode: str = "run",
     files: list[str] | None = None,
+    shard: str | None = None,
 ) -> None:
-    """Run the e2e suite, or only `files`, with the requested worker count and mode."""
+    """Run the e2e suite, or only `files` or one `shard`, in the given mode."""
     n = workers or default_workers()
     if n < 1:
         sys.exit("--workers must be at least 1")
     os.environ["E2E_WORKERS"] = str(n)
     args = [shutil.which("npx") or "npx", "playwright", "test"]  # npx.cmd on Windows
     args.extend(files or [])
+    args.extend(shard_args(shard))
     if mode in ("headed", "slow"):
         args.append("--headed")
     if mode == "slow":

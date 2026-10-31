@@ -83,6 +83,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-packages --group dev
 
+      - name: Cache the Postgres image
+        uses: ./.github/actions/postgres-image
+
       - name: Run backend unit and integration tests and enforce coverage
         run: uv run poe coverage
 
@@ -93,9 +96,15 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
-  e2e:
-    name: End-to-end Tests (Playwright)
+  e2e-shards:
+    name: End-to-end shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -123,25 +132,114 @@ jobs:
       - name: Generate frontend API client
         run: uv run poe generate-frontend-client
 
+      - name: Cache the Postgres image
+        uses: ./.github/actions/postgres-image
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
       - name: Install Chromium and its system libraries
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
         working-directory: frontend
 
-      - name: Run end-to-end tests
-        run: uv run poe test-e2e
-
-      - name: Install WebKit and Firefox and their system libraries
-        run: npx playwright install --with-deps webkit firefox
+      - name: Install the system libraries for the cached browsers
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
         working-directory: frontend
 
-      - name: Run cookie tests in WebKit and Firefox
-        run: uv run poe test-e2e-cookies --skip-build
+      - name: Run end-to-end tests
+        run: uv run poe test-e2e --shard ${{ matrix.shard }}/${{ strategy.job-total }}
 
       - name: Upload failure traces
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-test-results
+          name: playwright-test-results-shard-${{ matrix.shard }}
           path: frontend/test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  e2e-cookies:
+    name: End-to-end cookies (WebKit, Firefox)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-packages --group dev
+          npm --prefix frontend ci
+
+      - name: Generate frontend API client
+        run: uv run poe generate-frontend-client
+
+      - name: Cache the Postgres image
+        uses: ./.github/actions/postgres-image
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-cookies-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Install Chromium, WebKit and Firefox and their system libraries
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium webkit firefox
+        working-directory: frontend
+
+      - name: Install the system libraries for the cached browsers
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium webkit firefox
+        working-directory: frontend
+
+      - name: Run cookie tests in WebKit and Firefox
+        run: uv run poe test-e2e-cookies
+
+      - name: Upload failure traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results-cookies
+          path: frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  e2e:
+    name: End-to-end Tests (Playwright)
+    # Keeps one stable check name for branch protection however the suite is split.
+    if: always()
+    needs: [e2e-shards, e2e-cookies]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Require every end-to-end job to pass
+        env:
+          SHARDS: ${{ needs.e2e-shards.result }}
+          COOKIES: ${{ needs.e2e-cookies.result }}
+        run: |
+          echo "shards: ${SHARDS}, cookies: ${COOKIES}"
+          test "${SHARDS}" = success && test "${COOKIES}" = success
