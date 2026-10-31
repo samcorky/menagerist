@@ -28,6 +28,67 @@
 	// Where focus was when the drawer opened, so closing it hands focus back (the burger).
 	let opener: HTMLElement | null = null;
 
+	// One highlight that slides to the current destination, instead of each link switching its own
+	// background. It is placed without animation the first time, so it never slides in from the corner.
+	let indicator = $state<HTMLElement | null>(null);
+	let placed = $state(false);
+	function place() {
+		if (!panel || !indicator) return;
+		const link = panel.querySelector<HTMLElement>('a[aria-current="page"]');
+		if (!link) {
+			indicator.style.opacity = '0';
+			return;
+		}
+		const box = link.getBoundingClientRect();
+		const within = panel.getBoundingClientRect();
+		const x = box.left - within.left + panel.scrollLeft;
+		const y = box.top - within.top + panel.scrollTop;
+		indicator.style.opacity = '1';
+		indicator.style.width = `${box.width}px`;
+		indicator.style.height = `${box.height}px`;
+		indicator.style.transform = `translate(${x}px, ${y}px)`;
+		if (!placed) requestAnimationFrame(() => (placed = true));
+	}
+
+	// Follow the current page, the sidebar's width and anything that moves the links.
+	$effect(() => {
+		void [active, sidebar.mode, sidebar.drawerOpen, panel, indicator];
+		void tick().then(place);
+	});
+	// Changing between rail and full sidebar moves the links for a moment (headings fold, margins
+	// ease), so the highlight is pinned to the current link each frame instead of gliding behind it.
+	$effect(() => {
+		void rail;
+		if (!indicator) return;
+		const node = indicator;
+		const end = performance.now() + 300;
+		let frame = 0;
+		node.style.transition = 'none';
+		const follow = () => {
+			place();
+			if (performance.now() < end) frame = requestAnimationFrame(follow);
+			else node.style.transition = '';
+		};
+		frame = requestAnimationFrame(follow);
+		return () => {
+			cancelAnimationFrame(frame);
+			node.style.transition = '';
+		};
+	});
+	$effect(() => {
+		if (!panel) return;
+		const node = panel;
+		const observer = new ResizeObserver(place);
+		observer.observe(node);
+		node.addEventListener('animationend', place);
+		node.addEventListener('transitionend', place);
+		return () => {
+			observer.disconnect();
+			node.removeEventListener('animationend', place);
+			node.removeEventListener('transitionend', place);
+		};
+	});
+
 	// Panels slide (200-250 ms); with reduced motion they only fade, briefly (design §22).
 	const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 	function slideIn(node: Element): TransitionConfig {
@@ -75,8 +136,7 @@
 	const linkClass = (current: boolean) =>
 		cn(
 			'flex h-8 items-center gap-2 rounded-xl px-2 text-sm text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 pointer-coarse:h-11',
-			rail && 'justify-center px-0',
-			current && 'bg-secondary font-medium text-foreground'
+			current && 'font-medium text-foreground'
 		);
 </script>
 
@@ -88,38 +148,60 @@
 	}}
 />
 
-{#snippet entry(item: ManageItem, current: boolean)}
+{#snippet row(item: ManageItem, current: boolean, props: Record<string, unknown> = {})}
 	{@const Icon = item.icon}
-	{#if rail}
-		<Tooltip.Root>
-			<Tooltip.Trigger>
-				{#snippet child({ props })}
-					<a
-						{...props}
-						href={resolve(item.href as '/')}
-						aria-current={current ? 'page' : undefined}
-						class={linkClass(current)}
-					>
-						<Icon class="size-4 shrink-0" />
-						<span class="sr-only">{item.label}</span>
-					</a>
-				{/snippet}
-			</Tooltip.Trigger>
-			<Tooltip.Content side="right">{item.label}</Tooltip.Content>
-		</Tooltip.Root>
-	{:else}
-		<a
-			href={resolve(item.href as '/')}
-			aria-current={current ? 'page' : undefined}
-			class={linkClass(current)}
+	<!-- The icon sits in the same place in every mode, so changing mode never moves it; the label
+	     stays in the page (and for screen readers) and only fades while the rail clips it. -->
+	<a
+		{...props}
+		href={resolve(item.href as '/')}
+		aria-current={current ? 'page' : undefined}
+		class={linkClass(current)}
+	>
+		<Icon class="size-4 shrink-0" />
+		<span
+			class={cn(
+				'truncate whitespace-nowrap transition-opacity duration-150 motion-reduce:transition-none',
+				rail && 'opacity-0'
+			)}>{item.label}</span
 		>
-			<Icon class="size-4 shrink-0" />
-			<span class="animate-in truncate fade-in-0 motion-reduce:animate-none">{item.label}</span>
-		</a>
-	{/if}
+	</a>
+{/snippet}
+
+{#snippet entry(item: ManageItem, current: boolean)}
+	<!-- Always inside a tooltip (off outside the rail), so the row is the same element in both modes
+	     and its label can fade rather than appear. -->
+	<Tooltip.Root disabled={!rail}>
+		<Tooltip.Trigger>
+			{#snippet child({ props })}
+				{@render row(item, current, props)}
+			{/snippet}
+		</Tooltip.Trigger>
+		<Tooltip.Content side="right">{item.label}</Tooltip.Content>
+	</Tooltip.Root>
+{/snippet}
+
+{#snippet docs(props: Record<string, unknown> = {})}
+	<a {...props} href={resolve('/api/docs' as '/')} target="_blank" class={linkClass(false)}>
+		<BookOpen class="size-4 shrink-0" />
+		<span
+			class={cn(
+				'truncate whitespace-nowrap transition-opacity duration-150 motion-reduce:transition-none',
+				rail && 'opacity-0'
+			)}>API docs</span
+		>
+	</a>
 {/snippet}
 
 {#snippet body()}
+	<span
+		bind:this={indicator}
+		aria-hidden="true"
+		class={cn(
+			'pointer-events-none absolute top-0 left-0 -z-10 rounded-xl bg-secondary opacity-0',
+			placed && 'transition-[transform,opacity] duration-200 ease-out motion-reduce:transition-none'
+		)}
+	></span>
 	<ul class="flex flex-col gap-0.5">
 		{#each mainDestinations as item (item.href)}
 			<li>{@render entry(item, active === item.href)}</li>
@@ -128,57 +210,38 @@
 
 	{#each groups as group (group.label)}
 		{#if group.items.length > 0}
-			{#if rail}
-				<hr class="my-2 border-border" />
+			<!-- The same section in both modes: the rail folds the heading away and shows a divider. -->
+			<CollapsibleSection
+				id={`nav-${group.label.toLowerCase()}`}
+				title={group.label}
+				heading="p"
+				titleClass="text-xs font-medium text-muted-foreground"
+				forceOpen={group.items.some((item) => item.href === active)}
+				bare={rail}
+				class={cn(
+					'border-t transition-[margin,padding,gap,border-color] duration-200 motion-reduce:transition-none',
+					rail ? 'mt-2 gap-0 border-border pt-2' : 'mt-3 gap-1 border-transparent'
+				)}
+			>
 				<ul class="flex flex-col gap-0.5">
 					{#each group.items as item (item.href)}
 						<li>{@render entry(item, active === item.href)}</li>
 					{/each}
 				</ul>
-			{:else}
-				<CollapsibleSection
-					id={`nav-${group.label.toLowerCase()}`}
-					title={group.label}
-					heading="p"
-					titleClass="text-xs font-medium text-muted-foreground"
-					forceOpen={group.items.some((item) => item.href === active)}
-					class="mt-3 gap-1"
-				>
-					<ul class="flex flex-col gap-0.5">
-						{#each group.items as item (item.href)}
-							<li>{@render entry(item, active === item.href)}</li>
-						{/each}
-					</ul>
-				</CollapsibleSection>
-			{/if}
+			</CollapsibleSection>
 		{/if}
 	{/each}
 
 	<div class="mt-auto flex flex-col gap-0.5 pt-3">
 		{@render entry({ href: '/settings', label: 'Settings', icon: Settings }, hubActive)}
-		{#if rail}
-			<Tooltip.Root>
-				<Tooltip.Trigger>
-					{#snippet child({ props })}
-						<a
-							{...props}
-							href={resolve('/api/docs' as '/')}
-							target="_blank"
-							class={linkClass(false)}
-						>
-							<BookOpen class="size-4 shrink-0" />
-							<span class="sr-only">API docs</span>
-						</a>
-					{/snippet}
-				</Tooltip.Trigger>
-				<Tooltip.Content side="right">API docs</Tooltip.Content>
-			</Tooltip.Root>
-		{:else}
-			<a href={resolve('/api/docs' as '/')} target="_blank" class={linkClass(false)}>
-				<BookOpen class="size-4 shrink-0" />
-				<span class="truncate">API docs</span>
-			</a>
-		{/if}
+		<Tooltip.Root disabled={!rail}>
+			<Tooltip.Trigger>
+				{#snippet child({ props })}
+					{@render docs(props)}
+				{/snippet}
+			</Tooltip.Trigger>
+			<Tooltip.Content side="right">API docs</Tooltip.Content>
+		</Tooltip.Root>
 	</div>
 {/snippet}
 
@@ -205,7 +268,7 @@
 				bind:this={panel}
 				id="app-sidebar"
 				aria-label="Main"
-				class="absolute inset-y-0 left-0 z-10 flex w-64 flex-col overflow-y-auto border-r bg-background p-2 shadow-xl"
+				class="absolute inset-y-0 left-0 isolate z-10 flex w-64 flex-col overflow-x-hidden overflow-y-auto border-r bg-background p-2 shadow-xl"
 				transition:slideIn
 			>
 				{@render body()}
@@ -218,9 +281,10 @@
 		id="app-sidebar"
 		aria-label="Main"
 		class={cn(
-			'flex shrink-0 flex-col overflow-y-auto border-r bg-background p-2 transition-[width] duration-200 ease-out motion-reduce:transition-none',
+			'relative isolate flex shrink-0 flex-col overflow-x-hidden overflow-y-auto border-r bg-background p-2 transition-[width] duration-200 ease-out motion-reduce:transition-none',
 			rail ? 'w-12' : 'w-56'
 		)}
+		style="view-transition-name: app-sidebar"
 	>
 		{@render body()}
 	</nav>

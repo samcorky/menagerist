@@ -205,3 +205,115 @@ test('there is no sidebar when signed out', async ({ browser, workerBaseURL }) =
 	await expect(burger(page)).toHaveCount(0);
 	await context.close();
 });
+
+/** The sidebar's own motion: icons stay put, the highlight slides, sections do not drop on load. */
+const iconBox = async (page: Page, name: string) =>
+	link(page, name).locator('svg').first().boundingBox();
+
+test('the icons stay in the same place when the sidebar becomes a rail and back', async ({
+	page
+}) => {
+	await page.goto('/items');
+	const wide = await iconBox(page, 'Items');
+
+	await burger(page).click();
+	await expect.poll(async () => (await sidebar(page).boundingBox())?.width).toBeLessThan(64);
+	const narrow = await iconBox(page, 'Items');
+	expect(narrow?.x).toBe(wide?.x);
+
+	await burger(page).click();
+	await expect.poll(async () => (await sidebar(page).boundingBox())?.width).toBeGreaterThan(200);
+	expect((await iconBox(page, 'Items'))?.x).toBe(wide?.x);
+});
+
+test('the icons stay put through the width change itself', async ({ page }) => {
+	await page.goto('/items');
+	const start = (await iconBox(page, 'Items'))?.x;
+	await burger(page).click();
+	const seen = new Set<number | undefined>();
+	for (let i = 0; i < 12; i++) {
+		seen.add((await iconBox(page, 'Items'))?.x);
+		await page.waitForTimeout(20);
+	}
+	expect([...seen]).toEqual([start]);
+});
+
+test('the highlight is one element that moves to the new page', async ({ page }) => {
+	await page.goto('/items');
+	const highlight = sidebar(page).locator('span[aria-hidden="true"].bg-secondary');
+	await expect(highlight).toHaveCount(1);
+	// It is placed a moment after the page appears, so wait for it rather than read it at once.
+	await expect
+		.poll(async () => Math.round((await highlight.boundingBox())?.y ?? 0))
+		.toBe(Math.round((await link(page, 'Items').boundingBox())?.y ?? -1));
+
+	await link(page, 'Collections').click();
+	await expect(link(page, 'Collections')).toHaveAttribute('aria-current', 'page');
+	await expect
+		.poll(async () => Math.round((await highlight.boundingBox())?.y ?? 0))
+		.toBe(Math.round((await link(page, 'Collections').boundingBox())?.y ?? -1));
+});
+
+test('the sidebar is not part of the page fade', async ({ page }) => {
+	await page.goto('/items');
+	const name = await sidebar(page).evaluate((nav) => getComputedStyle(nav).viewTransitionName);
+	expect(name).toBe('app-sidebar');
+});
+
+test('sections are already open when the sidebar appears, not dropping down', async ({ page }) => {
+	await page.goto('/items');
+	await burger(page).click();
+	await burger(page).click();
+	await expect.poll(async () => (await sidebar(page).boundingBox())?.width).toBeGreaterThan(200);
+	const animating = await sidebar(page).evaluate(
+		(nav) =>
+			nav
+				.getAnimations({ subtree: true })
+				.filter((a) => (a as CSSAnimation).animationName?.includes('collapsible')).length
+	);
+	expect(animating).toBe(0);
+});
+
+test('the labels fade and the headings fold instead of switching abruptly', async ({ page }) => {
+	await page.goto('/items');
+	const label = link(page, 'Items').locator('span').first();
+	const heading = sidebar(page).getByRole('button', { name: 'Library', exact: true });
+	await link(page, 'Items').evaluate((node) => ((node as HTMLElement).dataset.same = 'yes'));
+
+	await burger(page).click();
+	await expect.poll(async () => (await sidebar(page).boundingBox())?.width).toBeLessThan(64);
+	await expect(label).toHaveCSS('opacity', '0');
+	// Folded away and out of reach, not removed.
+	await expect.poll(() => heading.evaluate((node) => node.closest('[inert]') !== null)).toBe(true);
+	// The same link element survived the change, so its label had something to fade.
+	await expect(link(page, 'Items')).toHaveAttribute('data-same', 'yes');
+
+	await burger(page).click();
+	await expect(label).toHaveCSS('opacity', '1');
+	await expect(heading).toBeVisible();
+	expect(await heading.evaluate((node) => node.closest('[inert]') !== null)).toBe(false);
+});
+
+/** Back would only repeat the sidebar on its own destinations, so it shows on drill-down pages. */
+const back = (page: Page) => page.getByRole('button', { name: 'Back', exact: true });
+
+test('a sidebar destination has no Back button while the sidebar is showing', async ({ page }) => {
+	for (const path of ['/settings/item-types', '/settings/account', '/recently-deleted']) {
+		await page.goto(path);
+		await expect(sidebar(page)).toBeVisible();
+		await expect(back(page)).toHaveCount(0);
+	}
+});
+
+test('a drill-down page keeps its Back button beside the sidebar', async ({ page }) => {
+	await page.goto('/items/new');
+	await expect(sidebar(page)).toBeVisible();
+	await expect(back(page)).toBeVisible();
+});
+
+test('the rail hides Back on a destination too', async ({ page }) => {
+	await page.goto('/settings/item-types');
+	await burger(page).click();
+	await expect.poll(async () => (await sidebar(page).boundingBox())?.width).toBeLessThan(64);
+	await expect(back(page)).toHaveCount(0);
+});

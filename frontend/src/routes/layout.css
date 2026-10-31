@@ -141,7 +141,9 @@
 ::view-transition-old(site-header),
 ::view-transition-new(site-header),
 ::view-transition-old(site-nav),
-::view-transition-new(site-nav) {
+::view-transition-new(site-nav),
+::view-transition-old(app-sidebar),
+::view-transition-new(app-sidebar) {
 	animation: none;
 }
 
