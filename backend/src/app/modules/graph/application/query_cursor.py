@@ -56,6 +56,10 @@ def _parse(token: str) -> tuple[list[Any], uuid.UUID]:
         raise ValueError(token)
     padded = token + "=" * (-len(token) % 4)
     data = json.loads(base64.urlsafe_b64decode(padded), parse_constant=_reject_constant)
+    # A cursor is exactly {"s", "i"}. Without this a very deeply nested extra key is
+    # only rejected where json.loads hits its recursion limit, which varies by Python.
+    if data.keys() != {"s", "i"}:
+        raise ValueError(data.keys())
     values = data["s"]
     if not isinstance(values, list):
         raise TypeError(values)

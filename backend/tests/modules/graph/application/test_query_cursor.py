@@ -74,6 +74,7 @@ def test_encoded_token_is_unpadded_url_safe() -> None:
         _token('{"s": [[1]], "i": "' + str(uuid.uuid7()) + '"}'),
         _token('{"s": [{"a": 1}], "i": "' + str(uuid.uuid7()) + '"}'),
         _token('{"s": [1]}'),
+        _token('{"s": [1], "i": "' + str(uuid.uuid7()) + '", "x": 1}'),
         _token('{"s": [1], "i": "not-a-uuid"}'),
         _token('{"s": [1], "i": 5}'),
         _token('{"s": [NaN], "i": "' + str(uuid.uuid7()) + '"}'),
