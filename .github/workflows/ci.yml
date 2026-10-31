@@ -64,8 +64,10 @@ jobs:
         run: uv run prek run --all-files
 
   integration:
-    name: Backend Integration Tests
+    name: Backend Tests and Coverage
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -81,8 +83,15 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-packages --group dev
 
-      - name: Run backend integration tests
-        run: uv run poe test-backend-integration
+      - name: Run backend unit and integration tests and enforce coverage
+        run: uv run poe coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+        with:
+          files: backend/coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
   e2e:
     name: End-to-end Tests (Playwright)
