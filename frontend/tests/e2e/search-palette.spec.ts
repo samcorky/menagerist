@@ -30,7 +30,7 @@ async function collectionSlug(request: APIRequestContext, id: string) {
 
 async function openWithSlash(page: Page, path = '/') {
 	await page.goto(path);
-	await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Home', exact: true })).toBeVisible();
 	await page.keyboard.press('/');
 	await expect(popup(page)).toBeVisible();
 }
@@ -116,7 +116,7 @@ test('See all results opens the items page with the search pre-filled', async ({
 
 test('Esc closes the popup and returns focus to where it was', async ({ page }) => {
 	await page.goto('/');
-	await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Home', exact: true })).toBeVisible();
 	const before = page.getByRole('link', { name: 'Items', exact: true }).first();
 	await before.focus();
 	await page.keyboard.press('/');

@@ -3,7 +3,7 @@ import { createItem, createItemType, searchPopup, uniqueName, chooseItemType } f
 
 test('g c / g s / g e navigate between the main sections', async ({ page }) => {
 	await page.goto('/');
-	await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Home', exact: true })).toBeVisible();
 
 	await page.keyboard.press('g');
 	await page.keyboard.press('c');
@@ -23,7 +23,7 @@ test('g c / g s / g e navigate between the main sections', async ({ page }) => {
 
 test('g-sequences fire back to back with no waiting between them', async ({ page }) => {
 	await page.goto('/');
-	await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Home', exact: true })).toBeVisible();
 	for (let round = 0; round < 5; round++) {
 		for (const [key, path] of [
 			['c', /\/items$/],
@@ -53,7 +53,7 @@ test('/ opens the search popup on the items and home pages, and Esc returns focu
 	const popup = searchPopup(page);
 
 	await page.goto('/items');
-	await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Home', exact: true })).toBeVisible();
 	const itemsSearch = page.getByPlaceholder('Search your items…').first();
 	await itemsSearch.blur();
 	const before = page.getByRole('link', { name: 'Items', exact: true }).first();
@@ -67,7 +67,7 @@ test('/ opens the search popup on the items and home pages, and Esc returns focu
 	await expect(page).toHaveURL(/\/items$/);
 
 	await page.goto('/');
-	await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Home', exact: true })).toBeVisible();
 	await page.keyboard.press('/');
 	await expect(popup).toBeVisible();
 	await expect(page).toHaveURL(/\/$/);
@@ -77,7 +77,7 @@ test('/ opens the search popup on the items and home pages, and Esc returns focu
 
 test('? opens the shortcuts help overlay', async ({ page }) => {
 	await page.goto('/');
-	await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Home', exact: true })).toBeVisible();
 	await page.keyboard.press('Shift+?');
 	const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
 	await expect(dialog).toBeVisible();

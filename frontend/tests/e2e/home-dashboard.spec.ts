@@ -74,7 +74,7 @@ test('opening Home after capturing an item loads each figure once, not twice', a
 	page.on('request', (r) => {
 		if (r.url().includes('/api/v1/node/search/counts')) counts++;
 	});
-	await page.getByRole('link', { name: 'Home' }).first().click();
+	await page.getByRole('link', { name: 'Home', exact: true }).first().click();
 	await expect(page.getByTestId('stat-items')).toBeVisible();
 	await page.waitForLoadState('networkidle');
 

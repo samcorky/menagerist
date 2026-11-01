@@ -171,7 +171,7 @@ export async function openSearch(page: Page): Promise<void> {
  * keydown listener isn't attached until Svelte has mounted.
  */
 export async function openQuickCapture(page: Page) {
-	await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Home', exact: true })).toBeVisible();
 	// On a phone the bottom bar's "New" button opens it; on desktop the shortcut does.
 	const phoneButton = page.getByRole('button', { name: 'New', exact: true });
 	if (await phoneButton.isVisible()) await phoneButton.tap();
