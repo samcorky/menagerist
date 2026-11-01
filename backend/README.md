@@ -140,6 +140,8 @@ Coverage floors (defined in the root `codecov.yml`, enforced by `poe coverage` a
 
 One Alembic environment, one `alembic/versions/` directory, for the whole backend - not one per module. All bounded contexts share a single Postgres schema in v1. Each module's SQLAlchemy models register on the shared `Base` from `platform/database.py`; `alembic/env.py` imports every module's `adapters/persistence/models.py` explicitly so their tables exist on `Base.metadata` before autogenerate runs.
 
+The development history was flattened into `cd0c974e3e33_initial_schema` plus the preset seed before the first release (see DECISIONS.md). From then on a revision is immutable: change the schema with a new revision, never by editing an old one. A development database that predates the flattening needs `alembic stamp --purge e6f7a8b9c0d1` (or to be recreated).
+
 ## Running things
 
 Backend tests, migrations, and quality checks run as `poe` tasks from the workspace root - `poe test-backend`, `poe test-backend-integration`, `poe migrate`, `poe lint-backend`, `poe typecheck-backend`, etc. Full task list in the root `pyproject.toml`.

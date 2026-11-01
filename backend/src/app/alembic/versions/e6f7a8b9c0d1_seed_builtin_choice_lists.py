@@ -4,7 +4,7 @@ Seeds the built-in saved lists, fields and field groups in one step, using each
 preset's final shape. Ids are fixed (uuid5), so a re-run inserts nothing new.
 
 Revision ID: e6f7a8b9c0d1
-Revises: e5f6a7b8c9d0
+Revises: cd0c974e3e33
 Create Date: 2026-10-04 09:00:00.000000
 
 """
@@ -23,7 +23,7 @@ from app.platform.shared_data import shared_data_path
 
 # revision identifiers, used by Alembic.
 revision: str = "e6f7a8b9c0d1"
-down_revision: str | None = "e5f6a7b8c9d0"
+down_revision: str | None = "cd0c974e3e33"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
