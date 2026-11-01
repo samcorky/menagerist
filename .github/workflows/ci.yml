@@ -7,6 +7,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  # Fail rather than update uv.lock; poe's sync tasks pass this on to uv.
+  UV_LOCKED: "1"
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -16,15 +20,13 @@ jobs:
     name: Prek Checks (Lint, Typecheck, Unit Tests)
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           enable-cache: true
 
@@ -32,36 +34,20 @@ jobs:
         run: uv python install
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
-        run: |
-          uv sync --all-packages --group dev
-          npm --prefix frontend ci
+      - name: Install dependencies and generate the API client
+        run: uv run poe sync-ci
 
-      - name: Generate frontend API client
-        run: uv run poe generate-frontend-client
-
+      # Read-only: autofix.yml applies the fixes to pull requests.
       - name: Run prek
-        id: prek
-        continue-on-error: true
-        uses: j178/prek-action@v3.0.0
+        uses: j178/prek-action@44924fe9ef4a6f88253c4b6b1bf11c689d3ce53d # v3.1.0
         with:
           extra-args: --all-files
-
-      - name: Auto-commit hook fixes
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore(style): auto-apply pre-commit fixes"
-          branch: ${{ github.head_ref }}
-
-      - name: Verify all checks pass
-        if: steps.prek.outcome != 'success'
-        run: uv run prek run --all-files
 
   integration:
     name: Backend Tests and Coverage
@@ -70,10 +56,10 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           enable-cache: true
 
@@ -81,7 +67,7 @@ jobs:
         run: uv python install
 
       - name: Install dependencies
-        run: uv sync --all-packages --group dev
+        run: uv run poe sync-backend
 
       - name: Cache the Postgres image
         uses: ./.github/actions/postgres-image
@@ -90,7 +76,7 @@ jobs:
         run: uv run poe coverage
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: backend/coverage.xml
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -107,10 +93,10 @@ jobs:
         shard: [1, 2, 3]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           enable-cache: true
 
@@ -118,37 +104,28 @@ jobs:
         run: uv python install
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
-        run: |
-          uv sync --all-packages --group dev
-          npm --prefix frontend ci
-
-      - name: Generate frontend API client
-        run: uv run poe generate-frontend-client
+      - name: Install dependencies and generate the API client
+        run: uv run poe sync-ci
 
       - name: Cache the Postgres image
         uses: ./.github/actions/postgres-image
 
       - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
 
-      - name: Install Chromium and its system libraries
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-        working-directory: frontend
+      - name: Install Chromium (a no-op when cached)
+        run: uv run poe install-e2e-browser
 
-      - name: Install the system libraries for the cached browsers
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
+      - name: Install the system libraries Chromium needs
         run: npx playwright install-deps chromium
         working-directory: frontend
 
@@ -157,7 +134,7 @@ jobs:
 
       - name: Upload failure traces
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-test-results-shard-${{ matrix.shard }}
           path: frontend/test-results/
@@ -184,10 +161,10 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
@@ -227,10 +204,10 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           enable-cache: true
 
@@ -238,37 +215,30 @@ jobs:
         run: uv python install
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
-        run: |
-          uv sync --all-packages --group dev
-          npm --prefix frontend ci
-
-      - name: Generate frontend API client
-        run: uv run poe generate-frontend-client
+      - name: Install dependencies and generate the API client
+        run: uv run poe sync-ci
 
       - name: Cache the Postgres image
         uses: ./.github/actions/postgres-image
 
       - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-cookies-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
 
-      - name: Install Chromium, WebKit and Firefox and their system libraries
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium webkit firefox
-        working-directory: frontend
+      - name: Install Chromium, WebKit and Firefox (a no-op when cached)
+        run: |
+          uv run poe install-e2e-browser
+          uv run poe install-e2e-cookie-browsers
 
-      - name: Install the system libraries for the cached browsers
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
+      - name: Install the system libraries the browsers need
         run: npx playwright install-deps chromium webkit firefox
         working-directory: frontend
 
@@ -277,7 +247,7 @@ jobs:
 
       - name: Upload failure traces
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-test-results-cookies
           path: frontend/test-results/
@@ -299,3 +269,24 @@ jobs:
         run: |
           echo "shards: ${SHARDS}, cookies: ${COOKIES}"
           test "${SHARDS}" = success && test "${COOKIES}" = success
+
+  build:
+    name: Build and smoke test the image
+    uses: ./.github/workflows/build.yml
+    permissions:
+      contents: read
+
+  ci-passed:
+    name: CI passed
+    # One stable check to require in branch protection however the jobs above change.
+    # Runs even when a needed job fails or is cancelled: a skipped dependency would
+    # otherwise leave this check "skipped", which counts as passing.
+    if: always()
+    needs: [prek, integration, e2e, build]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Require every job to succeed
+        run: jq -e 'all(.[]; .result == "success")' <<< "$NEEDS"
+        env:
+          NEEDS: ${{ toJSON(needs) }}

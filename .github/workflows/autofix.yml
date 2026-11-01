@@ -1,0 +1,59 @@
+name: autofix.ci # needed by autofix.ci to securely identify the workflow
+
+# Applies the fixes the formatting and lint hooks make (ruff, prettier, eslint, line
+# endings) to pull requests as a commit from the autofix.ci app. ci.yml runs the
+# same hooks read-only and is what gates the merge. autofix.ci never edits files
+# under .github/workflows, so a workflow change has to be formatted by hand.
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  UV_LOCKED: "1"
+
+jobs:
+  autofix:
+    name: "Hooks: prek (autofix)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Checks with nothing to fix; ci.yml runs them.
+      SKIP: mypy,pytest,svelte-check,vitest,gitleaks,validate-compose,validate-smoke-compose,validate-e2e-compose
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies and generate the API client
+        run: uv run poe sync-ci
+
+      - name: Apply hook fixes
+        # A hook that rewrites a file exits non-zero; autofix.ci commits those
+        # rewrites below.
+        run: uv run prek run --all-files || true
+
+      - name: Push fixes
+        uses: autofix-ci/action@c5b2d67aa2274e7b5a18224e8171550871fc7e4a # v1.3.4
+        with:
+          commit-message: "style: apply hook fixes"
