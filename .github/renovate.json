@@ -8,6 +8,14 @@
     "security:minimumReleaseAgePypi"
   ],
   "timezone": "UTC",
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/bower_components/**",
+    "**/vendor/**",
+    "**/examples/**",
+    "**/__tests__/**",
+    "**/__fixtures__/**"
+  ],
   "semanticCommits": "disabled",
   "osvVulnerabilityAlerts": true,
   "labels": [
@@ -15,7 +23,8 @@
   ],
   "vulnerabilityAlerts": {
     "labels": [
-      "security"
+      "security",
+      "dependencies"
     ],
     "schedule": [
       "at any time"
@@ -50,6 +59,26 @@
     "pinDigests": true
   },
   "packageRules": [
+    {
+      "description": "Tell the two lock file maintenance pull requests apart (they share a title otherwise)",
+      "matchUpdateTypes": [
+        "lockFileMaintenance"
+      ],
+      "matchManagers": [
+        "npm"
+      ],
+      "commitMessageSuffix": "(frontend)"
+    },
+    {
+      "description": "Tell the two lock file maintenance pull requests apart (they share a title otherwise)",
+      "matchUpdateTypes": [
+        "lockFileMaintenance"
+      ],
+      "matchManagers": [
+        "pep621"
+      ],
+      "commitMessageSuffix": "(backend)"
+    },
     {
       "description": "One Postgres bump updates compose.yaml and backend/tests/conftest.py together. No digest pin: the CI image cache is keyed on the compose.yaml name and the tests ask for the tag",
       "matchDatasources": [
