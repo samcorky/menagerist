@@ -40,7 +40,6 @@ dev = [
     "mypy>=2.4.1",
     "psycopg[binary]>=3.3.6",
     "pycountry>=26.2.16", # lets mypy check scripts/generate_iso_data.py, which pins its own
-    "pypiwin32>=223; sys_platform == 'win32'",
     "pytest>=9.2.0",
     "pytest-alembic>=0.13.2",
     "pytest-asyncio>=1.4.1",

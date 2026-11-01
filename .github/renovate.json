@@ -19,6 +19,7 @@
   "semanticCommitType": "chore",
   "semanticCommitScope": "deps",
   "osvVulnerabilityAlerts": true,
+  "abandonmentThreshold": "3 years",
   "constraints": {
     "node": "^22.13.0"
   },
