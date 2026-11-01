@@ -1,0 +1,51 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# AI Stuff
+.claude/
+.agents/
+.junie/
+
+# Docker Compose Overrides
+compose.override.yml
+compose.override.yaml
+
+# Pytest artifacts
+.coverage*
+coverage.xml
+
+# Other
+openapi.json
+
+# Worktrees
+.worktrees/
+
+# Python caches
+__pycache__/
+
+# App specific
+data/
+backups/
+!/frontend/src/routes/admin/backups/
+
+# Node Stuff
+node_modules/
+
+# Agent run logs (scripts/poe_run.py)
+.agent-logs/
+
+# Brainstorming visual companion mockups
+.superpowers/

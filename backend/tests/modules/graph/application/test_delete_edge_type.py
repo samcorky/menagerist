@@ -1,0 +1,101 @@
+import uuid
+
+import pytest
+
+from app.entrypoints.api.shared.access_guard import get_access_guard
+from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
+    InMemoryEdgeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_edge_type_repository import (
+    InMemoryEdgeTypeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_node_repository import (
+    InMemoryNodeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
+    InMemoryNodeTypeRepository,
+)
+from app.modules.graph.application.delete_edge_type import (
+    DeleteEdgeType,
+    DeleteEdgeTypeCommand,
+)
+from app.modules.graph.domain.edge import Edge
+from app.modules.graph.domain.edge_type import EdgeType
+from app.modules.graph.domain.errors import EdgeTypeInUseError, EdgeTypeNotFoundError
+from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
+
+
+def _make_uow() -> tuple[InMemoryUnitOfWork[GraphRepos], GraphRepos]:
+    repos = GraphRepos(
+        nodes=InMemoryNodeRepository(),
+        edges=InMemoryEdgeRepository(),
+        node_types=InMemoryNodeTypeRepository(),
+        edge_types=InMemoryEdgeTypeRepository(),
+    )
+    return InMemoryUnitOfWork(repos), repos
+
+
+async def test_delete_edge_type_soft_deletes_and_commits() -> None:
+    """DeleteEdgeType marks the edge type as deleted and commits."""
+    uow, repos = _make_uow()
+    et = EdgeType.create(slug="directed-by", label="Directed By")
+    await repos.edge_types.add(et)
+    use_case = DeleteEdgeType(uow, get_access_guard())
+
+    await use_case.handle(DeleteEdgeTypeCommand(edge_type_id=et.id), SYSTEM_ACTOR)
+
+    assert et.is_deleted is True
+    assert uow.committed is True
+
+
+async def test_delete_edge_type_raises_when_missing() -> None:
+    """DeleteEdgeType raises EdgeTypeNotFoundError when the edge type doesn't exist."""
+    uow, _ = _make_uow()
+    use_case = DeleteEdgeType(uow, get_access_guard())
+
+    with pytest.raises(EdgeTypeNotFoundError):
+        await use_case.handle(
+            DeleteEdgeTypeCommand(edge_type_id=uuid.uuid4()), SYSTEM_ACTOR
+        )
+
+
+async def test_delete_edge_type_raises_when_edges_still_reference_it() -> None:
+    """DeleteEdgeType raises EdgeTypeInUseError when edges use the type."""
+    uow, repos = _make_uow()
+    et = EdgeType.create(slug="directed-by", label="Directed By")
+    await repos.edge_types.add(et)
+    edge = Edge.create(
+        owner_id=uuid.UUID(int=1),
+        source_id=uuid.uuid4(),
+        target_id=uuid.uuid4(),
+        type="directed-by",
+    )
+    await repos.edges.add(edge)
+    use_case = DeleteEdgeType(uow, get_access_guard())
+
+    with pytest.raises(EdgeTypeInUseError):
+        await use_case.handle(DeleteEdgeTypeCommand(edge_type_id=et.id), SYSTEM_ACTOR)
+
+    assert et.is_deleted is False
+
+
+async def test_delete_edge_type_succeeds_when_no_edges_reference_it() -> None:
+    """DeleteEdgeType soft-deletes when no active edges use the type."""
+    uow, repos = _make_uow()
+    et = EdgeType.create(slug="directed-by", label="Directed By")
+    await repos.edge_types.add(et)
+    # Edge with a different type - should not block deletion
+    other_edge = Edge.create(
+        owner_id=uuid.UUID(int=1),
+        source_id=uuid.uuid4(),
+        target_id=uuid.uuid4(),
+        type="produced-by",
+    )
+    await repos.edges.add(other_edge)
+    use_case = DeleteEdgeType(uow, get_access_guard())
+
+    await use_case.handle(DeleteEdgeTypeCommand(edge_type_id=et.id), SYSTEM_ACTOR)
+
+    assert et.is_deleted is True

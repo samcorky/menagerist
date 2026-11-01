@@ -1,0 +1,26 @@
+# Isolate the smoke-test stack from a running development stack.
+name: menagerist-smoke
+services:
+  postgres:
+    container_name: db
+
+  worker:
+    container_name: worker
+    hostname: menagerist-smoke-worker
+    image: menagerist:local
+
+  menagerist:
+    container_name: app
+    image: menagerist:local
+    environment:
+      # A fresh database skips the pre-migration backup anyway; opting out keeps the
+      # smoke run independent of the host ./backups bind mount's ownership.
+      MENAGERIST_BACKUP_BEFORE_MIGRATE: "false"
+    ports: !override
+      - "18080:8000"
+
+networks:
+  # Linux bridge names are limited to 15 characters.
+  menagerist:
+    driver_opts:
+      com.docker.network.bridge.name: mgr-smoke

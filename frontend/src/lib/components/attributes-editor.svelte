@@ -1,0 +1,503 @@
+<script lang="ts">
+	import { Plus, X } from '@lucide/svelte';
+	import { SvelteSet } from 'svelte/reactivity';
+	import { toast } from 'svelte-sonner';
+	import { rowsToAttributes } from '$lib/attribute-rows';
+	import type { AttributeRow, GroupRow } from '$lib/attribute-rows';
+	import type { AttributesSchema, JsonSchemaProperty, EditorField } from '$lib/schema-types';
+	import { generateFieldKey } from '$lib/field-key';
+	import { mergeAttributeSchemas, readSchemaMeta, validationSchema } from '$lib/schema-meta';
+	import { isSection, schemaToItems, itemsToSchema } from '$lib/schema-editor-items';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
+	import { normalise, isSectionItem } from '$lib/layout';
+	import { coreForProp } from '$lib/field-types';
+	import { describeConstraints, parseConstraints } from '$lib/field-types/text/constraints';
+	import { createSafeValidator } from '$lib/safe-validator';
+	import { friendlyClientError, topLevelKey } from '$lib/validation-messages';
+	import { listAttributeValues, promoteExtraSchemaField } from '$lib/api/client';
+	import { errorMessage } from '$lib/api/errors';
+	import FieldKindRow from '$lib/components/field-kind-row.svelte';
+	import PresetPickerDialog from '$lib/components/preset-picker-dialog.svelte';
+	import { definitionToFieldSet, type FieldSetDefinition, type Preset } from '$lib/presets';
+
+	/** Matches the backend's `MAX_EXTRA_SCHEMA_FIELDS` (extra_schema_limits.py). */
+	const MAX_EXTRA_SCHEMA_FIELDS = 50;
+
+	let {
+		rows = $bindable(),
+		schema = null,
+		extraSchema = $bindable(null),
+		supportsExtraFields = false,
+		nodeId,
+		nodeTypeId,
+		nodeCandidates = [],
+		onLinkItem,
+		onPromoted,
+		serverErrors = null
+	}: {
+		rows: AttributeRow[];
+		schema?: AttributesSchema | null;
+		extraSchema?: AttributesSchema | null;
+		supportsExtraFields?: boolean;
+		nodeId?: string;
+		nodeTypeId?: string;
+		nodeCandidates?: { id: string; name: string }[];
+		onLinkItem?: (key: string, item: { id: string; name: string }) => void;
+		onPromoted?: () => void;
+		serverErrors?: Record<string, string> | null;
+	} = $props();
+
+	let mergedSchema = $derived(mergeAttributeSchemas(schema, extraSchema));
+
+	// Required is advisory and never blocks, so validate without it.
+	let validator = $derived(
+		mergedSchema
+			? createSafeValidator(validationSchema($state.snapshot(mergedSchema)) as object)
+			: null
+	);
+
+	const touched = new SvelteSet<string>();
+
+	let clientErrors = $derived.by(() => {
+		const errors: Record<string, string> = {};
+		if (!validator || !mergedSchema) return errors;
+		for (const err of validator.validate(rowsToAttributes(rows, mergedSchema))) {
+			const key = topLevelKey(err.instanceLocation);
+			if (key && !errors[key]) errors[key] = friendlyClientError(mergedSchema, err);
+		}
+		return errors;
+	});
+
+	// Server errors show immediately; client errors only once the field has been left.
+	let fieldErrors = $derived.by(() => {
+		const errors: Record<string, string> = { ...serverErrors };
+		for (const [key, message] of Object.entries(clientErrors)) {
+			if (!errors[key] && touched.has(key)) errors[key] = message;
+		}
+		return errors;
+	});
+
+	function markTouched(key: string) {
+		touched.add(key);
+	}
+
+	let requiredKeys = $derived(mergedSchema ? (readSchemaMeta(mergedSchema).required ?? []) : []);
+	let schemaLayout = $derived(
+		schema ? normalise(readSchemaMeta(schema).layout, schema.properties) : []
+	);
+	let extraLayout = $derived(
+		extraSchema ? normalise(readSchemaMeta(extraSchema).layout, extraSchema.properties) : []
+	);
+	let extraFieldCount = $derived(Object.keys(extraSchema?.properties ?? {}).length);
+
+	function getValue(key: string): unknown {
+		return rows.find((r) => r.key === key)?.value ?? '';
+	}
+
+	function isEmptyValue(value: unknown): boolean {
+		if (value === null || value === undefined || value === '') return true;
+		if (Array.isArray(value)) return value.length === 0;
+		if (typeof value === 'object') {
+			return Object.values(value).every((v) => v === '' || v === null || v === undefined);
+		}
+		return false;
+	}
+
+	function setValue(key: string, value: unknown) {
+		const existing = rows.find((r) => r.key === key);
+		if (existing) {
+			rows = rows.map((r) =>
+				r.key === key ? { ...r, value: value as string | GroupRow[] | GroupRow } : r
+			);
+		} else {
+			rows = [...rows, { key, value: value as string | GroupRow[] | GroupRow }];
+		}
+	}
+
+	// -- Value type-ahead for text fields on a node's own attributes -------------
+
+	let typeaheadOpenKey = $state<string | null>(null);
+	let previousValuesByKey = $state<Record<string, { value: string; count: number }[]>>({});
+
+	async function fetchPreviousValues(key: string, q: string) {
+		if (!nodeTypeId || !q) {
+			previousValuesByKey = { ...previousValuesByKey, [key]: [] };
+			return;
+		}
+		const result = await listAttributeValues({
+			path: { node_type_id: nodeTypeId, key },
+			query: { q, limit: 8 }
+		});
+		if (result.data) {
+			previousValuesByKey = { ...previousValuesByKey, [key]: result.data };
+		}
+	}
+
+	// -- Overlay field creation ("Add field") -----------------------------------
+
+	let addingField = $state(false);
+	let draftField = $state<EditorField | null>(null);
+
+	function newDraftField(): EditorField {
+		return {
+			key: '',
+			keyPending: true,
+			label: '',
+			kind: 'text',
+			required: false,
+			options: [],
+			subFields: []
+		};
+	}
+
+	function startAddField() {
+		draftField = newDraftField();
+		addingField = true;
+	}
+
+	function cancelAddField() {
+		addingField = false;
+		draftField = null;
+	}
+
+	function confirmAddField() {
+		if (!draftField || !draftField.label.trim()) return;
+		const taken = [
+			...Object.keys(schema?.properties ?? {}),
+			...Object.keys(extraSchema?.properties ?? {})
+		];
+		const key = generateFieldKey(draftField.label, taken);
+		const items = schemaToItems(extraSchema).filter((i): i is EditorField => !isSection(i));
+		const nextItems = [...items, { ...draftField, key, keyPending: false }];
+		extraSchema = itemsToSchema(nextItems, readSchemaMeta(extraSchema), []);
+		rows = [...rows, { key, value: draftField.kind === 'boolean' ? 'false' : '' }];
+		addingField = false;
+		draftField = null;
+	}
+
+	function removeExtraField(key: string) {
+		if (!extraSchema) return;
+		const remainingItems = schemaToItems(extraSchema)
+			.filter((i): i is EditorField => !isSection(i))
+			.filter((f) => f.key !== key);
+		const removedField = schemaToItems(extraSchema).find(
+			(i): i is EditorField => !isSection(i) && i.key === key
+		);
+		const previousExtraSchema = extraSchema;
+		const previousRows = $state.snapshot(rows) as AttributeRow[];
+		// itemsToSchema returns null for an empty item list, but the backend's
+		// UpdateNode treats a null extra_schema as "leave unchanged" (same fix as
+		// PromoteExtraSchemaField) - build a real, empty schema instead so removing
+		// the last overlay field and saving actually clears it server-side.
+		extraSchema = itemsToSchema(remainingItems, readSchemaMeta(extraSchema), []) ?? {
+			$schema: 'https://json-schema.org/draft/2020-12/schema',
+			type: 'object',
+			properties: {}
+		};
+		rows = rows.filter((r) => r.key !== key);
+		toast(`${removedField?.label || 'Field'} removed`, {
+			action: {
+				label: 'Undo',
+				onClick: () => {
+					extraSchema = previousExtraSchema;
+					rows = previousRows;
+				}
+			},
+			duration: 5000
+		});
+	}
+
+	// Ad hoc field groups ("Add saved field group") -----------------------------
+
+	let fieldSetPickerOpen = $state(false);
+
+	function addFieldSetFromPreset(preset: Preset) {
+		const definition = preset.definition as FieldSetDefinition;
+		const section = definitionToFieldSet(
+			definition,
+			{ preset: preset.id, version: preset.version },
+			'field-set'
+		);
+		const taken = [
+			...Object.keys(schema?.properties ?? {}),
+			...Object.keys(extraSchema?.properties ?? {})
+		];
+		const newFields: EditorField[] = [];
+		for (const field of section.fields) {
+			const key = generateFieldKey(field.label, [...taken, ...newFields.map((f) => f.key)]);
+			newFields.push({ ...field, key, keyPending: false });
+		}
+		const items = schemaToItems(extraSchema).filter((i): i is EditorField => !isSection(i));
+		extraSchema = itemsToSchema([...items, ...newFields], readSchemaMeta(extraSchema), []);
+		rows = [
+			...rows,
+			...newFields.map((f) => ({ key: f.key, value: f.kind === 'boolean' ? 'false' : '' }))
+		];
+	}
+
+	let promotingKey = $state<string | null>(null);
+
+	async function promoteField(key: string) {
+		if (!nodeId || !nodeTypeId) return;
+		promotingKey = key;
+		const result = await promoteExtraSchemaField({
+			path: { node_id: nodeId, key },
+			body: { node_type_id: nodeTypeId }
+		});
+		promotingKey = null;
+		if (result.error) {
+			toast.error("Couldn't make this a field", { description: errorMessage(result.error) });
+			return;
+		}
+		toast.success('Field added to the item type');
+		onPromoted?.();
+	}
+</script>
+
+{#snippet fieldEntry(key: string, prop: JsonSchemaProperty, overlay: boolean = false)}
+	{@const isRequired = requiredKeys.includes(key)}
+	{@const error = fieldErrors[key]}
+	{@const desc = coreForProp(prop)}
+	{@const Widget = desc?.InputWidget}
+	{@const parsed =
+		prop.type === 'string'
+			? parseConstraints(prop as { pattern?: unknown; allOf?: unknown })
+			: null}
+	{@const rule = parsed && !parsed.custom ? describeConstraints(parsed.constraints) : null}
+	<div
+		class="-mx-2 flex flex-col gap-2 rounded-md p-2 transition-colors focus-within:bg-muted/40 sm:flex-row {prop.type ===
+		'array'
+			? 'sm:items-start'
+			: 'sm:items-center'}"
+		onfocusout={() => markTouched(key)}
+	>
+		<span class="w-full pt-1.5 text-sm text-muted-foreground sm:w-32 sm:shrink-0">
+			{prop.title || key}{#if isRequired}{#if isEmptyValue(getValue(key))}<span
+						class="ml-1 text-xs text-muted-foreground">Recommended</span
+					>{:else}<span class="ml-0.5 text-muted-foreground">*</span>{/if}{/if}{#if overlay}<span
+					class="ml-1.5 rounded border border-input px-1.5 text-xs text-muted-foreground"
+					>This item only</span
+				>{/if}
+		</span>
+		<div class="flex flex-1 flex-col gap-1">
+			<div
+				class="rounded-md transition-colors duration-150 {error
+					? 'ring-1 ring-destructive/60'
+					: ''}"
+			>
+				{#if desc?.kind === 'text' && nodeTypeId}
+					{@const currentValue = typeof getValue(key) === 'string' ? String(getValue(key)) : ''}
+					{@const previousValues = previousValuesByKey[key] ?? []}
+					{@const matchingCandidates =
+						nodeCandidates.length > 0 && onLinkItem
+							? nodeCandidates
+									.filter((c) => c.name.toLowerCase().includes(currentValue.toLowerCase()))
+									.slice(0, 8)
+							: []}
+					<div class="relative">
+						<Input
+							value={currentValue}
+							autocomplete="off"
+							oninput={(e) => {
+								const v = (e.target as HTMLInputElement).value;
+								setValue(key, v);
+								void fetchPreviousValues(key, v);
+							}}
+							onfocus={() => {
+								typeaheadOpenKey = key;
+								if (currentValue) void fetchPreviousValues(key, currentValue);
+							}}
+							onblur={() => setTimeout(() => (typeaheadOpenKey = null), 150)}
+							class="flex-1"
+							aria-label={prop.title || key}
+							aria-invalid={!!error}
+						/>
+						{#if typeaheadOpenKey === key && (previousValues.length > 0 || matchingCandidates.length > 0)}
+							<ul class="absolute z-50 mt-1 w-full rounded-md border bg-popover p-1 shadow-md">
+								{#each previousValues as pv (pv.value)}
+									<li>
+										<button
+											type="button"
+											class="flex w-full items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent"
+											onmousedown={() => {
+												setValue(key, pv.value);
+												typeaheadOpenKey = null;
+											}}
+										>
+											<span class="truncate">{pv.value}</span>
+											<span class="ml-2 shrink-0 text-xs text-muted-foreground">{pv.count}</span>
+										</button>
+									</li>
+								{/each}
+								{#each matchingCandidates as candidate (candidate.id)}
+									<li>
+										<button
+											type="button"
+											class="flex w-full items-center rounded px-2 py-1.5 text-sm hover:bg-accent"
+											onmousedown={() => {
+												onLinkItem?.(key, candidate);
+												setValue(key, '');
+												typeaheadOpenKey = null;
+											}}
+										>
+											<span class="truncate">{candidate.name}</span>
+										</button>
+									</li>
+								{/each}
+							</ul>
+						{/if}
+					</div>
+				{:else if Widget}
+					<Widget
+						value={getValue(key)}
+						onChange={(v) => setValue(key, v)}
+						ariaLabel={prop.title || key}
+						{prop}
+					/>
+				{:else}
+					<Input
+						value={typeof getValue(key) === 'string' ? String(getValue(key)) : ''}
+						oninput={(e) => setValue(key, (e.target as HTMLInputElement).value)}
+						class="flex-1"
+						aria-label={prop.title || key}
+						aria-invalid={!!error}
+					/>
+				{/if}
+			</div>
+			{#if error}
+				<p class="text-xs text-destructive">{error}</p>
+			{:else if rule}
+				<p class="text-xs text-muted-foreground">{rule}</p>
+			{/if}
+		</div>
+	</div>
+{/snippet}
+
+<div class="space-y-2">
+	<Label>Details</Label>
+	{#if validator?.degraded}
+		<p class="text-xs text-muted-foreground" role="status">
+			Some rules could not be checked here. They are still checked when you save.
+		</p>
+	{/if}
+
+	{#if schema && schemaLayout.length > 0}
+		{#each schemaLayout as layoutItem (isSectionItem(layoutItem) ? layoutItem.id : layoutItem.key)}
+			{#if isSectionItem(layoutItem)}
+				<div class="space-y-2 pt-1">
+					<p class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+						{layoutItem.section}
+					</p>
+					<div class="space-y-2 rounded-md border border-input/60 bg-muted/20 p-3">
+						{#each layoutItem.items as { key } (key)}
+							{#if key in schema.properties}
+								{@render fieldEntry(key, schema.properties[key])}
+							{/if}
+						{/each}
+					</div>
+				</div>
+			{:else if layoutItem.key in schema.properties}
+				{@render fieldEntry(layoutItem.key, schema.properties[layoutItem.key])}
+			{/if}
+		{/each}
+	{/if}
+
+	{#if extraSchema && extraLayout.length > 0}
+		{#each extraLayout as layoutItem (isSectionItem(layoutItem) ? layoutItem.id : layoutItem.key)}
+			{#if !isSectionItem(layoutItem) && layoutItem.key in extraSchema.properties}
+				{@const key = layoutItem.key}
+				{@const prop = extraSchema.properties[key]}
+				<div class="flex flex-col gap-2 sm:flex-row sm:items-start">
+					<div class="min-w-0 flex-1">
+						{@render fieldEntry(key, prop, true)}
+					</div>
+					<div class="flex flex-wrap items-center gap-2 sm:shrink-0">
+						{#if supportsExtraFields && nodeId && nodeTypeId}
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								class="mt-1 h-7 text-xs"
+								disabled={promotingKey === key}
+								onclick={() => promoteField(key)}
+							>
+								Make this a field
+							</Button>
+						{/if}
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon"
+							class="mt-1"
+							onclick={() => removeExtraField(key)}
+							aria-label="Remove field"
+						>
+							<X class="size-4" />
+						</Button>
+					</div>
+				</div>
+			{/if}
+		{/each}
+	{/if}
+
+	{#if supportsExtraFields}
+		{#if addingField && draftField}
+			<div class="space-y-2 rounded-md border border-input bg-muted/30 p-3">
+				<FieldKindRow
+					field={draftField}
+					onLabelChange={(v) => (draftField = { ...draftField!, label: v })}
+					onFieldChange={(f) => (draftField = f)}
+				/>
+				<div class="flex gap-2">
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onclick={confirmAddField}
+						disabled={!draftField.label.trim()}
+					>
+						Add
+					</Button>
+					<Button type="button" variant="ghost" size="sm" onclick={cancelAddField}>Cancel</Button>
+				</div>
+			</div>
+		{:else}
+			<div class="flex flex-wrap gap-2">
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					onclick={startAddField}
+					disabled={extraFieldCount >= MAX_EXTRA_SCHEMA_FIELDS}
+				>
+					<Plus class="size-4" />
+					Add field
+				</Button>
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					onclick={() => (fieldSetPickerOpen = true)}
+					disabled={extraFieldCount >= MAX_EXTRA_SCHEMA_FIELDS}
+				>
+					Add saved field group…
+				</Button>
+			</div>
+			{#if extraFieldCount >= MAX_EXTRA_SCHEMA_FIELDS}
+				<p class="text-xs text-muted-foreground">
+					You can add up to {MAX_EXTRA_SCHEMA_FIELDS} extra fields.
+				</p>
+			{/if}
+		{/if}
+	{/if}
+</div>
+
+<PresetPickerDialog
+	open={fieldSetPickerOpen}
+	kind="field_set"
+	title="Add saved field group"
+	onOpenChange={(v) => (fieldSetPickerOpen = v)}
+	onPick={addFieldSetFromPreset}
+/>

@@ -1,0 +1,232 @@
+from pathlib import Path
+
+from archunitpython import assert_passes, project_files, project_layers
+
+SRC_PATH = str(Path(__file__).resolve().parents[2] / "src" / "app")
+
+
+def test_dependency_direction_and_layering() -> None:
+    """Hexagonal architecture dependency direction.
+
+    entrypoints -> adapters -> application -> domain.
+    """
+    arch = (
+        project_layers(SRC_PATH)
+        .layer("domain")
+        .defined_by_folder("*domain*")
+        .layer("ports")
+        .defined_by_folder("*ports*")
+        .layer("application")
+        .defined_by_folder("*application*")
+        .layer("adapters")
+        .defined_by_folder("*adapters*")
+        .layer("shared_kernel")
+        .defined_by_folder("*shared_kernel*")
+        .layer("platform")
+        .defined_by_folder("*platform*")
+        .layer("entrypoints")
+        .defined_by_folder("*entrypoints/api")
+        .layer("entrypoints")
+        .defined_by_folder("*entrypoints/cli")
+        .layer("api_shared")
+        .defined_by_folder("*entrypoints/api/shared*")
+        .where_layer("domain")
+        .may_only_depend_on_layers("domain", "shared_kernel")
+        .where_layer("ports")
+        .may_only_depend_on_layers("ports", "domain", "shared_kernel")
+        .where_layer("application")
+        .may_only_depend_on_layers("application", "ports", "domain", "shared_kernel")
+        .where_layer("adapters")
+        .may_only_depend_on_layers(
+            "adapters",
+            "application",
+            "ports",
+            "domain",
+            "shared_kernel",
+            "platform",
+            "api_shared",
+        )
+        .where_layer("shared_kernel")
+        .may_only_depend_on_layers("shared_kernel")
+        .where_layer("platform")
+        .may_only_depend_on_layers("platform")
+    )
+    assert_passes(arch)
+
+
+def test_domain_layer_has_no_framework_dependencies() -> None:
+    """Domain layer may only depend on pure data modeling and typing primitives."""
+    rule = (
+        project_files(SRC_PATH)
+        .in_folder("*domain*")
+        .should()
+        .depend_on_external_modules()
+        .matching("dataclasses*")
+        .matching("typing*")
+        .matching("types*")
+        .matching("uuid*")
+        .matching("datetime*")
+        .matching("enum*")
+        .matching("abc*")
+        .matching("collections*")
+        .matching("mimetypes*")
+        .matching("re*")
+    )
+    assert_passes(rule)
+
+
+def test_shared_kernel_has_no_framework_dependencies() -> None:
+    """Shared kernel may only depend on pure data modeling and typing primitives."""
+    rule = (
+        project_files(SRC_PATH)
+        .in_folder("*shared_kernel*")
+        .should()
+        .depend_on_external_modules()
+        .matching("dataclasses*")
+        .matching("typing*")
+        .matching("types*")
+        .matching("uuid*")
+        .matching("datetime*")
+        .matching("enum*")
+        .matching("abc*")
+        .matching("collections*")
+        .matching("hashlib*")
+        .matching("re*")
+        .matching("unicodedata*")
+    )
+    assert_passes(rule)
+
+
+def test_ports_layer_has_no_framework_dependencies() -> None:
+    """Ports layer must not depend on web/storage frameworks or heavy I/O libraries."""
+    rule = (
+        project_files(SRC_PATH)
+        .in_folder("*ports*")
+        .should_not()
+        .depend_on_external_modules()
+        .matching("fastapi*")
+        .matching("starlette*")
+        .matching("sqlalchemy*")
+        .matching("PIL*")
+        .matching("pillow*")
+        .matching("filetype*")
+        .matching("aiofiles*")
+        .matching("tarfile*")
+        .matching("gzip*")
+    )
+    assert_passes(rule)
+
+
+def test_application_layer_has_no_framework_dependencies() -> None:
+    """Application layer must not depend on web/storage frameworks."""
+    rule = (
+        project_files(SRC_PATH)
+        .in_folder("*application*")
+        .should_not()
+        .depend_on_external_modules()
+        .matching("fastapi*")
+        .matching("starlette*")
+        .matching("sqlalchemy*")
+        .matching("PIL*")
+        .matching("pillow*")
+        .matching("filetype*")
+        .matching("aiofiles*")
+        .matching("tarfile*")
+        .matching("gzip*")
+    )
+    assert_passes(rule)
+
+
+def test_no_circular_dependencies() -> None:
+    """The application must have no circular dependencies across files."""
+    rule = project_files(SRC_PATH).should().have_no_cycles()
+    assert_passes(rule)
+
+
+def test_examples_module_is_independent_of_other_modules() -> None:
+    """`examples` reaches `graph`, `presets`, `collections`, `media` only via ports."""
+    for other in ("graph", "presets", "collections", "media"):
+        rule = (
+            project_files(SRC_PATH)
+            .in_folder("*modules/examples*")
+            .should_not()
+            .depend_on_files()
+            .in_folder(f"*modules/{other}*")
+        )
+        assert_passes(rule)
+
+
+def test_collections_module_is_independent_of_graph_and_presets() -> None:
+    """`collections` reaches `graph` and `presets` only through its own ports."""
+    for other in ("graph", "presets"):
+        rule = (
+            project_files(SRC_PATH)
+            .in_folder("*modules/collections*")
+            .should_not()
+            .depend_on_files()
+            .in_folder(f"*modules/{other}*")
+        )
+        assert_passes(rule)
+
+
+def test_graph_module_is_independent_of_collections() -> None:
+    """`graph` reaches `collections` only through its own ports."""
+    rule = (
+        project_files(SRC_PATH)
+        .in_folder("*modules/graph*")
+        .should_not()
+        .depend_on_files()
+        .in_folder("*modules/collections*")
+    )
+    assert_passes(rule)
+
+
+def test_no_content_module_imports_identity() -> None:
+    """Only the entrypoints (bridges, composition root, CLI) may use `identity`."""
+    for other in (
+        "graph",
+        "presets",
+        "examples",
+        "collections",
+        "media",
+        "system",
+        "backup",
+    ):
+        rule = (
+            project_files(SRC_PATH)
+            .in_folder(f"*modules/{other}*")
+            .should_not()
+            .depend_on_files()
+            .in_folder("*modules/identity*")
+        )
+        assert_passes(rule)
+
+
+def test_backup_module_is_independent_of_other_modules() -> None:
+    """Backups cross module boundaries only through entrypoint bridges."""
+    modules = Path(SRC_PATH) / "modules"
+    for other in modules.iterdir():
+        if not other.is_dir() or other.name in {"backup", "__pycache__"}:
+            continue
+        for source, target in (("backup", other.name), (other.name, "backup")):
+            rule = (
+                project_files(SRC_PATH)
+                .in_folder(f"*modules/{source}*")
+                .should_not()
+                .depend_on_files()
+                .in_folder(f"*modules/{target}*")
+            )
+            assert_passes(rule)
+
+
+def test_identity_module_is_independent_of_other_modules() -> None:
+    """`identity` imports no other module; bridges live in `entrypoints/api/shared`."""
+    for other in ("graph", "presets", "examples", "collections", "media"):
+        rule = (
+            project_files(SRC_PATH)
+            .in_folder("*modules/identity*")
+            .should_not()
+            .depend_on_files()
+            .in_folder(f"*modules/{other}*")
+        )
+        assert_passes(rule)

@@ -1,0 +1,221 @@
+import pytest
+
+from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
+    InMemoryEdgeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_edge_type_repository import (
+    InMemoryEdgeTypeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_node_repository import (
+    InMemoryNodeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
+    InMemoryNodeTypeRepository,
+)
+from app.modules.graph.application.create_node import CreateNode, CreateNodeCommand
+from app.modules.graph.domain.errors import InvalidAttributesError, InvalidSchemaError
+from app.modules.graph.domain.node_type import NodeType
+from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access_guard import InMemoryAccessGuard
+from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
+
+
+def _make_uow() -> tuple[InMemoryUnitOfWork[GraphRepos], GraphRepos]:
+    repos = GraphRepos(
+        nodes=InMemoryNodeRepository(),
+        edges=InMemoryEdgeRepository(),
+        node_types=InMemoryNodeTypeRepository(),
+        edge_types=InMemoryEdgeTypeRepository(),
+    )
+    return InMemoryUnitOfWork(repos), repos
+
+
+async def test_create_node_persists_and_commits() -> None:
+    """CreateNode adds the node to the repository and commits the unit of work."""
+    uow, repos = _make_uow()
+    use_case = CreateNode(uow, InMemoryAccessGuard())
+
+    node = await use_case.handle(
+        CreateNodeCommand(name="Alien", type="film", attributes={"title": "Alien"}),
+        SYSTEM_ACTOR,
+    )
+
+    assert await repos.nodes.get(node.id, scope=ContentFilter.everyone()) is node
+    assert uow.committed is True
+
+
+async def test_create_node_validates_attributes_against_schema() -> None:
+    """CreateNode rejects attributes that violate the node type's JSON Schema."""
+    uow, repos = _make_uow()
+    schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {"year": {"type": "number"}},
+        "required": ["year"],
+    }
+    await repos.node_types.add(
+        NodeType.create(slug="film", label="Film", attributes_schema=schema)
+    )
+    use_case = CreateNode(uow, InMemoryAccessGuard())
+
+    with pytest.raises(InvalidAttributesError):
+        await use_case.handle(
+            CreateNodeCommand(
+                name="Alien", type="film", attributes={"year": "not-a-number"}
+            ),
+            SYSTEM_ACTOR,
+        )
+
+
+async def test_create_node_passes_valid_attributes() -> None:
+    """CreateNode accepts attributes that conform to the node type's JSON Schema."""
+    uow, repos = _make_uow()
+    schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {"year": {"type": "number"}},
+        "required": ["year"],
+    }
+    await repos.node_types.add(
+        NodeType.create(slug="film", label="Film", attributes_schema=schema)
+    )
+    use_case = CreateNode(uow, InMemoryAccessGuard())
+
+    node = await use_case.handle(
+        CreateNodeCommand(name="Alien", type="film", attributes={"year": 1979}),
+        SYSTEM_ACTOR,
+    )
+
+    assert node.attributes["year"] == 1979
+
+
+async def test_create_node_ignores_required_in_schema() -> None:
+    """A missing required attribute never blocks creation (required is advisory)."""
+    uow, repos = _make_uow()
+    schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {"year": {"type": "number"}},
+        "required": ["year"],
+        "x-menagerist": {"required": ["year"]},
+    }
+    await repos.node_types.add(
+        NodeType.create(slug="film", label="Film", attributes_schema=schema)
+    )
+    use_case = CreateNode(uow, InMemoryAccessGuard())
+
+    node = await use_case.handle(
+        CreateNodeCommand(name="Alien", type="film", attributes={}),
+        SYSTEM_ACTOR,
+    )
+
+    assert node.attributes == {}
+
+
+async def test_create_node_validates_attributes_against_an_extra_schema() -> None:
+    """A per-item overlay field is validated even without a node type schema."""
+    uow, _ = _make_uow()
+    use_case = CreateNode(uow, InMemoryAccessGuard())
+
+    with pytest.raises(InvalidAttributesError):
+        await use_case.handle(
+            CreateNodeCommand(
+                name="Alien",
+                attributes={"signed": "not-a-boolean"},
+                extra_schema={
+                    "type": "object",
+                    "properties": {"signed": {"type": "boolean"}},
+                },
+            ),
+            SYSTEM_ACTOR,
+        )
+
+
+async def test_create_node_merges_type_schema_and_extra_schema() -> None:
+    """Attributes are checked against the type's fields and the per-item overlay."""
+    uow, repos = _make_uow()
+    await repos.node_types.add(
+        NodeType.create(
+            slug="film",
+            label="Film",
+            attributes_schema={
+                "type": "object",
+                "properties": {"year": {"type": "number"}},
+            },
+        )
+    )
+    use_case = CreateNode(uow, InMemoryAccessGuard())
+
+    node = await use_case.handle(
+        CreateNodeCommand(
+            name="Alien",
+            type="film",
+            attributes={"year": 1979, "signed": True},
+            extra_schema={
+                "type": "object",
+                "properties": {"signed": {"type": "boolean"}},
+            },
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    assert node.attributes == {"year": 1979, "signed": True}
+    assert node.extra_schema == {
+        "type": "object",
+        "properties": {"signed": {"type": "boolean"}},
+    }
+
+
+async def test_create_node_rejects_extra_schema_redefining_a_type_field() -> None:
+    """The overlay cannot redefine a key the item type already has."""
+    uow, repos = _make_uow()
+    await repos.node_types.add(
+        NodeType.create(
+            slug="film",
+            label="Film",
+            attributes_schema={
+                "type": "object",
+                "properties": {"year": {"type": "number"}},
+            },
+        )
+    )
+    use_case = CreateNode(uow, InMemoryAccessGuard())
+
+    with pytest.raises(InvalidSchemaError):
+        await use_case.handle(
+            CreateNodeCommand(
+                name="Alien",
+                type="film",
+                attributes={},
+                extra_schema={
+                    "type": "object",
+                    "properties": {"year": {"type": "string"}},
+                },
+            ),
+            SYSTEM_ACTOR,
+        )
+
+
+async def test_create_node_rejects_a_malformed_extra_schema() -> None:
+    """An invalid JSON Schema in `extra_schema` is rejected before anything is saved."""
+    uow, repos = _make_uow()
+    use_case = CreateNode(uow, InMemoryAccessGuard())
+
+    with pytest.raises(InvalidSchemaError):
+        await use_case.handle(
+            CreateNodeCommand(
+                name="Alien",
+                attributes={},
+                extra_schema={"type": "not-a-real-type"},
+            ),
+            SYSTEM_ACTOR,
+        )
+
+    assert (
+        await repos.nodes.count(
+            scope=ContentFilter.everyone(),
+        )
+        == 0
+    )

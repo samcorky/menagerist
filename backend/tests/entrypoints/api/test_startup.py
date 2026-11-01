@@ -1,0 +1,262 @@
+"""The start-up checks: no administrator, unusable storage and open CORS."""
+
+from datetime import UTC, datetime
+from types import SimpleNamespace
+from typing import TYPE_CHECKING
+
+import pytest
+from starlette.testclient import TestClient
+from structlog.testing import capture_logs
+
+from app.entrypoints.api import create_app, startup
+from app.modules.identity.adapters.persistence.in_memory_api_token_repository import (
+    InMemoryApiTokenRepository,
+)
+from app.modules.identity.adapters.persistence.in_memory_session_repository import (
+    InMemorySessionRepository,
+)
+from app.modules.identity.adapters.persistence.in_memory_sign_in_attempt_repository import (  # noqa: E501
+    InMemorySignInAttemptRepository,
+)
+from app.modules.identity.adapters.persistence.in_memory_user_repository import (
+    InMemoryUserRepository,
+)
+from app.modules.identity.domain.user import Role, User
+from app.modules.identity.ports.unit_of_work import IdentityRepos
+from app.platform.config.api import CORS_OPEN_HINT
+from app.platform.storage_probe import DirectoryProbe
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from app.platform.storage_probe import DirectoryState
+
+
+class _Session:
+    async def __aenter__(self) -> _Session:
+        return self
+
+    async def __aexit__(self, *_exc: object) -> None:
+        return None
+
+
+def _wire(monkeypatch: pytest.MonkeyPatch, users: InMemoryUserRepository) -> None:
+    repos = IdentityRepos(
+        users=users,
+        sessions=InMemorySessionRepository(),
+        attempts=InMemorySignInAttemptRepository(),
+        tokens=InMemoryApiTokenRepository(),
+    )
+    monkeypatch.setattr(startup, "get_session_factory", lambda: _Session)
+    monkeypatch.setattr(startup, "build_identity_repos", lambda _session: repos)
+
+
+def _user(role: Role, *, disabled: bool = False) -> User:
+    user = User.create(
+        username=f"{role.value}-{disabled}",
+        display_name="x",
+        password_hash="h",
+        now=datetime.now(UTC),
+        role=role,
+    )
+    user.disabled = disabled
+    return user
+
+
+async def test_warns_once_when_there_is_no_administrator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An empty database logs the one warning, with the way out."""
+    _wire(monkeypatch, InMemoryUserRepository())
+
+    with capture_logs() as logs:
+        await startup.warn_if_no_administrator()
+
+    warnings = [entry for entry in logs if entry["log_level"] == "warning"]
+    assert [entry["event"] for entry in warnings] == [startup.NO_ADMINISTRATOR_WARNING]
+    assert "/setup" in startup.NO_ADMINISTRATOR_WARNING
+    assert "menagerist identity create-admin" in startup.NO_ADMINISTRATOR_WARNING
+
+
+async def test_members_and_disabled_administrators_do_not_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without an enabled administrator the warning still appears."""
+    users = InMemoryUserRepository()
+    await users.add(_user(Role.MEMBER))
+    await users.add(_user(Role.ADMIN, disabled=True))
+    _wire(monkeypatch, users)
+
+    with capture_logs() as logs:
+        await startup.warn_if_no_administrator()
+
+    assert [entry["log_level"] for entry in logs] == ["warning"]
+
+
+async def test_stays_quiet_when_an_administrator_exists(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No warning once someone can administer the server."""
+    users = InMemoryUserRepository()
+    await users.add(_user(Role.ADMIN))
+    _wire(monkeypatch, users)
+
+    with capture_logs() as logs:
+        await startup.warn_if_no_administrator()
+
+    assert logs == []
+
+
+async def test_an_unreachable_database_is_not_a_startup_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The check is skipped, with no warning, if the query fails."""
+
+    def broken() -> object:
+        raise ConnectionError("no database")
+
+    monkeypatch.setattr(startup, "get_session_factory", broken)
+
+    with capture_logs() as logs:
+        await startup.warn_if_no_administrator()
+
+    assert [entry["log_level"] for entry in logs] == ["debug"]
+
+
+@pytest.mark.parametrize("storage", ["media", "backup"])
+@pytest.mark.parametrize("state", ["not-writable", "missing"])
+async def test_warns_when_storage_cannot_be_used(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    storage: str,
+    state: DirectoryState,
+) -> None:
+    """Each unusable storage path logs bind-mount guidance at warning level."""
+    monkeypatch.setattr(
+        startup,
+        "get_media_settings",
+        lambda: SimpleNamespace(storage_path=tmp_path / "media"),
+    )
+    monkeypatch.setattr(
+        startup,
+        "get_backup_settings",
+        lambda: SimpleNamespace(path=tmp_path / "backup"),
+    )
+
+    def probe(path: Path) -> DirectoryProbe:
+        return DirectoryProbe(
+            state=state if path.name == storage else "writable", free_bytes=1024
+        )
+
+    monkeypatch.setattr(
+        startup,
+        "probe_directory",
+        probe,
+    )
+
+    with capture_logs() as logs:
+        await startup.warn_if_storage_not_writable()
+
+    warnings = [entry for entry in logs if entry["log_level"] == "warning"]
+    assert len(warnings) == 1
+    assert str(tmp_path / storage) in warnings[0]["event"]
+    if state == "not-writable":
+        assert "chown 1000:1000 <host directory>" in warnings[0]["event"]
+    else:
+        assert "Mount a volume or directory there" in warnings[0]["event"]
+
+
+async def test_stays_quiet_when_media_storage_is_writable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A writable media directory needs no startup warning."""
+    monkeypatch.setattr(
+        startup,
+        "get_media_settings",
+        lambda: SimpleNamespace(storage_path=tmp_path),
+    )
+    monkeypatch.setattr(
+        startup,
+        "get_backup_settings",
+        lambda: SimpleNamespace(path=tmp_path),
+    )
+
+    with capture_logs() as logs:
+        await startup.warn_if_storage_not_writable()
+
+    assert logs == []
+
+
+async def test_probe_errors_are_skipped_at_debug_level(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A probe exception is logged for diagnostics without failing startup."""
+
+    def broken(_path: Path) -> object:
+        raise OSError("unavailable")
+
+    monkeypatch.setattr(
+        startup,
+        "get_media_settings",
+        lambda: SimpleNamespace(storage_path=tmp_path),
+    )
+    monkeypatch.setattr(startup, "probe_directory", broken)
+
+    with capture_logs() as logs:
+        await startup.warn_if_storage_not_writable()
+
+    assert [entry["log_level"] for entry in logs] == ["debug", "debug"]
+
+
+@pytest.mark.parametrize(
+    ("origins", "warns"),
+    [
+        (["*"], True),
+        (["https://a.example", "*"], True),
+        ([], False),
+        (["https://a.example"], False),
+    ],
+)
+async def test_warns_only_when_cors_allows_any_origin(
+    monkeypatch: pytest.MonkeyPatch, origins: list[str], warns: bool
+) -> None:
+    """Only a `*` is worth a warning; empty and explicit lists stay quiet."""
+    monkeypatch.setattr(
+        startup, "get_api_settings", lambda: SimpleNamespace(cors_origins=origins)
+    )
+
+    with capture_logs() as logs:
+        await startup.warn_if_cors_open()
+
+    if warns:
+        assert [(e["log_level"], e["event"]) for e in logs] == [
+            ("warning", CORS_OPEN_HINT)
+        ]
+    else:
+        assert logs == []
+
+
+def test_the_application_lifespan_runs_the_check_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Starting the app runs both checks once, before serving."""
+    calls: list[str] = []
+
+    async def fake_storage() -> None:
+        calls.append("storage")
+
+    async def fake_cors() -> None:
+        calls.append("cors")
+
+    async def fake_administrator() -> None:
+        calls.append("checked")
+
+    monkeypatch.setattr(startup, "warn_if_storage_not_writable", fake_storage)
+    monkeypatch.setattr(startup, "warn_if_cors_open", fake_cors)
+    monkeypatch.setattr(startup, "warn_if_no_administrator", fake_administrator)
+
+    with TestClient(create_app()) as client:
+        assert calls == ["storage", "cors", "checked"]
+        client.get("/api/health")
+
+    assert calls == ["storage", "cors", "checked"]

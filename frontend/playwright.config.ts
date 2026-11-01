@@ -1,0 +1,194 @@
+import { mkdirSync } from 'node:fs';
+import { availableParallelism, tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { defineConfig, devices } from '@playwright/test';
+
+// Keep the suite off the dev ports to avoid clashing with local stacks.
+const BACKEND_PORT = Number(process.env.E2E_BACKEND_PORT ?? 8100);
+
+// Auth tests run against a dedicated backend and empty database.
+const AUTH_BACKEND_PORT = Number(process.env.E2E_AUTH_BACKEND_PORT ?? 8190);
+
+// Cookie specs run on their own backend behind a TLS proxy, in WebKit and Firefox as well.
+// `E2E_COOKIES=1` (set by `poe test-e2e-cookies`) swaps the whole suite for just those.
+const COOKIES = process.env.E2E_COOKIES === '1';
+const COOKIES_BACKEND_PORT = Number(process.env.E2E_COOKIES_BACKEND_PORT ?? 8191);
+const COOKIES_TLS_PORT = Number(process.env.E2E_COOKIES_TLS_PORT ?? 8192);
+const COOKIES_STRIPPING_PORT = Number(process.env.E2E_COOKIES_STRIPPING_PORT ?? 8193);
+
+// Use the configured worker count, or fall back to the machine core count.
+const WORKERS = Number(process.env.E2E_WORKERS) || availableParallelism();
+
+// Use the production build served by each backend.
+const FRONTEND_DIST = fileURLToPath(new URL('./build', import.meta.url));
+
+// `E2E_SERVER_LOGS=1` shows what the backends and workers log, to explain a 500 or a stall.
+const serverLogs = process.env.E2E_SERVER_LOGS ? 'pipe' : 'ignore';
+
+// A slow-motion run is easier to watch, so extend the timeout too.
+const slowMo = process.env.PW_SLOWMO ? Number(process.env.PW_SLOWMO) : undefined;
+
+/**
+ * The environment of the instance on database menagerist_{name}; a backend and its worker
+ * share it, as the Compose services do.
+ */
+function instanceEnv(name: string, extraEnv: Record<string, string> = {}) {
+	const backupPath = join(tmpdir(), `menagerist-e2e-backups-${name}`);
+	mkdirSync(backupPath, { recursive: true });
+	// Example covers are stored as media, so each backend needs a writable directory. It
+	// must exist before the first upload, or the status page reports a storage warning.
+	const mediaPath = join(tmpdir(), `menagerist-e2e-media-${name}`);
+	mkdirSync(mediaPath, { recursive: true });
+
+	return {
+		MENAGERIST_DATABASE_URL: `postgresql+asyncpg://menagerist:menagerist@localhost:55433/menagerist_${name}`,
+		MENAGERIST_API_FRONTEND_DIST_PATH: FRONTEND_DIST,
+		MENAGERIST_MEDIA_STORAGE_PATH: mediaPath,
+		MENAGERIST_BACKUP_PATH: backupPath,
+		MENAGERIST_BACKUP_BEFORE_MIGRATE: 'false',
+		...extraEnv
+	};
+}
+
+/**
+ * A backend on `port` serving the built SPA from the database menagerist_{name}.
+ * `--no-sync` avoids Windows lock clashes while backends start together.
+ */
+function backend(port: number, name: string, extraEnv: Record<string, string> = {}) {
+	return {
+		command: `uv run --no-sync menagerist serve --host 127.0.0.1 --port ${port}`,
+		cwd: '..',
+		env: instanceEnv(name, extraEnv),
+		stdout: serverLogs,
+		url: `http://localhost:${port}/api/health/ready`,
+		reuseExistingServer: !process.env.CI,
+		timeout: 60_000
+	};
+}
+
+/**
+ * The scheduler worker for the same instance. It has no HTTP port, so it counts as started
+ * once it logs that it is running; the status page's worker check and every queued run
+ * depend on it. Each worker needs its own identity file, as they share one machine.
+ */
+function worker(name: string) {
+	return {
+		command: `uv run --no-sync menagerist worker --identity-file ${join(tmpdir(), `menagerist-e2e-worker-${name}`)}`,
+		cwd: '..',
+		env: instanceEnv(name),
+		stdout: serverLogs,
+		wait: { stdout: /worker started/ },
+		timeout: 60_000
+	};
+}
+
+// The cookie backend is reached directly over HTTP and, through the proxy, over HTTPS. Trusting
+// the proxy's address makes the app see the proxied requests as HTTPS, so one backend issues
+// both the `__Host-Http-` and the plain cookie name.
+const cookieServers = [
+	backend(COOKIES_BACKEND_PORT, 'cookies', { MENAGERIST_API_TRUSTED_PROXIES: '127.0.0.1' }),
+	{
+		command: `node tests/e2e/tls-proxy.mjs ${COOKIES_TLS_PORT} ${COOKIES_BACKEND_PORT}`,
+		url: `https://localhost:${COOKIES_TLS_PORT}/api/health/ready`,
+		ignoreHTTPSErrors: true,
+		reuseExistingServer: !process.env.CI,
+		timeout: 30_000
+	},
+	{
+		command: `node tests/e2e/tls-proxy.mjs ${COOKIES_STRIPPING_PORT} ${COOKIES_BACKEND_PORT} --strip-browser-headers`,
+		url: `https://localhost:${COOKIES_STRIPPING_PORT}/api/health/ready`,
+		ignoreHTTPSErrors: true,
+		reuseExistingServer: !process.env.CI,
+		timeout: 30_000
+	}
+];
+
+// Playwright's WebKit is an engine build, not Safari itself. Use these as a regression guard
+// and still check by hand in Safari on macOS and iOS before a release.
+const cookieProject = (name: string, device: string, extra: Record<string, unknown> = {}) => ({
+	name,
+	use: {
+		...devices[device],
+		baseURL: `https://localhost:${COOKIES_TLS_PORT}`,
+		ignoreHTTPSErrors: true,
+		...extra
+	},
+	testMatch: '**/cookies.spec.ts',
+	dependencies: ['cookies-setup']
+});
+const cookieProjects = [
+	{
+		name: 'cookies-setup',
+		use: { ...devices['Desktop Chrome'] },
+		testMatch: '**/cookies.setup.ts'
+	},
+	cookieProject('cookies-chromium', 'Desktop Chrome'),
+	cookieProject('cookies-webkit', 'Desktop Safari'),
+	// The app sends Cross-Origin-Opener-Policy: same-origin, and Playwright's Firefox then
+	// sometimes never finishes a navigation when the machine is busy (a plain static server
+	// with only that header does the same). A shorter navigation timeout makes it fail fast
+	// and the retries absorb it.
+	{
+		...cookieProject('cookies-firefox', 'Desktop Firefox', { navigationTimeout: 15_000 }),
+		retries: 2
+	}
+];
+
+export default defineConfig({
+	testDir: './tests/e2e',
+	// Files run in parallel across workers, each with its own backend and
+	// database; tests inside a file stay ordered.
+	fullyParallel: false,
+	workers: WORKERS,
+	forbidOnly: !!process.env.CI,
+	retries: process.env.CI ? 1 : 0,
+	// CI also annotates failures on the pull request and writes a blob report per shard, which
+	// the report job merges into one HTML report and job summary.
+	reporter: process.env.CI ? [['list'], ['github'], ['blob']] : 'list',
+	// Backends restart every run and workers share the CPU, so
+	// multi-step specs need more than Playwright's 30s default.
+	timeout: slowMo ? 90_000 : 60_000,
+	expect: { timeout: 10_000 },
+	use: {
+		trace: 'on-first-retry',
+		launchOptions: { slowMo }
+	},
+	projects: COOKIES
+		? cookieProjects
+		: [
+				{
+					name: 'chromium',
+					use: { ...devices['Desktop Chrome'] },
+					testIgnore: ['**/*.mobile.spec.ts', '**/auth.spec.ts', '**/cookies.*']
+				},
+				// Phone-sized run of the viewport-agnostic specs plus the *.mobile.spec.ts layout checks.
+				{
+					name: 'mobile',
+					use: { ...devices['Pixel 5'], viewport: { width: 360, height: 740 } },
+					testMatch: [
+						'**/backups.spec.ts',
+						'**/collections.spec.ts',
+						'**/create-item.spec.ts',
+						'**/connect-items.spec.ts',
+						'**/quick-capture.spec.ts',
+						'**/*.mobile.spec.ts'
+					]
+				},
+				// First-run setup and sign-in flows against the dedicated empty database; runs serially.
+				{
+					name: 'auth',
+					use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${AUTH_BACKEND_PORT}` },
+					testMatch: '**/auth.spec.ts'
+				}
+			],
+	webServer: COOKIES
+		? cookieServers
+		: [
+				...Array.from({ length: WORKERS }, (_, i) => [
+					backend(BACKEND_PORT + i, `w${i}`),
+					worker(`w${i}`)
+				]).flat(),
+				backend(AUTH_BACKEND_PORT, 'auth')
+			]
+});

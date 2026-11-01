@@ -1,0 +1,334 @@
+import uuid
+from typing import TYPE_CHECKING
+
+import pytest
+
+from app.modules.graph.adapters.persistence.edge_repository import (
+    SqlAlchemyEdgeRepository,
+)
+from app.modules.graph.adapters.persistence.node_repository import (
+    SqlAlchemyNodeRepository,
+)
+from app.modules.graph.domain.edge import Edge
+from app.modules.graph.domain.node import Node
+from app.shared_kernel.content_filter import ContentFilter
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+pytestmark = pytest.mark.integration
+
+
+async def _make_node(db_session: AsyncSession) -> Node:
+    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
+    await SqlAlchemyNodeRepository(db_session).add(node)
+    return node
+
+
+async def _make_edge(db_session: AsyncSession) -> Edge:
+    source = await _make_node(db_session)
+    target = await _make_node(db_session)
+    edge = Edge.create(
+        owner_id=uuid.UUID(int=1),
+        source_id=source.id,
+        target_id=target.id,
+        type="related-to",
+    )
+    await SqlAlchemyEdgeRepository(db_session).add(edge)
+    return edge
+
+
+async def test_add_and_get_round_trips(db_session: AsyncSession) -> None:
+    """An edge added to the repository can be retrieved by id."""
+    repository = SqlAlchemyEdgeRepository(db_session)
+    edge = await _make_edge(db_session)
+
+    result = await repository.get(edge.id, scope=ContentFilter.everyone())
+
+    assert result is not None
+    assert result.id == edge.id
+    assert result.source_id == edge.source_id
+    assert result.target_id == edge.target_id
+    assert result.type == edge.type
+    assert result.attributes == edge.attributes
+
+
+async def test_get_returns_none_for_missing_edge(db_session: AsyncSession) -> None:
+    """get() returns None for an id that was never added."""
+    repository = SqlAlchemyEdgeRepository(db_session)
+
+    assert await repository.get(uuid.uuid4(), scope=ContentFilter.everyone()) is None
+
+
+async def test_get_returns_none_for_a_soft_deleted_edge(
+    db_session: AsyncSession,
+) -> None:
+    """get() treats a soft-deleted edge as if it doesn't exist."""
+    repository = SqlAlchemyEdgeRepository(db_session)
+    edge = await _make_edge(db_session)
+
+    edge.soft_delete()
+    await repository.save(edge)
+
+    assert await repository.get(edge.id, scope=ContentFilter.everyone()) is None
+
+
+async def test_save_persists_changes_to_an_existing_edge(
+    db_session: AsyncSession,
+) -> None:
+    """save() overwrites the stored edge with the given instance."""
+    repository = SqlAlchemyEdgeRepository(db_session)
+    edge = await _make_edge(db_session)
+
+    edge.update(attributes={"since": "1979"})
+    await repository.save(edge)
+
+    result = await repository.get(edge.id, scope=ContentFilter.everyone())
+    assert result is not None
+    assert result.attributes == {"since": "1979"}
+
+
+async def test_list_orders_by_id_ascending(db_session: AsyncSession) -> None:
+    """list() returns edge ordered by id ascending, regardless of insert order."""
+    repository = SqlAlchemyEdgeRepository(db_session)
+    edges = [await _make_edge(db_session) for _ in range(3)]
+
+    result = await repository.list(after=None, limit=10, scope=ContentFilter.everyone())
+
+    assert [e.id for e in result] == sorted(e.id for e in edges)
+
+
+async def test_list_excludes_soft_deleted_edges(db_session: AsyncSession) -> None:
+    """list() omits soft-deleted edge."""
+    repository = SqlAlchemyEdgeRepository(db_session)
+    kept = await _make_edge(db_session)
+    deleted = await _make_edge(db_session)
+
+    deleted.soft_delete()
+    await repository.save(deleted)
+
+    result = await repository.list(after=None, limit=10, scope=ContentFilter.everyone())
+
+    assert [e.id for e in result] == [kept.id]
+
+
+async def test_list_for_node_returns_edges_touching_the_node_either_direction(
+    db_session: AsyncSession,
+) -> None:
+    """list_for_node() returns edge where the node is either source or target."""
+    repository = SqlAlchemyEdgeRepository(db_session)
+    node = await _make_node(db_session)
+    other_a = await _make_node(db_session)
+    other_b = await _make_node(db_session)
+    outgoing = Edge.create(
+        owner_id=uuid.UUID(int=1), source_id=node.id, target_id=other_a.id, type="owns"
+    )
+    incoming = Edge.create(
+        owner_id=uuid.UUID(int=1),
+        source_id=other_b.id,
+        target_id=node.id,
+        type="owned-by",
+    )
+    await repository.add(outgoing)
+    await repository.add(incoming)
+    unrelated = await _make_edge(db_session)
+
+    result = await repository.list_for_node(
+        node.id, after=None, limit=10, scope=ContentFilter.everyone()
+    )
+
+    assert {e.id for e in result} == {outgoing.id, incoming.id}
+    assert unrelated.id not in {e.id for e in result}
+
+
+async def test_list_for_node_respects_after_and_limit(
+    db_session: AsyncSession,
+) -> None:
+    """list_for_node() paginates using after/limit."""
+    repository = SqlAlchemyEdgeRepository(db_session)
+    node = await _make_node(db_session)
+    edges = []
+    for _ in range(4):
+        target = await _make_node(db_session)
+        edge = Edge.create(
+            owner_id=uuid.UUID(int=1),
+            source_id=node.id,
+            target_id=target.id,
+            type="owns",
+        )
+        await repository.add(edge)
+        edges.append(edge)
+    edges.sort(key=lambda e: e.id)
+
+    page = await repository.list_for_node(
+        node.id, after=edges[0].id, limit=2, scope=ContentFilter.everyone()
+    )
+
+    assert [e.id for e in page] == [e.id for e in edges[1:3]]
+
+
+async def test_count_and_list_with_attribute_use_jsonb_key_lookup(
+    db_session: AsyncSession,
+) -> None:
+    """Only live edges of the type whose JSONB attributes hold the key match."""
+    repository = SqlAlchemyEdgeRepository(db_session)
+    source = await _make_node(db_session)
+    target = await _make_node(db_session)
+
+    def make(type_: str, attributes: dict[str, int]) -> Edge:
+        return Edge.create(
+            owner_id=uuid.UUID(int=1),
+            source_id=source.id,
+            target_id=target.id,
+            type=type_,
+            attributes=attributes,
+        )
+
+    edges = [make("owns", {"k": i}) for i in range(3)]
+    gone = make("owns", {"k": 9})
+    gone.soft_delete()
+    for edge in [*edges, make("likes", {"k": 1}), make("owns", {}), gone]:
+        await repository.add(edge)
+
+    assert (
+        await repository.count_with_attribute(
+            "owns", "k", scope=ContentFilter.everyone()
+        )
+        == 3
+    )
+    page = await repository.list_with_attribute(
+        "owns", "k", after=None, limit=2, scope=ContentFilter.everyone()
+    )
+    rest = await repository.list_with_attribute(
+        "owns", "k", after=page[-1].id, limit=10, scope=ContentFilter.everyone()
+    )
+    assert [e.id for e in [*page, *rest]] == sorted(e.id for e in edges)
+    assert (
+        await repository.count_with_attribute(
+            "owns", "missing", scope=ContentFilter.everyone()
+        )
+        == 0
+    )
+
+
+async def test_count_with_attribute_matches_an_exact_string_value(
+    db_session: AsyncSession,
+) -> None:
+    """With `value`, JSONB containment counts only exact matches on that key."""
+    repository = SqlAlchemyEdgeRepository(db_session)
+    source = await _make_node(db_session)
+    target = await _make_node(db_session)
+    for attrs in [{"s": "Draft"}, {"s": "Draft"}, {"s": "Live"}, {"x": "Draft"}]:
+        await repository.add(
+            Edge.create(
+                owner_id=uuid.UUID(int=1),
+                source_id=source.id,
+                target_id=target.id,
+                type="owns",
+                attributes=attrs,
+            )
+        )
+
+    assert (
+        await repository.count_with_attribute(
+            "owns", "s", value="Draft", scope=ContentFilter.everyone()
+        )
+        == 2
+    )
+    assert (
+        await repository.count_with_attribute(
+            "owns", "s", value="Gone", scope=ContentFilter.everyone()
+        )
+        == 0
+    )
+
+
+async def test_count_with_attribute_value_matches_array_membership(
+    db_session: AsyncSession,
+) -> None:
+    """With `value`, an array holding it counts; a partial match does not."""
+    repository = SqlAlchemyEdgeRepository(db_session)
+    source = await _make_node(db_session)
+    target = await _make_node(db_session)
+    for held in [["CD", "Tape"], ["Vinyl"], "CD"]:
+        await repository.add(
+            Edge.create(
+                owner_id=uuid.UUID(int=1),
+                source_id=source.id,
+                target_id=target.id,
+                type="owns",
+                attributes={"f": held},
+            )
+        )
+
+    assert (
+        await repository.count_with_attribute(
+            "owns", "f", value="CD", scope=ContentFilter.everyone()
+        )
+        == 2
+    )
+    assert (
+        await repository.count_with_attribute(
+            "owns", "f", value="C", scope=ContentFilter.everyone()
+        )
+        == 0
+    )
+
+
+async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
+    db_session: AsyncSession,
+) -> None:
+    """With `sub_key`, `key` names a group array and its rows are matched instead."""
+    repository = SqlAlchemyEdgeRepository(db_session)
+    source = await _make_node(db_session)
+    target = await _make_node(db_session)
+
+    def make(attributes: dict[str, object]) -> Edge:
+        return Edge.create(
+            owner_id=uuid.UUID(int=1),
+            source_id=source.id,
+            target_id=target.id,
+            type="loaned-to",
+            attributes=attributes,
+        )
+
+    has_terms = make({"terms": [{"note": "handle with care", "duration": "2w"}]})
+    other_row_shape = make({"terms": [{"note": "fragile"}]})
+    for edge in [has_terms, other_row_shape, make({"terms": []}), make({})]:
+        await repository.add(edge)
+
+    assert (
+        await repository.count_with_attribute(
+            "loaned-to", "terms", sub_key="duration", scope=ContentFilter.everyone()
+        )
+        == 1
+    )
+    page = await repository.list_with_attribute(
+        "loaned-to",
+        "terms",
+        sub_key="duration",
+        after=None,
+        limit=10,
+        scope=ContentFilter.everyone(),
+    )
+    assert [e.id for e in page] == [has_terms.id]
+    assert (
+        await repository.count_with_attribute(
+            "loaned-to",
+            "terms",
+            sub_key="duration",
+            value="2w",
+            scope=ContentFilter.everyone(),
+        )
+        == 1
+    )
+    assert (
+        await repository.count_with_attribute(
+            "loaned-to",
+            "terms",
+            sub_key="duration",
+            value="1w",
+            scope=ContentFilter.everyone(),
+        )
+        == 0
+    )

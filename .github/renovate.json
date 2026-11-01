@@ -1,0 +1,221 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices",
+    "group:allNonMajor",
+    "schedule:weekly",
+    "security:openssf-scorecard",
+    "security:minimumReleaseAgePypi"
+  ],
+  "timezone": "UTC",
+  "semanticCommits": "disabled",
+  "osvVulnerabilityAlerts": true,
+  "labels": [
+    "dependencies"
+  ],
+  "vulnerabilityAlerts": {
+    "labels": [
+      "security"
+    ],
+    "schedule": [
+      "at any time"
+    ],
+    "automerge": true,
+    "platformAutomerge": true,
+    "minimumReleaseAge": null
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 6am on monday"
+    ],
+    "automerge": true,
+    "platformAutomerge": true
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The Postgres image testcontainers starts, so it moves with compose.yaml",
+      "managerFilePatterns": [
+        "/^backend/tests/conftest\\.py$/"
+      ],
+      "matchStrings": [
+        "PostgresContainer\\(\"(?<depName>postgres):(?<currentValue>[^\"]+)\"\\)"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "pre-commit": {
+    "enabled": true,
+    "pinDigests": true
+  },
+  "packageRules": [
+    {
+      "description": "One Postgres bump updates compose.yaml and backend/tests/conftest.py together. No digest pin: the CI image cache is keyed on the compose.yaml name and the tests ask for the tag",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "postgres"
+      ],
+      "groupName": "postgres image",
+      "pinDigests": false,
+      "automerge": false
+    },
+    {
+      "description": "Group all Python interpreter version bumps (.python-version, and any future Dockerfile python pins) into one PR, and treat as a major/manual-review change",
+      "matchManagers": [
+        "pyenv",
+        "dockerfile"
+      ],
+      "matchPackageNames": [
+        "python"
+      ],
+      "groupName": "python interpreter version",
+      "automerge": false,
+      "labels": [
+        "python-version"
+      ]
+    },
+    {
+      "description": "Group Python runtime dependencies (project.dependencies)",
+      "matchManagers": [
+        "pep621",
+        "pip_requirements"
+      ],
+      "matchDepTypes": [
+        "dependencies"
+      ],
+      "groupName": "python runtime dependencies"
+    },
+    {
+      "description": "Group Python dev/tooling dependencies (dependency-groups.dev and release)",
+      "matchManagers": [
+        "pep621",
+        "pip_requirements"
+      ],
+      "matchDepTypes": [
+        "dev",
+        "release"
+      ],
+      "groupName": "python dev dependencies"
+    },
+    {
+      "description": "Group Python build-system requirements (build-system.requires)",
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchDepTypes": [
+        "build-system.requires"
+      ],
+      "groupName": "python build system"
+    },
+    {
+      "description": "Group Python distroless-variant extras separately from main runtime deps",
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchDepTypes": [
+        "distroless"
+      ],
+      "groupName": "python distroless dependencies"
+    },
+    {
+      "description": "Group all frontend (npm) updates together",
+      "matchManagers": [
+        "npm"
+      ],
+      "groupName": "frontend dependencies"
+    },
+    {
+      "description": "Group SvelteKit/Vite ecosystem updates",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "/^svelte/",
+        "/^@sveltejs//",
+        "/^vite/",
+        "/^@sveltejs\\/vite-plugin-svelte/"
+      ],
+      "groupName": "svelte & vite"
+    },
+    {
+      "description": "Group GitHub Actions updates together and pin SHA digests",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "github actions",
+      "pinDigests": true
+    },
+    {
+      "description": "Automerge GitHub Actions updates",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "automerge": true,
+      "platformAutomerge": true
+    },
+    {
+      "description": "Group pre-commit hook updates together and pin SHA digests",
+      "matchManagers": [
+        "pre-commit"
+      ],
+      "groupName": "pre-commit hooks",
+      "pinDigests": true
+    },
+    {
+      "description": "Automerge pre-commit hook updates",
+      "matchManagers": [
+        "pre-commit"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "automerge": true,
+      "platformAutomerge": true
+    },
+    {
+      "description": "Automerge non-major devDependency and lint/format tooling updates",
+      "matchDepTypes": [
+        "devDependencies",
+        "dev",
+        "release"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "automerge": true,
+      "platformAutomerge": true
+    },
+    {
+      "description": "Require manual review for all major updates",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "labels": [
+        "major-update"
+      ]
+    },
+    {
+      "description": "Require manual review for runtime/production dependencies",
+      "matchDepTypes": [
+        "dependencies"
+      ],
+      "automerge": false
+    }
+  ]
+}

@@ -1,0 +1,276 @@
+from typing import TYPE_CHECKING
+
+import structlog
+from sqlalchemy import delete, func, select, tuple_
+from sqlalchemy.exc import IntegrityError
+
+from app.modules.collections.adapters.persistence.models import CollectionModel
+from app.modules.collections.domain.collection import (
+    Collection,
+    CollectionKind,
+    Visibility,
+)
+from app.platform.orm_mixins import claim_rows, owned_by
+from app.shared_kernel.errors import ConflictError
+from app.shared_kernel.slug import Slug
+
+if TYPE_CHECKING:
+    import builtins
+    import uuid
+    from datetime import datetime
+
+    from sqlalchemy import ColumnElement
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.orm import InstrumentedAttribute
+
+    from app.shared_kernel.content_filter import ContentFilter
+
+logger = structlog.get_logger()
+
+
+_LIKE_ESCAPE = "\\"
+
+
+def _like_pattern(q: str) -> str:
+    """Return a contains-pattern for `q` with LIKE wildcards escaped."""
+    escaped = q.replace(_LIKE_ESCAPE, _LIKE_ESCAPE * 2)
+    escaped = escaped.replace("%", _LIKE_ESCAPE + "%").replace("_", _LIKE_ESCAPE + "_")
+    return f"%{escaped}%"
+
+
+def _unaccent_ilike(
+    column_: InstrumentedAttribute[str] | InstrumentedAttribute[str | None],
+    pattern: str,
+) -> ColumnElement[bool]:
+    """Case- and accent-insensitive LIKE of `column_` against an escaped `pattern`."""
+    return func.unaccent(column_).ilike(func.unaccent(pattern), escape=_LIKE_ESCAPE)
+
+
+def _in_scope(scope: ContentFilter) -> ColumnElement[bool]:
+    """Live collections whose owner is inside `scope`."""
+    return CollectionModel.deleted_at.is_(None) & owned_by(
+        CollectionModel, scope.user_id
+    )
+
+
+def _to_domain(model: CollectionModel) -> Collection:
+    """Convert an ORM row into the domain entity."""
+    return Collection(
+        id=model.id,
+        name=model.name,
+        slug=Slug(model.slug),
+        description=model.description,
+        kind=CollectionKind(model.kind),
+        owner_id=model.owner_id,
+        visibility=Visibility(model.visibility),
+        definition=model.definition,
+        created_at=model.created_at,
+        updated_at=model.updated_at,
+        deleted_at=model.deleted_at,
+    )
+
+
+def _to_model(collection: Collection) -> CollectionModel:
+    """Convert a domain entity into its ORM row."""
+    return CollectionModel(
+        id=collection.id,
+        name=collection.name,
+        slug=str(collection.slug),
+        description=collection.description,
+        kind=collection.kind.value,
+        owner_id=collection.owner_id,
+        visibility=collection.visibility.value,
+        definition=collection.definition,
+        created_at=collection.created_at,
+        updated_at=collection.updated_at,
+        deleted_at=collection.deleted_at,
+    )
+
+
+class SqlAlchemyCollectionRepository:
+    """Postgres-backed `CollectionRepository`, scoped to one session."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, collection: Collection) -> None:
+        """Add a new collection.
+
+        Raises:
+            ConflictError: If a live collection of the same owner uses the slug.
+        """
+        logger.debug("adding collection", collection_id=collection.id)
+        try:
+            # A savepoint keeps the session usable after a rejected insert.
+            async with self._session.begin_nested():
+                self._session.add(_to_model(collection))
+        except IntegrityError as exc:
+            raise ConflictError(
+                f"A collection with slug '{collection.slug}' already exists"
+            ) from exc
+
+    async def save(self, collection: Collection) -> None:
+        """Persist changes to an existing collection, including soft deletion.
+
+        Raises:
+            ConflictError: If a live collection of the same owner uses the slug.
+        """
+        logger.debug("saving collection", collection_id=collection.id)
+        try:
+            # A savepoint keeps the session usable after a rejected write.
+            async with self._session.begin_nested():
+                await self._session.merge(_to_model(collection))
+                await self._session.flush()
+        except IntegrityError as exc:
+            raise ConflictError(
+                f"A collection with slug '{collection.slug}' already exists"
+            ) from exc
+
+    async def get(
+        self, collection_id: uuid.UUID, *, scope: ContentFilter
+    ) -> Collection | None:
+        """Return the live collection with `collection_id` in `scope`, or `None`."""
+        stmt = (
+            select(CollectionModel)
+            .where(_in_scope(scope), CollectionModel.id == collection_id)
+            # A read session may outlive a commit made through another session.
+            .execution_options(populate_existing=True)
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return None if model is None else _to_domain(model)
+
+    async def get_by_slug(
+        self, slug: str, *, scope: ContentFilter
+    ) -> Collection | None:
+        """Return the live collection with `slug` in `scope`, or `None`.
+
+        Slugs are unique per owner, so under `everyone()` the lowest id wins.
+        """
+        stmt = (
+            select(CollectionModel)
+            .where(_in_scope(scope), CollectionModel.slug == slug)
+            .order_by(CollectionModel.id)
+            .limit(1)
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return None if model is None else _to_domain(model)
+
+    async def list(
+        self,
+        *,
+        scope: ContentFilter,
+        after: uuid.UUID | None,
+        limit: int,
+        q: str | None = None,
+        kind: CollectionKind | None = None,
+    ) -> list[Collection]:
+        """Return up to `limit` live collections in `scope`, ordered by id.
+
+        A non-blank `q` keeps collections whose name or description contains it,
+        ignoring case and accents. A `kind` keeps only collections of that kind.
+        """
+        stmt = (
+            select(CollectionModel)
+            .where(_in_scope(scope))
+            .order_by(CollectionModel.id)
+            .limit(limit)
+        )
+        if after is not None:
+            stmt = stmt.where(CollectionModel.id > after)
+        if kind is not None:
+            stmt = stmt.where(CollectionModel.kind == kind.value)
+        needle = (q or "").strip()
+        if needle:
+            pattern = _like_pattern(needle)
+            stmt = stmt.where(
+                _unaccent_ilike(CollectionModel.name, pattern)
+                | _unaccent_ilike(CollectionModel.description, pattern)
+            )
+        return [_to_domain(m) for m in (await self._session.execute(stmt)).scalars()]
+
+    @staticmethod
+    def _deleted(scope: ContentFilter) -> ColumnElement[bool]:
+        """Soft-deleted collections whose owner is inside `scope`."""
+        return CollectionModel.deleted_at.is_not(None) & owned_by(
+            CollectionModel, scope.user_id
+        )
+
+    async def get_deleted(
+        self, collection_id: uuid.UUID, *, scope: ContentFilter
+    ) -> Collection | None:
+        """Return the soft-deleted collection with `collection_id`, or `None`."""
+        stmt = (
+            select(CollectionModel)
+            .where(self._deleted(scope), CollectionModel.id == collection_id)
+            .execution_options(populate_existing=True)
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return None if model is None else _to_domain(model)
+
+    async def list_deleted(
+        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[Collection]:
+        """List soft-deleted collections in `scope`, newest deleted first."""
+        stmt = (
+            select(CollectionModel)
+            .where(self._deleted(scope))
+            .order_by(CollectionModel.deleted_at.desc(), CollectionModel.id.desc())
+            .limit(limit)
+        )
+        if after is not None:
+            last = (
+                select(CollectionModel.deleted_at)
+                .where(CollectionModel.id == after, self._deleted(scope))
+                .scalar_subquery()
+            )
+            stmt = stmt.where(
+                tuple_(CollectionModel.deleted_at, CollectionModel.id)
+                < tuple_(last, after)
+            )
+        return [_to_domain(m) for m in (await self._session.execute(stmt)).scalars()]
+
+    async def count_deleted(self, *, scope: ContentFilter) -> int:
+        """Return the number of soft-deleted collections in `scope`."""
+        stmt = (
+            select(func.count())
+            .select_from(CollectionModel)
+            .where(self._deleted(scope))
+        )
+        return (await self._session.execute(stmt)).scalar_one()
+
+    async def purge(self, collection_id: uuid.UUID) -> None:
+        """Hard-delete the collection row, live or soft-deleted; unknown is a no-op."""
+        await self._session.execute(
+            delete(CollectionModel).where(CollectionModel.id == collection_id)
+        )
+        await self._session.flush()
+
+    async def list_deleted_before(
+        self, cutoff: datetime, *, limit: int
+    ) -> builtins.list[Collection]:
+        """List collections soft-deleted before `cutoff`, oldest first (ties by id)."""
+        stmt = (
+            select(CollectionModel)
+            .where(CollectionModel.deleted_at < cutoff)
+            .order_by(CollectionModel.deleted_at, CollectionModel.id)
+            .limit(limit)
+        )
+        result = await self._session.execute(stmt)
+        return [_to_domain(model) for model in result.scalars()]
+
+    async def count_deleted_before(self, cutoff: datetime) -> int:
+        """Return how many collections were soft-deleted before `cutoff`, any owner."""
+        stmt = (
+            select(func.count())
+            .select_from(CollectionModel)
+            .where(CollectionModel.deleted_at < cutoff)
+        )
+        return (await self._session.execute(stmt)).scalar_one()
+
+    async def claim_orphaned(
+        self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
+    ) -> int:
+        """Give `owner_id` every collection with no owner or a legacy owner."""
+        return await claim_rows(
+            self._session, CollectionModel, owner_id, legacy_owner_ids
+        )

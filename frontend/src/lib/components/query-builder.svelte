@@ -1,0 +1,362 @@
+<script lang="ts">
+	import { tick, untrack } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
+	import { TriangleAlert } from '@lucide/svelte';
+	import * as Alert from '$lib/components/ui/alert/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import * as Combobox from '$lib/components/ui/combobox/index.js';
+	import type { ComboboxItem } from '$lib/components/ui/combobox/index.js';
+	import * as NativeSelect from '$lib/components/ui/native-select/index.js';
+	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
+	import QueryGroup from '$lib/components/query-group.svelte';
+	import {
+		applyDraft,
+		conditionNumbers,
+		draftPathFor,
+		fieldSubject,
+		parseFieldSubject,
+		sortFromValue,
+		sortValue,
+		STALE_SORT_MESSAGE,
+		type BuilderError,
+		type BuilderView
+	} from '$lib/query/builder';
+	import { BuilderState } from '$lib/query/builder-state.svelte';
+	import { ConnectionLookups } from '$lib/query/connection-lookups.svelte';
+	import { canNestConnection } from '$lib/query/limits';
+	import {
+		fieldReferenceLabel,
+		findField,
+		groupByType,
+		sortableFields,
+		type Catalogue
+	} from '$lib/query/fields';
+	import { canAddCondition, canAddGroup } from '$lib/query/limits';
+	import { pathKey } from '$lib/query/warnings';
+	import type { Condition, Path, Query } from '$lib/query/types';
+
+	let {
+		open = $bindable(false),
+		query,
+		catalogue,
+		collections = null,
+		excludeCollectionId = null,
+		collectionsFailed = false,
+		onretrycollections,
+		connections: sharedConnections = undefined,
+		warned = new Set<string>(),
+		warnedMessages = new Map<string, string>(),
+		sortWarned = false,
+		error = null,
+		notice = null,
+		focus = null,
+		title = 'Filters',
+		description = 'Show only the items that match. Changes apply as you go.',
+		saving = false,
+		inline = false,
+		onsave,
+		oncancel,
+		onchange
+	}: {
+		open?: boolean;
+		/** The filter as applied (from the URL). */
+		query: Query;
+		catalogue: Catalogue;
+		/** Every collection the person has, for "In collection"; null until read. */
+		collections?: readonly { id: string; name: string }[] | null;
+		/** The collection being edited; it cannot be picked. */
+		excludeCollectionId?: string | null;
+		/** Reading the collections failed. */
+		collectionsFailed?: boolean;
+		onretrycollections?: () => void;
+		/** Relationships and linked item names; share the page's so its chips agree. */
+		connections?: ConnectionLookups;
+		/** Filter path keys of conditions the server could not match. */
+		warned?: ReadonlySet<string>;
+		/** The server's words for those conditions, by the same keys. */
+		warnedMessages?: ReadonlyMap<string, string>;
+		sortWarned?: boolean;
+		/** The server's reason for refusing the filter. */
+		error?: BuilderError | null;
+		/** A page-level message, such as the filter being too large to add the page's own filters. */
+		notice?: string | null;
+		/** Filter path of the row to show when the panel opens. */
+		focus?: Path | null;
+		title?: string;
+		description?: string;
+		saving?: boolean;
+		/** Render the conditions in place instead of in a dialog of their own. */
+		inline?: boolean;
+		/** When `oncancel` is set, keep the draft until Save. */
+		onsave?: () => void;
+		oncancel?: () => void;
+		onchange: (query: Query, options: { debounce: boolean }) => void;
+	} = $props();
+
+	// The props are read through closures so the state follows them.
+	const builder = new BuilderState(
+		untrack(() => query),
+		() => catalogue,
+		(next, options) => onchange(next, options)
+	);
+	const connections = untrack(() => sharedConnections) ?? new ConnectionLookups();
+	let announcement = $state('');
+	const sortLabelId = $props.id();
+	let contentEl = $state<HTMLElement | null>(null);
+
+	// Follow the URL when it changes from elsewhere (Back, a chip removed on the page).
+	$effect(() => {
+		const current = query;
+		untrack(() => builder.sync(current));
+	});
+
+	const shown = $derived(builder.shown);
+	const draft = $derived(builder.draft);
+
+	// Read the relationships and linked item names a connection row names.
+	$effect(() => {
+		const current = shown;
+		untrack(() => connections.ensureFor(current));
+	});
+	const applied = $derived(applyDraft(shown, catalogue));
+	const numbers = $derived(conditionNumbers(shown));
+
+	function toDraftKey(appliedPath: Path | null): string | null {
+		if (!appliedPath) return null;
+		const key = pathKey(appliedPath);
+		const path = draftPathFor(applied.toApplied, key);
+		if (path) return pathKey(path);
+		// A row the server refused may not be applied locally; until edited, the draft is the URL's tree.
+		return numbers.has(key) ? key : null;
+	}
+
+	const warnedDraft = $derived(
+		new Set(
+			[...warned]
+				.map((key) => toDraftKey(key === '' ? [] : key.split('.').map(Number)))
+				.filter((key): key is string => key !== null)
+		)
+	);
+	const warningMessages = $derived.by(() => {
+		const out = new SvelteMap<string, string>();
+		for (const [key, message] of warnedMessages) {
+			const draftKey = toDraftKey(key === '' ? [] : key.split('.').map(Number));
+			if (draftKey !== null) out.set(draftKey, message);
+		}
+		return out;
+	});
+	const errorKey = $derived(toDraftKey(error?.path ?? null));
+	const errorText = $derived.by(() => {
+		if (!error) return null;
+		const n = errorKey ? numbers.get(errorKey) : undefined;
+		return n ? `Condition ${n}: ${error.message}` : error.message;
+	});
+
+	async function focusRow(key: string | null) {
+		await tick();
+		const target =
+			(key && contentEl?.querySelector<HTMLElement>(`[data-row-key="${key}"] [role="combobox"]`)) ||
+			contentEl?.querySelector<HTMLElement>('[data-row-key] [role="combobox"]') ||
+			contentEl?.querySelector<HTMLElement>('[data-add-condition]');
+		target?.focus();
+		target?.scrollIntoView({ block: 'nearest' });
+	}
+
+	const view: BuilderView = $derived({
+		catalogue,
+		collections,
+		excludeCollectionId,
+		collectionsFailed,
+		retryCollections() {
+			onretrycollections?.();
+		},
+		numbers,
+		warned: warnedDraft,
+		warningMessages,
+		relationships: connections.relationships,
+		relationshipsFailed: connections.relationshipsFailed,
+		retryRelationships() {
+			connections.retryRelationships();
+		},
+		searchItems: (text: string) => connections.searchItems(text),
+		itemName: connections.itemName,
+		rememberItem: (item) => connections.rememberItem(item),
+		canNestConnection,
+		error: errorKey && error ? { key: errorKey, message: error.message } : null,
+		canAddCondition: canAddCondition(shown),
+		canAddGroup: (groupPath: Path) => canAddGroup(shown, groupPath),
+		update(path: Path, condition: Condition, options?: { debounce?: boolean }) {
+			builder.update(path, condition, options?.debounce ?? false);
+		},
+		remove(path: Path) {
+			const n = builder.remove(path);
+			announcement = n === undefined ? 'Group removed.' : `Condition ${n} removed.`;
+			void focusRow(pathKey(path));
+		},
+		addCondition(groupPath: Path) {
+			const at = builder.addCondition(groupPath);
+			if (!at) return;
+			announcement = `Condition ${conditionNumbers(builder.shown).get(pathKey(at)) ?? ''} added.`;
+			void focusRow(pathKey(at));
+		},
+		addGroup(groupPath: Path) {
+			const at = builder.addGroup(groupPath);
+			if (!at) return;
+			announcement = 'Group added. It matches any of its conditions.';
+			void focusRow(pathKey(at));
+		},
+		setGroupOp(path: Path, op: 'and' | 'or') {
+			builder.setGroupOp(path, op);
+		}
+	});
+
+	function clearAll() {
+		builder.clear();
+		announcement = 'All conditions removed.';
+		void focusRow('0');
+	}
+
+	const sortChoice = $derived(sortValue(draft.sort));
+	const sortDir = $derived(draft.sort[0]?.dir ?? 'asc');
+	const sortGroups = $derived(groupByType(catalogue, sortableFields(catalogue)));
+	const sortIsKnown = $derived(
+		!catalogue.loaded ||
+			!sortChoice.startsWith('field:') ||
+			sortGroups.some((g) => g.fields.some((f) => fieldSubject(f.type, f.key) === sortChoice))
+	);
+	const staleSort = $derived(sortIsKnown ? null : parseFieldSubject(sortChoice));
+	const sortItems = $derived.by((): ComboboxItem[] => {
+		const items: ComboboxItem[] = [
+			{ value: 'default', label: 'Order added (default)' },
+			{ value: 'name', label: 'Name' },
+			{ value: 'created', label: 'Date added' },
+			{ value: 'updated', label: 'Date changed' }
+		];
+		if (staleSort) {
+			const archived = findField(catalogue, staleSort.type, staleSort.key)?.archived;
+			items.push({
+				value: sortChoice,
+				label: `${fieldReferenceLabel(catalogue, staleSort.type, staleSort.key)}${
+					archived ? ' (archived)' : ' (no longer exists)'
+				}`
+			});
+		}
+		for (const group of sortGroups) {
+			for (const f of group.fields) {
+				items.push({
+					value: fieldSubject(f.type, f.key),
+					label: f.label,
+					group: group.label,
+					selectedLabel: `${group.label} › ${f.label}`
+				});
+			}
+		}
+		return items;
+	});
+
+	function onOpenAutoFocus(event: Event) {
+		const appliedKey = focus ? pathKey(focus) : null;
+		const key = appliedKey !== null ? toDraftKey(focus) : null;
+		const blankOnly = numbers.size === 1 && !applied.query.where;
+		const target = key ?? (blankOnly ? '0' : null);
+		if (target === null) return;
+		event.preventDefault();
+		void focusRow(target);
+	}
+</script>
+
+{#snippet panel()}
+	<div class={['flex flex-1 flex-col gap-4', !inline && 'mt-4']}>
+		{#if errorText}
+			<Alert.Root variant="destructive">
+				<TriangleAlert />
+				<Alert.Title>This filter can't be used</Alert.Title>
+				<Alert.Description>{errorText}</Alert.Description>
+			</Alert.Root>
+		{/if}
+		{#if notice}
+			<Alert.Root>
+				<TriangleAlert />
+				<Alert.Description>{notice}</Alert.Description>
+			</Alert.Root>
+		{/if}
+
+		{#if shown.where}
+			<QueryGroup group={shown.where} path={[]} {view} />
+		{/if}
+
+		<div class="flex flex-col gap-2 border-t pt-4">
+			<span class="text-sm font-medium" id={sortLabelId}>Sort by</span>
+			<div class="flex flex-wrap gap-2" role="group" aria-labelledby={sortLabelId}>
+				<Combobox.Root
+					class="h-9 min-w-0 flex-1 basis-48"
+					aria-label="Sort by"
+					items={sortItems}
+					value={sortChoice}
+					searchPlaceholder="Search fields…"
+					emptyText="No matching fields"
+					onValueChange={(next) => builder.setSort(sortFromValue(next, sortDir))}
+				/>
+				<NativeSelect.Root
+					class="min-w-0 basis-36 [&_select]:h-9"
+					aria-label="Sort direction"
+					disabled={sortChoice === 'default'}
+					value={sortDir}
+					onchange={(e) =>
+						builder.setSort(
+							sortFromValue(sortChoice, e.currentTarget.value === 'desc' ? 'desc' : 'asc')
+						)}
+				>
+					<NativeSelect.Option value="asc">Ascending</NativeSelect.Option>
+					<NativeSelect.Option value="desc">Descending</NativeSelect.Option>
+				</NativeSelect.Root>
+			</div>
+			{#if sortWarned || staleSort}
+				<p class="flex items-start gap-1.5 text-sm">
+					<TriangleAlert class="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
+					<span>{STALE_SORT_MESSAGE}</span>
+				</p>
+			{/if}
+		</div>
+	</div>
+
+	<p class="sr-only" role="status" aria-live="polite">{announcement}</p>
+{/snippet}
+
+{#if inline}
+	<div bind:this={contentEl} class="flex flex-col gap-3">
+		{@render panel()}
+		<div class="flex justify-start">
+			<Button type="button" variant="ghost" onclick={clearAll}>Clear all</Button>
+		</div>
+	</div>
+{:else}
+	<ResponsiveDialog.Root bind:open>
+		<ResponsiveDialog.Content
+			{title}
+			bind:ref={contentEl}
+			{onOpenAutoFocus}
+			class="flex flex-col pb-0 max-sm:h-dvh max-sm:max-h-dvh max-sm:rounded-none max-sm:border-t-0 sm:max-h-[85dvh] sm:max-w-2xl"
+		>
+			<ResponsiveDialog.Description>
+				{description}
+			</ResponsiveDialog.Description>
+
+			{@render panel()}
+
+			<div
+				class="sticky bottom-0 -mx-6 mt-6 flex items-center justify-between gap-2 border-t bg-background px-6 py-4"
+			>
+				<Button variant="ghost" onclick={clearAll}>Clear all</Button>
+				{#if onsave && oncancel}
+					<div class="flex items-center gap-2">
+						<Button variant="outline" disabled={saving} onclick={oncancel}>Cancel</Button>
+						<Button disabled={saving} onclick={onsave}>{saving ? 'Saving…' : 'Save'}</Button>
+					</div>
+				{:else}
+					<Button onclick={() => (open = false)}>Done</Button>
+				{/if}
+			</div>
+		</ResponsiveDialog.Content>
+	</ResponsiveDialog.Root>
+{/if}

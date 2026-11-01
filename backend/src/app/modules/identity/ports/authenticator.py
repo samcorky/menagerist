@@ -1,0 +1,39 @@
+from dataclasses import dataclass, field
+from typing import Protocol
+
+
+@dataclass(kw_only=True, frozen=True)
+class PasswordCredentials:
+    """A username and password as typed on the sign-in form."""
+
+    username: str
+    password: str
+
+    def __repr__(self) -> str:
+        """Keep the password out of logs and tracebacks."""
+        return f"PasswordCredentials(username={self.username!r})"
+
+
+@dataclass(kw_only=True, frozen=True)
+class VerifiedIdentity:
+    """Who a credential check proved the caller to be."""
+
+    subject: str
+    display_name: str
+    # The stored hash the password matched; a later step refuses if it changed.
+    credential_hash: str = field(repr=False)
+
+
+class Authenticator(Protocol):
+    """Checks credentials and names the person they belong to."""
+
+    async def authenticate(
+        self, credentials: PasswordCredentials
+    ) -> VerifiedIdentity | None:
+        """Return the verified identity, or `None` if the credentials are wrong.
+
+        Raises:
+            AccountDisabledError: If the credentials are right but the account
+                is disabled (never raised for wrong credentials).
+        """
+        ...

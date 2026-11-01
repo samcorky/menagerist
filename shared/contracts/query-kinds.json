@@ -1,0 +1,28 @@
+{
+  "ref_kinds": [
+    "date",
+    "duration",
+    "money",
+    "number",
+    "rating"
+  ],
+  "sortable_kinds": [
+    "choice",
+    "date",
+    "duration",
+    "email",
+    "money",
+    "number",
+    "partialdate",
+    "phone",
+    "rating",
+    "text",
+    "url"
+  ],
+  "no_value_operators": [
+    "complete",
+    "empty",
+    "incomplete",
+    "not_empty"
+  ]
+}

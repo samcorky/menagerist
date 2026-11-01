@@ -1,0 +1,192 @@
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Request, Response
+from fastapi.responses import StreamingResponse
+
+from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.entrypoints.api.shared.http.problem_response import error_response
+from app.entrypoints.api.shared.http.upload_limit_middleware import (
+    PAYLOAD_TOO_LARGE_RESPONSE,
+)
+from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
+from app.modules.backup.adapters.api.router import ARCHIVE_BODY
+from app.modules.backup.adapters.api.schemas import BackupResponse, UserExportResponse
+from app.modules.backup.adapters.api.user_dependencies import (
+    get_delete_user_export,
+    get_export_user_data,
+    get_import_user_archive,
+    get_list_user_exports,
+    get_open_user_export,
+)
+from app.modules.backup.application.delete_user_export import (
+    DeleteUserExport,
+    DeleteUserExportCommand,
+)
+from app.modules.backup.application.export_user_data import (
+    ExportUserData,
+    ExportUserDataCommand,
+)
+from app.modules.backup.application.import_user_archive import (
+    ImportUserArchive,
+    ImportUserArchiveCommand,
+)
+from app.modules.backup.application.list_user_exports import (
+    ListUserExports,
+    ListUserExportsQuery,
+)
+from app.modules.backup.application.open_user_export import (
+    OpenUserExport,
+    OpenUserExportQuery,
+)
+from app.modules.backup.domain.errors import (
+    BackupNotFoundError,
+    IncompatibleBackupError,
+)
+from app.shared_kernel.actor import Actor
+
+router = APIRouter(
+    prefix="/me", tags=["Personal backups"], route_class=PermissionAwareRoute
+)
+
+
+@router.post(
+    "/export",
+    status_code=201,
+    response_model=BackupResponse,
+    operation_id="export_user_data",
+    responses={
+        201: {
+            "links": {
+                "DownloadExport": {
+                    "operationId": "download_user_export",
+                    "parameters": {"backup_id": "$response.body#/id"},
+                    "description": "Download the archive that was just created.",
+                },
+                "DeleteExport": {
+                    "operationId": "delete_user_export",
+                    "parameters": {"backup_id": "$response.body#/id"},
+                    "description": "Delete the archive that was just created.",
+                },
+            }
+        }
+    },
+)
+async def export_user_data(
+    use_case: Annotated[ExportUserData, Depends(get_export_user_data)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> BackupResponse:
+    """Create a verified archive of the caller's content."""
+    return BackupResponse.model_validate(
+        await use_case.handle(ExportUserDataCommand(), actor)
+    )
+
+
+@router.get(
+    "/exports",
+    response_model=list[UserExportResponse],
+    operation_id="list_user_exports",
+    responses={
+        200: {
+            "links": {
+                "DownloadExport": {
+                    "operationId": "download_user_export",
+                    "parameters": {"backup_id": "$response.body#/0/id"},
+                    "description": "Download the newest export in this list.",
+                },
+                "DeleteExport": {
+                    "operationId": "delete_user_export",
+                    "parameters": {"backup_id": "$response.body#/0/id"},
+                    "description": "Delete the newest export in this list.",
+                },
+            }
+        }
+    },
+)
+async def list_user_exports(
+    use_case: Annotated[ListUserExports, Depends(get_list_user_exports)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> list[UserExportResponse]:
+    """List the caller's unexpired personal exports, newest first."""
+    return [
+        UserExportResponse.from_export(export)
+        for export in await use_case.handle(ListUserExportsQuery(), actor)
+    ]
+
+
+@router.get(
+    "/export/{backup_id}/download",
+    operation_id="download_user_export",
+    responses={
+        **error_response(
+            BackupNotFoundError,
+            detail="Export 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40 was not found.",
+        ),
+        200: {
+            "description": "The caller's personal archive.",
+            "content": {
+                "application/gzip": {"schema": {"type": "string", "format": "binary"}}
+            },
+        },
+    },
+)
+async def download_user_export(
+    backup_id: UUID,
+    use_case: Annotated[OpenUserExport, Depends(get_open_user_export)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> StreamingResponse:
+    """Stream an archive from the caller's private namespace."""
+    opened = await use_case.handle(OpenUserExportQuery(backup_id=backup_id), actor)
+    return StreamingResponse(
+        opened.chunks,
+        media_type="application/gzip",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="menagerist-personal-{backup_id}.tar.gz"'
+            ),
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.delete(
+    "/export/{backup_id}",
+    status_code=204,
+    operation_id="delete_user_export",
+    responses=error_response(
+        BackupNotFoundError,
+        detail="Export 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40 was not found.",
+    ),
+)
+async def delete_user_export(
+    backup_id: UUID,
+    use_case: Annotated[DeleteUserExport, Depends(get_delete_user_export)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> Response:
+    """Delete one of the caller's personal exports."""
+    await use_case.handle(DeleteUserExportCommand(backup_id=backup_id), actor)
+    return Response(status_code=204)
+
+
+@router.post(
+    "/import",
+    status_code=204,
+    operation_id="import_user_data",
+    openapi_extra=ARCHIVE_BODY,
+    responses={
+        **PAYLOAD_TOO_LARGE_RESPONSE,
+        **error_response(
+            IncompatibleBackupError,
+            detail="The archive's revision, format or scope cannot be restored here.",
+            description="The account contains content or the archive is incompatible.",
+        ),
+    },
+)
+async def import_user_data(
+    request: Request,
+    use_case: Annotated[ImportUserArchive, Depends(get_import_user_archive)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> Response:
+    """Import a verified personal archive into the caller's account."""
+    await use_case.handle(ImportUserArchiveCommand(stream=request.stream()), actor)
+    return Response(status_code=204)

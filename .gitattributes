@@ -1,0 +1,19 @@
+# Normalise all text files to LF in the repository, regardless of the
+# checking-out platform or a contributor's core.autocrlf setting. This is
+# git's/GitHub's own recommended default and is what actually stops
+# line-ending noise in diffs - core.autocrlf alone only controls the
+# working-tree checkout, not what gets committed.
+* text=auto eol=lf
+
+# Binary assets: never touched by line-ending normalisation.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary

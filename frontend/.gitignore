@@ -1,0 +1,38 @@
+node_modules
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
+/node_modules
+
+# Lint cache
+.eslintcache
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+.vite/
+
+# Generated API client (run `poe generate-frontend-client` to regenerate)
+/openapi.json
+/src/lib/api/generated
+
+# Playwright
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache

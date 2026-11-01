@@ -1,0 +1,101 @@
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, ClassVar
+
+import structlog
+
+from app.modules.graph.application._validate_attributes import validate_attributes
+from app.modules.graph.application.choice_lists import resolve_choice_lists
+from app.modules.graph.application.extra_schema_limits import check_extra_schema_limits
+from app.modules.graph.application.permissions import GraphPermission
+from app.modules.graph.application.schema_meta import (
+    check_schema_definition,
+    merge_attribute_schemas,
+)
+from app.modules.graph.domain.node import Node
+from app.modules.graph.domain.node_type import NodeType
+
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.access import Access, Content
+
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.slug import slugify
+
+if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
+    from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
+
+
+@dataclass(kw_only=True)
+class CreateNodeCommand:
+    """Request to create a new node."""
+
+    name: str
+    type: str | None = field(default=None)
+    description: str | None = field(default=None)
+    attributes: dict[str, Any] = field(default_factory=dict)
+    favourite: bool = field(default=False)
+    tags: list[str] = field(default_factory=list)
+    extra_schema: dict[str, Any] | None = field(default=None)
+
+
+class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
+    """Create and persist a new node, auto-creating its NodeType if not yet known."""
+
+    access: ClassVar[Access] = Content(GraphPermission.ITEM_WRITE)
+
+    def __init__(
+        self,
+        uow: GraphUnitOfWork,
+        guard: AccessGuard,
+        choice_lists: ChoiceListSource | None = None,
+    ) -> None:
+        super().__init__(uow, guard)
+        self._choice_lists = choice_lists
+
+    async def _handle(self, command: CreateNodeCommand, actor: Actor) -> Node:
+        """Create a node from `command` and commit it.
+
+        If no NodeType exists for the given type slug, one is created automatically
+        so the vocabulary builds itself as nodes are added.
+        """
+        if command.extra_schema is not None:
+            check_schema_definition(command.extra_schema)
+        check_extra_schema_limits(command.extra_schema)
+        node = Node.create(
+            owner_id=actor.id,
+            name=command.name,
+            type=command.type,
+            description=command.description,
+            attributes=command.attributes,
+            favourite=command.favourite,
+            tags=command.tags,
+            extra_schema=command.extra_schema,
+        )
+        async with self._uow as repos:
+            type_schema: dict[str, Any] | None = None
+            if command.type is not None:
+                slug = slugify(command.type)
+                node_type = await repos.node_types.get_by_slug(
+                    slug, guard_item_write=True
+                )
+                if node_type is None:
+                    await repos.node_types.add(
+                        NodeType.create(slug=slug, label=command.type)
+                    )
+                else:
+                    type_schema = node_type.attributes_schema
+            schema = await resolve_choice_lists(
+                merge_attribute_schemas(type_schema, command.extra_schema),
+                self._choice_lists,
+            )
+            if schema is not None:
+                validate_attributes(schema, command.attributes)
+            await repos.nodes.add(node)
+            await self._uow.commit()
+        logger.info("node created", node_id=node.id, node_type=node.type)
+        return node

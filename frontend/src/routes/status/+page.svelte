@@ -1,0 +1,826 @@
+<script lang="ts">
+	import Page from '$lib/components/page.svelte';
+	import type { Component } from 'svelte';
+	import { onMount, tick } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
+	import { resolve } from '$app/paths';
+	import {
+		getHealthReady,
+		getHealthReadyDetail,
+		getVersion,
+		checkForUpdates,
+		getVersionDetail,
+		runBrowserCheck
+	} from '$lib/api/client';
+	import type {
+		CheckObservation,
+		ReadyDetailResponse,
+		VersionDetailResponse,
+		VersionResponse
+	} from '$lib/api/client';
+	import { networkAwareError } from '$lib/api/errors';
+	import { auth } from '$lib/auth.svelte.js';
+	import { LOGIN_PATH, STATUS_PATH } from '$lib/auth';
+	import {
+		browserCheckOf,
+		countStatuses,
+		detailUnavailable,
+		formatObservedValue,
+		readinessOf,
+		readyDetailOf,
+		type BrowserCheck,
+		type Readiness
+	} from '$lib/status';
+	import { formatGroup, formatLabel, groupIcon, metricIcon } from '$lib/status-display';
+	import ReleaseCard from '$lib/components/release-card.svelte';
+	import * as Card from '$lib/components/ui/card/index.js';
+	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import * as Collapsible from '$lib/components/ui/collapsible/index.js';
+	import * as PopoverTooltip from '$lib/components/ui/popover-tooltip/index.js';
+	import {
+		Activity,
+		AlertTriangle,
+		CheckCircle2,
+		ChevronDown,
+		CircleX,
+		Globe,
+		LogIn,
+		PackageCheck,
+		RefreshCw,
+		TriangleAlert
+	} from '@lucide/svelte';
+
+	function formatValue(obs: CheckObservation): string {
+		return formatObservedValue(obs.observedValue, obs.observedUnit);
+	}
+
+	function statusLabel(status: string): string {
+		if (status === 'pass') return 'Operational';
+		if (status === 'fail') return 'Degraded';
+		return 'Warning';
+	}
+
+	function statusTone(status: string): string {
+		if (status === 'pass') {
+			return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400';
+		}
+		if (status === 'fail') {
+			return 'border-destructive/30 bg-destructive/10 text-destructive';
+		}
+		return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400';
+	}
+
+	function statusBarTone(status: string): string {
+		if (status === 'pass') return 'border border-emerald-500/30 bg-emerald-500/10';
+		if (status === 'fail') return 'border border-destructive/30 bg-destructive/10';
+		return 'border border-amber-500/30 bg-amber-500/10';
+	}
+
+	function statusIcon(status: string): Component {
+		if (status === 'pass') return CheckCircle2;
+		if (status === 'fail') return CircleX;
+		return TriangleAlert;
+	}
+
+	function groupStatus(checks: Array<{ obs: CheckObservation }>): CheckObservation['status'] {
+		if (checks.some(({ obs }) => obs.status === 'fail')) return 'fail';
+		if (checks.some(({ obs }) => obs.status === 'warn')) return 'warn';
+		return 'pass';
+	}
+
+	function groupSummary(checks: Array<{ obs: CheckObservation }>): string {
+		const counts = countStatuses(checks.map(({ obs }) => obs));
+		const parts: string[] = [];
+		if (counts.pass > 0) parts.push(`${counts.pass}/${counts.total} Operational`);
+		if (counts.warn > 0) {
+			parts.push(`${counts.warn} warning${counts.warn === 1 ? '' : 's'}`);
+		}
+		if (counts.fail > 0) parts.push(`${counts.fail} alert${counts.fail === 1 ? '' : 's'}`);
+		return parts.join(' · ') || 'No checks reported';
+	}
+
+	function urlSafeIdPart(value: string): string {
+		return (
+			value
+				.normalize('NFKD')
+				.replace(/[\u0300-\u036f]/g, '')
+				.toLowerCase()
+				.replace(/[^a-z0-9]+/g, '-')
+				.replace(/^-+|-+$/g, '') || 'check'
+		);
+	}
+
+	function checkAnchorIds(
+		groupKey: string,
+		checks: Array<{ label: string; obs: CheckObservation }>
+	): string[] {
+		const baseIds = checks.map(({ label, obs }) => {
+			const identity = [groupKey, label, obs.observedUnit ?? '']
+				.map((part) => urlSafeIdPart(String(part)))
+				.join('-');
+			return `status-check-${identity}`;
+		});
+		const assignedIds: string[] = [];
+		return baseIds.map((baseId, index) => {
+			const isDuplicate = baseIds.filter((id) => id === baseId).length > 1;
+			let id = isDuplicate ? `${baseId}-${index + 1}` : baseId;
+			while (assignedIds.includes(id)) id = `${id}-${index + 1}`;
+			assignedIds.push(id);
+			return id;
+		});
+	}
+
+	let highlightedCheckId = $state<string | null>(null);
+	const openGroups = new SvelteMap<string, boolean>();
+	const lastGroupStatus = new SvelteMap<string, CheckObservation['status']>();
+	let buildOpen = $state(false);
+
+	type CheckGroups = Map<string, Array<{ label: string; obs: CheckObservation }>>;
+
+	// Problem groups open by default; a pass group that starts failing opens once.
+	// Anything the user toggled is never forced closed.
+	function syncOpenGroups(current: CheckGroups): void {
+		for (const [groupKey, checks] of current) {
+			const status = groupStatus(checks);
+			const previous = lastGroupStatus.get(groupKey);
+			if (previous === undefined) {
+				openGroups.set(groupKey, status !== 'pass');
+			} else if (previous === 'pass' && status !== 'pass') {
+				openGroups.set(groupKey, true);
+			}
+			lastGroupStatus.set(groupKey, status);
+		}
+	}
+
+	async function revealCheck(groupKey: string, anchorId: string): Promise<void> {
+		openGroups.set(groupKey, true);
+		await tick();
+		for (let attempt = 0; attempt < 10; attempt++) {
+			const target = document.getElementById(anchorId);
+			if (target) {
+				target.scrollIntoView({ block: 'start' });
+				target.focus({ preventScroll: true });
+				return;
+			}
+			await new Promise((done) => requestAnimationFrame(() => done(null)));
+		}
+	}
+
+	function openCheckLink(event: MouseEvent, groupKey: string, anchorId: string): void {
+		event.preventDefault();
+		highlightedCheckId = anchorId;
+		if (window.location.hash !== `#${anchorId}`) {
+			window.history.pushState(window.history.state, '', `#${anchorId}`);
+		}
+		void revealCheck(groupKey, anchorId);
+	}
+
+	function revealInitialHash(current: CheckGroups): void {
+		const anchorId = decodeURIComponent(window.location.hash.slice(1));
+		if (!anchorId) return;
+		for (const [groupKey, checks] of current) {
+			if (checkAnchorIds(groupKey, checks).includes(anchorId)) {
+				void revealCheck(groupKey, anchorId);
+				return;
+			}
+		}
+	}
+
+	function clearStatusTarget(event: MouseEvent): void {
+		if (event.target instanceof Element && event.target.closest('a[data-status-check-link]')) {
+			return;
+		}
+
+		highlightedCheckId = null;
+		if (
+			document.activeElement instanceof HTMLElement &&
+			document.activeElement.matches('.status-check-detail')
+		) {
+			document.activeElement.blur();
+		}
+
+		if (window.location.hash) {
+			window.history.replaceState(
+				window.history.state,
+				'',
+				`${window.location.pathname}${window.location.search}`
+			);
+		}
+	}
+
+	onMount(() => {
+		document.addEventListener('click', clearStatusTarget);
+		return () => document.removeEventListener('click', clearStatusTarget);
+	});
+
+	function latestObservationTime(report: ReadyDetailResponse): Date | null {
+		let latest = Number.NEGATIVE_INFINITY;
+		for (const observation of Object.values(report.checks).flat()) {
+			const timestamp = Date.parse(observation.time);
+			if (Number.isFinite(timestamp) && timestamp > latest) latest = timestamp;
+		}
+		return Number.isFinite(latest) ? new Date(latest) : null;
+	}
+
+	let readiness = $state<Readiness | null>(null);
+	let detail = $state<ReadyDetailResponse | null>(null);
+	let version = $state<VersionResponse | null>(null);
+	let buildInfo = $state<VersionDetailResponse | null>(null);
+	let browserCheck = $state<BrowserCheck | null>(null);
+	const showDetail = $derived(auth.signedIn && auth.can('system:diagnostics:read'));
+	const signInHref = $derived(`${resolve(LOGIN_PATH)}?next=${encodeURIComponent(STATUS_PATH)}`);
+	let loading = $state(true);
+	let loadError = $state<string | null>(null);
+	let lastCheckTime = $state<Date | null>(null);
+	let refreshing = $state(false);
+	let autoRefreshEnabled = $state(true);
+	let databaseUnreachable = $state(false);
+	const autoRefreshMs = 30000;
+	const retryMs = 5000;
+	const refreshMs = $derived(databaseUnreachable ? retryMs : autoRefreshMs);
+
+	const groups = $derived.by(
+		(): SvelteMap<string, Array<{ label: string; obs: CheckObservation }>> => {
+			const map = new SvelteMap<string, Array<{ label: string; obs: CheckObservation }>>();
+			if (!detail?.checks) return map;
+			for (const [key, observations] of Object.entries(detail.checks)) {
+				const [groupKey, metricName] = key.includes(':') ? key.split(':', 2) : ['other', key];
+				if (!map.has(groupKey)) map.set(groupKey, []);
+				for (const [index, obs] of observations.entries()) {
+					const label = observations.length > 1 ? `${metricName} (${index + 1})` : metricName;
+					map.get(groupKey)!.push({ label, obs });
+				}
+			}
+			return map;
+		}
+	);
+
+	const versionRows = $derived.by((): Array<{ label: string; value: string }> => {
+		const rows: Array<{ label: string; value: string }> = [];
+		const info = buildInfo;
+		if (!info) return rows;
+
+		rows.push({ label: 'Application', value: `${info.name} v${info.current_version}` });
+		if (info.branch != null) rows.push({ label: 'Branch', value: info.branch });
+		if (info.short_sha != null) {
+			const dirty = info.dirty === true ? ' (dirty)' : '';
+			rows.push({ label: 'Commit', value: `${info.short_sha}${dirty}` });
+		}
+		if (info.build_timestamp != null) {
+			rows.push({ label: 'Built', value: new Date(info.build_timestamp).toLocaleString() });
+		}
+		rows.push({ label: 'Migration', value: info.migration_head.join(', ') || 'none' });
+
+		return rows;
+	});
+
+	const healthSummary = $derived.by(() => {
+		if (!detail?.checks) return countStatuses([]);
+		return countStatuses(Object.values(detail.checks).flat());
+	});
+
+	async function settle<T>(call: () => Promise<T>): Promise<T | null> {
+		try {
+			return await call();
+		} catch {
+			return null;
+		}
+	}
+
+	let checkingUpdates = $state(false);
+	let updateCheckError = $state<string | null>(null);
+
+	// Asks the server to look for a release, then re-reads the stored result. The
+	// 30-second refresh only ever re-reads it.
+	async function checkNow(): Promise<void> {
+		if (checkingUpdates) return;
+		checkingUpdates = true;
+		updateCheckError = null;
+		try {
+			const checked = await checkForUpdates();
+			if (checked.error !== undefined) {
+				updateCheckError = networkAwareError(checked).title;
+				return;
+			}
+			const detailRes = await getVersionDetail();
+			if (detailRes.data) buildInfo = detailRes.data;
+		} catch {
+			updateCheckError = 'The check could not be run.';
+		} finally {
+			checkingUpdates = false;
+		}
+	}
+
+	async function checkBrowser(): Promise<Parameters<typeof browserCheckOf>[0]> {
+		try {
+			return await runBrowserCheck();
+		} catch {
+			return {};
+		}
+	}
+
+	let initialHashHandled = false;
+
+	async function load(refresh = false): Promise<void> {
+		if (refresh) {
+			refreshing = true;
+		} else {
+			loading = true;
+		}
+		loadError = null;
+
+		try {
+			const withDetail = showDetail;
+			const [readyRes, versionRes, detailRes, buildRes, browserRes] = await Promise.all([
+				getHealthReady(),
+				getVersion(),
+				withDetail ? settle(() => getHealthReadyDetail()) : undefined,
+				withDetail ? settle(() => getVersionDetail()) : undefined,
+				withDetail ? checkBrowser() : undefined
+			]);
+
+			const state = readinessOf(readyRes);
+			if (state === null || !versionRes.data) {
+				throw new Error('The server gave an unexpected answer.');
+			}
+			readiness = state;
+			version = versionRes.data;
+			databaseUnreachable = withDetail && detailUnavailable(detailRes ?? null);
+			detail = detailRes ? readyDetailOf(detailRes) : null;
+			buildInfo = buildRes?.data ?? null;
+			browserCheck = browserRes && !databaseUnreachable ? browserCheckOf(browserRes) : null;
+			lastCheckTime = (detail && latestObservationTime(detail)) || new Date();
+			syncOpenGroups(groups);
+			if (!initialHashHandled) {
+				initialHashHandled = true;
+				revealInitialHash(groups);
+			}
+		} catch (err) {
+			loadError = err instanceof Error ? err.message : 'Unknown error';
+		} finally {
+			loading = false;
+			refreshing = false;
+		}
+	}
+
+	$effect(() => {
+		void load();
+	});
+
+	$effect(() => {
+		if (!autoRefreshEnabled) return;
+		const timer = window.setInterval(() => {
+			void load(true);
+		}, refreshMs);
+		return () => window.clearInterval(timer);
+	});
+
+	const triggerClass =
+		'relative -mb-(--card-spacing) flex min-h-9 pointer-coarse:min-h-11 w-full items-center justify-center gap-2 border-t border-border/70 px-5 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none';
+
+	function formatTime(date: Date): string {
+		return date.toLocaleString(undefined, {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit',
+			second: '2-digit'
+		});
+	}
+</script>
+
+{#snippet browserRow(label: string, value: string)}
+	<div class="flex items-center justify-between gap-4 border-t border-border/80 px-5 py-3">
+		<span class="text-sm text-muted-foreground">{label}</span>
+		<span class="max-w-[60%] truncate text-right font-mono text-sm">{value}</span>
+	</div>
+{/snippet}
+
+<svelte:head>
+	<title>System status - Menagerist</title>
+</svelte:head>
+
+<Page width="fluid">
+	<div
+		class="flex items-start justify-between gap-4 rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur-sm"
+	>
+		<div>
+			<p class="mb-2 text-xs font-medium tracking-[0.18em] text-muted-foreground uppercase">
+				Operations
+			</p>
+			<h1 class="font-heading text-3xl font-semibold tracking-tight">System status</h1>
+			{#if lastCheckTime}
+				<p class="mt-1 text-sm text-muted-foreground">
+					Last checked at {formatTime(lastCheckTime)}
+				</p>
+			{/if}
+			{#if version}
+				<p class="mt-1 text-sm text-muted-foreground">
+					{version.name} v{version.current_version}
+				</p>
+			{/if}
+			<p class="mt-1 text-xs text-muted-foreground">
+				{autoRefreshEnabled ? `Auto-refreshing every ${refreshMs / 1000}s` : 'Auto-refresh paused'}
+			</p>
+		</div>
+		<div class="flex items-center gap-2">
+			{#if !auth.signedIn}
+				<Button variant="outline" class="pointer-coarse:h-11" href={signInHref}>
+					<LogIn class="size-4" />
+					Sign in
+				</Button>
+			{/if}
+			<Button
+				variant="outline"
+				size="icon"
+				class="pointer-coarse:size-11"
+				onclick={() => load(true)}
+				disabled={refreshing || loading}
+				aria-label="Refresh status"
+				title="Refresh status"
+			>
+				<RefreshCw class="size-4 {refreshing ? 'animate-spin' : ''}" />
+			</Button>
+			<Button
+				variant={autoRefreshEnabled ? 'default' : 'outline'}
+				size="sm"
+				onclick={() => (autoRefreshEnabled = !autoRefreshEnabled)}
+				aria-label={autoRefreshEnabled ? 'Pause auto refresh' : 'Resume auto refresh'}
+				title={autoRefreshEnabled ? 'Pause auto refresh' : 'Resume auto refresh'}
+				class="gap-2 rounded-full pointer-coarse:min-h-11"
+			>
+				<Activity class="size-4" />
+				<span class="inline-flex items-center gap-1.5">
+					<span
+						class={autoRefreshEnabled
+							? 'size-2 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,0.2)]'
+							: 'size-2 rounded-full bg-muted-foreground'}
+					></span>
+					{autoRefreshEnabled ? 'Live' : 'Paused'}
+				</span>
+			</Button>
+		</div>
+	</div>
+
+	{#if loading}
+		<div class="flex flex-col gap-4">
+			<div class="h-16 animate-pulse rounded-2xl bg-muted"></div>
+			<div class="h-40 animate-pulse rounded-2xl bg-muted"></div>
+			<div class="h-48 animate-pulse rounded-2xl bg-muted"></div>
+		</div>
+	{:else if loadError}
+		<Card.Root class="border-destructive/50 bg-destructive/5 shadow-sm">
+			<Card.Content class="px-4 py-3">
+				<div class="flex items-center gap-2 text-destructive">
+					<AlertTriangle class="size-4" />
+					<p class="text-sm font-medium">Failed to load status</p>
+				</div>
+				<p class="mt-2 text-sm text-muted-foreground">{loadError}</p>
+			</Card.Content>
+		</Card.Root>
+	{:else if readiness}
+		{@const displayStatus = databaseUnreachable ? 'fail' : (detail?.status ?? readiness)}
+		{@const isPass = displayStatus === 'pass'}
+		{@const isWarning = displayStatus === 'warn'}
+		{@const StatusIcon = statusIcon(displayStatus)}
+		<Card.Root
+			class={isPass
+				? 'border-emerald-500/30 bg-emerald-500/5 shadow-sm'
+				: isWarning
+					? 'border-amber-500/30 bg-amber-500/5 shadow-sm'
+					: 'border-destructive/30 bg-destructive/5 shadow-sm'}
+		>
+			<Card.Content class="flex items-center justify-between gap-3 px-4 py-3">
+				<div class="flex items-center gap-3">
+					<div
+						class="flex size-8 items-center justify-center rounded-full {isPass
+							? 'bg-emerald-500/10 text-emerald-600'
+							: isWarning
+								? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+								: 'bg-destructive/10 text-destructive'}"
+					>
+						<StatusIcon class="size-4" />
+					</div>
+					<div>
+						<p class="font-medium">
+							{isPass
+								? 'All systems operational'
+								: isWarning
+									? 'Some checks need attention'
+									: 'Service degraded'}
+						</p>
+						<p class="text-xs text-muted-foreground">
+							{databaseUnreachable
+								? "Menagerist cannot reach its database, so details can't be loaded until it is back. This page keeps retrying."
+								: isPass
+									? 'Everything Menagerist needs is working.'
+									: isWarning
+										? 'The service is ready, but one or more checks reported a warning.'
+										: 'Something Menagerist needs is not working.'}
+						</p>
+					</div>
+				</div>
+				<Badge class={statusTone(displayStatus)}>
+					<StatusIcon class="size-3" />
+					{statusLabel(displayStatus)}
+				</Badge>
+			</Card.Content>
+		</Card.Root>
+
+		{#if detail}
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+				<div class="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+					<p class="text-xs tracking-[0.18em] text-muted-foreground uppercase">Checks</p>
+					<div class="mt-2 flex items-baseline gap-2">
+						<span class="font-heading text-2xl font-semibold">{healthSummary.total}</span>
+						<span class="text-sm text-muted-foreground">total</span>
+					</div>
+				</div>
+				<div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 shadow-sm">
+					<p class="text-xs tracking-[0.18em] text-emerald-700 uppercase dark:text-emerald-400">
+						Healthy
+					</p>
+					<div class="mt-2 flex items-baseline gap-2 text-emerald-600 dark:text-emerald-400">
+						<span class="font-heading text-2xl font-semibold">{healthSummary.pass}</span>
+						<span class="text-sm">operational</span>
+					</div>
+				</div>
+				<div class="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 shadow-sm">
+					<p class="text-xs tracking-[0.18em] text-amber-700 uppercase dark:text-amber-400">
+						Warnings
+					</p>
+					<div class="mt-2 flex items-baseline gap-2 text-amber-600 dark:text-amber-400">
+						<span class="font-heading text-2xl font-semibold">{healthSummary.warn}</span>
+						<span class="text-sm">warning</span>
+					</div>
+				</div>
+				<div class="rounded-2xl border border-destructive/20 bg-destructive/5 p-4 shadow-sm">
+					<p class="text-xs tracking-[0.18em] text-destructive uppercase">Alerts</p>
+					<div class="mt-2 flex items-baseline gap-2 text-destructive">
+						<span class="font-heading text-2xl font-semibold">{healthSummary.fail}</span>
+						<span class="text-sm">failing</span>
+					</div>
+				</div>
+			</div>
+		{/if}
+
+		{@const hasSide = (showDetail && browserCheck) || buildInfo?.release || buildInfo}
+		<div class={['grid items-start gap-4', hasSide && '2xl:grid-cols-[minmax(0,1fr)_22rem]']}>
+			<div class="grid items-start gap-4 xl:grid-cols-2">
+				{#each groups as [groupKey, checks] (groupKey)}
+					{@const anchorIds = checkAnchorIds(groupKey, checks)}
+					{@const GroupIcon = groupIcon(groupKey)}
+					{@const groupHealth = groupStatus(checks)}
+					{@const GroupStatusIcon = statusIcon(groupHealth)}
+					{@const isOpen = openGroups.get(groupKey) ?? false}
+					<Card.Root class="overflow-hidden border-border/70 bg-card shadow-sm">
+						<Collapsible.Root
+							open={isOpen}
+							onOpenChange={(value) => openGroups.set(groupKey, value)}
+							class="flex flex-col gap-(--card-spacing)"
+						>
+							<Card.Header class="px-4 pt-4 pb-0">
+								<div class="flex items-center justify-between gap-3">
+									<div class="flex items-center gap-2.5">
+										<div
+											class="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+										>
+											<GroupIcon class="size-4" />
+										</div>
+										<Card.Title class="text-base">{formatGroup(groupKey)}</Card.Title>
+									</div>
+									<Badge class={statusTone(groupHealth)}>
+										<GroupStatusIcon class="size-3" />
+										{statusLabel(groupHealth)}
+									</Badge>
+								</div>
+							</Card.Header>
+							<div class="space-y-2 px-5 pt-3 pb-0">
+								<div
+									class="flex h-3 gap-1"
+									role="group"
+									aria-label={`${formatGroup(groupKey)} checks; select a segment to view its details`}
+								>
+									{#each checks as { label, obs }, index (`${label}-${index}`)}
+										<PopoverTooltip.Root>
+											<PopoverTooltip.Trigger>
+												{#snippet child({ props })}
+													<a
+														{...props}
+														data-status-check-link
+														href={`#${anchorIds[index]}`}
+														onclick={(event) => openCheckLink(event, groupKey, anchorIds[index])}
+														class="min-w-0 flex-1 rounded-full {statusBarTone(
+															obs.status
+														)} transition-[filter] duration-150 hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none"
+														aria-label={`${formatLabel(label)}: ${statusLabel(obs.status)}. ${formatValue(obs)}${obs.output ? `. ${obs.output}` : ''}`}
+													></a>
+												{/snippet}
+											</PopoverTooltip.Trigger>
+											<PopoverTooltip.Content class="text-left whitespace-normal">
+												{formatLabel(label)}: {statusLabel(obs.status)}. {formatValue(obs)}
+												{#if obs.output}
+													. {obs.output}
+												{/if}
+											</PopoverTooltip.Content>
+										</PopoverTooltip.Root>
+									{/each}
+								</div>
+								<p class="text-center text-xs font-medium text-muted-foreground">
+									{groupSummary(checks)}
+								</p>
+							</div>
+							<Collapsible.Content>
+								<Card.Content class="space-y-3 p-4">
+									{#each checks as { label, obs }, index (`${label}-${index}`)}
+										{@const MetricIcon = metricIcon(label)}
+										{@const MetricStatusIcon = statusIcon(obs.status)}
+										<div
+											id={anchorIds[index]}
+											tabindex="-1"
+											class="status-check-detail flex scroll-mt-24 items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-3 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring {highlightedCheckId ===
+											anchorIds[index]
+												? 'status-check-highlighted'
+												: ''}"
+										>
+											<div
+												class="flex size-8 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground ring-1 ring-border/80"
+											>
+												<MetricIcon class="size-4" />
+											</div>
+											<div class="min-w-0 flex-1">
+												<div class="flex items-center justify-between gap-3">
+													<span class="text-sm font-medium">{formatLabel(label)}</span>
+													<Badge class={statusTone(obs.status)}>
+														<MetricStatusIcon class="size-3" />
+														{statusLabel(obs.status)}
+													</Badge>
+												</div>
+												<p class="mt-1 font-mono text-xs text-muted-foreground">
+													{formatValue(obs)}
+												</p>
+												{#if obs.output}
+													<p
+														class={obs.status === 'warn'
+															? 'mt-2 text-sm leading-relaxed break-words text-amber-700 dark:text-amber-400'
+															: 'mt-2 text-sm leading-relaxed break-words text-destructive'}
+													>
+														{obs.output}
+													</p>
+												{/if}
+											</div>
+										</div>
+									{/each}
+								</Card.Content>
+							</Collapsible.Content>
+							<Collapsible.Trigger class={triggerClass}>
+								<ChevronDown
+									class="size-4 transition-transform motion-reduce:transition-none {isOpen
+										? 'rotate-180'
+										: ''}"
+								/>
+								{isOpen ? 'Hide details' : 'Show details'}
+								<span class="sr-only"> for {formatGroup(groupKey)}</span>
+							</Collapsible.Trigger>
+						</Collapsible.Root>
+					</Card.Root>
+				{/each}
+			</div>
+			<div class="flex flex-col gap-4">
+				{#if showDetail && browserCheck}
+					{@const check = browserCheck}
+					<Card.Root
+						class="overflow-hidden border-border/70 bg-card shadow-sm"
+						data-testid="browser-check"
+						data-state={check.state}
+					>
+						<Card.Header class="px-4 pt-4 pb-0">
+							<div class="flex items-center justify-between gap-3">
+								<div class="flex items-center gap-2.5">
+									<div
+										class="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+									>
+										<Globe class="size-4" />
+									</div>
+									<Card.Title class="text-base">Browser check</Card.Title>
+								</div>
+								{#if check.state === 'pass' || check.state === 'warn' || check.state === 'fail'}
+									{@const BrowserStatusIcon = statusIcon(check.state)}
+									<Badge class={statusTone(check.state)}>
+										<BrowserStatusIcon class="size-3" />
+										{statusLabel(check.state)}
+									</Badge>
+								{/if}
+							</div>
+						</Card.Header>
+						<Card.Content class="space-y-0 p-0">
+							{#if check.state === 'pass'}
+								<p class="px-5 py-3 text-sm text-emerald-700 dark:text-emerald-400">
+									Your browser's headers reach Menagerist intact.
+								</p>
+							{:else if check.state === 'warn' || check.state === 'fail'}
+								{#if check.output}
+									<p
+										class="px-5 py-3 text-sm leading-relaxed break-words {check.state === 'warn'
+											? 'text-amber-700 dark:text-amber-400'
+											: 'text-destructive'}"
+									>
+										{check.output}
+									</p>
+								{/if}
+								{@render browserRow('Your browser sent', check.origin ?? 'Nothing')}
+								{@render browserRow('Menagerist saw', check.seenOrigin)}
+							{:else if check.state === 'stripped'}
+								<p class="px-5 py-3 text-sm leading-relaxed break-words text-destructive">
+									Something between your browser and Menagerist is removing the Origin and
+									Sec-Fetch-Site headers, so changes made from the app will be refused. Check that
+									your reverse proxy passes request headers through.
+								</p>
+								{@render browserRow('This page', window.location.origin)}
+							{:else}
+								<p class="px-5 py-3 text-sm text-muted-foreground">The check could not be run.</p>
+							{/if}
+						</Card.Content>
+					</Card.Root>
+				{/if}
+
+				{#if buildInfo?.release}
+					<ReleaseCard
+						release={buildInfo.release}
+						canCheck={auth.can('system:release:check')}
+						checking={checkingUpdates}
+						checkError={updateCheckError}
+						onCheck={() => void checkNow()}
+					/>
+				{/if}
+
+				{#if buildInfo}
+					<Card.Root class="overflow-hidden border-border/70 bg-card shadow-sm">
+						<Collapsible.Root bind:open={buildOpen} class="flex flex-col gap-(--card-spacing)">
+							<Card.Header class="px-4 pt-4 pb-0">
+								<div class="flex items-center gap-2.5">
+									<div
+										class="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+									>
+										<PackageCheck class="size-4" />
+									</div>
+									<Card.Title class="text-base">Build info</Card.Title>
+								</div>
+							</Card.Header>
+							<Collapsible.Content>
+								<Card.Content class="space-y-0 p-0">
+									{#each versionRows as { label, value }, i (label)}
+										<div
+											class="flex items-center justify-between gap-4 px-5 py-3 {i !==
+											versionRows.length - 1
+												? 'border-b border-border/80'
+												: ''}"
+										>
+											<span class="text-sm text-muted-foreground">{label}</span>
+											<span class="max-w-[60%] truncate text-right font-mono text-sm">{value}</span>
+										</div>
+									{/each}
+								</Card.Content>
+							</Collapsible.Content>
+							<Collapsible.Trigger class={triggerClass}>
+								<ChevronDown
+									class="size-4 transition-transform motion-reduce:transition-none {buildOpen
+										? 'rotate-180'
+										: ''}"
+								/>
+								{buildOpen ? 'Hide details' : 'Show details'}
+								<span class="sr-only"> for build info</span>
+							</Collapsible.Trigger>
+						</Collapsible.Root>
+					</Card.Root>
+				{/if}
+			</div>
+		</div>
+	{/if}
+</Page>
+
+<style>
+	.status-check-detail.status-check-highlighted {
+		outline: 2px solid var(--color-ring);
+		outline-offset: 2px;
+		animation: status-check-arrive 1.2s ease-out;
+	}
+
+	@keyframes status-check-arrive {
+		from {
+			box-shadow: 0 0 0 6px color-mix(in oklab, var(--color-ring) 35%, transparent);
+		}
+
+		to {
+			box-shadow: 0 0 0 0 transparent;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.status-check-detail.status-check-highlighted {
+			animation: none;
+		}
+	}
+</style>

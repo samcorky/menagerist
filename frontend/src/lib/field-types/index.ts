@@ -1,0 +1,35 @@
+// descriptorForProp ranks matches (see registry.ts), so order no longer decides
+// correctness - only ties, which none of the current kinds' shapes produce.
+// Scalars must be registered before group so sub-field fromSchema lookups work.
+import './date/date';
+import './longtext/longtext';
+import './choice/choice';
+import './multichoice/multichoice';
+import './url/url';
+import './email/email';
+import './phone/phone';
+import './partialdate/partialdate';
+import './number/number';
+import './rating/rating';
+import './duration/duration';
+import './boolean/boolean';
+import './text/text';
+import './group/group';
+import './quantity/quantity';
+import './money/money';
+import './list/list';
+import './checklist/checklist';
+import './opaque/opaque';
+// Core-only kinds have no schema-editor half.
+import './cron/cron';
+
+export {
+	register,
+	getDescriptor,
+	allDescriptors,
+	descriptorForProp,
+	fieldFromProperty,
+	propertyFromField
+} from './registry';
+export { registerCore, getCore, allCores, coreForProp } from './core';
+export type { FieldCore } from './core';

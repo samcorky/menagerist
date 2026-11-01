@@ -1,0 +1,43 @@
+import uuid
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, ClassVar
+
+import structlog
+
+from app.modules.graph.application.permissions import GraphPermission
+from app.modules.graph.domain.errors import NodeNotFoundError
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.cqrs import CommandHandler
+
+if TYPE_CHECKING:
+    from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
+
+
+@dataclass(kw_only=True)
+class DeleteNodeCommand:
+    """Request to soft-delete a node."""
+
+    node_id: uuid.UUID
+
+
+class DeleteNode(CommandHandler[GraphUnitOfWork, DeleteNodeCommand, None]):
+    """Soft-delete an existing node."""
+
+    access: ClassVar[Access] = Content(GraphPermission.ITEM_WRITE)
+
+    async def _handle(self, command: DeleteNodeCommand, actor: Actor) -> None:
+        """Soft-delete the node identified by `command` and commit."""
+        async with self._uow as repos:
+            node = await repos.nodes.get(command.node_id, scope=self.scope(actor))
+            if node is None:
+                raise NodeNotFoundError(f"Node {command.node_id} not found")
+            self._guard.assert_can_delete(actor, node.owner_id)
+
+            node.soft_delete()
+
+            await repos.nodes.save(node)
+            await self._uow.commit()
+        logger.info("node deleted", node_id=command.node_id)

@@ -1,0 +1,311 @@
+# Menagerist Backend Architecture
+
+Hexagonal (ports-and-adapters) architecture with DDD, organised as vertical slices by bounded context. This describes the pattern itself - how modules, ports, adapters, and routers relate - not a snapshot of what's currently built.
+
+## Coding conventions
+
+Shared project-wide conventions (British English, comment style, dependency policy) are in [AGENTS.md](../AGENTS.md#general-rules). Backend-specific rules:
+
+- Prefer Google-style docstrings for Python functions, methods, classes, and modules that are public or non-trivial. Keep the summary brief and use `Args:`, `Returns:`, and `Raises:` sections only when they add real value.
+- This project targets Python 3.14. The backend type-checking config in `backend/pyproject.toml` is strict: `mypy` runs with `strict = true`, `plugins = ["pydantic.mypy"]`, `warn_unused_configs = true`, and `show_error_codes = true`.
+- Use native Python 3.14 typing syntax and avoid quoted type annotations entirely. Prefer `str | None`, `list[str]`, and explicit concrete parameter/return types over stringified annotations or `Optional[...]`/`Union[...]` where the modern form is clearer.
+- Do not add `from __future__ import annotations`; the repo explicitly bans it because runtime frameworks need annotations to be resolvable at runtime.
+- Keep annotations explicit, precise, and readable; avoid `Any` unless it is truly necessary and document the reason when you do use it.
+
+## Hexagonal architecture
+
+Domain sits at the center and depends on nothing: entities, value objects, and business rules, with zero FastAPI/SQLAlchemy/Pydantic imports. Application wraps domain with use cases and defines **ports** - Python `Protocol`s describing what a use case needs from the outside world (a repository, a clock, an event publisher) without knowing how it's implemented. Adapters come in two directions:
+
+- **Driving (inbound) adapters** call *into* the application layer - API routers, CLI commands, scheduler consumers. They translate an external trigger (an HTTP request, a CLI invocation, a due cron job) into a use-case call.
+- **Driven (outbound) adapters** get called *by* the application layer through a port - a SQLAlchemy repository implementing a `NodeRepository` port, an HTTP client implementing a `MetadataEnricher` port.
+
+Dependency direction is the one rule everything else protects:
+
+```
+entrypoints  →  adapters  →  application  →  domain
+```
+
+Nothing on the right imports anything on the left. Application depends on port interfaces it defines itself, never on the concrete adapter satisfying them. The concrete adapter is chosen and wired in at the composition root (the entrypoint).
+
+## Modules as bounded contexts
+
+The organising principle is *what domain concept this is about* - `graph`, `media`, `search`, `identity` - never *what kind of code this is*. There's no repo-wide `models/`, `services/`, or `routers/`; each module carries its own domain, application, ports, and adapter code:
+
+```
+modules/<context>/
+├── domain/            # entities, value objects - no framework imports
+├── application/       # use cases only - no ports here
+├── ports/             # the slice's public contract - one Protocol per file
+│   ├── node_repository.py
+│   └── unit_of_work.py
+└── adapters/
+    ├── api/            # FastAPI router - driving adapter
+    ├── cli/             # Cyclopts commands, if the context needs one - driving adapter
+    └── persistence/     # driven adapters implementing ports/
+        ├── models.py
+        ├── node_repository.py            # e.g. SqlAlchemyNodeRepository
+        ├── in_memory_node_repository.py  # fast-test double, sibling file, no impl/ nesting
+        └── unit_of_work.py
+```
+
+`ports/` is a standalone package, not colocated inside `application/`, so it's importable by `application/`, `adapters/`, and tests without pulling in SQLAlchemy or FastAPI. In `adapters/persistence/`, a port's real and in-memory implementations are plain sibling files named to match the port they satisfy - no `impl/` subfolder.
+
+A module whose driven adapters aren't persistence at all - `system`'s health-check and app-info adapters, for instance - names that directory `adapters/platform/` instead of `adapters/persistence/`, since the folder name should describe what the adapters do, not just default to the common case.
+
+A module is created the day its first entity or use case is written, not scaffolded ahead of time. `graph`, modeling nodes, edges, node types, and edge types, is the first module in the codebase.
+
+Infra with no domain and nothing swappable behind it lives in `platform/` instead of a module - package metadata, logging config, the database engine. The test: is more than one implementation plausible? If yes (a second repository backend, a second notification channel), it's a port inside a module. If there's exactly one reasonable way to do it, it's a `platform/` primitive.
+
+## Routers are driving adapters, not where logic lives
+
+A router's only job is translating HTTP into a use-case call and the result back into a response. Business rules belong in application/domain, where they're testable without FastAPI running.
+
+```python
+@router.post("/nodes", response_model=NodeResponse)
+async def create_node(
+    payload: CreateNodeRequest,
+    use_case: Annotated[CreateNode, Depends(get_create_node_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> NodeResponse:
+    node = await use_case.handle(payload.to_command(), actor)
+    return NodeResponse.from_domain(node)
+```
+
+The router depends on the use case, not on the repository the use case happens to use - that dependency is resolved once, at the composition root, and injected down. CLI commands follow the identical shape: a Cyclopts command is a driving adapter calling the same use case a router would, just triggered from a terminal. A command returns its result (a dict, a list of dicts, or a `Report` from `platform/cli_output.py` that adds a title, an empty-list message and an exit status) and never prints it: the root app's `result_action` shows it as Rich tables on a terminal, plain lines when piped, or JSON with `--json`. An architecture-style test in `tests/entrypoints/cli/test_cli.py` fails any command except `serve`, `worker` and `help` that returns nothing. A use case never needs a second implementation to be reachable from a second entrypoint.
+
+## Request bodies: named Pydantic models, not `Form()` fields
+
+A request body is a Pydantic `BaseModel` (`XxxRequest`, with a `to_command()` method converting it to the use case's command), not a collection of individual `Form()`/`Body()` parameters - even when the payload happens to be small, e.g. `AttachMediaRequest` for `POST /media/{asset_id}/attachments`. FastAPI treats a single Pydantic model parameter as a JSON body automatically, and `@hey-api/openapi-ts` turns it into a properly named type for the frontend client (`AttachMediaRequest`) instead of an untyped bag of form fields.
+
+The one case that can't use a plain model is an endpoint that also accepts an `UploadFile` - multipart file uploads can't be embedded inside a Pydantic model, so those fields stay as `Form()` parameters alongside the `UploadFile`. FastAPI then synthesises its own request-body wrapper schema for the multipart body, always named `Body_<operation_id>` (see `fastapi.routing.APIRoute._get_body_field` - there is no per-route parameter to override this name). Left alone, that produces awkward generated-client types like `Body_upload_and_attach_media`. `configure_openapi()` in `entrypoints/api/openapi.py` renames every `Body_*` component schema after generation (`Body_upload_and_attach_media` -> `UploadAndAttachMediaBody`) so the frontend client gets a sane name without changing the route's `operation_id`.
+
+## Ports carry data, not machinery
+
+A port exposes only what the caller needs, never the internals that produce it. A scheduler port takes a `job_key` string, not a reference to the task registry that resolves it - resolution happens on the inbound side that already owns the registry. If a port signature includes a callable, a registry, or an ORM model, the interface is leaking an adapter's implementation detail into a contract that's supposed to be adapter-agnostic.
+
+Same discipline for ownership boundaries: a use case reconciling system-owned data (schedules, config) and one reconciling user-owned equivalents go through separate ports, even against the same table, so a user-facing edit can't silently touch system-managed state.
+
+## Shared kernel
+
+`shared_kernel/` is a top-level package, a sibling of `modules/` and `platform/`, for domain vocabulary that doesn't belong to one bounded context: the `Identifiable`/`Timestamped`/`SoftDeletable` mixins entities compose from, base exception types (`DomainError`, `NotFoundError`, `ConflictError`, `ValidationError`, `ForbiddenError`) that module-specific errors subclass, and the `Actor`/`AuthorisationPort`/`UnitOfWork`/CQRS Protocols every module depends on. Same purity rule as any module's `domain/` layer: zero framework imports. A mixin or error type genuinely specific to one module stays in that module's `domain/` instead.
+
+`platform/` is the other kind of shared code: infra with exactly one plausible implementation (the database engine, logging config, package metadata). `shared_kernel/` is for domain concepts that cut across contexts; `platform/` is for infra that has no domain shape to begin with.
+
+## Error handling wiring
+
+`register_exception_handlers(app)` is called once inside `create_app()`, mapping `shared_kernel.errors` base types to RFC 9457 (`application/problem+json`) responses:
+
+| Error | Status |
+|---|---|
+| `ValidationError` | 400 |
+| `ForbiddenError` | 403 |
+| `NotFoundError` | 404 |
+| `ConflictError` | 409 |
+
+A module-specific error like `NodeNotFoundError(NotFoundError)` gets the correct HTTP status for free, purely from subclassing. Routers never carry a `try/except` - the mapping is global, not per-endpoint.
+
+## Persistence and configuration
+
+The async engine, `async_sessionmaker`, and shared declarative `Base` live in `platform/database.py`, configured via `pydantic-settings` (`DATABASE_URL`) - a `platform/` concern by the same one-plausible-implementation test as everything else there.
+
+Deployment settings extend `MenageristBaseSettings` (`platform/config/_base.py`), the one place the `MENAGERIST_` prefix is written. A class declared with `group="backup"` reads `MENAGERIST_BACKUP_<FIELD>` with no `validation_alias`, and its tunable fields are keyed `backup.<field>`; a class without a group reads `MENAGERIST_<FIELD>`. Fields marked `Tunable` (`platform/config/_markers.py`) can be changed at runtime through the settings module (`modules/settings`, `/api/v1/settings/...`); code that must honour a change reads it with `SettingsReader.get(SettingKey[...]("group.field"))` from `entrypoints/api/shared/settings_reader.py` and never from the cached settings getter. Use an alias only for a name that cannot follow the pattern (`TZ`, or an older spelling kept for compatibility, as `MENAGERIST_BACKUP_USER_EXPORT_TTL_HOURS` is).
+
+What's module-specific is which unit of work and use case get constructed from that session factory. That wiring lives in `modules/<context>/adapters/api/dependencies.py`, turning `Depends(get_session_factory)` into `create_graph_uow(session_factory)`, then a `CreateNode` use case. There's no separate per-request session dependency - the unit of work owns session lifecycle itself (see below).
+
+`NodeRepository` has two read paths. `list` and `count` take plain filters (`type`, `q`, `favourite`, `ids`) and order by id. `search` and `search_count` take a `ResolvedQuery` (a parsed condition tree plus the field kinds of the item types it names), page by an opaque `Cursor` over the sort values and id (nulls last), and `search_count` takes an optional `limit` so the database stops counting early; the application layer caps the total at `TOTAL_CAP`. `SqlAlchemyNodeRepository` compiles the tree to SQL in `query_sql.py` (with the text prefilter in `search_sql.py`). The Python evaluator in `query_eval.py`, used by the in-memory adapter, is the reference semantics: the SQL must agree with it, and one scenario table in `tests/modules/graph/adapters/persistence/test_node_search.py` runs against both. `count_by_type` counts live nodes per item type in one `GROUP BY` (untyped is a `None` row), and `SearchNodeCounts` runs several named condition trees through the same `prepare_query` and `search_count`, exact up to `COUNT_CAP`, for the dashboard (see `docs/DECISIONS.md`). `random` picks one live node at random (`ORDER BY random() LIMIT 1`) from the plain filters, a set of ids or a `ResolvedQuery`, for `GET /node/random`; `RandomNode` reuses `ListNodes` to resolve a static or smart collection. `item_fields` lists the per-item (`extra_schema`) fields in use, and a field condition with `field_kind` instead of `type` filters on them. Text queries run with `SET LOCAL jit = off`. A `connection` condition compiles to correlated `EXISTS` over `edges` (`_connection` in `query_sql.py`); the in-memory repository reads the same edge store as `InMemoryEdgeRepository`, wired by `build_in_memory_graph_repos`, and its scenarios live in `test_query_connection_scenarios.py`. The reasoning and measurements are in `docs/DECISIONS.md`.
+
+## Local adapters for fast testing
+
+Every port ships an in-memory adapter alongside its real backend adapter, as a first-class citizen rather than a private test-only fake. Application-layer and router-level tests wire the in-memory adapter directly (constructor injection, or FastAPI `dependency_overrides` for router tests) and need no live infrastructure. Only tests checking the *real* adapter's correctness (a `SqlAlchemyNodeRepository` round-tripping through Postgres) are `@pytest.mark.integration` and can be skipped where that infrastructure isn't available.
+
+The `SchedulerPort` will need the same shape later (Postgres/APScheduler/Cron adapters plus an in-memory one), so treat this as a named convention rather than something reinvented per port.
+
+## Domain entities
+
+- Every entity primary key is `uuid7` - time-ordered, so it supports keyset pagination without a separate sort key. List ports paginate as `after: UUID | None` + `limit`, ordered by `id ASC`, not an offset. (`NodeRepository.search` is the exception: it pages by keyset on the query's sort values, then id.)
+- Entities set their own timestamps in domain methods (`datetime.now(UTC)`, alongside `uuid7()` generation) rather than via SQLAlchemy `server_default`/`onupdate`. Timestamping is domain behavior, testable with `freezegun`/`time-machine` without a live database.
+- Mixins compose vertically: `Timestamped`, `SoftDeletable(Timestamped)` (a lifecycle change is itself timestamped), concrete entities like `Node(Identifiable, SoftDeletable)`.
+- `kw_only=True, eq=False` on every mixin/entity dataclass - keyword-only keeps constructors unambiguous as fields accumulate across mixins; these entities need identity equality (by ID), not structural equality.
+- Invariant checks live in `__post_init__` and raise `shared_kernel.errors.ValidationError` (or a module-specific subclass), never a bare `ValueError` - so a violation bubbling up through a use case gets the correct 400 response for free, through the same handler every other domain error goes through.
+
+## Testing mirrors the architecture
+
+Coverage floors (defined in the root `codecov.yml`, enforced by `poe coverage` and Codecov): domain 100%, application 100%, shared_kernel 100%, adapters 80%, platform 70% - matching how much of each layer's correctness is structural versus incidental. Domain code has no framework dependencies and is exhaustively unit-testable; adapters carry real sessions/HTTP/external services where 100% is impractical or low-signal. `@pytest.mark.integration` separates the fast domain-heavy loop from the slower suite touching real adapters.
+
+`ports/` is tracked but has no fixed floor (`target: auto` in `codecov.yml`) rather than the 100% used for domain/application/shared_kernel - its files are `Protocol` interfaces whose stub method bodies (`...`) never execute, so forcing 100% there wouldn't test anything real.
+
+`backend/tests/` mirrors `src/app/modules/<context>/{domain,application,adapters}` directory-for-directory, plus `tests/architecture/`: an `archunitpython` suite encoding the dependency-direction rule itself (domain may not depend on application/adapters/entrypoints, application may not depend on adapters/entrypoints, adapters may not depend on entrypoints). No I/O, always runs, catches a boundary violation before it becomes a design problem.
+
+## Migrations
+
+One Alembic environment, one `alembic/versions/` directory, for the whole backend - not one per module. All bounded contexts share a single Postgres schema in v1. Each module's SQLAlchemy models register on the shared `Base` from `platform/database.py`; `alembic/env.py` imports every module's `adapters/persistence/models.py` explicitly so their tables exist on `Base.metadata` before autogenerate runs.
+
+The development history was flattened into `cd0c974e3e33_initial_schema` plus the preset seed before the first release (see DECISIONS.md). From then on a revision is immutable: change the schema with a new revision, never by editing an old one. A development database that predates the flattening needs `alembic stamp --purge e6f7a8b9c0d1` (or to be recreated).
+
+## Running things
+
+Backend tests, migrations, and quality checks run as `poe` tasks from the workspace root - `poe test-backend`, `poe test-backend-integration`, `poe migrate`, `poe lint-backend`, `poe typecheck-backend`, etc. Full task list in the root `pyproject.toml`.
+
+Scheduled housekeeping is a CLI command to run from cron: `menagerist media cleanup` (expired media) and `menagerist data purge-deleted [--older-than-days N] [--dry-run]` (retention purge of Recently deleted content; `MENAGERIST_RETENTION_DELETED_DAYS`, default 30, minimum 1). The purge is `PurgeExpiredNodes` (graph) and `PurgeExpiredCollections` (collections), both `System` use cases that read every owner's rows by age through `list_deleted_before` / `count_deleted_before`, composed in `entrypoints/cli/purge_deleted.py` as `PurgeDeletedContent`; a future scheduler adapter calls the same use cases.
+
+## Unit of work: a shared Protocol, not a per-module subclass
+
+`shared_kernel/unit_of_work.py` defines `UnitOfWork[TRepos]` as a `Protocol` - `__aenter__() -> TRepos`, `__aexit__`, `commit()` - satisfied structurally by two implementations written once and reused by every module:
+
+- `platform/unit_of_work.py::SqlAlchemySessionUnitOfWork[TRepos]` - opens a session from an `async_sessionmaker`, owns begin/rollback-on-exception/always-close/commit. Lives in `platform/` for the same reason `platform/database.py` does: exactly one plausible implementation.
+- `shared_kernel/unit_of_work.py::InMemoryUnitOfWork[TRepos]` - wraps an already-built repo bundle directly. `__aenter__` just returns what it was given, so there's no session to open or spoof. `.committed`/`.rolled_back` flags let a test assert a use case reached (or correctly avoided) its commit point.
+
+A module contributes a repo-bundle dataclass (`modules/graph/ports/unit_of_work.py::GraphRepos(nodes, edges, node_types, edge_types)`) and a `GraphUnitOfWork = UnitOfWork[GraphRepos]` alias next to it, plus two one-line factories in `adapters/persistence/unit_of_work.py` - `create_graph_uow(session_factory)` and `create_in_memory_graph_uow(repos)` - each constructing one of the two shared implementations around a `GraphRepos`. No module writes `__aenter__`/`__aexit__`/`commit` itself.
+
+A single central unit of work listing every module's repositories was rejected: it couples every module's use cases to every other module's repositories, and implies transactions spanning bounded contexts, which DDD treats as the wrong boundary. Cross-context consistency is handled by referencing IDs and accepting eventual consistency. A second module gets its own `Repos` dataclass and factories on the same two shared implementations, not a slot added to `GraphRepos`.
+
+This also decouples the transaction from the HTTP request/response cycle - the same use case is reachable from a CLI command or a scheduled job, neither of which has a "request" to hang a commit off. The use case owns the commit via the unit of work it's given, so the transaction boundary travels with it regardless of which driving adapter called it.
+
+**Commands take the unit of work; queries take a plain repository.** `CreateNode`/`CreateEdge` depend on `GraphUnitOfWork` and call `await uow.commit()` once their invariants pass. `GetNode`/`ListNodes`/`GetEdge` are read-only and depend on `NodeRepository`/`EdgeRepository` directly - a read has no commit boundary to own.
+
+## CQRS is a typing convention, not a dispatcher
+
+`shared_kernel/cqrs.py` defines three generic base classes: `UseCase[TRequest, TResult]`, and `CommandHandler[TUoW, TCommand, TResult]` and `QueryHandler[TRepos, TQuery, TResult]` on top of it. A use case sets its `access` stance, implements `async def _handle(self, request, actor: Actor) -> TResult` and never overrides the final `handle`, which asks the `AccessGuard` first (see "Access scope"). Every use case gets a matching `*Command`/`*Query` dataclass (`CreateNodeCommand`, `GetNodeQuery`, ...), so `mypy --strict` verifies every use case in every module is shaped the same way. A command handler is built with `(uow, guard)` and a query handler with `(repos, guard)`; a use case with no persistence extends `UseCase` and takes its own ports, then `guard`.
+
+`actor` is a `handle()` parameter, not a field on the command/query - it travels alongside the unit of work/repository rather than being baked into the "what to do" data.
+
+There's no bus or mediator between a router/CLI command and the use case it calls - the router calls the use case directly, as shown above. A bus with pipeline behaviors would give a single seam for cross-cutting concerns (logging, authorisation) applied uniformly, but nothing here needs that uniformity enforced yet. The typed-handler convention, plus every handler already taking an `actor`, is a prerequisite for a bus regardless, so this doesn't foreclose adding one later.
+
+## Logging
+
+The backend uses **structlog** (configured in `platform/logging_config.py`) with two output modes: colourised console in development, JSON in production (`MENAGERIST_LOG_JSON_OUTPUT=true`). The application log level is controlled by `MENAGERIST_LOG_LEVEL` (default: `INFO`); SQLAlchemy's engine log level is controlled independently by `MENAGERIST_LOG_SQLALCHEMY_LEVEL` (default: `WARNING`).
+
+**Where loggers live** - application-layer use cases and adapter modules only. The domain layer has zero framework imports, so it carries no logger. In-memory adapters are test infrastructure and are also logger-free.
+
+**Level semantics:**
+
+| Level | When to use |
+|---|---|
+| `INFO` | One log per mutating action (create, update, delete, promote, attach, detach, stage, orphan, cleanup). Logged after `commit()` so only committed work is recorded. |
+| `DEBUG` | Trace-level detail: repository method calls, SQL queries (via SQLAlchemy's stdlib logger), file operations, thumbnail generation steps. Application logs require `MENAGERIST_LOG_LEVEL=DEBUG`; SQL queries require `MENAGERIST_LOG_SQLALCHEMY_LEVEL=DEBUG`. |
+| `WARNING` | Recoverable anomalies that need attention (content-type mismatch, degraded trust level). |
+| `ERROR` | Unhandled exceptions, caught by the global exception handler. |
+
+**Third-party noise** - `configure_logging` pins `alembic.runtime.*` and `markdown_it` (rich's Markdown parser, which logs every rule at DEBUG) to WARNING, so `MENAGERIST_LOG_LEVEL=DEBUG` shows the application's own lines.
+
+**SQL query logging** is controlled independently of application logging. SQLAlchemy emits statements through Python's `logging.getLogger("sqlalchemy.engine")`, which structlog's stdlib bridge picks up. Set `MENAGERIST_LOG_SQLALCHEMY_LEVEL=INFO` for statements, or `DEBUG` to include result-fetching details. No parameters are logged.
+
+**Call-site pattern:**
+
+```python
+import structlog
+
+logger = structlog.get_logger()
+
+# In a mutating use case, after commit:
+logger.info("node created", node_id=node.id, node_type=node.type)
+
+# In a query use case or adapter:
+logger.debug("fetching node", node_id=node_id)
+```
+
+Pass values directly - `uuid.UUID` objects are serialised to strings automatically by the `_serialise_uuids` processor in the shared pipeline. Never use f-strings or string formatting for structured fields.
+
+**Request log context** - every line logged while handling a request carries `request_id` (bound by `RequestContextMiddleware`). Once a session resolves, the actor dependencies (`get_current_actor`, `get_signed_in_user`) also bind `user_id` and `session_id` and copy them to `request.state`, so use-case and adapter lines need not pass them. Requests with no valid session carry neither. `session_id` is the session row's id, which cannot authenticate; the cookie token and its hash are secrets and must never appear in a log line, repr or response.
+
+**Access log** - `RequestContextMiddleware` writes one line per request after the response (logger `app.access`), shaped like Granian's access line: event `"<METHOD> <path>"` with `addr` (the client address after the proxy-header wrapper), `method`, `path`, `protocol`, `status`, `dt_ms`, `request_id`, plus `user_id` and `session_id` when a session resolved. It logs at `info`, or `warning` for 5xx (4xx is ordinary traffic); an unhandled exception is logged as 500 and re-raised. The query string and all headers (`Cookie`, `Authorization`, `Set-Cookie`) are never logged in access lines. The sole exception is the `sign_in_device_headers` debug event on sign-in, which logs only an explicit allowlist of user-agent, Client Hint, forwarding headers, and the resolved client address; values are bounded and control characters escaped. Sign-in and setup requests carry no ids on their own access line (the session is created during the request); the "signed in" and "first administrator created" events carry them. The logged path is the raw, still percent-encoded one with control characters escaped, and a client `Request-Id` is only kept if it matches `[A-Za-z0-9._:-]{1,128}`. Only `/api/` paths are logged, minus `/api/health*` (probe polling); the SPA's static files write nothing. `dt_ms` measures time until the response starts. Switch it off with `MENAGERIST_LOG_ACCESS=false`. Granian's own access line is off by default now; `serve --access-log` turns it back on (it uses `GRANIAN_ACCESS_LOG_FORMAT` and carries no user or session ids).
+
+**Future:** when an event bus / pipeline behavior is introduced, cross-cutting logging will migrate to a central pipeline stage. The per-use-case logger calls will be removed at that point.
+
+## Example packs
+
+`modules/examples/` installs and removes optional example content (item types, connection types, items, connections and presets). It does not import `graph` or `presets`: it defines its own ports (`PresetTarget`, `GraphTarget`) and `entrypoints/api/shared/bridges/example_targets.py` supplies adapters that call the real use cases, the same pattern as `preset_usage.py` for cross-module reads. Install is an ordered list of steps with one commit per step and compensation on failure; removal keeps anything the user edited, connected or attached (rules in `docs/DECISIONS.md`).
+
+### Writing an example pack
+
+Packs are package data in `modules/examples/packs/`, read with `importlib.resources`. To add one:
+
+1. Create `<id>.json` and add `{id, name, description}` to `index.json`. The id is lowercase letters, digits and hyphens, and prefixes every type slug (`music-person`), so packs never clash with a user's own types.
+2. The file has `format` (`menagerist-example-pack`), `version` (`1`, `2` if it has collections, `3` if an item type has a `cover`, `4` if it has `requires`, `6` if a collection has a `definition`, `7` if an item type has an `icon` or `colour`), `id` and five sections: `presets`, `relationship_types`, `item_types`, `items`, `connections`. Version 2 also allows an optional sixth, `collections`; version 4 allows `requires`. Parsing is strict: unknown or missing keys are errors, and `collections` in a version 1 file is rejected.
+3. Every entity has a local `ref` (lowercase ASCII letters, digits and hyphens). Items name their type by `type`, connections name their endpoints `from` and `to` and their connection type `type`, all by `ref`. A schema refers to a preset with `{"$preset": "<ref>"}`.
+4. Item and connection values must use keys their type's `attributes_schema` defines. Write schemas the way the editor would (`x-menagerist` carries the field kind and display options, for example `"display": "words"` on a duration).
+5. Collections (version 2): each is `{"ref", "name", "description" (optional), "items": [item refs]}`, or at version 6 `"definition"` (a smart-collection query tree) in place of `items`, never both. A definition may use item type slugs, relationship slugs, field keys and the portable conditions (tag, text, type, date, favourite, name, description, media, and connection `exists` / `none`); the parser rejects `collection` conditions and a connection `item`, and install validates it with the same checker as `POST /collection`, so a refused definition rolls the install back. Direction is literal for a directional relationship: `out` means the item is the source. A manual collection must list at least one item, no duplicates, only items from the same pack; names are 1 to 120 characters (checked at parse time, mirroring the collections module) and should be unique within a pack (the contract test checks that; the parser does not), and should not be "Favourites" (items already have a favourite flag). The collections module derives each slug, so a pack collection can never clash with the user's own. A collection's items can be of different types.
+6. Covers (version 3): an item type may carry `"cover": {"style": "sleeve" | "poster" | "box" | "card"}`. Installing then draws one PNG cover per item of that type (`PillowCoverRenderer`: a coloured background from the item name, one initial, a shape per style: sleeve for records, poster for films, box for board games, card for recipes), attaches it through the `CoverTarget` port (bridged to media in `entrypoints/api/shared/bridges/`), and records it as a removable entity. Covers are deterministic from the name, so a reinstall gives identical images. Unknown styles are rejected at parse time.
+
+   An item type may also carry `"icon"` (a Lucide name from the frontend's `TYPE_ICONS`, such as `"camera"`) and `"colour"` (a name from the type palette in `graph/domain/node_type.py`). They are passed to `CreateNodeType`, which validates them, so an unknown colour fails the install and the shipped-pack tests.
+7. Add-ons (version 4): a pack may list `requires` (pack ids) and refer to a required pack's item types, relationship types and items as `pack:ref` (for example `games:game`, `games:published-by`, `games:lantern-harbour`) in item `type`, connection `from`, `to` and `type`, and collection `items`. An add-on never changes the required pack's types or items; everything it creates is recorded in its own installation. Installing it is refused until every required pack is installed, and removing a required pack is blocked (not cascaded) while an add-on is installed. An add-on item of a base item type inherits that type's cover style. One ships: `games-extras` ("Extra board games", requires `games`: five games including an expansion, publisher connections and a collection, no types of its own). An add-on's display name must not start with another pack's name.
+8. Links (version 5): a pack may list `links` to another pack (`{"with": "movies", "from": "night-drive", "to": "movies:cold-harbour", "type": "soundtrack-of"}`). Unprefixed refs are the pack's own, `<with>:<ref>` refs are the other pack's items, and `type` is one of the pack's own relationship types. A link is made, as an ordinary connection recorded under the declaring pack's installation (ref `link:<with>:<n>`), once both packs are installed, whichever was added second, and only between one person's own installations. It is skipped quietly if an end is gone or the same connection already exists. Removing either pack removes the links first and is never blocked; an edited link is kept like any connection. Music ships four "Soundtrack of" links to Movies. Use `requires` for content that cannot exist without the other pack and `links` for connections that are only nice to have.
+8. Content: fictional (no real titles, companies or people: check game, film and product names), British English, small and finished, with a few deliberate blanks so an item looks lived in.
+
+`tests/modules/examples/application/test_shipped_packs.py` runs against every pack listed in `index.json`: it installs, removes and reinstalls cleanly, checks slug prefixes, descriptions, British spelling, valid schemas and that all values match their type. `frontend/tests/example-packs.test.ts` checks the same packs from the frontend side. Neither needs editing when a pack is added.
+
+**Covers on removal.** Covers settle before items, so a pack's own cover never counts as the person's file. An untouched cover is deleted with its item. A cover the person replaced is their file: it is kept and keeps its item. Reinstalling re-adopts a kept cover, and a pack never takes over a cover the person added to an item that had none. Known limit: the built-in Pillow font draws only ASCII initials, so a name starting with anything else shows "?" (every shipped item name starts with an ASCII letter).
+
+**Reinstalling after keeping things.** Anything kept on removal also keeps the item types it uses. Installing the pack again re-adopts it rather than refusing: `InstallExamplePack` resolves, from the pack's installations newest first (`InstallationRepository.list_for_pack`, `adoptable_records`), every kept entity that still exists (item and relationship types must also still have the pack's slug) and records it as owned by the new installation with its original content hash, so an edited item is still kept on the next removal. `InstallResult.adopted` counts these beside `created`. A slug taken by something that is not a kept example is still a 409. Known limit: an adopted collection is left as the user has it, so items created afresh are not added to it.
+
+## Collections
+
+`modules/collections/` holds named lists of items. A collection refers to items by id only; it does not import `graph`, and `graph` does not import it. The two meet through ports and bridges in `entrypoints/api/shared/bridges/`: `collection_items.py` implements the collections module's `ItemLookup` (which of these ids are live items) from graph's repository, and `collection_members.py` implements graph's `CollectionMembers` (the item ids on a collection) from the collections repositories, for the `?collection=<id>` filter on the item list. Membership changes bump the collection's `updated_at`, and its ETag also covers the live item count (see `docs/DECISIONS.md`). A collection has a `kind`: `manual` (members stored as memberships) or `dynamic`, a smart collection whose `definition` is a saved search (the graph query tree) stored as sent and opaque to this module. The kind is fixed at creation; adding or removing items on a smart collection, or giving a manual one a definition (whatever it holds: the kind is checked before the definition), is a 409 (`CollectionKindError`). The definition is also bounded before it reaches the checker: at most 32 KiB, 12 levels of nesting, no NUL characters or invalid UTF-8 (`domain/definition_limits.py`), and `parse_query` rejects unknown keys. `GET /collection` takes an optional `kind` filter (`manual` or `dynamic`); `kind=manual` never loads or counts smart rows. A third bridge, `collection_definitions.py`, implements the module's `DefinitionChecker` (validate a definition, return warnings for stale fields) over a graph use case; `collection_items.py` also counts a definition's matches (`count_matching`, capped, or exact with `cap=None`), and `collection_members.py` resolves a collection to a `ManualSource` (ids) or a `SmartSource` (definition) for `GET /node?collection=`. A smart collection's `item_count` is capped at `TOTAL_CAP` with `item_count_capped`, and its response carries `warnings`; its ETag covers the count, the capped flag and a hash of the warnings, and skips `If-Modified-Since`. Every collection is scoped to its owner (see "Access scope").
+
+Routes: every `/collection/{collection_id}` route (get, patch, delete, `.../item`, `.../count`) accepts a UUID or a slug, resolved by `ResolveCollection` in the caller's scope (another owner's slug is the same 404 as an unknown one). `GET /collection/{id}/count` returns `{count}` exactly (uncapped; 0 for a stale or unreadable definition). `PATCH /collection/{id}` also takes `definition` (smart only), `slug` (normalised, unique per owner, 409 if taken, 400 if empty or UUID-shaped) or `regenerate_slug: true` (rebuilt from the current name with the free-suffix logic); `slug` and `regenerate_slug` together are a 400. Slugs are per owner, and a slug change keeps no history.
+
+`GET /collection` takes `q` (up to 200 characters; blank means unfiltered) to keep collections whose name or description contains the text, ignoring case and accents (Postgres `unaccent`, enabled by migration), with LIKE wildcards matched literally; it combines with `item_id` and paging.
+
+## Identity
+
+`modules/identity/` owns accounts (`User`, `Role`), sessions, sign-in, first-run setup, device management, and the `menagerist identity` CLI. It imports no other module and no content module imports it (architecture tests enforce both); other modules see an account only as the `Actor` that `get_current_actor` builds. Ports: `UserRepository`, `SessionRepository`, `SignInAttemptRepository` (failure counters keyed on hashes of the username and the client address, so throttling never depends on the account existing), `PasswordHasher`, `SessionTokenGenerator`, `Authenticator` (local username and password today; OIDC or trusted-proxy sign-in would be further adapters) and `ExistingDataClaim` (supplied by the entrypoint, since the claim spans modules). Passwords are hashed by a scheme registry (`adapters/security/`, default `scrypt`, `MENAGERIST_IDENTITY_PASSWORD_HASHER`); session and cookie settings are in `platform/config/identity.py` (`MENAGERIST_IDENTITY_SESSION_TTL_HOURS`, `MENAGERIST_IDENTITY_SESSION_IDLE_HOURS`, `MENAGERIST_IDENTITY_COOKIE_NAME`, `MENAGERIST_IDENTITY_COOKIE_SECURE`, `MENAGERIST_IDENTITY_SIGN_IN_USERNAME_ATTEMPTS`, `MENAGERIST_IDENTITY_SIGN_IN_IP_ATTEMPTS`, `MENAGERIST_IDENTITY_SIGN_IN_WINDOW_MINUTES`). The CLI alone reads `IdentityCliSettings` (`platform/config/identity_cli.py`: `MENAGERIST_IDENTITY_INITIAL_PASSWORD` or a `menagerist_identity_initial_password` secret file).
+
+A session records `user_agent` (truncated to 256 characters), `client_ip`, `client_platform` (truncated to 64 characters), and `client_mobile`, captured once upon session creation from `User-Agent`, `Sec-CH-UA-Platform`, and `Sec-CH-UA-Mobile` headers. Five use cases manage sessions: own devices via `ListOwnSessions` (query, filters expired and idle sessions and flags the active session), `RevokeOwnSession` (command, 404 for unknown or foreign sessions, 409 if attempting to revoke the current session), and `RevokeOtherSessions` (command, revokes all other sessions for the calling user); administrative sessions via `ListSessions` (query, with optional `user_id` filter) and `RevokeSession` (command, 404 on missing sessions and 409 on the administrator's own current session). Administrative operations are permission-gated (`identity:user:*`, `identity:session:*`) through `Requires` stances; `identity:session:revoke` implies `identity:session:list`. Disabling a user or resetting their password already terminates all active sessions for that account. The CLI gets its `AccessGuard` from the entrypoint (`use_access_guard`) and, without one, uses `DenyAllAccessGuard`, which runs only `Public` use cases and refuses everything else. The lifespan (`entrypoints/api/startup.py`) logs one warning when no enabled administrator exists. Rationale for these choices is in [docs/DECISIONS.md](../docs/DECISIONS.md).
+
+Identity routes use identity's own actor dependencies (`get_identity_actor`, `get_signed_in_user`), so an account whose `password_expired` flag is set can still change its password and sign out; every other route answers 403 `password_expired` until it does. Tests that need the real session lookup are marked `@pytest.mark.real_actor`; otherwise `tests/conftest.py` gives each `TestClient` a default member actor and the app's own `Origin` header (the same-origin check on cookie-authenticated unsafe requests), and the `as_user` fixture builds a client for a given account and role.
+
+**Personal access tokens** (`ApiToken`, `ApiTokenRepository`, `ApiTokenGenerator`, the `*ApiToken*` use cases in `application/`, `token_router.py` at `/api/v1/tokens`, the `api_tokens` migration; each port has an in-memory sibling) let a person act with a subset of their permissions through `Authorization: Bearer mnst_<id>_<secret>`. Only a hash is stored and the secret is shown once. `get_current_actor` decides the credential: a bearer header is authoritative (a bad token is a 401, never a fallback to the cookie), `get_session_token` returns `None` beside one, and `verify_csrf` skips bearer requests. `ChangePassword` and `ResetPassword` delete the user's tokens, and the `api_tokens` table is `TableRule.SKIP` in the backup table rules. Settings in `IdentitySettings`: `MENAGERIST_IDENTITY_API_TOKEN_DEFAULT_DAYS` (90), `MENAGERIST_IDENTITY_API_TOKEN_MAX_DAYS` (365) and `MENAGERIST_IDENTITY_API_TOKENS_PER_USER` (20); setting only `MAX_DAYS` below the default fails validation at start-up, so lower both. Routes are `POST|GET /tokens`, `GET /tokens/grants`, `POST /tokens/{id}/rotate` and `DELETE /tokens/{id}`; request and response fields are snake_case, `grants` is `list[str]` (an unknown or unheld grant is a 400) and expired tokens cannot be rotated. The decisions are in [docs/DECISIONS.md](../docs/DECISIONS.md), "Personal access tokens (2026-10-23)".
+
+**Account and token management is session-only.** Declare `access = OwnAccount()` and use identity's actor dependencies (which read only the cookie): `RoleAccessGuard` refuses `OwnAccount` to any actor with `grants`, and a bearer request never reaches the cookie. Token routes follow the same rule, so a token cannot create or revoke tokens.
+
+## Access scope
+
+Who may call a use case and who may see or change what is decided in one place, the `AccessGuard` port (`shared_kernel/access_guard.py`, implemented by `RoleAccessGuard` in `entrypoints/api/shared/`, which uses `OwnerAccessPolicy` for ownership). Repositories hold no rules; they only apply a `ContentFilter` (`ContentFilter.of(user_id)` or `ContentFilter.everyone()`).
+
+**Every use case declares a stance** with `access = ...` (`shared_kernel/access.py`): `Public` (anyone, including the anonymous actor: sign-in, setup, health probes), `System` (the system actor only: the first-admin claim jobs and the media clean-up and thumbnail jobs), `OwnAccount` (a signed-in session acting on themselves), `Content(permission)` (an actor whose role grants it, plus the owner scope) and `Requires(permission)` (the same, for shared catalogue use cases with no owner scope). Implement `_handle`, not `handle`. A non-`Content` use case that calls `self.scope(actor)` gets a `TypeError`. An architecture test fails a concrete use case with no stance or with its own `handle`, checks that a `Requires` permission is catalogued and belongs to the use case's own module, and pins the `Public`, `System`, `OwnAccount` and `Content` sets by name in `tests/architecture/test_access_stances.py` and every use case's permission in `test_permission_mapping.py`: adding to one means editing the pin. `test_no_direct_ownership_checks.py` keeps owner-versus-actor comparisons inside `AccessGuard`.
+
+**The rule: every repository method that returns or counts content takes a required keyword-only `scope: ContentFilter`.** Only the minimal write methods (`add`, `save`, `update`, `delete`, `remove`, `lock_target`, `claim_orphaned`) are exempt, and the architecture tests (`tests/architecture/test_content_filter_rules.py`) and the generated cross-user isolation test (`tests/entrypoints/test_cross_user_isolation.py`) enforce it. Content use cases declare `access = Content()`, fetch with `self.scope(actor)`, and call `self._guard.assert_can_view/modify/delete(actor, entity.owner_id)` after the fetch. A foreign id is a `NotFoundError`, so existence never leaks. `everyone()` is for system jobs (media clean-up, thumbnail regeneration), the first-admin claim and deliberate all-user checks on shared structure (a type's in-use check); comment each such site.
+
+**Adding a new content type or route safely:**
+
+1. Compose the entity from `Owned` and its model from `OwnedMixin`; stamp `owner_id=actor.id` when creating. Add an `(owner_id, id)` index in the migration.
+2. Give every port method that returns or counts content a required keyword-only `scope`, and the same signature on the SQL repository (use `owned_by()` in one predicate helper, applied to every statement) and on the in-memory twin (`scope.covers(owner_id)`).
+3. Declare `access = Content()`, fetch with `self.scope(actor)` and call `self._guard.assert_can_*` before acting.
+4. Add the route to the generated isolation test, or to its `ALLOWED` dict with a one-line reason (for example shared vocabulary or a route that creates and references nothing). A new route that is neither fails the meta test.
+5. Add two-user tests at the repository, use-case and router levels (the existing `*_scope.py`, `*_ownership.py` and `*_two_users.py` files are the pattern).
+
+**Adding an admin-only permission:**
+
+1. Add a member to the module's permission enum (`modules/<context>/application/permissions.py`, value `<module>:<resource>:<action>`).
+2. If it implies others, override `implied()` on the module's enum.
+3. If it is a new module's first permission, add the enum to `entrypoints/api/shared/permissions.py` (`Permission`, `ALL_PERMISSIONS`). The `Permission` alias becomes a union at that point. Leave it out of `MEMBER_PERMISSIONS` to keep it admin-only; `tests/architecture/test_permission_catalogue.py` checks the catalogue.
+4. Declare `access = Requires(<Module>Permission.<MEMBER>)` on the use case and implement `_handle` (not `handle`). The permission must be in the catalogue and in the module's own enum.
+5. The route's OpenAPI entry gets `x-required-permission` from `PermissionAwareRoute`; mention the 403 in the route's `responses`, regenerate the client (`poe generate-frontend-client`) and hide the control in the frontend with `auth.can(...)`.
+
+**Making a permission token-grantable.** A token holds only permissions in `TOKEN_GRANTABLE_PERMISSIONS` (`entrypoints/api/shared/authorisation.py`): the content permissions except the two backup ones, and never an admin permission. A new content permission is grantable by default through `MEMBER_PERMISSIONS`; to withhold it, subtract it there. `tests/architecture/test_token_grants.py` fails if the set is not a subset of `MEMBER_PERMISSIONS`, holds an admin-only or backup permission, or lacks an implied permission, and it checks the composite use cases' inner permissions (`COMPOSITES`), so add a new composite to that table. Widening the set also means updating the frontend areas in `frontend/src/lib/api-tokens.ts`. `PermissionAwareRoute` documents the bearer scheme on a route only when `get_current_actor` is its actor and its permission is grantable.
+
+**Links.** `entrypoints/api/openapi_links.py` adds `links` for the collection/item path convention (`POST /node` -> `GET /node/{node_id}`), named after the target operation. Where the convention cannot apply (like `/me/exports`), declare `links` in the route's `responses`; those are never overwritten. `tests/entrypoints/api/test_openapi_links.py` checks every link against the operations and schemas.
+
+**Every new route response needs an accurate example.** `entrypoints/api/openapi_responses.py` adds the shared 401, 403, 404, 422 and 500 responses; a route's own `error_response(...)` entries win. `tests/entrypoints/api/test_openapi_response_examples.py` fails an operation whose 4xx/5xx has no example of its own (412 and 304 have no body), whose example `status`, `type` or `instance` does not match its response, or whose description is a raw "Raised when" docstring. `tests/entrypoints/api/test_openapi_error_responses.py` checks which statuses each kind of route documents.
+
+## Cross-cutting concerns
+
+**Permissions - role-based, enforced.** `shared_kernel/actor.py::Actor` (an id plus a set of role names) and `shared_kernel/authorisation.py::AuthorisationPort` (`check(actor, action) -> None`, raising `ForbiddenError`) live in `shared_kernel/`; use cases do not call the port, `RoleAccessGuard` does for `Requires` stances. The concrete adapter, `entrypoints/api/shared/authorisation.py::RoleAuthorisationAdapter`, is wired at the composition root (`entrypoints/api/shared/dependencies.py`) because it has no bounded-context owner. Administrators and the system actor hold every permission; members hold `MEMBER_PERMISSIONS` (the 16 content permissions). A grant is expanded through each member's `implied()`, and a permission outside the catalogue is denied to everyone. `get_current_actor` resolves the session cookie to the signed-in account's `Actor` (401 otherwise). Row-level rules (whose content an actor may see) are a separate concern: see "Access scope" below.
+
+**`PermissionAwareRoute` - OpenAPI reflection, not enforcement.** `entrypoints/api/shared/permission_aware_route.py::PermissionAwareRoute` reads a use case's `access` stance (a class attribute, read on the *class* before any instance exists) and, for a `Requires` stance only, reflects its permission into the OpenAPI schema as `x-required-permission`, plus a "Requires permission" line in the endpoint description and a documentation-only `APIKeyCookie` security scheme. It does not check anything at request time; real enforcement stays in the final `handle()` of the use case bases via the `AccessGuard`. `tests/entrypoints/api/shared/test_openapi_permissions_pinned.py` pins which operations are documented, so migrating a use case cannot silently add or drop one.
+
+Every leaf router that declares endpoints (`@router.get`/`post`/etc.) must construct its `APIRouter` with `route_class=PermissionAwareRoute` directly - it is **not** enough to set `route_class` only on the top-level `api_router`/`api_v1_router` in `entrypoints/api/__init__.py`. FastAPI resolves an included router's routes from the `APIRoute` objects the leaf router already built at decoration time, not from the including router's `route_class`, so the parent's setting never cascades down through `include_router`. Don't wrap `APIRouter(...)` in a helper/factory function either: this project's ruff config (`runtime-evaluated-decorators` in `pyproject.toml`) statically pattern-matches `router = APIRouter(...)` to know `@router.get` etc. are runtime-evaluated - hiding the call behind a factory breaks that detection and flake8-type-checking starts flagging every import used only in route-handler signatures as needing a `TYPE_CHECKING` block.
+
+**Backups.** `modules/backup/` owns verified logical instance backups and owner-scoped user exports. CLI (`menagerist backup`) and API call the same use cases; permissions gate administrative operations and user transfers use an explicit owner scope. Archives stream database NDJSON and original media into `/data/backups`, with per-member checksums, a manifest and a whole-archive digest. The Docker image creates this directory for uid/gid 1000; Compose mounts persistent backup storage there.
+
+`backup create`, `list`, `verify`, `download`, `upload`, `delete` and `prune` manage instance archives. Stop the server before `backup restore <id>`; replacing existing data requires `--replace`. With no accounts, restore uses the setup lock and refuses if setup has already completed. `backup export-user <output> --user <uuid>` and `backup import-user <archive> --user <uuid>` select one account explicitly and store private archives below `users/<uuid>`.
+
+Uploads to the API accept raw streamed archive bytes rather than multipart forms; the archive limit is `MENAGERIST_BACKUP_MAX_UPLOAD_SIZE`. Instance restore is available through the CLI and the public first-run restore route only. A restore must match the target Alembic revision and passes integrity checks before writes. User imports preserve content ids, assign the target owner and refuse collisions or incompatible shared vocabulary.
+
+Pre-migration backups are on by default: a verified `pre-migration` archive is taken before `migrate upgrade` or `serve --migrate`; set `MENAGERIST_BACKUP_BEFORE_MIGRATE=false` to turn this off. New databases and schemas with no pending migrations skip it. Backup failures stop migration before DDL; `--no-backup` explicitly skips the configured policy. Restore a pre-migration archive onto a database at its recorded old revision. `MENAGERIST_BACKUP_KEEP_LAST` and `MENAGERIST_BACKUP_PRE_MIGRATION_KEEP` configure separate retention groups for `backup prune`.
+
+Scheduled backups run in the `worker` service, which must mount the same `/data/media` and `/data/backups` volumes as the API (a missing media directory fails the job rather than archiving nothing). `MENAGERIST_BACKUP_SCHEDULE` (default `0 3 * * *`, instance timezone) sets the cron expression for a verified `scheduled` backup; retention then runs once, only after that backup succeeds. An administrator can change it at runtime (setting `backup.schedule`, `PATCH /api/v1/settings/instance`) and the worker follows within about a minute; setting the variable pins the value and locks it in the settings API. `MENAGERIST_BACKUP_PRUNE_EXPORTS_SCHEDULE` (default `0 * * * *`) separately expires downloadable user exports on `MENAGERIST_BACKUP_USER_EXPORT_TTL_HOURS`, so they lapse on time even with scheduled backups off. Set either to an empty value to disable that job; a malformed expression stops startup.
+
+The worker also runs housekeeping jobs from the other modules: `MENAGERIST_IDENTITY_PURGE_EXPIRED_SCHEDULE` (default `15 4 * * *`) removes expired sessions and API tokens, and `MENAGERIST_MEDIA_CLEANUP_SCHEDULE` (default `30 * * * *`) removes media that was never attached or is no longer referenced once `MENAGERIST_MEDIA_STAGED_TTL_HOURS` or `MENAGERIST_MEDIA_ORPHANED_TTL_HOURS` has passed. Empty disables either. `MENAGERIST_MEDIA_STRAY_FILES_SCHEDULE` (default `45 3 * * 0`) removes stored files that no upload refers to, such as those a crash or a failed delete left behind, once they are older than `MENAGERIST_MEDIA_STAGED_TTL_HOURS`. `MENAGERIST_RETENTION_PURGE_SCHEDULE` (empty, so off, by default) permanently removes content that has been in Recently deleted for longer than `MENAGERIST_RETENTION_DELETED_DAYS`; it cannot be started by hand from the Scheduled tasks page. A module adds jobs by contributing a `JobContribution` (decorated handlers or bindings, plus their deployment schedules) to `CONTRIBUTIONS` in `entrypoints/api/shared/job_catalogue.py`; a job's `title` and `description` are shown to administrators, and a schedule key that names a tunable setting is editable at runtime.
+
+**Update checks.** `CheckForUpdates` (`modules/system/application/`) looks up the repository in the build's `repository_url` through the `ReleaseProvider` port (`GitHubReleaseProvider` over `httpx2`, plus an in-memory sibling) and stores the answer through `UpdateCheckStore` in the `update_checks` table. `GetVersionDetail` composes the stored result with the installed version on read and never calls out. The Check now route and the `system.update_check` job share the use case; `MENAGERIST_RELEASE_CHANNEL` (`stable` or `preview`) and `MENAGERIST_RELEASE_CHECK_SCHEDULE` (default `20 5 * * *`, empty disables) are tunable settings. Rules and the rejected alternatives are in `docs/DECISIONS.md`, "Update checks (2026-10-29)".

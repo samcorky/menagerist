@@ -1,0 +1,222 @@
+{
+  "valid": [
+    {
+      "expression": "0 3 * * *",
+      "explained": "At 03:00"
+    },
+    {
+      "expression": "*/15 * * * *",
+      "explained": "Every 15 minutes"
+    },
+    {
+      "expression": "0 4 * * 1",
+      "explained": "At 04:00, only on Monday"
+    },
+    {
+      "expression": "30 2 1 * *",
+      "explained": "At 02:30, on day 1 of the month"
+    },
+    {
+      "expression": "0 9 * * 1-5",
+      "explained": "At 09:00, Monday through Friday"
+    },
+    {
+      "expression": "0 0 1 1 *",
+      "explained": "At 00:00, on day 1 of the month, only in January"
+    },
+    {
+      "expression": "0 3,15 * * *",
+      "explained": "At 03:00 and 15:00"
+    },
+    {
+      "expression": "0 9-17 * * 1-5",
+      "explained": "Every hour, between 09:00 and 17:00, Monday through Friday"
+    },
+    {
+      "expression": "0 3 * * MON",
+      "explained": "At 03:00, only on Monday"
+    },
+    {
+      "expression": "0 3 * * 7",
+      "explained": "At 03:00, only on Sunday"
+    },
+    {
+      "expression": "0 3 L * *",
+      "explained": "At 03:00, on the last day of the month"
+    },
+    {
+      "expression": "0 3 * * 5#2",
+      "explained": "At 03:00, on the second Friday of the month"
+    },
+    {
+      "expression": "* * * * *",
+      "explained": "Every minute"
+    },
+    {
+      "expression": "0 3\t* * *",
+      "explained": "At 03:00"
+    },
+    {
+      "expression": "*/5 14,18 * * *",
+      "explained": "Every 5 minutes, during the 14:00 and 18:00 hours"
+    },
+    {
+      "expression": "0,30 14,18 * * *",
+      "explained": "At 0 and 30 minutes past the hour, during the 14:00 and 18:00 hours"
+    },
+    {
+      "expression": "0 14,18 * * *",
+      "explained": "At 14:00 and 18:00"
+    },
+    {
+      "expression": "*/5 14-18 * * *",
+      "explained": "Every 5 minutes, between 14:00 and 18:59"
+    },
+    {
+      "expression": "7-59/13,*/17,2 1-23/5,0,12-18/2 */9,29-31 2,*/5,JAN-MAR 1-5,0",
+      "explained": "Minute: every 13 minutes from 7 to 59, every 17 minutes and 2\nHour: every 5 hours from 1 to 23, 0 and every 2 hours from 12 to 18\nDay of month: every 9 days and 29 to 31\nMonth: February, every 5 months and January to March\nDay of week: Monday to Friday and Sunday\nA day counts if it fits the day of the month or the day of the week."
+    },
+    {
+      "expression": "*/20,5 * * * *",
+      "explained": "Minute: every 20 minutes and 5"
+    },
+    {
+      "expression": "5/15,50 * * * *",
+      "explained": "Minute: every 15 minutes (starting at 5) and 50"
+    },
+    {
+      "expression": "0,30 9-17/2,20 * * mon-fri,sat",
+      "explained": "Minute: 0 and 30\nHour: every 2 hours from 9 to 17 and 20\nDay of week: Monday to Friday and Saturday"
+    },
+    {
+      "expression": "0 0 1-7,15 * 1,3-5",
+      "explained": "Minute: 0\nHour: 0\nDay of month: 1 to 7 and 15\nDay of week: Monday and Wednesday to Friday\nA day counts if it fits the day of the month or the day of the week."
+    },
+    {
+      "expression": "0 0 * jan-mar,6 *",
+      "explained": "Minute: 0\nHour: 0\nMonth: January to March and June"
+    },
+    {
+      "expression": "0 0 * * 0-2,7",
+      "explained": "Minute: 0\nHour: 0\nDay of week: Sunday to Tuesday and Sunday"
+    },
+    {
+      "expression": "0 0 1-5/1,10 * *",
+      "explained": "Minute: 0\nHour: 0\nDay of month: every day from 1 to 5 and 10"
+    },
+    {
+      "expression": "0 0 29 2 *",
+      "explained": "At 00:00, on day 29 of the month, only in February"
+    },
+    {
+      "expression": "0 0 31 2-3 *",
+      "explained": "At 00:00, on day 31 of the month, February through March"
+    },
+    {
+      "expression": "0 0 31 */2 *",
+      "explained": "At 00:00, on day 31 of the month, every 2 months"
+    }
+  ],
+  "invalid": [
+    "@daily",
+    "@hourly",
+    "0 3 * *",
+    "0 3 * * * * *",
+    "61 * * * *",
+    "0 24 * * *",
+    "0 3 32 * *",
+    "0 3 * 13 *",
+    "0 3 * * 8",
+    "*/0 * * * *",
+    "every day",
+    "0 3 * * ?",
+    "0 3 ? * *",
+    "0 3 15W * *",
+    "H 3 * * *",
+    "0 0 3 * * *",
+    "*/10 * * * * *",
+    "0 3 31 2 *",
+    "0 3 30 2 *",
+    "0 3 31 4,6 *",
+    "0 3 30-31 2 *",
+    "0 3 31 2 1",
+    "5-1 * * * *",
+    "0 22-2 * * *",
+    "0 0 * 11-2 *",
+    "0 0 * * FRI-MON",
+    "0 0 * * SAT-SUN"
+  ],
+  "sentences": [
+    {
+      "sentence": {
+        "kind": "off"
+      },
+      "cron": ""
+    },
+    {
+      "sentence": {
+        "kind": "minutes",
+        "every": 15
+      },
+      "cron": "*/15 * * * *"
+    },
+    {
+      "sentence": {
+        "kind": "hourly",
+        "minute": 5
+      },
+      "cron": "5 * * * *"
+    },
+    {
+      "sentence": {
+        "kind": "daily",
+        "hour": 3,
+        "minute": 0
+      },
+      "cron": "0 3 * * *"
+    },
+    {
+      "sentence": {
+        "kind": "weekdays",
+        "hour": 9,
+        "minute": 30
+      },
+      "cron": "30 9 * * 1-5"
+    },
+    {
+      "sentence": {
+        "kind": "weekly",
+        "day": 0,
+        "hour": 4,
+        "minute": 0
+      },
+      "cron": "0 4 * * 0"
+    },
+    {
+      "sentence": {
+        "kind": "weekly",
+        "day": 1,
+        "hour": 9,
+        "minute": 30
+      },
+      "cron": "30 9 * * 1"
+    },
+    {
+      "sentence": {
+        "kind": "monthly",
+        "dayOfMonth": 28,
+        "hour": 23,
+        "minute": 59
+      },
+      "cron": "59 23 28 * *"
+    }
+  ],
+  "custom": [
+    "0 3 * * 1,3",
+    "0 3 1 */2 *",
+    "0 3 31 * *",
+    "*/7 * * * *",
+    "0 3,15 * * *",
+    "0 3 * * MON"
+  ]
+}

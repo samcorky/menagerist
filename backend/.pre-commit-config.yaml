@@ -1,0 +1,48 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-ast
+        name: check python files syntax
+      - id: name-tests-test
+        name: Name tests with test prefix
+        args:
+          - --pytest-test-first
+
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: check and fix linting errors (ruff check)
+        entry: uv run poe lint-backend-fix
+        language: system
+        types_or:
+          - python
+          - pyi
+        pass_filenames: false
+
+      - id: ruff-format
+        name: check and fix formatting errors (ruff format)
+        entry: uv run poe format-backend
+        language: system
+        types_or:
+          - python
+          - pyi
+        pass_filenames: false
+
+      - id: mypy
+        name: check types (mypy)
+        entry: uv run poe typecheck-backend
+        language: system
+        types_or:
+          - python
+          - pyi
+        pass_filenames: false
+
+      - id: pytest
+        name: run fast tests (pytest -m fast)
+        entry: uv run poe test-backend-fast
+        language: system
+        types_or:
+          - python
+          - pyi
+        pass_filenames: false

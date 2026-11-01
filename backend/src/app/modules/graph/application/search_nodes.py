@@ -1,0 +1,146 @@
+"""Search items with a saved-able condition tree."""
+
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from datetime import date  # noqa: TC003
+from typing import TYPE_CHECKING, Any, ClassVar
+
+import structlog
+
+from app.modules.graph.application.permissions import GraphPermission
+from app.modules.graph.application.prepare_query import prepare_query, utc_today
+from app.modules.graph.application.query_cursor import decode_cursor, encode_cursor
+from app.modules.graph.domain.node import Node
+from app.modules.graph.domain.query import (
+    Cursor,
+    FieldKey,
+    InvalidQueryError,
+    QueryWarning,
+    SortKey,
+)
+from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.access import Access, Content
+
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.shared_kernel.actor import Actor  # noqa: TC001
+from app.shared_kernel.cqrs import QueryHandler
+
+if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
+
+logger = structlog.get_logger()
+
+MAX_LIMIT = 200
+TOTAL_CAP = 1000
+_NUMERIC_KINDS = frozenset({"number", "duration", "rating", "money"})
+
+
+def _is_number(value: object) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
+def _fits_sort_key(key: SortKey, value: object, kinds: Mapping[FieldKey, str]) -> bool:
+    """Whether a cursor `value` has the type its sort `key` produces."""
+    if value is None:
+        return True
+    if key.by == "name":
+        return isinstance(value, str)
+    if key.by in {"created", "updated"}:
+        return _is_number(value)
+    kind = kinds.get((key.type or "", key.key or "", None))
+    if kind is None:
+        return False
+    return _is_number(value) if kind in _NUMERIC_KINDS else isinstance(value, str)
+
+
+def _check_cursor_types(
+    cursor: Cursor, sort: tuple[SortKey, ...], kinds: Mapping[FieldKey, str]
+) -> None:
+    """Reject a cursor whose values do not fit the query's sort keys."""
+    for key, value in zip(sort, cursor.sort_values, strict=True):
+        if not _fits_sort_key(key, value, kinds):
+            raise InvalidQueryError("Not a valid cursor.", path="cursor")
+
+
+@dataclass(kw_only=True)
+class SearchNodesQuery:
+    """A condition tree (as JSON), a page size and an optional cursor."""
+
+    query: Mapping[str, Any]
+    limit: int = 50
+    cursor: str | None = None
+
+
+@dataclass(frozen=True)
+class SearchNodesResult:
+    """One page of matches, the total, where to resume, and stale conditions.
+
+    `total` is exact up to the cap; when `total_capped` it is a lower bound.
+    """
+
+    items: list[Node]
+    total: int
+    total_capped: bool
+    next_cursor: str | None
+    warnings: list[QueryWarning]
+
+
+class SearchNodes(QueryHandler[GraphRepos, SearchNodesQuery, SearchNodesResult]):
+    """Search items by condition tree, ordered and paged by keyset."""
+
+    access: ClassVar[Access] = Content(GraphPermission.ITEM_READ)
+
+    def __init__(
+        self,
+        repos: GraphRepos,
+        guard: AccessGuard,
+        today: Callable[[], date] = utc_today,
+        total_cap: int = TOTAL_CAP,
+    ) -> None:
+        super().__init__(repos, guard)
+        self._today = today
+        self._total_cap = total_cap
+
+    async def _handle(self, query: SearchNodesQuery, actor: Actor) -> SearchNodesResult:
+        """Return a page of matching items.
+
+        Raises:
+            InvalidQueryError: For a malformed query, limit or cursor, or an
+                operator or value that does not fit a field.
+        """
+        if not 1 <= query.limit <= MAX_LIMIT:
+            raise InvalidQueryError(
+                f"The limit must be 1 to {MAX_LIMIT}.", path="limit"
+            )
+        scope = self.scope(actor)
+        resolved, warnings = await prepare_query(
+            self._repos, query.query, self._today(), scope=scope
+        )
+        parsed = resolved.query
+        after: Cursor | None = None
+        if query.cursor is not None:
+            after = decode_cursor(query.cursor, sort_count=len(parsed.sort))
+            _check_cursor_types(after, parsed.sort, resolved.field_kinds)
+        hits = await self._repos.nodes.search(
+            scope=scope, resolved=resolved, after=after, limit=query.limit + 1
+        )
+        # One past the cap tells "exactly the cap" from "more than the cap".
+        counted = await self._repos.nodes.search_count(
+            scope=scope, resolved=resolved, limit=self._total_cap + 1
+        )
+        total = min(counted, self._total_cap)
+        page = hits[: query.limit]
+        next_cursor = None
+        if len(hits) > query.limit:
+            last = page[-1]
+            next_cursor = encode_cursor(
+                Cursor(sort_values=last.sort_values, id=last.node.id)
+            )
+        logger.debug("nodes searched", count=len(page), total=total)
+        return SearchNodesResult(
+            items=[hit.node for hit in page],
+            total=total,
+            total_capped=counted > self._total_cap,
+            next_cursor=next_cursor,
+            warnings=warnings,
+        )

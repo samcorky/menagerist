@@ -1,0 +1,134 @@
+import uuid
+from datetime import UTC, datetime, timedelta
+
+from app.modules.identity.domain.errors import CurrentSessionError, SessionNotFoundError
+from app.modules.identity.domain.session import Session
+from app.shared_kernel.errors import ConflictError, NotFoundError
+
+NOW = datetime(2026, 10, 10, 12, 0, tzinfo=UTC)
+
+
+def test_create_sets_expiry_from_ttl() -> None:
+    """A session expires `ttl` after creation."""
+    user_id = uuid.uuid7()
+    session = Session.create(
+        user_id=user_id, token_hash="ab" * 32, now=NOW, ttl=timedelta(hours=1)
+    )
+    assert session.user_id == user_id
+    assert session.created_at == session.last_seen_at == NOW
+    assert session.expires_at == NOW + timedelta(hours=1)
+    assert session.user_agent is None
+    assert session.client_ip is None
+    assert session.client_platform is None
+    assert session.client_mobile is None
+
+
+def test_create_stores_device_details() -> None:
+    """Device details pass through to the session."""
+    session = Session.create(
+        user_id=uuid.uuid7(),
+        token_hash="h",
+        now=NOW,
+        ttl=timedelta(hours=1),
+        user_agent="Mozilla/5.0 Firefox/131.0",
+        client_ip="192.0.2.1",
+        client_platform="Linux",
+        client_mobile=False,
+    )
+    assert session.user_agent == "Mozilla/5.0 Firefox/131.0"
+    assert session.client_ip == "192.0.2.1"
+    assert session.client_platform == "Linux"
+    assert session.client_mobile is False
+
+
+def test_create_truncates_long_user_agent_and_platform() -> None:
+    """User agent is cut to 256 characters and platform to 64."""
+    long_ua = "A" * 300
+    long_platform = "P" * 100
+    session = Session.create(
+        user_id=uuid.uuid7(),
+        token_hash="h",
+        now=NOW,
+        ttl=timedelta(hours=1),
+        user_agent=long_ua,
+        client_platform=long_platform,
+    )
+    assert session.user_agent == "A" * 256
+    assert session.client_platform == "P" * 64
+
+
+def test_create_turns_blank_device_details_into_none() -> None:
+    """Empty or whitespace-only device details become `None`."""
+    session = Session.create(
+        user_id=uuid.uuid7(),
+        token_hash="h",
+        now=NOW,
+        ttl=timedelta(hours=1),
+        user_agent="   ",
+        client_ip="",
+        client_platform=" \t\n ",
+        client_mobile=None,
+    )
+    assert session.user_agent is None
+    assert session.client_ip is None
+    assert session.client_platform is None
+    assert session.client_mobile is None
+
+
+def test_is_expired_at_and_after_expiry() -> None:
+    """Expiry is inclusive of the expiry instant."""
+    session = Session.create(
+        user_id=uuid.uuid7(), token_hash="h", now=NOW, ttl=timedelta(hours=1)
+    )
+    assert session.is_expired(NOW) is False
+    assert session.is_expired(NOW + timedelta(hours=1)) is True
+
+
+def test_seen_records_activity() -> None:
+    """`seen` moves last_seen_at to the given instant."""
+    session = Session.create(
+        user_id=uuid.uuid7(), token_hash="h", now=NOW, ttl=timedelta(hours=1)
+    )
+    later = NOW + timedelta(minutes=5)
+
+    session.seen(later)
+
+    assert session.last_seen_at == later
+
+
+def test_is_idle_is_off_without_a_limit() -> None:
+    """No limit means a session is never idle, however long it sat."""
+    session = Session.create(
+        user_id=uuid.uuid7(), token_hash="h", now=NOW, ttl=timedelta(days=30)
+    )
+
+    assert session.is_idle(NOW + timedelta(days=29), None) is False
+
+
+def test_is_idle_only_after_more_than_the_limit() -> None:
+    """The boundary itself is still active; one second more is idle."""
+    session = Session.create(
+        user_id=uuid.uuid7(), token_hash="h", now=NOW, ttl=timedelta(days=30)
+    )
+    limit = timedelta(hours=2)
+
+    assert session.is_idle(NOW + limit, limit) is False
+    assert session.is_idle(NOW + limit + timedelta(seconds=1), limit) is True
+
+
+def test_activity_restarts_the_idle_clock() -> None:
+    """`seen` moves the idle reference point."""
+    session = Session.create(
+        user_id=uuid.uuid7(), token_hash="h", now=NOW, ttl=timedelta(days=30)
+    )
+    limit = timedelta(hours=2)
+    session.seen(NOW + timedelta(hours=1, minutes=59))
+
+    assert session.is_idle(NOW + timedelta(hours=3), limit) is False
+    assert session.is_idle(NOW + timedelta(hours=4), limit) is True
+
+
+def test_session_errors_subclass_shared_kernel_errors() -> None:
+    """Session errors inherit correct HTTP mapping base types."""
+    assert issubclass(SessionNotFoundError, NotFoundError)
+    assert issubclass(CurrentSessionError, ConflictError)

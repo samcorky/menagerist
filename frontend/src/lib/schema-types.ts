@@ -1,0 +1,50 @@
+import type { JsonSchemaProperty } from '$lib/json-schema';
+import type { PropertyMeta } from '$lib/prop-meta';
+import type { SchemaMeta } from '$lib/schema-meta';
+
+export type { JsonSchemaProperty } from '$lib/json-schema';
+
+export type AttributesSchema = {
+	$schema: 'https://json-schema.org/draft/2020-12/schema';
+	type: 'object';
+	properties: Record<string, JsonSchemaProperty>;
+	'x-menagerist'?: SchemaMeta;
+};
+
+export type EditorSubField = {
+	key: string;
+	label: string;
+	kind: string;
+	/** A choice sub-field's options; empty for every other kind. */
+	options?: string[];
+	/** True until the schema is saved: the key is still derived from the label. */
+	keyPending?: boolean;
+	/** Kind when loaded from a saved schema; limits which kinds it may change to. */
+	originalKind?: string;
+	/** Editor-only settings a descriptor maps to and from validation keywords. */
+	config?: Record<string, unknown>;
+	meta?: PropertyMeta;
+	/** Original property for the `opaque` kind, written back unchanged on save. */
+	raw?: Record<string, unknown>;
+};
+
+export type EditorField = {
+	key: string;
+	label: string;
+	kind: string;
+	required: boolean;
+	options: string[];
+	subFields: EditorSubField[];
+	/** True until the schema is saved: the key is still derived from the label. */
+	keyPending?: boolean;
+	/** Kind when loaded from a saved schema; limits which kinds it may change to. */
+	originalKind?: string;
+	/** 1-based position among the fields shown on cards; unset when not highlighted. */
+	highlight?: number;
+	/** Editor-only settings a descriptor maps to and from validation keywords (e.g. star count). */
+	config?: Record<string, unknown>;
+	/** Metadata members carried through unchanged (display, archived, unknown members). */
+	meta?: PropertyMeta;
+	/** Original property for the `opaque` kind, written back unchanged on save. */
+	raw?: Record<string, unknown>;
+};

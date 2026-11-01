@@ -1,0 +1,642 @@
+import uuid
+from typing import TYPE_CHECKING
+
+from starlette.testclient import TestClient
+
+from app.entrypoints.api import create_app
+from app.entrypoints.api.shared.bridges.collection_members import get_collection_members
+from app.modules.graph.adapters.api.dependencies import get_graph_repos, get_graph_uow
+from app.modules.graph.adapters.persistence.in_memory_collection_members import (
+    InMemoryCollectionMembers,
+)
+from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
+    InMemoryEdgeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_edge_type_repository import (
+    InMemoryEdgeTypeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_node_repository import (
+    InMemoryNodeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
+    InMemoryNodeTypeRepository,
+)
+from app.modules.graph.adapters.persistence.unit_of_work import (
+    create_in_memory_graph_uow,
+)
+from app.modules.graph.ports.unit_of_work import GraphRepos
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+
+
+def _app_with_in_memory_graph() -> FastAPI:
+    """Build the app with the graph module wired to fresh in-memory repositories.
+
+    Router tests exercise the API layer, not real persistence - the in-memory
+    adapter is the fast, Docker-free double `backend/README.md` prescribes for
+    this test tier.
+    """
+    app = create_app()
+    repos = GraphRepos(
+        nodes=InMemoryNodeRepository(),
+        edges=InMemoryEdgeRepository(),
+        node_types=InMemoryNodeTypeRepository(),
+        edge_types=InMemoryEdgeTypeRepository(),
+    )
+    app.dependency_overrides[get_graph_uow] = lambda: create_in_memory_graph_uow(repos)
+    app.dependency_overrides[get_graph_repos] = lambda: repos
+    return app
+
+
+def test_create_get_list_and_404_round_trip() -> None:
+    """A node created via the API can be fetched and listed, and a miss is a 404."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    create_response = client.post(
+        "/api/v1/node",
+        json={"name": "Alien", "type": "film", "attributes": {"title": "Alien"}},
+    )
+    assert create_response.status_code == 201
+    node = create_response.json()
+    assert node["type"] == "film"
+    assert node["attributes"] == {"title": "Alien"}
+
+    get_response = client.get(f"/api/v1/node/{node['id']}")
+    assert get_response.status_code == 200
+    assert get_response.json() == node
+
+    list_response = client.get("/api/v1/node")
+    assert list_response.status_code == 200
+    assert node in list_response.json()
+
+    missing_response = client.get(f"/api/v1/node/{uuid.uuid4()}")
+    assert missing_response.status_code == 404
+    assert missing_response.json()["title"] == "NodeNotFoundError"
+
+
+def test_update_node_applies_changes() -> None:
+    """PATCH updates the given fields and leaves the rest unchanged."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
+
+    update_response = client.patch(
+        f"/api/v1/node/{node['id']}", json={"name": "Alien (1979)"}
+    )
+
+    assert update_response.status_code == 200
+    updated = update_response.json()
+    assert updated["name"] == "Alien (1979)"
+    assert updated["type"] == "film"
+
+
+def test_update_node_returns_404_when_missing() -> None:
+    """PATCH on a nonexistent node returns 404."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    response = client.patch(f"/api/v1/node/{uuid.uuid4()}", json={"name": "Alien"})
+
+    assert response.status_code == 404
+
+
+def test_create_node_with_an_extra_schema_round_trips_and_validates() -> None:
+    """A per-item overlay is returned as-is and validates its own fields."""
+    client = TestClient(_app_with_in_memory_graph())
+    schema = {"type": "object", "properties": {"signed": {"type": "boolean"}}}
+
+    create_response = client.post(
+        "/api/v1/node",
+        json={"name": "Alien", "attributes": {"signed": True}, "extra_schema": schema},
+    )
+    assert create_response.status_code == 201
+    assert create_response.json()["extra_schema"] == schema
+
+    invalid_response = client.post(
+        "/api/v1/node",
+        json={
+            "name": "Alien 2",
+            "attributes": {"signed": "nope"},
+            "extra_schema": schema,
+        },
+    )
+    assert invalid_response.status_code == 400
+
+
+def test_create_node_rejects_a_malformed_extra_schema() -> None:
+    """A structurally invalid `extra_schema` is rejected with a client error."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    response = client.post(
+        "/api/v1/node",
+        json={"name": "Alien", "extra_schema": {"type": "not-a-real-type"}},
+    )
+
+    assert response.status_code == 400
+
+
+def test_update_node_extra_schema_persists_and_is_kept_when_omitted() -> None:
+    """PATCH stores extra_schema, and a later PATCH without it leaves it in place."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien"}).json()
+    schema = {"type": "object", "properties": {"signed": {"type": "boolean"}}}
+
+    first = client.patch(f"/api/v1/node/{node['id']}", json={"extra_schema": schema})
+    assert first.json()["extra_schema"] == schema
+
+    second = client.patch(f"/api/v1/node/{node['id']}", json={"name": "Alien (1979)"})
+    assert second.json()["extra_schema"] == schema
+
+
+def test_delete_node_then_get_and_list_no_longer_find_it() -> None:
+    """DELETE soft-deletes the node, so subsequent GET/LIST treat it as gone."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
+
+    delete_response = client.delete(f"/api/v1/node/{node['id']}")
+    assert delete_response.status_code == 204
+
+    assert client.get(f"/api/v1/node/{node['id']}").status_code == 404
+    assert node not in client.get("/api/v1/node").json()
+
+
+def test_delete_node_returns_404_when_missing() -> None:
+    """DELETE on a nonexistent node returns 404."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    response = client.delete(f"/api/v1/node/{uuid.uuid4()}")
+
+    assert response.status_code == 404
+
+
+def test_list_nodes_filters_by_type() -> None:
+    """GET /api/v1/node?type=film returns only film nodes."""
+    client = TestClient(_app_with_in_memory_graph())
+    film = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
+    client.post("/api/v1/node", json={"name": "Ridley Scott", "type": "person"})
+
+    response = client.get("/api/v1/node?type=film")
+
+    assert response.status_code == 200
+    results = response.json()
+    assert len(results) == 1
+    assert results[0]["id"] == film["id"]
+
+
+def test_list_nodes_search_by_name() -> None:
+    """GET /api/v1/node?q=alien returns only nodes whose name contains the query."""
+    client = TestClient(_app_with_in_memory_graph())
+    client.post("/api/v1/node", json={"name": "Alien", "type": "film"})
+    client.post("/api/v1/node", json={"name": "Predator", "type": "film"})
+
+    response = client.get("/api/v1/node?q=alien")
+
+    assert response.status_code == 200
+    results = response.json()
+    assert len(results) == 1
+    assert results[0]["name"] == "Alien"
+
+
+def test_list_nodes_search_and_type_filter_combine() -> None:
+    """GET /api/v1/node?q=alien&type=film applies both filters."""
+    client = TestClient(_app_with_in_memory_graph())
+    client.post("/api/v1/node", json={"name": "Alien", "type": "film"})
+    client.post("/api/v1/node", json={"name": "Alien character", "type": "person"})
+
+    response = client.get("/api/v1/node?q=alien&type=film")
+
+    assert response.status_code == 200
+    results = response.json()
+    assert len(results) == 1
+    assert results[0]["type"] == "film"
+
+
+def test_get_node_response_includes_etag_and_last_modified_headers() -> None:
+    """GET /api/v1/node/{id} returns ETag and Last-Modified headers."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
+
+    response = client.get(f"/api/v1/node/{node['id']}")
+
+    assert response.status_code == 200
+    assert "ETag" in response.headers
+    assert "Last-Modified" in response.headers
+
+
+def test_get_node_returns_304_when_etag_matches() -> None:
+    """GET /api/v1/node/{id} returns 304 Not Modified when ETag matches."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
+
+    initial_response = client.get(f"/api/v1/node/{node['id']}")
+    etag = initial_response.headers["ETag"]
+
+    response = client.get(f"/api/v1/node/{node['id']}", headers={"If-None-Match": etag})
+
+    assert response.status_code == 304
+    assert response.headers["ETag"] == etag
+
+
+def test_get_node_returns_304_when_not_modified_since() -> None:
+    """GET /api/v1/node/{id} returns 304 Not Modified when If-Modified-Since matches."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
+
+    initial_response = client.get(f"/api/v1/node/{node['id']}")
+    last_modified = initial_response.headers["Last-Modified"]
+
+    response = client.get(
+        f"/api/v1/node/{node['id']}", headers={"If-Modified-Since": last_modified}
+    )
+
+    assert response.status_code == 304
+    assert response.headers["Last-Modified"] == last_modified
+
+
+def test_update_node_returns_412_when_if_match_stale() -> None:
+    """PATCH /api/v1/node/{id} returns 412 Precondition Failed.
+
+    When If-Match is stale.
+    """
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
+
+    initial_response = client.get(f"/api/v1/node/{node['id']}")
+    etag = initial_response.headers["ETag"]
+
+    # Update the node to change its ETag
+    client.patch(f"/api/v1/node/{node['id']}", json={"name": "Alien (1979)"})
+
+    response = client.patch(
+        f"/api/v1/node/{node['id']}",
+        json={"name": "Alien (1980)"},
+        headers={"If-Match": etag},
+    )
+
+    assert response.status_code == 412
+    assert response.headers["ETag"] != etag
+
+
+def test_update_node_proceeds_when_if_match_current() -> None:
+    """PATCH /api/v1/node/{id} succeeds when If-Match matches current ETag."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
+
+    initial_response = client.get(f"/api/v1/node/{node['id']}")
+    etag = initial_response.headers["ETag"]
+
+    response = client.patch(
+        f"/api/v1/node/{node['id']}",
+        json={"name": "Alien (1979)"},
+        headers={"If-Match": etag},
+    )
+
+    assert response.status_code == 200
+    updated_node = response.json()
+    assert updated_node["name"] == "Alien (1979)"
+
+
+def test_list_nodes_link_header_present_when_more_pages_exist() -> None:
+    """GET /api/v1/node returns Link header when more pages exist."""
+    client = TestClient(_app_with_in_memory_graph())
+    # Create enough nodes to require pagination
+    for i in range(15):
+        client.post("/api/v1/node", json={"name": f"Node {i}", "type": "test"})
+
+    response = client.get("/api/v1/node?limit=10")
+
+    assert response.status_code == 200
+    assert "Link" in response.headers
+    assert 'rel="next"' in response.headers["Link"]
+
+
+def test_list_nodes_no_link_header_on_last_page() -> None:
+    """GET /api/v1/node does not return Link header on last page."""
+    client = TestClient(_app_with_in_memory_graph())
+    # Create fewer nodes than the page size (assuming default page size is 10)
+    for i in range(5):
+        client.post("/api/v1/node", json={"name": f"Node {i}", "type": "test"})
+
+    response = client.get("/api/v1/node")
+
+    assert response.status_code == 200
+    assert "Link" not in response.headers
+
+
+def test_list_nodes_returns_x_total_count_header() -> None:
+    """GET /api/v1/node returns Total-Count with the total number of nodes."""
+    client = TestClient(_app_with_in_memory_graph())
+    for i in range(5):
+        client.post("/api/v1/node", json={"name": f"Node {i}", "type": "test"})
+
+    response = client.get("/api/v1/node")
+
+    assert response.status_code == 200
+    assert response.headers["Total-Count"] == "5"
+
+
+def test_list_nodes_x_total_count_reflects_filters() -> None:
+    """Total-Count matches the filtered total, not the overall total."""
+    client = TestClient(_app_with_in_memory_graph())
+    client.post("/api/v1/node", json={"name": "Alien", "type": "film"})
+    client.post("/api/v1/node", json={"name": "Aliens", "type": "film"})
+    client.post("/api/v1/node", json={"name": "Ridley Scott", "type": "person"})
+
+    response = client.get("/api/v1/node?type=film")
+
+    assert response.status_code == 200
+    assert response.headers["Total-Count"] == "2"
+
+
+def test_create_node_favourite_defaults_to_false() -> None:
+    """POST /api/v1/node without favourite returns favourite=false in the response."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    response = client.post("/api/v1/node", json={"name": "Alien"})
+
+    assert response.status_code == 201
+    assert response.json()["favourite"] is False
+
+
+def test_create_node_with_favourite_true() -> None:
+    """POST /api/v1/node with favourite=true stores and returns it."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    response = client.post("/api/v1/node", json={"name": "Alien", "favourite": True})
+
+    assert response.status_code == 201
+    assert response.json()["favourite"] is True
+
+
+def test_update_node_sets_favourite() -> None:
+    """PATCH /api/v1/node/{id} with favourite=true stores and returns it."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien"}).json()
+
+    response = client.patch(f"/api/v1/node/{node['id']}", json={"favourite": True})
+
+    assert response.status_code == 200
+    assert response.json()["favourite"] is True
+
+
+def test_update_node_clears_favourite() -> None:
+    """PATCH /api/v1/node/{id} with favourite=false unfavourites a starred node."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien", "favourite": True}).json()
+
+    response = client.patch(f"/api/v1/node/{node['id']}", json={"favourite": False})
+
+    assert response.status_code == 200
+    assert response.json()["favourite"] is False
+
+
+def test_create_node_tags_default_to_empty() -> None:
+    """POST /api/v1/node without tags returns an empty tags list."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    response = client.post("/api/v1/node", json={"name": "Alien"})
+
+    assert response.status_code == 201
+    assert response.json()["tags"] == []
+
+
+def test_create_node_normalises_tags() -> None:
+    """POST /api/v1/node trims, lowercases and de-duplicates tags."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    response = client.post(
+        "/api/v1/node",
+        json={"name": "Alien", "tags": [" Sci-Fi ", "sci-fi", "", "Horror"]},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["tags"] == ["sci-fi", "horror"]
+
+
+def test_update_node_replaces_and_clears_tags() -> None:
+    """PATCH /api/v1/node/{id} replaces tags, and an empty list clears them."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien", "tags": ["a"]}).json()
+
+    replaced = client.patch(f"/api/v1/node/{node['id']}", json={"tags": ["B"]})
+    untouched = client.patch(f"/api/v1/node/{node['id']}", json={"name": "Aliens"})
+    cleared = client.patch(f"/api/v1/node/{node['id']}", json={"tags": []})
+
+    assert replaced.json()["tags"] == ["b"]
+    assert untouched.json()["tags"] == ["b"]
+    assert cleared.json()["tags"] == []
+
+
+def test_list_nodes_filters_by_favourite() -> None:
+    """GET /api/v1/node?favourite=true returns only favourited nodes."""
+    client = TestClient(_app_with_in_memory_graph())
+    starred = client.post(
+        "/api/v1/node", json={"name": "Alien", "favourite": True}
+    ).json()
+    client.post("/api/v1/node", json={"name": "Predator"})
+
+    response = client.get("/api/v1/node?favourite=true")
+
+    assert response.status_code == 200
+    results = response.json()
+    assert len(results) == 1
+    assert results[0]["id"] == starred["id"]
+
+
+def test_list_nodes_x_total_count_reflects_favourite_filter() -> None:
+    """Total-Count respects the favourite filter."""
+    client = TestClient(_app_with_in_memory_graph())
+    for _ in range(3):
+        client.post("/api/v1/node", json={"name": "Alien", "favourite": True})
+    for _ in range(2):
+        client.post("/api/v1/node", json={"name": "Predator"})
+
+    response = client.get("/api/v1/node?favourite=true")
+
+    assert response.status_code == 200
+    assert response.headers["Total-Count"] == "3"
+
+
+def test_promote_extra_schema_field_moves_the_property() -> None:
+    """POST .../attribute/{key}/promote moves the overlay field onto the item type."""
+    client = TestClient(_app_with_in_memory_graph())
+    node_type = client.post(
+        "/api/v1/node-type", json={"slug": "film", "label": "Film"}
+    ).json()
+    schema = {"type": "object", "properties": {"condition": {"type": "string"}}}
+    node = client.post(
+        "/api/v1/node",
+        json={
+            "name": "Alien",
+            "type": "film",
+            "attributes": {"condition": "mint"},
+            "extra_schema": schema,
+        },
+    ).json()
+
+    response = client.post(
+        f"/api/v1/node/{node['id']}/attribute/condition/promote",
+        json={"node_type_id": node_type["id"]},
+    )
+
+    assert response.status_code == 200
+    promoted = response.json()
+    assert "condition" not in (promoted["extra_schema"] or {}).get("properties", {})
+    assert promoted["attributes"]["condition"] == "mint"
+
+    updated_type = client.get(f"/api/v1/node-type/{node_type['id']}").json()
+    assert "condition" in updated_type["attributes_schema"]["properties"]
+
+
+def test_promote_extra_schema_field_returns_404_when_node_missing() -> None:
+    """POST .../attribute/{key}/promote on a nonexistent node returns 404."""
+    client = TestClient(_app_with_in_memory_graph())
+    node_type = client.post(
+        "/api/v1/node-type", json={"slug": "film", "label": "Film"}
+    ).json()
+
+    response = client.post(
+        f"/api/v1/node/{uuid.uuid4()}/attribute/condition/promote",
+        json={"node_type_id": node_type["id"]},
+    )
+
+    assert response.status_code == 404
+
+
+def test_list_nodes_x_total_count_matches_full_count_across_pages() -> None:
+    """Total-Count equals the full total even when pagination limits the page."""
+    client = TestClient(_app_with_in_memory_graph())
+    for i in range(15):
+        client.post("/api/v1/node", json={"name": f"Node {i}", "type": "test"})
+
+    response = client.get("/api/v1/node?limit=10")
+
+    assert response.status_code == 200
+    assert len(response.json()) == 10
+    assert response.headers["Total-Count"] == "15"
+
+
+def _app_with_collection(
+    collection_id: uuid.UUID, item_ids: list[uuid.UUID]
+) -> FastAPI:
+    app = _app_with_in_memory_graph()
+    members = InMemoryCollectionMembers()
+    members.add_collection(collection_id, item_ids, owner_id=uuid.UUID(int=1))
+    app.dependency_overrides[get_collection_members] = lambda: members
+    return app
+
+
+def test_list_nodes_collection_restricts_and_combines_with_filters_and_paging() -> None:
+    """?collection= restricts items, Total-Count and Link to the collection."""
+    plain = _app_with_in_memory_graph()
+    client = TestClient(plain)
+    ids = [
+        client.post("/api/v1/node", json={"name": f"Film {i}", "type": "film"}).json()[
+            "id"
+        ]
+        for i in range(4)
+    ]
+    client.post("/api/v1/node", json={"name": "Outside", "type": "film"})
+    collection_id = uuid.uuid4()
+    members = InMemoryCollectionMembers()
+    members.add_collection(
+        collection_id, [uuid.UUID(i) for i in ids], owner_id=uuid.UUID(int=1)
+    )
+    plain.dependency_overrides[get_collection_members] = lambda: members
+
+    page = client.get(f"/api/v1/node?collection={collection_id}&limit=3")
+    searched = client.get(f"/api/v1/node?collection={collection_id}&q=outside")
+
+    assert page.status_code == 200
+    assert len(page.json()) == 3
+    assert page.headers["Total-Count"] == "4"
+    assert 'rel="next"' in page.headers["Link"]
+    assert searched.json() == []
+    assert searched.headers["Total-Count"] == "0"
+
+
+def test_list_nodes_unknown_collection_returns_404() -> None:
+    """?collection= for an unknown collection is a 404 problem response."""
+    app = _app_with_in_memory_graph()
+    members = InMemoryCollectionMembers()
+    app.dependency_overrides[get_collection_members] = lambda: members
+    client = TestClient(app)
+
+    response = client.get(f"/api/v1/node?collection={uuid.uuid4()}")
+
+    assert response.status_code == 404
+
+
+def test_list_nodes_empty_collection_returns_empty_list() -> None:
+    """A collection with no items lists nothing, with Total-Count 0."""
+    collection_id = uuid.uuid4()
+    client = TestClient(_app_with_collection(collection_id, []))
+    client.post("/api/v1/node", json={"name": "Alien", "type": "film"})
+
+    response = client.get(f"/api/v1/node?collection={collection_id}")
+
+    assert response.status_code == 200
+    assert response.json() == []
+    assert response.headers["Total-Count"] == "0"
+
+
+def test_list_nodes_search_ignores_accents() -> None:
+    """GET /api/v1/node?q=cafe finds a node named Café."""
+    client = TestClient(_app_with_in_memory_graph())
+    client.post("/api/v1/node", json={"name": "Café", "type": "film"})
+    client.post("/api/v1/node", json={"name": "Predator", "type": "film"})
+
+    response = client.get("/api/v1/node?q=cafe")
+
+    assert [n["name"] for n in response.json()] == ["Café"]
+
+
+def test_update_node_changes_the_type_and_keeps_the_attributes() -> None:
+    """PATCH type replaces the type; the attribute values stay."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post(
+        "/api/v1/node",
+        json={"name": "Alien", "type": "film", "attributes": {"year": 1979}},
+    ).json()
+
+    response = client.patch(f"/api/v1/node/{node['id']}", json={"type": "book"})
+
+    assert response.status_code == 200
+    assert response.json()["type"] == "book"
+    assert response.json()["attributes"] == {"year": 1979}
+
+
+def test_update_node_clears_the_type_with_null() -> None:
+    """PATCH type null removes the type and keeps the attributes."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post(
+        "/api/v1/node",
+        json={"name": "Alien", "type": "film", "attributes": {"year": 1979}},
+    ).json()
+
+    response = client.patch(f"/api/v1/node/{node['id']}", json={"type": None})
+
+    assert response.status_code == 200
+    assert response.json()["type"] is None
+    assert response.json()["attributes"] == {"year": 1979}
+    assert client.get(f"/api/v1/node/{node['id']}").json()["type"] is None
+
+
+def test_update_node_without_type_leaves_it_alone() -> None:
+    """Omitting type is not a clear."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
+
+    response = client.patch(f"/api/v1/node/{node['id']}", json={"favourite": True})
+
+    assert response.json()["type"] == "film"
+
+
+def test_update_node_rejects_a_blank_type() -> None:
+    """A blank string is an error, not a way to clear the type."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
+
+    response = client.patch(f"/api/v1/node/{node['id']}", json={"type": ""})
+
+    assert response.status_code == 400
+    assert client.get(f"/api/v1/node/{node['id']}").json()["type"] == "film"

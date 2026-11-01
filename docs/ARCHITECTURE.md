@@ -1,0 +1,128 @@
+# Architecture
+
+Menagerist is a three-tier web application: a SvelteKit SPA frontend, a FastAPI backend, and a PostgreSQL database - deployed as Docker containers.
+
+## Deployment topology
+
+```
+Browser
+  │
+  ▼
+menagerist (port 8000, distroless)
+  ├── /*      → SvelteKit static build (served directly)
+  └── /api/*  → FastAPI (same process)
+              │
+              ▼
+         PostgreSQL
+```
+
+A single `menagerist` container runs the FastAPI process, which serves the pre-built frontend as a static SPA (`entrypoints/api/spa.py`, mounted at `/` after every API router) alongside the API itself - one process, one port, no reverse proxy in front of it. No server-side rendering, no API gateway, no service mesh.
+
+Docker Compose (`compose.yaml`) orchestrates the stack: PostgreSQL plus the `menagerist` service. A machine-specific override (`compose.override.yml`) handles per-machine configuration and is picked up automatically. The container image uses a distroless base (`gcr.io/distroless/base-debian13:nonroot`) - non-root, minimal attack surface.
+
+## Backend
+
+Hexagonal architecture (ports and adapters) with DDD, organised as vertical slices by bounded context.
+
+```
+backend/src/app/
+├── entrypoints/     # FastAPI app factory, composition root, CLI entrypoints
+├── modules/         # one directory per bounded context
+│   ├── collections/ # named lists of items (manual) and saved searches (smart) with their memberships
+│   ├── examples/    # optional example packs: install, remove, shipped pack files
+│   ├── graph/       # nodes, edges, node types, edge types
+│   ├── identity/    # accounts, sessions, sign-in, first-run setup, identity CLI
+│   ├── media/       # attachments and images
+│   └── system/      # health, readiness, version (public: minimal; detail needs system:diagnostics:read)
+├── shared_kernel/   # Actor, access stances and guard, ContentFilter, error base types, UoW protocol, use case bases
+├── platform/        # database engine, session factory, logging (one plausible implementation each)
+└── alembic/         # migrations - one environment for all modules
+```
+
+**Dependency rule:** `entrypoints → adapters → application → domain`. Domain has zero framework imports. Enforced in CI by `archunitpython` tests in `backend/tests/architecture/`.
+
+Each module follows this internal layout:
+
+```
+modules/<context>/
+├── domain/          # entities, value objects, domain rules
+├── application/     # use cases - depends on ports, never on adapter implementations
+├── ports/           # Protocol interfaces - importable by application, adapters, and tests
+└── adapters/
+    ├── api/         # FastAPI router (driving adapter)
+    ├── cli/         # Cyclopts commands (driving adapter, where needed)
+    └── persistence/ # SQLAlchemy adapters + in-memory siblings (driven adapters)
+```
+
+See [backend/README.md](../backend/README.md) for the full description of every pattern.
+
+## Access model
+
+Every item, connection, collection, file and example installation belongs to the account that created it, and nobody else can see it (Stage 1; sharing is Stage 2).
+
+- **`ContentFilter`** (`shared_kernel/content_filter.py`) is a query criterion and carries no rules: `ContentFilter.of(user_id)` (owned by that account) or `ContentFilter.everyone()`. Every repository method that returns or counts content takes one as a required keyword-only `scope`, so lists, searches, counts, paging and ETags are filtered in SQL. The SQL predicate is the shared `owned_by()` in `platform/orm_mixins.py`; the in-memory twins use `ContentFilter.covers()`.
+- **Access stances** (`shared_kernel/access.py`): every use case declares who may call it with `access = ...`: `Public` (anyone, anonymous included), `System` (the system actor only), `OwnAccount` (a signed-in session acting on themselves), `Content(permission)` (the role must grant the permission, plus the owner scope) or `Requires(permission)`. `shared_kernel/cqrs.py` holds the bases (`UseCase`, `CommandHandler`, `QueryHandler`): `handle` is final and asks the guard first, then calls `_handle`.
+- **`AccessGuard`** (`shared_kernel/access_guard.py`) is the one port that decides: `check(actor, access)` (raising `ForbiddenError`; the anonymous actor is refused before any permission lookup unless the stance is `Public`), `scope_for(actor)` and `assert_can_view/modify/delete(actor, owner_id)` (raising `NotFoundError`, so a foreign id looks like a missing one). `RoleAccessGuard` (`entrypoints/api/shared/access_guard.py`) is the implementation: stances over roles, and `OwnerAccessPolicy` for ownership (own content only, admins included). `InMemoryAccessGuard` is the test twin. Stage 2 swaps in a sharing rule.
+- **Ownership on entities:** domain entities compose the `Owned` mixin (`owner_id`, `shared_kernel/mixins.py`) and their models `OwnedMixin` (`platform/orm_mixins.py`). The column is nullable in the database in Stage 1, and a row with no owner is visible to nobody.
+- **Permissions** are `<module>:<resource>:<action>` strings declared as an enum per module (`GraphPermission`). Each enum derives `PermissionEnum` and owns its implications in `implied()`; `RoleAuthorisationAdapter` expands an actor's grants through them. Admins hold all 32 permissions and members hold the 16 content permissions (`MEMBER_PERMISSIONS`). `GET /api/v1/auth/me/permissions` returns the effective set for the frontend's `can()`.
+
+Architecture tests (`backend/tests/architecture/test_content_filter_rules.py`) require `scope` on the content ports and their implementations and a `Content` or `Requires` stance (or a named exclusion) on every use case; `test_access_stances.py` fails any use case without a stance and pins the `Public`, `System`, `OwnAccount` and `Content` sets by name; `test_permission_mapping.py` pins every use case's permission and the catalogue; `tests/entrypoints/test_cross_user_isolation.py` generates a request per route as a second account and expects 404, 403 or an empty answer.
+
+### Request flow
+
+```
+Browser or script ── session cookie (HttpOnly, SameSite=Strict, `__Host-Http-` prefix when Secure); Sec-Fetch-Site / Origin on unsafe methods
+  │
+  ▼
+verify_csrf  →  get_current_actor  →  router  →  use case  →  repository(scope)
+                 │                                │
+                 │ bearer: AuthenticateApiToken → Actor(id, role, grants)
+                 │ cookie: session token hash → GetCurrentUser → Actor(id, role)
+                 └ 401 setup_required | 401 unauthenticated | 403 password_expired
+```
+
+`get_current_actor` (`entrypoints/api/shared/dependencies.py`) reads the session cookie, resolves it through the identity module and returns the `Actor`; the router passes it to the use case, whose `access` stance the `AccessGuard` checks before it runs; content use cases then ask the guard for the scope.
+
+**Credentials.** A request carries either the session cookie or an `Authorization: Bearer mnst_...` personal access token, never both: `get_current_actor` resolves a bearer first (an invalid, expired or unknown token is a 401 and never falls back to the cookie) and otherwise the cookie. `get_session_token` returns `None` beside a bearer header, so cookie-only routes (account, session and token management) refuse such a request, and `verify_csrf` skips bearer requests because no cookie is read. A token actor is `Actor(id, roles, grants)` with the token's grants; a session actor has `grants=None`. `RoleAuthorisationAdapter.effective_permissions` intersects the owner's expanded permissions with the expanded grants, and `RoleAccessGuard` refuses `OwnAccount` stances to any actor with grants, so the guard and use cases need no token knowledge. What a token may be granted is `TOKEN_GRANTABLE_PERMISSIONS` (`entrypoints/api/shared/authorisation.py`). Tokens belong to the `identity` module: `ApiToken` (domain), `ApiTokenRepository` and `ApiTokenGenerator` (ports), SQL and in-memory repositories, `secrets_api_token_generator`, the `api_tokens` migration and `token_router` (`/api/v1/tokens`). Only a hash is stored, deleting a user cascades to their tokens, and backups skip the `api_tokens` table. See DECISIONS, "Personal access tokens (2026-10-23)".
+
+Identity routes (`/api/v1/auth/*`, `/api/v1/user*`) use identity's own actor dependency so a user whose password has expired can still reach them. `/auth/status`, `/auth/setup` and `/auth/login` are public and exempt from the same-origin check (they have their own `refuse_cross_site` guard), as are health, version, docs and the SPA shell. The `identity` module imports no other module, and no content module imports it; the architecture tests enforce both.
+
+## Frontend
+
+Static SPA built with SvelteKit (static adapter), served by the backend process itself.
+
+```
+frontend/src/
+├── routes/      # file-based SvelteKit routing - client-rendered, no +page.server.ts
+└── lib/
+    ├── api/
+    │   ├── generated/  # auto-generated from OpenAPI schema - never edit by hand
+    │   └── client.ts   # import all API calls through here
+    ├── components/     # shared UI components
+    └── …
+```
+
+The typed API client is generated from the backend's OpenAPI schema by `@hey-api/openapi-ts`. Regenerate it after any backend schema change with `poe generate-frontend-client`.
+
+See [frontend/README.md](../frontend/README.md) for dev workflow and [frontend/DESIGN_GUIDELINES.md](../frontend/DESIGN_GUIDELINES.md) for UX rules.
+
+## Data model
+
+All data lives in PostgreSQL under a single schema. The core graph:
+
+- **Nodes** - records of any type (items, people, events, places)
+- **Node types** - named categories with optional attribute schemas
+- **Edges** - typed, directed or symmetric relationships between nodes
+- **Edge types** - named relationship categories with forward/reverse labels and optional attribute schemas
+
+Identity adds two tables, `users` (username, hash, role, `password_expired`, `disabled`, sign-in throttling state) and `sessions` (token hash, expiry, last seen). Owner columns are added to `nodes`, `edges`, `media_assets` and `example_installations` (nullable; collections already had `owner_id`, NOT NULL). Collection slugs are unique per `(owner_id, slug)` and, like ids, address a collection in every `/collection/{id_or_slug}` route; a collection has a `kind` (`manual`, or `dynamic` for a smart collection) and a nullable JSONB `definition` holding a smart collection's saved search, which the `collections` module never interprets (graph evaluates it, reached through the bridges in `entrypoints/api/shared/bridges/`), and the active-pack uniqueness of example installations is per `(pack_id, owner_id)`.
+
+**First run.** With no users, `POST /api/v1/auth/setup` creates the first administrator and, in the same transaction, assigns them every row that has no owner or a legacy owner (the fixed pre-accounts users `UUID(int=0)` and `UUID(int=1)`). The claim is a bridge in `entrypoints/api/shared/bridges/claim_existing_data.py` that calls one claim use case per module on a shared session. Setup is serialised by an advisory lock. `menagerist identity create-admin` does the same from the command line.
+
+Every entity uses a `uuid7` primary key (time-ordered; supports keyset pagination without a separate sort column). Timestamps are set in domain methods, not by database defaults. Records are soft-deleted via a `deleted_at` timestamp.
+
+Cross-module references use IDs, not joins across bounded-context boundaries. Bounded contexts accept eventual consistency rather than distributed transactions.
+
+## Key decisions
+
+See [DECISIONS.md](DECISIONS.md) for rationale behind significant architectural choices.

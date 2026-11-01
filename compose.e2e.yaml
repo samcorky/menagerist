@@ -1,0 +1,17 @@
+# Isolate the Playwright test stack from a running development stack.
+name: menagerist-e2e
+services:
+  worker:
+    container_name: menagerist-e2e-worker
+    hostname: menagerist-e2e-worker
+
+  postgres:
+    container_name: menagerist-e2e-db
+    ports:
+      - "55433:5432"
+
+networks:
+  # Use a unique, short bridge name (Linux limits names to 15 characters).
+  menagerist:
+    driver_opts:
+      com.docker.network.bridge.name: mgr-e2e

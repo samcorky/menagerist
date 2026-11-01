@@ -1,0 +1,136 @@
+import type { XLayout } from '$lib/layout';
+import type { AttributesSchema } from '$lib/schema-types';
+import { NAMESPACE, readMeta, readPropMeta } from '$lib/prop-meta';
+
+export { NAMESPACE, readPropMeta, withPropMeta, replacePropMeta } from '$lib/prop-meta';
+export type { PropertyMeta } from '$lib/prop-meta';
+
+/**
+ * Schema-level `x-menagerist` metadata (layout, highlights, version). Property metadata and
+ * the shared accessors live in `prop-meta.ts`.
+ */
+export const META_VERSION = 1;
+
+export type HighlightEntry = { key: string };
+
+/** Which highlight list: an item type's cards, or a relationship type's connection rows. */
+export type HighlightList = 'card' | 'connection';
+
+export type SchemaMeta = {
+	version?: number;
+	layout?: XLayout;
+	required?: string[];
+	/** Fields shown on cards (`card`); other lists (for example `connection`) are preserved. */
+	highlights?: {
+		card?: HighlightEntry[];
+		connection?: HighlightEntry[];
+		[list: string]: unknown;
+	};
+	/** Unknown members are preserved on round-trip. */
+	[member: string]: unknown;
+};
+
+/** Read a schema's root metadata. Returns `{}` when absent or malformed. */
+export function readSchemaMeta(schema: object | null | undefined): SchemaMeta {
+	return readMeta<SchemaMeta>(schema);
+}
+
+/** Return a copy of `schema` with `patch` merged into its root metadata. */
+export function withSchemaMeta<T extends object>(schema: T, patch: SchemaMeta): T {
+	return { ...schema, [NAMESPACE]: { ...readSchemaMeta(schema), ...patch } };
+}
+
+/** A stored highlight list, in order. Malformed entries are skipped. */
+export function readHighlights(
+	schema: object | null | undefined,
+	list: HighlightList = 'card'
+): HighlightEntry[] {
+	const entries = readSchemaMeta(schema).highlights?.[list];
+	if (!Array.isArray(entries)) return [];
+	return entries.flatMap((e) =>
+		typeof e === 'object' && e !== null && typeof (e as HighlightEntry).key === 'string'
+			? [{ key: (e as HighlightEntry).key }]
+			: []
+	);
+}
+
+/** Return a copy of `schema` with one highlight list replaced. Other lists are kept. */
+export function withHighlights<T extends object>(
+	schema: T,
+	entries: HighlightEntry[],
+	list: HighlightList = 'card'
+): T {
+	const { [list]: _previous, ...others } = readSchemaMeta(schema).highlights ?? {};
+	const highlights = entries.length > 0 ? { ...others, [list]: entries } : others;
+	const meta = { ...readSchemaMeta(schema) };
+	if (Object.keys(highlights).length > 0) meta.highlights = highlights;
+	else delete meta.highlights;
+	return { ...schema, [NAMESPACE]: meta };
+}
+
+/** Keys of top-level properties marked archived: hidden from forms, data kept. */
+export function archivedKeys(schema: { properties?: Record<string, unknown> } | null): Set<string> {
+	return new Set(
+		Object.entries(schema?.properties ?? {})
+			.filter(([, prop]) => readPropMeta(prop as object).archived === true)
+			.map(([key]) => key)
+	);
+}
+
+/**
+ * Return a copy of `schema` for client-side validation. A standard root `required` array
+ * (for example from a schema authored through the API) and archived properties are dropped:
+ * required is advisory and archived fields are hidden, so neither may produce a blocking
+ * error. Mirrors the backend's `validation_schema`.
+ */
+export function validationSchema<T extends object>(schema: T): T {
+	const copy: Record<string, unknown> = { ...(schema as Record<string, unknown>) };
+	delete copy.required;
+	const properties = copy.properties as Record<string, unknown> | undefined;
+	if (properties) {
+		const archived = archivedKeys({ properties });
+		copy.properties = Object.fromEntries(
+			Object.entries(properties).filter(([k]) => !archived.has(k))
+		);
+	}
+	return copy as T;
+}
+
+/**
+ * Combine a node type's schema with a node's per-item `extra_schema` overlay (WI-19d).
+ * Mirrors the backend's `merge_attribute_schemas`: `required` and `layout` are
+ * concatenated (type fields first); `highlights` stays type-only. Returns `null`
+ * when both inputs are `null`.
+ *
+ * @throws when a key is defined by both schemas (including one archived on the type).
+ */
+export function mergeAttributeSchemas(
+	typeSchema: AttributesSchema | null,
+	extraSchema: AttributesSchema | null
+): AttributesSchema | null {
+	if (!typeSchema && !extraSchema) return null;
+	if (!extraSchema) return typeSchema;
+	if (!typeSchema) return extraSchema;
+
+	const overlap = Object.keys(typeSchema.properties).filter((key) =>
+		Object.hasOwn(extraSchema.properties, key)
+	);
+	if (overlap.length > 0) {
+		throw new Error(
+			`extra_schema redefines field(s) already on the item type: ${overlap.join(', ')}`
+		);
+	}
+
+	const typeMeta = readSchemaMeta(typeSchema);
+	const extraMeta = readSchemaMeta(extraSchema);
+	const merged: AttributesSchema = {
+		$schema: 'https://json-schema.org/draft/2020-12/schema',
+		type: 'object',
+		properties: { ...typeSchema.properties, ...extraSchema.properties }
+	};
+	return withSchemaMeta(merged, {
+		...typeMeta,
+		required: [...(typeMeta.required ?? []), ...(extraMeta.required ?? [])],
+		layout: [...(typeMeta.layout ?? []), ...(extraMeta.layout ?? [])]
+	});
+}

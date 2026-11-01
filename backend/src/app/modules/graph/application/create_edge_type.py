@@ -1,0 +1,89 @@
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, ClassVar
+
+import jsonschema
+import structlog
+
+from app.modules.graph.application.choice_lists import check_list_refs, strip_list_enums
+from app.modules.graph.application.permissions import GraphPermission
+from app.modules.graph.application.schema_meta import check_meta_shape
+from app.modules.graph.domain.edge_type import EdgeType
+from app.modules.graph.domain.errors import (
+    EdgeTypeSlugConflictError,
+    InvalidSchemaError,
+)
+
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.slug import slugify
+
+if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
+    from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
+
+
+@dataclass(kw_only=True)
+class CreateEdgeTypeCommand:
+    """Request to create a new edge type."""
+
+    slug: str
+    label: str
+    reverse_label: str | None = field(default=None)
+    description: str | None = field(default=None)
+    directional: bool = field(default=True)
+    attributes_schema: dict[str, Any] | None = field(default=None)
+
+
+class CreateEdgeType(CommandHandler[GraphUnitOfWork, CreateEdgeTypeCommand, EdgeType]):
+    """Create and persist a new edge type."""
+
+    access: ClassVar[Access] = Requires(GraphPermission.TYPE_WRITE)
+
+    def __init__(
+        self,
+        uow: GraphUnitOfWork,
+        guard: AccessGuard,
+        choice_lists: ChoiceListSource | None = None,
+    ) -> None:
+        super().__init__(uow, guard)
+        self._choice_lists = choice_lists
+
+    async def _handle(self, command: CreateEdgeTypeCommand, actor: Actor) -> EdgeType:
+        """Create an edge type from `command` and commit it."""
+        if command.attributes_schema is not None:
+            try:
+                jsonschema.validators.validator_for(
+                    command.attributes_schema
+                ).check_schema(command.attributes_schema)
+            except jsonschema.SchemaError as exc:
+                raise InvalidSchemaError(str(exc.message)) from exc
+            check_meta_shape(command.attributes_schema)
+            attributes_schema = strip_list_enums(command.attributes_schema)
+            await check_list_refs(attributes_schema, self._choice_lists)
+        else:
+            attributes_schema = None
+        async with self._uow as repos:
+            slug = slugify(command.slug)
+            if await repos.edge_types.get_by_slug(slug) is not None:
+                raise EdgeTypeSlugConflictError(
+                    f"Edge type with slug '{slug}' already exists"
+                )
+            edge_type = EdgeType.create(
+                slug=slug,
+                label=command.label,
+                reverse_label=command.reverse_label,
+                description=command.description,
+                directional=command.directional,
+                attributes_schema=attributes_schema,
+            )
+            await repos.edge_types.add(edge_type)
+            await self._uow.commit()
+        logger.info(
+            "edge type created", edge_type_id=edge_type.id, slug=str(edge_type.slug)
+        )
+        return edge_type

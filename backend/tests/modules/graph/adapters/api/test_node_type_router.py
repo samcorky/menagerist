@@ -1,0 +1,356 @@
+import uuid
+from typing import TYPE_CHECKING
+
+from starlette.testclient import TestClient
+
+from app.entrypoints.api import create_app
+from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.modules.graph.adapters.api.dependencies import get_graph_repos, get_graph_uow
+from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
+    InMemoryEdgeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_edge_type_repository import (
+    InMemoryEdgeTypeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_node_repository import (
+    InMemoryNodeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
+    InMemoryNodeTypeRepository,
+)
+from app.modules.graph.adapters.persistence.unit_of_work import (
+    create_in_memory_graph_uow,
+)
+from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.actor import Actor
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+
+
+def _app_with_in_memory_graph() -> FastAPI:
+    app = create_app()
+    repos = GraphRepos(
+        nodes=InMemoryNodeRepository(),
+        edges=InMemoryEdgeRepository(),
+        node_types=InMemoryNodeTypeRepository(),
+        edge_types=InMemoryEdgeTypeRepository(),
+    )
+    app.dependency_overrides[get_graph_uow] = lambda: create_in_memory_graph_uow(repos)
+    app.dependency_overrides[get_graph_repos] = lambda: repos
+    return app
+
+
+def _admin_client() -> TestClient:
+    """A client acting as an administrator (structure deletes are admin-only)."""
+    app = _app_with_in_memory_graph()
+    actor = Actor(id=uuid.UUID(int=1), roles=frozenset({"admin"}))
+    app.dependency_overrides[get_current_actor] = lambda: actor
+    return TestClient(app)
+
+
+def test_create_get_list_and_404_round_trip() -> None:
+    """A node type created via the API can be fetched and listed; a miss is 404."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    create_response = client.post(
+        "/api/v1/node-type",
+        json={"slug": "film", "label": "Film", "description": "Motion pictures"},
+    )
+    assert create_response.status_code == 201
+    nt = create_response.json()
+    assert nt["slug"] == "film"
+    assert nt["label"] == "Film"
+    assert nt["description"] == "Motion pictures"
+
+    get_response = client.get(f"/api/v1/node-type/{nt['id']}")
+    assert get_response.status_code == 200
+    assert get_response.json() == nt
+
+    list_response = client.get("/api/v1/node-type")
+    assert list_response.status_code == 200
+    assert nt in list_response.json()
+
+    missing_response = client.get(f"/api/v1/node-type/{uuid.uuid4()}")
+    assert missing_response.status_code == 404
+    assert missing_response.json()["title"] == "NodeTypeNotFoundError"
+
+
+def test_create_node_type_returns_409_on_slug_conflict() -> None:
+    """POST with a duplicate slug returns 409."""
+    client = TestClient(_app_with_in_memory_graph())
+    client.post("/api/v1/node-type", json={"slug": "film", "label": "Film"})
+
+    response = client.post(
+        "/api/v1/node-type", json={"slug": "film", "label": "Duplicate"}
+    )
+
+    assert response.status_code == 409
+
+
+def test_update_node_type_applies_changes() -> None:
+    """PATCH updates the label and leaves slug unchanged."""
+    client = TestClient(_app_with_in_memory_graph())
+    nt = client.post("/api/v1/node-type", json={"slug": "film", "label": "Film"}).json()
+
+    update_response = client.patch(
+        f"/api/v1/node-type/{nt['id']}", json={"label": "Movie"}
+    )
+
+    assert update_response.status_code == 200
+    updated = update_response.json()
+    assert updated["label"] == "Movie"
+    assert updated["slug"] == "film"
+
+
+def test_update_node_type_returns_404_when_missing() -> None:
+    """PATCH on a nonexistent node type returns 404."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    response = client.patch(
+        f"/api/v1/node-type/{uuid.uuid4()}", json={"label": "Ghost"}
+    )
+
+    assert response.status_code == 404
+
+
+def test_delete_node_type_then_get_returns_404() -> None:
+    """DELETE soft-deletes the node type; subsequent GET returns 404."""
+    client = _admin_client()
+    nt = client.post("/api/v1/node-type", json={"slug": "film", "label": "Film"}).json()
+
+    delete_response = client.delete(f"/api/v1/node-type/{nt['id']}")
+    assert delete_response.status_code == 204
+
+    assert client.get(f"/api/v1/node-type/{nt['id']}").status_code == 404
+    assert nt not in client.get("/api/v1/node-type").json()
+
+
+def test_delete_node_type_returns_404_when_missing() -> None:
+    """DELETE on a nonexistent node type returns 404."""
+    client = _admin_client()
+
+    response = client.delete(f"/api/v1/node-type/{uuid.uuid4()}")
+
+    assert response.status_code == 404
+
+
+def test_attributes_schema_round_trips_through_create_and_update() -> None:
+    """attributes_schema is stored on create and can be updated via PATCH."""
+    client = TestClient(_app_with_in_memory_graph())
+    schema: dict[str, object] = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {"year": {"title": "Year", "type": "number"}},
+    }
+
+    nt = client.post(
+        "/api/v1/node-type",
+        json={"slug": "film", "label": "Film", "attributes_schema": schema},
+    ).json()
+    assert nt["attributes_schema"] == schema
+
+    new_schema: dict[str, object] = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+    }
+    updated = client.patch(
+        f"/api/v1/node-type/{nt['id']}",
+        json={"attributes_schema": new_schema},
+    ).json()
+    assert updated["attributes_schema"] == new_schema
+
+
+def test_attribute_usage_and_purge_round_trip() -> None:
+    """Usage counts nodes holding a key; purge removes it and answers 204."""
+    client = _admin_client()
+    nt = client.post("/api/v1/node-type", json={"slug": "film", "label": "Film"}).json()
+    for name, attrs in [("A", {"old": 1}), ("B", {"old": 2}), ("C", {})]:
+        client.post(
+            "/api/v1/node", json={"name": name, "type": "film", "attributes": attrs}
+        )
+    base = f"/api/v1/node-type/{nt['id']}/attribute/old"
+
+    assert client.get(f"{base}/usage").json() == {"count": 2}
+    purge = client.delete(base)
+    assert purge.status_code == 204
+    assert purge.content == b""
+    assert client.get(f"{base}/usage").json() == {"count": 0}
+
+
+def test_attribute_usage_and_purge_return_404_for_missing_type() -> None:
+    """Both endpoints report a missing node type as 404."""
+    client = _admin_client()
+    base = f"/api/v1/node-type/{uuid.uuid4()}/attribute/old"
+
+    assert client.get(f"{base}/usage").status_code == 404
+    assert client.delete(base).status_code == 404
+
+
+def test_attribute_usage_can_filter_by_value() -> None:
+    """`?value=` counts only nodes whose attribute equals that string."""
+    client = TestClient(_app_with_in_memory_graph())
+    nt = client.post("/api/v1/node-type", json={"slug": "film", "label": "Film"}).json()
+    for name, status in [("A", "Draft"), ("B", "Draft"), ("C", "Live")]:
+        client.post(
+            "/api/v1/node",
+            json={"name": name, "type": "film", "attributes": {"status": status}},
+        )
+    base = f"/api/v1/node-type/{nt['id']}/attribute/status/usage"
+
+    assert client.get(base, params={"value": "Draft"}).json() == {"count": 2}
+    assert client.get(base).json() == {"count": 3}
+
+
+def test_attribute_usage_and_purge_can_target_a_group_sub_key() -> None:
+    """`?sub_key=` counts and purges rows of a group array, not the whole key."""
+    client = _admin_client()
+    nt = client.post(
+        "/api/v1/node-type", json={"slug": "recipe", "label": "Recipe"}
+    ).json()
+    client.post(
+        "/api/v1/node",
+        json={
+            "name": "A",
+            "type": "recipe",
+            "attributes": {"ingredients": [{"name": "Flour", "unit": "g"}]},
+        },
+    )
+    base = f"/api/v1/node-type/{nt['id']}/attribute/ingredients"
+
+    assert client.get(f"{base}/usage", params={"sub_key": "unit"}).json() == {
+        "count": 1
+    }
+    purge = client.delete(base, params={"sub_key": "unit"})
+    assert purge.status_code == 204
+    assert purge.content == b""
+    assert client.get(f"{base}/usage", params={"sub_key": "unit"}).json() == {
+        "count": 0
+    }
+
+
+def test_list_attribute_values_returns_distinct_values_most_used_first() -> None:
+    """Distinct string values are returned with counts, most-used first."""
+    client = TestClient(_app_with_in_memory_graph())
+    nt = client.post("/api/v1/node-type", json={"slug": "film", "label": "Film"}).json()
+    for name, status in [("A", "Draft"), ("B", "Draft"), ("C", "Live")]:
+        client.post(
+            "/api/v1/node",
+            json={"name": name, "type": "film", "attributes": {"status": status}},
+        )
+    base = f"/api/v1/node-type/{nt['id']}/attribute/status/values"
+
+    response = client.get(base)
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"value": "Draft", "count": 2},
+        {"value": "Live", "count": 1},
+    ]
+
+
+def test_list_attribute_values_can_filter_by_q() -> None:
+    """`?q=` filters values by a case-insensitive substring."""
+    client = TestClient(_app_with_in_memory_graph())
+    nt = client.post("/api/v1/node-type", json={"slug": "film", "label": "Film"}).json()
+    for name, status in [("A", "Draft"), ("B", "Live")]:
+        client.post(
+            "/api/v1/node",
+            json={"name": name, "type": "film", "attributes": {"status": status}},
+        )
+    base = f"/api/v1/node-type/{nt['id']}/attribute/status/values"
+
+    response = client.get(base, params={"q": "dra"})
+
+    assert response.json() == [{"value": "Draft", "count": 1}]
+
+
+def test_list_attribute_values_returns_404_for_missing_type() -> None:
+    """A missing node type is reported as 404."""
+    client = TestClient(_app_with_in_memory_graph())
+    base = f"/api/v1/node-type/{uuid.uuid4()}/attribute/status/values"
+
+    assert client.get(base).status_code == 404
+
+
+def test_icon_and_colour_can_be_set_changed_and_cleared() -> None:
+    """A type's icon and colour are in every response and can be cleared with ''."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    created = client.post(
+        "/api/v1/node-type",
+        json={"slug": "film", "label": "Film", "icon": "clapperboard", "colour": "red"},
+    )
+    assert created.status_code == 201
+    assert (created.json()["icon"], created.json()["colour"]) == ("clapperboard", "red")
+    type_id = created.json()["id"]
+
+    changed = client.patch(f"/api/v1/node-type/{type_id}", json={"colour": "blue"})
+    assert (changed.json()["icon"], changed.json()["colour"]) == (
+        "clapperboard",
+        "blue",
+    )
+
+    cleared = client.patch(
+        f"/api/v1/node-type/{type_id}", json={"icon": None, "colour": None}
+    )
+    assert (cleared.json()["icon"], cleared.json()["colour"]) == (None, None)
+
+
+def test_a_blank_icon_or_colour_is_refused_not_treated_as_a_clear() -> None:
+    """An empty string is an error; null is how an icon or colour is removed."""
+    client = TestClient(_app_with_in_memory_graph())
+    created = client.post(
+        "/api/v1/node-type",
+        json={"slug": "film", "label": "Film", "icon": "film", "colour": "red"},
+    ).json()
+
+    for body in ({"icon": ""}, {"colour": ""}):
+        response = client.patch(f"/api/v1/node-type/{created['id']}", json=body)
+        assert response.status_code == 400
+
+    kept = client.get(f"/api/v1/node-type/{created['id']}").json()
+    assert (kept["icon"], kept["colour"]) == ("film", "red")
+
+
+def test_leaving_icon_and_colour_out_keeps_them() -> None:
+    """Omitted is not null: only an explicit null removes the value."""
+    client = TestClient(_app_with_in_memory_graph())
+    created = client.post(
+        "/api/v1/node-type",
+        json={"slug": "film", "label": "Film", "icon": "film", "colour": "red"},
+    ).json()
+
+    changed = client.patch(
+        f"/api/v1/node-type/{created['id']}", json={"label": "Movie"}
+    )
+
+    assert (changed.json()["icon"], changed.json()["colour"]) == ("film", "red")
+
+
+def test_a_type_without_an_icon_or_colour_reports_nulls() -> None:
+    """Both fields are always present, null when unset."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    created = client.post("/api/v1/node-type", json={"slug": "book", "label": "Book"})
+
+    assert created.json()["icon"] is None
+    assert created.json()["colour"] is None
+
+
+def test_an_invalid_icon_or_colour_is_a_400() -> None:
+    """A bad icon name or a colour outside the palette is refused."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    bad_icon = client.post(
+        "/api/v1/node-type", json={"slug": "a", "label": "A", "icon": "Not An Icon"}
+    )
+    bad_colour = client.post(
+        "/api/v1/node-type", json={"slug": "b", "label": "B", "colour": "purple"}
+    )
+
+    assert bad_icon.status_code == 400
+    assert "icon must be" in bad_icon.json()["detail"]
+    assert bad_colour.status_code == 400
+    assert "colour must be one of" in bad_colour.json()["detail"]

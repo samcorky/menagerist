@@ -1,0 +1,71 @@
+name: Build
+
+# Builds the image and smoke tests it. Nothing is pushed.
+# ci.yml calls it on pull requests and pushes to main, publish.yml calls it before it
+# publishes, and it can be run by hand.
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build image and smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The version is worked out from the tags.
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Fails on a broken CalVer config; warns about a shallow clone or no tag yet.
+      - name: Check the CalVer setup
+        working-directory: backend
+        run: uv run --locked --only-group release calver-scm doctor
+
+      - name: Work out the build arguments
+        id: args
+        env:
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          version="$(cd backend && uv run --locked --only-group release calver-scm --format plain version)"
+          timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          {
+            echo "version=${version}"
+            echo "commit=${COMMIT_SHA}"
+            echo "branch=${BRANCH}"
+            echo "timestamp=${timestamp}"
+          } | tee -a "$GITHUB_OUTPUT"
+          echo "No tags: this image is built as menagerist:local and not pushed."
+
+      - name: Build the image
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
+        env:
+          VERSION: ${{ steps.args.outputs.version }}
+          COMMIT_SHA: ${{ steps.args.outputs.commit }}
+          BRANCH: ${{ steps.args.outputs.branch }}
+          REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
+          BUILD_TIMESTAMP: ${{ steps.args.outputs.timestamp }}
+          DIRTY: "false"
+        with:
+          # The Dockerfile reads .git from the build context, so build the checkout.
+          source: .
+          files: docker-bake.hcl
+          targets: local
+          set: |
+            local.cache-from=type=gha,scope=build
+            local.cache-to=type=gha,mode=max,scope=build
+
+      - name: Smoke test the image
+        run: uv run --script scripts/smoke_test.py

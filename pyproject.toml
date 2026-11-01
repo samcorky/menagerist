@@ -1,0 +1,512 @@
+[project]
+name = "menagerist-workspace"
+version = "0.0.0"
+description = "A lightweight, self-hostable and flexible platform for organising the things you care about."
+requires-python = ">=3.14"
+
+dependencies = [
+    "menagerist",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = [
+    "backend"
+]
+
+[tool.uv.sources]
+menagerist = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "prek>=0.5.9",
+    "poethepoet>=0.49.0"
+]
+
+[tool.poe]
+verbosity = -1
+
+[tool.poe.groups.setup]
+heading = "Setup"
+
+[tool.poe.groups.setup.tasks._install-hooks]
+cmd = "prek install -f"
+help = "Install or update local git hooks"
+
+[tool.poe.groups.setup.tasks.sync-backend]
+cmd = "uv sync --all-packages --group dev"
+help = "Sync the backend environment with all workspace members and their dependency groups"
+
+[tool.poe.groups.setup.tasks.repair-backend]
+cmd = "uv sync --all-packages --group dev --reinstall"
+help = "Force-reinstall all backend packages to repair a corrupted venv (e.g. after an interrupted sync). On Windows this reinstalls poe.exe itself, which is locked while it's the running process — invoke via `python -m poethepoet repair` (or `.venv/Scripts/python.exe -m poethepoet repair`) instead of `poe repair` if you hit an 'Access is denied' error"
+
+[tool.poe.groups.setup.tasks.repair]
+sequence = ["repair-backend"]
+help = "Repair local backend"
+
+[tool.poe.groups.setup.tasks.sync-frontend]
+shell = "npm install"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Install frontend npm dependencies"
+
+[tool.poe.groups.setup.tasks.sync-frontend-locked]
+shell = "npm ci"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Install exactly the npm dependencies in package-lock.json (what CI uses)"
+
+[tool.poe.groups.setup.tasks.sync-ci]
+sequence = ["sync-frontend-locked", "generate-frontend-client"]
+help = "CI setup: locked frontend install, backend sync and the generated API client (set UV_LOCKED=1 to also lock the backend sync)"
+
+[tool.poe.groups.setup.tasks.install-e2e-browser]
+shell = "npx playwright install chromium"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Download the Chromium build the Playwright e2e suite drives (no-op once installed)"
+
+[tool.poe.groups.setup.tasks.install-e2e-cookie-browsers]
+shell = "npx playwright install webkit firefox"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Download the WebKit and Firefox builds that the cookie e2e specs (test-e2e-cookies) drive (no-op once installed)"
+
+[tool.poe.groups.setup.tasks.install-e2e-deps]
+# sudo needs a real terminal to prompt, which a poe subprocess doesn't get, and it
+# resets PATH (picking root's older Node). So print the command rather than run it.
+cmd = "echo 'Run in your own terminal: cd frontend && sudo env \"PATH=$PATH\" npx playwright install-deps chromium'"
+help = "Linux only: print the one-off command that installs the system libraries Chromium needs"
+
+[tool.poe.groups.setup.tasks.install-e2e-cookie-deps]
+# Same reason as install-e2e-deps: sudo needs a real terminal, so print the command.
+cmd = "echo 'Run in your own terminal: cd frontend && sudo env \"PATH=$PATH\" npx playwright install-deps webkit firefox'"
+help = "Linux only: print the one-off command that installs the system libraries WebKit and Firefox need (for test-e2e-cookies)"
+
+[tool.poe.groups.setup.tasks.dump-schema]
+cmd = "menagerist schema dump --output ../frontend/openapi.json"
+cwd = "backend"
+help = "Dump the backend's OpenAPI schema for frontend client generation"
+deps = ["sync-backend"]
+
+[tool.poe.groups.setup.tasks._run-frontend-generate]
+shell = "npm run generate"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+
+[tool.poe.groups.setup.tasks.generate-frontend-client]
+sequence = ["dump-schema", "_run-frontend-generate"]
+help = "Generate the frontend's typed API client from the OpenAPI schema"
+
+[tool.poe.groups.setup.tasks.generate-iso-data]
+cmd = "uv run --script scripts/generate_iso_data.py"
+help = "Regenerate shared/data/iso-data.json (ISO 3166-1 countries, ISO 4217 currencies) from pycountry"
+
+[tool.poe.groups.setup.tasks.sync]
+sequence = ["sync-backend", "sync-frontend", "install-e2e-browser", "generate-frontend-client"]
+help = "Sync all project dependencies"
+
+[tool.poe.groups.setup.tasks.init]
+sequence = ["sync", "_install-hooks"]
+help = "Initialize the local development environment"
+
+[tool.poe.groups.quality]
+heading = "Quality"
+
+[tool.poe.groups.quality.tasks.format-backend]
+cmd = "ruff format . ../scripts"
+cwd = "backend"
+help = "Format backend Python files with Ruff"
+
+[tool.poe.groups.quality.tasks.lint-backend]
+script = "scripts.poe_run:main('lint-backend', mode=mode)"
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+]
+help = "Lint backend Python files with Ruff"
+
+[tool.poe.groups.quality.tasks.lint-backend-fix]
+cmd = "ruff check . ../scripts --fix"
+cwd = "backend"
+help = "Lint backend Python files with Ruff and apply safe fixes"
+
+[tool.poe.groups.quality.tasks.lint-backend-fix-unsafe]
+cmd = "ruff check . ../scripts --fix --unsafe-fixes"
+cwd = "backend"
+help = "Lint backend Python files with Ruff and apply safe and unsafe fixes"
+
+[tool.poe.groups.quality.tasks.typecheck-backend]
+script = "scripts.poe_run:main('typecheck-backend', mode=mode)"
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+]
+help = "Type-check backend Python files with mypy"
+
+[tool.poe.groups.quality.tasks._coverage-erase]
+cmd = "coverage erase"
+cwd = "backend"
+help = "Clear the backend coverage dataset before running unit tests"
+
+[tool.poe.groups.quality.tasks.test-backend]
+script = "scripts.poe_run:main('test-backend', mode=mode, workers=workers)"
+deps = ["_coverage-erase"]
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+  { name = "workers", options = ["-w", "--workers"], default = "auto", help = "pytest-xdist workers: a number, auto (one per CPU) or 0 for serial" },
+]
+help = "Run backend unit tests in parallel (pytest-xdist, one worker per CPU unless --workers) from a clean coverage dataset"
+
+[tool.poe.groups.quality.tasks.test-backend-fast]
+cmd = "uv run --directory backend pytest -m fast -n 4 -q -p no:cacheprovider --no-cov"
+help = "Run only the quick in-memory backend tests (domain, application, shared kernel, architecture, platform); what pre-commit runs"
+
+[tool.poe.groups.quality.tasks.test-backend-integration]
+script = "scripts.poe_run:main('test-backend-integration', mode=mode, workers=workers)"
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+  { name = "workers", options = ["-w", "--workers"], default = "auto", help = "pytest-xdist workers: a number, auto (one per CPU) or 0 for serial" },
+]
+help = "Run backend integration tests in parallel (one Postgres container per worker), appending to unit test coverage"
+
+[tool.poe.groups.quality.tasks.test-backend-all]
+sequence = ["test-backend --workers ${workers} ${mode:+--mode ${mode}}", "test-backend-integration --workers ${workers} ${mode:+--mode ${mode}}"]
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+  { name = "workers", options = ["-w", "--workers"], default = "auto", help = "pytest-xdist workers: a number, auto (one per CPU) or 0 for serial" },
+]
+help = "Run unit + integration backend tests with combined coverage data"
+
+[tool.poe.groups.quality.tasks.coverage-domain]
+cmd = 'coverage report --include="src/app/modules/*/domain/*" --fail-under=100'
+cwd = "backend"
+help = "Enforce 100% coverage on domain layers"
+
+[tool.poe.groups.quality.tasks.coverage-ports]
+cmd = 'coverage report --include="src/app/modules/*/ports/*" --fail-under=100'
+cwd = "backend"
+help = "Enforce 100% coverage on port interfaces"
+
+[tool.poe.groups.quality.tasks.coverage-application]
+cmd = 'coverage report --include="src/app/modules/*/application/*" --fail-under=100'
+cwd = "backend"
+help = "Enforce 100% coverage on application use cases"
+
+[tool.poe.groups.quality.tasks.coverage-shared-kernel]
+cmd = 'coverage report --include="src/app/shared_kernel/*" --fail-under=100'
+cwd = "backend"
+help = "Enforce 100% coverage on the shared kernel"
+
+[tool.poe.groups.quality.tasks.coverage-adapters]
+cmd = 'coverage report --include="src/app/modules/*/adapters/*" --fail-under=80'
+cwd = "backend"
+help = "Enforce coverage threshold on adapters"
+
+[tool.poe.groups.quality.tasks.coverage-platform]
+cmd = 'coverage report --include="src/app/platform/*" --fail-under=70'
+cwd = "backend"
+help = "Enforce coverage threshold on platform/infrastructure wiring"
+
+[tool.poe.groups.quality.tasks.coverage-status]
+cmd = "uv run --script scripts/check_component_coverage.py"
+cwd = "backend"
+help = "Show per-component coverage percentages without failing locally"
+
+[tool.poe.groups.quality.tasks.coverage-check]
+cmd = "uv run --script scripts/check_component_coverage.py --strict"
+cwd = "backend"
+help = "Fail CI when any component is below its Codecov threshold"
+
+[tool.poe.groups.quality.tasks.test-and-status]
+sequence = ["test-backend-all --workers ${workers} ${mode:+--mode ${mode}}", "coverage-status"]
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+  { name = "workers", options = ["-w", "--workers"], default = "auto", help = "pytest-xdist workers: a number, auto (one per CPU) or 0 for serial" },
+]
+help = "Run all backend tests and print per-component coverage status without failing"
+deps = ["sync-backend"]
+
+[tool.poe.groups.quality.tasks.coverage-report]
+cmd = "coverage xml"
+cwd = "backend"
+help = "Write the combined coverage.xml for Codecov upload"
+
+[tool.poe.groups.quality.tasks.coverage]
+sequence = ["test-backend-all --workers ${workers} ${mode:+--mode ${mode}}", "coverage-check", "coverage-report"]
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+  { name = "workers", options = ["-w", "--workers"], default = "auto", help = "pytest-xdist workers: a number, auto (one per CPU) or 0 for serial" },
+]
+help = "Run full backend test suite and enforce per-layer coverage thresholds"
+
+[tool.poe.groups.quality.tasks.format-frontend]
+shell = "npm run format"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Format frontend files with Prettier"
+
+[tool.poe.groups.quality.tasks.lint-frontend]
+script = "scripts.poe_run:main('lint-frontend', mode=mode)"
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+]
+help = "Lint frontend files with Prettier and ESLint"
+
+[tool.poe.groups.quality.tasks.lint-frontend-fix]
+shell = "npm run lint:fix"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Lint frontend files with ESLint and apply safe fixes"
+
+[tool.poe.groups.quality.tasks.typecheck-frontend]
+script = "scripts.poe_run:main('typecheck-frontend', mode=mode)"
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+]
+help = "Type-check frontend files with svelte-check"
+
+[tool.poe.groups.quality.tasks.test-frontend]
+script = "scripts.poe_run:main('test-frontend', mode=mode, workers=workers)"
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+  { name = "workers", options = ["-w", "--workers"], default = "", help = "Vitest workers (--maxWorkers): a number or a percentage; vitest's default if omitted" },
+]
+help = "Run frontend unit tests (vitest)"
+
+[tool.poe.groups.quality.tasks.format]
+sequence = ["format-backend", "format-frontend"]
+help = "Format all project code"
+
+[tool.poe.groups.quality.tasks.lint]
+sequence = ["lint-backend ${mode:+--mode ${mode}}", "lint-frontend ${mode:+--mode ${mode}}"]
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+]
+help = "Lint all project code"
+
+[tool.poe.groups.quality.tasks.typecheck]
+sequence = ["typecheck-backend ${mode:+--mode ${mode}}", "typecheck-frontend ${mode:+--mode ${mode}}"]
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+]
+help = "Type-check all project code"
+
+[tool.poe.groups.quality.tasks._check-hooks]
+shell = "prek run --all-files"
+help = "Run all configured pre-commit checks against the full repository"
+
+[tool.poe.groups.quality.tasks.validate-renovate]
+cmd = "prek run renovate-config-validator --all-files"
+help = "Validate Renovate config with prek"
+
+[tool.poe.groups.quality.tasks._renovate-local]
+shell = 'docker run --rm -e LOG_LEVEL=debug -v "${PWD}:/tmp/repo" -w /tmp/repo renovate/renovate --platform=local --dry-run=full'
+cwd = "."
+interpreter = ["powershell", "posix"]
+help = "Run Renovate locally in dry-run mode"
+
+[tool.poe.groups.quality.tasks.renovate-local]
+sequence = ["validate-renovate", "_renovate-local"]
+help = "Validate Renovate config, then run Renovate locally in dry-run mode"
+
+[tool.poe.groups.quality.tasks.check]
+sequence = ["_check-hooks"]
+help = "Run every pre-commit check, including the fast backend tests, against the whole repository"
+deps = ["sync"]
+
+[tool.poe.groups.quality.tasks.check-changed]
+script = "scripts.poe_run:main('check-changed', mode=mode)"
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+]
+help = "Run pre-commit checks on changed files only"
+
+[tool.poe.groups.quality.tasks.validate-compose]
+cmd = "docker compose config --quiet"
+help = "Validate the Docker Compose configuration"
+
+[tool.poe.groups.quality.tasks.validate-smoke-compose]
+cmd = "docker compose -f compose.yaml -f compose.smoke.yaml config --quiet"
+help = "Validate compose.yaml merged with the smoke-test override"
+
+[tool.poe.groups.quality.tasks.validate-e2e-compose]
+cmd = "docker compose -f compose.yaml -f compose.e2e.yaml config --quiet"
+help = "Validate compose.yaml merged with the e2e-test override"
+
+[tool.poe.groups.quality.tasks.test]
+parallel = ["test-backend ${workers:+--workers ${workers}} ${mode:+--mode ${mode}}", "test-frontend ${workers:+--workers ${workers}} ${mode:+--mode ${mode}}"]
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+  { name = "workers", options = ["-w", "--workers"], default = "", help = "Parallel workers: a number, auto (one per CPU) or 0 for serial (frontend: its own default if omitted)" },
+]
+help = "Run backend and frontend unit tests concurrently"
+
+[tool.poe.groups.quality.tasks.test-e2e]
+script = "scripts.e2e:main(workers=workers, skip_build=skip_build, files=files, shard=shard)"
+deps = ["generate-frontend-client"]
+args = [
+  { name = "workers", options = ["-w", "--workers"], type = "integer", help = "Parallel workers, each with its own database and backend (default: CPU cores)" },
+  { name = "skip_build", options = ["--skip-build"], type = "boolean", help = "Reuse the existing frontend/build (only when it is current)" },
+  { name = "shard", options = ["--shard"], help = "Run one shard of the suite, as CURRENT/TOTAL (e.g. 2/3); CI runs the shards as separate jobs" },
+  { name = "files", positional = true, multiple = true, help = "Spec files to run, as Playwright takes them (e.g. tests/e2e/status.spec.ts or status.spec.ts:78); all specs if none" },
+]
+help = "Run the Playwright e2e suite in parallel against a throwaway Postgres, building the frontend first and tearing the database down afterwards (requires Docker)"
+
+[tool.poe.groups.quality.tasks.test-e2e-cookies]
+script = "scripts.e2e:main(skip_build=skip_build, mode='cookies')"
+deps = ["generate-frontend-client"]
+args = [
+  { name = "skip_build", options = ["--skip-build"], type = "boolean", help = "Reuse the existing frontend/build (only when it is current)" },
+]
+help = "Run only the session-cookie specs in Chromium, WebKit and Firefox, against their own backend behind a TLS proxy (needs Docker, openssl and poe install-e2e-cookie-browsers)"
+
+[tool.poe.groups.quality.tasks.test-e2e-headed]
+script = "scripts.e2e:main(workers=workers, skip_build=skip_build, mode='headed', files=files)"
+args = [
+  { name = "workers", options = ["-w", "--workers"], type = "integer", help = "Parallel workers, each with its own database and backend (default: CPU cores)" },
+  { name = "skip_build", options = ["--skip-build"], type = "boolean", help = "Reuse the existing frontend/build (only when it is current)" },
+  { name = "files", positional = true, multiple = true, help = "Spec files to run, as Playwright takes them; all specs if none" },
+]
+help = "Same as test-e2e, but opens a visible browser window so you can watch the tests run"
+
+[tool.poe.groups.quality.tasks.test-e2e-slow]
+script = "scripts.e2e:main(workers=workers, skip_build=skip_build, mode='slow', files=files)"
+args = [
+  { name = "workers", options = ["-w", "--workers"], type = "integer", help = "Parallel workers, each with its own database and backend (default: CPU cores)" },
+  { name = "skip_build", options = ["--skip-build"], type = "boolean", help = "Reuse the existing frontend/build (only when it is current)" },
+  { name = "files", positional = true, multiple = true, help = "Spec files to run, as Playwright takes them; all specs if none" },
+]
+help = "Same as test-e2e-headed, but slowed down (1s between actions) so you can actually follow along"
+
+[tool.poe.groups.release]
+heading = "Release"
+
+[tool.poe.groups.release.tasks.version]
+cmd = "calver-scm version"
+cwd = "backend"
+help = "Print the version a build from the current checkout would get"
+
+[tool.poe.groups.release.tasks.version-explain]
+cmd = "calver-scm explain"
+cwd = "backend"
+help = "Show how the current version was derived from the tags and commits"
+
+[tool.poe.groups.release.tasks.version-doctor]
+cmd = "calver-scm doctor"
+cwd = "backend"
+help = "Check the CalVer setup for problems (shallow clone, no compatible tag, bad config)"
+
+[tool.poe.groups.release.tasks.release-tag]
+cmd = "calver-scm --format plain next-tag"
+cwd = "backend"
+help = "Print the next release tag without creating it; run `git fetch --tags` first, then `git tag \"$(poe release-tag)\"`"
+
+[tool.poe.groups.database]
+heading = "Database"
+
+[tool.poe.groups.database.tasks.db-up]
+cmd = "docker compose up -d postgres --wait postgres"
+help = "Start the local Postgres container"
+
+[tool.poe.groups.database.tasks.db-down]
+cmd = "docker compose down"
+help = "Stop and remove local Docker Compose containers"
+
+[tool.poe.groups.database.tasks.migrate]
+cmd = "menagerist migrate upgrade"
+cwd = "backend"
+env = { MENAGERIST_BACKUP_BEFORE_MIGRATE = { default = "false" } }
+help = "Apply database migrations up to the latest revision"
+
+[tool.poe.groups.database.tasks.e2e-db-up]
+cmd = "docker compose -f compose.yaml -f compose.e2e.yaml up -d --wait postgres"
+help = "Start the isolated Postgres container used by the Playwright e2e suite, waiting for its healthcheck before returning"
+
+[tool.poe.groups.database.tasks.e2e-migrate]
+script = "scripts.e2e_migrate:main"
+help = "Create and migrate one database per e2e worker (menagerist_w0..; count from E2E_WORKERS, default CPU cores)"
+
+[tool.poe.groups.database.tasks.e2e-build]
+shell = "npm run build"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Build the production frontend (frontend/build) that the e2e backends serve"
+
+[tool.poe.groups.database.tasks.e2e-db-down]
+cmd = "docker compose -f compose.yaml -f compose.e2e.yaml down -v"
+help = "Stop and remove the isolated e2e Postgres container and its volume"
+
+[tool.poe.groups.run]
+heading = "Build & Run"
+
+[tool.poe.groups.run.tasks.build-backend]
+cmd = "uv build --package menagerist"
+help = "Build sdist+wheel for the menagerist package"
+
+[tool.poe.groups.run.tasks.build-frontend]
+shell = "npm run build"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Build the frontend for production"
+
+[tool.poe.groups.run.tasks.build]
+sequence = ["build-backend", "build-frontend"]
+help = "Build backend and frontend"
+
+[tool.poe.groups.run.tasks.serve-backend]
+deps = ["ensure-editable-backend"]
+cmd = "menagerist serve --host 0.0.0.0 --reload ${workers:+--workers ${workers}}"
+args = [
+  { name = "workers", options = ["-w", "--workers", "--worker"], help = "Server worker processes: 1 to 16, or auto; defaults to the server setting" },
+]
+help = "Run the backend API server with auto-reload for development"
+
+[tool.poe.groups.run.tasks.ensure-editable-backend]
+cmd = "uv pip install -e backend"
+help = "Editable install of the backend package (Windows-friendly alternative to uv sync)"
+
+[tool.poe.groups.run.tasks.serve-frontend]
+shell = "npm run dev -- --host 0.0.0.0"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Run the frontend dev server with hot reload"
+
+[tool.poe.groups.run.tasks.serve]
+parallel = ["serve-backend ${workers:+--workers ${workers}}", "serve-frontend"]
+args = [
+  { name = "workers", options = ["-w", "--workers", "--worker"], help = "Backend server worker processes: 1 to 16, or auto; defaults to the server setting" },
+]
+help = "Run the app for local development"
+# Ctrl+C exits the server non-zero; without this poe reports it as a failed task.
+ignore_fail = true
+
+[tool.poe.groups.run.tasks._docker-version]
+shell = "uv run --locked --only-group release calver-scm --format plain version"
+interpreter = ["powershell", "posix"]
+cwd = "backend"
+
+[tool.poe.groups.run.tasks.docker-build]
+cmd = "docker buildx bake -f docker-bake.hcl local"
+help = "Build the Menagerist Docker image, with VERSION set from hatch-vcs"
+uses = { VERSION = "_docker-version" }
+
+[tool.poe.groups.run.tasks.docker-config]
+cmd = "docker compose config"
+help = "Print the fully merged Docker Compose config (base + override applied)"
+
+[tool.poe.groups.run.tasks.docker-up]
+cmd = "docker compose up -d --force-recreate"
+env = { MENAGERIST_IMAGE = "menagerist:local" }
+help = "Build the image locally and (re)start the stack detached on it"
+deps = ["docker-build"]
+
+[tool.poe.groups.run.tasks.docker-down]
+cmd = "docker compose down"
+help = "Stop and remove the stack"
+
+[tool.poe.groups.run.tasks.smoke-test]
+cmd = "uv run --script scripts/smoke_test.py"
+help = "Smoke test the built image through its own compose.yaml"
+deps = ["docker-build"]

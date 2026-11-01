@@ -1,0 +1,98 @@
+import uuid
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, ClassVar
+
+import structlog
+
+from app.modules.graph.application._validate_attributes import validate_attributes
+from app.modules.graph.application.choice_lists import resolve_choice_lists
+from app.modules.graph.application.permissions import GraphPermission
+from app.modules.graph.domain.edge import Edge
+from app.modules.graph.domain.edge_type import EdgeType
+from app.modules.graph.domain.errors import NodeNotFoundError
+
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
+from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
+from app.shared_kernel.access import Access, Content
+
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.slug import slugify
+
+if TYPE_CHECKING:
+    from app.shared_kernel.access_guard import AccessGuard
+    from app.shared_kernel.actor import Actor
+
+logger = structlog.get_logger()
+
+
+@dataclass(kw_only=True)
+class CreateEdgeCommand:
+    """Request to create a new edge between two node."""
+
+    source_id: uuid.UUID
+    target_id: uuid.UUID
+    type: str
+    attributes: dict[str, Any] = field(default_factory=dict)
+
+
+class CreateEdge(CommandHandler[GraphUnitOfWork, CreateEdgeCommand, Edge]):
+    """Create and persist a new edge, auto-creating its EdgeType if not yet known."""
+
+    access: ClassVar[Access] = Content(GraphPermission.ITEM_WRITE)
+
+    def __init__(
+        self,
+        uow: GraphUnitOfWork,
+        guard: AccessGuard,
+        choice_lists: ChoiceListSource | None = None,
+    ) -> None:
+        super().__init__(uow, guard)
+        self._choice_lists = choice_lists
+
+    async def _handle(self, command: CreateEdgeCommand, actor: Actor) -> Edge:
+        """Create an edge from `command` and commit it.
+
+        If no EdgeType exists for the given type slug, one is created automatically
+        so the vocabulary builds itself as edges are added.
+        """
+        scope = self.scope(actor)
+        async with self._uow as repos:
+            if await repos.nodes.get(command.source_id, scope=scope) is None:
+                raise NodeNotFoundError(f"Node {command.source_id} not found")
+            if await repos.nodes.get(command.target_id, scope=scope) is None:
+                raise NodeNotFoundError(f"Node {command.target_id} not found")
+
+            slug = slugify(command.type)
+            edge_type = await repos.edge_types.get_by_slug(slug)
+            if edge_type is None:
+                await repos.edge_types.add(
+                    EdgeType.create(
+                        slug=slug,
+                        label=command.type.replace("-", " ").title(),
+                    )
+                )
+            elif edge_type.attributes_schema is not None:
+                schema = await resolve_choice_lists(
+                    edge_type.attributes_schema, self._choice_lists
+                )
+                validate_attributes(schema, command.attributes)
+
+            edge = Edge.create(
+                owner_id=actor.id,
+                source_id=command.source_id,
+                target_id=command.target_id,
+                type=command.type,
+                attributes=command.attributes,
+            )
+            await repos.edges.add(edge)
+            await self._uow.commit()
+        logger.info(
+            "edge created",
+            edge_id=edge.id,
+            source_id=edge.source_id,
+            target_id=edge.target_id,
+            edge_type=edge.type,
+        )
+        return edge
