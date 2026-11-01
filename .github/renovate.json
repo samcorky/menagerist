@@ -19,10 +19,14 @@
   "semanticCommitType": "chore",
   "semanticCommitScope": "deps",
   "osvVulnerabilityAlerts": true,
+  "abandonmentThreshold": "3 years",
   "constraints": {
     "node": "^22.13.0"
   },
   "npmrc": "allow-remote=all\ninstall-strategy=hoisted\n",
+  "postUpdateOptions": [
+    "npmDedupe"
+  ],
   "schedule": [
     "at any time"
   ],
@@ -174,17 +178,16 @@
       "groupName": "frontend dependencies"
     },
     {
-      "description": "Group SvelteKit/Vite ecosystem updates",
+      "description": "Group Svelte and Vite packages, majors included, so one pull request moves them together",
       "matchManagers": [
         "npm"
       ],
       "matchPackageNames": [
-        "/^svelte/",
-        "/^@sveltejs//",
-        "/^vite/",
-        "/^@sveltejs\\/vite-plugin-svelte/"
+        "/svelte/",
+        "/^vite/"
       ],
-      "groupName": "svelte & vite"
+      "groupName": "svelte & vite",
+      "separateMajorMinor": false
     },
     {
       "description": "Group GitHub Actions updates together and pin SHA digests",
