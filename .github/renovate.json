@@ -113,7 +113,8 @@
         "pip_requirements"
       ],
       "matchDepTypes": [
-        "dependencies"
+        "dependencies",
+        "project.dependencies"
       ],
       "groupName": "python runtime dependencies"
     },
@@ -124,8 +125,7 @@
         "pip_requirements"
       ],
       "matchDepTypes": [
-        "dev",
-        "release"
+        "dependency-groups"
       ],
       "groupName": "python dev dependencies"
     },
@@ -138,16 +138,6 @@
         "build-system.requires"
       ],
       "groupName": "python build system"
-    },
-    {
-      "description": "Group Python distroless-variant extras separately from main runtime deps",
-      "matchManagers": [
-        "pep621"
-      ],
-      "matchDepTypes": [
-        "distroless"
-      ],
-      "groupName": "python distroless dependencies"
     },
     {
       "description": "Group all frontend (npm) updates together",
@@ -217,8 +207,7 @@
       "description": "Automerge non-major devDependency and lint/format tooling updates",
       "matchDepTypes": [
         "devDependencies",
-        "dev",
-        "release"
+        "dependency-groups"
       ],
       "matchUpdateTypes": [
         "minor",
@@ -242,9 +231,44 @@
     {
       "description": "Require manual review for runtime/production dependencies",
       "matchDepTypes": [
-        "dependencies"
+        "dependencies",
+        "project.dependencies"
       ],
       "automerge": false
+    },
+    {
+      "description": "One pull request pins all npm packages (otherwise there are several, all titled Pin dependencies)",
+      "matchUpdateTypes": [
+        "pin"
+      ],
+      "matchManagers": [
+        "npm"
+      ],
+      "groupName": "pin npm dependencies"
+    },
+    {
+      "description": "One pull request pins the Docker images by digest",
+      "matchUpdateTypes": [
+        "pin",
+        "pinDigest"
+      ],
+      "matchManagers": [
+        "dockerfile",
+        "docker-compose"
+      ],
+      "groupName": "pin docker images"
+    },
+    {
+      "description": "hatchling, hatch-vcs and calver-scm are pinned in build-system.requires and in a dependency group; keep both in one pull request so they move together",
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchPackageNames": [
+        "hatchling",
+        "hatch-vcs",
+        "calver-scm"
+      ],
+      "groupName": "python build system"
     }
   ]
 }
