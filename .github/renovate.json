@@ -24,6 +24,9 @@
     "node": "^22.13.0"
   },
   "npmrc": "allow-remote=all\ninstall-strategy=hoisted\n",
+  "postUpdateOptions": [
+    "npmDedupe"
+  ],
   "schedule": [
     "at any time"
   ],
