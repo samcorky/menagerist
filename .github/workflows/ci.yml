@@ -13,7 +13,9 @@ env:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push to a branch replaces its older run, but every commit on main keeps its
+  # own, so a quick second merge does not leave the first without a result.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   changes:
