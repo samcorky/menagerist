@@ -3,7 +3,6 @@
   "extends": [
     "config:best-practices",
     "group:allNonMajor",
-    "schedule:weekly",
     "security:openssf-scorecard",
     "security:minimumReleaseAgePypi"
   ],
@@ -18,6 +17,11 @@
   ],
   "semanticCommits": "disabled",
   "osvVulnerabilityAlerts": true,
+  "schedule": [
+    "at any time"
+  ],
+  "prConcurrentLimit": 20,
+  "prHourlyLimit": 10,
   "labels": [
     "dependencies"
   ],
