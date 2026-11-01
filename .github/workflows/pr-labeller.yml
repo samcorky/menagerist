@@ -1,0 +1,109 @@
+name: PR labeller
+
+# Labels pull requests from the files they change and from the conventional-commit
+# prefix of the title, so generated release notes (.github/release.yml) can group them.
+# pull_request_target runs with write access, so this workflow never checks out or runs
+# the pull request's code: the labeller reads its config from the base branch and the
+# title is only read as data.
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize, ready_for_review, labeled, unlabeled]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  paths:
+    name: "Labels: from changed files"
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Label from the changed paths
+        uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
+        with:
+          configuration-path: .github/labeller.yml
+          sync-labels: false
+
+  title:
+    name: "Labels: from the title prefix"
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Label from the conventional-commit prefix
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const types = {
+              feat: 'enhancement',
+              fix: 'bug',
+              perf: 'performance',
+              security: 'security',
+              docs: 'documentation',
+              ci: 'CI/CD',
+              test: 'tests',
+              tests: 'tests',
+              build: 'maintenance',
+              chore: 'maintenance',
+              refactor: 'maintenance',
+              style: 'maintenance',
+              revert: 'maintenance',
+            };
+            const pr = context.payload.pull_request;
+            const match = /^(\w+)(?:\(([^)]*)\))?(!)?:/.exec(pr.title);
+            if (!match) {
+              core.info(`No conventional-commit prefix in "${pr.title}".`);
+              return;
+            }
+            const [, type, scope, bang] = match;
+            const labels = new Set();
+            if (types[type.toLowerCase()]) labels.add(types[type.toLowerCase()]);
+            if (scope && scope.toLowerCase().split(/[,/ ]+/).includes('security')) {
+              labels.add('security');
+            }
+            if (bang || /BREAKING CHANGE/.test(pr.body || '')) labels.add('breaking-change');
+            if (labels.size === 0) return;
+            await github.rest.issues.addLabels({
+              ...context.repo,
+              issue_number: pr.number,
+              labels: [...labels],
+            });
+            core.info(`Added: ${[...labels].join(', ')}`);
+
+  has-label:
+    name: "Labels: at least one"
+    # Runs after the labelling jobs, and again when someone adds or removes a label, so
+    # a pull request that failed can be fixed by labelling it by hand.
+    needs: [paths, title]
+    if: ${{ !cancelled() && github.event_name == 'pull_request_target' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require a label
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            // Read the labels now: the payload predates the labelling jobs.
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              ...context.repo,
+              issue_number: context.payload.pull_request.number,
+            });
+            // `area: ...` labels say where a change is, not what it is, so they do not count.
+            const kinds = labels.filter((l) => !l.name.startsWith('area: '));
+            if (kinds.length === 0) {
+              core.setFailed(
+                'Add a label for the kind of change, or start the title with a ' +
+                  'conventional-commit prefix (feat:, fix:, docs:, ...). See "Labels and ' +
+                  'release notes" in CONTRIBUTING.md.',
+              );
+            } else {
+              core.info(`Labels: ${labels.map((l) => l.name).join(', ')}`);
+            }

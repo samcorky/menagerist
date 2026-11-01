@@ -10,6 +10,9 @@
   "timezone": "UTC",
   "semanticCommits": "disabled",
   "osvVulnerabilityAlerts": true,
+  "labels": [
+    "dependencies"
+  ],
   "vulnerabilityAlerts": {
     "labels": [
       "security"
@@ -29,11 +32,36 @@
     "automerge": true,
     "platformAutomerge": true
   },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The Postgres image testcontainers starts, so it moves with compose.yaml",
+      "managerFilePatterns": [
+        "/^backend/tests/conftest\\.py$/"
+      ],
+      "matchStrings": [
+        "PostgresContainer\\(\"(?<depName>postgres):(?<currentValue>[^\"]+)\"\\)"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
   "pre-commit": {
     "enabled": true,
     "pinDigests": true
   },
   "packageRules": [
+    {
+      "description": "One Postgres bump updates compose.yaml and backend/tests/conftest.py together. No digest pin: the CI image cache is keyed on the compose.yaml name and the tests ask for the tag",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "postgres"
+      ],
+      "groupName": "postgres image",
+      "pinDigests": false,
+      "automerge": false
+    },
     {
       "description": "Group all Python interpreter version bumps (.python-version, and any future Dockerfile python pins) into one PR, and treat as a major/manual-review change",
       "matchManagers": [
@@ -61,13 +89,14 @@
       "groupName": "python runtime dependencies"
     },
     {
-      "description": "Group Python dev/tooling dependencies (dependency-groups.dev)",
+      "description": "Group Python dev/tooling dependencies (dependency-groups.dev and release)",
       "matchManagers": [
         "pep621",
         "pip_requirements"
       ],
       "matchDepTypes": [
-        "dev"
+        "dev",
+        "release"
       ],
       "groupName": "python dev dependencies"
     },
@@ -159,7 +188,8 @@
       "description": "Automerge non-major devDependency and lint/format tooling updates",
       "matchDepTypes": [
         "devDependencies",
-        "dev"
+        "dev",
+        "release"
       ],
       "matchUpdateTypes": [
         "minor",

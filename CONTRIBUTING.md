@@ -269,7 +269,26 @@ Versions are CalVer, `0.YYYY.MM.PATCH` while pre-stable (for example `0.2026.11.
 | `Publish` run by hand with "push" ticked | `sha-<commit>`, plus `edge` from `main` |
 | A pull request, or `Publish` run by hand with "push" unticked | nothing is pushed |
 
-To release: on `main`, run `git fetch --tags`, then `poe release-tag` to print the next tag (it creates nothing; `git tag "$(poe release-tag)"` does) and publish a GitHub release for that tag (mark it a pre-release while the version starts with `0.`). `poe version` shows the version the current checkout would build, `poe version-explain` shows how it was derived, and `poe version-doctor` checks the CalVer setup; all four wrap the `calver-scm` CLI. Until the first tag exists, `version-doctor` warns that no compatible tag was found. The `Publish` workflow runs the same doctor check, validates the tag against the CalVer configuration, fails if the tag and the version built from it disagree, smoke tests the image, builds `linux/amd64` and `linux/arm64` on native runners, and tags the combined image. Run `Publish` by hand with "push" unticked to try the builds without pushing anything; the run summary lists the tags it would have used.
+To release: on `main`, run `git fetch --tags`, then `poe release-tag` to print the next tag (it creates nothing; `git tag "$(poe release-tag)"` does) and publish a GitHub release for that tag (mark it a pre-release while the version starts with `0.`). Use the "Generate release notes" button, or from the terminal `gh release create "$(poe release-tag)" --generate-notes --prerelease` once the tag is pushed. `poe version` shows the version the current checkout would build, `poe version-explain` shows how it was derived, and `poe version-doctor` checks the CalVer setup; all four wrap the `calver-scm` CLI. Until the first tag exists, `version-doctor` warns that no compatible tag was found. The `Publish` workflow runs the same doctor check, validates the tag against the CalVer configuration, fails if the tag and the version built from it disagree, smoke tests the image, builds `linux/amd64` and `linux/arm64` on native runners, and tags the combined image. Run `Publish` by hand with "push" unticked to try the builds without pushing anything; the run summary lists the tags it would have used.
+
+## Labels and release notes
+
+Generated release notes group pull requests by label (`.github/release.yml`), so give pull requests a conventional-commit title such as `feat: ...`, `fix(auth): ...` or `docs: ...`; add `!` after the type (`feat!:`) for a breaking change. The `PR labeller` workflow then adds labels from the title prefix and from the files changed (`.github/labeller.yml`), and Renovate adds `dependencies`. Labels are only ever added, so correct a wrong one by hand. The `Labels: at least one` check fails a pull request that has no label for the kind of change (`area: ...` labels do not count); add one by hand and it reruns.
+
+| Label | Meaning | Release notes section |
+|---|---|---|
+| `breaking-change` | Changes behaviour or an interface people rely on | Breaking changes |
+| `upgrade-note` | Needs a note for people upgrading; add by hand | Upgrade notes |
+| `performance` | `perf:` | Performance |
+| `enhancement` | `feat:` | Enhancements |
+| `bug` | `fix:` | Bug fixes |
+| `security` | `security:` or a `(security)` scope | Security |
+| `dependencies` | Dependency updates | Dependencies |
+| `maintenance`, `tests`, `CI/CD`, `documentation` | `chore:`, `refactor:`, `build:`, `test:`, `ci:`, `docs:` and matching files | Housekeeping |
+| `area: backend`, `area: frontend` | Files under `backend/` or `frontend/` changed (area only; added automatically) | none |
+| `skip-release-notes` | Leave the pull request out; add by hand | none |
+
+A pull request appears under the first section it matches, in the order above; one with no label lands under "Other changes".
 
 ## Architecture
 
