@@ -256,7 +256,7 @@ Swagger UI is at `/api/docs` on the backend (`http://localhost:8000/api/docs` in
 - One focused change per PR.
 - The `Build` workflow builds the image and runs the smoke test; `CI` calls it, so it runs on every pull request.
 - On a pull request, the autofix.ci app may push a `style: apply hook fixes` commit (formatting and lint fixes), so pull before pushing again. It never edits files under `.github/workflows`.
-- Require the `CI passed` check in branch protection: it is the only required check and succeeds only when the lint, backend, end-to-end and image build jobs all do.
+- Require two checks in branch protection: `CI passed`, which succeeds only when the type check, frontend test, backend, end-to-end and image build jobs all do, and `Hooks: prek (autofix)`, which runs every other pre-commit hook (formatting, lint, secrets, config validation). They are separate workflows, so `CI passed` cannot cover the hooks.
 
 ## Releases
 

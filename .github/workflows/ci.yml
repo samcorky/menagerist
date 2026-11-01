@@ -16,8 +16,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  prek:
-    name: Prek Checks (Lint, Typecheck, Unit Tests)
+  typecheck-backend:
+    name: Backend type check (mypy)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv run poe sync-backend
+
+      - name: Run mypy
+        run: uv run poe typecheck-backend
+
+  typecheck-frontend:
+    name: Frontend type check (svelte-check)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -43,11 +66,38 @@ jobs:
       - name: Install dependencies and generate the API client
         run: uv run poe sync-ci
 
-      # Read-only: autofix.yml applies the fixes to pull requests.
-      - name: Run prek
-        uses: j178/prek-action@44924fe9ef4a6f88253c4b6b1bf11c689d3ce53d # v3.1.0
+      - name: Run svelte-check
+        run: uv run poe typecheck-frontend
+
+  frontend-tests:
+    name: Frontend unit tests (Vitest)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
-          extra-args: --all-files
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies and generate the API client
+        run: uv run poe sync-ci
+
+      - name: Run the frontend unit tests
+        run: uv run poe test-frontend
 
   integration:
     name: Backend Tests and Coverage
@@ -282,7 +332,7 @@ jobs:
     # Runs even when a needed job fails or is cancelled: a skipped dependency would
     # otherwise leave this check "skipped", which counts as passing.
     if: always()
-    needs: [prek, integration, e2e, build]
+    needs: [typecheck-backend, typecheck-frontend, frontend-tests, integration, e2e, build]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
