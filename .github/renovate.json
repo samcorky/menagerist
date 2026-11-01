@@ -19,6 +19,9 @@
   "semanticCommitType": "chore",
   "semanticCommitScope": "deps",
   "osvVulnerabilityAlerts": true,
+  "constraints": {
+    "node": "^22.13.0"
+  },
   "schedule": [
     "at any time"
   ],
