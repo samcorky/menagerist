@@ -349,7 +349,7 @@ A node may carry `extra_schema`, a schema in the same shape as a node type's `at
 
 **Promoting a field to the item type.** "Make this a field on `<item type>`" (shown only when the node has a type) calls `POST /node/{node_id}/attribute/{key}/promote`, backed by `application/promote_extra_schema_field.py`'s `PromoteExtraSchemaField`: composes `UpdateNodeType` (add the property) and `UpdateNode` (remove it from the overlay) through `JoinedUnitOfWork` - one transaction, the same pattern `media/application/upload_and_attach_media.py` uses. The value is untouched (it already satisfied the property's schema as an overlay field). A node's `extra_schema` can never be cleared by sending `null` - `UpdateNode`'s `extra_schema=None` means "leave unchanged" (`node.py`'s own convention, shared with every other optional field on that command) - so both this command and `attributes-editor.svelte`'s remove-the-last-field path always write a real `{"properties": {}}` object instead, never `null`.
 
-**Superseded:** the old loose, untyped "Additional details" model (`lib/attribute-rows.ts`'s `AttributeRow.extra`, `newDetailRow`, and `lib/custom-details.ts`) is gone, along with per-connection custom fields (edges have no overlay). The history and reasoning are in git history (`docs/field-types-spec/wi-18-per-item-custom-fields.md`).
+**Superseded:** the old loose, untyped "Additional details" model (`lib/attribute-rows.ts`'s `AttributeRow.extra`, `newDetailRow`, and `lib/custom-details.ts`) is gone, along with per-connection custom fields (edges have no overlay). The history and reasoning are in the `archive/initial-implementation` tag (`docs/field-types-spec/wi-18-per-item-custom-fields.md`).
 
 ### Saved fields and lists (presets)
 

@@ -50,6 +50,10 @@ def database(
             await session.commit()
         await engine.dispose()
 
+    # An earlier test in this worker may have left connections pooled on an event
+    # loop that has since ended; the commands below each run their own loop.
+    get_session_factory.cache_clear()
+    get_engine.cache_clear()
     wipe()
     asyncio.run(seed())
     monkeypatch.setenv(PASSWORD_ENV_VAR, PASSWORD)
