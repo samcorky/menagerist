@@ -16,8 +16,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Work out which jobs are needed
+    # A pull request that only changes documentation or repository housekeeping skips the
+    # test jobs; see scripts/ci_changes.py for the rules. Everything else runs them all.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      backend: ${{ steps.changes.outputs.backend }}
+      frontend: ${{ steps.changes.outputs.frontend }}
+      e2e: ${{ steps.changes.outputs.e2e }}
+      image: ${{ steps.changes.outputs.image }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: scripts/ci_changes.py
+          sparse-checkout-cone-mode: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+      - name: Classify the changed files
+        id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: uv run --script scripts/ci_changes.py
+
   typecheck-backend:
     name: Backend type check (mypy)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -41,6 +76,8 @@ jobs:
 
   typecheck-frontend:
     name: Frontend type check (svelte-check)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -71,6 +108,8 @@ jobs:
 
   frontend-tests:
     name: Frontend unit tests (Vitest)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -101,6 +140,8 @@ jobs:
 
   integration:
     name: Backend Tests and Coverage
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -134,6 +175,8 @@ jobs:
 
   e2e-shards:
     name: End-to-end shard ${{ matrix.shard }}
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -249,6 +292,8 @@ jobs:
 
   e2e-cookies:
     name: End-to-end cookies (WebKit, Firefox)
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -318,10 +363,15 @@ jobs:
           COOKIES: ${{ needs.e2e-cookies.result }}
         run: |
           echo "shards: ${SHARDS}, cookies: ${COOKIES}"
-          test "${SHARDS}" = success && test "${COOKIES}" = success
+          # Both are skipped when nothing the tests cover has changed.
+          for result in "${SHARDS}" "${COOKIES}"; do
+            case "${result}" in success|skipped) ;; *) exit 1 ;; esac
+          done
 
   build:
     name: Build and smoke test the image
+    needs: changes
+    if: needs.changes.outputs.image == 'true'
     uses: ./.github/workflows/build.yml
     permissions:
       contents: read
@@ -330,13 +380,15 @@ jobs:
     name: CI passed
     # One stable check to require in branch protection however the jobs above change.
     # Runs even when a needed job fails or is cancelled: a skipped dependency would
-    # otherwise leave this check "skipped", which counts as passing.
+    # otherwise leave this check "skipped", which counts as passing. A job that was
+    # skipped because nothing it covers changed is fine; one skipped because a job before
+    # it failed is not, but that failure is itself in `needs` and fails this check.
     if: always()
-    needs: [typecheck-backend, typecheck-frontend, frontend-tests, integration, e2e, build]
+    needs: [changes, typecheck-backend, typecheck-frontend, frontend-tests, integration, e2e, build]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
       - name: Require every job to succeed
-        run: jq -e 'all(.[]; .result == "success")' <<< "$NEEDS"
+        run: jq -e 'all(.[]; .result == "success" or .result == "skipped")' <<< "$NEEDS"
         env:
           NEEDS: ${{ toJSON(needs) }}
