@@ -27,6 +27,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "archunitpython>=1.8.1",
+    "calver-scm[cli]>=1.7.1",
     "docker>=7.2.0",
     "granian[reload]>=2.8.7",
     "hatch>=1.18.2",
@@ -57,7 +58,7 @@ menagerist = "app.entrypoints.cli:app.meta"
 requires = [
     "hatchling==1.32.0",
     "hatch-vcs==0.5.0",
-    "calver-scm==1.5.1"
+    "calver-scm==1.7.1"
 ]
 
 build-backend = "hatchling.build"
