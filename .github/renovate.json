@@ -244,7 +244,8 @@
       "matchManagers": [
         "npm"
       ],
-      "groupName": "pin npm dependencies"
+      "groupName": "pin npm dependencies",
+      "commitMessageSuffix": "(npm)"
     },
     {
       "description": "One pull request pins the Docker images by digest",
@@ -256,7 +257,8 @@
         "dockerfile",
         "docker-compose"
       ],
-      "groupName": "pin docker images"
+      "groupName": "pin docker images",
+      "commitMessageSuffix": "(docker images)"
     },
     {
       "description": "hatchling, hatch-vcs and calver-scm are pinned in build-system.requires and in a dependency group; keep both in one pull request so they move together",
