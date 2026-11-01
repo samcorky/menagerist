@@ -49,6 +49,7 @@ repos:
       - id: check-github-workflows
       - id: check-github-actions
       - id: check-codecov
+      - id: check-github-issue-forms
 
   - repo: https://github.com/rhysd/actionlint
     rev: v1.7.12
