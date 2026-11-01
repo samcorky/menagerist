@@ -389,7 +389,7 @@ test('smart collections are not offered as places to add an item, and links use 
 
 	// The search popup opens it by slug.
 	await page.goto('/');
-	await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Home', exact: true })).toBeVisible();
 	await page.keyboard.press('/');
 	const popup = searchPopup(page);
 	await expect(popup).toBeVisible();
