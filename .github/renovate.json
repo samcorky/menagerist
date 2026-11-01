@@ -22,6 +22,7 @@
   "constraints": {
     "node": "^22.13.0"
   },
+  "npmrc": "allow-remote=all\ninstall-strategy=hoisted\n",
   "schedule": [
     "at any time"
   ],
@@ -53,6 +54,20 @@
     "platformAutomerge": true
   },
   "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The Python floor in requires-python, so it moves with .python-version in one pull request",
+      "managerFilePatterns": [
+        "/^pyproject\\.toml$/",
+        "/^backend/pyproject\\.toml$/"
+      ],
+      "matchStrings": [
+        "requires-python = \">=(?<currentValue>3\\.\\d+)\""
+      ],
+      "depNameTemplate": "python",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    },
     {
       "customType": "regex",
       "description": "The Postgres image testcontainers starts, so it moves with compose.yaml",
@@ -103,10 +118,11 @@
       "automerge": false
     },
     {
-      "description": "Group all Python interpreter version bumps (.python-version, and any future Dockerfile python pins) into one PR, and treat as a major/manual-review change",
+      "description": "Group all Python interpreter version bumps (.python-version and the requires-python floors) into one PR, and treat as a major/manual-review change",
       "matchManagers": [
         "pyenv",
-        "dockerfile"
+        "dockerfile",
+        "custom.regex"
       ],
       "matchPackageNames": [
         "python"
