@@ -49,6 +49,11 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
 
+      # Fails on a broken CalVer config; warns about a shallow clone or no tag yet.
+      - name: Check the CalVer setup
+        working-directory: backend
+        run: uvx --from "calver-scm[cli]" calver-scm doctor
+
       - name: Read the version from the tags
         id: version
         run: |
@@ -65,7 +70,9 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
           VERSION: ${{ steps.version.outputs.version }}
+        working-directory: backend
         run: |
+          uvx --from "calver-scm[cli]" calver-scm validate "$TAG" --tag
           if [[ "${TAG#v}" != "$VERSION" ]]; then
             echo "::error::The release tag is '${TAG}' but the version built from it is '${VERSION}'. Tags look like 0.YYYY.MM.PATCH."
             exit 1

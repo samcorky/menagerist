@@ -53,6 +53,16 @@ interpreter = ["powershell", "posix"]
 cwd = "frontend"
 help = "Install frontend npm dependencies"
 
+[tool.poe.groups.setup.tasks.sync-frontend-locked]
+shell = "npm ci"
+interpreter = ["powershell", "posix"]
+cwd = "frontend"
+help = "Install exactly the npm dependencies in package-lock.json (what CI uses)"
+
+[tool.poe.groups.setup.tasks.sync-ci]
+sequence = ["sync-frontend-locked", "generate-frontend-client"]
+help = "CI setup: locked frontend install, backend sync and the generated API client (set UV_LOCKED=1 to also lock the backend sync)"
+
 [tool.poe.groups.setup.tasks.install-e2e-browser]
 shell = "npx playwright install chromium"
 interpreter = ["powershell", "posix"]
@@ -369,6 +379,29 @@ args = [
   { name = "files", positional = true, multiple = true, help = "Spec files to run, as Playwright takes them; all specs if none" },
 ]
 help = "Same as test-e2e-headed, but slowed down (1s between actions) so you can actually follow along"
+
+[tool.poe.groups.release]
+heading = "Release"
+
+[tool.poe.groups.release.tasks.version]
+cmd = "calver-scm version"
+cwd = "backend"
+help = "Print the version a build from the current checkout would get"
+
+[tool.poe.groups.release.tasks.version-explain]
+cmd = "calver-scm explain"
+cwd = "backend"
+help = "Show how the current version was derived from the tags and commits"
+
+[tool.poe.groups.release.tasks.version-doctor]
+cmd = "calver-scm doctor"
+cwd = "backend"
+help = "Check the CalVer setup for problems (shallow clone, no compatible tag, bad config)"
+
+[tool.poe.groups.release.tasks.release-tag]
+cmd = "calver-scm --format plain next-tag"
+cwd = "backend"
+help = "Print the next release tag without creating it; run `git fetch --tags` first, then `git tag \"$(poe release-tag)\"`"
 
 [tool.poe.groups.database]
 heading = "Database"

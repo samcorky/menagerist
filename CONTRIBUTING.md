@@ -254,7 +254,9 @@ Swagger UI is at `/api/docs` on the backend (`http://localhost:8000/api/docs` in
 - `poe check` must pass, and `poe coverage` for backend changes.
 - Coverage floors must not drop.
 - One focused change per PR.
-- The `Build` workflow builds the image and runs the smoke test on every pull request.
+- The `Build` workflow builds the image and runs the smoke test; `CI` calls it, so it runs on every pull request.
+- On a pull request, the autofix.ci app may push a `style: apply hook fixes` commit (formatting and lint fixes), so pull before pushing again. It never edits files under `.github/workflows`.
+- Require the `CI passed` check in branch protection: it is the only required check and succeeds only when the lint, backend, end-to-end and image build jobs all do.
 
 ## Releases
 
@@ -267,7 +269,7 @@ Versions are CalVer, `0.YYYY.MM.PATCH` while pre-stable (for example `0.2026.11.
 | `Publish` run by hand with "push" ticked | `sha-<commit>`, plus `edge` from `main` |
 | A pull request, or `Publish` run by hand with "push" unticked | nothing is pushed |
 
-To release: tag `main` with the version and publish a GitHub release for that tag (mark it a pre-release while the version starts with `0.`). The `Publish` workflow fails if the tag and the version built from it disagree, smoke tests the image, builds `linux/amd64` and `linux/arm64` on native runners, and tags the combined image. Run `Publish` by hand with "push" unticked to try the builds without pushing anything; the run summary lists the tags it would have used.
+To release: on `main`, run `git fetch --tags`, then `poe release-tag` to print the next tag (it creates nothing; `git tag "$(poe release-tag)"` does) and publish a GitHub release for that tag (mark it a pre-release while the version starts with `0.`). `poe version` shows the version the current checkout would build, `poe version-explain` shows how it was derived, and `poe version-doctor` checks the CalVer setup; all four wrap the `calver-scm` CLI. Until the first tag exists, `version-doctor` warns that no compatible tag was found. The `Publish` workflow runs the same doctor check, validates the tag against the CalVer configuration, fails if the tag and the version built from it disagree, smoke tests the image, builds `linux/amd64` and `linux/arm64` on native runners, and tags the combined image. Run `Publish` by hand with "push" unticked to try the builds without pushing anything; the run summary lists the tags it would have used.
 
 ## Architecture
 

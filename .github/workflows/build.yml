@@ -1,9 +1,9 @@
 name: Build
 
 # Builds the image and smoke tests it. Nothing is pushed.
-# Runs on pull requests and by hand, and publish.yml calls it before it publishes.
+# ci.yml calls it on pull requests and pushes to main, publish.yml calls it before it
+# publishes, and it can be run by hand.
 on:
-  pull_request:
   workflow_dispatch:
   workflow_call:
 
@@ -27,6 +27,11 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Fails on a broken CalVer config; warns about a shallow clone or no tag yet.
+      - name: Check the CalVer setup
+        working-directory: backend
+        run: uvx --from "calver-scm[cli]" calver-scm doctor
 
       - name: Work out the build arguments
         id: args
