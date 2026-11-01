@@ -1149,6 +1149,9 @@ dev = [
     { name = "types-jsonschema" },
     { name = "types-pyyaml" },
 ]
+release = [
+    { name = "calver-scm", extra = ["cli"] },
+]
 
 [package.metadata]
 requires-dist = [
@@ -1196,6 +1199,7 @@ dev = [
     { name = "types-jsonschema", specifier = ">=4.26.0.20261006" },
     { name = "types-pyyaml", specifier = ">=6.0.12.20261030" },
 ]
+release = [{ name = "calver-scm", extras = ["cli"], specifier = ">=1.7.1" }]
 
 [[package]]
 name = "menagerist-workspace"

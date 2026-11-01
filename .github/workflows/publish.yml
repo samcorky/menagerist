@@ -43,7 +43,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # hatch-vcs works the version out from the tags.
+          # The version is worked out from the tags.
           fetch-depth: 0
 
       - name: Install uv
@@ -52,12 +52,12 @@ jobs:
       # Fails on a broken CalVer config; warns about a shallow clone or no tag yet.
       - name: Check the CalVer setup
         working-directory: backend
-        run: uvx --from "calver-scm[cli]" calver-scm doctor
+        run: uv run --locked --only-group release calver-scm doctor
 
       - name: Read the version from the tags
         id: version
         run: |
-          version="$(cd backend && uv run --with hatch hatch --no-interactive version)"
+          version="$(cd backend && uv run --locked --only-group release calver-scm --format plain version)"
           timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           {
             echo "version=${version}"
@@ -72,7 +72,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         working-directory: backend
         run: |
-          uvx --from "calver-scm[cli]" calver-scm validate "$TAG" --tag
+          uv run --locked --only-group release calver-scm validate "$TAG" --tag
           if [[ "${TAG#v}" != "$VERSION" ]]; then
             echo "::error::The release tag is '${TAG}' but the version built from it is '${VERSION}'. Tags look like 0.YYYY.MM.PATCH."
             exit 1
