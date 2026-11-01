@@ -19,12 +19,12 @@ changelog:
     - title: Enhancements
       labels:
         - enhancement
-    - title: Bug fixes
-      labels:
-        - bug
     - title: Security
       labels:
         - security
+    - title: Bug fixes
+      labels:
+        - bug
     - title: Dependencies
       labels:
         - dependencies
