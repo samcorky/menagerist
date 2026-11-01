@@ -174,17 +174,16 @@
       "groupName": "frontend dependencies"
     },
     {
-      "description": "Group SvelteKit/Vite ecosystem updates",
+      "description": "Group Svelte and Vite packages, majors included, so one pull request moves them together",
       "matchManagers": [
         "npm"
       ],
       "matchPackageNames": [
-        "/^svelte/",
-        "/^@sveltejs//",
-        "/^vite/",
-        "/^@sveltejs\\/vite-plugin-svelte/"
+        "/svelte/",
+        "/^vite/"
       ],
-      "groupName": "svelte & vite"
+      "groupName": "svelte & vite",
+      "separateMajorMinor": false
     },
     {
       "description": "Group GitHub Actions updates together and pin SHA digests",
