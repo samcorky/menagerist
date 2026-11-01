@@ -3,7 +3,6 @@
   "extends": [
     "config:best-practices",
     "group:allNonMajor",
-    "schedule:weekly",
     "security:openssf-scorecard",
     "security:minimumReleaseAgePypi"
   ],
@@ -16,8 +15,15 @@
     "**/__tests__/**",
     "**/__fixtures__/**"
   ],
-  "semanticCommits": "disabled",
+  "semanticCommits": "enabled",
+  "semanticCommitType": "chore",
+  "semanticCommitScope": "deps",
   "osvVulnerabilityAlerts": true,
+  "schedule": [
+    "at any time"
+  ],
+  "prConcurrentLimit": 20,
+  "prHourlyLimit": 10,
   "labels": [
     "dependencies"
   ],
@@ -31,6 +37,8 @@
     ],
     "automerge": true,
     "platformAutomerge": true,
+    "semanticCommitType": "fix",
+    "semanticCommitScope": "security",
     "minimumReleaseAge": null
   },
   "lockFileMaintenance": {
@@ -271,6 +279,31 @@
         "calver-scm"
       ],
       "groupName": "python build system"
+    },
+    {
+      "description": "Workflow and composite action updates are CI changes",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "semanticCommitType": "ci"
+    },
+    {
+      "description": "Docker images and the Python build system are build changes",
+      "matchManagers": [
+        "dockerfile",
+        "docker-compose"
+      ],
+      "semanticCommitType": "build"
+    },
+    {
+      "description": "Build-system requirements (hatchling, hatch-vcs, calver-scm) are build changes",
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchDepTypes": [
+        "build-system.requires"
+      ],
+      "semanticCommitType": "build"
     }
   ]
 }
