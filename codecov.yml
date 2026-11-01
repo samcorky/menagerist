@@ -56,3 +56,5 @@ comment:
   require_base: false
   # A pull request that skips the backend job uploads no coverage, so post nothing.
   require_head: true
+  # Show the components and files tables, not only the patch summary.
+  hide_project_coverage: false
