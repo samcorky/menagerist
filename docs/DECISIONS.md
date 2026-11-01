@@ -414,7 +414,7 @@ Separately, `field-kind-row.svelte`/`GroupExtras.svelte`'s three dropdowns (fiel
 
 **Rationale:** The owner asked directly for an ordered-list kind (already a documented but unscheduled candidate in `further-field-types.md`), then separately asked for a checklist while discussing list display styles. A first instinct to fold checklist in as a third `display` value on `list` was rejected: that option only ever controls presentation in this codebase (boolean's switch/checkbox/buttons behave identically), and overloading it with a storage-shape change would break that invariant for every future reader of the code. `attributesToRows` must check the schema's declared `checklist` kind before its existing generic array-of-objects fallback (shared with `group`'s untyped-key catch-all) - otherwise a checklist's boolean `done` silently degrades through the group cell coercion path built for arbitrary string-typed table columns, always producing `false`. A regression test locks this ordering in (`attributes-editor.test.ts`).
 
-The implementation notes for this work item are in git history (`docs/field-types-spec/`).
+The implementation notes for this work item are in the `archive/initial-implementation` tag (`docs/field-types-spec/`).
 
 ---
 
@@ -1066,7 +1066,7 @@ Over HTTPS (a `Secure` cookie) the session cookie is `__Host-Http-menagerist-ses
 
 ## Personal access tokens (2026-10-23)
 
-*Supersedes the Phase 4 sketch in `docs/superpowers/plans/2026-10-20-api-tokens-and-permissions.md`; the task plan was `docs/superpowers/plans/2026-10-23-api-tokens.md` (both removed from the tree, in git history).*
+*Supersedes the Phase 4 sketch in `docs/superpowers/plans/2026-10-20-api-tokens-and-permissions.md`; the task plan was `docs/superpowers/plans/2026-10-23-api-tokens.md` (both removed from the tree; in the `archive/initial-implementation` tag).*
 
 **Decision:** a signed-in person can create personal access tokens (`mnst_<id>_<secret>`) that act as them with a chosen subset of their permissions, for scripts and for Swagger. Tokens live in the `identity` module (`ApiToken`, `ApiTokenRepository`, `ApiTokenGenerator`, use cases, SQL and in-memory adapters). The secret is shown once and stored as a hash. Personal access tokens were chosen over OAuth: a person issues a credential to themselves, which needs no authorisation server, consent screen or client registration. OAuth is added only if third-party apps appear; verification sits behind `get_current_actor`, so a second bearer format would not touch the guard.
 
@@ -1330,6 +1330,8 @@ Two more jobs finish the picture. `media.remove_stray_files` (`RemoveStrayMediaF
 **Decision:** the 37 migrations written while the schema was taking shape became two: `cd0c974e3e33_initial_schema` (every table, index, the `immutable_unaccent` function and the `pg_trgm` and `unaccent` extensions) and `e6f7a8b9c0d1_seed_builtin_choice_lists` (the built-in presets, unchanged apart from its parent). From the first release, a revision is never edited or removed: schema changes are new revisions on top.
 
 **Rationale:** nothing had been released, so no deployment had a database at an old revision, and the history carried renames, dropped seeds and index swaps that a new installation would replay for no benefit. Doing it before `main` has a history costs nothing; afterwards it needs a migration path for every installed database.
+
+**Where the old chain is:** the original 37 migrations are in the `archive/initial-implementation` tag, which keeps the whole development history reachable after the branch was squash-merged into `main`.
 
 **Checked by:** migrating an empty Postgres with the old chain and with the new one and diffing `pg_dump` output: the schema (tables, column order, defaults, indexes, constraints, functions, extensions) and the seeded rows were identical, apart from timestamps. The migration tests (`test_upgrade`, `test_up_down_consistency`, `test_model_definitions_match_ddl`) pass.
 
