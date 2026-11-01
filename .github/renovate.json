@@ -171,6 +171,40 @@
       "groupName": "python build system"
     },
     {
+      "description": "TypeScript 7 is outside the peer range of SvelteKit 2 (typescript ^5.3.3 || ^6.0.0); remove once SvelteKit supports it",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "typescript"
+      ],
+      "allowedVersions": "<7"
+    },
+    {
+      "description": "The frontend builds on Node 22, so @types/node stays on 22; raise it with the Node image",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "@types/node"
+      ],
+      "allowedVersions": "<23"
+    },
+    {
+      "description": "SvelteKit 3 cannot install while bits-ui depends on runed 0.35 (peer @sveltejs/kit ^2.21.0); the adapter must match SvelteKit. Remove once bits-ui moves to a runed that accepts SvelteKit 3",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "@sveltejs/kit",
+        "@sveltejs/adapter-static"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Group all frontend (npm) updates together",
       "matchManagers": [
         "npm"
