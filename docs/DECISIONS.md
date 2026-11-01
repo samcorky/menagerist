@@ -1066,7 +1066,7 @@ Over HTTPS (a `Secure` cookie) the session cookie is `__Host-Http-menagerist-ses
 
 ## Personal access tokens (2026-10-23)
 
-*Supersedes the Phase 4 sketch in `docs/superpowers/plans/2026-10-20-api-tokens-and-permissions.md`; the task plan is `docs/superpowers/plans/2026-10-23-api-tokens.md`.*
+*Supersedes the Phase 4 sketch in `docs/superpowers/plans/2026-10-20-api-tokens-and-permissions.md`; the task plan was `docs/superpowers/plans/2026-10-23-api-tokens.md` (both removed from the tree, in git history).*
 
 **Decision:** a signed-in person can create personal access tokens (`mnst_<id>_<secret>`) that act as them with a chosen subset of their permissions, for scripts and for Swagger. Tokens live in the `identity` module (`ApiToken`, `ApiTokenRepository`, `ApiTokenGenerator`, use cases, SQL and in-memory adapters). The secret is shown once and stored as a hash. Personal access tokens were chosen over OAuth: a person issues a credential to themselves, which needs no authorisation server, consent screen or client registration. OAuth is added only if third-party apps appear; verification sits behind `get_current_actor`, so a second bearer format would not touch the guard.
 
@@ -1322,3 +1322,15 @@ Two more jobs finish the picture. `media.remove_stray_files` (`RemoveStrayMediaF
 - **Shapes follow the neighbours.** One structure per endpoint: an object keyed by name (like search's wrapper object), and a bare array of rows (like `GET /node/item-fields`). No hyphens in the paths.
 
 **Alternatives rejected:** a dedicated `GET /node/stats` with hard-coded definitions (the definitions would drift from the Items filters); `?group=type` on `GET /node/count` (one URL, two response shapes); looping `GET /node/count?type=` per type (many requests, and a cap on how many types are looked at); uncapped counting with no ceiling (an unbounded scan on a very large library).
+
+---
+
+## Flatten the development migrations before the first release (2026-11-01)
+
+**Decision:** the 37 migrations written while the schema was taking shape became two: `cd0c974e3e33_initial_schema` (every table, index, the `immutable_unaccent` function and the `pg_trgm` and `unaccent` extensions) and `e6f7a8b9c0d1_seed_builtin_choice_lists` (the built-in presets, unchanged apart from its parent). From the first release, a revision is never edited or removed: schema changes are new revisions on top.
+
+**Rationale:** nothing had been released, so no deployment had a database at an old revision, and the history carried renames, dropped seeds and index swaps that a new installation would replay for no benefit. Doing it before `main` has a history costs nothing; afterwards it needs a migration path for every installed database.
+
+**Checked by:** migrating an empty Postgres with the old chain and with the new one and diffing `pg_dump` output: the schema (tables, column order, defaults, indexes, constraints, functions, extensions) and the seeded rows were identical, apart from timestamps. The migration tests (`test_upgrade`, `test_up_down_consistency`, `test_model_definitions_match_ddl`) pass.
+
+**Consequence:** a development database created before this change records a revision that no longer exists, so `alembic upgrade` refuses to run. Its schema is identical, so either recreate it (`poe db-down`, then `poe db-up`) or adopt the new history with `alembic stamp --purge e6f7a8b9c0d1` from `backend/`.
