@@ -9,45 +9,50 @@ component_management:
     - component_id: domain
       name: Domain
       paths:
-        - src/app/modules/*/domain/**
+        - backend/src/app/modules/*/domain/**
       statuses:
         - type: project
           target: 100%
     - component_id: ports
       name: Ports
       paths:
-        - src/app/modules/*/ports/**
+        - backend/src/app/modules/*/ports/**
       statuses:
         - type: project
           target: auto
     - component_id: application
       name: Application
       paths:
-        - src/app/modules/*/application/**
+        - backend/src/app/modules/*/application/**
       statuses:
         - type: project
           target: 100%
     - component_id: shared-kernel
       name: Shared Kernel
       paths:
-        - src/app/shared_kernel/**
+        - backend/src/app/shared_kernel/**
       statuses:
         - type: project
           target: 100%
     - component_id: adapters
       name: Adapters
       paths:
-        - src/app/modules/*/adapters/**
+        - backend/src/app/modules/*/adapters/**
       statuses:
         - type: project
           target: 80%
     - component_id: platform
       name: Platform
       paths:
-        - src/app/platform/**
+        - backend/src/app/platform/**
       statuses:
         - type: project
           target: 70%
 
 comment:
-  layout: "header, diff, components"
+  layout: "header, diff, components, files, footer"
+  behavior: default
+  require_changes: false
+  require_base: false
+  # A pull request that skips the backend job uploads no coverage, so post nothing.
+  require_head: true
