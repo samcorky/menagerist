@@ -1,3 +1,6 @@
+# Install both the pre-commit and the commit-msg hooks with a plain `prek install`.
+default_install_hook_types: [pre-commit, commit-msg]
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -23,6 +26,27 @@ repos:
         exclude: ^frontend/
       - id: check-added-large-files
       - id: check-executables-have-shebangs
+
+  # Commit messages follow Conventional Commits; the types match .github/release.yml
+  # and the labeller. Merge and fixup commits are allowed (no --strict).
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.5.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args:
+          - feat
+          - fix
+          - perf
+          - security
+          - docs
+          - ci
+          - test
+          - build
+          - chore
+          - refactor
+          - style
+          - revert
 
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
