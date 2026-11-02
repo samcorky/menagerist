@@ -91,6 +91,23 @@ repos:
         always_run: true
         pass_filenames: false
 
+      # backend/.pre-commit-config.yaml already runs Ruff when backend/ changes, and its
+      # tasks cover ../scripts too. These only fire for a change under scripts/, which
+      # that project never sees. Same poe tasks, so the same locked Ruff and rules.
+      - id: ruff-check
+        name: ruff check
+        entry: uv run poe lint-backend-fix
+        language: system
+        files: '^scripts/.*\.py$'
+        pass_filenames: false
+
+      - id: ruff-format
+        name: ruff format
+        entry: uv run poe format-backend
+        language: system
+        files: '^scripts/.*\.py$'
+        pass_filenames: false
+
       - id: validate-compose
         name: validate docker compose
         entry: uv run poe validate-compose
