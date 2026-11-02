@@ -401,8 +401,45 @@ _STATIC_LABELS = (
 # empty, so they are required in CI and format-checked wherever present.
 _BUILD_LABELS = ("revision", "created")
 _LABEL_PREFIX = "org.opencontainers.image."
-_COMMIT_SHA = re.compile(r"[0-9a-f]{40}")
-_TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
+_URL_LABELS = ("source", "url")
+# Labels with a fixed shape, and how to describe it when it is wrong.
+_LABEL_FORMATS = {
+    "revision": (re.compile(r"[0-9a-f]{40}"), "a 40-character commit"),
+    "created": (re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"), "a UTC timestamp"),
+}
+
+
+def _missing_labels(oci: dict[str, str], required: tuple[str, ...]) -> list[str]:
+    """Name the required labels that are absent or blank."""
+    return [
+        f"{_LABEL_PREFIX}{name} is missing or empty"
+        for name in required
+        if not oci.get(name, "").strip()
+    ]
+
+
+def _unexpanded_labels(oci: dict[str, str]) -> list[str]:
+    """Name the labels still holding a literal build-argument or shell expansion."""
+    return [
+        f"{_LABEL_PREFIX}{name} has an unexpanded value: {value!r}"
+        for name, value in oci.items()
+        if "${" in value or "$(" in value
+    ]
+
+
+def _malformed_labels(oci: dict[str, str]) -> list[str]:
+    """Name the labels that are set but are not an https URL or the expected shape."""
+    problems = []
+    for name in _URL_LABELS:
+        value = oci.get(name, "")
+        parsed = urlparse(value)
+        if value and (parsed.scheme != "https" or not parsed.netloc):
+            problems.append(f"{_LABEL_PREFIX}{name} is not an https URL: {value!r}")
+    for name, (pattern, description) in _LABEL_FORMATS.items():
+        value = oci.get(name, "")
+        if value and not pattern.fullmatch(value):
+            problems.append(f"{_LABEL_PREFIX}{name} is not {description}: {value!r}")
+    return problems
 
 
 def check_image_labels(client: docker.DockerClient) -> None:
@@ -414,38 +451,25 @@ def check_image_labels(client: docker.DockerClient) -> None:
     """
     print("checking the image's OCI labels are present and well formed...")
     labels = client.images.get(IMAGE).labels or {}
-    in_ci = bool(os.environ.get("GITHUB_ACTIONS"))
-    required = _STATIC_LABELS + (_BUILD_LABELS if in_ci else ())
+    oci = {
+        name.removeprefix(_LABEL_PREFIX): value
+        for name, value in labels.items()
+        if name.startswith(_LABEL_PREFIX)
+    }
+    required = _STATIC_LABELS + (
+        _BUILD_LABELS if os.environ.get("GITHUB_ACTIONS") else ()
+    )
 
-    problems: list[str] = []
-    for name in required:
-        if not labels.get(_LABEL_PREFIX + name, "").strip():
-            problems.append(f"{_LABEL_PREFIX}{name} is missing or empty")
-    for name, value in labels.items():
-        if name.startswith(_LABEL_PREFIX) and ("${" in value or "$(" in value):
-            problems.append(f"{name} has an unexpanded value: {value!r}")
-
-    for name in ("source", "url"):
-        parsed = urlparse(labels.get(_LABEL_PREFIX + name, ""))
-        if labels.get(_LABEL_PREFIX + name) and (
-            parsed.scheme != "https" or not parsed.netloc
-        ):
-            problems.append(f"{_LABEL_PREFIX}{name} is not an https URL")
-
-    revision = labels.get(_LABEL_PREFIX + "revision", "")
-    if revision and not _COMMIT_SHA.fullmatch(revision):
-        problems.append(
-            f"{_LABEL_PREFIX}revision is not a 40-character commit: {revision!r}"
-        )
-    created = labels.get(_LABEL_PREFIX + "created", "")
-    if created and not _TIMESTAMP.fullmatch(created):
-        problems.append(f"{_LABEL_PREFIX}created is not a UTC timestamp: {created!r}")
-
+    problems = [
+        *_missing_labels(oci, required),
+        *_unexpanded_labels(oci),
+        *_malformed_labels(oci),
+    ]
     if problems:
-        raise SmokeTestError("bad image labels:\n  " + "\n  ".join(problems))
-    for name in sorted(labels):
-        if name.startswith(_LABEL_PREFIX):
-            print(f"  {name}={labels[name]}")
+        details = "\n  ".join(problems)
+        raise SmokeTestError(f"bad image labels:\n  {details}")
+    for name, value in sorted(oci.items()):
+        print(f"  {_LABEL_PREFIX}{name}={value}")
 
 
 def check_version_lockstep(client: docker.DockerClient) -> None:
