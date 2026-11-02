@@ -74,7 +74,9 @@ jobs:
         run: |
           if tag="$(uv run --locked --only-group release calver-scm --format plain next-tag)"; then
             version="${tag#v}"
-            tags="${version}, sha-<commit>"
+            # Seven characters, as docker/metadata-action's sha tag. A literal <commit>
+            # would be read as an HTML tag and vanish from the rendered summary.
+            tags="${version}, sha-${GITHUB_SHA::7}"
             # Release candidates (and other PEP 440 pre-releases) are marked as
             # pre-releases, which keeps them off latest.
             tags="${tags}, latest (not for a release candidate)"
