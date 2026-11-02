@@ -1,5 +1,5 @@
-# Install both the pre-commit and the commit-msg hooks with a plain `prek install`.
-default_install_hook_types: [pre-commit, commit-msg]
+# Install the pre-commit, commit-msg and pre-push hooks with a plain `prek install`.
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -82,6 +82,32 @@ repos:
 
   - repo: local
     hooks:
+      # no-commit-to-branch (above) cannot see a feature branch pushed to main.
+      - id: no-push-to-main
+        name: do not push to main
+        entry: uv run --script scripts/no_push_to_main.py
+        language: system
+        stages: [pre-push]
+        always_run: true
+        pass_filenames: false
+
+      # backend/.pre-commit-config.yaml already runs Ruff when backend/ changes, and its
+      # tasks cover ../scripts too. These only fire for a change under scripts/, which
+      # that project never sees. Same poe tasks, so the same locked Ruff and rules.
+      - id: ruff-check
+        name: ruff check
+        entry: uv run poe lint-backend-fix
+        language: system
+        files: '^scripts/.*\.py$'
+        pass_filenames: false
+
+      - id: ruff-format
+        name: ruff format
+        entry: uv run poe format-backend
+        language: system
+        files: '^scripts/.*\.py$'
+        pass_filenames: false
+
       - id: validate-compose
         name: validate docker compose
         entry: uv run poe validate-compose
