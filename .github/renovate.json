@@ -191,16 +191,6 @@
       "allowedVersions": "<7"
     },
     {
-      "description": "The frontend builds on the Node in .node-version, so @types/node stays on that major; raise it with .node-version",
-      "matchManagers": [
-        "npm"
-      ],
-      "matchPackageNames": [
-        "@types/node"
-      ],
-      "allowedVersions": "<23"
-    },
-    {
       "description": "SvelteKit 3 cannot install while bits-ui depends on runed 0.35 (peer @sveltejs/kit ^2.21.0); the adapter must match SvelteKit. Remove once bits-ui moves to a runed that accepts SvelteKit 3",
       "matchManagers": [
         "npm"
