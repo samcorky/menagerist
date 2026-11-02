@@ -20,6 +20,8 @@
   "semanticCommitScope": "deps",
   "osvVulnerabilityAlerts": true,
   "abandonmentThreshold": "3 years",
+  "internalChecksFilter": "strict",
+  "rebaseWhen": "behind-base-branch",
   "constraints": {
     "node": "^22.13.0"
   },
@@ -28,12 +30,14 @@
     "npmDedupe"
   ],
   "schedule": [
-    "at any time"
+    "before 6am on saturday",
+    "before 6am on sunday",
+    "before 6am on monday"
   ],
   "gitIgnoredAuthors": [
     "114827586+autofix-ci[bot]@users.noreply.github.com"
   ],
-  "prConcurrentLimit": 20,
+  "prConcurrentLimit": 8,
   "prHourlyLimit": 10,
   "labels": [
     "dependencies"
@@ -247,18 +251,6 @@
       "separateMultipleMajor": true,
       "automerge": true,
       "platformAutomerge": true
-    },
-    {
-      "description": "Test tooling; Playwright updates need a new browser build, so they stay apart from the UI libraries",
-      "matchManagers": [
-        "npm"
-      ],
-      "matchPackageNames": [
-        "@playwright/test",
-        "@types/node"
-      ],
-      "groupName": "frontend test tooling",
-      "separateMultipleMajor": true
     },
     {
       "description": "UI libraries change what users see and are where e2e regressions come from",
