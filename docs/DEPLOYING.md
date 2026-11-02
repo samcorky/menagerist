@@ -19,7 +19,17 @@ The `menagerist` container applies database migrations when it starts. Before it
 | `0.2026.11.0` | One release, by version. Pin this to update only when you choose to. |
 | `0.2026.11.0rc1` | A release candidate, published ahead of its release for testing. |
 | `edge` | The latest commit on `main`. |
-| `sha-<commit>` | One exact commit. |
+| `sha-<commit>` | One exact commit, by its first seven characters. Not every commit on `main` gets one: a newer merge cancels an older build that is still running. |
+
+### Checking where an image came from
+
+Release images carry a signed build provenance attestation, made by the `Publish` workflow of this repository and stored beside the image in GHCR. Check it with the GitHub CLI:
+
+```sh
+gh attestation verify oci://ghcr.io/samcorky/menagerist:0.2026.11.0 --owner samcorky
+```
+
+It succeeds only when the attestation matches the image and was signed by this repository's workflow, so a rebuilt or altered image fails. Use the tag you pulled.
 
 ## Behind a reverse proxy
 
