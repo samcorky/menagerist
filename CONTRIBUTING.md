@@ -285,16 +285,20 @@ Swagger UI is at `/api/docs` on the backend (`http://localhost:8000/api/docs` in
 
 ## Releases
 
-Versions are CalVer, `0.YYYY.MM.PATCH` while pre-stable (for example `0.2026.11.0`), and come from the git tag through hatch-vcs. The `0.` prefix is dropped once the data model and API are stable.
+Versions are CalVer, `0.YYYY.M.PATCH` while pre-stable (for example `0.2026.11.0`; the month has no leading zero), and come from the git tag through hatch-vcs and `calver-scm`. The patch number counts releases within the month and restarts at `0` in a new month. `0.` means the data model and API are not yet stable; `[tool.calver-scm] stable = false` in `backend/pyproject.toml` adds it, and removing that line drops it when they are.
+
+Tags are the version with a `v` in front: `v0.2026.11.0`. `calver-scm` rejects a tag without the `v` or without the `0.`, so `v2026.11.0` is not valid while `stable = false`.
+
+A release candidate is the same version with `rc` and a number: `v0.2026.11.0rc1`, then `rc2` and so on, and finally `v0.2026.11.0` on the commit that passed. Write it exactly like that; the `-rc.1` spelling passes `calver-scm validate`, but it builds as `0.2026.11.0rc1`, so `Publish` would fail its tag-and-version check. A release candidate does not use up the patch number, so `poe release-tag` keeps proposing the final tag (`v0.2026.11.0`) until that is tagged; type the `rc` tag by hand. Builds from commits between a release candidate and its final tag report `0.2026.11.1.dev<N>`, which compares higher than the final `0.2026.11.0`; ignore that, it is only the dev build label.
 
 | Trigger | Image tags on GHCR |
 |---|---|
-| A published GitHub release | the version, `sha-<commit>` and `latest` |
+| A published GitHub release | the version and `sha-<commit>`, plus `latest` unless the release is marked a pre-release |
 | A push to `main` | `edge` and `sha-<commit>` |
 | `Publish` run by hand with "push" ticked | `sha-<commit>`, plus `edge` from `main` |
 | A pull request, or `Publish` run by hand with "push" unticked | nothing is pushed |
 
-To release: on `main`, run `git fetch --tags`, then `poe release-tag` to print the next tag (it creates nothing; `git tag "$(poe release-tag)"` does) and publish a GitHub release for that tag (mark it a pre-release while the version starts with `0.`). Use the "Generate release notes" button, or from the terminal `gh release create "$(poe release-tag)" --generate-notes --prerelease` once the tag is pushed. `poe version` shows the version the current checkout would build, `poe version-explain` shows how it was derived, and `poe version-doctor` checks the CalVer setup; all four wrap the `calver-scm` CLI. Until the first tag exists, `version-doctor` warns that no compatible tag was found. The `Publish` workflow runs the same doctor check, validates the tag against the CalVer configuration, fails if the tag and the version built from it disagree, smoke tests the image, builds `linux/amd64` and `linux/arm64` on native runners, and tags the combined image. Run `Publish` by hand with "push" unticked to try the builds without pushing anything; the run summary lists the tags it would have used.
+To release: on `main`, run `git fetch --tags`, then `poe release-tag` to print the next tag (it creates nothing; `git tag "$(poe release-tag)"` does) and publish a GitHub release for that tag. Mark it a pre-release only for a release candidate; `0.` releases are ordinary releases and do move `latest`. Use the "Generate release notes" button, or from the terminal `gh release create "$(poe release-tag)" --generate-notes` once the tag is pushed (add `--prerelease` for a release candidate, with its tag typed in place of `poe release-tag`). `poe version` shows the version the current checkout would build, `poe version-explain` shows how it was derived, and `poe version-doctor` checks the CalVer setup; all four wrap the `calver-scm` CLI. Until the first tag exists, `version-doctor` warns that no compatible tag was found. The `Publish` workflow runs the same doctor check, validates the tag against the CalVer configuration, fails if the tag and the version built from it disagree, smoke tests the image, builds `linux/amd64` and `linux/arm64` on native runners, and tags the combined image. Run `Publish` by hand with "push" unticked to try the builds without pushing anything; the run summary lists the tags it would have used.
 
 ## Labels and release notes
 

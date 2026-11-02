@@ -15,8 +15,9 @@ The `menagerist` container applies database migrations when it starts. Before it
 
 | Tag | What it is |
 |---|---|
-| `latest` | The most recent published release. Pre-release versions (`0.` while the project is pre-stable) are published as releases too, so this is the newest one. |
+| `latest` | The most recent release. The `0.` in the version only means the project is not yet stable, so those releases count; release candidates (`0.2026.11.0rc1`) do not. |
 | `0.2026.11.0` | One release, by version. Pin this to update only when you choose to. |
+| `0.2026.11.0rc1` | A release candidate, published ahead of its release for testing. |
 | `edge` | The latest commit on `main`. |
 | `sha-<commit>` | One exact commit. |
 
