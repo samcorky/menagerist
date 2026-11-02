@@ -18,6 +18,8 @@ that's plain container/image introspection uses the `docker` SDK instead of
 parsing `docker inspect` Go-template output.
 
 Checks:
+- the image carries well-formed OCI labels (present, no unexpanded build
+  arguments, valid URLs; commit and timestamp too when built in CI)
 - the stack comes up and the menagerist service reports healthy (proves
   `serve --migrate` applied migrations and reached the database)
 - the worker service reports healthy too, and its `worker-health` probe, run
@@ -52,6 +54,7 @@ import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
+from urllib.parse import urlparse
 
 import docker
 from docker.errors import DockerException, NotFound
@@ -384,6 +387,91 @@ def check_worker_jobs(client: docker.DockerClient) -> None:
     print(f"  {len(registered)} jobs registered; scheduling.prune_runs succeeded")
 
 
+# Labels every build carries. GHCR also builds the package page from these, and the
+# publish job copies them onto the multi-platform index.
+_STATIC_LABELS = (
+    "title",
+    "description",
+    "licenses",
+    "source",
+    "url",
+    "version",
+)
+# Set from build arguments that only CI passes; a plain `poe docker-build` leaves them
+# empty, so they are required in CI and format-checked wherever present.
+_BUILD_LABELS = ("revision", "created")
+_LABEL_PREFIX = "org.opencontainers.image."
+_URL_LABELS = ("source", "url")
+# Labels with a fixed shape, and how to describe it when it is wrong.
+_LABEL_FORMATS = {
+    "revision": (re.compile(r"[0-9a-f]{40}"), "a 40-character commit"),
+    "created": (re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"), "a UTC timestamp"),
+}
+
+
+def _missing_labels(oci: dict[str, str], required: tuple[str, ...]) -> list[str]:
+    """Name the required labels that are absent or blank."""
+    return [
+        f"{_LABEL_PREFIX}{name} is missing or empty"
+        for name in required
+        if not oci.get(name, "").strip()
+    ]
+
+
+def _unexpanded_labels(oci: dict[str, str]) -> list[str]:
+    """Name the labels still holding a literal build-argument or shell expansion."""
+    return [
+        f"{_LABEL_PREFIX}{name} has an unexpanded value: {value!r}"
+        for name, value in oci.items()
+        if "${" in value or "$(" in value
+    ]
+
+
+def _malformed_labels(oci: dict[str, str]) -> list[str]:
+    """Name the labels that are set but are not an https URL or the expected shape."""
+    problems = []
+    for name in _URL_LABELS:
+        value = oci.get(name, "")
+        parsed = urlparse(value)
+        if value and (parsed.scheme != "https" or not parsed.netloc):
+            problems.append(f"{_LABEL_PREFIX}{name} is not an https URL: {value!r}")
+    for name, (pattern, description) in _LABEL_FORMATS.items():
+        value = oci.get(name, "")
+        if value and not pattern.fullmatch(value):
+            problems.append(f"{_LABEL_PREFIX}{name} is not {description}: {value!r}")
+    return problems
+
+
+def check_image_labels(client: docker.DockerClient) -> None:
+    """Confirm the image carries well-formed OCI labels.
+
+    Catches a label dropped or blanked in the Dockerfile, a build argument that never
+    reached it (a literal `${...}` or an empty value) and malformed URLs, commit
+    hashes or timestamps, before the publish job copies them onto the index.
+    """
+    print("checking the image's OCI labels are present and well formed...")
+    labels = client.images.get(IMAGE).labels or {}
+    oci = {
+        name.removeprefix(_LABEL_PREFIX): value
+        for name, value in labels.items()
+        if name.startswith(_LABEL_PREFIX)
+    }
+    required = _STATIC_LABELS + (
+        _BUILD_LABELS if os.environ.get("GITHUB_ACTIONS") else ()
+    )
+
+    problems = [
+        *_missing_labels(oci, required),
+        *_unexpanded_labels(oci),
+        *_malformed_labels(oci),
+    ]
+    if problems:
+        details = "\n  ".join(problems)
+        raise SmokeTestError(f"bad image labels:\n  {details}")
+    for name, value in sorted(oci.items()):
+        print(f"  {_LABEL_PREFIX}{name}={value}")
+
+
 def check_version_lockstep(client: docker.DockerClient) -> None:
     """Confirm the image's version label matches the running app's own report."""
     print("checking the image label and the running app report the same version...")
@@ -459,6 +547,7 @@ def main() -> int:
     try:
         client = get_client()
         require_image_built(client)
+        check_image_labels(client)
 
         print(f"bringing up the stack from {COMPOSE_FILE} ...")
         compose("up", "-d")

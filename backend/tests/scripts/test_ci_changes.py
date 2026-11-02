@@ -74,9 +74,12 @@ def test_shared_contracts_run_both_sides() -> None:
     assert ci_changes.classify(["shared/contracts/cron-conformance.json"]) == EVERYTHING
 
 
-def test_an_image_only_change_runs_only_the_image() -> None:
-    """The Dockerfile changes the image and nothing the tests run against."""
-    assert ci_changes.classify(["Dockerfile"]) == {
+@pytest.mark.parametrize(
+    "path", ["Dockerfile", "docker-bake.hcl", ".dockerignore", "scripts/smoke_test.py"]
+)
+def test_an_image_only_change_runs_only_the_image(path: str) -> None:
+    """The image build and its smoke test change nothing the other tests run against."""
+    assert ci_changes.classify([path]) == {
         "backend": False,
         "frontend": False,
         "e2e": False,

@@ -267,8 +267,34 @@ jobs:
           for digest in *; do
             sources+=("${REGISTRY_IMAGE}@sha256:${digest}")
           done
+          # GHCR reads the package description and repository link from the index
+          # manifest, not from the per-platform image labels, so copy the
+          # Dockerfile's OCI labels onto the index.
+          annotation_args=()
+          while IFS= read -r annotation; do
+            annotation_args+=(--annotation "index:${annotation}")
+          done < <(
+            docker buildx imagetools inspect --format '{{json .Image}}' "${sources[0]}" |
+              jq -r '(.config.Labels // {}) | to_entries[]
+                | select(.key | startswith("org.opencontainers.image."))
+                | "\(.key)=\(.value)"'
+          )
+          if [[ ${#annotation_args[@]} -eq 0 ]]; then
+            echo "::error::No OCI labels found on ${sources[0]}"
+            exit 1
+          fi
+          annotations="$(printf '%s\n' "${annotation_args[@]}" | grep -v '^--annotation$' | sed 's/^index://')"
+          echo "Index annotations:"
+          echo "$annotations"
+          {
+            echo "### Index annotations"
+            echo
+            echo '```'
+            echo "$annotations"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
           echo "Combining ${#sources[@]} platform image(s) into: ${tag_args[*]}"
-          docker buildx imagetools create "${tag_args[@]}" "${sources[@]}"
+          docker buildx imagetools create "${annotation_args[@]}" "${tag_args[@]}" "${sources[@]}"
 
       - name: Inspect the image
         env:

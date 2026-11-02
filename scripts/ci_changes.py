@@ -66,7 +66,11 @@ PIPELINE_PREFIXES = (".github/actions/",)
 BACKEND_PREFIXES = ("backend/", "shared/", "scripts/")
 BACKEND_FILES = frozenset({"uv.lock", "pyproject.toml", ".python-version"})
 FRONTEND_PREFIXES = ("frontend/", "shared/")
-IMAGE_FILES = frozenset({"Dockerfile", "docker-bake.hcl", ".dockerignore"})
+# The image build and its smoke test. Only the image job reads them, so they are matched
+# before BACKEND_PREFIXES, which would otherwise claim scripts/smoke_test.py.
+IMAGE_FILES = frozenset(
+    {"Dockerfile", "docker-bake.hcl", ".dockerignore", "scripts/smoke_test.py"}
+)
 COMPOSE = re.compile(r"^compose(\.[a-z0-9_-]+)?\.ya?ml$")
 
 
@@ -86,13 +90,13 @@ def _owners(path: str) -> set[str] | None:
         return set()
     if path in PIPELINE_FILES or path.startswith(PIPELINE_PREFIXES):
         return {"pipeline"}
+    if path in IMAGE_FILES or COMPOSE.match(path):
+        return {"image"}
     owners = set()
     if path.startswith(BACKEND_PREFIXES) or path in BACKEND_FILES:
         owners.add("backend")
     if path.startswith(FRONTEND_PREFIXES):
         owners.add("frontend")
-    if path in IMAGE_FILES or COMPOSE.match(path):
-        owners.add("image")
     return owners or None
 
 
