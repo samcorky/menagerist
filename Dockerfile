@@ -134,7 +134,47 @@ RUN for lib in libgcc_s.so.1 libstdc++.so.6; do \
 RUN mkdir -p /data/media /data/backups && chown 1000:1000 /data/media /data/backups
 
 
-FROM node:22-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da AS frontend-deps
+FROM debian:trixie-slim@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4 AS node-runtime
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# The Node version comes from .node-version, as the Python version does from
+# .python-version. A major ("22") installs the latest release of that line; a full
+# version ("22.13.0") installs exactly that. The download is checked against the
+# SHASUMS256.txt published beside it.
+COPY .node-version /tmp/.node-version
+WORKDIR /tmp/node
+RUN set -eu; \
+    spec="$(tr -d '[:space:]' < /tmp/.node-version)"; \
+    spec="${spec#v}"; \
+    case "$(dpkg --print-architecture)" in \
+        amd64) arch=x64 ;; \
+        arm64) arch=arm64 ;; \
+        *) echo "unsupported architecture" >&2; exit 1 ;; \
+    esac; \
+    case "${spec}" in \
+        *.*.*) release="v${spec}" ;; \
+        *) release="latest-v${spec%%.*}.x" ;; \
+    esac; \
+    base="https://nodejs.org/dist/${release}"; \
+    curl -fsSLO "${base}/SHASUMS256.txt"; \
+    archive="$(awk -v suffix="-linux-${arch}.tar.xz" 'index($2, suffix) { print $2 }' SHASUMS256.txt)"; \
+    test -n "${archive}"; \
+    curl -fsSLO "${base}/${archive}"; \
+    grep " ${archive}\$" SHASUMS256.txt | sha256sum -c -; \
+    tar -xJf "${archive}" -C /usr/local --strip-components=1 --no-same-owner; \
+    cd /; \
+    rm -rf /tmp/node; \
+    node --version; \
+    npm --version
+
+
+FROM node-runtime AS frontend-deps
 
 WORKDIR /app
 

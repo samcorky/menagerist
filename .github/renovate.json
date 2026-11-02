@@ -188,7 +188,7 @@
       "allowedVersions": "<7"
     },
     {
-      "description": "The frontend builds on Node 22, so @types/node stays on 22; raise it with the Node image",
+      "description": "The frontend builds on the Node in .node-version, so @types/node stays on that major; raise it with .node-version",
       "matchManagers": [
         "npm"
       ],
@@ -429,6 +429,19 @@
         "build-system.requires"
       ],
       "semanticCommitType": "build"
+    },
+    {
+      "description": "Group Node version bumps (.node-version, which CI and the Dockerfile read, the engines.node range in frontend/package.json and the Renovate tool constraint) into one PR, and treat as a major/manual-review change. Matched by package name alone, because the tool constraint comes from no single manager, and kept last because a later rule would override its group (the npm catch-all and the major rule both do)",
+      "matchDepNames": [
+        "node"
+      ],
+      "groupName": "node version",
+      "commitMessageTopic": "Node",
+      "semanticCommitType": "build",
+      "automerge": false,
+      "labels": [
+        "node-version"
+      ]
     }
   ]
 }

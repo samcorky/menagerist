@@ -2,7 +2,7 @@
 
 ## Setup
 
-Requires [uv](https://docs.astral.sh/uv/) and Node 20+. If you don't have uv installed:
+Requires [uv](https://docs.astral.sh/uv/) and the Node version in `.node-version`. uv installs the right Python for you; [fnm](https://github.com/Schniz/fnm) does the same for Node (see [Node version](#node-version)). If you don't have uv installed:
 
 ```sh
 curl -LsSf https://astral.sh/uv/install.sh | sh   # macOS/Linux
@@ -29,6 +29,31 @@ source .venv/bin/activate       # Linux/macOS
 ```
 
 Skipping activation is fine too - just prefix each command with `uv run` instead, e.g. `uv run poe test`.
+
+### Node version
+
+`.node-version` is the one place the Node version is set. CI, the Docker image and the `engines` field in `frontend/package.json` all follow it, and `npm` in `frontend/` refuses to run on a different major version (`engine-strict`). [fnm](https://github.com/Schniz/fnm) installs and switches to that version for you:
+
+```sh
+winget install Schniz.fnm      # Windows (or: scoop install fnm); macOS/Linux: brew install fnm
+fnm install                    # installs the version in .node-version
+```
+
+Add its shell hook once so the version switches when you enter the repository. `--version-file-strategy recursive` makes it find the root `.node-version` from `frontend/` too:
+
+```powershell
+# $PROFILE (PowerShell)
+fnm env --use-on-cd --version-file-strategy recursive --shell powershell | Out-String | Invoke-Expression
+```
+
+```sh
+# ~/.bashrc or ~/.zshrc
+eval "$(fnm env --use-on-cd --version-file-strategy recursive)"
+```
+
+Other managers that read `.node-version` (mise, asdf, nodenv) work too. nvm only reads `.nvmrc`, so it does not.
+
+If `npm` in `frontend/` fails with `EBADENGINE` ("Not compatible with your version of node/npm"), the shell is still on another Node. That is `engine-strict` doing its job. Open a new terminal after adding the hook, then check `node --version` against `.node-version`. If it is still wrong, run `Get-Command node -All` (PowerShell) or `which -a node` to see which one comes first on `PATH`. The fnm line should come last in the profile, and an activated virtual environment must not put another Node ahead of it.
 
 Start the full stack (Docker required):
 
