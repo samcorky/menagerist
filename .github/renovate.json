@@ -282,6 +282,17 @@
       "groupName": null
     },
     {
+      "description": "Runtime npm dependencies ship to users and need a manual review; keeping them in their own group lets the dev-only groups above automerge instead of one runtime package making the whole group manual",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchDepTypes": [
+        "dependencies"
+      ],
+      "groupName": "frontend runtime dependencies",
+      "separateMultipleMajor": true
+    },
+    {
       "description": "Group GitHub Actions updates together and pin SHA digests",
       "matchManagers": [
         "github-actions"
