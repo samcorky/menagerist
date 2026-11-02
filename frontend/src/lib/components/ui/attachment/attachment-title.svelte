@@ -14,7 +14,7 @@
 	bind:this={ref}
 	data-slot="attachment-title"
 	class={cn(
-		'group-data-[state=processing]/attachment:shimmer group-data-[state=uploading]/attachment:shimmer block max-w-full min-w-0 truncate font-medium',
+		'block max-w-full min-w-0 truncate font-medium group-data-[state=processing]/attachment:shimmer group-data-[state=uploading]/attachment:shimmer',
 		className
 	)}
 	{...restProps}
