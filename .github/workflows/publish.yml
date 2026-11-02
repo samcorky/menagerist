@@ -19,7 +19,9 @@ on:
         default: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # A manual run that pushes nothing has its own group, so trying a build never cancels
+  # the run for a merge to main.
+  group: ${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'workflow_dispatch' && !inputs.push && '-dry-run' || '' }}
   # Never abandon a release half way; a newer push to main replaces an older one.
   cancel-in-progress: ${{ github.event_name != 'release' }}
 
@@ -63,6 +65,29 @@ jobs:
             echo "version=${version}"
             echo "timestamp=${timestamp}"
           } | tee -a "$GITHUB_OUTPUT"
+
+      # A build that is not a release has no release tag, so say what a release made
+      # now would publish. Informational: it never fails the build.
+      - name: Show what a release made now would publish
+        if: github.event_name != 'release'
+        working-directory: backend
+        run: |
+          if tag="$(uv run --locked --only-group release calver-scm --format plain next-tag)"; then
+            version="${tag#v}"
+            tags="${version}, sha-<commit>"
+            # Release candidates (and other PEP 440 pre-releases) are marked as
+            # pre-releases, which keeps them off latest.
+            tags="${tags}, latest (not for a release candidate)"
+            message="A release made now would be tagged ${tag} and publish ${tags}."
+          else
+            message="The next release tag could not be worked out; run poe release-tag locally."
+          fi
+          echo "$message"
+          {
+            echo "### Next release"
+            echo
+            echo "$message"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # A release is built from its tag, so the two must agree.
       - name: Check the release tag
@@ -207,8 +232,8 @@ jobs:
             *.attest=type=provenance,disabled=true
             *.attest=type=sbom,disabled=true
             *.output=${{ env.PUSH == 'true' && format('type=image,name={0},push-by-digest=true,name-canonical=true,push=true', env.REGISTRY_IMAGE) || 'type=cacheonly' }}
-            *.cache-from=type=gha,scope=publish-${{ env.PLATFORM_PAIR }}
-            *.cache-to=type=gha,mode=max,scope=publish-${{ env.PLATFORM_PAIR }}
+            *.cache-from=type=gha,scope=image-${{ env.PLATFORM_PAIR }}
+            *.cache-to=type=gha,mode=max,scope=image-${{ env.PLATFORM_PAIR }}
 
       - name: Export the digest
         if: env.PUSH == 'true'

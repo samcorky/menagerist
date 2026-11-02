@@ -63,9 +63,11 @@ jobs:
           source: .
           files: docker-bake.hcl
           targets: local
+          # Same scope as the linux/amd64 build in publish.yml, which runs after this one
+          # in a publish run and so reuses these layers.
           set: |
-            local.cache-from=type=gha,scope=build
-            local.cache-to=type=gha,mode=max,scope=build
+            local.cache-from=type=gha,scope=image-linux-amd64
+            local.cache-to=type=gha,mode=max,scope=image-linux-amd64
 
       - name: Smoke test the image
         run: uv run --script scripts/smoke_test.py
