@@ -188,7 +188,23 @@
       "allowedVersions": "<7"
     },
     {
-      "description": "The frontend builds on Node 22, so @types/node stays on 22; raise it with the Node image",
+      "description": "Group Node version bumps (.node-version, which CI and the Dockerfile read, the engines.node range in frontend/package.json and the Renovate tool constraint) into one PR, and treat as a major/manual-review change",
+      "matchDepNames": [
+        "node"
+      ],
+      "matchManagers": [
+        "node-version",
+        "npm"
+      ],
+      "groupName": "node version",
+      "commitMessageTopic": "Node",
+      "automerge": false,
+      "labels": [
+        "node-version"
+      ]
+    },
+    {
+      "description": "The frontend builds on the Node in .node-version, so @types/node stays on that major; raise it with .node-version",
       "matchManagers": [
         "npm"
       ],
