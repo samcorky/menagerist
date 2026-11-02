@@ -140,6 +140,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
+        libatomic1 \
         xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
