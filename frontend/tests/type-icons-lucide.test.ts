@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { TYPE_ICONS, TYPE_ICON_WORDS } from '$lib/type-icons';
@@ -20,7 +20,13 @@ describe('type icons against the installed Lucide package', () => {
 	});
 
 	it('only lists icons the package has', () => {
-		expect(names.filter((name) => !available.has(name))).toEqual([]);
+		// Lucide keeps a renamed icon as an alias module (e.g. `music.js`) with no index export, so
+		// a stored name is still fine while that alias exists.
+		const aliasFile = (name: string) =>
+			join(process.cwd(), 'node_modules/@lucide/svelte/dist/icons', `${name}.js`);
+		expect(names.filter((name) => !available.has(name) && !existsSync(aliasFile(name)))).toEqual(
+			[]
+		);
 	});
 
 	it('has search words for exactly the listed icons', () => {
