@@ -60,6 +60,16 @@ jobs:
         working-directory: frontend
         run: npm install --package-lock-only --ignore-scripts
 
+      - name: Repair the uv lockfile (Renovate)
+        # Renovate bumps requires-python and .python-version with a regex manager, which
+        # leaves uv.lock stale and fails every UV_LOCKED step. Locking again restores it;
+        # Push fixes commits it. UV_LOCKED is switched off here because it would make
+        # `uv lock` refuse to write.
+        if: startsWith(github.head_ref, 'renovate/')
+        env:
+          UV_LOCKED: "0"
+        run: uv lock
+
       - name: Install dependencies and generate the API client
         run: uv run poe sync-ci
 
