@@ -1,4 +1,4 @@
-FROM debian:trixie-slim AS backend-builder
+FROM debian:trixie-slim@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4 AS backend-builder
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -134,7 +134,7 @@ RUN for lib in libgcc_s.so.1 libstdc++.so.6; do \
 RUN mkdir -p /data/media /data/backups && chown 1000:1000 /data/media /data/backups
 
 
-FROM node:22-slim AS frontend-deps
+FROM node:22-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da AS frontend-deps
 
 WORKDIR /app
 
@@ -170,7 +170,7 @@ RUN --mount=type=cache,target=/app/node_modules/.vite \
     npm run build
 
 
-FROM gcr.io/distroless/base-debian13:nonroot AS runtime
+FROM gcr.io/distroless/base-debian13:nonroot@sha256:9039a88709bcc2bacf5a2faac331d65dd6840f763f225ad9594cc0c67bcd0fba AS runtime
 
 ARG VERSION=""
 ARG MENAGERIST_BUILD_COMMIT_SHA=""
