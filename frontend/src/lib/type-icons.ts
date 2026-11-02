@@ -7,7 +7,6 @@ import {
 	Clapperboard,
 	Tv,
 	Popcorn,
-	Music,
 	Disc3,
 	Guitar,
 	Piano,
@@ -137,6 +136,10 @@ import {
 	CassetteTape,
 	Projector
 } from '@lucide/svelte';
+// Lucide 1.64 renamed `music` to `eighth-notes` and dropped the `Music` export, but keeps
+// `icons/music` as an alias. The deep import works before and after, and the stored `music`
+// name stays valid.
+import MusicIcon from '@lucide/svelte/icons/music';
 
 /**
  * The icons an item type can use, by their Lucide name (kebab case, as the server stores it).
@@ -153,7 +156,7 @@ export const TYPE_ICONS = {
 	clapperboard: Clapperboard,
 	tv: Tv,
 	popcorn: Popcorn,
-	music: Music,
+	music: MusicIcon,
 	'disc-3': Disc3,
 	guitar: Guitar,
 	piano: Piano,
