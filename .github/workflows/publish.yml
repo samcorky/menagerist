@@ -97,7 +97,7 @@ jobs:
             type=edge
             type=pep440,pattern={{version}}
             type=sha
-            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
 
       - name: Show the tags
         env:
