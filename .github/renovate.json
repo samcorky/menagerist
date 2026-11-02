@@ -212,7 +212,7 @@
       "matchManagers": [
         "npm"
       ],
-      "groupName": "other frontend dependencies",
+      "groupName": "frontend dependencies (other)",
       "separateMultipleMajor": true
     },
     {
@@ -226,7 +226,7 @@
         "/^@sveltejs\\//",
         "/^vite/"
       ],
-      "groupName": "svelte toolchain",
+      "groupName": "frontend svelte toolchain",
       "separateMajorMinor": false
     },
     {
@@ -243,7 +243,7 @@
         "/^eslint-/",
         "/^prettier-/"
       ],
-      "groupName": "lint and format tooling",
+      "groupName": "frontend lint and format tooling",
       "separateMultipleMajor": true,
       "automerge": true,
       "platformAutomerge": true
@@ -257,7 +257,7 @@
         "@playwright/test",
         "@types/node"
       ],
-      "groupName": "test tooling",
+      "groupName": "frontend test tooling",
       "separateMultipleMajor": true
     },
     {
@@ -276,7 +276,7 @@
         "tw-animate-css",
         "/^@tailwindcss\\//"
       ],
-      "groupName": "ui libraries",
+      "groupName": "frontend ui libraries",
       "separateMultipleMajor": true
     },
     {
