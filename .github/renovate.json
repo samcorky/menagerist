@@ -120,6 +120,17 @@
       "commitMessageSuffix": "(backend)"
     },
     {
+      "description": "Our own image is not a dependency to track: compose.yaml ships `latest` on purpose (a digest would freeze every new install on one build), and the compose.smoke.yaml tag is built locally",
+      "matchManagers": [
+        "docker-compose"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/samcorky/menagerist",
+        "menagerist"
+      ],
+      "enabled": false
+    },
+    {
       "description": "One Postgres bump updates compose.yaml and backend/tests/conftest.py together. No digest pin: the CI image cache is keyed on the compose.yaml name and the tests ask for the tag",
       "matchDatasources": [
         "docker"
