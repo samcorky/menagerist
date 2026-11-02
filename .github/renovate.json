@@ -424,9 +424,10 @@
       "semanticCommitType": "build"
     },
     {
-      "description": "Group Node version bumps (.node-version, which CI and the Dockerfile read, the engines.node range in frontend/package.json and the Renovate tool constraint) into one PR, and treat as a major/manual-review change. Matched by package name alone, because the tool constraint comes from no single manager, and kept last because a later rule would override its group (the npm catch-all and the major rule both do). separateMultipleMajor is off because the npm catch-all turns it on, which split engines.node into one pull request per major",
+      "description": "Group Node version bumps (.node-version, which CI and the Dockerfile read, the engines.node range in frontend/package.json, the Renovate tool constraint and the @types/node typings) into one PR, and treat as a major/manual-review change. Matched by package name alone, because the tool constraint comes from no single manager, and kept last because a later rule would override its group (the npm catch-all and the major rule both do). separateMultipleMajor is off because the npm catch-all turns it on, which split these into one pull request per major",
       "matchDepNames": [
-        "node"
+        "node",
+        "@types/node"
       ],
       "groupName": "node version",
       "separateMultipleMajor": false,
