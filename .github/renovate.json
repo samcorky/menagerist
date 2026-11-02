@@ -132,13 +132,13 @@
       "description": "Group all Python interpreter version bumps (.python-version and the requires-python floors) into one PR, and treat as a major/manual-review change",
       "matchManagers": [
         "pyenv",
-        "dockerfile",
         "custom.regex"
       ],
       "matchPackageNames": [
         "python"
       ],
       "groupName": "python interpreter version",
+      "commitMessageTopic": "Python interpreter",
       "automerge": false,
       "labels": [
         "python-version"
@@ -280,6 +280,17 @@
         "bits-ui"
       ],
       "groupName": null
+    },
+    {
+      "description": "Runtime npm dependencies ship to users and need a manual review; keeping them in their own group lets the dev-only groups above automerge instead of one runtime package making the whole group manual",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchDepTypes": [
+        "dependencies"
+      ],
+      "groupName": "frontend runtime dependencies",
+      "separateMultipleMajor": true
     },
     {
       "description": "Group GitHub Actions updates together and pin SHA digests",
