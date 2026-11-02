@@ -1,12 +1,21 @@
 # Install the pre-commit, commit-msg and pre-push hooks with a plain `prek install`.
 default_install_hook_types: [pre-commit, commit-msg, pre-push]
 
+# Without this a hook with no `stages` of its own also runs on every push, which repeats the
+# whole suite after the commit already ran it and CI runs it again. Only no-push-to-main (a
+# push can be the only thing that checks it) and conventional-pre-commit (the commit message)
+# name another stage. Four upstream hooks declare pre-push themselves, so they say pre-commit.
+# The nested backend/ and frontend/ configs set the same default.
+default_stages: [pre-commit]
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
       - id: trailing-whitespace
+        stages: [pre-commit]
       - id: end-of-file-fixer
+        stages: [pre-commit]
       - id: mixed-line-ending
         args:
           - --fix=lf
@@ -25,7 +34,9 @@ repos:
           - --no-sort-keys
         exclude: ^frontend/
       - id: check-added-large-files
+        stages: [pre-commit]
       - id: check-executables-have-shebangs
+        stages: [pre-commit]
 
   # Commit messages follow Conventional Commits; the types match .github/release.yml
   # and the labeller. Merge and fixup commits are allowed (no --strict).
