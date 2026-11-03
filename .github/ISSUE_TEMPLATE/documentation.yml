@@ -1,0 +1,24 @@
+name: Documentation
+description: Something in the docs is missing, unclear or wrong
+title: "[docs] "
+labels: [documentation, "area: docs"]
+body:
+  - type: textarea
+    id: where
+    attributes:
+      label: Where is the problem?
+      description: A link, file path or page name for the documentation concerned.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is missing, unclear or wrong?
+      description: What you were trying to do and where the documentation let you down.
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: What would help?
+      description: Suggested wording or content, if you have any.
