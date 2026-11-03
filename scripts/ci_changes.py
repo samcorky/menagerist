@@ -16,7 +16,8 @@ any failure to list the files.
   and issue templates) run nothing: no test reads them.
 - Backend changes also run the frontend jobs, because the frontend type-checks against
   the generated API client and some of its tests read the example packs and shared
-  contracts.
+  contracts. The change detection and its own test are the exception: they run the
+  backend jobs only.
 - A change to ci.yml, build.yml or a composite action runs everything, so the
   pipeline is tested when it changes.
 """
@@ -74,6 +75,13 @@ FRONTEND_FILES = frozenset({".node-version"})
 IMAGE_FILES = frozenset(
     {"Dockerfile", "docker-bake.hcl", ".dockerignore", "scripts/smoke_test.py"}
 )
+# The change detection and its own test. The script runs in the `changes` job and the
+# test in the backend suite, and nothing in the frontend, e2e or image reads either, so
+# they are matched before BACKEND_PREFIXES and skip the coupled frontend jobs. Other
+# backend tests do not qualify: some frontend tests read files under backend/tests.
+BACKEND_ONLY_FILES = frozenset(
+    {"scripts/ci_changes.py", "backend/tests/scripts/test_ci_changes.py"}
+)
 COMPOSE = re.compile(r"^compose(\.[a-z0-9_-]+)?\.ya?ml$")
 
 
@@ -95,6 +103,8 @@ def _owners(path: str) -> set[str] | None:
         return {"pipeline"}
     if path in IMAGE_FILES or COMPOSE.match(path):
         return {"image"}
+    if path in BACKEND_ONLY_FILES:
+        return {"backend-only"}
     owners = set()
     if path.startswith(BACKEND_PREFIXES) or path in BACKEND_FILES:
         owners.add("backend")
@@ -121,9 +131,9 @@ def classify(files: Sequence[str]) -> dict[str, bool]:
         owners |= found
     if not files or "pipeline" in owners:
         return dict(EVERYTHING)
-    backend = "backend" in owners
+    backend = bool(owners & {"backend", "backend-only"})
     # The frontend checks itself against the backend's schema and example packs.
-    frontend = backend or "frontend" in owners
+    frontend = "backend" in owners or "frontend" in owners
     return {
         "backend": backend,
         "frontend": frontend,
