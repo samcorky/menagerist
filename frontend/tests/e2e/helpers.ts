@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import {
 	expect,
 	openSession,
@@ -14,7 +15,7 @@ import {
 
 /** A name that's unique per call, so tests never collide with earlier runs against the same db. */
 export function uniqueName(prefix: string): string {
-	return `${prefix} ${Date.now()}-${Math.floor(Math.random() * 100_000)}`;
+	return `${prefix} ${Date.now()}-${randomInt(100_000)}`;
 }
 
 export type FieldSpec = {

@@ -2,6 +2,7 @@ import importlib
 import inspect
 import json
 import re
+from html.parser import HTMLParser
 from pathlib import Path
 
 import pytest
@@ -109,20 +110,40 @@ def test_swagger_page_references_init_script() -> None:
     assert "/api/docs/favicon.svg" in response.text
 
 
+class _ExternalAssetCollector(HTMLParser):
+    """Collect the attributes of script/link tags that load from http(s) URLs."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.external: list[dict[str, str | None]] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag not in {"script", "link"}:
+            return
+        attributes = dict(attrs)
+        url = attributes.get("src") or attributes.get("href") or ""
+        if url.startswith(("http://", "https://")):
+            self.external.append(attributes)
+
+
 @pytest.mark.parametrize(("path", "expected"), [("/api/docs", 2), ("/api/redoc", 1)])
 def test_docs_external_assets_are_pinned_and_have_integrity(
     path: str, expected: int
 ) -> None:
     """Every external script or stylesheet has an exact version and SRI hash."""
     html = TestClient(create_app()).get(path).text
-    tags = re.findall(r"<(?:script|link)[^>]*>", html)
-    external = [t for t in tags if re.search(r'(?:src|href)="https?://', t)]
+    collector = _ExternalAssetCollector()
+    collector.feed(html)
+    external = collector.external
 
     assert len(external) == expected
-    for tag in external:
-        assert re.search(r'(?:src|href)="https://[^"]+@\d+\.\d+\.\d+/', tag), tag
-        assert re.search(r'integrity="sha384-[A-Za-z0-9+/]{64}"', tag), tag
-        assert 'crossorigin="anonymous"' in tag, tag
+    for attrs in external:
+        url = attrs.get("src") or attrs.get("href") or ""
+        assert url.startswith("https://"), attrs
+        assert re.search(r"@\d+\.\d+\.\d+/", url), attrs
+        integrity = attrs.get("integrity") or ""
+        assert re.fullmatch(r"sha384-[A-Za-z0-9+/]{64}", integrity), attrs
+        assert attrs.get("crossorigin") == "anonymous", attrs
 
 
 def test_swagger_page_csp_allows_script_without_unsafe_eval() -> None:
