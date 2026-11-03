@@ -528,3 +528,27 @@ test('a text search past the cap shows 1,000+ and then the exact count', async (
 	await expect(page.getByText('1,005 items', { exact: true })).toBeVisible();
 	await expect(page.getByText('1,000+ items', { exact: true })).toHaveCount(0);
 });
+
+test('type chips change the selected type and the address when ?type= is already set', async ({
+	page,
+	request
+}) => {
+	const first = await makeItemType(request, uniqueName('ChipA'));
+	const second = await makeItemType(request, uniqueName('ChipB'));
+	await makeItem(request, uniqueName('InFirst'), first.slug);
+	await makeItem(request, uniqueName('InSecond'), second.slug);
+
+	await page.goto(`/items?type=${first.slug}`);
+	const chip = (name: string) => page.getByText(name, { exact: true });
+	await expect(page).toHaveURL(new RegExp(`[?&]type=${first.slug}`));
+
+	await chip(second.label).click();
+	await expect(page).toHaveURL(new RegExp(`[?&]type=${second.slug}(&|$)`));
+	await expect(page.getByText('InSecond')).toBeVisible();
+	await expect(page.getByText('InFirst')).toHaveCount(0);
+
+	await chip('All').click();
+	await expect(page).not.toHaveURL(/[?&]type=/);
+	await expect(page.getByText('InFirst')).toBeVisible();
+	await expect(page.getByText('InSecond')).toBeVisible();
+});
