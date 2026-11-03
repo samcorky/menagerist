@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import AsyncIterator, Callable, Iterator
     from pathlib import Path
 
 
@@ -170,6 +170,19 @@ def test_serve_configures_granian_from_the_given_options(
     assert granian_calls[1] == "served"
 
 
+def _skip_migration_lock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stand in for the database lock, which these tests have no database for."""
+    from contextlib import asynccontextmanager
+
+    from app.entrypoints.cli import backups
+
+    @asynccontextmanager
+    async def no_lock(*_args: object) -> AsyncIterator[None]:
+        yield
+
+    monkeypatch.setattr(backups, "session_lock", no_lock)
+
+
 def test_serve_migrates_before_starting_when_asked(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -189,6 +202,7 @@ def test_serve_migrates_before_starting_when_asked(
     monkeypatch.setattr(
         alembic_runner, "upgrade", lambda revision: order.append(f"upgrade:{revision}")
     )
+    _skip_migration_lock(monkeypatch)
 
     cli.serve(migrate=True, backup=False)
 
@@ -228,6 +242,7 @@ def test_migrate_upgrade_enables_migration_logs_and_delegates(
     monkeypatch.setattr(
         alembic_runner, "upgrade", lambda revision: calls.append(revision)
     )
+    _skip_migration_lock(monkeypatch)
     logging.getLogger("alembic.runtime.migration").setLevel(logging.WARNING)
 
     result = cli.upgrade("abc123", backup=False)

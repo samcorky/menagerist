@@ -38,7 +38,7 @@ from app.modules.scheduling.adapters.platform.in_memory_schedule_source import (
     InMemoryScheduleSource,
 )
 from app.modules.scheduling.domain.job_run import JobRun, RunStatus
-from app.platform.advisory_locks import BACKUP_RESTORE_LOCK_KEY
+from app.platform.advisory_locks import AdvisoryLock
 from app.platform.config.backup import BackupSettings
 from app.shared_kernel.jobs import JobBinding, JobDefinition, Lane
 
@@ -532,7 +532,11 @@ async def test_cli_restore_holds_exclusive_lock_through_use_case(
         assert command.setup_only
         async with factory.begin() as session:
             assert not await session.scalar(
-                select(func.pg_try_advisory_xact_lock_shared(BACKUP_RESTORE_LOCK_KEY))
+                select(
+                    func.pg_try_advisory_xact_lock_shared(
+                        AdvisoryLock.BACKUP_RESTORE.key
+                    )
+                )
             )
         if fail:
             raise RuntimeError("restore failed")
@@ -552,7 +556,7 @@ async def test_cli_restore_holds_exclusive_lock_through_use_case(
         assert invoked
         async with factory.begin() as session:
             assert await session.scalar(
-                select(func.pg_try_advisory_xact_lock(BACKUP_RESTORE_LOCK_KEY))
+                select(func.pg_try_advisory_xact_lock(AdvisoryLock.BACKUP_RESTORE.key))
             )
     finally:
         await engine.dispose()

@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.modules.scheduling.adapters.platform.restore_guard import (
     SqlAlchemyRestoreGuard,
 )
-from app.platform.advisory_locks import BACKUP_RESTORE_LOCK_KEY
+from app.platform.advisory_locks import AdvisoryLock
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -40,11 +40,11 @@ async def test_shared_executions_coexist_and_exclude_restore(
         assert second
         async with factory.begin() as session:
             assert not await session.scalar(
-                select(func.pg_try_advisory_xact_lock(BACKUP_RESTORE_LOCK_KEY))
+                select(func.pg_try_advisory_xact_lock(AdvisoryLock.BACKUP_RESTORE.key))
             )
     async with factory.begin() as session:
         assert await session.scalar(
-            select(func.pg_try_advisory_xact_lock(BACKUP_RESTORE_LOCK_KEY))
+            select(func.pg_try_advisory_xact_lock(AdvisoryLock.BACKUP_RESTORE.key))
         )
 
 
@@ -54,7 +54,7 @@ async def test_exclusive_restore_refuses_execution_without_waiting(
     """An API-style exclusive restore makes the shared try-lock return false."""
     async with factory.begin() as session:
         await session.execute(
-            select(func.pg_advisory_xact_lock(BACKUP_RESTORE_LOCK_KEY))
+            select(func.pg_advisory_xact_lock(AdvisoryLock.BACKUP_RESTORE.key))
         )
         async with (
             asyncio.timeout(2),
@@ -82,5 +82,5 @@ async def test_cancelled_execution_releases_shared_lock(
         await task
     async with factory.begin() as session:
         assert await session.scalar(
-            select(func.pg_try_advisory_xact_lock(BACKUP_RESTORE_LOCK_KEY))
+            select(func.pg_try_advisory_xact_lock(AdvisoryLock.BACKUP_RESTORE.key))
         )
