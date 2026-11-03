@@ -60,9 +60,25 @@ def test_a_frontend_only_change_skips_the_backend_jobs() -> None:
     }
 
 
+def test_a_node_version_change_runs_the_frontend_and_image_not_the_backend() -> None:
+    """Only the frontend jobs and the image's Node stage read .node-version."""
+    assert ci_changes.classify([".node-version"]) == {
+        "backend": False,
+        "frontend": True,
+        "e2e": True,
+        "image": True,
+    }
+
+
 @pytest.mark.parametrize(
     "path",
-    ["backend/src/app/main.py", "uv.lock", "pyproject.toml", "scripts/e2e.py"],
+    [
+        "backend/src/app/main.py",
+        "uv.lock",
+        "pyproject.toml",
+        ".python-version",
+        "scripts/e2e.py",
+    ],
 )
 def test_a_backend_change_also_runs_the_frontend(path: str) -> None:
     """The frontend checks itself against the backend's schema and example packs."""
