@@ -63,11 +63,13 @@ docker compose up -d
 
 On PowerShell, download with `Invoke-WebRequest https://raw.githubusercontent.com/samcorky/menagerist/main/compose.yaml -OutFile compose.yaml` instead.
 
+On Linux, run `mkdir backups` before the first `docker compose up`, so Docker does not create the folder owned by root where the app cannot write to it (see [docs/DEPLOYING.md](docs/DEPLOYING.md#host-folders-must-be-writable-by-the-container-linux)).
+
 Open [http://localhost:8080](http://localhost:8080). Compose starts Postgres, the app (which sets up its own database on first start) and a background worker, and keeps backups in `./backups` next to the Compose file.
 
 **First visit:** Menagerist asks you to create the administrator account (a username and a password of at least 10 characters). Anything already in the database is adopted by that account. The administrator can then add other people under Settings > Users, and each person sees only their own items. Accounts are local to your instance; there is no email or external sign-in yet. If you forget the administrator password, reset it from the command line: `docker compose exec menagerist menagerist identity reset-password --username <name>` (see [CONTRIBUTING.md](CONTRIBUTING.md#first-run-and-accounts)).
 
-**Next steps.** Updating, choosing an image tag, putting Menagerist behind a reverse proxy, tuning the database and keeping your own Compose changes are in [docs/DEPLOYING.md](docs/DEPLOYING.md).
+**Next steps.** Updating, rolling back, choosing an image tag, tuning the database and keeping your own Compose changes are in [docs/DEPLOYING.md](docs/DEPLOYING.md); putting Menagerist behind a reverse proxy is in [docs/REVERSE-PROXY.md](docs/REVERSE-PROXY.md).
 
 ---
 
@@ -147,7 +149,8 @@ MENAGERIST_IMAGE=menagerist:local docker compose up -d --force-recreate
 
 | Document | Contents |
 |---|---|
-| [docs/DEPLOYING.md](docs/DEPLOYING.md) | Updating, image tags, reverse proxy, database sizing, local overrides |
+| [docs/DEPLOYING.md](docs/DEPLOYING.md) | Updating, rolling back, image tags, host folders, database sizing, local overrides |
+| [docs/REVERSE-PROXY.md](docs/REVERSE-PROXY.md) | What a reverse proxy must do, with Caddy and Traefik examples |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, commands, testing and releases |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System topology and data model |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Significant technical decisions and rationale |
@@ -155,6 +158,8 @@ MENAGERIST_IMAGE=menagerist:local docker compose up -d --force-recreate
 | [frontend/README.md](frontend/README.md) | Frontend stack and dev workflow |
 | [frontend/DESIGN_GUIDELINES.md](frontend/DESIGN_GUIDELINES.md) | Frontend UX/UI rules |
 | [SECURITY.md](SECURITY.md) | Reporting a vulnerability |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | How we expect people to behave, and how to report a problem |
+| [ACCESSIBILITY.md](ACCESSIBILITY.md) | What the interface aims for, known gaps and how to report a barrier |
 
 ---
 

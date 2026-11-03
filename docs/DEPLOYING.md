@@ -1,6 +1,6 @@
 # Deploying Menagerist
 
-Running Menagerist for real: updating, image tags, reverse proxies, database sizing and local overrides. For a first run, start with the quickstart in the [README](../README.md).
+Running Menagerist for real: updating, rolling back, image tags, reverse proxies, database sizing and local overrides. For a first run, start with the quickstart in the [README](../README.md).
 
 ## Updating and image tags
 
@@ -31,25 +31,34 @@ gh attestation verify oci://ghcr.io/samcorky/menagerist:0.2026.11.0 --owner samc
 
 It succeeds only when the attestation matches the image and was signed by this repository's workflow, so a rebuilt or altered image fails. Use the tag you pulled.
 
+## Rolling back to an earlier release
+
+Every release image stays in GHCR under its version tag and its `sha-<commit>` tag, so a known-good one can be pinned again. Put it in the `.env` file next to `compose.yaml`:
+
+```sh
+MENAGERIST_IMAGE=ghcr.io/samcorky/menagerist:0.2026.10.2
+```
+
+then run `docker compose up -d`. If the release you are leaving applied no database migration, that is the whole rollback.
+
+Migrations only run forward. If the newer release did migrate the database, the earlier image cannot use it, and the way back is the `pre-migration` backup that was written just before the upgrade (see [Updating](#updating-and-image-tags)). A restore only works onto a database at the revision the archive was taken at, so start the older image on an empty database first:
+
+1. Optionally keep what you have: `docker compose run --rm --no-deps menagerist backup create` writes an archive of the current data to `./backups`. Anything entered since the upgrade is otherwise lost.
+2. Stop the stack with `docker compose down`, then delete the database volume: find it with `docker volume ls` (it is called `<project>_postgres-data`) and remove it with `docker volume rm`. This erases the database; the archives in `./backups` are untouched.
+3. Pin the older tag as above and start only the app and database: `docker compose up -d postgres menagerist`. The empty database is set up at that release's own revision, and no backup is taken because there is nothing to protect.
+4. Find the archive labelled `pre-migration` with `docker compose run --rm --no-deps menagerist backup list`. Its `ALEMBIC_REVISION` is the revision before the upgrade.
+5. Stop the app with `docker compose stop menagerist`, then restore: `docker compose run --rm --no-deps menagerist backup restore <id>`. It refuses if the revisions differ.
+6. Start everything: `docker compose up -d`.
+
+To move forward again, set `MENAGERIST_IMAGE` back to the newer tag (or delete the line to follow `latest`) and run `docker compose pull` then `docker compose up -d`. The upgrade writes a fresh pre-migration backup first. The backup commands are described in [backend/README.md](../backend/README.md).
+
 ## Behind a reverse proxy
 
-Set `MENAGERIST_API_TRUSTED_PROXIES` to the proxy's address or network, and tell Menagerist its public address with `MENAGERIST_API_PUBLIC_ORIGIN=https://menagerist.example.com` plus `MENAGERIST_IDENTITY_COOKIE_SECURE=origin` if the proxy terminates TLS. Without the first, every visitor shares the proxy's address and 20 failed sign-ins from anyone lock sign-in for everyone for 15 minutes; without the second, the session cookie may be sent without `Secure`. `MENAGERIST_IDENTITY_COOKIE_SECURE` is `auto` by default (Secure when the app sees HTTPS), `origin` (follow the scheme of the public address, and refuse to start if none is set), or `always` / `never`. Signing in over plain `http://` sends the password and session cookie unencrypted, which is fine on `localhost` and a home network you trust, and not over the internet. Details are in [CONTRIBUTING.md](../CONTRIBUTING.md#first-run-and-accounts).
-
-## Sign-in and first-run setup refuse requests from other sites
-
-The browser's own `Sec-Fetch-Site` header decides: `cross-site` is refused and `same-origin` is accepted, whatever the proxy does to the scheme or host. Without that header (very old browsers, or plain HTTP on a LAN address) or when it says `same-site`, the request's `Origin` must match the origin the app sees, so there the proxy must pass `Host` and `X-Forwarded-Proto` through and be listed in `MENAGERIST_API_TRUSTED_PROXIES`. `MENAGERIST_API_CORS_ORIGINS` is not the fix for a proxy problem.
-
-## If the proxy setup looks wrong, Menagerist says so
-
-The first time in an hour it sees forwarding headers from a peer it does not trust, or a browser whose origin differs from the one it saw, it logs a warning (`reverse proxy may be misconfigured`) with the setting to change. With `MENAGERIST_API_PUBLIC_ORIGIN` set it also notices requests that arrive at a different address (`publicOriginMismatch`) or over plain `http` when the public address is `https` (`insecureOrigin`); the container's own health check is ignored. Administrators also see a warning for `proxy:configuration` at `/api/v1/system/health/ready/detail` for the next hour. It is a warning only: `/api/health/ready` still answers pass. Find your proxy's network with `docker network inspect <network>` and list it, for example `MENAGERIST_API_TRUSTED_PROXIES=172.21.0.0/16`, in `.env`, then recreate the container.
-
-## Send HSTS from the proxy
-
-Menagerist trusts the browser's headers, and the browser only keeps using HTTPS if the proxy tells it to. Set `Strict-Transport-Security` at the TLS-terminating proxy so a browser never falls back to plain HTTP for your address (Caddy `header Strict-Transport-Security "max-age=15552000"`, nginx `add_header Strict-Transport-Security "max-age=15552000" always;`, Traefik's `stsSeconds` headers middleware). The app does not send it itself because it cannot know it is reached over HTTPS.
+Menagerist leaves TLS to a reverse proxy. [REVERSE-PROXY.md](REVERSE-PROXY.md) lists what the proxy must do, the settings to change, and a Caddy and a Traefik example. Without `MENAGERIST_API_TRUSTED_PROXIES`, every visitor shares the proxy's address and sign-in can lock for everyone.
 
 ## Deployment notes
 
-No other website may call the API unless you list its origin in `MENAGERIST_API_CORS_ORIGINS` (only needed if the frontend is hosted separately). Menagerist does not send `Strict-Transport-Security`; set it at the TLS-terminating proxy (see above). The public `/api/health/ready` answers only pass or fail; measurements are for administrators at `/api/v1/system/health/ready/detail`.
+No other website may call the API unless you list its origin in `MENAGERIST_API_CORS_ORIGINS` (only needed if the frontend is hosted separately). Menagerist does not send `Strict-Transport-Security`; set it at the TLS-terminating proxy (see [REVERSE-PROXY.md](REVERSE-PROXY.md#send-hsts-from-the-proxy)). The public `/api/health/ready` answers only pass or fail; measurements are for administrators at `/api/v1/system/health/ready/detail`.
 
 ## Database memory tuning
 
@@ -68,6 +77,16 @@ For example, a machine with 2 GB to spare for the database: `POSTGRES_MEM_LIMIT=
 ## Web server workers
 
 `MENAGERIST_SERVER_WORKERS` is `auto` by default (or a number from `1` to `16`). `auto` follows the advice in [Granian's documentation](https://github.com/emmett-framework/granian), which Menagerist runs on: one worker per CPU core on a plain host, and one worker per container on Docker and Kubernetes, scaling by running more containers. So the Docker image runs one worker, and so does `serve --reload` for development. One worker already serves many requests at once, because it is asynchronous. Set a number to override it, for example on a many-core machine where you would rather not run several containers. Each worker can hold up to 15 database connections, and the background worker another 15, so at startup the server reads Postgres' `max_connections` and logs a warning if the pools could exceed it; raise `POSTGRES_MAX_CONNECTIONS` with the workers. A changed setting can take up to 5 seconds to reach every worker.
+
+## Host folders must be writable by the container (Linux)
+
+The container runs as user `1000:1000`. The named volumes (`media-data`, `postgres-data`) are set up with the right owner by the image, but a folder on the host that Compose bind-mounts, such as `./backups` in `compose.yaml` or `./data/media` in the override below, is created by Docker as `root` if it does not exist yet on Linux. The app then cannot write to it, so backups fail with a permission error. Create the folders yourself before the first `docker compose up`:
+
+```sh
+mkdir -p backups data/media
+```
+
+If your user is not uid 1000, also run `sudo chown 1000:1000 backups data/media`. A folder Docker already created as root needs the same `chown`. Docker Desktop on Windows and macOS maps ownership itself, so none of this is needed there.
 
 ## Your own changes: `compose.override.yaml`
 
@@ -88,4 +107,4 @@ services:
       - "127.0.0.1:5432:5432"
 ```
 
-Give the app and the worker the same volumes, as above, because both read and write media. `!override` replaces a list instead of adding to it. `docker compose config` prints the merged result to check it. Running `docker compose -f compose.yaml up` skips the override.
+Create those folders first (see above). Give the app and the worker the same volumes, as above, because both read and write media. `!override` replaces a list instead of adding to it. `docker compose config` prints the merged result to check it. Running `docker compose -f compose.yaml up` skips the override.
