@@ -10,7 +10,7 @@ default_stages: [pre-commit]
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0 # v6.0.0
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # frozen: v6.0.0
     hooks:
       - id: trailing-whitespace
         stages: [pre-commit]
@@ -41,7 +41,7 @@ repos:
   # Commit messages follow Conventional Commits; the types match .github/release.yml
   # and the labeller. Merge and fixup commits are allowed (no --strict).
   - repo: https://github.com/compilerla/conventional-pre-commit
-    rev: 33b50eb042bee26eac0ee96ad84aa9c1b4dccdd8 # v4.5.0
+    rev: 33b50eb042bee26eac0ee96ad84aa9c1b4dccdd8 # frozen: v4.5.0
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]
@@ -60,18 +60,18 @@ repos:
           - revert
 
   - repo: https://github.com/gitleaks/gitleaks
-    rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e # v8.30.1
+    rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e # frozen: v8.30.1
     hooks:
       - id: gitleaks
 
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: 82d21874c3242e4dc27bb47641c996902ef64eef # v0.27
+    rev: 82d21874c3242e4dc27bb47641c996902ef64eef # frozen: v0.27
     hooks:
       - id: validate-pyproject
         name: validate pyproject.toml files
 
   - repo: https://github.com/renovatebot/pre-commit-hooks
-    rev: 44.206.2 # 44.206.2
+    rev: 74023a3e23382c7e146dc5abef8ba70c96461e4e # frozen: 44.207.0
     hooks:
       - id: renovate-config-validator
         name: Validate Renovate Config
@@ -79,7 +79,7 @@ repos:
         files: ^\.github/renovate\.json$
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: a76b92851fc9eede9f9bc4073eb55202f34eb0df # 0.39.0
+    rev: a76b92851fc9eede9f9bc4073eb55202f34eb0df # frozen: 0.39.0
     hooks:
       - id: check-github-workflows
       - id: check-github-actions
@@ -87,7 +87,7 @@ repos:
       - id: check-github-issue-forms
 
   - repo: https://github.com/rhysd/actionlint
-    rev: 914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
+    rev: 914e7df21a07ef503a81201c76d2b11c789d3fca # frozen: v1.7.12
     hooks:
       - id: actionlint
 
