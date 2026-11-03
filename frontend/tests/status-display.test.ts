@@ -26,7 +26,7 @@ const PLAIN_UNITS = new Set(contract.plain_units);
 const STATES: readonly string[] = contract.states;
 
 const parts = (key: string) => {
-	const [group, metric] = key.replace('*', 'media').split(':');
+	const [group, metric] = key.replaceAll('*', 'media').split(':');
 	return { group, metric };
 };
 
