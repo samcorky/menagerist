@@ -117,7 +117,8 @@ test('filter items by a field, move through history and share the link', async (
 	await expect(searchBox).toHaveValue('f');
 	await expect(filtersDialog(page)).toHaveCount(0);
 	await searchBox.fill('');
-	await page.locator('body').click({ position: { x: 5, y: 5 } });
+	// The shell is fixed, so <body> has no box of its own to click.
+	await page.locator('#main-scroll').click({ position: { x: 5, y: 5 } });
 
 	// Outside an input it opens the panel.
 	await page.keyboard.press('f');
