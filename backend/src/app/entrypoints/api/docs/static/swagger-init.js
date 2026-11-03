@@ -453,6 +453,44 @@
     return found;
   }
 
+  /** The position of an operation among all operations, in the spec's own order. */
+  function operationIndex(paths, operation) {
+    var index = 0;
+    var found = -1;
+    Object.keys(paths || {}).forEach(function (path) {
+      Object.keys(paths[path]).forEach(function (method) {
+        if (!paths[path][method] || !paths[path][method].operationId) return;
+        if (path === operation.path && method === operation.method) found = index;
+        index += 1;
+      });
+    });
+    return found;
+  }
+
+  /**
+   * Scrolls to a rendered operation and focuses it, so keyboard and screen-reader users land on it.
+   * Swagger UI only keeps the operations near the viewport in the page, so a distant target does
+   * not exist yet: step towards it until it has been rendered.
+   */
+  function revealOperation(operationId, below) {
+    var attempts = 0;
+    function look() {
+      var block = document.querySelector('.opblock[id$="-' + operationId + '"]');
+      if (block) {
+        if (block.scrollIntoView) block.scrollIntoView({ block: "start" });
+        var summary = block.querySelector(".opblock-summary-control");
+        if (summary && summary.focus) summary.focus({ preventScroll: true });
+        return;
+      }
+      attempts += 1;
+      if (attempts > 80) return;
+      var distance = Math.round(root.innerHeight * 0.8);
+      root.scrollBy(0, below ? distance : -distance);
+      setTimeout(look, 50);
+    }
+    setTimeout(look, 50);
+  }
+
   /**
    * Opens a link's target and fills its parameters from the response that offered the link.
    * `from` is the offering operation as { path, method, code }.
@@ -494,12 +532,8 @@
         false,
       );
     });
-    setTimeout(function () {
-      var block = document.querySelector(
-        '.opblock[id$="-' + link.operationId + '"]',
-      );
-      if (block && block.scrollIntoView) block.scrollIntoView({ block: "start" });
-    }, 50);
+    var below = operationIndex(spec.paths, target) > operationIndex(spec.paths, from);
+    revealOperation(link.operationId, below);
   }
 
   /** The offering operation of a rendered link, read from the surrounding DOM. */

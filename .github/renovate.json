@@ -95,8 +95,7 @@
     }
   ],
   "pre-commit": {
-    "enabled": true,
-    "pinDigests": true
+    "enabled": true
   },
   "packageRules": [
     {
@@ -118,6 +117,17 @@
         "pep621"
       ],
       "commitMessageSuffix": "(backend)"
+    },
+    {
+      "description": "Our own image is not a dependency to track: compose.yaml ships `latest` on purpose (a digest would freeze every new install on one build), and the compose.smoke.yaml tag is built locally",
+      "matchManagers": [
+        "docker-compose"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/samcorky/menagerist",
+        "menagerist"
+      ],
+      "enabled": false
     },
     {
       "description": "One Postgres bump updates compose.yaml and backend/tests/conftest.py together. No digest pin: the CI image cache is keyed on the compose.yaml name and the tests ask for the tag",
@@ -308,12 +318,11 @@
       "platformAutomerge": true
     },
     {
-      "description": "Group pre-commit hook updates together and pin SHA digests",
+      "description": "Group pre-commit hook updates together",
       "matchManagers": [
         "pre-commit"
       ],
-      "groupName": "pre-commit hooks",
-      "pinDigests": true
+      "groupName": "pre-commit hooks"
     },
     {
       "description": "Automerge pre-commit hook updates",
@@ -323,7 +332,6 @@
       "matchUpdateTypes": [
         "minor",
         "patch",
-        "pin",
         "digest"
       ],
       "automerge": true,

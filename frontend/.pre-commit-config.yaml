@@ -1,3 +1,6 @@
+# Run on commit only; see the note on default_stages in the root config.
+default_stages: [pre-commit]
+
 repos:
   - repo: local
     hooks:
