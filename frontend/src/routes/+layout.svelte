@@ -217,7 +217,9 @@
 <ShortcutsHelpDialog open={helpOpen} onOpenChange={(v) => (helpOpen = v)} />
 
 <TooltipProvider>
-	<div class="flex h-dvh flex-col">
+	<!-- Fixed, not h-dvh: on Chrome for Android 100dvh can exceed the visible area, which lets the
+	     whole document scroll and carries the bottom bar away. Only #main-scroll scrolls. -->
+	<div class="fixed inset-0 flex flex-col">
 		<header
 			style="view-transition-name: site-header"
 			class="sticky top-0 z-30 border-b bg-background/95 backdrop-blur"
