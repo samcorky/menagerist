@@ -71,7 +71,7 @@ repos:
         name: validate pyproject.toml files
 
   - repo: https://github.com/renovatebot/pre-commit-hooks
-    rev: aab3b0b567371defc37a281146ef8a49e6af1f8f # frozen: 44.206.2
+    rev: 74023a3e23382c7e146dc5abef8ba70c96461e4e # frozen: 44.207.0
     hooks:
       - id: renovate-config-validator
         name: Validate Renovate Config
