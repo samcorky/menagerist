@@ -62,6 +62,10 @@ RUN mkdir -p /out \
 # Keep the minimal terminal database needed for readline/curses CLI usage.
 RUN PYTHON_DIR="$(find /opt/python -mindepth 1 -maxdepth 1 -type d -name 'cpython-*' -print -quit)" \
     && echo "Python runtime: ${PYTHON_DIR}" \
+    && STDLIB="$(find "${PYTHON_DIR}/lib" -mindepth 1 -maxdepth 1 -type d -name 'python3.*' -print -quit)" \
+    && [ -n "${STDLIB}" ] || { echo "missing Python stdlib directory" >&2; exit 1; } \
+    && PY_MM="${STDLIB##*/python}" \
+    && echo "Python stdlib: ${STDLIB} (${PY_MM})" \
     \
     && echo "=== Before cleanup ===" \
     && du -sh "${PYTHON_DIR}" \
@@ -73,13 +77,13 @@ RUN PYTHON_DIR="$(find /opt/python -mindepth 1 -maxdepth 1 -type d -name 'cpytho
         "${PYTHON_DIR}/lib/tk"* \
         "${PYTHON_DIR}/lib/libtcl"* \
         "${PYTHON_DIR}/lib/libtk"* \
-        "${PYTHON_DIR}/lib/python3.14/idlelib" \
-        "${PYTHON_DIR}/lib/python3.14/tkinter" \
-        "${PYTHON_DIR}/lib/python3.14/turtledemo" \
-        "${PYTHON_DIR}/lib/python3.14/ensurepip" \
-        "${PYTHON_DIR}/lib/python3.14/site-packages/pip" \
-        "${PYTHON_DIR}/lib/python3.14/site-packages/setuptools" \
-        "${PYTHON_DIR}"/lib/python3.14/config-3.14* \
+        "${STDLIB}/idlelib" \
+        "${STDLIB}/tkinter" \
+        "${STDLIB}/turtledemo" \
+        "${STDLIB}/ensurepip" \
+        "${STDLIB}/site-packages/pip" \
+        "${STDLIB}/site-packages/setuptools" \
+        "${STDLIB}"/config-"${PY_MM}"* \
     \
     && find /opt/python /app/.venv \
         \( \
@@ -111,7 +115,7 @@ RUN PYTHON_DIR="$(find /opt/python -mindepth 1 -maxdepth 1 -type d -name 'cpytho
        done \
     \
     && echo "=== greenlet dependencies ===" \
-    && ldd /app/.venv/lib/python3.14/site-packages/greenlet/_greenlet*.so \
+    && ldd /app/.venv/lib/python"${PY_MM}"/site-packages/greenlet/_greenlet*.so \
     \
     && echo "=== After cleanup ===" \
     && du -sh "${PYTHON_DIR}" \
