@@ -263,12 +263,17 @@
 		});
 	});
 
-	// Pick up ?type= from URL (from dashboard category chips)
+	// The selected type lives in the URL (`?type=`), so dashboard chips, the back button and a
+	// reload all agree with the chips here. Only the URL is tracked: reading `selectedType` would
+	// re-run this on every click and write the old URL value straight back.
 	$effect(() => {
 		const typeParam = page.url.searchParams.get('type');
-		if (typeParam && typeParam !== selectedType) {
+		untrack(() => {
+			if (typeParam === selectedType) return;
+			items = [];
+			hasMore = true;
 			selectedType = typeParam;
-		}
+		});
 	});
 
 	$effect(() => {
@@ -363,6 +368,15 @@
 		items = [];
 		hasMore = true;
 		selectedType = type;
+		const params = new SvelteURLSearchParams(page.url.searchParams);
+		if (type) params.set('type', type);
+		else params.delete('type');
+		const search = params.toString();
+		void goto(resolve(search ? `/items?${search}` : '/items'), {
+			replaceState: true,
+			keepFocus: true,
+			noScroll: true
+		});
 	}
 
 	function sentinel(node: HTMLElement) {
