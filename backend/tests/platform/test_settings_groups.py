@@ -2,7 +2,7 @@ import pytest
 
 from app.platform.config import BackupSettings, MenageristBaseSettings
 from app.platform.config._base import ENV_PREFIX
-from app.platform.config._discovery import group_name
+from app.platform.config._fields import group_name
 
 
 class Widgets(MenageristBaseSettings, group="widgets"):

@@ -184,6 +184,11 @@ app.command(identity_app)
 schema_app = App(name="schema", help="Inspect the API schema.")
 app.command(schema_app)
 
+settings_app = App(
+    name="settings", help="Document the deployment settings.", show=False
+)
+app.command(settings_app)
+
 
 @app.default
 def shell() -> None:
@@ -401,6 +406,36 @@ def dump(*, output: Path = Path("openapi.json")) -> dict[str, object]:
         "output": output,
         "size": output.stat().st_size,
     }
+
+
+@settings_app.command(name="docs")
+def settings_docs(*, root: Path, check: bool = False) -> dict[str, object]:
+    """Write `.env.example` and `docs/settings.md` from the settings classes.
+
+    Args:
+        root: Repository root to write under; there is no default, so nothing is
+            written to the wrong place.
+        check: Write nothing and exit with an error if either file is out of date.
+    """
+    from app.platform.config import ALL_SETTINGS
+    from app.platform.config._reference import reference_files
+
+    files = reference_files(ALL_SETTINGS)
+    stale = [
+        name
+        for name, text in files.items()
+        if not (root / name).is_file()
+        or (root / name).read_text(encoding="utf-8") != text
+    ]
+    if check:
+        if stale:
+            msg = f"Out of date: {', '.join(stale)}. Run `poe generate-settings-docs`."
+            raise SystemExit(msg)
+        return {"message": "Settings reference is up to date", "files": list(files)}
+    for name in stale:
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_text(files[name], encoding="utf-8", newline="\n")
+    return {"message": "Settings reference written", "updated": stale}
 
 
 if __name__ == "__main__":

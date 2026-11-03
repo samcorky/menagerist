@@ -29,19 +29,25 @@ INSTANCE_SETTINGS = (
     get_server_settings,
 )
 
-# Settings classes searched for tunable and public fields.
-SETTING_GROUPS = (
+# Every deployment settings class, including the CLI-only ones. The generated
+# reference lists all of them; the settings page keeps only their tunable fields.
+ALL_SETTINGS: tuple[type[MenageristBaseSettings], ...] = (
+    ApiSettings,
     BackupSettings,
+    DatabaseSettings,
     IdentitySettings,
+    IdentityCliSettings,
+    LoggingSettings,
     MediaSettings,
     ReleaseSettings,
     RetentionSettings,
     SchedulerSettings,
+    ServerSettings,
 )
 
 __all__ = [
+    "ALL_SETTINGS",
     "INSTANCE_SETTINGS",
-    "SETTING_GROUPS",
     "ApiSettings",
     "BackupSettings",
     "DatabaseSettings",

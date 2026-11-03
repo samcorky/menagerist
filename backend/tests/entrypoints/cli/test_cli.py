@@ -330,6 +330,42 @@ def test_schema_dump_writes_the_openapi_schema(
     assert result["size"] == output.stat().st_size
 
 
+def test_settings_docs_writes_both_files_under_the_root(tmp_path: Path) -> None:
+    """`settings docs` creates `.env.example` and `docs/settings.md` where asked."""
+    result = cli.settings_docs(root=tmp_path)
+
+    assert result["updated"] == [".env.example", "docs/settings.md"]
+    assert "MENAGERIST_MEDIA_STORAGE_PATH" in (tmp_path / ".env.example").read_text()
+    assert (
+        (tmp_path / "docs/settings.md").read_text().startswith("# Settings reference")
+    )
+
+
+def test_settings_docs_leaves_current_files_alone(tmp_path: Path) -> None:
+    """A second run changes nothing and `--check` agrees."""
+    cli.settings_docs(root=tmp_path)
+
+    assert cli.settings_docs(root=tmp_path)["updated"] == []
+    checked = cli.settings_docs(root=tmp_path, check=True)
+    assert str(checked["message"]).endswith("up to date")
+
+
+def test_settings_docs_check_names_the_stale_file_and_writes_nothing(
+    tmp_path: Path,
+) -> None:
+    """A hand-edited or missing file fails the check without being overwritten."""
+    cli.settings_docs(root=tmp_path)
+    edited = tmp_path / "docs/settings.md"
+    edited.write_text("edited by hand\n")
+    (tmp_path / ".env.example").unlink()
+
+    with pytest.raises(SystemExit, match=r"\.env\.example, docs/settings\.md"):
+        cli.settings_docs(root=tmp_path, check=True)
+
+    assert edited.read_text() == "edited by hand\n"
+    assert not (tmp_path / ".env.example").exists()
+
+
 def test_identity_commands_are_registered_with_the_real_claim_wired() -> None:
     """`identity` is a command group and first-run setup claims across modules."""
     from sqlalchemy.ext.asyncio import AsyncSession

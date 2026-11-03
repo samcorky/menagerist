@@ -119,6 +119,15 @@ repos:
         files: '^scripts/.*\.py$'
         pass_filenames: false
 
+      # Spans backend/ and the root files it generates, so it lives here rather than in
+      # the nested backend config.
+      - id: settings-docs
+        name: check the settings reference is current
+        entry: uv run poe check-settings-docs
+        language: system
+        files: '^(backend/src/app/platform/config/|\.env\.example$|docs/settings\.md$)'
+        pass_filenames: false
+
       - id: validate-compose
         name: validate docker compose
         entry: uv run poe validate-compose

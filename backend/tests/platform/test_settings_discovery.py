@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from pydantic import AliasChoices, Field, SecretStr, ValidationError
 
-from app.platform.config import SETTING_GROUPS, MenageristBaseSettings
+from app.platform.config import ALL_SETTINGS, MenageristBaseSettings
 from app.platform.config._discovery import (
     SettingDeclarationError,
     SettingSpec,
@@ -214,7 +214,7 @@ def test_registered_groups_pass_registration_guards() -> None:
     contract = json.loads(
         shared_data_path("contracts/field-kinds.json").read_text(encoding="utf-8")
     )
-    specs = discover(SETTING_GROUPS, kinds=frozenset(contract["kinds"]))
+    specs = discover(ALL_SETTINGS, kinds=frozenset(contract["kinds"]))
     assert {spec.key for spec in specs} >= {
         "backup.schedule",
         "scheduler.run_history_per_job",
@@ -242,7 +242,7 @@ def test_ui_meta_merges_all_hints_and_skips_when_empty() -> None:
 
 def test_group_name_is_snake_case() -> None:
     """Group name is snake case."""
-    from app.platform.config._discovery import group_name
+    from app.platform.config._fields import group_name
 
     class ApiTokenSettings(MenageristBaseSettings): ...
 
