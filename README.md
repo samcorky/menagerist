@@ -69,7 +69,7 @@ Open [http://localhost:8080](http://localhost:8080). Compose starts Postgres, th
 
 **First visit:** Menagerist asks you to create the administrator account (a username and a password of at least 10 characters). Anything already in the database is adopted by that account. The administrator can then add other people under Settings > Users, and each person sees only their own items. Accounts are local to your instance; there is no email or external sign-in yet. If you forget the administrator password, reset it from the command line: `docker compose exec menagerist menagerist identity reset-password --username <name>` (see [CONTRIBUTING.md](CONTRIBUTING.md#first-run-and-accounts)).
 
-**Next steps.** Updating, rolling back, choosing an image tag, tuning the database and keeping your own Compose changes are in [docs/DEPLOYING.md](docs/DEPLOYING.md); putting Menagerist behind a reverse proxy is in [docs/REVERSE-PROXY.md](docs/REVERSE-PROXY.md).
+**Next steps.** Updating, rolling back, choosing an image tag, tuning the database and keeping your own Compose changes are in [docs/DEPLOYING.md](docs/DEPLOYING.md); putting Menagerist behind a reverse proxy is in [docs/REVERSE-PROXY.md](docs/REVERSE-PROXY.md). Every environment variable, with its default, is listed in [docs/settings.md](docs/settings.md); [.env.example](.env.example) is a ready-to-copy `.env`.
 
 ---
 
@@ -87,7 +87,7 @@ Send it in a header:
 curl -H "Authorization: Bearer mnst_..." https://your-server/api/v1/auth/me/permissions
 ```
 
-A token carries only the permissions you give it, never more than you hold, and stops working when it expires or you revoke it. Use **Regenerate** for a new token with the same name and access. Changing or resetting your password removes all your tokens. A token cannot manage tokens or your account, and it cannot export or import your data. The interactive docs at `/api/docs` accept a token through Authorize. Operators can tune the limits with `MENAGERIST_IDENTITY_API_TOKEN_DEFAULT_DAYS`, `MENAGERIST_IDENTITY_API_TOKEN_MAX_DAYS` and `MENAGERIST_IDENTITY_API_TOKENS_PER_USER`.
+A token carries only the permissions you give it, never more than you hold, and stops working when it expires or you revoke it. Use **Regenerate** for a new token with the same name and access. Changing or resetting your password removes all your tokens. A token cannot manage tokens or your account, and it cannot export or import your data. The interactive docs at `/api/docs` accept a token through Authorize. Operators can tune the limits; see the `MENAGERIST_IDENTITY_API_TOKEN_*` variables in the [settings reference](docs/settings.md#identity).
 
 ---
 
@@ -151,6 +151,7 @@ MENAGERIST_IMAGE=menagerist:local docker compose up -d --force-recreate
 |---|---|
 | [docs/DEPLOYING.md](docs/DEPLOYING.md) | Updating, rolling back, image tags, host folders, database sizing, local overrides |
 | [docs/REVERSE-PROXY.md](docs/REVERSE-PROXY.md) | What a reverse proxy must do, with Caddy and Traefik examples |
+| [docs/settings.md](docs/settings.md) | Every environment variable: type, default, allowed values (generated; see also [.env.example](.env.example)) |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, commands, testing and releases |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System topology and data model |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Significant technical decisions and rationale |

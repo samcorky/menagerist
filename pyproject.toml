@@ -92,6 +92,12 @@ cwd = "backend"
 help = "Dump the backend's OpenAPI schema for frontend client generation"
 deps = ["sync-backend"]
 
+[tool.poe.groups.setup.tasks.generate-settings-docs]
+cmd = "menagerist settings docs --root .."
+cwd = "backend"
+help = "Regenerate .env.example and docs/settings.md from the settings classes"
+deps = ["sync-backend"]
+
 [tool.poe.groups.setup.tasks._run-frontend-generate]
 shell = "npm run generate"
 interpreter = ["powershell", "posix"]
@@ -144,6 +150,12 @@ args = [
   { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
 ]
 help = "Type-check backend Python files with mypy"
+
+[tool.poe.groups.quality.tasks.check-settings-docs]
+cmd = "menagerist settings docs --root .. --check"
+cwd = "backend"
+help = "Fail when .env.example or docs/settings.md is out of date with the settings classes"
+deps = ["sync-backend"]
 
 [tool.poe.groups.quality.tasks._coverage-erase]
 cmd = "coverage erase"

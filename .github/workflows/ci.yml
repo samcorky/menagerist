@@ -76,6 +76,9 @@ jobs:
       - name: Run mypy
         run: uv run poe typecheck-backend
 
+      - name: Check the settings reference is current
+        run: uv run poe check-settings-docs
+
   typecheck-frontend:
     name: Frontend type check (svelte-check)
     needs: changes

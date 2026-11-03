@@ -146,7 +146,10 @@ poe sync                      # re-sync all deps, the e2e browser and the API cl
 poe generate-frontend-client  # regenerate the typed API client after a backend schema change
 poe migrate                   # apply Alembic migrations
 poe db-up / poe db-down       # start/stop the local Postgres container
+poe generate-settings-docs    # regenerate .env.example and docs/settings.md after changing a settings class
 ```
+
+[`.env.example`](.env.example) and [`docs/settings.md`](docs/settings.md) are generated from the settings classes in `backend/src/app/platform/config`, so change a variable's default or description there, not in those files. `poe check-settings-docs` (run by CI and by pre-commit when those paths change) fails when they are stale. Secret and credential defaults are never written out.
 
 ## Quality checks
 

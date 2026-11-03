@@ -7,7 +7,7 @@ import app
 from app.modules.backup.application.setting_keys import KEEP_LAST, USER_EXPORT_TTL_HOURS
 from app.modules.scheduling.application.setting_keys import RUN_HISTORY_PER_JOB
 from app.modules.system.application.setting_keys import RELEASE_CHANNEL
-from app.platform.config import SETTING_GROUPS
+from app.platform.config import ALL_SETTINGS
 from app.platform.config._discovery import discover
 
 CODE_KEYS = {
@@ -20,7 +20,7 @@ CODE_KEYS = {
 
 def test_every_key_the_code_reads_is_a_tunable_setting() -> None:
     """A renamed field or a dropped marker would otherwise fail only at runtime."""
-    tunable = {spec.key for spec in discover(SETTING_GROUPS) if spec.tunable}
+    tunable = {spec.key for spec in discover(ALL_SETTINGS) if spec.tunable}
     assert tunable >= CODE_KEYS
 
 
@@ -55,7 +55,7 @@ _JSON_TYPES = {"int": "integer", "str": "string", "bool": "boolean", "float": "n
 def test_the_declared_type_of_every_key_matches_its_setting() -> None:
     """`SettingKey[int]` for a string setting would type-check and fail at runtime."""
     declared = _declared_keys()
-    specs = {spec.key: spec for spec in discover(SETTING_GROUPS)}
+    specs = {spec.key: spec for spec in discover(ALL_SETTINGS)}
     assert declared.keys() >= CODE_KEYS, "found no declarations"
     for key, python_type in declared.items():
         assert _JSON_TYPES[python_type] == specs[key].schema["type"], key

@@ -6,7 +6,7 @@ from app.modules.settings.adapters.platform.pydantic_settings_catalogue import (
     PydanticSettingsCatalogue,
 )
 from app.modules.settings.domain.setting import Pin, SettingDescriptor, SettingScope
-from app.platform.config import INSTANCE_SETTINGS, SETTING_GROUPS
+from app.platform.config import ALL_SETTINGS, INSTANCE_SETTINGS
 from app.platform.config._discovery import SettingSpec, discover
 
 if TYPE_CHECKING:
@@ -59,4 +59,4 @@ def deployment_catalogue() -> PydanticSettingsCatalogue:
     instances: dict[type[MenageristBaseSettings], MenageristBaseSettings] = {
         type(settings): settings for settings in (g() for g in INSTANCE_SETTINGS)
     }
-    return build_catalogue(discover(SETTING_GROUPS), instances)
+    return build_catalogue(discover(ALL_SETTINGS), instances)

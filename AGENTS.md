@@ -34,6 +34,7 @@ Run tasks with `poe` from the repository root; consult `pyproject.toml` rather t
 | Checks for changed files                      | `poe check-changed`                                                                        |
 | Database start / stop / migrations            | `poe db-up` / `poe db-down` / `poe migrate`                                                |
 | Regenerate API client                         | `poe generate-frontend-client`                                                             |
+| Regenerate settings docs                      | `poe generate-settings-docs` (`.env.example`, `docs/settings.md`; never edit by hand)      |
 
 - For test, lint, typecheck and `check-changed` tasks, use `--mode agent`. This preserves the tool's exit code and prints a compact summary; read full logs in `.agent-logs/<run>/` instead of rerunning for output (newest 20 runs retained).
 - `human` runs directly without capture; `verbose` captures and streams output. Default precedence is flag, `MENAGERIST_OUTPUT`, `~/.config/menagerist/output`, then `human`.
