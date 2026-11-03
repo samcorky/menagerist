@@ -15,7 +15,7 @@ A lightweight, self-hostable platform for organising the things you care about.
 [![Coverage][coverage-badge]][coverage-link]
 [![License: Apache-2.0][license-badge]][license-link]
 [![GHCR pulls][pulls-badge]][pulls-link]
-[![Image size][size-badge]][pulls-link]
+[![Download size][size-badge]][pulls-link]
 [![CalVer][calver-badge]][calver-link]
 [![Python][python-badge]][python-link]
 [![mypy: strict][mypy-badge]][mypy-link]
@@ -171,7 +171,7 @@ A subtle nod to *Star Trek: The Original Series - The Menagerie*.
 [coverage-badge]: https://codecov.io/github/samcorky/menagerist/graph/badge.svg
 [license-badge]: https://img.shields.io/github/license/samcorky/menagerist
 [pulls-badge]: https://img.shields.io/badge/dynamic/json?url=https://ghcr-badge.elias.eu.org/api/samcorky/menagerist/menagerist&query=downloadCount&label=pulls&logo=docker&logoColor=white&color=2496ED
-[size-badge]: https://ghcr-badge.egpl.dev/samcorky/menagerist/size?tag=latest&label=image%20size
+[size-badge]: https://ghcr-badge.egpl.dev/samcorky/menagerist/size?tag=latest&label=download%20size%20(amd64)
 [calver-badge]: https://img.shields.io/badge/calver-0.YYYY.MM.PATCH-22bfda
 [python-badge]: https://img.shields.io/badge/dynamic/regex?url=https://raw.githubusercontent.com/samcorky/menagerist/main/.python-version&search=(.%2B)&replace=%241&label=python&logo=python&logoColor=white&color=blue
 [mypy-badge]: https://img.shields.io/badge/mypy-strict-blue?logo=python&logoColor=white
