@@ -46,6 +46,7 @@ META_FILES = frozenset(
         ".github/release.yml",
         ".github/renovate.json",
         ".github/workflows/autofix.yml",
+        ".github/workflows/codeql.yml",
         ".github/workflows/pr-labeller.yml",
         ".github/workflows/publish.yml",
         ".gitignore",
