@@ -48,7 +48,7 @@ The graph model is deliberately hidden from the user. You interact with familiar
 
 **Make it yours.** Dark mode, a layout that works on a phone, and a quick-capture sheet (`Cmd/Ctrl+K`) to add an item without leaving the page you are on. Install an example pack (music, recipes, movies, comic-con posters, electronic parts or games) to see how it fits together, and remove it again when you are done.
 
-**Run it yourself.** One container plus Postgres. Every person has a local account and sees only their own items; administrators manage users, settings, scheduled tasks and backups from the app. Back up and restore from the command line or the admin page, with an automatic backup before each upgrade. Scripts use scoped, expiring [API tokens](#api-tokens). Administrators are told when a newer release is out.
+**Run it yourself.** One container plus Postgres. Every person has a local account and sees only their own items; administrators manage users, settings, scheduled tasks and backups from the app. Back up and restore from the command line or the admin page, with an automatic backup before each upgrade. Scripts use scoped, expiring [API tokens](#api-tokens). A Status page shows the instance's health checks and version, and administrators are told there when a newer release is out.
 
 ---
 
