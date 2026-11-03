@@ -2,6 +2,7 @@
 
 import io
 import os
+from collections.abc import Callable  # noqa: TC003 - pydantic resolves this at runtime
 from typing import Literal
 
 import pytest
@@ -28,12 +29,20 @@ class Demo(MenageristBaseSettings, group="demo"):
     schedule: Cron = Field(default="0 3 * * *", description="When to run.")
     note: str | None = Field(default=None, description="An optional note.")
     enabled: bool = Field(default=True, description="Whether it is on.")
+    count: int = Field(default=3, description="Any whole number.")
+    ceiling: int = Field(default=1, le=10, description="At most ten.")
     mode: Literal["fast", "slow"] = Field(default="fast", description="Which mode.")
     token: SecretStr = Field(default=SecretStr("hunter2"), description="A secret.")
     dsn: PostgresDsn = Field(
         default=PostgresDsn("postgresql://user:s3cret@db.example/app"),
         description="A database URL.",
     )
+
+
+class Opaque(MenageristBaseSettings, group="opaque"):
+    """A field type that has no JSON Schema."""
+
+    hook: Callable[[str], int] | None = Field(default=None, description="A callable.")
 
 
 def _demo() -> dict[str, str]:
@@ -105,6 +114,21 @@ def test_the_reference_describes_type_and_allowed_values() -> None:
     assert "comma-separated list of IP addresses or networks" in doc
     assert "`*` on its own" in doc
     assert "cron schedule" in doc
+
+
+def test_an_unbounded_number_has_no_allowed_range() -> None:
+    """With no bounds there is nothing to add to the allowed values."""
+    entries = {e.env_name: e for s in build_sections([Demo]) for e in s.entries}
+    assert entries["MENAGERIST_DEMO_COUNT"].type_label == "whole number"
+    assert entries["MENAGERIST_DEMO_COUNT"].allowed == ""
+    assert entries["MENAGERIST_DEMO_CEILING"].allowed == "10 or less"
+
+
+def test_a_type_without_a_json_schema_is_listed_as_text() -> None:
+    """The reference still lists the variable when pydantic cannot describe it."""
+    (section,) = build_sections([Opaque])
+    (entry,) = section.entries
+    assert (entry.type_label, entry.allowed, entry.default) == ("text", "", None)
 
 
 def test_every_field_of_every_class_is_listed_once() -> None:

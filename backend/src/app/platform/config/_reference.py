@@ -191,8 +191,6 @@ def _describe_scalar(schema: JsonObject) -> tuple[list[str], list[str]]:
 
 def _text(value: object) -> str:
     """Render a JSON-mode value the way an environment variable carries it."""
-    if value is None:
-        return ""
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, list):
