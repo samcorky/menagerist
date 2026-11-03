@@ -66,6 +66,8 @@ PIPELINE_PREFIXES = (".github/actions/",)
 BACKEND_PREFIXES = ("backend/", "shared/", "scripts/")
 BACKEND_FILES = frozenset({"uv.lock", "pyproject.toml", ".python-version"})
 FRONTEND_PREFIXES = ("frontend/", "shared/")
+# The Node version is read by the frontend jobs and the image's Node stage only.
+FRONTEND_FILES = frozenset({".node-version"})
 # The image build and its smoke test. Only the image job reads them, so they are matched
 # before BACKEND_PREFIXES, which would otherwise claim scripts/smoke_test.py.
 IMAGE_FILES = frozenset(
@@ -95,7 +97,7 @@ def _owners(path: str) -> set[str] | None:
     owners = set()
     if path.startswith(BACKEND_PREFIXES) or path in BACKEND_FILES:
         owners.add("backend")
-    if path.startswith(FRONTEND_PREFIXES):
+    if path.startswith(FRONTEND_PREFIXES) or path in FRONTEND_FILES:
         owners.add("frontend")
     return owners or None
 
