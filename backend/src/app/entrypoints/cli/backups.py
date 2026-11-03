@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from app.entrypoints.api.shared.backup_operations import create_backup, media_files
 from app.platform import alembic_runner
+from app.platform.advisory_locks import AdvisoryLock, session_lock
 from app.platform.config.backup import get_backup_settings
 from app.platform.database import get_session_factory
 
@@ -32,19 +33,25 @@ async def backup_before_upgrade(revision: str) -> None:
 
 
 def upgrade_with_backup(revision: str = "head", *, backup: bool = True) -> None:
-    """Fail before DDL if an enabled pre-migration backup cannot complete."""
-    if backup and get_backup_settings().before_migrate:
+    """Migrate under the migration lock; fail before DDL if a backup cannot complete.
 
-        async def prepare() -> None:
-            from app.platform.database import get_engine
+    The lock covers the backup and the upgrade, and the pending check runs only
+    once it is held, so instances starting together migrate (and back up) once.
+    """
 
-            try:
-                await backup_before_upgrade(revision)
-            finally:
-                await get_engine().dispose()
+    async def run() -> None:
+        from app.platform.database import get_engine
 
-        asyncio.run(prepare())
-    alembic_runner.upgrade(revision)
+        try:
+            async with session_lock(get_engine(), AdvisoryLock.MIGRATION):
+                if backup and get_backup_settings().before_migrate:
+                    await backup_before_upgrade(revision)
+                # Alembic's env.py starts its own event loop, so it needs a thread.
+                await asyncio.to_thread(alembic_runner.upgrade, revision)
+        finally:
+            await get_engine().dispose()
+
+    asyncio.run(run())
 
 
 async def restore_backup(backup_id: UUID, *, replace: bool, guard: AccessGuard) -> None:
@@ -71,14 +78,14 @@ async def restore_backup(backup_id: UUID, *, replace: bool, guard: AccessGuard) 
         GetSetupStatus,
         GetSetupStatusQuery,
     )
-    from app.platform.advisory_locks import BACKUP_RESTORE_LOCK_KEY
+    from app.platform.advisory_locks import AdvisoryLock
     from app.shared_kernel.actor import SYSTEM_ACTOR
 
     factory = get_session_factory()
     async with factory() as lock_session, lock_session.begin():
-        await lock_session.execute(
-            select(func.pg_advisory_xact_lock(BACKUP_RESTORE_LOCK_KEY))
-        )
+        # Always in this order; a migration holds only the migration lock.
+        for lock in (AdvisoryLock.BACKUP_RESTORE, AdvisoryLock.MIGRATION):
+            await lock_session.execute(select(func.pg_advisory_xact_lock(lock.key)))
         async with factory() as session:
             setup_only = await GetSetupStatus(
                 build_identity_repos(session), guard

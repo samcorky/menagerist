@@ -1336,3 +1336,15 @@ Two more jobs finish the picture. `media.remove_stray_files` (`RemoveStrayMediaF
 **Checked by:** migrating an empty Postgres with the old chain and with the new one and diffing `pg_dump` output: the schema (tables, column order, defaults, indexes, constraints, functions, extensions) and the seeded rows were identical, apart from timestamps. The migration tests (`test_upgrade`, `test_up_down_consistency`, `test_model_definitions_match_ddl`) pass.
 
 **Consequence:** a development database created before this change records a revision that no longer exists, so `alembic upgrade` refuses to run. Its schema is identical, so either recreate it (`poe db-down`, then `poe db-up`) or adopt the new history with `alembic stamp --purge e6f7a8b9c0d1` from `backend/`.
+
+---
+
+## Migrations take a Postgres advisory lock (2026-11-03)
+
+**Decision:** `upgrade_with_backup` holds `pg_advisory_lock` on `AdvisoryLock.MIGRATION` for the pre-migration backup and the Alembic upgrade, so `serve --migrate` is safe with several instances. This supersedes the "single-instance deployments" caveat in the one-image entry above.
+
+**Rationale:** the lock must be session-level on its own autocommit connection, because Alembic opens its own connection in `env.py` and the backup runs in separate transactions; Postgres drops it if the process dies. The "is anything pending?" check runs only once the lock is held, so an instance that waited sees a migrated database and takes no second backup. The upgrade runs in a thread because `env.py` starts its own event loop. Restore (CLI and the first-run API route) also takes the migration lock, so the two exclude each other; a migration takes no other lock, so there is no ordering to deadlock on.
+
+**Lock keys:** every advisory lock is an `AdvisoryLock` member, with a key derived from the first 8 bytes of `blake2b("menagerist:<name>")` as a signed 64-bit integer. The old hand-numbered keys were dropped; locks last a transaction or a migration run, so the only constraint is not running old and new versions against one database mid-upgrade.
+
+**Not done:** `create_backup` does not take `BACKUP_RESTORE`; a restore is already excluded from the pre-migration backup by the migration lock.

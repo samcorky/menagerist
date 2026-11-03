@@ -269,9 +269,9 @@ def serve(
             session ids); `MENAGERIST_LOG_ACCESS=false` turns that one off.
         log_level: Minimum level for Granian's own server logs.
         backup: Honour the configured pre-migration backup policy.
-        migrate: Apply pending database migrations before starting. Meant for
-            single-instance deployments; run `migrate upgrade` separately when
-            several instances share one database.
+        migrate: Apply pending database migrations before starting. Safe with
+            several instances: one takes a database lock and migrates, the
+            others wait and find nothing to do.
     """
     from granian import Granian
     from granian.constants import Interfaces, Loops

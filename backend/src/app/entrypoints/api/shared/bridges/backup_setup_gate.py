@@ -19,7 +19,7 @@ from app.modules.identity.application.get_setup_status import (
 )
 from app.modules.identity.application.sign_in_throttle import SignInThrottle, ip_key
 from app.modules.identity.domain.throttle import ThrottlePolicy
-from app.platform.advisory_locks import BACKUP_RESTORE_LOCK_KEY
+from app.platform.advisory_locks import AdvisoryLock
 from app.platform.database import get_session_factory
 from app.shared_kernel.actor import ANONYMOUS_ACTOR
 from app.shared_kernel.errors import TooManyRequestsError
@@ -87,10 +87,17 @@ async def first_run_restore_slot(
             await session.commit()
     async with factory() as session, session.begin():
         acquired = await session.scalar(
-            select(func.pg_try_advisory_xact_lock(BACKUP_RESTORE_LOCK_KEY))
+            select(func.pg_try_advisory_xact_lock(AdvisoryLock.BACKUP_RESTORE.key))
         )
         if not acquired:
             raise TooManyRequestsError(
                 "Another restore is in progress. Try again shortly.", retry_after=30
+            )
+        migrating = not await session.scalar(
+            select(func.pg_try_advisory_xact_lock(AdvisoryLock.MIGRATION.key))
+        )
+        if migrating:
+            raise TooManyRequestsError(
+                "The database is being migrated. Try again shortly.", retry_after=30
             )
         yield

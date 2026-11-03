@@ -11,7 +11,7 @@ from app.modules.backup.domain.errors import (
     CorruptBackupError,
     RestoreTargetNotEmptyError,
 )
-from app.platform.advisory_locks import SETUP_LOCK_KEY
+from app.platform.advisory_locks import AdvisoryLock
 from app.platform.alembic_runner import db_current_revisions
 
 MAX_ROW_BYTES = 16 * 1024 * 1024
@@ -83,7 +83,7 @@ class SqlAlchemyDatabaseRestorer:
             connection = await session.connection()
             if setup_only:
                 await connection.execute(
-                    select(func.pg_advisory_xact_lock(SETUP_LOCK_KEY))
+                    select(func.pg_advisory_xact_lock(AdvisoryLock.SETUP.key))
                 )
             tables = await self._tables(connection)
             mutable = [

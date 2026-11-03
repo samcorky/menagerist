@@ -20,7 +20,7 @@ from app.modules.backup.domain.errors import (
     RestoreTargetNotEmptyError,
 )
 from app.modules.backup.ports.archive_member import ArchiveMember
-from app.platform.advisory_locks import SETUP_LOCK_KEY
+from app.platform.advisory_locks import AdvisoryLock
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -334,7 +334,8 @@ async def test_first_run_restore_waits_for_setup(snapshot_database: str) -> None
         restorer = SqlAlchemyDatabaseRestorer(async_sessionmaker(engine))
         async with engine.begin() as connection:
             await connection.execute(
-                text("SELECT pg_advisory_xact_lock(:key)"), {"key": SETUP_LOCK_KEY}
+                text("SELECT pg_advisory_xact_lock(:key)"),
+                {"key": AdvisoryLock.SETUP.key},
             )
             task = asyncio.create_task(
                 restorer.restore_instance(
