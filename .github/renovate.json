@@ -95,8 +95,7 @@
     }
   ],
   "pre-commit": {
-    "enabled": true,
-    "pinDigests": true
+    "enabled": true
   },
   "packageRules": [
     {
@@ -319,12 +318,11 @@
       "platformAutomerge": true
     },
     {
-      "description": "Group pre-commit hook updates together and pin SHA digests",
+      "description": "Group pre-commit hook updates together",
       "matchManagers": [
         "pre-commit"
       ],
-      "groupName": "pre-commit hooks",
-      "pinDigests": true
+      "groupName": "pre-commit hooks"
     },
     {
       "description": "Automerge pre-commit hook updates",
@@ -334,7 +332,6 @@
       "matchUpdateTypes": [
         "minor",
         "patch",
-        "pin",
         "digest"
       ],
       "automerge": true,
