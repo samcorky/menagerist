@@ -40,6 +40,7 @@ EVERYTHING = {"backend": True, "frontend": True, "e2e": True, "image": True}
             ".github/labeller.yml",
             ".github/release.yml",
             ".github/workflows/autofix.yml",
+            ".github/workflows/codeql.yml",
         ],
         ["frontend/README.md", "backend/README.md"],
         [".pre-commit-config.yaml", "backend/.pre-commit-config.yaml"],
@@ -83,6 +84,34 @@ def test_a_node_version_change_runs_the_frontend_and_image_not_the_backend() -> 
 def test_a_backend_change_also_runs_the_frontend(path: str) -> None:
     """The frontend checks itself against the backend's schema and example packs."""
     assert ci_changes.classify([path]) == EVERYTHING
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["scripts/ci_changes.py", "backend/tests/scripts/test_ci_changes.py"],
+)
+def test_the_change_detection_and_its_test_run_only_the_backend(path: str) -> None:
+    """Nothing outside the backend suite reads them, so the coupled jobs are skipped."""
+    assert ci_changes.classify([path]) == {
+        "backend": True,
+        "frontend": False,
+        "e2e": False,
+        "image": False,
+    }
+
+
+def test_other_backend_tests_still_run_the_frontend() -> None:
+    """Some frontend tests read files under backend/tests, so those are not exempt."""
+    flags = ci_changes.classify(["backend/tests/test_something.py"])
+    assert flags["frontend"] is True
+
+
+def test_the_exemption_does_not_hide_a_frontend_change() -> None:
+    """Listing the script beside frontend code still runs the frontend."""
+    flags = ci_changes.classify(
+        ["scripts/ci_changes.py", "frontend/src/routes/+page.svelte"]
+    )
+    assert flags == EVERYTHING
 
 
 def test_shared_contracts_run_both_sides() -> None:
