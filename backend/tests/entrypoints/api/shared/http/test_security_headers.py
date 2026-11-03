@@ -27,6 +27,11 @@ def _sources(csp: str) -> dict[str, list[str]]:
     return parsed
 
 
+def _allows(csp: str, directive: str, source: str) -> bool:
+    """Whether the CSP lists `source` as an exact entry of `directive`."""
+    return source in _sources(csp)[directive]
+
+
 def test_security_headers_middleware_attaches_headers() -> None:
     """SecurityHeadersMiddleware injects nosniff, frame-deny, csp headers."""
     app = Starlette(routes=[Route("/", _endpoint)])
@@ -63,12 +68,11 @@ def test_security_headers_middleware_allows_docs_csp(path: str) -> None:
     resp = client.get(path)
     assert resp.status_code == 200
     csp = resp.headers["Content-Security-Policy"]
-    sources = _sources(csp)
-    assert "https://cdn.jsdelivr.net" in sources["script-src"]
-    assert "'unsafe-inline'" in sources["style-src"]
-    assert "https://fonts.googleapis.com" in sources["style-src"]
-    assert "https://fonts.gstatic.com" in sources["font-src"]
-    assert sources["connect-src"][:2] == ["'self'", "https://cdn.jsdelivr.net"]
+    assert _allows(csp, "script-src", "https://cdn.jsdelivr.net")
+    assert _allows(csp, "style-src", "'unsafe-inline'")
+    assert _allows(csp, "style-src", "https://fonts.googleapis.com")
+    assert _allows(csp, "font-src", "https://fonts.gstatic.com")
+    assert _sources(csp)["connect-src"][:2] == ["'self'", "https://cdn.jsdelivr.net"]
 
 
 def test_security_headers_middleware_preserves_custom_csp() -> None:
@@ -89,11 +93,11 @@ def test_create_app_docs_endpoints_have_docs_csp() -> None:
     docs_resp = client.get("/api/docs")
     assert docs_resp.status_code == 200
     docs_csp = docs_resp.headers["Content-Security-Policy"]
-    assert "https://cdn.jsdelivr.net" in _sources(docs_csp)["script-src"]
-    assert "'unsafe-inline'" in _sources(docs_csp)["style-src"]
+    assert _allows(docs_csp, "script-src", "https://cdn.jsdelivr.net")
+    assert _allows(docs_csp, "style-src", "'unsafe-inline'")
 
     redoc_resp = client.get("/api/redoc")
     assert redoc_resp.status_code == 200
     redoc_csp = redoc_resp.headers["Content-Security-Policy"]
-    assert "https://cdn.jsdelivr.net" in _sources(redoc_csp)["script-src"]
-    assert "'unsafe-inline'" in _sources(redoc_csp)["style-src"]
+    assert _allows(redoc_csp, "script-src", "https://cdn.jsdelivr.net")
+    assert _allows(redoc_csp, "style-src", "'unsafe-inline'")
