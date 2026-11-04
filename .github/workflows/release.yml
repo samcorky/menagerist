@@ -1,0 +1,191 @@
+name: Release
+
+# Plans the next release tag with calver-scm, checks it against the repository and
+# creates the GitHub release. Publishing that release is what makes Publish build and
+# push the image. Run it by hand from main:
+#   - channel final:   the next release tag (calver-scm next-tag)
+#   - channel a, b or rc: the next alpha, beta or release candidate (next-tag --pre ...)
+#   - channel promote: the final tag for the latest pre-release (next-tag --promote)
+#   - channel post:    a post-release of the latest release (next-tag --post)
+#   - draft:           create a draft to review, then publish it from the Releases page
+#   - dry run:         plan and check only; nothing is created
+# calver-scm only reads the repository. The release itself is created here, by gh.
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Which tag to plan
+        type: choice
+        options:
+          - final
+          - a
+          - b
+          - rc
+          - promote
+          - post
+        default: final
+      draft:
+        description: Create a draft release, to review and publish by hand
+        type: boolean
+        default: true
+      dry_run:
+        description: Plan and check only; create nothing
+        type: boolean
+        default: false
+
+concurrency:
+  # Two releases planned at once would propose the same tag.
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Plan and create the release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # gh release create makes the release and, once it is published, the tag.
+      contents: write
+    env:
+      CHANNEL: ${{ inputs.channel }}
+      DRAFT: ${{ inputs.draft }}
+      DRY_RUN: ${{ inputs.dry_run }}
+      # A release published with the default token does not start Publish, so a release
+      # that is not a draft needs a token of our own (a fine-grained token or app token
+      # with contents: write). A draft is published by a person, which does start it.
+      HAS_RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN != '' }}
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+    steps:
+      - name: Check the branch
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Release runs from main, not ${GITHUB_REF}. Choose main in the 'Use workflow from' box."
+          exit 1
+
+      - name: Check a release can be published
+        if: env.DRAFT != 'true' && env.DRY_RUN != 'true' && env.HAS_RELEASE_TOKEN != 'true'
+        run: |
+          echo "::error::A release published with GITHUB_TOKEN does not start Publish, so no image would be built. Tick 'draft' and publish the draft from the Releases page, or add a RELEASE_TOKEN secret."
+          exit 1
+
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The tag is worked out from the existing tags, and next-tag refuses a shallow clone.
+          fetch-depth: 0
+          # gh does the writing, with its own token.
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+      # Fails on a broken CalVer config; warns about a shallow clone or no tag yet.
+      - name: Check the CalVer setup
+        working-directory: backend
+        run: uv run --locked --only-group release calver-scm doctor
+
+      # Writes tag, version, is_prerelease, channel and reason to GITHUB_OUTPUT. Exits 3
+      # when no safe tag can be proposed, for example promote with no pre-release or a
+      # pre-release that is not an ancestor of HEAD, or post with no release this month.
+      - name: Plan the tag
+        id: plan
+        working-directory: backend
+        run: |
+          case "$CHANNEL" in
+            final) args=() ;;
+            a | b | rc) args=(--pre "$CHANNEL") ;;
+            promote) args=(--promote) ;;
+            post) args=(--post) ;;
+            *) echo "::error::Unknown channel '${CHANNEL}'."; exit 1 ;;
+          esac
+          uv run --locked --only-group release calver-scm --format github next-tag "${args[@]}"
+
+      # Is the tag sensible here: not already used, not skipping a patch, not lower than an
+      # existing release. A tag pushed by hand and this one are judged the same way.
+      - name: Check the tag against the repository
+        working-directory: backend
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: uv run --locked --only-group release calver-scm validate "$TAG" --tag --against-repo
+
+      # A draft holds its tag name without creating the tag, so a second run would plan the
+      # same tag again. Look through the drafts as well as the published releases.
+      - name: Check there is no release for the tag yet
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          if gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName' | grep -Fqx "$TAG"; then
+            echo "::error::A release for ${TAG} already exists, possibly a draft. Publish or delete it first."
+            exit 1
+          fi
+
+      # Where the release notes come from. Today that is GitHub's generated notes, grouped
+      # by label (.github/release.yml). To write them another way, for example with an AI
+      # step, produce a Markdown file here and set `file` to its path; the release step
+      # then uses that instead. `base_tag` is the last final release, which the notes
+      # should cover everything since: a candidate does not move it, so finalising after
+      # rc3 lists all the work in the release, not only what came after rc3.
+      - name: Choose the release notes
+        id: notes
+        run: |
+          base_tag="$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // ""')"
+          {
+            echo "base_tag=${base_tag}"
+            echo "file="
+          } | tee -a "$GITHUB_OUTPUT"
+
+      - name: Summarise the plan
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+          VERSION: ${{ steps.plan.outputs.version }}
+          IS_PRERELEASE: ${{ steps.plan.outputs.is_prerelease }}
+          REASON: ${{ steps.plan.outputs.reason }}
+          BASE_TAG: ${{ steps.notes.outputs.base_tag }}
+        run: |
+          {
+            echo "### Release plan"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Tag | \`${TAG}\` |"
+            echo "| Version | \`${VERSION}\` |"
+            echo "| Pre-release | ${IS_PRERELEASE} |"
+            echo "| Reason | ${REASON} |"
+            echo "| Notes since | ${BASE_TAG:-the first commit} |"
+            echo "| Draft | ${DRAFT} |"
+            echo "| Dry run | ${DRY_RUN} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create the release
+        if: env.DRY_RUN != 'true'
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+          IS_PRERELEASE: ${{ steps.plan.outputs.is_prerelease }}
+          BASE_TAG: ${{ steps.notes.outputs.base_tag }}
+          NOTES_FILE: ${{ steps.notes.outputs.file }}
+        run: |
+          args=(--repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" "--prerelease=${IS_PRERELEASE}")
+          if [[ "$DRAFT" == "true" ]]; then
+            args+=(--draft)
+          fi
+          if [[ -n "$NOTES_FILE" ]]; then
+            args+=(--notes-file "$NOTES_FILE")
+          else
+            args+=(--generate-notes)
+            if [[ -n "$BASE_TAG" ]]; then
+              args+=(--notes-start-tag "$BASE_TAG")
+            fi
+          fi
+          url="$(gh release create "$TAG" "${args[@]}")"
+          echo "Created ${url}"
+          {
+            echo
+            if [[ "$DRAFT" == "true" ]]; then
+              echo "Draft created: ${url}. Review it and publish it to build the image."
+            else
+              echo "Published: ${url}. Publish is building the image."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
