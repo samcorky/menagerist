@@ -19,6 +19,7 @@ import argparse
 import io
 import os
 import sys
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,8 @@ from coverage.exceptions import NoDataError
 
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_DIR = ROOT / "backend"
+FRONTEND_DIR = ROOT / "frontend"
+FRONTEND_LCOV = FRONTEND_DIR / "coverage" / "lcov.info"
 CODECOV_YML = ROOT / "codecov.yml"
 COMMENT_MARKER = "<!-- component-coverage -->"
 
@@ -88,9 +91,39 @@ def component_paths(component: dict[str, Any]) -> list[str]:
     return paths
 
 
+def is_frontend(component: dict[str, Any]) -> bool:
+    """Whether a component's paths are under frontend/, so lcov measures it."""
+    paths = component.get("paths", [])
+    return bool(paths) and all(str(p).strip().startswith("frontend/") for p in paths)
+
+
+def frontend_paths(component: dict[str, Any]) -> list[str]:
+    """Return a frontend component's globs relative to frontend/, as lcov lists them."""
+    return [str(p).strip().removeprefix("frontend/") for p in component["paths"]]
+
+
+def lcov_percent(lcov: str, patterns: list[str]) -> float:
+    """Return the line coverage of the lcov files that match any of the globs."""
+    found = hit = 0
+    included = False
+    for line in lcov.splitlines():
+        if line.startswith("SF:"):
+            included = any(fnmatch(line.removeprefix("SF:"), p) for p in patterns)
+        elif included and line.startswith("LF:"):
+            found += int(line.removeprefix("LF:"))
+        elif included and line.startswith("LH:"):
+            hit += int(line.removeprefix("LH:"))
+    return 100.0 * hit / found if found else 0.0
+
+
 def parse_args() -> argparse.Namespace:
     """Parse CLI arguments for local reporting or CI enforcement."""
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--frontend",
+        action="store_true",
+        help="Check the frontend components against frontend/coverage/lcov.info.",
+    )
     parser.add_argument(
         "--strict",
         action="store_true",
@@ -147,10 +180,12 @@ def print_missing_details(
         print()
 
 
-def summary_markdown(results: list[tuple[str, float, float]]) -> str:
+def summary_markdown(
+    results: list[tuple[str, float, float]], heading: str = "Backend coverage"
+) -> str:
     """Return a Markdown table of each component's coverage against its target."""
     lines = [
-        "### Backend coverage",
+        f"### {heading}",
         "",
         "| Component | Coverage | Target | Result |",
         "| --- | ---: | ---: | --- |",
@@ -161,61 +196,96 @@ def summary_markdown(results: list[tuple[str, float, float]]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def write_step_summary(results: list[tuple[str, float, float]]) -> None:
+def write_step_summary(
+    results: list[tuple[str, float, float]], heading: str = "Backend coverage"
+) -> None:
     """Append the results to the GitHub Actions job summary, when there is one."""
     path = os.environ.get("GITHUB_STEP_SUMMARY")
     if path:
         with open(path, "a", encoding="utf-8") as summary:
-            summary.write(summary_markdown(results))
+            summary.write(summary_markdown(results, heading))
 
 
-def write_comment_file(results: list[tuple[str, float, float]]) -> None:
+def write_comment_file(
+    results: list[tuple[str, float, float]], heading: str = "Backend coverage"
+) -> None:
     """Write the table for the pull request comment, when CI names a file for it.
 
     The marker lets the workflow find and update its earlier comment.
     """
     path = os.environ.get("COMPONENT_COVERAGE_COMMENT")
     if path:
-        body = COMMENT_MARKER + "\n" + summary_markdown(results)
+        body = COMMENT_MARKER + "\n" + summary_markdown(results, heading)
         Path(path).write_text(body, encoding="utf-8")
+
+
+def collect_frontend_results(
+    components: list[dict[str, Any]], lcov: str
+) -> list[tuple[str, float, float]]:
+    """Collect each frontend component's line coverage from the lcov report."""
+    results: list[tuple[str, float, float]] = []
+    for component in components:
+        target = component_target(component)
+        if target is None:
+            continue
+        name = str(component.get("name") or component["component_id"])
+        results.append((name, lcov_percent(lcov, frontend_paths(component)), target))
+    return results
+
+
+def report(results: list[tuple[str, float, float]], heading: str) -> list[str]:
+    """Print each component against its target and return those below it."""
+    write_step_summary(results, heading)
+    write_comment_file(results, heading)
+    width = max(len(name) for name, _, _ in results)
+
+    for name, percent, target in results:
+        status = "OK  " if percent >= target else "FAIL"
+        target_text = f"target {target:.0f}%"
+        print(f"[{status}] {name.ljust(width)}  {percent:6.2f}%  ({target_text})")
+
+    return [name for name, percent, target in results if percent < target]
 
 
 def main() -> int:
     """Display component percentages and optionally fail on their targets."""
     args = parse_args()
     components = load_components()
+    frontend = [c for c in components if is_frontend(c)]
+    backend = [c for c in components if not is_frontend(c)]
     os.chdir(BACKEND_DIR)
 
-    cov = Coverage(data_file=str(BACKEND_DIR / ".coverage"))
-    try:
-        cov.load()
-    except NoDataError:
-        print("No coverage data found - run tests with coverage enabled first.")
-        return 1
+    cov: Coverage | None = None
+    if args.frontend:
+        if not FRONTEND_LCOV.is_file():
+            print("No frontend coverage found - run `poe coverage-frontend` first.")
+            return 1
+        lcov = FRONTEND_LCOV.read_text(encoding="utf-8")
+        results = collect_frontend_results(frontend, lcov)
+        heading = "Frontend coverage"
+    else:
+        cov = Coverage(data_file=str(BACKEND_DIR / ".coverage"))
+        try:
+            cov.load()
+        except NoDataError:
+            print("No coverage data found - run tests with coverage enabled first.")
+            return 1
+        results = collect_results(backend, cov)
+        heading = "Backend coverage"
 
-    results = collect_results(components, cov)
     if not results:
         print("No components with a fixed (non-auto) target to check.")
         return 0
 
-    write_step_summary(results)
-    write_comment_file(results)
-    width = max(len(name) for name, _, _ in results)
-    failures = [name for name, percent, target in results if percent < target]
-
-    for name, percent, target in results:
-        status = "OK  " if percent >= target else "FAIL"
-        target_text = f"target {target:.0f}%"
-        message = f"[{status}] {name.ljust(width)}  {percent:6.2f}%  ({target_text})"
-        print(message)
-
+    failures = report(results, heading)
     if not failures:
         print("\nAll components meet their coverage targets.")
         return 0
 
     print(f"\n{len(failures)} component(s) below target: {', '.join(failures)}\n")
     if args.strict:
-        print_missing_details(components, failures, cov)
+        if cov is not None:
+            print_missing_details(backend, failures, cov)
         return 1
 
     print("(informational only; rerun with --strict to fail CI)")

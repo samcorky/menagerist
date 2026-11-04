@@ -176,8 +176,28 @@ jobs:
       - name: Install dependencies and generate the API client
         run: uv run poe sync-ci
 
-      - name: Run the frontend unit tests
-        run: uv run poe test-frontend
+      - name: Run the frontend unit tests with coverage
+        run: uv run poe coverage-frontend
+        env:
+          COMPONENT_COVERAGE_COMMENT: ${{ runner.temp }}/component-coverage.md
+
+      - name: Upload frontend coverage to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          files: frontend/coverage/lcov.info
+          flags: frontend
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      # The coverage-comment job joins this with the backend table.
+      - name: Upload the frontend coverage table
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-frontend
+          path: ${{ runner.temp }}/component-coverage.md
+          if-no-files-found: ignore
+          retention-days: 1
 
   integration:
     name: Backend Tests and Coverage
@@ -186,7 +206,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -208,29 +227,17 @@ jobs:
       - name: Run backend unit and integration tests and enforce coverage
         run: uv run poe coverage
         env:
-          COMPONENT_COVERAGE_COMMENT: ${{ github.workspace }}/.coverage-components.md
+          COMPONENT_COVERAGE_COMMENT: ${{ runner.temp }}/component-coverage.md
 
-      # Codecov's free plan posts only a short patch comment, so show the per-component
-      # table ourselves. Fork pull requests get a read-only token and are skipped.
-      - name: Comment per-component coverage on the pull request
-        if: >-
-          ${{ !cancelled() && github.event_name == 'pull_request'
-          && github.event.pull_request.head.repo.full_name == github.repository
-          && hashFiles('.coverage-components.md') != '' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          marker='<!-- component-coverage -->'
-          existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
-            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"${marker}\"))) | .id" | head -n 1)
-          if [ -n "$existing" ]; then
-            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
-              -F body=@.coverage-components.md
-          else
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
-              -F body=@.coverage-components.md
-          fi
+      # The coverage-comment job joins this with the frontend summary.
+      - name: Upload the component coverage table
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-backend
+          path: ${{ runner.temp }}/component-coverage.md
+          if-no-files-found: ignore
+          retention-days: 1
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
@@ -441,6 +448,58 @@ jobs:
     uses: ./.github/workflows/build.yml
     permissions:
       contents: read
+
+  coverage-comment:
+    name: Comment coverage on the pull request
+    # Codecov's free plan posts only a short patch comment, so show the backend component
+    # table and the frontend figures ourselves, in one comment that later pushes update.
+    # Fork pull requests get a read-only token and are skipped. Not part of ci-passed: a
+    # missing comment should not fail a pull request.
+    needs: [integration, frontend-tests]
+    if: >-
+      ${{ !cancelled() && github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout the comment script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: scripts/coverage_comment.py
+          sparse-checkout-cone-mode: false
+
+      - name: Download the coverage reports
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: coverage-reports
+          pattern: coverage-*
+
+      - name: Build the comment
+        run: >-
+          python3 scripts/coverage_comment.py
+          coverage-reports/coverage-backend/component-coverage.md
+          coverage-reports/coverage-frontend/component-coverage.md
+          --output "$RUNNER_TEMP/coverage-comment.md"
+
+      - name: Post or update the comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          [ -f "$RUNNER_TEMP/coverage-comment.md" ] || exit 0
+          marker='<!-- component-coverage -->'
+          existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"${marker}\"))) | .id" | head -n 1)
+          if [ -n "$existing" ]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
+              -F body=@"$RUNNER_TEMP/coverage-comment.md"
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+              -F body=@"$RUNNER_TEMP/coverage-comment.md"
+          fi
 
   ci-passed:
     name: CI passed

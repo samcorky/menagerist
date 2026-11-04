@@ -519,3 +519,12 @@ def test_run_dir_is_private(tmp_path: Path) -> None:
     run = poe_run.make_run_dir(tmp_path / ".agent-logs", "test-backend")
     assert run.stat().st_mode & 0o777 == 0o700
     assert run.name.endswith(f"-test-backend-{os.getpid()}")
+
+
+def test_frontend_coverage_is_the_vitest_run_with_the_coverage_flag() -> None:
+    """The coverage task is the plain run plus --coverage, keeping workers and mode."""
+    plain = poe_run._vitest("verbose", "2")
+
+    assert poe_run._vitest_coverage("verbose", "2") == [*plain, "--coverage"]
+    assert "--maxWorkers=2" in plain
+    assert poe_run.TOOLS["test-frontend-coverage"].cwd == "frontend"

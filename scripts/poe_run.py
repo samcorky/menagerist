@@ -426,6 +426,10 @@ def _vitest(mode: str, workers: str) -> list[str]:
     return [*cmd, "--reporter=verbose"] if mode == "verbose" else cmd
 
 
+def _vitest_coverage(mode: str, workers: str) -> list[str]:
+    return [*_vitest(mode, workers), "--coverage"]
+
+
 def _prek(mode: str, _workers: str) -> list[str]:
     return [_exe("prek"), "run", *(["--verbose"] if mode == "verbose" else [])]
 
@@ -441,6 +445,9 @@ TOOLS: dict[str, Tool] = {
         "pytest", "backend", _pytest(["-m", "integration"], append=True), parse_pytest
     ),
     "test-frontend": Tool("vitest", "frontend", _vitest, parse_vitest),
+    "test-frontend-coverage": Tool(
+        "vitest", "frontend", _vitest_coverage, parse_vitest
+    ),
     "lint-backend": Tool("ruff", "backend", _ruff, parse_ruff),
     "lint-frontend": Tool("lint", "frontend", _npm("lint"), parse_lint_frontend),
     "typecheck-backend": Tool("mypy", "backend", _mypy, parse_mypy),
