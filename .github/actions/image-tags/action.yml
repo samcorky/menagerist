@@ -1,0 +1,35 @@
+name: Image tags
+description: >-
+  Work out the version tags of the Docker image for a release tag: the full version, the
+  month and year tags, and whether the release also moves latest. One place for the
+  rules, used to publish the tags and to preview them. The caller needs the repository
+  checked out and uv installed.
+
+inputs:
+  tag:
+    description: The release tag, for example v0.2026.11.0 or v0.2026.11.0.post1.
+    required: true
+
+outputs:
+  tags:
+    description: The partial tags as type=raw lines for docker/metadata-action.
+    value: ${{ steps.tags.outputs.tags }}
+  preview:
+    description: Every version tag the release publishes, comma separated, for display.
+    value: ${{ steps.tags.outputs.preview }}
+
+runs:
+  using: composite
+  steps:
+    # calver-scm reads the tag against the project's scheme, so a tag it rejects fails
+    # the step (pipefail), and image_tags.py holds the rules for what to publish.
+    - name: Work out the tags
+      id: tags
+      shell: bash
+      working-directory: backend
+      env:
+        TAG: ${{ inputs.tag }}
+      run: |
+        set -o pipefail
+        uv run --locked --only-group release calver-scm --json parse "$TAG" --tag \
+          | uv run --script ../scripts/image_tags.py

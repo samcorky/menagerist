@@ -214,6 +214,28 @@ jobs:
             echo "$body"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # The image tags the release would publish, from the same action as Publish, so a
+      # post-release or candidate shows its tags before anything is created.
+      - name: Work out the image tags
+        id: image_tags
+        if: env.DRY_RUN == 'true'
+        uses: ./.github/actions/image-tags
+        with:
+          tag: ${{ steps.plan.outputs.tag }}
+
+      - name: Preview the image tags
+        if: env.DRY_RUN == 'true'
+        env:
+          PREVIEW: ${{ steps.image_tags.outputs.preview }}
+        run: |
+          echo "Image tags: ${PREVIEW}"
+          {
+            echo
+            echo "### Image tags"
+            echo
+            echo "\`${PREVIEW}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Create the release
         if: env.DRY_RUN != 'true'
         env:
