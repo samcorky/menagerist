@@ -150,7 +150,7 @@ poe generate-settings-docs    # regenerate .env.example and docs/settings.md aft
 poe dump-schema               # regenerate frontend/openapi.json after changing the API
 ```
 
-[`.env.example`](.env.example) and [`docs/settings.md`](docs/settings.md) are generated from the settings classes in `backend/src/app/platform/config`, so change a variable's default or description there, not in those files. `poe check-settings-docs` (run by CI as "Generated files current (settings reference)" and by pre-commit when those paths change) fails when they are stale. Secret and credential defaults are never written out.
+[`.env.example`](.env.example) and [`docs/settings.md`](docs/settings.md) are generated from the settings classes in `backend/src/app/platform/config`, so change a variable's default or description there, not in those files. `poe check-settings-docs` (run by CI as "Generated files (settings reference is current)" and by pre-commit when those paths change) fails when they are stale. Secret and credential defaults are never written out.
 
 ### The API schema
 
@@ -158,7 +158,8 @@ poe dump-schema               # regenerate frontend/openapi.json after changing 
 
 Two checks protect it:
 
-- **Generated files current (API schema)** runs `poe check-schema` in CI, and in pre-commit when backend source or the schema changes. It fails when the committed file differs from what the code produces.
+- **Generated files (API schema is current)** runs `poe check-schema` in CI, and in pre-commit when backend source or the schema changes. It fails when the committed file differs from what the code produces.
+- **Generated files (API schema is valid)** runs `poe validate-schema` in CI only (it takes about 20 seconds, too slow for pre-commit) and checks the file against the OpenAPI 3.1 specification with [openapi-spec-validator](https://github.com/python-openapi/openapi-spec-validator). Run it by hand after a large API change if you want the answer sooner.
 - **Check for breaking API changes** (`.github/workflows/api-breaking-changes.yml`) compares the schema with the base branch using [oasdiff](https://github.com/oasdiff/oasdiff) and its default rules: for example a removed endpoint or field, a tightened type, or a new required request field. A breaking change fails the check unless the pull request carries the `breaking-change` label (see [Labels and release notes](#labels-and-release-notes)); adding or removing the label re-runs the check. Every schema change, breaking or not, is listed in the run summary. Changes that only add things, such as a new response field, never fail the check, but a strict client could still reject them, so read the summary.
 
 ## Quality checks

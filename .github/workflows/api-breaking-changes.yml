@@ -1,7 +1,7 @@
 name: API breaking changes
 
 # Compares the pull request's frontend/openapi.json (the committed API contract, kept
-# current by the "Generated files current" check in ci.yml) with the base branch's, and
+# current by the "Generated files (API schema is current)" check in ci.yml) with the base branch's, and
 # fails on a breaking change unless the pull request carries the `breaking-change` label.
 # It is a separate workflow so adding or removing that label re-runs only this check,
 # not the whole of CI. The check runs on every pull request and passes at once when the

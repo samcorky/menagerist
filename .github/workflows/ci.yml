@@ -78,7 +78,7 @@ jobs:
 
   generated-files:
     # A matrix so each generated file reports as its own check on the pull request.
-    name: Generated files current (${{ matrix.name }})
+    name: Generated files (${{ matrix.name }})
     needs: changes
     if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
@@ -89,10 +89,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: settings reference
+          - name: settings reference is current
             task: check-settings-docs
-          - name: API schema
+          - name: API schema is current
             task: check-schema
+          # About 20 seconds, too slow for pre-commit; the file is the committed
+          # contract, which check-schema ties to the live API.
+          - name: API schema is valid
+            task: validate-schema
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

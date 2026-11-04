@@ -163,6 +163,12 @@ cwd = "backend"
 help = "Fail when frontend/openapi.json is out of date with the API"
 deps = ["sync-backend"]
 
+[tool.poe.groups.quality.tasks.validate-schema]
+cmd = "openapi-spec-validator ../frontend/openapi.json"
+cwd = "backend"
+help = "Fail when frontend/openapi.json is not a valid OpenAPI document"
+deps = ["sync-backend"]
+
 [tool.poe.groups.quality.tasks._coverage-erase]
 cmd = "coverage erase"
 cwd = "backend"
