@@ -26,7 +26,10 @@ class NodeRepository(Protocol):
     """
 
     async def add(self, node: Node) -> None:
-        """Add a new node."""
+        """Add a new node.
+
+        A node whose `favourite` is set is added as its owner's favourite.
+        """
         ...
 
     async def save(self, node: Node) -> None:
@@ -34,7 +37,22 @@ class NodeRepository(Protocol):
         ...
 
     async def get(self, node_id: uuid.UUID, *, scope: ContentFilter) -> Node | None:
-        """Return the node with `node_id`, or `None` if missing, deleted or unseen."""
+        """Return the node with `node_id`, or `None` if missing, deleted or unseen.
+
+        `Node.favourite` is the favourite of the person `scope` names; under
+        `everyone()` it is always `False`. Every read that returns nodes does this.
+        """
+        ...
+
+    async def set_favourite(
+        self, node_id: uuid.UUID, favourite: bool, *, scope: ContentFilter
+    ) -> None:
+        """Favourite or unfavourite a live node for the person `scope` names.
+
+        Only that person's favourite changes; the node is untouched. An id the
+        scope cannot see does nothing. Raises `ValueError` under `everyone()`,
+        which names no one.
+        """
         ...
 
     async def list(
@@ -127,7 +145,8 @@ class NodeRepository(Protocol):
         """Return one live node in `scope` chosen at random, or `None` if none match.
 
         `resolved` narrows by a query (a smart collection), `type`, `favourite`
-        and `ids` as `list` does; an empty `ids` matches nothing.
+        (the scope's person's own) and `ids` as `list` does; an empty `ids`
+        matches nothing.
         """
         ...
 

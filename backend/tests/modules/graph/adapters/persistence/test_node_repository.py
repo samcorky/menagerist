@@ -170,25 +170,29 @@ async def test_favourite_field_round_trips(db_session: AsyncSession) -> None:
     node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", favourite=True)
 
     await repository.add(node)
-    result = await repository.get(node.id, scope=ContentFilter.everyone())
+    result = await repository.get(node.id, scope=ContentFilter.of(uuid.UUID(int=1)))
 
     assert result is not None
     assert result.favourite is True
     assert _fields(result) == _fields(node)
 
 
-async def test_save_persists_favourite_change(db_session: AsyncSession) -> None:
-    """save() persists a change to the favourite field."""
+async def test_set_favourite_persists_and_leaves_the_node_alone(
+    db_session: AsyncSession,
+) -> None:
+    """set_favourite() stores the caller's favourite without editing the node."""
     repository = SqlAlchemyNodeRepository(db_session)
     node = Node.create(owner_id=uuid.UUID(int=1), name="Alien")
     await repository.add(node)
 
-    node.update(favourite=True)
-    await repository.save(node)
+    await repository.set_favourite(
+        node.id, True, scope=ContentFilter.of(uuid.UUID(int=1))
+    )
 
-    result = await repository.get(node.id, scope=ContentFilter.everyone())
+    result = await repository.get(node.id, scope=ContentFilter.of(uuid.UUID(int=1)))
     assert result is not None
     assert result.favourite is True
+    assert result.updated_at == node.updated_at
 
 
 async def test_list_filters_by_favourite(db_session: AsyncSession) -> None:
@@ -200,7 +204,7 @@ async def test_list_filters_by_favourite(db_session: AsyncSession) -> None:
     await repository.add(plain)
 
     result = await repository.list(
-        scope=ContentFilter.everyone(), after=None, limit=10, favourite=True
+        scope=ContentFilter.of(uuid.UUID(int=1)), after=None, limit=10, favourite=True
     )
 
     assert [n.id for n in result] == [starred.id]
@@ -216,8 +220,16 @@ async def test_count_filters_by_favourite(db_session: AsyncSession) -> None:
     for _ in range(2):
         await repository.add(Node.create(owner_id=uuid.UUID(int=1), name="Predator"))
 
-    assert await repository.count(scope=ContentFilter.everyone(), favourite=True) == 3
-    assert await repository.count(scope=ContentFilter.everyone(), favourite=False) == 2
+    assert (
+        await repository.count(scope=ContentFilter.of(uuid.UUID(int=1)), favourite=True)
+        == 3
+    )
+    assert (
+        await repository.count(
+            scope=ContentFilter.of(uuid.UUID(int=1)), favourite=False
+        )
+        == 2
+    )
 
 
 async def test_list_excludes_soft_deleted_nodes(db_session: AsyncSession) -> None:
@@ -757,12 +769,16 @@ async def test_ids_combines_with_other_filters(db_session: AsyncSession) -> None
     )
 
     by_fav = await repository.list(
-        scope=ContentFilter.everyone(), after=None, limit=10, ids=films, favourite=True
+        scope=ContentFilter.of(uuid.UUID(int=1)),
+        after=None,
+        limit=10,
+        ids=films,
+        favourite=True,
     )
     assert by_fav == []
     assert (
         await repository.count(
-            scope=ContentFilter.everyone(), ids=everything, favourite=True
+            scope=ContentFilter.of(uuid.UUID(int=1)), ids=everything, favourite=True
         )
         == 1
     )

@@ -79,10 +79,10 @@ async def test_per_item_field_condition_uses_the_extra_schema_index(
     await db_session.execute(
         text(
             """
-            INSERT INTO nodes (id, owner_id, name, tags, attributes, favourite,
+            INSERT INTO nodes (id, owner_id, name, tags, attributes,
                                created_at, updated_at, type, extra_schema)
             SELECT gen_random_uuid(), :owner, 'Item ' || n, '[]'::jsonb, '{}'::jsonb,
-                   false, to_timestamp(1700000000 + n), to_timestamp(1700000000 + n),
+                   to_timestamp(1700000000 + n), to_timestamp(1700000000 + n),
                    NULL,
                    CASE WHEN n % 5000 = 0 THEN jsonb_build_object(
                        'properties', jsonb_build_object(

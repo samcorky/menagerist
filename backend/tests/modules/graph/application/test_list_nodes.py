@@ -22,7 +22,7 @@ from app.modules.graph.domain.errors import CollectionNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
-from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 
 
 def _make_repos(nodes: InMemoryNodeRepository) -> GraphRepos:
@@ -153,8 +153,10 @@ async def test_list_nodes_collection_combines_with_other_filters() -> None:
     by_type = await use_case.handle(
         ListNodesQuery(collection=collection_id, type="person"), SYSTEM_ACTOR
     )
+    # A favourite is a person's own, so ask as the owner rather than as the system.
     by_fav = await use_case.handle(
-        ListNodesQuery(collection=collection_id, favourite=True), SYSTEM_ACTOR
+        ListNodesQuery(collection=collection_id, favourite=True),
+        Actor(id=uuid.UUID(int=1)),
     )
 
     assert {n.name for n in by_q.items} == {"Alien", "Aliens"}

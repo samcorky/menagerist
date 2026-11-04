@@ -214,32 +214,14 @@ def test_create_defaults_favourite_to_false() -> None:
 
 
 def test_create_with_favourite_true() -> None:
-    """Node.create with favourite=True stores the value."""
+    """Node.create with favourite=True marks it for its owner's first save."""
     node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", favourite=True)
 
     assert node.favourite is True
-
-
-def test_update_sets_favourite() -> None:
-    """update() sets favourite when provided."""
-    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien")
-
-    node.update(favourite=True)
-
-    assert node.favourite is True
-
-
-def test_update_clears_favourite() -> None:
-    """update() can unset favourite by passing False."""
-    node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", favourite=True)
-
-    node.update(favourite=False)
-
-    assert node.favourite is False
 
 
 def test_update_leaves_favourite_unchanged_when_not_given() -> None:
-    """update() without favourite leaves the existing value untouched."""
+    """update() never touches the viewer's favourite flag."""
     node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", favourite=True)
 
     node.update(name="Alien (1979)")

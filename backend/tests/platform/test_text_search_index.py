@@ -69,14 +69,14 @@ async def test_selective_text_search_uses_the_trigram_indexes(
     await db_session.execute(
         text(
             """
-            INSERT INTO nodes (id, owner_id, name, tags, attributes, favourite,
+            INSERT INTO nodes (id, owner_id, name, tags, attributes,
                                created_at, updated_at, type)
             SELECT gen_random_uuid(), :owner, 'Item ' || n, '[]'::jsonb,
                    jsonb_build_object(
                        'notes', 'filler text ' || n || ' about nothing',
                        'extra', CASE WHEN n % 5000 = 0
                                 THEN 'zebrafish ' || n ELSE 'plain' END),
-                   false, to_timestamp(1700000000 + n),
+                   to_timestamp(1700000000 + n),
                    to_timestamp(1700000000 + n), 'film'
             FROM generate_series(1, 20000) AS n
             """
@@ -103,11 +103,11 @@ async def test_description_and_name_words_use_their_trigram_indexes(
         text(
             """
             INSERT INTO nodes (id, owner_id, name, description, tags, attributes,
-                               favourite, created_at, updated_at, type)
+                               created_at, updated_at, type)
             SELECT gen_random_uuid(), :owner, 'Item ' || n,
                    CASE WHEN n % 5000 = 0 THEN 'zebrafish ' || n
                         ELSE 'filler text ' || n END,
-                   '[]'::jsonb, '{}'::jsonb, false,
+                   '[]'::jsonb, '{}'::jsonb,
                    to_timestamp(1700000000 + n), to_timestamp(1700000000 + n),
                    'film'
             FROM generate_series(1, 20000) AS n

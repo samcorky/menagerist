@@ -160,6 +160,7 @@ def _validate_references(
         "edges": (("source_id", "nodes"), ("target_id", "nodes")),
         "collection_members": (("collection_id", "collections"), ("item_id", "nodes")),
         "media_attachments": (("asset_id", "media_assets"), ("target_id", "nodes")),
+        "node_favourites": (("node_id", "nodes"),),
     }
     for key, target in references.get(name, ()):
         if str(row.get(key)) not in imported[target]:

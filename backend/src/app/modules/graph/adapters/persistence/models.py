@@ -1,7 +1,8 @@
 import uuid
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import ForeignKey, Index, text
+from sqlalchemy import DateTime, ForeignKey, Index, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -121,9 +122,24 @@ class NodeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):
     type: Mapped[str | None] = mapped_column(index=True, nullable=True)
     description: Mapped[str | None]
     attributes: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
-    favourite: Mapped[bool] = mapped_column(default=False)
     tags: Mapped[list[str]] = mapped_column(JSONB, default=list)
     extra_schema: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+
+
+class NodeFavouriteModel(Base):
+    """ORM row recording that one user has favourited one item.
+
+    `user_id` has no foreign key: accounts belong to another module, as `owner_id`
+    does on the content tables.
+    """
+
+    __tablename__ = "node_favourites"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    node_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("nodes.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class EdgeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):

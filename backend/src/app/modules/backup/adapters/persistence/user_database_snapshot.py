@@ -118,6 +118,11 @@ class SqlAlchemyUserDatabaseSnapshot(SqlAlchemyDatabaseSnapshot):
             tables["media_attachments"].c.target_type == "node",
             tables["media_attachments"].c.target_id.in_(nodes),
         )
+        # Only the exporting person's own favourites; other people's stay with them.
+        predicates["node_favourites"] = and_(
+            tables["node_favourites"].c.user_id == owner_id,
+            tables["node_favourites"].c.node_id.in_(nodes),
+        )
         for vocabulary, content in (("node_types", "nodes"), ("edge_types", "edges")):
             predicates[vocabulary] = and_(
                 tables[vocabulary].c.deleted_at.is_(None),

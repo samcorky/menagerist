@@ -97,12 +97,33 @@ def test_304_preserves_etag_and_last_modified() -> None:
     assert r1.headers["ETag"] == etag
     assert r1.headers["Last-Modified"] == last_mod
 
+    # A date alone cannot show the copy is current: the body depends on the viewer's
+    # favourite, which Last-Modified does not follow. Only the ETag answers 304.
     r2 = client.get(
         f"/api/v1/node/{node['id']}", headers={"If-Modified-Since": last_mod}
     )
-    assert r2.status_code == 304
+    assert r2.status_code == 200
     assert r2.headers["ETag"] == etag
     assert r2.headers["Last-Modified"] == last_mod
+
+
+def test_favouriting_changes_the_etag_even_though_the_item_is_unchanged() -> None:
+    """A cached copy must not hide a favourite: the ETag follows the viewer's star."""
+    client = TestClient(_app_with_in_memory_graph())
+    node = _create_node(client, name="Alien", type_="film")
+    url = f"/api/v1/node/{node['id']}"
+
+    before = client.get(url)
+    toggled = client.patch(url, json={"favourite": True})
+    stale = client.get(url, headers={"If-None-Match": before.headers["ETag"]})
+    current = client.get(url, headers={"If-None-Match": toggled.headers["ETag"]})
+
+    assert toggled.json()["favourite"] is True
+    assert toggled.json()["updated_at"] == before.json()["updated_at"]
+    assert toggled.headers["ETag"] != before.headers["ETag"]
+    assert stale.status_code == 200
+    assert stale.json()["favourite"] is True
+    assert current.status_code == 304
 
 
 def test_patch_with_if_unmodified_since_returns_412_when_stale() -> None:

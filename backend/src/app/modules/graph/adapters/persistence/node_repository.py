@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import structlog
@@ -18,13 +19,20 @@ from sqlalchemy import (
     tuple_,
     update,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID, aggregate_order_by
+from sqlalchemy.dialects.postgresql import (
+    ARRAY,
+    JSONB,
+    UUID,
+    aggregate_order_by,
+    insert,
+)
 
-from app.modules.graph.adapters.persistence.models import NodeModel
+from app.modules.graph.adapters.persistence.models import NodeFavouriteModel, NodeModel
 from app.modules.graph.adapters.persistence.query_env import QueryEnv
 from app.modules.graph.adapters.persistence.query_sql import (
     after_clause,
     compile_where,
+    favourite_clause,
     order_by,
     sort_expressions,
 )
@@ -51,7 +59,6 @@ if TYPE_CHECKING:
     import collections.abc
     import uuid
     from collections.abc import Mapping, Sequence
-    from datetime import datetime
 
     from sqlalchemy import ColumnElement
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -72,7 +79,6 @@ def _to_domain(model: NodeModel) -> Node:
         type=model.type,
         description=model.description,
         attributes=model.attributes,
-        favourite=model.favourite,
         tags=model.tags,
         extra_schema=model.extra_schema,
         created_at=model.created_at,
@@ -90,7 +96,6 @@ def _to_model(node: Node) -> NodeModel:
         type=node.type,
         description=node.description,
         attributes=node.attributes,
-        favourite=node.favourite,
         tags=node.tags,
         extra_schema=node.extra_schema,
         created_at=node.created_at,
@@ -141,6 +146,53 @@ class SqlAlchemyNodeRepository:
         self._session = session
         self._external = external
 
+    async def _viewed(
+        self, nodes: builtins.list[Node], scope: ContentFilter
+    ) -> builtins.list[Node]:
+        """Mark each node with whether the scope's person has favourited it."""
+        if scope.user_id is None or not nodes:
+            return nodes
+        found = await self._session.execute(
+            select(NodeFavouriteModel.node_id).where(
+                NodeFavouriteModel.user_id == scope.user_id,
+                NodeFavouriteModel.node_id
+                == any_(cast([node.id for node in nodes], ARRAY(UUID))),
+            )
+        )
+        favourited = set(found.scalars())
+        for node in nodes:
+            node.favourite = node.id in favourited
+        return nodes
+
+    async def set_favourite(
+        self, node_id: uuid.UUID, favourite: bool, *, scope: ContentFilter
+    ) -> None:
+        """Favourite or unfavourite a live node for the scope's person."""
+        if scope.user_id is None:
+            msg = "A favourite belongs to one person; the scope names none."
+            raise ValueError(msg)
+        visible = await self._session.execute(
+            select(NodeModel.id).where(_in_scope(scope), NodeModel.id == node_id)
+        )
+        if visible.scalar_one_or_none() is None:
+            return
+        if favourite:
+            await self._session.execute(
+                insert(NodeFavouriteModel)
+                .values(
+                    user_id=scope.user_id, node_id=node_id, created_at=datetime.now(UTC)
+                )
+                .on_conflict_do_nothing()
+            )
+        else:
+            await self._session.execute(
+                delete(NodeFavouriteModel).where(
+                    NodeFavouriteModel.user_id == scope.user_id,
+                    NodeFavouriteModel.node_id == node_id,
+                )
+            )
+        await self._session.flush()
+
     async def add(self, node: Node) -> None:
         """Add a new node.
 
@@ -151,6 +203,13 @@ class SqlAlchemyNodeRepository:
         logger.debug("adding node", node_id=node.id)
         self._session.add(_to_model(node))
         await self._session.flush()
+        if node.favourite and node.owner_id is not None:
+            self._session.add(
+                NodeFavouriteModel(
+                    user_id=node.owner_id, node_id=node.id, created_at=datetime.now(UTC)
+                )
+            )
+            await self._session.flush()
 
     async def save(self, node: Node) -> None:
         """Persist changes to an existing node."""
@@ -165,7 +224,9 @@ class SqlAlchemyNodeRepository:
             select(NodeModel).where(_in_scope(scope), NodeModel.id == node_id)
         )
         model = result.scalar_one_or_none()
-        return None if model is None else _to_domain(model)
+        if model is None:
+            return None
+        return (await self._viewed([_to_domain(model)], scope))[0]
 
     async def list(
         self,
@@ -198,10 +259,10 @@ class SqlAlchemyNodeRepository:
         if q is not None:
             stmt = stmt.where(search_clause(q, attribute_search_exclusions))
         if favourite is not None:
-            stmt = stmt.where(NodeModel.favourite == favourite)
+            stmt = stmt.where(favourite_clause(scope.user_id, favourite))
         await _jit_off_for_text(self._session, has_text=q is not None)
         result = await self._session.execute(stmt)
-        return [_to_domain(model) for model in result.scalars()]
+        return await self._viewed([_to_domain(m) for m in result.scalars()], scope)
 
     async def search(
         self,
@@ -226,9 +287,10 @@ class SqlAlchemyNodeRepository:
         stmt = stmt.order_by(*order_by(resolved, exprs)).limit(limit)
         await _jit_off_for_text(self._session, has_text=_has_text(resolved))
         rows = (await self._session.execute(stmt)).all()
+        nodes = await self._viewed([_to_domain(row[0]) for row in rows], scope)
         return [
-            SearchHit(node=_to_domain(row[0]), sort_values=tuple(row[1:]))
-            for row in rows
+            SearchHit(node=node, sort_values=tuple(row[1:]))
+            for node, row in zip(nodes, rows, strict=True)
         ]
 
     async def search_count(
@@ -276,7 +338,7 @@ class SqlAlchemyNodeRepository:
         if q is not None:
             matches = matches.where(search_clause(q, attribute_search_exclusions))
         if favourite is not None:
-            matches = matches.where(NodeModel.favourite == favourite)
+            matches = matches.where(favourite_clause(scope.user_id, favourite))
         if limit is not None:
             matches = matches.limit(limit)
         stmt = select(func.count()).select_from(matches.subquery())
@@ -307,7 +369,7 @@ class SqlAlchemyNodeRepository:
         if type is not None:
             stmt = stmt.where(NodeModel.type == type)
         if favourite is not None:
-            stmt = stmt.where(NodeModel.favourite == favourite)
+            stmt = stmt.where(favourite_clause(scope.user_id, favourite))
         if resolved is not None:
             where = compile_where(
                 resolved, QueryEnv(scope=scope, external=self._external)
@@ -320,7 +382,9 @@ class SqlAlchemyNodeRepository:
         model = (
             await self._session.execute(stmt.order_by(func.random()).limit(1))
         ).scalar_one_or_none()
-        return None if model is None else _to_domain(model)
+        if model is None:
+            return None
+        return (await self._viewed([_to_domain(model)], scope))[0]
 
     async def count_by_type(self, *, scope: ContentFilter) -> builtins.list[TypeCount]:
         """Count live nodes in `scope` per item type; untyped is one NULL row."""
@@ -402,7 +466,7 @@ class SqlAlchemyNodeRepository:
         if after is not None:
             stmt = stmt.where(NodeModel.id > after)
         result = await self._session.execute(stmt)
-        return [_to_domain(model) for model in result.scalars()]
+        return await self._viewed([_to_domain(m) for m in result.scalars()], scope)
 
     async def list_attribute_values(
         self,

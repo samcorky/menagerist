@@ -57,10 +57,16 @@ async def test_reflected_user_transfer_keeps_other_accounts(
             ):
                 await connection.execute(
                     text("""INSERT INTO nodes
-                    (id, owner_id, name, type, attributes, favourite, tags,
+                    (id, owner_id, name, type, attributes, tags,
                     created_at, updated_at)
-                    VALUES (:id,:owner,:name,'book','{}',false,'[]',now(),now())"""),
+                    VALUES (:id,:owner,:name,'book','{}','[]',now(),now())"""),
                     {"id": identifier, "owner": user_id, "name": name},
+                )
+            for user_id, node_id in ((owner, item), (other, item), (other, private)):
+                await connection.execute(
+                    text("""INSERT INTO node_favourites (user_id, node_id, created_at)
+                    VALUES (:user, :node, now())"""),
+                    {"user": user_id, "node": node_id},
                 )
         snapshot = SqlAlchemyUserDatabaseSnapshot(factory)
         members = {
@@ -71,6 +77,13 @@ async def test_reflected_user_transfer_keeps_other_accounts(
         assert b"Private" not in b"".join(members.values())
         assert "data/users.ndjson" not in members
         assert json.loads(members["data/nodes.ndjson"])["id"] == str(item)
+        starred = [
+            json.loads(line)
+            for line in members["data/node_favourites.ndjson"].splitlines()
+        ]
+        assert [(row["user_id"], row["node_id"]) for row in starred] == [
+            (str(owner), str(item))
+        ]
         restorer = SqlAlchemyUserDatabaseRestorer(factory, BackupUserImportValidator())
         with pytest.raises(ImportCollisionError):
             await restorer.import_user(
@@ -96,6 +109,17 @@ async def test_reflected_user_transfer_keeps_other_accounts(
                 )
                 == other
             )
+            favourites = (
+                await connection.execute(
+                    text("SELECT user_id, node_id FROM node_favourites")
+                )
+            ).all()
+            # The import gives the item's star to the importing account; the other
+            # person's stars on their own item are untouched.
+            assert {(row.user_id, row.node_id) for row in favourites} == {
+                (destination, item),
+                (other, private),
+            }
             assert await connection.scalar(text("SELECT count(*) FROM users")) == 3
     finally:
         await engine.dispose()

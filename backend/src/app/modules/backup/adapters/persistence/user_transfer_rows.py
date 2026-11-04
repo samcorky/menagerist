@@ -25,6 +25,7 @@ USER_TABLES = (
     "edges",
     "collection_members",
     "media_attachments",
+    "node_favourites",
 )
 VOCABULARY = frozenset({"presets", "node_types", "edge_types"})
 ENTITY_TABLES = {
@@ -51,6 +52,7 @@ _PARENTS = {
     "edges": (("source_id", "nodes"), ("target_id", "nodes")),
     "collection_members": (("collection_id", "collections"), ("item_id", "nodes")),
     "media_attachments": (("target_id", "nodes"),),
+    "node_favourites": (("node_id", "nodes"),),
 }
 
 
@@ -152,6 +154,8 @@ def prepare_row(
     row = dict(row)
     if name in OWNED_TABLES:
         row["owner_id"] = owner_id
+    if name == "node_favourites":
+        row["user_id"] = owner_id
     for key in ("attributes_schema", "extra_schema", "definition"):
         if key in row:
             row[key] = remap_schema(row[key], remap)

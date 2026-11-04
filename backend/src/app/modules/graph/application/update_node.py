@@ -88,32 +88,54 @@ class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
             if command.attributes is not None or target_type != node.type:
                 await self._validate(repos, node, target_type, command)
 
-            if command.clear_type:
-                node.clear_type()
-            node.update(
-                name=command.name,
-                type=new_type,
-                description=command.description,
-                attributes=command.attributes,
-                favourite=command.favourite,
-                tags=command.tags,
-                extra_schema=command.extra_schema,
-            )
-
-            if node.type is not None and new_type is not None:
-                slug = node.type
-                if (
-                    await repos.node_types.get_by_slug(slug, guard_item_write=True)
-                    is None
-                ):
-                    await repos.node_types.add(
-                        NodeType.create(slug=slug, label=new_type)
-                    )
-
-            await repos.nodes.save(node)
+            # A favourite is the caller's own, so changing only that leaves the item,
+            # its timestamp and everyone else's view of it alone.
+            if self._edits_item(command):
+                await self._apply_edits(repos, node, command, new_type)
+            if command.favourite is not None:
+                await repos.nodes.set_favourite(
+                    node.id, command.favourite, scope=self.scope(actor)
+                )
+                node.favourite = command.favourite
             await self._uow.commit()
         logger.info("node updated", node_id=command.node_id)
         return node
+
+    @staticmethod
+    async def _apply_edits(
+        repos: GraphRepos, node: Node, command: UpdateNodeCommand, new_type: str | None
+    ) -> None:
+        """Apply the item's own changes, creating a newly named type, and save."""
+        if command.clear_type:
+            node.clear_type()
+        node.update(
+            name=command.name,
+            type=new_type,
+            description=command.description,
+            attributes=command.attributes,
+            tags=command.tags,
+            extra_schema=command.extra_schema,
+        )
+        if node.type is not None and new_type is not None:
+            slug = node.type
+            if await repos.node_types.get_by_slug(slug, guard_item_write=True) is None:
+                await repos.node_types.add(NodeType.create(slug=slug, label=new_type))
+        await repos.nodes.save(node)
+
+    @staticmethod
+    def _edits_item(command: UpdateNodeCommand) -> bool:
+        """Whether the command changes the item itself, not just the caller's star."""
+        return command.clear_type or any(
+            value is not None
+            for value in (
+                command.name,
+                command.type,
+                command.description,
+                command.attributes,
+                command.tags,
+                command.extra_schema,
+            )
+        )
 
     @staticmethod
     def _target_type(node: Node, new_type: str | None, clearing: bool) -> str | None:

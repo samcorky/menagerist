@@ -66,6 +66,12 @@ class InMemoryUserDatabaseSnapshot:
             and row.get("target_type") == "node"
             and str(row.get("target_id")) in nodes
         ]
+        selected["node_favourites"] = [
+            row
+            for row in self.tables.get("node_favourites", [])
+            if str(row.get("user_id")) == str(scope.user_id)
+            and str(row.get("node_id")) in nodes
+        ]
         installation_refs: dict[str, set[str]] = {
             name: set() for name in ("presets", "node_types", "edge_types")
         }

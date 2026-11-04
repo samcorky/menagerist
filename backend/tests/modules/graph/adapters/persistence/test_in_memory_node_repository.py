@@ -586,16 +586,13 @@ async def test_ids_combines_with_other_filters() -> None:
         == 2
     )
 
+    # Favourites are a person's own, so look as the owner.
+    owner = ContentFilter.of(uuid.UUID(int=1))
     by_fav = await repository.list(
-        scope=ContentFilter.everyone(), after=None, limit=10, ids=films, favourite=True
+        scope=owner, after=None, limit=10, ids=films, favourite=True
     )
     assert by_fav == []
-    assert (
-        await repository.count(
-            scope=ContentFilter.everyone(), ids=everything, favourite=True
-        )
-        == 1
-    )
+    assert await repository.count(scope=owner, ids=everything, favourite=True) == 1
 
     paged = await repository.list(
         scope=ContentFilter.everyone(), after=nodes[0].id, limit=1, ids=films
