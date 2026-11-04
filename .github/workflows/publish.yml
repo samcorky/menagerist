@@ -1,7 +1,8 @@
 name: Publish
 
 # Builds the image on a native runner for each platform and pushes it to GHCR.
-#   - a published release:  <version> and latest
+#   - a published release:  <version>, the month and year tags and latest, each only
+#                           when no newer release covers it (.github/actions/image-tags)
 #   - a push to main:       edge and sha-<commit>
 #   - run by hand:          a build only, unless "push" is ticked (sha-<commit>, plus
 #                           edge when run from main)
@@ -134,7 +135,9 @@ jobs:
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
 
       # type=pep440 skips the pattern for a .post release, so the month and year tags
-      # come from the image-tags action and are handed over as raw tags.
+      # and latest come from the image-tags action and are handed over as raw tags. It
+      # holds back any tag a newer release already covers, so a hotfix for an older
+      # month cannot move latest backwards.
       - name: Work out the partial version tags
         id: partial
         if: github.event_name == 'release' && !github.event.release.prerelease
@@ -154,7 +157,6 @@ jobs:
             type=pep440,pattern={{version}}
             type=sha
             ${{ steps.partial.outputs.tags }}
-            type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
 
       - name: Show the tags
         env:

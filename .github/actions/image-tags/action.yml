@@ -1,14 +1,17 @@
 name: Image tags
 description: >-
   Work out the version tags of the Docker image for a release tag: the full version, the
-  month and year tags, and whether the release also moves latest. One place for the
-  rules, used to publish the tags and to preview them. The caller needs the repository
-  checked out and uv installed.
+  month and year tags, and latest, each moved only when no newer published release
+  covers it. One place for the rules, used to publish the tags and to preview them. The
+  caller needs the repository checked out and uv installed.
 
 inputs:
   tag:
     description: The release tag, for example v0.2026.11.0 or v0.2026.11.0.post1.
     required: true
+  token:
+    description: Token used to list the published releases.
+    default: ${{ github.token }}
 
 outputs:
   tags:
@@ -17,19 +20,37 @@ outputs:
   preview:
     description: Every version tag the release publishes, comma separated, for display.
     value: ${{ steps.tags.outputs.preview }}
+  held:
+    description: Tags the release must not move because a newer release covers them.
+    value: ${{ steps.tags.outputs.held }}
 
 runs:
   using: composite
   steps:
+    # Drafts and pre-releases never hold a tag back, so they are left out. A failure here
+    # stops the step: moving latest without knowing what is newer could point it backwards.
+    - name: List the published releases
+      id: released
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+      run: |
+        file="${RUNNER_TEMP}/released-tags.txt"
+        gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --exclude-pre-releases \
+          --limit 200 --json tagName --jq '.[].tagName' > "$file"
+        echo "file=${file}" >> "$GITHUB_OUTPUT"
+
     # calver-scm reads the tag against the project's scheme, so a tag it rejects fails
-    # the step (pipefail), and image_tags.py holds the rules for what to publish.
+    # the step (pipefail), and image_tags.py holds the rules for what to publish. It runs
+    # in the release group so it uses the locked packaging.
     - name: Work out the tags
       id: tags
       shell: bash
       working-directory: backend
       env:
         TAG: ${{ inputs.tag }}
+        RELEASED_FILE: ${{ steps.released.outputs.file }}
       run: |
         set -o pipefail
         uv run --locked --only-group release calver-scm --json parse "$TAG" --tag \
-          | uv run --script ../scripts/image_tags.py
+          | uv run --locked --only-group release python ../scripts/image_tags.py
