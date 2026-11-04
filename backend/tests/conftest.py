@@ -10,6 +10,7 @@ from testcontainers.community.postgres import PostgresContainer
 
 from app.entrypoints.api.shared import settings_reader
 from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.entrypoints.api.shared.http.rate_limit import get_rate_limiter
 from app.modules.settings.adapters.persistence.in_memory_setting_value_repository import (  # noqa: E501
     InMemorySettingValueRepository,
 )
@@ -18,6 +19,7 @@ from app.modules.settings.adapters.persistence.unit_of_work import (
 )
 from app.platform import alembic_runner
 from app.platform.config import get_database_settings
+from app.platform.config.rate_limit import get_rate_limit_settings
 from app.shared_kernel.actor import Actor
 
 if TYPE_CHECKING:
@@ -249,3 +251,13 @@ def _in_memory_settings(
     yield
     settings_reader.get_settings_catalogue.cache_clear()
     settings_reader.get_settings_reader.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_rate_limits() -> Iterator[None]:
+    """Give each test its own request counts, so no test spends another's allowance."""
+    get_rate_limiter.cache_clear()
+    get_rate_limit_settings.cache_clear()
+    yield
+    get_rate_limiter.cache_clear()
+    get_rate_limit_settings.cache_clear()

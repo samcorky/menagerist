@@ -2,6 +2,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
+import pytest
 import time_machine
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
@@ -12,6 +13,12 @@ from app.modules.identity.application.authenticate_api_token import (
     AuthenticateApiToken,
     AuthenticateApiTokenCommand,
 )
+from app.modules.identity.application.sign_in_throttle import (
+    SignInThrottle,
+    ip_key,
+    token_ip_key,
+)
+from app.modules.identity.domain.errors import SignInThrottledError
 from app.shared_kernel.actor import ANONYMOUS_ACTOR
 
 if TYPE_CHECKING:
@@ -171,7 +178,9 @@ async def test_an_unknown_id_costs_the_same_as_a_wrong_secret(
         (wrong, f"mnst_{parsed.token_id.hex}_{'0' * 64}"),
         (ghost, f"mnst_{uuid.uuid7().hex}_{'0' * 64}"),
     ):
-        handler = AuthenticateApiToken(world.uow, get_access_guard(), spy)
+        handler = AuthenticateApiToken(
+            world.uow, get_access_guard(), spy, SignInThrottle()
+        )
         spy.hashes = spy.comparisons = 0
         assert (
             await handler.handle(
@@ -187,3 +196,96 @@ async def test_an_unknown_id_costs_the_same_as_a_wrong_secret(
 def test_the_command_repr_hides_the_value() -> None:
     """Tracebacks never show the token."""
     assert "mnst_" not in repr(AuthenticateApiTokenCommand(value="mnst_secret"))
+
+
+IP = "203.0.113.7"
+
+
+def _from(ip: str | None, value: str) -> AuthenticateApiTokenCommand:
+    return AuthenticateApiTokenCommand(value=value, client_ip=ip)
+
+
+@time_machine.travel(NOW, tick=False)
+async def test_repeated_failures_lock_the_address_before_the_value_is_checked(
+    cases: Cases, world: World, make_user: MakeUser, issue_token: IssueToken
+) -> None:
+    """Past the limit even a valid token is refused with a Retry-After."""
+    user = make_user()
+    await world.users.add(user)
+    created = await issue_token(user)
+    limit = cases.throttle.policy.ip_limit
+    for _ in range(limit):
+        assert (
+            await cases.authenticate_api_token.handle(
+                _from(IP, "not-a-token"), ANONYMOUS_ACTOR
+            )
+            is None
+        )
+
+    with pytest.raises(SignInThrottledError) as refused:
+        await cases.authenticate_api_token.handle(
+            _from(IP, created.plaintext), ANONYMOUS_ACTOR
+        )
+    assert refused.value.retry_after == int(
+        cases.throttle.policy.window.total_seconds()
+    )
+
+
+@time_machine.travel(NOW, tick=False)
+async def test_each_kind_of_bad_value_counts_but_a_good_one_does_not(
+    cases: Cases, world: World, make_user: MakeUser, issue_token: IssueToken
+) -> None:
+    """Malformed, unknown and wrong-secret values count; successes never do."""
+    user = make_user()
+    await world.users.add(user)
+    created = await issue_token(user)
+    parsed = cases.api_tokens.parse(created.plaintext)
+    assert parsed is not None
+    bad = [
+        "garbage",
+        cases.api_tokens.new_token().plaintext,
+        f"mnst_{parsed.token_id.hex}_{'0' * 64}",
+    ]
+    for value in bad:
+        await cases.authenticate_api_token.handle(_from(IP, value), ANONYMOUS_ACTOR)
+    key = token_ip_key(IP)
+    assert world.attempts.windows[key].count == len(bad)
+
+    for _ in range(cases.throttle.policy.ip_limit * 2):
+        assert (
+            await cases.authenticate_api_token.handle(
+                _from(IP, created.plaintext), ANONYMOUS_ACTOR
+            )
+            is not None
+        )
+    assert world.attempts.windows[key].count == len(bad)
+
+
+@time_machine.travel(NOW, tick=False)
+async def test_other_addresses_and_sign_in_are_unaffected(
+    cases: Cases, world: World
+) -> None:
+    """A locked address does not lock another one or the sign-in counter."""
+    for _ in range(cases.throttle.policy.ip_limit):
+        await cases.authenticate_api_token.handle(_from(IP, "x"), ANONYMOUS_ACTOR)
+
+    assert (
+        await cases.authenticate_api_token.handle(
+            _from("203.0.113.8", "x"), ANONYMOUS_ACTOR
+        )
+        is None
+    )
+    assert ip_key(IP) not in world.attempts.windows
+
+
+@time_machine.travel(NOW, tick=False)
+async def test_requests_without_an_address_are_not_counted(
+    cases: Cases, world: World
+) -> None:
+    """With no client address there is nothing to key a counter on."""
+    for _ in range(cases.throttle.policy.ip_limit + 1):
+        assert (
+            await cases.authenticate_api_token.handle(_from(None, "x"), ANONYMOUS_ACTOR)
+            is None
+        )
+    assert not world.attempts.windows

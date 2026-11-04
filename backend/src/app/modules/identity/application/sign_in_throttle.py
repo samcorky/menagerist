@@ -42,6 +42,18 @@ def ip_key(client_ip: str) -> ThrottleKey:
     return _key(ThrottleKind.IP, client_ip)
 
 
+def token_ip_key(client_ip: str) -> ThrottleKey:
+    """The counter for failed API-token checks from a client address.
+
+    Separate from `ip_key`, so a script with a stale token cannot lock people
+    out of signing in from the same address.
+    """
+    return _key(ThrottleKind.TOKEN_IP, client_ip)
+
+
+_ADDRESS_KINDS = frozenset({ThrottleKind.IP, ThrottleKind.TOKEN_IP})
+
+
 @dataclass(kw_only=True, frozen=True)
 class Reservation:
     """Attempts counted before a password check, and any lock they hit."""
@@ -58,7 +70,7 @@ class SignInThrottle:
 
     def limit_for(self, key: ThrottleKey) -> int:
         """Return how many failures `key` may make in one window."""
-        if key.kind is ThrottleKind.IP:
+        if key.kind in _ADDRESS_KINDS:
             return self.policy.ip_limit
         return self.policy.username_limit
 
@@ -105,7 +117,7 @@ class SignInThrottle:
     ) -> None:
         """Forget a correct check: clear the account's counter, refund the address's."""
         for key, window in reservation.windows.items():
-            if key.kind is ThrottleKind.IP:
+            if key.kind in _ADDRESS_KINDS:
                 await attempts.release_attempt(
                     key, window_start=window.window_start, limit=self.limit_for(key)
                 )

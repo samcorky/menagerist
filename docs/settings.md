@@ -54,6 +54,7 @@ Configuration for the identity module.
 | `MENAGERIST_IDENTITY_PASSWORD_HASHER` | text | `scrypt` | `scrypt` | Password-hashing scheme used for newly created password hashes. |
 | `MENAGERIST_IDENTITY_SIGN_IN_USERNAME_ATTEMPTS` | whole number | `5` | 1 or more | Failed sign-ins allowed per username in each throttle window. |
 | `MENAGERIST_IDENTITY_SIGN_IN_IP_ATTEMPTS` | whole number | `20` | 1 or more | Failed sign-ins allowed per IP address in each throttle window. |
+| `MENAGERIST_IDENTITY_API_TOKEN_IP_ATTEMPTS` | whole number | `20` | 1 or more | Failed API-token checks allowed per IP address per window. |
 | `MENAGERIST_IDENTITY_SIGN_IN_WINDOW_MINUTES` | whole number | `15` | 1 or more | Duration of the failed sign-in throttle window in minutes. |
 | `MENAGERIST_IDENTITY_PASSWORD_HASH_CONCURRENCY` | whole number | `2` | 1 or more | Maximum number of simultaneous password-hash operations in this process. |
 | `MENAGERIST_IDENTITY_API_TOKEN_DEFAULT_DAYS` | whole number | `90` | 1 or more | Lifetime in days offered for a new API token. |
@@ -84,6 +85,17 @@ Configuration for the media module.
 | `MENAGERIST_MEDIA_STAGED_TTL_HOURS` | whole number | `24` | 1 or more | Hours to keep media uploads that have not been attached. |
 | `MENAGERIST_MEDIA_ORPHANED_TTL_HOURS` | whole number | `72` | 1 or more | Hours to keep media files that are no longer referenced. |
 | `MENAGERIST_MEDIA_MAX_UPLOAD_SIZE` | whole number | `104857600` | more than 0 | Maximum accepted media upload size in bytes. |
+
+## Rate_Limit
+
+Request limits on the endpoints that are expensive to serve.
+
+| Variable | Type | Default | Allowed values | Notes |
+| --- | --- | --- | --- | --- |
+| `MENAGERIST_RATE_LIMIT_UPLOADS_PER_MINUTE` | whole number | `30` | 0 or more | Media and backup uploads allowed per user each minute. |
+| `MENAGERIST_RATE_LIMIT_THUMBNAILS_PER_MINUTE` | whole number | `600` | 0 or more | Thumbnail requests allowed per user each minute. |
+| `MENAGERIST_RATE_LIMIT_SEARCH_PER_MINUTE` | whole number | `120` | 0 or more | Item searches allowed per user each minute. |
+| `MENAGERIST_RATE_LIMIT_IMPORTS_PER_MINUTE` | whole number | `10` | 0 or more | Preset and user-data imports allowed per user each minute. |
 
 ## Release
 

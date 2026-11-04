@@ -61,6 +61,11 @@ class IdentitySettings(MenageristBaseSettings, group="identity"):
         ge=1,
         description="Failed sign-ins allowed per IP address in each throttle window.",
     )
+    api_token_ip_attempts: int = Field(
+        default=20,
+        ge=1,
+        description="Failed API-token checks allowed per IP address per window.",
+    )
     sign_in_window_minutes: int = Field(
         default=15,
         ge=1,

@@ -14,6 +14,11 @@ from app.entrypoints.api.shared.http.http_headers import (
     conditional_patch_responses,
 )
 from app.entrypoints.api.shared.http.problem_response import error_response
+from app.entrypoints.api.shared.http.rate_limit import (
+    RATE_LIMITED_RESPONSE,
+    RateLimitBucket,
+    rate_limited,
+)
 from app.entrypoints.api.shared.http.upload_limit_middleware import (
     PAYLOAD_TOO_LARGE_RESPONSE,
 )
@@ -106,7 +111,9 @@ async def _chunks(upload: UploadFile) -> AsyncGenerator[bytes]:
     response_model=MediaAssetResponse,
     status_code=201,
     operation_id="stage_media",
+    dependencies=[Depends(rate_limited(RateLimitBucket.UPLOADS))],
     responses={
+        **RATE_LIMITED_RESPONSE,
         **error_response(MediaFileTooLargeError, detail="upload exceeds the limit"),
         **PAYLOAD_TOO_LARGE_RESPONSE,
     },
@@ -140,7 +147,9 @@ async def stage_media(
     response_model=MediaAttachmentResponse,
     status_code=201,
     operation_id="upload_and_attach_media",
+    dependencies=[Depends(rate_limited(RateLimitBucket.UPLOADS))],
     responses={
+        **RATE_LIMITED_RESPONSE,
         **error_response(MediaFileTooLargeError, detail="upload exceeds the limit"),
         **PAYLOAD_TOO_LARGE_RESPONSE,
         **error_response(
@@ -311,8 +320,10 @@ async def stream_media_content(
 @router.get(
     "/{asset_id}/thumbnail",
     operation_id="stream_media_thumbnail",
+    dependencies=[Depends(rate_limited(RateLimitBucket.THUMBNAILS))],
     response_model=None,
     responses={
+        **RATE_LIMITED_RESPONSE,
         200: {"content": {"image/webp": {}}},
         **error_response(
             MediaAssetNotFoundError,

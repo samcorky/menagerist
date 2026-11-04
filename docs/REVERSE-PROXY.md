@@ -66,6 +66,29 @@ networks:
 
 Traefik forwards the headers and sets no body limit unless you add a `buffering` middleware. Redirecting `http` to `https` is a setting on Traefik's own `web` entrypoint, not on this service. List the `proxy` network (`docker network inspect proxy`) in `MENAGERIST_API_TRUSTED_PROXIES`, because Traefik reaches the app over it. Publishing `8080` in `compose.yaml` still exposes the app directly; add `ports: !override []` to the service if the proxy should be the only way in.
 
+## Rate-limit at the proxy
+
+Menagerist counts failed sign-ins, password checks and API-token checks itself (see "Sign-in lockouts" in [CONTRIBUTING.md](../CONTRIBUTING.md)), but a proxy can also cap the raw request rate per address before a request reaches the app. This is coarse and per address; the app's own limits are what protect accounts.
+
+nginx, limiting the sign-in route to 10 requests a minute per address with a short burst:
+
+```nginx
+# http {} context
+limit_req_zone $binary_remote_addr zone=menagerist_signin:10m rate=10r/m;
+limit_req_status 429;
+
+# server {} context
+location = /api/v1/auth/login {
+    limit_req zone=menagerist_signin burst=5 nodelay;
+    proxy_pass http://menagerist:8000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+The app sees the real client address only when the proxy is listed in `MENAGERIST_API_TRUSTED_PROXIES`. Without that, every request appears to come from the proxy, so the app's per-address counters (sign-in and API-token failures) are shared by everyone behind it.
+
 ## Sign-in and first-run setup refuse requests from other sites
 
 The browser's own `Sec-Fetch-Site` header decides: `cross-site` is refused and `same-origin` is accepted, whatever the proxy does to the scheme or host. Without that header (very old browsers, or plain HTTP on a LAN address) or when it says `same-site`, the request's `Origin` must match the origin the app sees, so there the proxy must pass `Host` and `X-Forwarded-Proto` through and be listed in `MENAGERIST_API_TRUSTED_PROXIES`. `MENAGERIST_API_CORS_ORIGINS` is not the fix for a proxy problem.

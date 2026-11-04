@@ -14,6 +14,11 @@ from app.entrypoints.api.shared.http.http_headers import (
     link_next_header,
 )
 from app.entrypoints.api.shared.http.problem_response import error_response
+from app.entrypoints.api.shared.http.rate_limit import (
+    RATE_LIMITED_RESPONSE,
+    RateLimitBucket,
+    rate_limited,
+)
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.graph.adapters.api.dependencies import (
     get_count_node_types_use_case,
@@ -192,9 +197,13 @@ async def create_node(
     "/search",
     response_model=NodeSearchResponse,
     operation_id="search_nodes",
-    responses=error_response(
-        InvalidQueryError, detail="where.children[0]: Unknown condition kind."
-    ),
+    dependencies=[Depends(rate_limited(RateLimitBucket.SEARCH))],
+    responses={
+        **RATE_LIMITED_RESPONSE,
+        **error_response(
+            InvalidQueryError, detail="where.children[0]: Unknown condition kind."
+        ),
+    },
 )
 async def search_nodes(
     body: NodeSearchRequest,
@@ -222,10 +231,14 @@ async def search_nodes(
     "/search/counts",
     response_model=NodeSearchCountsResponse,
     operation_id="count_node_searches",
-    responses=error_response(
-        InvalidQueryError,
-        detail="queries.no_photo: where.children[0]: Unknown condition kind.",
-    ),
+    dependencies=[Depends(rate_limited(RateLimitBucket.SEARCH))],
+    responses={
+        **RATE_LIMITED_RESPONSE,
+        **error_response(
+            InvalidQueryError,
+            detail="queries.no_photo: where.children[0]: Unknown condition kind.",
+        ),
+    },
 )
 async def count_node_searches(
     body: NodeSearchCountsRequest,
