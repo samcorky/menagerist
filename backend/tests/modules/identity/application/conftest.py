@@ -181,7 +181,9 @@ def build_cases(world: World, claim: ExistingDataClaim | None = None) -> Cases:
             default_days=DEFAULT_DAYS,
             max_days=MAX_DAYS,
         ),
-        authenticate_api_token=AuthenticateApiToken(world.uow, guard, api_tokens),
+        authenticate_api_token=AuthenticateApiToken(
+            world.uow, guard, api_tokens, throttle
+        ),
         list_grantable=ListGrantablePermissions(
             repos, guard, authorisation, grantable=GRANTABLE
         ),
