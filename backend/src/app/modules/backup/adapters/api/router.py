@@ -9,6 +9,11 @@ from app.entrypoints.api.shared.bridges.backup_setup_gate import first_run_resto
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.entrypoints.api.shared.http.cross_site import refuse_cross_site
 from app.entrypoints.api.shared.http.problem_response import error_response
+from app.entrypoints.api.shared.http.rate_limit import (
+    RATE_LIMITED_RESPONSE,
+    RateLimitBucket,
+    rate_limited,
+)
 from app.entrypoints.api.shared.http.upload_limit_middleware import (
     PAYLOAD_TOO_LARGE_RESPONSE,
 )
@@ -137,8 +142,13 @@ async def prune_backups(
     status_code=201,
     response_model=BackupResponse,
     operation_id="upload_backup",
+    dependencies=[Depends(rate_limited(RateLimitBucket.UPLOADS))],
     openapi_extra=ARCHIVE_BODY,
-    responses={**ADMIN_RESPONSES, **PAYLOAD_TOO_LARGE_RESPONSE},
+    responses={
+        **ADMIN_RESPONSES,
+        **PAYLOAD_TOO_LARGE_RESPONSE,
+        **RATE_LIMITED_RESPONSE,
+    },
 )
 async def upload_backup(
     request: Request,

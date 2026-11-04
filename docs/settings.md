@@ -86,6 +86,17 @@ Configuration for the media module.
 | `MENAGERIST_MEDIA_ORPHANED_TTL_HOURS` | whole number | `72` | 1 or more | Hours to keep media files that are no longer referenced. |
 | `MENAGERIST_MEDIA_MAX_UPLOAD_SIZE` | whole number | `104857600` | more than 0 | Maximum accepted media upload size in bytes. |
 
+## Rate_Limit
+
+Request limits on the endpoints that are expensive to serve.
+
+| Variable | Type | Default | Allowed values | Notes |
+| --- | --- | --- | --- | --- |
+| `MENAGERIST_RATE_LIMIT_UPLOADS_PER_MINUTE` | whole number | `30` | 0 or more | Media and backup uploads allowed per user each minute. |
+| `MENAGERIST_RATE_LIMIT_THUMBNAILS_PER_MINUTE` | whole number | `600` | 0 or more | Thumbnail requests allowed per user each minute. |
+| `MENAGERIST_RATE_LIMIT_SEARCH_PER_MINUTE` | whole number | `120` | 0 or more | Item searches allowed per user each minute. |
+| `MENAGERIST_RATE_LIMIT_IMPORTS_PER_MINUTE` | whole number | `10` | 0 or more | Preset and user-data imports allowed per user each minute. |
+
 ## Release
 
 Which releases the instance looks for and how often.

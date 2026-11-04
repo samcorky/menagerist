@@ -252,6 +252,27 @@ def test_stream_content_returns_bytes() -> None:
     assert cached_resp.status_code == 304
 
 
+def test_uploads_and_thumbnails_are_rate_limited(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Past its allowance a route answers 429 with Retry-After."""
+    monkeypatch.setenv("MENAGERIST_RATE_LIMIT_UPLOADS_PER_MINUTE", "1")
+    monkeypatch.setenv("MENAGERIST_RATE_LIMIT_THUMBNAILS_PER_MINUTE", "1")
+    app, _, _ = _app_with_in_memory_media()
+    client = TestClient(app)
+    files = {"file": ("f.jpg", TINY_JPEG, "image/jpeg")}
+
+    stage = client.post("/api/v1/media", files=files)
+    assert stage.status_code == 201
+    refused = client.post("/api/v1/media", files=files)
+    assert refused.status_code == 429
+    assert int(refused.headers["Retry-After"]) >= 1
+
+    url = f"/api/v1/media/{stage.json()['id']}/thumbnail"
+    assert client.get(url).status_code == 200
+    assert client.get(url).status_code == 429
+
+
 def test_stream_thumbnail_returns_thumbnail_bytes() -> None:
     """GET /media/{id}/thumbnail streams the thumbnail bytes."""
     app, _, _ = _app_with_in_memory_media()
