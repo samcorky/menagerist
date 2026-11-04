@@ -41,6 +41,8 @@ EVERYTHING = {"backend": True, "frontend": True, "e2e": True, "image": True}
             ".github/release.yml",
             ".github/workflows/autofix.yml",
             ".github/workflows/codeql.yml",
+            ".github/workflows/publish.yml",
+            ".github/workflows/release.yml",
         ],
         ["frontend/README.md", "backend/README.md"],
         [".pre-commit-config.yaml", "backend/.pre-commit-config.yaml"],
