@@ -1,6 +1,6 @@
 # Running behind a reverse proxy
 
-Menagerist serves plain HTTP and leaves TLS to whatever sits in front of it. This page is the contract any reverse proxy has to meet, with a minimal Caddy and Traefik example. For everything else about running it, see [DEPLOYING.md](DEPLOYING.md).
+Menagerist serves plain HTTP and leaves TLS to whatever sits in front of it. This page is the contract any reverse proxy has to meet, with a minimal nginx, Caddy and Traefik example. For everything else about running it, see [DEPLOYING.md](DEPLOYING.md).
 
 ## What the proxy must do
 
@@ -26,9 +26,65 @@ Without the first, every visitor shares the proxy's address and 20 failed sign-i
 
 ## Examples
 
-Both examples assume the proxy can reach the `menagerist` container's port 8000 over a Docker network it shares with it, and that the public name is `menagerist.example.com`.
+The files are also kept in [`examples/reverse-proxy/`](examples/reverse-proxy/) to copy from. Each example assumes the proxy can reach the `menagerist` container's port 8000 over a Docker network it shares with it, and that the public name is `menagerist.example.com`.
 
+### nginx
+
+nginx needs the most spelling out: it does not send the forwarding headers, it refuses bodies over 1 MB and it does not get certificates for you. This goes in `compose.override.yaml` (see [DEPLOYING.md](DEPLOYING.md#your-own-changes-composeoverrideyaml)), next to an `nginx.conf` and a `certs` folder holding your certificate and key as `fullchain.pem` and `privkey.pem` ([`nginx/`](examples/reverse-proxy/nginx/)):
+
+```yaml
+services:
+  menagerist:
+    ports: !override []
+  nginx:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    depends_on:
+      - menagerist
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    networks:
+      - menagerist
+```
+
+```nginx
+server {
+    listen 80;
+    server_name menagerist.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name menagerist.example.com;
+
+    ssl_certificate     /etc/nginx/certs/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/privkey.pem;
+
+    add_header Strict-Transport-Security "max-age=15552000" always;
+
+    # At least MENAGERIST_BACKUP_MAX_UPLOAD_SIZE (8 GiB by default); use 0 for no limit.
+    client_max_body_size 8g;
+
+    location / {
+        proxy_pass http://menagerist:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Stream uploads to the app instead of spooling a backup archive to the proxy's disk first.
+        proxy_request_buffering off;
+    }
+}
+```
+
+The `ports: !override []` line stops `compose.yaml` publishing `8080`, so nginx is the only way in. nginx reaches the app over the `menagerist` network, so list that network (`docker network inspect <project>_menagerist`) in `MENAGERIST_API_TRUSTED_PROXIES`; the project name is the folder name unless you set `name:`.
 ### Caddy
+
+The [`Caddyfile`](examples/reverse-proxy/caddy/Caddyfile):
 
 ```caddyfile
 menagerist.example.com {
@@ -41,7 +97,7 @@ Caddy gets its certificate, redirects `http` to `https`, forwards the headers an
 
 ### Traefik
 
-This goes in `compose.override.yaml` (see [DEPLOYING.md](DEPLOYING.md#your-own-changes-composeoverrideyaml)). It assumes Traefik already runs with a `websecure` entrypoint, a `letsencrypt` certificate resolver and a shared Docker network called `proxy`; rename them to match yours.
+This goes in `compose.override.yaml` (see [DEPLOYING.md](DEPLOYING.md#your-own-changes-composeoverrideyaml)). It assumes Traefik already runs with a `websecure` entrypoint, a `letsencrypt` certificate resolver and a shared Docker network called `proxy`; rename them to match yours ([`traefik/compose.override.yaml`](examples/reverse-proxy/traefik/compose.override.yaml)).
 
 ```yaml
 services:
