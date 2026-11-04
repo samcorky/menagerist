@@ -14,6 +14,11 @@ from app.entrypoints.api.shared.http.http_headers import (
     link_next_header,
 )
 from app.entrypoints.api.shared.http.problem_response import error_response
+from app.entrypoints.api.shared.http.rate_limit import (
+    RATE_LIMITED_RESPONSE,
+    RateLimitBucket,
+    rate_limited,
+)
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.presets.adapters.api.dependencies import (
     get_create_preset_use_case,
@@ -116,7 +121,8 @@ async def export_presets(
     "/import",
     response_model=ImportPresetsResponse,
     operation_id="import_presets",
-    responses=_INVALID_DEFINITION,
+    dependencies=[Depends(rate_limited(RateLimitBucket.IMPORTS))],
+    responses={**_INVALID_DEFINITION, **RATE_LIMITED_RESPONSE},
 )
 async def import_presets(
     payload: PackRequest,

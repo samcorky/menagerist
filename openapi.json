@@ -588,6 +588,31 @@
               }
             }
           },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
+                  "instance": "https://menagerist.example/api/v1/backup/upload"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected server error. The detail is generic; the cause is only logged.",
             "content": {
@@ -1836,6 +1861,31 @@
               }
             }
           },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
+                  "instance": "https://menagerist.example/api/v1/me/import"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected server error. The detail is generic; the cause is only logged.",
             "content": {
@@ -2555,6 +2605,31 @@
               }
             }
           },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
+                  "instance": "https://menagerist.example/api/v1/node/search"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected server error. The detail is generic; the cause is only logged.",
             "content": {
@@ -2741,6 +2816,31 @@
                       "msg": "Field required"
                     }
                   ],
+                  "instance": "https://menagerist.example/api/v1/node/search/counts"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
                   "instance": "https://menagerist.example/api/v1/node/search/counts"
                 }
               }
@@ -9650,6 +9750,31 @@
               }
             }
           },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
+                  "instance": "https://menagerist.example/api/v1/media"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected server error. The detail is generic; the cause is only logged.",
             "content": {
@@ -9887,6 +10012,31 @@
                       "msg": "Field required"
                     }
                   ],
+                  "instance": "https://menagerist.example/api/v1/media/attached"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
                   "instance": "https://menagerist.example/api/v1/media/attached"
                 }
               }
@@ -11192,6 +11342,31 @@
                     }
                   ],
                   "instance": "https://menagerist.example/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/thumbnail"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
+                  "instance": "https://menagerist.example/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/thumbnail"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
                 }
               }
             }
@@ -13288,6 +13463,31 @@
                       "msg": "Field required"
                     }
                   ],
+                  "instance": "https://menagerist.example/api/v1/preset/import"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
                   "instance": "https://menagerist.example/api/v1/preset/import"
                 }
               }

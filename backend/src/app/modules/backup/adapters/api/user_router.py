@@ -6,6 +6,11 @@ from fastapi.responses import StreamingResponse
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.entrypoints.api.shared.http.problem_response import error_response
+from app.entrypoints.api.shared.http.rate_limit import (
+    RATE_LIMITED_RESPONSE,
+    RateLimitBucket,
+    rate_limited,
+)
 from app.entrypoints.api.shared.http.upload_limit_middleware import (
     PAYLOAD_TOO_LARGE_RESPONSE,
 )
@@ -172,8 +177,10 @@ async def delete_user_export(
     "/import",
     status_code=204,
     operation_id="import_user_data",
+    dependencies=[Depends(rate_limited(RateLimitBucket.IMPORTS))],
     openapi_extra=ARCHIVE_BODY,
     responses={
+        **RATE_LIMITED_RESPONSE,
         **PAYLOAD_TOO_LARGE_RESPONSE,
         **error_response(
             IncompatibleBackupError,
