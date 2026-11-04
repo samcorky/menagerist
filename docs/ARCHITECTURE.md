@@ -18,7 +18,7 @@ menagerist (port 8000, distroless)
 
 A single `menagerist` container runs the FastAPI process, which serves the pre-built frontend as a static SPA (`entrypoints/api/spa.py`, mounted at `/` after every API router) alongside the API itself - one process, one port, no reverse proxy in front of it. No server-side rendering, no API gateway, no service mesh.
 
-Docker Compose (`compose.yaml`) orchestrates the stack: PostgreSQL plus the `menagerist` service. A machine-specific override (`compose.override.yml`) handles per-machine configuration and is picked up automatically. The container image uses a distroless base (`gcr.io/distroless/base-debian13:nonroot`) - non-root, minimal attack surface.
+Docker Compose (`compose.yaml`) orchestrates the stack: PostgreSQL plus the `menagerist` service. A gitignored override file handles per-machine configuration and is picked up automatically (the development one is `compose.override.yml`; self-hosters use `compose.override.yaml`, see [DEPLOYING.md](DEPLOYING.md#your-own-changes-composeoverrideyaml)). The container image uses a distroless base (`gcr.io/distroless/base-debian13:nonroot`) - non-root, minimal attack surface.
 
 ## Backend
 
