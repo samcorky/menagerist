@@ -1,5 +1,14 @@
 # Contributing
 
+[![GHCR pulls][pulls-badge]][pulls-link]
+[![Download size][size-badge]][pulls-link]
+[![CalVer][calver-badge]][calver-link]
+[![Python][python-badge]][python-link]
+[![mypy: strict][mypy-badge]][mypy-link]
+[![Ruff][ruff-badge]][ruff-link]
+[![uv][uv-badge]][uv-link]
+[![Renovate][renovate-badge]][renovate-link]
+
 ## Setup
 
 Requires [uv](https://docs.astral.sh/uv/) and the Node version in `.node-version`. uv installs the right Python for you; [fnm](https://github.com/Schniz/fnm) does the same for Node (see [Node version](#node-version)). If you don't have uv installed:
@@ -36,6 +45,7 @@ Skipping activation is fine too - just prefix each command with `uv run` instead
 
 ```sh
 winget install Schniz.fnm      # Windows (or: scoop install fnm); macOS/Linux: brew install fnm
+curl -fsSL https://fnm.vercel.app/install | bash   # macOS/Linux, no package manager required
 fnm install                    # installs the version in .node-version
 ```
 
@@ -84,6 +94,27 @@ Migrations take a verified backup first once a schema has pending upgrades, whic
 ```sh
 cd frontend && npm run dev -- --host 0.0.0.0       # frontend at :5173, in a second shell
 ```
+
+### Building the Docker image
+
+To run your own changes instead of the published image, build it locally. The build produces the backend's OpenAPI schema and the frontend's typed client itself, so a fresh clone needs nothing pre-generated.
+
+```sh
+uv run poe init            # sync deps + install git hooks
+uv run poe docker-build    # build the Menagerist image
+uv run poe docker-up       # start Postgres + Menagerist, detached, at :8080
+```
+
+Without `poe`:
+
+```sh
+docker buildx bake -f docker-bake.hcl local
+MENAGERIST_IMAGE=menagerist:local docker compose up -d --force-recreate
+```
+
+`compose.yaml` pulls the published image unless `MENAGERIST_IMAGE` says otherwise, so `poe docker-up` and the line above point it at the image you just built. On PowerShell, set the variable first: `$env:MENAGERIST_IMAGE = "menagerist:local"`.
+
+`uv run` syncs and resolves the backend package on its own - no separate install step. If you've activated the project's venv instead (see [Setup](#setup)), drop the `uv run` prefix and call `menagerist` directly.
 
 ### First run and accounts
 
@@ -345,3 +376,20 @@ A pull request appears under the first section it matches, in the order above; o
 ## Architecture
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [backend/README.md](backend/README.md), and [frontend/README.md](frontend/README.md).
+
+[pulls-badge]: https://img.shields.io/badge/dynamic/json?url=https://ghcr-badge.elias.eu.org/api/samcorky/menagerist/menagerist&query=downloadCount&label=pulls&logo=docker&logoColor=white&color=2496ED
+[size-badge]: https://ghcr-badge.egpl.dev/samcorky/menagerist/size?tag=latest&label=download%20size%20(amd64)
+[calver-badge]: https://img.shields.io/badge/calver-0.YYYY.MM.PATCH-22bfda
+[python-badge]: https://img.shields.io/badge/dynamic/regex?url=https://raw.githubusercontent.com/samcorky/menagerist/main/.python-version&search=(.%2B)&replace=%241&label=python&logo=python&logoColor=white&color=blue
+[mypy-badge]: https://img.shields.io/badge/mypy-strict-blue?logo=python&logoColor=white
+[ruff-badge]: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json
+[uv-badge]: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json
+[renovate-badge]: https://img.shields.io/badge/renovate-enabled-brightgreen?logo=renovatebot&logoColor=white
+
+[pulls-link]: https://github.com/samcorky/menagerist/pkgs/container/menagerist
+[calver-link]: https://calver.org
+[python-link]: https://www.python.org/
+[mypy-link]: https://mypy-lang.org/
+[ruff-link]: https://github.com/astral-sh/ruff
+[uv-link]: https://github.com/astral-sh/uv
+[renovate-link]: https://renovatebot.com
