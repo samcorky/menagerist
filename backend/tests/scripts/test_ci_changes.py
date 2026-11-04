@@ -39,6 +39,7 @@ EVERYTHING = {"backend": True, "frontend": True, "e2e": True, "image": True}
         [
             ".github/labeller.yml",
             ".github/release.yml",
+            ".github/workflows/api-breaking-changes.yml",
             ".github/workflows/autofix.yml",
             ".github/workflows/codeql.yml",
             ".github/workflows/publish.yml",

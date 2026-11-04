@@ -328,7 +328,7 @@ def test_schema_dump_writes_the_openapi_schema(
 
     schema: dict[str, object] = {
         "openapi": "3.1.0",
-        "info": {"title": "Menagerist"},
+        "info": {"title": "Menagerist", "version": "0.2026.11.1.dev34"},
     }
 
     class FakeApp:
@@ -340,9 +340,62 @@ def test_schema_dump_writes_the_openapi_schema(
 
     result = cli.dump(output=output)
 
-    assert json.loads(output.read_text()) == schema
+    # The build's version is replaced so the committed file does not change per commit.
+    assert json.loads(output.read_text()) == {
+        "openapi": "3.1.0",
+        "info": {"title": "Menagerist", "version": "0.0.0"},
+    }
+    assert output.read_text().endswith("}\n")
     assert result["output"] == output
     assert result["size"] == output.stat().st_size
+
+
+def test_schema_dump_with_version_keeps_the_build_version(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`--with-version` keeps the real version and cannot be combined with `--check`."""
+    from app.entrypoints import api
+
+    class FakeApp:
+        def openapi(self) -> dict[str, object]:
+            return {"info": {"title": "Menagerist", "version": "0.2026.11.1.dev34"}}
+
+    monkeypatch.setattr(api, "create_app", lambda: FakeApp())
+    output = tmp_path / "openapi.json"
+
+    cli.dump(output=output, with_version=True)
+
+    assert json.loads(output.read_text())["info"]["version"] == "0.2026.11.1.dev34"
+    with pytest.raises(SystemExit, match="drop --with-version"):
+        cli.dump(output=output, check=True, with_version=True)
+
+
+def test_schema_dump_check_reports_a_stale_or_missing_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`schema dump --check` passes only when the file matches and never writes."""
+    from app.entrypoints import api
+
+    schema: dict[str, object] = {"openapi": "3.1.0", "info": {"title": "Menagerist"}}
+
+    class FakeApp:
+        def openapi(self) -> dict[str, object]:
+            return schema
+
+    monkeypatch.setattr(api, "create_app", lambda: FakeApp())
+    output = tmp_path / "openapi.json"
+
+    with pytest.raises(SystemExit, match="poe dump-schema"):
+        cli.dump(output=output, check=True)
+    assert not output.exists()
+
+    cli.dump(output=output)
+    assert cli.dump(output=output, check=True)["output"] == output
+
+    output.write_text("{}\n")
+    with pytest.raises(SystemExit, match="poe dump-schema"):
+        cli.dump(output=output, check=True)
+    assert output.read_text() == "{}\n"
 
 
 @pytest.fixture

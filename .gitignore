@@ -28,7 +28,8 @@ compose.override.yaml
 coverage.xml
 
 # Other
-openapi.json
+# The committed schema is frontend/openapi.json; a root copy is a stray dump.
+/openapi.json
 
 # Worktrees
 .worktrees/

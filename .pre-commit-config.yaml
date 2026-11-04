@@ -35,6 +35,8 @@ repos:
         exclude: ^frontend/
       - id: check-added-large-files
         stages: [pre-commit]
+        # The committed API schema is about 1 MB of generated JSON.
+        exclude: ^frontend/openapi\.json$
       - id: check-executables-have-shebangs
         stages: [pre-commit]
 
@@ -126,6 +128,14 @@ repos:
         entry: uv run poe check-settings-docs
         language: system
         files: '^(backend/src/app/platform/config/|\.env\.example$|docs/settings\.md$)'
+        pass_filenames: false
+
+      # The committed OpenAPI schema follows the API, which spans the whole backend.
+      - id: api-schema
+        name: check the committed OpenAPI schema is current
+        entry: uv run poe check-schema
+        language: system
+        files: '^(backend/(src|pyproject\.toml)|frontend/openapi\.json$)'
         pass_filenames: false
 
       - id: validate-compose

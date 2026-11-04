@@ -89,7 +89,7 @@ help = "Linux only: print the one-off command that installs the system libraries
 [tool.poe.groups.setup.tasks.dump-schema]
 cmd = "menagerist schema dump --output ../frontend/openapi.json"
 cwd = "backend"
-help = "Dump the backend's OpenAPI schema for frontend client generation"
+help = "Write the backend's OpenAPI schema to frontend/openapi.json (the committed API contract and the frontend client's input)"
 deps = ["sync-backend"]
 
 [tool.poe.groups.setup.tasks.generate-settings-docs]
@@ -155,6 +155,12 @@ help = "Type-check backend Python files with mypy"
 cmd = "menagerist settings docs --root .. --check"
 cwd = "backend"
 help = "Fail when .env.example or docs/settings.md is out of date with the settings classes"
+deps = ["sync-backend"]
+
+[tool.poe.groups.quality.tasks.check-schema]
+cmd = "menagerist schema dump --output ../frontend/openapi.json --check"
+cwd = "backend"
+help = "Fail when frontend/openapi.json is out of date with the API"
 deps = ["sync-backend"]
 
 [tool.poe.groups.quality.tasks._coverage-erase]

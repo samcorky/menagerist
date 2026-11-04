@@ -46,6 +46,7 @@ META_FILES = frozenset(
         ".github/pull_request_template.md",
         ".github/release.yml",
         ".github/renovate.json",
+        ".github/workflows/api-breaking-changes.yml",
         ".github/workflows/autofix.yml",
         ".github/workflows/codeql.yml",
         ".github/workflows/pr-labeller.yml",
