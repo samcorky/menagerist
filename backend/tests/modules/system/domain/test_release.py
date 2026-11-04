@@ -130,6 +130,16 @@ def test_nothing_eligible_selects_nothing() -> None:
     assert select_latest([], ReleaseChannel.STABLE) is None
 
 
+def test_stable_takes_a_post_release_as_an_ordinary_final() -> None:
+    """A `.post` is not a prerelease, so stable selects it over its base."""
+    candidates = [release("0.2026.11.0"), release("0.2026.11.0.post1")]
+
+    chosen = select_latest(candidates, ReleaseChannel.STABLE)
+
+    assert chosen is not None
+    assert chosen.version == "0.2026.11.0.post1"
+
+
 @pytest.mark.parametrize(
     ("installed", "latest", "expected"),
     [
@@ -145,6 +155,24 @@ def test_the_installed_build_is_compared_with_the_latest(
 ) -> None:
     """The installed build is compared with the latest."""
     assert assess(installed, dirty=False, check=check(release(latest))) is expected
+
+
+def test_the_base_release_is_told_about_its_post_release() -> None:
+    """An instance on the release a hotfix fixes is offered the hotfix."""
+    result = assess(
+        "0.2026.11.0", dirty=False, check=check(release("0.2026.11.0.post1"))
+    )
+
+    assert result is UpdateStatus.UPDATE_AVAILABLE
+
+
+def test_the_post_release_is_not_told_about_its_own_base() -> None:
+    """An instance on the hotfix is not asked to install the release it fixes."""
+    result = assess(
+        "0.2026.11.0.post1", dirty=False, check=check(release("0.2026.11.0"))
+    )
+
+    assert result is UpdateStatus.AHEAD
 
 
 def test_an_uncommitted_build_is_never_called_out_of_date() -> None:
