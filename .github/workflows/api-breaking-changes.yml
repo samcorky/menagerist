@@ -1,0 +1,106 @@
+name: API breaking changes
+
+# Compares the pull request's frontend/openapi.json (the committed API contract, kept
+# current by the "Generated files (API schema is current)" check in ci.yml) with the base branch's, and
+# fails on a breaking change unless the pull request carries the `breaking-change` label.
+# It is a separate workflow so adding or removing that label re-runs only this check,
+# not the whole of CI. The check runs on every pull request and passes at once when the
+# schema is unchanged, so it can be made a required check.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  breaking-changes:
+    name: Check for breaking API changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SCHEMA: frontend/openapi.json
+    steps:
+      - name: Checkout the pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Checkout the base schema
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+          sparse-checkout: ${{ env.SCHEMA }}
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Look for a schema change
+        id: diff
+        run: |
+          if [ ! -f "base/${SCHEMA}" ]; then
+            echo "The base branch has no committed schema yet, so there is nothing to compare."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          elif cmp -s "base/${SCHEMA}" "${SCHEMA}"; then
+            echo "The API schema is unchanged."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Every schema change, breaking or not, goes in the job summary for reviewers.
+      # `review: false` keeps the specs on the runner instead of uploading them to
+      # oasdiff.com for a hosted comparison page.
+      - name: Summarise the API changes
+        if: steps.diff.outputs.changed == 'true'
+        uses: oasdiff/oasdiff-action/changelog@514e22ec2f1d1654fb78ac3bb7dc00d8f3c6c4d9 # v0.1.19
+        with:
+          base: base/${{ env.SCHEMA }}
+          revision: ${{ env.SCHEMA }}
+          format: markdown
+          output-to-file: changelog.md
+          review: "false"
+          github-token: ""
+
+      - name: Show the summary
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          {
+            echo "## API changes"
+            echo
+            if [ -s changelog.md ]; then cat changelog.md; else echo "No changes detected."; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Read the labels now rather than from the event: the PR labeller adds
+      # `breaking-change` for a `feat!:` title with the workflow token, which starts no
+      # new run, and its labelling may finish after this run began.
+      - name: Look for the breaking-change label
+        id: label
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          labels=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/labels" --jq '.[].name')
+          if grep -qx 'breaking-change' <<< "${labels}"; then
+            echo "exempt=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exempt=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The label does not hide the breaking changes: they are still listed in the log,
+      # but no longer fail the check.
+      - name: Fail on breaking changes
+        if: steps.diff.outputs.changed == 'true'
+        uses: oasdiff/oasdiff-action/breaking@514e22ec2f1d1654fb78ac3bb7dc00d8f3c6c4d9 # v0.1.19
+        with:
+          base: base/${{ env.SCHEMA }}
+          revision: ${{ env.SCHEMA }}
+          fail-on: ${{ steps.label.outputs.exempt == 'true' && '' || 'ERR' }}
+          review: "false"
+          github-token: ""

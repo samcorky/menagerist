@@ -5,7 +5,7 @@ import sys
 from contextlib import nullcontext
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 import structlog
 from cyclopts import App, Parameter
@@ -182,6 +182,18 @@ use_access_guard(get_access_guard())
 app.command(identity_app)
 
 schema_app = App(name="schema", help="Inspect the API schema.")
+# The dumped schema carries this instead of the build's version (see `dump`).
+_SCHEMA_DUMP_VERSION = "0.0.0"
+
+
+def _without_build_details(schema: dict[str, Any]) -> dict[str, Any]:
+    """Return the schema without the parts of `info` that depend on the build."""
+    info = {**schema["info"], "version": _SCHEMA_DUMP_VERSION}
+    if "license" in info:
+        info["license"] = {k: v for k, v in info["license"].items() if k != "url"}
+    return {**schema, "info": info}
+
+
 app.command(schema_app)
 
 settings_app = App(
@@ -393,16 +405,41 @@ def revision(message: str, *, autogenerate: bool = True) -> dict[str, object]:
 
 
 @schema_app.command
-def dump(*, output: Path = Path("openapi.json")) -> dict[str, object]:
+def dump(
+    *,
+    output: Path = Path("openapi.json"),
+    check: bool = False,
+    with_version: bool = False,
+) -> dict[str, object]:
     """Write the API's OpenAPI schema to a file.
+
+    The committed contract pins `info.version` and leaves out `info.license.url`: the
+    version and the commit-specific licence link both change with every commit and
+    would make the file permanently stale.
 
     Args:
         output: Path to write the schema JSON to.
+        check: Write nothing and exit with an error if the file is out of date.
+        with_version: Keep the build's real `info.version` and licence link, for a
+            schema to publish or attach to a release. It cannot be checked against
+            the committed file.
     """
+    if check and with_version:
+        msg = "--check compares against the pinned version; drop --with-version."
+        raise SystemExit(msg)
     from app.entrypoints.api import create_app
 
+    schema = create_app().openapi()
+    if not with_version:
+        schema = _without_build_details(schema)
+    text = json.dumps(schema, indent=2) + "\n"
+    if check:
+        if not output.is_file() or output.read_text(encoding="utf-8") != text:
+            msg = f"Out of date: {output}. Run `poe dump-schema`."
+            raise SystemExit(msg)
+        return {"message": "OpenAPI schema is up to date", "output": output}
     logger.debug("dumping API schema", output=str(output))
-    output.write_text(json.dumps(create_app().openapi(), indent=2))
+    output.write_text(text, encoding="utf-8", newline="\n")
     logger.info("schema dump complete", output=str(output))
     return {
         "message": "OpenAPI schema written",

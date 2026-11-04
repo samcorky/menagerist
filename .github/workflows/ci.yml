@@ -76,8 +76,44 @@ jobs:
       - name: Run mypy
         run: uv run poe typecheck-backend
 
-      - name: Check the settings reference is current
-        run: uv run poe check-settings-docs
+  generated-files:
+    # A matrix so each generated file reports as its own check on the pull request.
+    name: Generated files (${{ matrix.name }})
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: settings reference is current
+            task: check-settings-docs
+          - name: API schema is current
+            task: check-schema
+          # About 20 seconds, too slow for pre-commit; the file is the committed
+          # contract, which check-schema ties to the live API.
+          - name: API schema is valid
+            task: validate-schema
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv run poe sync-backend
+
+      - name: Check ${{ matrix.name }}
+        run: uv run poe ${{ matrix.task }}
 
   typecheck-frontend:
     name: Frontend type check (svelte-check)
@@ -389,7 +425,7 @@ jobs:
     # skipped because nothing it covers changed is fine; one skipped because a job before
     # it failed is not, but that failure is itself in `needs` and fails this check.
     if: always()
-    needs: [changes, typecheck-backend, typecheck-frontend, frontend-tests, integration, e2e, build]
+    needs: [changes, typecheck-backend, generated-files, typecheck-frontend, frontend-tests, integration, e2e, build]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
