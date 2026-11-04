@@ -7,6 +7,10 @@ name: Publish
 #   - run by hand:          a build only, unless "push" is ticked (sha-<commit>, plus
 #                           edge when run from main)
 # The image is smoke tested (build.yml) before anything is pushed.
+#
+# Pass "tag" on a manual run to preview the tags a release of that tag would publish
+# (the "Work out the tags" job only, nothing built or pushed), without creating a
+# release or a git tag.
 on:
   release:
     types: [published]
@@ -18,6 +22,10 @@ on:
         description: Push the image to GHCR (otherwise build only)
         type: boolean
         default: false
+      tag:
+        description: Preview the image tags for this release tag only, for example v0.2026.11.0.post1 (leave empty to build as usual)
+        type: string
+        default: ''
 
 concurrency:
   # A manual run that pushes nothing has its own group, so trying a build never cancels
@@ -37,6 +45,8 @@ env:
 jobs:
   version:
     name: Work out the version
+    # A manual run with "tag" set only previews the tags job; it builds nothing.
+    if: github.event_name != 'workflow_dispatch' || inputs.tag == ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -122,6 +132,8 @@ jobs:
 
   tags:
     name: Work out the tags
+    # A manual run with "tag" set only previews these; it builds and pushes nothing.
+    if: github.event_name != 'workflow_dispatch' || inputs.tag != ''
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -137,17 +149,29 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
 
+      # This job only runs for a release or a manual preview (its "if", above), so
+      # exactly one of these is ever set.
+      - name: Read the tag to work out
+        id: tag
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
+          PREVIEW_TAG: ${{ inputs.tag }}
+        run: echo "tag=${RELEASE_TAG}${PREVIEW_TAG}" >> "$GITHUB_OUTPUT"
+
       # type=pep440 skips the pattern for a .post release, so the month and year tags
       # and latest come from the image-tags action and are handed over as raw tags. It
       # holds back any tag a newer release already covers, so a hotfix for an older
       # month cannot move latest backwards.
       - name: Work out the partial version tags
         id: partial
-        if: github.event_name == 'release' && !github.event.release.prerelease
+        if: github.event_name != 'release' || !github.event.release.prerelease
         uses: ./.github/actions/image-tags
         with:
-          tag: ${{ github.event.release.tag_name }}
+          tag: ${{ steps.tag.outputs.tag }}
 
+      # On a real release, type=pep440 reads the pushed tag itself. A manual preview
+      # has no such tag to read, so "value" hands it the typed tag directly; the
+      # result is identical either way since pep440 only parses the string.
       - name: Work out the tags
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
@@ -157,19 +181,24 @@ jobs:
             latest=false
           tags: |
             type=edge
-            type=pep440,pattern={{version}}
+            type=pep440,pattern={{version}}${{ github.event_name == 'workflow_dispatch' && format(',value={0}', steps.tag.outputs.tag) || '' }}
             type=sha
             ${{ steps.partial.outputs.tags }}
 
       - name: Show the tags
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
+          PREVIEW: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           echo "Event: ${GITHUB_EVENT_NAME}, ref: ${GITHUB_REF}, pushed: ${PUSH}"
           echo "Tags:"
           echo "$TAGS"
           {
-            echo "### Image tags (pushed: ${PUSH})"
+            if [[ "$PREVIEW" == "true" ]]; then
+              echo "### Image tags (preview only, nothing built or pushed)"
+            else
+              echo "### Image tags (pushed: ${PUSH})"
+            fi
             echo
             echo '```'
             echo "$TAGS"
@@ -178,6 +207,8 @@ jobs:
 
   smoke:
     name: Build and smoke test
+    # A manual run with "tag" set only previews the tags job; it builds nothing.
+    if: github.event_name != 'workflow_dispatch' || inputs.tag == ''
     uses: ./.github/workflows/build.yml
     permissions:
       contents: read
@@ -185,6 +216,8 @@ jobs:
   image:
     name: Build ${{ matrix.platform }}
     needs: [version, smoke]
+    # A manual run with "tag" set only previews the tags job; it builds nothing.
+    if: github.event_name != 'workflow_dispatch' || inputs.tag == ''
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     permissions:
