@@ -28,12 +28,16 @@ INSTANCES = 4
 INITIAL_REVISION = "cd0c974e3e33"
 # Runs the installed `menagerist` entry point without relying on the script path.
 ENTRY_POINT = "from app.entrypoints.cli import app; app.meta()"
-# The same entry point with the migration lock removed. It also pauses after the
-# "is anything pending?" check so every instance sees the work before any
-# finishes, which makes the race certain rather than likely.
+# The same entry point with the migration lock removed. After the "is anything
+# pending?" check it waits until every instance has made that check, so each sees
+# the work before any starts it. That makes the race certain: a fixed pause is not,
+# because on a busy machine the instances can start further apart than the pause.
 UNLOCKED_ENTRY_POINT = """
 import asyncio
+import os
+import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from app.entrypoints.cli import app, backups
 from app.platform import alembic_runner
@@ -49,7 +53,13 @@ real_pending = alembic_runner.pending
 
 async def slow_pending(*args):
     result = await real_pending(*args)
-    await asyncio.sleep(3)
+    barrier = Path(os.environ["TEST_BARRIER_DIR"])
+    (barrier / str(os.getpid())).touch()
+    deadline = time.monotonic() + 60
+    while len(list(barrier.iterdir())) < int(os.environ["TEST_BARRIER_COUNT"]):
+        if time.monotonic() > deadline:
+            raise TimeoutError("not every instance reached the pending check")
+        await asyncio.sleep(0.05)
     return result
 
 
@@ -119,7 +129,13 @@ async def _start_together(
     backups_dir = tmp_path / "backups"
     media_dir = tmp_path / "media"
     media_dir.mkdir()
-    env = _env(database, backups_dir, media_dir)
+    barrier_dir = tmp_path / "barrier"
+    barrier_dir.mkdir()
+    env = {
+        **_env(database, backups_dir, media_dir),
+        "TEST_BARRIER_DIR": str(barrier_dir),
+        "TEST_BARRIER_COUNT": str(INSTANCES),
+    }
     results = await asyncio.gather(*(_instance(env, entry) for _ in range(INSTANCES)))
     return list(results), list((backups_dir / "instance").glob("*.tar.gz"))
 
@@ -154,7 +170,8 @@ async def test_without_the_lock_instances_each_take_a_backup(
     """Negative control: the check above fails when the lock is removed.
 
     Without this, a regression that made the lock a no-op could still pass the
-    positive test on a lucky start order.
+    positive test on a lucky start order. Each instance waits for the others at the
+    pending check, so all of them see the migration as pending.
     """
     _, archives = await _start_together(old_database, tmp_path, UNLOCKED_ENTRY_POINT)
     assert len(archives) > 1, archives
