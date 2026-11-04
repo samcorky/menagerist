@@ -7,6 +7,7 @@ name: Release
 #   - channel a, b or rc: the next alpha, beta or release candidate (next-tag --pre ...)
 #   - channel promote: the final tag for the latest pre-release (next-tag --promote)
 #   - channel post:    a post-release of the latest release (next-tag --post)
+#   - tag:             a tag typed by hand, instead of a channel; it is checked the same way
 #   - draft:           create a draft to review, then publish it from the Releases page
 #   - dry run:         plan and check, and show the title and notes; nothing is created
 # calver-scm only reads the repository. The release itself is created here, by gh.
@@ -24,6 +25,10 @@ on:
           - promote
           - post
         default: final
+      tag:
+        description: A tag to release instead of a channel, for example v0.2026.11.1rc2 (leave empty to plan one)
+        type: string
+        default: ''
       draft:
         description: Create a draft release, to review and publish by hand
         type: boolean
@@ -51,6 +56,7 @@ jobs:
       contents: write
     env:
       CHANNEL: ${{ inputs.channel }}
+      TAG_INPUT: ${{ inputs.tag }}
       DRAFT: ${{ inputs.draft }}
       DRY_RUN: ${{ inputs.dry_run }}
       # A release published with the default token does not start Publish, so a release
@@ -87,13 +93,29 @@ jobs:
         working-directory: backend
         run: uv run --locked --only-group release calver-scm doctor
 
-      # Writes tag, version, is_prerelease, channel and reason to GITHUB_OUTPUT. Exits 3
+      # Writes tag, version, is_prerelease and reason to GITHUB_OUTPUT. Planning exits 3
       # when no safe tag can be proposed, for example promote with no pre-release or a
       # pre-release that is not an ancestor of HEAD, or post with no release this month.
+      # A tag typed by hand is validated instead, and validate says whether it is a
+      # pre-release, so the release is marked the same way as a planned one.
       - name: Plan the tag
         id: plan
         working-directory: backend
         run: |
+          tag="$(echo "$TAG_INPUT" | xargs)"
+          if [[ -n "$tag" ]]; then
+            if [[ "$CHANNEL" != "final" ]]; then
+              echo "::error::Choose a channel or type a tag, not both. Set the channel back to final to release ${tag}."
+              exit 1
+            fi
+            uv run --locked --only-group release calver-scm --format github validate "$tag" --tag --against-repo
+            {
+              echo "tag=${tag}"
+              echo "version=${tag#v}"
+              echo "reason=typed by hand"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           case "$CHANNEL" in
             final) args=() ;;
             a | b | rc) args=(--pre "$CHANNEL") ;;

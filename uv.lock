@@ -194,14 +194,14 @@ wheels = [
 
 [[package]]
 name = "calver-scm"
-version = "1.8.0"
+version = "1.8.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "setuptools-scm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/22/38/6b564faa50dc4176e95c342ee5617d3895954b1578bd21036e682a4b6eca/calver_scm-1.8.0.tar.gz", hash = "sha256:0455af7fe41fae59d79c95d02c27149edf794a1624de2bbdfc3588b977e9f442", size = 150809, upload-time = "2026-11-03T23:51:38.129Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a2/17/f545160612cf74f7c231d542f70b60313d347d5a6f11732a121c45312cd8/calver_scm-1.8.1.tar.gz", hash = "sha256:390d432214af1a7533181dfb24149d0456df47a5e767dcf10a7776cd71dd489d", size = 151721, upload-time = "2026-11-04T09:11:41.952Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/93/10/abfa7ec133712344520117633382c988f2453b42165576bb8bb1441669e3/calver_scm-1.8.0-py3-none-any.whl", hash = "sha256:6674fea47617ce39e52febaa5c6fb196695c311e8720c096c0cb89245c4b0194", size = 46904, upload-time = "2026-11-03T23:51:36.943Z" },
+    { url = "https://files.pythonhosted.org/packages/91/6d/87df8dbd27bdbe403f5759d8c1e273e44eff82cb108c3fd70b2e8df9b9f0/calver_scm-1.8.1-py3-none-any.whl", hash = "sha256:a74797eaa73ee670a904eaeb0217959e3d2862ac40031e9f6d12f0137d9e59ec", size = 47275, upload-time = "2026-11-04T09:11:40.47Z" },
 ]
 
 [package.optional-dependencies]
@@ -1175,7 +1175,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "archunitpython", specifier = ">=1.8.1" },
-    { name = "calver-scm", extras = ["cli"], specifier = ">=1.8.0" },
+    { name = "calver-scm", extras = ["cli"], specifier = ">=1.8.1" },
     { name = "docker", specifier = ">=7.2.0" },
     { name = "granian", extras = ["reload"], specifier = ">=2.8.7" },
     { name = "hatch", specifier = ">=1.18.2" },
@@ -1197,7 +1197,7 @@ dev = [
     { name = "types-jsonschema", specifier = ">=4.26.0.20261006" },
     { name = "types-pyyaml", specifier = ">=6.0.12.20261030" },
 ]
-release = [{ name = "calver-scm", extras = ["cli"], specifier = ">=1.8.0" }]
+release = [{ name = "calver-scm", extras = ["cli"], specifier = ">=1.8.1" }]
 
 [[package]]
 name = "menagerist-workspace"
