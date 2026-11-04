@@ -28,7 +28,7 @@ dependencies = [
 # Just the CalVer CLI, so release workflows can run it from the lockfile without
 # installing the whole dev group.
 release = [
-    "calver-scm[cli]>=1.9.1",
+    "calver-scm[cli]>=1.10.0",
 ]
 dev = [
     { include-group = "release" },
