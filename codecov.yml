@@ -1,5 +1,10 @@
 coverage:
   status:
+    # Informational: Codecov reports patch coverage without failing the check. The
+    # component floors below are enforced by `poe coverage`, which is the real gate.
+    patch:
+      default:
+        informational: true
     project:
       default:
         target: auto

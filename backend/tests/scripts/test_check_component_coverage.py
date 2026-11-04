@@ -60,3 +60,29 @@ def test_nothing_is_written_outside_github_actions(
     check.write_step_summary(RESULTS)
 
     assert list(tmp_path.iterdir()) == []
+
+
+def test_the_comment_file_starts_with_the_marker_and_holds_the_table(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The workflow finds its earlier comment by the marker on the first line."""
+    comment = tmp_path / "comment.md"
+    monkeypatch.setenv("COMPONENT_COVERAGE_COMMENT", str(comment))
+
+    check.write_comment_file(RESULTS)
+
+    text = comment.read_text(encoding="utf-8")
+    assert text.startswith(check.COMMENT_MARKER + "\n")
+    assert "| Domain | 100.00% | 100% | Pass |" in text
+
+
+def test_no_comment_file_is_written_unless_named(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Locally, where no file is named, nothing is written."""
+    monkeypatch.delenv("COMPONENT_COVERAGE_COMMENT", raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    check.write_comment_file(RESULTS)
+
+    assert list(tmp_path.iterdir()) == []

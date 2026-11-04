@@ -29,6 +29,7 @@ from coverage.exceptions import NoDataError
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_DIR = ROOT / "backend"
 CODECOV_YML = ROOT / "codecov.yml"
+COMMENT_MARKER = "<!-- component-coverage -->"
 
 
 def load_components() -> list[dict[str, Any]]:
@@ -168,6 +169,17 @@ def write_step_summary(results: list[tuple[str, float, float]]) -> None:
             summary.write(summary_markdown(results))
 
 
+def write_comment_file(results: list[tuple[str, float, float]]) -> None:
+    """Write the table for the pull request comment, when CI names a file for it.
+
+    The marker lets the workflow find and update its earlier comment.
+    """
+    path = os.environ.get("COMPONENT_COVERAGE_COMMENT")
+    if path:
+        body = COMMENT_MARKER + "\n" + summary_markdown(results)
+        Path(path).write_text(body, encoding="utf-8")
+
+
 def main() -> int:
     """Display component percentages and optionally fail on their targets."""
     args = parse_args()
@@ -187,6 +199,7 @@ def main() -> int:
         return 0
 
     write_step_summary(results)
+    write_comment_file(results)
     width = max(len(name) for name, _, _ in results)
     failures = [name for name, percent, target in results if percent < target]
 

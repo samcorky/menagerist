@@ -157,6 +157,10 @@ cwd = "backend"
 help = "Fail when .env.example or docs/settings.md is out of date with the settings classes"
 deps = ["sync-backend"]
 
+[tool.poe.groups.quality.tasks.check-codecov]
+cmd = "curl --fail-with-body --silent --show-error --max-time 30 --data-binary @codecov.yml https://codecov.io/validate"
+help = "Validate codecov.yml with Codecov's validator (needs network access)"
+
 [tool.poe.groups.quality.tasks.check-schema]
 cmd = "menagerist schema dump --output ../openapi.json --check"
 cwd = "backend"
