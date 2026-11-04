@@ -50,6 +50,7 @@ META_FILES = frozenset(
         ".github/workflows/codeql.yml",
         ".github/workflows/pr-labeller.yml",
         ".github/workflows/publish.yml",
+        ".github/workflows/release.yml",
         ".gitignore",
         ".gitleaksignore",
         ".pre-commit-config.yaml",
