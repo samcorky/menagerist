@@ -227,13 +227,19 @@ jobs:
         if: env.DRY_RUN == 'true'
         env:
           PREVIEW: ${{ steps.image_tags.outputs.preview }}
+          HELD: ${{ steps.image_tags.outputs.held }}
         run: |
           echo "Image tags: ${PREVIEW}"
+          echo "Not moved: ${HELD:-none}"
           {
             echo
             echo "### Image tags"
             echo
             echo "\`${PREVIEW}\`"
+            if [[ -n "$HELD" ]]; then
+              echo
+              echo "Not moved, because a newer release covers them: \`${HELD}\`"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create the release

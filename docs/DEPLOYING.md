@@ -17,11 +17,14 @@ The `menagerist` container applies database migrations when it starts. Before it
 |---|---|
 | `latest` | The most recent release. The `0.` in the version only means the project is not yet stable, so those releases count; release candidates (`0.2026.11.0rc1`) do not. |
 | `0.2026.11.0` | One release, by version, which never moves, even when a hotfix (`0.2026.11.0.post1`) follows it. Pin this to update only when you choose to. |
+| `0.2026.11.0.post1` | A hotfix for that release, made for a fix to the release process or packaging rather than for new features. It gets its own exact tag and moves `latest`, `0.2026.11` and `0.2026`; `0.2026.11.0` stays as it was built. |
 | `0.2026.11` | The newest release of that month, including a `.post` hotfix. Follow this to take patches and hotfixes but not the next month's changes. |
 | `0.2026` | The newest release of that year. |
 | `0.2026.11.0rc1` | A release candidate, published ahead of its release for testing. |
 | `edge` | The latest commit on `main`. |
 | `sha-<commit>` | One exact commit, by its first seven characters. Not every commit on `main` gets one: a newer merge cancels an older build that is still running. |
+
+A tag moves only when the release is the newest it covers. A hotfix for an older month (a `.post` of `0.2026.10.0` once `0.2026.11.0` is out) moves its own month tag, `0.2026.10`, but not `0.2026` or `latest`, which stay with the newer release. Pre-releases move none of the shared tags. Moving `latest` or a month tag back to an older release is not supported: pin the exact version instead.
 
 ### Checking where an image came from
 
