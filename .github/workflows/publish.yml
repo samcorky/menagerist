@@ -162,9 +162,11 @@ jobs:
       # and latest come from the image-tags action and are handed over as raw tags. It
       # holds back any tag a newer release already covers, so a hotfix for an older
       # month cannot move latest backwards.
+      # A push to main has no release tag to work from, and needs none: edge and the sha
+      # tag below are all it publishes, so the step is skipped rather than given nothing.
       - name: Work out the partial version tags
         id: partial
-        if: github.event_name != 'release' || !github.event.release.prerelease
+        if: steps.tag.outputs.tag != '' && (github.event_name != 'release' || !github.event.release.prerelease)
         uses: ./.github/actions/image-tags
         with:
           tag: ${{ steps.tag.outputs.tag }}
