@@ -31,8 +31,15 @@ def test_the_summary_lists_each_component_against_its_target() -> None:
     """Every component gets a row, and one below its target is marked."""
     table = check.summary_markdown(RESULTS)
 
-    assert "| Domain | 100.00% | 100% | ✅ Pass |" in table
+    assert "| Domain | 100% | 100% | ✅ Pass |" in table
     assert "| Adapters | 71.46% | 80% | ❌ **Below target** |" in table
+
+
+def test_only_a_full_hundred_loses_its_decimals() -> None:
+    """99.999 must not read as 100%, or a shortfall would look like a pass."""
+    table = check.summary_markdown([("Domain", 99.999, 100.0)])
+
+    assert "| Domain | 100.00% | 100% | ❌ **Below target** |" in table
 
 
 def test_the_summary_line_names_the_components_below_target() -> None:
@@ -83,7 +90,7 @@ def test_the_comment_file_starts_with_the_marker_and_holds_the_table(
 
     text = comment.read_text(encoding="utf-8")
     assert text.startswith(check.COMMENT_MARKER + "\n")
-    assert "| Domain | 100.00% | 100% | ✅ Pass |" in text
+    assert "| Domain | 100% | 100% | ✅ Pass |" in text
 
 
 def test_no_comment_file_is_written_unless_named(

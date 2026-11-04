@@ -199,7 +199,8 @@ def summary_markdown(
     ]
     for name, percent, target in results:
         result = "✅ Pass" if percent >= target else "❌ **Below target**"
-        lines.append(f"| {name} | {percent:.2f}% | {target:.0f}% | {result} |")
+        shown = "100" if percent >= 100 else f"{percent:.2f}"
+        lines.append(f"| {name} | {shown}% | {target:.0f}% | {result} |")
     return "\n".join(lines) + "\n"
 
 
