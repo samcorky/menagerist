@@ -22,6 +22,8 @@ Thumbs.db
 # Docker Compose Overrides
 compose.override.yml
 compose.override.yaml
+# The documented examples use the same file name.
+!docs/examples/**/compose.override.yaml
 
 # Pytest artifacts
 .coverage*

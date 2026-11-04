@@ -1,0 +1,18 @@
+services:
+  menagerist:
+    networks:
+      - menagerist
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.menagerist.rule=Host(`menagerist.example.com`)
+      - traefik.http.routers.menagerist.entrypoints=websecure
+      - traefik.http.routers.menagerist.tls.certresolver=letsencrypt
+      - traefik.http.routers.menagerist.middlewares=menagerist-hsts
+      - traefik.http.middlewares.menagerist-hsts.headers.stsSeconds=15552000
+      - traefik.http.services.menagerist.loadbalancer.server.port=8000
+
+networks:
+  proxy:
+    external: true
