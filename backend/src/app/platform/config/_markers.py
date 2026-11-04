@@ -1,4 +1,4 @@
-"""Annotations that mark a settings field as editable, public or UI-hinted."""
+"""Annotations that mark a settings field as editable, public, internal or UI-hinted."""
 
 from dataclasses import dataclass
 from enum import StrEnum
@@ -31,6 +31,14 @@ class Tunable:
 @dataclass(frozen=True)
 class Public:
     """Server-side marker: the value is exposed by public configuration."""
+
+
+@dataclass(frozen=True)
+class Internal:
+    """Marker: a real setting that is not for operators, such as a packaging override.
+
+    The generated reference leaves it out; the class must still be in `ALL_SETTINGS`.
+    """
 
 
 @dataclass(frozen=True, kw_only=True)

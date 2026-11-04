@@ -13,9 +13,12 @@ from app.platform.config.release import ReleaseSettings, get_release_settings
 from app.platform.config.retention import RetentionSettings, get_retention_settings
 from app.platform.config.scheduler import SchedulerSettings, get_scheduler_settings
 from app.platform.config.server import ServerSettings, get_server_settings
+from app.platform.config.shared_data import SharedDataSettings, get_shared_data_settings
+from app.platform.config.terminal import TerminalSettings, get_terminal_settings
 
-# Settings that describe a running instance; the CLI-only identity settings
-# are read fresh by the CLI and are not part of it.
+# Settings that describe a running instance. The CLI-only identity settings, the
+# shared-data location and the terminal are read fresh where they are needed, so they
+# are not part of it.
 INSTANCE_SETTINGS = (
     get_api_settings,
     get_backup_settings,
@@ -43,6 +46,8 @@ ALL_SETTINGS: tuple[type[MenageristBaseSettings], ...] = (
     RetentionSettings,
     SchedulerSettings,
     ServerSettings,
+    SharedDataSettings,
+    TerminalSettings,
 )
 
 __all__ = [
@@ -61,6 +66,8 @@ __all__ = [
     "RetentionSettings",
     "SchedulerSettings",
     "ServerSettings",
+    "SharedDataSettings",
+    "TerminalSettings",
     "get_api_settings",
     "get_backup_settings",
     "get_database_settings",
@@ -72,4 +79,6 @@ __all__ = [
     "get_retention_settings",
     "get_scheduler_settings",
     "get_server_settings",
+    "get_shared_data_settings",
+    "get_terminal_settings",
 ]

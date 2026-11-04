@@ -1,12 +1,11 @@
 import logging
-import os
 import sys
 import uuid
 from typing import TYPE_CHECKING
 
 import structlog
 
-from app.platform.config import get_logging_settings
+from app.platform.config import get_logging_settings, get_terminal_settings
 
 if TYPE_CHECKING:
     from typing import TextIO
@@ -101,7 +100,7 @@ def configure_logging(
         renderer: structlog.types.Processor = structlog.processors.JSONRenderer()
     else:
         # https://no-color.org/
-        colors_enabled = os.environ.get("NO_COLOR", "0")[0] == "0"
+        colors_enabled = get_terminal_settings().colour
         renderer = structlog.dev.ConsoleRenderer(
             colors=colors_enabled,
             force_colors=colors_enabled,

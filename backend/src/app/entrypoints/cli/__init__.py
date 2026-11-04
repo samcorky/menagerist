@@ -289,7 +289,10 @@ def serve(
 
     server_settings = get_server_settings()
     requested = server_settings.workers if workers is None else workers
-    container = worker_count.in_container(server_settings.in_container)
+    container = worker_count.in_container(
+        server_settings.in_container,
+        kubernetes_host=server_settings.kubernetes_service_host,
+    )
     cpus = worker_count.available_cpus()
     workers = worker_count.resolve_workers(
         requested, container=reload or container, cpus=cpus
@@ -410,7 +413,7 @@ def dump(*, output: Path = Path("openapi.json")) -> dict[str, object]:
 
 @settings_app.command(name="docs")
 def settings_docs(*, root: Path, check: bool = False) -> dict[str, object]:
-    """Write `.env.example` and `docs/settings.md` from the settings classes.
+    """Write `.env.example` and `docs/settings.md` from the settings and Compose files.
 
     Args:
         root: Repository root to write under; there is no default, so nothing is
@@ -418,9 +421,10 @@ def settings_docs(*, root: Path, check: bool = False) -> dict[str, object]:
         check: Write nothing and exit with an error if either file is out of date.
     """
     from app.platform.config import ALL_SETTINGS
+    from app.platform.config._compose import read_compose_files
     from app.platform.config._reference import reference_files
 
-    files = reference_files(ALL_SETTINGS)
+    files = reference_files(ALL_SETTINGS, read_compose_files(root))
     stale = [
         name
         for name, text in files.items()

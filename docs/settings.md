@@ -4,6 +4,8 @@
 
 Every deployment setting is an environment variable. Put the ones you change in a `.env` file next to `compose.yaml`; [`.env.example`](../.env.example) lists them all with their defaults. A list is comma-separated, and a sensitive value (a secret or a URL with credentials) has no default here.
 
+The Docker image sets `MENAGERIST_API_FRONTEND_DIST_PATH=/app/frontend` and `MENAGERIST_SERVER_IN_CONTAINER=1` itself, so in a container those two differ from the defaults listed here.
+
 ## api
 
 API entrypoint settings.
@@ -120,3 +122,24 @@ How many web worker processes run, and whether this is a container.
 | --- | --- | --- | --- | --- |
 | `MENAGERIST_SERVER_WORKERS` | whole number | `auto` | 1 to 16, `auto` | Web worker processes, 1 to 16, or auto: one per CPU core on a host and one in a container or when reloading, as Granian advises. |
 | `MENAGERIST_SERVER_IN_CONTAINER` | true or false | unset | any | Whether the server runs in a container. Unset detects it; the image sets it, and 0 or 1 overrides detection. |
+
+## terminal
+
+What the terminal the process writes to can show.
+
+| Variable | Type | Default | Allowed values | Notes |
+| --- | --- | --- | --- | --- |
+| `NO_COLOR` | text | unset | any | Set to any value that does not start with 0 to turn off colour in console logs (see https://no-color.org). |
+
+## compose
+
+Read by Docker Compose from `.env` when it starts the stack, not by Menagerist. Recreate the stack after changing one.
+
+| Variable | Type | Default | Allowed values | Notes |
+| --- | --- | --- | --- | --- |
+| `MENAGERIST_IMAGE` | text | `ghcr.io/samcorky/menagerist:latest` | any | Image the app and worker run. Set a version tag to pin a release or to roll back (see docs/DEPLOYING.md). The development override (compose.override.yml) defaults it to `menagerist:local`. |
+| `POSTGRES_MEM_LIMIT` | text | `512m` | any | The database container's hard memory cap (Postgres has no limit of its own). Raise it together with the memory values below if the database is large. |
+| `POSTGRES_SHARED_BUFFERS` | text | `128MB` | any | Postgres `shared_buffers` (its own default is 128MB). About a quarter of the memory cap; the most useful one to raise on a bigger machine. |
+| `POSTGRES_EFFECTIVE_CACHE_SIZE` | text | `256MB` | any | Postgres `effective_cache_size` (its own default is 4GB), a planner hint for how much data the OS can cache. Keep it near half the memory cap so the planner is not too optimistic. |
+| `POSTGRES_WORK_MEM` | text | `4MB` | any | Postgres `work_mem` (its own default is 4MB), the memory per sort or hash in a query. Raise it only if large sorts spill to disk, as it applies to each step of each connection. |
+| `POSTGRES_MAX_CONNECTIONS` | text | `100` | any | Postgres `max_connections` (its own default is 100). Each worker process keeps a pool of connections: lower it on a very small machine, and keep it above the total of all pools. |

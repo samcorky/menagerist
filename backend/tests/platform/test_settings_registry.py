@@ -7,10 +7,12 @@ from app.platform.config import (
     INSTANCE_SETTINGS,
     IdentityCliSettings,
     MenageristBaseSettings,
+    SharedDataSettings,
+    TerminalSettings,
 )
 from app.platform.config._discovery import discover
 from app.platform.config._fields import group_name, unwrap
-from app.platform.config._markers import Public, Tunable
+from app.platform.config._markers import Internal, Public, Tunable
 
 
 def _declared_settings() -> set[type[MenageristBaseSettings]]:
@@ -31,11 +33,16 @@ def test_all_settings_lists_each_class_once() -> None:
     assert set(ALL_SETTINGS) == _declared_settings()
 
 
-def test_all_settings_is_the_instance_settings_plus_the_cli_only_class() -> None:
-    """The server's getters and the CLI's class together make up every class."""
+def test_all_settings_is_the_instance_settings_plus_the_fresh_read_classes() -> None:
+    """The server's getters and the classes read fresh make up every class."""
     served = {get_type_hints(getter)["return"] for getter in INSTANCE_SETTINGS}
-    assert served | {IdentityCliSettings} == set(ALL_SETTINGS)
-    assert served.isdisjoint({IdentityCliSettings})
+    fresh: set[type[MenageristBaseSettings]] = {
+        IdentityCliSettings,
+        SharedDataSettings,
+        TerminalSettings,
+    }
+    assert served | fresh == set(ALL_SETTINGS)
+    assert served.isdisjoint(fresh)
 
 
 def test_discovery_finds_every_marked_field_in_all_settings() -> None:
@@ -47,3 +54,12 @@ def test_discovery_finds_every_marked_field_in_all_settings() -> None:
         if any(isinstance(m, Tunable | Public) for m in unwrap(field)[1])
     }
     assert {spec.key for spec in discover(ALL_SETTINGS)} == marked
+
+
+def test_an_internal_field_is_never_tunable_or_public() -> None:
+    """Internal means operators never see it, which tunable and public contradict."""
+    for cls in ALL_SETTINGS:
+        for name, field in cls.model_fields.items():
+            markers = unwrap(field)[1]
+            if any(isinstance(m, Internal) for m in markers):
+                assert not any(isinstance(m, Tunable | Public) for m in markers), name

@@ -20,7 +20,12 @@ if TYPE_CHECKING:
 
 PASSWORD = "s3cr3t-p4ss"
 DSN = f"postgresql+asyncpg://menagerist:{PASSWORD}@db:5432/menagerist"
-CLI_ONLY = {"get_identity_cli_settings"}
+# Read fresh where needed, so not logged at start-up.
+CLI_ONLY = {
+    "get_identity_cli_settings",
+    "get_shared_data_settings",
+    "get_terminal_settings",
+}
 
 
 @pytest.fixture
@@ -155,7 +160,7 @@ def _flatten(annotation: object) -> set[object]:
 
 
 def test_every_settings_getter_is_in_instance_settings() -> None:
-    """A new settings group must be logged (or explicitly CLI-only)."""
+    """A new settings group must be logged (or explicitly read fresh instead)."""
     getters: list[Callable[[], BaseSettings]] = [
         getattr(config, name)
         for name in dir(config)
