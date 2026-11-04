@@ -12,7 +12,7 @@ import math
 import time
 from enum import StrEnum
 from functools import lru_cache
-from typing import TYPE_CHECKING, Annotated, Any, assert_never
+from typing import TYPE_CHECKING, Annotated, Any
 
 import structlog
 from fastapi import Depends
@@ -47,7 +47,11 @@ class RateLimitedError(TooManyRequestsError):
 
 
 def limit_for(settings: RateLimitSettings, bucket: RateLimitBucket) -> int:
-    """Return how many requests `bucket` allows per window; `0` means no limit."""
+    """Return how many requests `bucket` allows per window; `0` means no limit.
+
+    The `match` has no default, so mypy reports a missing return for a bucket
+    that has no setting.
+    """
     match bucket:
         case RateLimitBucket.UPLOADS:
             return settings.uploads_per_minute
@@ -57,8 +61,6 @@ def limit_for(settings: RateLimitSettings, bucket: RateLimitBucket) -> int:
             return settings.search_per_minute
         case RateLimitBucket.IMPORTS:
             return settings.imports_per_minute
-        case _:
-            assert_never(bucket)
 
 
 class FixedWindowCounter:
