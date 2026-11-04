@@ -8,6 +8,7 @@ name: Release
 #   - channel promote: the final tag for the latest pre-release (next-tag --promote)
 #   - channel post:    a post-release of the latest release (next-tag --post)
 #   - tag:             a tag typed by hand, instead of a channel; it is checked the same way
+#   - name:            an optional release name; the title becomes "<tag> - <name>"
 #   - draft:           create a draft to review, then publish it from the Releases page
 #   - dry run:         plan and check, and show the title and notes; nothing is created
 # calver-scm only reads the repository. The release itself is created here, by gh.
@@ -27,6 +28,10 @@ on:
         default: final
       tag:
         description: A tag to release instead of a channel, for example v0.2026.11.1rc2 (leave empty to plan one)
+        type: string
+        default: ''
+      name:
+        description: A name for the release, for example Safe Harbour; the title becomes "v0.2026.11.1 - Safe Harbour" (leave empty for the tag alone)
         type: string
         default: ''
       draft:
@@ -57,6 +62,7 @@ jobs:
     env:
       CHANNEL: ${{ inputs.channel }}
       TAG_INPUT: ${{ inputs.tag }}
+      NAME_INPUT: ${{ inputs.name }}
       DRAFT: ${{ inputs.draft }}
       DRY_RUN: ${{ inputs.dry_run }}
       # A release published with the default token does not start Publish, so a release
@@ -144,6 +150,21 @@ jobs:
             exit 1
           fi
 
+      # The title is the tag, or "<tag> - <name>" when a name was given. Only the title
+      # carries the name: the tag, the version and the image tags are unchanged.
+      - name: Work out the release title
+        id: title
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          # One line, trimmed: a newline in the name must not reach GITHUB_OUTPUT.
+          name="$(printf '%s' "$NAME_INPUT" | tr -d '\r\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+          title="$TAG"
+          if [[ -n "$name" ]]; then
+            title="${TAG} - ${name}"
+          fi
+          echo "title=${title}" >> "$GITHUB_OUTPUT"
+
       # Where the release notes come from. Today that is GitHub's generated notes, grouped
       # by label (.github/release.yml). To write them another way, for example with an AI
       # step, produce a Markdown file here and set `file` to its path; the release step
@@ -162,6 +183,7 @@ jobs:
       - name: Summarise the plan
         env:
           TAG: ${{ steps.plan.outputs.tag }}
+          TITLE: ${{ steps.title.outputs.title }}
           VERSION: ${{ steps.plan.outputs.version }}
           IS_PRERELEASE: ${{ steps.plan.outputs.is_prerelease }}
           REASON: ${{ steps.plan.outputs.reason }}
@@ -173,6 +195,7 @@ jobs:
             echo "| | |"
             echo "|---|---|"
             echo "| Tag | \`${TAG}\` |"
+            echo "| Title | ${TITLE} |"
             echo "| Version | \`${VERSION}\` |"
             echo "| Pre-release | ${IS_PRERELEASE} |"
             echo "| Reason | ${REASON} |"
@@ -188,6 +211,7 @@ jobs:
         if: env.DRY_RUN == 'true'
         env:
           TAG: ${{ steps.plan.outputs.tag }}
+          TITLE: ${{ steps.title.outputs.title }}
           BASE_TAG: ${{ steps.notes.outputs.base_tag }}
           NOTES_FILE: ${{ steps.notes.outputs.file }}
         run: |
@@ -200,14 +224,14 @@ jobs:
             fi
             body="$(gh api --method POST "repos/${GITHUB_REPOSITORY}/releases/generate-notes" "${args[@]}" --jq .body)"
           fi
-          echo "Title: ${TAG}"
+          echo "Title: ${TITLE}"
           echo
           echo "$body"
           {
             echo
             echo "### Release title"
             echo
-            echo "\`${TAG}\`"
+            echo "\`${TITLE}\`"
             echo
             echo "### Release notes"
             echo
@@ -246,11 +270,12 @@ jobs:
         if: env.DRY_RUN != 'true'
         env:
           TAG: ${{ steps.plan.outputs.tag }}
+          TITLE: ${{ steps.title.outputs.title }}
           IS_PRERELEASE: ${{ steps.plan.outputs.is_prerelease }}
           BASE_TAG: ${{ steps.notes.outputs.base_tag }}
           NOTES_FILE: ${{ steps.notes.outputs.file }}
         run: |
-          args=(--repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" "--prerelease=${IS_PRERELEASE}")
+          args=(--repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TITLE" "--prerelease=${IS_PRERELEASE}")
           if [[ "$DRAFT" == "true" ]]; then
             args+=(--draft)
           fi
