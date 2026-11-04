@@ -55,6 +55,8 @@ Migrations only run forward. If the newer release did migrate the database, the 
 5. Stop the app with `docker compose stop menagerist`, then restore: `docker compose run --rm --no-deps menagerist backup restore <id>`. It refuses if the revisions differ (even with `--replace`) or if the database is not empty, which is why step 3 must not have run the newer image first.
 6. Start everything: `docker compose up -d`.
 
+This procedure, including the pre-migration `backup create` step, is checked automatically in CI against a real schema change (the per-user favourites migration): a backup taken at the old revision is refused on the new one, even with `--replace`, and restores cleanly onto a database still at the old revision.
+
 The archive holds the original media files, so they come back even onto a new media volume. It does not hold thumbnails, which are made again from the originals: if you also lost the media volume, run `docker compose run --rm --no-deps menagerist media regenerate-thumbnails --yes` after the restore, or the thumbnails stay blank until you do.
 
 To move forward again, set `MENAGERIST_IMAGE` back to the newer tag (or delete the line to follow `latest`) and run `docker compose pull` then `docker compose up -d`. The upgrade writes a fresh pre-migration backup first. The backup commands are described in [backend/README.md](../backend/README.md).
