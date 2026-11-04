@@ -1,0 +1,9 @@
+# The Caddy example in docs/examples/reverse-proxy/caddy, on plain HTTP.
+{
+	auto_https off
+	admin off
+}
+
+:80 {
+	reverse_proxy app:8000
+}

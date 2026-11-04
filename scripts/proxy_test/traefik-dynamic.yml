@@ -1,0 +1,12 @@
+http:
+  routers:
+    menagerist:
+      rule: "PathPrefix(`/`)"
+      entryPoints:
+        - web
+      service: menagerist
+  services:
+    menagerist:
+      loadBalancer:
+        servers:
+          - url: "http://app:8000"

@@ -1,0 +1,86 @@
+# Reverse proxy test stack, driven by `poe proxy-test` (scripts/proxy_test.py).
+#
+# The app is the real upload guard on Granian with no database (see
+# scripts/proxy_test/stub.py); each proxy is a profile, so only the one under
+# test starts. Ports are published on loopback only.
+name: menagerist-proxy
+
+services:
+  app:
+    # Built locally by `poe docker-build`; the test never pulls it.
+    image: menagerist:local
+    pull_policy: never
+    entrypoint:
+      - granian
+      - --interface
+      - asgi
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --working-dir
+      - /stub
+      - stub:app
+    mem_limit: 256m
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "1000:1000"
+    volumes:
+      - ./scripts/proxy_test/stub.py:/stub/stub.py:ro
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import socket; socket.create_connection(("127.0.0.1", 8000), 2)
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  nginx:
+    profiles: [nginx]
+    image: nginx:stable-alpine
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:18081:80"
+    volumes:
+      - ./scripts/proxy_test/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+  nginx-buffered:
+    profiles: [nginx-buffered]
+    image: nginx:stable-alpine
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:18082:80"
+    volumes:
+      - ./scripts/proxy_test/nginx-buffered.conf:/etc/nginx/conf.d/default.conf:ro
+
+  caddy:
+    profiles: [caddy]
+    image: caddy:2-alpine
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:18083:80"
+    volumes:
+      - ./scripts/proxy_test/Caddyfile:/etc/caddy/Caddyfile:ro
+
+  traefik:
+    profiles: [traefik]
+    image: traefik:v3.7.9
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:18084:80"
+    volumes:
+      - ./scripts/proxy_test/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./scripts/proxy_test/traefik-dynamic.yml:/etc/traefik/dynamic.yml:ro
