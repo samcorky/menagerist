@@ -31,8 +31,18 @@ def test_the_summary_lists_each_component_against_its_target() -> None:
     """Every component gets a row, and one below its target is marked."""
     table = check.summary_markdown(RESULTS)
 
-    assert "| Domain | 100.00% | 100% | Pass |" in table
-    assert "| Adapters | 71.46% | 80% | **Below target** |" in table
+    assert "| Domain | 100.00% | 100% | ✅ Pass |" in table
+    assert "| Adapters | 71.46% | 80% | ❌ **Below target** |" in table
+
+
+def test_the_summary_line_names_the_components_below_target() -> None:
+    """One line above the table says how many fall short, and which."""
+    short = check.summary_markdown(RESULTS)
+    met = check.summary_markdown([("Domain", 100.0, 100.0)], "Frontend coverage")
+
+    assert "❌ 1 of 2 below target: Adapters" in short
+    assert "✅ All 1 meet their targets" in met
+    assert met.startswith("### Frontend coverage\n")
 
 
 def test_the_summary_is_appended_when_github_provides_a_file(
@@ -73,7 +83,7 @@ def test_the_comment_file_starts_with_the_marker_and_holds_the_table(
 
     text = comment.read_text(encoding="utf-8")
     assert text.startswith(check.COMMENT_MARKER + "\n")
-    assert "| Domain | 100.00% | 100% | Pass |" in text
+    assert "| Domain | 100.00% | 100% | ✅ Pass |" in text
 
 
 def test_no_comment_file_is_written_unless_named(

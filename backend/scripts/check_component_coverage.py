@@ -184,14 +184,21 @@ def summary_markdown(
     results: list[tuple[str, float, float]], heading: str = "Backend coverage"
 ) -> str:
     """Return a Markdown table of each component's coverage against its target."""
+    below = [name for name, percent, target in results if percent < target]
+    if below:
+        verdict = f"❌ {len(below)} of {len(results)} below target: {', '.join(below)}"
+    else:
+        verdict = f"✅ All {len(results)} meet their targets"
     lines = [
         f"### {heading}",
+        "",
+        verdict,
         "",
         "| Component | Coverage | Target | Result |",
         "| --- | ---: | ---: | --- |",
     ]
     for name, percent, target in results:
-        result = "Pass" if percent >= target else "**Below target**"
+        result = "✅ Pass" if percent >= target else "❌ **Below target**"
         lines.append(f"| {name} | {percent:.2f}% | {target:.0f}% | {result} |")
     return "\n".join(lines) + "\n"
 
