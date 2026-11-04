@@ -175,11 +175,12 @@ cwd = "backend"
 help = "Clear the backend coverage dataset before running unit tests"
 
 [tool.poe.groups.quality.tasks.test-backend]
-script = "scripts.poe_run:main('test-backend', mode=mode, workers=workers)"
+script = "scripts.poe_run:main('test-backend', mode=mode, workers=workers, files=files)"
 deps = ["_coverage-erase"]
 args = [
   { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
   { name = "workers", options = ["-w", "--workers"], default = "auto", help = "pytest-xdist workers: a number, auto (one per CPU) or 0 for serial" },
+  { name = "files", positional = true, multiple = true, help = "Test files or node ids to run, as pytest takes them (e.g. tests/modules/graph or tests/modules/graph/test_node.py::test_create); all unit tests if none" },
 ]
 help = "Run backend unit tests in parallel (pytest-xdist, one worker per CPU unless --workers) from a clean coverage dataset"
 
@@ -188,10 +189,11 @@ cmd = "uv run --directory backend pytest -m fast -n 4 -q -p no:cacheprovider --n
 help = "Run only the quick in-memory backend tests (domain, application, shared kernel, architecture, platform); what pre-commit runs"
 
 [tool.poe.groups.quality.tasks.test-backend-integration]
-script = "scripts.poe_run:main('test-backend-integration', mode=mode, workers=workers)"
+script = "scripts.poe_run:main('test-backend-integration', mode=mode, workers=workers, files=files)"
 args = [
   { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
   { name = "workers", options = ["-w", "--workers"], default = "auto", help = "pytest-xdist workers: a number, auto (one per CPU) or 0 for serial" },
+  { name = "files", positional = true, multiple = true, help = "Test files or node ids to run, as pytest takes them (e.g. tests/modules/backup or tests/modules/backup/test_x.py::test_y); all integration tests if none" },
 ]
 help = "Run backend integration tests in parallel (one Postgres container per worker), appending to unit test coverage"
 
