@@ -236,8 +236,11 @@ def test_get_node_returns_304_when_etag_matches() -> None:
     assert response.headers["ETag"] == etag
 
 
-def test_get_node_returns_304_when_not_modified_since() -> None:
-    """GET /api/v1/node/{id} returns 304 Not Modified when If-Modified-Since matches."""
+def test_get_node_ignores_if_modified_since() -> None:
+    """GET /api/v1/node/{id} answers 304 only to the ETag, never to a date.
+
+    The body depends on the viewer's favourite, which Last-Modified does not follow.
+    """
     client = TestClient(_app_with_in_memory_graph())
     node = client.post("/api/v1/node", json={"name": "Alien", "type": "film"}).json()
 
@@ -248,7 +251,7 @@ def test_get_node_returns_304_when_not_modified_since() -> None:
         f"/api/v1/node/{node['id']}", headers={"If-Modified-Since": last_modified}
     )
 
-    assert response.status_code == 304
+    assert response.status_code == 200
     assert response.headers["Last-Modified"] == last_modified
 
 
