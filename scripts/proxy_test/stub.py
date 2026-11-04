@@ -7,12 +7,17 @@ unauthenticated upload, so both ways of replying early are covered: the guard's
 413 and the app's own 401.
 """
 
+from typing import TYPE_CHECKING
+
 from app.entrypoints.api.shared.http.upload_limit_middleware import (
     UploadLimitMiddleware,
 )
 
+if TYPE_CHECKING:
+    from starlette.types import Receive, Scope, Send
 
-async def _unauthenticated(scope, receive, send) -> None:
+
+async def _unauthenticated(scope: Scope, receive: Receive, send: Send) -> None:
     if scope["type"] != "http":
         return
     await send({"type": "http.response.start", "status": 401, "headers": []})

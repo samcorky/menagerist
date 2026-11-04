@@ -41,6 +41,8 @@ PROXIES = {"nginx": 18081, "nginx-buffered": 18082, "caddy": 18083, "traefik": 1
 
 @dataclass(frozen=True)
 class Scenario:
+    """One body to post and the only status that is acceptable in reply."""
+
     name: str
     megabytes: int
     expected: int
@@ -65,6 +67,7 @@ def compose(*args: str, profile: str | None = None) -> subprocess.CompletedProce
 
 
 def image_exists() -> bool:
+    """Whether the locally built image is there."""
     result = subprocess.run(
         ["docker", "image", "inspect", IMAGE],
         check=False,
@@ -101,7 +104,7 @@ def post_body(port: int, megabytes: int) -> str:
             for _ in range(megabytes):
                 connection.send(CHUNK)
         except OSError:
-            pass  # The proxy may already have answered; read the reply as a browser does.
+            pass  # The proxy may have answered already; read it as a browser would.
         return str(connection.getresponse().status)
     except (OSError, http.client.HTTPException) as error:
         return type(error).__name__
@@ -143,6 +146,7 @@ def check_proxy(name: str, attempts: int) -> bool:
 
 
 def main() -> int:
+    """Test the chosen proxies; return the exit status."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument(
         "proxy",
