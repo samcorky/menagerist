@@ -11,7 +11,7 @@ docker compose up -d
 
 The `menagerist` container applies database migrations when it starts. Before it upgrades an existing database it writes a verified backup archive to `./backups` (turn this off with `MENAGERIST_BACKUP_BEFORE_MIGRATE=false`), so a failed upgrade can be restored.
 
-`compose.yaml` pulls `ghcr.io/samcorky/menagerist:latest` unless `MENAGERIST_IMAGE` says otherwise. Set it in a `.env` file next to `compose.yaml` to choose another tag:
+`compose.yaml` follows the `latest` image unless `MENAGERIST_IMAGE` says otherwise ([Compose variables](settings.md#compose)). Set it in a `.env` file next to `compose.yaml` to choose another tag:
 
 | Tag | What it is |
 |---|---|
@@ -62,15 +62,7 @@ No other website may call the API unless you list its origin in `MENAGERIST_API_
 
 ## Database memory tuning
 
-The Postgres container is capped at 512 MB and its memory settings are sized to match. Set any of these in a `.env` file next to `compose.yaml` (Compose reads it automatically) and recreate the stack. The defaults suit a small install; raise them together on a larger machine.
-
-| `.env` variable | Default | Postgres' own default | When to change it |
-| --- | --- | --- | --- |
-| `POSTGRES_MEM_LIMIT` | `512m` | no limit | The container's hard memory cap. Raise it with the values below if the database is large. |
-| `POSTGRES_SHARED_BUFFERS` | `128MB` | `128MB` | About a quarter of the memory cap. The most useful one to raise on a bigger machine. |
-| `POSTGRES_EFFECTIVE_CACHE_SIZE` | `256MB` | `4GB` | A planner hint for how much data the OS can cache; keep it near half the memory cap so the planner is not over-optimistic. |
-| `POSTGRES_WORK_MEM` | `4MB` | `4MB` | Memory per sort or hash in a query. Raise it only if large sorts spill to disk, as it applies to each step of each connection. |
-| `POSTGRES_MAX_CONNECTIONS` | `100` | `100` | Each worker process keeps a pool of connections; lower it on a very small machine, and keep it above the total of all pools. |
+The Postgres container is capped at 512 MB and its memory settings are sized to match, which suits a small install. Raise the memory values together on a larger machine by setting them in a `.env` file next to `compose.yaml` (Compose reads it automatically) and recreating the stack. The variables (`POSTGRES_MEM_LIMIT`, `POSTGRES_SHARED_BUFFERS`, `POSTGRES_EFFECTIVE_CACHE_SIZE`, `POSTGRES_WORK_MEM` and `POSTGRES_MAX_CONNECTIONS`), their defaults and when to change each are listed under [Compose variables](settings.md#compose).
 
 For example, a machine with 2 GB to spare for the database: `POSTGRES_MEM_LIMIT=2g`, `POSTGRES_SHARED_BUFFERS=512MB`, `POSTGRES_EFFECTIVE_CACHE_SIZE=1GB`. To see the values in effect: `docker compose exec postgres psql -U menagerist -c "SHOW shared_buffers"`.
 

@@ -13,7 +13,6 @@ Results go to stdout. Logs, progress and errors go to stderr or the logger.
 
 import dataclasses
 import json
-import os
 import sys
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime
@@ -25,6 +24,8 @@ from uuid import UUID
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
+
+from app.platform.config.terminal import get_terminal_settings
 
 # A command's result: anything made of dataclasses, mappings, sequences and scalars.
 type Result = object
@@ -70,7 +71,7 @@ def resolved_format() -> OutputFormat:
     """The format in effect: `auto` is Rich on a capable terminal, else plain text."""
     if _format is not OutputFormat.AUTO:
         return _format
-    capable = sys.stdout.isatty() and os.environ.get("TERM") != "dumb"
+    capable = sys.stdout.isatty() and not get_terminal_settings().is_dumb
     return OutputFormat.RICH if capable else OutputFormat.TEXT
 
 

@@ -10,6 +10,8 @@ from dotenv import dotenv_values
 from pydantic import Field, PostgresDsn, SecretStr
 
 from app.platform.config import ALL_SETTINGS, MenageristBaseSettings
+from app.platform.config._fields import unwrap
+from app.platform.config._markers import Internal
 from app.platform.config._reference import (
     build_sections,
     reference_files,
@@ -138,7 +140,26 @@ def test_every_field_of_every_class_is_listed_once() -> None:
     assert "MENAGERIST_MEDIA_STORAGE_PATH" in listed
     assert "MENAGERIST_API_TRUSTED_PROXIES" in listed
     assert "MENAGERIST_IDENTITY_INITIAL_PASSWORD" in listed
-    assert len(listed) == sum(len(cls.model_fields) for cls in ALL_SETTINGS)
+    internal = sum(
+        isinstance(marker, Internal)
+        for cls in ALL_SETTINGS
+        for field in cls.model_fields.values()
+        for marker in unwrap(field)[1]
+    )
+    assert internal  # `MENAGERIST_SHARED_DIR` at least
+    assert len(listed) + internal == sum(len(cls.model_fields) for cls in ALL_SETTINGS)
+
+
+def test_an_internal_field_is_left_out_of_the_reference() -> None:
+    """A real setting that is not for operators is neither listed nor written out."""
+    listed = [e.env_name for s in build_sections(ALL_SETTINGS) for e in s.entries]
+    assert "MENAGERIST_SHARED_DIR" not in listed
+    assert "SHARED_DIR" not in render_env_example(build_sections(ALL_SETTINGS))
+
+
+def test_a_class_with_only_internal_fields_has_no_section() -> None:
+    """The shared-data class would otherwise print an empty table."""
+    assert "shared_data" not in [s.group for s in build_sections(ALL_SETTINGS)]
 
 
 def test_classes_sharing_a_group_share_a_section() -> None:

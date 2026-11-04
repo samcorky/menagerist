@@ -6,6 +6,7 @@ from typing import Annotated, Final, Literal
 from pydantic import Field
 
 from app.platform.config._base import MenageristBaseSettings
+from app.platform.config._markers import Internal
 
 MAX_WORKERS: Final = 16
 
@@ -28,6 +29,14 @@ class ServerSettings(MenageristBaseSettings, group="server"):
             + "sets it, and 0 or 1 overrides detection."
         ),
     )
+    kubernetes_service_host: Annotated[
+        str | None,
+        Field(
+            validation_alias="KUBERNETES_SERVICE_HOST",
+            description="Set by Kubernetes in every pod; read to detect a container.",
+        ),
+        Internal(),
+    ] = None
 
 
 @lru_cache(maxsize=1)

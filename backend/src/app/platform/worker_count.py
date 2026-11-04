@@ -8,7 +8,7 @@ from app.platform.config.server import MAX_WORKERS
 from app.platform.connection_budget import validate_workers
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Callable
 
 Workers = int | Literal["auto"]
 
@@ -26,7 +26,7 @@ def _read_cgroup() -> str:
 def in_container(
     configured: bool | None,
     *,
-    environ: Mapping[str, str] = os.environ,
+    kubernetes_host: str | None = None,
     exists: Callable[[str], bool] = os.path.exists,
     read_cgroup: Callable[[], str] = _read_cgroup,
 ) -> bool:
@@ -34,11 +34,12 @@ def in_container(
 
     `configured` (`ServerSettings.in_container`) decides when set, either way, as
     the image sets it; otherwise Docker's and Podman's marker files, Kubernetes'
-    environment and the runtime named in the cgroup path are looked for.
+    `KUBERNETES_SERVICE_HOST` (`kubernetes_host`) and the runtime named in the
+    cgroup path are looked for.
     """
     if configured is not None:
         return configured
-    if "KUBERNETES_SERVICE_HOST" in environ:
+    if kubernetes_host is not None:
         return True
     if any(exists(path) for path in _MARKER_FILES):
         return True

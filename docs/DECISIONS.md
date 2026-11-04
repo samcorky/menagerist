@@ -1348,3 +1348,13 @@ Two more jobs finish the picture. `media.remove_stray_files` (`RemoveStrayMediaF
 **Lock keys:** every advisory lock is an `AdvisoryLock` member, with a key derived from the first 8 bytes of `blake2b("menagerist:<name>")` as a signed 64-bit integer. The old hand-numbered keys were dropped; locks last a transaction or a migration run, so the only constraint is not running old and new versions against one database mid-upgrade.
 
 **Not done:** `create_backup` does not take `BACKUP_RESTORE`; a restore is already excluded from the pre-migration backup by the migration lock.
+
+---
+
+## Every environment variable has one documented home (2026-11-04)
+
+**Decision:** the generated `.env.example` and `docs/settings.md` also list the variables Docker Compose substitutes (`MENAGERIST_IMAGE` and the `POSTGRES_*` tuning values), read from the `${NAME:-default}` references in the Compose files with a description kept in `platform/config/_compose.py`. Generating fails if a referenced variable has no description or a description has no reference. The header notes the two values the image bakes in (`MENAGERIST_API_FRONTEND_DIST_PATH`, `MENAGERIST_SERVER_IN_CONTAINER`), and a test checks the Dockerfile still sets them. `docs/DEPLOYING.md` links to the section instead of repeating the defaults.
+
+**Decision:** application code reads the environment only through a settings class. `MENAGERIST_SHARED_DIR` became `SharedDataSettings.shared_dir`, marked `Internal()` so the reference skips it (the class stays in `ALL_SETTINGS`); it is loaded fresh, not cached, because it is read rarely and by a migration that has no database. An architecture test fails on `os.environ` or `os.getenv` outside `platform/config`.
+
+**Standard names:** `TERM`, `NO_COLOR` and `KUBERNETES_SERVICE_HOST` are owned by the terminal, no-color.org and Kubernetes, so their fields carry a `validation_alias` of the exact name, as `TZ` does (`TerminalSettings`, `ServerSettings`). `TERM` and `KUBERNETES_SERVICE_HOST` are marked `Internal()` and left out of the operator reference; `NO_COLOR` is documented. `TerminalSettings` is read fresh rather than cached, so colour detection works before the application is configured. **Alternative rejected:** allow-listing four files to read them from `os.environ`; it left an exception in the architecture test.

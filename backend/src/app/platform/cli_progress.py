@@ -4,7 +4,6 @@ All of it goes to stderr and only appears when a person is there: stdout stays a
 command's result, and pipes, cron, `--json` and tests see none of it.
 """
 
-import os
 import sys
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
@@ -20,13 +19,15 @@ from rich.progress import (
 )
 from rich.prompt import Confirm
 
+from app.platform.config.terminal import get_terminal_settings
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
 
 def interactive() -> bool:
     """Whether a person is watching stderr on a terminal that can redraw."""
-    return sys.stderr.isatty() and os.environ.get("TERM") != "dumb"
+    return sys.stderr.isatty() and not get_terminal_settings().is_dumb
 
 
 def _console() -> Console:

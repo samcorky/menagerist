@@ -14,14 +14,14 @@ from app.platform.worker_count import (
 def _detect(
     configured: bool | None = None,
     *,
-    environ: dict[str, str] | None = None,
+    kubernetes_host: str | None = None,
     files: set[str] | None = None,
     cgroup: str = "",
 ) -> bool:
     present = files or set()
     return in_container(
         configured,
-        environ=environ or {},
+        kubernetes_host=kubernetes_host,
         exists=lambda path: path in present,
         read_cgroup=lambda: cgroup,
     )
@@ -50,7 +50,7 @@ def test_docker_and_podman_marker_files() -> None:
 
 def test_kubernetes_is_detected_from_its_environment() -> None:
     """Kubernetes injects its service host into every pod."""
-    assert _detect(environ={"KUBERNETES_SERVICE_HOST": "10.0.0.1"}) is True
+    assert _detect(kubernetes_host="10.0.0.1") is True
 
 
 @pytest.mark.parametrize("word", ["docker", "kubepods", "containerd", "libpod"])
