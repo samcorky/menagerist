@@ -21,6 +21,8 @@ class Node(Identifiable, Owned, SoftDeletable):
     type: str | None = None
     description: str | None = None
     attributes: dict[str, Any] = field(default_factory=dict)
+    # The viewer's own favourite, filled in by the repository on a read. It is not
+    # stored on the item, so changing it here does nothing: use `set_favourite`.
     favourite: bool = False
     tags: list[str] = field(default_factory=list)
     extra_schema: dict[str, Any] | None = None
@@ -51,7 +53,10 @@ class Node(Identifiable, Owned, SoftDeletable):
         tags: list[str] | None = None,
         extra_schema: dict[str, Any] | None = None,
     ) -> Node:
-        """Create a new node, generating its id and timestamps."""
+        """Create a new node, generating its id and timestamps.
+
+        `favourite` makes it a favourite of its owner when it is first added.
+        """
         now = datetime.now(UTC)
         return cls(
             id=uuid.uuid7(),
@@ -91,7 +96,6 @@ class Node(Identifiable, Owned, SoftDeletable):
         type: str | None = None,
         description: str | None = None,
         attributes: dict[str, Any] | None = None,
-        favourite: bool | None = None,
         tags: list[str] | None = None,
         extra_schema: dict[str, Any] | None = None,
     ) -> None:
@@ -114,7 +118,6 @@ class Node(Identifiable, Owned, SoftDeletable):
         self._set_if_given(
             description=description,
             attributes=attributes,
-            favourite=favourite,
             extra_schema=extra_schema,
         )
         if tags is not None:

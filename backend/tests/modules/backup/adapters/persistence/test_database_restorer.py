@@ -82,10 +82,10 @@ async def _seed(engine: AsyncEngine) -> None:
         )
         await connection.execute(
             text("""INSERT INTO nodes
-                (id, owner_id, name, attributes, favourite, tags,
+                (id, owner_id, name, attributes, tags,
                  created_at, updated_at, deleted_at)
                 SELECT :id, id, 'Archived item', '{"nested": [true, null]}',
-                false, '[]', now(), now(), now() FROM users"""),
+                '[]', now(), now(), now() FROM users"""),
             {"id": uuid7()},
         )
 

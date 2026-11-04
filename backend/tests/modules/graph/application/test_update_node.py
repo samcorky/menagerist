@@ -24,7 +24,7 @@ from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
-from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -513,3 +513,78 @@ async def test_update_node_clear_type_wins_over_a_type_in_the_same_command() -> 
 
     assert result.type is None
     assert await repos.node_types.list(after=None, limit=10) == []
+
+
+async def _owned_node() -> tuple[UpdateNode, InMemoryNodeRepository, Node, Actor]:
+    owner = Actor(id=uuid.UUID(int=7))
+    repository = InMemoryNodeRepository()
+    node = Node.create(owner_id=owner.id, name="Alien", type="film")
+    await repository.add(node)
+    repos = GraphRepos(
+        nodes=repository,
+        edges=InMemoryEdgeRepository(),
+        node_types=InMemoryNodeTypeRepository(),
+        edge_types=InMemoryEdgeTypeRepository(),
+    )
+    return (
+        UpdateNode(InMemoryUnitOfWork(repos), InMemoryAccessGuard()),
+        (repository),
+        node,
+        owner,
+    )
+
+
+async def test_favouriting_records_the_callers_favourite_only() -> None:
+    """A favourite-only update stars the item for the caller and nothing else."""
+    use_case, repository, node, owner = await _owned_node()
+    before = node.updated_at
+
+    result = await use_case.handle(
+        UpdateNodeCommand(node_id=node.id, favourite=True), owner
+    )
+
+    assert result.favourite is True
+    assert result.updated_at == before
+    stored = await repository.get(node.id, scope=ContentFilter.of(owner.id))
+    assert stored is not None
+    assert stored.favourite is True
+    assert await repository.count(scope=ContentFilter.of(owner.id), favourite=True) == 1
+
+
+async def test_unfavouriting_clears_it() -> None:
+    """`favourite=False` removes the caller's favourite."""
+    use_case, repository, node, owner = await _owned_node()
+    await use_case.handle(UpdateNodeCommand(node_id=node.id, favourite=True), owner)
+
+    result = await use_case.handle(
+        UpdateNodeCommand(node_id=node.id, favourite=False), owner
+    )
+
+    assert result.favourite is False
+    assert await repository.count(scope=ContentFilter.of(owner.id), favourite=True) == 0
+
+
+async def test_editing_without_a_favourite_leaves_it_as_it_was() -> None:
+    """Changing the name neither sets nor clears the caller's favourite."""
+    use_case, _, node, owner = await _owned_node()
+    await use_case.handle(UpdateNodeCommand(node_id=node.id, favourite=True), owner)
+
+    result = await use_case.handle(
+        UpdateNodeCommand(node_id=node.id, name="Alien (1979)"), owner
+    )
+
+    assert result.name == "Alien (1979)"
+    assert result.favourite is True
+
+
+async def test_an_edit_and_a_favourite_in_one_update_both_apply() -> None:
+    """A combined update changes the item and the caller's favourite."""
+    use_case, _, node, owner = await _owned_node()
+
+    result = await use_case.handle(
+        UpdateNodeCommand(node_id=node.id, name="Alien (1979)", favourite=True), owner
+    )
+
+    assert result.name == "Alien (1979)"
+    assert result.favourite is True
+    assert result.updated_at > node.created_at

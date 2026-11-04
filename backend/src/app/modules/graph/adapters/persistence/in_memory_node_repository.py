@@ -1,4 +1,5 @@
 import random
+from datetime import UTC, datetime
 from functools import partial
 from typing import TYPE_CHECKING, cast
 
@@ -18,7 +19,6 @@ if TYPE_CHECKING:
     import collections.abc
     import uuid
     from collections.abc import Mapping, Sequence
-    from datetime import datetime
 
     from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
         EdgeStore,
@@ -52,6 +52,8 @@ class InMemoryNodeRepository:
         self._nodes: dict[uuid.UUID, Node] = {}
         self._external = external
         self._edges: EdgeStore = {} if edges is None else edges
+        # (user, item) -> when it was favourited; the twin of `node_favourites`.
+        self._favourites: dict[tuple[uuid.UUID, uuid.UUID], datetime] = {}
 
     def connected(
         self, node_id: uuid.UUID, scope: ContentFilter
@@ -84,9 +86,27 @@ class InMemoryNodeRepository:
             if not node.is_deleted and scope.covers(node.owner_id)
         ]
 
+    def _is_favourite(self, node: Node, scope: ContentFilter) -> bool:
+        """Whether the person `scope` stands for has favourited the item."""
+        return (
+            scope.user_id is not None and (scope.user_id, node.id) in self._favourites
+        )
+
+    def _viewed(self, node: Node, scope: ContentFilter) -> Node:
+        """Mark the stored item with the viewer's own favourite flag and return it.
+
+        The flag is set on the shared instance (so identity is kept for callers
+        that hold it) just before each read returns, which is enough for a test
+        double where one read is used at a time.
+        """
+        node.favourite = self._is_favourite(node, scope)
+        return node
+
     async def add(self, node: Node) -> None:
-        """Add a new node."""
+        """Add a new node, as its owner's favourite if it was created as one."""
         self._nodes[node.id] = node
+        if node.favourite and node.owner_id is not None:
+            self._favourites[(node.owner_id, node.id)] = datetime.now(UTC)
 
     async def save(self, node: Node) -> None:
         """Persist changes to an existing node."""
@@ -94,7 +114,23 @@ class InMemoryNodeRepository:
 
     async def get(self, node_id: uuid.UUID, *, scope: ContentFilter) -> Node | None:
         """Return the node with `node_id`, or `None` if missing, deleted or unseen."""
-        return next((n for n in self._visible(scope) if n.id == node_id), None)
+        found = next((n for n in self._visible(scope) if n.id == node_id), None)
+        return None if found is None else self._viewed(found, scope)
+
+    async def set_favourite(
+        self, node_id: uuid.UUID, favourite: bool, *, scope: ContentFilter
+    ) -> None:
+        """Record or remove the scope's person's favourite on a live item."""
+        if scope.user_id is None:
+            msg = "A favourite belongs to one person; the scope names none."
+            raise ValueError(msg)
+        if not any(n.id == node_id for n in self._visible(scope)):
+            return
+        key = (scope.user_id, node_id)
+        if not favourite:
+            self._favourites.pop(key, None)
+        elif key not in self._favourites:
+            self._favourites[key] = datetime.now(UTC)
 
     async def list(
         self,
@@ -127,8 +163,10 @@ class InMemoryNodeRepository:
                 if text_matches(node, needle, attribute_search_exclusions)
             ]
         if favourite is not None:
-            ordered = [node for node in ordered if node.favourite == favourite]
-        return ordered[:limit]
+            ordered = [
+                node for node in ordered if self._is_favourite(node, scope) == favourite
+            ]
+        return [self._viewed(node, scope) for node in ordered[:limit]]
 
     async def count(
         self,
@@ -153,7 +191,7 @@ class InMemoryNodeRepository:
                 n for n in nodes if text_matches(n, needle, attribute_search_exclusions)
             ]
         if favourite is not None:
-            nodes = [n for n in nodes if n.favourite == favourite]
+            nodes = [n for n in nodes if self._is_favourite(n, scope) == favourite]
         return len(nodes) if limit is None else min(len(nodes), limit)
 
     def _matching(
@@ -164,7 +202,10 @@ class InMemoryNodeRepository:
         env = QueryEnv(scope=scope, external=self._external, links=self)
         hits = [
             SearchHit(node=node, sort_values=sort_values(node, resolved))
-            for node in sorted(self._visible(scope), key=lambda n: n.id)
+            for node in (
+                self._viewed(n, scope)
+                for n in sorted(self._visible(scope), key=lambda n: n.id)
+            )
             if where is None or matches(node, where, resolved, env)
         ]
         # Stable passes from the last key to the first give the multi-key order.
@@ -208,7 +249,7 @@ class InMemoryNodeRepository:
     ) -> Node | None:
         """Return one matching live node at random, or `None`."""
         if resolved is None:
-            nodes = self._visible(scope)
+            nodes = [self._viewed(n, scope) for n in self._visible(scope)]
         else:
             nodes = [hit.node for hit in self._matching(scope, resolved)]
         if ids is not None:
@@ -288,7 +329,7 @@ class InMemoryNodeRepository:
         nodes = self._with_attribute(type_slug, key, scope=scope, sub_key=sub_key)
         if after is not None:
             nodes = [node for node in nodes if node.id > after]
-        return nodes[:limit]
+        return [self._viewed(node, scope) for node in nodes[:limit]]
 
     async def list_attribute_values(
         self,
@@ -393,6 +434,9 @@ class InMemoryNodeRepository:
     async def purge(self, node_id: uuid.UUID) -> None:
         """Hard-delete the node row, live or soft-deleted; an unknown id is a no-op."""
         self._nodes.pop(node_id, None)
+        # What the database does with `ON DELETE CASCADE`.
+        for key in [k for k in self._favourites if k[1] == node_id]:
+            del self._favourites[key]
 
     async def list_deleted_before(
         self, cutoff: datetime, *, limit: int

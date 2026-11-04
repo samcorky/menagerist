@@ -39,7 +39,11 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.sql.util import ClauseAdapter
 
-from app.modules.graph.adapters.persistence.models import EdgeModel, NodeModel
+from app.modules.graph.adapters.persistence.models import (
+    EdgeModel,
+    NodeFavouriteModel,
+    NodeModel,
+)
 from app.modules.graph.adapters.persistence.search_sql import (
     like_pattern,
     search_clause,
@@ -74,6 +78,7 @@ from app.modules.graph.domain.query import (
 from app.platform.orm_mixins import owned_by
 
 if TYPE_CHECKING:
+    import uuid
     from collections.abc import Callable, Mapping
 
     from sqlalchemy import SQLColumnExpression
@@ -90,6 +95,20 @@ _C: Final = "C"  # byte-wise collation: Python's code-point string order
 # Description counts as blank when only ASCII whitespace (see `description_blank`).
 _BLANK_PATTERN: Final = r"^[ \t\n\r\f\v]*$"
 _FLOAT_MAX: Final = Decimal(int(sys.float_info.max))
+
+
+def favourite_clause(user_id: uuid.UUID | None, value: bool) -> _Bool:
+    """Whether the item is (or is not) a favourite of `user_id`.
+
+    No user, as for a system job, means nobody has favourited anything.
+    """
+    if user_id is None:
+        return not_(true()) if value else true()
+    favourited = exists().where(
+        NodeFavouriteModel.node_id == NodeModel.id,
+        NodeFavouriteModel.user_id == user_id,
+    )
+    return favourited if value else not_(favourited)
 
 
 def _never_null(expression: _Bool) -> _Bool:
@@ -494,7 +513,7 @@ def _item_condition(condition: Condition, ctx: ResolvedQuery, env: QueryEnv) -> 
     if isinstance(condition, TypeCondition):
         return _never_null(NodeModel.type.in_(condition.slugs))
     if isinstance(condition, FavouriteCondition):
-        return _never_null(NodeModel.favourite == condition.value)
+        return favourite_clause(env.scope.user_id, condition.value)
     if isinstance(condition, MediaCondition):
         return _media(condition, env)
     if isinstance(condition, CollectionCondition):

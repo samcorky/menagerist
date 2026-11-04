@@ -972,7 +972,7 @@ Open items from Stage 1; none is scheduled.
 
 - **A universal `handle`/`_handle` template for all use cases** *(done 2026-10-22: every use case has a final `handle` and implements `_handle`, with `self.scope(actor)` for content)*; a single place for a future activity log is still open.
 - **Combined Authorised and Scoped handlers** when one use case needs both. Example: Stage 3 public-link creation needs a permission gate and an owner scope.
-- **Per-person favourites** once sharing exists (an existing follow-up: the favourite flag is on the item, so it would be shared).
+- **Per-person favourites** *(done 2026-11-04: see "Favourites belong to a person")*.
 - **Make the owner columns NOT NULL** (items, connections, files, example installations) after every deployment has claimed its data.
 - **Open idea, decided against (2026-10-11):** a readiness `warn` for "setup not completed" (see the 2026-10-11 entry).
 - **Stage 2:** sharing, through a sharing `AccessPolicy` and a wider SQL scope.
@@ -1358,3 +1358,21 @@ Two more jobs finish the picture. `media.remove_stray_files` (`RemoveStrayMediaF
 **Decision:** application code reads the environment only through a settings class. `MENAGERIST_SHARED_DIR` became `SharedDataSettings.shared_dir`, marked `Internal()` so the reference skips it (the class stays in `ALL_SETTINGS`); it is loaded fresh, not cached, because it is read rarely and by a migration that has no database. An architecture test fails on `os.environ` or `os.getenv` outside `platform/config`.
 
 **Standard names:** `TERM`, `NO_COLOR` and `KUBERNETES_SERVICE_HOST` are owned by the terminal, no-color.org and Kubernetes, so their fields carry a `validation_alias` of the exact name, as `TZ` does (`TerminalSettings`, `ServerSettings`). `TERM` and `KUBERNETES_SERVICE_HOST` are marked `Internal()` and left out of the operator reference; `NO_COLOR` is documented. `TerminalSettings` is read fresh rather than cached, so colour detection works before the application is configured. **Alternative rejected:** allow-listing four files to read them from `os.environ`; it left an exception in the architecture test.
+
+---
+
+## Favourites belong to a person (2026-11-04)
+
+**Decision:** a favourite is a row in `node_favourites` (`user_id`, `node_id`, `created_at`; the pair is the primary key), not a column on the item. Starring an item changes only the caller's row, so once items can be shared everyone keeps their own stars. The migration copies each existing flag to the item's owner and drops `nodes.favourite`; its downgrade puts the flag back from the owner's row.
+
+**Reads:** `Node.favourite` stays on the entity as what a read reports for the viewer, filled in by the repository from the scope's person (`False` under `everyone()`, which names nobody). It is never written by `save`. The `favourite` filter on `GET /node` and the `favourite` search condition become an `EXISTS` on the table for the same person, so a saved search judges favourites for whoever runs it. The SQL repository marks results with one extra query per page; the in-memory twin marks the stored node in place just before each read returns.
+
+**Writes:** `NodeRepository.set_favourite(node_id, favourite, *, scope)` favourites or unfavourites for the scope's person (a node outside the scope does nothing; `everyone()` raises `ValueError`). A favourite-only `PATCH /node/{id}` does not touch the item, so `updated_at` and everyone else's view are unchanged. Creating an item with `favourite: true` makes it its owner's favourite.
+
+**Caching:** because a toggle no longer moves `updated_at`, the node ETag includes the viewer's favourite state. `GET /node/{id}` therefore ignores `If-Modified-Since` and answers 304 only for a matching `If-None-Match`, because a date cannot show the viewer's star is unchanged (unstarring leaves no timestamp). `Last-Modified` is still sent, and `If-Unmodified-Since` on `PATCH` still compares `updated_at`.
+
+**Cascade:** `node_id` is a foreign key with `ON DELETE CASCADE`, so purging an item removes its favourites (the in-memory twin does the same). A soft-deleted item keeps its favourites, so a restore brings the star back. `user_id` has no foreign key, as `owner_id` has none, because accounts belong to another module; the app has no user deletion today, so nothing needs removing.
+
+**Backup:** `node_favourites` is `KEEP` in instance backups. The user archive carries only the exporting person's rows for their live items (last in the table order) and sets `user_id` to the importing account. An archive written before this migration is refused by the revision check like any other.
+
+**Not changed:** example packs never set the flag (the music pack's "favourite" is a tag) and `_node_content` leaves it out on purpose, so installing, editing and removing packs is unaffected; a pack's smart collection with a `favourite` condition now shows the viewer's own favourites.

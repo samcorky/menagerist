@@ -18,6 +18,7 @@ TABLE_RULES = {
         (
             "users",
             "nodes",
+            "node_favourites",
             "edges",
             "collections",
             "collection_members",

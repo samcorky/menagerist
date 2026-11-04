@@ -86,10 +86,10 @@ async def test_sort_is_served_by_the_index(
     await db_session.execute(
         text(
             """
-            INSERT INTO nodes (id, owner_id, name, tags, attributes, favourite,
+            INSERT INTO nodes (id, owner_id, name, tags, attributes,
                                created_at, updated_at)
             SELECT gen_random_uuid(), :owner, 'Item ' || n, '[]'::jsonb,
-                   '{}'::jsonb, false,
+                   '{}'::jsonb,
                    to_timestamp(1700000000 + n), to_timestamp(1700000000 + n)
             FROM generate_series(1, 20000) AS n
             """

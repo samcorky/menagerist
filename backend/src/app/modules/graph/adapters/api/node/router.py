@@ -97,6 +97,15 @@ from app.shared_kernel.errors import ValidationError
 
 router = APIRouter(prefix="/node", tags=["Nodes"], route_class=PermissionAwareRoute)
 
+
+def _viewer_state(favourite: bool) -> str:
+    """The part of an item's ETag that depends on who is looking.
+
+    Favouriting changes neither `updated_at` nor the item, only the viewer's copy.
+    """
+    return "favourite" if favourite else "plain"
+
+
 _TOTAL_COUNT_HEADERS: dict[int | str, dict[str, Any]] = {
     200: {
         "headers": {
@@ -404,7 +413,11 @@ async def get_node(
 ) -> NodeResponse | Response:
     """Fetch a single node by id."""
     node = await use_case.handle(GetNodeQuery(node_id=node_id), actor)
-    if earlier := cond.check_get(node):
+    # The body depends on the viewer's favourite, which `updated_at` does not track,
+    # so only the ETag can say a cached copy is current.
+    if earlier := cond.check_get(
+        node, _viewer_state(node.favourite), honour_if_modified_since=False
+    ):
         return earlier
     return NodeResponse.from_domain(node)
 
@@ -476,10 +489,10 @@ async def update_node(
 ) -> NodeResponse | Response:
     """Update a node's editable fields."""
     current = await get_usecase.handle(GetNodeQuery(node_id=node_id), actor)
-    if earlier := cond.check_patch(current):
+    if earlier := cond.check_patch(current, _viewer_state(current.favourite)):
         return earlier
     node = await update_usecase.handle(payload.to_command(node_id), actor)
-    cond.set_response_etag(node)
+    cond.set_response_etag(node, _viewer_state(node.favourite))
     return NodeResponse.from_domain(node)
 
 

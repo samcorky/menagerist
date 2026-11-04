@@ -174,9 +174,9 @@ def _postgres_bulk(
                 sqlalchemy.text(
                     """
                     INSERT INTO nodes (id, owner_id, name, type, attributes,
-                                       favourite, tags, created_at, updated_at)
+                                       tags, created_at, updated_at)
                     SELECT gen_random_uuid(), :owner, :slug || ' ' || n, :slug,
-                           '{}'::jsonb, false, '[]'::jsonb, now(), now()
+                           '{}'::jsonb, '[]'::jsonb, now(), now()
                     FROM generate_series(1, :count) AS n
                     """
                 ),

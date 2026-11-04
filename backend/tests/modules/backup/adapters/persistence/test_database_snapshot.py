@@ -148,9 +148,9 @@ async def test_real_instance_archive_verifies_and_reports_tampered_members(
             )
             await session.execute(
                 text("""INSERT INTO nodes
-                    (id, owner_id, name, attributes, favourite, tags,
+                    (id, owner_id, name, attributes, tags,
                      created_at, updated_at, deleted_at) VALUES
-                    (:id, :owner_id, 'Archived item', '{}', false, '[]',
+                    (:id, :owner_id, 'Archived item', '{}', '[]',
                      now(), now(), now())"""),
                 {"id": uuid7(), "owner_id": owner_id},
             )

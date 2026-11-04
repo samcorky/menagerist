@@ -24,9 +24,9 @@ from app.shared_kernel.content_filter import ContentFilter
 pytestmark = pytest.mark.integration
 
 _NODE = """INSERT INTO nodes
-    (id, owner_id, name, type, attributes, favourite, tags,
+    (id, owner_id, name, type, attributes, tags,
      created_at, updated_at, deleted_at)
-    VALUES (:id, :owner, :name, NULL, '{}', false, '[]', now(), now(), :deleted)"""
+    VALUES (:id, :owner, :name, NULL, '{}', '[]', now(), now(), :deleted)"""
 _EDGE = """INSERT INTO edges
     (id, owner_id, source_id, target_id, type, attributes,
      created_at, updated_at, deleted_at)
