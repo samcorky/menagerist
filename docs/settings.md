@@ -6,7 +6,7 @@ Every deployment setting is an environment variable. Put the ones you change in 
 
 The Docker image sets `MENAGERIST_API_FRONTEND_DIST_PATH=/app/frontend` and `MENAGERIST_SERVER_IN_CONTAINER=1` itself, so in a container those two differ from the defaults listed here.
 
-## api
+## API
 
 API entrypoint settings.
 
@@ -17,7 +17,7 @@ API entrypoint settings.
 | `MENAGERIST_API_FRONTEND_DIST_PATH` | path | unset | any | Built frontend directory; unset in API-only mode. |
 | `MENAGERIST_API_TRUSTED_PROXIES` | comma-separated list of IP addresses or networks | `127.0.0.1` | `*` on its own | Trusted proxy IPs/CIDRs (CSV); '*' trusts all peers. |
 
-## backup
+## Backup
 
 Instance backup storage, retention and upload limits.
 
@@ -32,7 +32,7 @@ Instance backup storage, retention and upload limits.
 | `MENAGERIST_BACKUP_PRUNE_EXPORTS_SCHEDULE` | cron schedule | `0 * * * *` | five fields; empty turns the job off | Cron expression for expiring downloadable data exports. Empty disables the job. Editable in the app's settings unless set here. |
 | `MENAGERIST_BACKUP_MAX_UPLOAD_SIZE` | whole number | `8589934592` | more than 0 | Maximum accepted backup archive upload size in bytes. |
 
-## database
+## Database
 
 Database connection settings.
 
@@ -40,7 +40,7 @@ Database connection settings.
 | --- | --- | --- | --- | --- |
 | `MENAGERIST_DATABASE_URL` | database URL | `postgresql+asyncpg://menagerist:***@localhost:5432/menagerist` | any | PostgreSQL connection URL for the backend database. |
 
-## identity
+## Identity
 
 Configuration for the identity module.
 
@@ -61,7 +61,7 @@ Configuration for the identity module.
 | `MENAGERIST_IDENTITY_API_TOKENS_PER_USER` | whole number | `20` | 1 or more | Most active API tokens one person may hold. |
 | `MENAGERIST_IDENTITY_INITIAL_PASSWORD` | secret | none (sensitive) | any | Optional first-admin password; prefer its Docker secret file. |
 
-## log
+## Log
 
 Logging settings.
 
@@ -72,7 +72,7 @@ Logging settings.
 | `MENAGERIST_LOG_JSON_OUTPUT` | true or false | `false` | any | Emit structured logs as JSON instead of the development format. |
 | `MENAGERIST_LOG_ACCESS` | true or false | `true` | any | Emit HTTP access log entries for application requests. |
 
-## media
+## Media
 
 Configuration for the media module.
 
@@ -85,7 +85,7 @@ Configuration for the media module.
 | `MENAGERIST_MEDIA_ORPHANED_TTL_HOURS` | whole number | `72` | 1 or more | Hours to keep media files that are no longer referenced. |
 | `MENAGERIST_MEDIA_MAX_UPLOAD_SIZE` | whole number | `104857600` | more than 0 | Maximum accepted media upload size in bytes. |
 
-## release
+## Release
 
 Which releases the instance looks for and how often.
 
@@ -94,7 +94,7 @@ Which releases the instance looks for and how often.
 | `MENAGERIST_RELEASE_CHANNEL` | text | `stable` | `stable`, `preview` | Releases to report: stable only, or preview, which also includes release candidates and other prereleases. Editable in the app's settings unless set here. |
 | `MENAGERIST_RELEASE_CHECK_SCHEDULE` | cron schedule | `20 5 * * *` | five fields; empty turns the job off | Cron expression for looking for a newer release in the instance timezone. Empty turns the scheduled check off; an administrator can still check from the Status page. Editable in the app's settings unless set here. |
 
-## retention
+## Retention
 
 How long deleted content stays recoverable before it is purged.
 
@@ -103,7 +103,7 @@ How long deleted content stays recoverable before it is purged.
 | `MENAGERIST_RETENTION_DELETED_DAYS` | whole number | `30` | 1 or more | Days deleted content stays recoverable before it is purged. |
 | `MENAGERIST_RETENTION_PURGE_SCHEDULE` | cron schedule | empty | five fields; empty turns the job off | Cron expression for permanently removing content older than the retention period, in the instance timezone. Empty, the default, leaves it to the data purge-deleted command. Editable in the app's settings unless set here. |
 
-## scheduler
+## Scheduler
 
 Instance timezone, worker liveness and job history retention.
 
@@ -114,7 +114,7 @@ Instance timezone, worker liveness and job history retention.
 | `MENAGERIST_SCHEDULER_WORKER_HEARTBEAT_TIMEOUT_SECONDS` | whole number | `300` | more than 0 | Seconds without a worker heartbeat before liveness checks warn. |
 | `MENAGERIST_SCHEDULER_WORKER_HEARTBEAT_INTERVAL_SECONDS` | whole number | `60` | more than 0 | Seconds between the worker's liveness heartbeats. |
 
-## server
+## Server
 
 How many web worker processes run, and whether this is a container.
 
@@ -123,7 +123,7 @@ How many web worker processes run, and whether this is a container.
 | `MENAGERIST_SERVER_WORKERS` | whole number | `auto` | 1 to 16, `auto` | Web worker processes, 1 to 16, or auto: one per CPU core on a host and one in a container or when reloading, as Granian advises. |
 | `MENAGERIST_SERVER_IN_CONTAINER` | true or false | unset | any | Whether the server runs in a container. Unset detects it; the image sets it, and 0 or 1 overrides detection. |
 
-## terminal
+## Terminal
 
 What the terminal the process writes to can show.
 
@@ -131,7 +131,7 @@ What the terminal the process writes to can show.
 | --- | --- | --- | --- | --- |
 | `NO_COLOR` | text | unset | any | Set to any value that does not start with 0 to turn off colour in console logs (see https://no-color.org). |
 
-## compose
+## Compose
 
 Read by Docker Compose from `.env` when it starts the stack, not by Menagerist. Recreate the stack after changing one.
 

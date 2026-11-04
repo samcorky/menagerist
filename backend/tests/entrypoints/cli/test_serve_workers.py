@@ -111,7 +111,7 @@ def _host(
 ) -> None:
     from app.platform import worker_count
 
-    monkeypatch.setattr(worker_count, "in_container", lambda configured: container)
+    monkeypatch.setattr(worker_count, "in_container", lambda configured, **_: container)
     monkeypatch.setattr(worker_count, "available_cpus", lambda: cpus)
 
 
@@ -224,7 +224,7 @@ def test_says_one_per_core_for_auto_on_a_plain_host(
     """Off a container and without reload, `auto` logs the core count it used."""
     _limit(monkeypatch, 1000)
     monkeypatch.setattr(worker_count, "available_cpus", lambda: 4)
-    monkeypatch.setattr(worker_count, "in_container", lambda configured: False)
+    monkeypatch.setattr(worker_count, "in_container", lambda configured, **_: False)
 
     with structlog.testing.capture_logs() as logs:
         cli.serve(workers="auto", reload=False)
@@ -238,7 +238,7 @@ def test_says_when_the_container_decides(monkeypatch: pytest.MonkeyPatch) -> Non
     """`auto` inside a container logs that the container sets one worker."""
     _limit(monkeypatch, 100)
     monkeypatch.setattr(worker_count, "available_cpus", lambda: 8)
-    monkeypatch.setattr(worker_count, "in_container", lambda configured: True)
+    monkeypatch.setattr(worker_count, "in_container", lambda configured, **_: True)
 
     with structlog.testing.capture_logs() as logs:
         cli.serve(workers="auto", reload=False)

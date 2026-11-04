@@ -45,6 +45,7 @@ ENV_EXAMPLE_PATH = ".env.example"
 SETTINGS_DOC_PATH = "docs/settings.md"
 
 _WIDTH = 88
+_ACRONYMS = {"api": "API"}
 _INTRO = (
     "Every deployment setting is an environment variable. Put the ones you change in a "
     + "`.env` file next to `compose.yaml`; "
@@ -141,6 +142,11 @@ def _is_sensitive(field: FieldInfo, schema: JsonObject) -> bool:
         isinstance(leaf, type) and issubclass(leaf, _SENSITIVE)
         for leaf in _leaves(base)
     )
+
+
+def group_title(group: str) -> str:
+    """Title-case a group name for a heading, keeping acronyms upper-case."""
+    return _ACRONYMS.get(group, group.title())
 
 
 def _code(text: str) -> str:
@@ -325,9 +331,10 @@ def render_env_example(
         *_comment(_IMAGE_NOTE.replace("`", "")),
     ]
     for section in sections:
+        title = group_title(section.group)
         lines += [
             "",
-            f"# {'=' * 4} {section.group} {'=' * (_WIDTH - 8 - len(section.group))}",
+            f"# {'=' * 4} {title} {'=' * (_WIDTH - 8 - len(title))}",
         ]
         lines += _comment(section.summary)
         for entry in section.entries:
@@ -381,7 +388,7 @@ def render_settings_doc(sections: Iterable[SettingsSection]) -> str:
         _IMAGE_NOTE,
     ]
     for section in sections:
-        lines += ["", f"## {section.group}", "", section.summary, ""]
+        lines += ["", f"## {group_title(section.group)}", "", section.summary, ""]
         lines += [
             "| Variable | Type | Default | Allowed values | Notes |",
             "| --- | --- | --- | --- | --- |",

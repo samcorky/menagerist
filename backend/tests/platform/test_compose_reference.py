@@ -22,7 +22,9 @@ FULL = {
 def test_every_variable_in_the_real_compose_files_is_described() -> None:
     """Adding a `${VAR}` to a Compose file fails here until it has a description."""
     texts = read_compose_files(REPO)
-    assert set(texts) == set(COMPOSE_FILES)
+    # The override is git-ignored (a local development file), so CI has only the first.
+    assert "compose.yaml" in texts
+    assert set(texts) <= set(COMPOSE_FILES)
     assert set(compose_defaults(texts)) == set(DESCRIPTIONS)
     assert reference_files(ALL_SETTINGS, texts)
 

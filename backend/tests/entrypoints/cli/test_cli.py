@@ -347,10 +347,9 @@ def test_schema_dump_writes_the_openapi_schema(
 
 @pytest.fixture
 def root(tmp_path: Path) -> Path:
-    """A scratch repository root holding the real Compose files, which feed the docs."""
+    """A scratch repository root holding the tracked Compose file for the docs."""
     repo = Path(__file__).resolve().parents[4]
-    for name in ("compose.yaml", "compose.override.yml"):
-        (tmp_path / name).write_bytes((repo / name).read_bytes())
+    (tmp_path / "compose.yaml").write_bytes((repo / "compose.yaml").read_bytes())
     return tmp_path
 
 
