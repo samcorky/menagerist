@@ -6,6 +6,10 @@ import structlog
 
 from app.modules.identity.application.api_token_issue import utc_now
 from app.modules.identity.application.get_current_user import LAST_SEEN_INTERVAL
+from app.modules.identity.application.sign_in_throttle import (
+    SignInThrottle,
+    token_ip_key,
+)
 from app.modules.identity.domain.user import User
 from app.modules.identity.ports.api_token_generator import ApiTokenGenerator  # noqa: TC001
 from app.modules.identity.ports.unit_of_work import IdentityUnitOfWork
@@ -13,6 +17,10 @@ from app.shared_kernel.access import Access, Public
 from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
+    from app.modules.identity.domain.throttle import ThrottleKey
+    from app.modules.identity.ports.unit_of_work import IdentityRepos
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
@@ -24,6 +32,7 @@ class AuthenticateApiTokenCommand:
     """Request to resolve a presented token value to its owner."""
 
     value: str
+    client_ip: str | None = None
 
     def __repr__(self) -> str:
         """Keep the token out of logs and tracebacks."""
@@ -48,15 +57,22 @@ class AuthenticateApiToken(
 
     A command handler because it records use: `last_used_at` moves at most once
     a minute. An unknown id costs the same hash and comparison as a wrong secret.
+    Failed checks (malformed, unknown or wrong secret) are counted per client
+    address; once the address is locked its requests are refused unchecked.
     """
 
     access: ClassVar[Access] = Public()
 
     def __init__(
-        self, uow: IdentityUnitOfWork, guard: AccessGuard, tokens: ApiTokenGenerator
+        self,
+        uow: IdentityUnitOfWork,
+        guard: AccessGuard,
+        tokens: ApiTokenGenerator,
+        throttle: SignInThrottle,
     ) -> None:
         super().__init__(uow, guard)
         self._tokens = tokens
+        self._throttle = throttle
         self._decoy_hash = tokens.hash("decoy")
 
     async def _handle(
@@ -66,16 +82,25 @@ class AuthenticateApiToken(
 
         Unusable means malformed, unknown, wrong secret, expired (the row is
         removed) or owned by a disabled user.
+
+        Raises:
+            SignInThrottledError: If the client address has made too many
+                failed checks; the value is not examined.
         """
+        now = utc_now()
+        key = token_ip_key(command.client_ip) if command.client_ip else None
+        if key is not None:
+            await self._refuse_if_locked(key, now)
         parsed = self._tokens.parse(command.value)
         if parsed is None:
+            await self._count_failure(key, now)
             return None
-        now = utc_now()
         async with self._uow as repos:
             token = await repos.tokens.get(parsed.token_id)
             stored = self._decoy_hash if token is None else token.secret_hash
             matched = self._tokens.matches(parsed.secret, stored)
             if token is None or not matched:
+                await self._count_failure(key, now, repos)
                 return None
             if token.is_expired(now):
                 await repos.tokens.delete(token.id)
@@ -92,3 +117,26 @@ class AuthenticateApiToken(
                 await repos.tokens.save(token)
                 await self._uow.commit()
             return ResolvedApiToken(user=user, token_id=token.id, grants=token.grants)
+
+    async def _refuse_if_locked(self, key: ThrottleKey, now: datetime) -> None:
+        async with self._uow as repos:
+            locked = await repos.attempts.locked_keys([key], now=now)
+        if key in locked:
+            logger.warning("api_token_throttled")
+            raise self._throttle.throttled(locked[key], now)
+
+    async def _count_failure(
+        self,
+        key: ThrottleKey | None,
+        now: datetime,
+        repos: IdentityRepos | None = None,
+    ) -> None:
+        """Count one failed check against the address, if the request has one."""
+        if key is None:
+            return
+        if repos is None:
+            async with self._uow as opened:
+                await self._count_failure(key, now, opened)
+            return
+        await self._throttle.reserve(repos.attempts, [key], now)
+        await self._uow.commit()

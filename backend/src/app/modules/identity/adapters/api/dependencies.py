@@ -304,9 +304,16 @@ def get_get_current_user_use_case(
 def get_authenticate_api_token_use_case(
     uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
     tokens: Annotated[ApiTokenGenerator, Depends(get_api_token_generator)],
+    settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> AuthenticateApiToken:
-    return AuthenticateApiToken(uow, guard, tokens)
+    throttle = SignInThrottle(
+        ThrottlePolicy(
+            ip_limit=settings.api_token_ip_attempts,
+            window=timedelta(minutes=settings.sign_in_window_minutes),
+        )
+    )
+    return AuthenticateApiToken(uow, guard, tokens, throttle)
 
 
 def get_create_api_token_use_case(

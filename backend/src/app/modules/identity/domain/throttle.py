@@ -9,6 +9,7 @@ class ThrottleKind(StrEnum):
     USERNAME = "username"
     USER_ID = "user_id"
     IP = "ip"
+    TOKEN_IP = "token_ip"
 
 
 @dataclass(kw_only=True, frozen=True)

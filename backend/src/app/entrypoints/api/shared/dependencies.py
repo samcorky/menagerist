@@ -9,6 +9,7 @@ from app.entrypoints.api.shared.http.bearer import bearer_token
 from app.modules.identity.adapters.api.dependencies import (
     bind_session_context,
     get_authenticate_api_token_use_case,
+    get_client_ip,
     get_get_current_user_use_case,
     get_get_setup_status_use_case,
     get_session_token,
@@ -39,7 +40,8 @@ async def _token_actor(
 ) -> Actor:
     """Resolve a bearer token to its owner, carrying the token's grants."""
     resolved = await authenticate.handle(
-        AuthenticateApiTokenCommand(value=value), ANONYMOUS_ACTOR
+        AuthenticateApiTokenCommand(value=value, client_ip=get_client_ip(request)),
+        ANONYMOUS_ACTOR,
     )
     if resolved is None:
         raise InvalidApiTokenError("The access token is not valid.")
@@ -71,6 +73,8 @@ async def get_current_actor(
     Raises:
         InvalidApiTokenError: If a bearer token is malformed, unknown, expired or
             its owner is disabled.
+        SignInThrottledError: If the client address has made too many failed
+            token checks (429).
         SetupRequiredError: If no account exists yet.
         SessionRequiredError: If there is no live session for an enabled user.
         PasswordExpiredError: If the account's password has expired.

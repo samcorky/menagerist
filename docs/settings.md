@@ -54,6 +54,7 @@ Configuration for the identity module.
 | `MENAGERIST_IDENTITY_PASSWORD_HASHER` | text | `scrypt` | `scrypt` | Password-hashing scheme used for newly created password hashes. |
 | `MENAGERIST_IDENTITY_SIGN_IN_USERNAME_ATTEMPTS` | whole number | `5` | 1 or more | Failed sign-ins allowed per username in each throttle window. |
 | `MENAGERIST_IDENTITY_SIGN_IN_IP_ATTEMPTS` | whole number | `20` | 1 or more | Failed sign-ins allowed per IP address in each throttle window. |
+| `MENAGERIST_IDENTITY_API_TOKEN_IP_ATTEMPTS` | whole number | `20` | 1 or more | Failed API-token checks allowed per IP address per window. |
 | `MENAGERIST_IDENTITY_SIGN_IN_WINDOW_MINUTES` | whole number | `15` | 1 or more | Duration of the failed sign-in throttle window in minutes. |
 | `MENAGERIST_IDENTITY_PASSWORD_HASH_CONCURRENCY` | whole number | `2` | 1 or more | Maximum number of simultaneous password-hash operations in this process. |
 | `MENAGERIST_IDENTITY_API_TOKEN_DEFAULT_DAYS` | whole number | `90` | 1 or more | Lifetime in days offered for a new API token. |
