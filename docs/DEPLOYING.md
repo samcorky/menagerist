@@ -16,7 +16,9 @@ The `menagerist` container applies database migrations when it starts. Before it
 | Tag | What it is |
 |---|---|
 | `latest` | The most recent release. The `0.` in the version only means the project is not yet stable, so those releases count; release candidates (`0.2026.11.0rc1`) do not. |
-| `0.2026.11.0` | One release, by version. Pin this to update only when you choose to. |
+| `0.2026.11.0` | One release, by version, which never moves, even when a hotfix (`0.2026.11.0.post1`) follows it. Pin this to update only when you choose to. |
+| `0.2026.11` | The newest release of that month, including a `.post` hotfix. Follow this to take patches and hotfixes but not the next month's changes. |
+| `0.2026` | The newest release of that year. |
 | `0.2026.11.0rc1` | A release candidate, published ahead of its release for testing. |
 | `edge` | The latest commit on `main`. |
 | `sha-<commit>` | One exact commit, by its first seven characters. Not every commit on `main` gets one: a newer merge cancels an older build that is still running. |

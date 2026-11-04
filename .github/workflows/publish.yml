@@ -68,19 +68,33 @@ jobs:
 
       # A build that is not a release has no release tag, so say what a release made
       # now would publish. Informational: it never fails the build.
-      - name: Show what a release made now would publish
+      - name: Plan the next release tag
+        id: next
         if: github.event_name != 'release'
+        continue-on-error: true
         working-directory: backend
         run: |
-          if tag="$(uv run --locked --only-group release calver-scm --format plain next-tag)"; then
-            version="${tag#v}"
+          tag="$(uv run --locked --only-group release calver-scm --format plain next-tag)"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Work out the next release's image tags
+        id: next_tags
+        if: steps.next.outputs.tag != ''
+        continue-on-error: true
+        uses: ./.github/actions/image-tags
+        with:
+          tag: ${{ steps.next.outputs.tag }}
+
+      - name: Show what a release made now would publish
+        if: github.event_name != 'release'
+        env:
+          TAG: ${{ steps.next.outputs.tag }}
+          PREVIEW: ${{ steps.next_tags.outputs.preview }}
+        run: |
+          if [[ -n "$PREVIEW" ]]; then
             # Seven characters, as docker/metadata-action's sha tag. A literal <commit>
             # would be read as an HTML tag and vanish from the rendered summary.
-            tags="${version}, sha-${GITHUB_SHA::7}"
-            # Release candidates (and other PEP 440 pre-releases) are marked as
-            # pre-releases, which keeps them off latest.
-            tags="${tags}, latest (not for a release candidate)"
-            message="A release made now would be tagged ${tag} and publish ${tags}."
+            message="A release made now would be tagged ${TAG} and publish ${PREVIEW}, sha-${GITHUB_SHA::7}."
           else
             message="The next release tag could not be worked out; run poe release-tag locally."
           fi
@@ -113,6 +127,21 @@ jobs:
       tags: ${{ steps.meta.outputs.tags }}
       version: ${{ steps.meta.outputs.version }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+      # type=pep440 skips the pattern for a .post release, so the month and year tags
+      # come from the image-tags action and are handed over as raw tags.
+      - name: Work out the partial version tags
+        id: partial
+        if: github.event_name == 'release' && !github.event.release.prerelease
+        uses: ./.github/actions/image-tags
+        with:
+          tag: ${{ github.event.release.tag_name }}
+
       - name: Work out the tags
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
@@ -124,6 +153,7 @@ jobs:
             type=edge
             type=pep440,pattern={{version}}
             type=sha
+            ${{ steps.partial.outputs.tags }}
             type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
 
       - name: Show the tags
