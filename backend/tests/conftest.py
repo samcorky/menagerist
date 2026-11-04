@@ -20,6 +20,7 @@ from app.modules.settings.adapters.persistence.unit_of_work import (
 from app.platform import alembic_runner
 from app.platform.config import get_database_settings
 from app.platform.config.rate_limit import get_rate_limit_settings
+from app.platform.database import get_engine, get_session_factory
 from app.shared_kernel.actor import Actor
 
 if TYPE_CHECKING:
@@ -58,6 +59,24 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
         integration = item.get_closest_marker("integration") is not None
         if _is_fast(item.path.parts, integration=integration):
             item.add_marker(pytest.mark.fast)
+
+
+@pytest.fixture(autouse=True)
+def _own_process_engine(request: pytest.FixtureRequest) -> None:
+    """Give each database test its own process-wide engine.
+
+    `get_engine` is cached for the process, but every async test runs in its own
+    event loop. A pooled asyncpg connection made in one test's loop fails in the
+    next test's ("attached to a different loop") whenever that test reaches the
+    cached engine too. Dropping the pool without closing it is safe, as its
+    connections belong to a loop that has already ended.
+    """
+    if request.node.get_closest_marker("docker") is None:
+        return
+    if get_engine.cache_info().currsize:
+        get_engine().sync_engine.dispose(close=False)
+    get_engine.cache_clear()
+    get_session_factory.cache_clear()
 
 
 @pytest.fixture(autouse=True)
