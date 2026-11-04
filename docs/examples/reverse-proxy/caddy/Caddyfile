@@ -1,0 +1,4 @@
+menagerist.example.com {
+	reverse_proxy menagerist:8000
+	header Strict-Transport-Security "max-age=15552000"
+}

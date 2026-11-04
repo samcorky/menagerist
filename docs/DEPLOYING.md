@@ -84,7 +84,7 @@ If your user is not uid 1000, also run `sudo chown 1000:1000 backups data/media`
 
 ## Your own changes: `compose.override.yaml`
 
-Compose merges a file named `compose.override.yaml` onto `compose.yaml` automatically, so local choices stay out of the shipped file and survive an update. The repository ignores it (`.gitignore`), so create it yourself next to `compose.yaml`. Anything you set replaces the matching entry in `compose.yaml`; the rest is kept. For example, keep media and backups in plain folders you can see and back up, and reach the database from the host for a one-off query:
+Compose merges a file named `compose.override.yaml` onto `compose.yaml` automatically, so local choices stay out of the shipped file and survive an update. The repository ignores it (`.gitignore`), so create it yourself next to `compose.yaml`. Compose merges the two rather than replacing the service: a single value you set (an image, a command) replaces the one in `compose.yaml`, mappings such as `environment` are combined, and lists of `ports`, `volumes`, `labels` and `networks` are added to, with an entry replacing the one that has the same container path or published port. For example, keep media and backups in plain folders you can see and back up, and reach the database from the host for a one-off query:
 
 ```yaml
 services:
@@ -97,8 +97,10 @@ services:
       - ./data/media:/data/media
       - ./backups:/data/backups
   postgres:
-    ports: !override
+    ports:
       - "127.0.0.1:5432:5432"
 ```
 
-Create those folders first (see above). Give the app and the worker the same volumes, as above, because both read and write media. `!override` replaces a list instead of adding to it. `docker compose config` prints the merged result to check it. Running `docker compose -f compose.yaml up` skips the override.
+Create those folders first (see above). Give the app and the worker the same volumes, as above, because both read and write media. To drop an entry from `compose.yaml` rather than add to it, write the list with `!override` (replace the whole list, as `ports: !override []` does in [REVERSE-PROXY.md](REVERSE-PROXY.md)) or `!reset`. `docker compose config` prints the merged result to check it. Running `docker compose -f compose.yaml up` skips the override.
+
+Compose also accepts `compose.override.yml`, and the repository's own development file (gitignored, used by `poe docker-up` and read by `poe generate-settings-docs`) is spelt that way. This documentation uses `.yaml` throughout, to match `compose.yaml`. Keep only one of the two: with both present Compose warns and uses the `.yml` one.
