@@ -92,10 +92,9 @@ class _FailingSessionFactory:
         return _FakeAsyncCM()
 
 
-def _make_mock_engine(*, checkedout: int, pool_size: int) -> MagicMock:
+def _make_mock_engine(*, checkedout: int) -> MagicMock:
     pool = MagicMock()
     pool.checkedout.return_value = checkedout
-    pool.size.return_value = pool_size
     engine = MagicMock()
     engine.pool = pool
     return engine
@@ -121,7 +120,7 @@ def _app_with_failing_db(role: str = "admin") -> FastAPI:
 
 def test_liveness_passes_when_db_is_unreachable() -> None:
     """GET /health must return 200 regardless of database state."""
-    engine = _make_mock_engine(checkedout=0, pool_size=5)
+    engine = _make_mock_engine(checkedout=0)
     with patch(_PATCH_GET_ENGINE, return_value=engine):
         client = TestClient(_app_with_failing_db())
         response = client.get("/api/health")
@@ -133,7 +132,7 @@ def test_liveness_passes_when_db_is_unreachable() -> None:
 
 def test_public_readiness_is_only_pass_or_fail() -> None:
     """No component names, values or driver errors reach an anonymous caller."""
-    engine = _make_mock_engine(checkedout=5, pool_size=5)
+    engine = _make_mock_engine(checkedout=15)
     with patch(_PATCH_GET_ENGINE, return_value=engine):
         client = TestClient(_app_with_failing_db("member"))
         response = client.get("/api/health/ready")
@@ -147,7 +146,7 @@ def test_public_readiness_is_only_pass_or_fail() -> None:
 
 def test_readiness_detail_needs_the_diagnostics_permission() -> None:
     """A member is refused the detail with 403."""
-    engine = _make_mock_engine(checkedout=0, pool_size=5)
+    engine = _make_mock_engine(checkedout=0)
     with patch(_PATCH_GET_ENGINE, return_value=engine):
         response = TestClient(_app_with_failing_db("member")).get(
             "/api/v1/system/health/ready/detail"
@@ -159,7 +158,7 @@ def test_readiness_detail_needs_the_diagnostics_permission() -> None:
 
 def test_readiness_check_failure_is_logged_not_returned() -> None:
     """The real error goes to the log with a fixed message in the payload."""
-    engine = _make_mock_engine(checkedout=0, pool_size=5)
+    engine = _make_mock_engine(checkedout=0)
     with patch(_PATCH_GET_ENGINE, return_value=engine), capture_logs() as logs:
         response = TestClient(_app_with_failing_db()).get(
             "/api/v1/system/health/ready/detail"
@@ -173,7 +172,7 @@ def test_readiness_check_failure_is_logged_not_returned() -> None:
 
 def test_readiness_503_when_db_unreachable() -> None:
     """The detail returns 503, status fail, and a fixed output on DB checks."""
-    engine = _make_mock_engine(checkedout=0, pool_size=5)
+    engine = _make_mock_engine(checkedout=0)
     with patch(_PATCH_GET_ENGINE, return_value=engine):
         client = TestClient(_app_with_failing_db())
         response = client.get("/api/v1/system/health/ready/detail")
@@ -197,21 +196,21 @@ def test_readiness_503_when_db_unreachable() -> None:
 
 def test_readiness_output_absent_on_passing_checks() -> None:
     """Passing checks must omit output entirely - not serialize it as null."""
-    engine = _make_mock_engine(checkedout=0, pool_size=5)
+    engine = _make_mock_engine(checkedout=0)
     with patch(_PATCH_GET_ENGINE, return_value=engine):
         client = TestClient(_app_with_failing_db())
         response = client.get("/api/v1/system/health/ready/detail")
 
     data = response.json()
     pool_check = data["checks"]["database:poolUtilization"][0]
-    # Pool is healthy (0/5): status is pass and output must not appear in the payload.
+    # Pool is healthy (0/15): status is pass and output must not appear in the payload.
     assert pool_check["status"] == "pass"
     assert "output" not in pool_check
 
 
 def test_pool_saturated_reports_fail_with_output() -> None:
-    """database:poolUtilization is fail with output when pool is fully checked out."""
-    engine = _make_mock_engine(checkedout=5, pool_size=5)
+    """database:poolUtilization is fail with output when every connection is out."""
+    engine = _make_mock_engine(checkedout=15)
     with patch(_PATCH_GET_ENGINE, return_value=engine):
         client = TestClient(_app_with_failing_db())
         response = client.get("/api/v1/system/health/ready/detail")
@@ -220,12 +219,12 @@ def test_pool_saturated_reports_fail_with_output() -> None:
     pool_check = data["checks"]["database:poolUtilization"][0]
     assert pool_check["status"] == "fail"
     assert "output" in pool_check
-    assert "5/5" in pool_check["output"]
+    assert "15/15" in pool_check["output"]
 
 
 def test_pool_healthy_omits_output() -> None:
     """database:poolUtilization output is absent when the pool has free connections."""
-    engine = _make_mock_engine(checkedout=1, pool_size=5)
+    engine = _make_mock_engine(checkedout=1)
     with patch(_PATCH_GET_ENGINE, return_value=engine):
         client = TestClient(_app_with_failing_db())
         response = client.get("/api/v1/system/health/ready/detail")
@@ -234,6 +233,32 @@ def test_pool_healthy_omits_output() -> None:
     pool_check = data["checks"]["database:poolUtilization"][0]
     assert pool_check["status"] == "pass"
     assert "output" not in pool_check
+
+
+@pytest.mark.parametrize("checkedout", [5, 9])
+def test_pool_using_only_some_overflow_passes(checkedout: int) -> None:
+    """Using the 5 pooled connections, or a few overflow ones, is not a problem."""
+    engine = _make_mock_engine(checkedout=checkedout)
+    with patch(_PATCH_GET_ENGINE, return_value=engine):
+        client = TestClient(_app_with_failing_db())
+        response = client.get("/api/v1/system/health/ready/detail")
+
+    pool_check = response.json()["checks"]["database:poolUtilization"][0]
+    assert pool_check["status"] == "pass"
+    assert "output" not in pool_check
+
+
+@pytest.mark.parametrize("checkedout", [10, 14])
+def test_pool_half_through_its_overflow_warns(checkedout: int) -> None:
+    """Warn from 10 connections out, with the count as the reason."""
+    engine = _make_mock_engine(checkedout=checkedout)
+    with patch(_PATCH_GET_ENGINE, return_value=engine):
+        client = TestClient(_app_with_failing_db())
+        response = client.get("/api/v1/system/health/ready/detail")
+
+    pool_check = response.json()["checks"]["database:poolUtilization"][0]
+    assert pool_check["status"] == "warn"
+    assert pool_check["output"] == f"{checkedout}/15 connections checked out"
 
 
 @pytest.mark.parametrize("storage", ["media", "backup"])
