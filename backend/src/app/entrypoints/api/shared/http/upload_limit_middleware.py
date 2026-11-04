@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import TYPE_CHECKING, Any
 
@@ -11,6 +12,12 @@ if TYPE_CHECKING:
 
 # Multipart boundaries and the small form fields come on top of the file.
 _OVERHEAD_ALLOWANCE = 64 * 1024
+
+# After answering without reading the whole body, the rest is read and thrown
+# away so a proxy still writing it sees a reply, not a broken pipe (a 502).
+# Bounded by bytes and time so an anonymous client cannot hold a worker.
+_DRAIN_BYTES = 256 * 1024 * 1024
+_DRAIN_SECONDS = 30.0
 
 _UPLOAD_PATHS = frozenset({"/api/v1/media", "/api/v1/media/attached"})
 _BACKUP_PATHS = frozenset(
@@ -61,6 +68,22 @@ async def _refuse(scope: Scope, send: Send) -> None:
     await send({"type": "http.response.body", "body": body})
 
 
+async def _drain(receive: Receive) -> None:
+    """Read and discard the rest of the request body, up to a byte and time bound."""
+    remaining = _DRAIN_BYTES
+    try:
+        async with asyncio.timeout(_DRAIN_SECONDS):
+            while remaining >= 0:
+                message = await receive()
+                if message["type"] != "http.request" or not message.get(
+                    "more_body", False
+                ):
+                    return
+                remaining -= len(message.get("body", b""))
+    except TimeoutError:
+        return
+
+
 class _BodyCounter:
     """Counts a request body as it is read and swaps in a 413 once over `limit`.
 
@@ -77,11 +100,14 @@ class _BodyCounter:
         self._received = 0
         self._exceeded = False
         self._refused = False
+        self._body_ended = False
 
     async def receive(self) -> Message:
         if self._exceeded:
             return {"type": "http.disconnect"}
         message = await self._receive()
+        if message["type"] != "http.request" or not message.get("more_body", False):
+            self._body_ended = True
         if message["type"] == "http.request":
             self._received += len(message.get("body", b""))
             self._exceeded = self._received > self._limit
@@ -101,6 +127,11 @@ class _BodyCounter:
             self._refused = True
             await _refuse(self._scope, self._send)
 
+    async def drain(self) -> None:
+        """Discard what is left of the body if the app never read it all."""
+        if not self._body_ended:
+            await _drain(self._receive)
+
 
 class UploadLimitMiddleware:
     """Refuse an oversize upload before the multipart body is parsed.
@@ -109,7 +140,9 @@ class UploadLimitMiddleware:
     without this an anonymous client could fill the disk with a body that is
     only rejected, as unauthenticated, afterwards. A declared `Content-Length`
     over the limit is refused without reading; a body with no length (chunked)
-    is counted as it arrives and aborted once it passes the limit.
+    is counted as it arrives and aborted once it passes the limit. Whenever the
+    reply goes out with part of the body unread, the remainder is then drained
+    (bounded) before the connection closes, so a reverse proxy gets the reply.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -129,8 +162,10 @@ class UploadLimitMiddleware:
         declared = Headers(scope=scope).get("content-length")
         if declared is not None and declared.isdigit() and int(declared) > limit:
             await _refuse(scope, send)
+            await _drain(receive)
             return
 
         counter = _BodyCounter(scope, receive, send, limit)
         await self._app(scope, counter.receive, counter.send)
         await counter.finish()
+        await counter.drain()

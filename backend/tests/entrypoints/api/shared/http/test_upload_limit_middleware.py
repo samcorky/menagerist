@@ -1,5 +1,6 @@
 """Oversize uploads are refused before the multipart body is parsed."""
 
+import asyncio
 import json
 from typing import TYPE_CHECKING
 
@@ -17,7 +18,7 @@ from app.platform.config.media import MediaSettings
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from starlette.types import Message, Receive, Scope, Send
+    from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 LIMIT = 1000
 ALLOWANCE = upload_limit_middleware._OVERHEAD_ALLOWANCE
@@ -38,7 +39,7 @@ async def test_archive_uploads_use_backup_limit(
     )
     sent, reads = await _call("POST", path, [(b"content-length", b"21")], [b"x"])
     assert sent[0]["status"] == 413
-    assert reads == 0
+    assert reads == 1
     sent, _ = await _call("POST", path, [], [b"x" * 11, b"y" * 11])
     assert sent[0]["status"] == 413
     sent, _ = await _call("POST", path, [], [b"x" * 20])
@@ -93,13 +94,13 @@ async def _call(
     return sent, reads
 
 
-async def test_declared_length_over_the_limit_is_refused_without_reading() -> None:
-    """The body is never read and the app never runs."""
+async def test_declared_length_over_the_limit_is_refused_and_drained() -> None:
+    """The app never runs; the body is read only to be discarded."""
     headers = [(b"content-length", str(LIMIT + ALLOWANCE + 1).encode())]
 
     sent, reads = await _call("POST", "/api/v1/media", headers, [b"x"])
 
-    assert reads == 0
+    assert reads == 1
     assert sent[0]["status"] == 413
     assert (b"content-type", b"application/problem+json") in sent[0]["headers"]
     assert json.loads(sent[1]["body"])["status"] == 413
@@ -107,14 +108,167 @@ async def test_declared_length_over_the_limit_is_refused_without_reading() -> No
 
 
 async def test_chunked_body_over_the_limit_is_aborted_part_way() -> None:
-    """With no length the bytes are counted and the read stops past the limit."""
+    """With no length the app is cut off past the limit; the rest is drained."""
     chunk = b"x" * (ALLOWANCE)
-    sent, reads = await _call(
-        "POST", "/api/v1/media/attached", [], [chunk, chunk, chunk, chunk]
-    )
+    seen: list[str] = []
+
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
+        while (message := await receive())["type"] == "http.request":
+            seen.append("chunk")
+        seen.append(message["type"])
+
+    reads, sent = await _run_with_stub_app(app, [chunk, chunk, chunk, chunk])
 
     assert sent[0]["status"] == 413
-    assert reads < 4
+    assert seen == ["chunk", "http.disconnect"]
+    assert reads == 4
+
+
+async def _run_with_stub_app(
+    app: ASGIApp, bodies: list[bytes]
+) -> tuple[int, list[Message]]:
+    reads = 0
+    sent: list[Message] = []
+    remaining = list(bodies)
+
+    async def receive() -> Message:
+        nonlocal reads
+        reads += 1
+        body = remaining.pop(0)
+        return {"type": "http.request", "body": body, "more_body": bool(remaining)}
+
+    async def send(message: Message) -> None:
+        sent.append(message)
+
+    scope: Scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/media/attached",
+        "headers": [],
+    }
+    await UploadLimitMiddleware(app)(scope, receive, send)
+    return reads, sent
+
+
+async def test_reply_goes_out_before_the_rest_of_the_body_is_read() -> None:
+    """The 413 is sent first, so the client can read it while still writing."""
+    log: list[str] = []
+    remaining = [b"x" * (LIMIT + ALLOWANCE + 1), b"y", b"z"]
+
+    async def receive() -> Message:
+        log.append("read")
+        body = remaining.pop(0)
+        return {"type": "http.request", "body": body, "more_body": bool(remaining)}
+
+    async def send(message: Message) -> None:
+        log.append(message["type"])
+
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
+        await receive()
+
+    scope: Scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/media",
+        "headers": [],
+    }
+    await UploadLimitMiddleware(app)(scope, receive, send)
+
+    assert log == [
+        "read",
+        "http.response.start",
+        "http.response.body",
+        "read",
+        "read",
+    ]
+
+
+async def test_an_early_reply_to_an_unread_body_drains_it() -> None:
+    """A 401 sent without reading the body is followed by reading the rest."""
+
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
+        await send({"type": "http.response.start", "status": 401, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
+
+    reads, sent = await _run_with_stub_app(app, [b"a", b"b", b"c"])
+
+    assert sent[0]["status"] == 401
+    assert reads == 3
+
+
+async def test_a_fully_read_body_is_not_read_again() -> None:
+    """Nothing is left to drain once the app has taken the last chunk."""
+
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
+        while (await receive()).get("more_body"):
+            pass
+        await send({"type": "http.response.start", "status": 204, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
+
+    reads, _ = await _run_with_stub_app(app, [b"a", b"b"])
+
+    assert reads == 2
+
+
+async def test_drain_stops_at_the_byte_bound(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A body that keeps coming is abandoned after the bound."""
+    monkeypatch.setattr(upload_limit_middleware, "_DRAIN_BYTES", 250)
+
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
+        return None
+
+    reads, _ = await _run_with_stub_app(app, [b"x" * 100] * 10)
+
+    assert reads == 3
+
+
+async def test_drain_stops_at_the_time_bound(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A client that trickles or stalls cannot hold the request open."""
+    monkeypatch.setattr(upload_limit_middleware, "_DRAIN_SECONDS", 0.05)
+
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
+        return None
+
+    async def receive() -> Message:
+        await asyncio.sleep(10)
+        raise AssertionError
+
+    async def send(message: Message) -> None:
+        return None
+
+    scope: Scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/media",
+        "headers": [(b"content-length", str(LIMIT + ALLOWANCE + 1).encode())],
+    }
+    await UploadLimitMiddleware(app)(scope, receive, send)
+
+
+async def test_drain_ends_on_a_disconnect() -> None:
+    """A client that goes away ends the drain."""
+    calls = 0
+
+    async def receive() -> Message:
+        nonlocal calls
+        calls += 1
+        return {"type": "http.disconnect"}
+
+    async def send(message: Message) -> None:
+        return None
+
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
+        return None
+
+    scope: Scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/media",
+        "headers": [],
+    }
+    await UploadLimitMiddleware(app)(scope, receive, send)
+
+    assert calls == 1
 
 
 async def test_body_within_the_limit_passes_through() -> None:
