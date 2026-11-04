@@ -158,3 +158,10 @@ repos:
         language: system
         files: '(^|/)(?:docker-)?compose(?:\.[a-zA-Z0-9_-]+)?\.ya?ml$'
         pass_filenames: false
+
+      - id: validate-proxy-compose
+        name: validate docker compose (reverse proxy test)
+        entry: uv run poe validate-proxy-compose
+        language: system
+        files: '(^|/)(?:docker-)?compose(?:\.[a-zA-Z0-9_-]+)?\.ya?ml$'
+        pass_filenames: false

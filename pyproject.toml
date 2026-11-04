@@ -359,6 +359,10 @@ help = "Validate compose.yaml merged with the smoke-test override"
 cmd = "docker compose -f compose.yaml -f compose.e2e.yaml config --quiet"
 help = "Validate compose.yaml merged with the e2e-test override"
 
+[tool.poe.groups.quality.tasks.validate-proxy-compose]
+cmd = "docker compose -f compose.proxy.yaml --profile nginx --profile nginx-buffered --profile caddy --profile traefik config --quiet"
+help = "Validate compose.proxy.yaml with every proxy profile enabled"
+
 [tool.poe.groups.quality.tasks.test]
 parallel = ["test-backend ${workers:+--workers ${workers}} ${mode:+--mode ${mode}}", "test-frontend ${workers:+--workers ${workers}} ${mode:+--mode ${mode}}"]
 args = [
@@ -533,4 +537,9 @@ help = "Stop and remove the stack"
 [tool.poe.groups.run.tasks.smoke-test]
 cmd = "uv run --script scripts/smoke_test.py"
 help = "Smoke test the built image through its own compose.yaml"
+deps = ["docker-build"]
+
+[tool.poe.groups.run.tasks.proxy-test]
+cmd = "uv run --script scripts/proxy_test.py"
+help = "Check nginx, Caddy and Traefik relay the app's early 413 and 401 replies (run the script directly to pick proxies)"
 deps = ["docker-build"]

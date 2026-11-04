@@ -190,8 +190,11 @@ poe test-backend-all          # unit + integration with combined coverage data
 poe test-backend-fast         # only the quick in-memory areas (about 20 s): what pre-commit runs
 poe test-frontend             # Vitest unit tests
 poe test-e2e                  # Playwright end-to-end tests - requires Docker
+poe proxy-test                # nginx, Caddy and Traefik relay early 413/401 replies - requires Docker
 poe coverage                  # full test suite + enforce all coverage thresholds
 ```
+
+`poe proxy-test` builds the image, then runs `compose.proxy.yaml`: the real upload guard on Granian (no database) behind each proxy in turn, with a body sent after the app has already replied. It fails if any reply is a 502 instead of the 413 or 401. It sends a few hundred megabytes through each proxy; run `uv run --script scripts/proxy_test.py caddy --attempts 5` to test one proxy more quickly. Use it when changing the upload guard, Granian or a proxy example.
 
 ### Running tests in parallel
 

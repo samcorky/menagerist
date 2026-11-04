@@ -1,0 +1,9 @@
+# Static configuration: one plain HTTP entry point and a file provider, so the
+# test needs no Docker socket (the example in docs/examples/reverse-proxy/traefik
+# uses Docker labels and TLS instead).
+entryPoints:
+  web:
+    address: ":80"
+providers:
+  file:
+    filename: /etc/traefik/dynamic.yml
