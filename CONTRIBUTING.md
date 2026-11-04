@@ -147,14 +147,14 @@ poe generate-frontend-client  # regenerate the typed API client after a backend 
 poe migrate                   # apply Alembic migrations
 poe db-up / poe db-down       # start/stop the local Postgres container
 poe generate-settings-docs    # regenerate .env.example and docs/settings.md after changing a settings class
-poe dump-schema               # regenerate frontend/openapi.json after changing the API
+poe dump-schema               # regenerate openapi.json after changing the API
 ```
 
 [`.env.example`](.env.example) and [`docs/settings.md`](docs/settings.md) are generated from the settings classes in `backend/src/app/platform/config`, so change a variable's default or description there, not in those files. `poe check-settings-docs` (run by CI as "Generated files (settings reference is current)" and by pre-commit when those paths change) fails when they are stale. Secret and credential defaults are never written out.
 
 ### The API schema
 
-[`frontend/openapi.json`](frontend/openapi.json) is the committed OpenAPI schema: the contract that API clients, API-token scripts and the generated frontend client depend on. It is generated from the backend, so change the API there and run `poe dump-schema` (`poe generate-frontend-client` does this too), then commit the result with the change. `info.version` is pinned to `0.0.0` and `info.license.url` (a link that names the build's commit) is left out of the file, because both change with every commit; the running API still reports them, and `menagerist schema dump --with-version --output <path>` writes a copy that keeps it (the `Publish` workflow attaches one to each release; it cannot be used with `--check`). Do not edit the committed file by hand.
+[`openapi.json`](openapi.json) is the committed OpenAPI schema: the contract that API clients, API-token scripts and the generated frontend client depend on. It is generated from the backend, so change the API there and run `poe dump-schema` (`poe generate-frontend-client` does this too), then commit the result with the change. `info.version` is pinned to `0.0.0` and `info.license.url` (a link that names the build's commit) is left out of the file, because both change with every commit; the running API still reports them, and `menagerist schema dump --with-version --output <path>` writes a copy that keeps it (the `Publish` workflow attaches one to each release; it cannot be used with `--check`). Do not edit the committed file by hand.
 
 Two checks protect it:
 

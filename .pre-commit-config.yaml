@@ -32,11 +32,11 @@ repos:
         args:
           - --autofix
           - --no-sort-keys
-        exclude: ^frontend/
+        exclude: ^(frontend/|openapi\.json$)
       - id: check-added-large-files
         stages: [pre-commit]
         # The committed API schema is about 1 MB of generated JSON.
-        exclude: ^frontend/openapi\.json$
+        exclude: ^openapi\.json$
       - id: check-executables-have-shebangs
         stages: [pre-commit]
 
@@ -135,7 +135,7 @@ repos:
         name: check the committed OpenAPI schema is current
         entry: uv run poe check-schema
         language: system
-        files: '^(backend/(src|pyproject\.toml)|frontend/openapi\.json$)'
+        files: '^(backend/(src|pyproject\.toml)|openapi\.json$)'
         pass_filenames: false
 
       - id: validate-compose

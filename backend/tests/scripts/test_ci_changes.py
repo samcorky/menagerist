@@ -117,6 +117,11 @@ def test_the_exemption_does_not_hide_a_frontend_change() -> None:
     assert flags == EVERYTHING
 
 
+def test_the_api_schema_runs_both_sides() -> None:
+    """The backend produces openapi.json; the frontend client is generated from it."""
+    assert ci_changes.classify(["openapi.json"]) == EVERYTHING
+
+
 def test_shared_contracts_run_both_sides() -> None:
     """Both stacks read shared/contracts."""
     assert ci_changes.classify(["shared/contracts/cron-conformance.json"]) == EVERYTHING

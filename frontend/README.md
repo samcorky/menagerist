@@ -92,10 +92,10 @@ To regenerate after backend schema changes:
 ```sh
 poe generate-frontend-client   # from repo root
 # or
-npm run generate               # from this directory (requires openapi.json to exist)
+npm run generate               # from this directory (requires ../openapi.json to exist)
 ```
 
-The schema dump step (`poe dump-schema`) writes `frontend/openapi.json`, which the generate step reads.
+The schema dump step (`poe dump-schema`) writes `openapi.json` at the repository root, which the generate step reads.
 
 ## Quality checks
 

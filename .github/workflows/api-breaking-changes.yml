@@ -1,6 +1,6 @@
 name: API breaking changes
 
-# Compares the pull request's frontend/openapi.json (the committed API contract, kept
+# Compares the pull request's openapi.json (the committed API contract, kept
 # current by the "Generated files (API schema is current)" check in ci.yml) with the base branch's, and
 # fails on a breaking change unless the pull request carries the `breaking-change` label.
 # It is a separate workflow so adding or removing that label re-runs only this check,
@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      SCHEMA: frontend/openapi.json
+      SCHEMA: openapi.json
     steps:
       - name: Checkout the pull request
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
