@@ -328,7 +328,14 @@ def test_schema_dump_writes_the_openapi_schema(
 
     schema: dict[str, object] = {
         "openapi": "3.1.0",
-        "info": {"title": "Menagerist", "version": "0.2026.11.1.dev34"},
+        "info": {
+            "title": "Menagerist",
+            "version": "0.2026.11.1.dev34",
+            "license": {
+                "name": "MIT",
+                "url": "https://example.test/blob/abc123/LICENSE",
+            },
+        },
     }
 
     class FakeApp:
@@ -340,10 +347,14 @@ def test_schema_dump_writes_the_openapi_schema(
 
     result = cli.dump(output=output)
 
-    # The build's version is replaced so the committed file does not change per commit.
+    # Build details are dropped so the committed file does not change per commit.
     assert json.loads(output.read_text()) == {
         "openapi": "3.1.0",
-        "info": {"title": "Menagerist", "version": "0.0.0"},
+        "info": {
+            "title": "Menagerist",
+            "version": "0.0.0",
+            "license": {"name": "MIT"},
+        },
     }
     assert output.read_text().endswith("}\n")
     assert result["output"] == output
@@ -353,19 +364,27 @@ def test_schema_dump_writes_the_openapi_schema(
 def test_schema_dump_with_version_keeps_the_build_version(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """`--with-version` keeps the real version and cannot be combined with `--check`."""
+    """`--with-version` keeps the build details and rejects `--check`."""
     from app.entrypoints import api
 
     class FakeApp:
         def openapi(self) -> dict[str, object]:
-            return {"info": {"title": "Menagerist", "version": "0.2026.11.1.dev34"}}
+            return {
+                "info": {
+                    "title": "Menagerist",
+                    "version": "0.2026.11.1.dev34",
+                    "license": {"name": "MIT", "url": "https://example.test/LICENSE"},
+                }
+            }
 
     monkeypatch.setattr(api, "create_app", lambda: FakeApp())
     output = tmp_path / "openapi.json"
 
     cli.dump(output=output, with_version=True)
 
-    assert json.loads(output.read_text())["info"]["version"] == "0.2026.11.1.dev34"
+    info = json.loads(output.read_text())["info"]
+    assert info["version"] == "0.2026.11.1.dev34"
+    assert info["license"]["url"] == "https://example.test/LICENSE"
     with pytest.raises(SystemExit, match="drop --with-version"):
         cli.dump(output=output, check=True, with_version=True)
 

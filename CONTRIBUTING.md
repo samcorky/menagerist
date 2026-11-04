@@ -154,7 +154,7 @@ poe dump-schema               # regenerate frontend/openapi.json after changing 
 
 ### The API schema
 
-[`frontend/openapi.json`](frontend/openapi.json) is the committed OpenAPI schema: the contract that API clients, API-token scripts and the generated frontend client depend on. It is generated from the backend, so change the API there and run `poe dump-schema` (`poe generate-frontend-client` does this too), then commit the result with the change. `info.version` is pinned to `0.0.0` in the file because the real version changes with every commit; the running API still reports its real version, and `menagerist schema dump --with-version --output <path>` writes a copy that keeps it (the `Publish` workflow attaches one to each release; it cannot be used with `--check`). Do not edit the committed file by hand.
+[`frontend/openapi.json`](frontend/openapi.json) is the committed OpenAPI schema: the contract that API clients, API-token scripts and the generated frontend client depend on. It is generated from the backend, so change the API there and run `poe dump-schema` (`poe generate-frontend-client` does this too), then commit the result with the change. `info.version` is pinned to `0.0.0` and `info.license.url` (a link that names the build's commit) is left out of the file, because both change with every commit; the running API still reports them, and `menagerist schema dump --with-version --output <path>` writes a copy that keeps it (the `Publish` workflow attaches one to each release; it cannot be used with `--check`). Do not edit the committed file by hand.
 
 Two checks protect it:
 
