@@ -11,6 +11,11 @@ import pytest
 
 if TYPE_CHECKING:
     from types import ModuleType
+    from typing import Protocol
+
+    class _BuildsCommand(Protocol):
+        def build(self, mode: str, workers: str) -> list[str]: ...
+
 
 SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "poe_run.py"
 
@@ -152,6 +157,47 @@ def test_pytest_unparseable() -> None:
     """Pytest unparseable."""
     assert poe_run.parse_pytest("Traceback\nboom\n") is None
     assert poe_run.parse_pytest("no tests ran in 0.01s\n").headline == "no tests ran"
+
+
+def test_pytest_build_appends_files_before_worker_flags() -> None:
+    """Pytest build appends files before worker flags."""
+    build = poe_run._pytest(["-m", "integration"], append=True, files=["tests/x.py"])
+    cmd = build("agent", "auto")
+    assert cmd[: cmd.index("-n")] == [cmd[0], "-m", "integration", "tests/x.py"]
+
+
+def test_main_without_files_uses_the_plain_tool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Main without files uses the plain tool."""
+    captured: list[_BuildsCommand] = []
+
+    def _capture(task: str, tool: _BuildsCommand, mode: str, workers: str) -> int:
+        captured.append(tool)
+        return 0
+
+    monkeypatch.setattr(poe_run, "execute", _capture)
+    with pytest.raises(SystemExit):
+        poe_run.main("test-backend")
+    (tool,) = captured
+    assert "tests/x.py" not in tool.build("agent", "auto")
+
+
+def test_main_with_files_scopes_pytest_to_them(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Main with files scopes pytest to them."""
+    captured: list[_BuildsCommand] = []
+
+    def _capture(task: str, tool: _BuildsCommand, mode: str, workers: str) -> int:
+        captured.append(tool)
+        return 0
+
+    monkeypatch.setattr(poe_run, "execute", _capture)
+    with pytest.raises(SystemExit):
+        poe_run.main("test-backend-integration", files=["tests/x.py"])
+    (tool,) = captured
+    assert "tests/x.py" in tool.build("agent", "auto")
 
 
 def test_ruff() -> None:

@@ -377,11 +377,14 @@ def _exe(name: str) -> str:
     return shutil.which(name) or name
 
 
-def _pytest(selector: list[str], append: bool) -> Callable[[str, str], list[str]]:
+def _pytest(
+    selector: list[str], append: bool, files: list[str] | None = None
+) -> Callable[[str, str], list[str]]:
     def build(mode: str, workers: str) -> list[str]:
         cmd = [
             _exe("pytest"),
             *selector,
+            *(files or []),
             "-n",
             workers or "auto",
             "--dist",
@@ -586,6 +589,18 @@ def execute(
     return code
 
 
-def main(task: str, mode: str = "", workers: str = "") -> None:
+PYTEST_SELECTORS: dict[str, tuple[list[str], bool]] = {
+    "test-backend": (["-m", "not integration"], False),
+    "test-backend-integration": (["-m", "integration"], True),
+}
+
+
+def main(
+    task: str, mode: str = "", workers: str = "", files: list[str] | None = None
+) -> None:
     """Poe entry point: resolve the mode, run the task's tool, exit with its code."""
-    sys.exit(execute(task, TOOLS[task], resolve_mode(mode), workers))
+    tool = TOOLS[task]
+    if files and task in PYTEST_SELECTORS:
+        selector, append = PYTEST_SELECTORS[task]
+        tool = Tool(tool.name, tool.cwd, _pytest(selector, append, files), tool.parser)
+    sys.exit(execute(task, tool, resolve_mode(mode), workers))
