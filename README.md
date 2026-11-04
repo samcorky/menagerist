@@ -74,13 +74,11 @@ Updating, rolling back, choosing an image tag, tuning the database and keeping y
 
 ## What you can do
 
-| | |
-|---|---|
-| **Describe anything** | An item type for each kind of thing you collect, with the fields it needs - text, numbers, dates, choices, ratings, money, quantities, links, checklists, repeating tables and more. Photos, scans and documents attach to any item. |
-| **Connect it** | Link items with relationships that have their own names and fields, such as who signed a poster and where. Explore draws the connections map. |
-| **Find it** | Search names, descriptions and field values; filter by type or any field; save a search as a smart collection that updates itself. |
-| **Make it yours** | Dark mode, a layout that works on a phone, and a quick-capture sheet (`Cmd/Ctrl+K`) to add an item from anywhere. Example packs (music, recipes, movies, comic-con posters, electronic parts, games) show how it fits together. |
-| **Run it yourself** | One container plus Postgres. Local accounts, each seeing only their own items. Back up and restore from the command line or the admin page, with an automatic backup before each upgrade. |
+- **Describe anything.** An item type for each kind of thing you collect, with the fields it needs - text, numbers, dates, choices, ratings, money, quantities, links, checklists, repeating tables and more. Photos, scans and documents attach to any item.
+- **Connect it.** Link items with relationships that have their own names and fields, such as who signed a poster and where. Explore draws the connections map.
+- **Find it.** Search names, descriptions and field values; filter by type or any field; save a search as a smart collection that updates itself.
+- **Make it yours.** Dark mode, a layout that works on a phone, and a quick-capture sheet (`Cmd/Ctrl+K`) to add an item from anywhere. Example packs (music, recipes, movies, comic-con posters, electronic parts, games) show how it fits together.
+- **Run it yourself.** One container plus Postgres. Local accounts, each seeing only their own items. Back up and restore from the command line or the admin page, with an automatic backup before each upgrade.
 
 The full list of field kinds is in [docs/field-types.md](docs/field-types.md#built-in-field-types-and-their-json-schema-shapes).
 
