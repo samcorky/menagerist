@@ -8,7 +8,7 @@ name: Release
 #   - channel promote: the final tag for the latest pre-release (next-tag --promote)
 #   - channel post:    a post-release of the latest release (next-tag --post)
 #   - draft:           create a draft to review, then publish it from the Releases page
-#   - dry run:         plan and check only; nothing is created
+#   - dry run:         plan and check, and show the title and notes; nothing is created
 # calver-scm only reads the repository. The release itself is created here, by gh.
 on:
   workflow_dispatch:
@@ -157,6 +157,39 @@ jobs:
             echo "| Notes since | ${BASE_TAG:-the first commit} |"
             echo "| Draft | ${DRAFT} |"
             echo "| Dry run | ${DRY_RUN} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # A dry run shows what would be published: the title and the notes, produced the same
+      # way as in the next step but without creating anything. generate-notes only
+      # returns the text; it does not need the tag or a release to exist.
+      - name: Preview the release notes
+        if: env.DRY_RUN == 'true'
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+          BASE_TAG: ${{ steps.notes.outputs.base_tag }}
+          NOTES_FILE: ${{ steps.notes.outputs.file }}
+        run: |
+          if [[ -n "$NOTES_FILE" ]]; then
+            body="$(cat "$NOTES_FILE")"
+          else
+            args=(-f "tag_name=${TAG}" -f "target_commitish=${GITHUB_SHA}")
+            if [[ -n "$BASE_TAG" ]]; then
+              args+=(-f "previous_tag_name=${BASE_TAG}")
+            fi
+            body="$(gh api --method POST "repos/${GITHUB_REPOSITORY}/releases/generate-notes" "${args[@]}" --jq .body)"
+          fi
+          echo "Title: ${TAG}"
+          echo
+          echo "$body"
+          {
+            echo
+            echo "### Release title"
+            echo
+            echo "\`${TAG}\`"
+            echo
+            echo "### Release notes"
+            echo
+            echo "$body"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create the release
