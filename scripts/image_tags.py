@@ -1,10 +1,9 @@
 """Work out the version tags of the Docker image for a parsed release tag.
 
-Run by the ``image-tags`` composite action inside the ``release`` dependency group, so
-``packaging`` is the locked one. It reads the output of ``calver-scm --json parse
-<tag> --tag`` on stdin and the published releases from the file named by
-``RELEASED_FILE``. The Publish workflow hands the ``tags`` lines it writes to
-``docker/metadata-action``, and previews of a release show ``preview``.
+Run by the ``image-tags`` composite action inside the ``release`` dependency group. It
+reads the output of ``calver-scm --json parse <tag> --tag --against-repo`` on stdin.
+The Publish workflow hands the ``tags`` lines it writes to ``docker/metadata-action``,
+and previews of a release show ``preview``.
 
 A release ``0.2026.11.0`` is also published as ``0.2026.11`` and ``0.2026``, and moves
 ``latest``, so a deployment can follow a month, a year or the newest release without
@@ -14,10 +13,11 @@ month and year, so it moves those tags, while the exact tag of the release it fo
 is left alone. Release candidates and other pre-releases move none of them.
 
 A tag moves only if the release is the newest in its scope: the month for
-``0.2026.11``, the year for ``0.2026`` and everything for ``latest``. A hotfix for an
-older month therefore moves its own month tag, but not the year or ``latest``.
+``0.2026.11``, the year for ``0.2026`` and everything for ``latest``. calver-scm
+reports that for each scope under ``newest``, from the repository's tags, so a hotfix
+for an older month moves its own month tag, but not the year or ``latest``.
 
-The date parts and whether the scheme is stable come from calver-scm, so the scheme is
+The scopes and whether the scheme is stable come from calver-scm, so the scheme is
 not repeated here.
 """
 
@@ -27,58 +27,28 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from packaging.version import InvalidVersion, Version
-
 if TYPE_CHECKING:
-    from collections.abc import Collection, Mapping
+    from collections.abc import Mapping
 
 LATEST = "latest"
+OVERALL = "all"  # calver-scm's name for the scope of every release
 
 
-def candidates(parsed: Mapping[str, Any]) -> list[str]:
-    """Return the tags a release could move, longest first, ending with ``latest``."""
-    if not parsed["valid"] or parsed["is_prerelease"]:
-        return []
-    values = [str(value) for value in parsed["date"].values()]
-    prefix = "" if parsed["stable"] else "0."
-    partial = [prefix + ".".join(values[:size]) for size in range(len(values), 0, -1)]
-    return [*partial, LATEST]
-
-
-def plan(
-    parsed: Mapping[str, Any], released: Collection[str]
-) -> tuple[list[str], list[str]]:
+def plan(parsed: Mapping[str, Any]) -> tuple[list[str], list[str]]:
     """Split the candidate tags into those the release moves and those it must not.
 
-    ``released`` holds the tags of the other published releases. A tag is held back
-    when one of them is newer and falls in the tag's scope.
+    The candidates are the longest date prefix first, ending with ``latest``. A tag is
+    held back when calver-scm says a newer release falls in its scope.
     """
-    wanted = candidates(parsed)
-    if not wanted:
+    if not parsed["valid"] or parsed["is_prerelease"]:
         return [], []
-    this = Version(parsed["version"])
-    others = _versions(released, parsed["tag_prefix"])
+    prefix = "" if parsed["stable"] else "0."
     moved: list[str] = []
     held: list[str] = []
-    for tag in wanted:
-        newer = any(
-            version > this and (tag == LATEST or text.startswith(f"{tag}."))
-            for text, version in others
-        )
-        (held if newer else moved).append(tag)
+    for scope, newest in parsed["newest"].items():
+        tag = LATEST if scope == OVERALL else prefix + scope
+        (moved if newest else held).append(tag)
     return moved, held
-
-
-def _versions(tags: Collection[str], prefix: str) -> list[tuple[str, Version]]:
-    """Parse release tags, leaving out any that are not versions."""
-    versions: list[tuple[str, Version]] = []
-    for tag in tags:
-        text = tag.strip().removeprefix(prefix)
-        try:
-            versions.append((text, Version(text)))
-        except InvalidVersion:
-            continue
-    return versions
 
 
 def main(stdin: str, env: Mapping[str, str] = os.environ) -> int:
@@ -88,11 +58,7 @@ def main(stdin: str, env: Mapping[str, str] = os.environ) -> int:
     ``held`` are comma separated lists for people.
     """
     parsed = json.loads(stdin)
-    released_file = env.get("RELEASED_FILE")
-    released = (
-        Path(released_file).read_text(encoding="utf-8").split() if released_file else []
-    )
-    moved, held = plan(parsed, released)
+    moved, held = plan(parsed)
     shown = ", ".join([parsed["version"], *moved] if parsed["valid"] else [])
     held_text = ", ".join(held)
     print(f"Version tags: {shown or 'none'}")
