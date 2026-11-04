@@ -87,9 +87,9 @@ cmd = "echo 'Run in your own terminal: cd frontend && sudo env \"PATH=$PATH\" np
 help = "Linux only: print the one-off command that installs the system libraries WebKit and Firefox need (for test-e2e-cookies)"
 
 [tool.poe.groups.setup.tasks.dump-schema]
-cmd = "menagerist schema dump --output ../frontend/openapi.json"
+cmd = "menagerist schema dump --output ../openapi.json"
 cwd = "backend"
-help = "Write the backend's OpenAPI schema to frontend/openapi.json (the committed API contract and the frontend client's input)"
+help = "Write the backend's OpenAPI schema to openapi.json (the committed API contract and the frontend client's input)"
 deps = ["sync-backend"]
 
 [tool.poe.groups.setup.tasks.generate-settings-docs]
@@ -158,15 +158,15 @@ help = "Fail when .env.example or docs/settings.md is out of date with the setti
 deps = ["sync-backend"]
 
 [tool.poe.groups.quality.tasks.check-schema]
-cmd = "menagerist schema dump --output ../frontend/openapi.json --check"
+cmd = "menagerist schema dump --output ../openapi.json --check"
 cwd = "backend"
-help = "Fail when frontend/openapi.json is out of date with the API"
+help = "Fail when openapi.json is out of date with the API"
 deps = ["sync-backend"]
 
 [tool.poe.groups.quality.tasks.validate-schema]
-cmd = "openapi-spec-validator ../frontend/openapi.json"
+cmd = "openapi-spec-validator ../openapi.json"
 cwd = "backend"
-help = "Fail when frontend/openapi.json is not a valid OpenAPI document"
+help = "Fail when openapi.json is not a valid OpenAPI document"
 deps = ["sync-backend"]
 
 [tool.poe.groups.quality.tasks._coverage-erase]

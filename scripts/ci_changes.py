@@ -68,10 +68,14 @@ SOURCE_PREFIXES = ("backend/src/", "frontend/src/")
 PIPELINE_FILES = frozenset({".github/workflows/ci.yml", ".github/workflows/build.yml"})
 PIPELINE_PREFIXES = (".github/actions/",)
 BACKEND_PREFIXES = ("backend/", "shared/", "scripts/")
-BACKEND_FILES = frozenset({"uv.lock", "pyproject.toml", ".python-version"})
+# openapi.json is the API contract: the backend produces it and the frontend client is
+# generated from it, so a change to it needs both.
+BACKEND_FILES = frozenset(
+    {"uv.lock", "pyproject.toml", ".python-version", "openapi.json"}
+)
 FRONTEND_PREFIXES = ("frontend/", "shared/")
 # The Node version is read by the frontend jobs and the image's Node stage only.
-FRONTEND_FILES = frozenset({".node-version"})
+FRONTEND_FILES = frozenset({".node-version", "openapi.json"})
 # The image build and its smoke test. Only the image job reads them, so they are matched
 # before BACKEND_PREFIXES, which would otherwise claim scripts/smoke_test.py.
 IMAGE_FILES = frozenset(
