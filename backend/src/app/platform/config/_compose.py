@@ -28,6 +28,11 @@ DESCRIPTIONS = {
         + "back (see docs/DEPLOYING.md). The development override "
         + "(compose.override.yml) defaults it to `menagerist:local`."
     ),
+    "POSTGRES_PASSWORD": (
+        "The database password, given once: the database container is created with "
+        + "it and the app and worker connect with it. Change it before the first "
+        + "start, as an existing database keeps the password it was created with."
+    ),
     "POSTGRES_MEM_LIMIT": (
         "The database container's hard memory cap (Postgres has no limit of its own). "
         + "Raise it together with the memory values below if the database is large."
