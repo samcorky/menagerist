@@ -33,8 +33,10 @@ def _mib(size: int) -> str:
 def _delta(current: int, base: int) -> str:
     """Return the signed change in MiB and as a percentage of the base."""
     change = current - base
-    share = f" ({change / base:+.1%})" if base else ""
-    return f"{change / MIB:+.2f} MiB{share}"
+    # Rounding first and adding zero turns a tiny negative change into +0.00, not -0.00.
+    mib = round(change / MIB, 2) + 0
+    share = f" ({round(change / base, 3) + 0:+.1%})" if base else ""
+    return f"{mib:+.2f} MiB{share}"
 
 
 def _row(label: str, base: int, current: int) -> str:

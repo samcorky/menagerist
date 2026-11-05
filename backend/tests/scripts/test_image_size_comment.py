@@ -131,3 +131,14 @@ def test_main_copes_with_a_missing_base_and_no_output_file(
 
     assert comment.main() == 0
     assert "The `edge` image could not be pulled" in out.read_text(encoding="utf-8")
+
+
+def test_a_tiny_shrink_is_not_shown_as_negative_zero() -> None:
+    """A change that rounds to nothing reads +0.00, never -0.00."""
+    current = {"compressed": 100 * MIB - 1000, "uncompressed": 300 * MIB - 1000}
+
+    body = comment.build_comment(current, BASE)
+
+    assert "-0.00" not in body
+    assert "-0.0%" not in body
+    assert "+0.00 MiB (+0.0%)" in body
