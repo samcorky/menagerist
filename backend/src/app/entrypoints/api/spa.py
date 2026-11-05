@@ -15,6 +15,10 @@ Behaviour mirrors ``frontend/nginx.conf``:
 * ``/favicon.ico``                            -> 301 ``/favicon.svg``
 * any other path (client-side routes)         -> the SPA shell (``200.html``),
                                                   never cached, with the SPA's CSP
+* a ``.br``/``.gz`` file beside the asset     -> served instead when the client
+                                                  accepts it (adapter-static's
+                                                  ``precompress``), so the build,
+                                                  not each request, pays for it
 
 Security headers on the shell are set explicitly. ``SecurityHeadersMiddleware``
 uses ``setdefault``, so it fills in the API-oriented defaults (CSP ``default-src
@@ -24,6 +28,7 @@ uses ``setdefault``, so it fills in the API-oriented defaults (CSP ``default-src
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
+from starlette.datastructures import Headers
 from starlette.exceptions import HTTPException
 from starlette.responses import RedirectResponse, Response
 from starlette.staticfiles import StaticFiles
@@ -33,6 +38,8 @@ if TYPE_CHECKING:
 
 _SHELL = "200.html"
 _IMMUTABLE_PREFIX = "_app/immutable/"
+# Best first: Brotli is smaller than gzip, which every client accepts.
+_PRECOMPRESSED = (("br", ".br"), ("gzip", ".gz"))
 
 _IMMUTABLE_CACHE = "public, max-age=31536000, immutable"
 _ASSET_CACHE = "public, max-age=3600"
@@ -64,6 +71,16 @@ def _is_hidden(path: str) -> bool:
     )
 
 
+def _accepted_encodings(header: str) -> set[str]:
+    """The content codings an `Accept-Encoding` header allows (`q=0` refuses one)."""
+    accepted: set[str] = set()
+    for item in header.split(","):
+        coding, _, params = item.partition(";")
+        if params.replace(" ", "").lower() not in ("q=0", "q=0.0", "q=0.00", "q=0.000"):
+            accepted.add(coding.strip().lower())
+    return accepted
+
+
 def _looks_like_asset(path: str) -> bool:
     return "." in PurePosixPath(path).name
 
@@ -83,11 +100,11 @@ class SpaStaticFiles(StaticFiles):
             raise HTTPException(status_code=404)
 
         try:
-            response = await super().get_response(path, scope)
+            response = await self._negotiated(path, scope)
         except HTTPException as exc:
             if exc.status_code != 404 or _looks_like_asset(path):
                 raise
-            return self._shell(await super().get_response(_SHELL, scope))
+            return self._shell(await self._negotiated(_SHELL, scope))
 
         if path == _SHELL:
             return self._shell(response)
@@ -96,6 +113,33 @@ class SpaStaticFiles(StaticFiles):
             _IMMUTABLE_CACHE if path.startswith(_IMMUTABLE_PREFIX) else _ASSET_CACHE
         )
         response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    async def _negotiated(self, path: str, scope: Scope) -> Response:
+        """Serve `path`, or its precompressed sibling when the client accepts one.
+
+        The sibling keeps the original's content type and gets its own ETag, so a
+        cached copy is never confused across encodings. A range request gets the
+        plain file, as a range of compressed bytes is no use to the client.
+        """
+        response = await super().get_response(path, scope)
+        headers = Headers(scope=scope)
+        if response.status_code != 200 or "range" in headers:
+            return response
+        accepted = _accepted_encodings(headers.get("accept-encoding", ""))
+        for encoding, suffix in _PRECOMPRESSED:
+            try:
+                compressed = await super().get_response(path + suffix, scope)
+            except HTTPException as exc:
+                if exc.status_code != 404:
+                    raise
+                continue
+            compressed.headers["Vary"] = "Accept-Encoding"
+            response.headers["Vary"] = "Accept-Encoding"
+            if encoding in accepted:
+                compressed.headers["Content-Type"] = response.headers["Content-Type"]
+                compressed.headers["Content-Encoding"] = encoding
+                return compressed
         return response
 
     @staticmethod

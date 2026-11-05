@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, FastAPI, Security
 from granian.utils.proxies import wrap_asgi_with_proxy_headers
 from starlette.middleware.cors import CORSMiddleware
+from starlette_compress import CompressMiddleware
 
 from app.entrypoints.api.docs.router import router as docs_router
 from app.entrypoints.api.openapi import configure_openapi
@@ -150,6 +151,11 @@ def create_app() -> FastAPI:
     )
     if (public_origin := get_api_settings().public_origin) is not None:
         fastapi_app.add_middleware(PublicOriginObserver, public_origin=public_origin)
+    # Outermost, so it compresses what everything else produced. Only text-like types
+    # (JSON, HTML, CSS, JS, SVG) qualify; media, PDFs, archives, range and already
+    # encoded responses pass through untouched.
+    # noinspection PyTypeChecker
+    fastapi_app.add_middleware(CompressMiddleware)
 
     # Identity cannot import the other modules; this bridge supplies the claim.
     fastapi_app.dependency_overrides[get_existing_data_claim] = get_claim_existing_data
