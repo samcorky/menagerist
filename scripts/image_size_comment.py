@@ -31,11 +31,15 @@ def _mb(size: int) -> str:
 
 
 def _delta(current: int, base: int) -> str:
-    """Return the signed change in MB and as a percentage of the base."""
+    """Return the signed change in MB and as a percentage of the base.
+
+    A change that rounds to nothing is a dash, so noise does not read as +0.00.
+    """
     change = current - base
-    # Rounding first and adding zero turns a tiny negative change into +0.00, not -0.00.
-    change_mb = round(change / MB, 2) + 0
-    share = f" ({round(change / base, 3) + 0:+.1%})" if base else ""
+    change_mb = round(change / MB, 2)
+    if change_mb == 0:
+        return "-"
+    share = f" ({change / base:+.1%})" if base else ""
     return f"{change_mb:+.2f} MB{share}"
 
 
