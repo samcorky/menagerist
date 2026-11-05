@@ -392,9 +392,9 @@
 </script>
 
 {#snippet browserRow(label: string, value: string)}
-	<div class="flex items-center justify-between gap-4 border-t border-border/80 px-5 py-3">
+	<div class="flex items-start justify-between gap-4 border-t border-border/80 px-5 py-3">
 		<span class="text-sm text-muted-foreground">{label}</span>
-		<span class="max-w-[60%] truncate text-right font-mono text-sm">{value}</span>
+		<span class="max-w-[60%] text-right font-mono text-sm break-all">{value}</span>
 	</div>
 {/snippet}
 
@@ -406,7 +406,7 @@
 	<div
 		class="flex items-start justify-between gap-4 rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur-sm"
 	>
-		<div>
+		<div class="min-w-0">
 			<p class="mb-2 text-xs font-medium tracking-[0.18em] text-muted-foreground uppercase">
 				Operations
 			</p>
@@ -774,13 +774,14 @@
 								<Card.Content class="space-y-0 p-0">
 									{#each versionRows as { label, value }, i (label)}
 										<div
-											class="flex items-center justify-between gap-4 px-5 py-3 {i !==
+											class="flex items-start justify-between gap-4 px-5 py-3 {i !==
 											versionRows.length - 1
 												? 'border-b border-border/80'
 												: ''}"
 										>
 											<span class="text-sm text-muted-foreground">{label}</span>
-											<span class="max-w-[60%] truncate text-right font-mono text-sm">{value}</span>
+											<span class="max-w-[60%] text-right font-mono text-sm break-all">{value}</span
+											>
 										</div>
 									{/each}
 								</Card.Content>

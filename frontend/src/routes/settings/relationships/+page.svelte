@@ -180,7 +180,7 @@
 <Page width="reading">
 	<BackButton peer fallback={resolve('/settings')} />
 
-	<div class="flex items-start justify-between gap-4">
+	<div class="flex flex-wrap items-start justify-between gap-4">
 		<div>
 			<h1 class="font-heading text-3xl font-semibold tracking-tight">Relationship types</h1>
 			<p class="mt-1 text-muted-foreground">

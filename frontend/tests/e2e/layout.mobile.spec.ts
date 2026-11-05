@@ -1,6 +1,7 @@
 import { test, expect, type Locator, type Page } from './fixtures';
 import {
 	failCollectionSearch,
+	openQuickCapture,
 	openSearch,
 	ownedData,
 	removeExamplePacks,
@@ -108,6 +109,53 @@ async function overflow(page: Page, width: number) {
 			wide
 		};
 	}, width);
+}
+
+/** The routes among `routes` whose content is wider than a phone of `width`, with the evidence. */
+async function wideRoutes(page: Page, width: number, routes: string[]): Promise<string[]> {
+	const offenders: string[] = [];
+	for (const route of routes) {
+		await page.goto(route);
+		const m = await overflow(page, width);
+		test.info().annotations.push({
+			type: `overflow ${width} ${route}`,
+			description: JSON.stringify(m)
+		});
+		if (
+			m.innerWidth > width ||
+			m.documentScrollWidth > width ||
+			m.mainScrollWidth > m.mainClientWidth
+		) {
+			offenders.push(`${route}: ${JSON.stringify(m)}`);
+		}
+	}
+	return offenders;
+}
+
+/**
+ * Visible text fields and selects whose computed text is under 16px. iOS Safari zooms the page
+ * when one of those gets focus and never zooms back out.
+ */
+async function smallTextControls(page: Page): Promise<string[]> {
+	return page.evaluate(() => {
+		const NOT_TEXT = ['checkbox', 'radio', 'hidden', 'file', 'range', 'color', 'button', 'submit'];
+		return [...document.querySelectorAll<HTMLInputElement>('input, textarea, select')]
+			.filter((el) => {
+				const style = getComputedStyle(el);
+				return (
+					!NOT_TEXT.includes(el.type) &&
+					el.getClientRects().length > 0 &&
+					style.visibility !== 'hidden' &&
+					style.opacity !== '0'
+				);
+			})
+			.map((el) => ({
+				name: `${el.tagName.toLowerCase()}[${el.type}] ${el.getAttribute('aria-label') ?? el.name ?? el.id}`,
+				size: parseFloat(getComputedStyle(el).fontSize)
+			}))
+			.filter((c) => c.size < 16)
+			.map((c) => `${c.name} is ${c.size}px`);
+	});
 }
 
 async function seed(request: Parameters<typeof makeCollection>[0]) {
@@ -221,6 +269,7 @@ for (const size of SIZES) {
 				const button = dialog.getByRole('button', { name: primary }).last();
 				await button.scrollIntoViewIfNeeded();
 				expect(await fits(page, await box(button)), `${name} primary button`).toBe(true);
+				expect(await smallTextControls(page), `${name} controls under 16px`).toEqual([]);
 				await page.keyboard.press('Escape');
 				await expect(dialog).toBeHidden();
 				await expect(trigger).toBeFocused();
@@ -445,6 +494,133 @@ for (const size of SIZES) {
 			expect(s.height).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
 			await select.tap();
 			await select.selectOption({ index: 1 });
+		});
+
+		test('form, settings and admin pages do not scroll horizontally', async ({ page }) => {
+			test.setTimeout(240_000);
+			const offenders = await wideRoutes(page, size.width, [
+				'/items/new',
+				'/explore',
+				'/recently-deleted',
+				'/status',
+				'/settings',
+				'/settings/account',
+				'/settings/item-types',
+				'/settings/relationships',
+				'/settings/saved-fields',
+				'/admin',
+				'/admin/users',
+				'/admin/settings',
+				'/admin/devices',
+				'/admin/backups',
+				'/admin/scheduled-tasks'
+			]);
+			expect(offenders, 'pages wider than the viewport').toEqual([]);
+		});
+
+		test('text fields and selects are 16px so iOS does not zoom in', async ({ page, request }) => {
+			test.setTimeout(120_000);
+			const { collection, item } = await seed(request);
+			const small: string[] = [];
+			for (const route of [
+				'/items/new',
+				'/items',
+				'/collections',
+				`/collections/${collection.id}`,
+				`/items/${item.id}`,
+				'/settings/account',
+				'/settings/saved-fields',
+				'/admin/settings'
+			]) {
+				await page.goto(route);
+				await page.waitForLoadState('networkidle');
+				small.push(...(await smallTextControls(page)).map((s) => `${route}: ${s}`));
+			}
+
+			await page.goto('/');
+			await openSearch(page);
+			const search = page.getByRole('dialog', { name: 'Search', exact: true });
+			await expect(search).toBeVisible();
+			small.push(...(await smallTextControls(page)).map((s) => `search popup: ${s}`));
+
+			expect(small, 'controls under 16px').toEqual([]);
+		});
+
+		test('the quick capture dialog fits the viewport', async ({ page }) => {
+			await page.goto('/');
+			const dialog = await openQuickCapture(page);
+			const d = await box(dialog);
+			test.info().annotations.push({
+				type: `capture dialog ${size.width}`,
+				description: `${round(d.x)},${round(d.y)} ${round(d.width)}x${round(d.height)}`
+			});
+			expect(await fits(page, d), 'dialog inside viewport').toBe(true);
+			const spill = await dialog.evaluate((el) => el.scrollWidth - el.clientWidth);
+			expect(spill, 'dialog horizontal overflow').toBeLessThanOrEqual(0);
+			const save = dialog.getByRole('button', { name: /^Saving…$|^Save$/ });
+			await save.scrollIntoViewIfNeeded();
+			const s = await box(save);
+			expect(await fits(page, s), 'save button inside viewport').toBe(true);
+			expect(s.height).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
+			for (const control of [
+				dialog.getByPlaceholder('Name…'),
+				dialog.getByRole('button', { name: /^Use full form/ })
+			]) {
+				const c = await box(control);
+				expect(await fits(page, c), 'control inside viewport').toBe(true);
+				expect(c.height).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
+			}
+			expect(await smallTextControls(page), 'controls under 16px').toEqual([]);
+		});
+
+		test('status values wrap instead of being cut off with an ellipsis', async ({ page }) => {
+			await page.goto('/status');
+			const build = page.getByRole('button', { name: 'Show details for build info' });
+			await build.click();
+			await expect(page.getByText('Migration', { exact: true })).toBeVisible();
+			await page.waitForLoadState('networkidle');
+			const cut = await page.evaluate(() =>
+				[...document.querySelectorAll<HTMLElement>('#main-scroll *')]
+					.filter(
+						(el) =>
+							getComputedStyle(el).textOverflow === 'ellipsis' && el.scrollWidth > el.clientWidth
+					)
+					.map(
+						(el) => `${el.tagName.toLowerCase()} "${(el.textContent ?? '').trim().slice(0, 60)}"`
+					)
+			);
+			expect(cut, 'values cut off with an ellipsis').toEqual([]);
+		});
+
+		test.describe('signed out', () => {
+			test.use({ storageState: { cookies: [], origins: [] } });
+
+			test('the sign-in page fits and its fields are 16px', async ({ page }) => {
+				await page.goto('/login');
+				await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+				const m = await overflow(page, size.width);
+				test.info().annotations.push({
+					type: `overflow ${size.width} /login`,
+					description: JSON.stringify(m)
+				});
+				expect(m.innerWidth, 'page zoomed out to fit').toBeLessThanOrEqual(size.width);
+				expect(m.documentScrollWidth, 'page scrolls sideways').toBeLessThanOrEqual(size.width);
+
+				const button = page.getByRole('button', { name: 'Sign in', exact: true });
+				await button.scrollIntoViewIfNeeded();
+				const b = await box(button);
+				expect(await fits(page, b), 'sign-in button inside viewport').toBe(true);
+				expect(b.height).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
+				for (const label of ['Username', 'Password']) {
+					// A field inside an input group (the password) looks as tall as the group.
+					const field = page.getByLabel(label, { exact: true });
+					const group = field.locator('xpath=ancestor::*[@data-slot="input-group"]');
+					const f = await box((await group.count()) > 0 ? group : field);
+					expect(await fits(page, f), `${label} field inside viewport`).toBe(true);
+					expect(f.height).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
+				}
+				expect(await smallTextControls(page), 'controls under 16px').toEqual([]);
+			});
 		});
 	});
 }
