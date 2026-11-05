@@ -9,19 +9,22 @@
 
 	let {
 		release,
+		installedVersion = null,
 		canCheck,
 		checking,
 		checkError,
 		onCheck
 	}: {
 		release: ReleaseResponse;
+		/** The running build's version, shown beside the latest release. */
+		installedVersion?: string | null;
 		canCheck: boolean;
 		checking: boolean;
 		checkError: string | null;
 		onCheck: () => void;
 	} = $props();
 
-	const view = $derived(releaseViewOf(release));
+	const view = $derived(releaseViewOf(release, installedVersion));
 
 	const toneClass: Record<ReleaseTone, string> = {
 		ok: 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400',

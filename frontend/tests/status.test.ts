@@ -199,6 +199,7 @@ describe('releaseViewOf', () => {
 		...base,
 		status: 'update_available',
 		latest_version: '0.2026.11.0',
+		title: 'Spring clean',
 		url: 'https://github.com/o/r/releases/tag/0.2026.11.0',
 		published_at: '2026-11-01T12:00:00Z',
 		checked_at: '2026-11-02T03:00:00Z',
@@ -214,10 +215,31 @@ describe('releaseViewOf', () => {
 		expect(view.rows.map((row) => row.label)).toEqual([
 			'Channel',
 			'Latest release',
+			'Title',
 			'Published',
 			'Last checked'
 		]);
 		expect(view.failureNote).toBeNull();
+	});
+
+	it('shows the installed version when it is known', () => {
+		const labels = (installed?: string) =>
+			releaseViewOf(newer, installed).rows.map((row) => row.label);
+		expect(labels('0.2026.10.0')).toEqual([
+			'Channel',
+			'Installed',
+			'Latest release',
+			'Title',
+			'Published',
+			'Last checked'
+		]);
+		expect(releaseViewOf(newer, '0.2026.10.0').rows[1]?.value).toBe('0.2026.10.0');
+		expect(labels()).not.toContain('Installed');
+	});
+
+	it('leaves the title out when it is only the tag again', () => {
+		const view = releaseViewOf({ ...newer, title: newer.latest_version });
+		expect(view.rows.map((row) => row.label)).not.toContain('Title');
 	});
 
 	it('says up to date only when a check confirmed it', () => {

@@ -749,6 +749,7 @@
 				{#if buildInfo?.release}
 					<ReleaseCard
 						release={buildInfo.release}
+						installedVersion={buildInfo.current_version}
 						canCheck={auth.can('system:release:check')}
 						checking={checkingUpdates}
 						checkError={updateCheckError}
