@@ -220,6 +220,7 @@ poe test-backend-integration  # backend integration tests - requires live Postgr
 poe test-backend-all          # unit + integration with combined coverage data
 poe test-backend-fast         # only the quick in-memory areas (about 20 s): what pre-commit runs
 poe test-frontend             # Vitest unit tests
+poe coverage-frontend         # Vitest unit tests with coverage, failing below the frontend target
 poe test-e2e                  # Playwright end-to-end tests - requires Docker
 poe proxy-test                # nginx, Caddy and Traefik relay early 413/401 replies - requires Docker
 poe coverage                  # full test suite + enforce all coverage thresholds
@@ -314,8 +315,13 @@ Enforced by Codecov on every PR and locally via `poe coverage`:
 | shared_kernel | 100% |
 | adapters | 80% |
 | platform | 70% |
+| frontend (`src/**/*.ts`) | 90% of lines |
 
 `ports/` holds `Protocol` interfaces - the stub method bodies (`...`) never execute, so a hard 100% floor wouldn't test anything real. Codecov tracks it for visibility (`target: auto` in `codecov.yml`) without gating on it.
+
+Every floor, frontend included, is a component `target` in `codecov.yml`, which is the single source of truth. `poe coverage-frontend` enforces the frontend one from the lcov report. It measures plain TypeScript only, since the Vitest environment renders no components; Playwright covers the rest.
+
+Codecov's free plan posts only a short patch comment and no project or component statuses, so it cannot enforce the targets. Instead the `coverage-comment` CI job posts one comment on each pull request with the backend and frontend component tables. Patch coverage in Codecov is informational, and `poe coverage` and `poe coverage-frontend` are the gates. `codecov.yml` is validated by a pre-commit hook (`poe check-codecov`).
 
 ### Adding a new bounded context
 

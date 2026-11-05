@@ -1,8 +1,20 @@
 coverage:
   status:
+    # Informational: Codecov reports patch coverage without failing the check. The
+    # component floors below are enforced by `poe coverage`, which is the real gate.
+    patch:
+      default:
+        informational: true
     project:
       default:
         target: auto
+
+flags:
+  frontend:
+    paths:
+      - frontend/src/
+    # A pull request that skips the frontend job uploads nothing, so keep the last report.
+    carryforward: true
 
 component_management:
   individual_components:
@@ -48,6 +60,15 @@ component_management:
       statuses:
         - type: project
           target: 70%
+    # Line coverage of the plain TypeScript the unit tests reach; `poe coverage-frontend`
+    # enforces this target from the lcov report.
+    - component_id: frontend
+      name: Frontend
+      paths:
+        - frontend/src/**
+      statuses:
+        - type: project
+          target: 90%
 
 comment:
   layout: "header, diff, components, files, footer"

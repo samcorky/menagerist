@@ -103,6 +103,7 @@ The schema dump step (`poe dump-schema`) writes `openapi.json` at the repository
 poe typecheck-frontend   # svelte-check + tsc
 poe lint-frontend        # prettier + eslint
 poe test-frontend        # Vitest unit tests
+poe coverage-frontend    # the same tests with V8 coverage (frontend/coverage/lcov.info)
 poe build-frontend       # production build
 poe check                # all of the above (from repo root)
 ```
@@ -110,6 +111,8 @@ poe check                # all of the above (from repo root)
 ### Testing
 
 Vitest tests live in `frontend/tests/*.test.ts` (not colocated with components) and run in a Node, not browser, environment - there's no component-rendering test setup here, only unit tests against plain exports (including a `.svelte` file's `<script module>` exports, e.g. `attributes-editor.svelte`'s `attributesToRows`/`rowsToAttributes`).
+
+Coverage (`poe coverage-frontend`, V8 provider) measures `src/**/*.ts` only, excluding the generated API client and `src/routes/`. Components are left out because this environment renders none, so counting them would report what Playwright covers as untested. The floor is the `frontend` component's `target` in `codecov.yml`, the same single source of truth as the backend layers. It applies to line coverage. `poe coverage-frontend` runs the tests, then `backend/scripts/check_component_coverage.py --frontend` reads `coverage/lcov.info` and fails below the target. Codecov's free plan posts no project or component statuses, so it cannot enforce the target itself. CI also uploads the lcov report to Codecov under the `frontend` flag for tracking, and the `coverage-comment` job shows the figure against the target in the pull request comment. Raise the target when coverage settles higher; lower it only with a reason.
 
 `vitest.config.ts` aliases `@lucide/svelte` and `bits-ui` to stubs in `tests/mocks/`. Without them, importing anything that pulls in those packages adds well over a minute per run: Vitest's Node/SSR transform has no browser-style dep pre-bundling, so their large module graphs (thousands of icon exports; floating-ui/melt internals) get compiled file-by-file every run instead of being pre-bundled once. If a test starts failing with a missing export from either package, add the missing name to the relevant stub file - don't remove the alias.
 

@@ -130,6 +130,15 @@ repos:
         files: '^(backend/src/app/platform/config/|\.env\.example$|docs/settings\.md$)'
         pass_filenames: false
 
+      # Codecov silently keeps its last valid config when the file is invalid, so check it
+      # with Codecov's own validator. This also runs in CI via the prek workflow.
+      - id: codecov-yml
+        name: validate codecov.yml
+        entry: uv run poe check-codecov
+        language: system
+        files: '^codecov\.yml$'
+        pass_filenames: false
+
       # The committed OpenAPI schema follows the API, which spans the whole backend.
       - id: api-schema
         name: check the committed OpenAPI schema is current

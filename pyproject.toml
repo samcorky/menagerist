@@ -157,6 +157,10 @@ cwd = "backend"
 help = "Fail when .env.example or docs/settings.md is out of date with the settings classes"
 deps = ["sync-backend"]
 
+[tool.poe.groups.quality.tasks.check-codecov]
+cmd = "curl --fail-with-body --silent --show-error --max-time 30 --data-binary @codecov.yml https://codecov.io/validate"
+help = "Validate codecov.yml with Codecov's validator (needs network access)"
+
 [tool.poe.groups.quality.tasks.check-schema]
 cmd = "menagerist schema dump --output ../openapi.json --check"
 cwd = "backend"
@@ -300,6 +304,27 @@ args = [
   { name = "workers", options = ["-w", "--workers"], default = "", help = "Vitest workers (--maxWorkers): a number or a percentage; vitest's default if omitted" },
 ]
 help = "Run frontend unit tests (vitest)"
+
+[tool.poe.groups.quality.tasks.test-frontend-coverage]
+script = "scripts.poe_run:main('test-frontend-coverage', mode=mode, workers=workers)"
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+  { name = "workers", options = ["-w", "--workers"], default = "", help = "Vitest workers (--maxWorkers): a number or a percentage; vitest's default if omitted" },
+]
+help = "Run frontend unit tests with V8 coverage, writing frontend/coverage/lcov.info"
+
+[tool.poe.groups.quality.tasks.coverage-check-frontend]
+cmd = "uv run --script scripts/check_component_coverage.py --frontend --strict"
+cwd = "backend"
+help = "Fail when the frontend component is below its codecov.yml target (needs frontend/coverage/lcov.info)"
+
+[tool.poe.groups.quality.tasks.coverage-frontend]
+sequence = ["test-frontend-coverage ${workers:+--workers ${workers}} ${mode:+--mode ${mode}}", "coverage-check-frontend"]
+args = [
+  { name = "mode", options = ["--mode"], default = "", help = "Output mode: agent (summary, writes log), human (direct terminal, no log) or verbose (streams, writes log); default from MENAGERIST_OUTPUT, ~/.config/menagerist/output, then human" },
+  { name = "workers", options = ["-w", "--workers"], default = "", help = "Vitest workers (--maxWorkers): a number or a percentage; vitest's default if omitted" },
+]
+help = "Run frontend unit tests with coverage and enforce the frontend target in codecov.yml"
 
 [tool.poe.groups.quality.tasks.format]
 sequence = ["format-backend", "format-frontend"]
