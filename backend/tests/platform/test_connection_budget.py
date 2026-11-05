@@ -5,7 +5,6 @@ import pytest
 from app.platform.config import get_database_settings
 from app.platform.config.server import MAX_WORKERS
 from app.platform.connection_budget import (
-    PER_PROCESS,
     RESERVED,
     connection_warning,
     fetch_max_connections,
@@ -16,13 +15,31 @@ from app.platform.connection_budget import (
 
 def test_each_process_can_use_its_whole_pool() -> None:
     """A process may hold the pool plus overflow, so that is what is budgeted."""
-    assert PER_PROCESS == 15
+    assert get_database_settings().connections_per_process == 15
+
+
+def test_the_budget_follows_the_pool_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A bigger pool or overflow raises what each process may hold, and the total."""
+    monkeypatch.setenv("MENAGERIST_DATABASE_POOL_SIZE", "8")
+    monkeypatch.setenv("MENAGERIST_DATABASE_MAX_OVERFLOW", "2")
+    get_database_settings.cache_clear()
+    try:
+        assert get_database_settings().connections_per_process == 10
+        assert possible_connections(workers=2) == 30
+        message = connection_warning(workers=2, max_connections=20)
+        assert message is not None
+        assert "10 each" in message
+    finally:
+        get_database_settings.cache_clear()
 
 
 def test_counts_the_workers_and_the_background_worker() -> None:
     """The background worker process has its own pool beside the web workers."""
-    assert possible_connections(workers=1) == 2 * PER_PROCESS
-    assert possible_connections(workers=4) == 5 * PER_PROCESS
+    per_process = get_database_settings().connections_per_process
+    assert possible_connections(workers=1) == 2 * per_process
+    assert possible_connections(workers=4) == 5 * per_process
 
 
 def test_no_warning_when_postgres_allows_enough() -> None:

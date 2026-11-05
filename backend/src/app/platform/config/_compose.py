@@ -53,8 +53,9 @@ DESCRIPTIONS = {
     ),
     "POSTGRES_MAX_CONNECTIONS": (
         "Postgres `max_connections` (its own default is 100). Each worker process "
-        + "keeps a pool of connections: lower it on a very small machine, and keep "
-        + "it above the total of all pools."
+        + "keeps a pool of connections (see `MENAGERIST_DATABASE_POOL_SIZE` and "
+        + "`MENAGERIST_DATABASE_MAX_OVERFLOW`): lower it on a very small machine, "
+        + "and keep it above the total of all pools."
     ),
 }
 

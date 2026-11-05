@@ -9,6 +9,7 @@ their defaults written out.
 import re
 import textwrap
 from dataclasses import dataclass
+from pathlib import PurePath
 from types import UnionType
 from typing import TYPE_CHECKING, Annotated, TypeAliasType, Union, get_args, get_origin
 
@@ -235,7 +236,10 @@ def _entry(group_type: type[MenageristBaseSettings], name: str) -> SettingEntry:
     types, allowed = _describe(schema)
     sensitive = _is_sensitive(field, schema)
     raw = field.get_default(call_default_factory=True)
-    value = adapter.dump_python(raw, mode="json")
+    # A path dumps with the host's separators; the reference is the same on every OS.
+    value = raw.as_posix() if isinstance(raw, PurePath) else None
+    if value is None:
+        value = adapter.dump_python(raw, mode="json")
     shown = mask_dsn(raw) if sensitive and "://" in str(raw) else None
     tunable = next((m for m in unwrap(field)[1] if isinstance(m, Tunable)), None)
     return SettingEntry(

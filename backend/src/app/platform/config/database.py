@@ -23,7 +23,8 @@ class DatabaseSettings(MenageristBaseSettings, group="database"):
 
     The connection is either given whole as `url`, or composed from `host`, `port`,
     `user`, `password` and `name`. `url` wins when set; use it for query options such
-    as TLS mode, which have no part of their own. The DSN carries the password, so
+    as TLS mode, which have no part of their own. `pool_size` and `max_overflow` size
+    each process's connection pool. The DSN carries the password, so
     serialisation, `repr` and validation errors show it masked; attribute access still
     returns the real value.
     """
@@ -56,6 +57,32 @@ class DatabaseSettings(MenageristBaseSettings, group="database"):
     name: Annotated[
         str, Field(min_length=1, description="Name of the database to use.")
     ] = "menagerist"
+    pool_size: Annotated[
+        int,
+        Field(
+            ge=1,
+            description=(
+                "Database connections each process (every web worker, and the "
+                + "background worker) keeps open in its pool."
+            ),
+        ),
+    ] = 5
+    max_overflow: Annotated[
+        int,
+        Field(
+            ge=0,
+            description=(
+                "Extra database connections each process may open beyond the pool "
+                + "under load, closed again when idle. 0 caps a process at the pool "
+                + "size."
+            ),
+        ),
+    ] = 10
+
+    @property
+    def connections_per_process(self) -> int:
+        """The most connections one process may hold: its pool plus the overflow."""
+        return self.pool_size + self.max_overflow
 
     @model_validator(mode="after")
     def _compose_url(self) -> DatabaseSettings:

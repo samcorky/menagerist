@@ -42,6 +42,9 @@ data/
 backups/
 !/frontend/src/routes/admin/backups/
 
+# Stray copy of the OpenAPI schema; the committed contract is ../openapi.json
+/frontend/openapi.json
+
 # Node Stuff
 node_modules/
 

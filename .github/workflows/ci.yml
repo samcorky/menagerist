@@ -501,6 +501,71 @@ jobs:
               -F body=@"$RUNNER_TEMP/coverage-comment.md"
           fi
 
+  image-size-comment:
+    name: Comment the image size on the pull request
+    # Compares the image the build job just measured with the published edge image, which
+    # is main's latest build. One comment, updated by later pushes; a change too small to
+    # matter posts nothing unless a comment already exists to correct. A fork pull
+    # request has a read-only token, so it gets the job summary instead. Not part of
+    # ci-passed: a missing comment should not fail a pull request.
+    needs: build
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.build.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout the comment script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            scripts/image_size_comment.py
+            scripts/measure_image_size.py
+          sparse-checkout-cone-mode: false
+
+      - name: Download this pull request's image size
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: image-size
+          path: image-size
+
+      # edge is the image built from main and is public, so a fork can pull it too. If it
+      # cannot be pulled the comment shows the new size alone.
+      - name: Measure the published edge image
+        run: |
+          if docker pull --platform linux/amd64 ghcr.io/${{ github.repository }}:edge; then
+            python3 scripts/measure_image_size.py ghcr.io/${{ github.repository }}:edge > "$RUNNER_TEMP/edge-size.json"
+          fi
+
+      - name: Build the comment
+        id: comment
+        run: >-
+          python3 scripts/image_size_comment.py image-size/image-size.json
+          --base "$RUNNER_TEMP/edge-size.json"
+          --output "$RUNNER_TEMP/image-size-comment.md"
+
+      - name: Show the comment in the job summary
+        run: cat "$RUNNER_TEMP/image-size-comment.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post or update the comment
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MEANINGFUL: ${{ steps.comment.outputs.meaningful }}
+        run: |
+          marker='<!-- image-size -->'
+          existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"${marker}\"))) | .id" | head -n 1)
+          if [ -n "$existing" ]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
+              -F body=@"$RUNNER_TEMP/image-size-comment.md"
+          elif [ "$MEANINGFUL" = "true" ]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+              -F body=@"$RUNNER_TEMP/image-size-comment.md"
+          fi
+
   ci-passed:
     name: CI passed
     # One stable check to require in branch protection however the jobs above change.

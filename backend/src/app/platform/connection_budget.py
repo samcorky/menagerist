@@ -11,11 +11,6 @@ from app.platform.config.server import MAX_WORKERS
 
 logger = structlog.get_logger(__name__)
 
-# Each process pools up to POOL_SIZE connections and may open MAX_OVERFLOW more
-# under load.
-POOL_SIZE: Final = 5
-MAX_OVERFLOW: Final = 10
-PER_PROCESS: Final = POOL_SIZE + MAX_OVERFLOW
 # Postgres keeps this many of `max_connections` back for superusers.
 RESERVED: Final = 3
 # The background worker is its own process with its own pool.
@@ -24,19 +19,22 @@ _BACKGROUND_PROCESSES: Final = 1
 
 def possible_connections(*, workers: int) -> int:
     """The most connections the web workers and the background worker could hold."""
-    return (workers + _BACKGROUND_PROCESSES) * PER_PROCESS
+    per_process = get_database_settings().connections_per_process
+    return (workers + _BACKGROUND_PROCESSES) * per_process
 
 
 def connection_warning(*, workers: int, max_connections: int) -> str | None:
     """Say so when the pools could outgrow Postgres' limit, else return `None`."""
+    per_process = get_database_settings().connections_per_process
     need = possible_connections(workers=workers)
     if need <= max_connections - RESERVED:
         return None
     return (
         f"Up to {need} database connections could be open ({workers} web "
-        + f"worker(s) and the background worker, {PER_PROCESS} each) but Postgres "
+        + f"worker(s) and the background worker, {per_process} each) but Postgres "
         + f"allows {max_connections} ({RESERVED} reserved). Raise "
-        + "POSTGRES_MAX_CONNECTIONS or lower MENAGERIST_SERVER_WORKERS."
+        + "POSTGRES_MAX_CONNECTIONS, or lower MENAGERIST_SERVER_WORKERS or the "
+        + "database pool size and overflow settings."
     )
 
 
