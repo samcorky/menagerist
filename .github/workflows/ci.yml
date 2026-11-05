@@ -521,7 +521,7 @@ jobs:
         with:
           sparse-checkout: |
             scripts/image_size_comment.py
-            scripts/measure_image_size.sh
+            scripts/measure_image_size.py
           sparse-checkout-cone-mode: false
 
       - name: Download this pull request's image size
@@ -535,7 +535,7 @@ jobs:
       - name: Measure the published edge image
         run: |
           if docker pull --platform linux/amd64 ghcr.io/${{ github.repository }}:edge; then
-            scripts/measure_image_size.sh ghcr.io/${{ github.repository }}:edge > "$RUNNER_TEMP/edge-size.json"
+            python3 scripts/measure_image_size.py ghcr.io/${{ github.repository }}:edge > "$RUNNER_TEMP/edge-size.json"
           fi
 
       - name: Build the comment

@@ -73,7 +73,7 @@ jobs:
         run: uv run --script scripts/smoke_test.py
 
       - name: Measure the image size
-        run: scripts/measure_image_size.sh menagerist:local | tee "${RUNNER_TEMP}/image-size.json"
+        run: python3 scripts/measure_image_size.py menagerist:local | tee "${RUNNER_TEMP}/image-size.json"
 
       # The image-size-comment job in ci.yml compares this with the published edge image.
       - name: Upload the image size
