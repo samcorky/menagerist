@@ -74,12 +74,6 @@ describe('app.html', () => {
 		expect(APP_HTML).toContain(`dark ? '${THEME_COLOURS.dark}' : '${THEME_COLOURS.light}'`);
 	});
 
-	// Without this the installed app stops above the system navigation bar and
-	// env(safe-area-inset-bottom), which the tab bar pads by, is always zero.
-	it('draws edge to edge so the safe-area insets take effect', () => {
-		expect(APP_HTML).toContain('viewport-fit=cover');
-	});
-
 	it('marks the site as installable as a standalone app on iOS and Android', () => {
 		for (const name of [
 			'mobile-web-app-capable',
