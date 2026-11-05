@@ -1,13 +1,15 @@
 from typing import TYPE_CHECKING
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.modules.presets.adapters.persistence.models import PresetModel
 from app.modules.presets.domain.preset import Preset
 
 if TYPE_CHECKING:
+    import builtins
     import uuid
+    from datetime import datetime
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -96,3 +98,25 @@ class SqlAlchemyPresetRepository:
             stmt = stmt.where(PresetModel.label.ilike(f"%{q}%"))
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
+
+    async def list_deleted_before(
+        self, cutoff: datetime, *, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[Preset]:
+        """List presets soft-deleted before `cutoff`, ordered by id after `after`."""
+        stmt = (
+            select(PresetModel)
+            .where(PresetModel.deleted_at < cutoff)
+            .order_by(PresetModel.id)
+            .limit(limit)
+        )
+        if after is not None:
+            stmt = stmt.where(PresetModel.id > after)
+        result = await self._session.execute(stmt)
+        return [_to_domain(model) for model in result.scalars()]
+
+    async def purge(self, preset_id: uuid.UUID) -> None:
+        """Hard-delete the row, live or soft-deleted; an unknown id is a no-op."""
+        await self._session.execute(
+            delete(PresetModel).where(PresetModel.id == preset_id)
+        )
+        await self._session.flush()

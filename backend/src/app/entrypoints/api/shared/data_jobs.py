@@ -23,7 +23,9 @@ if TYPE_CHECKING:
         title="Permanently remove old deleted items",
         description=(
             "Permanently removes items, connections and collections that have been "
-            + "in Recently deleted for longer than the retention period."
+            + "in Recently deleted for longer than the retention period, and the "
+            + "item types, relationship types and presets removed with an example "
+            + "pack, unless something still uses them."
         ),
     )
 )

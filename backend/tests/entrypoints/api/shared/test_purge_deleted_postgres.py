@@ -28,12 +28,25 @@ from app.modules.collections.domain.collection import Collection, Membership
 from app.modules.graph.adapters.persistence.edge_repository import (
     SqlAlchemyEdgeRepository,
 )
-from app.modules.graph.adapters.persistence.models import EdgeModel, NodeModel
+from app.modules.graph.adapters.persistence.edge_type_repository import (
+    SqlAlchemyEdgeTypeRepository,
+)
+from app.modules.graph.adapters.persistence.models import (
+    EdgeModel,
+    EdgeTypeModel,
+    NodeModel,
+    NodeTypeModel,
+)
 from app.modules.graph.adapters.persistence.node_repository import (
     SqlAlchemyNodeRepository,
 )
+from app.modules.graph.adapters.persistence.node_type_repository import (
+    SqlAlchemyNodeTypeRepository,
+)
 from app.modules.graph.domain.edge import Edge
+from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.node import Node
+from app.modules.graph.domain.node_type import NodeType
 from app.modules.media.adapters.persistence.media_asset_repository import (
     SqlAlchemyMediaAssetRepository,
 )
@@ -45,6 +58,11 @@ from app.modules.media.adapters.storage.in_memory_media_storage import (
 )
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
 from app.modules.media.domain.media_attachment import MediaAttachment
+from app.modules.presets.adapters.persistence.models import PresetModel
+from app.modules.presets.adapters.persistence.preset_repository import (
+    SqlAlchemyPresetRepository,
+)
+from app.modules.presets.domain.preset import Preset
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.slug import Slug
 
@@ -160,6 +178,76 @@ async def test_a_full_run_on_postgres_purges_old_content_and_is_idempotent(
     assert await _count(factory, CollectionMemberModel) == 0
     assert storage._files == {}
 
+    assert await purge.handle(command, SYSTEM_ACTOR) == PurgeDeletedContentResult(
+        items=0, connections=0, collections=0
+    )
+
+
+async def test_expired_types_and_presets_are_purged_unless_still_used(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Unused pack leftovers go; a type an item carries and a linked preset stay."""
+    linked = Preset.create(kind="choice_list", label="Linked", definition={})
+    spare = Preset.create(kind="choice_list", label="Spare", definition={})
+    linked.deleted_at = spare.deleted_at = LONG_AGO
+    gone = NodeType.create(slug="gone", label="Gone")
+    carried = NodeType.create(slug="carried", label="Carried")
+    gone.deleted_at = carried.deleted_at = LONG_AGO
+    live_type = NodeType.create(
+        slug="live",
+        label="Live",
+        attributes_schema={
+            "properties": {"genre": {"x-menagerist": {"list": str(linked.id)}}}
+        },
+    )
+    unused_link = EdgeType.create(slug="unused", label="Unused")
+    carried_link = EdgeType.create(slug="used", label="Used")
+    unused_link.deleted_at = carried_link.deleted_at = LONG_AGO
+    async with factory() as session:
+        for preset in (linked, spare):
+            await SqlAlchemyPresetRepository(session).add(preset)
+        types = SqlAlchemyNodeTypeRepository(session)
+        for node_type in (gone, carried, live_type):
+            await types.add(node_type)
+        link_types = SqlAlchemyEdgeTypeRepository(session)
+        for edge_type in (unused_link, carried_link):
+            await link_types.add(edge_type)
+        item = Node.create(owner_id=BOB, name="Kept", type="carried")
+        other = Node.create(owner_id=BOB, name="Other", type=None)
+        for node in (item, other):
+            await SqlAlchemyNodeRepository(session).add(node)
+        await SqlAlchemyEdgeRepository(session).add(
+            Edge.create(
+                owner_id=BOB, source_id=item.id, target_id=other.id, type="used"
+            )
+        )
+        await session.commit()
+
+    purge = build_purge_deleted_content_on(factory, InMemoryMediaStorage())
+    command = PurgeDeletedContentCommand(older_than=CUTOFF, dry_run=True)
+    expected = PurgeDeletedContentResult(
+        items=0,
+        connections=0,
+        collections=0,
+        item_types=1,
+        relationship_types=1,
+        presets=1,
+    )
+
+    assert await purge.handle(command, SYSTEM_ACTOR) == expected
+    assert await _count(factory, NodeTypeModel) == 3
+    command.dry_run = False
+    assert await purge.handle(command, SYSTEM_ACTOR) == expected
+
+    async with factory() as session:
+        left_types = set((await session.execute(select(NodeTypeModel.slug))).scalars())
+        left_links = set((await session.execute(select(EdgeTypeModel.slug))).scalars())
+        left_presets = set((await session.execute(select(PresetModel.id))).scalars())
+    assert left_types == {"carried", "live"}
+    assert left_links == {"used"}
+    # The built-in presets are seeded by migration, so look only at the two made here.
+    assert linked.id in left_presets
+    assert spare.id not in left_presets
     assert await purge.handle(command, SYSTEM_ACTOR) == PurgeDeletedContentResult(
         items=0, connections=0, collections=0
     )

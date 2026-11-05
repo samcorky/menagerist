@@ -1,14 +1,16 @@
 from typing import TYPE_CHECKING
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.modules.graph.adapters.persistence.models import EdgeTypeModel
 from app.modules.graph.domain.edge_type import EdgeType
 from app.shared_kernel.slug import Slug
 
 if TYPE_CHECKING:
+    import builtins
     import uuid
+    from datetime import datetime
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -98,3 +100,25 @@ class SqlAlchemyEdgeTypeRepository:
             stmt = stmt.where(EdgeTypeModel.id > after)
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
+
+    async def list_deleted_before(
+        self, cutoff: datetime, *, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[EdgeType]:
+        """List relationship types deleted before `cutoff`, by id after `after`."""
+        stmt = (
+            select(EdgeTypeModel)
+            .where(EdgeTypeModel.deleted_at < cutoff)
+            .order_by(EdgeTypeModel.id)
+            .limit(limit)
+        )
+        if after is not None:
+            stmt = stmt.where(EdgeTypeModel.id > after)
+        result = await self._session.execute(stmt)
+        return [_to_domain(model) for model in result.scalars()]
+
+    async def purge(self, edge_type_id: uuid.UUID) -> None:
+        """Hard-delete the row, live or soft-deleted; an unknown id is a no-op."""
+        await self._session.execute(
+            delete(EdgeTypeModel).where(EdgeTypeModel.id == edge_type_id)
+        )
+        await self._session.flush()

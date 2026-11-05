@@ -172,7 +172,7 @@ uv run menagerist data purge-deleted --older-than-days 60    # use another reten
 uv run menagerist data purge-deleted --dry-run               # show what would be deleted and change nothing
 ```
 
-`data purge-deleted` covers every person's items, connections and collections that have been in Recently deleted longer than `MENAGERIST_RETENTION_DELETED_DAYS` (default 30, minimum 1), with the memberships, attachments and stored files only they used. Live content, deleted item types, relationship types and presets are never touched. It prints the cutoff (UTC) and the counts per kind.
+`data purge-deleted` covers every person's items, connections and collections that have been in Recently deleted longer than `MENAGERIST_RETENTION_DELETED_DAYS` (default 30, minimum 1), with the memberships, attachments and stored files only they used. Live content is never touched. It also removes the item types, relationship types and presets that an uninstalled example pack left behind, once they are past the same cutoff, but never one that an item, connection or live type still uses. It prints the cutoff (UTC) and the counts per kind.
 
 ## Common tasks
 
