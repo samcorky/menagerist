@@ -503,11 +503,11 @@ jobs:
 
   image-size-comment:
     name: Comment the image size on the pull request
-    # Compares the image the build job just measured with the latest main build, whose
-    # size build.yml caches on every push to main. One comment, updated by later pushes;
-    # a change too small to matter posts nothing unless a comment already exists to
-    # correct. A fork pull request has a read-only token, so it gets the job summary
-    # instead. Not part of ci-passed: a missing comment should not fail a pull request.
+    # Compares the image the build job just measured with the published edge image, which
+    # is main's latest build. One comment, updated by later pushes; a change too small to
+    # matter posts nothing unless a comment already exists to correct. A fork pull
+    # request has a read-only token, so it gets the job summary instead. Not part of
+    # ci-passed: a missing comment should not fail a pull request.
     needs: build
     if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
@@ -519,7 +519,9 @@ jobs:
       - name: Checkout the comment script
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          sparse-checkout: scripts/image_size_comment.py
+          sparse-checkout: |
+            scripts/image_size_comment.py
+            scripts/measure_image_size.sh
           sparse-checkout-cone-mode: false
 
       - name: Download this pull request's image size
@@ -528,20 +530,19 @@ jobs:
           name: image-size
           path: image-size
 
-      # The newest cached main size; a miss only means there is no baseline yet, for
-      # example when no build on main has run in the last week.
-      - name: Look up the size of main's image
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ runner.temp }}/base
-          key: image-size-main-none
-          restore-keys: image-size-main-
+      # edge is the image built from main and is public, so a fork can pull it too. If it
+      # cannot be pulled the comment shows the new size alone.
+      - name: Measure the published edge image
+        run: |
+          if docker pull --platform linux/amd64 ghcr.io/${{ github.repository }}:edge; then
+            scripts/measure_image_size.sh ghcr.io/${{ github.repository }}:edge > "$RUNNER_TEMP/edge-size.json"
+          fi
 
       - name: Build the comment
         id: comment
         run: >-
           python3 scripts/image_size_comment.py image-size/image-size.json
-          --base "$RUNNER_TEMP/base/image-size.json"
+          --base "$RUNNER_TEMP/edge-size.json"
           --output "$RUNNER_TEMP/image-size-comment.md"
 
       - name: Show the comment in the job summary

@@ -75,7 +75,7 @@ def test_no_base_shows_the_new_size_alone() -> None:
     body = comment.build_comment(_sizes(110, 320), None)
 
     assert "| Compressed | 110.00 MiB |" in body
-    assert "No size for `main` was available" in body
+    assert "The `edge` image could not be pulled" in body
     assert "Change" not in body
 
 
@@ -130,4 +130,4 @@ def test_main_copes_with_a_missing_base_and_no_output_file(
     monkeypatch.setattr(sys, "argv", [*argv, "--output", str(out)])
 
     assert comment.main() == 0
-    assert "No size for `main`" in out.read_text(encoding="utf-8")
+    assert "The `edge` image could not be pulled" in out.read_text(encoding="utf-8")

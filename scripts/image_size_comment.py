@@ -2,8 +2,8 @@
 """Build the pull request comment that compares the Docker image size with ``main``.
 
 ``build.yml`` measures the image it builds and writes ``{"compressed", "uncompressed",
-"commit"}`` (sizes in bytes) to a JSON file. On a push to ``main`` that file is cached;
-on a pull request this compares the new file with the cached one. It uses only the
+"commit"}`` (sizes in bytes) to a JSON file. The same script measures the published
+``edge`` image, built from ``main``, and this compares the two. It uses only the
 standard library.
 
 When ``GITHUB_OUTPUT`` is set it records ``meaningful=true|false``, so the workflow can
@@ -66,9 +66,8 @@ def build_comment(current: dict[str, int], base: dict[str, int] | None) -> str:
             "",
             " ".join(
                 [
-                    "No size for `main` was available to compare with, so this shows",
-                    "the new image on its own. A later build on `main` provides the",
-                    "baseline.",
+                    "The `edge` image could not be pulled to compare with, so this",
+                    "shows the new image on its own.",
                 ]
             ),
         ]
@@ -103,7 +102,7 @@ def main() -> int:
     """Write the comment to ``--output`` and report whether it is worth posting."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("current", type=Path, help="Sizes of the pull request's image")
-    parser.add_argument("--base", type=Path, help="Sizes of the latest main image")
+    parser.add_argument("--base", type=Path, help="Sizes of the published edge image")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 

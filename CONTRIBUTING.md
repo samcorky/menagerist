@@ -338,7 +338,7 @@ Swagger UI is at `/api/docs` on the backend (`http://localhost:8000/api/docs` in
 - Coverage floors must not drop.
 - One focused change per PR.
 - The `Build` workflow builds the image and runs the smoke test; `CI` calls it, so it runs on every pull request.
-- The `image-size-comment` CI job comments the compressed and uncompressed image size against the latest `main` build on a pull request, editing one comment on later pushes and staying quiet when the change is under half a percent. `main` builds cache their size for seven days of disuse, so a quiet week leaves no baseline and the comment shows the new size alone. Fork pull requests get the job summary instead.
+- The `image-size-comment` CI job comments the compressed and uncompressed image size against the published `edge` image (the latest `main` build) on a pull request, editing one comment on later pushes and staying quiet when the change is under half a percent. If `edge` cannot be pulled the comment shows the new size alone. Fork pull requests get the job summary instead.
 - On a pull request, the autofix.ci app may push a `style: apply hook fixes` commit (formatting and lint fixes), so pull before pushing again. It never edits files under `.github/workflows`.
 - Require two checks in branch protection: `CI passed`, which succeeds only when the type check, frontend test, backend, end-to-end and image build jobs all do, and `Hooks: prek (autofix)`, which runs every other pre-commit hook (formatting, lint, secrets, config validation). They are separate workflows, so `CI passed` cannot cover the hooks.
 
