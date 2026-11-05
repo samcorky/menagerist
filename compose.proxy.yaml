@@ -42,7 +42,7 @@ services:
 
   nginx:
     profiles: [nginx]
-    image: nginx:stable-alpine
+    image: nginx:stable-alpine@sha256:0e52bd054126cdc040b1276c0af347aeb02a41b9cfe305d6094767ac30e97949
     depends_on:
       app:
         condition: service_healthy
@@ -53,7 +53,7 @@ services:
 
   nginx-buffered:
     profiles: [nginx-buffered]
-    image: nginx:stable-alpine
+    image: nginx:stable-alpine@sha256:0e52bd054126cdc040b1276c0af347aeb02a41b9cfe305d6094767ac30e97949
     depends_on:
       app:
         condition: service_healthy
@@ -64,7 +64,7 @@ services:
 
   caddy:
     profiles: [caddy]
-    image: caddy:2-alpine
+    image: caddy:2-alpine@sha256:f6228111e5fafa1a5238258d0858e103f10599b8d1659a146e7726681a002bb9
     depends_on:
       app:
         condition: service_healthy
@@ -75,7 +75,7 @@ services:
 
   traefik:
     profiles: [traefik]
-    image: traefik:v3.7.9
+    image: traefik:v3.7.9@sha256:652929a140a32d7cafafb13c6cdfab5376cfeff800f51397b87b524501ed02a8
     depends_on:
       app:
         condition: service_healthy
