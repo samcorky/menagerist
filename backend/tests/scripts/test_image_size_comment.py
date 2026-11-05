@@ -12,8 +12,8 @@ if TYPE_CHECKING:
     import pytest
 
 SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "image_size_comment.py"
-MIB = 1024 * 1024
-BASE = {"compressed": 100 * MIB, "uncompressed": 300 * MIB, "commit": "abcdef1234567"}
+MB = 1_000_000
+BASE = {"compressed": 100 * MB, "uncompressed": 300 * MB, "commit": "abcdef1234567"}
 
 
 def _load() -> ModuleType:
@@ -30,7 +30,7 @@ comment = _load()
 
 
 def _sizes(compressed: int, uncompressed: int) -> dict[str, int]:
-    return {"compressed": compressed * MIB, "uncompressed": uncompressed * MIB}
+    return {"compressed": compressed * MB, "uncompressed": uncompressed * MB}
 
 
 def test_a_growth_shows_before_after_and_difference() -> None:
@@ -39,8 +39,8 @@ def test_a_growth_shows_before_after_and_difference() -> None:
 
     assert body.startswith(comment.MARKER + "\n### Docker image size")
     assert "`main` (`abcdef1`)" in body
-    assert "| Compressed | 100.00 MiB | 110.00 MiB | +10.00 MiB (+10.0%) |" in body
-    assert "| Uncompressed | 300.00 MiB | 320.00 MiB | +20.00 MiB (+6.7%) |" in body
+    assert "| Compressed | 100.00 MB | 110.00 MB | +10.00 MB (+10.0%) |" in body
+    assert "| Uncompressed | 300.00 MB | 320.00 MB | +20.00 MB (+6.7%) |" in body
     assert "No meaningful change" not in body
 
 
@@ -48,12 +48,12 @@ def test_a_shrink_is_signed_negative() -> None:
     """A smaller image reads as a negative change."""
     body = comment.build_comment(_sizes(90, 300), BASE)
 
-    assert "-10.00 MiB (-10.0%)" in body
+    assert "-10.00 MB (-10.0%)" in body
 
 
 def test_a_missing_base_commit_still_names_main() -> None:
     """The commit is only a nicety, so a base without one still renders."""
-    base = {"compressed": 100 * MIB, "uncompressed": 300 * MIB}
+    base = {"compressed": 100 * MB, "uncompressed": 300 * MB}
 
     assert "| | `main` | This pull request |" in comment.build_comment(
         _sizes(100, 300), base
@@ -66,7 +66,7 @@ def test_a_zero_base_omits_the_percentage() -> None:
 
     body = comment.build_comment(_sizes(1, 1), base)
 
-    assert "+1.00 MiB |" in body
+    assert "+1.00 MB |" in body
     assert "%" not in body
 
 
@@ -74,14 +74,14 @@ def test_no_base_shows_the_new_size_alone() -> None:
     """Without a size for main the comment says so rather than inventing one."""
     body = comment.build_comment(_sizes(110, 320), None)
 
-    assert "| Compressed | 110.00 MiB |" in body
+    assert "| Compressed | 110.00 MB |" in body
     assert "The `edge` image could not be pulled" in body
     assert "Change" not in body
 
 
 def test_a_tiny_change_is_not_meaningful() -> None:
     """Under half a percent in both figures is noise."""
-    current = {"compressed": 100 * MIB + 1000, "uncompressed": 300 * MIB - 1000}
+    current = {"compressed": 100 * MB + 1000, "uncompressed": 300 * MB - 1000}
 
     assert not comment.is_meaningful(current, BASE)
     assert "No meaningful change." in comment.build_comment(current, BASE)
@@ -113,7 +113,7 @@ def test_main_writes_the_comment_and_the_flag(
     monkeypatch.setattr(sys, "argv", [*argv, "--output", str(out)])
 
     assert comment.main() == 0
-    assert "+10.00 MiB" in out.read_text(encoding="utf-8")
+    assert "+10.00 MB" in out.read_text(encoding="utf-8")
     assert github_output.read_text(encoding="utf-8") == "meaningful=true\n"
 
 
@@ -135,10 +135,10 @@ def test_main_copes_with_a_missing_base_and_no_output_file(
 
 def test_a_tiny_shrink_is_not_shown_as_negative_zero() -> None:
     """A change that rounds to nothing reads +0.00, never -0.00."""
-    current = {"compressed": 100 * MIB - 1000, "uncompressed": 300 * MIB - 1000}
+    current = {"compressed": 100 * MB - 1000, "uncompressed": 300 * MB - 1000}
 
     body = comment.build_comment(current, BASE)
 
     assert "-0.00" not in body
     assert "-0.0%" not in body
-    assert "+0.00 MiB (+0.0%)" in body
+    assert "+0.00 MB (+0.0%)" in body

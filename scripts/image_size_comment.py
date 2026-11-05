@@ -23,24 +23,24 @@ MARKER = "<!-- image-size -->"
 # ordering and timestamps rather than something a reviewer needs to see.
 MEANINGFUL_SHARE = 0.005
 
-MIB = 1024 * 1024
+MB = 1_000_000
 
 
-def _mib(size: int) -> str:
-    return f"{size / MIB:.2f} MiB"
+def _mb(size: int) -> str:
+    return f"{size / MB:.2f} MB"
 
 
 def _delta(current: int, base: int) -> str:
-    """Return the signed change in MiB and as a percentage of the base."""
+    """Return the signed change in MB and as a percentage of the base."""
     change = current - base
     # Rounding first and adding zero turns a tiny negative change into +0.00, not -0.00.
-    mib = round(change / MIB, 2) + 0
+    change_mb = round(change / MB, 2) + 0
     share = f" ({round(change / base, 3) + 0:+.1%})" if base else ""
-    return f"{mib:+.2f} MiB{share}"
+    return f"{change_mb:+.2f} MB{share}"
 
 
 def _row(label: str, base: int, current: int) -> str:
-    return f"| {label} | {_mib(base)} | {_mib(current)} | {_delta(current, base)} |"
+    return f"| {label} | {_mb(base)} | {_mb(current)} | {_delta(current, base)} |"
 
 
 def is_meaningful(current: dict[str, int], base: dict[str, int] | None) -> bool:
@@ -64,7 +64,7 @@ def build_comment(current: dict[str, int], base: dict[str, int] | None) -> str:
         lines += [
             "| | This pull request |",
             "| --- | ---: |",
-            *(f"| {label} | {_mib(current[key])} |" for label, key in rows),
+            *(f"| {label} | {_mb(current[key])} |" for label, key in rows),
             "",
             " ".join(
                 [
