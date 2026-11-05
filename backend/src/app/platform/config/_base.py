@@ -1,11 +1,19 @@
 import re
+from pathlib import Path
 from typing import Any, ClassVar
 
-from pydantic_settings import SettingsConfigDict
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SecretsSettingsSource,
+    SettingsConfigDict,
+)
 
 from app.platform.config._tracking import TrackedSettings
 
 ENV_PREFIX = "MENAGERIST_"
+# Where Docker and Compose mount secrets; a file named after a variable supplies it.
+SECRETS_DIR = Path("/run/secrets")
 _GROUP = re.compile(r"[a-z][a-z0-9_]*")
 
 
@@ -24,6 +32,29 @@ class MenageristBaseSettings(TrackedSettings):
     )
 
     group: ClassVar[str | None] = None
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Add `/run/secrets/<VARIABLE>` files below the environment and `.env`.
+
+        A directory given at construction (`_secrets_dir`) is kept as it is. The
+        default one is looked up on each load, and skipped when absent so a host
+        without Docker secrets sees no warning.
+        """
+        if (
+            isinstance(file_secret_settings, SecretsSettingsSource)
+            and file_secret_settings.secrets_dir is None
+            and SECRETS_DIR.is_dir()
+        ):
+            file_secret_settings = SecretsSettingsSource(settings_cls, SECRETS_DIR)
+        return init_settings, env_settings, dotenv_settings, file_secret_settings
 
     def __init_subclass__(
         cls,

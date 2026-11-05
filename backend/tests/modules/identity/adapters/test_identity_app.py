@@ -82,7 +82,7 @@ def _wired(monkeypatch: pytest.MonkeyPatch, world: World) -> None:
     monkeypatch.delenv(PASSWORD_ENV_VAR, raising=False)
     monkeypatch.setattr(identity_app, "_guard", get_access_guard())
     monkeypatch.setattr(
-        "app.platform.config.identity_cli.SECRETS_DIR", Path("/nonexistent-secrets")
+        "app.platform.config._base.SECRETS_DIR", Path("/nonexistent-secrets")
     )
     repos = IdentityRepos(
         users=world.users,
@@ -339,7 +339,7 @@ def test_password_can_come_from_a_secret_file(
 ) -> None:
     """A `menagerist_identity_initial_password` secrets-directory file is read."""
     (tmp_path / "menagerist_identity_initial_password").write_text(PASSWORD)
-    monkeypatch.setattr("app.platform.config.identity_cli.SECRETS_DIR", tmp_path)
+    monkeypatch.setattr("app.platform.config._base.SECRETS_DIR", tmp_path)
     monkeypatch.setattr(getpass, "getpass", lambda _p="": pytest.fail("prompted"))
 
     create_admin(username="sam")

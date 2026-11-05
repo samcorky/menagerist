@@ -51,7 +51,10 @@ _INTRO = (
     + "`.env` file next to `compose.yaml`; "
     + f"[`{ENV_EXAMPLE_PATH}`](../{ENV_EXAMPLE_PATH}) lists them all with their "
     + "defaults. A list is comma-separated, and a sensitive value (a secret or a URL "
-    + "with credentials) has no default here."
+    + "with credentials) has no default here. Any setting can instead be read from a "
+    + "file named after its variable in `/run/secrets` (Docker and Compose secrets "
+    + "mount there); the environment variable wins when both are set. See "
+    + "[Secrets from files](DEPLOYING.md#secrets-from-files)."
 )
 # Set by the Dockerfile, so a container differs from the defaults below. A test checks
 # the Dockerfile still sets each of these.
@@ -346,6 +349,7 @@ def render_env_example(
                 lines += _comment(f"Also read from {', '.join(entry.aliases)}.")
             if entry.sensitive:
                 lines += _comment("Sensitive: no default is written here.")
+                lines += _comment("Best given as a secrets file.")
             if entry.default is None:
                 lines.append(f"# {entry.env_name}=")
                 continue
@@ -368,6 +372,8 @@ def _default_cell(entry: SettingEntry) -> str:
 
 def _notes(entry: SettingEntry) -> str:
     notes = [entry.description]
+    if entry.sensitive:
+        notes.append("Sensitive: best given as a secrets file.")
     if entry.aliases:
         notes.append(f"Also read from `{'`, `'.join(entry.aliases)}`.")
     if entry.tunable:
