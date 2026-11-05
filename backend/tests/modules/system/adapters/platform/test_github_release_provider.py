@@ -43,12 +43,13 @@ async def test_releases_are_read_from_the_api_with_no_credentials() -> None:
             json=[
                 {
                     "tag_name": "v0.2026.11.0",
+                    "name": "  Spring clean  ",
                     "draft": False,
                     "prerelease": False,
                     "published_at": "2026-11-01T12:00:00Z",
                     "html_url": "https://evil.example/phish",
                 },
-                {"tag_name": "0.2026.12.0rc1", "prerelease": True},
+                {"tag_name": "0.2026.12.0rc1", "name": " ", "prerelease": True},
                 {"tag_name": "0.2026.13.0", "draft": True},
                 {"tag_name": ""},
                 {"name": "no tag"},
@@ -69,6 +70,8 @@ async def test_releases_are_read_from_the_api_with_no_credentials() -> None:
     assert releases[0].url == (
         "https://github.com/samcorky/menagerist/releases/tag/v0.2026.11.0"
     )
+    # The title is the release name, or the tag when the name is blank.
+    assert [r.title for r in releases] == ["Spring clean", "0.2026.12.0rc1"]
     assert releases[0].published_at is not None
     assert releases[1].prerelease
     assert releases[1].published_at is None

@@ -18,6 +18,8 @@ class UpdateCheckModel(Base):
     channel: Mapped[str]
     latest_version: Mapped[str | None]
     latest_url: Mapped[str | None]
+    # Null on rows stored before titles were kept; read back as the version.
+    latest_title: Mapped[str | None]
     latest_published_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )

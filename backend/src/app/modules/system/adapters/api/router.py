@@ -292,6 +292,10 @@ class ReleaseResponse(BaseModel):
         str | None,
         Field(description="Newest release on the channel, when one was found."),
     ] = None
+    title: Annotated[
+        str | None,
+        Field(description="That release's title, or its tag when it has none."),
+    ] = None
     url: Annotated[
         str | None, Field(description="Where to read that release's notes.")
     ] = None
@@ -328,6 +332,7 @@ class ReleaseResponse(BaseModel):
             provider="github",
             status=status.status.value,
             latest_version=None if latest is None else latest.version,
+            title=None if latest is None else latest.title,
             url=None if latest is None else latest.url,
             published_at=None if latest is None else latest.published_at,
             prerelease=None if latest is None else latest.prerelease,

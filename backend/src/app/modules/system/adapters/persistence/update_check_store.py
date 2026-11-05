@@ -22,6 +22,7 @@ def _to_domain(model: UpdateCheckModel) -> UpdateCheck:
         if model.latest_version is None or model.latest_url is None
         else Release(
             version=model.latest_version,
+            title=model.latest_title or model.latest_version,
             url=model.latest_url,
             published_at=model.latest_published_at,
             prerelease=model.latest_prerelease,
@@ -55,6 +56,7 @@ class SqlAlchemyUpdateCheckStore:
             "source": check.source,
             "channel": check.channel.value,
             "latest_version": None if latest is None else latest.version,
+            "latest_title": None if latest is None else latest.title,
             "latest_url": None if latest is None else latest.url,
             "latest_published_at": None if latest is None else latest.published_at,
             "latest_prerelease": False if latest is None else latest.prerelease,

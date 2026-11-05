@@ -28,6 +28,7 @@ def _check(**overrides: object) -> UpdateCheck:
         "channel": ReleaseChannel.STABLE,
         "latest": Release(
             version="0.2026.11.0",
+            title="Spring clean",
             url="https://github.com/o/r/releases/tag/0.2026.11.0",
             published_at=NOW,
             prerelease=False,
