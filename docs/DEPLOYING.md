@@ -91,9 +91,11 @@ If your user is not uid 1000, also run `sudo chown 1000:1000 backups data/media`
 
 ## Secrets from files
 
-Any setting can be read from a file as well as from its environment variable, so a secret such as the database URL or an OIDC client secret need not sit in `.env` or show up in `docker inspect`. Docker and Compose mount secrets in `/run/secrets`; a file there named after the variable (`MENAGERIST_DATABASE_URL`, or in lower case) supplies that setting, and its trailing newline is ignored. The environment variable wins when both are set, so a secret file never overrides a value in `.env`. A host with no `/run/secrets` directory is unaffected.
+Any setting can be read from a file as well as from its environment variable, so a secret such as the database URL or the first-admin password need not sit in `.env` or show up in `docker inspect`. Docker and Compose mount secrets in `/run/secrets`; a file there named after the variable (`MENAGERIST_DATABASE_URL`, or in lower case) supplies that setting, and its trailing newline is ignored. The environment variable wins when both are set, so a secret file never overrides a value in `.env`. A host with no `/run/secrets` directory is unaffected.
 
-`compose.yaml` sets `MENAGERIST_DATABASE_URL` itself, so reset that entry when you supply the URL as a secret. In `compose.override.yaml`, give both the app and the worker the secret:
+The [settings reference](settings.md) marks the settings worth keeping this way: any row whose notes say "Sensitive" holds a credential or a URL that can carry one, such as `MENAGERIST_DATABASE_URL` and `MENAGERIST_IDENTITY_INITIAL_PASSWORD`. Settings that are not marked work the same way, but there is little to gain.
+
+`compose.yaml` sets `MENAGERIST_DATABASE_URL` itself, so reset that entry when you supply the URL as a secret. A secret is mounted under its own name, so call it after the variable (lower case is fine). In `compose.override.yaml`, give both the app and the worker the secret:
 
 ```yaml
 secrets:
@@ -105,17 +107,15 @@ services:
     environment:
       MENAGERIST_DATABASE_URL: !reset null
     secrets:
-      - source: menagerist_database_url
-        target: MENAGERIST_DATABASE_URL
+      - menagerist_database_url
   worker:
     environment:
       MENAGERIST_DATABASE_URL: !reset null
     secrets:
-      - source: menagerist_database_url
-        target: MENAGERIST_DATABASE_URL
+      - menagerist_database_url
 ```
 
-Keep `./secrets` out of version control and readable only by you. The Status page marks a setting read from a file as set by the deployment, the same as one from the environment.
+Keep `./secrets` out of version control and readable only by you. A setting read from a file counts as set by the deployment, the same as one from the environment.
 
 ## Your own changes: `compose.override.yaml`
 

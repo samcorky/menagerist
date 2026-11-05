@@ -38,7 +38,7 @@ Database connection settings.
 
 | Variable | Type | Default | Allowed values | Notes |
 | --- | --- | --- | --- | --- |
-| `MENAGERIST_DATABASE_URL` | database URL | `postgresql+asyncpg://menagerist:***@localhost:5432/menagerist` | any | PostgreSQL connection URL for the backend database. |
+| `MENAGERIST_DATABASE_URL` | database URL | `postgresql+asyncpg://menagerist:***@localhost:5432/menagerist` | any | PostgreSQL connection URL for the backend database. Sensitive: best given as a secrets file. |
 
 ## Identity
 
@@ -60,7 +60,7 @@ Configuration for the identity module.
 | `MENAGERIST_IDENTITY_API_TOKEN_DEFAULT_DAYS` | whole number | `90` | 1 or more | Lifetime in days offered for a new API token. |
 | `MENAGERIST_IDENTITY_API_TOKEN_MAX_DAYS` | whole number | `365` | 1 or more | Longest lifetime in days an API token may be given. |
 | `MENAGERIST_IDENTITY_API_TOKENS_PER_USER` | whole number | `20` | 1 or more | Most active API tokens one person may hold. |
-| `MENAGERIST_IDENTITY_INITIAL_PASSWORD` | secret | none (sensitive) | any | Optional first-admin password; prefer its Docker secret file. |
+| `MENAGERIST_IDENTITY_INITIAL_PASSWORD` | secret | none (sensitive) | any | Optional first-admin password; prefer its Docker secret file. Sensitive: best given as a secrets file. |
 
 ## Log
 

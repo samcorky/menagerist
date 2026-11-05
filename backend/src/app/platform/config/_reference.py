@@ -349,6 +349,7 @@ def render_env_example(
                 lines += _comment(f"Also read from {', '.join(entry.aliases)}.")
             if entry.sensitive:
                 lines += _comment("Sensitive: no default is written here.")
+                lines += _comment("Best given as a secrets file.")
             if entry.default is None:
                 lines.append(f"# {entry.env_name}=")
                 continue
@@ -371,6 +372,8 @@ def _default_cell(entry: SettingEntry) -> str:
 
 def _notes(entry: SettingEntry) -> str:
     notes = [entry.description]
+    if entry.sensitive:
+        notes.append("Sensitive: best given as a secrets file.")
     if entry.aliases:
         notes.append(f"Also read from `{'`, `'.join(entry.aliases)}`.")
     if entry.tunable:
