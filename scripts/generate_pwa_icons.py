@@ -3,27 +3,25 @@
     poe generate-pwa-icons
 
 The PNGs are committed, so a build never needs this; run it when the mark changes.
-It draws the mark from frontend/static/menagerist-icon.svg (a 64 unit square) with
-Pillow, which the backend already depends on, at eight times the size and shrinks it
-for smooth edges.
+It reads the shapes in frontend/static/menagerist-icon.svg (a rounded tile, a
+polyline and a dot at each vertex) and draws them with Pillow, which the backend
+already depends on, at eight times the size before shrinking for smooth edges. It
+handles only those shapes, and fails if the SVG gains any other.
 """
 
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageColor, ImageDraw
 
-OUT = Path(__file__).resolve().parent.parent / "frontend" / "static"
-INK = (0x1D, 0x1B, 0x18, 255)
-WHITE = (255, 255, 255, 255)
-POINTS = [(16, 42), (24, 20), (32, 34), (40, 20), (48, 42)]
-STROKE = 3
-DOT_RADIUS = 3
-TILE_RADIUS = 14
+STATIC = Path(__file__).resolve().parent.parent / "frontend" / "static"
+SVG = STATIC / "menagerist-icon.svg"
 SUPERSAMPLE = 8
 
 # "any" icons keep the rounded tile on a transparent background. The maskable icon
-# and the iOS icon are full-bleed squares, since the platform applies its own mask and
-# rounding; the mark sits well inside the 80% safe zone a maskable icon must keep clear.
+# and the iOS icon are full-bleed squares, since the platform applies its own mask
+# and rounding; the mark sits well inside the 80% safe zone a maskable icon must
+# keep clear.
 ICONS = [
     ("icon-192.png", 192, True),
     ("icon-512.png", 512, True),
@@ -32,30 +30,44 @@ ICONS = [
 ]
 
 
-def render(size: int, *, rounded: bool) -> Image.Image:
-    """Draw the mark on its tile at `size` pixels square."""
+def render(svg: ET.Element, size: int, *, rounded: bool) -> Image.Image:
+    """Draw the SVG's shapes at `size` pixels square."""
+    view = [float(n) for n in svg.attrib["viewBox"].split()]
     big = size * SUPERSAMPLE
-    unit = big / 64
+    unit = big / view[2]
     image = Image.new("RGBA", (big, big), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
 
-    radius = TILE_RADIUS * unit if rounded else 0
-    draw.rounded_rectangle((0, 0, big - 1, big - 1), radius=radius, fill=INK)
-
-    points = [(x * unit, y * unit) for x, y in POINTS]
-    draw.line(points, fill=WHITE, width=round(STROKE * unit))
-    # A dot at each vertex also gives the line round caps and joins.
-    for x, y in points:
-        r = DOT_RADIUS * unit
-        draw.ellipse((x - r, y - r, x + r, y + r), fill=WHITE)
+    for shape in svg:
+        kind = shape.tag.rpartition("}")[2]
+        attr = shape.attrib
+        if kind == "rect":
+            radius = float(attr["rx"]) * unit if rounded else 0
+            draw.rounded_rectangle(
+                (0, 0, big - 1, big - 1), radius=radius, fill=attr["fill"]
+            )
+        elif kind == "polyline":
+            points = [
+                tuple(float(n) * unit for n in pair.split(","))
+                for pair in attr["points"].split()
+            ]
+            colour = ImageColor.getrgb(attr["stroke"])
+            width = round(float(attr["stroke-width"]) * unit)
+            draw.line(points, fill=colour, width=width)
+        elif kind == "circle":
+            x, y, r = (float(attr[k]) * unit for k in ("cx", "cy", "r"))
+            draw.ellipse((x - r, y - r, x + r, y + r), fill=attr["fill"])
+        else:
+            raise ValueError(f"menagerist-icon.svg has an unsupported <{kind}>")
 
     return image.resize((size, size), Image.Resampling.LANCZOS)
 
 
 def main() -> None:
     """Write every icon."""
+    svg = ET.parse(SVG).getroot()
     for name, size, rounded in ICONS:
-        render(size, rounded=rounded).save(OUT / name)
+        render(svg, size, rounded=rounded).save(STATIC / name)
         print(f"{name} {size}x{size}")
 
 
