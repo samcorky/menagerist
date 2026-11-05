@@ -124,8 +124,10 @@ def _release(entry: Mapping[str, object], repository: RepositoryRef) -> Release 
         published_at = None
     # The link is rebuilt from the tag rather than trusted from the response, so a
     # release can only ever point at its own repository's page.
+    name = entry.get("name")
     return Release(
         version=tag,
+        title=name.strip() if isinstance(name, str) and name.strip() else tag,
         url=f"{repository.url}/releases/tag/{quote(tag, safe='')}",
         published_at=published_at,
         prerelease=entry.get("prerelease") is True,

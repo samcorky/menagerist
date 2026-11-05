@@ -98,6 +98,7 @@ class CheckForUpdates(
                 source=repository.slug,
                 channel=command.channel.value,
                 latest=None if latest is None else latest.version,
+                title=None if latest is None else latest.title,
             )
 
         async with self._uow as repos:

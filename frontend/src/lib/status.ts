@@ -146,7 +146,7 @@ export function safeNotesUrl(url: string | null | undefined): string | null {
  * How the Status page describes the last release check. An uncheckable build is never
  * reported as up to date, and a failed attempt keeps showing the last good answer.
  */
-export function releaseViewOf(release: ReleaseResponse): ReleaseView {
+export function releaseViewOf(release: ReleaseResponse, installed?: string | null): ReleaseView {
 	const latest = release.latest_version ?? null;
 	const channel = CHANNEL_LABELS[release.channel];
 	const failureNote = release.failure ? FAILURE_NOTES[release.failure] : null;
@@ -185,11 +185,16 @@ export function releaseViewOf(release: ReleaseResponse): ReleaseView {
 	}
 
 	const rows: ReleaseView['rows'] = [{ label: 'Channel', value: channel }];
+	if (installed) rows.push({ label: 'Installed', value: installed });
 	if (latest) {
 		rows.push({
 			label: 'Latest release',
 			value: release.prerelease ? `${latest} (prerelease)` : latest
 		});
+		// A release with no name of its own is titled with its tag, which adds nothing.
+		if (release.title && release.title !== latest) {
+			rows.push({ label: 'Title', value: release.title });
+		}
 	}
 	if (release.published_at) {
 		rows.push({ label: 'Published', value: release.published_at, time: true });

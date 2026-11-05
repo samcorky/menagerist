@@ -95,6 +95,8 @@ class Release:
     """A published release, as the source describes it."""
 
     version: str
+    # The release's own name; the source falls back to the tag when it has none.
+    title: str
     url: str
     published_at: datetime | None = None
     prerelease: bool = False

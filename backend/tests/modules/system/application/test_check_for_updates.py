@@ -59,6 +59,7 @@ def release(version: str, *, prerelease: bool = False) -> Release:
     """Release."""
     return Release(
         version=version,
+        title=f"Release {version}",
         url=f"https://github.com/o/r/releases/tag/{version}",
         prerelease=prerelease,
     )

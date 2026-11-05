@@ -497,7 +497,9 @@ def test_version_detail_omits_release_when_the_build_names_no_repository() -> No
 def test_check_now_stores_a_result_the_detail_then_reports() -> None:
     """POST checks and stores; the next GET shows the newer release."""
     newer = Release(
-        version="0.2026.11.0", url="https://github.com/o/r/releases/tag/0.2026.11.0"
+        version="0.2026.11.0",
+        title="Spring clean",
+        url="https://github.com/o/r/releases/tag/0.2026.11.0",
     )
     app, _, provider = _app_with_updates(releases=[newer])
     client = TestClient(app)
@@ -510,6 +512,7 @@ def test_check_now_stores_a_result_the_detail_then_reports() -> None:
     release = data["release"]
     assert release["status"] == "update_available"
     assert release["latest_version"] == "0.2026.11.0"
+    assert release["title"] == "Spring clean"
     assert release["url"] == "https://github.com/o/r/releases/tag/0.2026.11.0"
     assert release["checked_at"] is not None
     assert "failure" not in release
