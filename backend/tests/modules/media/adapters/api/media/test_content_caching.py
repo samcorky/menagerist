@@ -38,7 +38,7 @@ def test_content_cache_headers() -> None:
     """content_cache_headers gives a private, revalidating ETag and Last-Modified."""
     asset = _dummy_asset()
     headers = content_cache_headers(asset)
-    assert headers["ETag"] == '"abcdef1234567890"'
+    assert headers["ETag"].startswith('"abcdef1234567890-')
     assert headers["Cache-Control"] == "private, no-cache"
     assert headers["Last-Modified"] == http_date(asset.created_at)
 
@@ -49,7 +49,7 @@ def test_check_content_not_modified_if_none_match() -> None:
 
     # Exact ETag match
     req = MagicMock(spec=Request)
-    req.headers = {"If-None-Match": '"abcdef1234567890"'}
+    req.headers = {"If-None-Match": content_cache_headers(asset)["ETag"]}
     res = check_content_not_modified(req, asset)
     assert res is not None
     assert res.status_code == 304
@@ -112,3 +112,33 @@ def test_regenerated_thumbnail_gets_a_new_etag() -> None:
 
     assert check_thumbnail_not_modified(req, stale) is not None
     assert check_thumbnail_not_modified(req, regenerated) is None
+
+
+def test_renaming_the_file_gives_a_new_content_etag() -> None:
+    """A client that cached the old name is sent the file again, not a bare 304.
+
+    A 304 has no `Content-Disposition`, so it would leave the old download
+    filename in the browser's cache.
+    """
+    asset = _dummy_asset()
+    req = MagicMock(spec=Request)
+    req.headers = {"If-None-Match": content_cache_headers(asset)["ETag"]}
+    assert check_content_not_modified(req, asset) is not None
+
+    asset.rename("holiday")
+
+    assert content_cache_headers(asset)["ETag"] != req.headers["If-None-Match"]
+    assert check_content_not_modified(req, asset) is None
+
+
+def test_if_none_match_takes_precedence_over_if_modified_since() -> None:
+    """A changed ETag is not overridden by a date that still looks unmodified."""
+    dt = datetime(2026, 9, 10, 12, 0, 0, tzinfo=UTC)
+    asset = _dummy_asset(created_at=dt)
+    req = MagicMock(spec=Request)
+    req.headers = {
+        "If-None-Match": '"some-other-validator"',
+        "If-Modified-Since": http_date(dt),
+    }
+
+    assert check_content_not_modified(req, asset) is None

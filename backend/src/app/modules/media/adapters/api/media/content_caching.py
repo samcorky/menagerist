@@ -1,3 +1,4 @@
+import hashlib
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -19,6 +20,17 @@ def _cache_headers(*, etag_hash: str, last_modified: datetime) -> dict[str, str]
     }
 
 
+def _content_etag_hash(asset: MediaAsset) -> str:
+    """The original's hash plus a short digest of its filename.
+
+    A 304 carries no `Content-Disposition`, so a client revalidating after a
+    rename would keep the filename it cached. The file name is part of the
+    validator for that reason.
+    """
+    name = hashlib.sha256(asset.filename.encode()).hexdigest()[:8]
+    return f"{asset.sha256}-{name}"
+
+
 def _check_not_modified(
     request: Request, *, etag_hash: str, last_modified: datetime
 ) -> Response | None:
@@ -26,8 +38,12 @@ def _check_not_modified(
     etag = headers["ETag"]
 
     if_none_match = request.headers.get("If-None-Match")
-    if if_none_match and (if_none_match == etag or if_none_match == "*"):
-        return Response(status_code=304, headers=headers)
+    if if_none_match:
+        # With an ETag the client sent, a date it also sent is not consulted
+        # (RFC 9110 section 13.1.3), so a changed ETag cannot end in a 304.
+        if if_none_match == etag or if_none_match == "*":
+            return Response(status_code=304, headers=headers)
+        return None
 
     if_modified_since = request.headers.get("If-Modified-Since")
     if if_modified_since:
@@ -46,17 +62,21 @@ def content_cache_headers(asset: MediaAsset) -> dict[str, str]:
     Never public or long-lived: every response must pass the ownership check,
     and the ETag only saves the transfer once it has.
 
-    Deliberately keyed on ``sha256`` + ``created_at`` rather than the
+    Deliberately keyed on ``sha256``, the filename and ``created_at`` rather than the
     shared_kernel ``etag_from_entity()`` pattern (``id`` + ``updated_at``):
     every lifecycle transition (stage -> attach -> orphan) calls ``touch()``
     and bumps ``updated_at`` even though the underlying bytes never change,
     which would false-invalidate the cache on every move. The hash is stable
     across the entire lifecycle, so revalidation almost always ends in a 304.
+    A rename changes the ETag, so the next request is a full 200 that carries
+    the new ``Content-Disposition`` filename.
 
     Covers only the original file's bytes - see ``thumbnail_cache_headers``
     for the derived thumbnail, which is keyed on its own hash.
     """
-    return _cache_headers(etag_hash=asset.sha256, last_modified=asset.created_at)
+    return _cache_headers(
+        etag_hash=_content_etag_hash(asset), last_modified=asset.created_at
+    )
 
 
 def check_content_not_modified(request: Request, asset: MediaAsset) -> Response | None:
@@ -74,7 +94,7 @@ def check_content_not_modified(request: Request, asset: MediaAsset) -> Response 
     304 branch.
     """
     return _check_not_modified(
-        request, etag_hash=asset.sha256, last_modified=asset.created_at
+        request, etag_hash=_content_etag_hash(asset), last_modified=asset.created_at
     )
 
 

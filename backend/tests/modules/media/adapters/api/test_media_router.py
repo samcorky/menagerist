@@ -252,6 +252,30 @@ def test_stream_content_returns_bytes() -> None:
     assert cached_resp.status_code == 304
 
 
+def test_a_renamed_file_is_sent_again_with_its_new_filename() -> None:
+    """A browser holding the old copy gets a 200 with the new name, not a 304."""
+    app, _, _ = _app_with_in_memory_media()
+    client = TestClient(app)
+    stage = client.post(
+        "/api/v1/media",
+        files={"file": ("cover.jpg", TINY_JPEG, "image/jpeg")},
+    ).json()
+    url = f"/api/v1/media/{stage['id']}/content"
+    first = client.get(url)
+    revalidate = {
+        "If-None-Match": first.headers["etag"],
+        "If-Modified-Since": first.headers["last-modified"],
+    }
+    assert client.get(url, headers=revalidate).status_code == 304
+
+    client.patch(f"/api/v1/media/{stage['id']}", json={"filename": "front page"})
+    after = client.get(url, headers=revalidate)
+
+    assert after.status_code == 200
+    assert after.headers["content-disposition"] == 'inline; filename="front page.jpg"'
+    assert after.headers["etag"] != first.headers["etag"]
+
+
 def test_uploads_and_thumbnails_are_rate_limited(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
