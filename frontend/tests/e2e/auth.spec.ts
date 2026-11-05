@@ -67,6 +67,44 @@ test.beforeAll(async ({ playwright }, testInfo) => {
 	);
 });
 
+// Changes nothing, so it can run before the setup that the later tests build on. Setup is a
+// one-off, which is why a phone check of it has to live in this file.
+test('the setup page and its restore view fit a phone without zooming', async ({ page }) => {
+	for (const size of [
+		{ width: 360, height: 740 },
+		{ width: 320, height: 640 }
+	]) {
+		await page.setViewportSize(size);
+		await page.goto('/setup');
+		await expect(page.getByRole('heading', { name: 'Welcome to Menagerist' })).toBeVisible();
+		await page.waitForLoadState('networkidle');
+		await expectFitsAndReadable(page, size.width, 'setup');
+
+		await page.getByRole('button', { name: 'Restore from backup instead' }).click();
+		await expect(page.getByRole('heading', { name: 'Restore from backup' })).toBeVisible();
+		await expectFitsAndReadable(page, size.width, 'restore');
+	}
+});
+
+/** No sideways scroll, and no text field under 16px (iOS Safari zooms in on those). */
+async function expectFitsAndReadable(page: Page, width: number, view: string) {
+	const m = await page.evaluate(() => ({
+		inner: window.innerWidth,
+		scroll: document.documentElement.scrollWidth,
+		small: [...document.querySelectorAll<HTMLInputElement>('input, textarea, select')]
+			.filter(
+				(el) =>
+					!['checkbox', 'radio', 'hidden', 'file'].includes(el.type) &&
+					el.getClientRects().length > 0 &&
+					parseFloat(getComputedStyle(el).fontSize) < 16
+			)
+			.map((el) => `${el.tagName.toLowerCase()}[${el.type}] ${el.name || el.id}`)
+	}));
+	expect(m.inner, `${view} at ${width}: page zoomed out to fit`).toBeLessThanOrEqual(width);
+	expect(m.scroll, `${view} at ${width}: page scrolls sideways`).toBeLessThanOrEqual(width);
+	expect(m.small, `${view} at ${width}: controls under 16px`).toEqual([]);
+}
+
 test('first visit goes to setup, creates the administrator and signs them in', async ({ page }) => {
 	await page.goto('/items');
 	await expect(page).toHaveURL(/\/setup$/);
