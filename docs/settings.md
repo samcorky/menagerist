@@ -38,7 +38,12 @@ Database connection settings.
 
 | Variable | Type | Default | Allowed values | Notes |
 | --- | --- | --- | --- | --- |
-| `MENAGERIST_DATABASE_URL` | database URL | `postgresql+asyncpg://menagerist:***@localhost:5432/menagerist` | any | PostgreSQL connection URL for the backend database. Sensitive: best given as a secrets file. |
+| `MENAGERIST_DATABASE_URL` | database URL | `postgresql+asyncpg://menagerist:***@localhost:5432/menagerist` | any | PostgreSQL connection URL for the backend database. When set, it replaces the host, port, user, password and name settings; use it for query options such as TLS mode. Sensitive: best given as a secrets file. |
+| `MENAGERIST_DATABASE_HOST` | text | `localhost` | any | Database server host name or address. |
+| `MENAGERIST_DATABASE_PORT` | whole number | `5432` | 1 to 65535 | Database server port. |
+| `MENAGERIST_DATABASE_USER` | text | `menagerist` | any | Database user to connect as. |
+| `MENAGERIST_DATABASE_PASSWORD` | secret | none (sensitive) | any | Database password; any characters, no URL encoding. Sensitive: best given as a secrets file. |
+| `MENAGERIST_DATABASE_NAME` | text | `menagerist` | any | Name of the database to use. |
 
 ## Identity
 
@@ -150,6 +155,7 @@ Read by Docker Compose from `.env` when it starts the stack, not by Menagerist. 
 | Variable | Type | Default | Allowed values | Notes |
 | --- | --- | --- | --- | --- |
 | `MENAGERIST_IMAGE` | text | `ghcr.io/samcorky/menagerist:latest` | any | Image the app and worker run. Set a version tag to pin a release or to roll back (see docs/DEPLOYING.md). The development override (compose.override.yml) defaults it to `menagerist:local`. |
+| `POSTGRES_PASSWORD` | text | `menagerist` | any | The database password, given once: the database container is created with it and the app and worker connect with it. Change it before the first start, as an existing database keeps the password it was created with. |
 | `POSTGRES_MEM_LIMIT` | text | `512m` | any | The database container's hard memory cap (Postgres has no limit of its own). Raise it together with the memory values below if the database is large. |
 | `POSTGRES_SHARED_BUFFERS` | text | `128MB` | any | Postgres `shared_buffers` (its own default is 128MB). About a quarter of the memory cap; the most useful one to raise on a bigger machine. |
 | `POSTGRES_EFFECTIVE_CACHE_SIZE` | text | `256MB` | any | Postgres `effective_cache_size` (its own default is 4GB), a planner hint for how much data the OS can cache. Keep it near half the memory cap so the planner is not too optimistic. |

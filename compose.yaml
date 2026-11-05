@@ -19,7 +19,8 @@ x-app: &app
     - path: .env
       required: false
   environment:
-    MENAGERIST_DATABASE_URL: postgresql+asyncpg://menagerist:menagerist@postgres:5432/menagerist
+    MENAGERIST_DATABASE_HOST: postgres
+    MENAGERIST_DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-menagerist}
   volumes:
     - media-data:/data/media
     - ./backups:/data/backups
@@ -64,7 +65,7 @@ services:
       - /run/postgresql:mode=1777,size=16M,noexec,nosuid,nodev
     environment:
       POSTGRES_USER: menagerist
-      POSTGRES_PASSWORD: menagerist
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-menagerist}
       POSTGRES_DB: menagerist
       POSTGRES_INITDB_ARGS: -c log_connections=on -c log_disconnections=on
     volumes:
