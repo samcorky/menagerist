@@ -7,7 +7,8 @@ from pydantic import ValidationError
 from sqlalchemy.engine import make_url
 from structlog.testing import capture_logs
 
-from app.platform.config import DatabaseSettings
+from app.platform.alembic_runner import build_config
+from app.platform.config import DatabaseSettings, get_database_settings
 from app.platform.config.dsn import mask_dsn
 
 if TYPE_CHECKING:
@@ -116,3 +117,24 @@ def test_no_warning_without_both_forms(settings: Callable[[], object]) -> None:
     with capture_logs() as logs:
         settings()
     assert logs == []
+
+
+def test_alembic_config_keeps_an_encoded_password_literal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ConfigParser reads `%` as interpolation, so the URL is escaped for it."""
+    monkeypatch.setenv("MENAGERIST_DATABASE_PASSWORD", TRICKY)
+    get_database_settings.cache_clear()
+    try:
+        url = build_config().get_main_option("sqlalchemy.url")
+        assert url == str(get_database_settings().url)
+        assert make_url(str(url)).password == TRICKY
+    finally:
+        get_database_settings.cache_clear()
+
+
+def test_invalid_part_error_does_not_echo_the_password() -> None:
+    """A part the URL refuses is reported without the URL it was composed into."""
+    with pytest.raises(ValidationError) as caught:
+        DatabaseSettings(host="bad host", password=TRICKY)
+    assert TRICKY not in str(caught.value)

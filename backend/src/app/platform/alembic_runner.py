@@ -15,11 +15,20 @@ if TYPE_CHECKING:
 _MIGRATIONS_PATH = Path(__file__).resolve().parent.parent / "alembic"
 
 
+def set_database_url(config: Config) -> None:
+    """Point `config` at the database, escaping `%` so ConfigParser keeps it literal.
+
+    A percent-encoded password (`%40` for `@`) would otherwise read as interpolation.
+    """
+    url = str(get_database_settings().url).replace("%", "%%")
+    config.set_main_option("sqlalchemy.url", url)
+
+
 def build_config() -> Config:
     """Build an Alembic Config pointed at backend migrations and database."""
     config = Config()
     config.set_main_option("script_location", str(_MIGRATIONS_PATH))
-    config.set_main_option("sqlalchemy.url", str(get_database_settings().url))
+    set_database_url(config)
     return config
 
 

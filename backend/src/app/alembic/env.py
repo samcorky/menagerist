@@ -17,7 +17,7 @@ from app.modules.presets.adapters.persistence import models as preset_models  # 
 from app.modules.scheduling.adapters.persistence import models as scheduling_models  # noqa: F401
 from app.modules.settings.adapters.persistence import models as settings_models  # noqa: F401
 from app.modules.system.adapters.persistence import models as system_models  # noqa: F401
-from app.platform.config import get_database_settings
+from app.platform.alembic_runner import set_database_url
 from app.platform.database import Base
 
 # this is the Alembic Config object, which provides access to values within
@@ -27,7 +27,7 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", str(get_database_settings().url))
+set_database_url(config)
 
 # `graph_models`/`media_models` above register their tables on `Base.metadata`
 # before autogenerate runs - every future module's persistence models get the
