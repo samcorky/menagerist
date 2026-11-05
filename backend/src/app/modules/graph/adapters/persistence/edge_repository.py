@@ -245,6 +245,11 @@ class SqlAlchemyEdgeRepository:
         )
         return (await self._session.execute(stmt)).scalar_one()
 
+    async def has_any_of_type(self, type_slug: str) -> bool:
+        """Return whether any connection, live or soft-deleted, has `type_slug`."""
+        stmt = select(exists().where(EdgeModel.type == type_slug))
+        return bool((await self._session.execute(stmt)).scalar())
+
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
     ) -> int:

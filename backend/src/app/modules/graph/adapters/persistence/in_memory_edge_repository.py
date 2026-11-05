@@ -178,6 +178,10 @@ class InMemoryEdgeRepository:
             key=lambda row: (row.deleted_at, row.id),
         )
 
+    async def has_any_of_type(self, type_slug: str) -> bool:
+        """Return whether any connection, live or soft-deleted, has `type_slug`."""
+        return any(edge.type == type_slug for edge in self._edges.values())
+
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
     ) -> int:

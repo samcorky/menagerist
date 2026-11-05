@@ -1,7 +1,9 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import builtins
     import uuid
+    from datetime import datetime
 
     from app.modules.presets.domain.preset import Preset
 
@@ -48,3 +50,23 @@ class InMemoryPresetRepository:
             needle = q.casefold()
             ordered = [p for p in ordered if needle in p.label.casefold()]
         return ordered[:limit]
+
+    async def list_deleted_before(
+        self, cutoff: datetime, *, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[Preset]:
+        """List rows soft-deleted before `cutoff`, ordered by id after `after`."""
+        ordered = sorted(
+            (
+                p
+                for p in self._presets.values()
+                if p.deleted_at is not None and p.deleted_at < cutoff
+            ),
+            key=lambda p: p.id,
+        )
+        if after is not None:
+            ordered = [p for p in ordered if p.id > after]
+        return ordered[:limit]
+
+    async def purge(self, preset_id: uuid.UUID) -> None:
+        """Hard-delete the row, live or soft-deleted; an unknown id is a no-op."""
+        self._presets.pop(preset_id, None)

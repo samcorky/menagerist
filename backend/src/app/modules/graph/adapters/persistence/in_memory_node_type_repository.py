@@ -1,7 +1,9 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import builtins
     import uuid
+    from datetime import datetime
 
     from app.modules.graph.domain.node_type import NodeType
 
@@ -53,3 +55,23 @@ class InMemoryNodeTypeRepository:
         if after is not None:
             ordered = [nt for nt in ordered if nt.id > after]
         return ordered[:limit]
+
+    async def list_deleted_before(
+        self, cutoff: datetime, *, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[NodeType]:
+        """List rows soft-deleted before `cutoff`, ordered by id after `after`."""
+        ordered = sorted(
+            (
+                nt
+                for nt in self._node_types.values()
+                if nt.deleted_at is not None and nt.deleted_at < cutoff
+            ),
+            key=lambda nt: nt.id,
+        )
+        if after is not None:
+            ordered = [nt for nt in ordered if nt.id > after]
+        return ordered[:limit]
+
+    async def purge(self, node_type_id: uuid.UUID) -> None:
+        """Hard-delete the row, live or soft-deleted; an unknown id is a no-op."""
+        self._node_types.pop(node_type_id, None)

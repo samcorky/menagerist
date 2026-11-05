@@ -1,14 +1,16 @@
 from typing import TYPE_CHECKING
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.modules.graph.adapters.persistence.models import NodeTypeModel
 from app.modules.graph.domain.node_type import NodeType
 from app.shared_kernel.slug import Slug
 
 if TYPE_CHECKING:
+    import builtins
     import uuid
+    from datetime import datetime
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -117,3 +119,25 @@ class SqlAlchemyNodeTypeRepository:
             stmt = stmt.where(NodeTypeModel.id > after)
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
+
+    async def list_deleted_before(
+        self, cutoff: datetime, *, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[NodeType]:
+        """List item types soft-deleted before `cutoff`, ordered by id after `after`."""
+        stmt = (
+            select(NodeTypeModel)
+            .where(NodeTypeModel.deleted_at < cutoff)
+            .order_by(NodeTypeModel.id)
+            .limit(limit)
+        )
+        if after is not None:
+            stmt = stmt.where(NodeTypeModel.id > after)
+        result = await self._session.execute(stmt)
+        return [_to_domain(model) for model in result.scalars()]
+
+    async def purge(self, node_type_id: uuid.UUID) -> None:
+        """Hard-delete the row, live or soft-deleted; an unknown id is a no-op."""
+        await self._session.execute(
+            delete(NodeTypeModel).where(NodeTypeModel.id == node_type_id)
+        )
+        await self._session.flush()
