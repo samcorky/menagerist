@@ -630,6 +630,11 @@ class SqlAlchemyNodeRepository:
         )
         return (await self._session.execute(stmt)).scalar_one()
 
+    async def has_any_of_type(self, type_slug: str) -> bool:
+        """Return whether any item, live or soft-deleted, has `type_slug`."""
+        stmt = select(NodeModel.id).where(NodeModel.type == type_slug).limit(1)
+        return (await self._session.execute(stmt)).first() is not None
+
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
     ) -> int:
