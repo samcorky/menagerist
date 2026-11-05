@@ -130,6 +130,16 @@
       "enabled": false
     },
     {
+      "description": "The proxy harness images float on purpose: it exists to notice when a new nginx, Caddy or Traefik release changes how an early upload reply is relayed, so a digest pin would freeze it and add a weekly digest pull request for test-only images",
+      "matchManagers": [
+        "docker-compose"
+      ],
+      "matchFileNames": [
+        "compose.proxy.yaml"
+      ],
+      "pinDigests": false
+    },
+    {
       "description": "One Postgres bump updates compose.yaml and backend/tests/conftest.py together. No digest pin: the CI image cache is keyed on the compose.yaml name and the tests ask for the tag",
       "matchDatasources": [
         "docker"
