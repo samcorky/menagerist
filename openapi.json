@@ -26559,6 +26559,18 @@
             "title": "Latest Version",
             "description": "Newest release on the channel, when one was found."
           },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "That release's title, or its tag when it has none."
+          },
           "url": {
             "anyOf": [
               {
