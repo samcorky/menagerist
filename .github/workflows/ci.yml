@@ -504,8 +504,7 @@ jobs:
   image-size-comment:
     name: Comment the image size on the pull request
     # Compares the image the build job just measured with the published edge image, which
-    # is main's latest build. One comment, updated by later pushes; a change too small to
-    # matter posts nothing unless a comment already exists to correct. A fork pull
+    # is main's latest build. One comment, updated by later pushes. A fork pull
     # request has a read-only token, so it gets the job summary instead. Not part of
     # ci-passed: a missing comment should not fail a pull request.
     needs: build
@@ -539,21 +538,34 @@ jobs:
           fi
 
       - name: Build the comment
-        id: comment
         run: >-
           python3 scripts/image_size_comment.py image-size/image-size.json
           --base "$RUNNER_TEMP/edge-size.json"
           --output "$RUNNER_TEMP/image-size-comment.md"
 
-      - name: Show the comment in the job summary
-        run: cat "$RUNNER_TEMP/image-size-comment.md" >> "$GITHUB_STEP_SUMMARY"
+      # The raw measurements go in the log and, under the table, the summary, so a
+      # figure that looks wrong can be checked.
+      - name: Show the comment and the measurements
+        run: |
+          echo "pull request: $(cat image-size/image-size.json)"
+          echo "edge: $(cat "$RUNNER_TEMP/edge-size.json" 2>/dev/null || echo 'not measured')"
+          {
+            cat "$RUNNER_TEMP/image-size-comment.md"
+            echo
+            echo '<details><summary>Measurements (bytes)</summary>'
+            echo
+            echo '```json'
+            echo "{\"pull_request\": $(cat image-size/image-size.json),"
+            echo " \"edge\": $(cat "$RUNNER_TEMP/edge-size.json" 2>/dev/null || echo null)}"
+            echo '```'
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Post or update the comment
         if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          MEANINGFUL: ${{ steps.comment.outputs.meaningful }}
         run: |
           marker='<!-- image-size -->'
           existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
@@ -561,7 +573,7 @@ jobs:
           if [ -n "$existing" ]; then
             gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
               -F body=@"$RUNNER_TEMP/image-size-comment.md"
-          elif [ "$MEANINGFUL" = "true" ]; then
+          else
             gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
               -F body=@"$RUNNER_TEMP/image-size-comment.md"
           fi
