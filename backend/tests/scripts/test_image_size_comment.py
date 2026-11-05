@@ -41,7 +41,6 @@ def test_a_growth_shows_before_after_and_difference() -> None:
     assert "`main` (`abcdef1`)" in body
     assert "| Compressed | 100.00 MB | 110.00 MB | +10.00 MB (+10.0%) |" in body
     assert "| Uncompressed | 300.00 MB | 320.00 MB | +20.00 MB (+6.7%) |" in body
-    assert "No meaningful change" not in body
 
 
 def test_a_shrink_is_signed_negative() -> None:
@@ -79,52 +78,29 @@ def test_no_base_shows_the_new_size_alone() -> None:
     assert "Change" not in body
 
 
-def test_a_tiny_change_is_not_meaningful() -> None:
-    """Under half a percent in both figures is noise."""
-    current = {"compressed": 100 * MB + 1000, "uncompressed": 300 * MB - 1000}
-
-    assert not comment.is_meaningful(current, BASE)
-    assert "No meaningful change." in comment.build_comment(current, BASE)
-
-
-def test_either_figure_moving_is_meaningful() -> None:
-    """A move in just the uncompressed size still counts."""
-    assert comment.is_meaningful(_sizes(100, 310), BASE)
-    assert comment.is_meaningful(_sizes(101, 300), BASE)
-
-
-def test_no_base_is_meaningful() -> None:
-    """The first sizes are worth showing once."""
-    assert comment.is_meaningful(_sizes(100, 300), None)
-
-
-def test_main_writes_the_comment_and_the_flag(
+def test_main_writes_the_comment(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The workflow reads the output file and the ``meaningful`` step output."""
+    """The workflow posts the output file."""
     current = tmp_path / "current.json"
     current.write_text(json.dumps(_sizes(110, 320)), encoding="utf-8")
     base = tmp_path / "base.json"
     base.write_text(json.dumps(BASE), encoding="utf-8")
     out = tmp_path / "out.md"
-    github_output = tmp_path / "github_output"
-    monkeypatch.setenv("GITHUB_OUTPUT", str(github_output))
     argv = ["image_size_comment.py", str(current), "--base", str(base)]
     monkeypatch.setattr(sys, "argv", [*argv, "--output", str(out)])
 
     assert comment.main() == 0
     assert "+10.00 MB" in out.read_text(encoding="utf-8")
-    assert github_output.read_text(encoding="utf-8") == "meaningful=true\n"
 
 
-def test_main_copes_with_a_missing_base_and_no_output_file(
+def test_main_copes_with_a_missing_base(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A base that was never cached is the no-baseline case, not an error."""
     current = tmp_path / "current.json"
     current.write_text(json.dumps(_sizes(110, 320)), encoding="utf-8")
     out = tmp_path / "out.md"
-    monkeypatch.delenv("GITHUB_OUTPUT", raising=False)
     gone = tmp_path / "gone.json"
     argv = ["image_size_comment.py", str(current), "--base", str(gone)]
     monkeypatch.setattr(sys, "argv", [*argv, "--output", str(out)])
