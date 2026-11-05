@@ -57,13 +57,13 @@
 		{/if}
 		<div>
 			{#each view.rows as row (row.label)}
-				<div class="flex items-center justify-between gap-4 border-t border-border/80 px-5 py-3">
+				<div class="flex items-start justify-between gap-4 border-t border-border/80 px-5 py-3">
 					<span class="text-sm text-muted-foreground">{row.label}</span>
 					{#if row.time}
 						{@const when = formatDateTime(row.value)}
 						<span class="text-right text-sm" title={when.utc}>{when.local}</span>
 					{:else}
-						<span class="max-w-[60%] truncate text-right font-mono text-sm">{row.value}</span>
+						<span class="max-w-[60%] text-right font-mono text-sm break-words">{row.value}</span>
 					{/if}
 				</div>
 			{/each}
