@@ -67,6 +67,9 @@ def purge_deleted(
         items=result.items,
         connections=result.connections,
         collections=result.collections,
+        item_types=result.item_types,
+        relationship_types=result.relationship_types,
+        presets=result.presets,
     )
     return Report(
         value={
@@ -78,6 +81,9 @@ def purge_deleted(
             "items": result.items,
             "connections": result.connections,
             "collections": result.collections,
+            "item_types": result.item_types,
+            "relationship_types": result.relationship_types,
+            "presets": result.presets,
         },
         title="Deleted-content purge",
     )

@@ -1,7 +1,9 @@
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
+    import builtins
     import uuid
+    from datetime import datetime
 
     from app.modules.graph.domain.node_type import NodeType
 
@@ -38,4 +40,17 @@ class NodeTypeRepository(Protocol):
 
     async def list(self, *, after: uuid.UUID | None, limit: int) -> list[NodeType]:
         """List non-deleted node types ordered by id, starting after `after`."""
+        ...
+
+    async def list_deleted_before(
+        self, cutoff: datetime, *, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[NodeType]:
+        """List item types soft-deleted before `cutoff`, ordered by id after `after`.
+
+        System-level, for the retention purge.
+        """
+        ...
+
+    async def purge(self, node_type_id: uuid.UUID) -> None:
+        """Hard-delete the row, live or soft-deleted; an unknown id is a no-op."""
         ...

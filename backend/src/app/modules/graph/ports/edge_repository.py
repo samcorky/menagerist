@@ -101,6 +101,13 @@ class EdgeRepository(Protocol):
         """Return how many connections were soft-deleted before `cutoff`, any owner."""
         ...
 
+    async def has_any_of_type(self, type_slug: str) -> bool:
+        """Return whether any connection, live or soft-deleted, has `type_slug`.
+
+        System-level and unscoped, for the retention purge of relationship types.
+        """
+        ...
+
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
     ) -> int:

@@ -86,8 +86,10 @@ _ADD = "persists a new entity; the use case stamps the owner"
 _SAVE = "persists an entity already fetched through a scoped read"
 _RETENTION = "system-only retention purge reads every owner's rows by age"
 _PURGE = "system-only hard delete by id; the System use case reads no content"
+_TYPE_IN_USE = "system-only check that any row, whoever owns it, still has the type"
 NO_SCOPE_NEEDED: dict[type, dict[str, str]] = {
     NodeRepository: {
+        "has_any_of_type": _TYPE_IN_USE,
         "add": _ADD,
         "save": _SAVE,
         "claim_orphaned": _CLAIM,
@@ -96,6 +98,7 @@ NO_SCOPE_NEEDED: dict[type, dict[str, str]] = {
         "count_deleted_before": _RETENTION,
     },
     EdgeRepository: {
+        "has_any_of_type": _TYPE_IN_USE,
         "add": _ADD,
         "save": _SAVE,
         "claim_orphaned": _CLAIM,
@@ -249,6 +252,7 @@ UNSCOPED_USE_CASES = {
     # System-actor retention purge, run from the data CLI: sweeps all owners by age.
     "PurgeExpiredNodes": "system retention purge",
     "PurgeExpiredCollections": "system retention purge",
+    "PurgeExpiredTypes": "system retention purge of types, which hold no content",
     "PurgeItemMemberships": "system purge",
     "PurgeAttachment": "system purge",
 }
