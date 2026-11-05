@@ -1,7 +1,9 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import builtins
     import uuid
+    from datetime import datetime
 
     from app.modules.graph.domain.edge_type import EdgeType
 
@@ -47,3 +49,23 @@ class InMemoryEdgeTypeRepository:
         if after is not None:
             ordered = [et for et in ordered if et.id > after]
         return ordered[:limit]
+
+    async def list_deleted_before(
+        self, cutoff: datetime, *, after: uuid.UUID | None, limit: int
+    ) -> builtins.list[EdgeType]:
+        """List rows soft-deleted before `cutoff`, ordered by id after `after`."""
+        ordered = sorted(
+            (
+                et
+                for et in self._edge_types.values()
+                if et.deleted_at is not None and et.deleted_at < cutoff
+            ),
+            key=lambda et: et.id,
+        )
+        if after is not None:
+            ordered = [et for et in ordered if et.id > after]
+        return ordered[:limit]
+
+    async def purge(self, edge_type_id: uuid.UUID) -> None:
+        """Hard-delete the row, live or soft-deleted; an unknown id is a no-op."""
+        self._edge_types.pop(edge_type_id, None)

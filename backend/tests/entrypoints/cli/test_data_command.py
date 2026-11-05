@@ -29,7 +29,14 @@ class _Purge:
         await asyncio.sleep(0)
         self.commands.append(command)
         self.actors.append(actor)
-        return PurgeDeletedContentResult(items=3, connections=5, collections=1)
+        return PurgeDeletedContentResult(
+            items=3,
+            connections=5,
+            collections=1,
+            item_types=2,
+            relationship_types=1,
+            presets=4,
+        )
 
 
 @pytest.fixture
@@ -67,6 +74,9 @@ def test_uses_the_configured_retention_and_reports_the_counts(purge: _Purge) -> 
         "items": 3,
         "connections": 5,
         "collections": 1,
+        "item_types": 2,
+        "relationship_types": 1,
+        "presets": 4,
     }
 
 

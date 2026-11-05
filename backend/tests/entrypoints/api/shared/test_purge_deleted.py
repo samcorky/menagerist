@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.bridges.item_dependents import ItemDependentsPurger
+from app.entrypoints.api.shared.bridges.preset_usage import GraphPresetUsage
 from app.entrypoints.api.shared.purge_deleted import (
     PurgeDeletedContent,
     PurgeDeletedContentCommand,
@@ -31,8 +32,11 @@ from app.modules.graph.adapters.persistence.unit_of_work import (
     create_in_memory_graph_uow,
 )
 from app.modules.graph.application.purge_expired_nodes import PurgeExpiredNodes
+from app.modules.graph.application.purge_expired_types import PurgeExpiredTypes
 from app.modules.graph.domain.edge import Edge
+from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.node import Node
+from app.modules.graph.domain.node_type import NodeType
 from app.modules.media.adapters.persistence.unit_of_work import (
     create_in_memory_media_uow,
     make_in_memory_repos,
@@ -42,6 +46,15 @@ from app.modules.media.adapters.storage.in_memory_media_storage import (
 )
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
 from app.modules.media.domain.media_attachment import MediaAttachment
+from app.modules.presets.adapters.persistence.in_memory_preset_repository import (
+    InMemoryPresetRepository,
+)
+from app.modules.presets.adapters.persistence.unit_of_work import (
+    create_in_memory_preset_uow,
+)
+from app.modules.presets.application.purge_expired_presets import PurgeExpiredPresets
+from app.modules.presets.domain.preset import Preset
+from app.modules.presets.ports.unit_of_work import PresetRepos
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.slug import Slug
@@ -68,6 +81,7 @@ class _World:
         self.collections = InMemoryCollectionRepository()
         self.members = InMemoryMembershipRepository(self.collections)
         self.media = make_in_memory_repos()
+        self.presets = PresetRepos(presets=InMemoryPresetRepository())
         self.storage = InMemoryMediaStorage()
         collections_repos = CollectionsRepos(
             collections=self.collections, memberships=self.members
@@ -89,6 +103,12 @@ class _World:
             PurgeExpiredNodes(create_in_memory_graph_uow(self.graph), guard, purger),
             PurgeExpiredCollections(
                 create_in_memory_collections_uow(collections_repos), guard
+            ),
+            PurgeExpiredTypes(create_in_memory_graph_uow(self.graph), guard),
+            PurgeExpiredPresets(
+                create_in_memory_preset_uow(self.presets),
+                guard,
+                GraphPresetUsage(self.graph),
             ),
         )
 
@@ -216,3 +236,32 @@ async def test_a_second_run_is_a_no_op() -> None:
     assert await w.run() == PurgeDeletedContentResult(
         items=0, connections=0, collections=0
     )
+
+
+async def test_types_and_presets_follow_the_items_that_carried_them() -> None:
+    """An uninstalled pack's types and presets go once their items have."""
+    w = _World()
+    book_type = NodeType.create(slug="book", label="Book")
+    book_type.deleted_at = LONG_AGO
+    await w.graph.node_types.add(book_type)
+    link_type = EdgeType.create(slug="cites", label="Cites")
+    link_type.deleted_at = LONG_AGO
+    await w.graph.edge_types.add(link_type)
+    kept_type = NodeType.create(slug="film", label="Film")
+    kept_type.deleted_at = LONG_AGO
+    await w.graph.node_types.add(kept_type)
+    preset = Preset.create(kind="choice_list", label="Genres", definition={})
+    preset.deleted_at = LONG_AGO
+    await w.presets.presets.add(preset)
+    # The expired item carries "book" and goes in the same run; a live one keeps "film".
+    old = Node.create(owner_id=ALICE, name="Old", type="book")
+    old.deleted_at = LONG_AGO
+    await w.graph.nodes.add(old)
+    await w.graph.nodes.add(Node.create(owner_id=ALICE, name="Live", type="film"))
+
+    result = await w.run()
+
+    assert (result.item_types, result.relationship_types, result.presets) == (1, 1, 1)
+    assert await w.graph.node_types.list_deleted_before(NOW, after=None, limit=9) == [
+        kept_type
+    ]
