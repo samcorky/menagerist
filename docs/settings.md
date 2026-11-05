@@ -44,6 +44,8 @@ Database connection settings.
 | `MENAGERIST_DATABASE_USER` | text | `menagerist` | any | Database user to connect as. |
 | `MENAGERIST_DATABASE_PASSWORD` | secret | none (sensitive) | any | Database password; any characters, no URL encoding. Sensitive: best given as a secrets file. |
 | `MENAGERIST_DATABASE_NAME` | text | `menagerist` | any | Name of the database to use. |
+| `MENAGERIST_DATABASE_POOL_SIZE` | whole number | `5` | 1 or more | Database connections each process (every web worker, and the background worker) keeps open in its pool. |
+| `MENAGERIST_DATABASE_MAX_OVERFLOW` | whole number | `10` | 0 or more | Extra database connections each process may open beyond the pool under load, closed again when idle. 0 caps a process at the pool size. |
 
 ## Identity
 
@@ -160,4 +162,4 @@ Read by Docker Compose from `.env` when it starts the stack, not by Menagerist. 
 | `POSTGRES_SHARED_BUFFERS` | text | `128MB` | any | Postgres `shared_buffers` (its own default is 128MB). About a quarter of the memory cap; the most useful one to raise on a bigger machine. |
 | `POSTGRES_EFFECTIVE_CACHE_SIZE` | text | `256MB` | any | Postgres `effective_cache_size` (its own default is 4GB), a planner hint for how much data the OS can cache. Keep it near half the memory cap so the planner is not too optimistic. |
 | `POSTGRES_WORK_MEM` | text | `4MB` | any | Postgres `work_mem` (its own default is 4MB), the memory per sort or hash in a query. Raise it only if large sorts spill to disk, as it applies to each step of each connection. |
-| `POSTGRES_MAX_CONNECTIONS` | text | `100` | any | Postgres `max_connections` (its own default is 100). Each worker process keeps a pool of connections: lower it on a very small machine, and keep it above the total of all pools. |
+| `POSTGRES_MAX_CONNECTIONS` | text | `100` | any | Postgres `max_connections` (its own default is 100). Each worker process keeps a pool of connections (see `MENAGERIST_DATABASE_POOL_SIZE` and `MENAGERIST_DATABASE_MAX_OVERFLOW`): lower it on a very small machine, and keep it above the total of all pools. |
