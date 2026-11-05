@@ -89,6 +89,34 @@ mkdir -p backups data/media
 
 If your user is not uid 1000, also run `sudo chown 1000:1000 backups data/media`. A folder Docker already created as root needs the same `chown`. Docker Desktop on Windows and macOS maps ownership itself, so none of this is needed there.
 
+## Secrets from files
+
+Any setting can be read from a file as well as from its environment variable, so a secret such as the database URL or the first-admin password need not sit in `.env` or show up in `docker inspect`. Docker and Compose mount secrets in `/run/secrets`; a file there named after the variable (`MENAGERIST_DATABASE_URL`, or in lower case) supplies that setting, and its trailing newline is ignored. The environment variable wins when both are set, so a secret file never overrides a value in `.env`. A host with no `/run/secrets` directory is unaffected.
+
+The [settings reference](settings.md) marks the settings worth keeping this way: any row whose notes say "Sensitive" holds a credential or a URL that can carry one, such as `MENAGERIST_DATABASE_URL` and `MENAGERIST_IDENTITY_INITIAL_PASSWORD`. Settings that are not marked work the same way, but there is little to gain.
+
+`compose.yaml` sets `MENAGERIST_DATABASE_URL` itself, so reset that entry when you supply the URL as a secret. A secret is mounted under its own name, so call it after the variable (lower case is fine). In `compose.override.yaml`, give both the app and the worker the secret:
+
+```yaml
+secrets:
+  menagerist_database_url:
+    file: ./secrets/database_url
+
+services:
+  menagerist:
+    environment:
+      MENAGERIST_DATABASE_URL: !reset null
+    secrets:
+      - menagerist_database_url
+  worker:
+    environment:
+      MENAGERIST_DATABASE_URL: !reset null
+    secrets:
+      - menagerist_database_url
+```
+
+Keep `./secrets` out of version control and readable only by you. A setting read from a file counts as set by the deployment, the same as one from the environment.
+
 ## Your own changes: `compose.override.yaml`
 
 Compose merges a file named `compose.override.yaml` onto `compose.yaml` automatically, so local choices stay out of the shipped file and survive an update. The repository ignores it (`.gitignore`), so create it yourself next to `compose.yaml`. Compose merges the two rather than replacing the service: a single value you set (an image, a command) replaces the one in `compose.yaml`, mappings such as `environment` are combined, and lists of `ports`, `volumes`, `labels` and `networks` are added to, with an entry replacing the one that has the same container path or published port. For example, keep media and backups in plain folders you can see and back up, and reach the database from the host for a one-off query:

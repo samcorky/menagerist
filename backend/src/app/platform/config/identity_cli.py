@@ -1,11 +1,6 @@
-from pathlib import Path
-
 from pydantic import Field, SecretStr
 
 from app.platform.config._base import MenageristBaseSettings
-
-# Where Docker and Compose mount secrets; a file named after the variable works.
-SECRETS_DIR = Path("/run/secrets")
 
 
 class IdentityCliSettings(MenageristBaseSettings, group="identity"):
@@ -25,6 +20,4 @@ class IdentityCliSettings(MenageristBaseSettings, group="identity"):
 
 def get_identity_cli_settings() -> IdentityCliSettings:
     """Load the CLI settings fresh (the CLI is one short-lived process)."""
-    return IdentityCliSettings(
-        _secrets_dir=SECRETS_DIR if SECRETS_DIR.is_dir() else None
-    )
+    return IdentityCliSettings()
