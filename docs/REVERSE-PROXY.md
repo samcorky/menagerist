@@ -156,3 +156,9 @@ The first time in an hour it sees forwarding headers from a peer it does not tru
 ## Send HSTS from the proxy
 
 Menagerist trusts the browser's headers, and the browser only keeps using HTTPS if the proxy tells it to. Set `Strict-Transport-Security` at the TLS-terminating proxy so a browser never falls back to plain HTTP for your address (Caddy `header Strict-Transport-Security "max-age=15552000"`, nginx `add_header Strict-Transport-Security "max-age=15552000" always;`, Traefik's `stsSeconds` headers middleware, as in the examples above). The app does not send it itself because it cannot know it is reached over HTTPS.
+
+## Leave compression to Menagerist
+
+Menagerist compresses its own responses, so the proxy does not need to. JSON, HTML, CSS, JavaScript and SVG are sent as Zstandard, Brotli or gzip, whichever the browser prefers and accepts. The web app's files are compressed once when the image is built, so serving them costs no CPU per request. Photos, documents, backups and other downloads are not compressed, because they already are, and ranged requests are sent as they are.
+
+Turning on compression at the proxy as well is harmless: proxies leave a response that already has a `Content-Encoding` alone. Do not strip or rewrite the browser's `Accept-Encoding` header on the way through, or the app cannot tell what the browser accepts. If you would rather the proxy did the work, for example to use a coding it supports and the app does not, send `Accept-Encoding: identity` to the app and compress in the proxy; the app then sends everything uncompressed.

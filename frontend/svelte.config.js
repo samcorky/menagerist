@@ -25,7 +25,11 @@ const config = {
 			// filename. nginx (or any static host) just needs to serve this
 			// for any path that doesn't match a prerendered file.
 			fallback: '200.html',
-			strict: true
+			strict: true,
+			// Writes a .br and .gz beside each file at build time; the backend serves
+			// them to clients that accept them (see backend spa.py), so the SPA costs
+			// no CPU per request.
+			precompress: true
 		})
 	}
 };
