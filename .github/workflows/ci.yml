@@ -501,6 +501,70 @@ jobs:
               -F body=@"$RUNNER_TEMP/coverage-comment.md"
           fi
 
+  image-size-comment:
+    name: Comment the image size on the pull request
+    # Compares the image the build job just measured with the latest main build, whose
+    # size build.yml caches on every push to main. One comment, updated by later pushes;
+    # a change too small to matter posts nothing unless a comment already exists to
+    # correct. A fork pull request has a read-only token, so it gets the job summary
+    # instead. Not part of ci-passed: a missing comment should not fail a pull request.
+    needs: build
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.build.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout the comment script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: scripts/image_size_comment.py
+          sparse-checkout-cone-mode: false
+
+      - name: Download this pull request's image size
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: image-size
+          path: image-size
+
+      # The newest cached main size; a miss only means there is no baseline yet, for
+      # example when no build on main has run in the last week.
+      - name: Look up the size of main's image
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/base
+          key: image-size-main-none
+          restore-keys: image-size-main-
+
+      - name: Build the comment
+        id: comment
+        run: >-
+          python3 scripts/image_size_comment.py image-size/image-size.json
+          --base "$RUNNER_TEMP/base/image-size.json"
+          --output "$RUNNER_TEMP/image-size-comment.md"
+
+      - name: Show the comment in the job summary
+        run: cat "$RUNNER_TEMP/image-size-comment.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post or update the comment
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MEANINGFUL: ${{ steps.comment.outputs.meaningful }}
+        run: |
+          marker='<!-- image-size -->'
+          existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"${marker}\"))) | .id" | head -n 1)
+          if [ -n "$existing" ]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
+              -F body=@"$RUNNER_TEMP/image-size-comment.md"
+          elif [ "$MEANINGFUL" = "true" ]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+              -F body=@"$RUNNER_TEMP/image-size-comment.md"
+          fi
+
   ci-passed:
     name: CI passed
     # One stable check to require in branch protection however the jobs above change.

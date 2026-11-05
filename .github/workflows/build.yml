@@ -71,3 +71,34 @@ jobs:
 
       - name: Smoke test the image
         run: uv run --script scripts/smoke_test.py
+
+      # Compressed is the saved image gzipped: an estimate of the pull size that is
+      # measured the same way on main and on pull requests, so the two compare.
+      - name: Measure the image size
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          uncompressed="$(docker image inspect menagerist:local --format '{{.Size}}')"
+          compressed="$(docker save menagerist:local | gzip -n | wc -c)"
+          jq -n --argjson compressed "${compressed}" --argjson uncompressed "${uncompressed}" \
+            --arg commit "${COMMIT_SHA}" \
+            '{compressed: $compressed, uncompressed: $uncompressed, commit: $commit}' \
+            | tee "${RUNNER_TEMP}/image-size.json"
+
+      # The image-size-comment job in ci.yml compares this with the latest main build.
+      - name: Upload the image size
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-size
+          path: ${{ runner.temp }}/image-size.json
+          retention-days: 1
+
+      # Pull requests restore the newest of these by prefix, so main is never rebuilt
+      # just to be measured. A publish run for the same commit finds the key taken, which
+      # only warns.
+      - name: Remember the size of main's image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/image-size.json
+          key: image-size-main-${{ github.sha }}
