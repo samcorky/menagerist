@@ -138,3 +138,43 @@ def test_invalid_part_error_does_not_echo_the_password() -> None:
     with pytest.raises(ValidationError) as caught:
         DatabaseSettings(host="bad host", password=TRICKY)
     assert TRICKY not in str(caught.value)
+
+
+def test_pool_defaults_match_the_previous_fixed_sizes() -> None:
+    """Nothing set keeps today's pool of 5 with 10 overflow connections."""
+    settings = DatabaseSettings()
+    assert (settings.pool_size, settings.max_overflow) == (5, 10)
+
+
+@pytest.mark.parametrize(("pool_size", "max_overflow"), [(0, 10), (-1, 10), (5, -1)])
+def test_pool_bounds_are_enforced(pool_size: int, max_overflow: int) -> None:
+    """A pool needs a connection; overflow may be none but not negative."""
+    with pytest.raises(ValidationError):
+        DatabaseSettings(pool_size=pool_size, max_overflow=max_overflow)
+
+
+def test_pool_may_have_no_overflow() -> None:
+    """Zero overflow caps a process at its pool size."""
+    assert DatabaseSettings(max_overflow=0).max_overflow == 0
+
+
+def test_engine_is_built_with_the_configured_pool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`get_engine` hands the settings to SQLAlchemy's queue pool."""
+    from typing import cast
+
+    from sqlalchemy.pool import QueuePool
+
+    from app.platform.database import get_engine
+
+    monkeypatch.setenv("MENAGERIST_DATABASE_POOL_SIZE", "3")
+    monkeypatch.setenv("MENAGERIST_DATABASE_MAX_OVERFLOW", "7")
+    get_database_settings.cache_clear()
+    get_engine.cache_clear()
+    try:
+        pool = cast(QueuePool, get_engine().pool)
+        assert (pool.size(), pool._max_overflow) == (3, 7)
+    finally:
+        get_engine.cache_clear()
+        get_database_settings.cache_clear()

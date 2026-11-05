@@ -144,7 +144,7 @@ def test_conditional_request_matches_the_compressed_variant(
 
 def test_app_compresses_text_but_not_media(app_client: TestClient, dist: Path) -> None:
     """Without a precompressed file, text is compressed on the fly; images are not."""
-    (dist / "big.js").write_text(_BIG_JS)
+    (dist / "big.js").write_text(_BIG_JS, newline="")
     (dist / "photo.png").write_bytes(_BIG_JS.encode())
 
     text = app_client.get("/big.js", headers={"Accept-Encoding": "gzip"})
@@ -160,7 +160,7 @@ def test_compressing_a_static_file_keeps_its_strong_etag(
     app_client: TestClient, dist: Path
 ) -> None:
     """A file's ETag is the same whether or not it is compressed on the way out."""
-    (dist / "big.js").write_text(_BIG_JS)
+    (dist / "big.js").write_text(_BIG_JS, newline="")
 
     plain = app_client.get("/big.js", headers={"Accept-Encoding": "identity"})
     packed = app_client.get("/big.js", headers={"Accept-Encoding": "gzip"})
@@ -174,7 +174,7 @@ def test_app_does_not_compress_a_precompressed_file_again(
     app_client: TestClient, dist: Path
 ) -> None:
     """The middleware leaves a response that already has a content encoding alone."""
-    (dist / "big.js").write_text(_BIG_JS)
+    (dist / "big.js").write_text(_BIG_JS, newline="")
     (dist / "big.js.br").write_bytes(brotli.compress(_BROTLI_TEXT.encode()))
 
     resp = app_client.get("/big.js", headers={"Accept-Encoding": "br, gzip"})

@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 
 from app.platform.config import get_database_settings
-from app.platform.connection_budget import MAX_OVERFLOW, POOL_SIZE
 
 # Errors that mean the database is unreachable rather than the code being wrong.
 DATABASE_OUTAGE_ERRORS = (
@@ -29,10 +28,11 @@ class Base(DeclarativeBase):
 @lru_cache(maxsize=1)
 def get_engine() -> AsyncEngine:
     """Return the process-wide async database engine."""
+    settings = get_database_settings()
     return create_async_engine(
-        str(get_database_settings().url),
-        pool_size=POOL_SIZE,
-        max_overflow=MAX_OVERFLOW,
+        str(settings.url),
+        pool_size=settings.pool_size,
+        max_overflow=settings.max_overflow,
     )
 
 
