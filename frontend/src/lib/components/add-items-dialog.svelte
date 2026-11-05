@@ -170,7 +170,7 @@
 				placeholder="Search your items…"
 				aria-label="Search your items"
 				autocomplete="off"
-				class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+				class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none md:text-sm"
 			/>
 
 			<div class="max-h-72 overflow-y-auto rounded-md border" aria-busy={loading}>

@@ -130,6 +130,7 @@
 			<Input
 				bind:value={name}
 				placeholder="Name…"
+				class="pointer-coarse:h-11"
 				autofocus
 				onkeydown={(e) => {
 					if (e.key === 'Enter') void save();
@@ -147,11 +148,11 @@
 				<button
 					type="button"
 					onclick={openFullForm}
-					class="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+					class="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline pointer-coarse:flex pointer-coarse:min-h-11 pointer-coarse:items-center"
 				>
 					Use full form →
 				</button>
-				<Button onclick={save} disabled={!name.trim() || saving}>
+				<Button class="pointer-coarse:h-11" onclick={save} disabled={!name.trim() || saving}>
 					{saving ? 'Saving…' : 'Save'}
 				</Button>
 			</div>
