@@ -51,7 +51,10 @@ _INTRO = (
     + "`.env` file next to `compose.yaml`; "
     + f"[`{ENV_EXAMPLE_PATH}`](../{ENV_EXAMPLE_PATH}) lists them all with their "
     + "defaults. A list is comma-separated, and a sensitive value (a secret or a URL "
-    + "with credentials) has no default here."
+    + "with credentials) has no default here. Any setting can instead be read from a "
+    + "file named after its variable in `/run/secrets` (Docker and Compose secrets "
+    + "mount there); the environment variable wins when both are set. See "
+    + "[Secrets from files](DEPLOYING.md#secrets-from-files)."
 )
 # Set by the Dockerfile, so a container differs from the defaults below. A test checks
 # the Dockerfile still sets each of these.
