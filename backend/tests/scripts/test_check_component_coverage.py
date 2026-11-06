@@ -153,3 +153,40 @@ def test_ports_alone_are_tracked_without_a_floor() -> None:
 
     assert check.component_target(components["ports"]) is None
     assert check.component_target(components["domain"]) == 100.0
+
+
+def test_the_whole_side_row_has_no_target_or_verdict() -> None:
+    """The overall row is informational: it neither passes nor fails."""
+    overall = check.overall_row("All backend", (90, 100))
+    table = check.summary_markdown([*RESULTS, overall])
+
+    assert "| All backend | 90.00% | - | - |" in table
+    assert "❌ 1 of 2 below target: Adapters" in table
+
+
+def test_an_empty_side_reads_as_zero_percent() -> None:
+    """No lines found must not divide by zero."""
+    assert check.overall_row("All frontend", (0, 0)) == ("All frontend", 0.0, None)
+
+
+def test_the_hit_and_found_counts_ride_in_the_table_for_the_comment() -> None:
+    """A hidden line carries the counts so the comment can weight the total."""
+    table = check.summary_markdown(RESULTS, totals=("backend", (90, 100)))
+
+    assert table.rstrip().endswith("<!-- coverage-total backend 90 100 -->")
+
+
+def test_lcov_counts_give_hits_and_lines_found() -> None:
+    """The counts behind the percentage are available on their own."""
+    assert check.lcov_counts(LCOV, ["src/*"]) == (14, 20)
+    assert check.lcov_counts(LCOV, ["*"]) == (14, 120)
+
+
+def test_the_overall_row_is_not_counted_as_a_failure(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """report() lists targetless rows as information and returns only real failures."""
+    rows = [("Domain", 100.0, 100.0), check.overall_row("All backend", (1, 2))]
+
+    assert check.report(rows, "Backend coverage") == []
+    assert "[INFO] All backend" in capsys.readouterr().out
