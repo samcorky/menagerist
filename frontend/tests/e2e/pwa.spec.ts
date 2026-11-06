@@ -47,7 +47,7 @@ test('the theme colour follows the theme the person picks', async ({ page }) => 
 	await expect(colour).toHaveAttribute('content', '#ffffff');
 });
 
-test('the service worker shows an offline page and keeps nothing private in the cache', async ({
+test('a launch with no connection starts the real app, and the cache holds nothing private', async ({
 	page,
 	context
 }) => {
@@ -60,8 +60,8 @@ test('the service worker shows an offline page and keeps nothing private in the 
 		})
 		.toBe(true);
 
-	// Cache Storage holds the build's files and the offline page, and no API response, page
-	// or media.
+	// Cache Storage holds the build's files, the app shell and the last-resort offline page, and
+	// no API response, account page or media.
 	const cached = await page.evaluate(async () => {
 		const paths: string[] = [];
 		for (const name of await caches.keys()) {
@@ -71,16 +71,21 @@ test('the service worker shows an offline page and keeps nothing private in the 
 		}
 		return paths;
 	});
+	expect(cached).toContain('/200.html');
 	expect(cached).toContain('/offline.html');
-	expect(cached.filter((p) => !p.startsWith('/_app/') && p !== '/offline.html')).toEqual([]);
+	const shellFiles = ['/200.html', '/offline.html'];
+	expect(cached.filter((p) => !p.startsWith('/_app/') && !shellFiles.includes(p))).toEqual([]);
 
+	// The shell boots the real app, which shows its own offline screen rather than a login
+	// redirect or the hand-written page, and loads the page by itself once the connection returns.
 	await context.setOffline(true);
 	await page.goto('/items');
-	await expect(page.getByRole('heading', { name: "You're offline" })).toBeVisible();
+	await expect(page.getByTestId('start-offline')).toContainText("You're offline");
+	await expect(page).toHaveURL(/\/items$/);
 
 	await context.setOffline(false);
-	await page.goto('/');
-	await expect(home).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'My items', level: 1 })).toBeVisible();
+	await expect(page.getByTestId('start-offline')).toHaveCount(0);
 });
 
 test('the service worker script is revalidated, not cached for an hour', async ({ request }) => {

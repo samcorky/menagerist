@@ -4,10 +4,17 @@
 /// <reference lib="webworker" />
 
 // A small worker for resilience, not offline data (see lib/service-worker/policy.ts for what
-// it may touch). It keeps the build's immutable files so the app starts quickly, and shows one
-// offline page when a page load cannot reach the server.
+// it may touch). It keeps the build's immutable files and the app shell so the app starts quickly,
+// and starts that shell (or, failing that, one offline page) when a page load cannot reach the
+// server.
 import { build, version } from '$service-worker';
-import { SHELL_FILES, cacheName, routeFor, staleCaches } from '$lib/service-worker/policy';
+import {
+	NAVIGATION_FALLBACKS,
+	SHELL_FILES,
+	cacheName,
+	routeFor,
+	staleCaches
+} from '$lib/service-worker/policy';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 const CURRENT = cacheName(version);
@@ -42,12 +49,15 @@ sw.addEventListener('fetch', (event) => {
 		return;
 	}
 
-	// Network first, and only a failure to connect shows the offline page: an error status from
-	// the server is still the server's answer. The response is never stored.
+	// Network first, and only a failure to connect falls back: an error status from the server is
+	// still the server's answer. The response is never stored.
 	event.respondWith(
 		fetch(request).catch(async () => {
-			const offline = await caches.match(new URL('/offline.html', sw.location.origin).href);
-			return offline ?? Response.error();
+			for (const path of NAVIGATION_FALLBACKS) {
+				const cached = await caches.match(new URL(path, sw.location.origin).href);
+				if (cached) return cached;
+			}
+			return Response.error();
 		})
 	);
 });
