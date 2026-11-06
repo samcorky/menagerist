@@ -12,6 +12,9 @@ const config = {
 	},
 
 	kit: {
+		// Registered by hand in the root layout (lib/service-worker-client.ts), so an update
+		// waits for the person instead of replacing the page under them.
+		serviceWorker: { register: false },
 		// Data shared with the backend. Resolves to repo/shared locally and /shared in Docker.
 		alias: {
 			$shared: fileURLToPath(new URL('../shared', import.meta.url))
