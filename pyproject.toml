@@ -60,8 +60,8 @@ cwd = "frontend"
 help = "Install exactly the npm dependencies in package-lock.json (what CI uses)"
 
 [tool.poe.groups.setup.tasks.sync-ci]
-sequence = ["sync-frontend-locked", "generate-frontend-client"]
-help = "CI setup: locked frontend install, backend sync and the generated API client (set UV_LOCKED=1 to also lock the backend sync)"
+sequence = ["sync-backend", "sync-frontend-locked", "_run-frontend-generate"]
+help = "CI setup: backend sync, locked frontend install and the API client generated from the committed openapi.json (the schema-is-current check keeps that file honest; set UV_LOCKED=1 to also lock the backend sync)"
 
 [tool.poe.groups.setup.tasks.install-e2e-browser]
 shell = "npx playwright install chromium"
