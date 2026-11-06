@@ -95,6 +95,40 @@ def test_other_files_get_a_short_cache(client: TestClient) -> None:
     assert resp.headers.get_list("Cache-Control") == ["public, max-age=3600"]
 
 
+def test_the_service_worker_script_is_always_revalidated(
+    client: TestClient, dist: Path
+) -> None:
+    """An hour of caching would hold every update back by that long."""
+    (dist / "service-worker.js").write_text("self.skipWaiting")
+
+    resp = client.get("/service-worker.js")
+
+    assert resp.status_code == 200
+    assert resp.headers.get_list("Cache-Control") == ["no-cache"]
+    assert resp.headers["ETag"]
+    # The worker's own fetches obey this policy, so it must let it reach its own origin.
+    assert "connect-src 'self'" in resp.headers["Content-Security-Policy"]
+
+
+def test_a_missing_service_worker_is_a_real_404(client: TestClient) -> None:
+    """Browsers drop a worker whose script is gone, so it must not be the shell."""
+    assert client.get("/service-worker.js").status_code == 404
+
+
+def test_web_app_manifest_is_served_with_its_own_type(
+    client: TestClient, dist: Path
+) -> None:
+    """Browsers only accept the manifest as `application/manifest+json`."""
+    (dist / "manifest.webmanifest").write_text('{"name": "Menagerist"}')
+
+    resp = client.get("/manifest.webmanifest")
+
+    assert resp.status_code == 200
+    assert resp.headers["Content-Type"].startswith("application/manifest+json")
+    assert resp.headers.get_list("Cache-Control") == ["public, max-age=3600"]
+    assert resp.json() == {"name": "Menagerist"}
+
+
 @pytest.mark.parametrize("path", ["/missing.js", "/_app/immutable/gone.deadbeef.js"])
 def test_missing_assets_are_404_not_the_shell(client: TestClient, path: str) -> None:
     """A stale asset URL must fail loudly rather than return HTML as JavaScript."""
