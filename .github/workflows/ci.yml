@@ -274,6 +274,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     strategy:
@@ -315,6 +316,8 @@ jobs:
         run: uv run poe install-e2e-browser
 
       - name: Install the system libraries Chromium needs
+        # About 10-35s normally; a stalled apt mirror has held it for 15 minutes.
+        timeout-minutes: 3
         uses: ./.github/actions/playwright-system-libraries
         with:
           browsers: chromium
@@ -392,6 +395,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
@@ -431,6 +435,8 @@ jobs:
           uv run poe install-e2e-cookie-browsers
 
       - name: Install the system libraries the browsers need
+        # About 10-35s normally; a stalled apt mirror has held it for 15 minutes.
+        timeout-minutes: 3
         uses: ./.github/actions/playwright-system-libraries
         with:
           browsers: chromium webkit firefox
