@@ -315,8 +315,9 @@ jobs:
         run: uv run poe install-e2e-browser
 
       - name: Install the system libraries Chromium needs
-        run: npx playwright install-deps chromium
-        working-directory: frontend
+        uses: ./.github/actions/playwright-system-libraries
+        with:
+          browsers: chromium
 
       - name: Run end-to-end tests
         run: uv run poe test-e2e --shard ${{ matrix.shard }}/${{ strategy.job-total }}
@@ -430,8 +431,9 @@ jobs:
           uv run poe install-e2e-cookie-browsers
 
       - name: Install the system libraries the browsers need
-        run: npx playwright install-deps chromium webkit firefox
-        working-directory: frontend
+        uses: ./.github/actions/playwright-system-libraries
+        with:
+          browsers: chromium webkit firefox
 
       - name: Run cookie tests in WebKit and Firefox
         run: uv run poe test-e2e-cookies
