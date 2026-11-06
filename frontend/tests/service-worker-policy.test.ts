@@ -3,8 +3,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
 	CACHE_PREFIX,
+	NAVIGATION_FALLBACKS,
 	OFFLINE_URL,
 	SHELL_FILES,
+	SHELL_URL,
 	cacheName,
 	routeFor,
 	staleCaches
@@ -46,6 +48,20 @@ describe('routeFor', () => {
 		expect(routeFor(get('/items', 'navigate', 'POST'), ORIGIN, PRECACHED)).toBe('network');
 		const other = { method: 'GET', mode: 'cors', url: 'https://cdn.example/_app/x.js' };
 		expect(routeFor(other, ORIGIN, PRECACHED)).toBe('network');
+	});
+});
+
+describe('the offline fallbacks', () => {
+	it('start the real app shell first and keep the plain page as the last resort', () => {
+		expect(NAVIGATION_FALLBACKS).toEqual([SHELL_URL, OFFLINE_URL]);
+		expect(SHELL_URL).toBe('/200.html');
+	});
+
+	it('are all precached, and answered from the cache when asked for directly', () => {
+		for (const path of NAVIGATION_FALLBACKS) {
+			expect(SHELL_FILES).toContain(path);
+			expect(routeFor(get(path, 'navigate'), ORIGIN, PRECACHED)).toBe('asset');
+		}
 	});
 });
 

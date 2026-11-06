@@ -1,19 +1,27 @@
 // What the service worker may touch. Kept apart from the worker so it can be unit tested.
 //
-// The worker is for resilience, not offline data: it holds the build's immutable files and one
-// offline page, and nothing else. Responses to anything the person did (API calls, sign-in,
+// The worker is for resilience, not offline data: it holds the build's immutable files, the app
+// shell and one last-resort offline page, and nothing else. Responses to anything the person did (API calls, sign-in,
 // uploads, media, admin pages) are never put in Cache Storage.
 
 export const CACHE_PREFIX = 'menagerist-shell-';
 export const OFFLINE_URL = '/offline.html';
+/** The SPA shell the backend serves for every client-side route; it holds no account data. */
+export const SHELL_URL = '/200.html';
 
-/** Extra files the offline page needs, beside the build's own files. */
-export const SHELL_FILES = [OFFLINE_URL];
+/**
+ * What a page load that cannot reach the server is answered with, best first: the real app (which
+ * shows its own offline screen), then the hand-written page for when the shell is not cached yet.
+ */
+export const NAVIGATION_FALLBACKS = [SHELL_URL, OFFLINE_URL];
+
+/** Extra files to keep beside the build's own files. */
+export const SHELL_FILES = [...NAVIGATION_FALLBACKS];
 
 export type Route =
 	/** A precached file: answer from Cache Storage. */
 	| 'asset'
-	/** A page load: ask the network, and show the offline page if it cannot be reached. */
+	/** A page load: ask the network, and start the cached app shell if it cannot be reached. */
 	| 'navigation'
 	/** Leave it alone: the browser handles it as if there were no worker. */
 	| 'network';
