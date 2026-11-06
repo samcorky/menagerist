@@ -44,3 +44,21 @@ def test_a_malformed_shard_is_refused(shard: str) -> None:
     """Anything but CURRENT/TOTAL, with CURRENT at most TOTAL, stops the run."""
     with pytest.raises(SystemExit):
         e2e.shard_args(shard)
+
+
+def test_setup_regenerates_the_client_first_by_default() -> None:
+    """A local run refreshes the API client before anything else."""
+    steps = e2e.setup_steps(skip_build=False, skip_generate=False)
+    assert steps == [
+        "generate-frontend-client",
+        "sync-backend",
+        "e2e-db-up",
+        "e2e-build",
+        "e2e-migrate",
+    ]
+
+
+def test_setup_can_skip_the_client_and_the_build() -> None:
+    """CI reuses the client from sync-ci, and --skip-build reuses the build."""
+    steps = e2e.setup_steps(skip_build=True, skip_generate=True)
+    assert steps == ["sync-backend", "e2e-db-up", "e2e-migrate"]

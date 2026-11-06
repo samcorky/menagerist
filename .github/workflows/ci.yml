@@ -141,8 +141,11 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies and generate the API client
-        run: uv run poe sync-ci
+      - name: Install the frontend dependencies
+        uses: ./.github/actions/frontend-deps
+
+      - name: Sync the backend and generate the API client
+        run: uv run poe sync-ci-installed
 
       - name: Run svelte-check
         run: uv run poe typecheck-frontend
@@ -173,8 +176,11 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies and generate the API client
-        run: uv run poe sync-ci
+      - name: Install the frontend dependencies
+        uses: ./.github/actions/frontend-deps
+
+      - name: Sync the backend and generate the API client
+        run: uv run poe sync-ci-installed
 
       - name: Run the frontend unit tests with coverage
         run: uv run poe coverage-frontend
@@ -274,6 +280,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     strategy:
@@ -299,8 +306,11 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies and generate the API client
-        run: uv run poe sync-ci
+      - name: Install the frontend dependencies
+        uses: ./.github/actions/frontend-deps
+
+      - name: Sync the backend and generate the API client
+        run: uv run poe sync-ci-installed
 
       - name: Cache the Postgres image
         uses: ./.github/actions/postgres-image
@@ -315,12 +325,14 @@ jobs:
         run: uv run poe install-e2e-browser
 
       - name: Install the system libraries Chromium needs
+        # About 10-35s normally; a stalled apt mirror has held it for 15 minutes.
+        timeout-minutes: 3
         uses: ./.github/actions/playwright-system-libraries
         with:
           browsers: chromium
 
       - name: Run end-to-end tests
-        run: uv run poe test-e2e --shard ${{ matrix.shard }}/${{ strategy.job-total }}
+        run: uv run poe test-e2e --no-generate --shard ${{ matrix.shard }}/${{ strategy.job-total }}
 
       - name: Upload failure traces
         if: failure()
@@ -360,8 +372,8 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
-        run: npm --prefix frontend ci
+      - name: Install the frontend dependencies
+        uses: ./.github/actions/frontend-deps
 
       - name: Download the blob reports
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -392,6 +404,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
@@ -413,8 +426,11 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies and generate the API client
-        run: uv run poe sync-ci
+      - name: Install the frontend dependencies
+        uses: ./.github/actions/frontend-deps
+
+      - name: Sync the backend and generate the API client
+        run: uv run poe sync-ci-installed
 
       - name: Cache the Postgres image
         uses: ./.github/actions/postgres-image
@@ -431,12 +447,14 @@ jobs:
           uv run poe install-e2e-cookie-browsers
 
       - name: Install the system libraries the browsers need
+        # About 10-35s normally; a stalled apt mirror has held it for 15 minutes.
+        timeout-minutes: 3
         uses: ./.github/actions/playwright-system-libraries
         with:
           browsers: chromium webkit firefox
 
       - name: Run cookie tests in WebKit and Firefox
-        run: uv run poe test-e2e-cookies
+        run: uv run poe test-e2e-cookies --no-generate
 
       - name: Upload failure traces
         if: failure()

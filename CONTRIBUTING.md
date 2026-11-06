@@ -255,6 +255,7 @@ Each integration worker starts its own Postgres container (`postgres:18-alpine`,
 poe test-e2e                      # one worker per two CPU cores (each runs a backend, a scheduler worker and a browser)
 poe test-e2e --workers 2          # or -w 2; --workers 1 runs serially
 poe test-e2e --skip-build         # reuse frontend/build - only when it is current
+poe test-e2e --no-generate        # reuse the API client already generated (CI does, after `poe sync-ci`)
 poe test-e2e status.spec.ts       # only these spec files (several allowed; `file.ts:78` runs one test)
 poe test-e2e --shard 2/3          # one third of the suite, split by spec file (CI runs three of these as parallel jobs)
 ```

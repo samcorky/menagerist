@@ -1,0 +1,40 @@
+name: Frontend dependencies
+description: >-
+  Restore frontend/node_modules from the Actions cache, or run `npm ci` and save the
+  result. Extracting the cached archive (about 45 MB) is much quicker than npm
+  unpacking some 290 packages, even from a warm npm download cache. Run it after
+  setup-node.
+
+runs:
+  using: composite
+  steps:
+    - name: Restore node_modules
+      id: cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: frontend/node_modules
+        # Some packages ship a binary per platform, and the Node version can change what
+        # install builds, so both belong in the key beside the lockfile and npm settings.
+        key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.node-version') }}-${{ hashFiles('frontend/package-lock.json', 'frontend/.npmrc') }}
+
+    - name: Install the packages
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: frontend
+      run: npm ci
+
+    # Saved straight after the install, before anything else can touch the directory,
+    # and even when a later step fails.
+    - name: Save node_modules
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: frontend/node_modules
+        key: ${{ steps.cache.outputs.cache-primary-key }}
+
+    # npm ci runs this as its prepare script; a restored directory has not.
+    - name: Generate the SvelteKit files
+      if: steps.cache.outputs.cache-hit == 'true'
+      shell: bash
+      working-directory: frontend
+      run: npx svelte-kit sync
