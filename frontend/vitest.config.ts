@@ -47,7 +47,7 @@ export default defineConfig({
 		// Only measured when asked for (`vitest run --coverage`). Plain TypeScript only: the
 		// Node environment renders no components, so counting .svelte files would report
 		// what Playwright covers as untested. The target is the frontend component in
-		// codecov.yml, checked by backend/scripts/check_component_coverage.py.
+		// codecov.yml, checked by scripts/check_component_coverage.py.
 		coverage: {
 			provider: 'v8',
 			reporter: ['text-summary', 'lcov'],

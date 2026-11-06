@@ -320,7 +320,6 @@ help = "Run frontend unit tests with V8 coverage, writing frontend/coverage/lcov
 
 [tool.poe.groups.quality.tasks.coverage-check-frontend]
 cmd = "uv run --script scripts/check_component_coverage.py --frontend --strict"
-cwd = "backend"
 help = "Fail when the frontend component is below its codecov.yml target (needs frontend/coverage/lcov.info)"
 
 [tool.poe.groups.quality.tasks.coverage-frontend]
