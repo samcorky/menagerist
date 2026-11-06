@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
     import pytest
 
-SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "check_component_coverage.py"
+SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "check_component_coverage.py"
 RESULTS = [("Domain", 100.0, 100.0), ("Adapters", 71.456, 80.0)]
 
 

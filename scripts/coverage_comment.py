@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the pull request comment that shows backend and frontend coverage.
 
-Each test job runs ``backend/scripts/check_component_coverage.py``, which writes its
+Each test job runs ``scripts/check_component_coverage.py``, which writes its
 component table (headed and marked for the comment) to a file that CI uploads as an
 artifact. This joins whichever tables exist into one comment, so a pull request that
 skipped a job still gets the other half. It uses only the standard library.

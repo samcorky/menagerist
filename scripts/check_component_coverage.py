@@ -29,7 +29,7 @@ import yaml
 from coverage import Coverage
 from coverage.exceptions import NoDataError
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 BACKEND_DIR = ROOT / "backend"
 FRONTEND_DIR = ROOT / "frontend"
 FRONTEND_LCOV = FRONTEND_DIR / "coverage" / "lcov.info"
