@@ -98,6 +98,11 @@ cwd = "backend"
 help = "Regenerate .env.example and docs/settings.md from the settings classes"
 deps = ["sync-backend"]
 
+[tool.poe.groups.setup.tasks.generate-pwa-icons]
+cmd = "uv run --project backend python scripts/generate_pwa_icons.py"
+help = "Regenerate the install icons in frontend/static from the Menagerist mark"
+deps = ["sync-backend"]
+
 [tool.poe.groups.setup.tasks._run-frontend-generate]
 shell = "npm run generate"
 interpreter = ["powershell", "posix"]
