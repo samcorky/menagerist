@@ -290,6 +290,8 @@ jobs:
         -v /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins
     env:
       E2E_DB_HOST: host.docker.internal
+      # The runner sets HOME to /github/home, which Firefox refuses to run as root in.
+      HOME: /root
     strategy:
       fail-fast: false
       matrix:
@@ -297,6 +299,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The workspace belongs to the runner's user, not root. Without this git refuses it,
+      # and the build cannot read the commit, branch or repository URL (the Updates card
+      # needs the URL).
+      - name: Trust the workspace in git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Install uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
@@ -413,6 +421,8 @@ jobs:
         -v /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins
     env:
       E2E_DB_HOST: host.docker.internal
+      # The runner sets HOME to /github/home, which Firefox refuses to run as root in.
+      HOME: /root
     strategy:
       fail-fast: false
       matrix:
@@ -420,6 +430,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The workspace belongs to the runner's user, not root. Without this git refuses it,
+      # and the build cannot read the commit, branch or repository URL (the Updates card
+      # needs the URL).
+      - name: Trust the workspace in git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Install uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
