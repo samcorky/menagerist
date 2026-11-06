@@ -34,7 +34,10 @@ jobs:
 
   title:
     name: "Labels: from the title prefix"
-    if: github.event_name == 'pull_request_target'
+    # After the paths job, not beside it: actions/labeler reads the labels first and
+    # then replaces them all, so labels added in between were removed again.
+    needs: [paths]
+    if: ${{ !cancelled() && github.event_name == 'pull_request_target' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
