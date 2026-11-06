@@ -50,14 +50,31 @@ def poe(task: str) -> int:
     return subprocess.call([sys.executable, "-m", "poethepoet", task], cwd=ROOT)
 
 
+def setup_steps(*, skip_build: bool, skip_generate: bool) -> list[str]:
+    """Return the poe tasks to run before Playwright, in order."""
+    # Sync first: the servers run with `uv run --no-sync` (playwright.config.ts).
+    return (
+        ([] if skip_generate else ["generate-frontend-client"])
+        + ["sync-backend", "e2e-db-up"]
+        + ([] if skip_build else ["e2e-build"])
+        + ["e2e-migrate"]
+    )
+
+
 def main(
     workers: int | None = None,
     skip_build: bool = False,
     mode: str = "run",
     files: list[str] | None = None,
     shard: str | None = None,
+    skip_generate: bool = True,
 ) -> None:
-    """Run the e2e suite, or only `files` or one `shard`, in the given mode."""
+    """Run the e2e suite, or only `files` or one `shard`, in the given mode.
+
+    The suite tasks (``test-e2e``, ``test-e2e-cookies``) pass ``skip_generate=False``
+    unless given ``--no-generate``, and so regenerate the API client from a fresh schema
+    first. The headed and slow tasks reuse the client already on disk.
+    """
     n = workers or default_workers()
     if n < 1:
         sys.exit("--workers must be at least 1")
@@ -74,12 +91,7 @@ def main(
 
     code = 1
     try:
-        # Sync first: the servers run with `uv run --no-sync` (playwright.config.ts).
-        steps = (
-            ["sync-backend", "e2e-db-up"]
-            + ([] if skip_build else ["e2e-build"])
-            + ["e2e-migrate"]
-        )
+        steps = setup_steps(skip_build=skip_build, skip_generate=skip_generate)
         for step in steps:
             if (code := poe(step)) != 0:
                 break

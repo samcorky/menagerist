@@ -323,7 +323,7 @@ jobs:
           browsers: chromium
 
       - name: Run end-to-end tests
-        run: uv run poe test-e2e --shard ${{ matrix.shard }}/${{ strategy.job-total }}
+        run: uv run poe test-e2e --no-generate --shard ${{ matrix.shard }}/${{ strategy.job-total }}
 
       - name: Upload failure traces
         if: failure()
@@ -442,7 +442,7 @@ jobs:
           browsers: chromium webkit firefox
 
       - name: Run cookie tests in WebKit and Firefox
-        run: uv run poe test-e2e-cookies
+        run: uv run poe test-e2e-cookies --no-generate
 
       - name: Upload failure traces
         if: failure()
