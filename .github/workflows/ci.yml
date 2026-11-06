@@ -280,14 +280,16 @@ jobs:
     # The Playwright image brings the browsers and their system libraries, so nothing is
     # installed with apt. Its tag must match @playwright/test in frontend/package.json.
     # The runner's Docker is mounted in so Compose still starts the e2e Postgres, which
-    # --network host makes reachable on localhost:55433 as it is outside the container.
+    # is published on the runner and reached from here as host.docker.internal:55433.
     container:
       image: mcr.microsoft.com/playwright:v1.64.1-noble
       options: >-
-        --network host --ipc=host --init
+        --add-host=host.docker.internal:host-gateway --ipc=host --init
         -v /var/run/docker.sock:/var/run/docker.sock
         -v /usr/bin/docker:/usr/bin/docker
         -v /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins
+    env:
+      E2E_DB_HOST: host.docker.internal
     strategy:
       fail-fast: false
       matrix:
@@ -401,14 +403,16 @@ jobs:
     # The Playwright image brings the browsers and their system libraries, so nothing is
     # installed with apt. Its tag must match @playwright/test in frontend/package.json.
     # The runner's Docker is mounted in so Compose still starts the e2e Postgres, which
-    # --network host makes reachable on localhost:55433 as it is outside the container.
+    # is published on the runner and reached from here as host.docker.internal:55433.
     container:
       image: mcr.microsoft.com/playwright:v1.64.1-noble
       options: >-
-        --network host --ipc=host --init
+        --add-host=host.docker.internal:host-gateway --ipc=host --init
         -v /var/run/docker.sock:/var/run/docker.sock
         -v /usr/bin/docker:/usr/bin/docker
         -v /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins
+    env:
+      E2E_DB_HOST: host.docker.internal
     strategy:
       fail-fast: false
       matrix:

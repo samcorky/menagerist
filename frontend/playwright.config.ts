@@ -17,6 +17,9 @@ const COOKIES_BACKEND_PORT = Number(process.env.E2E_COOKIES_BACKEND_PORT ?? 8191
 const COOKIES_TLS_PORT = Number(process.env.E2E_COOKIES_TLS_PORT ?? 8192);
 const COOKIES_STRIPPING_PORT = Number(process.env.E2E_COOKIES_STRIPPING_PORT ?? 8193);
 
+// Where the e2e Postgres is reached: localhost, or the runner's address from CI's job container.
+const DB_HOST = process.env.E2E_DB_HOST ?? 'localhost';
+
 // Use the configured worker count, or fall back to the machine core count.
 const WORKERS = Number(process.env.E2E_WORKERS) || availableParallelism();
 
@@ -42,7 +45,7 @@ function instanceEnv(name: string, extraEnv: Record<string, string> = {}) {
 	mkdirSync(mediaPath, { recursive: true });
 
 	return {
-		MENAGERIST_DATABASE_URL: `postgresql+asyncpg://menagerist:menagerist@localhost:55433/menagerist_${name}`,
+		MENAGERIST_DATABASE_URL: `postgresql+asyncpg://menagerist:menagerist@${DB_HOST}:55433/menagerist_${name}`,
 		MENAGERIST_API_FRONTEND_DIST_PATH: FRONTEND_DIST,
 		MENAGERIST_MEDIA_STORAGE_PATH: mediaPath,
 		MENAGERIST_BACKUP_PATH: backupPath,

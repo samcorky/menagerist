@@ -21,7 +21,8 @@ ROOT = Path(__file__).resolve().parent.parent
 CONTAINER = "menagerist-e2e-db"
 AUTH_DB = "menagerist_auth"
 COOKIES_DB = "menagerist_cookies"
-URL = "postgresql+asyncpg://menagerist:menagerist@localhost:55433/{db}"
+DB_HOST = os.environ.get("E2E_DB_HOST", "localhost")
+URL = f"postgresql+asyncpg://menagerist:menagerist@{DB_HOST}:55433/{{db}}"
 
 
 def worker_count() -> int:
