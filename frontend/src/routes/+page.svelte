@@ -6,7 +6,17 @@
 	import SurpriseButton from '$lib/components/surprise-button.svelte';
 	import { resolve } from '$app/paths';
 	import { goto } from '$app/navigation';
-	import { Package, Plus, Camera, ChevronRight, CircleCheck, RefreshCw, X } from '@lucide/svelte';
+	import {
+		Package,
+		Plus,
+		Camera,
+		ChevronRight,
+		CircleCheck,
+		RefreshCw,
+		WifiOff,
+		X
+	} from '@lucide/svelte';
+	import { offlineController } from '$lib/offline.svelte.js';
 	import { auth } from '$lib/auth.svelte.js';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { collectionRouteParams } from '$lib/collections';
@@ -112,6 +122,18 @@
 		if (!stale()) tidy = tidyResult;
 	}
 
+	const anyFailed = $derived(
+		[stats, newest, edited, collections, breakdown].some((block) => block?.status === 'error')
+	);
+
+	// Coming back online, or Retry in the banner, reloads when any block had failed.
+	$effect(() => {
+		void offlineController.retryCount;
+		untrack(() => {
+			if (anyFailed) void loadData();
+		});
+	});
+
 	// Loads once on arrival, and again each time an item is created while Home is open.
 	$effect(() => {
 		void captureController.nodeCreationCount;
@@ -127,7 +149,12 @@
 	<div
 		class="flex items-center gap-2 rounded-xl border border-dashed p-3 text-sm text-muted-foreground"
 	>
-		Couldn't load {what}.
+		{#if offlineController.offline}
+			<WifiOff class="size-4 shrink-0" />
+			You're offline, so {what} can't load.
+		{:else}
+			Couldn't load {what}.
+		{/if}
 		<Button variant="outline" size="sm" onclick={() => void loadData()}>
 			<RefreshCw class="size-3.5" />
 			Try again

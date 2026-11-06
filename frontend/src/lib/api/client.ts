@@ -4,6 +4,8 @@ import { client } from './generated/client.gen';
 import './etag-interceptor';
 // 401 / password-expired handling.
 import './auth-interceptor';
+// Tracks whether the server can be reached.
+import './offline-interceptor';
 
 // Use relative URL in browser, fallback to localhost for Node tests.
 const defaultBase = typeof window !== 'undefined' ? '' : 'http://localhost';

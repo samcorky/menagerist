@@ -1,4 +1,5 @@
 import { errorMessage } from '$lib/api/errors';
+import { OFFLINE_MESSAGE } from '$lib/offline';
 import { problemTitle, retryAfterSeconds, throttleMessage } from '$lib/auth';
 
 /** An area of the app a token can be given access to, with the permissions behind it. */
@@ -140,7 +141,7 @@ export function describeLastUsed(lastUsedAt: string | null | undefined, now: Dat
 /** A plain sentence for a failed create, regenerate or revoke call. */
 export function tokenErrorMessage(result: { error?: unknown; response?: Response | null }): string {
 	const { response } = result;
-	if (!response) return 'You appear to be offline. Check your connection and try again.';
+	if (!response) return OFFLINE_MESSAGE;
 	if (response.status === 429) return throttleMessage(retryAfterSeconds(response));
 	if (response.status === 409) {
 		return 'You have reached the limit of active tokens. Revoke one you no longer use, then try again.';
