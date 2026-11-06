@@ -69,3 +69,41 @@ def test_main_writes_nothing_without_tables(
 
     assert comment.main() == 0
     assert not out.exists()
+
+
+def _with_total(table: str, side: str, hit: int, found: int) -> str:
+    return table + f"\n<!-- coverage-total {side} {hit} {found} -->\n"
+
+
+def test_two_sides_get_a_total_weighted_by_lines() -> None:
+    """900/1000 and 50/100 combine to 950/1100, not the average of 90% and 50%."""
+    body = comment.build_comment(
+        [
+            _with_total(BACKEND, "backend", 900, 1000),
+            _with_total(FRONTEND, "frontend", 50, 100),
+        ]
+    )
+
+    assert body is not None
+    assert "**Total: 86.36%** (backend 90.00%, frontend 50.00%)" in body
+    assert body.index("**Total") < body.index("### Backend")
+    assert "coverage-total" not in body
+
+
+def test_a_lone_side_has_no_combined_line() -> None:
+    """A pull request that skipped a job shows only the side that ran."""
+    body = comment.build_comment([_with_total(BACKEND, "backend", 9, 10)])
+
+    assert body is not None
+    assert "Total" not in body
+    assert "coverage-total" not in body
+
+
+def test_tables_without_counts_still_post() -> None:
+    """Older artifacts, or a side with nothing measured, do not break the comment."""
+    assert "Total" not in (comment.build_comment([BACKEND, FRONTEND]) or "")
+    zero = [
+        _with_total(BACKEND, "backend", 0, 0),
+        _with_total(FRONTEND, "frontend", 0, 0),
+    ]
+    assert "Total" not in (comment.build_comment(zero) or "")

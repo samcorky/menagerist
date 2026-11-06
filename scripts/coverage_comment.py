@@ -8,22 +8,54 @@ skipped a job still gets the other half. It uses only the standard library.
 """
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
 MARKER = "<!-- component-coverage -->"
+# Each table ends with `<!-- coverage-total <side> <hit> <found> -->`, so the total is
+# weighted by line count instead of averaging two percentages.
+TOTAL_LINE = re.compile(r"^<!-- coverage-total (\w+) (\d+) (\d+) -->$", re.MULTILINE)
 
 
 def strip_marker(table: str) -> str:
     """Return a table without the marker line its own script adds."""
-    return "\n".join(line for line in table.splitlines() if line != MARKER).strip()
+    lines = (
+        line
+        for line in table.splitlines()
+        if line != MARKER and not TOTAL_LINE.match(line)
+    )
+    return "\n".join(lines).strip()
+
+
+def total_line(tables: list[str]) -> str | None:
+    """Return the combined figure, or None unless two sides reported.
+
+    A side that skipped its job leaves no figure, and a lone side is already
+    shown by its own "All ..." row.
+    """
+    sides = [m for t in tables for m in TOTAL_LINE.findall(t)]
+    if len(sides) < 2:
+        return None
+    hit = sum(int(h) for _, h, _ in sides)
+    found = sum(int(f) for _, _, f in sides)
+    if not found:
+        return None
+    parts = ", ".join(
+        f"{side} {100 * int(h) / int(f):.2f}%" for side, h, f in sides if int(f)
+    )
+    return f"**Total: {100 * hit / found:.2f}%** ({parts})"
 
 
 def build_comment(tables: list[str]) -> str | None:
     """Join the tables under one marker, or None when there are none."""
     if not tables:
         return None
-    return MARKER + "\n" + "\n\n".join(strip_marker(t) for t in tables) + "\n"
+    blocks = [strip_marker(t) for t in tables]
+    total = total_line(tables)
+    if total is not None:
+        blocks.insert(0, total)
+    return MARKER + "\n" + "\n\n".join(blocks) + "\n"
 
 
 def main() -> int:

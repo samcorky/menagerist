@@ -17,8 +17,10 @@ never drift.
 
 import argparse
 import io
+import json
 import os
 import sys
+import tempfile
 from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
@@ -33,6 +35,9 @@ FRONTEND_DIR = ROOT / "frontend"
 FRONTEND_LCOV = FRONTEND_DIR / "coverage" / "lcov.info"
 CODECOV_YML = ROOT / "codecov.yml"
 COMMENT_MARKER = "<!-- component-coverage -->"
+TOTALS_PREFIX = "<!-- coverage-total"
+Result = tuple[str, float, float | None]
+Counts = tuple[int, int]  # (hit, found)
 
 
 def load_components() -> list[dict[str, Any]]:
@@ -102,8 +107,8 @@ def frontend_paths(component: dict[str, Any]) -> list[str]:
     return [str(p).strip().removeprefix("frontend/") for p in component["paths"]]
 
 
-def lcov_percent(lcov: str, patterns: list[str]) -> float:
-    """Return the line coverage of the lcov files that match any of the globs."""
+def lcov_counts(lcov: str, patterns: list[str]) -> Counts:
+    """Return the lines hit and found in the lcov files that match any of the globs."""
     found = hit = 0
     included = False
     for line in lcov.splitlines():
@@ -113,7 +118,41 @@ def lcov_percent(lcov: str, patterns: list[str]) -> float:
             found += int(line.removeprefix("LF:"))
         elif included and line.startswith("LH:"):
             hit += int(line.removeprefix("LH:"))
+    return hit, found
+
+
+def lcov_percent(lcov: str, patterns: list[str]) -> float:
+    """Return the line coverage of the lcov files that match any of the globs."""
+    hit, found = lcov_counts(lcov, patterns)
     return 100.0 * hit / found if found else 0.0
+
+
+def backend_counts(cov: Coverage) -> Counts:
+    """Return the hit and total of every measured backend file, branches included.
+
+    That is the basis ``Coverage.report`` uses for the component percentages.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "coverage.json"
+        try:
+            cov.json_report(outfile=str(out), include=["src/**"])
+        except NoDataError:
+            return 0, 0
+        totals = json.loads(out.read_text(encoding="utf-8"))["totals"]
+    found = totals["num_statements"] + totals.get("num_branches", 0)
+    hit = totals["covered_lines"] + totals.get("covered_branches", 0)
+    return hit, found
+
+
+def totals_marker(label: str, counts: Counts) -> str:
+    """Return the hidden line that lets the comment script add the sides together."""
+    return f"{TOTALS_PREFIX} {label} {counts[0]} {counts[1]} -->"
+
+
+def overall_row(label: str, counts: Counts) -> Result:
+    """Return the informational row for a whole side, which has no target."""
+    hit, found = counts
+    return label, 100.0 * hit / found if found else 0.0, None
 
 
 def parse_args() -> argparse.Namespace:
@@ -135,9 +174,9 @@ def parse_args() -> argparse.Namespace:
 def collect_results(
     components: list[dict[str, Any]],
     cov: Coverage,
-) -> list[tuple[str, float, float]]:
+) -> list[Result]:
     """Collect each configured component's percentage against the loaded data."""
-    results: list[tuple[str, float, float]] = []
+    results: list[Result] = []
     for component in components:
         target = component_target(component)
         if target is None:
@@ -181,14 +220,20 @@ def print_missing_details(
 
 
 def summary_markdown(
-    results: list[tuple[str, float, float]], heading: str = "Backend coverage"
+    results: list[Result],
+    heading: str = "Backend coverage",
+    totals: tuple[str, Counts] | None = None,
 ) -> str:
-    """Return a Markdown table of each component's coverage against its target."""
-    below = [name for name, percent, target in results if percent < target]
+    """Return a Markdown table of each component's coverage against its target.
+
+    Rows without a target (the whole-side row) are informational and carry no result.
+    """
+    checked = [(n, p, t) for n, p, t in results if t is not None]
+    below = [name for name, percent, target in checked if percent < target]
     if below:
-        verdict = f"❌ {len(below)} of {len(results)} below target: {', '.join(below)}"
+        verdict = f"❌ {len(below)} of {len(checked)} below target: {', '.join(below)}"
     else:
-        verdict = f"✅ All {len(results)} meet their targets"
+        verdict = f"✅ All {len(checked)} meet their targets"
     lines = [
         f"### {heading}",
         "",
@@ -198,24 +243,33 @@ def summary_markdown(
         "| --- | ---: | ---: | --- |",
     ]
     for name, percent, target in results:
-        result = "✅ Pass" if percent >= target else "❌ **Below target**"
         shown = "100" if percent >= 100 else f"{percent:.2f}"
+        if target is None:
+            lines.append(f"| {name} | {shown}% | - | - |")
+            continue
+        result = "✅ Pass" if percent >= target else "❌ **Below target**"
         lines.append(f"| {name} | {shown}% | {target:.0f}% | {result} |")
+    if totals is not None:
+        lines.extend(["", totals_marker(*totals)])
     return "\n".join(lines) + "\n"
 
 
 def write_step_summary(
-    results: list[tuple[str, float, float]], heading: str = "Backend coverage"
+    results: list[Result],
+    heading: str = "Backend coverage",
+    totals: tuple[str, Counts] | None = None,
 ) -> None:
     """Append the results to the GitHub Actions job summary, when there is one."""
     path = os.environ.get("GITHUB_STEP_SUMMARY")
     if path:
         with open(path, "a", encoding="utf-8") as summary:
-            summary.write(summary_markdown(results, heading))
+            summary.write(summary_markdown(results, heading, totals))
 
 
 def write_comment_file(
-    results: list[tuple[str, float, float]], heading: str = "Backend coverage"
+    results: list[Result],
+    heading: str = "Backend coverage",
+    totals: tuple[str, Counts] | None = None,
 ) -> None:
     """Write the table for the pull request comment, when CI names a file for it.
 
@@ -223,15 +277,15 @@ def write_comment_file(
     """
     path = os.environ.get("COMPONENT_COVERAGE_COMMENT")
     if path:
-        body = COMMENT_MARKER + "\n" + summary_markdown(results, heading)
+        body = COMMENT_MARKER + "\n" + summary_markdown(results, heading, totals)
         Path(path).write_text(body, encoding="utf-8")
 
 
 def collect_frontend_results(
     components: list[dict[str, Any]], lcov: str
-) -> list[tuple[str, float, float]]:
+) -> list[Result]:
     """Collect each frontend component's line coverage from the lcov report."""
-    results: list[tuple[str, float, float]] = []
+    results: list[Result] = []
     for component in components:
         target = component_target(component)
         if target is None:
@@ -241,18 +295,29 @@ def collect_frontend_results(
     return results
 
 
-def report(results: list[tuple[str, float, float]], heading: str) -> list[str]:
+def report(
+    results: list[Result],
+    heading: str,
+    totals: tuple[str, Counts] | None = None,
+) -> list[str]:
     """Print each component against its target and return those below it."""
-    write_step_summary(results, heading)
-    write_comment_file(results, heading)
+    write_step_summary(results, heading, totals)
+    write_comment_file(results, heading, totals)
     width = max(len(name) for name, _, _ in results)
 
     for name, percent, target in results:
+        if target is None:
+            print(f"[INFO] {name.ljust(width)}  {percent:6.2f}%  (no target)")
+            continue
         status = "OK  " if percent >= target else "FAIL"
         target_text = f"target {target:.0f}%"
         print(f"[{status}] {name.ljust(width)}  {percent:6.2f}%  ({target_text})")
 
-    return [name for name, percent, target in results if percent < target]
+    return [
+        name
+        for name, percent, target in results
+        if target is not None and percent < target
+    ]
 
 
 def main() -> int:
@@ -270,6 +335,9 @@ def main() -> int:
             return 1
         lcov = FRONTEND_LCOV.read_text(encoding="utf-8")
         results = collect_frontend_results(frontend, lcov)
+        counts = lcov_counts(lcov, ["*"])
+        results.append(overall_row("All frontend", counts))
+        totals = ("frontend", counts)
         heading = "Frontend coverage"
     else:
         cov = Coverage(data_file=str(BACKEND_DIR / ".coverage"))
@@ -279,13 +347,16 @@ def main() -> int:
             print("No coverage data found - run tests with coverage enabled first.")
             return 1
         results = collect_results(backend, cov)
+        counts = backend_counts(cov)
+        results.append(overall_row("All backend", counts))
+        totals = ("backend", counts)
         heading = "Backend coverage"
 
-    if not results:
+    if not any(target is not None for _, _, target in results):
         print("No components with a fixed (non-auto) target to check.")
         return 0
 
-    failures = report(results, heading)
+    failures = report(results, heading, totals)
     if not failures:
         print("\nAll components meet their coverage targets.")
         return 0
