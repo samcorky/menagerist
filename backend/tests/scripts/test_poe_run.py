@@ -528,3 +528,37 @@ def test_frontend_coverage_is_the_vitest_run_with_the_coverage_flag() -> None:
     assert poe_run._vitest_coverage("verbose", "2") == [*plain, "--coverage"]
     assert "--maxWorkers=2" in plain
     assert poe_run.TOOLS["test-frontend-coverage"].cwd == "frontend"
+
+
+def test_junit_reports_are_written_only_when_ci_names_a_directory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Local runs leave no XML behind; CI gets one file per test run."""
+    monkeypatch.delenv("JUNIT_XML_DIR", raising=False)
+    build = poe_run._pytest(
+        ["-m", "integration"], append=True, report="backend-integration"
+    )
+    assert not any(arg.startswith("--junitxml") for arg in build("agent", "auto"))
+
+    monkeypatch.setenv("JUNIT_XML_DIR", "junit-reports")
+    cmd = build("agent", "auto")
+    expected = (
+        f"--junitxml={poe_run.ROOT / 'junit-reports' / 'backend-integration.xml'}"
+    )
+    assert expected in cmd
+    assert "junit_family=xunit2" in cmd
+
+
+def test_vitest_keeps_its_console_reporter_beside_junit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Naming the junit reporter would otherwise drop the console output."""
+    monkeypatch.setenv("JUNIT_XML_DIR", "junit-reports")
+    cmd = poe_run._vitest("agent", "")
+    assert cmd.count("--reporter=default") == 1
+    assert "--reporter=junit" in cmd
+    assert any(arg.endswith("frontend.xml") for arg in cmd)
+    assert "--reporter=verbose" in poe_run._vitest("verbose", "")
+
+    monkeypatch.delenv("JUNIT_XML_DIR")
+    assert not any("junit" in arg for arg in poe_run._vitest("agent", ""))
