@@ -162,9 +162,9 @@ async def upload_backup(
 
 
 @public_router.post(
-    "/first-run-restore",
+    "/restore",
     status_code=204,
-    operation_id="restore_on_first_run",
+    operation_id="restore_instance",
     openapi_extra=ARCHIVE_BODY,
     dependencies=[Depends(refuse_cross_site), Depends(first_run_restore_slot)],
     responses={
@@ -181,7 +181,7 @@ async def upload_backup(
         **PAYLOAD_TOO_LARGE_RESPONSE,
     },
 )
-async def restore_on_first_run(
+async def restore_instance(
     request: Request,
     use_case: Annotated[RestoreOnFirstRun, Depends(get_restore_on_first_run)],
 ) -> Response:

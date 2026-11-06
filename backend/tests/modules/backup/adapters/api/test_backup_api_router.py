@@ -136,14 +136,14 @@ def test_public_first_run_restore_then_closed_gate(client: TestClient) -> None:
     created = client.post("/api/v1/backup", json={}).json()
     archive = client.get(f"/api/v1/backup/{created['id']}/download").content
     response = client.post(
-        "/api/v1/backup/first-run-restore",
+        "/api/v1/backup/restore",
         content=archive,
         headers={"Content-Type": "application/gzip"},
     )
     assert response.status_code == 204, response.text
     assert (
         client.post(
-            "/api/v1/backup/first-run-restore",
+            "/api/v1/backup/restore",
             content=archive,
             headers={"Content-Type": "application/gzip"},
         ).status_code
@@ -156,7 +156,7 @@ def test_cross_site_first_run_restore_is_refused(client: TestClient) -> None:
     """A third-party site cannot claim an empty instance through restoration."""
     assert (
         client.post(
-            "/api/v1/backup/first-run-restore",
+            "/api/v1/backup/restore",
             content=b"unused",
             headers={
                 "Origin": "https://foreign.example",
