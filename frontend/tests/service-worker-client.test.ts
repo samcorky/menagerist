@@ -136,6 +136,15 @@ describe('recovery', () => {
 		expect(go).not.toHaveBeenCalled();
 	});
 
+	it('never turns a doubled leading slash into another site', async () => {
+		vi.stubGlobal('navigator', { serviceWorker: { getRegistrations: async () => [] } });
+		vi.stubGlobal('caches', { keys: async () => [], delete: async () => true });
+		const go = vi.fn();
+		await resetIfAsked(new URL(`https://x.example//evil.example/path?${RESET_PARAM}=1`), go);
+		expect(go).toHaveBeenCalledWith('/evil.example/path');
+		vi.unstubAllGlobals();
+	});
+
 	it('resets, then returns to the same page without the flag', async () => {
 		vi.stubGlobal('navigator', { serviceWorker: { getRegistrations: async () => [] } });
 		vi.stubGlobal('caches', { keys: async () => [], delete: async () => true });

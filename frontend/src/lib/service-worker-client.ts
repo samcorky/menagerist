@@ -82,6 +82,7 @@ export async function resetIfAsked(url: URL, go: (to: string) => void): Promise<
 	if (!url.searchParams.has(RESET_PARAM)) return false;
 	await resetServiceWorker();
 	url.searchParams.delete(RESET_PARAM);
-	go(url.pathname + url.search + url.hash);
+	// A path of "//host" would read as another site, so keep a single leading slash.
+	go('/' + url.pathname.replace(/^\/+/, '') + url.search + url.hash);
 	return true;
 }
