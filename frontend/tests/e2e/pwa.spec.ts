@@ -46,3 +46,45 @@ test('the theme colour follows the theme the person picks', async ({ page }) => 
 	await page.reload();
 	await expect(colour).toHaveAttribute('content', '#ffffff');
 });
+
+test('the service worker shows an offline page and keeps nothing private in the cache', async ({
+	page,
+	context
+}) => {
+	const home = page.getByRole('link', { name: 'Home', exact: true }).first();
+	await page.goto('/');
+	await expect(home).toBeVisible();
+	await expect
+		.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null), {
+			message: 'the worker takes control of the page'
+		})
+		.toBe(true);
+
+	// Cache Storage holds the build's files and the offline page, and no API response, page
+	// or media.
+	const cached = await page.evaluate(async () => {
+		const paths: string[] = [];
+		for (const name of await caches.keys()) {
+			for (const request of await (await caches.open(name)).keys()) {
+				paths.push(new URL(request.url).pathname);
+			}
+		}
+		return paths;
+	});
+	expect(cached).toContain('/offline.html');
+	expect(cached.filter((p) => !p.startsWith('/_app/') && p !== '/offline.html')).toEqual([]);
+
+	await context.setOffline(true);
+	await page.goto('/items');
+	await expect(page.getByRole('heading', { name: "You're offline" })).toBeVisible();
+
+	await context.setOffline(false);
+	await page.goto('/');
+	await expect(home).toBeVisible();
+});
+
+test('the service worker script is revalidated, not cached for an hour', async ({ request }) => {
+	const worker = await request.get('/service-worker.js');
+	expect(worker.status()).toBe(200);
+	expect(worker.headers()['cache-control']).toBe('no-cache');
+});

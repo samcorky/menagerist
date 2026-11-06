@@ -5,7 +5,7 @@
 	import { onNavigate, goto } from '$app/navigation';
 	import { CirclePlus, LayoutGrid, House, Settings, Library, Menu, Search } from '@lucide/svelte';
 	import { onMount, setContext } from 'svelte';
-	import { Toaster } from 'svelte-sonner';
+	import { Toaster, toast } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { TooltipProvider } from '$lib/components/ui/tooltip/index.js';
 	import AppSidebar from '$lib/components/app-sidebar.svelte';
@@ -21,6 +21,12 @@
 	import { auth } from '$lib/auth.svelte.js';
 	import { guardDecision } from '$lib/auth';
 	import { animatesNavigation } from '$lib/view-transition';
+	import {
+		checkWhenShown,
+		registerServiceWorker,
+		resetIfAsked,
+		workerSupported
+	} from '$lib/service-worker-client';
 	import { themeController } from '$lib/theme.svelte.js';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { searchPaletteController } from '$lib/search-palette.svelte.js';
@@ -77,6 +83,21 @@
 
 	onMount(() => {
 		void auth.init();
+		if (!workerSupported()) return;
+		let stopChecking: (() => void) | undefined;
+		void (async () => {
+			if (await resetIfAsked(new URL(location.href), (to) => location.replace(to))) return;
+			const registration = await registerServiceWorker((apply) =>
+				toast('A new version is ready', {
+					id: 'app-update',
+					description: "Reload when you've saved your work.",
+					duration: Infinity,
+					action: { label: 'Reload', onClick: apply }
+				})
+			);
+			if (registration) stopChecking = checkWhenShown(registration);
+		})();
+		return () => stopChecking?.();
 	});
 
 	const pathname = $derived(page.url.pathname);

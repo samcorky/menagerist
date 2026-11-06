@@ -48,6 +48,13 @@ _PRECOMPRESSED = (("br", ".br"), ("gzip", ".gz"))
 
 _IMMUTABLE_CACHE = "public, max-age=31536000, immutable"
 _ASSET_CACHE = "public, max-age=3600"
+# A browser checks the worker script for a new version on its own schedule, and an hour
+# of caching would delay every update by that long. no-cache still revalidates by ETag.
+_REVALIDATE = "no-cache"
+_REVALIDATED_FILES = frozenset({"service-worker.js"})
+# A worker's own requests obey the policy of its script's response. The API default
+# (`default-src 'none'`) would block it from fetching the files it precaches.
+_WORKER_CSP = "default-src 'none'; connect-src 'self'"
 _NO_CACHE = "no-store, no-cache, must-revalidate"
 
 _SHELL_CSP = "; ".join(
@@ -90,6 +97,15 @@ def _looks_like_asset(path: str) -> bool:
     return "." in PurePosixPath(path).name
 
 
+def _asset_headers(path: str) -> dict[str, str]:
+    """Return the caching (and, for the worker, security) headers of a real file."""
+    if path.startswith(_IMMUTABLE_PREFIX):
+        return {"Cache-Control": _IMMUTABLE_CACHE}
+    if path in _REVALIDATED_FILES:
+        return {"Cache-Control": _REVALIDATE, "Content-Security-Policy": _WORKER_CSP}
+    return {"Cache-Control": _ASSET_CACHE}
+
+
 class SpaStaticFiles(StaticFiles):
     """StaticFiles with SPA-shell fallback and per-path caching."""
 
@@ -114,9 +130,7 @@ class SpaStaticFiles(StaticFiles):
         if path == _SHELL:
             return self._shell(response)
 
-        response.headers["Cache-Control"] = (
-            _IMMUTABLE_CACHE if path.startswith(_IMMUTABLE_PREFIX) else _ASSET_CACHE
-        )
+        response.headers.update(_asset_headers(path))
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 
