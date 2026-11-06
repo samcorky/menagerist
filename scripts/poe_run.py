@@ -377,8 +377,23 @@ def _exe(name: str) -> str:
     return shutil.which(name) or name
 
 
+def junit_path(name: str) -> str | None:
+    """Return where to write a JUnit report, when CI asks for them.
+
+    ``JUNIT_XML_DIR`` (relative to the repository root, or absolute) switches the
+    reports on. They feed Codecov Test Analytics, so local runs write none.
+    """
+    directory = os.environ.get("JUNIT_XML_DIR")
+    if not directory:
+        return None
+    return str(ROOT / directory / f"{name}.xml")
+
+
 def _pytest(
-    selector: list[str], append: bool, files: list[str] | None = None
+    selector: list[str],
+    append: bool,
+    files: list[str] | None = None,
+    report: str = "backend",
 ) -> Callable[[str, str], list[str]]:
     def build(mode: str, workers: str) -> list[str]:
         cmd = [
@@ -396,6 +411,9 @@ def _pytest(
             *(["--cov-append"] if append else []),
             "--cov-report=",
         ]
+        junit = junit_path(report)
+        if junit:
+            cmd += [f"--junitxml={junit}", "-o", "junit_family=xunit2"]
         if mode == "agent":
             return [*cmd, "-q", "--tb=short", "--no-header"]
         cmd.append("--cov-report=term-missing:skip-covered")
@@ -423,6 +441,16 @@ def _vitest(mode: str, workers: str) -> list[str]:
     cmd = [shutil.which("node") or "node", "./node_modules/vitest/vitest.mjs", "run"]
     if workers:
         cmd.append(f"--maxWorkers={workers}")
+    junit = junit_path("frontend")
+    if junit:
+        # Each --reporter replaces the default one, so name it again beside junit.
+        console = "verbose" if mode == "verbose" else "default"
+        return [
+            *cmd,
+            f"--reporter={console}",
+            "--reporter=junit",
+            f"--outputFile.junit={junit}",
+        ]
     return [*cmd, "--reporter=verbose"] if mode == "verbose" else cmd
 
 
@@ -438,11 +466,14 @@ TOOLS: dict[str, Tool] = {
     "test-backend": Tool(
         "pytest",
         "backend",
-        _pytest(["-m", "not integration"], append=False),
+        _pytest(["-m", "not integration"], append=False, report="backend-unit"),
         parse_pytest,
     ),
     "test-backend-integration": Tool(
-        "pytest", "backend", _pytest(["-m", "integration"], append=True), parse_pytest
+        "pytest",
+        "backend",
+        _pytest(["-m", "integration"], append=True, report="backend-integration"),
+        parse_pytest,
     ),
     "test-frontend": Tool("vitest", "frontend", _vitest, parse_vitest),
     "test-frontend-coverage": Tool(
@@ -609,5 +640,15 @@ def main(
     tool = TOOLS[task]
     if files and task in PYTEST_SELECTORS:
         selector, append = PYTEST_SELECTORS[task]
-        tool = Tool(tool.name, tool.cwd, _pytest(selector, append, files), tool.parser)
+        tool = Tool(
+            tool.name,
+            tool.cwd,
+            _pytest(
+                selector,
+                append,
+                files,
+                report="backend-integration" if append else "backend-unit",
+            ),
+            tool.parser,
+        )
     sys.exit(execute(task, tool, resolve_mode(mode), workers))
