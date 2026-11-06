@@ -271,7 +271,7 @@ ALLOWED: dict[Route, str] = {
     ("DELETE", "/api/v1/backup/{backup_id}"): "administrator-only instance deletion",
     (
         "POST",
-        "/api/v1/backup/first-run-restore",
+        "/api/v1/backups/restore",
     ): "public only before setup; shared-lock and rate-limit integration tests",
     (
         "POST",

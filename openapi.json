@@ -22425,15 +22425,15 @@
         }
       }
     },
-    "/api/v1/backup/first-run-restore": {
+    "/api/v1/backups/restore": {
       "post": {
         "tags": [
           "v1",
           "Backups"
         ],
-        "summary": "Restore On First Run",
+        "summary": "Restore Instance",
         "description": "Restore an empty instance using the archived accounts and credentials.",
-        "operationId": "restore_on_first_run",
+        "operationId": "restore_instance",
         "requestBody": {
           "content": {
             "application/gzip": {
@@ -22461,7 +22461,7 @@
                   "title": "CorruptBackupError",
                   "status": 400,
                   "detail": "The archive failed integrity or structural validation.",
-                  "instance": "https://menagerist.example/api/v1/backup/first-run-restore"
+                  "instance": "https://menagerist.example/api/v1/backups/restore"
                 }
               }
             }
@@ -22478,7 +22478,7 @@
                   "title": "RestoreTargetNotEmptyError",
                   "status": 409,
                   "detail": "Restore would overwrite existing instance content.",
-                  "instance": "https://menagerist.example/api/v1/backup/first-run-restore"
+                  "instance": "https://menagerist.example/api/v1/backups/restore"
                 }
               }
             }
@@ -22495,7 +22495,7 @@
                   "title": "Payload Too Large",
                   "status": 413,
                   "detail": "The upload is larger than this server allows.",
-                  "instance": "/api/v1/backup/first-run-restore"
+                  "instance": "/api/v1/backups/restore"
                 }
               }
             }
@@ -22515,7 +22515,7 @@
                       "title": "Internal Server Error",
                       "status": 500,
                       "detail": "An unexpected error occurred.",
-                      "instance": "https://menagerist.example/api/v1/backup/first-run-restore"
+                      "instance": "https://menagerist.example/api/v1/backups/restore"
                     }
                   }
                 }

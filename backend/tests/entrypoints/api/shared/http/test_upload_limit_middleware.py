@@ -26,7 +26,7 @@ ALLOWANCE = upload_limit_middleware._OVERHEAD_ALLOWANCE
 
 @pytest.mark.parametrize(
     "path",
-    ["/api/v1/backup/upload", "/api/v1/backup/first-run-restore", "/api/v1/me/import"],
+    ["/api/v1/backup/upload", "/api/v1/backups/restore", "/api/v1/me/import"],
 )
 async def test_archive_uploads_use_backup_limit(
     path: str, monkeypatch: pytest.MonkeyPatch

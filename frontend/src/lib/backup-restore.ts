@@ -1,10 +1,10 @@
-import { restoreOnFirstRun } from '$lib/api/client';
+import { restoreInstance } from '$lib/api/client';
 
 type RestoreResult = { ok: true } | { ok: false; message: string };
 
 export async function restoreFirstRunArchive(file: File): Promise<RestoreResult> {
 	try {
-		const result = await restoreOnFirstRun({ body: file });
+		const result = await restoreInstance({ body: file });
 		if (result.response?.ok) return { ok: true };
 		switch (result.response?.status) {
 			case 400:
