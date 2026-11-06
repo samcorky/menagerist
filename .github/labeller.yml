@@ -12,6 +12,27 @@
       - any-glob-to-any-file:
           - "frontend/**"
 
+# Sign-in, roles, permissions and access stances, wherever they are enforced.
+"area: identity":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "backend/src/app/modules/identity/**"
+          - "backend/tests/modules/identity/**"
+          - "backend/src/app/platform/config/identity*.py"
+          - "backend/src/app/shared_kernel/access*.py"
+          - "backend/src/app/shared_kernel/actor.py"
+          - "backend/src/app/shared_kernel/authorisation.py"
+          - "backend/src/app/entrypoints/api/shared/access*"
+          - "backend/src/app/entrypoints/api/shared/*permission*"
+          - "backend/src/app/entrypoints/api/shared/*authorisation*"
+          - "backend/tests/**/*access_stances*"
+          - "backend/tests/**/*permission*"
+          - "backend/tests/**/*authorisation*"
+          - "frontend/src/routes/login/**"
+          - "frontend/src/routes/settings/account/**"
+          - "frontend/src/lib/auth*"
+          - "frontend/src/lib/api/auth-*"
+
 documentation:
   - changed-files:
       - any-glob-to-any-file:
