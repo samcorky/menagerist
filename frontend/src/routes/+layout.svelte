@@ -2,7 +2,7 @@
 	import './layout.css';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { onNavigate, goto } from '$app/navigation';
+	import { onNavigate, beforeNavigate, afterNavigate, goto } from '$app/navigation';
 	import { CirclePlus, LayoutGrid, House, Settings, Library, Menu, Search } from '@lucide/svelte';
 	import { onMount, setContext } from 'svelte';
 	import { Toaster } from 'svelte-sonner';
@@ -21,6 +21,13 @@
 	import { auth } from '$lib/auth.svelte.js';
 	import { guardDecision } from '$lib/auth';
 	import { animatesNavigation } from '$lib/view-transition';
+	import {
+		changesPage,
+		restoreScroll,
+		savePosition,
+		savedPosition,
+		scrollToFragment
+	} from '$lib/scroll-restore';
 	import { themeController } from '$lib/theme.svelte.js';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { searchPaletteController } from '$lib/search-palette.svelte.js';
@@ -73,6 +80,26 @@
 			});
 			transition.finished.catch(() => {});
 		});
+	});
+
+	// SvelteKit only manages window scroll; the app scrolls inside #main-scroll.
+	let cancelRestore: (() => void) | undefined;
+	beforeNavigate(({ from, type }) => {
+		cancelRestore?.();
+		const el = document.getElementById('main-scroll');
+		if (el && from && type !== 'leave') savePosition(from.url, el.scrollTop);
+	});
+	afterNavigate(({ from, to, type }) => {
+		const el = document.getElementById('main-scroll');
+		if (!el || !to || type === 'enter') return;
+		if (type === 'popstate') {
+			const top = savedPosition(to.url);
+			if (top !== undefined) cancelRestore = restoreScroll(el, top);
+		} else if (to.url.hash) {
+			scrollToFragment(el, to.url.hash);
+		} else if (changesPage(from?.url, to.url)) {
+			el.scrollTop = 0;
+		}
 	});
 
 	onMount(() => {
