@@ -3,8 +3,17 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { onNavigate, beforeNavigate, afterNavigate, goto } from '$app/navigation';
-	import { CirclePlus, LayoutGrid, House, Settings, Library, Menu, Search } from '@lucide/svelte';
-	import { onMount, setContext } from 'svelte';
+	import {
+		CirclePlus,
+		LayoutGrid,
+		House,
+		Settings,
+		Library,
+		Menu,
+		Search,
+		WifiOff
+	} from '@lucide/svelte';
+	import { onMount, setContext, untrack } from 'svelte';
 	import { Toaster, toast } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { TooltipProvider } from '$lib/components/ui/tooltip/index.js';
@@ -36,6 +45,8 @@
 		workerSupported
 	} from '$lib/service-worker-client';
 	import { themeController } from '$lib/theme.svelte.js';
+	import { offlineController } from '$lib/offline.svelte.js';
+	import OfflineBanner from '$lib/components/offline-banner.svelte';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { searchPaletteController } from '$lib/search-palette.svelte.js';
 	import SearchPalette from '$lib/components/search-palette.svelte';
@@ -66,6 +77,16 @@
 
 	$effect(() => {
 		themeController.init();
+	});
+
+	$effect(() => offlineController.init());
+
+	// Launched with no connection, the sign-in check fails: try again once the connection returns.
+	$effect(() => {
+		void offlineController.retryCount;
+		untrack(() => {
+			if (auth.loadFailed) void auth.init();
+		});
 	});
 
 	$effect(() => {
@@ -342,10 +363,17 @@
 			{/if}
 			<div id="main-scroll" class="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
 				{#if showPage}
+					<OfflineBanner />
 					{@render children()}
 				{:else if auth.loadFailed}
-					<main class="flex flex-1 flex-col items-center gap-3 px-4 py-16 text-center">
-						<h1 class="font-heading text-xl font-semibold">Can't reach Menagerist</h1>
+					<main
+						data-testid="start-offline"
+						class="flex flex-1 flex-col items-center gap-3 px-4 py-16 text-center"
+					>
+						<WifiOff class="size-10 text-muted-foreground/50" />
+						<h1 class="font-heading text-xl font-semibold">
+							{offlineController.offline ? "You're offline" : "Can't reach Menagerist"}
+						</h1>
 						<p class="text-muted-foreground">Check your connection, then try again.</p>
 						<Button class="pointer-coarse:h-11" onclick={() => auth.init()}>Try again</Button>
 					</main>

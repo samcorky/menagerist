@@ -24,6 +24,8 @@
 	} from '$lib/collections';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import LoadFailed from '$lib/components/load-failed.svelte';
+	import { offlineController } from '$lib/offline.svelte.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import QueryBuilder from '$lib/components/query-builder.svelte';
@@ -162,6 +164,14 @@
 
 	$effect(() => {
 		void fetchPage();
+	});
+
+	// Coming back online, or Retry in the banner, reloads a list that had failed.
+	$effect(() => {
+		void offlineController.retryCount;
+		untrack(() => {
+			if (loadFailed) void fetchPage();
+		});
 	});
 
 	$effect(() => {
@@ -305,10 +315,7 @@
 			{/each}
 		</div>
 	{:else if loadFailed}
-		<div class="flex flex-col items-start gap-3 rounded-xl border border-dashed p-5">
-			<p class="text-sm text-muted-foreground">Couldn't load your collections.</p>
-			<Button variant="outline" onclick={() => void fetchPage()}>Try again</Button>
-		</div>
+		<LoadFailed what="your collections" onretry={() => void fetchPage()} />
 	{:else if collections.length > 0}
 		<ul class="grid gap-3 sm:grid-cols-[repeat(auto-fill,minmax(20rem,1fr))]">
 			{#each collections as collection (collection.id)}

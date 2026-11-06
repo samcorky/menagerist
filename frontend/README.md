@@ -15,7 +15,7 @@ For UI work, read the core rules and terminology in [DESIGN_GUIDELINES.md](DESIG
 
 ## Key patterns
 
-**Reactivity** - Svelte 5 runes throughout (`$state`, `$derived`, `$effect`). No global stores except singleton controllers (`src/lib/theme.svelte.ts`, `src/lib/capture.svelte.ts`, `src/lib/search-palette.svelte.ts`).
+**Reactivity** - Svelte 5 runes throughout (`$state`, `$derived`, `$effect`). No global stores except singleton controllers (`src/lib/theme.svelte.ts`, `src/lib/capture.svelte.ts`, `src/lib/search-palette.svelte.ts`, `src/lib/offline.svelte.ts`).
 
 **API client** - generated types and functions live in `src/lib/api/generated/`. Never edit those files by hand. Import everything through `src/lib/api/client.ts`.
 

@@ -1,3 +1,5 @@
+import { OFFLINE_DESCRIPTION, OFFLINE_MESSAGE, OFFLINE_TITLE } from '$lib/offline';
+
 /** Extract a human-readable message from a failed API call's error field. */
 export function errorMessage(error: unknown): string {
 	if (error && typeof error === 'object' && 'detail' in error) {
@@ -24,13 +26,9 @@ export function networkAwareError(result: { error?: unknown; response?: Response
 	title: string;
 	description?: string;
 } {
-	if (!result.response) {
-		return {
-			title: 'You appear to be offline',
-			description: 'Check your connection and try again.'
-		};
-	}
-	if (result.response.status >= 500) {
+	const { response } = result;
+	if (!response) return { title: OFFLINE_TITLE, description: OFFLINE_DESCRIPTION };
+	if (response.status >= 500) {
 		return {
 			title: 'Something went wrong',
 			description: 'Try again, or reload the page if the problem persists.'
@@ -46,7 +44,8 @@ export function uploadErrorMessage(result: {
 	error?: unknown;
 	response?: Response | null;
 }): string {
-	if (!result.response) return 'You appear to be offline. Check your connection and try again.';
-	if (result.response.status === 413) return FILE_TOO_LARGE_MESSAGE;
+	const { response } = result;
+	if (!response) return OFFLINE_MESSAGE;
+	if (response.status === 413) return FILE_TOO_LARGE_MESSAGE;
 	return errorMessage(result.error);
 }

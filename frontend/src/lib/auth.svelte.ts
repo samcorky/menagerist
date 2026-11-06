@@ -11,6 +11,7 @@ import {
 } from '$lib/api/client';
 import { registerAuthHandlers, resetAuthEvents } from '$lib/api/auth-events';
 import { clearAllEtags } from '$lib/api/etagStore';
+import { OFFLINE_MESSAGE } from '$lib/offline';
 import {
 	authErrorMessage,
 	DISPLAY_NAME_MESSAGE,
@@ -24,8 +25,6 @@ export type ChangePasswordResult = AuthResult | { ok: false; message: string; fi
 export type SetupResult = { ok: true; claimed: Record<string, number> } | AuthResult;
 
 type SessionOutcome = 'signed-in' | 'signed-out' | 'failed';
-
-const OFFLINE = 'You appear to be offline. Check your connection and try again.';
 
 /**
  * The signed-in account and what it may do. No password is ever kept here;
@@ -105,7 +104,7 @@ class AuthController {
 			}
 			return { ok: true };
 		} catch {
-			return { ok: false, message: OFFLINE };
+			return { ok: false, message: OFFLINE_MESSAGE };
 		}
 	}
 
@@ -123,7 +122,7 @@ class AuthController {
 			this.beginSession();
 			return { ok: true, claimed: result.data.claimed };
 		} catch {
-			return { ok: false, message: OFFLINE };
+			return { ok: false, message: OFFLINE_MESSAGE };
 		}
 	}
 
@@ -145,13 +144,13 @@ class AuthController {
 		try {
 			// keepalive lets the request finish even if the page navigates away meanwhile.
 			const result = await apiSignOut({ keepalive: true });
-			if (!result.response) failure = OFFLINE;
+			if (!result.response) failure = OFFLINE_MESSAGE;
 			// 401 means the session had already ended.
 			else if (!result.response.ok && result.response.status !== 401) {
 				failure = authErrorMessage(result);
 			}
 		} catch {
-			failure = OFFLINE;
+			failure = OFFLINE_MESSAGE;
 		}
 		if (failure === null) return { ok: true };
 		this.leftOnPurpose = false;
@@ -178,7 +177,7 @@ class AuthController {
 			await this.loadSession();
 			return { ok: true };
 		} catch {
-			return { ok: false, message: OFFLINE };
+			return { ok: false, message: OFFLINE_MESSAGE };
 		}
 	}
 
@@ -191,7 +190,7 @@ class AuthController {
 			this.user = result.data;
 			return { ok: true };
 		} catch {
-			return { ok: false, message: OFFLINE };
+			return { ok: false, message: OFFLINE_MESSAGE };
 		}
 	}
 
