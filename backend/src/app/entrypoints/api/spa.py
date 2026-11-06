@@ -25,6 +25,7 @@ uses ``setdefault``, so it fills in the API-oriented defaults (CSP ``default-src
 'none'``) only where a response hasn't already chosen its own.
 """
 
+import mimetypes
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
@@ -35,6 +36,10 @@ from starlette.staticfiles import StaticFiles
 
 if TYPE_CHECKING:
     from starlette.types import Scope
+
+# StaticFiles types a file from the system's MIME tables, which not every host maps
+# for the web app manifest; browsers will not treat it as one without this type.
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 _SHELL = "200.html"
 _IMMUTABLE_PREFIX = "_app/immutable/"

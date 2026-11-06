@@ -396,7 +396,7 @@
 							? 'text-primary'
 							: 'text-muted-foreground hover:text-foreground'}"
 					>
-						<CirclePlus class="size-6" />
+						<CirclePlus class="size-5" />
 						<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">New</span>
 					</button>
 

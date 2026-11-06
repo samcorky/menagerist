@@ -95,6 +95,20 @@ def test_other_files_get_a_short_cache(client: TestClient) -> None:
     assert resp.headers.get_list("Cache-Control") == ["public, max-age=3600"]
 
 
+def test_web_app_manifest_is_served_with_its_own_type(
+    client: TestClient, dist: Path
+) -> None:
+    """Browsers only accept the manifest as `application/manifest+json`."""
+    (dist / "manifest.webmanifest").write_text('{"name": "Menagerist"}')
+
+    resp = client.get("/manifest.webmanifest")
+
+    assert resp.status_code == 200
+    assert resp.headers["Content-Type"].startswith("application/manifest+json")
+    assert resp.headers.get_list("Cache-Control") == ["public, max-age=3600"]
+    assert resp.json() == {"name": "Menagerist"}
+
+
 @pytest.mark.parametrize("path", ["/missing.js", "/_app/immutable/gone.deadbeef.js"])
 def test_missing_assets_are_404_not_the_shell(client: TestClient, path: str) -> None:
     """A stale asset URL must fail loudly rather than return HTML as JavaScript."""
