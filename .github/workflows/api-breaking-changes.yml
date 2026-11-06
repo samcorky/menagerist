@@ -94,13 +94,23 @@ jobs:
           fi
 
       # The label does not hide the breaking changes: they are still listed in the log,
-      # but no longer fail the check.
+      # but no longer fail the check. Two steps rather than one `fail-on` expression,
+      # because an empty string is falsy in `a && '' || b`, which would always pick `b`.
       - name: Fail on breaking changes
-        if: steps.diff.outputs.changed == 'true'
+        if: steps.diff.outputs.changed == 'true' && steps.label.outputs.exempt != 'true'
         uses: oasdiff/oasdiff-action/breaking@514e22ec2f1d1654fb78ac3bb7dc00d8f3c6c4d9 # v0.1.19
         with:
           base: base/${{ env.SCHEMA }}
           revision: ${{ env.SCHEMA }}
-          fail-on: ${{ steps.label.outputs.exempt == 'true' && '' || 'ERR' }}
+          fail-on: ERR
+          review: "false"
+          github-token: ""
+
+      - name: List breaking changes (labelled breaking-change)
+        if: steps.diff.outputs.changed == 'true' && steps.label.outputs.exempt == 'true'
+        uses: oasdiff/oasdiff-action/breaking@514e22ec2f1d1654fb78ac3bb7dc00d8f3c6c4d9 # v0.1.19
+        with:
+          base: base/${{ env.SCHEMA }}
+          revision: ${{ env.SCHEMA }}
           review: "false"
           github-token: ""
