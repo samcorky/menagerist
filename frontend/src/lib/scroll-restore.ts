@@ -22,6 +22,17 @@ export function changesPage(from: Pick<URL, 'pathname'> | undefined, to: Pick<UR
 }
 
 /**
+ * Whether a navigation should jump to the destination's #fragment: it names one, and either the
+ * page or the fragment is new. A query rewrite that merely carries the fragment along must not.
+ */
+export function jumpsToFragment(
+	from: Pick<URL, 'pathname' | 'hash'> | undefined,
+	to: Pick<URL, 'pathname' | 'hash'>
+) {
+	return to.hash !== '' && (changesPage(from, to) || from?.hash !== to.hash);
+}
+
+/**
  * Scrolls to `top`, retrying while the content is still loading and too short to reach it.
  *
  * Gives up after `timeout` ms, or as soon as the person scrolls themselves. Returns a cancel

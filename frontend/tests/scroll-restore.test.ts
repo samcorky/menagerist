@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	changesPage,
+	jumpsToFragment,
 	clearPositions,
 	restoreScroll,
 	savePosition,
@@ -39,6 +40,23 @@ describe('changesPage', () => {
 		expect(changesPage(url('/items'), url('/items?q=a'))).toBe(false);
 		expect(changesPage(url('/items'), url('/home'))).toBe(true);
 		expect(changesPage(undefined, url('/home'))).toBe(true);
+	});
+});
+
+describe('jumpsToFragment', () => {
+	it('jumps when the fragment is new or the page changes', () => {
+		expect(jumpsToFragment(url('/a'), url('/a#x'))).toBe(true);
+		expect(jumpsToFragment(url('/a#x'), url('/a#y'))).toBe(true);
+		expect(jumpsToFragment(url('/a#x'), url('/b#x'))).toBe(true);
+		expect(jumpsToFragment(undefined, url('/a#x'))).toBe(true);
+	});
+
+	it('stays put when a query rewrite carries the same fragment', () => {
+		expect(jumpsToFragment(url('/a#x'), url('/a?q=1#x'))).toBe(false);
+	});
+
+	it('never jumps without a fragment', () => {
+		expect(jumpsToFragment(url('/a#x'), url('/a'))).toBe(false);
 	});
 });
 

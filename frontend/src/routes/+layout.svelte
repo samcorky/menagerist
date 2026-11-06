@@ -23,6 +23,7 @@
 	import { animatesNavigation } from '$lib/view-transition';
 	import {
 		changesPage,
+		jumpsToFragment,
 		restoreScroll,
 		savePosition,
 		savedPosition,
@@ -95,9 +96,9 @@
 		if (type === 'popstate') {
 			const top = savedPosition(to.url);
 			if (top !== undefined) cancelRestore = restoreScroll(el, top);
-		} else if (to.url.hash) {
+		} else if (jumpsToFragment(from?.url, to.url)) {
 			scrollToFragment(el, to.url.hash);
-		} else if (changesPage(from?.url, to.url)) {
+		} else if (!to.url.hash && changesPage(from?.url, to.url)) {
 			el.scrollTop = 0;
 		}
 	});
