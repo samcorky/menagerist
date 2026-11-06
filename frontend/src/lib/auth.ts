@@ -1,4 +1,5 @@
 import { errorMessage } from '$lib/api/errors';
+import { OFFLINE_MESSAGE } from '$lib/offline';
 import type {
 	BackupPermission,
 	CollectionPermission,
@@ -168,7 +169,7 @@ export const ACCOUNT_DISABLED_MESSAGE = 'This account has been disabled. Ask an 
 /** A plain-words message for a failed sign-in, setup or password call. */
 export function authErrorMessage(result: { error?: unknown; response?: Response | null }): string {
 	const { response } = result;
-	if (!response) return 'You appear to be offline. Check your connection and try again.';
+	if (!response) return OFFLINE_MESSAGE;
 	if (response.status === 429) return throttleMessage(retryAfterSeconds(response));
 	if (response.status === 403 && problemType(result.error) === 'account_disabled') {
 		return ACCOUNT_DISABLED_MESSAGE;

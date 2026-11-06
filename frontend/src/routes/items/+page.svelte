@@ -63,6 +63,8 @@
 	import type { Path, Query } from '$lib/query/types';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import LoadFailed from '$lib/components/load-failed.svelte';
+	import { offlineController } from '$lib/offline.svelte.js';
 	import * as Item from '$lib/components/ui/item/index.js';
 	import NodeCard from '$lib/components/node-card.svelte';
 	import NodeGridCard from '$lib/components/node-grid-card.svelte';
@@ -99,6 +101,8 @@
 	let marks = $state<WarningMarks>({ conditions: new Set(), messages: new Map(), sort: false });
 	let filterError = $state<BuilderError | null>(null);
 	let tooMany = $state(false);
+	// The first page could not be fetched: shown as a failure with Retry, never as an empty list.
+	let loadFailed = $state(false);
 	let filtersOpen = $state(false);
 	let filtersFocus = $state<Path | null>(null);
 	let saveOpen = $state(false);
@@ -289,7 +293,10 @@
 
 	async function fetchPage(more = false) {
 		const seq = ++fetchSeq;
-		if (!more) counts.cancel();
+		if (!more) {
+			counts.cancel();
+			loadFailed = false;
+		}
 		loading = true;
 		const basics = { type: selectedType, q };
 		const result = await loadItemsPage({
@@ -330,7 +337,8 @@
 				filterError = { message, path };
 			} else filterError = null;
 			if (result.status === 'failed') {
-				toast.error(result.title, { description: result.description });
+				if (more) toast.error(result.title, { description: result.description });
+				else loadFailed = true;
 			}
 		}
 		loading = false;
@@ -426,6 +434,14 @@
 
 	$effect(() => {
 		void fetchCategories();
+	});
+
+	// Coming back online, or Retry in the banner, reloads a list that had failed.
+	$effect(() => {
+		void offlineController.retryCount;
+		untrack(() => {
+			if (loadFailed) void fetchPage();
+		});
 	});
 
 	$effect(() => {
@@ -689,6 +705,8 @@
 				Show all items
 			</Button>
 		</div>
+	{:else if loadFailed}
+		<LoadFailed what="your items" onretry={() => void fetchPage()} />
 	{:else if items.length === 0 && !loading && !filterError && !tooMany}
 		<div class="flex flex-col items-center gap-3 py-12 text-center">
 			{#if searching && conditionCount > 0}

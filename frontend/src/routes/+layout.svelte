@@ -36,6 +36,8 @@
 		workerSupported
 	} from '$lib/service-worker-client';
 	import { themeController } from '$lib/theme.svelte.js';
+	import { offlineController } from '$lib/offline.svelte.js';
+	import OfflineBanner from '$lib/components/offline-banner.svelte';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { searchPaletteController } from '$lib/search-palette.svelte.js';
 	import SearchPalette from '$lib/components/search-palette.svelte';
@@ -67,6 +69,8 @@
 	$effect(() => {
 		themeController.init();
 	});
+
+	$effect(() => offlineController.init());
 
 	$effect(() => {
 		function suppressViewTransitionAbort(e: PromiseRejectionEvent) {
@@ -342,6 +346,7 @@
 			{/if}
 			<div id="main-scroll" class="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
 				{#if showPage}
+					<OfflineBanner />
 					{@render children()}
 				{:else if auth.loadFailed}
 					<main class="flex flex-1 flex-col items-center gap-3 px-4 py-16 text-center">

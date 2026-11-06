@@ -1,4 +1,5 @@
 import type { CollectionKind } from '$lib/api/client';
+import { OFFLINE_MESSAGE } from '$lib/offline';
 
 export const NOTHING_DELETED_MESSAGE = 'Nothing has been deleted.';
 export const DELETED_PAGE_SIZE = 50;
@@ -59,7 +60,7 @@ export function deletedActionError(
 	if (status === 409 && detail) return detail;
 	if (status === 404) return 'This has already been removed. Reload the page to refresh the list.';
 	if (status === 403) return `You do not have permission to ${action} this.`;
-	if (status === undefined) return 'You appear to be offline. Check your connection and try again.';
+	if (status === undefined) return OFFLINE_MESSAGE;
 	return `Could not ${action} this. Try again.`;
 }
 
