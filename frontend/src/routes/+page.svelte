@@ -80,6 +80,13 @@
 	const nothingToTidy = $derived(
 		tidy !== null && tidy.every((row) => row.count !== null && row.count.total === 0)
 	);
+	// What a tile says in place of a number when its own request failed.
+	const failedNote = (block: Block<unknown> | null) =>
+		block?.status === 'error'
+			? offlineController.offline
+				? "You're offline"
+				: "Couldn't load"
+			: '';
 	const firstName = $derived(auth.user?.display_name?.split(' ')[0] ?? '');
 	const hello = $derived(greeting(new Date().getHours()));
 
@@ -290,14 +297,14 @@
 					'stat-collections',
 					'Collections',
 					collections?.status === 'ok' ? String(collections.data.length) : '–',
-					collections?.status === 'ok' ? `${smartCount} smart` : '',
+					collections?.status === 'ok' ? `${smartCount} smart` : failedNote(collections),
 					resolve('/collections')
 				)}
 				{@render tile(
 					'stat-types',
 					'Item types',
 					breakdown?.status === 'ok' ? String(usedTypes.length) : '–',
-					'with items in them',
+					breakdown?.status === 'error' ? failedNote(breakdown) : 'with items in them',
 					undefined,
 					true
 				)}

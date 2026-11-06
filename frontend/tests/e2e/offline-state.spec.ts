@@ -45,6 +45,7 @@ test('Home shows that it is offline, and loads again from the banner Retry', asy
 	await expect(page.getByRole('link', { name: 'Home', exact: true }).first()).toBeVisible();
 
 	await page.getByRole('link', { name: 'Items', exact: true }).first().click();
+	await expect(page.getByText('Nothing here yet')).toBeVisible();
 	await cutApi(page);
 	await page.getByRole('link', { name: 'Home', exact: true }).first().click();
 	await expect(page.getByText("You're offline, so your totals can't load.")).toBeVisible();
@@ -55,4 +56,26 @@ test('Home shows that it is offline, and loads again from the banner Retry', asy
 	await banner.getByRole('button', { name: 'Retry' }).click();
 	await expect(page.getByText("You're offline, so your totals can't load.")).toHaveCount(0);
 	await expect(banner).toHaveCount(0);
+});
+
+test('Home never shows blank counts when the browser itself goes offline', async ({
+	page,
+	context
+}) => {
+	await page.goto('/');
+	await expect(page.getByRole('link', { name: 'Home', exact: true }).first()).toBeVisible();
+	await page.getByRole('link', { name: 'Items', exact: true }).first().click();
+	await expect(page.getByText('Nothing here yet')).toBeVisible();
+
+	await context.setOffline(true);
+	await page.getByRole('link', { name: 'Home', exact: true }).first().click();
+
+	await expect(page.getByTestId('offline-banner')).toBeVisible();
+	await expect(page.getByText("You're offline, so your totals can't load.")).toBeVisible();
+	await expect(page.getByText("You don't have any items yet")).toHaveCount(0);
+
+	// Coming back online reloads the failed blocks without a tap.
+	await context.setOffline(false);
+	await expect(page.getByText("You don't have any items yet")).toBeVisible();
+	await expect(page.getByTestId('offline-banner')).toHaveCount(0);
 });
