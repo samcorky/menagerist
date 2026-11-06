@@ -502,12 +502,17 @@ jobs:
           path: coverage-reports
           pattern: coverage-*
 
+      # With a single matching artifact, download-artifact puts its file straight into
+      # coverage-reports/ instead of a folder named after it, so find the tables rather than
+      # naming their paths. Sorted, backend comes before frontend.
       - name: Build the comment
-        run: >-
-          python3 scripts/coverage_comment.py
-          coverage-reports/coverage-backend/component-coverage.md
-          coverage-reports/coverage-frontend/component-coverage.md
-          --output "$RUNNER_TEMP/coverage-comment.md"
+        run: |
+          mapfile -t tables < <(find coverage-reports -name component-coverage.md | sort)
+          if [ "${#tables[@]}" -eq 0 ]; then
+            echo "::warning::No coverage tables were downloaded, so no coverage comment is posted."
+            exit 0
+          fi
+          python3 scripts/coverage_comment.py "${tables[@]}" --output "$RUNNER_TEMP/coverage-comment.md"
 
       - name: Post or update the comment
         env:
