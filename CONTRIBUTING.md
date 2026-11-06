@@ -323,6 +323,8 @@ Every floor, frontend included, is a component `target` in `codecov.yml`, which 
 
 Codecov's free plan posts only a short patch comment and no project or component statuses, so it cannot enforce the targets. Instead the `coverage-comment` CI job posts one comment on each pull request with the backend and frontend component tables. Patch coverage in Codecov is informational, and `poe coverage` and `poe coverage-frontend` are the gates. `codecov.yml` is validated by a pre-commit hook (`poe check-codecov`).
 
+CI also uploads JUnit reports to Codecov Test Analytics, so failing, slow and flaky tests show on pull requests. Setting `JUNIT_XML_DIR` (a path relative to the repository root) makes `poe` write `backend-unit.xml`, `backend-integration.xml` and `frontend.xml` there; it is unset locally, so local runs write no reports. Playwright is not uploaded yet.
+
 ### Adding a new bounded context
 
 A complete feature at one bounded context requires: domain entity/value object, use case(s), port Protocol(s), in-memory adapter, SQLAlchemy adapter, and tests at each layer (domain, application, router, persistence).
