@@ -23,10 +23,7 @@ runs:
     - name: Restore the downloaded packages
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: |
-          ~/.cache/apt-archives
-          !~/.cache/apt-archives/partial
-          !~/.cache/apt-archives/lock
+        path: ~/.cache/apt-archives
         # The library list changes with the Playwright version.
         key: playwright-apt-${{ runner.os }}-${{ inputs.browsers }}-${{ hashFiles('frontend/package-lock.json') }}
 
@@ -37,3 +34,7 @@ runs:
         BROWSERS: ${{ inputs.browsers }}
       # Unquoted on purpose: BROWSERS is a space-separated list of arguments.
       run: npx playwright install-deps $BROWSERS
+
+    - name: Remove apt's root-only files so the cache can be saved
+      shell: bash
+      run: sudo rm -rf "$HOME/.cache/apt-archives/partial" "$HOME/.cache/apt-archives/lock"
