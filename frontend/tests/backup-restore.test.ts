@@ -12,7 +12,7 @@ describe('first-run backup restore', () => {
 			return new Response(null, { status: 204 });
 		});
 		expect(await restoreFirstRunArchive(file)).toEqual({ ok: true });
-		expect(sent?.url).toContain('/api/v1/backup/restore');
+		expect(sent?.url).toContain('/api/v1/backups/restore');
 		expect(sent?.headers.get('Content-Type')).toBe('application/gzip');
 		expect(await sent?.text()).toBe('archive bytes');
 	});

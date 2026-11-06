@@ -63,7 +63,7 @@ from app.shared_kernel.slug import slugify
 
 router = APIRouter(prefix="/backup", tags=["Backups"], route_class=PermissionAwareRoute)
 public_router = APIRouter(
-    prefix="/backup", tags=["Backups"], route_class=PermissionAwareRoute
+    prefix="/backups", tags=["Backups"], route_class=PermissionAwareRoute
 )
 
 ARCHIVE_BODY = {

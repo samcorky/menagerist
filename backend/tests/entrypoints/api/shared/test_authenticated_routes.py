@@ -27,7 +27,7 @@ PUBLIC_ROUTES = {
     ("POST", "/v1/auth/setup"),
     ("POST", "/v1/auth/login"),
     # The backup restorer rechecks setup under the shared identity lock.
-    ("POST", "/v1/backup/restore"),
+    ("POST", "/v1/backups/restore"),
     # Name and version only; the build detail is on the authenticated router.
     ("GET", "/v1/system/version"),
 }
@@ -36,7 +36,7 @@ PUBLIC_ROUTES = {
 CROSS_SITE_GUARDED_ROUTES = {
     ("POST", "/v1/auth/setup"),
     ("POST", "/v1/auth/login"),
-    ("POST", "/v1/backup/restore"),
+    ("POST", "/v1/backups/restore"),
 }
 # On the same-origin-checked router but deliberately tolerant of a missing session.
 NO_ACTOR_ROUTES = {("POST", "/v1/auth/logout")}
