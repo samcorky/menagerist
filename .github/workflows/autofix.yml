@@ -73,6 +73,12 @@ jobs:
       - name: Install dependencies and generate the API client
         run: uv run poe sync-ci
 
+      - name: Cache the hook environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/prek
+          key: prek-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+
       - name: Apply hook fixes
         # A hook that rewrites a file exits non-zero; autofix.ci commits those
         # rewrites below.

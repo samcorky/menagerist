@@ -1,0 +1,39 @@
+name: Playwright system libraries
+description: >-
+  Install the system libraries Playwright's browsers need, keeping the downloaded .deb
+  files in the Actions cache so a warm run skips the package downloads. apt still
+  refreshes its index, so a stale cache can only cost a download, never a wrong version.
+
+inputs:
+  browsers:
+    description: The browsers to install libraries for, as `playwright install-deps` takes them.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Point apt at a cacheable archive directory
+      shell: bash
+      run: |
+        # /var/cache/apt/archives belongs to root; the cache action runs as the runner user.
+        mkdir -p "$HOME/.cache/apt-archives/partial"
+        echo "Dir::Cache::Archives \"$HOME/.cache/apt-archives\";" \
+          | sudo tee /etc/apt/apt.conf.d/99playwright-archives > /dev/null
+
+    - name: Restore the downloaded packages
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ~/.cache/apt-archives
+          !~/.cache/apt-archives/partial
+          !~/.cache/apt-archives/lock
+        # The library list changes with the Playwright version.
+        key: playwright-apt-${{ runner.os }}-${{ inputs.browsers }}-${{ hashFiles('frontend/package-lock.json') }}
+
+    - name: Install the libraries
+      shell: bash
+      working-directory: frontend
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+      # Unquoted on purpose: BROWSERS is a space-separated list of arguments.
+      run: npx playwright install-deps $BROWSERS
