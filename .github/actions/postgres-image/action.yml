@@ -18,13 +18,14 @@ runs:
       id: cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: ~/.cache/docker-images
+        # Not under ~: a container job's cache action and shell resolve it differently.
+        path: ${{ runner.temp }}/docker-images
         key: docker-image-${{ steps.image.outputs.slug }}
 
     - name: Load the cached image
       if: steps.cache.outputs.cache-hit == 'true'
       shell: bash
-      run: docker load --input ~/.cache/docker-images/image.tar
+      run: docker load --input "${RUNNER_TEMP}/docker-images/image.tar"
 
     - name: Pull and save the image
       if: steps.cache.outputs.cache-hit != 'true'
@@ -33,5 +34,5 @@ runs:
         IMAGE: ${{ steps.image.outputs.name }}
       run: |
         docker pull "$IMAGE"
-        mkdir -p ~/.cache/docker-images
-        docker save --output ~/.cache/docker-images/image.tar "$IMAGE"
+        mkdir -p "${RUNNER_TEMP}/docker-images"
+        docker save --output "${RUNNER_TEMP}/docker-images/image.tar" "$IMAGE"
