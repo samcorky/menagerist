@@ -70,8 +70,11 @@ jobs:
           UV_LOCKED: "0"
         run: uv lock
 
-      - name: Install dependencies and generate the API client
-        run: uv run poe sync-ci
+      - name: Install the frontend dependencies
+        uses: ./.github/actions/frontend-deps
+
+      - name: Sync the backend and generate the API client
+        run: uv run poe sync-ci-installed
 
       - name: Cache the hook environments
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
