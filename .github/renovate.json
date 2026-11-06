@@ -152,6 +152,15 @@
       "automerge": false
     },
     {
+      "description": "The Playwright image the e2e jobs run in must be the same version as @playwright/test, or the browsers it ships are not the ones the library asks for",
+      "matchPackageNames": [
+        "@playwright/test",
+        "mcr.microsoft.com/playwright"
+      ],
+      "groupName": "playwright",
+      "automerge": false
+    },
+    {
       "description": "Group all Python interpreter version bumps (.python-version and the requires-python floors) into one PR, and treat as a major/manual-review change",
       "matchManagers": [
         "pyenv",

@@ -274,8 +274,20 @@ jobs:
     needs: changes
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
+    # The Playwright image brings the browsers and their system libraries, so nothing is
+    # installed with apt. Its tag must match @playwright/test in frontend/package.json.
+    # The runner's Docker is mounted in so Compose still starts the e2e Postgres, which
+    # --network host makes reachable on localhost:55433 as it is outside the container.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: >-
+        --network host --ipc=host --init
+        -v /var/run/docker.sock:/var/run/docker.sock
+        -v /usr/bin/docker:/usr/bin/docker
+        -v /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins
     strategy:
       fail-fast: false
       matrix:
@@ -302,22 +314,13 @@ jobs:
       - name: Install dependencies and generate the API client
         run: uv run poe sync-ci
 
+      - name: Check the runner's Docker is reachable from the container
+        run: |
+          docker version --format '{{.Server.Version}}'
+          docker compose version
+
       - name: Cache the Postgres image
         uses: ./.github/actions/postgres-image
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
-
-      - name: Install Chromium (a no-op when cached)
-        run: uv run poe install-e2e-browser
-
-      - name: Install the system libraries Chromium needs
-        uses: ./.github/actions/playwright-system-libraries
-        with:
-          browsers: chromium
 
       - name: Run end-to-end tests
         run: uv run poe test-e2e --shard ${{ matrix.shard }}/${{ strategy.job-total }}
@@ -392,8 +395,24 @@ jobs:
     needs: changes
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
+    # The Playwright image brings the browsers and their system libraries, so nothing is
+    # installed with apt. Its tag must match @playwright/test in frontend/package.json.
+    # The runner's Docker is mounted in so Compose still starts the e2e Postgres, which
+    # --network host makes reachable on localhost:55433 as it is outside the container.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: >-
+        --network host --ipc=host --init
+        -v /var/run/docker.sock:/var/run/docker.sock
+        -v /usr/bin/docker:/usr/bin/docker
+        -v /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -416,24 +435,13 @@ jobs:
       - name: Install dependencies and generate the API client
         run: uv run poe sync-ci
 
+      - name: Check the runner's Docker is reachable from the container
+        run: |
+          docker version --format '{{.Server.Version}}'
+          docker compose version
+
       - name: Cache the Postgres image
         uses: ./.github/actions/postgres-image
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-cookies-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
-
-      - name: Install Chromium, WebKit and Firefox (a no-op when cached)
-        run: |
-          uv run poe install-e2e-browser
-          uv run poe install-e2e-cookie-browsers
-
-      - name: Install the system libraries the browsers need
-        uses: ./.github/actions/playwright-system-libraries
-        with:
-          browsers: chromium webkit firefox
 
       - name: Run cookie tests in WebKit and Firefox
         run: uv run poe test-e2e-cookies
