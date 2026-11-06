@@ -1,5 +1,11 @@
 export type Theme = 'system' | 'light' | 'dark';
 
+/**
+ * The page background in each theme, as the browser or installed app's title bar colour. These
+ * match `--background` in layout.css; app.html and static/manifest.webmanifest repeat the light one.
+ */
+export const THEME_COLOURS = { light: '#ffffff', dark: '#0a0a0a' } as const;
+
 class ThemeController {
 	theme = $state<Theme>('system');
 
@@ -8,6 +14,9 @@ class ThemeController {
 		const dark =
 			t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 		document.documentElement.classList.toggle('dark', dark);
+		document
+			.querySelector('meta[name="theme-color"]')
+			?.setAttribute('content', dark ? THEME_COLOURS.dark : THEME_COLOURS.light);
 	}
 
 	init(): void {
