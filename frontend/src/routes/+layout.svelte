@@ -390,7 +390,7 @@
 
 		{#if showNav}
 			<nav
-				style="view-transition-name: site-nav; padding-bottom: env(safe-area-inset-bottom)"
+				style="view-transition-name: site-nav; padding-bottom: calc(env(safe-area-inset-bottom) * 0.5)"
 				class="shrink-0 border-t bg-background/95 backdrop-blur md:hidden {keyboardUp
 					? 'h-0 overflow-hidden border-t-0 p-0 opacity-0'
 					: ''}"
