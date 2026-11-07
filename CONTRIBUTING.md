@@ -101,7 +101,7 @@ To run your own changes instead of the published image, build it locally. The bu
 
 ```sh
 uv run poe init            # sync deps + install git hooks
-uv run poe docker-build    # build the Menagerist image
+uv run poe docker-build    # build the Menagerist image (git info is read on the host, so worktrees work)
 uv run poe docker-up       # start Postgres + Menagerist, detached, at :8080
 ```
 

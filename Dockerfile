@@ -40,12 +40,11 @@ ARG MENAGERIST_BUILD_REPOSITORY_URL=""
 ARG MENAGERIST_BUILD_TIMESTAMP=""
 ARG MENAGERIST_BUILD_DIRTY=""
 
-# Keep metadata tied to the repo root during build.
+# The repository is not mounted: in a worktree .git is a pointer file whose target
+# does not exist here. The version and build info arrive as build arguments, computed
+# on the host by `poe docker-build` and by CI. Without VERSION the package is 0.0.0.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=.git,target=/app/.git,ro \
-    --mount=type=bind,source=.,target=/src,ro \
-    GIT_DIR=/app/.git GIT_WORK_TREE=/src \
-    SETUPTOOLS_SCM_PRETEND_VERSION=${VERSION} \
+    SETUPTOOLS_SCM_PRETEND_VERSION=${VERSION:-0.0.0} \
     MENAGERIST_BUILD_COMMIT_SHA=${MENAGERIST_BUILD_COMMIT_SHA} \
     MENAGERIST_BUILD_BRANCH=${MENAGERIST_BUILD_BRANCH} \
     MENAGERIST_BUILD_REPOSITORY_URL=${MENAGERIST_BUILD_REPOSITORY_URL} \
