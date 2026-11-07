@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 3,
+  "version": 7,
   "id": "recipes",
   "relationship_types": [
     {
@@ -32,6 +32,8 @@
     {
       "ref": "recipe",
       "slug": "recipes-recipe",
+      "icon": "chef-hat",
+      "colour": "orange",
       "label": "Recipe",
       "description": "A recipe with its timings, ingredients table and full method.",
       "cover": {
@@ -202,6 +204,8 @@
     {
       "ref": "source",
       "slug": "recipes-source",
+      "icon": "book",
+      "colour": "violet",
       "label": "Source",
       "description": "Where a recipe came from: a tin of cards, a cookbook or a person.",
       "attributes_schema": {
@@ -264,6 +268,8 @@
     {
       "ref": "ingredient",
       "slug": "recipes-ingredient",
+      "icon": "apple",
+      "colour": "green",
       "label": "Ingredient",
       "description": "A staple worth tracking, and where it lives in the kitchen.",
       "attributes_schema": {

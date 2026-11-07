@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 6,
+  "version": 7,
   "id": "parts",
   "relationship_types": [
     {
@@ -78,6 +78,8 @@
     {
       "ref": "part",
       "slug": "parts-part",
+      "icon": "cpu",
+      "colour": "teal",
       "label": "Part",
       "description": "A component or consumable in the parts drawer.",
       "attributes_schema": {
@@ -180,6 +182,8 @@
     {
       "ref": "assembly",
       "slug": "parts-assembly",
+      "icon": "puzzle",
+      "colour": "orange",
       "label": "Assembly",
       "description": "Something you have built, or are building, from the drawer.",
       "attributes_schema": {
@@ -252,6 +256,8 @@
     {
       "ref": "supplier",
       "slug": "parts-supplier",
+      "icon": "package",
+      "colour": "amber",
       "label": "Supplier",
       "description": "A shop you buy parts from.",
       "attributes_schema": {
