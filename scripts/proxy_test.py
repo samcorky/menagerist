@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-COMPOSE_FILE = ROOT / "compose.proxy.yaml"
+COMPOSE_FILE = ROOT / "scripts" / "compose" / "compose.proxy.yaml"
 IMAGE = "menagerist:local"
 CHUNK = b"\0" * 1_000_000
 

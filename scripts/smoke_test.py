@@ -64,7 +64,7 @@ if TYPE_CHECKING:
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 COMPOSE_FILE = REPO_ROOT / "compose.yaml"
-COMPOSE_OVERRIDE_FILE = REPO_ROOT / "compose.smoke.yaml"
+COMPOSE_OVERRIDE_FILE = REPO_ROOT / "scripts" / "compose" / "compose.smoke.yaml"
 PROJECT_NAME = "menagerist-smoke"
 BASE_URL = "http://localhost:18080"
 SERVICE = "menagerist"
