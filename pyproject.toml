@@ -182,6 +182,20 @@ cwd = "backend"
 help = "Fail when openapi.json is not a valid OpenAPI document"
 deps = ["sync-backend"]
 
+[tool.poe.groups.setup.tasks.sync-api-lint]
+cmd = "npm ci --prefix scripts/api-lint"
+help = "Install the OpenAPI linter (scripts/api-lint, kept apart from the frontend's dependencies)"
+
+[tool.poe.groups.quality.tasks.lint-schema]
+cmd = "uv run --script scripts/api_lint.py"
+help = "Lint openapi.json with the IBM OpenAPI rules (docs/API_STYLE.md); errors fail, warnings may not rise above the baseline"
+deps = ["sync-api-lint"]
+
+[tool.poe.groups.quality.tasks.lint-schema-baseline]
+cmd = "uv run --script scripts/api_lint.py --update"
+help = "Rewrite scripts/api-lint/baseline.json after fixing API lint warnings"
+deps = ["sync-api-lint"]
+
 [tool.poe.groups.quality.tasks._coverage-erase]
 cmd = "coverage erase"
 cwd = "backend"

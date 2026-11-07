@@ -75,7 +75,7 @@ The router depends on the use case, not on the repository the use case happens t
 
 ## Route naming
 
-Paths read as nouns under `/api/v1`, and `openapi.json` is the contract the rules below are checked against.
+Paths read as nouns under `/api/v1`, and `openapi.json` is the contract the rules below are checked against. The wider API conventions (pagination, errors, status codes, and where we differ from the IBM and Google guides) are in [docs/API_STYLE.md](../docs/API_STYLE.md), enforced by `poe lint-schema`.
 
 - **Collections are plural** (`/nodes`, `/backups`, `/me/sessions`), singletons are not (`/settings/instance`), and nested collections are plural too (`/collections/{id}/items`, `/node-types/{id}/attributes/{key}`).
 - **One word per segment.** A hyphen is allowed only where it is listed in `HYPHENATED_SEGMENTS` in `tests/entrypoints/api/test_openapi_path_style.py` (`node-types`, `edge-types`), so a new one is a deliberate choice. Prefer a nested resource to a compound name.
