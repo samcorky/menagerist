@@ -17,6 +17,7 @@ from app.entrypoints.cli import scheduling
 from app.modules.scheduling.adapters.cli import job_app as commands
 from app.modules.scheduling.application.list_jobs import JobStatus
 from app.modules.scheduling.domain.job_run import JobRun
+from app.platform.app_info import load_app_info
 from app.shared_kernel.jobs import JobDefinition, Lane
 
 if TYPE_CHECKING:
@@ -188,6 +189,7 @@ async def test_worker_logs_bind_hostname_and_process_identity(
     ]
     assert all(entry["log_level"] == "info" for entry in logs)
     assert all(entry["worker_id"] == worker_id for entry in logs)
+    assert logs[0]["version"] == load_app_info().version
     assert structlog.contextvars.get_contextvars() == {}
 
 

@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 from app.entrypoints.api import create_app
@@ -104,3 +105,49 @@ def test_create_app_without_license_name() -> None:
         app = create_app()
         schema = app.openapi()
         assert "license" not in schema["info"]
+
+
+def test_details_lists_the_build_and_runtime() -> None:
+    """The details carry the build identity first, then where it runs."""
+    app_info = AppInfo(
+        project=ProjectInfo(name="menagerist", version="1.0.0"),
+        build=BuildInfo(commit_sha="abcdef123456", branch="main", dirty=False),
+    )
+
+    details = app_info.details()
+
+    assert list(details)[:4] == ["name", "version", "commit", "branch"]
+    assert details["commit"] == "abcdef123456"
+    assert details["uncommitted_changes"] is False
+    assert details["built_at"] is None
+
+
+def test_log_fields_leave_out_what_is_unknown() -> None:
+    """Missing build metadata is dropped rather than logged as null."""
+    app_info = AppInfo(
+        project=ProjectInfo(name="menagerist", version="1.0.0"),
+        build=BuildInfo(short_sha="abc1234"),
+    )
+
+    assert app_info.log_fields() == {"version": "1.0.0", "commit": "abc1234"}
+
+
+def test_log_fields_describe_a_full_build() -> None:
+    """A full build logs its commit, branch, state and build time."""
+    app_info = AppInfo(
+        project=ProjectInfo(name="menagerist", version="1.0.0"),
+        build=BuildInfo(
+            short_sha="abc1234",
+            branch="main",
+            dirty=False,
+            build_timestamp=datetime(2026, 11, 7, 20, 0, tzinfo=UTC),
+        ),
+    )
+
+    assert app_info.log_fields() == {
+        "version": "1.0.0",
+        "commit": "abc1234",
+        "branch": "main",
+        "dirty": False,
+        "built_at": "2026-11-07T20:00:00+00:00",
+    }

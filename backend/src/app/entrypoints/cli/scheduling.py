@@ -62,6 +62,7 @@ from app.modules.scheduling.application.run_job_now import RunJobNow, RunJobNowC
 from app.modules.scheduling.application.tick_schedules import TickSchedules
 from app.modules.scheduling.domain.job_run import RunStatus
 from app.platform.alembic_runner import code_head_revisions, db_current_revisions
+from app.platform.app_info import load_app_info
 from app.platform.config.scheduler import get_scheduler_settings
 from app.platform.database import get_engine, get_session_factory
 from app.shared_kernel.actor import SYSTEM_ACTOR
@@ -275,7 +276,7 @@ async def run_worker_cli(*, identity_file: Path | None = None) -> None:
             stop_on_signals(stop),
             worker_log_context(worker_id),
         ):
-            logger.info("worker starting")
+            logger.info("worker starting", **load_app_info().log_fields())
             factory = get_session_factory()
             if await wait_for_schema(factory, stop):
                 logger.info("worker started")
