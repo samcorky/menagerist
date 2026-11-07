@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import os
+import shutil
 import uuid
 from contextlib import suppress
 from typing import TYPE_CHECKING
@@ -101,6 +102,38 @@ class LocalFilesystemMediaStorage:
         dst_thumb = self._thumb_path(asset_id, to_status)
         with suppress(FileNotFoundError):
             await asyncio.to_thread(os.replace, str(src_thumb), str(dst_thumb))
+
+    async def copy(
+        self, source_id: uuid.UUID, target_id: uuid.UUID, status: MediaStatus
+    ) -> None:
+        """Copy the file, and its thumbnail if there is one, under `target_id`."""
+        logger.debug(
+            "copying media file",
+            source_id=source_id,
+            target_id=target_id,
+            status=status.value,
+        )
+        await self._copy_file(
+            self._path(source_id, status), self._path(target_id, status)
+        )
+        with suppress(FileNotFoundError):
+            await self._copy_file(
+                self._thumb_path(source_id, status),
+                self._thumb_path(target_id, status),
+            )
+
+    @staticmethod
+    async def _copy_file(src: Path, dst: Path) -> None:
+        """Copy through a temporary name so a reader never sees half a file."""
+        await asyncio.to_thread(dst.parent.mkdir, parents=True, exist_ok=True)
+        tmp = dst.parent / (dst.name + ".tmp")
+        try:
+            await asyncio.to_thread(shutil.copyfile, src, tmp)
+            await asyncio.to_thread(os.replace, str(tmp), str(dst))
+        except BaseException:
+            with suppress(FileNotFoundError):
+                await asyncio.to_thread(tmp.unlink)
+            raise
 
     async def delete(self, asset_id: uuid.UUID, status: MediaStatus) -> None:
         """Remove stored file and its thumbnail sibling."""

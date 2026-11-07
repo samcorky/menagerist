@@ -135,9 +135,24 @@
         "docker-compose"
       ],
       "matchFileNames": [
-        "compose.proxy.yaml"
+        "scripts/compose/compose.proxy.yaml"
       ],
       "pinDigests": false
+    },
+    {
+      "description": "Automerge minor, patch and digest bumps of the compose images (the proxy harness, e2e and smoke stacks). Listed before the Postgres rule, which turns automerge back off for the shipped database image, and before the major rule, which does the same for majors",
+      "matchManagers": [
+        "docker-compose"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest"
+      ],
+      "automerge": true,
+      "platformAutomerge": true
     },
     {
       "description": "One Postgres bump updates compose.yaml and backend/tests/conftest.py together. No digest pin: the CI image cache is keyed on the compose.yaml name and the tests ask for the tag",
@@ -241,10 +256,23 @@
         "svelte",
         "svelte-check",
         "/^@sveltejs\\//",
-        "/^vite/"
+        "vite",
+        "/^vite-/"
       ],
       "groupName": "frontend svelte toolchain",
       "separateMajorMinor": false
+    },
+    {
+      "description": "vitest and its coverage provider pin each other's exact version through peer ranges, so they move in one pull request. The Svelte toolchain rule's old /^vite/ pattern matched vitest too, which pulled it into that group and left @vitest/coverage-v8 alone, a combination npm could not resolve",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "vitest",
+        "/^@vitest\\//"
+      ],
+      "groupName": "frontend test tooling",
+      "separateMultipleMajor": true
     },
     {
       "description": "Lint and format tooling only affects lint results, so its minor and patch updates automerge once CI passes",

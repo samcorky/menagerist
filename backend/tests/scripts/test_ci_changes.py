@@ -153,6 +153,26 @@ def test_compose_changes_run_the_image_and_end_to_end() -> None:
 @pytest.mark.parametrize(
     "path",
     [
+        "scripts/compose/compose.e2e.yaml",
+        "scripts/compose/compose.smoke.yaml",
+        "scripts/compose/compose.proxy.yaml",
+    ],
+)
+def test_test_stack_compose_files_beside_the_scripts_count_as_compose(
+    path: str,
+) -> None:
+    """The test stacks live under scripts/ but are not backend code."""
+    assert ci_changes.classify([path]) == {
+        "backend": False,
+        "frontend": False,
+        "e2e": True,
+        "image": True,
+    }
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
         ".github/workflows/ci.yml",
         ".github/workflows/build.yml",
         ".github/actions/postgres-image/action.yml",

@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { Pencil, Star, Trash2, X } from '@lucide/svelte';
+	import { Copy, Pencil, Star, Trash2, X } from '@lucide/svelte';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import {
 		createEdge,
@@ -35,6 +35,7 @@
 	import { loadExampleIds } from '$lib/examples';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
+	import DuplicateItemDialog from '$lib/components/duplicate-item-dialog.svelte';
 	import TagList from '$lib/components/tag-list.svelte';
 	import TagsInput from '$lib/components/tags-input.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -125,6 +126,7 @@
 	let saving = $state(false);
 	let deletingNode = $state(false);
 	let confirmDeleteNode = $state(false);
+	let duplicateOpen = $state(false);
 
 	let editingEdge = $state<EdgeResponse | null>(null);
 	let editRows = $state<AttributeRow[]>([]);
@@ -412,6 +414,11 @@
 		await goto(resolve('/items'));
 	}
 
+	async function handleDuplicated(copy: NodeResponse) {
+		toast.success('Item duplicated', { description: copy.name });
+		await goto(resolve('/items/[id]', { id: copy.id }));
+	}
+
 	async function handleToggleFavourite() {
 		if (!node) return;
 		const newValue = !node.favourite;
@@ -679,6 +686,15 @@
 										<Star class="size-4 {node?.favourite ? 'fill-current' : ''}" />
 									</Toggle>
 									{#if mode === 'read'}
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon"
+											onclick={() => (duplicateOpen = true)}
+											aria-label="Duplicate"
+										>
+											<Copy class="size-4" />
+										</Button>
 										<Button
 											type="button"
 											variant="ghost"
@@ -1169,6 +1185,15 @@
 		fields, and nothing is deleted.
 	{/snippet}
 </ConfirmDialog>
+
+{#if node}
+	<DuplicateItemDialog
+		open={duplicateOpen}
+		{node}
+		onOpenChange={(v) => (duplicateOpen = v)}
+		onDuplicated={handleDuplicated}
+	/>
+{/if}
 
 <ConfirmDialog
 	open={confirmDeleteNode}

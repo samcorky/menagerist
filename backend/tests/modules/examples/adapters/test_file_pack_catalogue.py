@@ -91,6 +91,18 @@ async def test_defaults_to_the_packaged_directory() -> None:
     assert all(p.counts.items > 0 or p.counts.connections > 0 for p in packs)
 
 
+async def test_every_shipped_item_type_has_an_icon_and_colour() -> None:
+    """Shipped example item types are never left on the generic grey cube."""
+    catalogue = FilePackCatalogue()
+
+    for summary in await catalogue.list_packs():
+        pack = await catalogue.get(summary.id)
+        assert pack is not None
+        for item_type in pack.item_types:
+            assert item_type.icon, f"{pack.id}/{item_type.slug} has no icon"
+            assert item_type.colour, f"{pack.id}/{item_type.slug} has no colour"
+
+
 async def test_an_unsafe_index_id_never_reads_outside_the_directory(
     tmp_path: Path, pack_data: dict[str, Any]
 ) -> None:

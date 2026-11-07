@@ -2,9 +2,16 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { descriptorForProp, fieldFromProperty } from '../src/lib/field-types';
 import type { JsonSchemaProperty } from '../src/lib/schema-types';
+import { TYPE_ICONS } from '../src/lib/type-icons';
 
 type Schema = { properties?: Record<string, JsonSchemaProperty> } | null | undefined;
-type Typed = { ref: string; slug: string; attributes_schema?: Schema };
+type Typed = {
+	ref: string;
+	slug: string;
+	icon?: string;
+	colour?: string;
+	attributes_schema?: Schema;
+};
 type Pack = {
 	id: string;
 	requires?: string[];
@@ -150,5 +157,16 @@ describe('shipped example packs', () => {
 				}
 			}
 		});
+	});
+});
+
+describe('example item type icons', () => {
+	it('gives every item type an icon the app can draw, so none fall back to the generic cube', () => {
+		const missing = packs.flatMap((pack) =>
+			(pack.item_types ?? [])
+				.filter((t) => t.icon === undefined || !(t.icon in TYPE_ICONS) || !t.colour)
+				.map((t) => `${pack.id}/${t.slug}`)
+		);
+		expect(missing).toEqual([]);
 	});
 });

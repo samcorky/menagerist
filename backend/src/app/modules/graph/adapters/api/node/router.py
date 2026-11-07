@@ -25,6 +25,7 @@ from app.modules.graph.adapters.api.dependencies import (
     get_count_nodes_use_case,
     get_create_node_use_case,
     get_delete_node_use_case,
+    get_duplicate_node_use_case,
     get_get_node_use_case,
     get_list_deleted_nodes_use_case,
     get_list_item_fields_use_case,
@@ -40,6 +41,7 @@ from app.modules.graph.adapters.api.dependencies import (
 from app.modules.graph.adapters.api.node.schemas import (
     CreateNodeRequest,
     DeletedNodeResponse,
+    DuplicateNodeRequest,
     ItemFieldResponse,
     NodeCountResponse,
     NodeResponse,
@@ -58,6 +60,7 @@ from app.modules.graph.application.count_node_types import (
 from app.modules.graph.application.count_nodes import CountNodes
 from app.modules.graph.application.create_node import CreateNode
 from app.modules.graph.application.delete_node import DeleteNode, DeleteNodeCommand
+from app.modules.graph.application.duplicate_node import DuplicateNode
 from app.modules.graph.application.get_node import GetNode, GetNodeQuery
 from app.modules.graph.application.list_deleted_nodes import (
     ListDeletedNodes,
@@ -581,6 +584,33 @@ async def restore_node(
     this is a 409 until a type with that slug exists again.
     """
     node = await use_case.handle(RestoreNodeCommand(node_id=node_id), actor)
+    return NodeResponse.from_domain(node)
+
+
+@router.post(
+    "/{node_id}/duplicate",
+    response_model=NodeResponse,
+    status_code=201,
+    operation_id="duplicate_node",
+    responses=error_response(
+        NodeNotFoundError,
+        detail="Node 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10 not found",
+    ),
+)
+async def duplicate_node(
+    node_id: uuid.UUID,
+    payload: DuplicateNodeRequest,
+    use_case: Annotated[DuplicateNode, Depends(get_duplicate_node_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> NodeResponse:
+    """Copy an item under a new name.
+
+    The copy has the original's type, description, fields and tags, its own id and
+    history, and is not a favourite. Each flag adds one more thing from the
+    original: connections, media (every attachment but the cover), the cover, and
+    its manual collections. Media files are copied, so the two items are independent.
+    """
+    node = await use_case.handle(payload.to_command(node_id), actor)
     return NodeResponse.from_domain(node)
 
 

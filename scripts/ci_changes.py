@@ -88,7 +88,8 @@ IMAGE_FILES = frozenset(
 BACKEND_ONLY_FILES = frozenset(
     {"scripts/ci_changes.py", "backend/tests/scripts/test_ci_changes.py"}
 )
-COMPOSE = re.compile(r"^compose(\.[a-z0-9_-]+)?\.ya?ml$")
+# The stack in the root, plus the e2e, smoke and proxy test stacks under scripts/.
+COMPOSE = re.compile(r"^(scripts/compose/)?compose(\.[a-z0-9_-]+)?\.ya?ml$")
 
 
 def _is_meta(path: str) -> bool:

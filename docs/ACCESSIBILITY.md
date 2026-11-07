@@ -4,7 +4,7 @@ Menagerist should be usable whatever you use to reach it: keyboard, screen reade
 
 ## What we aim for
 
-These are the rules the interface is built to, set out in section 20 of the [design guidelines](frontend/DESIGN_GUIDELINES.md):
+These are the rules the interface is built to, set out in section 20 of the [design guidelines](../frontend/DESIGN_GUIDELINES.md):
 
 - Semantic HTML, with labels and alternative text for controls and images.
 - Everything reachable and usable by keyboard, with visible focus. Every shortcut has a button, link or menu equivalent and is listed in the `?` overlay.

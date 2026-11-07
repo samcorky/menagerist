@@ -387,15 +387,15 @@ cmd = "docker compose config --quiet"
 help = "Validate the Docker Compose configuration"
 
 [tool.poe.groups.quality.tasks.validate-smoke-compose]
-cmd = "docker compose -f compose.yaml -f compose.smoke.yaml config --quiet"
+cmd = "docker compose -f compose.yaml -f scripts/compose/compose.smoke.yaml config --quiet"
 help = "Validate compose.yaml merged with the smoke-test override"
 
 [tool.poe.groups.quality.tasks.validate-e2e-compose]
-cmd = "docker compose -f compose.yaml -f compose.e2e.yaml config --quiet"
+cmd = "docker compose -f compose.yaml -f scripts/compose/compose.e2e.yaml config --quiet"
 help = "Validate compose.yaml merged with the e2e-test override"
 
 [tool.poe.groups.quality.tasks.validate-proxy-compose]
-cmd = "docker compose -f compose.proxy.yaml --profile nginx --profile nginx-buffered --profile caddy --profile traefik config --quiet"
+cmd = "docker compose -f scripts/compose/compose.proxy.yaml --profile nginx --profile nginx-buffered --profile caddy --profile traefik config --quiet"
 help = "Validate compose.proxy.yaml with every proxy profile enabled"
 
 [tool.poe.groups.quality.tasks.test]
@@ -484,7 +484,7 @@ env = { MENAGERIST_BACKUP_BEFORE_MIGRATE = { default = "false" } }
 help = "Apply database migrations up to the latest revision"
 
 [tool.poe.groups.database.tasks.e2e-db-up]
-cmd = "docker compose -f compose.yaml -f compose.e2e.yaml up -d --wait postgres"
+cmd = "docker compose -f compose.yaml -f scripts/compose/compose.e2e.yaml up -d --wait postgres"
 help = "Start the isolated Postgres container used by the Playwright e2e suite, waiting for its healthcheck before returning"
 
 [tool.poe.groups.database.tasks.e2e-migrate]
@@ -498,7 +498,7 @@ cwd = "frontend"
 help = "Build the production frontend (frontend/build) that the e2e backends serve"
 
 [tool.poe.groups.database.tasks.e2e-db-down]
-cmd = "docker compose -f compose.yaml -f compose.e2e.yaml down -v"
+cmd = "docker compose -f compose.yaml -f scripts/compose/compose.e2e.yaml down -v"
 help = "Stop and remove the isolated e2e Postgres container and its volume"
 
 [tool.poe.groups.run]
@@ -550,10 +550,22 @@ shell = "uv run --locked --only-group release calver-scm --format plain version"
 interpreter = ["powershell", "posix"]
 cwd = "backend"
 
+[tool.poe.groups.run.tasks._docker-commit-sha]
+cmd = "python scripts/git_build_info.py commit"
+
+[tool.poe.groups.run.tasks._docker-branch]
+cmd = "python scripts/git_build_info.py branch"
+
+[tool.poe.groups.run.tasks._docker-dirty]
+cmd = "python scripts/git_build_info.py dirty"
+
+[tool.poe.groups.run.tasks._docker-repository-url]
+cmd = "python scripts/git_build_info.py repository-url"
+
 [tool.poe.groups.run.tasks.docker-build]
 cmd = "docker buildx bake -f docker-bake.hcl local"
-help = "Build the Menagerist Docker image, with VERSION set from hatch-vcs"
-uses = { VERSION = "_docker-version" }
+help = "Build the Menagerist Docker image, with the version and git build info computed on the host (works from a worktree)"
+uses = { VERSION = "_docker-version", COMMIT_SHA = "_docker-commit-sha", BRANCH = "_docker-branch", DIRTY = "_docker-dirty", REPOSITORY_URL = "_docker-repository-url" }
 
 [tool.poe.groups.run.tasks.docker-config]
 cmd = "docker compose config"

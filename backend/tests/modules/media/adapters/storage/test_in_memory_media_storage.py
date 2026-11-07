@@ -1,5 +1,6 @@
 """The in-memory storage lists stored files the way the filesystem one does."""
 
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
@@ -61,3 +62,29 @@ async def test_a_moved_file_keeps_its_age_and_a_deleted_one_is_forgotten() -> No
 
     await storage.delete(asset.id, MediaStatus.ATTACHED)
     assert [item async for item in storage.list_files(older_than=cutoff)] == []
+
+
+async def test_copy_duplicates_bytes_and_thumbnail_under_a_new_id() -> None:
+    """copy() gives the target its own bytes and thumbnail."""
+    storage = InMemoryMediaStorage()
+    source, target = uuid.uuid7(), uuid.uuid7()
+    await storage.store(source, MediaStatus.ATTACHED, _stream(b"photo"))
+    await storage.store_thumbnail(source, MediaStatus.ATTACHED, b"thumb")
+
+    await storage.copy(source, target, MediaStatus.ATTACHED)
+    await storage.delete(source, MediaStatus.ATTACHED)
+
+    assert storage._files[(target, "attached")] == b"photo"
+    assert storage._thumbnails[(target, "attached")] == b"thumb"
+
+
+async def test_copy_without_a_thumbnail_copies_just_the_bytes() -> None:
+    """A file with no thumbnail copies on its own."""
+    storage = InMemoryMediaStorage()
+    source, target = uuid.uuid7(), uuid.uuid7()
+    await storage.store(source, MediaStatus.ATTACHED, _stream(b"photo"))
+
+    await storage.copy(source, target, MediaStatus.ATTACHED)
+
+    assert storage._files[(target, "attached")] == b"photo"
+    assert (target, "attached") not in storage._thumbnails

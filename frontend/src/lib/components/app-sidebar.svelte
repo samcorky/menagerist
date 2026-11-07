@@ -269,7 +269,7 @@
 				id="app-sidebar"
 				aria-label="Main"
 				class="absolute inset-y-0 left-0 isolate z-10 flex w-64 flex-col overflow-x-hidden overflow-y-auto border-r bg-background p-2 shadow-xl"
-				style="padding-top: env(safe-area-inset-top); padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); padding-left: max(0.5rem, env(safe-area-inset-left))"
+				style="padding-top: env(safe-area-inset-top); padding-bottom: max(0.5rem, calc(env(safe-area-inset-bottom) * 0.5)); padding-left: max(0.5rem, env(safe-area-inset-left))"
 				transition:slideIn
 			>
 				{@render body()}

@@ -29,7 +29,7 @@ services:
       - ALL
     user: "1000:1000"
     volumes:
-      - ./scripts/proxy_test/stub.py:/stub/stub.py:ro
+      - ../proxy_test/stub.py:/stub/stub.py:ro
     healthcheck:
       test:
         - CMD
@@ -49,7 +49,7 @@ services:
     ports:
       - "127.0.0.1:18081:80"
     volumes:
-      - ./scripts/proxy_test/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../proxy_test/nginx.conf:/etc/nginx/conf.d/default.conf:ro
 
   nginx-buffered:
     profiles: [nginx-buffered]
@@ -60,7 +60,7 @@ services:
     ports:
       - "127.0.0.1:18082:80"
     volumes:
-      - ./scripts/proxy_test/nginx-buffered.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../proxy_test/nginx-buffered.conf:/etc/nginx/conf.d/default.conf:ro
 
   caddy:
     profiles: [caddy]
@@ -71,16 +71,16 @@ services:
     ports:
       - "127.0.0.1:18083:80"
     volumes:
-      - ./scripts/proxy_test/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../proxy_test/Caddyfile:/etc/caddy/Caddyfile:ro
 
   traefik:
     profiles: [traefik]
-    image: traefik:v3.7.9
+    image: traefik:v3.7.17
     depends_on:
       app:
         condition: service_healthy
     ports:
       - "127.0.0.1:18084:80"
     volumes:
-      - ./scripts/proxy_test/traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./scripts/proxy_test/traefik-dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - ../proxy_test/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ../proxy_test/traefik-dynamic.yml:/etc/traefik/dynamic.yml:ro
