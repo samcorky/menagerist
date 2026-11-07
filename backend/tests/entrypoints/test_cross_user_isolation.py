@@ -13,7 +13,7 @@ import asyncio
 import hashlib
 import re
 import uuid
-from contextlib import ExitStack, nullcontext
+from contextlib import ExitStack, asynccontextmanager, nullcontext
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Annotated, Any
@@ -62,6 +62,10 @@ from app.entrypoints.api.shared.bridges.example_targets import (
     in_memory_cover_stores,
     in_memory_graph_stores,
     in_memory_preset_stores,
+)
+from app.entrypoints.api.shared.bridges.item_companions import (
+    ItemCompanionCopier,
+    get_item_companions,
 )
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.collections.adapters.api.dependencies import (
@@ -188,7 +192,7 @@ from app.shared_kernel.actor import Actor
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator, Sequence
+    from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 
     from fastapi import FastAPI
     from httpx2 import Response
@@ -397,6 +401,7 @@ QUERY_PARAMS: dict[str, Callable[[Seed], str]] = {
 # Request-body recipes by OpenAPI schema name: kwargs for `client.request`.
 BODIES: dict[str, Callable[[Seed], dict[str, Any]]] = {
     "UpdateNodeRequest": lambda s: {"json": {"name": "Stolen"}},
+    "DuplicateNodeRequest": lambda s: {"json": {"name": "Stolen copy"}},
     "PromoteExtraSchemaFieldRequest": lambda s: {"json": {"node_type_id": s.film}},
     "NodeSearchRequest": lambda s: {
         "json": {
@@ -679,6 +684,23 @@ class World:
         o[get_choice_list_source] = lambda: PresetChoiceListSource(presets)
         o[get_item_lookup] = lambda: GraphItemLookup(graph)
         o[get_collection_members] = lambda: CollectionsMembers(collections)
+
+        @asynccontextmanager
+        async def companion_items() -> AsyncIterator[GraphItemLookup]:
+            yield GraphItemLookup(graph)
+
+        @asynccontextmanager
+        async def companion_targets() -> AsyncIterator[GraphAttachTargetAccess]:
+            yield GraphAttachTargetAccess(graph)
+
+        o[get_item_companions] = lambda: ItemCompanionCopier(
+            guard=get_access_guard(),
+            storage=storage,
+            collections_uow=lambda: create_in_memory_collections_uow(collections),
+            media_uow=lambda: create_in_memory_media_uow(media),
+            items=companion_items,
+            targets=companion_targets,
+        )
         o[get_definition_checker] = lambda: GraphDefinitionChecker(graph)
         # Readiness would otherwise open a real database connection.
         ready = InMemoryHealthCheckAdapter(_PASSING_READINESS)

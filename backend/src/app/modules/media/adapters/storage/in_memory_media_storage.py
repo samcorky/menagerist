@@ -67,6 +67,16 @@ class InMemoryMediaStorage:
                 (asset_id, from_status.value)
             )
 
+    async def copy(
+        self, source_id: uuid.UUID, target_id: uuid.UUID, status: MediaStatus
+    ) -> None:
+        """Copy the bytes, and the thumbnail if there is one, under `target_id`."""
+        key = status.value
+        self._files[(target_id, key)] = self._files[(source_id, key)]
+        self.modified_at[(target_id, key)] = datetime.now(UTC)
+        if (source_id, key) in self._thumbnails:
+            self._thumbnails[(target_id, key)] = self._thumbnails[(source_id, key)]
+
     async def delete(self, asset_id: uuid.UUID, status: MediaStatus) -> None:
         """Remove the stored bytes (no-op if absent)."""
         self._files.pop((asset_id, status.value), None)

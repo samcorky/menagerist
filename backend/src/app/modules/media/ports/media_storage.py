@@ -52,6 +52,18 @@ class MediaStoragePort(Protocol):
         """Atomically move an asset between lifecycle buckets."""
         ...
 
+    async def copy(
+        self,
+        source_id: uuid.UUID,
+        target_id: uuid.UUID,
+        status: MediaStatus,
+    ) -> None:
+        """Copy an asset's file, and its thumbnail if it has one, to a new asset id.
+
+        The copy is independent: deleting either asset leaves the other's file.
+        """
+        ...
+
     async def delete(
         self,
         asset_id: uuid.UUID,
