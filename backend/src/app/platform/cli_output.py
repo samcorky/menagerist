@@ -294,3 +294,6 @@ def emit_result(result: object) -> int:
 
 # Show the result, then exit non-zero if the command asked to.
 RESULT_ACTION: list[Any] = [emit_result, "sys_exit_if_non_zero_else_return"]
+
+# The same inside the interactive shell, where a failing command must not end it.
+SHELL_RESULT_ACTION: list[Any] = [emit_result, "return_none"]
