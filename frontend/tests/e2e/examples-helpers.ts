@@ -113,7 +113,7 @@ export const coverOf = async (request: APIRequestContext, nodeId: string) =>
 
 /** Uploads an image and makes it the node's cover, replacing any current one (as the UI does). */
 export async function setOwnCover(request: APIRequestContext, nodeId: string) {
-	const res = await request.post('/api/v1/media/attached', {
+	const res = await request.post('/api/v1/media/attachments', {
 		multipart: {
 			file: { name: 'mine.png', mimeType: 'image/png', buffer: OWN_COVER },
 			target_type: 'node',

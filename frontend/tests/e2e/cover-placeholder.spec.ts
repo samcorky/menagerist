@@ -49,7 +49,7 @@ test('adding a photo through the placeholder makes it the cover', async ({ page,
 
 test('an item with a cover shows no placeholder', async ({ page, request }) => {
 	const item = await makeItem(request, uniqueName('Has cover'));
-	await request.post('/api/v1/media/attached', {
+	await request.post('/api/v1/media/attachments', {
 		multipart: {
 			file: { name: 'a.png', mimeType: 'image/png', buffer: PNG },
 			target_type: 'node',
@@ -86,7 +86,7 @@ test('list rows show the type icon and colour, or a small cover when there is on
 	const covered = uniqueName('Covered row');
 	await makeItem(request, plain, type.slug);
 	const item = await makeItem(request, covered, type.slug);
-	await request.post('/api/v1/media/attached', {
+	await request.post('/api/v1/media/attachments', {
 		multipart: {
 			file: { name: 'a.png', mimeType: 'image/png', buffer: PNG },
 			target_type: 'node',

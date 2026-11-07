@@ -143,7 +143,7 @@ async def _run_with_stub_app(
     scope: Scope = {
         "type": "http",
         "method": "POST",
-        "path": "/api/v1/media/attached",
+        "path": "/api/v1/media/attachments",
         "headers": [],
     }
     await UploadLimitMiddleware(app)(scope, receive, send)
@@ -416,7 +416,7 @@ def test_chunked_oversize_through_the_app_is_413() -> None:
     client = TestClient(create_app())
 
     response = client.post(
-        "/api/v1/media/attached",
+        "/api/v1/media/attachments",
         content=_chunks(LIMIT + ALLOWANCE + 1000),
         headers={"content-type": "multipart/form-data; boundary=x"},
     )

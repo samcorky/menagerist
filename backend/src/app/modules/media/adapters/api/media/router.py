@@ -147,7 +147,7 @@ async def stage_media(
 
 
 @router.post(
-    "/attached",
+    "/attachments",
     response_model=MediaAttachmentResponse,
     status_code=201,
     operation_id="upload_and_attach_media",

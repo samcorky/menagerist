@@ -93,16 +93,17 @@ def test_attach_second_cover_is_409_problem_json() -> None:
 
 
 def test_upload_and_attach_second_cover_is_409_problem_json() -> None:
-    """POST /media/attached with a second cover returns the same 409 problem."""
+    """POST /media/attachments with a second cover returns the same 409 problem."""
     client = _client()
     item_id = uuid.uuid4()
     data = {"target_type": "node", "target_id": str(item_id), "attribute_key": "cover"}
     files = {"file": ("c.jpg", TINY_JPEG, "image/jpeg")}
     assert (
-        client.post("/api/v1/media/attached", data=data, files=files).status_code == 201
+        client.post("/api/v1/media/attachments", data=data, files=files).status_code
+        == 201
     )
 
-    response = client.post("/api/v1/media/attached", data=data, files=files)
+    response = client.post("/api/v1/media/attachments", data=data, files=files)
 
     assert response.status_code == 409
     assert response.headers["content-type"].startswith("application/problem+json")
