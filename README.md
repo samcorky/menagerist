@@ -131,9 +131,9 @@ Want to run your own changes instead of the published image, or help develop Men
 | [backend/README.md](backend/README.md) | Backend architecture and conventions |
 | [frontend/README.md](frontend/README.md) | Frontend stack and dev workflow |
 | [frontend/DESIGN_GUIDELINES.md](frontend/DESIGN_GUIDELINES.md) | Frontend UX/UI rules |
-| [SECURITY.md](SECURITY.md) | Reporting a vulnerability |
-| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | How we expect people to behave, and how to report a problem |
-| [ACCESSIBILITY.md](ACCESSIBILITY.md) | What the interface aims for, known gaps and how to report a barrier |
+| [SECURITY.md](.github/SECURITY.md) | Reporting a vulnerability |
+| [CODE_OF_CONDUCT.md](.github/CODE_OF_CONDUCT.md) | How we expect people to behave, and how to report a problem |
+| [ACCESSIBILITY.md](docs/ACCESSIBILITY.md) | What the interface aims for, known gaps and how to report a barrier |
 
 ---
 
