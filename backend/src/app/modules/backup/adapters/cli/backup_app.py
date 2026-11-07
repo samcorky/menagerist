@@ -16,7 +16,6 @@ from app.modules.backup.adapters.cli.progress_sink import snapshot_display
 from app.modules.backup.adapters.storage.local_backup_store import (
     LocalDirectoryBackupStore,
 )
-from app.modules.backup.adapters.storage.local_progress_store import LocalProgressStore
 from app.modules.backup.application.delete_backup import (
     DeleteBackup,
     DeleteBackupCommand,
@@ -45,7 +44,7 @@ if TYPE_CHECKING:
     from app.modules.backup.domain.backup import BackupSummary
     from app.modules.backup.domain.verification import PruneReport
     from app.shared_kernel.access_guard import AccessGuard
-    from app.shared_kernel.progress import ProgressReporter, ProgressSink
+    from app.shared_kernel.progress import ProgressReporter
     from app.shared_kernel.settings import SettingKey, SettingsReader
 
 backup_app = App(name="backup", help="Manage verified instance backups.")
@@ -118,19 +117,15 @@ def _run[T](operation: Coroutine[Any, Any, T], working: str | None = None) -> T:
         raise SystemExit(1) from error
 
 
-def _reported[T](
-    build: Callable[[ProgressReporter], Coroutine[Any, Any, T]],
-    *,
-    store: ProgressSink | None = None,
-) -> T:
-    """Run an operation with a reporter drawing a bar and, if given, writing `store`.
+def _reported[T](build: Callable[[ProgressReporter], Coroutine[Any, Any, T]]) -> T:
+    """Run an operation with a reporter that draws a bar on a terminal.
 
-    Failures are recorded on the reporter before they propagate, so the bar and
-    the stored snapshot end on `failed` with a curated message.
+    Failures are recorded on the reporter before they propagate, so the bar ends
+    on `failed` with a curated message. Nothing is written to disk: the public
+    restore progress route serves only what the first-run restore writes.
     """
     with snapshot_display() as display:
-        sinks = [sink for sink in (display, store) if sink is not None]
-        reporter = make_reporter(*sinks) if sinks else NULL_PROGRESS
+        reporter = make_reporter(display) if display is not None else NULL_PROGRESS
 
         async def run() -> T:
             try:
@@ -309,10 +304,7 @@ def restore(
     """
     if replace:
         confirm("Replace all data on this instance with the backup?", assume_yes=yes)
-    _reported(
-        lambda progress: _restore(backup_id, replace, _guard, progress),
-        store=LocalProgressStore(get_backup_settings().path, "restore"),
-    )
+    _reported(lambda progress: _restore(backup_id, replace, _guard, progress))
     return {
         "message": "Backup restored",
         "id": str(backup_id),

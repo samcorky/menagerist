@@ -1,9 +1,10 @@
 import asyncio
-from datetime import timedelta
+import io
 from typing import TYPE_CHECKING
 from unittest.mock import ANY, AsyncMock
 
 import pytest
+from rich.console import Console
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.settings_reader import get_settings_reader
@@ -15,13 +16,13 @@ from app.modules.backup.adapters.persistence.in_memory_database_snapshot import 
 from app.modules.backup.adapters.storage.local_backup_store import (
     LocalDirectoryBackupStore,
 )
-from app.modules.backup.adapters.storage.local_progress_store import LocalProgressStore
 from app.modules.backup.application.create_backup import (
     CreateBackup,
     CreateBackupCommand,
 )
 from app.modules.backup.domain.errors import CorruptBackupError
 from app.modules.settings.domain.setting import SettingScope, StoredSetting
+from app.platform import cli_progress
 from app.platform.config.backup import BackupSettings
 from app.shared_kernel.access_guard import DenyAllAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
@@ -34,7 +35,7 @@ if TYPE_CHECKING:
     from app.modules.settings.adapters.persistence.in_memory_setting_value_repository import (  # noqa: E501
         InMemorySettingValueRepository,
     )
-    from app.shared_kernel.progress import ProgressReporter, ProgressSnapshot
+    from app.shared_kernel.progress import ProgressReporter
 
 
 @pytest.fixture
@@ -116,38 +117,49 @@ def test_create_and_restore_use_composition(
     assert restore.await_args.args[1] is True
 
 
-def _recorded_restore(settings: BackupSettings) -> ProgressSnapshot | None:
-    store = LocalProgressStore(settings.path, "restore")
-    return asyncio.run(store.read(max_age=timedelta(minutes=10)))
+@pytest.fixture
+def terminal(monkeypatch: pytest.MonkeyPatch) -> io.StringIO:
+    """Pretend a person is at a terminal, and capture what is drawn on stderr."""
+    drawn = io.StringIO()
+    monkeypatch.setattr(cli_progress, "interactive", lambda: True)
+    monkeypatch.setattr(
+        cli_progress,
+        "_console",
+        lambda: Console(file=drawn, force_terminal=True, width=100),
+    )
+    return drawn
 
 
-def test_restore_writes_progress_for_the_setup_page(
+def test_restore_draws_its_progress_but_writes_no_file(
     archive: BackupSummary,
     backup_settings: BackupSettings,
     monkeypatch: pytest.MonkeyPatch,
+    terminal: io.StringIO,
 ) -> None:
-    """A CLI restore reports through the same file the first-run page polls."""
+    """The public restore route serves only the first-run restore's file."""
 
     async def restore(
         backup_id: object, replace: bool, guard: object, progress: ProgressReporter
     ) -> None:
-        await progress.begin((Phase(key="verify", label="Checking"),))
-        await progress.done()
+        await progress.begin((Phase(key="verify", label="Checking the backup"),))
+        await progress.start("verify", 1)
 
     monkeypatch.setattr(commands, "_restore", restore)
     commands.restore(archive.id)
-    snapshot = _recorded_restore(backup_settings)
-    assert snapshot is not None
-    assert (snapshot.outcome, snapshot.percent) == ("succeeded", 100)
+    assert "Checking the backup" in terminal.getvalue()
+    assert not (backup_settings.path / ".progress").exists()
 
 
-def test_a_failed_restore_is_recorded_with_the_curated_message(
+def test_a_failed_restore_ends_the_bar_on_the_curated_message(
     archive: BackupSummary,
-    backup_settings: BackupSettings,
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+    terminal: io.StringIO,
 ) -> None:
-    """The file ends on failed, then the command exits as it always has."""
+    """The bar says why, then the command exits as it always has.
+
+    While the bar is live Rich carries the command's own stderr line above it,
+    so both appear in the same stream.
+    """
 
     async def restore(
         backup_id: object, replace: bool, guard: object, progress: ProgressReporter
@@ -157,18 +169,17 @@ def test_a_failed_restore_is_recorded_with_the_curated_message(
     monkeypatch.setattr(commands, "_restore", restore)
     with pytest.raises(SystemExit, match="1"):
         commands.restore(archive.id)
-    snapshot = _recorded_restore(backup_settings)
-    assert snapshot is not None
-    assert (snapshot.outcome, snapshot.message) == ("failed", "The archive is damaged.")
-    assert "The archive is damaged." in capsys.readouterr().err
+    drawn = terminal.getvalue()
+    assert "Failed: The archive is damaged." in drawn
+    assert drawn.count("The archive is damaged.") >= 2
 
 
-def test_an_unexpected_failure_never_leaks_its_message_into_the_file(
+def test_an_unexpected_failure_shows_a_generic_line_on_the_bar(
     archive: BackupSummary,
-    backup_settings: BackupSettings,
     monkeypatch: pytest.MonkeyPatch,
+    terminal: io.StringIO,
 ) -> None:
-    """Only curated domain messages reach the file the public page reads."""
+    """Only curated domain messages are put on the bar."""
 
     async def restore(
         backup_id: object, replace: bool, guard: object, progress: ProgressReporter
@@ -178,17 +189,16 @@ def test_an_unexpected_failure_never_leaks_its_message_into_the_file(
     monkeypatch.setattr(commands, "_restore", restore)
     with pytest.raises(OSError, match="permission denied"):
         commands.restore(archive.id)
-    snapshot = _recorded_restore(backup_settings)
-    assert snapshot is not None
-    assert snapshot.message == GENERIC_FAILURE
+    assert GENERIC_FAILURE in terminal.getvalue()
+    assert "secret" not in terminal.getvalue()
 
 
-def test_other_commands_write_no_progress_file(
+def test_no_command_writes_a_progress_file(
     archive: BackupSummary, backup_settings: BackupSettings
 ) -> None:
     """Without a terminal, verify reports to nobody and leaves no file behind."""
     commands.verify(archive.id)
-    assert _recorded_restore(backup_settings) is None
+    assert not (backup_settings.path / ".progress").exists()
 
 
 def test_unwired_authorisation_fails_closed(
