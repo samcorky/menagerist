@@ -186,7 +186,7 @@ def test_cannot_upload_and_attach_to_another_users_item(world: _World) -> None:
     bob = world.act_as(BOB)
 
     response = bob.post(
-        f"{BASE}/attached",
+        f"{BASE}/attachments",
         data={"target_type": "node", "target_id": str(alices_item)},
         files={"file": JPEG},
     )

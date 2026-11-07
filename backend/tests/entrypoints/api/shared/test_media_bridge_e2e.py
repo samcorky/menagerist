@@ -68,12 +68,16 @@ def test_attaching_needs_a_visible_item_through_the_real_bridge(
         data = {"target_type": "node", "target_id": item}
 
         as_user(app, BOB)
-        refused = client.post("/api/v1/media/attached", data=data, files={"file": PDF})
+        refused = client.post(
+            "/api/v1/media/attachments", data=data, files={"file": PDF}
+        )
         assert refused.status_code == 404, refused.text
         assert client.get(f"/api/v1/nodes/{item}/media").json() == []
 
         as_user(app, ALICE)
-        accepted = client.post("/api/v1/media/attached", data=data, files={"file": PDF})
+        accepted = client.post(
+            "/api/v1/media/attachments", data=data, files={"file": PDF}
+        )
         assert accepted.status_code == 201, accepted.text
         asset_id = accepted.json()["asset_id"]
         listed = client.get(f"/api/v1/nodes/{item}/media").json()

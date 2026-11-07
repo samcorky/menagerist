@@ -82,7 +82,7 @@ Paths read as nouns under `/api/v1`, and `openapi.json` is the contract the rule
 - **The signed-in account lives under `/me`** (`/me`, `/me/permissions`, `/me/password`, `/me/sessions`, `/me/exports`); `/auth` is for signing in and out and first-run setup, and `/sessions` is the administrators' list.
 - **Actions on a resource are `POST` sub-resources named for the verb** (`/restore`, `/purge`, `/promote`, `/rotate`).
 - **`count` returns a number; `usage` or another noun returns a small report.** Operation ids follow: `count_*` only for numbers, otherwise `get_*` or `list_*`, always `verb_noun`.
-- **A path parameter is `{thing_id}`** and is named for what it identifies (`{export_id}`, not the `{backup_id}` it is stored as); `{key}` is the exception for an attribute key.
+- **A path parameter is `{thing_id}`** and is named for what it identifies (`{backup_id}` under `/backups`, `{export_id}` under `/me/exports`, though both are stored as backups); `{key}` is the exception for an attribute key.
 
 ## Request bodies: named Pydantic models, not `Form()` fields
 

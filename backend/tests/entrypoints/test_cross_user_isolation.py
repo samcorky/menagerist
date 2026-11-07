@@ -777,7 +777,7 @@ class World:
         assert smart["item_count"] == 1, smart
         asset = _created(
             a.post(
-                "/api/v1/media/attached",
+                "/api/v1/media/attachments",
                 files={"file": ("poster-alpha.jpg", TINY_JPEG, "image/jpeg")},
                 data={"target_type": "node", "target_id": item["id"]},
             )

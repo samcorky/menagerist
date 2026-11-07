@@ -45,7 +45,7 @@ async function makeItem(
 }
 
 async function attachImage(request: APIRequestContext, itemId: string) {
-	const res = await request.post('/api/v1/media/attached', {
+	const res = await request.post('/api/v1/media/attachments', {
 		multipart: {
 			file: { name: 'mine.png', mimeType: 'image/png', buffer: OWN_COVER },
 			target_type: 'node',

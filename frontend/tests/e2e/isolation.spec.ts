@@ -61,7 +61,7 @@ test('user A creates content that only A can reach', async ({ browser }) => {
 	const a = await asUser(browser, userA);
 	aContent = await makeContent(a.request, 'alpha');
 
-	const upload = await a.request.post('/api/v1/media/attached', {
+	const upload = await a.request.post('/api/v1/media/attachments', {
 		multipart: {
 			file: { name: 'alpha.png', mimeType: 'image/png', buffer: OWN_COVER },
 			target_type: 'node',

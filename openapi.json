@@ -9835,7 +9835,7 @@
         "x-required-permission": "media:item:write"
       }
     },
-    "/api/v1/media/attached": {
+    "/api/v1/media/attachments": {
       "post": {
         "tags": [
           "v1",
@@ -9877,7 +9877,7 @@
                   "title": "UnsupportedMediaTypeError",
                   "status": 400,
                   "detail": "content type not permitted",
-                  "instance": "https://menagerist.example/api/v1/media/attached"
+                  "instance": "https://menagerist.example/api/v1/media/attachments"
                 }
               }
             }
@@ -9897,7 +9897,7 @@
                       "title": "SessionRequiredError",
                       "status": 401,
                       "detail": "Sign in to continue.",
-                      "instance": "https://menagerist.example/api/v1/media/attached"
+                      "instance": "https://menagerist.example/api/v1/media/attachments"
                     }
                   },
                   "setup_required": {
@@ -9907,7 +9907,7 @@
                       "title": "SetupRequiredError",
                       "status": 401,
                       "detail": "Create the first account to continue.",
-                      "instance": "https://menagerist.example/api/v1/media/attached"
+                      "instance": "https://menagerist.example/api/v1/media/attachments"
                     }
                   },
                   "invalid_token": {
@@ -9917,7 +9917,7 @@
                       "title": "InvalidApiTokenError",
                       "status": 401,
                       "detail": "The access token is not valid.",
-                      "instance": "https://menagerist.example/api/v1/media/attached"
+                      "instance": "https://menagerist.example/api/v1/media/attachments"
                     }
                   }
                 }
@@ -9939,7 +9939,7 @@
                       "title": "ForbiddenError",
                       "status": 403,
                       "detail": "You do not have permission to do that.",
-                      "instance": "https://menagerist.example/api/v1/media/attached"
+                      "instance": "https://menagerist.example/api/v1/media/attachments"
                     }
                   },
                   "csrf_failed": {
@@ -9949,7 +9949,7 @@
                       "title": "CsrfError",
                       "status": 403,
                       "detail": "This request was not sent from this site's own pages.",
-                      "instance": "https://menagerist.example/api/v1/media/attached"
+                      "instance": "https://menagerist.example/api/v1/media/attachments"
                     }
                   },
                   "password_expired": {
@@ -9959,7 +9959,7 @@
                       "title": "PasswordExpiredError",
                       "status": 403,
                       "detail": "Change your password to continue.",
-                      "instance": "https://menagerist.example/api/v1/media/attached"
+                      "instance": "https://menagerist.example/api/v1/media/attachments"
                     }
                   }
                 }
@@ -9978,7 +9978,7 @@
                   "title": "AttachTargetNotFoundError",
                   "status": 404,
                   "detail": "node 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
-                  "instance": "https://menagerist.example/api/v1/media/attached"
+                  "instance": "https://menagerist.example/api/v1/media/attachments"
                 }
               }
             }
@@ -9995,7 +9995,7 @@
                   "title": "CoverAlreadySetError",
                   "status": 409,
                   "detail": "This item already has a cover. Set another image as the cover instead, or clear the cover first.",
-                  "instance": "https://menagerist.example/api/v1/media/attached"
+                  "instance": "https://menagerist.example/api/v1/media/attachments"
                 }
               }
             }
@@ -10012,7 +10012,7 @@
                   "title": "Payload Too Large",
                   "status": 413,
                   "detail": "The upload is larger than this server allows.",
-                  "instance": "/api/v1/media/attached"
+                  "instance": "/api/v1/media/attachments"
                 }
               }
             }
@@ -10038,7 +10038,7 @@
                       "msg": "Field required"
                     }
                   ],
-                  "instance": "https://menagerist.example/api/v1/media/attached"
+                  "instance": "https://menagerist.example/api/v1/media/attachments"
                 }
               }
             }
@@ -10063,7 +10063,7 @@
                   "title": "RateLimitedError",
                   "status": 429,
                   "detail": "Too many requests. Try again later.",
-                  "instance": "https://menagerist.example/api/v1/media/attached"
+                  "instance": "https://menagerist.example/api/v1/media/attachments"
                 }
               }
             }
@@ -10083,7 +10083,7 @@
                       "title": "Internal Server Error",
                       "status": 500,
                       "detail": "An unexpected error occurred.",
-                      "instance": "https://menagerist.example/api/v1/media/attached"
+                      "instance": "https://menagerist.example/api/v1/media/attachments"
                     }
                   }
                 }

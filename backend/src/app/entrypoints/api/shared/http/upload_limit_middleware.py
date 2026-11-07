@@ -19,7 +19,7 @@ _OVERHEAD_ALLOWANCE = 64 * 1024
 _DRAIN_BYTES = 256 * 1024 * 1024
 _DRAIN_SECONDS = 30.0
 
-_UPLOAD_PATHS = frozenset({"/api/v1/media", "/api/v1/media/attached"})
+_UPLOAD_PATHS = frozenset({"/api/v1/media", "/api/v1/media/attachments"})
 _BACKUP_PATHS = frozenset(
     {
         "/api/v1/backups/upload",

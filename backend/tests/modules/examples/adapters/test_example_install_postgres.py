@@ -339,7 +339,7 @@ def test_a_replaced_cover_survives_removal_with_its_item(
     items = {n["name"]: n for n in client.get("/api/v1/nodes?limit=100").json()}
     target = {"target_type": "node", "target_id": items["A"]["id"]}
     mine = client.post(
-        "/api/v1/media/attached",
+        "/api/v1/media/attachments",
         data=target,
         files={"file": ("mine.png", _own_png(), "image/png")},
     )
