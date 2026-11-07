@@ -6,6 +6,11 @@
 	"start_url": "/",
 	"scope": "/",
 	"display": "standalone",
+	"display_override": ["standalone", "minimal-ui"],
+	"orientation": "any",
+	"lang": "en-GB",
+	"dir": "ltr",
+	"categories": ["productivity", "lifestyle"],
 	"background_color": "#ffffff",
 	"theme_color": "#ffffff",
 	"icons": [
@@ -16,6 +21,27 @@
 			"sizes": "512x512",
 			"type": "image/png",
 			"purpose": "maskable"
+		}
+	],
+	"shortcuts": [
+		{ "name": "Add an item", "short_name": "Add item", "url": "/items/new" },
+		{ "name": "Browse items", "short_name": "Items", "url": "/items" },
+		{ "name": "Collections", "url": "/collections" }
+	],
+	"screenshots": [
+		{
+			"src": "/screenshot-narrow.png",
+			"sizes": "780x1688",
+			"type": "image/png",
+			"form_factor": "narrow",
+			"label": "Browse your items on a phone"
+		},
+		{
+			"src": "/screenshot-wide.png",
+			"sizes": "1280x800",
+			"type": "image/png",
+			"form_factor": "wide",
+			"label": "Browse your items on a desktop"
 		}
 	]
 }
