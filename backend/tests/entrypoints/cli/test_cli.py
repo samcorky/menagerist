@@ -19,7 +19,9 @@ from app.platform.app_info import AppInfo
 from app.platform.build_info import BuildInfo
 from app.platform.cli_output import (
     RESULT_ACTION,
+    SHELL_RESULT_ACTION,
     OutputFormat,
+    Report,
     resolved_format,
     set_format,
 )
@@ -131,7 +133,7 @@ def test_shell_starts_the_interactive_shell(monkeypatch: pytest.MonkeyPatch) -> 
         {
             "prompt": f"{cli.app_info.name}> ",
             "intro": "",
-            "result_action": RESULT_ACTION,
+            "result_action": SHELL_RESULT_ACTION,
         }
     ]
 
@@ -168,6 +170,31 @@ def test_shell_stays_quiet_when_results_are_not_for_a_terminal(
     cli.shell()
 
     assert capsys.readouterr().out == ""
+
+
+def test_a_failing_command_does_not_end_the_shell(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`worker-health` exits 1 when unhealthy; typed in the shell it only reports."""
+    shell_app = App(result_action=RESULT_ACTION)
+
+    @shell_app.command
+    def unhealthy() -> Report:
+        return Report(value={"message": "Not well."}, exit_code=1)
+
+    @shell_app.command
+    def healthy() -> dict[str, object]:
+        return {"message": "Fine."}
+
+    lines = iter(["unhealthy", "healthy"])
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(lines))
+
+    with pytest.raises(StopIteration):  # input runs dry only if the shell carried on
+        shell_app.interactive_shell(intro="", result_action=SHELL_RESULT_ACTION)
+
+    out = capsys.readouterr().out
+    assert "Not well." in out
+    assert "Fine." in out
 
 
 def test_format_command_changes_how_later_results_are_shown() -> None:
