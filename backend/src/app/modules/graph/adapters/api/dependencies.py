@@ -14,6 +14,10 @@ from app.entrypoints.api.shared.bridges.collection_members import (
     CollectionsMembers,
     get_collection_members,
 )
+from app.entrypoints.api.shared.bridges.item_companions import (
+    ItemCompanionCopier,
+    get_item_companions,
+)
 from app.entrypoints.api.shared.bridges.item_dependents import (
     ItemDependentsPurger,
     get_item_dependents,
@@ -36,6 +40,7 @@ from app.modules.graph.application.delete_edge import DeleteEdge
 from app.modules.graph.application.delete_edge_type import DeleteEdgeType
 from app.modules.graph.application.delete_node import DeleteNode
 from app.modules.graph.application.delete_node_type import DeleteNodeType
+from app.modules.graph.application.duplicate_node import DuplicateNode
 from app.modules.graph.application.get_edge import GetEdge
 from app.modules.graph.application.get_edge_type import GetEdgeType
 from app.modules.graph.application.get_node import GetNode
@@ -100,6 +105,14 @@ def get_create_node_use_case(
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> CreateNode:
     return CreateNode(uow, guard, choice_lists)
+
+
+def get_duplicate_node_use_case(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    companions: Annotated[ItemCompanionCopier, Depends(get_item_companions)],
+) -> DuplicateNode:
+    return DuplicateNode(uow, guard, companions)
 
 
 def get_get_node_use_case(

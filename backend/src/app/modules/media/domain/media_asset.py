@@ -57,6 +57,26 @@ class MediaAsset(Identifiable, Owned, Timestamped):
             updated_at=now,
         )
 
+    def duplicate(self, *, owner_id: uuid.UUID) -> MediaAsset:
+        """Return a new, attached asset describing a copy of this one's file.
+
+        The caller copies the stored file (and thumbnail) under the new id.
+        """
+        now = datetime.now(UTC)
+        return MediaAsset(
+            id=uuid.uuid7(),
+            owner_id=owner_id,
+            filename=self.filename,
+            content_type=self.content_type,
+            size=self.size,
+            sha256=self.sha256,
+            status=MediaStatus.ATTACHED,
+            has_thumbnail=self.has_thumbnail,
+            thumbnail_sha256=self.thumbnail_sha256,
+            created_at=now,
+            updated_at=now,
+        )
+
     @staticmethod
     def _extension(name: str) -> str:
         dot = name.rfind(".")

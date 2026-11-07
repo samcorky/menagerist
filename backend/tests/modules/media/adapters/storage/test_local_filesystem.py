@@ -281,3 +281,50 @@ async def test_delete_also_removes_a_leftover_upload(tmp_path: Path) -> None:
     await storage.delete(asset.id, MediaStatus.STAGED)
 
     assert not leftover.exists()
+
+
+async def _read(storage: LocalFilesystemMediaStorage, asset: MediaAsset) -> bytes:
+    return b"".join([c async for c in storage.retrieve(asset.id, MediaStatus.ATTACHED)])
+
+
+async def test_copy_makes_an_independent_file_and_thumbnail(tmp_path: Path) -> None:
+    """copy() writes both under a new id; deleting one keeps the other."""
+    storage = _storage(tmp_path)
+    source, target = _asset(), _asset()
+    await storage.store(source.id, MediaStatus.ATTACHED, _stream(b"photo bytes"))
+    await storage.store_thumbnail(source.id, MediaStatus.ATTACHED, b"thumb bytes")
+
+    await storage.copy(source.id, target.id, MediaStatus.ATTACHED)
+
+    assert await _read(storage, target) == b"photo bytes"
+    thumb = b"".join(
+        [c async for c in storage.retrieve_thumbnail(target.id, MediaStatus.ATTACHED)]
+    )
+    assert thumb == b"thumb bytes"
+    await storage.delete(target.id, MediaStatus.ATTACHED)
+    assert await _read(storage, source) == b"photo bytes"
+    assert not list(tmp_path.rglob("*.tmp"))
+
+
+async def test_copy_without_a_thumbnail_copies_just_the_file(tmp_path: Path) -> None:
+    """A file with no thumbnail copies without error."""
+    storage = _storage(tmp_path)
+    source, target = _asset(), _asset()
+    await storage.store(source.id, MediaStatus.ATTACHED, _stream(b"plain"))
+
+    await storage.copy(source.id, target.id, MediaStatus.ATTACHED)
+
+    assert await _read(storage, target) == b"plain"
+
+
+async def test_copy_of_a_missing_file_fails_and_leaves_nothing_behind(
+    tmp_path: Path,
+) -> None:
+    """A source that is not on disk raises and leaves no temporary file."""
+    storage = _storage(tmp_path)
+    source, target = _asset(), _asset()
+
+    with pytest.raises(FileNotFoundError):
+        await storage.copy(source.id, target.id, MediaStatus.ATTACHED)
+
+    assert not [p for p in tmp_path.rglob("*") if p.is_file()]

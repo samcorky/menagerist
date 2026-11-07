@@ -1974,6 +1974,13 @@
                 },
                 "description": "Delete node with the id from this response."
               },
+              "DuplicateNode": {
+                "operationId": "duplicate_node",
+                "parameters": {
+                  "node_id": "$response.body#/id"
+                },
+                "description": "Duplicate node with the id from this response."
+              },
               "ListNodeMedia": {
                 "operationId": "list_node_media",
                 "parameters": {
@@ -2307,6 +2314,13 @@
                   "node_id": "$response.body#/0/id"
                 },
                 "description": "Delete node with the id from this response."
+              },
+              "DuplicateNode": {
+                "operationId": "duplicate_node",
+                "parameters": {
+                  "node_id": "$response.body#/0/id"
+                },
+                "description": "Duplicate node with the id from this response."
               },
               "ListNodeMedia": {
                 "operationId": "list_node_media",
@@ -3932,6 +3946,13 @@
                 },
                 "description": "Delete node with the id from this response."
               },
+              "DuplicateNode": {
+                "operationId": "duplicate_node",
+                "parameters": {
+                  "node_id": "$response.body#/id"
+                },
+                "description": "Duplicate node with the id from this response."
+              },
               "ListNodeMedia": {
                 "operationId": "list_node_media",
                 "parameters": {
@@ -4148,6 +4169,13 @@
                   "node_id": "$response.body#/id"
                 },
                 "description": "Delete node with the id from this response."
+              },
+              "DuplicateNode": {
+                "operationId": "duplicate_node",
+                "parameters": {
+                  "node_id": "$response.body#/id"
+                },
+                "description": "Duplicate node with the id from this response."
               },
               "ListNodeMedia": {
                 "operationId": "list_node_media",
@@ -4952,6 +4980,209 @@
                       "status": 500,
                       "detail": "An unexpected error occurred.",
                       "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/restore"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "graph:item:write"
+      }
+    },
+    "/api/v1/nodes/{node_id}/duplicate": {
+      "post": {
+        "tags": [
+          "v1",
+          "Nodes"
+        ],
+        "summary": "Duplicate Node",
+        "description": "Copy an item under a new name.\n\nThe copy has the original's type, description, fields and tags, its own id and\nhistory, and is not a favourite. Each flag adds one more thing from the\noriginal: connections, media (every attachment but the cover), the cover, and\nits manual collections. Media files are copied, so the two items are independent.\n\n**Requires permission:** `graph:item:write`",
+        "operationId": "duplicate_node",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DuplicateNodeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/duplicate"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/duplicate"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/duplicate"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/duplicate"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/duplicate"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/duplicate"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when a requested node does not exist.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "NodeNotFoundError",
+                  "status": 404,
+                  "detail": "Node 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10 not found",
+                  "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/duplicate"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/duplicate"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Unhandled error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/duplicate"
                     }
                   }
                 }
@@ -24216,6 +24447,53 @@
             "attribute_key": "cover",
             "target_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
             "target_type": "node"
+          }
+        ]
+      },
+      "DuplicateNodeRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "copy_relationships": {
+            "type": "boolean",
+            "title": "Copy Relationships",
+            "default": false
+          },
+          "copy_media": {
+            "type": "boolean",
+            "title": "Copy Media",
+            "default": false
+          },
+          "copy_cover": {
+            "type": "boolean",
+            "title": "Copy Cover",
+            "default": false
+          },
+          "copy_collections": {
+            "type": "boolean",
+            "title": "Copy Collections",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "DuplicateNodeRequest",
+        "description": "Request body for copying an item. The copy's `name` is required.\n\nThe original's fields and tags are always copied. Each flag adds one more\nthing from it; connections, media and cover default to off, collections to on.",
+        "examples": [
+          {
+            "name": "Copy of Alien"
+          },
+          {
+            "copy_collections": false,
+            "copy_cover": true,
+            "copy_media": true,
+            "copy_relationships": true,
+            "name": "Alien (director's cut)"
           }
         ]
       },

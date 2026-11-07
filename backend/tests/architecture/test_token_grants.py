@@ -13,7 +13,11 @@ from app.entrypoints.api.shared.permissions import expand
 from app.modules.backup.application.import_user_archive import ImportUserArchive
 from app.modules.backup.application.import_user_data import ImportUserData
 from app.modules.backup.application.permissions import BackupPermission
+from app.modules.collections.application.copy_item_memberships import (
+    CopyItemMemberships,
+)
 from app.modules.collections.application.permissions import CollectionPermission
+from app.modules.graph.application.duplicate_node import DuplicateNode
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.promote_extra_schema_field import (
     PromoteExtraSchemaField,
@@ -21,6 +25,7 @@ from app.modules.graph.application.promote_extra_schema_field import (
 from app.modules.graph.application.update_node import UpdateNode
 from app.modules.graph.application.update_node_type import UpdateNodeType
 from app.modules.media.application.attach_media import AttachMedia
+from app.modules.media.application.copy_item_media import CopyItemMedia
 from app.modules.media.application.stage_media import StageMedia
 from app.modules.media.application.upload_and_attach_media import UploadAndAttachMedia
 from app.shared_kernel.access import Content, Requires
@@ -39,6 +44,16 @@ COMPOSITES: dict[UseCaseType, tuple[tuple[UseCaseType, ...], frozenset[str]]] = 
         frozenset({"graph:type:write", "graph:item:write"}),
     ),
     ImportUserArchive: ((ImportUserData,), frozenset({"backup:own_data:import"})),
+    DuplicateNode: (
+        (CopyItemMedia, CopyItemMemberships),
+        frozenset(
+            {
+                "graph:item:write",
+                "media:item:write",
+                "collections:collection:write",
+            }
+        ),
+    ),
 }
 
 

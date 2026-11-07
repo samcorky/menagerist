@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, cast
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.modules.graph.application.create_node import CreateNodeCommand
+from app.modules.graph.application.duplicate_node import DuplicateNodeCommand
 from app.modules.graph.application.update_node import UpdateNodeCommand
 from app.modules.graph.domain.query import ItemFieldUse, TypeCount  # noqa: TC001
 from app.platform.request_model import RequestModel
@@ -39,6 +40,46 @@ _NODE_MINIMAL_EXAMPLE: dict[str, Any] = {
     "created_at": "2026-08-23T10:14:44.465954Z",
     "updated_at": "2026-08-23T10:14:44.465954Z",
 }
+
+
+class DuplicateNodeRequest(RequestModel):
+    """Request body for copying an item. The copy's `name` is required.
+
+    The original's fields and tags are always copied. Each flag adds one more
+    thing from it; connections, media and cover default to off, collections to on.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"name": "Copy of Alien"},
+                {
+                    "name": "Alien (director's cut)",
+                    "copy_relationships": True,
+                    "copy_media": True,
+                    "copy_cover": True,
+                    "copy_collections": False,
+                },
+            ]
+        }
+    )
+
+    name: str
+    copy_relationships: bool = Field(default=False)
+    copy_media: bool = Field(default=False)
+    copy_cover: bool = Field(default=False)
+    copy_collections: bool = Field(default=True)
+
+    def to_command(self, node_id: uuid.UUID) -> DuplicateNodeCommand:
+        """Convert this request into a `DuplicateNodeCommand` for `node_id`."""
+        return DuplicateNodeCommand(
+            node_id=node_id,
+            name=self.name,
+            copy_relationships=self.copy_relationships,
+            copy_media=self.copy_media,
+            copy_cover=self.copy_cover,
+            copy_collections=self.copy_collections,
+        )
 
 
 class CreateNodeRequest(RequestModel):
