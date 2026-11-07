@@ -147,9 +147,9 @@ test('a clashing item type slug gives a friendly error and creates nothing', asy
 	await expect(page.getByText("Couldn't add these examples")).toBeVisible();
 	await expect(page.getByRole('button', { name: /^Add Music/ })).toBeVisible();
 
-	const nodes = (await (await request.get('/api/v1/node?limit=500')).json()) as { name: string }[];
+	const nodes = (await (await request.get('/api/v1/nodes?limit=500')).json()) as { name: string }[];
 	expect(nodes.some((n) => n.name === 'Night Drive')).toBe(false);
-	const types = (await (await request.get('/api/v1/node-type?limit=500')).json()) as {
+	const types = (await (await request.get('/api/v1/node-types?limit=500')).json()) as {
 		slug: string;
 	}[];
 	expect(types.some((t) => t.slug === 'music-record')).toBe(false);
@@ -161,7 +161,7 @@ test('the empty-state link opens the examples page, and only shows with no items
 }) => {
 	const link = page.getByRole('link', { name: 'Or look around with some examples' });
 
-	const probe = await request.get('/api/v1/node?limit=1');
+	const probe = await request.get('/api/v1/nodes?limit=1');
 	if (Number(probe.headers()['total-count'] ?? '0') === 0) {
 		await page.goto('/');
 		await link.click();

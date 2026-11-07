@@ -64,14 +64,14 @@ def test_list_shows_packs_and_installation_state(
     """The list reports each pack and, once installed, its owned counts."""
     client = _client(make_world(sample_pack("one"), sample_pack("two")))
 
-    first = client.get("/api/v1/example")
+    first = client.get("/api/v1/examples")
     assert first.status_code == 200
     assert [p["id"] for p in first.json()] == ["one", "two"]
     assert first.json()[0]["installation"] is None
     assert first.json()[0]["counts"]["items"] == 2
 
-    assert client.put("/api/v1/example/one/installation").status_code == 200
-    after = client.get("/api/v1/example").json()
+    assert client.put("/api/v1/examples/one/installation").status_code == 200
+    after = client.get("/api/v1/examples").json()
     assert after[0]["installation"]["status"] == "installed"
     assert after[0]["installation"]["counts"]["items"] == 2
     assert after[1]["installation"] is None
@@ -81,7 +81,7 @@ def test_install_returns_what_was_created(make_world: MakeWorld) -> None:
     """Installing returns the pack id and the counts created."""
     client = _client(make_world())
 
-    response = client.put("/api/v1/example/demo/installation")
+    response = client.put("/api/v1/examples/demo/installation")
 
     assert response.status_code == 200
     body = response.json()
@@ -101,13 +101,13 @@ def test_reinstall_reports_what_it_adopted(make_world: MakeWorld) -> None:
     """Kept, edited examples are taken back and counted as adopted, not created."""
     world = make_world()
     client = _client(world)
-    client.put("/api/v1/example/demo/installation")
+    client.put("/api/v1/examples/demo/installation")
     blue = asyncio.run(_blue(world))
     blue.name = "Blue (my copy)"
     asyncio.run(world.graph_repos.nodes.save(blue))
-    client.delete("/api/v1/example/demo/installation")
+    client.delete("/api/v1/examples/demo/installation")
 
-    response = client.put("/api/v1/example/demo/installation")
+    response = client.put("/api/v1/examples/demo/installation")
 
     assert response.status_code == 200
     body = response.json()
@@ -118,21 +118,21 @@ def test_reinstall_reports_what_it_adopted(make_world: MakeWorld) -> None:
 def test_install_twice_is_a_409_and_unknown_is_a_404(make_world: MakeWorld) -> None:
     """A second install conflicts; an unknown pack is not found."""
     client = _client(make_world())
-    assert client.put("/api/v1/example/demo/installation").status_code == 200
+    assert client.put("/api/v1/examples/demo/installation").status_code == 200
 
-    again = client.put("/api/v1/example/demo/installation")
+    again = client.put("/api/v1/examples/demo/installation")
 
     assert again.status_code == 409
     assert again.json()["title"] == "PackAlreadyInstalledError"
-    assert client.put("/api/v1/example/nope/installation").status_code == 404
+    assert client.put("/api/v1/examples/nope/installation").status_code == 404
 
 
 def test_uninstall_reports_removed_and_kept(make_world: MakeWorld) -> None:
     """Uninstalling returns what was removed and what was kept."""
     client = _client(make_world())
-    client.put("/api/v1/example/demo/installation")
+    client.put("/api/v1/examples/demo/installation")
 
-    response = client.delete("/api/v1/example/demo/installation")
+    response = client.delete("/api/v1/examples/demo/installation")
 
     assert response.status_code == 200
     body = response.json()
@@ -144,12 +144,12 @@ def test_uninstall_reports_kept_entities(make_world: MakeWorld) -> None:
     """Kept entities are serialised with kind, label and reason."""
     world = make_world()
     client = _client(world)
-    client.put("/api/v1/example/demo/installation")
+    client.put("/api/v1/examples/demo/installation")
     blue = asyncio.run(_blue(world))
     blue.name = "Blue (my copy)"
     asyncio.run(world.graph_repos.nodes.save(blue))
 
-    response = client.delete("/api/v1/example/demo/installation")
+    response = client.delete("/api/v1/examples/demo/installation")
 
     assert response.status_code == 200
     kept = response.json()["kept"]
@@ -167,7 +167,7 @@ def test_uninstall_when_not_installed_is_a_409(make_world: MakeWorld) -> None:
     """Removing a pack that is not installed conflicts."""
     client = _client(make_world())
 
-    assert client.delete("/api/v1/example/demo/installation").status_code == 409
+    assert client.delete("/api/v1/examples/demo/installation").status_code == 409
 
 
 def test_a_failed_install_is_a_500_problem_without_the_cause(
@@ -183,7 +183,7 @@ def test_a_failed_install_is_a_500_problem_without_the_cause(
     client = _client(world, raise_server_exceptions=False)
 
     with capture_logs() as logs:
-        response = client.put("/api/v1/example/demo/installation")
+        response = client.put("/api/v1/examples/demo/installation")
 
     assert response.status_code == 500
     assert response.headers["content-type"].startswith("application/problem+json")
@@ -202,7 +202,7 @@ def test_slug_clash_is_a_409_naming_the_slug(make_world: MakeWorld) -> None:
         )
     )
 
-    response = _client(world).put("/api/v1/example/demo/installation")
+    response = _client(world).put("/api/v1/examples/demo/installation")
 
     assert response.status_code == 409
     assert "demo-record" in response.json()["detail"]
@@ -224,19 +224,19 @@ def test_openapi_documents_the_installation_status_values(
 def test_entities_lists_owned_item_and_item_type_ids(make_world: MakeWorld) -> None:
     """Once installed, the pack's items and item types are listed; none before."""
     client = _client(make_world())
-    assert client.get("/api/v1/example/entities").json() == {
+    assert client.get("/api/v1/examples/entities").json() == {
         "item_ids": [],
         "item_type_ids": [],
         "collection_ids": [],
     }
 
-    assert client.put("/api/v1/example/demo/installation").status_code == 200
-    body = client.get("/api/v1/example/entities").json()
+    assert client.put("/api/v1/examples/demo/installation").status_code == 200
+    body = client.get("/api/v1/examples/entities").json()
     assert len(body["item_ids"]) == 2
     assert len(body["item_type_ids"]) == 2
 
-    assert client.delete("/api/v1/example/demo/installation").status_code == 200
-    assert client.get("/api/v1/example/entities").json() == {
+    assert client.delete("/api/v1/examples/demo/installation").status_code == 200
+    assert client.get("/api/v1/examples/entities").json() == {
         "item_ids": [],
         "item_type_ids": [],
         "collection_ids": [],
@@ -254,13 +254,13 @@ def test_entities_lists_owned_collection_ids(
     world = make_world(pack)
     client = _client(world)
 
-    assert client.put("/api/v1/example/demo/installation").status_code == 200
-    body = client.get("/api/v1/example/entities").json()
+    assert client.put("/api/v1/examples/demo/installation").status_code == 200
+    body = client.get("/api/v1/examples/entities").json()
     assert body["collection_ids"] == [str(c) for c in world.collections.collections]
     assert len(body["collection_ids"]) == 1
 
-    assert client.delete("/api/v1/example/demo/installation").status_code == 200
-    assert client.get("/api/v1/example/entities").json()["collection_ids"] == []
+    assert client.delete("/api/v1/examples/demo/installation").status_code == 200
+    assert client.get("/api/v1/examples/entities").json()["collection_ids"] == []
 
 
 def _linking_packs() -> tuple[ExamplePack, ExamplePack]:
@@ -305,19 +305,19 @@ def test_list_shows_requires_and_required_by_with_names(
     """An add-on lists what it requires; the base lists installed dependants."""
     client = _client(_add_on_world(make_world, sample_pack))
 
-    before = {p["id"]: p for p in client.get("/api/v1/example").json()}
+    before = {p["id"]: p for p in client.get("/api/v1/examples").json()}
     assert before["extras"]["requires"] == [{"id": "base", "name": "Base"}]
     assert before["base"]["requires"] == []
     assert before["base"]["required_by"] == []
 
-    client.put("/api/v1/example/base/installation")
-    client.put("/api/v1/example/extras/installation")
-    during = {p["id"]: p for p in client.get("/api/v1/example").json()}
+    client.put("/api/v1/examples/base/installation")
+    client.put("/api/v1/examples/extras/installation")
+    during = {p["id"]: p for p in client.get("/api/v1/examples").json()}
     assert during["base"]["required_by"] == [{"id": "extras", "name": "Extras"}]
     assert during["extras"]["required_by"] == []
 
-    client.delete("/api/v1/example/extras/installation")
-    after = {p["id"]: p for p in client.get("/api/v1/example").json()}
+    client.delete("/api/v1/examples/extras/installation")
+    after = {p["id"]: p for p in client.get("/api/v1/examples").json()}
     assert after["base"]["required_by"] == []
 
 
@@ -325,12 +325,12 @@ def test_links_show_in_the_list_and_the_install_result(make_world: MakeWorld) ->
     """`links_with` names the partner; `linked` counts the connections made."""
     client = _client(make_world(*_linking_packs()))
 
-    listed = {p["id"]: p for p in client.get("/api/v1/example").json()}
+    listed = {p["id"]: p for p in client.get("/api/v1/examples").json()}
     assert listed["music"]["links_with"] == [{"id": "movies", "name": "Movies"}]
     assert listed["movies"]["links_with"] == []
 
-    first = client.put("/api/v1/example/movies/installation").json()
-    second = client.put("/api/v1/example/music/installation").json()
+    first = client.put("/api/v1/examples/movies/installation").json()
+    second = client.put("/api/v1/examples/music/installation").json()
     assert (first["linked"], second["linked"]) == (0, 1)
 
 
@@ -340,7 +340,7 @@ def test_ordinary_packs_have_empty_requirement_lists(
     """A pack with no add-ons around it reports empty lists."""
     client = _client(make_world(sample_pack("one")))
 
-    pack = client.get("/api/v1/example").json()[0]
+    pack = client.get("/api/v1/examples").json()[0]
 
     assert (pack["requires"], pack["required_by"]) == ([], [])
 
@@ -351,7 +351,7 @@ def test_install_add_on_without_base_is_a_409(
     """Adding an add-on before its base conflicts, in plain words."""
     client = _client(_add_on_world(make_world, sample_pack))
 
-    response = client.put("/api/v1/example/extras/installation")
+    response = client.put("/api/v1/examples/extras/installation")
 
     assert response.status_code == 409
     assert response.json()["title"] == "RequirementsNotMetError"
@@ -364,9 +364,9 @@ def test_uninstall_base_with_dependants_is_a_409(
     """Removing a base lists every installed add-on that needs it."""
     client = _client(_add_on_world(make_world, sample_pack))
     for pack_id in ("base", "extras", "more"):
-        client.put(f"/api/v1/example/{pack_id}/installation")
+        client.put(f"/api/v1/examples/{pack_id}/installation")
 
-    response = client.delete("/api/v1/example/base/installation")
+    response = client.delete("/api/v1/examples/base/installation")
 
     assert response.status_code == 409
     assert response.json()["title"] == "RequiredByInstalledPackError"
@@ -379,11 +379,11 @@ def test_half_added_add_on_counts_as_dependant_and_blocks_removal(
     """An installing add-on shows in `required_by` and blocks removing the base."""
     world = _add_on_world(make_world, sample_pack)
     client = _client(world)
-    client.put("/api/v1/example/base/installation")
+    client.put("/api/v1/examples/base/installation")
     asyncio.run(world.installations.add(Installation.start("extras", USER_A.id)))
 
-    listed = {p["id"]: p for p in client.get("/api/v1/example").json()}
-    blocked = client.delete("/api/v1/example/base/installation")
+    listed = {p["id"]: p for p in client.get("/api/v1/examples").json()}
+    blocked = client.delete("/api/v1/examples/base/installation")
 
     assert listed["base"]["required_by"] == [{"id": "extras", "name": "Extras"}]
     assert blocked.status_code == 409
@@ -396,8 +396,8 @@ def test_required_by_lists_every_dependant_in_catalogue_order(
     """Two installed add-ons are both listed, in catalogue order."""
     client = _client(_add_on_world(make_world, sample_pack))
     for pack_id in ("base", "more", "extras"):
-        client.put(f"/api/v1/example/{pack_id}/installation")
+        client.put(f"/api/v1/examples/{pack_id}/installation")
 
-    base = client.get("/api/v1/example").json()[0]
+    base = client.get("/api/v1/examples").json()[0]
 
     assert [r["id"] for r in base["required_by"]] == ["extras", "more"]

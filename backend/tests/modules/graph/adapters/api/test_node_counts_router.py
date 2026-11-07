@@ -1,4 +1,4 @@
-"""POST /node/search/counts and GET /node/count/types: counts per person.
+"""POST /nodes/search/counts and GET /nodes/count/types: counts per person.
 
 Sign-in is enforced for every route by test_authenticated_routes.
 """
@@ -31,8 +31,8 @@ if TYPE_CHECKING:
 
 ALICE = uuid.UUID(int=101)
 BOB = uuid.UUID(int=102)
-COUNTS_URL = "/api/v1/node/search/counts"
-TYPES_URL = "/api/v1/node/count/types"
+COUNTS_URL = "/api/v1/nodes/search/counts"
+TYPES_URL = "/api/v1/nodes/count/types"
 EVERYTHING: dict[str, Any] = {"v": 1, "where": None, "sort": []}
 FILMS: dict[str, Any] = {
     "v": 1,

@@ -21,7 +21,7 @@ test('a user creates, lists and deletes a personal export', async ({ page }) => 
 	await expect(rows.first()).toContainText(/Expires in about 2[34] hours/);
 	await expect(rows.first().getByRole('link', { name: 'Download' })).toHaveAttribute(
 		'href',
-		/\/api\/v1\/me\/export\/[^/]+\/download$/
+		/\/api\/v1\/me\/exports\/[^/]+\/download$/
 	);
 
 	await rows.first().getByRole('button', { name: 'Delete' }).click();

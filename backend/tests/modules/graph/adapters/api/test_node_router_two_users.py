@@ -71,7 +71,7 @@ def world(as_user: Callable[..., None]) -> _World:
 
 
 def _create(client: TestClient, **fields: object) -> dict[str, object]:
-    response = client.post("/api/v1/node", json=fields)
+    response = client.post("/api/v1/nodes", json=fields)
     assert response.status_code == 201
     created: dict[str, object] = response.json()
     return created
@@ -83,10 +83,10 @@ def test_other_users_item_is_404_on_get_patch_delete_and_promote(
     """Someone else's item answers 404 on every single-item route."""
     alice = world.act_as(ALICE)
     node_type = alice.post(
-        "/api/v1/node-type", json={"slug": "film", "label": "Film"}
+        "/api/v1/node-types", json={"slug": "film", "label": "Film"}
     ).json()
     node = _create(alice, name="Alien", type="film")
-    url = f"/api/v1/node/{node['id']}"
+    url = f"/api/v1/nodes/{node['id']}"
 
     bob = world.act_as(BOB)
 
@@ -94,7 +94,7 @@ def test_other_users_item_is_404_on_get_patch_delete_and_promote(
     assert bob.patch(url, json={"name": "Stolen"}).status_code == 404
     assert bob.delete(url).status_code == 404
     promote = bob.post(
-        f"{url}/attribute/x/promote", json={"node_type_id": node_type["id"]}
+        f"{url}/attributes/x/promote", json={"node_type_id": node_type["id"]}
     )
     assert promote.status_code == 404
 
@@ -113,10 +113,10 @@ def test_other_users_items_never_appear_in_lists_search_or_counts(
     _create(alice, name="Aliens", type="film")
 
     bob = world.act_as(BOB)
-    empty = bob.get("/api/v1/node")
-    searched = bob.get("/api/v1/node", params={"q": "alien"})
-    by_attribute = bob.get("/api/v1/node", params={"q": "xenomorph"})
-    typed = bob.get("/api/v1/node", params={"type": "film"})
+    empty = bob.get("/api/v1/nodes")
+    searched = bob.get("/api/v1/nodes", params={"q": "alien"})
+    by_attribute = bob.get("/api/v1/nodes", params={"q": "xenomorph"})
+    typed = bob.get("/api/v1/nodes", params={"type": "film"})
 
     for response in (empty, searched, by_attribute, typed):
         assert response.status_code == 200
@@ -125,7 +125,7 @@ def test_other_users_items_never_appear_in_lists_search_or_counts(
         assert "Link" not in response.headers
 
     alice = world.act_as(ALICE)
-    mine = alice.get("/api/v1/node", params={"q": "alien"})
+    mine = alice.get("/api/v1/nodes", params={"q": "alien"})
     assert len(mine.json()) == 2
     assert mine.headers["Total-Count"] == "2"
 
@@ -139,8 +139,8 @@ def test_pagination_link_and_total_do_not_count_other_users_items(
         _create(world.act_as(BOB), name=f"B{i}")
 
     alice = world.act_as(ALICE)
-    full = alice.get("/api/v1/node", params={"limit": 3})
-    split = alice.get("/api/v1/node", params={"limit": 2})
+    full = alice.get("/api/v1/nodes", params={"limit": 3})
+    split = alice.get("/api/v1/nodes", params={"limit": 2})
 
     assert full.headers["Total-Count"] == "3"
     assert "Link" not in full.headers
@@ -154,7 +154,7 @@ def test_etag_of_someone_elses_item_does_not_leak(world: _World) -> None:
     """A conditional GET with another person's ETag is a 404, never a 304."""
     alice = world.act_as(ALICE)
     node = _create(alice, name="Alien")
-    url = f"/api/v1/node/{node['id']}"
+    url = f"/api/v1/nodes/{node['id']}"
     etag = alice.get(url).headers["ETag"]
     assert alice.get(url, headers={"If-None-Match": etag}).status_code == 304
 
@@ -169,7 +169,7 @@ def test_patch_with_if_match_of_someone_elses_item_is_404(world: _World) -> None
     """A guarded PATCH on another person's item is a 404, not a 412."""
     alice = world.act_as(ALICE)
     node = _create(alice, name="Alien")
-    url = f"/api/v1/node/{node['id']}"
+    url = f"/api/v1/nodes/{node['id']}"
     etag = alice.get(url).headers["ETag"]
 
     bob = world.act_as(BOB)
@@ -182,15 +182,15 @@ def test_usage_counts_and_value_suggestions_are_per_person(world: _World) -> Non
     """Attribute usage and suggestions only reflect the caller's own items."""
     alice = world.act_as(ALICE)
     node_type = alice.post(
-        "/api/v1/node-type", json={"slug": "film", "label": "Film"}
+        "/api/v1/node-types", json={"slug": "film", "label": "Film"}
     ).json()
     _create(alice, name="Alien", type="film", attributes={"rating": "R"})
-    base = f"/api/v1/node-type/{node_type['id']}/attribute/rating"
+    base = f"/api/v1/node-types/{node_type['id']}/attributes/rating"
 
     assert alice.get(f"{base}/usage").json() == {"count": 1}
     assert alice.get(f"{base}/values").json() == [{"value": "R", "count": 1}]
 
     bob = world.act_as(BOB)
-    assert bob.get(f"/api/v1/node-type/{node_type['id']}").status_code == 200
+    assert bob.get(f"/api/v1/node-types/{node_type['id']}").status_code == 200
     assert bob.get(f"{base}/usage").json() == {"count": 0}
     assert bob.get(f"{base}/values").json() == []

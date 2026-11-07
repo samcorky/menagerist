@@ -1,4 +1,4 @@
-"""Router tests for /api/v1/auth and /api/v1/user over in-memory adapters."""
+"""Router tests for /api/v1/auth and /api/v1/users over in-memory adapters."""
 
 import logging
 import uuid
@@ -41,7 +41,8 @@ if TYPE_CHECKING:
     from tests.modules.identity.conftest import MakeUser, World
 
 AUTH = "/api/v1/auth"
-USERS = "/api/v1/user"
+ME = "/api/v1/me"
+USERS = "/api/v1/users"
 FOREIGN_ORIGIN = "https://evil.example"
 SESSION_COOKIE = "menagerist-session"
 PREFIXED_COOKIE = "__Host-Http-menagerist-session"
@@ -173,7 +174,7 @@ def test_setup_creates_a_signed_in_admin_and_sets_cookies(api: Api) -> None:
         "created_at",
         "updated_at",
     }
-    me = api.client.get(f"{AUTH}/me")
+    me = api.client.get(f"{ME}")
     assert me.status_code == 200
     assert me.json() == body["user"]
 
@@ -226,9 +227,9 @@ def _https_session(world: World) -> tuple[Api, str]:
 
 
 def _me(api: Api, cookie: str) -> int:
-    """Status of `GET /auth/me` sending `cookie` as the Cookie header."""
+    """Status of `GET /me` sending `cookie` as the Cookie header."""
     client = api.new_client("https://testserver")
-    return client.get(f"{AUTH}/me", headers={"Cookie": cookie}).status_code
+    return client.get(f"{ME}", headers={"Cookie": cookie}).status_code
 
 
 def test_https_session_is_read_from_the_prefixed_cookie(world: World) -> None:
@@ -270,11 +271,11 @@ def test_idle_session_is_a_401_like_an_expired_one(world: World) -> None:
     now = datetime.now(UTC)
 
     with time_machine.travel(now + timedelta(minutes=50), tick=False):
-        assert api.client.get(f"{AUTH}/me").status_code == 200
+        assert api.client.get(f"{ME}").status_code == 200
     with time_machine.travel(now + timedelta(minutes=100), tick=False):
-        assert api.client.get(f"{AUTH}/me").status_code == 200
+        assert api.client.get(f"{ME}").status_code == 200
     with time_machine.travel(now + timedelta(minutes=170), tick=False):
-        idle = api.client.get(f"{AUTH}/me")
+        idle = api.client.get(f"{ME}")
 
     assert idle.status_code == 401
     assert idle.json()["type"] == "unauthenticated"
@@ -315,7 +316,7 @@ async def test_login_sets_cookies_and_me_returns_the_user(
     assert response.json()["username"] == "alice"
     assert SESSION_COOKIE in _cookie_headers(response)
     assert "Clear-Site-Data" not in response.headers
-    assert client.get(f"{AUTH}/me").json()["username"] == "alice"
+    assert client.get(f"{ME}").json()["username"] == "alice"
 
 
 async def test_login_logs_only_allowlisted_device_headers(
@@ -421,7 +422,7 @@ async def test_repeated_failures_throttle_with_retry_after(
 
 def test_me_without_a_session_is_unauthenticated(api: Api) -> None:
     """No cookie answers 401 with the `unauthenticated` problem type."""
-    response = api.client.get(f"{AUTH}/me")
+    response = api.client.get(f"{ME}")
 
     assert response.status_code == 401
     assert response.json()["type"] == "unauthenticated"
@@ -431,7 +432,7 @@ def test_me_with_an_unknown_token_is_unauthenticated(api: Api) -> None:
     """A forged cookie is not a session."""
     api.client.cookies.set(SESSION_COOKIE, "forged", domain="testserver.local")
 
-    assert api.client.get(f"{AUTH}/me").status_code == 401
+    assert api.client.get(f"{ME}").status_code == 401
 
 
 def test_logout_ends_the_session_and_clears_cookies(api: Api) -> None:
@@ -448,7 +449,7 @@ def test_logout_ends_the_session_and_clears_cookies(api: Api) -> None:
     assert "samesite=strict" in cookies[SESSION_COOKIE].lower()
     assert set(cookies) == {SESSION_COOKIE}
     api.client.cookies.set(SESSION_COOKIE, token, domain="testserver.local")
-    assert api.client.get(f"{AUTH}/me").status_code == 401
+    assert api.client.get(f"{ME}").status_code == 401
 
 
 def test_logout_without_a_session_changes_nothing(api: Api) -> None:
@@ -481,7 +482,7 @@ def test_logout_clears_the_browser_cache(api: Api) -> None:
 def test_other_auth_routes_do_not_clear_site_data(api: Api) -> None:
     """Only logout sends Clear-Site-Data: not login, me, or error responses."""
     api.setup()
-    me = api.client.get(f"{AUTH}/me")
+    me = api.client.get(f"{ME}")
     refused = api.post(api.client, f"{AUTH}/logout", csrf=False)
 
     assert "Clear-Site-Data" not in me.headers
@@ -520,9 +521,9 @@ def test_csrf_applies_to_other_v1_routes_and_never_to_safe_methods(api: Api) -> 
     api.setup()
 
     blocked = api.client.post(
-        "/api/v1/collection", json={"name": "x"}, headers={"Origin": FOREIGN_ORIGIN}
+        "/api/v1/collections", json={"name": "x"}, headers={"Origin": FOREIGN_ORIGIN}
     )
-    safe = api.client.get(f"{AUTH}/me")
+    safe = api.client.get(f"{ME}")
 
     assert blocked.status_code == 403
     assert blocked.json()["type"] == "csrf_failed"
@@ -586,14 +587,14 @@ async def test_change_password_ends_other_sessions_and_keeps_this_one(
 
     response = api.post(
         here,
-        f"{AUTH}/password",
+        f"{ME}/password",
         {"current_password": "password-123", "new_password": "a-much-better-one"},
     )
 
     assert response.status_code == 200
     assert response.json()["password_expired"] is False
-    assert elsewhere.get(f"{AUTH}/me").status_code == 401
-    assert here.get(f"{AUTH}/me").status_code == 200
+    assert elsewhere.get(f"{ME}").status_code == 401
+    assert here.get(f"{ME}").status_code == 200
     assert here.cookies.get(SESSION_COOKIE) != old_token
     assert api.sign_in("alice", "password-123")[1].status_code == 401
     assert api.sign_in("alice", "a-much-better-one")[1].status_code == 200
@@ -608,19 +609,19 @@ async def test_change_password_rejects_a_wrong_current_password(
 
     response = api.post(
         client,
-        f"{AUTH}/password",
+        f"{ME}/password",
         {"current_password": "nope-nope-nope", "new_password": "a-much-better-one"},
     )
 
     assert response.status_code == 400
-    assert client.get(f"{AUTH}/me").status_code == 200
+    assert client.get(f"{ME}").status_code == 200
 
 
 def test_change_password_requires_a_session(api: Api) -> None:
     """No session, no password change."""
     response = api.post(
         api.client,
-        f"{AUTH}/password",
+        f"{ME}/password",
         {"current_password": "password-123", "new_password": "a-much-better-one"},
     )
 
@@ -693,7 +694,7 @@ async def test_last_admin_cannot_be_disabled_or_demoted(api: Api) -> None:
 
     assert disable.status_code == 409
     assert demote.status_code == 409
-    assert api.client.get(f"{AUTH}/me").json()["role"] == "admin"
+    assert api.client.get(f"{ME}").json()["role"] == "admin"
 
 
 async def test_unknown_user_is_not_found(api: Api) -> None:
@@ -749,7 +750,7 @@ async def test_login_reports_last_sign_in(api: Api, make_user: MakeUser) -> None
     assert response.status_code == 200
     stamp = response.json()["last_login_at"]
     assert stamp is not None
-    assert client.get(f"{AUTH}/me").json()["last_login_at"] == stamp
+    assert client.get(f"{ME}").json()["last_login_at"] == stamp
     assert response.json()["locked_until"] is None
 
 
@@ -836,11 +837,11 @@ async def test_patch_me_changes_the_display_name(api: Api, make_user: MakeUser) 
     await api.add_user(make_user, "alice")
     client, _ = api.sign_in()
 
-    response = api.patch(client, f"{AUTH}/me", {"display_name": "  Alice B  "})
+    response = api.patch(client, f"{ME}", {"display_name": "  Alice B  "})
 
     assert response.status_code == 200
     assert response.json()["display_name"] == "Alice B"
-    assert client.get(f"{AUTH}/me").json() == response.json()
+    assert client.get(f"{ME}").json() == response.json()
 
 
 async def test_patch_me_validates_the_name(api: Api, make_user: MakeUser) -> None:
@@ -848,14 +849,14 @@ async def test_patch_me_validates_the_name(api: Api, make_user: MakeUser) -> Non
     await api.add_user(make_user, "alice")
     client, _ = api.sign_in()
 
-    blank = api.patch(client, f"{AUTH}/me", {"display_name": "   "})
-    long = api.patch(client, f"{AUTH}/me", {"display_name": "x" * 121})
-    unknown = api.patch(client, f"{AUTH}/me", {"display_name": "A", "role": "admin"})
+    blank = api.patch(client, f"{ME}", {"display_name": "   "})
+    long = api.patch(client, f"{ME}", {"display_name": "x" * 121})
+    unknown = api.patch(client, f"{ME}", {"display_name": "A", "role": "admin"})
 
     assert blank.status_code == 400
     assert long.status_code == 422
     assert unknown.status_code == 422
-    assert client.get(f"{AUTH}/me").json()["display_name"] == "Alice"
+    assert client.get(f"{ME}").json()["display_name"] == "Alice"
 
 
 async def test_patch_me_needs_a_session_and_origin(
@@ -865,9 +866,9 @@ async def test_patch_me_needs_a_session_and_origin(
     await api.add_user(make_user, "alice")
     client, _ = api.sign_in()
 
-    anonymous = api.patch(api.new_client(), f"{AUTH}/me", {"display_name": "X"})
+    anonymous = api.patch(api.new_client(), f"{ME}", {"display_name": "X"})
     no_csrf = client.patch(
-        f"{AUTH}/me", json={"display_name": "X"}, headers={"Origin": FOREIGN_ORIGIN}
+        f"{ME}", json={"display_name": "X"}, headers={"Origin": FOREIGN_ORIGIN}
     )
 
     assert anonymous.status_code in (401, 403)
@@ -883,7 +884,7 @@ async def test_change_password_rejects_the_same_password(
 
     response = api.post(
         client,
-        f"{AUTH}/password",
+        f"{ME}/password",
         {"current_password": "password-123", "new_password": "password-123"},
     )
 
@@ -893,7 +894,7 @@ async def test_change_password_rejects_the_same_password(
         response.json()["detail"]
         == "The new password must differ from the current one."
     )
-    assert client.get(f"{AUTH}/me").status_code == 200
+    assert client.get(f"{ME}").status_code == 200
 
 
 async def test_change_password_wrong_current_is_throttled(
@@ -904,9 +905,9 @@ async def test_change_password_wrong_current_is_throttled(
     client, _ = api.sign_in()
     body = {"current_password": "nope-nope-nope", "new_password": "a-much-better-one"}
     for _ in range(5):
-        assert api.post(client, f"{AUTH}/password", body).status_code == 400
+        assert api.post(client, f"{ME}/password", body).status_code == 400
 
-    response = api.post(client, f"{AUTH}/password", body)
+    response = api.post(client, f"{ME}/password", body)
 
     assert response.status_code == 429
     assert int(response.headers["retry-after"]) > 0
@@ -969,13 +970,13 @@ def test_openapi_documents_the_new_responses_and_permissions() -> None:
 
     assert "403" in login
     assert "429" in login
-    assert "patch" in paths["/api/v1/auth/me"]
+    assert "patch" in paths["/api/v1/me"]
     expected = {
-        ("/api/v1/user", "get"): "identity:user:list",
-        ("/api/v1/user", "post"): "identity:user:create",
-        ("/api/v1/user/{user_id}", "patch"): "identity:user:update",
-        ("/api/v1/user/{user_id}/password", "post"): "identity:user:reset_password",
-        ("/api/v1/user/{user_id}/unlock", "post"): "identity:user:unlock",
+        ("/api/v1/users", "get"): "identity:user:list",
+        ("/api/v1/users", "post"): "identity:user:create",
+        ("/api/v1/users/{user_id}", "patch"): "identity:user:update",
+        ("/api/v1/users/{user_id}/password", "post"): "identity:user:reset_password",
+        ("/api/v1/users/{user_id}/unlock", "post"): "identity:user:unlock",
     }
     for (path, method), permission in expected.items():
         assert paths[path][method]["x-required-permission"] == permission
@@ -1150,7 +1151,7 @@ async def test_change_password_stores_client_device_and_ip(api: Api) -> None:
         "current_password": "password-123",
         "new_password": "new-password-456",
     }
-    resp = api.client.post(f"{AUTH}/password", json=body, headers=headers)
+    resp = api.client.post(f"{ME}/password", json=body, headers=headers)
     assert resp.status_code == 200
 
     active_sessions = await api.world.sessions.list_active(now=datetime.now(UTC))
@@ -1230,10 +1231,10 @@ async def test_set_cookie_is_documented_exactly_where_it_is_sent(
     client, login = api.sign_in()
     record(f"{AUTH}/login", login)
     record(
-        f"{AUTH}/password",
+        f"{ME}/password",
         api.post(
             client,
-            f"{AUTH}/password",
+            f"{ME}/password",
             {"current_password": "password-123", "new_password": "a-much-better-one"},
         ),
     )

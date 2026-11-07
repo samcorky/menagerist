@@ -48,7 +48,7 @@ _INVALID = error_response(ValidationError, detail="Invalid cron schedule: 61 * *
 
 
 @router.get(
-    "/schedule-preview",
+    "/preview",
     response_model=SchedulePreviewResponse,
     operation_id="preview_schedule",
     responses={**_FORBIDDEN, **_INVALID},

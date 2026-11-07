@@ -18,7 +18,7 @@ const { makeItem, makeItemType, trackCollection, trackCollectionFromUrl, cleanUp
 const edgeTypeIds: string[] = [];
 
 test.afterEach(async ({ request }) => {
-	for (const id of edgeTypeIds.splice(0)) await request.delete(`/api/v1/edge-type/${id}`);
+	for (const id of edgeTypeIds.splice(0)) await request.delete(`/api/v1/edge-types/${id}`);
 	await cleanUp(request);
 });
 
@@ -36,7 +36,7 @@ async function seed(request: Parameters<typeof makeItem>[0]) {
 	const suffix = uniqueName('x').replace(/\W+/g, '');
 	const label = `Directed by ${suffix}`;
 	const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-	const res = await request.post('/api/v1/edge-type', {
+	const res = await request.post('/api/v1/edge-types', {
 		data: { slug, label, reverse_label: `Director of ${suffix}`, directional: true }
 	});
 	expect(res.status(), await res.text()).toBe(201);
@@ -44,7 +44,7 @@ async function seed(request: Parameters<typeof makeItem>[0]) {
 	const film = await makeItem(request, `Casablanca${suffix}`);
 	const lonely = await makeItem(request, `Lonely${suffix}`);
 	const director = await makeItem(request, `Curtiz${suffix}`);
-	const edge = await request.post('/api/v1/edge', {
+	const edge = await request.post('/api/v1/edges', {
 		data: { source_id: film.id, target_id: director.id, type: slug }
 	});
 	expect(edge.status(), await edge.text()).toBe(201);
@@ -153,7 +153,7 @@ async function seedFilms(request: APIRequestContext) {
 	const viewingType = await makeItemType(request, `Viewing ${suffix}`);
 	const label = `Viewing of ${suffix}`;
 	const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-	const res = await request.post('/api/v1/edge-type', {
+	const res = await request.post('/api/v1/edge-types', {
 		data: { slug, label, reverse_label: `Viewings ${suffix}`, directional: true }
 	});
 	expect(res.status(), await res.text()).toBe(201);
@@ -168,7 +168,7 @@ async function seedFilms(request: APIRequestContext) {
 }
 
 async function connect(request: APIRequestContext, source: string, target: string, type: string) {
-	const edge = await request.post('/api/v1/edge', {
+	const edge = await request.post('/api/v1/edges', {
 		data: { source_id: source, target_id: target, type }
 	});
 	expect(edge.status(), await edge.text()).toBe(201);
@@ -190,7 +190,7 @@ function noViewing(films: Awaited<ReturnType<typeof seedFilms>>) {
 }
 
 async function makeSmart(request: APIRequestContext, name: string, definition: unknown) {
-	const res = await request.post('/api/v1/collection', { data: { name, definition } });
+	const res = await request.post('/api/v1/collections', { data: { name, definition } });
 	expect(res.status(), await res.text()).toBe(201);
 	const created = (await res.json()) as Created;
 	trackCollection(created.id);
@@ -293,8 +293,8 @@ test('a deleted relationship type shows a warning and an empty list, not an erro
 	await page.goto(`/collections/${smart.slug}`);
 	await expect(link(page, films.unseen.name)).toBeVisible();
 
-	await request.delete(`/api/v1/edge/${await edgeIdOf(request, films.watched.id)}`);
-	const del = await request.delete(`/api/v1/edge-type/${films.edgeType.id}`);
+	await request.delete(`/api/v1/edges/${await edgeIdOf(request, films.watched.id)}`);
+	const del = await request.delete(`/api/v1/edge-types/${films.edgeType.id}`);
 	expect(del.ok(), await del.text()).toBeTruthy();
 
 	await page.reload();
@@ -310,7 +310,7 @@ test('a deleted relationship type shows a warning and an empty list, not an erro
 });
 
 async function edgeIdOf(request: APIRequestContext, itemId: string): Promise<string> {
-	const res = await request.get(`/api/v1/edge?node_id=${itemId}`);
+	const res = await request.get(`/api/v1/edges?node_id=${itemId}`);
 	expect(res.ok(), await res.text()).toBeTruthy();
 	const body = (await res.json()) as { id: string }[] | { items: { id: string }[] };
 	return (Array.isArray(body) ? body : body.items)[0].id;
@@ -333,7 +333,7 @@ test('another user cannot open a smart collection that has a connection conditio
 	await b.page.goto(`/collections/${smart.slug}`);
 	await expect(b.page.getByRole('heading', { name: 'Collection not found' })).toBeVisible();
 	await expect(b.page.getByText(films.unseen.name)).toHaveCount(0);
-	expect((await b.request.get(`/api/v1/collection/${smart.id}`)).status()).toBe(404);
-	expect((await b.request.get(`/api/v1/node?collection=${smart.id}`)).status()).toBe(404);
+	expect((await b.request.get(`/api/v1/collections/${smart.id}`)).status()).toBe(404);
+	expect((await b.request.get(`/api/v1/nodes?collection=${smart.id}`)).status()).toBe(404);
 	await b.context.close();
 });

@@ -203,7 +203,7 @@ export function ownedData() {
 			return id;
 		},
 		async makeCollection(request: APIRequestContext, name: string, description?: string) {
-			const res = await request.post('/api/v1/collection', { data: { name, description } });
+			const res = await request.post('/api/v1/collections', { data: { name, description } });
 			expect(res.status()).toBe(201);
 			const created = (await res.json()) as { id: string; name: string };
 			collectionIds.push(created.id);
@@ -212,33 +212,33 @@ export function ownedData() {
 		/** Creates an item type through the API; its slug is made unique from the label. */
 		async makeItemType(request: APIRequestContext, label: string) {
 			const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-			const res = await request.post('/api/v1/node-type', { data: { slug, label } });
+			const res = await request.post('/api/v1/node-types', { data: { slug, label } });
 			expect(res.status()).toBe(201);
 			const created = (await res.json()) as { id: string; slug: string; label: string };
 			typeIds.push(created.id);
 			return created;
 		},
 		async makeItem(request: APIRequestContext, name: string, type?: string) {
-			const res = await request.post('/api/v1/node', { data: { name, type } });
+			const res = await request.post('/api/v1/nodes', { data: { name, type } });
 			expect(res.status()).toBe(201);
 			const created = (await res.json()) as { id: string; name: string };
 			itemIds.push(created.id);
 			return created;
 		},
 		async addToCollection(request: APIRequestContext, collectionId: string, ids: string[]) {
-			const res = await request.put(`/api/v1/collection/${collectionId}/item`, {
+			const res = await request.put(`/api/v1/collections/${collectionId}/items`, {
 				data: { item_ids: ids }
 			});
 			expect(res.ok()).toBeTruthy();
 		},
 		async cleanUp(request: APIRequestContext) {
-			for (const id of collectionIds) await request.delete(`/api/v1/collection/${id}`);
+			for (const id of collectionIds) await request.delete(`/api/v1/collections/${id}`);
 			for (let i = 0; i < itemIds.length; i += 50) {
 				await Promise.all(
-					itemIds.slice(i, i + 50).map((id) => request.delete(`/api/v1/node/${id}`))
+					itemIds.slice(i, i + 50).map((id) => request.delete(`/api/v1/nodes/${id}`))
 				);
 			}
-			for (const id of typeIds) await request.delete(`/api/v1/node-type/${id}`);
+			for (const id of typeIds) await request.delete(`/api/v1/node-types/${id}`);
 			collectionIds = [];
 			itemIds = [];
 			typeIds = [];
@@ -280,16 +280,16 @@ async function deleteTolerantOfReset(request: APIRequestContext, url: string) {
  */
 export async function removeExamplePacks(request: APIRequestContext) {
 	for (const id of EXAMPLE_PACK_IDS)
-		await deleteTolerantOfReset(request, `/api/v1/example/${id}/installation`);
-	const nodes = await request.get('/api/v1/node?limit=500');
+		await deleteTolerantOfReset(request, `/api/v1/examples/${id}/installation`);
+	const nodes = await request.get('/api/v1/nodes?limit=500');
 	for (const node of (await nodes.json()) as { id: string; type: string | null }[]) {
 		if (EXAMPLE_SLUG_PREFIXES.test(node.type ?? ''))
-			await deleteTolerantOfReset(request, `/api/v1/node/${node.id}`);
+			await deleteTolerantOfReset(request, `/api/v1/nodes/${node.id}`);
 	}
-	const types = await request.get('/api/v1/node-type?limit=500');
+	const types = await request.get('/api/v1/node-types?limit=500');
 	for (const type of (await types.json()) as { id: string; slug: string }[]) {
 		if (EXAMPLE_SLUG_PREFIXES.test(type.slug))
-			await deleteTolerantOfReset(request, `/api/v1/node-type/${type.id}`);
+			await deleteTolerantOfReset(request, `/api/v1/node-types/${type.id}`);
 	}
 }
 
@@ -298,7 +298,7 @@ export async function removeExamplePacks(request: APIRequestContext) {
  * returned function is called. Single-collection reads are left alone.
  */
 export async function failCollectionSearch(page: Page): Promise<() => Promise<void>> {
-	const pattern = /\/api\/v1\/collection\?/;
+	const pattern = /\/api\/v1\/collections\?/;
 	await page.route(pattern, (route) =>
 		route.fulfill({
 			status: 500,
@@ -334,7 +334,7 @@ export async function createUserViaApi(
 		.replace(/[^a-z0-9]+/g, '-');
 	const startingPassword = `start-${username}-pw`;
 	const role = options.role ?? 'member';
-	const res = await admin.post('/api/v1/user', {
+	const res = await admin.post('/api/v1/users', {
 		data: { username, display_name: `Name ${username}`, password: startingPassword, role }
 	});
 	expect(res.status(), await res.text()).toBe(201);

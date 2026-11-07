@@ -89,7 +89,7 @@ from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ConflictError, ValidationError
 
 router = APIRouter(
-    prefix="/collection", tags=["Collections"], route_class=PermissionAwareRoute
+    prefix="/collections", tags=["Collections"], route_class=PermissionAwareRoute
 )
 
 _NOT_FOUND = error_response(
@@ -290,7 +290,7 @@ async def get_collection(
 
 
 @router.get(
-    "/{collection_id}/count",
+    "/{collection_id}/items/count",
     response_model=CollectionCountResponse,
     operation_id="count_collection_items",
     responses=_NOT_FOUND,
@@ -380,7 +380,7 @@ async def delete_collection(
 
 
 @router.put(
-    "/{collection_id}/item",
+    "/{collection_id}/items",
     response_model=AddItemsResponse,
     operation_id="add_items_to_collection",
     responses={
@@ -410,7 +410,7 @@ async def add_items_to_collection(
 
 
 @router.delete(
-    "/{collection_id}/item/{item_id}",
+    "/{collection_id}/items/{item_id}",
     status_code=204,
     operation_id="remove_item_from_collection",
     responses={**_NOT_FOUND, **_SMART},

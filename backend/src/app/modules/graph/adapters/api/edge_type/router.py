@@ -58,7 +58,7 @@ from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ForbiddenError
 
 router = APIRouter(
-    prefix="/edge-type", tags=["Edge Types"], route_class=PermissionAwareRoute
+    prefix="/edge-types", tags=["Edge Types"], route_class=PermissionAwareRoute
 )
 
 
@@ -192,9 +192,9 @@ async def delete_edge_type(
 
 
 @router.get(
-    "/{edge_type_id}/attribute/{key}/usage",
+    "/{edge_type_id}/attributes/{key}/usage",
     response_model=AttributeUsageResponse,
-    operation_id="count_edge_type_attribute_usage",
+    operation_id="get_edge_type_attribute_usage",
     responses=error_response(
         EdgeTypeNotFoundError,
         detail="EdgeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
@@ -226,7 +226,7 @@ async def count_edge_type_attribute_usage(
 
 
 @router.delete(
-    "/{edge_type_id}/attribute/{key}",
+    "/{edge_type_id}/attributes/{key}",
     status_code=204,
     operation_id="purge_edge_type_attribute",
     responses={

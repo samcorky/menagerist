@@ -97,6 +97,10 @@ public_router = APIRouter(
 router = APIRouter(
     prefix="/auth", tags=["Authentication"], route_class=PermissionAwareRoute
 )
+# The signed-in account's own details, password and devices.
+me_router = APIRouter(
+    prefix="/me", tags=["Authentication"], route_class=PermissionAwareRoute
+)
 
 _CROSS_SITE = error_response(
     CrossSiteRequestError, detail="This request was sent from another site."
@@ -256,8 +260,8 @@ async def sign_out(
     response.headers["Clear-Site-Data"] = '"cache"'
 
 
-@router.get(
-    "/me",
+@me_router.get(
+    "",
     response_model=UserResponse,
     operation_id="get_current_user",
     responses=_UNAUTHENTICATED,
@@ -269,8 +273,8 @@ async def get_current_user(
     return UserResponse.from_domain(user)
 
 
-@router.patch(
-    "/me",
+@me_router.patch(
+    "",
     response_model=UserResponse,
     operation_id="update_current_user",
     responses={
@@ -301,7 +305,7 @@ _CHANGE_PASSWORD_400[400]["description"] += (
 )
 
 
-@router.post(
+@me_router.post(
     "/password",
     response_model=UserResponse,
     operation_id="change_password",
@@ -333,7 +337,7 @@ async def change_password(
     return UserResponse.from_domain(result.user)
 
 
-@router.get(
+@me_router.get(
     "/sessions",
     response_model=list[SessionResponse],
     operation_id="list_own_sessions",
@@ -353,7 +357,7 @@ async def list_own_sessions(
     return [SessionResponse.from_own_session(s) for s in sessions]
 
 
-@router.delete(
+@me_router.delete(
     "/sessions/{session_id}",
     status_code=204,
     operation_id="revoke_own_session",
@@ -381,7 +385,7 @@ async def revoke_own_session(
     )
 
 
-@router.delete(
+@me_router.delete(
     "/sessions",
     response_model=RevokedSessionsResponse,
     operation_id="revoke_other_sessions",

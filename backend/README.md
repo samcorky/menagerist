@@ -73,6 +73,17 @@ async def create_node(
 
 The router depends on the use case, not on the repository the use case happens to use - that dependency is resolved once, at the composition root, and injected down. CLI commands follow the identical shape: a Cyclopts command is a driving adapter calling the same use case a router would, just triggered from a terminal. A command returns its result (a dict, a list of dicts, or a `Report` from `platform/cli_output.py` that adds a title, an empty-list message and an exit status) and never prints it: the root app's `result_action` shows it as Rich tables on a terminal, plain lines when piped, or JSON with `--json`. An architecture-style test in `tests/entrypoints/cli/test_cli.py` fails any command except `serve`, `worker` and `help` that returns nothing. A use case never needs a second implementation to be reachable from a second entrypoint.
 
+## Route naming
+
+Paths read as nouns under `/api/v1`, and `openapi.json` is the contract the rules below are checked against.
+
+- **Collections are plural** (`/nodes`, `/backups`, `/me/sessions`), singletons are not (`/settings/instance`), and nested collections are plural too (`/collections/{id}/items`, `/node-types/{id}/attributes/{key}`).
+- **One word per segment.** A hyphen is allowed only where it is listed in `HYPHENATED_SEGMENTS` in `tests/entrypoints/api/test_openapi_path_style.py` (`node-types`, `edge-types`), so a new one is a deliberate choice. Prefer a nested resource to a compound name.
+- **The signed-in account lives under `/me`** (`/me`, `/me/permissions`, `/me/password`, `/me/sessions`, `/me/exports`); `/auth` is for signing in and out and first-run setup, and `/sessions` is the administrators' list.
+- **Actions on a resource are `POST` sub-resources named for the verb** (`/restore`, `/purge`, `/promote`, `/rotate`).
+- **`count` returns a number; `usage` or another noun returns a small report.** Operation ids follow: `count_*` only for numbers, otherwise `get_*` or `list_*`, always `verb_noun`.
+- **A path parameter is `{thing_id}`** and is named for what it identifies (`{export_id}`, not the `{backup_id}` it is stored as); `{key}` is the exception for an attribute key.
+
 ## Request bodies: named Pydantic models, not `Form()` fields
 
 A request body is a Pydantic `BaseModel` (`XxxRequest`, with a `to_command()` method converting it to the use case's command), not a collection of individual `Form()`/`Body()` parameters - even when the payload happens to be small, e.g. `AttachMediaRequest` for `POST /media/{asset_id}/attachments`. FastAPI treats a single Pydantic model parameter as a JSON body automatically, and `@hey-api/openapi-ts` turns it into a properly named type for the frontend client (`AttachMediaRequest`) instead of an untyped bag of form fields.

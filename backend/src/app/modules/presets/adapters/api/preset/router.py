@@ -58,7 +58,9 @@ from app.modules.presets.domain.errors import (
 )
 from app.shared_kernel.actor import Actor
 
-router = APIRouter(prefix="/preset", tags=["Presets"], route_class=PermissionAwareRoute)
+router = APIRouter(
+    prefix="/presets", tags=["Presets"], route_class=PermissionAwareRoute
+)
 
 _NOT_FOUND = error_response(
     PresetNotFoundError, detail="Preset 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30 not found"

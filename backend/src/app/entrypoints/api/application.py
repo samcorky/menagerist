@@ -44,6 +44,7 @@ from app.modules.graph.adapters.api.edge_type.router import router as edge_type_
 from app.modules.graph.adapters.api.node.router import router as graph_router
 from app.modules.graph.adapters.api.node_type.router import router as node_type_router
 from app.modules.identity.adapters.api.auth_router import (
+    me_router,
     public_router as public_auth_router,
     router as auth_router,
 )
@@ -51,7 +52,10 @@ from app.modules.identity.adapters.api.dependencies import get_existing_data_cla
 from app.modules.identity.adapters.api.session_router import router as session_router
 from app.modules.identity.adapters.api.token_router import router as token_router
 from app.modules.identity.adapters.api.user_router import router as user_router
-from app.modules.media.adapters.api.media.router import router as media_router
+from app.modules.media.adapters.api.media.router import (
+    node_media_router,
+    router as media_router,
+)
 from app.modules.presets.adapters.api.preset.router import router as preset_router
 from app.modules.scheduling.adapters.api.router import router as scheduling_router
 from app.modules.settings.adapters.api.router import router as settings_router
@@ -92,12 +96,14 @@ api_v1_router.include_router(edge_router)
 api_v1_router.include_router(node_type_router)
 api_v1_router.include_router(edge_type_router)
 api_v1_router.include_router(media_router)
+api_v1_router.include_router(node_media_router)
 api_v1_router.include_router(preset_router)
 api_v1_router.include_router(scheduling_router)
 api_v1_router.include_router(settings_router)
 api_v1_router.include_router(example_router)
 api_v1_router.include_router(collection_router)
 api_v1_router.include_router(auth_router)
+api_v1_router.include_router(me_router)
 api_v1_router.include_router(permissions_router)
 api_v1_router.include_router(user_router)
 api_v1_router.include_router(session_router)

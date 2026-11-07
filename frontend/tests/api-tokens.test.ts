@@ -264,7 +264,7 @@ describe('tokenErrorMessage', () => {
 describe('sampleCurl', () => {
 	it('calls the permissions endpoint with the real token as a bearer header', () => {
 		const text = sampleCurl('https://example.test', 'mnst_secret123');
-		expect(text).toContain('https://example.test/api/v1/auth/me/permissions');
+		expect(text).toContain('https://example.test/api/v1/me/permissions');
 		expect(text).toContain('Authorization: Bearer mnst_secret123');
 	});
 });

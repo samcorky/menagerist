@@ -1,4 +1,4 @@
-"""Router tests for /api/v1/auth/sessions and /api/v1/session."""
+"""Router tests for /api/v1/me/sessions and /api/v1/sessions."""
 
 import uuid
 from typing import TYPE_CHECKING
@@ -34,7 +34,8 @@ if TYPE_CHECKING:
     from tests.modules.identity.conftest import MakeUser, World
 
 AUTH = "/api/v1/auth"
-SESSIONS = "/api/v1/session"
+ME = "/api/v1/me"
+SESSIONS = "/api/v1/sessions"
 FOREIGN_ORIGIN = "https://evil.example"
 SESSION_COOKIE = "menagerist-session"
 SETUP_BODY = {
@@ -168,7 +169,7 @@ async def test_list_own_sessions_returns_active_devices_with_current_flag(
     assert r2.status_code == 200
 
     # Call from client 1
-    resp1 = c1.get(f"{AUTH}/sessions")
+    resp1 = c1.get(f"{ME}/sessions")
     assert resp1.status_code == 200
     sessions = resp1.json()
     assert len(sessions) == 2
@@ -193,7 +194,7 @@ async def test_list_own_sessions_returns_active_devices_with_current_flag(
 
 def test_list_own_sessions_unauthenticated_returns_401(api: Api) -> None:
     """Unauthenticated request to list own sessions returns 401."""
-    resp = api.client.get(f"{AUTH}/sessions")
+    resp = api.client.get(f"{ME}/sessions")
     assert resp.status_code == 401
 
 
@@ -203,15 +204,15 @@ async def test_revoke_own_session_success(api: Api, make_user: MakeUser) -> None
     c1, _ = api.sign_in("alice", headers={"User-Agent": "Device 1"})
     c2, _ = api.sign_in("alice", headers={"User-Agent": "Device 2"})
 
-    sessions = c1.get(f"{AUTH}/sessions").json()
+    sessions = c1.get(f"{ME}/sessions").json()
     device2 = next(s for s in sessions if s["user_agent"] == "Device 2")
 
-    del_resp = api.delete(c1, f"{AUTH}/sessions/{device2['id']}")
+    del_resp = api.delete(c1, f"{ME}/sessions/{device2['id']}")
     assert del_resp.status_code == 204
 
     # Device 2 is signed out; Device 1 remains signed in
-    assert c2.get(f"{AUTH}/me").status_code == 401
-    assert c1.get(f"{AUTH}/me").status_code == 200
+    assert c2.get(f"{ME}").status_code == 401
+    assert c1.get(f"{ME}").status_code == 200
 
 
 async def test_revoke_own_session_refuses_current_session(
@@ -221,10 +222,10 @@ async def test_revoke_own_session_refuses_current_session(
     await api.add_user(make_user, "alice")
     c1, _ = api.sign_in("alice")
 
-    sessions = c1.get(f"{AUTH}/sessions").json()
+    sessions = c1.get(f"{ME}/sessions").json()
     current_session = next(s for s in sessions if s["current"] is True)
 
-    del_resp = api.delete(c1, f"{AUTH}/sessions/{current_session['id']}")
+    del_resp = api.delete(c1, f"{ME}/sessions/{current_session['id']}")
     assert del_resp.status_code == 409
     assert del_resp.json()["title"] == "CurrentSessionError"
 
@@ -239,33 +240,33 @@ async def test_revoke_own_session_foreign_and_unknown_ids_return_404(
     c_alice, _ = api.sign_in("alice")
     c_bob, _ = api.sign_in("bob")
 
-    bob_sessions = c_bob.get(f"{AUTH}/sessions").json()
+    bob_sessions = c_bob.get(f"{ME}/sessions").json()
     bob_session_id = bob_sessions[0]["id"]
 
     # Foreign session ID
-    del_foreign = api.delete(c_alice, f"{AUTH}/sessions/{bob_session_id}")
+    del_foreign = api.delete(c_alice, f"{ME}/sessions/{bob_session_id}")
     assert del_foreign.status_code == 404
     assert del_foreign.json()["title"] == "SessionNotFoundError"
 
     # Bob's session survives intact
-    assert c_bob.get(f"{AUTH}/me").status_code == 200
+    assert c_bob.get(f"{ME}").status_code == 200
 
     # Non-existent session ID
-    del_unknown = api.delete(c_alice, f"{AUTH}/sessions/{uuid.uuid7()}")
+    del_unknown = api.delete(c_alice, f"{ME}/sessions/{uuid.uuid7()}")
     assert del_unknown.status_code == 404
     assert del_unknown.json()["title"] == "SessionNotFoundError"
 
 
 async def test_revoke_own_session_requires_csrf(api: Api, make_user: MakeUser) -> None:
-    """DELETE /auth/sessions/{id} requires a same-origin request."""
+    """DELETE /me/sessions/{id} requires a same-origin request."""
     await api.add_user(make_user, "alice")
     c1, _ = api.sign_in("alice")
     _c2, _ = api.sign_in("alice")
 
-    sessions = c1.get(f"{AUTH}/sessions").json()
+    sessions = c1.get(f"{ME}/sessions").json()
     device2 = next(s for s in sessions if not s["current"])
 
-    del_resp = api.delete(c1, f"{AUTH}/sessions/{device2['id']}", csrf=False)
+    del_resp = api.delete(c1, f"{ME}/sessions/{device2['id']}", csrf=False)
     assert del_resp.status_code == 403
 
 
@@ -279,25 +280,25 @@ async def test_revoke_other_sessions_success(api: Api, make_user: MakeUser) -> N
     c3, _ = api.sign_in("alice", headers={"User-Agent": "Device 3"})
     c_bob, _ = api.sign_in("bob")
 
-    del_resp = api.delete(c1, f"{AUTH}/sessions")
+    del_resp = api.delete(c1, f"{ME}/sessions")
     assert del_resp.status_code == 200
     assert del_resp.json() == {"ended": 2}
 
     # c1 still valid, c2 and c3 ended, Bob untouched
-    assert c1.get(f"{AUTH}/me").status_code == 200
-    assert c2.get(f"{AUTH}/me").status_code == 401
-    assert c3.get(f"{AUTH}/me").status_code == 401
-    assert c_bob.get(f"{AUTH}/me").status_code == 200
+    assert c1.get(f"{ME}").status_code == 200
+    assert c2.get(f"{ME}").status_code == 401
+    assert c3.get(f"{ME}").status_code == 401
+    assert c_bob.get(f"{ME}").status_code == 200
 
 
 async def test_revoke_other_sessions_requires_csrf(
     api: Api, make_user: MakeUser
 ) -> None:
-    """DELETE /auth/sessions requires a same-origin request."""
+    """DELETE /me/sessions requires a same-origin request."""
     await api.add_user(make_user, "alice")
     c1, _ = api.sign_in("alice")
 
-    del_resp = api.delete(c1, f"{AUTH}/sessions", csrf=False)
+    del_resp = api.delete(c1, f"{ME}/sessions", csrf=False)
     assert del_resp.status_code == 403
 
 
@@ -381,7 +382,7 @@ async def test_revoke_session_admin_success(api: Api, make_user: MakeUser) -> No
     assert del_resp.status_code == 204
 
     # Alice is now signed out
-    assert c_alice.get(f"{AUTH}/me").status_code == 401
+    assert c_alice.get(f"{ME}").status_code == 401
 
 
 async def test_revoke_session_admin_refuses_current_session(

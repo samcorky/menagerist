@@ -177,7 +177,7 @@ def test_cannot_attach_to_another_users_item(world: _World) -> None:
 
     assert response.status_code == 404  # type: ignore[attr-defined]
     assert bob.get(f"{BASE}/{asset_id}").json()["status"] == "staged"
-    assert world.act_as(ALICE).get(f"{BASE}/for-node/{alices_item}").json() == []
+    assert world.act_as(ALICE).get(f"/api/v1/nodes/{alices_item}/media").json() == []
 
 
 def test_cannot_upload_and_attach_to_another_users_item(world: _World) -> None:
@@ -202,8 +202,8 @@ def test_listing_media_for_another_users_item_is_empty(world: _World) -> None:
     alice = world.act_as(ALICE)
     assert _attach(alice, _stage(alice), item).status_code == 201  # type: ignore[attr-defined]
 
-    assert len(alice.get(f"{BASE}/for-node/{item}").json()) == 1
-    assert world.act_as(BOB).get(f"{BASE}/for-node/{item}").json() == []
+    assert len(alice.get(f"/api/v1/nodes/{item}/media").json()) == 1
+    assert world.act_as(BOB).get(f"/api/v1/nodes/{item}/media").json() == []
 
 
 def test_uploads_are_owned_by_the_uploader(world: _World) -> None:

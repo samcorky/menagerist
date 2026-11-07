@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 
 ALICE = uuid.UUID(int=101)
 BOB = uuid.UUID(int=102)
-URL = "/api/v1/node/random"
+URL = "/api/v1/nodes/random"
 
 
 @pytest.fixture

@@ -89,7 +89,7 @@ test('a long connected item name wraps in the connections panel instead of trunc
 		request,
 		uniqueName(`${'Michael Example signing the maxi poster at a convention '.repeat(4)}`.trim())
 	);
-	const res = await request.post('/api/v1/edge', {
+	const res = await request.post('/api/v1/edges', {
 		data: { source_id: other.id, target_id: item.id, type: 'related-to' }
 	});
 	expect(res.status()).toBe(201);

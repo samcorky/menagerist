@@ -125,7 +125,7 @@ test('a disabled account sees why, and a wrong password stays generic', async ({
 }) => {
 	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
 	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'disabled' });
-	const res = await adminApi.patch(`/api/v1/user/${user.id}`, { data: { disabled: true } });
+	const res = await adminApi.patch(`/api/v1/users/${user.id}`, { data: { disabled: true } });
 	expect(res.ok(), await res.text()).toBeTruthy();
 	await adminApi.dispose();
 

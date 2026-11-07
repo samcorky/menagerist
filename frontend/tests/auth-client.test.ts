@@ -86,25 +86,25 @@ describe('401 handling', () => {
 
 describe('sign-in and sign-out clear the cache', () => {
 	it('clears cached bodies on sign-in', async () => {
-		setEtag('/api/v1/node', { etag: '"v1"', data: { secret: 1 } });
+		setEtag('/api/v1/nodes', { etag: '"v1"', data: { secret: 1 } });
 		vi.stubGlobal('fetch', async (request: Request) =>
-			new URL(request.url).pathname.endsWith('/auth/me/permissions')
+			new URL(request.url).pathname.endsWith('/me/permissions')
 				? json({ permissions: [] })
 				: json(user)
 		);
 		const result = await auth.signIn('sam', 'a-long-password');
 		expect(result.ok).toBe(true);
-		expect(getEtag('/api/v1/node')).toBeUndefined();
+		expect(getEtag('/api/v1/nodes')).toBeUndefined();
 		expect(auth.user?.username).toBe('sam');
 	});
 
 	it('clears cached bodies on sign-out and drops the account', async () => {
 		auth.user = user as never;
-		setEtag('/api/v1/node', { etag: '"v1"', data: { secret: 1 } });
+		setEtag('/api/v1/nodes', { etag: '"v1"', data: { secret: 1 } });
 		vi.stubGlobal('fetch', async () => new Response(null, { status: 204 }));
 		const result = await auth.signOut();
 		expect(result.ok).toBe(true);
-		expect(getEtag('/api/v1/node')).toBeUndefined();
+		expect(getEtag('/api/v1/nodes')).toBeUndefined();
 		expect(auth.user).toBeNull();
 		expect(auth.leftOnPurpose).toBe(true);
 	});
@@ -129,7 +129,7 @@ describe('can()', () => {
 		await auth.refresh();
 		expect(auth.passwordExpired).toBe(true);
 		expect(auth.can('graph:node_type:delete')).toBe(false);
-		expect(paths).toEqual(['/api/v1/auth/me']);
+		expect(paths).toEqual(['/api/v1/me']);
 		auth.user = null;
 	});
 });
@@ -217,10 +217,10 @@ describe('identity permissions and account calls', () => {
 describe('more auth behaviour', () => {
 	it('clears the cache on a 401-forced sign-out', async () => {
 		auth.user = user as never;
-		setEtag('/api/v1/node', { etag: '"v1"', data: { secret: 1 } });
+		setEtag('/api/v1/nodes', { etag: '"v1"', data: { secret: 1 } });
 		vi.stubGlobal('fetch', async () => problem(401, 'unauthenticated'));
 		await client.get({ url: '/api/v1/a' });
-		expect(getEtag('/api/v1/node')).toBeUndefined();
+		expect(getEtag('/api/v1/nodes')).toBeUndefined();
 		expect(auth.user).toBeNull();
 	});
 
@@ -233,7 +233,7 @@ describe('more auth behaviour', () => {
 		auth.user = null;
 	});
 
-	it('treats a 401 from /auth/me during init as signed out', async () => {
+	it('treats a 401 from /me during init as signed out', async () => {
 		auth.ready = false;
 		vi.stubGlobal('fetch', async (request: Request) =>
 			new URL(request.url).pathname.endsWith('/auth/status')
@@ -258,7 +258,7 @@ describe('more auth behaviour', () => {
 	it('clears local state at once and finishes the request afterwards', async () => {
 		auth.user = user as never;
 		auth.permissions = new Set(['graph:node_type:delete']);
-		setEtag('/api/v1/node', { etag: '"v1"', data: { secret: 1 } });
+		setEtag('/api/v1/nodes', { etag: '"v1"', data: { secret: 1 } });
 		let release!: () => void;
 		const gate = new Promise<void>((r) => (release = r));
 		let keepalive: boolean | undefined;
@@ -272,7 +272,7 @@ describe('more auth behaviour', () => {
 		expect(auth.user).toBeNull();
 		expect(auth.can('graph:node_type:delete')).toBe(false);
 		expect(auth.leftOnPurpose).toBe(true);
-		expect(getEtag('/api/v1/node')).toBeUndefined();
+		expect(getEtag('/api/v1/nodes')).toBeUndefined();
 		release();
 		expect((await pending).ok).toBe(true);
 		expect(keepalive).toBe(true);
@@ -326,7 +326,7 @@ describe('more auth behaviour', () => {
 		let during: boolean | null = null;
 		vi.stubGlobal('fetch', async (request: Request) => {
 			const path = new URL(request.url).pathname;
-			if (path.endsWith('/auth/me')) during = auth.setupRequired;
+			if (path.endsWith('/me')) during = auth.setupRequired;
 			return path.endsWith('/permissions') ? json({ permissions: [] }) : json(user);
 		});
 		await auth.finishSetup();

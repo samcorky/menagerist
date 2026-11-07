@@ -27,7 +27,7 @@ pytestmark = pytest.mark.integration
 
 ALICE = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
 BOB = Actor(id=uuid.UUID(int=0xB2), roles=frozenset({"member"}))
-_INSTALL = "/api/v1/example/demo/installation"
+_INSTALL = "/api/v1/examples/demo/installation"
 
 _PACK: dict[str, Any] = {
     "format": "menagerist-example-pack",
@@ -139,21 +139,21 @@ def test_both_people_install_and_remove_with_shared_types(
         owners = _owners(postgres_sync_url, table)
         assert set(owners) == {ALICE.id, BOB.id}, table
     assert len(_owners(postgres_sync_url, "example_installations")) == 2
-    assert len(client.get("/api/v1/node?limit=100").json()) == 2
-    assert len(client.get("/api/v1/collection").json()) == 1
-    assert len(client.get("/api/v1/node-type").json()) == 1
+    assert len(client.get("/api/v1/nodes?limit=100").json()) == 2
+    assert len(client.get("/api/v1/collections").json()) == 1
+    assert len(client.get("/api/v1/node-types").json()) == 1
 
     who.actor = ALICE
     left = client.delete(_INSTALL)
     assert left.status_code == 200, left.text
     assert left.json()["removed"]["items"] == 2
-    assert len(client.get("/api/v1/node-type").json()) == 1
+    assert len(client.get("/api/v1/node-types").json()) == 1
     who.actor = BOB
-    assert len(client.get("/api/v1/node?limit=100").json()) == 2
+    assert len(client.get("/api/v1/nodes?limit=100").json()) == 2
 
     assert client.delete(_INSTALL).status_code == 200
-    assert client.get("/api/v1/node-type").json() == []
-    assert client.get("/api/v1/edge-type").json() == []
+    assert client.get("/api/v1/node-types").json() == []
+    assert client.get("/api/v1/edge-types").json() == []
     assert _owners(postgres_sync_url, "media_assets") == []
 
 
@@ -165,14 +165,14 @@ def test_people_cannot_see_each_others_installations_or_example_ids(
     client.put(_INSTALL)
     who.actor = BOB
 
-    listed = client.get("/api/v1/example").json()
-    entities = client.get("/api/v1/example/entities").json()
+    listed = client.get("/api/v1/examples").json()
+    entities = client.get("/api/v1/examples/entities").json()
 
     assert listed[0]["installation"] is None
     assert entities == {"item_ids": [], "item_type_ids": [], "collection_ids": []}
     assert client.delete(_INSTALL).status_code == 409
     who.actor = ALICE
-    assert len(client.get("/api/v1/example/entities").json()["item_ids"]) == 2
+    assert len(client.get("/api/v1/examples/entities").json()["item_ids"]) == 2
 
 
 def test_another_persons_own_item_keeps_a_shared_type_alive(
@@ -182,7 +182,9 @@ def test_another_persons_own_item_keeps_a_shared_type_alive(
     who.actor = ALICE
     assert client.put(_INSTALL).status_code == 200
     who.actor = BOB
-    made = client.post("/api/v1/node", json={"name": "Bob's own", "type": "demo-thing"})
+    made = client.post(
+        "/api/v1/nodes", json={"name": "Bob's own", "type": "demo-thing"}
+    )
     assert made.status_code == 201, made.text
 
     who.actor = ALICE
@@ -193,10 +195,12 @@ def test_another_persons_own_item_keeps_a_shared_type_alive(
         (k["kind"], k["reason"]) for k in left.json()["kept"]
     }
     who.actor = BOB
-    assert [n["name"] for n in client.get("/api/v1/node?limit=100").json()] == [
+    assert [n["name"] for n in client.get("/api/v1/nodes?limit=100").json()] == [
         "Bob's own"
     ]
-    assert [t["slug"] for t in client.get("/api/v1/node-type").json()] == ["demo-thing"]
+    assert [t["slug"] for t in client.get("/api/v1/node-types").json()] == [
+        "demo-thing"
+    ]
 
 
 def test_an_unrelated_type_with_the_packs_slug_is_still_a_conflict(
@@ -205,7 +209,7 @@ def test_an_unrelated_type_with_the_packs_slug_is_still_a_conflict(
     """A type Bob made himself blocks the install for everyone."""
     who.actor = BOB
     made = client.post(
-        "/api/v1/node-type", json={"slug": "demo-thing", "label": "Mine"}
+        "/api/v1/node-types", json={"slug": "demo-thing", "label": "Mine"}
     )
     assert made.status_code == 201, made.text
     who.actor = ALICE

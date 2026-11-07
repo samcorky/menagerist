@@ -56,7 +56,7 @@ router = APIRouter(
 
 
 @router.post(
-    "/export",
+    "/exports",
     status_code=201,
     response_model=BackupResponse,
     operation_id="export_user_data",
@@ -65,12 +65,12 @@ router = APIRouter(
             "links": {
                 "DownloadExport": {
                     "operationId": "download_user_export",
-                    "parameters": {"backup_id": "$response.body#/id"},
+                    "parameters": {"export_id": "$response.body#/id"},
                     "description": "Download the archive that was just created.",
                 },
                 "DeleteExport": {
                     "operationId": "delete_user_export",
-                    "parameters": {"backup_id": "$response.body#/id"},
+                    "parameters": {"export_id": "$response.body#/id"},
                     "description": "Delete the archive that was just created.",
                 },
             }
@@ -96,12 +96,12 @@ async def export_user_data(
             "links": {
                 "DownloadExport": {
                     "operationId": "download_user_export",
-                    "parameters": {"backup_id": "$response.body#/0/id"},
+                    "parameters": {"export_id": "$response.body#/0/id"},
                     "description": "Download the newest export in this list.",
                 },
                 "DeleteExport": {
                     "operationId": "delete_user_export",
-                    "parameters": {"backup_id": "$response.body#/0/id"},
+                    "parameters": {"export_id": "$response.body#/0/id"},
                     "description": "Delete the newest export in this list.",
                 },
             }
@@ -120,7 +120,7 @@ async def list_user_exports(
 
 
 @router.get(
-    "/export/{backup_id}/download",
+    "/exports/{export_id}/download",
     operation_id="download_user_export",
     responses={
         **error_response(
@@ -136,18 +136,18 @@ async def list_user_exports(
     },
 )
 async def download_user_export(
-    backup_id: UUID,
+    export_id: UUID,
     use_case: Annotated[OpenUserExport, Depends(get_open_user_export)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> StreamingResponse:
     """Stream an archive from the caller's private namespace."""
-    opened = await use_case.handle(OpenUserExportQuery(backup_id=backup_id), actor)
+    opened = await use_case.handle(OpenUserExportQuery(backup_id=export_id), actor)
     return StreamingResponse(
         opened.chunks,
         media_type="application/gzip",
         headers={
             "Content-Disposition": (
-                f'attachment; filename="menagerist-personal-{backup_id}.tar.gz"'
+                f'attachment; filename="menagerist-personal-{export_id}.tar.gz"'
             ),
             "Cache-Control": "no-store",
         },
@@ -155,7 +155,7 @@ async def download_user_export(
 
 
 @router.delete(
-    "/export/{backup_id}",
+    "/exports/{export_id}",
     status_code=204,
     operation_id="delete_user_export",
     responses=error_response(
@@ -164,12 +164,12 @@ async def download_user_export(
     ),
 )
 async def delete_user_export(
-    backup_id: UUID,
+    export_id: UUID,
     use_case: Annotated[DeleteUserExport, Depends(get_delete_user_export)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> Response:
     """Delete one of the caller's personal exports."""
-    await use_case.handle(DeleteUserExportCommand(backup_id=backup_id), actor)
+    await use_case.handle(DeleteUserExportCommand(backup_id=export_id), actor)
     return Response(status_code=204)
 
 

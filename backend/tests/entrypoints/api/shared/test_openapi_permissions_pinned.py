@@ -20,33 +20,33 @@ if TYPE_CHECKING:
 # Pinned before the access refactor: the operations documented as needing an
 # administrator-only permission must not change when use cases migrate.
 EXPECTED: dict[tuple[str, str], str] = {
-    ("/api/v1/system/browser-check", "post"): "system:diagnostics:read",
+    ("/api/v1/system/browser", "post"): "system:diagnostics:read",
     ("/api/v1/system/health/ready/detail", "get"): "system:diagnostics:read",
-    ("/api/v1/backup", "get"): "backup:archive:read",
-    ("/api/v1/backup", "post"): "backup:archive:create",
-    ("/api/v1/backup/prune", "post"): "backup:archive:delete",
-    ("/api/v1/backup/upload", "post"): "backup:archive:create",
-    ("/api/v1/backup/{backup_id}", "delete"): "backup:archive:delete",
-    ("/api/v1/backup/{backup_id}/download", "get"): "backup:archive:read",
-    ("/api/v1/backup/{backup_id}/verify", "post"): "backup:archive:read",
-    ("/api/v1/edge-type/{edge_type_id}", "delete"): "graph:edge_type:delete",
-    ("/api/v1/edge-type/{edge_type_id}/attribute/{key}", "delete"): (
+    ("/api/v1/backups", "get"): "backup:archive:read",
+    ("/api/v1/backups", "post"): "backup:archive:create",
+    ("/api/v1/backups/prune", "post"): "backup:archive:delete",
+    ("/api/v1/backups/upload", "post"): "backup:archive:create",
+    ("/api/v1/backups/{backup_id}", "delete"): "backup:archive:delete",
+    ("/api/v1/backups/{backup_id}/download", "get"): "backup:archive:read",
+    ("/api/v1/backups/{backup_id}/verify", "post"): "backup:archive:read",
+    ("/api/v1/edge-types/{edge_type_id}", "delete"): "graph:edge_type:delete",
+    ("/api/v1/edge-types/{edge_type_id}/attributes/{key}", "delete"): (
         "graph:edge_type:purge_attribute"
     ),
-    ("/api/v1/node-type/{node_type_id}", "delete"): "graph:node_type:delete",
-    ("/api/v1/node-type/{node_type_id}/attribute/{key}", "delete"): (
+    ("/api/v1/node-types/{node_type_id}", "delete"): "graph:node_type:delete",
+    ("/api/v1/node-types/{node_type_id}/attributes/{key}", "delete"): (
         "graph:node_type:purge_attribute"
     ),
-    ("/api/v1/session", "get"): "identity:session:list",
-    ("/api/v1/session/{session_id}", "delete"): "identity:session:revoke",
-    ("/api/v1/user", "get"): "identity:user:list",
-    ("/api/v1/user", "post"): "identity:user:create",
-    ("/api/v1/user/{user_id}", "patch"): "identity:user:update",
-    ("/api/v1/user/{user_id}/password", "post"): "identity:user:reset_password",
-    ("/api/v1/user/{user_id}/unlock", "post"): "identity:user:unlock",
+    ("/api/v1/sessions", "get"): "identity:session:list",
+    ("/api/v1/sessions/{session_id}", "delete"): "identity:session:revoke",
+    ("/api/v1/users", "get"): "identity:user:list",
+    ("/api/v1/users", "post"): "identity:user:create",
+    ("/api/v1/users/{user_id}", "patch"): "identity:user:update",
+    ("/api/v1/users/{user_id}/password", "post"): "identity:user:reset_password",
+    ("/api/v1/users/{user_id}/unlock", "post"): "identity:user:unlock",
     ("/api/v1/system/version/check", "post"): "system:release:check",
     ("/api/v1/system/version/detail", "get"): "system:diagnostics:read",
-    ("/api/v1/scheduling/schedule-preview", "get"): "scheduling:job:read",
+    ("/api/v1/scheduling/preview", "get"): "scheduling:job:read",
     ("/api/v1/scheduling/jobs", "get"): "scheduling:job:read",
     ("/api/v1/scheduling/jobs/{job_key}/runs", "get"): "scheduling:job:read",
     ("/api/v1/scheduling/jobs/{job_key}/run", "post"): "scheduling:job:run",

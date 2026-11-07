@@ -65,9 +65,9 @@ def test_search_over_the_cap_reports_a_capped_count() -> None:
     """1,005 matches: Total-Count is 1000, flagged, and paging still works."""
     client = _client(1005)
 
-    first = client.get("/api/v1/node?q=coin&limit=10")
+    first = client.get("/api/v1/nodes?q=coin&limit=10")
     after = first.json()[-1]["id"]
-    second = client.get(f"/api/v1/node?q=coin&limit=10&after={after}")
+    second = client.get(f"/api/v1/nodes?q=coin&limit=10&after={after}")
 
     assert first.status_code == 200
     assert first.headers["Total-Count"] == "1000"
@@ -82,7 +82,7 @@ def test_search_under_the_cap_is_exact_and_unflagged() -> None:
     """A small search keeps an exact count and no flag."""
     client = _client(7)
 
-    response = client.get("/api/v1/node?q=coin")
+    response = client.get("/api/v1/nodes?q=coin")
 
     assert response.headers["Total-Count"] == "7"
     assert "Total-Count-Capped" not in response.headers
@@ -92,7 +92,7 @@ def test_list_without_search_stays_exact_above_the_cap() -> None:
     """Without `q`, 1,005 items count as 1,005."""
     client = _client(1005)
 
-    response = client.get("/api/v1/node?limit=5")
+    response = client.get("/api/v1/nodes?limit=5")
 
     assert response.headers["Total-Count"] == "1005"
     assert "Total-Count-Capped" not in response.headers
@@ -101,7 +101,7 @@ def test_list_without_search_stays_exact_above_the_cap() -> None:
 def test_openapi_documents_the_count_headers() -> None:
     """The list operation describes Total-Count and its capped flag."""
     spec = _client(0).get("/api/openapi.json").json()
-    headers = spec["paths"]["/api/v1/node"]["get"]["responses"]["200"]["headers"]
+    headers = spec["paths"]["/api/v1/nodes"]["get"]["responses"]["200"]["headers"]
 
     assert {"Link", "Total-Count", "Total-Count-Capped"} <= set(headers)
 
@@ -110,8 +110,8 @@ def test_count_is_exact_above_the_cap_and_never_below_the_list() -> None:
     """1,005 matches: the count route says 1,005; the list's capped value is lower."""
     client = _client(1005, others=3)
 
-    counted = client.get("/api/v1/node/count?q=coin")
-    listed = client.get("/api/v1/node?q=coin&limit=1")
+    counted = client.get("/api/v1/nodes/count?q=coin")
+    listed = client.get("/api/v1/nodes?q=coin&limit=1")
 
     assert counted.status_code == 200
     assert counted.json() == {"count": 1005}
@@ -122,10 +122,10 @@ def test_count_follows_the_list_filters() -> None:
     """Type and favourite narrow the count as they narrow the list."""
     client = _client(4)
 
-    assert client.get("/api/v1/node/count").json() == {"count": 4}
-    assert client.get("/api/v1/node/count?type=coin").json() == {"count": 4}
-    assert client.get("/api/v1/node/count?type=film").json() == {"count": 0}
-    assert client.get("/api/v1/node/count?favourite=true").json() == {"count": 0}
+    assert client.get("/api/v1/nodes/count").json() == {"count": 4}
+    assert client.get("/api/v1/nodes/count?type=coin").json() == {"count": 4}
+    assert client.get("/api/v1/nodes/count?type=film").json() == {"count": 0}
+    assert client.get("/api/v1/nodes/count?favourite=true").json() == {"count": 0}
 
 
 def test_count_of_an_unknown_collection_is_the_lists_404() -> None:
@@ -133,8 +133,8 @@ def test_count_of_an_unknown_collection_is_the_lists_404() -> None:
     client = _client(1)
     missing = uuid.uuid4()
 
-    listed = client.get(f"/api/v1/node?collection={missing}")
-    counted = client.get(f"/api/v1/node/count?collection={missing}")
+    listed = client.get(f"/api/v1/nodes?collection={missing}")
+    counted = client.get(f"/api/v1/nodes/count?collection={missing}")
 
     assert listed.status_code == counted.status_code == 404
     assert counted.json()["type"] == listed.json()["type"]
@@ -144,8 +144,8 @@ def test_count_with_a_malformed_filter_is_the_lists_422() -> None:
     """A filter that does not parse is refused identically."""
     client = _client(1)
 
-    listed = client.get("/api/v1/node?favourite=maybe")
-    counted = client.get("/api/v1/node/count?favourite=maybe")
+    listed = client.get("/api/v1/nodes?favourite=maybe")
+    counted = client.get("/api/v1/nodes/count?favourite=maybe")
 
     assert listed.status_code == counted.status_code == 422
     assert counted.json()["type"] == listed.json()["type"]
@@ -154,8 +154,8 @@ def test_count_with_a_malformed_filter_is_the_lists_422() -> None:
 def test_count_route_is_in_the_spec() -> None:
     """The count operation is published with the shared filter parameters."""
     spec = _client(0).get("/api/openapi.json").json()
-    get = spec["paths"]["/api/v1/node/count"]["get"]
-    listed = spec["paths"]["/api/v1/node"]["get"]
+    get = spec["paths"]["/api/v1/nodes/count"]["get"]
+    listed = spec["paths"]["/api/v1/nodes"]["get"]
 
     names = {p["name"] for p in get["parameters"]}
     assert names == {"type", "q", "favourite", "collection"}

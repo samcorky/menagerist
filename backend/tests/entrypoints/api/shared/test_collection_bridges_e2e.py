@@ -50,22 +50,22 @@ def test_collection_lists_exactly_its_items_through_the_real_bridges(
     client: TestClient,
 ) -> None:
     """Items put on a collection are listed, counted and filtered by it."""
-    _create(client, "/api/v1/node-type", {"slug": "film", "label": "Film"})
+    _create(client, "/api/v1/node-types", {"slug": "film", "label": "Film"})
     names = ["Alien", "Aliens", "Heat", "Ronin"]
     items = {
-        name: _create(client, "/api/v1/node", {"name": name, "type": "film"})["id"]
+        name: _create(client, "/api/v1/nodes", {"name": name, "type": "film"})["id"]
         for name in names
     }
-    shelf = _create(client, "/api/v1/collection", {"name": "Shelf"})
-    base = f"/api/v1/collection/{shelf['id']}"
+    shelf = _create(client, "/api/v1/collections", {"name": "Shelf"})
+    base = f"/api/v1/collections/{shelf['id']}"
 
     put = client.put(
-        f"{base}/item",
+        f"{base}/items",
         json={"item_ids": [items["Alien"], items["Aliens"], items["Heat"]]},
     )
     assert put.status_code == 200, put.text
 
-    listed = client.get(f"/api/v1/node?collection={shelf['id']}")
+    listed = client.get(f"/api/v1/nodes?collection={shelf['id']}")
     assert listed.status_code == 200
     assert {n["id"] for n in listed.json()} == {
         items["Alien"],
@@ -74,21 +74,21 @@ def test_collection_lists_exactly_its_items_through_the_real_bridges(
     }
     assert listed.headers["Total-Count"] == "3"
 
-    searched = client.get(f"/api/v1/node?collection={shelf['id']}&q=alien")
+    searched = client.get(f"/api/v1/nodes?collection={shelf['id']}&q=alien")
     assert {n["name"] for n in searched.json()} == {"Alien", "Aliens"}
     assert searched.headers["Total-Count"] == "2"
 
     assert client.get(base).json()["item_count"] == 3
 
-    assert client.delete(f"/api/v1/node/{items['Heat']}").status_code == 204
+    assert client.delete(f"/api/v1/nodes/{items['Heat']}").status_code == 204
     assert client.get(base).json()["item_count"] == 2
-    after_delete = client.get(f"/api/v1/node?collection={shelf['id']}")
+    after_delete = client.get(f"/api/v1/nodes?collection={shelf['id']}")
     assert {n["name"] for n in after_delete.json()} == {"Alien", "Aliens"}
     assert after_delete.headers["Total-Count"] == "2"
 
-    rejected = client.put(f"{base}/item", json={"item_ids": [items["Heat"]]})
+    rejected = client.put(f"{base}/items", json={"item_ids": [items["Heat"]]})
     assert rejected.status_code == 400
 
     assert client.delete(base).status_code == 204
-    gone = client.get(f"/api/v1/node?collection={shelf['id']}")
+    gone = client.get(f"/api/v1/nodes?collection={shelf['id']}")
     assert gone.status_code == 404

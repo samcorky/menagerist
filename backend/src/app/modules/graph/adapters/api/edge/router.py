@@ -40,7 +40,7 @@ from app.modules.graph.domain.errors import EdgeNotFoundError, NodeNotFoundError
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ValidationError
 
-router = APIRouter(prefix="/edge", tags=["Edges"], route_class=PermissionAwareRoute)
+router = APIRouter(prefix="/edges", tags=["Edges"], route_class=PermissionAwareRoute)
 
 
 @router.post(

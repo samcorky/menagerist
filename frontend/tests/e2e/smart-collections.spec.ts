@@ -23,7 +23,7 @@ const { makeCollection, makeItemType, trackCollection, trackCollectionFromUrl, c
 const seededItemIds: string[] = [];
 
 test.afterEach(async ({ request }) => {
-	for (const id of seededItemIds.splice(0)) await request.delete(`/api/v1/node/${id}`);
+	for (const id of seededItemIds.splice(0)) await request.delete(`/api/v1/nodes/${id}`);
 	await cleanUp(request);
 });
 
@@ -38,7 +38,7 @@ const WEIGHT = {
 /** An item type with a number field "Weight". */
 async function makeTool(request: APIRequestContext): Promise<Tool> {
 	const tool = await makeItemType(request, uniqueName('Tool'));
-	const res = await request.patch(`/api/v1/node-type/${tool.id}`, {
+	const res = await request.patch(`/api/v1/node-types/${tool.id}`, {
 		data: { attributes_schema: WEIGHT }
 	});
 	expect(res.ok(), await res.text()).toBeTruthy();
@@ -51,7 +51,7 @@ async function makeToolItem(
 	name: string,
 	attributes: Record<string, unknown> = {}
 ) {
-	const res = await request.post('/api/v1/node', { data: { name, type: tool.slug, attributes } });
+	const res = await request.post('/api/v1/nodes', { data: { name, type: tool.slug, attributes } });
 	expect(res.status(), await res.text()).toBe(201);
 	const created = (await res.json()) as { id: string };
 	seededItemIds.push(created.id);
@@ -92,7 +92,7 @@ async function makeSmart(
 	name: string,
 	definition: unknown
 ): Promise<Smart> {
-	const res = await request.post('/api/v1/collection', { data: { name, definition } });
+	const res = await request.post('/api/v1/collections', { data: { name, definition } });
 	expect(res.status(), await res.text()).toBe(201);
 	const created = (await res.json()) as Smart;
 	trackCollection(created.id);
@@ -104,7 +104,7 @@ const slugOf = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 const lastSegment = (page: Page) => new URL(page.url()).pathname.split('/').pop()!;
 
 async function definitionOf(request: APIRequestContext, id: string): Promise<unknown> {
-	const res = await request.get(`/api/v1/collection/${id}`);
+	const res = await request.get(`/api/v1/collections/${id}`);
 	expect(res.ok(), await res.text()).toBeTruthy();
 	return ((await res.json()) as { definition: unknown }).definition;
 }
@@ -183,7 +183,7 @@ test('saves an items-page filter as a smart collection, lists it, opens it and k
 	await page.getByRole('button', { name: 'Save as smart collection' }).click();
 	const save = page.getByRole('dialog', { name: 'Save as smart collection' });
 	await save.getByLabel('Name').fill(name);
-	await page.route(/\/api\/v1\/collection$/, (route) =>
+	await page.route(/\/api\/v1\/collections$/, (route) =>
 		route.request().method() === 'POST'
 			? route.fulfill({
 					status: 400,
@@ -195,7 +195,7 @@ test('saves an items-page filter as a smart collection, lists it, opens it and k
 	await save.getByRole('button', { name: 'Save smart collection' }).click();
 	await expect(save.getByRole('alert')).toHaveText('Condition 1: That value is not valid here.');
 	await expect(save).toBeVisible();
-	await page.unroute(/\/api\/v1\/collection$/);
+	await page.unroute(/\/api\/v1\/collections$/);
 
 	await save.getByRole('button', { name: 'Save smart collection' }).click();
 	await page.waitForURL(/\/collections\/(?!$)[^/]+$/);
@@ -316,7 +316,7 @@ test('saves what the items page shows: the search text and the type as well as t
 	// Weight at least 5 would match B and C; the search text narrows it to the seeded ones.
 	await expect(itemLink(page, names.b)).toBeVisible();
 	await expect(itemLink(page, names.c)).toBeVisible();
-	const res = await request.get(`/api/v1/collection/${lastSegment(page)}`);
+	const res = await request.get(`/api/v1/collections/${lastSegment(page)}`);
 	const saved = (await res.json()) as { definition: { where: { children: { kind: string }[] } } };
 	const kinds = saved.definition.where.children.map((c) => c.kind).sort();
 	expect(kinds).toEqual(['field', 'text', 'type']);
@@ -330,7 +330,7 @@ test('a condition on a removed field shows a warning, and the list still loads',
 	await seedItems(request, tool);
 	const smart = await makeSmart(request, uniqueName('Stale'), weightAtLeast(tool, 5));
 
-	const patched = await request.patch(`/api/v1/node-type/${tool.id}`, {
+	const patched = await request.patch(`/api/v1/node-types/${tool.id}`, {
 		data: { attributes_schema: { type: 'object', properties: {} } }
 	});
 	expect(patched.ok(), await patched.text()).toBeTruthy();
@@ -357,7 +357,7 @@ test('smart collections are not offered as places to add an item, and links use 
 	const smart = await makeSmart(request, uniqueName('Auto'), weightAtLeast(tool, 1));
 	const manual = await makeCollection(request, uniqueName('Hand'));
 	const manualSlug = (
-		(await (await request.get(`/api/v1/collection/${manual.id}`)).json()) as Smart
+		(await (await request.get(`/api/v1/collections/${manual.id}`)).json()) as Smart
 	).slug;
 
 	// Adding to or removing from a smart collection is refused by the API.
@@ -366,13 +366,13 @@ test('smart collections are not offered as places to add an item, and links use 
 	});
 	expect(
 		(
-			await request.put(`/api/v1/collection/${smart.id}/item`, { data: { item_ids: [item.id] } })
+			await request.put(`/api/v1/collections/${smart.id}/items`, { data: { item_ids: [item.id] } })
 		).status()
 	).toBe(409);
-	expect((await request.delete(`/api/v1/collection/${smart.id}/item/${item.id}`)).status()).toBe(
+	expect((await request.delete(`/api/v1/collections/${smart.id}/items/${item.id}`)).status()).toBe(
 		409
 	);
-	await request.put(`/api/v1/collection/${manual.id}/item`, { data: { item_ids: [item.id] } });
+	await request.put(`/api/v1/collections/${manual.id}/items`, { data: { item_ids: [item.id] } });
 
 	// On the item page the picker lists the manual collection only, and the chip links by slug.
 	await page.goto(`/items/${item.id}`);
@@ -419,10 +419,10 @@ test('another user cannot open a smart collection by id or by slug, nor count or
 		await b.page.goto(`/collections/${segment}`);
 		await expect(b.page.getByRole('heading', { name: 'Collection not found' })).toBeVisible();
 		await expect(b.page.getByText(smart.name)).toHaveCount(0);
-		expect((await b.request.get(`/api/v1/collection/${segment}`)).status()).toBe(404);
-		expect((await b.request.get(`/api/v1/collection/${segment}/count`)).status()).toBe(404);
+		expect((await b.request.get(`/api/v1/collections/${segment}`)).status()).toBe(404);
+		expect((await b.request.get(`/api/v1/collections/${segment}/items/count`)).status()).toBe(404);
 	}
-	expect((await b.request.get(`/api/v1/node?collection=${smart.id}`)).status()).toBe(404);
+	expect((await b.request.get(`/api/v1/nodes?collection=${smart.id}`)).status()).toBe(404);
 	await b.context.close();
 });
 
@@ -570,11 +570,11 @@ test('edits the slug: no history entry, old link gone, taken and invalid slugs r
 	// The old slug no longer resolves; the id still does.
 	await page.goto(`/collections/${smart.slug}`);
 	await expect(page.getByRole('heading', { name: 'Collection not found' })).toBeVisible();
-	expect((await request.get(`/api/v1/collection/${smart.id}`)).status()).toBe(200);
+	expect((await request.get(`/api/v1/collections/${smart.id}`)).status()).toBe(200);
 
 	// A slug another collection holds is refused inline.
 	const other = await makeCollection(request, uniqueName('Holder'));
-	const otherSlug = ((await (await request.get(`/api/v1/collection/${other.id}`)).json()) as Smart)
+	const otherSlug = ((await (await request.get(`/api/v1/collections/${other.id}`)).json()) as Smart)
 		.slug;
 	await page.goto(`/collections/${custom}`);
 	dialog = await openEdit();
@@ -592,9 +592,9 @@ test('edits the slug: no history entry, old link gone, taken and invalid slugs r
 
 	// Regenerate rebuilds from the name; a taken one gets a suffix.
 	const rival = await makeCollection(request, name);
-	expect(((await (await request.get(`/api/v1/collection/${rival.id}`)).json()) as Smart).slug).toBe(
-		slugOf(name)
-	);
+	expect(
+		((await (await request.get(`/api/v1/collections/${rival.id}`)).json()) as Smart).slug
+	).toBe(slugOf(name));
 	dialog = await openEdit();
 	await dialog.getByRole('button', { name: 'Regenerate from name' }).click();
 	await expect(page).toHaveURL(new RegExp(`/collections/${slugOf(name)}-2$`));
@@ -612,7 +612,7 @@ test('shows 1,000+ for a capped count, then the exact figure; a failed count off
 
 	// Make the collection look capped, as one above the 1,000 cap would; the count route is real.
 	// The page loads by slug first, then by id.
-	const collectionRoute = new RegExp(`/api/v1/collection/(${smart.slug}|${smart.id})$`);
+	const collectionRoute = new RegExp(`/api/v1/collections/(${smart.slug}|${smart.id})$`);
 	await page.route(collectionRoute, async (route) => {
 		const response = await route.fetch();
 		const body = (await response.json()) as Record<string, unknown>;
@@ -621,7 +621,7 @@ test('shows 1,000+ for a capped count, then the exact figure; a failed count off
 			json: { ...body, item_count: 1000, item_count_capped: true }
 		});
 	});
-	const countRoute = /\/api\/v1\/collection\/[^/]+\/count$/;
+	const countRoute = /\/api\/v1\/collections\/[^/]+\/items\/count$/;
 
 	// Hold the count until the capped label has been seen, then the exact figure replaces it.
 	let release!: () => void;
@@ -668,7 +668,7 @@ test('counts a really large smart collection exactly (E2E_BULK=1)', async ({ pag
 	for (let start = 0; start < total; start += 50) {
 		const batch = await Promise.all(
 			Array.from({ length: Math.min(50, total - start) }, async (_, i) => {
-				const res = await request.post('/api/v1/node', {
+				const res = await request.post('/api/v1/nodes', {
 					data: { name: `Bulk ${start + i}`, type: tool.slug }
 				});
 				expect(res.status(), await res.text()).toBe(201);
@@ -689,7 +689,7 @@ test('counts a really large smart collection exactly (E2E_BULK=1)', async ({ pag
 		// Hold the count until the capped label has been seen.
 		let release!: () => void;
 		const held = new Promise<void>((resolve) => (release = resolve));
-		await page.route(/\/api\/v1\/collection\/[^/]+\/count$/, async (route) => {
+		await page.route(/\/api\/v1\/collections\/[^/]+\/items\/count$/, async (route) => {
 			await held;
 			await route.continue();
 		});
@@ -697,7 +697,7 @@ test('counts a really large smart collection exactly (E2E_BULK=1)', async ({ pag
 		await expect(page.getByText('1,000+ items', { exact: true })).toBeVisible();
 		release();
 		await expect(page.getByText('1,003 items', { exact: true })).toBeVisible();
-		await page.unroute(/\/api\/v1\/collection\/[^/]+\/count$/);
+		await page.unroute(/\/api\/v1\/collections\/[^/]+\/items\/count$/);
 
 		// The list keeps the capped figure.
 		await page.goto('/collections');
@@ -706,7 +706,7 @@ test('counts a really large smart collection exactly (E2E_BULK=1)', async ({ pag
 		);
 
 		// A failing count offers a retry that fills in the figure.
-		await page.route(/\/api\/v1\/collection\/[^/]+\/count$/, (route) =>
+		await page.route(/\/api\/v1\/collections\/[^/]+\/items\/count$/, (route) =>
 			route.fulfill({
 				status: 500,
 				contentType: 'application/json',
@@ -718,13 +718,15 @@ test('counts a really large smart collection exactly (E2E_BULK=1)', async ({ pag
 			page.getByRole('alert').filter({ hasText: "Couldn't count the items" })
 		).toBeVisible();
 		await expect(page.getByText('1,000+ items', { exact: true })).toBeVisible();
-		await page.unroute(/\/api\/v1\/collection\/[^/]+\/count$/);
+		await page.unroute(/\/api\/v1\/collections\/[^/]+\/items\/count$/);
 		await page.getByRole('button', { name: 'Count exactly' }).click();
 		await expect(page.getByText('1,003 items', { exact: true })).toBeVisible();
 	} finally {
-		if (smart) await request.delete(`/api/v1/collection/${smart.id}`);
+		if (smart) await request.delete(`/api/v1/collections/${smart.id}`);
 		for (let i = 0; i < created.length; i += 50) {
-			await Promise.all(created.slice(i, i + 50).map((id) => request.delete(`/api/v1/node/${id}`)));
+			await Promise.all(
+				created.slice(i, i + 50).map((id) => request.delete(`/api/v1/nodes/${id}`))
+			);
 		}
 	}
 });

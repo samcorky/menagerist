@@ -242,7 +242,7 @@ test('deletes a collection, keeps its items, and allows reusing the name', async
 	await page.waitForURL(/\/collections$/);
 	await expect(page.getByRole('link', { name: new RegExp(name) })).toHaveCount(0);
 
-	const item2 = await request.get(`/api/v1/node/${item.id}`);
+	const item2 = await request.get(`/api/v1/nodes/${item.id}`);
 	expect(item2.ok()).toBeTruthy();
 
 	await page.getByRole('button', { name: 'New collection' }).first().click();
@@ -290,7 +290,7 @@ test('the collection page count drops after an item is deleted', async ({ page, 
 
 	await page.goto(`/collections/${collection.id}`);
 	await expect(page.getByText('2 items', { exact: true })).toBeVisible();
-	await request.delete(`/api/v1/node/${a.id}`);
+	await request.delete(`/api/v1/nodes/${a.id}`);
 
 	await page.goto(`/collections/${collection.id}`);
 	await expect(page.getByText('1 item', { exact: true })).toBeVisible();
@@ -354,7 +354,7 @@ test('double-clicking Remove sends one request and Undo restores the item', asyn
 	let deletes = 0;
 	page.on('request', (r) => {
 		// The page addresses the collection by its slug, so match on the item.
-		if (r.method() === 'DELETE' && r.url().endsWith(`/item/${item.id}`)) {
+		if (r.method() === 'DELETE' && r.url().endsWith(`/items/${item.id}`)) {
 			deletes += 1;
 		}
 	});
@@ -404,7 +404,7 @@ test('clears and edits a collection description', async ({ page, request }) => {
 
 test('adding an unknown item id reports unknown or deleted items', async ({ request }) => {
 	const collection = await makeCollection(request, uniqueName('Unknown'));
-	const res = await request.put(`/api/v1/collection/${collection.id}/item`, {
+	const res = await request.put(`/api/v1/collections/${collection.id}/items`, {
 		data: { item_ids: ['00000000-0000-7000-8000-000000000000'] }
 	});
 	expect(res.status()).toBe(400);

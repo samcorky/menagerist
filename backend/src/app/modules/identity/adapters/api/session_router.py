@@ -29,7 +29,7 @@ from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ForbiddenError
 
 router = APIRouter(
-    prefix="/session", tags=["Sessions"], route_class=PermissionAwareRoute
+    prefix="/sessions", tags=["Sessions"], route_class=PermissionAwareRoute
 )
 
 _ADMIN_ONLY = {

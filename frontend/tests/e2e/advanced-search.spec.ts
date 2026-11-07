@@ -14,7 +14,7 @@ const { makeItem, makeItemType, cleanUp } = ownedData();
 const seededItemIds: string[] = [];
 
 test.afterEach(async ({ request }) => {
-	for (const id of seededItemIds.splice(0)) await request.delete(`/api/v1/node/${id}`);
+	for (const id of seededItemIds.splice(0)) await request.delete(`/api/v1/nodes/${id}`);
 	await cleanUp(request);
 });
 
@@ -31,7 +31,7 @@ const WEIGHT_AND_GRADE = {
 /** An item type with a number field "Weight" and a choice field "Grade". */
 async function makeTool(request: APIRequestContext): Promise<Tool> {
 	const tool = await makeItemType(request, uniqueName('Tool'));
-	const res = await request.patch(`/api/v1/node-type/${tool.id}`, {
+	const res = await request.patch(`/api/v1/node-types/${tool.id}`, {
 		data: { attributes_schema: WEIGHT_AND_GRADE }
 	});
 	expect(res.ok(), await res.text()).toBeTruthy();
@@ -54,7 +54,7 @@ async function seedItems(request: APIRequestContext, tool: Tool) {
 		[names.d, {}]
 	];
 	for (const [name, attributes] of seeds) {
-		const res = await request.post('/api/v1/node', {
+		const res = await request.post('/api/v1/nodes', {
 			data: { name, type: tool.slug, attributes }
 		});
 		expect(res.status(), await res.text()).toBe(201);
@@ -197,7 +197,7 @@ test('a group can match any, and a stale condition shows a warning', async ({ pa
 	const url = page.url();
 
 	// Remove the Weight field through the API; the saved link keeps naming it.
-	const patched = await request.patch(`/api/v1/node-type/${tool.id}`, {
+	const patched = await request.patch(`/api/v1/node-types/${tool.id}`, {
 		data: {
 			attributes_schema: {
 				type: 'object',
@@ -337,7 +337,7 @@ test('the count line stays while more items load', async ({ page, request }) => 
 	for (let start = 0; start < total; start += 10) {
 		await Promise.all(
 			Array.from({ length: Math.min(10, total - start) }, async (_, i) => {
-				const res = await request.post('/api/v1/node', {
+				const res = await request.post('/api/v1/nodes', {
 					data: {
 						name: `Pile${suffix}-${String(start + i).padStart(3, '0')}`,
 						type: tool.slug,
@@ -389,7 +389,7 @@ test('filter items by a per-item field, and never match a type field with the sa
 	const names = { a: `Atlas${suffix}`, b: `Brief${suffix}`, c: `Clash${suffix}` };
 
 	async function seed(data: Record<string, unknown>) {
-		const res = await request.post('/api/v1/node', { data });
+		const res = await request.post('/api/v1/nodes', { data });
 		expect(res.status(), await res.text()).toBe(201);
 		seededItemIds.push(((await res.json()) as { id: string }).id);
 	}
@@ -398,7 +398,7 @@ test('filter items by a per-item field, and never match a type field with the sa
 	await seed({ name: names.a, extra_schema: overlay, attributes: { [key]: 'oak' } });
 	await seed({ name: names.b, extra_schema: overlay, attributes: { [key]: 'pine' } });
 	const clashType = await makeItemType(request, uniqueName('Clash'));
-	const patched = await request.patch(`/api/v1/node-type/${clashType.id}`, {
+	const patched = await request.patch(`/api/v1/node-types/${clashType.id}`, {
 		data: {
 			attributes_schema: {
 				type: 'object',
@@ -449,7 +449,7 @@ test('filter items by a per-item number field with at least', async ({ page, req
 		[names.small, 3],
 		[names.big, 12]
 	] as const) {
-		const res = await request.post('/api/v1/node', {
+		const res = await request.post('/api/v1/nodes', {
 			data: { name, extra_schema: overlay, attributes: { [key]: size } }
 		});
 		expect(res.status(), await res.text()).toBe(201);
@@ -516,7 +516,7 @@ test('a text search past the cap shows 1,000+ and then the exact count', async (
 	// Hold the exact count back so the capped figure can be seen first.
 	let release!: () => void;
 	const gate = new Promise<void>((resolve) => (release = resolve));
-	await page.route('**/api/v1/node/count*', async (route) => {
+	await page.route('**/api/v1/nodes/count*', async (route) => {
 		await gate;
 		await route.continue();
 	});

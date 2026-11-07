@@ -42,8 +42,18 @@ CROSS_SITE_GUARDED_ROUTES = {
 NO_ACTOR_ROUTES = {("POST", "/v1/auth/logout")}
 # Identity routes resolve the session through the identity dependencies.
 # Identity-prefixed paths that live in entrypoints and use the content actor.
-CONTENT_ACTOR_ROUTES = {("GET", "/v1/auth/me/permissions")}
-IDENTITY_PREFIXES = ("/v1/auth/", "/v1/user", "/v1/session", "/v1/tokens")
+CONTENT_ACTOR_ROUTES = {("GET", "/v1/me/permissions")}
+IDENTITY_PREFIXES = (
+    "/v1/auth/",
+    "/v1/users",
+    "/v1/sessions",
+    "/v1/tokens",
+    "/v1/me/password",
+    "/v1/me/sessions",
+)
+# `/me` itself is the signed-in account; the rest of `/me` (exports, import,
+# permissions) acts on content.
+IDENTITY_PATHS = {"/v1/me"}
 IDENTITY_ACTORS = {
     get_identity_actor,
     get_active_identity_actor,
@@ -92,7 +102,7 @@ def test_every_other_v1_route_resolves_a_session_actor() -> None:
         calls = _calls(route.dependant)
         if (method, path) in CONTENT_ACTOR_ROUTES:
             ok = get_current_actor in calls
-        elif path.startswith(IDENTITY_PREFIXES):
+        elif path in IDENTITY_PATHS or path.startswith(IDENTITY_PREFIXES):
             ok = bool(calls & IDENTITY_ACTORS)
         else:
             ok = get_current_actor in calls

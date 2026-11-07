@@ -17,7 +17,7 @@ test('Newly added shows the latest items even in a large library', async ({ page
 
 test('the Items tile shows the real total', async ({ page, request }) => {
 	await makeItem(request, uniqueName('Dash tile'));
-	const res = await request.get('/api/v1/node/count');
+	const res = await request.get('/api/v1/nodes/count');
 	const { count } = (await res.json()) as { count: number };
 	await page.goto('/');
 	await expect(page.getByTestId('stat-items')).toContainText(count.toLocaleString('en-GB'));
@@ -72,7 +72,7 @@ test('opening Home after capturing an item loads each figure once, not twice', a
 
 	let counts = 0;
 	page.on('request', (r) => {
-		if (r.url().includes('/api/v1/node/search/counts')) counts++;
+		if (r.url().includes('/api/v1/nodes/search/counts')) counts++;
 	});
 	await page.getByRole('link', { name: 'Home', exact: true }).first().click();
 	await expect(page.getByTestId('stat-items')).toBeVisible();

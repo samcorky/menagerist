@@ -23,7 +23,7 @@ const input = (page: Page) => popup(page).getByPlaceholder('Search everything…
 
 /** The collection page shows its slug in the address. */
 async function collectionSlug(request: APIRequestContext, id: string) {
-	const res = await request.get(`/api/v1/collection/${id}`);
+	const res = await request.get(`/api/v1/collections/${id}`);
 	expect(res.ok()).toBe(true);
 	return ((await res.json()) as { slug: string }).slug;
 }
@@ -160,7 +160,7 @@ test('clicking outside the field closes the results', async ({ page }) => {
 });
 
 test('example items carry the Example badge in results', async ({ page, request }) => {
-	const res = await request.put('/api/v1/example/recipes/installation');
+	const res = await request.put('/api/v1/examples/recipes/installation');
 	expect(res.ok()).toBeTruthy();
 
 	await openWithSlash(page);

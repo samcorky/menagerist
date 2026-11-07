@@ -30,7 +30,7 @@ test('a film example shows a loaded cover and a person example shows none', asyn
 }) => {
 	await install(page, MOVIES);
 	const film = await nodeNamed(request, 'Cold Harbour');
-	const nodes = (await (await request.get('/api/v1/node?limit=500')).json()) as ApiNode[];
+	const nodes = (await (await request.get('/api/v1/nodes?limit=500')).json()) as ApiNode[];
 	const person = nodes.find((n) => n.type === 'movies-person')!;
 
 	await page.goto(`/items/${film.id}`);

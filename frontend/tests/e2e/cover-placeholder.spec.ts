@@ -17,7 +17,7 @@ const mark = (page: Page) => placeholder(page).locator('[data-slot="type-icon"]'
 
 test('shows the type icon and colour where the cover would be', async ({ page, request }) => {
 	const type = await makeItemType(request, uniqueName('Placeholder type'));
-	await request.patch(`/api/v1/node-type/${type.id}`, { data: { icon: 'film', colour: 'red' } });
+	await request.patch(`/api/v1/node-types/${type.id}`, { data: { icon: 'film', colour: 'red' } });
 	const item = await makeItem(request, uniqueName('No cover'), type.slug);
 	await page.goto(`/items/${item.id}`);
 
@@ -43,7 +43,7 @@ test('adding a photo through the placeholder makes it the cover', async ({ page,
 	await expect(page.getByTestId('item-cover').locator('img').first()).toBeVisible();
 	await expect(placeholder(page)).toHaveCount(0);
 
-	const media = await (await request.get(`/api/v1/media/for-node/${item.id}`)).json();
+	const media = await (await request.get(`/api/v1/nodes/${item.id}/media`)).json();
 	expect(media.some((m: { attribute_key?: string }) => m.attribute_key === 'cover')).toBe(true);
 });
 
@@ -67,7 +67,7 @@ test('grid tiles use the type icon and colour for items with no cover', async ({
 	request
 }) => {
 	const type = await makeItemType(request, uniqueName('Tile type'));
-	await request.patch(`/api/v1/node-type/${type.id}`, { data: { icon: 'music', colour: 'blue' } });
+	await request.patch(`/api/v1/node-types/${type.id}`, { data: { icon: 'music', colour: 'blue' } });
 	const name = uniqueName('Tile item');
 	await makeItem(request, name, type.slug);
 	await page.goto('/');
@@ -81,7 +81,7 @@ test('list rows show the type icon and colour, or a small cover when there is on
 	request
 }) => {
 	const type = await makeItemType(request, uniqueName('Row type'));
-	await request.patch(`/api/v1/node-type/${type.id}`, { data: { icon: 'book', colour: 'green' } });
+	await request.patch(`/api/v1/node-types/${type.id}`, { data: { icon: 'book', colour: 'green' } });
 	const plain = uniqueName('Plain row');
 	const covered = uniqueName('Covered row');
 	await makeItem(request, plain, type.slug);

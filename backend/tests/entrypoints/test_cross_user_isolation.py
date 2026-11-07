@@ -236,7 +236,7 @@ DIAGNOSTICS = (
 ALLOWED: dict[Route, str] = {
     ("GET", "/api/v1/system/version/detail"): DIAGNOSTICS,
     ("POST", "/api/v1/system/version/check"): DIAGNOSTICS,
-    ("GET", "/api/v1/scheduling/schedule-preview"): SCHEDULING,
+    ("GET", "/api/v1/scheduling/preview"): SCHEDULING,
     ("GET", "/api/v1/scheduling/jobs"): SCHEDULING,
     ("GET", "/api/v1/scheduling/jobs/{job_key}/runs"): SCHEDULING,
     ("POST", "/api/v1/scheduling/jobs/{job_key}/run"): SCHEDULING,
@@ -244,42 +244,42 @@ ALLOWED: dict[Route, str] = {
     ("GET", "/api/v1/settings/instance"): SETTINGS,
     ("PATCH", "/api/v1/settings/instance"): SETTINGS,
     ("DELETE", "/api/v1/settings/instance/{key}"): SETTINGS,
-    ("GET", "/api/v1/node/deleted"): RECENTLY_DELETED,
-    ("POST", "/api/v1/node/{node_id}/restore"): RECENTLY_DELETED,
-    ("DELETE", "/api/v1/node/{node_id}/purge"): RECENTLY_DELETED,
-    ("GET", "/api/v1/collection/deleted"): RECENTLY_DELETED,
-    ("POST", "/api/v1/collection/{collection_id}/restore"): RECENTLY_DELETED,
-    ("DELETE", "/api/v1/collection/{collection_id}/purge"): RECENTLY_DELETED,
+    ("GET", "/api/v1/nodes/deleted"): RECENTLY_DELETED,
+    ("POST", "/api/v1/nodes/{node_id}/restore"): RECENTLY_DELETED,
+    ("DELETE", "/api/v1/nodes/{node_id}/purge"): RECENTLY_DELETED,
+    ("GET", "/api/v1/collections/deleted"): RECENTLY_DELETED,
+    ("POST", "/api/v1/collections/{collection_id}/restore"): RECENTLY_DELETED,
+    ("DELETE", "/api/v1/collections/{collection_id}/purge"): RECENTLY_DELETED,
     (
         "POST",
-        "/api/v1/backup",
+        "/api/v1/backups",
     ): "administrator-only instance archive; tested by backup router permission tests",
     (
         "GET",
-        "/api/v1/backup",
+        "/api/v1/backups",
     ): "administrator-only instance archive; tested by backup router permission tests",
-    ("POST", "/api/v1/backup/upload"): "administrator-only verified instance upload",
-    ("POST", "/api/v1/backup/prune"): "administrator-only instance retention",
+    ("POST", "/api/v1/backups/upload"): "administrator-only verified instance upload",
+    ("POST", "/api/v1/backups/prune"): "administrator-only instance retention",
     (
         "POST",
-        "/api/v1/backup/{backup_id}/verify",
+        "/api/v1/backups/{backup_id}/verify",
     ): "administrator-only instance verification",
     (
         "GET",
-        "/api/v1/backup/{backup_id}/download",
+        "/api/v1/backups/{backup_id}/download",
     ): "administrator-only instance download",
-    ("DELETE", "/api/v1/backup/{backup_id}"): "administrator-only instance deletion",
+    ("DELETE", "/api/v1/backups/{backup_id}"): "administrator-only instance deletion",
     (
         "POST",
         "/api/v1/backups/restore",
     ): "public only before setup; shared-lock and rate-limit integration tests",
     (
         "POST",
-        "/api/v1/me/export",
+        "/api/v1/me/exports",
     ): "personal snapshots and dedicated two-user export API tests",
     (
         "GET",
-        "/api/v1/me/export/{backup_id}/download",
+        "/api/v1/me/exports/{export_id}/download",
     ): "private owner namespace; API test checks foreign exports return 404",
     (
         "GET",
@@ -287,7 +287,7 @@ ALLOWED: dict[Route, str] = {
     ): "private owner namespace; API test checks each account lists only its own",
     (
         "DELETE",
-        "/api/v1/me/export/{backup_id}",
+        "/api/v1/me/exports/{export_id}",
     ): "private owner namespace; API test checks foreign exports return 404",
     (
         "POST",
@@ -308,35 +308,38 @@ ALLOWED: dict[Route, str] = {
     ("POST", "/api/v1/auth/setup"): PUBLIC,
     ("POST", "/api/v1/auth/login"): PUBLIC,
     ("POST", "/api/v1/auth/logout"): OWN_SESSION,
-    ("GET", "/api/v1/auth/me"): OWN_SESSION,
-    ("PATCH", "/api/v1/auth/me"): OWN_SESSION,
-    ("POST", "/api/v1/auth/password"): OWN_SESSION,
-    ("GET", "/api/v1/auth/me/permissions"): OWN_SESSION,
-    ("GET", "/api/v1/auth/sessions"): OWN_SESSION,
-    ("DELETE", "/api/v1/auth/sessions/{session_id}"): OWN_SESSION,
-    ("DELETE", "/api/v1/auth/sessions"): OWN_SESSION,
-    ("GET", "/api/v1/session"): "permission-gated: administrators list active sessions",
+    ("GET", "/api/v1/me"): OWN_SESSION,
+    ("PATCH", "/api/v1/me"): OWN_SESSION,
+    ("POST", "/api/v1/me/password"): OWN_SESSION,
+    ("GET", "/api/v1/me/permissions"): OWN_SESSION,
+    ("GET", "/api/v1/me/sessions"): OWN_SESSION,
+    ("DELETE", "/api/v1/me/sessions/{session_id}"): OWN_SESSION,
+    ("DELETE", "/api/v1/me/sessions"): OWN_SESSION,
+    (
+        "GET",
+        "/api/v1/sessions",
+    ): "permission-gated: administrators list active sessions",
     (
         "DELETE",
-        "/api/v1/session/{session_id}",
+        "/api/v1/sessions/{session_id}",
     ): "permission-gated: administrators revoke sessions",
-    ("GET", "/api/v1/node-type"): VOCABULARY,
-    ("GET", "/api/v1/node-type/{node_type_id}"): VOCABULARY,
-    ("POST", "/api/v1/node-type"): VOCABULARY,
-    ("PATCH", "/api/v1/node-type/{node_type_id}"): VOCABULARY,
-    ("GET", "/api/v1/edge-type"): VOCABULARY,
-    ("GET", "/api/v1/edge-type/{edge_type_id}"): VOCABULARY,
-    ("POST", "/api/v1/edge-type"): VOCABULARY,
-    ("PATCH", "/api/v1/edge-type/{edge_type_id}"): VOCABULARY,
-    ("POST", "/api/v1/preset"): PRESETS,
-    ("GET", "/api/v1/preset"): PRESETS,
-    ("GET", "/api/v1/preset/export"): PRESETS,
-    ("POST", "/api/v1/preset/import"): PRESETS,
-    ("GET", "/api/v1/preset/{preset_id}"): PRESETS,
-    ("PATCH", "/api/v1/preset/{preset_id}"): PRESETS,
-    ("DELETE", "/api/v1/preset/{preset_id}"): PRESETS,
-    ("POST", "/api/v1/node"): CREATES_OWN,
-    ("POST", "/api/v1/collection"): CREATES_OWN,
+    ("GET", "/api/v1/node-types"): VOCABULARY,
+    ("GET", "/api/v1/node-types/{node_type_id}"): VOCABULARY,
+    ("POST", "/api/v1/node-types"): VOCABULARY,
+    ("PATCH", "/api/v1/node-types/{node_type_id}"): VOCABULARY,
+    ("GET", "/api/v1/edge-types"): VOCABULARY,
+    ("GET", "/api/v1/edge-types/{edge_type_id}"): VOCABULARY,
+    ("POST", "/api/v1/edge-types"): VOCABULARY,
+    ("PATCH", "/api/v1/edge-types/{edge_type_id}"): VOCABULARY,
+    ("POST", "/api/v1/presets"): PRESETS,
+    ("GET", "/api/v1/presets"): PRESETS,
+    ("GET", "/api/v1/presets/export"): PRESETS,
+    ("POST", "/api/v1/presets/import"): PRESETS,
+    ("GET", "/api/v1/presets/{preset_id}"): PRESETS,
+    ("PATCH", "/api/v1/presets/{preset_id}"): PRESETS,
+    ("DELETE", "/api/v1/presets/{preset_id}"): PRESETS,
+    ("POST", "/api/v1/nodes"): CREATES_OWN,
+    ("POST", "/api/v1/collections"): CREATES_OWN,
     ("POST", "/api/v1/tokens"): CREATES_OWN,
     ("GET", "/api/v1/tokens/grants"): OWN_SESSION,
     ("POST", "/api/v1/media"): CREATES_OWN,
@@ -480,7 +483,7 @@ def _no_installation(response: Response) -> str | None:
     return f"B sees installations of {shown}" if shown else None
 
 
-SPECIAL[("PUT", "/api/v1/example/{pack_id}/installation")] = _installed_for_b
+SPECIAL[("PUT", "/api/v1/examples/{pack_id}/installation")] = _installed_for_b
 
 
 def _not_installed_for_b(response: Response) -> str | None:
@@ -492,12 +495,12 @@ def _not_installed_for_b(response: Response) -> str | None:
     return f"expected 409 PackNotInstalledError, got {response.status_code}"
 
 
-SPECIAL[("GET", "/api/v1/example")] = _no_installation
-SPECIAL[("DELETE", "/api/v1/example/{pack_id}/installation")] = _not_installed_for_b
-ADMIN_PREFIXES = ("/api/v1/user", "/api/v1/session")
+SPECIAL[("GET", "/api/v1/examples")] = _no_installation
+SPECIAL[("DELETE", "/api/v1/examples/{pack_id}/installation")] = _not_installed_for_b
+ADMIN_PREFIXES = ("/api/v1/users", "/api/v1/sessions")
 # Setup the positive control needs because the seed already did the thing.
 POSITIVE_PREP: dict[Route, Callable[[World], None]] = {
-    ("PUT", "/api/v1/example/{pack_id}/installation"): lambda w: w.uninstall_pack(),
+    ("PUT", "/api/v1/examples/{pack_id}/installation"): lambda w: w.uninstall_pack(),
 }
 
 
@@ -717,11 +720,11 @@ class World:
         token = self._seed_token_owners()
         a = self.act_as(ALICE)
         film = _created(
-            a.post("/api/v1/node-type", json={"slug": "film", "label": "F"})
+            a.post("/api/v1/node-types", json={"slug": "film", "label": "F"})
         )
         item = _created(
             a.post(
-                "/api/v1/node",
+                "/api/v1/nodes",
                 json={
                     "name": "Xenomorph Alpha",
                     "type": "film",
@@ -740,10 +743,10 @@ class World:
                 },
             )
         )
-        item2 = _created(a.post("/api/v1/node", json={"name": "Ripley Beta"}))
+        item2 = _created(a.post("/api/v1/nodes", json={"name": "Ripley Beta"}))
         edge = _created(
             a.post(
-                "/api/v1/edge",
+                "/api/v1/edges",
                 json={
                     "source_id": item["id"],
                     "target_id": item2["id"],
@@ -753,21 +756,21 @@ class World:
         )
         # Unused, so the admin-only delete has something it may remove.
         edge_type = _created(
-            a.post("/api/v1/edge-type", json={"slug": "spare", "label": "Spare"})
+            a.post("/api/v1/edge-types", json={"slug": "spare", "label": "Spare"})
         )
         collection = _created(
-            a.post("/api/v1/collection", json={"name": "Alpha Collection"})
+            a.post("/api/v1/collections", json={"name": "Alpha Collection"})
         )
         assert (
             a.put(
-                f"/api/v1/collection/{collection['id']}/item",
+                f"/api/v1/collections/{collection['id']}/items",
                 json={"item_ids": [item["id"]]},
             ).status_code
             == 200
         )
         smart = _created(
             a.post(
-                "/api/v1/collection",
+                "/api/v1/collections",
                 json={"name": "Alpha Smart", "definition": SMART_DEFINITION},
             )
         )
@@ -789,7 +792,7 @@ class World:
                 "/api/v1/media", files={"file": ("staged.jpg", TINY_JPEG, "image/jpeg")}
             )
         )
-        installed = a.put(f"/api/v1/example/{PACK_ID}/installation")
+        installed = a.put(f"/api/v1/examples/{PACK_ID}/installation")
         assert installed.status_code == 200, installed.text
         return Seed(
             item=item["id"],
@@ -837,25 +840,25 @@ class World:
 
     def uninstall_pack(self) -> None:
         """Let A install the pack again."""
-        removed = self.act_as(ALICE).delete(f"/api/v1/example/{PACK_ID}/installation")
+        removed = self.act_as(ALICE).delete(f"/api/v1/examples/{PACK_ID}/installation")
         assert removed.status_code == 200, removed.text
 
     def snapshot(self, seed: Seed) -> dict[str, object]:
         """A's own view of all its content, to prove B's call changed nothing."""
         a = self.act_as(ALICE)
         urls = [
-            "/api/v1/node",
-            f"/api/v1/node/{seed.item}",
-            "/api/v1/edge",
-            f"/api/v1/edge/{seed.edge}",
-            "/api/v1/collection",
-            f"/api/v1/collection/{seed.collection}",
-            f"/api/v1/collection/{seed.smart}",
-            f"/api/v1/node?collection={seed.smart}",
-            f"/api/v1/media/for-node/{seed.item}",
+            "/api/v1/nodes",
+            f"/api/v1/nodes/{seed.item}",
+            "/api/v1/edges",
+            f"/api/v1/edges/{seed.edge}",
+            "/api/v1/collections",
+            f"/api/v1/collections/{seed.collection}",
+            f"/api/v1/collections/{seed.smart}",
+            f"/api/v1/nodes?collection={seed.smart}",
+            f"/api/v1/nodes/{seed.item}/media",
             f"/api/v1/media/{seed.asset}",
             f"/api/v1/media/{seed.staged}",
-            "/api/v1/example/entities",
+            "/api/v1/examples/entities",
         ]
         view: dict[str, object] = {}
         for url in urls:
@@ -955,21 +958,21 @@ STREAMS = ("/content", "/thumbnail")  # file streams send an ETag too
 # `collection` query). Its membership routes are a 409 even for A, so they are
 # checked in `test_user_b_cannot_edit_a_smart_collections_membership`.
 SMART_TOO: set[Route] = {
-    ("GET", "/api/v1/collection/{collection_id}"),
-    ("GET", "/api/v1/collection/{collection_id}/count"),
-    ("PATCH", "/api/v1/collection/{collection_id}"),
-    ("DELETE", "/api/v1/collection/{collection_id}"),
-    ("GET", "/api/v1/node"),
+    ("GET", "/api/v1/collections/{collection_id}"),
+    ("GET", "/api/v1/collections/{collection_id}/items/count"),
+    ("PATCH", "/api/v1/collections/{collection_id}"),
+    ("DELETE", "/api/v1/collections/{collection_id}"),
+    ("GET", "/api/v1/nodes"),
 }
 # Routes whose `collection_id` also accepts A's slug. Smart ones also run against
 # A's smart collection by slug (its membership routes are covered separately).
 SLUG_TOO: set[Route] = {
-    ("GET", "/api/v1/collection/{collection_id}"),
-    ("GET", "/api/v1/collection/{collection_id}/count"),
-    ("PATCH", "/api/v1/collection/{collection_id}"),
-    ("DELETE", "/api/v1/collection/{collection_id}"),
-    ("PUT", "/api/v1/collection/{collection_id}/item"),
-    ("DELETE", "/api/v1/collection/{collection_id}/item/{item_id}"),
+    ("GET", "/api/v1/collections/{collection_id}"),
+    ("GET", "/api/v1/collections/{collection_id}/items/count"),
+    ("PATCH", "/api/v1/collections/{collection_id}"),
+    ("DELETE", "/api/v1/collections/{collection_id}"),
+    ("PUT", "/api/v1/collections/{collection_id}/items"),
+    ("DELETE", "/api/v1/collections/{collection_id}/items/{item_id}"),
 }
 SMART_DEFINITION: dict[str, Any] = {
     "v": 1,
@@ -1036,8 +1039,8 @@ def _fill(
 
 # Where the generic value would match nothing of A's even for A.
 QUERY_OVERRIDES: dict[tuple[str, str], str] = {
-    ("/api/v1/collection", "q"): "alpha",  # collections match on their name
-    ("/api/v1/node-type/{node_type_id}/attribute/{key}/values", "q"): "R",
+    ("/api/v1/collections", "q"): "alpha",  # collections match on their name
+    ("/api/v1/node-types/{node_type_id}/attributes/{key}/values", "q"): "R",
 }
 
 
@@ -1138,27 +1141,27 @@ def _shape(response: Response) -> tuple[object, ...]:
 # Variants whose value cannot match anything of A's even for A, and why.
 EMPTY_FOR_A: dict[tuple[str, str], str] = {
     (
-        "/api/v1/node-type/{node_type_id}/attribute/{key}/usage",
+        "/api/v1/node-types/{node_type_id}/attributes/{key}/usage",
         "query:sub_key",
     ): "'rating' is a plain value, so no sub-key 'x' exists",
     (
-        "/api/v1/edge-type/{edge_type_id}/attribute/{key}/usage",
+        "/api/v1/edge-types/{edge_type_id}/attributes/{key}/usage",
         "query:sub_key",
     ): "the unused edge type has no attributes",
     (
-        "/api/v1/edge-type/{edge_type_id}/attribute/{key}/usage",
+        "/api/v1/edge-types/{edge_type_id}/attributes/{key}/usage",
         "query:value",
     ): "the unused edge type has no attributes",
     (
-        "/api/v1/node-type/{node_type_id}/attribute/{key}/usage",
+        "/api/v1/node-types/{node_type_id}/attributes/{key}/usage",
         "query:all",
     ): "value 'R' with sub-key 'x' matches no item",
     (
-        "/api/v1/edge-type/{edge_type_id}/attribute/{key}/usage",
+        "/api/v1/edge-types/{edge_type_id}/attributes/{key}/usage",
         "query:all",
     ): "the unused edge type has no attributes",
     (
-        "/api/v1/edge-type/{edge_type_id}/attribute/{key}/usage",
+        "/api/v1/edge-types/{edge_type_id}/attributes/{key}/usage",
         "bare",
     ): "the unused edge type has no attributes",
 }
@@ -1212,7 +1215,7 @@ def test_every_route_is_allow_listed_or_generated() -> None:
     # The walk sees routes mounted straight on the app as well as the v1 router.
     assert len(table) >= 70, f"the route walk found only {len(table)} routes"
     assert ("GET", "/api/health") in table
-    assert ("GET", "/api/v1/node/{node_id}") in table
+    assert ("GET", "/api/v1/nodes/{node_id}") in table
 
 
 def test_empty_and_query_override_entries_match_generated_cases() -> None:
@@ -1234,26 +1237,26 @@ def test_generated_cases_cover_the_content_routes() -> None:
     """Sanity: lists, search, filters, ETags and media streams are all generated."""
     ids = {c.id for c in CASES}
     for expected in (
-        "GET /api/v1/node [query:q]",
-        "GET /api/v1/node [query:collection]",
-        "GET /api/v1/node [smart]",
-        "GET /api/v1/collection/{collection_id} [smart]",
-        "GET /api/v1/collection/{collection_id}/count [bare]",
-        "GET /api/v1/collection/{collection_id}/count [smart]",
-        "GET /api/v1/collection/{collection_id} [smart-if-none-match]",
-        "GET /api/v1/collection/{collection_id} [slug]",
-        "GET /api/v1/collection/{collection_id} [smart-slug]",
-        "GET /api/v1/collection/{collection_id}/count [slug]",
-        "PATCH /api/v1/collection/{collection_id} [slug]",
-        "DELETE /api/v1/collection/{collection_id} [slug]",
-        "PUT /api/v1/collection/{collection_id}/item [slug]",
-        "DELETE /api/v1/collection/{collection_id}/item/{item_id} [slug]",
-        "PATCH /api/v1/collection/{collection_id} [smart-if-match]",
-        "GET /api/v1/node/{node_id} [if-none-match]",
-        "PATCH /api/v1/node/{node_id} [if-match]",
+        "GET /api/v1/nodes [query:q]",
+        "GET /api/v1/nodes [query:collection]",
+        "GET /api/v1/nodes [smart]",
+        "GET /api/v1/collections/{collection_id} [smart]",
+        "GET /api/v1/collections/{collection_id}/items/count [bare]",
+        "GET /api/v1/collections/{collection_id}/items/count [smart]",
+        "GET /api/v1/collections/{collection_id} [smart-if-none-match]",
+        "GET /api/v1/collections/{collection_id} [slug]",
+        "GET /api/v1/collections/{collection_id} [smart-slug]",
+        "GET /api/v1/collections/{collection_id}/items/count [slug]",
+        "PATCH /api/v1/collections/{collection_id} [slug]",
+        "DELETE /api/v1/collections/{collection_id} [slug]",
+        "PUT /api/v1/collections/{collection_id}/items [slug]",
+        "DELETE /api/v1/collections/{collection_id}/items/{item_id} [slug]",
+        "PATCH /api/v1/collections/{collection_id} [smart-if-match]",
+        "GET /api/v1/nodes/{node_id} [if-none-match]",
+        "PATCH /api/v1/nodes/{node_id} [if-match]",
         "GET /api/v1/media/{asset_id}/content [if-none-match]",
         "GET /api/v1/media/{asset_id}/thumbnail [bare]",
-        "GET /api/v1/example/entities [bare]",
+        "GET /api/v1/examples/entities [bare]",
     ):
         assert expected in ids
 
@@ -1335,9 +1338,9 @@ def test_user_a_succeeds_on_the_same_call(case: Case, world: World) -> None:
     "call",
     [
         lambda c, s: c.put(
-            f"/api/v1/collection/{s.smart}/item", json={"item_ids": [s.item2]}
+            f"/api/v1/collections/{s.smart}/items", json={"item_ids": [s.item2]}
         ),
-        lambda c, s: c.delete(f"/api/v1/collection/{s.smart}/item/{s.item}"),
+        lambda c, s: c.delete(f"/api/v1/collections/{s.smart}/items/{s.item}"),
     ],
     ids=["put", "delete"],
 )
@@ -1372,7 +1375,7 @@ def test_a_collection_condition_naming_a_foreign_collection_reads_like_an_unknow
         condition = {"kind": "collection", "mode": mode, "in": [collection_id]}
         definition = {"v": 1, "where": {"op": "and", "children": [condition]}}
         return bob.post(
-            "/api/v1/collection",
+            "/api/v1/collections",
             json={"name": f"Mine {mode}", "definition": definition},
         )
 
@@ -1383,5 +1386,5 @@ def test_a_collection_condition_naming_a_foreign_collection_reads_like_an_unknow
             assert mine.status_code == unknown.status_code == 201, mine.text
             assert mine.json()["warnings"] == unknown.json()["warnings"]
             assert mine.json()["warnings"], "the stale id is reported"
-            count = bob.get(f"/api/v1/collection/{mine.json()['id']}/count")
+            count = bob.get(f"/api/v1/collections/{mine.json()['id']}/items/count")
             assert count.json()["count"] == 0, count.text

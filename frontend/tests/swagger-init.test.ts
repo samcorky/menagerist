@@ -110,7 +110,7 @@ beforeAll(async () => {
 describe('swagger-init prepareRequest', () => {
 	it('sends same-origin credentials', () => {
 		const req = init.prepareRequest(
-			{ method: 'POST', url: `${ORIGIN}/api/v1/collection`, headers: {} },
+			{ method: 'POST', url: `${ORIGIN}/api/v1/collections`, headers: {} },
 			ORIGIN
 		);
 		expect(req.credentials).toBe('same-origin');
@@ -118,7 +118,7 @@ describe('swagger-init prepareRequest', () => {
 
 	it('adds the origin for the curl snippet and sends no CSRF header', () => {
 		const req = init.prepareRequest(
-			{ method: 'POST', url: `${ORIGIN}/api/v1/collection`, headers: { A: '1' } },
+			{ method: 'POST', url: `${ORIGIN}/api/v1/collections`, headers: { A: '1' } },
 			ORIGIN
 		);
 		expect(req.headers).toEqual({ A: '1', Origin: ORIGIN });
@@ -159,8 +159,8 @@ describe('swagger-init fetchJson', () => {
 describe('swagger-init session banner', () => {
 	it('recognises session-changing responses', () => {
 		expect(init.isSessionChange(`${ORIGIN}/api/v1/auth/login`, ORIGIN)).toBe(true);
-		expect(init.isSessionChange(`${ORIGIN}/api/v1/auth/password`, ORIGIN)).toBe(true);
-		expect(init.isSessionChange(`${ORIGIN}/api/v1/auth/me`, ORIGIN)).toBe(false);
+		expect(init.isSessionChange(`${ORIGIN}/api/v1/me/password`, ORIGIN)).toBe(true);
+		expect(init.isSessionChange(`${ORIGIN}/api/v1/me`, ORIGIN)).toBe(false);
 	});
 
 	const me = { display_name: 'Ada', role: 'admin', password_expired: false };
@@ -284,7 +284,7 @@ describe('swagger-init session banner', () => {
 					return reply(200, { permissions: ['a:b:c', 'd:e:f'] })();
 				});
 				expect(result).toEqual({ status: 'ok', count: 2 });
-				expect(seen?.url).toBe('/api/v1/auth/me/permissions');
+				expect(seen?.url).toBe('/api/v1/me/permissions');
 				expect(seen?.credentials).toBe('omit');
 				expect(seen?.auth).toBe('Bearer mnst_secret');
 				expect(seen?.url).not.toContain('mnst_secret');

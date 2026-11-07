@@ -278,6 +278,6 @@ test('signing out ends the session: the protected page asks you to sign in again
 	await page.reload();
 	await expect(page).toHaveURL(/\/login\?next=%2Fitems$/);
 
-	const res = await page.request.get('/api/v1/node');
+	const res = await page.request.get('/api/v1/nodes');
 	expect(res.status()).toBe(401);
 });

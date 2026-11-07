@@ -52,7 +52,7 @@ def app(postgres_url: str, postgres_sync_url: str) -> Iterator[FastAPI]:
 
 
 def _create_item(client: TestClient) -> str:
-    response = client.post("/api/v1/node", json={"name": "Alien"})
+    response = client.post("/api/v1/nodes", json={"name": "Alien"})
     assert response.status_code == 201, response.text
     created: dict[str, Any] = response.json()
     return str(created["id"])
@@ -70,16 +70,16 @@ def test_attaching_needs_a_visible_item_through_the_real_bridge(
         as_user(app, BOB)
         refused = client.post("/api/v1/media/attached", data=data, files={"file": PDF})
         assert refused.status_code == 404, refused.text
-        assert client.get(f"/api/v1/media/for-node/{item}").json() == []
+        assert client.get(f"/api/v1/nodes/{item}/media").json() == []
 
         as_user(app, ALICE)
         accepted = client.post("/api/v1/media/attached", data=data, files={"file": PDF})
         assert accepted.status_code == 201, accepted.text
         asset_id = accepted.json()["asset_id"]
-        listed = client.get(f"/api/v1/media/for-node/{item}").json()
+        listed = client.get(f"/api/v1/nodes/{item}/media").json()
         assert [row["id"] for row in listed] == [asset_id]
 
         as_user(app, BOB)
-        assert client.get(f"/api/v1/media/for-node/{item}").json() == []
+        assert client.get(f"/api/v1/nodes/{item}/media").json() == []
         assert client.get(f"/api/v1/media/{asset_id}").status_code == 404
         assert client.get(f"/api/v1/media/{asset_id}/content").status_code == 404

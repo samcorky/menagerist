@@ -693,7 +693,7 @@ class BrowserCheckResponse(BaseModel):
 # browser's headers is refused there with `csrf_failed`, before this runs. The
 # /api/v1 router applies it; the route repeats it so it holds if mounted elsewhere.
 @router.post(
-    "/browser-check",
+    "/browser",
     summary="Browser header check",
     operation_id="run_browser_check",
     dependencies=[Depends(verify_csrf)],

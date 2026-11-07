@@ -52,7 +52,7 @@ if TYPE_CHECKING:
 
     from fastapi import FastAPI
 
-BASE = "/api/v1/collection"
+BASE = "/api/v1/collections"
 ALICE = uuid.UUID(int=101)
 BOB = uuid.UUID(int=102)
 
@@ -102,8 +102,8 @@ def test_other_user_gets_404_on_every_collection_route(world: _World) -> None:
 
     assert bob.get(url).status_code == 404
     assert bob.patch(url, json={"name": "Mine"}).status_code == 404
-    assert bob.put(f"{url}/item", json={"item_ids": [str(item)]}).status_code == 404
-    assert bob.delete(f"{url}/item/{item}").status_code == 404
+    assert bob.put(f"{url}/items", json={"item_ids": [str(item)]}).status_code == 404
+    assert bob.delete(f"{url}/items/{item}").status_code == 404
     assert bob.delete(url).status_code == 404
     assert world.act_as(ALICE).get(url).json()["name"] == "Jazz"
 
@@ -138,7 +138,7 @@ def test_adding_an_item_of_someone_else_is_rejected(world: _World) -> None:
     world.items.add_owned(theirs, ALICE)
 
     response = world.act_as(BOB).put(
-        f"{BASE}/{shelf['id']}/item", json={"item_ids": [str(theirs)]}
+        f"{BASE}/{shelf['id']}/items", json={"item_ids": [str(theirs)]}
     )
 
     assert response.status_code == 400
@@ -152,10 +152,10 @@ def test_item_count_and_etag_use_the_visible_count(world: _World) -> None:
     mine = uuid.uuid7()
     world.items.add_owned(mine, ALICE)
     client = world.act_as(ALICE)
-    client.put(f"{url}/item", json={"item_ids": [str(mine)]})
+    client.put(f"{url}/items", json={"item_ids": [str(mine)]})
     hidden = uuid.uuid7()
     world.items.live.add(hidden)
-    client.put(f"{url}/item", json={"item_ids": [str(hidden)]})
+    client.put(f"{url}/items", json={"item_ids": [str(hidden)]})
     before = client.get(url)
     world.items.live.discard(hidden)
     world.items.add_owned(hidden, BOB)
@@ -191,9 +191,9 @@ def test_items_in_collection_filter_is_404_for_other_people(
     client = TestClient(app)
 
     as_user(app, ALICE)
-    assert client.get(f"/api/v1/node?collection={collection_id}").status_code == 200
+    assert client.get(f"/api/v1/nodes?collection={collection_id}").status_code == 200
     as_user(app, BOB)
-    assert client.get(f"/api/v1/node?collection={collection_id}").status_code == 404
+    assert client.get(f"/api/v1/nodes?collection={collection_id}").status_code == 404
 
 
 def test_other_users_slug_is_404_everywhere_and_never_resolves(world: _World) -> None:
@@ -210,8 +210,8 @@ def test_other_users_slug_is_404_everywhere_and_never_resolves(world: _World) ->
     bob.delete(url)
     assert bob.get(url).status_code == 404
     assert bob.patch(url, json={"name": "Mine"}).status_code == 404
-    assert bob.get(f"{url}/count").status_code == 404
-    assert bob.put(f"{url}/item", json={"item_ids": [str(item)]}).status_code == 404
-    assert bob.delete(f"{url}/item/{item}").status_code == 404
+    assert bob.get(f"{url}/items/count").status_code == 404
+    assert bob.put(f"{url}/items", json={"item_ids": [str(item)]}).status_code == 404
+    assert bob.delete(f"{url}/items/{item}").status_code == 404
     assert bob.delete(url).status_code == 404
     assert world.act_as(ALICE).get(url).json()["id"] == shelf["id"]

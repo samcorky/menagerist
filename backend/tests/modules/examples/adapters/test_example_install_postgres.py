@@ -157,23 +157,23 @@ def test_install_uninstall_and_reinstall_on_postgres(
     client: TestClient,
 ) -> None:
     """A pack installs, lists, removes cleanly and installs again on Postgres."""
-    first = client.put("/api/v1/example/demo/installation")
+    first = client.put("/api/v1/examples/demo/installation")
     assert first.status_code == 200, first.text
     assert first.json()["created"]["items"] == 2
     assert first.json()["adopted"]["items"] == 0
 
-    listed = client.get("/api/v1/example").json()
+    listed = client.get("/api/v1/examples").json()
     assert listed[0]["installation"]["status"] == "installed"
-    assert len(client.get("/api/v1/node-type").json()) == 1
+    assert len(client.get("/api/v1/node-types").json()) == 1
 
-    removed = client.delete("/api/v1/example/demo/installation")
+    removed = client.delete("/api/v1/examples/demo/installation")
     assert removed.status_code == 200, removed.text
     assert removed.json()["kept"] == []
-    assert client.get("/api/v1/node-type").json() == []
+    assert client.get("/api/v1/node-types").json() == []
 
-    again = client.put("/api/v1/example/demo/installation")
+    again = client.put("/api/v1/examples/demo/installation")
     assert again.status_code == 200, again.text
-    client.delete("/api/v1/example/demo/installation")
+    client.delete("/api/v1/examples/demo/installation")
 
 
 _CONTENT_TABLES = (
@@ -204,7 +204,7 @@ def test_uninstall_hard_deletes_everything_the_pack_created(
     client: TestClient, postgres_sync_url: str
 ) -> None:
     """No row of the pack is left in any table, and a reinstall is clean."""
-    assert client.put("/api/v1/example/demo/installation").status_code == 200
+    assert client.put("/api/v1/examples/demo/installation").status_code == 200
     installed = _row_counts(postgres_sync_url)
     assert installed == {
         "nodes": 2,
@@ -215,12 +215,12 @@ def test_uninstall_hard_deletes_everything_the_pack_created(
         "media_assets": 2,
     }
 
-    removed = client.delete("/api/v1/example/demo/installation")
+    removed = client.delete("/api/v1/examples/demo/installation")
 
     assert removed.status_code == 200, removed.text
     assert removed.json()["kept"] == []
     assert _row_counts(postgres_sync_url) == dict.fromkeys(_CONTENT_TABLES, 0)
-    assert client.put("/api/v1/example/demo/installation").status_code == 200
+    assert client.put("/api/v1/examples/demo/installation").status_code == 200
     assert _row_counts(postgres_sync_url) == installed
 
 
@@ -228,17 +228,17 @@ def test_a_kept_item_and_the_persons_own_collection_survive_a_purge(
     client: TestClient, postgres_sync_url: str
 ) -> None:
     """An item in the person's own collection is kept, with its membership."""
-    assert client.put("/api/v1/example/demo/installation").status_code == 200
-    items = {n["name"]: n for n in client.get("/api/v1/node?limit=100").json()}
-    mine = client.post("/api/v1/collection", json={"name": "Mine"})
+    assert client.put("/api/v1/examples/demo/installation").status_code == 200
+    items = {n["name"]: n for n in client.get("/api/v1/nodes?limit=100").json()}
+    mine = client.post("/api/v1/collections", json={"name": "Mine"})
     assert mine.status_code == 201, mine.text
     added = client.put(
-        f"/api/v1/collection/{mine.json()['id']}/item",
+        f"/api/v1/collections/{mine.json()['id']}/items",
         json={"item_ids": [items["A"]["id"]]},
     )
     assert added.status_code == 200, added.text
 
-    removed = client.delete("/api/v1/example/demo/installation").json()
+    removed = client.delete("/api/v1/examples/demo/installation").json()
 
     assert ("item", "A") in {(k["kind"], k["label"]) for k in removed["kept"]}
     counts = _row_counts(postgres_sync_url)
@@ -250,12 +250,12 @@ def test_an_export_after_install_and_uninstall_holds_no_deleted_rows(
     client: TestClient, postgres_url: str
 ) -> None:
     """Soft-deleted items and removed packs add nothing to the personal export."""
-    assert client.put("/api/v1/example/demo/installation").status_code == 200
-    assert client.delete("/api/v1/example/demo/installation").status_code == 200
-    created = client.post("/api/v1/node", json={"name": "Gone", "type": None})
+    assert client.put("/api/v1/examples/demo/installation").status_code == 200
+    assert client.delete("/api/v1/examples/demo/installation").status_code == 200
+    created = client.post("/api/v1/nodes", json={"name": "Gone", "type": None})
     assert created.status_code == 201, created.text
-    assert client.delete(f"/api/v1/node/{created.json()['id']}").status_code == 204
-    kept = client.post("/api/v1/node", json={"name": "Kept", "type": None})
+    assert client.delete(f"/api/v1/nodes/{created.json()['id']}").status_code == 204
+    kept = client.post("/api/v1/nodes", json={"name": "Kept", "type": None})
     assert kept.status_code == 201, kept.text
 
     async def export() -> dict[str, bytes]:
@@ -280,30 +280,30 @@ def test_an_export_after_install_and_uninstall_holds_no_deleted_rows(
 
 def test_reinstall_adopts_an_edited_item_on_postgres(client: TestClient) -> None:
     """A removal keeps an edited item and its type; the next install takes them back."""
-    assert client.put("/api/v1/example/demo/installation").status_code == 200
-    items = {n["name"]: n for n in client.get("/api/v1/node?limit=100").json()}
+    assert client.put("/api/v1/examples/demo/installation").status_code == 200
+    items = {n["name"]: n for n in client.get("/api/v1/nodes?limit=100").json()}
     patched = client.patch(
-        f"/api/v1/node/{items['A']['id']}",
+        f"/api/v1/nodes/{items['A']['id']}",
         json={"name": "Mine"},
     )
     assert patched.status_code == 200, patched.text
-    removed = client.delete("/api/v1/example/demo/installation").json()
+    removed = client.delete("/api/v1/examples/demo/installation").json()
     assert {(k["kind"], k["reason"]) for k in removed["kept"]} >= {
         ("item", "edited"),
         ("item_type", "still in use"),
     }
 
-    again = client.put("/api/v1/example/demo/installation")
+    again = client.put("/api/v1/examples/demo/installation")
 
     assert again.status_code == 200, again.text
     body = again.json()
     assert (body["adopted"]["items"], body["adopted"]["item_types"]) == (1, 1)
     assert (body["created"]["items"], body["created"]["item_types"]) == (1, 0)
-    names = sorted(n["name"] for n in client.get("/api/v1/node?limit=100").json())
+    names = sorted(n["name"] for n in client.get("/api/v1/nodes?limit=100").json())
     assert names == ["B", "Mine"]
-    assert len(client.get("/api/v1/node-type").json()) == 1
+    assert len(client.get("/api/v1/node-types").json()) == 1
     # Still protected: another removal keeps the edited item.
-    second = client.delete("/api/v1/example/demo/installation").json()
+    second = client.delete("/api/v1/examples/demo/installation").json()
     assert ("item", "A", "edited") in {
         (k["kind"], k["label"], k["reason"]) for k in second["kept"]
     }
@@ -313,18 +313,18 @@ def test_covers_are_attached_then_removed_without_leaving_media_behind(
     client: TestClient, postgres_sync_url: str, media_dir: Path
 ) -> None:
     """Two covered items: two assets, attachments and files (plus thumbnails)."""
-    assert client.put("/api/v1/example/demo/installation").status_code == 200
+    assert client.put("/api/v1/examples/demo/installation").status_code == 200
 
     assets, attachments, files = _media_state(postgres_sync_url, media_dir)
     assert (assets, attachments) == (2, 2)
     assert files >= 2  # the images, and a thumbnail beside each
-    items = client.get("/api/v1/node?limit=100").json()
+    items = client.get("/api/v1/nodes?limit=100").json()
     assert len(items) == 2
     for item in items:
-        media = client.get(f"/api/v1/media/for-node/{item['id']}").json()
+        media = client.get(f"/api/v1/nodes/{item['id']}/media").json()
         assert [m["attribute_key"] for m in media] == ["cover"]
 
-    removed = client.delete("/api/v1/example/demo/installation")
+    removed = client.delete("/api/v1/examples/demo/installation")
 
     assert removed.status_code == 200, removed.text
     assert removed.json()["kept"] == []
@@ -335,8 +335,8 @@ def test_a_replaced_cover_survives_removal_with_its_item(
     client: TestClient, postgres_sync_url: str, media_dir: Path
 ) -> None:
     """Swapping in the person's own image keeps that item, and only that item."""
-    assert client.put("/api/v1/example/demo/installation").status_code == 200
-    items = {n["name"]: n for n in client.get("/api/v1/node?limit=100").json()}
+    assert client.put("/api/v1/examples/demo/installation").status_code == 200
+    items = {n["name"]: n for n in client.get("/api/v1/nodes?limit=100").json()}
     target = {"target_type": "node", "target_id": items["A"]["id"]}
     mine = client.post(
         "/api/v1/media/attached",
@@ -349,17 +349,17 @@ def test_a_replaced_cover_survives_removal_with_its_item(
     )
     assert set_cover.status_code == 200, set_cover.text
 
-    removed = client.delete("/api/v1/example/demo/installation").json()
+    removed = client.delete("/api/v1/examples/demo/installation").json()
 
     assert ("item", "A", "has your connections, files or collections") in {
         (k["kind"], k["label"], k["reason"]) for k in removed["kept"]
     }
     assert all(k["kind"] != "cover" for k in removed["kept"])
-    assert [n["name"] for n in client.get("/api/v1/node?limit=100").json()] == ["A"]
+    assert [n["name"] for n in client.get("/api/v1/nodes?limit=100").json()] == ["A"]
     assets, attachments, _ = _media_state(postgres_sync_url, media_dir)
     assert (assets, attachments) == (2, 2)  # the pack's image stays beside theirs
 
-    again = client.put("/api/v1/example/demo/installation")
+    again = client.put("/api/v1/examples/demo/installation")
 
     assert again.status_code == 200, again.text
     assert again.json()["adopted"]["items"] == 1
@@ -368,9 +368,9 @@ def test_a_replaced_cover_survives_removal_with_its_item(
 
 def test_a_cover_for_a_non_latin1_item_name_can_be_fetched(client: TestClient) -> None:
     """The asset filename carries the name, and its headers must still encode."""
-    assert client.put("/api/v1/example/tune/installation").status_code == 200
-    [item] = client.get("/api/v1/node?limit=100").json()
-    [media] = client.get(f"/api/v1/media/for-node/{item['id']}").json()
+    assert client.put("/api/v1/examples/tune/installation").status_code == 200
+    [item] = client.get("/api/v1/nodes?limit=100").json()
+    [media] = client.get(f"/api/v1/nodes/{item['id']}/media").json()
     assert media["filename"] == "Łódź 🎵 (card).png"
 
     thumbnail = client.get(media["thumbnail_url"])
@@ -379,7 +379,7 @@ def test_a_cover_for_a_non_latin1_item_name_can_be_fetched(client: TestClient) -
     assert thumbnail.status_code == 200
     assert content.status_code == 200
     assert "filename*=UTF-8''" in thumbnail.headers["content-disposition"]
-    assert client.delete("/api/v1/example/tune/installation").status_code == 200
+    assert client.delete("/api/v1/examples/tune/installation").status_code == 200
 
 
 def test_a_failure_part_way_through_the_covers_leaves_no_media(
@@ -416,11 +416,11 @@ def test_a_failure_part_way_through_the_covers_leaves_no_media(
     app.dependency_overrides[get_cover_pack_target] = failing
 
     with pytest.raises(InstallFailedError, match="Nothing was left behind"):
-        client.put("/api/v1/example/demo/installation")
+        client.put("/api/v1/examples/demo/installation")
 
     assert _media_state(postgres_sync_url, media_dir) == (0, 0, 0)
-    assert client.get("/api/v1/node?limit=100").json() == []
-    assert client.get("/api/v1/node-type").json() == []
+    assert client.get("/api/v1/nodes?limit=100").json() == []
+    assert client.get("/api/v1/node-types").json() == []
 
 
 @pytest.fixture
@@ -479,33 +479,33 @@ def test_an_add_on_connects_to_its_base_and_blocks_its_removal(
 ) -> None:
     """The add-on needs the base, links to its item, and is removed first."""
     c = add_on_client
-    assert c.put("/api/v1/example/extra/installation").status_code == 409
-    assert c.put("/api/v1/example/base/installation").status_code == 200
+    assert c.put("/api/v1/examples/extra/installation").status_code == 409
+    assert c.put("/api/v1/examples/base/installation").status_code == 200
 
-    added = c.put("/api/v1/example/extra/installation")
+    added = c.put("/api/v1/examples/extra/installation")
 
     assert added.status_code == 200, added.text
     assert added.json()["created"]["items"] == 1
     assert added.json()["created"]["connections"] == 1
-    items = {n["name"]: n for n in c.get("/api/v1/node?limit=100").json()}
+    items = {n["name"]: n for n in c.get("/api/v1/nodes?limit=100").json()}
     assert set(items) == {"Base A", "Extra X"}
-    (edge,) = c.get("/api/v1/edge?limit=100").json()
+    (edge,) = c.get("/api/v1/edges?limit=100").json()
     assert (edge["source_id"], edge["target_id"]) == (
         items["Extra X"]["id"],
         items["Base A"]["id"],
     )
-    assert len(c.get("/api/v1/collection").json()) == 1
+    assert len(c.get("/api/v1/collections").json()) == 1
 
-    blocked = c.delete("/api/v1/example/base/installation")
+    blocked = c.delete("/api/v1/examples/base/installation")
     assert blocked.status_code == 409
     assert "Remove Extra first" in blocked.json()["detail"]
-    assert len(c.get("/api/v1/node?limit=100").json()) == 2
+    assert len(c.get("/api/v1/nodes?limit=100").json()) == 2
 
-    assert c.delete("/api/v1/example/extra/installation").status_code == 200
-    assert [n["name"] for n in c.get("/api/v1/node?limit=100").json()] == ["Base A"]
-    assert c.get("/api/v1/edge?limit=100").json() == []
-    assert c.delete("/api/v1/example/base/installation").status_code == 200
-    assert c.get("/api/v1/node?limit=100").json() == []
+    assert c.delete("/api/v1/examples/extra/installation").status_code == 200
+    assert [n["name"] for n in c.get("/api/v1/nodes?limit=100").json()] == ["Base A"]
+    assert c.get("/api/v1/edges?limit=100").json() == []
+    assert c.delete("/api/v1/examples/base/installation").status_code == 200
+    assert c.get("/api/v1/nodes?limit=100").json() == []
 
 
 _UNMADE = {
@@ -592,7 +592,7 @@ def smart_client(
 
 
 def _collections(c: TestClient) -> dict[str, Any]:
-    return {x["name"]: x for x in c.get("/api/v1/collection").json()}
+    return {x["name"]: x for x in c.get("/api/v1/collections").json()}
 
 
 def test_a_pack_smart_collection_is_validated_stored_and_counted_on_postgres(
@@ -601,7 +601,7 @@ def test_a_pack_smart_collection_is_validated_stored_and_counted_on_postgres(
     """Installed through the real checker, it is dynamic and matches the right items."""
     c = smart_client
 
-    first = c.put("/api/v1/example/smart/installation")
+    first = c.put("/api/v1/examples/smart/installation")
 
     assert first.status_code == 200, first.text
     assert first.json()["created"]["collections"] == 2
@@ -611,7 +611,7 @@ def test_a_pack_smart_collection_is_validated_stored_and_counted_on_postgres(
     assert (found["Unmade"]["item_count"], found["Unmade"]["warnings"]) == (2, [])
     assert found["Manual"]["kind"] == "manual"
     # A second install is refused and changes nothing.
-    assert c.put("/api/v1/example/smart/installation").status_code == 409
+    assert c.put("/api/v1/examples/smart/installation").status_code == 409
     assert len(_collections(c)) == 2
 
 
@@ -620,16 +620,16 @@ def test_a_pack_smart_collection_is_removed_and_comes_back_on_postgres(
 ) -> None:
     """Uninstall leaves no collection rows; reinstalling makes a fresh smart one."""
     c = smart_client
-    assert c.put("/api/v1/example/smart/installation").status_code == 200
+    assert c.put("/api/v1/examples/smart/installation").status_code == 200
     first_id = _collections(c)["Unmade"]["id"]
 
-    removed = c.delete("/api/v1/example/smart/installation")
+    removed = c.delete("/api/v1/examples/smart/installation")
 
     assert removed.status_code == 200, removed.text
     assert removed.json()["kept"] == []
     assert _collections(c) == {}
     assert _row_counts(postgres_sync_url)["collections"] == 0
-    assert c.put("/api/v1/example/smart/installation").status_code == 200
+    assert c.put("/api/v1/examples/smart/installation").status_code == 200
     again = _collections(c)["Unmade"]
     assert again["id"] != first_id
     assert again["item_count"] == 2
@@ -642,10 +642,10 @@ def test_a_refused_pack_definition_rolls_the_whole_install_back_on_postgres(
     c = smart_client
 
     with pytest.raises(InstallFailedError, match="Nothing was left behind"):
-        c.put("/api/v1/example/badsmart/installation")
+        c.put("/api/v1/examples/badsmart/installation")
 
-    assert c.get("/api/v1/node?limit=100").json() == []
-    assert c.get("/api/v1/node-type").json() == []
+    assert c.get("/api/v1/nodes?limit=100").json() == []
+    assert c.get("/api/v1/node-types").json() == []
     assert _collections(c) == {}
     assert _row_counts(postgres_sync_url)["collections"] == 0
 
@@ -675,17 +675,17 @@ def test_the_shipped_games_extras_add_on_end_to_end(
 ) -> None:
     """Extra board games needs Board games, links to it, and leaves nothing behind."""
     c = shipped_client
-    assert c.put("/api/v1/example/games-extras/installation").status_code == 409
-    assert c.put("/api/v1/example/games/installation").status_code == 200
+    assert c.put("/api/v1/examples/games-extras/installation").status_code == 409
+    assert c.put("/api/v1/examples/games/installation").status_code == 200
 
-    added = c.put("/api/v1/example/games-extras/installation")
+    added = c.put("/api/v1/examples/games-extras/installation")
 
     assert added.status_code == 200, added.text
     assert added.json()["created"]["items"] == 5
-    items = {n["name"]: n["id"] for n in c.get("/api/v1/node?limit=200").json()}
+    items = {n["name"]: n["id"] for n in c.get("/api/v1/nodes?limit=200").json()}
     edges = {
         (e["source_id"], e["target_id"]): e["type"]
-        for e in c.get("/api/v1/edge?limit=200").json()
+        for e in c.get("/api/v1/edges?limit=200").json()
     }
     assert (
         edges[(items["Lantern Harbour: The Night Fair"], items["Lantern Harbour"])]
@@ -695,14 +695,14 @@ def test_the_shipped_games_extras_add_on_end_to_end(
         edges[(items["Quillfeather Quarry"], items["Marrow Lane Press"])]
         == "games-published-by"
     )
-    blocked = c.delete("/api/v1/example/games/installation")
+    blocked = c.delete("/api/v1/examples/games/installation")
     assert blocked.status_code == 409
     assert "Remove Extra board games first" in blocked.json()["detail"]
 
-    assert c.delete("/api/v1/example/games-extras/installation").json()["kept"] == []
-    assert c.delete("/api/v1/example/games/installation").json()["kept"] == []
-    assert c.get("/api/v1/node?limit=200").json() == []
-    assert c.get("/api/v1/edge?limit=200").json() == []
+    assert c.delete("/api/v1/examples/games-extras/installation").json()["kept"] == []
+    assert c.delete("/api/v1/examples/games/installation").json()["kept"] == []
+    assert c.get("/api/v1/nodes?limit=200").json() == []
+    assert c.get("/api/v1/edges?limit=200").json() == []
     assert _media_state(postgres_sync_url, media_dir) == (0, 0, 0)
 
 
@@ -711,8 +711,8 @@ def test_the_shipped_smart_collections_match_the_pack_data_on_postgres(
 ) -> None:
     """Still to try and No poster yet count on Postgres as the pack data implies."""
     c = shipped_client
-    assert c.put("/api/v1/example/games/installation").status_code == 200
-    assert c.put("/api/v1/example/movies/installation").status_code == 200
+    assert c.put("/api/v1/examples/games/installation").status_code == 200
+    assert c.put("/api/v1/examples/movies/installation").status_code == 200
 
     found = _collections(c)
 
@@ -726,5 +726,5 @@ def test_the_shipped_smart_collections_match_the_pack_data_on_postgres(
     )
     assert found["Still to try"]["warnings"] == []
     assert found["No poster yet"]["warnings"] == []
-    assert c.delete("/api/v1/example/games/installation").json()["kept"] == []
-    assert c.delete("/api/v1/example/movies/installation").json()["kept"] == []
+    assert c.delete("/api/v1/examples/games/installation").json()["kept"] == []
+    assert c.delete("/api/v1/examples/movies/installation").json()["kept"] == []

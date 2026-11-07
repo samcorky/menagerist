@@ -9,7 +9,7 @@ const type = (n: number) => ({ id: `id-${n}`, slug: `type-${n}`, label: `Type ${
 const page = (from: number, count: number, next: boolean) => ({
 	data: Array.from({ length: count }, (_, i) => type(from + i)),
 	response: new Response(null, {
-		headers: next ? { link: '</api/v1/node-type?after=x>; rel="next"' } : {}
+		headers: next ? { link: '</api/v1/node-types?after=x>; rel="next"' } : {}
 	})
 });
 

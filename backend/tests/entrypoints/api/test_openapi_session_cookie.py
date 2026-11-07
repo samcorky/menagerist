@@ -10,7 +10,7 @@ _METHODS = ("get", "put", "post", "delete", "patch")
 DOCUMENTED = {
     ("post", "/api/v1/auth/setup", "201"),
     ("post", "/api/v1/auth/login", "200"),
-    ("post", "/api/v1/auth/password", "200"),
+    ("post", "/api/v1/me/password", "200"),
     ("post", "/api/v1/auth/logout", "204"),
 }
 

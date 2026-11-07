@@ -95,7 +95,7 @@ from app.modules.graph.domain.query import InvalidQueryError
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ValidationError
 
-router = APIRouter(prefix="/node", tags=["Nodes"], route_class=PermissionAwareRoute)
+router = APIRouter(prefix="/nodes", tags=["Nodes"], route_class=PermissionAwareRoute)
 
 
 def _viewer_state(favourite: bool) -> str:
@@ -268,7 +268,7 @@ async def count_node_searches(
 
 
 @router.get(
-    "/item-fields",
+    "/fields",
     response_model=list[ItemFieldResponse],
     operation_id="list_item_fields",
 )
@@ -497,7 +497,7 @@ async def update_node(
 
 
 @router.post(
-    "/{node_id}/attribute/{key}/promote",
+    "/{node_id}/attributes/{key}/promote",
     response_model=NodeResponse,
     operation_id="promote_extra_schema_field",
     responses={

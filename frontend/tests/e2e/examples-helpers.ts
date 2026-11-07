@@ -33,9 +33,9 @@ export function exampleData() {
 		await removeExamplePacks(request);
 		// Collections made here, including a kept example collection that was edited.
 		await owned.cleanUp(request);
-		const nodes = await request.get('/api/v1/node?limit=500');
+		const nodes = await request.get('/api/v1/nodes?limit=500');
 		for (const node of (await nodes.json()) as { id: string; name: string }[]) {
-			if (ownNames.includes(node.name)) await request.delete(`/api/v1/node/${node.id}`);
+			if (ownNames.includes(node.name)) await request.delete(`/api/v1/nodes/${node.id}`);
 		}
 		ownNames.length = 0;
 	}
@@ -60,7 +60,7 @@ export async function remove(page: Page, pack: RegExp) {
 	await page.goto('/settings/examples');
 	await page.getByRole('button', { name: new RegExp(`^Remove ${pack.source.slice(1)}`) }).click();
 	const done = page.waitForResponse(
-		(res) => res.request().method() === 'DELETE' && /\/api\/v1\/example\//.test(res.url()),
+		(res) => res.request().method() === 'DELETE' && /\/api\/v1\/examples\//.test(res.url()),
 		{ timeout: 60_000 }
 	);
 	const started = Date.now();
@@ -93,7 +93,7 @@ export type ApiNode = { id: string; name: string; type: string | null };
 export type ApiMedia = { id: string; filename: string; attribute_key: string | null };
 
 export async function nodesNamed(request: APIRequestContext, name: string): Promise<ApiNode[]> {
-	const nodes = (await (await request.get('/api/v1/node?limit=500')).json()) as ApiNode[];
+	const nodes = (await (await request.get('/api/v1/nodes?limit=500')).json()) as ApiNode[];
 	return nodes.filter((n) => n.name === name);
 }
 
@@ -104,7 +104,7 @@ export async function nodeNamed(request: APIRequestContext, name: string): Promi
 }
 
 export async function mediaOf(request: APIRequestContext, nodeId: string): Promise<ApiMedia[]> {
-	const res = await request.get(`/api/v1/media/for-node/${nodeId}`);
+	const res = await request.get(`/api/v1/nodes/${nodeId}/media`);
 	return res.ok() ? ((await res.json()) as ApiMedia[]) : [];
 }
 
@@ -130,12 +130,12 @@ export async function setOwnCover(request: APIRequestContext, nodeId: string) {
 }
 
 export async function installViaApi(request: APIRequestContext, pack: string) {
-	const res = await request.put(`/api/v1/example/${pack}/installation`);
+	const res = await request.put(`/api/v1/examples/${pack}/installation`);
 	expect(res.ok()).toBeTruthy();
 }
 
 export async function removeViaApi(request: APIRequestContext, pack: string) {
-	const res = await request.delete(`/api/v1/example/${pack}/installation`);
+	const res = await request.delete(`/api/v1/examples/${pack}/installation`);
 	expect(res.ok()).toBeTruthy();
 }
 
@@ -144,7 +144,7 @@ export const packCard = (page: Page, title: string) =>
 
 export async function installViaApiMany(request: APIRequestContext, packs: string[]) {
 	for (const pack of packs) {
-		const res = await request.put(`/api/v1/example/${pack}/installation`);
+		const res = await request.put(`/api/v1/examples/${pack}/installation`);
 		expect(res.ok(), await res.text()).toBeTruthy();
 	}
 }

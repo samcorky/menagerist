@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 pytestmark = pytest.mark.integration
 
 AUTH = "/api/v1/auth"
+ME = "/api/v1/me"
 
 
 @pytest.fixture
@@ -48,11 +49,11 @@ def test_setup_then_login_then_me(client: TestClient) -> None:
         },
     )
     assert setup.status_code == 201
-    assert client.get(f"{AUTH}/me").json()["username"] == "admin"
+    assert client.get(f"{ME}").json()["username"] == "admin"
     assert client.get(f"{AUTH}/status").json() == {"setup_required": False}
 
     assert client.post(f"{AUTH}/logout").status_code == 204
-    assert client.get(f"{AUTH}/me").status_code == 401
+    assert client.get(f"{ME}").status_code == 401
 
     wrong = client.post(
         f"{AUTH}/login", json={"username": "admin", "password": "wrong passphrase"}
@@ -62,7 +63,7 @@ def test_setup_then_login_then_me(client: TestClient) -> None:
         f"{AUTH}/login", json={"username": "ADMIN", "password": "a long passphrase"}
     )
     assert login.status_code == 200
-    me = client.get(f"{AUTH}/me")
+    me = client.get(f"{ME}")
     assert me.status_code == 200
     assert me.json()["role"] == "admin"
     again = client.post(

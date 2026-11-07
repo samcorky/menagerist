@@ -74,7 +74,7 @@ test('the dice button picks an icon and a colour, and a second press changes the
 
 test('an existing type can have its icon and colour cleared', async ({ page, request }) => {
 	const type = await makeItemType(request, uniqueName('Clearable'));
-	await request.patch(`/api/v1/node-type/${type.id}`, { data: { icon: 'music', colour: 'blue' } });
+	await request.patch(`/api/v1/node-types/${type.id}`, { data: { icon: 'music', colour: 'blue' } });
 	await page.goto('/settings/item-types');
 	await expect(marker(page, type.label)).toHaveAttribute('data-icon', 'music');
 

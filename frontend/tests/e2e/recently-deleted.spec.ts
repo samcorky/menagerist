@@ -12,13 +12,13 @@ const edgeTypeIds: string[] = [];
 
 test.afterEach(async ({ request }) => {
 	await cleanUp(request);
-	for (const id of edgeTypeIds.splice(0)) await request.delete(`/api/v1/edge-type/${id}`);
+	for (const id of edgeTypeIds.splice(0)) await request.delete(`/api/v1/edge-types/${id}`);
 });
 
 async function makeEdgeType(request: APIRequestContext, suffix: string) {
 	const slug = `deleted-link-${suffix}`.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 	const label = `Linked to ${suffix}`;
-	const res = await request.post('/api/v1/edge-type', {
+	const res = await request.post('/api/v1/edge-types', {
 		data: { slug, label, reverse_label: `Linked from ${suffix}`, directional: true }
 	});
 	expect(res.status(), await res.text()).toBe(201);
@@ -40,11 +40,11 @@ test('restores a deleted item with its connection', async ({ page, request }) =>
 	const edgeType = await makeEdgeType(request, suffix);
 	const item = await makeItem(request, `Deleted restore ${suffix}`);
 	const other = await makeItem(request, `Deleted partner ${suffix}`);
-	const edge = await request.post('/api/v1/edge', {
+	const edge = await request.post('/api/v1/edges', {
 		data: { source_id: item.id, target_id: other.id, type: edgeType.slug }
 	});
 	expect(edge.status(), await edge.text()).toBe(201);
-	expect((await request.delete(`/api/v1/node/${item.id}`)).status()).toBe(204);
+	expect((await request.delete(`/api/v1/nodes/${item.id}`)).status()).toBe(204);
 
 	await openRecentlyDeleted(page, 'Items');
 	const deleted = row(page, item.name);
@@ -59,7 +59,7 @@ test('restores a deleted item with its connection', async ({ page, request }) =>
 
 test('purges a deleted item for good', async ({ page, request }) => {
 	const item = await makeItem(request, uniqueName('Deleted purge'));
-	expect((await request.delete(`/api/v1/node/${item.id}`)).status()).toBe(204);
+	expect((await request.delete(`/api/v1/nodes/${item.id}`)).status()).toBe(204);
 
 	await openRecentlyDeleted(page, 'Items');
 	await row(page, item.name)
@@ -72,7 +72,7 @@ test('purges a deleted item for good', async ({ page, request }) => {
 	await dialog.getByRole('button', { name: 'Purge', exact: true }).click();
 	await expect(row(page, item.name)).toHaveCount(0);
 
-	expect((await request.get(`/api/v1/node/${item.id}`)).status()).toBe(404);
+	expect((await request.get(`/api/v1/nodes/${item.id}`)).status()).toBe(404);
 	await openRecentlyDeleted(page, 'Items');
 	await expect(page.getByRole('heading', { name: 'Recently deleted' })).toBeVisible();
 	await expect(row(page, item.name)).toHaveCount(0);
@@ -83,8 +83,8 @@ test('restores and purges collections', async ({ page, request }) => {
 	const gone = await makeCollection(request, uniqueName('Deleted gone'));
 	const member = await makeItem(request, uniqueName('Deleted member'));
 	await addToCollection(request, kept.id, [member.id]);
-	expect((await request.delete(`/api/v1/collection/${kept.id}`)).status()).toBe(204);
-	expect((await request.delete(`/api/v1/collection/${gone.id}`)).status()).toBe(204);
+	expect((await request.delete(`/api/v1/collections/${kept.id}`)).status()).toBe(204);
+	expect((await request.delete(`/api/v1/collections/${gone.id}`)).status()).toBe(204);
 
 	await openRecentlyDeleted(page, 'Collections');
 	await expect(row(page, kept.name)).toContainText('List');
@@ -102,7 +102,7 @@ test('restores and purges collections', async ({ page, request }) => {
 		.click();
 	await page.getByRole('dialog').getByRole('button', { name: 'Purge', exact: true }).click();
 	await expect(row(page, gone.name)).toHaveCount(0);
-	expect((await request.get(`/api/v1/collection/${gone.id}`)).status()).toBe(404);
+	expect((await request.get(`/api/v1/collections/${gone.id}`)).status()).toBe(404);
 	await openRecentlyDeleted(page, 'Collections');
 	await expect(page.getByRole('heading', { name: 'Recently deleted' })).toBeVisible();
 	await expect(row(page, gone.name)).toHaveCount(0);
@@ -111,8 +111,8 @@ test('restores and purges collections', async ({ page, request }) => {
 test('another account sees nothing of it', async ({ browser, request, workerBaseURL }) => {
 	const item = await makeItem(request, uniqueName('Deleted private'));
 	const collection = await makeCollection(request, uniqueName('Deleted private list'));
-	await request.delete(`/api/v1/node/${item.id}`);
-	await request.delete(`/api/v1/collection/${collection.id}`);
+	await request.delete(`/api/v1/nodes/${item.id}`);
+	await request.delete(`/api/v1/collections/${collection.id}`);
 
 	const user = await createUserViaApi(request, workerBaseURL, { prefix: 'deleted-b' });
 	const other = await asUser(browser, user);
@@ -123,8 +123,8 @@ test('another account sees nothing of it', async ({ browser, request, workerBase
 		await openRecentlyDeleted(other.page, 'Collections');
 		await expect(other.page.getByText('Nothing has been deleted.')).toBeVisible();
 		await expect(other.page.getByText(collection.name)).toHaveCount(0);
-		expect((await other.request.post(`/api/v1/node/${item.id}/restore`)).status()).toBe(404);
-		expect((await other.request.delete(`/api/v1/node/${item.id}/purge`)).status()).toBe(404);
+		expect((await other.request.post(`/api/v1/nodes/${item.id}/restore`)).status()).toBe(404);
+		expect((await other.request.delete(`/api/v1/nodes/${item.id}/purge`)).status()).toBe(404);
 	} finally {
 		await other.context.close();
 	}

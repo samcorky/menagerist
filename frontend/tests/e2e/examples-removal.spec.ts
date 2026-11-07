@@ -82,7 +82,7 @@ test('keeps an example item that has your own connection', async ({ page }) => {
 	await page.goto('/items');
 	await page.getByPlaceholder('Search your items…').fill('');
 	const firstExample = await page.request
-		.get('/api/v1/node?limit=500')
+		.get('/api/v1/nodes?limit=500')
 		.then((r) => r.json() as Promise<{ id: string; name: string; type: string | null }[]>)
 		.then((nodes) => nodes.find((n) => n.type?.startsWith('movies-')));
 	expect(firstExample).toBeTruthy();

@@ -47,7 +47,7 @@ class ProblemDetail(BaseModel):
                     "title": "ValidationError",
                     "status": 400,
                     "detail": "A value is not acceptable.",
-                    "instance": "https://menagerist.example/api/v1/node",
+                    "instance": "https://menagerist.example/api/v1/nodes",
                 }
             ]
         }

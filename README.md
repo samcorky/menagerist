@@ -95,7 +95,7 @@ Scripts and other tools can use Menagerist without your password through a perso
 Send it in a header:
 
 ```sh
-curl -H "Authorization: Bearer mnst_..." https://your-server/api/v1/auth/me/permissions
+curl -H "Authorization: Bearer mnst_..." https://your-server/api/v1/me/permissions
 ```
 
 A token carries only the permissions you give it, never more than you hold, and stops working when it expires or you revoke it. Use **Regenerate** for a new token with the same name and access. Changing or resetting your password removes all your tokens. A token cannot manage tokens or your account, and it cannot export or import your data. The interactive docs at `/api/docs` accept a token through Authorize. Operators can tune the limits; see the `MENAGERIST_IDENTITY_API_TOKEN_*` variables in the [settings reference](docs/settings.md#identity).

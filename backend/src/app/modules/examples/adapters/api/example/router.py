@@ -41,7 +41,7 @@ from app.modules.examples.domain.errors import (
 from app.shared_kernel.actor import Actor
 
 router = APIRouter(
-    prefix="/example", tags=["Examples"], route_class=PermissionAwareRoute
+    prefix="/examples", tags=["Examples"], route_class=PermissionAwareRoute
 )
 
 _NOT_FOUND = error_response(PackNotFoundError, detail="Example pack 'vinyl' not found")

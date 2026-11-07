@@ -8,7 +8,7 @@ from starlette.testclient import TestClient
 from app.entrypoints.api import create_app
 from app.platform.config import get_scheduler_settings
 
-URL = "/api/v1/scheduling/schedule-preview"
+URL = "/api/v1/scheduling/preview"
 
 type AsUser = Callable[..., None]
 
