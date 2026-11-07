@@ -26,6 +26,7 @@ from app.entrypoints.cli.backups import (
 from app.entrypoints.cli.data import data_app
 from app.entrypoints.cli.scheduling import (
     check_worker_health_cli,
+    default_worker_identity_file,
     list_jobs_cli,
     run_job_cli,
     run_worker_cli,
@@ -50,6 +51,7 @@ from app.modules.scheduling.adapters.cli.job_app import (
 from app.platform.app_info import load_app_info
 from app.platform.cli_output import (
     RESULT_ACTION,
+    SHELL_RESULT_ACTION,
     OutputFormat,
     Report,
     resolved_format,
@@ -169,11 +171,17 @@ def worker_health(*, identity_file: Path | None = None) -> Report:
             value={"message": "Worker is healthy.", "healthy": True},
             title="Worker health",
         )
+    if (identity_file or default_worker_identity_file()).exists():
+        message = "Worker is unhealthy: no recent heartbeat for this process."
+    else:
+        message = " ".join(
+            (
+                "Worker is unhealthy: no worker has started in this container.",
+                "Run this in the worker container; the API is checked over HTTP.",
+            )
+        )
     return Report(
-        value={
-            "message": "Worker is unhealthy: no recent heartbeat for this process.",
-            "healthy": False,
-        },
+        value={"message": message, "healthy": False},
         title="Worker health",
         exit_code=1,
     )
@@ -245,7 +253,7 @@ def shell() -> None:
     if resolved_format() is OutputFormat.RICH:
         Console().print(_banner())
     app.interactive_shell(
-        prompt=f"{app_info.name}> ", intro="", result_action=RESULT_ACTION
+        prompt=f"{app_info.name}> ", intro="", result_action=SHELL_RESULT_ACTION
     )
 
 

@@ -36,6 +36,38 @@ def test_worker_health_command_reports_status_and_exit_code(
         assert "unhealthy" in capsys.readouterr().out
 
 
+def test_unhealthy_without_a_worker_identity_says_no_worker_started(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Run in the API container, the answer is "no worker here", not a stale beat."""
+    monkeypatch.setattr(cli, "check_worker_health_cli", AsyncMock(return_value=False))
+
+    with pytest.raises(SystemExit, match="1"):
+        cli.app(["worker-health", "--identity-file", str(tmp_path / "missing")])
+
+    out = capsys.readouterr().out
+    assert "no worker has started in this container" in out
+    assert "heartbeat" not in out
+
+
+def test_unhealthy_with_a_worker_identity_blames_the_heartbeat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A worker that started but stopped beating still reports the heartbeat."""
+    identity = tmp_path / "worker-id"
+    identity.write_text("worker-1", encoding="utf-8")
+    monkeypatch.setattr(cli, "check_worker_health_cli", AsyncMock(return_value=False))
+
+    with pytest.raises(SystemExit, match="1"):
+        cli.app(["worker-health", "--identity-file", str(identity)])
+
+    assert "no recent heartbeat" in capsys.readouterr().out
+
+
 def test_worker_health_output_stays_free_of_asyncio_debug_logs(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
