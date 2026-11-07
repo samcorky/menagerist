@@ -2,14 +2,17 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="shortcut icon" href="$favicon_url">
 <title>$title</title>
 <style>
 body { margin: 0; padding: 0; }
+.menagerist-back { display: flex; align-items: center; min-height: 44px; padding: env(safe-area-inset-top) 16px 0; font: 14px system-ui, sans-serif; }
+.menagerist-back a { color: #333; text-decoration: none; }
 </style>
 </head>
 <body>
+<nav class="menagerist-back"><a href="/">&larr; Back to Menagerist</a></nav>
 <noscript>ReDoc requires JavaScript to function. Please enable it to browse the documentation.</noscript>
 <redoc spec-url="$openapi_url"></redoc>
 <script src="$redoc_js_url"

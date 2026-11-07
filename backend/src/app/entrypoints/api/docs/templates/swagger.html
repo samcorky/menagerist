@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link
       type="text/css"
       rel="stylesheet"
@@ -13,6 +13,19 @@
     <link rel="shortcut icon" href="$favicon_url" />
     <title>$title</title>
     <style>
+      .menagerist-back {
+        display: flex;
+        align-items: center;
+        min-height: 44px;
+        padding: 0 16px;
+        padding-top: env(safe-area-inset-top);
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+      .menagerist-back a {
+        color: #3b4151;
+        text-decoration: none;
+      }
       /* Browsers cannot set a Cookie header, so swagger-init.js hides the cookie scheme's block in the Authorize dialog
    and adds a Browser session block above the bearer token block. The page-level status goes into the scheme bar. */
       .swagger-ui .menagerist-session {
@@ -124,6 +137,7 @@
     </style>
   </head>
   <body>
+    <nav class="menagerist-back"><a href="/">&larr; Back to Menagerist</a></nav>
     <div id="swagger-ui"></div>
     <script
       src="$swagger_js_url"
