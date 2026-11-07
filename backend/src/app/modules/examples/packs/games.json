@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 6,
+  "version": 7,
   "id": "games",
   "relationship_types": [
     {
@@ -70,6 +70,8 @@
     {
       "ref": "game",
       "slug": "games-game",
+      "icon": "dices",
+      "colour": "green",
       "label": "Game",
       "description": "A board game on the shelf or on the wishlist, with how it plays and what state it is in.",
       "cover": {
@@ -266,6 +268,8 @@
     {
       "ref": "publisher",
       "slug": "games-publisher",
+      "icon": "briefcase",
+      "colour": "gray",
       "label": "Publisher",
       "description": "A company that publishes board games.",
       "attributes_schema": {
@@ -312,6 +316,8 @@
     {
       "ref": "person",
       "slug": "games-person",
+      "icon": "user",
+      "colour": "blue",
       "label": "Person",
       "description": "A game designer, or a friend you play with.",
       "attributes_schema": {
@@ -351,6 +357,8 @@
     {
       "ref": "night",
       "slug": "games-night",
+      "icon": "users",
+      "colour": "teal",
       "label": "Game night",
       "description": "An evening of playing games together.",
       "attributes_schema": {

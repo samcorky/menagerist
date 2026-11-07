@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 5,
+  "version": 7,
   "id": "music",
   "presets": [
     {
@@ -170,6 +170,8 @@
     {
       "ref": "record",
       "slug": "music-record",
+      "icon": "disc-3",
+      "colour": "violet",
       "label": "Record",
       "description": "A record in the collection, with how it was pressed, how it plays and what it cost.",
       "cover": {
@@ -295,6 +297,8 @@
     {
       "ref": "artist",
       "slug": "music-artist",
+      "icon": "mic",
+      "colour": "pink",
       "label": "Artist",
       "description": "A band or solo performer.",
       "attributes_schema": {
@@ -342,6 +346,8 @@
     {
       "ref": "gig",
       "slug": "music-gig",
+      "icon": "ticket",
+      "colour": "teal",
       "label": "Gig",
       "description": "A night out to see an artist play live.",
       "attributes_schema": {
@@ -404,6 +410,8 @@
     {
       "ref": "venue",
       "slug": "music-venue",
+      "icon": "house",
+      "colour": "amber",
       "label": "Venue",
       "description": "A place that hosts gigs.",
       "attributes_schema": {
@@ -450,6 +458,8 @@
     {
       "ref": "person",
       "slug": "music-person",
+      "icon": "user",
+      "colour": "blue",
       "label": "Person",
       "description": "A friend, or a member of a band."
     }

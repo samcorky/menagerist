@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 6,
+  "version": 7,
   "id": "movies",
   "relationship_types": [
     {
@@ -95,6 +95,8 @@
     {
       "ref": "film",
       "slug": "movies-film",
+      "icon": "film",
+      "colour": "red",
       "label": "Film",
       "description": "A film you have watched or want to remember.",
       "cover": {
@@ -190,12 +192,16 @@
     {
       "ref": "person",
       "slug": "movies-person",
+      "icon": "user",
+      "colour": "blue",
       "label": "Person",
       "description": "A director, an actor or a friend to watch with."
     },
     {
       "ref": "place",
       "slug": "movies-place",
+      "icon": "globe",
+      "colour": "green",
       "label": "Place",
       "description": "Somewhere you watch films, or collect their posters.",
       "attributes_schema": {
@@ -231,6 +237,8 @@
     {
       "ref": "viewing",
       "slug": "movies-viewing",
+      "icon": "popcorn",
+      "colour": "orange",
       "label": "Viewing",
       "description": "One occasion of watching a film, and how it went.",
       "attributes_schema": {
@@ -293,6 +301,8 @@
     {
       "ref": "memorabilia",
       "slug": "movies-memorabilia",
+      "icon": "star",
+      "colour": "violet",
       "label": "Memorabilia",
       "description": "A poster, ticket stub or programme from the collection.",
       "attributes_schema": {

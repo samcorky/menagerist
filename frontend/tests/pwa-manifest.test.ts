@@ -18,6 +18,13 @@ const manifest = JSON.parse(readFileSync(STATIC + 'manifest.webmanifest', 'utf8'
 	theme_color: string;
 	background_color: string;
 	icons: Icon[];
+	orientation: string;
+	lang: string;
+	dir: string;
+	categories: string[];
+	display_override: string[];
+	shortcuts: { name: string; url: string }[];
+	screenshots: (Icon & { form_factor: string; label: string })[];
 };
 
 /** Width and height from a PNG's IHDR chunk. */
@@ -59,6 +66,30 @@ describe('web app manifest', () => {
 		expect(manifest.icons.some((i) => i.purpose === 'maskable' && i.sizes === '512x512')).toBe(
 			true
 		);
+	});
+
+	it('describes the app for install prompts and app stores', () => {
+		expect(manifest.orientation).toBe('any');
+		expect(manifest.lang).toBe('en-GB');
+		expect(manifest.dir).toBe('ltr');
+		expect(manifest.categories.length).toBeGreaterThan(0);
+		expect(manifest.display_override[0]).toBe(manifest.display);
+	});
+
+	it('offers shortcuts that point at real routes', () => {
+		expect(manifest.shortcuts.map((s) => s.url)).toEqual(['/items/new', '/items', '/collections']);
+		for (const { url } of manifest.shortcuts) expect(url.startsWith(manifest.scope)).toBe(true);
+	});
+
+	it('ships a narrow and a wide screenshot that exist and are the size they claim', () => {
+		expect(manifest.screenshots.map((s) => s.form_factor).sort()).toEqual(['narrow', 'wide']);
+		for (const shot of manifest.screenshots) {
+			const file = STATIC + shot.src.replace(/^\//, '');
+			expect(existsSync(file), `${shot.src} exists`).toBe(true);
+			expect(shot.type).toBe('image/png');
+			expect(pngSize(file), shot.src).toBe(shot.sizes);
+			expect(shot.label.length).toBeGreaterThan(0);
+		}
 	});
 });
 
