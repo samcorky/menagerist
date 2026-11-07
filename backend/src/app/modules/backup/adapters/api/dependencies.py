@@ -8,6 +8,7 @@ from app.entrypoints.api.shared.backup_dependencies import (
     get_media_files,
     get_setup_gate,
 )
+from app.entrypoints.api.shared.progress import make_reporter
 from app.entrypoints.api.shared.settings_reader import get_settings_reader
 from app.modules.backup.adapters.persistence.database_restorer import (
     SqlAlchemyDatabaseRestorer,
@@ -21,8 +22,10 @@ from app.modules.backup.adapters.storage.local_backup_store import (
 from app.modules.backup.adapters.storage.local_backup_workspace import (
     LocalBackupWorkspace,
 )
+from app.modules.backup.adapters.storage.local_progress_store import LocalProgressStore
 from app.modules.backup.application.create_backup import CreateBackup
 from app.modules.backup.application.delete_backup import DeleteBackup
+from app.modules.backup.application.get_restore_progress import GetRestoreProgress
 from app.modules.backup.application.list_backups import ListBackups
 from app.modules.backup.application.open_backup import OpenBackup
 from app.modules.backup.application.prune_backups import PruneBackups
@@ -35,6 +38,7 @@ from app.modules.backup.ports.backup_workspace import BackupWorkspace
 from app.modules.backup.ports.database_restorer import DatabaseRestorer
 from app.modules.backup.ports.database_snapshot import DatabaseSnapshot
 from app.modules.backup.ports.media_files import MediaFiles
+from app.modules.backup.ports.progress_store import ProgressStore
 from app.modules.backup.ports.setup_gate import SetupGate
 from app.platform.app_info import load_app_info
 from app.platform.config.backup import get_backup_settings
@@ -46,6 +50,11 @@ from app.shared_kernel.settings import SettingsReader
 def get_backup_store() -> BackupStore:
     """Use the configured volume for committed instance archives."""
     return LocalDirectoryBackupStore(get_backup_settings().path)
+
+
+def get_restore_progress_store() -> ProgressStore:
+    """Keep restore progress on the backup volume, outside the replaced database."""
+    return LocalProgressStore(get_backup_settings().path, "restore")
 
 
 def get_backup_workspace() -> BackupWorkspace:
@@ -144,6 +153,7 @@ def get_restore_on_first_run(
     media: Annotated[MediaFiles, Depends(get_media_files)],
     workspace: Annotated[BackupWorkspace, Depends(get_backup_workspace)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    progress_store: Annotated[ProgressStore, Depends(get_restore_progress_store)],
 ) -> RestoreOnFirstRun:
     """Compose anonymous restoration behind the existing identity setup gate."""
     return RestoreOnFirstRun(
@@ -154,4 +164,13 @@ def get_restore_on_first_run(
         workspace,
         guard,
         max_upload_size=get_backup_settings().max_upload_size,
+        progress=make_reporter(progress_store),
     )
+
+
+def get_restore_progress(
+    store: Annotated[ProgressStore, Depends(get_restore_progress_store)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> GetRestoreProgress:
+    """Compose the first-run page's view of the restore."""
+    return GetRestoreProgress(store, guard)

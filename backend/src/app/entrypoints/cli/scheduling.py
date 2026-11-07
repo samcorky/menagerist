@@ -58,6 +58,9 @@ from app.modules.scheduling.application.maintain_worker import (
     MaintainWorker,
     MaintainWorkerCommand,
 )
+from app.modules.scheduling.application.record_job_run_progress import (
+    RecordJobRunProgress,
+)
 from app.modules.scheduling.application.run_job_now import RunJobNow, RunJobNowCommand
 from app.modules.scheduling.application.tick_schedules import TickSchedules
 from app.modules.scheduling.domain.job_run import RunStatus
@@ -176,6 +179,9 @@ def build_job_executor(
             catalogue.registry, source, CronScheduleEvaluator(), guard
         ),
         timezone=get_scheduler_settings().timezone.key,
+        record_progress=lambda: RecordJobRunProgress(
+            create_scheduling_uow(factory), guard
+        ),
     )
 
 

@@ -15,15 +15,21 @@ from app.modules.backup.domain.verification import (
 )
 from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import UseCase
+from app.shared_kernel.progress import NULL_PROGRESS, Phase
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from app.modules.backup.ports.archive_member import ArchiveMember
     from app.modules.backup.ports.backup_reader import BackupReader
     from app.modules.backup.ports.backup_store import BackupStore
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.progress import ProgressReporter
 
 _METADATA_LIMIT = 16 * 1024 * 1024
+
+VERIFY_PLAN = (Phase(key="verify", label="Checking every file", unit="bytes"),)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -33,7 +39,25 @@ class VerifyBackupQuery:
     backup_id: UUID
 
 
-async def _read_member(member: ArchiveMember) -> tuple[MemberDigest, bytes | None]:
+class CompressedMeter:
+    """Advances a reporter by the compressed bytes a reader has consumed."""
+
+    def __init__(self, reader: BackupReader, progress: ProgressReporter) -> None:
+        self._reader = reader
+        self._progress = progress
+        self._reported = 0
+
+    async def tick(self) -> None:
+        """Report whatever the reader has consumed since the last tick."""
+        position = self._reader.compressed_read()
+        if position > self._reported:
+            await self._progress.advance(position - self._reported)
+            self._reported = position
+
+
+async def _read_member(
+    member: ArchiveMember, tick: Callable[[], Awaitable[None]]
+) -> tuple[MemberDigest, bytes | None]:
     digest = hashlib.sha256()
     size = lines = 0
     collected = bytearray()
@@ -42,6 +66,7 @@ async def _read_member(member: ArchiveMember) -> tuple[MemberDigest, bytes | Non
         digest.update(chunk)
         size += len(chunk)
         lines += chunk.count(b"\n")
+        await tick()
         if is_metadata:
             if size > _METADATA_LIMIT:
                 raise CorruptBackupError("Backup integrity metadata exceeds 16 MiB.")
@@ -52,15 +77,17 @@ async def _read_member(member: ArchiveMember) -> tuple[MemberDigest, bytes | Non
 
 
 async def _scan(
-    reader: BackupReader,
+    reader: BackupReader, progress: ProgressReporter = NULL_PROGRESS
 ) -> tuple[dict[str, MemberDigest], dict[str, bytes], list[Finding]]:
+    """Read every member once, advancing `progress` by compressed bytes consumed."""
     digests: dict[str, MemberDigest] = {}
     metadata: dict[str, bytes] = {}
     findings: list[Finding] = []
+    meter = CompressedMeter(reader, progress)
     try:
         async with aclosing(reader.members()) as members:
             async for member in members:
-                digest, data = await _read_member(member)
+                digest, data = await _read_member(member, meter.tick)
                 if member.name in digests:
                     findings.append(
                         Finding(
@@ -78,13 +105,20 @@ async def _scan(
                 kind=FindingKind.MANIFEST_INVALID, member="archive", actual=str(exc)
             )
         )
+    await meter.tick()  # the gzip trailer is read after the last member
     return digests, metadata, findings
 
 
-async def verify_archive(store: BackupStore, backup_id: UUID) -> VerificationReport:
-    """Read compressed bytes once, checking every member and the digest sidecar."""
+async def verify_archive(
+    store: BackupStore, backup_id: UUID, progress: ProgressReporter = NULL_PROGRESS
+) -> VerificationReport:
+    """Read compressed bytes once, checking every member and the digest sidecar.
+
+    `progress` advances by compressed bytes; the caller starts the phase and sets
+    its total (the archive size, once per pass).
+    """
     reader = await store.open(backup_id)
-    digests, metadata, findings = await _scan(reader)
+    digests, metadata, findings = await _scan(reader, progress)
     report = analyse_members(
         digests, metadata.get("manifest.json"), metadata.get("checksums.sha256")
     )
@@ -118,11 +152,23 @@ class VerifyBackup(UseCase[VerifyBackupQuery, VerificationReport]):
 
     access: ClassVar[Access] = Requires(BackupPermission.READ)
 
-    def __init__(self, store: BackupStore, guard: AccessGuard) -> None:
+    def __init__(
+        self,
+        store: BackupStore,
+        guard: AccessGuard,
+        progress: ProgressReporter | None = None,
+    ) -> None:
         self._guard = guard
         self._store = store
+        self._progress = progress or NULL_PROGRESS
 
     async def _handle(
         self, request: VerifyBackupQuery, actor: Actor
     ) -> VerificationReport:
-        return await verify_archive(self._store, request.backup_id)
+        await self._progress.begin(VERIFY_PLAN)
+        await self._progress.start(
+            "verify", await self._store.archive_size(request.backup_id)
+        )
+        report = await verify_archive(self._store, request.backup_id, self._progress)
+        await self._progress.done()
+        return report

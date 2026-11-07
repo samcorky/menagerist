@@ -134,9 +134,9 @@ use_backup_access_guard(get_access_guard())
 use_backup_settings_reader(get_settings_reader)
 
 use_operations(
-    lambda label: create_backup(label=label),
-    lambda backup_id, replace, guard: restore_backup(
-        backup_id, replace=replace, guard=guard
+    lambda label, progress: create_backup(label=label, progress=progress),
+    lambda backup_id, replace, guard, progress: restore_backup(
+        backup_id, replace=replace, guard=guard, progress=progress
     ),
 )
 use_user_operations(export_user_data, import_user_data)

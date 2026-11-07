@@ -5,7 +5,13 @@ import pytest
 from rich.console import Console
 
 from app.platform import cli_progress
-from app.platform.cli_progress import activity, byte_progress, confirm, interactive
+from app.platform.cli_progress import (
+    activity,
+    byte_progress,
+    confirm,
+    interactive,
+    overall_bar,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -110,3 +116,23 @@ def test_the_callable_type_is_usable() -> None:
     with byte_progress("x", 1) as advance:
         typed: Callable[[int], None] = advance
         typed(1)
+
+
+# --- overall bar -----------------------------------------------------------------
+
+
+def test_no_overall_bar_without_a_terminal() -> None:
+    """Pipes, cron and tests get None, so nothing is drawn."""
+    with overall_bar() as update:
+        assert update is None
+
+
+def test_the_overall_bar_shows_percentage_and_description(
+    terminal: io.StringIO,
+) -> None:
+    """Updating moves the bar and rewrites the line beside it."""
+    with overall_bar() as update:
+        assert update is not None
+        update(62, "Restoring photos")
+    assert "Restoring photos" in terminal.getvalue()
+    assert "62%" in terminal.getvalue()

@@ -1,20 +1,26 @@
 """`@job` attaches a job's policy to its handler; `from_handlers` reads it back."""
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.errors import ValidationError
 from app.shared_kernel.jobs import JobContribution, JobDefinition, job
+from app.shared_kernel.progress import NULL_PROGRESS
+
+if TYPE_CHECKING:
+    from app.shared_kernel.progress import ProgressReporter
 
 DEFINITION = JobDefinition(job_key="demo.tidy", title="Tidy", description="Tidies.")
 
 
 @job(DEFINITION)
-async def tidy(actor: Actor) -> None:
+async def tidy(actor: Actor, progress: ProgressReporter = NULL_PROGRESS) -> None:
     """A decorated handler."""
 
 
-async def undecorated(actor: Actor) -> None:
+async def undecorated(actor: Actor, progress: ProgressReporter) -> None:
     """A handler that forgot `@job`."""
 
 

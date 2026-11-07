@@ -22782,6 +22782,68 @@
         }
       }
     },
+    "/api/v1/backups/restore/progress": {
+      "get": {
+        "tags": [
+          "v1",
+          "Backups"
+        ],
+        "summary": "Get Restore Progress Snapshot",
+        "description": "Report how the current or most recent restore is getting on.",
+        "operationId": "get_restore_progress",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressSnapshotResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No restore has reported progress in the last few minutes.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RestoreProgressNotFoundError",
+                  "status": 404,
+                  "detail": "No restore is in progress.",
+                  "instance": "https://menagerist.example/api/v1/backups/restore/progress"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Unhandled error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/backups/restore/progress"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/system/version": {
       "get": {
         "tags": [
@@ -25382,6 +25444,17 @@
             ],
             "title": "Requested By",
             "description": "The administrator who ran it, when run by hand."
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProgressSnapshotResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How far a running job has got, or where a failed one stopped. Empty once a run has succeeded."
           }
         },
         "type": "object",
@@ -26243,6 +26316,14 @@
           }
         ]
       },
+      "Outcome": {
+        "type": "string",
+        "enum": [
+          "running",
+          "succeeded",
+          "failed"
+        ]
+      },
       "Overlap": {
         "type": "string",
         "enum": [
@@ -26476,6 +26557,68 @@
           }
         ]
       },
+      "PhaseProgressResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "state": {
+            "$ref": "#/components/schemas/PhaseStatus"
+          },
+          "done": {
+            "type": "integer",
+            "title": "Done"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/Unit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "state",
+          "done",
+          "total",
+          "unit"
+        ],
+        "title": "PhaseProgressResponse",
+        "description": "One planned stage of an operation and how far it has got.",
+        "examples": [
+          {
+            "done": 1240,
+            "key": "media",
+            "label": "Restoring photos and files",
+            "state": "running",
+            "total": 2000,
+            "unit": "count"
+          }
+        ]
+      },
+      "PhaseStatus": {
+        "type": "string",
+        "enum": [
+          "waiting",
+          "running",
+          "done"
+        ]
+      },
       "PresetPermission": {
         "type": "string",
         "enum": [
@@ -26571,6 +26714,77 @@
             "label": "Condition",
             "updated_at": "2026-08-23T10:14:44.465954Z",
             "version": 1
+          }
+        ]
+      },
+      "ProgressSnapshotResponse": {
+        "properties": {
+          "phases": {
+            "items": {
+              "$ref": "#/components/schemas/PhaseProgressResponse"
+            },
+            "type": "array",
+            "title": "Phases"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "percent": {
+            "type": "integer",
+            "title": "Percent"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phases",
+          "message",
+          "percent",
+          "outcome"
+        ],
+        "title": "ProgressSnapshotResponse",
+        "description": "How a long operation is getting on: phases, an overall percentage, a note.",
+        "examples": [
+          {
+            "message": "Restoring photos and files",
+            "outcome": "running",
+            "percent": 81,
+            "phases": [
+              {
+                "done": 2097152,
+                "key": "verify",
+                "label": "Checking the backup",
+                "state": "done",
+                "total": 2097152,
+                "unit": "bytes"
+              },
+              {
+                "done": 4210,
+                "key": "database",
+                "label": "Restoring your collection",
+                "state": "done",
+                "total": 4210,
+                "unit": "count"
+              },
+              {
+                "done": 1240,
+                "key": "media",
+                "label": "Restoring photos and files",
+                "state": "running",
+                "total": 2000,
+                "unit": "count"
+              }
+            ]
           }
         ]
       },
@@ -27488,6 +27702,13 @@
               "relationship_types": 2
             }
           }
+        ]
+      },
+      "Unit": {
+        "type": "string",
+        "enum": [
+          "count",
+          "bytes"
         ]
       },
       "UpdateCollectionRequest": {

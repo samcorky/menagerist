@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.entrypoints.api.shared.progress_schemas import ProgressSnapshotResponse
 from app.modules.scheduling.application.list_jobs import JobStatus  # noqa: TC001
 from app.modules.scheduling.application.preview_schedule import SchedulePreview  # noqa: TC001
 from app.modules.scheduling.domain.job_run import JobRun, RunStatus
@@ -85,6 +86,13 @@ class JobRunResponse(BaseModel):
     requested_by: UUID | None = Field(
         default=None, description="The administrator who ran it, when run by hand."
     )
+    progress: ProgressSnapshotResponse | None = Field(
+        default=None,
+        description=(
+            "How far a running job has got, or where a failed one stopped. "
+            + "Empty once a run has succeeded."
+        ),
+    )
 
     @classmethod
     def from_domain(cls, run: JobRun) -> JobRunResponse:
@@ -99,6 +107,11 @@ class JobRunResponse(BaseModel):
             finished_at=run.finished_at,
             error=run.error,
             requested_by=run.requested_by,
+            progress=(
+                None
+                if run.progress is None
+                else ProgressSnapshotResponse.model_validate(run.progress)
+            ),
         )
 
 

@@ -40,6 +40,11 @@ class InMemoryBackupStore:
         self._require(backup_id)
         yield self.archives[backup_id]
 
+    async def archive_size(self, backup_id: UUID) -> int:
+        """Return the stored archive's length."""
+        self._require(backup_id)
+        return len(self.archives[backup_id])
+
     async def archive_digest(self, backup_id: UUID) -> str | None:
         """Return the independently stored sidecar digest."""
         self._require(backup_id)

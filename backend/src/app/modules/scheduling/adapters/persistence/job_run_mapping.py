@@ -3,6 +3,7 @@
 from app.modules.scheduling.adapters.persistence.models import JobRunModel
 from app.modules.scheduling.domain.job_run import JobRun, RunStatus
 from app.shared_kernel.jobs import Lane, Overlap
+from app.shared_kernel.progress import ProgressSnapshot
 
 
 def to_domain(model: JobRunModel) -> JobRun:
@@ -22,6 +23,11 @@ def to_domain(model: JobRunModel) -> JobRun:
         heartbeat_at=model.heartbeat_at,
         finished_at=model.finished_at,
         error=model.error,
+        progress=(
+            None
+            if model.progress is None
+            else ProgressSnapshot.from_dict(model.progress)
+        ),
     )
 
 
@@ -42,6 +48,7 @@ def to_model(run: JobRun) -> JobRunModel:
         heartbeat_at=run.heartbeat_at,
         finished_at=run.finished_at,
         error=run.error,
+        progress=None if run.progress is None else run.progress.to_dict(),
     )
 
 
@@ -53,3 +60,4 @@ def apply_transition(model: JobRunModel, run: JobRun) -> None:
     model.heartbeat_at = run.heartbeat_at
     model.finished_at = run.finished_at
     model.error = run.error
+    model.progress = None if run.progress is None else run.progress.to_dict()

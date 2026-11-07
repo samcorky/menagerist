@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from uuid import UUID
 
     from app.modules.scheduling.domain.job_run import RunStatus
+    from app.shared_kernel.progress import ProgressSnapshot
 
 
 class JobRunRecorder(Protocol):
@@ -22,6 +23,12 @@ class JobRunRecorder(Protocol):
 
     async def heartbeat(self, run_id: UUID, worker_id: str, now: datetime) -> None:
         """Renew a running job only for its current claimant."""
+        ...
+
+    async def record_progress(
+        self, run_id: UUID, worker_id: str, snapshot: ProgressSnapshot
+    ) -> None:
+        """Keep a running job's latest progress, only for its current claimant."""
         ...
 
     async def finish(

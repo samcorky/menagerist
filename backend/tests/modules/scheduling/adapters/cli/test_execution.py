@@ -45,6 +45,7 @@ if TYPE_CHECKING:
 
     from app.modules.scheduling.ports.unit_of_work import SchedulingUnitOfWork
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.progress import ProgressReporter
 
 NOW = datetime(2026, 10, 26, 12, tzinfo=UTC)
 
@@ -97,7 +98,7 @@ async def test_handler_runs_as_system_inside_guard_and_records_success() -> None
     harness = Harness()
     run = await harness.claimed()
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         assert actor is SYSTEM_ACTOR
         assert harness.restore.holders == 1
         harness.now += timedelta(seconds=1)
@@ -129,7 +130,7 @@ async def test_blocked_jobs_are_skipped_without_invoking_handler(
     harness.restore.available = restore
     run = await harness.claimed()
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         pytest.fail("A blocked handler must not execute")
 
     await harness.executor().execute(run, JobDefinition(job_key="x"), handler)
@@ -145,7 +146,7 @@ async def test_setup_independent_jobs_can_execute_before_setup() -> None:
     harness.setup.complete = False
     run = await harness.claimed()
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         assert actor is SYSTEM_ACTOR
 
     await harness.executor().execute(
@@ -159,7 +160,7 @@ async def test_handler_failure_is_recorded_and_guard_is_released() -> None:
     harness = Harness()
     run = await harness.claimed()
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         raise ValueError("job failed")
 
     await harness.executor().execute(run, JobDefinition(job_key="x"), handler)
@@ -174,7 +175,7 @@ async def test_long_running_handler_renews_run_and_worker_heartbeats() -> None:
     harness = Harness()
     run = await harness.claimed()
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         harness.changed.clear()
         harness.now += timedelta(minutes=1)
         await asyncio.wait_for(harness.changed.wait(), timeout=2)
@@ -194,7 +195,7 @@ async def test_lost_claim_cancels_handler_and_preserves_abandonment() -> None:
     run = await harness.claimed()
     cancelled = asyncio.Event()
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         repos = build_in_memory_scheduling_repos(harness.store)
         await repos.recorder.reap_abandoned(
             NOW + timedelta(minutes=1), NOW + timedelta(minutes=2)
@@ -221,7 +222,7 @@ async def test_cancellation_releases_guard_and_leaves_run_for_reaper() -> None:
     started = asyncio.Event()
     cancelled = asyncio.Event()
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         started.set()
         try:
             await asyncio.Event().wait()
@@ -252,7 +253,7 @@ async def test_stale_claim_cannot_start_a_handler(missing: bool) -> None:
             run.id, "worker", RunStatus.SUCCEEDED, NOW
         )
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         pytest.fail("A stale claimant must not execute")
 
     with pytest.raises(UnknownRunError if missing else LostClaimError):
@@ -264,7 +265,7 @@ async def test_unclaimed_run_is_rejected() -> None:
     harness = Harness()
     run = JobRun.create(job_key="x", scheduled_for=NOW)
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         pytest.fail("An unclaimed run must not execute")
 
     with pytest.raises(LostClaimError):
@@ -276,7 +277,7 @@ async def test_successful_job_logs_start_and_outcome_with_context() -> None:
     harness = Harness()
     run = await harness.claimed()
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         return None
 
     with capture_logs(processors=[structlog.contextvars.merge_contextvars]) as logs:
@@ -304,7 +305,7 @@ async def test_skipped_and_failed_jobs_log_their_outcome() -> None:
     harness.setup.complete = False
     skipped = await harness.claimed()
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         raise ValueError("job failed")
 
     with capture_logs(processors=[structlog.contextvars.merge_contextvars]) as logs:
@@ -332,7 +333,7 @@ async def test_cancelled_and_lost_claims_are_not_logged_as_finished() -> None:
     run = await harness.claimed()
     started = asyncio.Event()
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         started.set()
         await asyncio.Event().wait()
 
@@ -372,7 +373,7 @@ async def test_concurrent_jobs_keep_isolated_log_context() -> None:
     assert second is not None
     gate = asyncio.Event()
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         await gate.wait()
 
     with capture_logs(processors=[structlog.contextvars.merge_contextvars]) as logs:
@@ -404,7 +405,7 @@ async def test_finished_and_skipped_jobs_log_their_next_scheduled_time() -> None
         source = InMemoryScheduleSource({})
         return GetJobNextRun(registry, source, CronScheduleEvaluator(), guard)
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         return None
 
     upcoming = datetime(2026, 10, 26, 15, tzinfo=UTC).isoformat()
@@ -431,7 +432,7 @@ async def test_next_scheduled_time_is_absent_without_a_lookup() -> None:
     harness = Harness()
     run = await harness.claimed()
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         return None
 
     with capture_logs(processors=[structlog.contextvars.merge_contextvars]) as logs:

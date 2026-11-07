@@ -50,6 +50,7 @@ if TYPE_CHECKING:
 
     from app.modules.backup.application.restore_backup import RestoreBackupCommand
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.progress import ProgressReporter
 
 pytestmark = pytest.mark.integration
 
@@ -204,7 +205,7 @@ async def test_production_worker_composition_executes_a_registered_job(
     stop = asyncio.Event()
     worker_ids: list[str] = []
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         stop.set()
 
     catalogue = JobCatalogue(
@@ -269,7 +270,7 @@ async def test_synchronous_cli_retries_temporary_claim_contention(
     called = False
     original = ClaimJobRun.handle
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         nonlocal called
         called = True
 
@@ -341,7 +342,7 @@ async def test_synchronous_job_targets_only_its_requested_run(
     other_key = f"test-{uuid7()}"
     called = False
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         nonlocal called
         called = True
 
@@ -475,7 +476,7 @@ async def test_composed_executor_uses_durable_application_commands(
             run = await repos.queue.claim([Lane.DEFAULT], key, now)
             assert run is not None
 
-        async def handler(actor: Actor) -> None:
+        async def handler(actor: Actor, progress: ProgressReporter) -> None:
             assert actor.is_system
 
         await build_job_executor(

@@ -11,9 +11,12 @@ from uuid import UUID  # noqa: TC003
 
 from cyclopts import App, Parameter
 
+from app.entrypoints.api.shared.progress import make_reporter
+from app.modules.backup.adapters.cli.progress_sink import snapshot_display
 from app.modules.backup.adapters.storage.local_backup_store import (
     LocalDirectoryBackupStore,
 )
+from app.modules.backup.adapters.storage.local_progress_store import LocalProgressStore
 from app.modules.backup.application.delete_backup import (
     DeleteBackup,
     DeleteBackupCommand,
@@ -33,6 +36,7 @@ from app.shared_kernel.access import Requires
 from app.shared_kernel.access_guard import DenyAllAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.errors import DomainError, ForbiddenError
+from app.shared_kernel.progress import NULL_PROGRESS, failure_reason
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable, Coroutine
@@ -41,6 +45,7 @@ if TYPE_CHECKING:
     from app.modules.backup.domain.backup import BackupSummary
     from app.modules.backup.domain.verification import PruneReport
     from app.shared_kernel.access_guard import AccessGuard
+    from app.shared_kernel.progress import ProgressReporter, ProgressSink
     from app.shared_kernel.settings import SettingKey, SettingsReader
 
 backup_app = App(name="backup", help="Manage verified instance backups.")
@@ -69,23 +74,31 @@ def use_access_guard(guard: AccessGuard) -> None:
     _guard = guard
 
 
-async def _unwired_create(label: str) -> BackupSummary:
+async def _unwired_create(label: str, progress: ProgressReporter) -> BackupSummary:
     raise ForbiddenError("Backup composition is not wired for the CLI.")
 
 
-async def _unwired_restore(backup_id: UUID, replace: bool, guard: AccessGuard) -> None:
+async def _unwired_restore(
+    backup_id: UUID, replace: bool, guard: AccessGuard, progress: ProgressReporter
+) -> None:
     raise ForbiddenError("Backup composition is not wired for the CLI.")
 
 
-_create: Callable[[str], Coroutine[Any, Any, BackupSummary]] = _unwired_create
-_restore: Callable[[UUID, bool, AccessGuard], Coroutine[Any, Any, None]] = (
-    _unwired_restore
+_create: Callable[[str, ProgressReporter], Coroutine[Any, Any, BackupSummary]] = (
+    _unwired_create
 )
+_restore: Callable[
+    [UUID, bool, AccessGuard, ProgressReporter], Coroutine[Any, Any, None]
+] = _unwired_restore
 
 
 def use_operations(
-    create_operation: Callable[[str], Coroutine[Any, Any, BackupSummary]],
-    restore_operation: Callable[[UUID, bool, AccessGuard], Coroutine[Any, Any, None]],
+    create_operation: Callable[
+        [str, ProgressReporter], Coroutine[Any, Any, BackupSummary]
+    ],
+    restore_operation: Callable[
+        [UUID, bool, AccessGuard, ProgressReporter], Coroutine[Any, Any, None]
+    ],
 ) -> None:
     """Wire operations whose media bridge belongs to the composition root."""
     global _create, _restore
@@ -105,6 +118,30 @@ def _run[T](operation: Coroutine[Any, Any, T], working: str | None = None) -> T:
         raise SystemExit(1) from error
 
 
+def _reported[T](
+    build: Callable[[ProgressReporter], Coroutine[Any, Any, T]],
+    *,
+    store: ProgressSink | None = None,
+) -> T:
+    """Run an operation with a reporter drawing a bar and, if given, writing `store`.
+
+    Failures are recorded on the reporter before they propagate, so the bar and
+    the stored snapshot end on `failed` with a curated message.
+    """
+    with snapshot_display() as display:
+        sinks = [sink for sink in (display, store) if sink is not None]
+        reporter = make_reporter(*sinks) if sinks else NULL_PROGRESS
+
+        async def run() -> T:
+            try:
+                return await build(reporter)
+            except Exception as error:
+                await reporter.fail(failure_reason(error))
+                raise
+
+        return _run(run())
+
+
 def _summary(message: str, summary: BackupSummary) -> dict[str, object]:
     return {"message": message, **asdict(summary)}
 
@@ -114,13 +151,11 @@ def create(*, label: str = "manual") -> dict[str, object]:
     """Create and verify an instance backup."""
     from app.modules.backup.application.permissions import BackupPermission
 
-    async def run() -> BackupSummary:
+    async def run(progress: ProgressReporter) -> BackupSummary:
         await _guard.check(SYSTEM_ACTOR, Requires(BackupPermission.CREATE))
-        return await _create(label)
+        return await _create(label, progress)
 
-    return _summary(
-        "Backup created and verified", _run(run(), "Creating and verifying the backup")
-    )
+    return _summary("Backup created and verified", _reported(run))
 
 
 @backup_app.command(name="list")
@@ -139,11 +174,10 @@ def list_backups() -> Report:
 @backup_app.command
 def verify(backup_id: UUID) -> Report:
     """Check every file and the archive checksum."""
-    report = _run(
-        VerifyBackup(_store(), _guard).handle(
+    report = _reported(
+        lambda progress: VerifyBackup(_store(), _guard, progress=progress).handle(
             VerifyBackupQuery(backup_id=backup_id), SYSTEM_ACTOR
-        ),
-        "Checking every file",
+        )
     )
     message = "Backup is intact" if not report.findings else "Backup has problems"
     return Report(
@@ -275,7 +309,10 @@ def restore(
     """
     if replace:
         confirm("Replace all data on this instance with the backup?", assume_yes=yes)
-    _run(_restore(backup_id, replace, _guard), "Restoring the backup")
+    _reported(
+        lambda progress: _restore(backup_id, replace, _guard, progress),
+        store=LocalProgressStore(get_backup_settings().path, "restore"),
+    )
     return {
         "message": "Backup restored",
         "id": str(backup_id),
@@ -283,23 +320,33 @@ def restore(
     }
 
 
-async def _unwired_export_user(user_id: UUID, output: Path) -> BackupSummary:
+async def _unwired_export_user(
+    user_id: UUID, output: Path, progress: ProgressReporter
+) -> BackupSummary:
     raise ForbiddenError("User transfer composition is not wired for the CLI.")
 
 
-async def _unwired_import_user(user_id: UUID, archive: Path) -> None:
+async def _unwired_import_user(
+    user_id: UUID, archive: Path, progress: ProgressReporter
+) -> None:
     raise ForbiddenError("User transfer composition is not wired for the CLI.")
 
 
-_export_user: Callable[[UUID, Path], Coroutine[Any, Any, BackupSummary]] = (
-    _unwired_export_user
+_export_user: Callable[
+    [UUID, Path, ProgressReporter], Coroutine[Any, Any, BackupSummary]
+] = _unwired_export_user
+_import_user: Callable[[UUID, Path, ProgressReporter], Coroutine[Any, Any, None]] = (
+    _unwired_import_user
 )
-_import_user: Callable[[UUID, Path], Coroutine[Any, Any, None]] = _unwired_import_user
 
 
 def use_user_operations(
-    export_operation: Callable[[UUID, Path], Coroutine[Any, Any, BackupSummary]],
-    import_operation: Callable[[UUID, Path], Coroutine[Any, Any, None]],
+    export_operation: Callable[
+        [UUID, Path, ProgressReporter], Coroutine[Any, Any, BackupSummary]
+    ],
+    import_operation: Callable[
+        [UUID, Path, ProgressReporter], Coroutine[Any, Any, None]
+    ],
 ) -> None:
     """Wire owner-scoped user transfer infrastructure."""
     global _export_user, _import_user
@@ -311,11 +358,11 @@ def export_user(output: Path, *, user: UUID) -> dict[str, object]:
     """Export the explicit account's content into a new local archive."""
     from app.modules.backup.application.permissions import BackupPermission
 
-    async def run() -> BackupSummary:
+    async def run(progress: ProgressReporter) -> BackupSummary:
         await _guard.check(SYSTEM_ACTOR, Requires(BackupPermission.CREATE))
-        return await _export_user(user, output)
+        return await _export_user(user, output, progress)
 
-    summary = _run(run(), "Exporting the user's data")
+    summary = _reported(run)
     return {**_summary("User data exported", summary), "output": str(output)}
 
 
@@ -324,9 +371,9 @@ def import_user(archive: Path, *, user: UUID) -> dict[str, object]:
     """Import a user archive into the explicit account on a fresh instance."""
     from app.modules.backup.application.permissions import BackupPermission
 
-    async def run() -> None:
+    async def run(progress: ProgressReporter) -> None:
         await _guard.check(SYSTEM_ACTOR, Requires(BackupPermission.RESTORE))
-        await _import_user(user, archive)
+        await _import_user(user, archive, progress)
 
-    _run(run(), "Importing the user's data")
+    _reported(run)
     return {"message": "User data imported", "user": str(user), "archive": str(archive)}

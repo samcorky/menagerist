@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from app.modules.backup.domain.backup import BackupSummary
     from app.shared_kernel.actor import Actor
     from app.shared_kernel.content_filter import ContentFilter
+    from app.shared_kernel.progress import ProgressReporter
 
 
 @asynccontextmanager
@@ -46,6 +47,7 @@ async def create_backup(
     from_revision: str | None = None,
     to_revision: str | None = None,
     actor: Actor | None = None,
+    progress: ProgressReporter | None = None,
 ) -> BackupSummary:
     """Build and run a verified backup, as the system actor unless given one."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
@@ -69,6 +71,7 @@ async def create_backup(
             media,
             get_access_guard(),
             app_version=load_app_info().version,
+            progress=progress,
         ).handle(
             CreateBackupCommand(
                 label=label, from_revision=from_revision, to_revision=to_revision

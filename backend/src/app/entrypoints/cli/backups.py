@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
     from app.modules.backup.domain.backup import BackupSummary
     from app.shared_kernel.access_guard import AccessGuard
+    from app.shared_kernel.progress import ProgressReporter
 
 
 async def backup_before_upgrade(revision: str) -> None:
@@ -54,7 +55,13 @@ def upgrade_with_backup(revision: str = "head", *, backup: bool = True) -> None:
     asyncio.run(run())
 
 
-async def restore_backup(backup_id: UUID, *, replace: bool, guard: AccessGuard) -> None:
+async def restore_backup(
+    backup_id: UUID,
+    *,
+    replace: bool,
+    guard: AccessGuard,
+    progress: ProgressReporter | None = None,
+) -> None:
     """Select the setup gate when no accounts exist and run the restore."""
     from sqlalchemy import func, select
 
@@ -98,6 +105,7 @@ async def restore_backup(backup_id: UUID, *, replace: bool, guard: AccessGuard) 
                 media,
                 LocalBackupWorkspace(settings.path),
                 guard,
+                progress=progress,
             ).handle(
                 RestoreBackupCommand(
                     backup_id=backup_id, replace=replace, setup_only=setup_only
@@ -106,7 +114,9 @@ async def restore_backup(backup_id: UUID, *, replace: bool, guard: AccessGuard) 
             )
 
 
-async def export_user_data(user_id: UUID, output: Path) -> BackupSummary:
+async def export_user_data(
+    user_id: UUID, output: Path, progress: ProgressReporter | None = None
+) -> BackupSummary:
     """Export one explicit owner and stream their archive to a local file."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
     from app.modules.backup.adapters.persistence.user_database_snapshot import (
@@ -134,6 +144,7 @@ async def export_user_data(user_id: UUID, output: Path) -> BackupSummary:
             media,
             get_access_guard(),
             app_version=load_app_info().version,
+            progress=progress,
         ).handle(ExportUserDataCommand(), actor)
         with output.open("xb") as destination:
             async for chunk in store.read_bytes(summary.id):
@@ -141,7 +152,9 @@ async def export_user_data(user_id: UUID, output: Path) -> BackupSummary:
         return summary
 
 
-async def import_user_data(user_id: UUID, archive: Path) -> None:
+async def import_user_data(
+    user_id: UUID, archive: Path, progress: ProgressReporter | None = None
+) -> None:
     """Verify a user archive in the owner's namespace before importing it."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
     from app.entrypoints.api.shared.bridges.backup_user_validator import (
@@ -191,4 +204,5 @@ async def import_user_data(user_id: UUID, archive: Path) -> None:
             media,
             workspace,
             get_access_guard(),
+            progress=progress,
         ).handle(ImportUserDataCommand(backup_id=summary.id), actor)

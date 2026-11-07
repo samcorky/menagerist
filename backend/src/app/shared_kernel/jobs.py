@@ -7,6 +7,7 @@ from enum import StrEnum
 
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ValidationError
+from app.shared_kernel.progress import ProgressReporter
 
 
 class Lane(StrEnum):
@@ -58,7 +59,7 @@ class JobDefinition:
             raise ValidationError("Maximum lateness cannot be negative")
 
 
-type JobHandler = Callable[[Actor], Awaitable[None]]
+type JobHandler = Callable[[Actor, ProgressReporter], Awaitable[None]]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -72,10 +73,14 @@ class JobBinding:
 _DEFINITION_ATTRIBUTE = "__job_definition__"
 
 
-def job(definition: JobDefinition) -> Callable[[JobHandler], JobHandler]:
-    """Attach a job's policy to its handler without registering it anywhere."""
+def job[H: JobHandler](definition: JobDefinition) -> Callable[[H], H]:
+    """Attach a job's policy to its handler without registering it anywhere.
 
-    def attach(handler: JobHandler) -> JobHandler:
+    The handler keeps its own signature, so a default `progress` stays optional
+    for the tests and helpers that call it directly.
+    """
+
+    def attach(handler: H) -> H:
         setattr(handler, _DEFINITION_ATTRIBUTE, definition)
         return handler
 

@@ -1,6 +1,7 @@
 import asyncio
+from datetime import timedelta
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock
+from unittest.mock import ANY, AsyncMock
 
 import pytest
 
@@ -14,14 +15,17 @@ from app.modules.backup.adapters.persistence.in_memory_database_snapshot import 
 from app.modules.backup.adapters.storage.local_backup_store import (
     LocalDirectoryBackupStore,
 )
+from app.modules.backup.adapters.storage.local_progress_store import LocalProgressStore
 from app.modules.backup.application.create_backup import (
     CreateBackup,
     CreateBackupCommand,
 )
+from app.modules.backup.domain.errors import CorruptBackupError
 from app.modules.settings.domain.setting import SettingScope, StoredSetting
 from app.platform.config.backup import BackupSettings
 from app.shared_kernel.access_guard import DenyAllAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.progress import GENERIC_FAILURE, Phase
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -30,6 +34,7 @@ if TYPE_CHECKING:
     from app.modules.settings.adapters.persistence.in_memory_setting_value_repository import (  # noqa: E501
         InMemorySettingValueRepository,
     )
+    from app.shared_kernel.progress import ProgressReporter, ProgressSnapshot
 
 
 @pytest.fixture
@@ -104,11 +109,86 @@ def test_create_and_restore_use_composition(
     created = commands.create(label="scheduled")
     assert created["id"] == archive.id
     assert created["message"] == "Backup created and verified"
-    create.assert_awaited_once_with("scheduled")
+    create.assert_awaited_once_with("scheduled", ANY)
     restored = commands.restore(archive.id, replace=True)
     assert restored["replaced_existing_data"] is True
     assert restore.await_args is not None
     assert restore.await_args.args[1] is True
+
+
+def _recorded_restore(settings: BackupSettings) -> ProgressSnapshot | None:
+    store = LocalProgressStore(settings.path, "restore")
+    return asyncio.run(store.read(max_age=timedelta(minutes=10)))
+
+
+def test_restore_writes_progress_for_the_setup_page(
+    archive: BackupSummary,
+    backup_settings: BackupSettings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A CLI restore reports through the same file the first-run page polls."""
+
+    async def restore(
+        backup_id: object, replace: bool, guard: object, progress: ProgressReporter
+    ) -> None:
+        await progress.begin((Phase(key="verify", label="Checking"),))
+        await progress.done()
+
+    monkeypatch.setattr(commands, "_restore", restore)
+    commands.restore(archive.id)
+    snapshot = _recorded_restore(backup_settings)
+    assert snapshot is not None
+    assert (snapshot.outcome, snapshot.percent) == ("succeeded", 100)
+
+
+def test_a_failed_restore_is_recorded_with_the_curated_message(
+    archive: BackupSummary,
+    backup_settings: BackupSettings,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The file ends on failed, then the command exits as it always has."""
+
+    async def restore(
+        backup_id: object, replace: bool, guard: object, progress: ProgressReporter
+    ) -> None:
+        raise CorruptBackupError("The archive is damaged.")
+
+    monkeypatch.setattr(commands, "_restore", restore)
+    with pytest.raises(SystemExit, match="1"):
+        commands.restore(archive.id)
+    snapshot = _recorded_restore(backup_settings)
+    assert snapshot is not None
+    assert (snapshot.outcome, snapshot.message) == ("failed", "The archive is damaged.")
+    assert "The archive is damaged." in capsys.readouterr().err
+
+
+def test_an_unexpected_failure_never_leaks_its_message_into_the_file(
+    archive: BackupSummary,
+    backup_settings: BackupSettings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only curated domain messages reach the file the public page reads."""
+
+    async def restore(
+        backup_id: object, replace: bool, guard: object, progress: ProgressReporter
+    ) -> None:
+        raise OSError("/data/backups/secret: permission denied")
+
+    monkeypatch.setattr(commands, "_restore", restore)
+    with pytest.raises(OSError, match="permission denied"):
+        commands.restore(archive.id)
+    snapshot = _recorded_restore(backup_settings)
+    assert snapshot is not None
+    assert snapshot.message == GENERIC_FAILURE
+
+
+def test_other_commands_write_no_progress_file(
+    archive: BackupSummary, backup_settings: BackupSettings
+) -> None:
+    """Without a terminal, verify reports to nobody and leaves no file behind."""
+    commands.verify(archive.id)
+    assert _recorded_restore(backup_settings) is None
 
 
 def test_unwired_authorisation_fails_closed(
@@ -136,11 +216,11 @@ def test_user_transfers_require_explicit_owner(
     monkeypatch.setattr(commands, "_export_user", export)
     monkeypatch.setattr(commands, "_import_user", import_operation)
     exported = commands.export_user(output, user=owner_id)
-    export.assert_awaited_once_with(owner_id, output)
+    export.assert_awaited_once_with(owner_id, output, ANY)
     assert exported["id"] == archive.id
     imported = commands.import_user(output, user=owner_id)
     assert imported["user"] == str(owner_id)
-    import_operation.assert_awaited_once_with(owner_id, output)
+    import_operation.assert_awaited_once_with(owner_id, output, ANY)
     monkeypatch.setattr(commands, "_guard", DenyAllAccessGuard())
     with pytest.raises(SystemExit, match="1"):
         commands.export_user(output, user=owner_id)

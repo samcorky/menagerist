@@ -47,6 +47,7 @@ if TYPE_CHECKING:
 
     from app.modules.scheduling.ports.unit_of_work import SchedulingUnitOfWork
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.progress import ProgressReporter
 
 NOW = datetime(2026, 10, 27, 12, tzinfo=UTC)
 
@@ -120,12 +121,12 @@ async def test_lanes_execute_independently_as_system() -> None:
     heavy_started = asyncio.Event()
     release_heavy = asyncio.Event()
 
-    async def heavy(actor: Actor) -> None:
+    async def heavy(actor: Actor, progress: ProgressReporter) -> None:
         assert actor is SYSTEM_ACTOR
         heavy_started.set()
         await release_heavy.wait()
 
-    async def normal(actor: Actor) -> None:
+    async def normal(actor: Actor, progress: ProgressReporter) -> None:
         await heavy_started.wait()
         assert actor is SYSTEM_ACTOR
         world.stop.set()
@@ -153,7 +154,7 @@ async def test_tick_observes_then_submits_a_future_fire() -> None:
     """The loop uses TickSchedules rather than computing due fires itself."""
     world = World()
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         world.stop.set()
 
     catalogue = JobCatalogue(
@@ -175,7 +176,7 @@ async def test_tick_logs_each_submitted_run() -> None:
     """A schedule fire is visible at INFO before any worker claims it."""
     world = World()
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         world.stop.set()
 
     catalogue = JobCatalogue(
@@ -218,7 +219,7 @@ async def test_worker_heartbeats_continue_between_schedule_ticks() -> None:
     """Short heartbeat intervals do not accelerate schedule evaluation."""
     world = World()
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         pass
 
     catalogue = JobCatalogue(
@@ -267,7 +268,7 @@ async def test_shutdown_finishes_current_job_without_claiming_another() -> None:
     started = asyncio.Event()
     release = asyncio.Event()
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         world.stop.set()
         started.set()
         await release.wait()
@@ -295,7 +296,7 @@ async def test_shutdown_grace_cancels_unfinished_execution_for_reaper() -> None:
     world = World()
     cancelled = asyncio.Event()
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         world.stop.set()
         try:
             await asyncio.Event().wait()
@@ -331,7 +332,7 @@ async def test_unregistered_queued_jobs_are_skipped() -> None:
 def test_catalogue_rejects_duplicates_and_unknown_handlers() -> None:
     """Handler bindings share the metadata registry's key validation."""
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         pass
 
     binding = JobBinding(definition=JobDefinition(job_key="x"), handler=handler)
@@ -347,7 +348,7 @@ async def test_external_cancellation_cleans_up_active_lane_tasks() -> None:
     started = asyncio.Event()
     cancelled = asyncio.Event()
 
-    async def handler(actor: Actor) -> None:
+    async def handler(actor: Actor, progress: ProgressReporter) -> None:
         started.set()
         try:
             await asyncio.Event().wait()

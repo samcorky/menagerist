@@ -1,6 +1,20 @@
-import { restoreInstance } from '$lib/api/client';
+import {
+	getRestoreProgress,
+	restoreInstance,
+	type ProgressSnapshotResponse
+} from '$lib/api/client';
 
 type RestoreResult = { ok: true } | { ok: false; message: string };
+
+/** How the restore is getting on, or null when nothing has reported (or it cannot be read). */
+export async function readRestoreProgress(): Promise<ProgressSnapshotResponse | null> {
+	try {
+		const result = await getRestoreProgress();
+		return result.data ?? null;
+	} catch {
+		return null;
+	}
+}
 
 export async function restoreFirstRunArchive(file: File): Promise<RestoreResult> {
 	try {

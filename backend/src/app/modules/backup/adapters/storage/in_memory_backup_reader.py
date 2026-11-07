@@ -16,8 +16,14 @@ class InMemoryBackupReader:
 
     def __init__(self, members: dict[str, bytes]) -> None:
         self._members = members
+        self._consumed = 0
 
     async def members(self) -> AsyncGenerator[ArchiveMember]:
         """Yield members in insertion order."""
         for name, data in self._members.items():
             yield ArchiveMember(name=name, chunks=byte_chunks(data))
+            self._consumed += len(data)
+
+    def compressed_read(self) -> int:
+        """Return the member bytes yielded so far (this fake does not compress)."""
+        return self._consumed

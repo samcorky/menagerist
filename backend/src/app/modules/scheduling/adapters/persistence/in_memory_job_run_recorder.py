@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from app.modules.scheduling.adapters.persistence.in_memory_store import (
         InMemorySchedulingStore,
     )
+    from app.shared_kernel.progress import ProgressSnapshot
 
 
 class InMemoryJobRunRecorder:
@@ -48,6 +49,14 @@ class InMemoryJobRunRecorder:
         """Renew a run owned by this worker."""
         run = self._store.get(run_id)
         run.heartbeat(worker_id, now)
+        self._store.save(run)
+
+    async def record_progress(
+        self, run_id: UUID, worker_id: str, snapshot: ProgressSnapshot
+    ) -> None:
+        """Keep an owned run's latest progress."""
+        run = self._store.get(run_id)
+        run.record_progress(worker_id, snapshot)
         self._store.save(run)
 
     async def finish(

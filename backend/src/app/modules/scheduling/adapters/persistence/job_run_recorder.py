@@ -22,6 +22,8 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from app.shared_kernel.progress import ProgressSnapshot
+
 
 class SqlAlchemyJobRunRecorder:
     """Lock the latest row before applying domain lifecycle rules."""
@@ -82,6 +84,16 @@ class SqlAlchemyJobRunRecorder:
         model = await self._locked(run_id)
         run = to_domain(model)
         run.heartbeat(worker_id, now)
+        apply_transition(model, run)
+        await self._session.flush()
+
+    async def record_progress(
+        self, run_id: UUID, worker_id: str, snapshot: ProgressSnapshot
+    ) -> None:
+        """Store the claimant's latest progress; a finished or foreign run refuses."""
+        model = await self._locked(run_id)
+        run = to_domain(model)
+        run.record_progress(worker_id, snapshot)
         apply_transition(model, run)
         await self._session.flush()
 

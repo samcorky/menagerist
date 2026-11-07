@@ -25,6 +25,10 @@ class BackupStore(Protocol):
         """Stream the compressed archive for download and hashing."""
         ...
 
+    async def archive_size(self, backup_id: UUID) -> int:
+        """Return the compressed archive's size in bytes, for progress totals."""
+        ...
+
     async def archive_digest(self, backup_id: UUID) -> str | None:
         """Return the sidecar digest, or None if it is absent."""
         ...

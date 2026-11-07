@@ -9,6 +9,7 @@ from app.modules.backup.adapters.scheduling import jobs as backup_jobs
 from app.modules.settings.domain.setting import SettingScope, StoredSetting
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.jobs import Lane, MissedRun, Overlap
+from app.shared_kernel.progress import RecordingProgress
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -35,12 +36,45 @@ def _steps(
     """Replace the backup and retention steps with recorders."""
 
     def recorder(name: str) -> AsyncMock:
-        return AsyncMock(side_effect=lambda actor: calls.append(name))
+        return AsyncMock(side_effect=lambda *_arguments: calls.append(name))
 
     monkeypatch.setattr(
         backup_jobs, "create_scheduled_backup", create or recorder("create")
     )
     monkeypatch.setattr(backup_jobs, "prune_scheduled_backups", recorder("prune"))
+
+
+async def test_the_scheduled_backup_is_given_the_runs_reporter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The job hands its reporter on, so the run row can show the backup's phases."""
+    create = AsyncMock()
+    _steps(monkeypatch, [], create=create)
+    progress = RecordingProgress()
+    await backup_jobs.create_then_prune_backups(SYSTEM_ACTOR, progress)
+    create.assert_awaited_once_with(SYSTEM_ACTOR, progress)
+
+
+async def test_the_backup_composition_receives_the_reporter(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`create_scheduled_backup` forwards the reporter to the composed use case."""
+    from app.entrypoints.api.shared import backup_operations
+
+    created = AsyncMock()
+    monkeypatch.setattr(backup_operations, "create_backup", created)
+    media = tmp_path / "media"
+    media.mkdir()
+    monkeypatch.setattr(
+        backup_jobs,
+        "get_media_settings",
+        lambda: Mock(storage_path=media),
+    )
+    progress = RecordingProgress()
+    await backup_jobs.create_scheduled_backup(SYSTEM_ACTOR, progress)
+    created.assert_awaited_once_with(
+        label="scheduled", actor=SYSTEM_ACTOR, progress=progress
+    )
 
 
 def test_job_policies() -> None:
