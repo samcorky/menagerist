@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import platform
 import sys
 from contextlib import nullcontext
 from enum import StrEnum
@@ -9,6 +10,10 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 import structlog
 from cyclopts import App, Parameter
+from rich.console import Console, Group
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.backup_operations import create_backup
@@ -43,7 +48,13 @@ from app.modules.scheduling.adapters.cli.job_app import (
     use_operations as use_job_operations,
 )
 from app.platform.app_info import load_app_info
-from app.platform.cli_output import RESULT_ACTION, OutputFormat, Report, set_format
+from app.platform.cli_output import (
+    RESULT_ACTION,
+    OutputFormat,
+    Report,
+    resolved_format,
+    set_format,
+)
 from app.platform.cli_progress import activity, confirm
 from app.platform.logging_config import configure_logging
 
@@ -202,10 +213,57 @@ settings_app = App(
 app.command(settings_app)
 
 
+def _banner() -> Panel:
+    """A panel naming the build, so a pasted screenshot says what was running."""
+    build = app_info.build
+    facts = Table.grid(padding=(0, 2))
+    facts.add_column(style="dim")
+    facts.add_column()
+    revision = build.short_sha or "unknown"
+    if build.dirty:
+        revision += " (uncommitted changes)"
+    facts.add_row("Revision", revision)
+    if build.branch:
+        facts.add_row("Branch", build.branch)
+    if build.build_timestamp:
+        facts.add_row("Built", build.build_timestamp.strftime("%Y-%m-%d %H:%M %Z"))
+    facts.add_row("Python", platform.python_version())
+    title = Text.assemble((app_info.name, "bold"), f" {app_info.version}")
+    return Panel(
+        Group(facts, Text("\nType `help` for commands, `version` for details.", "dim")),
+        title=title,
+        title_align="left",
+        border_style="cyan",
+        expand=False,
+    )
+
+
 @app.default
 def shell() -> None:
     """Start the interactive shell."""
-    app.interactive_shell(prompt=f"{app_info.name}> ")
+    # Only a terminal gets the greeting; JSON and text output must stay clean.
+    if resolved_format() is OutputFormat.RICH:
+        Console().print(_banner())
+    app.interactive_shell(
+        prompt=f"{app_info.name}> ", intro="", result_action=RESULT_ACTION
+    )
+
+
+@app.command(name="format")
+def set_output_format(output_format: OutputFormat) -> dict[str, object]:
+    """Change how results are shown for the rest of this shell session.
+
+    Args:
+        output_format: `auto`, `rich`, `text` or `json`.
+    """
+    set_format(output_format)
+    return {"message": f"Results are now shown as {output_format.value}."}
+
+
+@app.command
+def version() -> Report:
+    """Show the version and the build this is running."""
+    return Report(value=app_info.details(), title=f"{app_info.name} build")
 
 
 @app.command

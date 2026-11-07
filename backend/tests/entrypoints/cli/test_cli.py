@@ -15,6 +15,14 @@ from cyclopts import App
 
 from app.entrypoints import cli
 from app.entrypoints.cli import ServeLogLevel
+from app.platform.app_info import AppInfo
+from app.platform.build_info import BuildInfo
+from app.platform.cli_output import (
+    RESULT_ACTION,
+    OutputFormat,
+    resolved_format,
+    set_format,
+)
 
 
 def test_main_forwards_tokens_to_the_app(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -119,7 +127,63 @@ def test_shell_starts_the_interactive_shell(monkeypatch: pytest.MonkeyPatch) -> 
 
     cli.shell()
 
-    assert calls == [{"prompt": f"{cli.app_info.name}> "}]
+    assert calls == [
+        {
+            "prompt": f"{cli.app_info.name}> ",
+            "intro": "",
+            "result_action": RESULT_ACTION,
+        }
+    ]
+
+
+def test_shell_greets_with_the_build(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The shell opens with a panel naming the version and revision."""
+    monkeypatch.setattr(App, "interactive_shell", lambda self, **kwargs: None)
+    set_format(OutputFormat.RICH)
+    build = BuildInfo(short_sha="abc1234", branch="main", dirty=True)
+    monkeypatch.setattr(
+        cli, "app_info", AppInfo(project=cli.app_info.project, build=build)
+    )
+
+    cli.shell()
+
+    out = capsys.readouterr().out
+    assert cli.app_info.version in out
+    assert "abc1234 (uncommitted changes)" in out
+    assert "main" in out
+
+
+@pytest.mark.parametrize("output_format", [OutputFormat.JSON, OutputFormat.TEXT])
+def test_shell_stays_quiet_when_results_are_not_for_a_terminal(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    output_format: OutputFormat,
+) -> None:
+    """A banner ahead of JSON or text would break whatever reads stdout."""
+    monkeypatch.setattr(App, "interactive_shell", lambda self, **kwargs: None)
+    set_format(output_format)
+
+    cli.shell()
+
+    assert capsys.readouterr().out == ""
+
+
+def test_format_command_changes_how_later_results_are_shown() -> None:
+    """Inside the shell `format json` switches the process-wide output format."""
+    result = cli.set_output_format(OutputFormat.JSON)
+
+    assert resolved_format() is OutputFormat.JSON
+    assert result == {"message": "Results are now shown as json."}
+
+
+def test_version_reports_the_build_details() -> None:
+    """`version` returns the build facts for the root app to show."""
+    report = cli.version()
+
+    assert report.value == cli.app_info.details()
+    assert report.value["version"] == cli.app_info.version
 
 
 def test_help_prints_the_help_screen(monkeypatch: pytest.MonkeyPatch) -> None:

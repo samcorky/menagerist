@@ -23,6 +23,7 @@ from app.modules.identity.adapters.persistence.in_memory_user_repository import 
 )
 from app.modules.identity.domain.user import Role, User
 from app.modules.identity.ports.unit_of_work import IdentityRepos
+from app.platform.app_info import load_app_info
 from app.platform.config.api import CORS_OPEN_HINT
 from app.platform.storage_probe import DirectoryProbe
 
@@ -234,6 +235,15 @@ async def test_warns_only_when_cors_allows_any_origin(
         ]
     else:
         assert logs == []
+
+
+def test_logs_the_build_that_is_starting() -> None:
+    """One INFO line names the version and commit before anything else."""
+    with capture_logs() as logs:
+        startup.log_build_info()
+
+    assert [(e["log_level"], e["event"]) for e in logs] == [("info", "starting")]
+    assert logs[0]["version"] == load_app_info().version
 
 
 def test_the_application_lifespan_runs_the_check_once(

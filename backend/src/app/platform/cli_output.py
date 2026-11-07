@@ -21,6 +21,7 @@ from pathlib import PurePath
 from typing import Any
 from uuid import UUID
 
+from rich import box
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
@@ -144,7 +145,7 @@ def _cell(key: str, value: object) -> Text:
 
 
 def _field_table(data: Mapping[str, Any], title: str | None) -> Table:
-    table = Table("Field", "Value", title=title, title_justify="left")
+    table = Table("Field", "Value", title=title, title_justify="left", box=box.ROUNDED)
     for key, value in data.items():
         table.add_row(Text(_label(key)), _cell(key, value))
     return table
@@ -152,7 +153,12 @@ def _field_table(data: Mapping[str, Any], title: str | None) -> Table:
 
 def _row_table(rows: Sequence[Mapping[str, Any]], title: str | None) -> Table:
     columns = list(dict.fromkeys(key for row in rows for key in row))
-    table = Table(*(_label(c) for c in columns), title=title, title_justify="left")
+    table = Table(
+        *(_label(c) for c in columns),
+        title=title,
+        title_justify="left",
+        box=box.ROUNDED,
+    )
     for row in rows:
         table.add_row(*(_cell(c, row.get(c)) for c in columns))
     return table
