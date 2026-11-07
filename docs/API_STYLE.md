@@ -33,7 +33,7 @@ The linter is its own small package, kept apart from the frontend because its de
 
 ## Methods and status codes
 
-- `GET` reads and never changes state. `POST` creates (201 with the new resource, linked to its `GET` through OpenAPI `links`) or runs an action. `PATCH` changes some fields of a resource (partial JSON). `PUT` replaces, and is used for idempotent sets such as `PUT /collections/{id}/items` and `PUT /examples/{pack_id}/installation`. `DELETE` removes (204).
+- `GET` reads and never changes state. `POST` creates (201 with the new resource, linked to its `GET` through OpenAPI `links`) or runs an action. `PATCH` changes some fields of a resource and is declared as `application/merge-patch+json` (RFC 7396): an omitted field is unchanged and `null` clears an optional one. The server parses it as ordinary JSON, so `application/json` still works for existing scripts, but the contract lists only the merge-patch type. `PUT` replaces, and is used for idempotent sets such as `PUT /collections/{id}/items` and `PUT /examples/{pack_id}/installation`. `DELETE` removes (204).
 - Domain validation is **400**, a missing or hidden resource **404**, a clash **409**, a failed `If-Match` **412**, an unchanged `If-None-Match` **304**, throttling **429** with `Retry-After`. A request FastAPI cannot parse is **422**; see [Collection errors](DECISIONS.md#collection-errors-400-for-domain-validation-422-for-malformed-requests). IBM prefers 400 for both; we keep 422 because the generated client and tests rely on it.
 - 403 is for an authenticated user lacking a permission, documented with `x-required-permission`.
 
@@ -68,6 +68,7 @@ Request bodies are named Pydantic models, with multipart uploads as the one exce
 | IBM            | 400 for every invalid payload      | 400 for domain rules, 422 for unparseable requests | FastAPI behaviour; the client depends on it                 |
 | IBM            | No hyphen in path segments         | `node-types`, `edge-types` only                    | Pinned by `HYPHENATED_SEGMENTS`                             |
 | IBM            | Bounds and formats on every scalar | Only where they carry meaning                      | Generated noise; add `ge`/`le`/`max_length` for real limits |
+| IBM            | `...Prototype` / `...Patch` request schema names | `XxxRequest`                  | Names the generated client's types; see the backend README  |
 | Google AIP-136 | `:verb` custom methods             | `/verb` sub-resources                              | Ids are uuid7; no slug paths to clash with                  |
 | Google AIP-193 | `google.rpc.Status` errors         | RFC 9457                                           | HTTP-native                                                 |
 | Google AIP-158 | `page_token` / `page_size`         | `after` / `limit` + `Link` header                  | Keyset on a time-ordered id                                 |
