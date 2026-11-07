@@ -135,7 +135,7 @@
         "docker-compose"
       ],
       "matchFileNames": [
-        "compose.proxy.yaml"
+        "scripts/compose/compose.proxy.yaml"
       ],
       "pinDigests": false
     },

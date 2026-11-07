@@ -226,7 +226,7 @@ poe proxy-test                # nginx, Caddy and Traefik relay early 413/401 rep
 poe coverage                  # full test suite + enforce all coverage thresholds
 ```
 
-`poe proxy-test` builds the image, then runs `compose.proxy.yaml`: the real upload guard on Granian (no database) behind each proxy in turn, with a body sent after the app has already replied. It fails if any reply is a 502 instead of the 413 or 401. It sends a few hundred megabytes through each proxy; run `uv run --script scripts/proxy_test.py caddy --attempts 5` to test one proxy more quickly. Use it when changing the upload guard, Granian or a proxy example.
+`poe proxy-test` builds the image, then runs `scripts/compose/compose.proxy.yaml`: the real upload guard on Granian (no database) behind each proxy in turn, with a body sent after the app has already replied. It fails if any reply is a 502 instead of the 413 or 401. It sends a few hundred megabytes through each proxy; run `uv run --script scripts/proxy_test.py caddy --attempts 5` to test one proxy more quickly. Use it when changing the upload guard, Granian or a proxy example.
 
 ### Running tests in parallel
 
@@ -247,7 +247,7 @@ Each integration worker starts its own Postgres container (`postgres:18-alpine`,
 
 ### End-to-end tests
 
-`poe test-e2e` runs the Playwright suite in `frontend/tests/e2e/` against an isolated, throwaway Postgres (via `compose.e2e.yaml`). It builds the production frontend (`poe e2e-build`, `npm run build`, roughly two minutes), runs the specs in parallel, and removes the database container afterwards whatever the outcome. It requires Docker. CI runs it as its own `e2e` job, retrying a failed test once and uploading the traces of failures. It covers the roadmap's core happy paths: creating an item, setting an item type, adding a connection, quick capture, and managing item types.
+`poe test-e2e` runs the Playwright suite in `frontend/tests/e2e/` against an isolated, throwaway Postgres (via `scripts/compose/compose.e2e.yaml`). It builds the production frontend (`poe e2e-build`, `npm run build`, roughly two minutes), runs the specs in parallel, and removes the database container afterwards whatever the outcome. It requires Docker. CI runs it as its own `e2e` job, retrying a failed test once and uploading the traces of failures. It covers the roadmap's core happy paths: creating an item, setting an item type, adding a connection, quick capture, and managing item types.
 
 `poe sync` (and so `poe init`) downloads the Chromium build Playwright drives (`poe install-e2e-browser`). On Linux, Chromium also needs a few system libraries; if the suite fails with `error while loading shared libraries`, run `poe install-e2e-deps` for the one-off command that fixes it (it needs `sudo` and a real terminal, so it prints the command rather than running it).
 
