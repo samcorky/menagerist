@@ -45,10 +45,11 @@ def run_validator(schema: Path) -> Report:
         check=False,
     )
     try:
-        return json.loads(result.stdout)
+        report: Report = json.loads(result.stdout)
     except json.JSONDecodeError:
         output = result.stderr or result.stdout
         sys.exit(f"No report from the validator (exit {result.returncode}):\n{output}")
+    return report
 
 
 def counts(report: Report, severity: str) -> Counter[str]:
