@@ -57,6 +57,11 @@ dev = [
     "types-pyyaml>=6.0.12.20261030",
 ]
 
+[project.urls]
+# Last-resort repository for the update check. A fork sets
+# MENAGERIST_BUILD_REPOSITORY_URL, or it reports upstream's releases.
+Repository = "https://github.com/samcorky/menagerist"
+
 [project.scripts]
 menagerist = "app.entrypoints.cli:app.meta"
 
@@ -75,6 +80,7 @@ cache-keys = [
     { git = { commit = true, tags = true } },
     { file = "src/**" },
     { file = "scripts/hatch_build_info.py" },
+    { file = "scripts/git_info.py" },
 ]
 
 [tool.hatch.version]
@@ -210,7 +216,7 @@ line-ending = "lf"
 plugins = ["pydantic.mypy"]
 strict = true
 files = ["src/app", "tests", "scripts", "../scripts"]
-mypy_path = "src"
+mypy_path = "src:scripts"
 explicit_package_bases = true
 warn_unused_configs = true
 show_error_codes = true

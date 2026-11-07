@@ -1,7 +1,7 @@
 import json
 import os
 import re
-import subprocess
+import sys
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -10,6 +10,10 @@ from urllib.parse import urlparse, urlunparse
 
 from hatchling.builders.config import BuilderConfig
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import git_info
 
 _SCP_LIKE_GIT_URL_PATTERN = re.compile(
     r"^(?:(?P<user>[^@/:]+)@)?(?P<host>[^:/]+):(?P<path>.+)$"
@@ -55,88 +59,37 @@ class BuildInfoHook(BuildHookInterface[BuilderConfig]):
             self._build_info_path.unlink()
 
     def _commit_sha(self) -> str | None:
-        """Return the commit SHA from the env override or `git rev-parse HEAD`."""
-        if sha := os.environ.get("MENAGERIST_BUILD_COMMIT_SHA"):
-            return sha
-        try:
-            result = subprocess.run(
-                ["git", "rev-parse", "HEAD"],
-                cwd=self.root,
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=5,
-            )
-            return result.stdout.strip()
-        except (
-            subprocess.CalledProcessError,
-            FileNotFoundError,
-            subprocess.TimeoutExpired,
-        ):
-            return None
+        """Return the commit SHA: env override, then git."""
+        return os.environ.get("MENAGERIST_BUILD_COMMIT_SHA") or git_info.query(
+            "commit", self.root
+        )
 
     def _branch(self) -> str | None:
-        """Return the current branch from the env override or `git branch`."""
-        if branch := os.environ.get("MENAGERIST_BUILD_BRANCH"):
-            return branch
-        try:
-            result = subprocess.run(
-                ["git", "branch", "--show-current"],
-                cwd=self.root,
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=5,
-            )
-            return result.stdout.strip() or None
-        except (
-            subprocess.CalledProcessError,
-            FileNotFoundError,
-            subprocess.TimeoutExpired,
-        ):
-            return None
+        """Return the branch: env override, then git."""
+        return (
+            os.environ.get("MENAGERIST_BUILD_BRANCH")
+            or git_info.query("branch", self.root)
+            or None
+        )
 
     def _is_dirty(self) -> bool | None:
         """Return whether the working tree has uncommitted changes."""
         if dirty := os.environ.get("MENAGERIST_BUILD_DIRTY"):
             return dirty.lower() in {"1", "true", "yes", "on"}
-        try:
-            result = subprocess.run(
-                ["git", "status", "--porcelain"],
-                cwd=self.root,
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=5,
-            )
-            return bool(result.stdout.strip())
-        except (
-            subprocess.CalledProcessError,
-            FileNotFoundError,
-            subprocess.TimeoutExpired,
-        ):
-            return None
+        return git_info.is_dirty(self.root)
 
     def _repository_url(self) -> str | None:
-        """Return the normalised repository URL from the env override or git remote."""
-        if repository_url := os.environ.get("MENAGERIST_BUILD_REPOSITORY_URL"):
-            return self._normalize_repository_url(repository_url)
-        try:
-            result = subprocess.run(
-                ["git", "config", "--get", "remote.origin.url"],
-                cwd=self.root,
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=5,
-            )
-            return self._normalize_repository_url(result.stdout.strip())
-        except (
-            subprocess.CalledProcessError,
-            FileNotFoundError,
-            subprocess.TimeoutExpired,
-        ):
-            return None
+        """Return the normalised URL: env override, git remote, then the default."""
+        url = (
+            os.environ.get("MENAGERIST_BUILD_REPOSITORY_URL")
+            or git_info.query("repository-url", self.root)
+            or self._default_url()
+        )
+        return self._normalize_repository_url(url) if url else None
+
+    def _default_url(self) -> str | None:
+        """Return the ``Repository`` URL declared in ``[project.urls]``, if any."""
+        return self.metadata.core.urls.get("Repository")
 
     def _normalize_repository_url(self, repository_url: str) -> str:
         """Convert an SSH, git, or HTTP(S) remote URL to a canonical HTTPS URL."""
