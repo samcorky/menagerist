@@ -13,6 +13,7 @@ Menagerist is a self-hostable collection management platform: a SvelteKit SPA, F
 | System/data-model changes  | [ARCHITECTURE.md](docs/ARCHITECTURE.md) and relevant [DECISIONS.md](docs/DECISIONS.md) entries                        |
 | Product direction          | Overview and quickstart in [README.md](README.md); the backlog is tracked outside the repository                      |
 | Cross-stack data/contracts | [shared/README.md](shared/README.md)                                                                                  |
+| API routes or OpenAPI      | [API_STYLE.md](docs/API_STYLE.md); `poe lint-schema` after `poe dump-schema`                                          |
 | Dependency changes         | `.github/renovate.json` and the dependency policy below                                                               |
 
 Load relevant sections, not every linked document. Keep rules in their owning document; link rather than duplicate. Document facts verified against the code, not temporary task notes.

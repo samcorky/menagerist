@@ -1,0 +1,34 @@
+# Ruleset for `poe lint-schema`. It extends the IBM Cloud OpenAPI ruleset and records where
+# Menagerist deliberately differs; the reasons are in docs/API_STYLE.md. Only errors fail
+# the check, so a rule that still has findings is "warn" until they are fixed, then "error".
+extends: "@ibm-cloud/openapi-ruleset"
+
+rules:
+  # --- Deliberate divergences (off) -------------------------------------------------
+  # Lists are bare arrays; paging is keyset (`after`/`limit`) with `Link` and `Total-Count` headers.
+  ibm-no-array-responses: off
+  # Errors are RFC 9457 `application/problem+json`, not `application/json`.
+  ibm-error-content-type-is-json: off
+  # FastAPI answers invalid payloads with 422 and the generated client depends on it.
+  ibm-response-status-codes: off
+  # `node-types` and `edge-types` are pinned by test_openapi_path_style.py.
+  ibm-path-segment-casing-convention: off
+  # Ids are uuid7, so `/backups/prune` cannot clash with `/backups/{backup_id}`.
+  ibm-no-ambiguous-paths: off
+  # Pydantic emits OpenAPI 3.1 `anyOf: [X, {type: null}]`, which this rule does not understand.
+  ibm-schema-type-format: off
+  # FastAPI inlines response models; naming them would change generated client types.
+  ibm-avoid-inline-schemas: off
+  # Bounds and formats on every string, integer and array are noise; add them where they carry meaning.
+  ibm-string-attributes: off
+  ibm-integer-attributes: off
+  ibm-array-attributes: off
+
+  # --- Findings to fix, then raise to "error" ---------------------------------------
+  ibm-enum-casing-convention: warn
+  ibm-property-casing-convention: warn
+  ibm-precondition-headers: warn
+  ibm-required-array-properties-in-response: warn
+  ibm-schema-keywords: warn
+  no-$ref-siblings: warn
+  ibm-accept-and-return-models: warn

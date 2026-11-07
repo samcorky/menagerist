@@ -1,0 +1,11 @@
+{
+  "name": "api-lint",
+  "private": true,
+  "description": "Lints the committed openapi.json against the IBM API Handbook rules; see docs/API_STYLE.md",
+  "engines": {
+    "node": "^26.0.0"
+  },
+  "devDependencies": {
+    "ibm-openapi-validator": "1.38.8"
+  }
+}
