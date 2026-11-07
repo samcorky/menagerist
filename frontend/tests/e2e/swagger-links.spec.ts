@@ -42,7 +42,7 @@ test('a response link opens the next operation with the id filled in', async ({ 
 	const target = page.locator('.opblock[id$="-download_user_export"]');
 	await expect(target.locator('.opblock-body')).toBeVisible();
 	await expect(target.getByRole('button', { name: 'Execute' })).toBeVisible();
-	await expect(target.locator('input[placeholder="backup_id"]')).toHaveValue(id!);
+	await expect(target.locator('input[placeholder="export_id"]')).toHaveValue(id!);
 	// The opened operation is brought into view and takes focus, so a keyboard or screen-reader
 	// user lands on it instead of having to find it by hand.
 	await expect
