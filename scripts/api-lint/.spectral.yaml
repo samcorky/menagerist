@@ -19,6 +19,8 @@ rules:
   ibm-schema-type-format: off
   # FastAPI inlines response models; naming them would change generated client types.
   ibm-avoid-inline-schemas: off
+  # Request models are `XxxRequest` (backend/README.md), not IBM's `...Prototype` and `...Patch`.
+  ibm-schema-naming-convention: off
   # Bounds and formats on every string, integer and array are noise; add them where they carry meaning.
   ibm-string-attributes: off
   ibm-integer-attributes: off

@@ -145,6 +145,19 @@ def _normalise_openapi_schemas(openapi_schema: dict[str, Any]) -> None:
     openapi_schema["components"]["schemas"] = dict(sorted(components.items()))
 
 
+def _declare_merge_patch(openapi_schema: dict[str, Any]) -> None:
+    """Declare PATCH bodies as RFC 7396 merge patches.
+
+    A PATCH body is a partial resource: an omitted field is unchanged and an explicit
+    null clears an optional one. FastAPI parses any ``+json`` media type as JSON, so
+    only the contract needs to say so.
+    """
+    for operations in openapi_schema.get("paths", {}).values():
+        content = operations.get("patch", {}).get("requestBody", {}).get("content", {})
+        if "application/json" in content:
+            content["application/merge-patch+json"] = content.pop("application/json")
+
+
 def configure_openapi(app: FastAPI) -> None:
     """Attach customised OpenAPI schema generation and tag metadata."""
     app.openapi_tags = OPENAPI_TAGS
@@ -170,6 +183,7 @@ def configure_openapi(app: FastAPI) -> None:
             "altText": f"{app.title} logo",
         }
         _normalise_openapi_schemas(openapi_schema)
+        _declare_merge_patch(openapi_schema)
         add_conventional_links(openapi_schema)
         add_error_responses(openapi_schema)
         app.openapi_schema = openapi_schema

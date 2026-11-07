@@ -4138,7 +4138,7 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
+            "application/merge-patch+json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateNodeRequest"
               }
@@ -6289,7 +6289,7 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
+            "application/merge-patch+json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateEdgeRequest"
               }
@@ -7352,7 +7352,7 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
+            "application/merge-patch+json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateNodeTypeRequest"
               }
@@ -8996,7 +8996,7 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
+            "application/merge-patch+json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateEdgeTypeRequest"
               }
@@ -10640,7 +10640,7 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
+            "application/merge-patch+json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateMediaRequest"
               }
@@ -14035,7 +14035,7 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
+            "application/merge-patch+json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdatePresetRequest"
               }
@@ -15322,7 +15322,7 @@
         "operationId": "update_instance_settings",
         "requestBody": {
           "content": {
-            "application/json": {
+            "application/merge-patch+json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateSettingsRequest"
               },
@@ -17409,7 +17409,7 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
+            "application/merge-patch+json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateCollectionRequest"
               }
@@ -19120,7 +19120,7 @@
         "operationId": "update_current_user",
         "requestBody": {
           "content": {
-            "application/json": {
+            "application/merge-patch+json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateMeRequest"
               }
@@ -20309,7 +20309,7 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
+            "application/merge-patch+json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateUserRequest"
               }
