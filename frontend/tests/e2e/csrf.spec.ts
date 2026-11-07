@@ -20,7 +20,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
 	await new Promise((resolve) => foreignServer.close(resolve));
 });
-const COLLECTION = '/api/v1/collection';
+const COLLECTION = '/api/v1/collections';
 
 test.describe('cross-site mutations', () => {
 	test('a page on another origin cannot change anything, while the app can', async ({

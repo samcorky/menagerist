@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
     from app.modules.graph.ports.unit_of_work import GraphRepos
 
-BASE = "/api/v1/node"
+BASE = "/api/v1/nodes"
 ALICE = uuid.UUID(int=101)
 BOB = uuid.UUID(int=102)
 
@@ -149,7 +149,7 @@ def test_restore_a_live_or_unknown_item_is_404(world: _World) -> None:
 def test_restore_when_the_type_was_deleted_is_a_409(world: _World) -> None:
     """The problem names the slug."""
     client = world.client
-    client.post("/api/v1/node-type", json={"slug": "film", "label": "Film"})
+    client.post("/api/v1/node-types", json={"slug": "film", "label": "Film"})
     item = world.create("Alien", type="film")
     client.delete(f"{BASE}/{item}")
     asyncio.run(_delete_type(world.repos, "film"))

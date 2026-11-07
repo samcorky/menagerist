@@ -4,7 +4,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { getContext } from 'svelte';
-	import { countEdgeTypeAttributeUsage, countNodeTypeAttributeUsage } from '$lib/api/client';
+	import { getEdgeTypeAttributeUsage, getNodeTypeAttributeUsage } from '$lib/api/client';
 	import { optionRemovalWarning } from '$lib/field-usage';
 	import { SCHEMA_TYPE_CONTEXT, type SchemaTypeContext } from '$lib/schema-type-context';
 	import type { EditorField } from '$lib/schema-types';
@@ -43,11 +43,11 @@
 		try {
 			const result =
 				kind === 'node'
-					? await countNodeTypeAttributeUsage({
+					? await getNodeTypeAttributeUsage({
 							path: { node_type_id: typeId, key: field.key },
 							query: { value: opt }
 						})
-					: await countEdgeTypeAttributeUsage({
+					: await getEdgeTypeAttributeUsage({
 							path: { edge_type_id: typeId, key: field.key },
 							query: { value: opt }
 						});

@@ -84,7 +84,7 @@ test('a base pack cannot be removed while its add-on is installed, then both go'
 	expect(await nodesNamed(request, 'Quillfeather Quarry')).toHaveLength(0);
 	expect(await nodesNamed(request, 'Lantern Harbour')).toHaveLength(0);
 	expect(await mediaOf(request, extra.id)).toHaveLength(0);
-	const collections = (await (await request.get('/api/v1/collection?limit=100')).json()) as {
+	const collections = (await (await request.get('/api/v1/collections?limit=100')).json()) as {
 		name: string;
 	}[];
 	expect(collections.some((c) => c.name === 'Weeknight picks')).toBe(false);

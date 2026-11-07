@@ -10,7 +10,7 @@ from app.modules.identity.domain.errors import PasswordExpiredError
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-URL = "/api/v1/auth/me/permissions"
+URL = "/api/v1/me/permissions"
 CONTENT = [
     "backup:own_data:export",
     "backup:own_data:import",

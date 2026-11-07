@@ -97,7 +97,7 @@ def test_conventional_links_are_named_after_the_target(schema: dict[str, Any]) -
         "parameters": {"node_id": "$response.body#/id"},
         "description": "Get node with the id from this response.",
     }
-    assert set(links) == {"GetNode", "UpdateNode", "DeleteNode"}
+    assert set(links) == {"GetNode", "UpdateNode", "DeleteNode", "ListNodeMedia"}
 
 
 def test_restore_and_purge_links_are_declared_on_the_deleted_lists_only(
@@ -147,7 +147,7 @@ def test_personal_export_links_are_written_on_the_routes(
     assert created["DownloadExport"]["operationId"] == "download_user_export"
     assert created["DeleteExport"]["operationId"] == "delete_user_export"
     assert listed["DownloadExport"]["parameters"] == {
-        "backup_id": "$response.body#/0/id"
+        "export_id": "$response.body#/0/id"
     }
 
 

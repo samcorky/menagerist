@@ -63,7 +63,7 @@ from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ForbiddenError
 
 router = APIRouter(
-    prefix="/node-type", tags=["Node Types"], route_class=PermissionAwareRoute
+    prefix="/node-types", tags=["Node Types"], route_class=PermissionAwareRoute
 )
 
 
@@ -192,9 +192,9 @@ async def delete_node_type(
 
 
 @router.get(
-    "/{node_type_id}/attribute/{key}/usage",
+    "/{node_type_id}/attributes/{key}/usage",
     response_model=AttributeUsageResponse,
-    operation_id="count_node_type_attribute_usage",
+    operation_id="get_node_type_attribute_usage",
     responses=error_response(
         NodeTypeNotFoundError,
         detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
@@ -226,7 +226,7 @@ async def count_node_type_attribute_usage(
 
 
 @router.get(
-    "/{node_type_id}/attribute/{key}/values",
+    "/{node_type_id}/attributes/{key}/values",
     response_model=list[AttributeValueCountResponse],
     operation_id="list_attribute_values",
     responses=error_response(
@@ -257,7 +257,7 @@ async def list_attribute_values(
 
 
 @router.delete(
-    "/{node_type_id}/attribute/{key}",
+    "/{node_type_id}/attributes/{key}",
     status_code=204,
     operation_id="purge_node_type_attribute",
     responses={

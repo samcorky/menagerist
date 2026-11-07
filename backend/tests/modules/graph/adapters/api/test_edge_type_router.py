@@ -54,7 +54,7 @@ def test_create_get_list_and_404_round_trip() -> None:
     client = TestClient(_app_with_in_memory_graph())
 
     create_response = client.post(
-        "/api/v1/edge-type",
+        "/api/v1/edge-types",
         json={
             "slug": "directed-by",
             "label": "Directed By",
@@ -69,15 +69,15 @@ def test_create_get_list_and_404_round_trip() -> None:
     assert et["reverse_label"] == "Directed"
     assert et["directional"] is True
 
-    get_response = client.get(f"/api/v1/edge-type/{et['id']}")
+    get_response = client.get(f"/api/v1/edge-types/{et['id']}")
     assert get_response.status_code == 200
     assert get_response.json() == et
 
-    list_response = client.get("/api/v1/edge-type")
+    list_response = client.get("/api/v1/edge-types")
     assert list_response.status_code == 200
     assert et in list_response.json()
 
-    missing_response = client.get(f"/api/v1/edge-type/{uuid.uuid4()}")
+    missing_response = client.get(f"/api/v1/edge-types/{uuid.uuid4()}")
     assert missing_response.status_code == 404
     assert missing_response.json()["title"] == "EdgeTypeNotFoundError"
 
@@ -86,11 +86,11 @@ def test_create_edge_type_returns_409_on_slug_conflict() -> None:
     """POST with a duplicate slug returns 409."""
     client = TestClient(_app_with_in_memory_graph())
     client.post(
-        "/api/v1/edge-type", json={"slug": "directed-by", "label": "Directed By"}
+        "/api/v1/edge-types", json={"slug": "directed-by", "label": "Directed By"}
     )
 
     response = client.post(
-        "/api/v1/edge-type", json={"slug": "directed-by", "label": "Duplicate"}
+        "/api/v1/edge-types", json={"slug": "directed-by", "label": "Duplicate"}
     )
 
     assert response.status_code == 409
@@ -100,11 +100,11 @@ def test_update_edge_type_applies_changes() -> None:
     """PATCH updates editable fields and leaves slug unchanged."""
     client = TestClient(_app_with_in_memory_graph())
     et = client.post(
-        "/api/v1/edge-type", json={"slug": "directed-by", "label": "Directed By"}
+        "/api/v1/edge-types", json={"slug": "directed-by", "label": "Directed By"}
     ).json()
 
     update_response = client.patch(
-        f"/api/v1/edge-type/{et['id']}",
+        f"/api/v1/edge-types/{et['id']}",
         json={"label": "Helmed By", "reverse_label": "Helmed"},
     )
 
@@ -120,7 +120,7 @@ def test_update_edge_type_returns_404_when_missing() -> None:
     client = TestClient(_app_with_in_memory_graph())
 
     response = client.patch(
-        f"/api/v1/edge-type/{uuid.uuid4()}", json={"label": "Ghost"}
+        f"/api/v1/edge-types/{uuid.uuid4()}", json={"label": "Ghost"}
     )
 
     assert response.status_code == 404
@@ -130,21 +130,21 @@ def test_delete_edge_type_then_get_returns_404() -> None:
     """DELETE soft-deletes the edge type; subsequent GET returns 404."""
     client = _admin_client()
     et = client.post(
-        "/api/v1/edge-type", json={"slug": "directed-by", "label": "Directed By"}
+        "/api/v1/edge-types", json={"slug": "directed-by", "label": "Directed By"}
     ).json()
 
-    delete_response = client.delete(f"/api/v1/edge-type/{et['id']}")
+    delete_response = client.delete(f"/api/v1/edge-types/{et['id']}")
     assert delete_response.status_code == 204
 
-    assert client.get(f"/api/v1/edge-type/{et['id']}").status_code == 404
-    assert et not in client.get("/api/v1/edge-type").json()
+    assert client.get(f"/api/v1/edge-types/{et['id']}").status_code == 404
+    assert et not in client.get("/api/v1/edge-types").json()
 
 
 def test_delete_edge_type_returns_404_when_missing() -> None:
     """DELETE on a nonexistent edge type returns 404."""
     client = _admin_client()
 
-    response = client.delete(f"/api/v1/edge-type/{uuid.uuid4()}")
+    response = client.delete(f"/api/v1/edge-types/{uuid.uuid4()}")
 
     assert response.status_code == 404
 
@@ -153,12 +153,12 @@ def test_delete_edge_type_returns_409_when_edges_still_use_it() -> None:
     """DELETE returns 409 when active edges reference the edge type."""
     client = _admin_client()
     et = client.post(
-        "/api/v1/edge-type", json={"slug": "directed-by", "label": "Directed By"}
+        "/api/v1/edge-types", json={"slug": "directed-by", "label": "Directed By"}
     ).json()
-    source = client.post("/api/v1/node", json={"name": "Ridley Scott"}).json()
-    target = client.post("/api/v1/node", json={"name": "Alien"}).json()
+    source = client.post("/api/v1/nodes", json={"name": "Ridley Scott"}).json()
+    target = client.post("/api/v1/nodes", json={"name": "Alien"}).json()
     client.post(
-        "/api/v1/edge",
+        "/api/v1/edges",
         json={
             "source_id": source["id"],
             "target_id": target["id"],
@@ -166,7 +166,7 @@ def test_delete_edge_type_returns_409_when_edges_still_use_it() -> None:
         },
     )
 
-    response = client.delete(f"/api/v1/edge-type/{et['id']}")
+    response = client.delete(f"/api/v1/edge-types/{et['id']}")
 
     assert response.status_code == 409
     assert response.json()["title"] == "EdgeTypeInUseError"
@@ -176,17 +176,17 @@ def test_delete_edge_type_succeeds_when_no_active_edges_use_it() -> None:
     """DELETE succeeds when no active edges reference the edge type."""
     client = _admin_client()
     et = client.post(
-        "/api/v1/edge-type", json={"slug": "directed-by", "label": "Directed By"}
+        "/api/v1/edge-types", json={"slug": "directed-by", "label": "Directed By"}
     ).json()
     # A different edge type's edges should not block this deletion
-    source = client.post("/api/v1/node", json={"name": "Ridley Scott"}).json()
-    target = client.post("/api/v1/node", json={"name": "Alien"}).json()
+    source = client.post("/api/v1/nodes", json={"name": "Ridley Scott"}).json()
+    target = client.post("/api/v1/nodes", json={"name": "Alien"}).json()
     client.post(
-        "/api/v1/edge",
+        "/api/v1/edges",
         json={"source_id": source["id"], "target_id": target["id"], "type": "produced"},
     )
 
-    response = client.delete(f"/api/v1/edge-type/{et['id']}")
+    response = client.delete(f"/api/v1/edge-types/{et['id']}")
 
     assert response.status_code == 204
 
@@ -201,7 +201,7 @@ def test_attributes_schema_round_trips_through_create_and_update() -> None:
     }
 
     et = client.post(
-        "/api/v1/edge-type",
+        "/api/v1/edge-types",
         json={
             "slug": "directed-by",
             "label": "Directed By",
@@ -216,7 +216,7 @@ def test_attributes_schema_round_trips_through_create_and_update() -> None:
         "properties": {},
     }
     updated = client.patch(
-        f"/api/v1/edge-type/{et['id']}",
+        f"/api/v1/edge-types/{et['id']}",
         json={"attributes_schema": new_schema},
     ).json()
     assert updated["attributes_schema"] == new_schema
@@ -226,13 +226,13 @@ def test_attribute_usage_and_purge_round_trip() -> None:
     """Usage counts edges holding a key; purge removes it and answers 204."""
     client = _admin_client()
     et = client.post(
-        "/api/v1/edge-type", json={"slug": "directed-by", "label": "Directed by"}
+        "/api/v1/edge-types", json={"slug": "directed-by", "label": "Directed by"}
     ).json()
-    source = client.post("/api/v1/node", json={"name": "Alien"}).json()
-    target = client.post("/api/v1/node", json={"name": "Ridley Scott"}).json()
+    source = client.post("/api/v1/nodes", json={"name": "Alien"}).json()
+    target = client.post("/api/v1/nodes", json={"name": "Ridley Scott"}).json()
     for attrs in ({"old": 1}, {"old": 2}, {}):
         client.post(
-            "/api/v1/edge",
+            "/api/v1/edges",
             json={
                 "source_id": source["id"],
                 "target_id": target["id"],
@@ -240,7 +240,7 @@ def test_attribute_usage_and_purge_round_trip() -> None:
                 "attributes": attrs,
             },
         )
-    base = f"/api/v1/edge-type/{et['id']}/attribute/old"
+    base = f"/api/v1/edge-types/{et['id']}/attributes/old"
 
     assert client.get(f"{base}/usage").json() == {"count": 2}
     purge = client.delete(base)
@@ -252,7 +252,7 @@ def test_attribute_usage_and_purge_round_trip() -> None:
 def test_attribute_usage_and_purge_return_404_for_missing_type() -> None:
     """Both endpoints report a missing edge type as 404."""
     client = _admin_client()
-    base = f"/api/v1/edge-type/{uuid.uuid4()}/attribute/old"
+    base = f"/api/v1/edge-types/{uuid.uuid4()}/attributes/old"
 
     assert client.get(f"{base}/usage").status_code == 404
     assert client.delete(base).status_code == 404
@@ -262,13 +262,13 @@ def test_attribute_usage_can_filter_by_value() -> None:
     """`?value=` counts only edges whose attribute equals that string."""
     client = TestClient(_app_with_in_memory_graph())
     et = client.post(
-        "/api/v1/edge-type", json={"slug": "directed-by", "label": "Directed by"}
+        "/api/v1/edge-types", json={"slug": "directed-by", "label": "Directed by"}
     ).json()
-    source = client.post("/api/v1/node", json={"name": "Alien"}).json()
-    target = client.post("/api/v1/node", json={"name": "Ridley Scott"}).json()
+    source = client.post("/api/v1/nodes", json={"name": "Alien"}).json()
+    target = client.post("/api/v1/nodes", json={"name": "Ridley Scott"}).json()
     for status in ("Draft", "Live"):
         client.post(
-            "/api/v1/edge",
+            "/api/v1/edges",
             json={
                 "source_id": source["id"],
                 "target_id": target["id"],
@@ -276,7 +276,7 @@ def test_attribute_usage_can_filter_by_value() -> None:
                 "attributes": {"status": status},
             },
         )
-    base = f"/api/v1/edge-type/{et['id']}/attribute/status/usage"
+    base = f"/api/v1/edge-types/{et['id']}/attributes/status/usage"
 
     assert client.get(base, params={"value": "Draft"}).json() == {"count": 1}
 
@@ -285,12 +285,12 @@ def test_attribute_usage_and_purge_can_target_a_group_sub_key() -> None:
     """`?sub_key=` counts and purges rows of a group array, not the whole key."""
     client = _admin_client()
     et = client.post(
-        "/api/v1/edge-type", json={"slug": "loaned-to", "label": "Loaned to"}
+        "/api/v1/edge-types", json={"slug": "loaned-to", "label": "Loaned to"}
     ).json()
-    source = client.post("/api/v1/node", json={"name": "Drill"}).json()
-    target = client.post("/api/v1/node", json={"name": "Neighbour"}).json()
+    source = client.post("/api/v1/nodes", json={"name": "Drill"}).json()
+    target = client.post("/api/v1/nodes", json={"name": "Neighbour"}).json()
     client.post(
-        "/api/v1/edge",
+        "/api/v1/edges",
         json={
             "source_id": source["id"],
             "target_id": target["id"],
@@ -298,7 +298,7 @@ def test_attribute_usage_and_purge_can_target_a_group_sub_key() -> None:
             "attributes": {"terms": [{"note": "care", "duration": "2w"}]},
         },
     )
-    base = f"/api/v1/edge-type/{et['id']}/attribute/terms"
+    base = f"/api/v1/edge-types/{et['id']}/attributes/terms"
 
     assert client.get(f"{base}/usage", params={"sub_key": "duration"}).json() == {
         "count": 1

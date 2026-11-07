@@ -23,7 +23,7 @@
     "/auth/login",
     "/auth/logout",
     "/auth/setup",
-    "/auth/password",
+    "/me/password",
   ];
 
   /**
@@ -186,7 +186,7 @@
    * cannot mask a bad token. The token is only ever sent as the header.
    */
   function checkToken(token, fetchFn) {
-    return (fetchFn || fetch)(API_PREFIX + "/auth/me/permissions", {
+    return (fetchFn || fetch)(API_PREFIX + "/me/permissions", {
       credentials: "omit",
       headers: { Accept: "application/json", Authorization: "Bearer " + token },
     }).then(
@@ -784,12 +784,12 @@
       state = Object.assign({}, state, { checking: true });
       paint();
       ensure();
-      // The sign-in state comes from /auth/me; a failing /auth/status only loses the setup hint.
+      // The sign-in state comes from /me; a failing /auth/status only loses the setup hint.
       return Promise.all([
         fetchJson(API_PREFIX + "/auth/status", false).catch(function () {
           return null;
         }),
-        fetchJson(API_PREFIX + "/auth/me", true).then(
+        fetchJson(API_PREFIX + "/me", true).then(
           function (me) {
             return { me: me, failed: false };
           },

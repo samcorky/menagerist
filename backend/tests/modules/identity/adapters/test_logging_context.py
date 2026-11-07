@@ -53,6 +53,7 @@ if TYPE_CHECKING:
 pytestmark = pytest.mark.real_actor
 
 AUTH = "/api/v1/auth"
+ME = "/api/v1/me"
 PROBE = "/api/v1/_probe"
 COOKIE = "menagerist-session"
 SETUP_BODY = {"username": "Admin", "display_name": "Admin", "password": "password-123"}
@@ -364,12 +365,12 @@ def test_no_secret_reaches_any_log_event(
     client, _ = api.sign_in("admin")
     first_token = client.cookies[COOKIE]
     cookie_header = f"{COOKIE}={first_token}"
-    client.get(f"{AUTH}/me")
+    client.get(f"{ME}")
     client.get(PROBE)
     new_password = "a-brand-new-passphrase"
     changed = api.post(
         client,
-        f"{AUTH}/password",
+        f"{ME}/password",
         {"current_password": SETUP_BODY["password"], "new_password": new_password},
     )
     assert changed.status_code == 200

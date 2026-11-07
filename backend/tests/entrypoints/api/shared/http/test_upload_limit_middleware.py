@@ -26,7 +26,7 @@ ALLOWANCE = upload_limit_middleware._OVERHEAD_ALLOWANCE
 
 @pytest.mark.parametrize(
     "path",
-    ["/api/v1/backup/upload", "/api/v1/backups/restore", "/api/v1/me/import"],
+    ["/api/v1/backups/upload", "/api/v1/backups/restore", "/api/v1/me/import"],
 )
 async def test_archive_uploads_use_backup_limit(
     path: str, monkeypatch: pytest.MonkeyPatch
@@ -280,7 +280,11 @@ async def test_body_within_the_limit_passes_through() -> None:
 
 @pytest.mark.parametrize(
     ("method", "path"),
-    [("POST", "/api/v1/node"), ("PATCH", "/api/v1/media"), ("POST", "/api/v1/media/x")],
+    [
+        ("POST", "/api/v1/nodes"),
+        ("PATCH", "/api/v1/media"),
+        ("POST", "/api/v1/media/x"),
+    ],
 )
 async def test_other_requests_are_not_limited(method: str, path: str) -> None:
     """Only the two upload routes are guarded."""

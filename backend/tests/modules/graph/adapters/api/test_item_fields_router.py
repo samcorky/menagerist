@@ -1,4 +1,4 @@
-"""GET /node/item-fields: the per-item fields in use, per person.
+"""GET /nodes/fields: the per-item fields in use, per person.
 
 Sign-in is enforced for every route by test_authenticated_routes.
 """
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 ALICE = uuid.UUID(int=101)
 BOB = uuid.UUID(int=102)
-URL = "/api/v1/node/item-fields"
+URL = "/api/v1/nodes/fields"
 SCHEMA = {
     "type": "object",
     "properties": {

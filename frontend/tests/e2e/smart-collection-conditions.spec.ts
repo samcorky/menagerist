@@ -23,7 +23,7 @@ const { makeCollection, makeItemType, trackCollection, trackCollectionFromUrl, c
 const seededItemIds: string[] = [];
 
 test.afterEach(async ({ request }) => {
-	for (const id of seededItemIds.splice(0)) await request.delete(`/api/v1/node/${id}`);
+	for (const id of seededItemIds.splice(0)) await request.delete(`/api/v1/nodes/${id}`);
 	await cleanUp(request);
 });
 
@@ -37,7 +37,7 @@ async function makeItem(
 	name: string,
 	extra: { description?: string; type?: string } = {}
 ) {
-	const res = await request.post('/api/v1/node', { data: { name, ...extra } });
+	const res = await request.post('/api/v1/nodes', { data: { name, ...extra } });
 	expect(res.status(), await res.text()).toBe(201);
 	const created = (await res.json()) as { id: string };
 	seededItemIds.push(created.id);
@@ -56,7 +56,7 @@ async function attachImage(request: APIRequestContext, itemId: string) {
 }
 
 async function addToCollection(request: APIRequestContext, collectionId: string, itemId: string) {
-	const res = await request.put(`/api/v1/collection/${collectionId}/item`, {
+	const res = await request.put(`/api/v1/collections/${collectionId}/items`, {
 		data: { item_ids: [itemId] }
 	});
 	expect(res.ok(), await res.text()).toBeTruthy();
@@ -67,7 +67,7 @@ async function makeSmart(
 	name: string,
 	children: unknown[]
 ): Promise<Smart> {
-	const res = await request.post('/api/v1/collection', {
+	const res = await request.post('/api/v1/collections', {
 		data: { name, definition: { v: 1, where: { op: 'and', children }, sort: [] } }
 	});
 	expect(res.status(), await res.text()).toBe(201);
@@ -235,7 +235,7 @@ test('a deleted collection used by a condition shows as deleted, with a warning'
 	const smart = await makeSmart(request, uniqueName('Uses doomed'), [
 		{ kind: 'collection', mode: 'any', in: [manual.id] }
 	]);
-	const gone = await request.delete(`/api/v1/collection/${manual.id}`);
+	const gone = await request.delete(`/api/v1/collections/${manual.id}`);
 	expect(gone.ok(), await gone.text()).toBeTruthy();
 
 	await page.goto(`/collections/${smart.slug}`);
@@ -332,7 +332,7 @@ test('a collection cannot refer to itself: the save is refused with a message', 
 
 	// The API refuses the direct reference and the loop through the second collection.
 	for (const target of [first.id, second.id]) {
-		const res = await request.patch(`/api/v1/collection/${first.id}`, {
+		const res = await request.patch(`/api/v1/collections/${first.id}`, {
 			data: {
 				definition: {
 					v: 1,
@@ -379,12 +379,12 @@ test('another user cannot see or count your collections through a condition', as
 	await admin.dispose();
 	const b = await asUser(browser, other);
 	try {
-		const theirs = await b.request.post('/api/v1/node', { data: { name: `Theirs${s}` } });
+		const theirs = await b.request.post('/api/v1/nodes', { data: { name: `Theirs${s}` } });
 		expect(theirs.status()).toBe(201);
 		const theirId = ((await theirs.json()) as { id: string }).id;
 
 		const search = async (mode: 'any' | 'none', ids: string[]) => {
-			const res = await b.request.post('/api/v1/node/search', {
+			const res = await b.request.post('/api/v1/nodes/search', {
 				data: {
 					query: {
 						v: 1,
@@ -418,11 +418,11 @@ test('another user cannot see or count your collections through a condition', as
 			}
 		}
 		// Their own item is still found without the condition, so the zero above is the condition.
-		const plain = await b.request.get(`/api/v1/node?q=Theirs${s}`);
+		const plain = await b.request.get(`/api/v1/nodes?q=Theirs${s}`);
 		expect(((await plain.json()) as { id: string }[]).map((n) => n.id)).toContain(theirId);
 
 		// A smart collection of theirs cannot be made to count yours either.
-		const made = await b.request.post('/api/v1/collection', {
+		const made = await b.request.post('/api/v1/collections', {
 			data: {
 				name: `Spy ${s}`,
 				definition: {
@@ -437,13 +437,13 @@ test('another user cannot see or count your collections through a condition', as
 		expect(spy.item_count).toBe(0);
 		expect(
 			(
-				(await (await b.request.get(`/api/v1/collection/${spy.id}/count`)).json()) as {
+				(await (await b.request.get(`/api/v1/collections/${spy.id}/items/count`)).json()) as {
 					count: number;
 				}
 			).count
 		).toBe(0);
-		await b.request.delete(`/api/v1/collection/${spy.id}`);
-		await b.request.delete(`/api/v1/node/${theirId}`);
+		await b.request.delete(`/api/v1/collections/${spy.id}`);
+		await b.request.delete(`/api/v1/nodes/${theirId}`);
 	} finally {
 		await b.context.close();
 	}
@@ -453,7 +453,7 @@ test('the collections picker shows an error with Retry when the list cannot be l
 	page
 }) => {
 	let failing = true;
-	await page.route(/\/api\/v1\/collection(\?[^/]*)?$/, (route) => {
+	await page.route(/\/api\/v1\/collections(\?[^/]*)?$/, (route) => {
 		if (failing && route.request().method() === 'GET') {
 			return route.fulfill({
 				status: 500,

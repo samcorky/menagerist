@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 pytestmark = pytest.mark.integration
 
-_INSTALL = "/api/v1/example/demo/installation"
+_INSTALL = "/api/v1/examples/demo/installation"
 _PACK: dict[str, Any] = {
     "format": "menagerist-example-pack",
     "version": 2,
@@ -105,29 +105,29 @@ def _uninstall(client: TestClient) -> dict[str, Any]:
 
 
 def _collections(client: TestClient) -> dict[str, dict[str, Any]]:
-    response = client.get("/api/v1/collection")
+    response = client.get("/api/v1/collections")
     assert response.status_code == 200, response.text
     return {c["name"]: c for c in response.json()}
 
 
 def _items(client: TestClient) -> dict[str, str]:
-    response = client.get("/api/v1/node?limit=100")
+    response = client.get("/api/v1/nodes?limit=100")
     assert response.status_code == 200, response.text
     return {n["name"]: n["id"] for n in response.json()}
 
 
 def _members(client: TestClient, collection_id: str) -> set[str]:
-    response = client.get(f"/api/v1/node?collection={collection_id}")
+    response = client.get(f"/api/v1/nodes?collection={collection_id}")
     assert response.status_code == 200, response.text
     return {n["name"] for n in response.json()}
 
 
 def _own_collection(client: TestClient, name: str, item_ids: list[str]) -> str:
-    created = client.post("/api/v1/collection", json={"name": name})
+    created = client.post("/api/v1/collections", json={"name": name})
     assert created.status_code == 201, created.text
     collection_id: str = created.json()["id"]
     put = client.put(
-        f"/api/v1/collection/{collection_id}/item", json={"item_ids": item_ids}
+        f"/api/v1/collections/{collection_id}/items", json={"item_ids": item_ids}
     )
     assert put.status_code == 200, put.text
     return collection_id
@@ -151,7 +151,7 @@ def test_install_creates_collections_with_members_and_slugs(
     assert collections["Duo"]["item_count"] == 2
     assert _members(client, collections["Duo"]["id"]) == {"A", "B"}
     assert _members(client, collections["Solo"]["id"]) == {"C"}
-    listed = client.get("/api/v1/example").json()
+    listed = client.get("/api/v1/examples").json()
     assert listed[0]["installation"]["counts"]["collections"] == 2
 
 
@@ -160,13 +160,13 @@ def test_entities_lists_the_collection_ids(client: TestClient) -> None:
     _install(client)
     collections = _collections(client)
 
-    body = client.get("/api/v1/example/entities").json()
+    body = client.get("/api/v1/examples/entities").json()
 
     assert set(body["collection_ids"]) == {c["id"] for c in collections.values()}
     assert len(body["item_ids"]) == 3
 
     _uninstall(client)
-    assert client.get("/api/v1/example/entities").json()["collection_ids"] == []
+    assert client.get("/api/v1/examples/entities").json()["collection_ids"] == []
 
 
 def test_uninstalling_an_untouched_install_removes_everything(
@@ -181,14 +181,14 @@ def test_uninstalling_an_untouched_install_removes_everything(
     assert result["removed"]["collections"] == 2
     assert _collections(client) == {}
     assert _items(client) == {}
-    assert client.get("/api/v1/node-type").json() == []
+    assert client.get("/api/v1/node-types").json() == []
 
 
 def test_a_renamed_collection_is_kept_with_its_items(client: TestClient) -> None:
     """Renaming an example collection keeps it and its members; the rest goes."""
     _install(client)
     duo = _collections(client)["Duo"]
-    renamed = client.patch(f"/api/v1/collection/{duo['id']}", json={"name": "Mine"})
+    renamed = client.patch(f"/api/v1/collections/{duo['id']}", json={"name": "Mine"})
     assert renamed.status_code == 200, renamed.text
 
     result = _uninstall(client)
@@ -221,11 +221,11 @@ def test_a_users_item_added_to_an_example_collection_keeps_it(
 ) -> None:
     """Adding the user's own item makes the example collection edited, so it stays."""
     _install(client)
-    client.post("/api/v1/node-type", json={"slug": "own", "label": "Own"})
-    own = client.post("/api/v1/node", json={"name": "Mine", "type": "own"}).json()
+    client.post("/api/v1/node-types", json={"slug": "own", "label": "Own"})
+    own = client.post("/api/v1/nodes", json={"name": "Mine", "type": "own"}).json()
     duo = _collections(client)["Duo"]
     put = client.put(
-        f"/api/v1/collection/{duo['id']}/item", json={"item_ids": [own["id"]]}
+        f"/api/v1/collections/{duo['id']}/items", json={"item_ids": [own["id"]]}
     )
     assert put.status_code == 200, put.text
 
@@ -244,7 +244,7 @@ def test_deleting_an_example_item_makes_its_collection_look_edited(
     """A user-deleted member changes the stored membership, so the collection stays."""
     _install(client)
     items = _items(client)
-    assert client.delete(f"/api/v1/node/{items['B']}").status_code == 204
+    assert client.delete(f"/api/v1/nodes/{items['B']}").status_code == 204
 
     result = _uninstall(client)
 
@@ -265,7 +265,7 @@ def test_reinstalling_adopts_a_kept_collection_as_the_user_left_it(
     duo = _collections(client)["Duo"]
     # Emptied by the user: edited, so kept, but it holds no items (and so no type).
     for item_id in _items(client).values():
-        client.delete(f"/api/v1/collection/{duo['id']}/item/{item_id}")
+        client.delete(f"/api/v1/collections/{duo['id']}/items/{item_id}")
     _uninstall(client)
     assert set(_collections(client)) == {"Duo"}
     assert _items(client) == {}
@@ -274,7 +274,7 @@ def test_reinstalling_adopts_a_kept_collection_as_the_user_left_it(
 
     assert again["adopted"]["collections"] == 1
     assert again["created"]["collections"] == 1
-    listed = client.get("/api/v1/collection").json()
+    listed = client.get("/api/v1/collections").json()
     assert sorted(c["slug"] for c in listed) == ["duo", "solo"]
     assert next(c for c in listed if c["slug"] == "duo")["id"] == duo["id"]
     assert _members(client, duo["id"]) == set()
@@ -286,7 +286,7 @@ def test_reinstalling_after_keeping_an_edited_collection_adopts_it(
     """Kept items, their type and the edited collection are reused, not duplicated."""
     _install(client)
     duo = _collections(client)["Duo"]
-    client.patch(f"/api/v1/collection/{duo['id']}", json={"name": "Mine"})
+    client.patch(f"/api/v1/collections/{duo['id']}", json={"name": "Mine"})
     _uninstall(client)
     kept_items = _items(client)
 
@@ -306,6 +306,6 @@ def test_reinstalling_after_keeping_an_edited_collection_adopts_it(
     assert {k: items[k] for k in ("A", "B")} == kept_items
     assert set(items) == {"A", "B", "C"}
     assert _members(client, duo["id"]) == {"A", "B"}
-    assert len(client.get("/api/v1/node-type").json()) == 1
+    assert len(client.get("/api/v1/node-types").json()) == 1
     # The adopted collection is left as the user has it; Solo is the pack's again.
-    assert len(client.get("/api/v1/example/entities").json()["collection_ids"]) == 2
+    assert len(client.get("/api/v1/examples/entities").json()["collection_ids"]) == 2

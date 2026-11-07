@@ -21,7 +21,7 @@ const TLS_URL = `https://localhost:${COOKIES_TLS_PORT}`;
 const STRIPPING_URL = `https://localhost:${COOKIES_STRIPPING_PORT}`;
 const PLAIN = 'menagerist-session';
 const PREFIXED = `__Host-Http-${PLAIN}`;
-const COLLECTION = '/api/v1/collection';
+const COLLECTION = '/api/v1/collections';
 
 // Pages are used once their elements appear; the `load` event also waits on fonts and images,
 // which stalls Firefox on a busy machine.
@@ -94,7 +94,7 @@ test.describe('over HTTPS', () => {
 		expect(await page.evaluate(() => document.cookie)).not.toContain(PLAIN);
 
 		// The page's own change passes the same-origin check in this engine.
-		expect(await fromPage(page, 'PATCH', '/api/v1/auth/me', { display_name: 'Renamed' })).toBe(200);
+		expect(await fromPage(page, 'PATCH', '/api/v1/me', { display_name: 'Renamed' })).toBe(200);
 	});
 
 	// Not every engine stores or sends these names the same way, so the invariant is only that a
@@ -121,7 +121,7 @@ test.describe('over HTTPS', () => {
 
 			let status: number;
 			try {
-				status = await fromPage(page, 'GET', '/api/v1/auth/me');
+				status = await fromPage(page, 'GET', '/api/v1/me');
 			} catch (error) {
 				// WebKit on Linux sometimes cannot send a control character in a cookie name at
 				// all; a name that is never sent cannot be accepted either.
@@ -141,7 +141,7 @@ test.describe('over HTTPS', () => {
 			.context()
 			.addCookies([{ name: PLAIN, value: real.value, url: TLS_URL, httpOnly: true }]);
 
-		expect(await fromPage(page, 'GET', '/api/v1/auth/me')).toBe(401);
+		expect(await fromPage(page, 'GET', '/api/v1/me')).toBe(401);
 	});
 
 	test('page script cannot create the prefixed cookie', async ({ page, browserName }) => {

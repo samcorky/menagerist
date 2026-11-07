@@ -22,7 +22,7 @@ _DRAIN_SECONDS = 30.0
 _UPLOAD_PATHS = frozenset({"/api/v1/media", "/api/v1/media/attached"})
 _BACKUP_PATHS = frozenset(
     {
-        "/api/v1/backup/upload",
+        "/api/v1/backups/upload",
         "/api/v1/backups/restore",
         "/api/v1/me/import",
     }

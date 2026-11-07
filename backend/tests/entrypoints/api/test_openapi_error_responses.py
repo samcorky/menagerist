@@ -136,18 +136,16 @@ def test_route_specific_entries_are_not_overwritten(schema: dict[str, Any]) -> N
     """Route specific entries are not overwritten."""
     login = schema["paths"]["/api/v1/auth/login"]["post"]["responses"]
     assert "another site" in login["403"]["description"]
-    revoke = schema["paths"]["/api/v1/auth/sessions/{session_id}"]["delete"][
-        "responses"
-    ]
+    revoke = schema["paths"]["/api/v1/me/sessions/{session_id}"]["delete"]["responses"]
     assert not revoke["404"]["description"].startswith("Not found, or not yours")
-    patch = schema["paths"]["/api/v1/node/{node_id}"]["patch"]["responses"]
+    patch = schema["paths"]["/api/v1/nodes/{node_id}"]["patch"]["responses"]
     assert patch["412"]["description"].startswith("Precondition failed")
 
 
 def test_bearer_operations_mention_invalid_token(schema: dict[str, Any]) -> None:
     """Bearer operations mention invalid token."""
-    node = schema["paths"]["/api/v1/node"]["post"]["responses"]
+    node = schema["paths"]["/api/v1/nodes"]["post"]["responses"]
     assert "invalid_token" in node["401"]["description"]
     assert "csrf_failed" in node["403"]["description"]
-    cookie_only = schema["paths"]["/api/v1/backup"]["get"]["responses"]
+    cookie_only = schema["paths"]["/api/v1/backups"]["get"]["responses"]
     assert "invalid_token" not in cookie_only["401"]["description"]

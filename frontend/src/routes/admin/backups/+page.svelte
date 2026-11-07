@@ -164,7 +164,10 @@
 			: `${(bytes / 1048576).toFixed(1)} MB`;
 	}
 	function downloadUrl(id: string) {
-		return client.buildUrl({ url: '/api/v1/backup/{backup_id}/download', path: { backup_id: id } });
+		return client.buildUrl({
+			url: '/api/v1/backups/{backup_id}/download',
+			path: { backup_id: id }
+		});
 	}
 </script>
 

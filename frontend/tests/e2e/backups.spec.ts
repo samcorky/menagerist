@@ -20,7 +20,7 @@ test('an administrator creates, verifies, downloads, uploads and deletes a backu
 		await page.getByRole('button', { name: 'Create backup', exact: true }).click();
 		await page.getByLabel('Backup label').fill(label);
 		const created = page.waitForResponse(
-			(res) => res.url().endsWith('/api/v1/backup') && res.request().method() === 'POST'
+			(res) => res.url().endsWith('/api/v1/backups') && res.request().method() === 'POST'
 		);
 		await page
 			.getByRole('dialog')
@@ -71,7 +71,7 @@ test('an administrator creates, verifies, downloads, uploads and deletes a backu
 			buffer: bytes
 		});
 		const uploaded = page.waitForResponse(
-			(res) => res.url().endsWith('/api/v1/backup/upload') && res.request().method() === 'POST'
+			(res) => res.url().endsWith('/api/v1/backups/upload') && res.request().method() === 'POST'
 		);
 		await page
 			.getByRole('dialog')
@@ -92,14 +92,14 @@ test('an administrator creates, verifies, downloads, uploads and deletes a backu
 		await expect(row).toHaveCount(1);
 		await expect(page.getByRole('button', { name: 'Create backup', exact: true })).toBeFocused();
 	} finally {
-		for (const id of ids) await request.delete(`/api/v1/backup/${id}`);
+		for (const id of ids) await request.delete(`/api/v1/backups/${id}`);
 	}
 });
 
 test('backup list failures can be retried and damaged uploads report an error', async ({
 	page
 }) => {
-	await page.route('**/api/v1/backup', (route) =>
+	await page.route('**/api/v1/backups', (route) =>
 		route.fulfill({
 			status: 503,
 			contentType: 'application/problem+json',
@@ -108,7 +108,7 @@ test('backup list failures can be retried and damaged uploads report an error', 
 	);
 	await page.goto('/admin/backups');
 	await expect(page.getByRole('alert')).toBeVisible();
-	await page.unroute('**/api/v1/backup');
+	await page.unroute('**/api/v1/backups');
 	await page.getByRole('button', { name: /Retry|Try again/ }).click();
 	await expect(page.getByRole('alert')).toHaveCount(0);
 	await page.getByRole('button', { name: 'Upload backup', exact: true }).click();
@@ -134,7 +134,7 @@ test('members cannot see backup controls or request the archive list', async ({
 	const session = await asUser(browser, member);
 	const archiveRequests: string[] = [];
 	session.page.on('request', (req) => {
-		if (new URL(req.url()).pathname.startsWith('/api/v1/backup')) archiveRequests.push(req.url());
+		if (new URL(req.url()).pathname.startsWith('/api/v1/backups')) archiveRequests.push(req.url());
 	});
 	try {
 		await session.page.goto('/admin/backups');

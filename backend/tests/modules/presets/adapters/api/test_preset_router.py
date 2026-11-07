@@ -52,7 +52,7 @@ def test_create_get_list_and_404_round_trip() -> None:
     client = TestClient(_app_with_in_memory_presets())
 
     create_response = client.post(
-        "/api/v1/preset",
+        "/api/v1/presets",
         json={
             "kind": "field",
             "label": "Condition",
@@ -66,15 +66,15 @@ def test_create_get_list_and_404_round_trip() -> None:
     assert preset["version"] == 1
     assert preset["builtin"] is False
 
-    get_response = client.get(f"/api/v1/preset/{preset['id']}")
+    get_response = client.get(f"/api/v1/presets/{preset['id']}")
     assert get_response.status_code == 200
     assert get_response.json() == preset
 
-    list_response = client.get("/api/v1/preset")
+    list_response = client.get("/api/v1/presets")
     assert list_response.status_code == 200
     assert preset in list_response.json()
 
-    missing_response = client.get(f"/api/v1/preset/{uuid.uuid4()}")
+    missing_response = client.get(f"/api/v1/presets/{uuid.uuid4()}")
     assert missing_response.status_code == 404
     assert missing_response.json()["title"] == "PresetNotFoundError"
 
@@ -84,7 +84,8 @@ def test_create_preset_returns_400_on_a_malformed_definition() -> None:
     client = TestClient(_app_with_in_memory_presets())
 
     response = client.post(
-        "/api/v1/preset", json={"kind": "field", "label": "Condition", "definition": {}}
+        "/api/v1/presets",
+        json={"kind": "field", "label": "Condition", "definition": {}},
     )
 
     assert response.status_code == 400
@@ -94,7 +95,7 @@ def test_list_presets_filters_by_kind_and_q() -> None:
     """`kind` and `q` query params narrow the listing."""
     client = TestClient(_app_with_in_memory_presets())
     client.post(
-        "/api/v1/preset",
+        "/api/v1/presets",
         json={
             "kind": "field",
             "label": "Condition",
@@ -102,7 +103,7 @@ def test_list_presets_filters_by_kind_and_q() -> None:
         },
     )
     client.post(
-        "/api/v1/preset",
+        "/api/v1/presets",
         json={
             "kind": "choice_list",
             "label": "Grades",
@@ -110,10 +111,10 @@ def test_list_presets_filters_by_kind_and_q() -> None:
         },
     )
 
-    by_kind = client.get("/api/v1/preset", params={"kind": "choice_list"}).json()
+    by_kind = client.get("/api/v1/presets", params={"kind": "choice_list"}).json()
     assert [p["label"] for p in by_kind] == ["Grades"]
 
-    by_q = client.get("/api/v1/preset", params={"q": "condition"}).json()
+    by_q = client.get("/api/v1/presets", params={"q": "condition"}).json()
     assert [p["label"] for p in by_q] == ["Condition"]
 
 
@@ -121,7 +122,7 @@ def test_update_preset_bumps_version_and_returns_404_when_missing() -> None:
     """PATCH bumps version on a definition change; a missing id is 404."""
     client = TestClient(_app_with_in_memory_presets())
     preset = client.post(
-        "/api/v1/preset",
+        "/api/v1/presets",
         json={
             "kind": "field",
             "label": "Condition",
@@ -130,14 +131,14 @@ def test_update_preset_bumps_version_and_returns_404_when_missing() -> None:
     ).json()
 
     update_response = client.patch(
-        f"/api/v1/preset/{preset['id']}",
+        f"/api/v1/presets/{preset['id']}",
         json={"definition": {"property": {"type": "number"}}},
     )
     assert update_response.status_code == 200
     assert update_response.json()["version"] == 2
 
     missing_response = client.patch(
-        f"/api/v1/preset/{uuid.uuid4()}", json={"label": "X"}
+        f"/api/v1/presets/{uuid.uuid4()}", json={"label": "X"}
     )
     assert missing_response.status_code == 404
 
@@ -159,7 +160,7 @@ async def test_update_preset_returns_409_for_a_builtin_preset() -> None:
     app.dependency_overrides[get_preset_repos] = lambda: repos
     client = TestClient(app)
 
-    response = client.patch(f"/api/v1/preset/{builtin.id}", json={"label": "X"})
+    response = client.patch(f"/api/v1/presets/{builtin.id}", json={"label": "X"})
 
     assert response.status_code == 409
 
@@ -168,7 +169,7 @@ def test_delete_preset_then_get_and_list_no_longer_find_it() -> None:
     """DELETE removes the preset from GET and list results."""
     client = TestClient(_app_with_in_memory_presets())
     preset = client.post(
-        "/api/v1/preset",
+        "/api/v1/presets",
         json={
             "kind": "field",
             "label": "Condition",
@@ -176,18 +177,18 @@ def test_delete_preset_then_get_and_list_no_longer_find_it() -> None:
         },
     ).json()
 
-    delete_response = client.delete(f"/api/v1/preset/{preset['id']}")
+    delete_response = client.delete(f"/api/v1/presets/{preset['id']}")
     assert delete_response.status_code == 204
 
-    assert client.get(f"/api/v1/preset/{preset['id']}").status_code == 404
-    assert preset not in client.get("/api/v1/preset").json()
+    assert client.get(f"/api/v1/presets/{preset['id']}").status_code == 404
+    assert preset not in client.get("/api/v1/presets").json()
 
 
 def test_delete_preset_returns_404_when_missing() -> None:
     """DELETE on a nonexistent preset returns 404."""
     client = TestClient(_app_with_in_memory_presets())
 
-    response = client.delete(f"/api/v1/preset/{uuid.uuid4()}")
+    response = client.delete(f"/api/v1/presets/{uuid.uuid4()}")
 
     assert response.status_code == 404
 
@@ -196,7 +197,7 @@ def test_export_then_import_into_a_fresh_store_reproduces_the_presets() -> None:
     """A pack exported from one store imports into another and dedupes on repeat."""
     source = TestClient(_app_with_in_memory_presets())
     created = source.post(
-        "/api/v1/preset",
+        "/api/v1/presets",
         json={
             "kind": "choice_list",
             "label": "Condition grades",
@@ -204,7 +205,7 @@ def test_export_then_import_into_a_fresh_store_reproduces_the_presets() -> None:
         },
     ).json()
 
-    export = source.get("/api/v1/preset/export", params={"ids": created["id"]})
+    export = source.get("/api/v1/presets/export", params={"ids": created["id"]})
     assert export.status_code == 200
     pack = export.json()
     assert pack["format"] == "menagerist-presets"
@@ -219,10 +220,10 @@ def test_export_then_import_into_a_fresh_store_reproduces_the_presets() -> None:
     ]
 
     target = TestClient(_app_with_in_memory_presets())
-    first = target.post("/api/v1/preset/import", json=pack)
+    first = target.post("/api/v1/presets/import", json=pack)
     assert first.status_code == 200
     assert first.json() == {"created": 1, "skipped": 0}
-    second = target.post("/api/v1/preset/import", json=pack)
+    second = target.post("/api/v1/presets/import", json=pack)
     assert second.json() == {"created": 0, "skipped": 1}
 
 
@@ -230,7 +231,7 @@ def test_export_of_a_missing_id_is_404() -> None:
     """Exporting an id that is not stored returns 404."""
     client = TestClient(_app_with_in_memory_presets())
 
-    response = client.get("/api/v1/preset/export", params={"ids": str(uuid.uuid7())})
+    response = client.get("/api/v1/presets/export", params={"ids": str(uuid.uuid7())})
 
     assert response.status_code == 404
 
@@ -239,7 +240,7 @@ def test_export_requires_at_least_one_id() -> None:
     """An export with no ids is rejected rather than returning an empty pack."""
     client = TestClient(_app_with_in_memory_presets())
 
-    assert client.get("/api/v1/preset/export").status_code == 422
+    assert client.get("/api/v1/presets/export").status_code == 422
 
 
 def test_import_rejects_an_unknown_format() -> None:
@@ -247,7 +248,7 @@ def test_import_rejects_an_unknown_format() -> None:
     client = TestClient(_app_with_in_memory_presets())
 
     response = client.post(
-        "/api/v1/preset/import", json={"format": "other", "version": 1, "items": []}
+        "/api/v1/presets/import", json={"format": "other", "version": 1, "items": []}
     )
 
     assert response.status_code == 400

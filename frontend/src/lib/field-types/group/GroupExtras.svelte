@@ -9,7 +9,7 @@
 	import { allDescriptors } from '../registry';
 	import { allowedKinds, changeKind } from '../kind-changes';
 	import type { EditorField, EditorSubField } from '$lib/schema-types';
-	import { countEdgeTypeAttributeUsage, countNodeTypeAttributeUsage } from '$lib/api/client';
+	import { getEdgeTypeAttributeUsage, getNodeTypeAttributeUsage } from '$lib/api/client';
 	import { optionRemovalWarning, purgeWarning } from '$lib/field-usage';
 	import { SCHEMA_TYPE_CONTEXT, type SchemaTypeContext } from '$lib/schema-type-context';
 
@@ -82,11 +82,11 @@
 		try {
 			const result =
 				ctx.kind === 'node'
-					? await countNodeTypeAttributeUsage({
+					? await getNodeTypeAttributeUsage({
 							path: { node_type_id: typeId, key: field.key },
 							query: { sub_key: sf.key }
 						})
-					: await countEdgeTypeAttributeUsage({
+					: await getEdgeTypeAttributeUsage({
 							path: { edge_type_id: typeId, key: field.key },
 							query: { sub_key: sf.key }
 						});
@@ -161,11 +161,11 @@
 		try {
 			const result =
 				ctx.kind === 'node'
-					? await countNodeTypeAttributeUsage({
+					? await getNodeTypeAttributeUsage({
 							path: { node_type_id: typeId, key: field.key },
 							query: { sub_key: sf.key, value: opt }
 						})
-					: await countEdgeTypeAttributeUsage({
+					: await getEdgeTypeAttributeUsage({
 							path: { edge_type_id: typeId, key: field.key },
 							query: { sub_key: sf.key, value: opt }
 						});

@@ -20,7 +20,7 @@ async function typeWithFields(
 	...keys: string[]
 ) {
 	const type = await makeItemType(request, label);
-	const res = await request.patch(`/api/v1/node-type/${type.id}`, {
+	const res = await request.patch(`/api/v1/node-types/${type.id}`, {
 		data: { attributes_schema: schema(...keys) }
 	});
 	expect(res.ok(), await res.text()).toBeTruthy();
@@ -33,13 +33,13 @@ async function itemWith(
 	attributes: Record<string, unknown>
 ) {
 	const item = await makeItem(request, uniqueName('Retyped'), type);
-	const res = await request.patch(`/api/v1/node/${item.id}`, { data: { attributes } });
+	const res = await request.patch(`/api/v1/nodes/${item.id}`, { data: { attributes } });
 	expect(res.ok(), await res.text()).toBeTruthy();
 	return item;
 }
 
 const fetchItem = async (request: Parameters<typeof makeItem>[0], id: string) =>
-	(await (await request.get(`/api/v1/node/${id}`)).json()) as {
+	(await (await request.get(`/api/v1/nodes/${id}`)).json()) as {
 		type: string | null;
 		attributes: Record<string, unknown>;
 	};
@@ -125,7 +125,7 @@ test('a clash between the item’s own field and the new type’s field is expla
 	const from = await makeItemType(request, uniqueName('From'));
 	const to = await typeWithFields(request, uniqueName('To'), 'year');
 	const item = await makeItem(request, uniqueName('Clashing'), from.slug);
-	const res = await request.patch(`/api/v1/node/${item.id}`, {
+	const res = await request.patch(`/api/v1/nodes/${item.id}`, {
 		data: { extra_schema: schema('year') }
 	});
 	expect(res.ok(), await res.text()).toBeTruthy();

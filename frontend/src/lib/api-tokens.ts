@@ -159,5 +159,5 @@ export function tokenErrorMessage(result: { error?: unknown; response?: Response
 
 /** A curl command that lists what the token can do, for the one-time panel. */
 export function sampleCurl(origin: string, token: string): string {
-	return `curl -H "Authorization: Bearer ${token}" ${origin}/api/v1/auth/me/permissions`;
+	return `curl -H "Authorization: Bearer ${token}" ${origin}/api/v1/me/permissions`;
 }

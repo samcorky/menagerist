@@ -96,6 +96,10 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 router = APIRouter(prefix="/media", tags=["Media"], route_class=PermissionAwareRoute)
+# A node's media is addressed through the node.
+node_media_router = APIRouter(
+    prefix="/nodes", tags=["Media"], route_class=PermissionAwareRoute
+)
 
 
 async def _chunks(upload: UploadFile) -> AsyncGenerator[bytes]:
@@ -195,8 +199,8 @@ async def upload_and_attach_media(
 # ── Node media listing ─────────────────────────────────────────────────────────
 
 
-@router.get(
-    "/for-node/{node_id}",
+@node_media_router.get(
+    "/{node_id}/media",
     response_model=list[NodeMediaItemResponse],
     operation_id="list_node_media",
 )

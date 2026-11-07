@@ -34,7 +34,7 @@ from app.modules.identity.domain.errors import (
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ForbiddenError
 
-router = APIRouter(prefix="/user", tags=["Users"], route_class=PermissionAwareRoute)
+router = APIRouter(prefix="/users", tags=["Users"], route_class=PermissionAwareRoute)
 
 _ADMIN_ONLY = {
     **error_response(SessionRequiredError, detail="Sign in to continue."),

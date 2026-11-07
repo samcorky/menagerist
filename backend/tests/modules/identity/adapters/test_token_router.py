@@ -52,7 +52,7 @@ TOKENS = "/api/v1/tokens"
 PASSWORD = "password-123"
 FOREIGN_ORIGIN = "https://evil.example"
 READ_ITEMS = ["graph:type:read"]
-NODE_TYPES = "/api/v1/node-type"
+NODE_TYPES = "/api/v1/node-types"
 
 
 class Api:
@@ -157,13 +157,11 @@ async def test_a_created_token_authenticates_as_its_owner(
 async def test_a_token_can_read_its_own_permissions(
     api: Api, make_user: MakeUser
 ) -> None:
-    """`/auth/me/permissions` accepts a bearer and shows the intersection."""
+    """`/me/permissions` accepts a bearer and shows the intersection."""
     client = await _alice(api, make_user)
     token = _create(client, grants=["graph:item:write"]).json()["token"]
 
-    response = api.anonymous().get(
-        "/api/v1/auth/me/permissions", headers=_bearer(token)
-    )
+    response = api.anonymous().get("/api/v1/me/permissions", headers=_bearer(token))
 
     assert response.status_code == 200, response.text
     assert response.json()["permissions"] == ["graph:item:read", "graph:item:write"]

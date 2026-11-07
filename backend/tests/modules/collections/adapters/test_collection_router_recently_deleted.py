@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
     from fastapi import FastAPI
 
-BASE = "/api/v1/collection"
+BASE = "/api/v1/collections"
 ALICE = uuid.UUID(int=101)
 BOB = uuid.UUID(int=102)
 
@@ -102,7 +102,7 @@ def test_restore_returns_the_collection_and_leaves_recently_deleted(
     shelf = _create(client)
     item = uuid.uuid7()
     world.items.add_owned(item, ALICE)
-    client.put(f"{BASE}/{shelf}/item", json={"item_ids": [str(item)]})
+    client.put(f"{BASE}/{shelf}/items", json={"item_ids": [str(item)]})
     client.delete(f"{BASE}/{shelf}")
 
     response = client.post(f"{BASE}/{shelf}/restore")

@@ -12,7 +12,7 @@ async function setUp(
 	label = 'Phone type'
 ) {
 	const type = await makeItemType(request, uniqueName(label));
-	await request.patch(`/api/v1/node-type/${type.id}`, { data: { icon: 'film', colour: 'red' } });
+	await request.patch(`/api/v1/node-types/${type.id}`, { data: { icon: 'film', colour: 'red' } });
 	await page.goto('/settings/item-types');
 	return type;
 }

@@ -80,26 +80,26 @@ def client() -> Iterator[TestClient]:
 
 def test_backup_create_verify_download_upload_delete(client: TestClient) -> None:
     """Administrative routes drive the same verified archive use cases."""
-    created = client.post("/api/v1/backup", json={})
+    created = client.post("/api/v1/backups", json={})
     assert created.status_code == 201, created.text
     backup_id = created.json()["id"]
-    listing = client.get("/api/v1/backup")
+    listing = client.get("/api/v1/backups")
     assert [row["id"] for row in listing.json()] == [backup_id]
-    verified = client.post(f"/api/v1/backup/{backup_id}/verify")
+    verified = client.post(f"/api/v1/backups/{backup_id}/verify")
     assert verified.status_code == 200
     assert verified.json()["findings"] == []
-    download = client.get(f"/api/v1/backup/{backup_id}/download")
+    download = client.get(f"/api/v1/backups/{backup_id}/download")
     assert download.status_code == 200
     assert download.headers["content-type"] == "application/gzip"
     uploaded = client.post(
-        "/api/v1/backup/upload",
+        "/api/v1/backups/upload",
         content=download.content,
         headers={"Content-Type": "application/gzip"},
     )
     assert uploaded.status_code == 201, uploaded.text
     assert uploaded.json()["id"] != backup_id
-    assert client.delete(f"/api/v1/backup/{backup_id}").status_code == 204
-    assert client.get(f"/api/v1/backup/{backup_id}/download").status_code == 404
+    assert client.delete(f"/api/v1/backups/{backup_id}").status_code == 204
+    assert client.get(f"/api/v1/backups/{backup_id}/download").status_code == 404
 
 
 def test_backup_member_is_forbidden(client: TestClient) -> None:
@@ -108,8 +108,8 @@ def test_backup_member_is_forbidden(client: TestClient) -> None:
     client.app.dependency_overrides[get_current_actor] = lambda: Actor(
         id=uuid7(), roles=frozenset({"member"})
     )
-    assert client.get("/api/v1/backup").status_code == 403
-    assert client.post("/api/v1/backup", json={}).status_code == 403
+    assert client.get("/api/v1/backups").status_code == 403
+    assert client.post("/api/v1/backups", json={}).status_code == 403
 
 
 @pytest.mark.parametrize(
@@ -123,8 +123,8 @@ def test_backup_member_is_forbidden(client: TestClient) -> None:
 )
 def test_backup_download_filename(client: TestClient, label: str, slug: str) -> None:
     """Downloads have a safe label, creation date and unique archive id."""
-    created = client.post("/api/v1/backup", json={"label": label}).json()
-    response = client.get(f"/api/v1/backup/{created['id']}/download")
+    created = client.post("/api/v1/backups", json={"label": label}).json()
+    response = client.get(f"/api/v1/backups/{created['id']}/download")
     expected = f"menagerist-{slug}-{created['created_at'][:10]}-{created['id']}.tar.gz"
     assert (
         response.headers["content-disposition"] == f'attachment; filename="{expected}"'
@@ -133,8 +133,8 @@ def test_backup_download_filename(client: TestClient, label: str, slug: str) -> 
 
 def test_public_first_run_restore_then_closed_gate(client: TestClient) -> None:
     """Restored accounts close the anonymous restore path with no live restore API."""
-    created = client.post("/api/v1/backup", json={}).json()
-    archive = client.get(f"/api/v1/backup/{created['id']}/download").content
+    created = client.post("/api/v1/backups", json={}).json()
+    archive = client.get(f"/api/v1/backups/{created['id']}/download").content
     response = client.post(
         "/api/v1/backups/restore",
         content=archive,
@@ -149,7 +149,7 @@ def test_public_first_run_restore_then_closed_gate(client: TestClient) -> None:
         ).status_code
         == 409
     )
-    assert client.post(f"/api/v1/backup/{created['id']}/restore").status_code == 404
+    assert client.post(f"/api/v1/backups/{created['id']}/restore").status_code == 404
 
 
 def test_cross_site_first_run_restore_is_refused(client: TestClient) -> None:
@@ -170,13 +170,13 @@ def test_cross_site_first_run_restore_is_refused(client: TestClient) -> None:
 def test_prune_has_explicit_preview(client: TestClient) -> None:
     """Preview retention without deleting archives."""
     for _ in range(3):
-        assert client.post("/api/v1/backup", json={}).status_code == 201
+        assert client.post("/api/v1/backups", json={}).status_code == 201
     preview = client.post(
-        "/api/v1/backup/prune", json={"keep_last": 1, "dry_run": True}
+        "/api/v1/backups/prune", json={"keep_last": 1, "dry_run": True}
     )
     assert preview.status_code == 200, preview.text
     assert len(preview.json()["deleted"]) == 2
-    assert len(client.get("/api/v1/backup").json()) == 3
+    assert len(client.get("/api/v1/backups").json()) == 3
 
 
 def test_personal_export_download_isolation_and_import(client: TestClient) -> None:
@@ -209,10 +209,10 @@ def test_personal_export_download_isolation_and_import(client: TestClient) -> No
             get_user_media_files: InMemoryMediaFiles,
         }
     )
-    exported = client.post("/api/v1/me/export")
+    exported = client.post("/api/v1/me/exports")
     assert exported.status_code == 201, exported.text
     backup_id = exported.json()["id"]
-    path = f"/api/v1/me/export/{backup_id}/download"
+    path = f"/api/v1/me/exports/{backup_id}/download"
     downloaded = client.get(path)
     assert downloaded.status_code == 200
     current = bob
@@ -261,8 +261,8 @@ def test_personal_exports_are_listed_and_deleted_per_account(
         }
     )
     assert client.get("/api/v1/me/exports").json() == []
-    first = client.post("/api/v1/me/export").json()["id"]
-    second = client.post("/api/v1/me/export").json()["id"]
+    first = client.post("/api/v1/me/exports").json()["id"]
+    second = client.post("/api/v1/me/exports").json()["id"]
 
     listed = client.get("/api/v1/me/exports")
     assert listed.status_code == 200
@@ -271,12 +271,12 @@ def test_personal_exports_are_listed_and_deleted_per_account(
 
     current = bob
     assert client.get("/api/v1/me/exports").json() == []
-    other = client.delete(f"/api/v1/me/export/{first}")
+    other = client.delete(f"/api/v1/me/exports/{first}")
     assert other.status_code == 404
     assert other.headers["content-type"] == "application/problem+json"
 
     current = alice
-    assert client.delete(f"/api/v1/me/export/{first}").status_code == 204
+    assert client.delete(f"/api/v1/me/exports/{first}").status_code == 204
     assert [row["id"] for row in client.get("/api/v1/me/exports").json()] == [second]
-    assert client.get(f"/api/v1/me/export/{first}/download").status_code == 404
-    assert client.delete(f"/api/v1/me/export/{first}").status_code == 404
+    assert client.get(f"/api/v1/me/exports/{first}/download").status_code == 404
+    assert client.delete(f"/api/v1/me/exports/{first}").status_code == 404

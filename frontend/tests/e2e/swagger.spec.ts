@@ -80,7 +80,7 @@ test('asks for the sign-in state while Swagger loads, and shows no banner until 
 		await held;
 		await route.continue();
 	});
-	const asked = page.waitForRequest('**/api/v1/auth/me');
+	const asked = page.waitForRequest('**/api/v1/me');
 	await page.goto('/api/docs', { waitUntil: 'commit' });
 	await asked;
 	await expect(banner(page)).toHaveCount(0);
@@ -98,7 +98,7 @@ test('shows a checking banner once Swagger has loaded, until the sign-in state i
 	const page = await context.newPage();
 	let answer!: () => void;
 	const held = new Promise<void>((resolve) => (answer = resolve));
-	await page.route('**/api/v1/auth/me', async (route) => {
+	await page.route('**/api/v1/me', async (route) => {
 		await held;
 		await route.continue();
 	});

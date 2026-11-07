@@ -1,4 +1,4 @@
-"""Router tests for /api/v1/collection over in-memory adapters."""
+"""Router tests for /api/v1/collections over in-memory adapters."""
 
 import uuid
 from dataclasses import dataclass
@@ -30,7 +30,7 @@ from app.modules.collections.ports.unit_of_work import CollectionsRepos
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-BASE = "/api/v1/collection"
+BASE = "/api/v1/collections"
 
 
 @dataclass
@@ -190,7 +190,9 @@ def test_patch_blank_description_clears_it_and_omitted_is_unchanged(api: Api) ->
 def test_patch_keeps_item_count(api: Api) -> None:
     """PATCH responds with the current live item count."""
     created = api.create()
-    api.client.put(f"{BASE}/{created['id']}/item", json={"item_ids": [api.live_item()]})
+    api.client.put(
+        f"{BASE}/{created['id']}/items", json={"item_ids": [api.live_item()]}
+    )
 
     response = api.client.patch(f"{BASE}/{created['id']}", json={"name": "New"})
 
@@ -254,7 +256,7 @@ def test_list_pages_with_link_header_and_counts(api: Api) -> None:
     second = api.create("B")
     third = api.create("C")
     api.client.put(
-        f"{BASE}/{second['id']}/item",
+        f"{BASE}/{second['id']}/items",
         json={"item_ids": [api.live_item(), api.live_item()]},
     )
 
@@ -289,7 +291,7 @@ def test_list_item_id_filter_returns_only_shelves_holding_it(api: Api) -> None:
     holding = api.create("Holding")
     api.create("Empty")
     item = api.live_item()
-    api.client.put(f"{BASE}/{holding['id']}/item", json={"item_ids": [item]})
+    api.client.put(f"{BASE}/{holding['id']}/items", json={"item_ids": [item]})
 
     response = api.client.get(BASE, params={"item_id": item})
 
@@ -327,7 +329,7 @@ def test_put_items_adds_and_is_idempotent(api: Api) -> None:
     """PUT adds items and reports how many were new; repeating adds none."""
     created = api.create()
     a, b = api.live_item(), api.live_item()
-    url = f"{BASE}/{created['id']}/item"
+    url = f"{BASE}/{created['id']}/items"
 
     first = api.client.put(url, json={"item_ids": [a, b, a]})
     second = api.client.put(url, json={"item_ids": [a, b]})
@@ -347,7 +349,7 @@ def test_put_items_with_unknown_item_names_it_and_adds_nothing(api: Api) -> None
     bad = str(uuid.uuid4())
 
     response = api.client.put(
-        f"{BASE}/{created['id']}/item", json={"item_ids": [good, bad]}
+        f"{BASE}/{created['id']}/items", json={"item_ids": [good, bad]}
     )
 
     assert response.status_code == 400
@@ -361,7 +363,7 @@ def test_put_items_over_500_is_422(api: Api) -> None:
     created = api.create()
 
     response = api.client.put(
-        f"{BASE}/{created['id']}/item",
+        f"{BASE}/{created['id']}/items",
         json={"item_ids": [str(uuid.uuid4()) for _ in range(501)]},
     )
 
@@ -373,7 +375,7 @@ def test_put_items_malformed_id_is_422(api: Api) -> None:
     created = api.create()
 
     response = api.client.put(
-        f"{BASE}/{created['id']}/item", json={"item_ids": ["nope"]}
+        f"{BASE}/{created['id']}/items", json={"item_ids": ["nope"]}
     )
 
     assert response.status_code == 422
@@ -383,7 +385,7 @@ def test_put_items_empty_list_adds_nothing(api: Api) -> None:
     """An empty id list is accepted and adds nothing."""
     created = api.create()
 
-    response = api.client.put(f"{BASE}/{created['id']}/item", json={"item_ids": []})
+    response = api.client.put(f"{BASE}/{created['id']}/items", json={"item_ids": []})
 
     assert response.json() == {"added": 0}
 
@@ -392,8 +394,8 @@ def test_delete_item_removes_it_and_is_idempotent(api: Api) -> None:
     """DELETE of an item returns 204, lowers the count, and repeats safely."""
     created = api.create()
     item = api.live_item()
-    api.client.put(f"{BASE}/{created['id']}/item", json={"item_ids": [item]})
-    url = f"{BASE}/{created['id']}/item/{item}"
+    api.client.put(f"{BASE}/{created['id']}/items", json={"item_ids": [item]})
+    url = f"{BASE}/{created['id']}/items/{item}"
 
     first = api.client.delete(url)
     second = api.client.delete(url)
@@ -406,8 +408,8 @@ def test_delete_item_removes_it_and_is_idempotent(api: Api) -> None:
 @pytest.mark.parametrize(
     "call",
     [
-        lambda c, cid: c.put(f"{BASE}/{cid}/item", json={"item_ids": []}),
-        lambda c, cid: c.delete(f"{BASE}/{cid}/item/{uuid.uuid4()}"),
+        lambda c, cid: c.put(f"{BASE}/{cid}/items", json={"item_ids": []}),
+        lambda c, cid: c.delete(f"{BASE}/{cid}/items/{uuid.uuid4()}"),
     ],
     ids=["put", "delete"],
 )
@@ -431,7 +433,7 @@ def test_etag_changes_when_items_are_added(api: Api) -> None:
     created = api.create()
     url = f"{BASE}/{created['id']}"
     old = _etag(api, created["id"])
-    api.client.put(f"{url}/item", json={"item_ids": [api.live_item()]})
+    api.client.put(f"{url}/items", json={"item_ids": [api.live_item()]})
 
     stale = api.client.get(url, headers={"If-None-Match": old})
 
@@ -447,9 +449,9 @@ def test_etag_changes_when_an_item_is_removed(api: Api) -> None:
     created = api.create()
     url = f"{BASE}/{created['id']}"
     item = api.live_item()
-    api.client.put(f"{url}/item", json={"item_ids": [item]})
+    api.client.put(f"{url}/items", json={"item_ids": [item]})
     old = _etag(api, created["id"])
-    api.client.delete(f"{url}/item/{item}")
+    api.client.delete(f"{url}/items/{item}")
 
     stale = api.client.get(url, headers={"If-None-Match": old})
 
@@ -465,7 +467,7 @@ def test_patch_with_old_if_match_after_membership_change_is_412(api: Api) -> Non
     created = api.create()
     url = f"{BASE}/{created['id']}"
     old = _etag(api, created["id"])
-    api.client.put(f"{url}/item", json={"item_ids": [api.live_item()]})
+    api.client.put(f"{url}/items", json={"item_ids": [api.live_item()]})
 
     response = api.client.patch(url, json={"name": "Late"}, headers={"If-Match": old})
 
@@ -479,7 +481,7 @@ def test_etag_changes_when_a_live_item_disappears_without_a_collection_write(
     created = api.create()
     url = f"{BASE}/{created['id']}"
     keep, gone = api.live_item(), api.live_item()
-    api.client.put(f"{url}/item", json={"item_ids": [keep, gone]})
+    api.client.put(f"{url}/items", json={"item_ids": [keep, gone]})
     first = api.client.get(url)
     old = first.headers["ETag"]
     assert first.json()["item_count"] == 2
@@ -501,7 +503,7 @@ def test_patch_etag_follows_live_item_count(api: Api) -> None:
     created = api.create()
     url = f"{BASE}/{created['id']}"
     keep, gone = api.live_item(), api.live_item()
-    api.client.put(f"{url}/item", json={"item_ids": [keep, gone]})
+    api.client.put(f"{url}/items", json={"item_ids": [keep, gone]})
     old = _etag(api, created["id"])
     api.items.live.discard(uuid.UUID(gone))
     fresh = _etag(api, created["id"])
@@ -522,7 +524,7 @@ def test_both_validators_after_live_count_drop_gets_200_not_304(api: Api) -> Non
     created = api.create()
     url = f"{BASE}/{created['id']}"
     keep, gone = api.live_item(), api.live_item()
-    api.client.put(f"{url}/item", json={"item_ids": [keep, gone]})
+    api.client.put(f"{url}/items", json={"item_ids": [keep, gone]})
     first = api.client.get(url)
     old_etag, last_modified = first.headers["ETag"], first.headers["Last-Modified"]
     api.items.live.discard(uuid.UUID(gone))
@@ -710,11 +712,11 @@ def test_every_collection_route_accepts_id_or_slug(api: Api) -> None:
             api.client.patch(url, json={"description": ref}).json()["slug"] == "shelf"
         )
         assert (
-            api.client.put(f"{url}/item", json={"item_ids": [item]}).status_code == 200
+            api.client.put(f"{url}/items", json={"item_ids": [item]}).status_code == 200
         )
-        assert api.client.get(f"{url}/count").json() == {"count": 1}
-        assert api.client.delete(f"{url}/item/{item}").status_code == 204
-        assert api.client.get(f"{url}/count").json() == {"count": 0}
+        assert api.client.get(f"{url}/items/count").json() == {"count": 1}
+        assert api.client.delete(f"{url}/items/{item}").status_code == 204
+        assert api.client.get(f"{url}/items/count").json() == {"count": 0}
 
     assert api.client.delete(f"{BASE}/shelf").status_code == 204
     assert api.client.get(f"{BASE}/{created['id']}").status_code == 404
@@ -725,11 +727,11 @@ def test_unknown_slug_is_404_on_every_route(api: Api) -> None:
     item = uuid.uuid4()
     calls = [
         api.client.get(f"{BASE}/nope"),
-        api.client.get(f"{BASE}/nope/count"),
+        api.client.get(f"{BASE}/nope/items/count"),
         api.client.patch(f"{BASE}/nope", json={"name": "x"}),
         api.client.delete(f"{BASE}/nope"),
-        api.client.put(f"{BASE}/nope/item", json={"item_ids": []}),
-        api.client.delete(f"{BASE}/nope/item/{item}"),
+        api.client.put(f"{BASE}/nope/items", json={"item_ids": []}),
+        api.client.delete(f"{BASE}/nope/items/{item}"),
     ]
 
     assert [c.status_code for c in calls] == [404] * 6

@@ -22,7 +22,7 @@ async def _visit(
     *,
     scheme: str,
     host: str,
-    path: str = "/api/v1/node",
+    path: str = "/api/v1/nodes",
     scope_type: str = "http",
 ) -> list[Scope]:
     seen: list[Scope] = []

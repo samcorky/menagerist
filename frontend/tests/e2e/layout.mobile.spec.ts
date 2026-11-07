@@ -443,7 +443,7 @@ for (const size of SIZES) {
 			expect(await fits(page, await box(reason))).toBe(true);
 
 			for (const id of ['games', 'games-extras']) {
-				const res = await request.put(`/api/v1/example/${id}/installation`);
+				const res = await request.put(`/api/v1/examples/${id}/installation`);
 				expect(res.ok()).toBeTruthy();
 			}
 			await page.reload();

@@ -6,8 +6,8 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { getContext, untrack } from 'svelte';
 	import {
-		countEdgeTypeAttributeUsage,
-		countNodeTypeAttributeUsage,
+		getEdgeTypeAttributeUsage,
+		getNodeTypeAttributeUsage,
 		getPreset,
 		type PresetResponse
 	} from '$lib/api/client';
@@ -62,11 +62,11 @@
 		try {
 			const result =
 				kind === 'node'
-					? await countNodeTypeAttributeUsage({
+					? await getNodeTypeAttributeUsage({
 							path: { node_type_id: typeId, key: field.key },
 							query: { value: opt }
 						})
-					: await countEdgeTypeAttributeUsage({
+					: await getEdgeTypeAttributeUsage({
 							path: { edge_type_id: typeId, key: field.key },
 							query: { value: opt }
 						});

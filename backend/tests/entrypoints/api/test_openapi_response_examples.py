@@ -138,21 +138,21 @@ def test_common_401_and_403_name_each_problem_type(schema: dict[str, Any]) -> No
         responses = schema["paths"][path][method]["responses"]
         return {b["type"] for b in _problem_bodies(responses[code])}
 
-    assert types("/api/v1/node", "post", "401") == {
+    assert types("/api/v1/nodes", "post", "401") == {
         "unauthenticated",
         "setup_required",
         "invalid_token",
     }
-    assert types("/api/v1/backup", "get", "401") == {
+    assert types("/api/v1/backups", "get", "401") == {
         "unauthenticated",
         "setup_required",
     }
-    assert types("/api/v1/node", "post", "403") == {
+    assert types("/api/v1/nodes", "post", "403") == {
         "about:blank",
         "csrf_failed",
         "password_expired",
     }
-    assert types("/api/v1/node", "get", "403") == {"about:blank", "password_expired"}
+    assert types("/api/v1/nodes", "get", "403") == {"about:blank", "password_expired"}
 
 
 def test_common_error_examples_cite_the_operations_own_url(
@@ -191,5 +191,5 @@ def test_error_response_types_match_the_exception_class(schema: dict[str, Any]) 
     """Identity problem types appear where the app emits them."""
     login = schema["paths"]["/api/v1/auth/login"]["post"]["responses"]
     assert _problem_bodies(login["403"])[0]["type"] == "account_disabled"
-    token = schema["paths"]["/api/v1/node"]["post"]["responses"]["401"]
+    token = schema["paths"]["/api/v1/nodes"]["post"]["responses"]["401"]
     assert "invalid_token" in {b["type"] for b in _problem_bodies(token)}

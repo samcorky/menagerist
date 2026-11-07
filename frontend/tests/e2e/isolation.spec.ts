@@ -35,12 +35,12 @@ async function makeContent(api: APIRequestContext, label: string): Promise<Made>
 	const itemName = `${token} ${label} item`;
 	const collectionName = `${token} ${label} collection`;
 	const item = await json<{ id: string }>(
-		await api.post('/api/v1/node', { data: { name: itemName } })
+		await api.post('/api/v1/nodes', { data: { name: itemName } })
 	);
 	const collection = await json<{ id: string }>(
-		await api.post('/api/v1/collection', { data: { name: collectionName } })
+		await api.post('/api/v1/collections', { data: { name: collectionName } })
 	);
-	const added = await api.put(`/api/v1/collection/${collection.id}/item`, {
+	const added = await api.put(`/api/v1/collections/${collection.id}/items`, {
 		data: { item_ids: [item.id] }
 	});
 	expect(added.ok(), await added.text()).toBeTruthy();
@@ -96,12 +96,12 @@ test("B's lists, collection list and API searches do not include A's content", a
 
 	// The same through the API: lists, search, and one collection's items.
 	const nodes = await json<{ id: string }[]>(
-		await b.request.get(`/api/v1/node?q=${token}&limit=100`)
+		await b.request.get(`/api/v1/nodes?q=${token}&limit=100`)
 	);
 	expect(nodes.map((n) => n.id)).toEqual([own.itemId]);
-	const collections = await json<{ id: string }[]>(await b.request.get('/api/v1/collection'));
+	const collections = await json<{ id: string }[]>(await b.request.get('/api/v1/collections'));
 	expect(collections.map((c) => c.id)).not.toContain(aContent.collectionId);
-	expect((await b.request.get(`/api/v1/collection/${aContent.collectionId}/item`)).status()).toBe(
+	expect((await b.request.get(`/api/v1/collections/${aContent.collectionId}/items`)).status()).toBe(
 		404
 	);
 	await b.context.close();
@@ -132,8 +132,8 @@ test("A's item, collection and media are not found by direct URL for B", async (
 
 	// 404 (not 403) for everything that exists but is not B's, media included.
 	for (const path of [
-		`/api/v1/node/${aContent.itemId}`,
-		`/api/v1/collection/${aContent.collectionId}`,
+		`/api/v1/nodes/${aContent.itemId}`,
+		`/api/v1/collections/${aContent.collectionId}`,
 		`/api/v1/media/${aMediaId}`,
 		`/api/v1/media/${aMediaId}/content`,
 		`/api/v1/media/${aMediaId}/thumbnail`
@@ -142,7 +142,7 @@ test("A's item, collection and media are not found by direct URL for B", async (
 		expect(res.status(), path).toBe(404);
 	}
 	// A list, not a single thing: B gets an empty one rather than A's attachments.
-	const attached = await b.request.get(`/api/v1/media/for-node/${aContent.itemId}`);
+	const attached = await b.request.get(`/api/v1/nodes/${aContent.itemId}/media`);
 	expect(await json<unknown[]>(attached)).toEqual([]);
 	await b.context.close();
 });
@@ -192,7 +192,7 @@ test('a member cannot open the Users page or call its API', async ({ browser }) 
 
 	await b.page.goto('/admin/users');
 	await expect(b.page.getByText('Only administrators can manage users.')).toBeVisible();
-	expect((await b.request.get('/api/v1/user')).status()).toBe(403);
+	expect((await b.request.get('/api/v1/users')).status()).toBe(403);
 	await b.context.close();
 });
 
@@ -206,13 +206,13 @@ test('each user installs the same example pack and sees only their own copy', as
 
 	try {
 		for (const user of [a, b]) {
-			const res = await user.request.put(`/api/v1/example/${pack}/installation`);
+			const res = await user.request.put(`/api/v1/examples/${pack}/installation`);
 			expect(res.ok(), await res.text()).toBeTruthy();
 		}
 
 		const idsOf = async (api: APIRequestContext) => {
 			const nodes = await json<{ id: string; type: string | null }[]>(
-				await api.get('/api/v1/node?limit=500')
+				await api.get('/api/v1/nodes?limit=500')
 			);
 			return nodes.filter((n) => slugPrefix.test(n.type ?? '')).map((n) => n.id);
 		};
@@ -226,7 +226,7 @@ test('each user installs the same example pack and sees only their own copy', as
 		await b.page.goto('/settings/examples');
 		await expect(b.page.getByRole('button', { name: /^Remove Recipes/ })).toBeVisible();
 
-		const removed = await a.request.delete(`/api/v1/example/${pack}/installation`);
+		const removed = await a.request.delete(`/api/v1/examples/${pack}/installation`);
 		expect(removed.ok(), await removed.text()).toBeTruthy();
 		expect(await idsOf(b.request)).toEqual(idsB);
 	} finally {
@@ -246,7 +246,7 @@ test('a member cannot delete an item type: no control, and the API refuses', asy
 	const label = uniqueName('Iso type');
 	const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 	const made = await json<{ id: string }>(
-		await admin.post('/api/v1/node-type', { data: { slug, label } })
+		await admin.post('/api/v1/node-types', { data: { slug, label } })
 	);
 
 	try {
@@ -256,7 +256,7 @@ test('a member cannot delete an item type: no control, and the API refuses', asy
 		await expect(b.page.getByRole('button', { name: 'Edit item type' }).first()).toBeVisible();
 		await expect(b.page.getByRole('button', { name: 'Delete item type' })).toHaveCount(0);
 
-		const denied = await b.request.delete(`/api/v1/node-type/${made.id}`);
+		const denied = await b.request.delete(`/api/v1/node-types/${made.id}`);
 		expect(denied.status()).toBe(403);
 		await b.context.close();
 
@@ -265,6 +265,6 @@ test('a member cannot delete an item type: no control, and the API refuses', asy
 		await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Delete item type' }).first()).toBeVisible();
 	} finally {
-		await admin.delete(`/api/v1/node-type/${made.id}`);
+		await admin.delete(`/api/v1/node-types/${made.id}`);
 	}
 });

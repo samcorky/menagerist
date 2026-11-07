@@ -53,7 +53,7 @@ test.describe('personal access tokens in Swagger', () => {
 	async function permissionCount(browser: Browser, baseURL: string | undefined, token: string) {
 		const context = await freshContext(browser, baseURL);
 		try {
-			const res = await context.request.get('/api/v1/auth/me/permissions', {
+			const res = await context.request.get('/api/v1/me/permissions', {
 				headers: { Authorization: `Bearer ${token}` }
 			});
 			expect(res.status()).toBe(200);
@@ -364,7 +364,7 @@ test.describe('API tokens card', () => {
 			// The sample command's own request works with the secret.
 			const sampled = await asToken(playwright, baseURL, secret);
 			try {
-				expect((await sampled.get('/api/v1/auth/me/permissions')).status()).toBe(200);
+				expect((await sampled.get('/api/v1/me/permissions')).status()).toBe(200);
 			} finally {
 				await sampled.dispose();
 			}
@@ -372,8 +372,8 @@ test.describe('API tokens card', () => {
 			// The secret reads but cannot write.
 			const api = await asToken(playwright, baseURL, secret);
 			try {
-				expect((await api.get('/api/v1/node-type')).status()).toBe(200);
-				const write = await api.post('/api/v1/node-type', {
+				expect((await api.get('/api/v1/node-types')).status()).toBe(200);
+				const write = await api.post('/api/v1/node-types', {
 					data: { slug: `ro-${Date.now()}`, label: 'Should not exist' }
 				});
 				expect(write.status()).toBe(403);
@@ -401,14 +401,14 @@ test.describe('API tokens card', () => {
 			await expect(row(page, name)).toContainText(/read and write/i);
 
 			api.current = await asToken(playwright, baseURL, secret);
-			const created = await api.current.post('/api/v1/node-type', {
+			const created = await api.current.post('/api/v1/node-types', {
 				data: { slug, label: 'Written by a token' }
 			});
 			expect(created.status()).toBe(201);
 			typeId = ((await created.json()) as { id: string }).id;
 		} finally {
 			await api.current?.dispose();
-			if (typeId) await request.delete(`/api/v1/node-type/${typeId}`);
+			if (typeId) await request.delete(`/api/v1/node-types/${typeId}`);
 			await cleanUp(request, name);
 		}
 	});
@@ -444,10 +444,10 @@ test.describe('API tokens card', () => {
 
 			const api = await asToken(playwright, baseURL, secret);
 			try {
-				expect((await api.get('/api/v1/node')).status()).toBe(200);
-				expect((await api.get('/api/v1/node-type')).status()).toBe(403);
-				expect((await api.get('/api/v1/collection')).status()).toBe(403);
-				const write = await api.post('/api/v1/node-type', {
+				expect((await api.get('/api/v1/nodes')).status()).toBe(200);
+				expect((await api.get('/api/v1/node-types')).status()).toBe(403);
+				expect((await api.get('/api/v1/collections')).status()).toBe(403);
+				const write = await api.post('/api/v1/node-types', {
 					data: { slug: `adv-${Date.now()}`, label: 'Should not exist' }
 				});
 				expect(write.status()).toBe(403);
@@ -485,8 +485,8 @@ test.describe('API tokens card', () => {
 			const oldApi = await asToken(playwright, baseURL, original.token);
 			const newApi = await asToken(playwright, baseURL, next);
 			try {
-				expect((await oldApi.get('/api/v1/node-type')).status()).toBe(401);
-				expect((await newApi.get('/api/v1/node-type')).status()).toBe(200);
+				expect((await oldApi.get('/api/v1/node-types')).status()).toBe(401);
+				expect((await newApi.get('/api/v1/node-types')).status()).toBe(200);
 			} finally {
 				await oldApi.dispose();
 				await newApi.dispose();
@@ -521,7 +521,7 @@ test.describe('API tokens card', () => {
 
 			const api = await asToken(playwright, baseURL, created.token);
 			try {
-				expect((await api.get('/api/v1/node-type')).status()).toBe(401);
+				expect((await api.get('/api/v1/node-types')).status()).toBe(401);
 			} finally {
 				await api.dispose();
 			}

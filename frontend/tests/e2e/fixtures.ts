@@ -77,7 +77,7 @@ export async function changePasswordViaApi(
 		...apiSessionOptions(baseURL, session)
 	});
 	try {
-		const res = await api.post('/api/v1/auth/password', {
+		const res = await api.post('/api/v1/me/password', {
 			data: { current_password: current, new_password: next }
 		});
 		if (!res.ok()) throw new Error(`Password change failed with ${res.status()}.`);

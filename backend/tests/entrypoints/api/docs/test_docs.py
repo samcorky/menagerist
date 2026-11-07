@@ -360,9 +360,9 @@ def test_api_description_placeholders_match_supplied_values() -> None:
     ("method", "path", "statuses"),
     [
         ("post", "/api/v1/auth/login", {"401", "403", "429"}),
-        ("post", "/api/v1/auth/password", {"400", "401", "429"}),
-        ("patch", "/api/v1/auth/me", {"400", "401", "422"}),
-        ("post", "/api/v1/user/{user_id}/unlock", {"404"}),
+        ("post", "/api/v1/me/password", {"400", "401", "429"}),
+        ("patch", "/api/v1/me", {"400", "401", "422"}),
+        ("post", "/api/v1/users/{user_id}/unlock", {"404"}),
     ],
 )
 def test_openapi_documents_auth_error_responses(
@@ -377,7 +377,7 @@ def test_openapi_documents_auth_error_responses(
         assert "application/problem+json" in responses[status]["content"]
 
 
-@pytest.mark.parametrize("path", ["/api/v1/auth/login", "/api/v1/auth/password"])
+@pytest.mark.parametrize("path", ["/api/v1/auth/login", "/api/v1/me/password"])
 def test_openapi_throttled_response_documents_retry_after(path: str) -> None:
     """The 429 answer lists the `Retry-After` header."""
     schema = TestClient(create_app()).get("/api/openapi.json").json()
@@ -402,17 +402,17 @@ def test_swagger_security_schemes() -> None:
     # Two requirement objects: either credential is enough, neither is required.
     either: list[dict[str, list[str]]] = [{"APIKeyCookie": []}, {"HTTPBearer": []}]
     cookie: list[dict[str, list[str]]] = [{"APIKeyCookie": []}]
-    assert paths["/api/v1/node"]["get"]["security"] == either
+    assert paths["/api/v1/nodes"]["get"]["security"] == either
     # Administration is session-only: no token can hold its permission.
-    assert paths["/api/v1/user"]["get"]["security"] == cookie
-    assert paths["/api/v1/session"]["get"]["security"] == cookie
+    assert paths["/api/v1/users"]["get"]["security"] == cookie
+    assert paths["/api/v1/sessions"]["get"]["security"] == cookie
     for path, method in (
         ("/api/v1/tokens", "get"),
         ("/api/v1/tokens", "post"),
         ("/api/v1/tokens/{token_id}", "delete"),
         ("/api/v1/tokens/{token_id}/rotate", "post"),
         ("/api/v1/tokens/grants", "get"),
-        ("/api/v1/auth/me", "get"),
+        ("/api/v1/me", "get"),
     ):
         assert paths[path][method]["security"] == cookie, (path, method)
     assert "security" not in paths["/api/v1/auth/login"]["post"]

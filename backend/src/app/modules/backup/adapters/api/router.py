@@ -61,7 +61,9 @@ from app.shared_kernel.actor import ANONYMOUS_ACTOR, Actor
 from app.shared_kernel.errors import ForbiddenError
 from app.shared_kernel.slug import slugify
 
-router = APIRouter(prefix="/backup", tags=["Backups"], route_class=PermissionAwareRoute)
+router = APIRouter(
+    prefix="/backups", tags=["Backups"], route_class=PermissionAwareRoute
+)
 public_router = APIRouter(
     prefix="/backups", tags=["Backups"], route_class=PermissionAwareRoute
 )

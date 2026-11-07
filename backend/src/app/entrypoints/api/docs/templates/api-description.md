@@ -17,7 +17,7 @@ ReDoc (`/api/redoc`) is read-only.
 Scripts and tools can use a personal access token instead of a session. Create one under Settings, Account, then send it with every request:
 
 ```
-curl -H 'Authorization: Bearer mnst_<id>_<secret>' https://menagerist.example.com/api/v1/collection
+curl -H 'Authorization: Bearer mnst_<id>_<secret>' https://menagerist.example.com/api/v1/collections
 ```
 
 - The token acts as you, but only with the permissions you gave it. It needs no `Origin` header. It is shown once, when it is created, and expires on the date shown beside it.
@@ -27,7 +27,7 @@ curl -H 'Authorization: Bearer mnst_<id>_<secret>' https://menagerist.example.co
 
 ## Permissions
 
-Every operation that needs a permission names it in a "Requires permission" line. Members hold the content permissions (items, collections, media and the like); administrators hold every permission, including those for shared structure such as item types and relationship types, accounts and backups. `GET /api/v1/auth/me/permissions` lists the permissions of the signed-in account.
+Every operation that needs a permission names it in a "Requires permission" line. Members hold the content permissions (items, collections, media and the like); administrators hold every permission, including those for shared structure such as item types and relationship types, accounts and backups. `GET /api/v1/me/permissions` lists the permissions of the signed-in account.
 
 ## Errors
 

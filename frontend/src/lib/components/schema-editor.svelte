@@ -21,9 +21,9 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import {
-		countNodeTypeAttributeUsage,
+		getNodeTypeAttributeUsage,
 		purgeNodeTypeAttribute,
-		countEdgeTypeAttributeUsage,
+		getEdgeTypeAttributeUsage,
 		purgeEdgeTypeAttribute
 	} from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
@@ -183,8 +183,8 @@
 		usage[key] = 'loading';
 		const result =
 			typeKind === 'node'
-				? await countNodeTypeAttributeUsage({ path: { node_type_id: typeId, key } })
-				: await countEdgeTypeAttributeUsage({ path: { edge_type_id: typeId, key } });
+				? await getNodeTypeAttributeUsage({ path: { node_type_id: typeId, key } })
+				: await getEdgeTypeAttributeUsage({ path: { edge_type_id: typeId, key } });
 		usage[key] = result.error || !result.data ? 'error' : result.data.count;
 	}
 

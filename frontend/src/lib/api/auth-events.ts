@@ -11,8 +11,8 @@ const SELF_HANDLED = [
 	'/api/v1/auth/login',
 	'/api/v1/auth/setup',
 	'/api/v1/auth/status',
-	'/api/v1/auth/me',
-	'/api/v1/auth/me/permissions',
+	'/api/v1/me',
+	'/api/v1/me/permissions',
 	'/api/v1/auth/logout'
 ];
 

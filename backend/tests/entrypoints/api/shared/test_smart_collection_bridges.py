@@ -68,8 +68,8 @@ if TYPE_CHECKING:
 
 ALICE = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
 BOB = Actor(id=uuid.UUID(int=0xB2), roles=frozenset({"member"}))
-NODES = "/api/v1/node"
-COLLECTIONS = "/api/v1/collection"
+NODES = "/api/v1/nodes"
+COLLECTIONS = "/api/v1/collections"
 RATED: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -256,11 +256,11 @@ def _films(env: Env) -> dict[str, str]:
     """Alice's films and a book, and Bob's film that matches every query."""
     a = env.as_(ALICE)
     film = a.post(
-        "/api/v1/node-type",
+        "/api/v1/node-types",
         json={"slug": "film", "label": "Film", "attributes_schema": RATED},
     )
     assert film.status_code == 201, film.text
-    assert a.post("/api/v1/node-type", json={"slug": "book", "label": "Book"})
+    assert a.post("/api/v1/node-types", json={"slug": "book", "label": "Book"})
     ids = {
         "Alien": env.item("Alien", type="film", attributes={"rating": 5}),
         "Aliens": env.item(
@@ -338,10 +338,10 @@ def test_another_persons_smart_collection_never_leaks(env: Env) -> None:
         == 404
     )
     assert (
-        b.put(f"{COLLECTIONS}/{smart['id']}/item", json={"item_ids": []}).status_code
+        b.put(f"{COLLECTIONS}/{smart['id']}/items", json={"item_ids": []}).status_code
         == 404
     )
-    assert b.delete(f"{COLLECTIONS}/{smart['id']}/item/{unknown}").status_code == 404
+    assert b.delete(f"{COLLECTIONS}/{smart['id']}/items/{unknown}").status_code == 404
     assert b.get(COLLECTIONS).json() == []
 
 
@@ -368,9 +368,9 @@ def test_adding_and_removing_items_is_409(env: Env) -> None:
     a = env.as_(ALICE)
 
     added = a.put(
-        f"{COLLECTIONS}/{smart['id']}/item", json={"item_ids": [ids["Ronin"]]}
+        f"{COLLECTIONS}/{smart['id']}/items", json={"item_ids": [ids["Ronin"]]}
     )
-    removed = a.delete(f"{COLLECTIONS}/{smart['id']}/item/{ids['Alien']}")
+    removed = a.delete(f"{COLLECTIONS}/{smart['id']}/items/{ids['Alien']}")
 
     assert added.status_code == removed.status_code == 409
     assert added.json()["title"] == "CollectionKindError"
@@ -410,7 +410,7 @@ def test_a_stale_field_warns_and_lists_nothing(env: Env) -> None:
         },
     }
     patched = a.patch(
-        f"/api/v1/node-type/{ids['film-type-id']}",
+        f"/api/v1/node-types/{ids['film-type-id']}",
         json={"attributes_schema": archived},
     )
     assert patched.status_code == 200, patched.text
@@ -444,7 +444,7 @@ def test_a_stale_field_in_an_or_moves_the_etag_at_the_same_count(env: Env) -> No
         },
     }
     a.patch(
-        f"/api/v1/node-type/{ids['film-type-id']}",
+        f"/api/v1/node-types/{ids['film-type-id']}",
         json={"attributes_schema": archived},
     )
 
@@ -502,7 +502,7 @@ def test_manual_collections_are_unchanged(env: Env) -> None:
     env.smart(_where(_rating(">=", 4)))
     a = env.as_(ALICE)
     shelf = a.post(COLLECTIONS, json={"name": "Shelf"}).json()
-    put = a.put(f"{COLLECTIONS}/{shelf['id']}/item", json={"item_ids": [ids["Ronin"]]})
+    put = a.put(f"{COLLECTIONS}/{shelf['id']}/items", json={"item_ids": [ids["Ronin"]]})
     assert put.status_code == 200
 
     assert _names(a.get(f"{NODES}?collection={shelf['id']}")) == {"Ronin"}
@@ -516,7 +516,7 @@ def _rating_as_text(env: Env, film_type_id: str) -> None:
         "properties": {"rating": {"type": "string", "x-menagerist": {"kind": "text"}}},
     }
     patched = env.as_(ALICE).patch(
-        f"/api/v1/node-type/{film_type_id}", json={"attributes_schema": schema}
+        f"/api/v1/node-types/{film_type_id}", json={"attributes_schema": schema}
     )
     assert patched.status_code == 200, patched.text
 
@@ -525,14 +525,14 @@ def test_count_is_exact_above_the_cap(env: Env) -> None:
     """The count route passes the 1,000 cap that the collection's own count hits."""
     _films(env)
     a = env.as_(ALICE)
-    assert a.post("/api/v1/node-type", json={"slug": "coin", "label": "Coin"})
+    assert a.post("/api/v1/node-types", json={"slug": "coin", "label": "Coin"})
     env.bulk(ALICE.id, "coin", 1005)
     smart = env.smart(
         {"v": 1, "where": {"op": "and", "children": [{"kind": "text", "q": "coin"}]}}
     )
 
     capped = a.get(f"{COLLECTIONS}/{smart['id']}").json()
-    exact = a.get(f"{COLLECTIONS}/{smart['id']}/count")
+    exact = a.get(f"{COLLECTIONS}/{smart['id']}/items/count")
 
     assert (capped["item_count"], capped["item_count_capped"]) == (1000, True)
     assert exact.status_code == 200
@@ -545,10 +545,10 @@ def test_count_of_a_manual_collection_is_its_live_members(env: Env) -> None:
     a = env.as_(ALICE)
     shelf = a.post(COLLECTIONS, json={"name": "Shelf"}).json()
     members = [ids["Alien"], ids["Heat"], ids["Ronin"]]
-    a.put(f"{COLLECTIONS}/{shelf['id']}/item", json={"item_ids": members})
+    a.put(f"{COLLECTIONS}/{shelf['id']}/items", json={"item_ids": members})
     assert a.delete(f"{NODES}/{ids['Ronin']}").status_code == 204
 
-    assert a.get(f"{COLLECTIONS}/{shelf['id']}/count").json() == {"count": 2}
+    assert a.get(f"{COLLECTIONS}/{shelf['id']}/items/count").json() == {"count": 2}
 
 
 def test_count_applies_the_definition_only_to_the_callers_items(env: Env) -> None:
@@ -556,7 +556,7 @@ def test_count_applies_the_definition_only_to_the_callers_items(env: Env) -> Non
     _films(env)
     smart = env.smart(_where(_rating("=", 5)))
 
-    assert env.as_(ALICE).get(f"{COLLECTIONS}/{smart['id']}/count").json() == {
+    assert env.as_(ALICE).get(f"{COLLECTIONS}/{smart['id']}/items/count").json() == {
         "count": 1
     }
 
@@ -576,11 +576,11 @@ def test_count_of_a_stale_definition_is_zero(env: Env) -> None:
     }
     a = env.as_(ALICE)
     a.patch(
-        f"/api/v1/node-type/{ids['film-type-id']}",
+        f"/api/v1/node-types/{ids['film-type-id']}",
         json={"attributes_schema": archived},
     )
 
-    counted = a.get(f"{COLLECTIONS}/{smart['id']}/count")
+    counted = a.get(f"{COLLECTIONS}/{smart['id']}/items/count")
 
     assert counted.status_code == 200
     assert counted.json() == {"count": 0}
@@ -592,7 +592,7 @@ def test_count_of_a_definition_that_no_longer_validates_is_zero(env: Env) -> Non
     smart = env.smart(_where(_rating(">=", 4)))
     _rating_as_text(env, ids["film-type-id"])
 
-    counted = env.as_(ALICE).get(f"{COLLECTIONS}/{smart['id']}/count")
+    counted = env.as_(ALICE).get(f"{COLLECTIONS}/{smart['id']}/items/count")
 
     assert counted.status_code == 200
     assert counted.json() == {"count": 0}
@@ -604,10 +604,10 @@ def test_another_persons_count_is_404_like_an_unknown_id(env: Env) -> None:
     smart = env.smart(_where(_rating(">=", 4)))
     shelf = env.as_(ALICE).post(COLLECTIONS, json={"name": "Shelf"}).json()
     b = env.as_(BOB)
-    ghost = b.get(f"{COLLECTIONS}/{uuid.uuid7()}/count")
+    ghost = b.get(f"{COLLECTIONS}/{uuid.uuid7()}/items/count")
 
     for collection in (smart, shelf):
-        theirs = b.get(f"{COLLECTIONS}/{collection['id']}/count")
+        theirs = b.get(f"{COLLECTIONS}/{collection['id']}/items/count")
         assert theirs.status_code == ghost.status_code == 404
         assert theirs.json()["title"] == ghost.json()["title"]
         assert "count" not in theirs.json()
@@ -698,7 +698,9 @@ def test_a_stored_legacy_definition_still_lists_and_loads(env: Env) -> None:
         fetched = a.get(f"{COLLECTIONS}/{collection['id']}")
         assert fetched.status_code == 200, fetched.text
         assert fetched.json()["warnings"] != []
-        assert a.get(f"{COLLECTIONS}/{collection['id']}/count").json() == {"count": 0}
+        assert a.get(f"{COLLECTIONS}/{collection['id']}/items/count").json() == {
+            "count": 0
+        }
         renamed = a.patch(f"{COLLECTIONS}/{collection['id']}", json={"name": "Again"})
         assert renamed.status_code == 200, renamed.text
 

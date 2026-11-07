@@ -77,7 +77,7 @@
 		deleting = true;
 		deleteError = null;
 		try {
-			const result = await deleteUserExport({ path: { backup_id: deleteTarget.id } });
+			const result = await deleteUserExport({ path: { export_id: deleteTarget.id } });
 			if (result.error) {
 				deleteError = errorMessage(result.error);
 				toast.error(deleteError);
@@ -97,8 +97,8 @@
 
 	function downloadUrl(id: string) {
 		return client.buildUrl({
-			url: '/api/v1/me/export/{backup_id}/download',
-			path: { backup_id: id }
+			url: '/api/v1/me/exports/{export_id}/download',
+			path: { export_id: id }
 		});
 	}
 </script>

@@ -220,9 +220,9 @@ async def test_password_expired_blocks_content_routes(
     assert response.status_code == 403
     assert response.json()["type"] == "password_expired"
     # The identity routes the user needs still answer.
-    assert client.get("/api/v1/auth/me").status_code == 200
+    assert client.get("/api/v1/me").status_code == 200
     change = client.post(
-        "/api/v1/auth/password",
+        "/api/v1/me/password",
         json={"current_password": "password-123", "new_password": "another-pass-456"},
     )
     assert change.status_code == 200
@@ -238,10 +238,10 @@ async def test_password_expired_admin_cannot_use_user_administration(
     await world.users.add(admin)
     client = _client(world)
     client.cookies.set(COOKIE, await _session_for(world, admin.id))
-    listing = client.get("/api/v1/user")
+    listing = client.get("/api/v1/users")
     assert listing.status_code == 403
     assert listing.json()["type"] == "password_expired"
-    assert client.get("/api/v1/auth/me").status_code == 200
+    assert client.get("/api/v1/me").status_code == 200
 
 
 def test_public_routes_need_no_session(world: World) -> None:
@@ -273,7 +273,7 @@ async def test_diagnostic_detail_needs_a_session_then_the_permission(
     assert as_admin.get(path).status_code in {200, 503}
 
 
-REAL_ROUTE = "/api/v1/node-type"
+REAL_ROUTE = "/api/v1/node-types"
 
 
 def test_a_real_content_route_needs_setup_first(world: World) -> None:
@@ -350,7 +350,7 @@ async def test_permissions_endpoint_needs_a_session(
 ) -> None:
     """The permissions route answers 401 without a session."""
     await world.users.add(make_user("alice"))
-    response = _client(world).get("/api/v1/auth/me/permissions")
+    response = _client(world).get("/api/v1/me/permissions")
     assert response.status_code == 401
     assert response.json()["type"] == "unauthenticated"
 
@@ -553,13 +553,13 @@ async def test_account_routes_refuse_a_token_request(
     client = _client(world)
     client.cookies.set(COOKIE, await _session_for(world, user.id))
 
-    me = client.get("/api/v1/auth/me", headers=_bearer(token))
+    me = client.get("/api/v1/me", headers=_bearer(token))
     change = client.post(
-        "/api/v1/auth/password",
+        "/api/v1/me/password",
         json={"current_password": "password-123", "new_password": "another-pass-456"},
         headers=_bearer(token),
     )
-    only_token = _client(world).get("/api/v1/auth/me", headers=_bearer(token))
+    only_token = _client(world).get("/api/v1/me", headers=_bearer(token))
 
     for response in (me, change, only_token):
         assert response.status_code == 401
@@ -580,7 +580,7 @@ async def test_a_cross_site_cookie_plus_bearer_is_the_token_alone(
     content = client.delete(UNSAFE, headers={**cross_site, **_bearer(token)})
     cookie_only = client.delete(UNSAFE, headers=cross_site)
     account = client.post(
-        "/api/v1/auth/password",
+        "/api/v1/me/password",
         json={"current_password": "password-123", "new_password": "another-pass-456"},
         headers={**cross_site, **_bearer(token)},
     )

@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
 ALICE = uuid.UUID(int=101)
 BOB = uuid.UUID(int=102)
-URL = "/api/v1/node/search"
+URL = "/api/v1/nodes/search"
 FILM_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {"rating": {"type": "number", "x-menagerist": {"kind": "rating"}}},
@@ -72,7 +72,7 @@ def world(as_user: Callable[..., None]) -> _World:
     """A fresh app wired to in-memory repositories, with a film type."""
     fresh = _World(as_user)
     response = fresh.act_as(ALICE).post(
-        "/api/v1/node-type",
+        "/api/v1/node-types",
         json={"slug": "film", "label": "Film", "attributes_schema": FILM_SCHEMA},
     )
     assert response.status_code == 201
@@ -81,7 +81,7 @@ def world(as_user: Callable[..., None]) -> _World:
 
 def _film(client: TestClient, name: str, rating: int) -> None:
     response = client.post(
-        "/api/v1/node",
+        "/api/v1/nodes",
         json={"name": name, "type": "film", "attributes": {"rating": rating}},
     )
     assert response.status_code == 201
@@ -119,7 +119,7 @@ def test_items_have_the_same_shape_as_the_list_route(world: _World) -> None:
 
     searched = client.post(URL, json={"query": _query(_rating("=", 5))}).json()
 
-    assert searched["items"] == client.get("/api/v1/node").json()
+    assert searched["items"] == client.get("/api/v1/nodes").json()
 
 
 def test_pages_through_next_cursor(world: _World) -> None:

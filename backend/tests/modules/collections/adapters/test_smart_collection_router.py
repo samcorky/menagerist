@@ -1,4 +1,4 @@
-"""Router tests for smart collections on /api/v1/collection over in-memory adapters."""
+"""Router tests for smart collections on /api/v1/collections over in-memory adapters."""
 
 import uuid
 from dataclasses import dataclass
@@ -38,7 +38,7 @@ from app.modules.collections.domain.definition_warning import DefinitionWarning
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
 from app.shared_kernel.etag import etag_from_entity
 
-BASE = "/api/v1/collection"
+BASE = "/api/v1/collections"
 DEFINITION: dict[str, Any] = {
     "v": 1,
     "where": {
@@ -187,7 +187,7 @@ def test_adding_or_removing_items_on_a_smart_collection_is_409(api: Api) -> None
     created = api.smart()
     item = uuid.uuid7()
     api.items.live.add(item)
-    url = f"{BASE}/{created['id']}/item"
+    url = f"{BASE}/{created['id']}/items"
 
     added = api.client.put(url, json={"item_ids": [str(item)]})
     removed = api.client.delete(f"{url}/{item}")

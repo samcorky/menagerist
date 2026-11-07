@@ -13,7 +13,7 @@ from app.entrypoints.api.shared.permissions import Permission
 from app.shared_kernel.actor import Actor
 
 router = APIRouter(
-    prefix="/auth", tags=["Authentication"], route_class=PermissionAwareRoute
+    prefix="/me", tags=["Authentication"], route_class=PermissionAwareRoute
 )
 
 
@@ -28,7 +28,7 @@ class PermissionsResponse(BaseModel):
 
 
 @router.get(
-    "/me/permissions",
+    "/permissions",
     response_model=PermissionsResponse,
     operation_id="get_my_permissions",
 )

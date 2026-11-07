@@ -82,7 +82,7 @@ test('removing a pack removes its collections and items', async ({ page, request
 	for (const { name } of GAME_COLLECTIONS) {
 		await expect(collectionCard(page, name)).toHaveCount(0);
 	}
-	const nodes = (await (await request.get('/api/v1/node?limit=500')).json()) as {
+	const nodes = (await (await request.get('/api/v1/nodes?limit=500')).json()) as {
 		type: string | null;
 	}[];
 	expect(nodes.some((n) => n.type?.startsWith('games-'))).toBe(false);
@@ -122,7 +122,7 @@ test('an example item on your own collection is kept when the pack goes', async 
 }) => {
 	const own = await makeCollection(request, uniqueName('My games'));
 	await install(page, GAMES);
-	const nodes = (await (await request.get('/api/v1/node?limit=500')).json()) as {
+	const nodes = (await (await request.get('/api/v1/nodes?limit=500')).json()) as {
 		id: string;
 		name: string;
 	}[];
@@ -149,7 +149,7 @@ test('reinstalling after keeping items adopts them instead of duplicating', asyn
 	const renamed = uniqueName('Edited night');
 	await installEditAndRemoveGames(page, renamed);
 	const list = async () =>
-		(await (await request.get('/api/v1/node?limit=500')).json()) as { name: string }[];
+		(await (await request.get('/api/v1/nodes?limit=500')).json()) as { name: string }[];
 	expect((await list()).filter((n) => n.name === 'Lantern Harbour')).toHaveLength(1);
 
 	await page.goto('/settings/examples');
