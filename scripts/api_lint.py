@@ -12,8 +12,10 @@ reasons live in ``scripts/api-lint/.spectral.yaml``; the conventions are in
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
+import tempfile
 from collections import Counter
 from pathlib import Path
 
@@ -22,6 +24,12 @@ LINT_DIR = ROOT / "scripts" / "api-lint"
 BASELINE = LINT_DIR / "baseline.json"
 
 type Report = dict[str, dict[str, list[dict[str, object]]]]
+type Findings = dict[tuple[str, str], str]
+
+# Where the schema to compare with may be found, tried in order.
+BASE_REFS = ("origin/main", "main")
+# Enough to fix by hand; the validator lists the rest.
+MAX_LISTED = 40
 
 
 def run_validator(schema: Path) -> Report:
@@ -29,9 +37,13 @@ def run_validator(schema: Path) -> Report:
 
     Exit status 1 only means there were errors, so it is not checked.
     """
+    # On Windows npx is npx.cmd, which subprocess only finds by its full path.
+    npx = shutil.which("npx")
+    if npx is None:
+        sys.exit("npx was not found. Install Node.js to run the API lint.")
     result = subprocess.run(
         [
-            "npx",
+            npx,
             "--no-install",
             "ibm-openapi-validator",
             "-r",
@@ -56,6 +68,63 @@ def counts(report: Report, severity: str) -> Counter[str]:
     """Count findings of one severity per rule."""
     results = report.get(severity, {}).get("results", [])
     return Counter(str(item["rule"]) for item in results)
+
+
+def findings(report: Report, severity: str) -> Findings:
+    """Each finding of one severity, keyed by rule and schema path."""
+    found: Findings = {}
+    for item in report.get(severity, {}).get("results", []):
+        parts = item["path"]
+        path = ".".join(str(part) for part in parts) if isinstance(parts, list) else ""
+        found[(str(item["rule"]), path)] = str(item.get("message", ""))
+    return found
+
+
+def base_report(ref: str) -> Report | None:
+    """Lint the schema committed at `ref`; None when git cannot supply it."""
+    shown = subprocess.run(
+        ["git", "show", f"{ref}:openapi.json"],
+        cwd=ROOT,
+        capture_output=True,
+        check=False,
+    )
+    if shown.returncode != 0:
+        return None
+    with tempfile.TemporaryDirectory() as directory:
+        schema = Path(directory) / "openapi.json"
+        schema.write_bytes(shown.stdout)
+        return run_validator(schema)
+
+
+def _listing(heading: str, found: Findings) -> list[str]:
+    """A heading and up to `MAX_LISTED` findings, one per line."""
+    if not found:
+        return []
+    lines = [heading]
+    for (rule, path), text in sorted(found.items())[:MAX_LISTED]:
+        lines.append(f"  {rule}  {path}" + (f"  ({text})" if text else ""))
+    if len(found) > MAX_LISTED:
+        lines.append(f"  ... and {len(found) - MAX_LISTED} more")
+    return lines
+
+
+def describe_findings(head: Report, rules: set[str], base: Report | None) -> list[str]:
+    """Name the findings behind a failure, as lines for a person to act on.
+
+    Errors are always listed. The baseline holds only counts, so the warnings
+    that are new are known only by comparing with the schema on the base branch;
+    without one, every warning of the rules that went over is listed instead.
+    """
+    warned = {
+        key: text for key, text in findings(head, "warning").items() if key[0] in rules
+    }
+    if base is None:
+        heading = "Warnings of the rules above (no base schema to compare with):"
+    else:
+        heading = "New warnings compared with the base branch:"
+        was = findings(base, "warning")
+        warned = {key: text for key, text in warned.items() if key not in was}
+    return _listing("Errors:", findings(head, "error")) + _listing(heading, warned)
 
 
 def main() -> int:
@@ -94,8 +163,12 @@ def main() -> int:
 
     if failures:
         print("API lint failed:\n  " + "\n  ".join(failures))
+        over = {rule for rule, n in warnings.items() if n > baseline.get(rule, 0)}
+        base = next(filter(None, (base_report(ref) for ref in BASE_REFS)), None)
+        for line in describe_findings(report, over, base):
+            print(line)
         print("Fix the new findings, or change the ruleset with a reason.")
-        print("The validator in scripts/api-lint lists each one.")
+        print("The validator in scripts/api-lint lists every finding.")
         return 1
     if improved:
         print(f"API lint passed. Fewer findings: {', '.join(improved)}.")
