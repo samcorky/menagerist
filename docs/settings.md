@@ -24,6 +24,7 @@ Instance backup storage, retention and upload limits.
 | Variable | Type | Default | Allowed values | Notes |
 | --- | --- | --- | --- | --- |
 | `MENAGERIST_BACKUP_PATH` | path | `/data/backups` | any | Directory used to store instance backup archives. |
+| `MENAGERIST_BACKUP_STAGING_PATH` | path | unset | any | Directory for the temporary copies a restore or upload makes, such as the original files it can put back if the restore fails. Unset keeps them in a .staging folder inside the backup directory. Set it when the backup directory is read-only or short of space; it needs room for your media and must be writable by the app. Menagerist keeps its files in a backup-staging folder inside it. |
 | `MENAGERIST_BACKUP_USER_EXPORT_TTL_HOURS` | whole number (hours) | `24` | more than 0 | Hours to retain a person's downloadable data export. Editable in the app's settings unless set here. |
 | `MENAGERIST_BACKUP_BEFORE_MIGRATE` | true or false | `true` | any | Create a backup before applying database migrations. Enabled by default. |
 | `MENAGERIST_BACKUP_KEEP_LAST` | whole number | `7` | 1 or more | Minimum number of ordinary backups to retain. Editable in the app's settings unless set here. |

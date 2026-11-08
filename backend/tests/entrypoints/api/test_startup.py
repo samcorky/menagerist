@@ -124,7 +124,7 @@ async def test_an_unreachable_database_is_not_a_startup_error(
     assert [entry["log_level"] for entry in logs] == ["debug"]
 
 
-@pytest.mark.parametrize("storage", ["media", "backup"])
+@pytest.mark.parametrize("storage", ["media", "backup", "staging"])
 @pytest.mark.parametrize("state", ["not-writable", "missing"])
 async def test_warns_when_storage_cannot_be_used(
     monkeypatch: pytest.MonkeyPatch,
@@ -141,7 +141,10 @@ async def test_warns_when_storage_cannot_be_used(
     monkeypatch.setattr(
         startup,
         "get_backup_settings",
-        lambda: SimpleNamespace(path=tmp_path / "backup"),
+        lambda: SimpleNamespace(
+            path=tmp_path / "backup",
+            staging_path=tmp_path / "staging" if storage == "staging" else None,
+        ),
     )
 
     def probe(path: Path) -> DirectoryProbe:
@@ -179,7 +182,7 @@ async def test_stays_quiet_when_media_storage_is_writable(
     monkeypatch.setattr(
         startup,
         "get_backup_settings",
-        lambda: SimpleNamespace(path=tmp_path),
+        lambda: SimpleNamespace(path=tmp_path, staging_path=None),
     )
 
     with capture_logs() as logs:

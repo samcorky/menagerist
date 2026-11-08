@@ -16,6 +16,17 @@ class BackupSettings(MenageristBaseSettings, group="backup"):
         default=Path("/data/backups"),
         description="Directory used to store instance backup archives.",
     )
+    staging_path: Path | None = Field(
+        default=None,
+        description=(
+            "Directory for the temporary copies a restore or upload makes, such as "
+            + "the original files it can put back if the restore fails. Unset keeps "
+            + "them in a .staging folder inside the backup directory. Set it when "
+            + "the backup directory is read-only or short of space; it needs room "
+            + "for your media and must be writable by the app. Menagerist keeps "
+            + "its files in a backup-staging folder inside it."
+        ),
+    )
     user_export_ttl_hours: Annotated[
         Hours,
         Field(

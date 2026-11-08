@@ -8,6 +8,9 @@ from app.modules.backup.adapters.storage.local_backup_reader import (
     LocalBackupReader,
 )
 from app.modules.backup.adapters.storage.local_backup_writer import LocalBackupWriter
+from app.modules.backup.adapters.storage.private_directory import (
+    require_private_directory,
+)
 from app.modules.backup.adapters.storage.staging_lock import lock_staging
 from app.modules.backup.application.archive import parse_summary
 from app.modules.backup.domain.errors import (
@@ -27,9 +30,17 @@ if TYPE_CHECKING:
 class LocalDirectoryBackupStore:
     """Archives and commit-marker summaries on a local backup volume."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, workspace_staging: Path | None = None) -> None:
+        """Keep archives under `root`.
+
+        Args:
+            root: The backup volume.
+            workspace_staging: A staging directory outside `root` that the matching
+                `LocalBackupWorkspace` uses, so clean-up reaches its leftovers too.
+        """
         self._root = root
         self._instance = root / "instance"
+        self._workspace_staging = workspace_staging
 
     async def begin(self, backup_id: UUID) -> LocalBackupWriter:
         """Create private staging directories, reporting volume permissions."""
@@ -195,8 +206,17 @@ class LocalDirectoryBackupStore:
 
     def _stale_staging(self, before: datetime) -> list[Path]:
         paths: list[Path] = []
-        for path in (self._root / ".staging").glob("*"):
-            if not self._inactive(path):
+        directories = [self._root / ".staging"]
+        if self._workspace_staging is not None:
+            directories.append(self._workspace_staging)
+        candidates = [
+            entry
+            for folder in directories
+            if self._trusted(folder)
+            for entry in folder.glob("*")
+        ]
+        for path in candidates:
+            if path.is_symlink() or not self._inactive(path):
                 continue
             try:
                 entries = [path, *path.rglob("*")] if path.is_dir() else [path]
@@ -215,7 +235,22 @@ class LocalDirectoryBackupStore:
                     shutil.rmtree(path)
                 else:
                     path.unlink(missing_ok=True)
-        return [str(path.relative_to(self._root)) for path in paths]
+        return [self._label(path) for path in paths]
+
+    @staticmethod
+    def _trusted(folder: Path) -> bool:
+        """Sweep a staging folder only if it is a real directory we own."""
+        try:
+            require_private_directory(folder)
+        except OSError:
+            return False
+        return True
+
+    def _label(self, path: Path) -> str:
+        """Name `path` relative to the backup volume, or in full if it is outside."""
+        if path.is_relative_to(self._root):
+            return str(path.relative_to(self._root))
+        return str(path)
 
     async def list(self) -> list[BackupSummary]:
         """List valid commit markers without opening archives."""

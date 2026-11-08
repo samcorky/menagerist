@@ -12,9 +12,7 @@ from cyclopts import App, Parameter
 
 from app.entrypoints.api.shared.progress import make_reporter
 from app.modules.backup.adapters.cli.progress_sink import snapshot_display
-from app.modules.backup.adapters.storage.local_backup_store import (
-    LocalDirectoryBackupStore,
-)
+from app.modules.backup.adapters.storage.instance_storage import instance_store
 from app.modules.backup.application.delete_backup import (
     DeleteBackup,
     DeleteBackupCommand,
@@ -40,6 +38,9 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable, Coroutine
     from typing import Any
 
+    from app.modules.backup.adapters.storage.local_backup_store import (
+        LocalDirectoryBackupStore,
+    )
     from app.modules.backup.domain.backup import BackupSummary
     from app.modules.backup.domain.verification import PruneReport
     from app.shared_kernel.access_guard import AccessGuard
@@ -104,7 +105,7 @@ def use_operations(
 
 
 def _store() -> LocalDirectoryBackupStore:
-    return LocalDirectoryBackupStore(get_backup_settings().path)
+    return instance_store(get_backup_settings())
 
 
 def _run[T](operation: Coroutine[Any, Any, T], working: str | None = None) -> T:
@@ -260,9 +261,7 @@ def delete(
 @backup_app.command
 def upload(archive: Path) -> dict[str, object]:
     """Verify and store an archive from a local file."""
-    from app.modules.backup.adapters.storage.local_backup_workspace import (
-        LocalBackupWorkspace,
-    )
+    from app.modules.backup.adapters.storage.instance_storage import instance_workspace
     from app.modules.backup.application.upload_backup import (
         UploadBackup,
         UploadBackupCommand,
@@ -281,7 +280,7 @@ def upload(archive: Path) -> dict[str, object]:
     summary = _run(
         UploadBackup(
             _store(),
-            LocalBackupWorkspace(settings.path),
+            instance_workspace(settings),
             _guard,
             max_upload_size=settings.max_upload_size,
         ).handle(UploadBackupCommand(stream=chunks()), SYSTEM_ACTOR)

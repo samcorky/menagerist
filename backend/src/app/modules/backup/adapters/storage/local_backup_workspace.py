@@ -4,6 +4,9 @@ from typing import TYPE_CHECKING
 from uuid import UUID, uuid7
 
 from app.modules.backup.adapters.storage.local_backup_reader import LocalBackupReader
+from app.modules.backup.adapters.storage.private_directory import (
+    require_private_directory,
+)
 from app.modules.backup.adapters.storage.staging_lock import lock_staging
 from app.modules.backup.domain.errors import BackupStorageError
 
@@ -16,8 +19,9 @@ if TYPE_CHECKING:
 class LocalBackupWorkspace:
     """Stream private staging files into the configured backup volume."""
 
-    def __init__(self, path: Path) -> None:
-        self._path = path / ".staging"
+    def __init__(self, path: Path, staging: Path | None = None) -> None:
+        """Stage under `staging`, or in `.staging` inside the backup volume `path`."""
+        self._path = staging if staging is not None else path / ".staging"
         self._leases: dict[UUID, BinaryIO] = {}
 
     async def save(self, stream: AsyncIterator[bytes]) -> UUID:
@@ -27,6 +31,7 @@ class LocalBackupWorkspace:
 
         def create_directory() -> None:
             self._path.mkdir(mode=0o700, parents=True, exist_ok=True)
+            require_private_directory(self._path)
             directory.mkdir(mode=0o700)
 
         try:

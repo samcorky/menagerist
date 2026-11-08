@@ -328,7 +328,7 @@ async def test_storage_check_includes_configured_backup_directory(
     monkeypatch.setattr(
         dependencies,
         "get_backup_settings",
-        lambda: SimpleNamespace(path=backup_path),
+        lambda: SimpleNamespace(path=backup_path, staging_path=None),
     )
 
     def probe(path: Path) -> DirectoryProbe:
@@ -365,6 +365,47 @@ async def test_storage_check_includes_configured_backup_directory(
             assert "storage:backupFreeSpace" not in result
         else:
             assert "chown 1000:1000" in backup.output
+
+
+async def test_storage_check_reports_the_staging_directory_when_configured(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A configured staging directory gets its own writability and space entries."""
+    staging_path = tmp_path / "staging"
+    monkeypatch.setattr(
+        dependencies,
+        "get_media_settings",
+        lambda: SimpleNamespace(storage_path=tmp_path / "media"),
+    )
+    monkeypatch.setattr(
+        dependencies,
+        "get_backup_settings",
+        lambda: SimpleNamespace(path=tmp_path / "backup", staging_path=staging_path),
+    )
+
+    def probe(path: Path) -> DirectoryProbe:
+        low = path == staging_path
+        return DirectoryProbe(
+            state="not-writable" if low else "writable",
+            free_bytes=2**20 if low else 2**31,
+        )
+
+    monkeypatch.setattr(
+        "app.modules.system.adapters.platform.checks.storage_check.probe_directory",
+        probe,
+    )
+    dependencies.get_storage_check.cache_clear()
+    try:
+        result = await dependencies.get_storage_check().run()
+    finally:
+        dependencies.get_storage_check.cache_clear()
+
+    staging = result["storage:backupStagingWritable"]
+    assert staging.status is CheckStatus.WARN
+    assert staging.output is not None
+    assert str(staging_path) in staging.output
+    assert result["storage:backupStagingFreeSpace"].status is CheckStatus.WARN
+    assert result["storage:backupWritable"].status is CheckStatus.PASS
 
 
 # ---------------------------------------------------------------------------

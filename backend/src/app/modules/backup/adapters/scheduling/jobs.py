@@ -42,9 +42,7 @@ async def create_scheduled_backup(
 async def prune_scheduled_backups(actor: Actor) -> object:
     """Apply the configured retention after a successful scheduled backup."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
-    from app.modules.backup.adapters.storage.local_backup_store import (
-        LocalDirectoryBackupStore,
-    )
+    from app.modules.backup.adapters.storage.instance_storage import instance_store
     from app.modules.backup.application.prune_backups import (
         PruneBackups,
         PruneBackupsCommand,
@@ -53,7 +51,7 @@ async def prune_scheduled_backups(actor: Actor) -> object:
     settings = get_backup_settings()
     reader = get_settings_reader()
     return await PruneBackups(
-        LocalDirectoryBackupStore(settings.path),
+        instance_store(settings),
         get_access_guard(),
         keep_last=await reader.get(KEEP_LAST),
         pre_migration_keep=settings.pre_migration_keep,
@@ -74,17 +72,14 @@ async def prune_expired_exports(
 ) -> None:
     """Expire user exports without applying backup retention."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
-    from app.modules.backup.adapters.storage.local_backup_store import (
-        LocalDirectoryBackupStore,
-    )
+    from app.modules.backup.adapters.storage.instance_storage import instance_store
     from app.modules.backup.application.prune_user_exports import (
         PruneUserExports,
         PruneUserExportsCommand,
     )
 
-    settings = get_backup_settings()
     await PruneUserExports(
-        LocalDirectoryBackupStore(settings.path),
+        instance_store(get_backup_settings()),
         get_access_guard(),
         user_export_ttl_hours=await get_settings_reader().get(USER_EXPORT_TTL_HOURS),
     ).handle(PruneUserExportsCommand(), actor)

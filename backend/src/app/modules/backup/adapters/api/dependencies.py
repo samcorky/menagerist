@@ -16,11 +16,9 @@ from app.modules.backup.adapters.persistence.database_restorer import (
 from app.modules.backup.adapters.persistence.database_snapshot import (
     SqlAlchemyDatabaseSnapshot,
 )
-from app.modules.backup.adapters.storage.local_backup_store import (
-    LocalDirectoryBackupStore,
-)
-from app.modules.backup.adapters.storage.local_backup_workspace import (
-    LocalBackupWorkspace,
+from app.modules.backup.adapters.storage.instance_storage import (
+    instance_store,
+    instance_workspace,
 )
 from app.modules.backup.adapters.storage.local_progress_store import LocalProgressStore
 from app.modules.backup.application.create_backup import CreateBackup
@@ -49,7 +47,7 @@ from app.shared_kernel.settings import SettingsReader
 
 def get_backup_store() -> BackupStore:
     """Use the configured volume for committed instance archives."""
-    return LocalDirectoryBackupStore(get_backup_settings().path)
+    return instance_store(get_backup_settings())
 
 
 def get_restore_progress_store() -> ProgressStore:
@@ -59,7 +57,7 @@ def get_restore_progress_store() -> ProgressStore:
 
 def get_backup_workspace() -> BackupWorkspace:
     """Stage uploads and media rollback copies on the backup volume."""
-    return LocalBackupWorkspace(get_backup_settings().path)
+    return instance_workspace(get_backup_settings())
 
 
 def get_database_snapshot(
