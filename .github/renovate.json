@@ -53,8 +53,7 @@
     "schedule": [
       "at any time"
     ],
-    "automerge": true,
-    "platformAutomerge": true,
+    "automerge": false,
     "semanticCommitType": "fix",
     "semanticCommitScope": "security",
     "minimumReleaseAge": null
@@ -64,8 +63,7 @@
     "schedule": [
       "before 6am on monday"
     ],
-    "automerge": true,
-    "platformAutomerge": true
+    "automerge": false
   },
   "customManagers": [
     {
