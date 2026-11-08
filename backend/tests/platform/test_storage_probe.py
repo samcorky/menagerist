@@ -3,7 +3,14 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.platform.storage_probe import DirectoryState, hint, probe_directory
+from app.platform.config.backup import BackupSettings
+from app.platform.config.media import MediaSettings
+from app.platform.storage_probe import (
+    DirectoryState,
+    hint,
+    probe_directory,
+    storage_directories,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -68,3 +75,20 @@ def test_hint_matches_directory_state(
         assert message is not None
         assert str(tmp_path) in message
         assert expected in message
+
+
+def test_storage_directories_lists_staging_only_when_configured(tmp_path: Path) -> None:
+    """Media and backups are always checked; staging is checked once it is set."""
+    media = MediaSettings(storage_path=tmp_path / "media")
+    backups = BackupSettings(path=tmp_path / "backups")
+    assert storage_directories(media, backups) == {
+        "media": tmp_path / "media",
+        "backup": tmp_path / "backups",
+    }
+
+    staged = BackupSettings(path=tmp_path / "backups", staging_path=tmp_path / "tmp")
+    assert storage_directories(media, staged) == {
+        "media": tmp_path / "media",
+        "backup": tmp_path / "backups",
+        "backupStaging": tmp_path / "tmp",
+    }

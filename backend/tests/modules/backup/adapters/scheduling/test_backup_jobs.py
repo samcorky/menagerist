@@ -233,7 +233,7 @@ async def test_scheduled_retention_reads_the_current_settings(
     monkeypatch.setattr(
         backup_jobs,
         "get_backup_settings",
-        Mock(return_value=Mock(path=tmp_path, pre_migration_keep=3)),
+        Mock(return_value=Mock(path=tmp_path, staging_path=None, pre_migration_keep=3)),
     )
     monkeypatch.setattr(prune_backups, "PruneBackups", _SpyPrune)
     await backup_jobs.prune_scheduled_backups(SYSTEM_ACTOR)

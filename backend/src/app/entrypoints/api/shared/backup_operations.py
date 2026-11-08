@@ -54,9 +54,7 @@ async def create_backup(
     from app.modules.backup.adapters.persistence.database_snapshot import (
         SqlAlchemyDatabaseSnapshot,
     )
-    from app.modules.backup.adapters.storage.local_backup_store import (
-        LocalDirectoryBackupStore,
-    )
+    from app.modules.backup.adapters.storage.instance_storage import instance_store
     from app.modules.backup.application.create_backup import (
         CreateBackup,
         CreateBackupCommand,
@@ -66,7 +64,7 @@ async def create_backup(
 
     async with media_files() as media:
         return await CreateBackup(
-            LocalDirectoryBackupStore(get_backup_settings().path),
+            instance_store(get_backup_settings()),
             SqlAlchemyDatabaseSnapshot(get_session_factory()),
             media,
             get_access_guard(),

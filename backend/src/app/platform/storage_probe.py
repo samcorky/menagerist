@@ -7,6 +7,9 @@ from uuid import uuid4
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from app.platform.config.backup import BackupSettings
+    from app.platform.config.media import MediaSettings
+
 DirectoryState = Literal["writable", "not-writable", "missing"]
 
 
@@ -16,6 +19,20 @@ class DirectoryProbe:
 
     state: DirectoryState
     free_bytes: int | None
+
+
+def storage_directories(
+    media: MediaSettings, backup: BackupSettings
+) -> dict[str, Path]:
+    """The directories the app writes to, by name, for startup and readiness checks.
+
+    The staging directory is listed only when one is configured: it is where a
+    restore keeps a copy of your media, so it needs room and write access too.
+    """
+    directories = {"media": media.storage_path, "backup": backup.path}
+    if backup.staging_path is not None:
+        directories["backupStaging"] = backup.staging_path
+    return directories
 
 
 def probe_directory(path: Path) -> DirectoryProbe:

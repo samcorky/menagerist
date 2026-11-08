@@ -16,8 +16,9 @@ if TYPE_CHECKING:
 class LocalBackupWorkspace:
     """Stream private staging files into the configured backup volume."""
 
-    def __init__(self, path: Path) -> None:
-        self._path = path / ".staging"
+    def __init__(self, path: Path, staging: Path | None = None) -> None:
+        """Stage under `staging`, or in `.staging` inside the backup volume `path`."""
+        self._path = staging if staging is not None else path / ".staging"
         self._leases: dict[UUID, BinaryIO] = {}
 
     async def save(self, stream: AsyncIterator[bytes]) -> UUID:

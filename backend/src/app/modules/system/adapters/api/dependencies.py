@@ -50,6 +50,7 @@ from app.platform.config.api import get_api_settings
 from app.platform.config.backup import get_backup_settings
 from app.platform.config.media import get_media_settings
 from app.platform.database import get_session_factory
+from app.platform.storage_probe import storage_directories
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -67,10 +68,7 @@ def get_get_health_use_case(
 def get_storage_check() -> StorageCheck:
     """Return the process-wide storage check and its cached probe results."""
     return StorageCheck(
-        {
-            "media": get_media_settings().storage_path,
-            "backup": get_backup_settings().path,
-        }
+        storage_directories(get_media_settings(), get_backup_settings())
     )
 
 

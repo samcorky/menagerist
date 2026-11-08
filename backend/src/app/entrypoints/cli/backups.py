@@ -68,11 +68,9 @@ async def restore_backup(
     from app.modules.backup.adapters.persistence.database_restorer import (
         SqlAlchemyDatabaseRestorer,
     )
-    from app.modules.backup.adapters.storage.local_backup_store import (
-        LocalDirectoryBackupStore,
-    )
-    from app.modules.backup.adapters.storage.local_backup_workspace import (
-        LocalBackupWorkspace,
+    from app.modules.backup.adapters.storage.instance_storage import (
+        instance_store,
+        instance_workspace,
     )
     from app.modules.backup.application.restore_backup import (
         RestoreBackup,
@@ -97,13 +95,12 @@ async def restore_backup(
             setup_only = await GetSetupStatus(
                 build_identity_repos(session), guard
             ).handle(GetSetupStatusQuery(), SYSTEM_ACTOR)
-        settings = get_backup_settings()
         async with media_files() as media:
             await RestoreBackup(
-                LocalDirectoryBackupStore(settings.path),
+                instance_store(get_backup_settings()),
                 SqlAlchemyDatabaseRestorer(factory),
                 media,
-                LocalBackupWorkspace(settings.path),
+                instance_workspace(get_backup_settings()),
                 guard,
                 progress=progress,
             ).handle(

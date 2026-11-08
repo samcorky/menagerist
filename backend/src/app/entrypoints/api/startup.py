@@ -16,7 +16,7 @@ from app.platform.config.api import CORS_OPEN_HINT, get_api_settings
 from app.platform.config.backup import get_backup_settings
 from app.platform.config.media import get_media_settings
 from app.platform.database import get_session_factory
-from app.platform.storage_probe import hint, probe_directory
+from app.platform.storage_probe import hint, probe_directory, storage_directories
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 if TYPE_CHECKING:
@@ -51,10 +51,7 @@ async def warn_if_no_administrator() -> None:
 
 async def warn_if_storage_not_writable() -> None:
     """Log a warning for each configured storage directory that cannot be used."""
-    directories = {
-        "media": get_media_settings().storage_path,
-        "backup": get_backup_settings().path,
-    }
+    directories = storage_directories(get_media_settings(), get_backup_settings())
     for path in directories.values():
         try:
             probe = await asyncio.to_thread(probe_directory, path)
