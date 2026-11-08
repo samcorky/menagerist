@@ -1,4 +1,3 @@
-import asyncio
 import sys
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
@@ -38,6 +37,7 @@ def purge_deleted(
         build_purge_deleted_content,
     )
     from app.platform.config.retention import get_retention_settings
+    from app.platform.database import run_async
     from app.shared_kernel.actor import SYSTEM_ACTOR
 
     if older_than_days is None:
@@ -55,7 +55,7 @@ def purge_deleted(
             assume_yes=yes,
         )
     with activity("Looking through Recently deleted"):
-        result = asyncio.run(
+        result = run_async(
             build_purge_deleted_content().handle(
                 PurgeDeletedContentCommand(older_than=cutoff, dry_run=dry_run),
                 SYSTEM_ACTOR,

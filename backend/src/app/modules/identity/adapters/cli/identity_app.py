@@ -1,4 +1,3 @@
-import asyncio
 import getpass
 import sys
 from collections.abc import Callable, Coroutine
@@ -81,8 +80,10 @@ def _read_password(*, use_settings: bool = True) -> str:
 
 def _run[T](coroutine: Coroutine[Any, Any, T]) -> T:
     """Run a use case, turning a refusal into a plain message and exit code 1."""
+    from app.platform.database import run_async
+
     try:
-        return asyncio.run(coroutine)
+        return run_async(coroutine)
     except DomainError as error:
         _fail(str(error))
 

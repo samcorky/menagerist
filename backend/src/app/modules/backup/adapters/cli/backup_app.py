@@ -1,6 +1,5 @@
 """Thin command adapters for instance backup operations."""
 
-import asyncio
 import sys
 from contextlib import nullcontext
 from dataclasses import asdict
@@ -109,9 +108,11 @@ def _store() -> LocalDirectoryBackupStore:
 
 
 def _run[T](operation: Coroutine[Any, Any, T], working: str | None = None) -> T:
+    from app.platform.database import run_async
+
     try:
         with activity(working) if working else nullcontext():
-            return asyncio.run(operation)
+            return run_async(operation)
     except DomainError as error:
         print(str(error), file=sys.stderr)
         raise SystemExit(1) from error
