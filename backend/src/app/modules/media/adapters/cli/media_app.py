@@ -1,4 +1,3 @@
-import asyncio
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
@@ -25,7 +24,7 @@ def cleanup() -> dict[str, object]:
         CleanupExpiredMediaCommand,
     )
     from app.platform.config.media import get_media_settings
-    from app.platform.database import get_session_factory
+    from app.platform.database import get_session_factory, run_async
     from app.shared_kernel.actor import SYSTEM_ACTOR
 
     logger.debug("starting media cleanup")
@@ -45,7 +44,7 @@ def cleanup() -> dict[str, object]:
         )
 
     with activity("Removing expired media"):
-        count = asyncio.run(_run())
+        count = run_async(_run())
     logger.info("media cleanup complete", deleted=count)
     return {"message": "Media cleanup complete", "deleted": count}
 
@@ -73,7 +72,7 @@ def regenerate_thumbnails(
         RegenerateThumbnailsCommand,
     )
     from app.platform.config.media import get_media_settings
-    from app.platform.database import get_session_factory
+    from app.platform.database import get_session_factory, run_async
     from app.shared_kernel.actor import SYSTEM_ACTOR
 
     confirm(
@@ -94,7 +93,7 @@ def regenerate_thumbnails(
         )
 
     with activity("Regenerating thumbnails"):
-        count = asyncio.run(_run())
+        count = run_async(_run())
     logger.info("thumbnail regeneration complete", regenerated=count)
     return {
         "message": "Thumbnails regenerated",
