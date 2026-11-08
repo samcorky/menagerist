@@ -145,7 +145,7 @@ Inspired by the idea of a *menagerie* - a curated collection of things. Rather t
 
 A subtle nod to *Star Trek: The Original Series - The Menagerie*.
 
-[release-badge]: https://img.shields.io/github/v/release/samcorky/menagerist?include_prereleases&logo=github
+[release-badge]: https://img.shields.io/github/v/release/samcorky/menagerist?include_prereleases&logo=github&color=green
 [ci-badge]: https://img.shields.io/github/actions/workflow/status/samcorky/menagerist/ci.yml?branch=main&logo=githubactions&label=CI
 [coverage-badge]: https://codecov.io/github/samcorky/menagerist/graph/badge.svg
 [license-badge]: https://img.shields.io/github/license/samcorky/menagerist
