@@ -58,7 +58,7 @@ jobs:
       # oasdiff.com for a hosted comparison page.
       - name: Summarise the API changes
         if: steps.diff.outputs.changed == 'true'
-        uses: oasdiff/oasdiff-action/changelog@514e22ec2f1d1654fb78ac3bb7dc00d8f3c6c4d9 # v0.1.19
+        uses: oasdiff/oasdiff-action/changelog@17214aea5113d728707fdd7d84bc811f4850fe3a # v0.1.22
         with:
           base: base/${{ env.SCHEMA }}
           revision: ${{ env.SCHEMA }}
@@ -98,7 +98,7 @@ jobs:
       # because an empty string is falsy in `a && '' || b`, which would always pick `b`.
       - name: Fail on breaking changes
         if: steps.diff.outputs.changed == 'true' && steps.label.outputs.exempt != 'true'
-        uses: oasdiff/oasdiff-action/breaking@514e22ec2f1d1654fb78ac3bb7dc00d8f3c6c4d9 # v0.1.19
+        uses: oasdiff/oasdiff-action/breaking@17214aea5113d728707fdd7d84bc811f4850fe3a # v0.1.22
         with:
           base: base/${{ env.SCHEMA }}
           revision: ${{ env.SCHEMA }}
@@ -108,7 +108,7 @@ jobs:
 
       - name: List breaking changes (labelled breaking-change)
         if: steps.diff.outputs.changed == 'true' && steps.label.outputs.exempt == 'true'
-        uses: oasdiff/oasdiff-action/breaking@514e22ec2f1d1654fb78ac3bb7dc00d8f3c6c4d9 # v0.1.19
+        uses: oasdiff/oasdiff-action/breaking@17214aea5113d728707fdd7d84bc811f4850fe3a # v0.1.22
         with:
           base: base/${{ env.SCHEMA }}
           revision: ${{ env.SCHEMA }}
