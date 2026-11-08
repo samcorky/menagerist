@@ -8,6 +8,9 @@ from app.modules.backup.adapters.storage.local_backup_reader import (
     LocalBackupReader,
 )
 from app.modules.backup.adapters.storage.local_backup_writer import LocalBackupWriter
+from app.modules.backup.adapters.storage.private_directory import (
+    require_private_directory,
+)
 from app.modules.backup.adapters.storage.staging_lock import lock_staging
 from app.modules.backup.application.archive import parse_summary
 from app.modules.backup.domain.errors import (
@@ -206,7 +209,12 @@ class LocalDirectoryBackupStore:
         directories = [self._root / ".staging"]
         if self._workspace_staging is not None:
             directories.append(self._workspace_staging)
-        candidates = [entry for folder in directories for entry in folder.glob("*")]
+        candidates = [
+            entry
+            for folder in directories
+            if self._trusted(folder)
+            for entry in folder.glob("*")
+        ]
         for path in candidates:
             if path.is_symlink() or not self._inactive(path):
                 continue
@@ -228,6 +236,15 @@ class LocalDirectoryBackupStore:
                 else:
                     path.unlink(missing_ok=True)
         return [self._label(path) for path in paths]
+
+    @staticmethod
+    def _trusted(folder: Path) -> bool:
+        """Sweep a staging folder only if it is a real directory we own."""
+        try:
+            require_private_directory(folder)
+        except OSError:
+            return False
+        return True
 
     def _label(self, path: Path) -> str:
         """Name `path` relative to the backup volume, or in full if it is outside."""

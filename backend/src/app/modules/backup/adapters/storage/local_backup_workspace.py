@@ -1,12 +1,12 @@
 import asyncio
-import os
 import shutil
-import stat
-import sys
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid7
 
 from app.modules.backup.adapters.storage.local_backup_reader import LocalBackupReader
+from app.modules.backup.adapters.storage.private_directory import (
+    require_private_directory,
+)
 from app.modules.backup.adapters.storage.staging_lock import lock_staging
 from app.modules.backup.domain.errors import BackupStorageError
 
@@ -31,7 +31,7 @@ class LocalBackupWorkspace:
 
         def create_directory() -> None:
             self._path.mkdir(mode=0o700, parents=True, exist_ok=True)
-            self._require_private()
+            require_private_directory(self._path)
             directory.mkdir(mode=0o700)
 
         try:
@@ -60,20 +60,6 @@ class LocalBackupWorkspace:
                 await self.remove(key)
             raise
         return key
-
-    def _require_private(self) -> None:
-        """Refuse a staging folder someone else could have planted or can write to.
-
-        It matters when the folder sits in a shared directory such as /tmp, where
-        another user could pre-create the name as a symlink or a directory they own.
-        """
-        status = self._path.lstat()
-        if not stat.S_ISDIR(status.st_mode):
-            raise OSError("Staging path is not a real directory.")
-        if sys.platform != "win32" and (
-            status.st_uid != os.getuid() or status.st_mode & 0o077
-        ):
-            raise OSError("Staging path is not private to this user.")
 
     async def read(self, key: UUID) -> AsyncIterator[bytes]:
         """Read bounded chunks from a private file."""

@@ -1,6 +1,7 @@
 """`MENAGERIST_BACKUP_STAGING_PATH` moves restore and upload staging off the backups."""
 
 import os
+import sys
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
@@ -16,6 +17,9 @@ from app.modules.backup.adapters.storage.local_backup_store import (
 )
 from app.modules.backup.adapters.storage.local_backup_workspace import (
     LocalBackupWorkspace,
+)
+from app.modules.backup.adapters.storage.private_directory import (
+    require_private_directory,
 )
 from app.modules.backup.domain.errors import BackupStorageError
 from app.platform.config.backup import get_backup_settings
@@ -161,3 +165,32 @@ async def test_cleanup_does_not_follow_a_symlink_in_staging(tmp_path: Path) -> N
 
     assert await store.cleanup_orphans(before=datetime.now(UTC), dry_run=False) == []
     assert (target / "data").read_bytes() == b"keep"
+
+
+async def test_cleanup_skips_a_staging_folder_that_is_a_link(tmp_path: Path) -> None:
+    """A planted link in place of the folder is not swept, nor is its target."""
+    target = tmp_path / "precious" / "stale"
+    target.mkdir(parents=True)
+    (target / "data").write_bytes(b"keep")
+    _age(target)
+    link = tmp_path / "scratch"
+    try:
+        link.symlink_to(target.parent, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlinks need privileges on this platform")
+    store = LocalDirectoryBackupStore(tmp_path / "backups", workspace_staging=link)
+
+    assert await store.cleanup_orphans(before=datetime.now(UTC), dry_run=False) == []
+    assert (target / "data").read_bytes() == b"keep"
+
+
+def test_the_privacy_check_refuses_a_group_writable_folder(tmp_path: Path) -> None:
+    """On POSIX, a folder other users can reach is not private."""
+    if sys.platform == "win32":
+        pytest.skip("POSIX permission bits")
+    folder = tmp_path / "shared"
+    folder.mkdir(mode=0o700)
+    require_private_directory(folder)
+    folder.chmod(0o770)
+    with pytest.raises(OSError, match="not private"):
+        require_private_directory(folder)
