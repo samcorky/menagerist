@@ -61,8 +61,9 @@ async def test_cleanup_reaches_abandoned_staging_outside_the_backup_volume(
     """A crash mid-restore must not strand a copy of the media somewhere unswept."""
     backups, scratch = tmp_path / "backups", tmp_path / "scratch"
     stale, fresh = scratch / "stale", scratch / "fresh"
+    scratch.mkdir(mode=0o700)
     for directory in (stale, fresh):
-        directory.mkdir(parents=True)
+        directory.mkdir()
         (directory / "stream").write_bytes(b"bytes")
     _age(stale)
     store = LocalDirectoryBackupStore(backups, workspace_staging=scratch)

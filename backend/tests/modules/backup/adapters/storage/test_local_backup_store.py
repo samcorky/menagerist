@@ -287,7 +287,7 @@ async def test_summary_is_written_last_and_failure_leaves_only_orphans(
 async def test_stale_staging_removed_and_fresh_staging_kept(tmp_path: Path) -> None:
     """Cleanup uses age for abandoned staging and honours dry-run exactly."""
     staging = tmp_path / ".staging"
-    staging.mkdir()
+    staging.mkdir(mode=0o700)
     stale = staging / "old"
     stale.mkdir()
     member = stale / "member"
