@@ -16,7 +16,7 @@ The conventions follow the [IBM API Handbook](https://cloud.ibm.com/docs/api-han
 
 `poe lint-schema` runs in CI as "API schema style". Errors always fail. Warnings are a ratchet: [`scripts/api-lint/baseline.json`](../scripts/api-lint/baseline.json) records the count per rule, and a rule may not gain findings. After fixing some, run `poe lint-schema-baseline` and commit the lower counts. The ruleset is [`scripts/api-lint/.spectral.yaml`](../scripts/api-lint/.spectral.yaml); switching a rule off needs a reason in that file and, if it is a convention, a line here.
 
-To see the individual findings rather than the counts, run the validator directly:
+When a rule goes over its baseline the failure also lists the new findings by rule and schema path. The baseline holds only counts, so "new" means a finding that is not in the committed `openapi.json` on `origin/main` (or `main`); if neither ref exists, as in a shallow clone, it lists every warning of the rules that went over instead, up to 40 lines. To see every finding, run the validator directly:
 
 ```sh
 cd scripts/api-lint && npx ibm-openapi-validator -r .spectral.yaml ../../openapi.json
