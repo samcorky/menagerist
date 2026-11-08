@@ -12,7 +12,6 @@ from app.modules.backup.domain.backup import BackupManifest, BackupScope, MediaF
 from app.modules.backup.domain.errors import (
     CorruptBackupError,
     IncompatibleBackupError,
-    MediaFileMissingError,
     RestoreTargetNotEmptyError,
 )
 from app.modules.backup.ports.archive_member import ArchiveMember
@@ -100,10 +99,11 @@ async def _write_media(
     undo: MediaUndo,
 ) -> None:
     """Stage any file being replaced, then write the archived original."""
-    try:
-        original = await workspace.save(media.open(ref))
-    except MediaFileMissingError:
-        original = None
+    # Stage only an original that will be replaced, so restoring into an
+    # empty instance never writes to the backups directory.
+    original = (
+        await workspace.save(media.open(ref)) if await media.exists(ref) else None
+    )
     undo.append((ref, original))
     await media.write(ref, member.chunks)
 

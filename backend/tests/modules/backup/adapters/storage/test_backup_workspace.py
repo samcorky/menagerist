@@ -10,6 +10,7 @@ from app.modules.backup.adapters.storage.local_backup_store import (
 from app.modules.backup.adapters.storage.local_backup_workspace import (
     LocalBackupWorkspace,
 )
+from app.modules.backup.domain.errors import BackupStorageError
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -29,6 +30,20 @@ async def test_private_staging_streams_and_cleans_up(tmp_path: Path) -> None:
     assert await workspace.open_archive(key) is not None
     await workspace.remove(key)
     assert list((tmp_path / ".staging").iterdir()) == []
+
+
+async def test_unwritable_backup_directory_is_a_storage_error(
+    tmp_path: Path,
+) -> None:
+    """A staging area that cannot be created reads as unwritable storage."""
+    (tmp_path / ".staging").write_text("not a directory")
+    workspace = LocalBackupWorkspace(tmp_path)
+
+    async def chunks() -> AsyncIterator[bytes]:
+        yield b"unwritten"
+
+    with pytest.raises(BackupStorageError, match="chown 1000:1000"):
+        await workspace.save(chunks())
 
 
 async def test_failed_staging_removes_partial_file(tmp_path: Path) -> None:
