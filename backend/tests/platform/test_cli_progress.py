@@ -136,3 +136,15 @@ def test_the_overall_bar_shows_percentage_and_description(
         update(62, "Restoring photos")
     assert "Restoring photos" in terminal.getvalue()
     assert "62%" in terminal.getvalue()
+
+
+def test_the_overall_bar_starts_with_a_spinner(terminal: io.StringIO) -> None:
+    """A spinner frame leads the line, so a quiet step still looks alive."""
+    with overall_bar() as update:
+        assert update is not None
+        update(10, "Checking the backup")
+    drawn = terminal.getvalue()
+    frames = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+    assert any(frame in drawn for frame in frames)
+    first = min(drawn.index(frame) for frame in frames if frame in drawn)
+    assert first < drawn.index("Checking the backup")

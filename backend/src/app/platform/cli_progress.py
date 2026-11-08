@@ -13,6 +13,7 @@ from rich.progress import (
     BarColumn,
     DownloadColumn,
     Progress,
+    SpinnerColumn,
     TaskProgressColumn,
     TextColumn,
     TimeElapsedColumn,
@@ -74,7 +75,10 @@ def overall_bar() -> Iterator[Callable[[int, str], None] | None]:
     if not interactive():
         yield None
         return
+    # The spinner turns on its own refresh, so a step that reports nothing for a
+    # while (a long database statement) still shows that the run is alive.
     with Progress(
+        SpinnerColumn("dots"),
         TextColumn("{task.description}"),
         BarColumn(),
         TaskProgressColumn(),
