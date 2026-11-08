@@ -58,7 +58,7 @@ from app.platform.cli_output import (
     set_format,
 )
 from app.platform.cli_progress import activity, confirm
-from app.platform.logging_config import configure_logging
+from app.platform.logging_config import CurrentStderr, configure_logging
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -117,7 +117,8 @@ def main(
         raise SystemExit("--json cannot be combined with --format other than json.")
     set_format(OutputFormat.JSON if json_output else output_format)
     # Results own stdout. Only the commands a container runs keep logging there.
-    stream = sys.stdout if _runs_until_stopped(tokens) else sys.stderr
+    # Stderr is looked up at each write so a live bar can print log lines above itself.
+    stream = sys.stdout if _runs_until_stopped(tokens) else CurrentStderr()
     level = logging.DEBUG if verbose else logging.ERROR if quiet else None
     configure_logging(level=level, stream=stream)
     return app(tokens)

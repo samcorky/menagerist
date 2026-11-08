@@ -25,6 +25,7 @@ from app.platform.cli_output import (
     resolved_format,
     set_format,
 )
+from app.platform.logging_config import CurrentStderr
 
 
 def test_main_forwards_tokens_to_the_app(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -51,7 +52,9 @@ def test_main_without_a_level_flag_leaves_the_log_level_to_the_setting(
 
     cli.main(verbose=False)
 
-    assert configure_logging_calls == [{"level": None, "stream": sys.stderr}]
+    [call] = configure_logging_calls
+    assert call["level"] is None
+    assert isinstance(call["stream"], CurrentStderr)
 
 
 def test_main_with_verbose_forces_debug_level(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -66,7 +69,9 @@ def test_main_with_verbose_forces_debug_level(monkeypatch: pytest.MonkeyPatch) -
 
     cli.main(verbose=True)
 
-    assert configure_logging_calls == [{"level": logging.DEBUG, "stream": sys.stderr}]
+    [call] = configure_logging_calls
+    assert call["level"] == logging.DEBUG
+    assert isinstance(call["stream"], CurrentStderr)
 
 
 def test_main_with_quiet_shows_only_errors_on_stderr(
@@ -83,22 +88,24 @@ def test_main_with_quiet_shows_only_errors_on_stderr(
 
     cli.main(quiet=True)
 
-    assert configure_logging_calls == [{"level": logging.ERROR, "stream": sys.stderr}]
+    [call] = configure_logging_calls
+    assert call["level"] == logging.ERROR
+    assert isinstance(call["stream"], CurrentStderr)
 
 
 @pytest.mark.parametrize(
     ("tokens", "stream"),
     [
-        (("worker",), sys.stdout),
-        (("--format", "json", "worker"), sys.stdout),
-        (("-v", "--format", "json", "backup", "list"), sys.stderr),
-        (("serve", "--port", "1"), sys.stdout),
-        (("backup", "list"), sys.stderr),
-        ((), sys.stderr),
+        (("worker",), "stdout"),
+        (("--format", "json", "worker"), "stdout"),
+        (("-v", "--format", "json", "backup", "list"), "stderr"),
+        (("serve", "--port", "1"), "stdout"),
+        (("backup", "list"), "stderr"),
+        ((), "stderr"),
     ],
 )
 def test_logs_go_to_stderr_except_for_the_commands_a_container_runs(
-    monkeypatch: pytest.MonkeyPatch, tokens: tuple[str, ...], stream: object
+    monkeypatch: pytest.MonkeyPatch, tokens: tuple[str, ...], stream: str
 ) -> None:
     """Results own stdout; `serve` and `worker` keep logging there for containers."""
     calls = []
@@ -107,7 +114,11 @@ def test_logs_go_to_stderr_except_for_the_commands_a_container_runs(
 
     cli.main(*tokens)
 
-    assert calls[0]["stream"] is stream
+    chosen = calls[0]["stream"]
+    if stream == "stdout":
+        assert chosen is sys.stdout
+    else:
+        assert isinstance(chosen, CurrentStderr)
 
 
 def test_main_refuses_verbose_and_quiet_together(

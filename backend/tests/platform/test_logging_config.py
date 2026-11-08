@@ -1,13 +1,16 @@
+import io
 import logging
+import re
 import sys
 from typing import TYPE_CHECKING
 
 import pytest
 import structlog
+from rich.console import Console
 
-from app.platform import logging_config
+from app.platform import cli_progress, logging_config
 from app.platform.config import LoggingSettings, LogLevel
-from app.platform.logging_config import configure_logging
+from app.platform.logging_config import CurrentStderr, configure_logging
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -163,3 +166,41 @@ def test_logs_go_to_stdout_by_default(capsys: pytest.CaptureFixture[str]) -> Non
     captured = capsys.readouterr()
     assert "hello" in captured.out
     assert captured.err == ""
+
+
+def test_current_stderr_writes_to_whichever_stderr_is_current(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The stream is looked up at each write, not captured when it is made."""
+    first, second = io.StringIO(), io.StringIO()
+    stream = CurrentStderr()
+    monkeypatch.setattr(sys, "stderr", first)
+    stream.write("one")
+    stream.flush()
+    monkeypatch.setattr(sys, "stderr", second)
+    stream.write("two")
+    assert (first.getvalue(), second.getvalue()) == ("one", "two")
+
+
+def test_a_log_line_during_a_live_bar_prints_above_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The bar's line is erased before the log text, so no stale frame is left."""
+    terminal = io.StringIO()  # stands in for the tty the bar and the log share
+    monkeypatch.setattr(sys, "stderr", terminal)
+    monkeypatch.setattr(cli_progress, "interactive", lambda: True)
+    monkeypatch.setattr(
+        cli_progress,
+        "_console",
+        lambda: Console(file=terminal, force_terminal=True, width=80),
+    )
+    configure_logging(level="WARNING", stream=CurrentStderr())
+
+    with cli_progress.overall_bar() as update:
+        assert update is not None
+        update(94, "Restoring photos and files")
+        logging.getLogger("test").warning("instance backup restored")
+
+    before = terminal.getvalue().split("instance backup restored")[0]
+    # The bar's last text (its elapsed time), then an erase of that line, then the log.
+    assert re.search(r"\d:\d{2}:\d{2}\r\x1b\[2K[^\r\n]*\[warning", before)
