@@ -1,5 +1,6 @@
 """Bridge instance backups to original media records and storage."""
 
+from contextlib import aclosing
 from typing import TYPE_CHECKING
 
 from app.modules.backup.domain.backup import MediaFileRef
@@ -46,6 +47,17 @@ class BackupMediaFiles:
                 for asset in assets
             )
         return refs
+
+    async def exists(self, ref: MediaFileRef) -> bool:
+        """Probe for the original by opening it and reading no more than a chunk."""
+        try:
+            async with aclosing(
+                self._storage.retrieve(ref.asset_id, MediaStatus(ref.status))
+            ) as chunks:
+                await anext(chunks, None)
+        except FileNotFoundError:
+            return False
+        return True
 
     async def open(self, ref: MediaFileRef) -> AsyncIterator[bytes]:
         """Stream an original, translating a missing storage file."""

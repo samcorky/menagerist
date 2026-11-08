@@ -13,6 +13,10 @@ class MediaFiles(Protocol):
         """Return references from asset records, excluding thumbnails."""
         ...
 
+    async def exists(self, ref: MediaFileRef) -> bool:
+        """Report whether the original is present, without streaming it."""
+        ...
+
     def open(self, ref: MediaFileRef) -> AsyncIterator[bytes]:
         """Stream an original, raising MediaFileMissingError if absent."""
         ...

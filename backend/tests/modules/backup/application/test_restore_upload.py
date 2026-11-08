@@ -42,6 +42,7 @@ from app.modules.backup.domain.backup import (
     MediaFileRef,
 )
 from app.modules.backup.domain.errors import (
+    BackupStorageError,
     CorruptBackupError,
     IncompatibleBackupError,
     RestoreTargetNotEmptyError,
@@ -162,6 +163,23 @@ async def test_restore_rolls_back_overwritten_originals(preexisting: bool) -> No
         b"old" if preexisting else None
     )
     assert not workspace.files
+
+
+async def test_restore_into_empty_instance_stages_nothing() -> None:
+    """With no original to replace, the backups directory is never written."""
+    store, summary, ref = await archive()
+
+    class UnwritableWorkspace(InMemoryBackupWorkspace):
+        async def save(self, stream: AsyncIterator[bytes]) -> UUID:
+            """Fail as an unwritable backups directory would."""
+            raise BackupStorageError("unwritable")
+
+    media = InMemoryMediaFiles()
+    target = InMemoryDatabaseRestorer("rev")
+    await restore_verified_backup(
+        store, target, media, UnwritableWorkspace(), summary.id
+    )
+    assert media.files[(ref.asset_id, ref.status)] == b"new"
 
 
 async def test_upload_rejects_corrupt_oversize_and_scope() -> None:

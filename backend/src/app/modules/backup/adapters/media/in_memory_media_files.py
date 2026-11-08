@@ -20,6 +20,10 @@ class InMemoryMediaFiles:
         """Return asset records, including those whose bytes are missing."""
         return list(self.refs.values())
 
+    async def exists(self, ref: MediaFileRef) -> bool:
+        """Report whether the original's bytes are present."""
+        return (ref.asset_id, ref.status) in self.files
+
     async def open(self, ref: MediaFileRef) -> AsyncIterator[bytes]:
         """Stream an original or report its absence."""
         key = (ref.asset_id, ref.status)

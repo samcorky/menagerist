@@ -78,11 +78,14 @@ async def test_originals_round_trip_in_recorded_bucket(
         asset.size,
         asset.sha256,
     )
+    assert not await bridge.exists(ref)
     await bridge.write(ref, _chunks(b"original"))
+    assert await bridge.exists(ref)
     await storage.store_thumbnail(asset.id, status, b"thumbnail")
     assert b"".join([chunk async for chunk in bridge.open(ref)]) == b"original"
     assert len(await bridge.list_files()) == 1
     assert list((tmp_path / status.value).glob("*/*"))
     await bridge.remove(ref)
+    assert not await bridge.exists(ref)
     with pytest.raises(MediaFileMissingError, match=str(asset.id)):
         _ = [chunk async for chunk in bridge.open(ref)]

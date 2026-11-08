@@ -5,6 +5,7 @@ from uuid import UUID, uuid7
 
 from app.modules.backup.adapters.storage.local_backup_reader import LocalBackupReader
 from app.modules.backup.adapters.storage.staging_lock import lock_staging
+from app.modules.backup.domain.errors import BackupStorageError
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -21,12 +22,19 @@ class LocalBackupWorkspace:
 
     async def save(self, stream: AsyncIterator[bytes]) -> UUID:
         """Save a stream, removing partial output on failure."""
-        await asyncio.to_thread(
-            self._path.mkdir, mode=0o700, parents=True, exist_ok=True
-        )
         key = uuid7()
         directory = self._path / str(key)
-        await asyncio.to_thread(directory.mkdir, mode=0o700)
+
+        def create_directory() -> None:
+            self._path.mkdir(mode=0o700, parents=True, exist_ok=True)
+            directory.mkdir(mode=0o700)
+
+        try:
+            await asyncio.to_thread(create_directory)
+        except OSError as error:
+            raise BackupStorageError(
+                "Backup storage is unwritable; chown 1000:1000 <host directory>."
+            ) from error
         path = directory / "stream"
         file: BinaryIO | None = None
         try:
