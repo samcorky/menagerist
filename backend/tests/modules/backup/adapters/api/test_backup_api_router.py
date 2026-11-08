@@ -18,6 +18,7 @@ from app.modules.backup.adapters.api.dependencies import (
     get_backup_workspace,
     get_database_restorer,
     get_database_snapshot,
+    get_restore_progress_store,
 )
 from app.modules.backup.adapters.api.user_dependencies import (
     get_user_backup_store,
@@ -46,6 +47,9 @@ from app.modules.backup.adapters.storage.in_memory_backup_store import (
 from app.modules.backup.adapters.storage.in_memory_backup_workspace import (
     InMemoryBackupWorkspace,
 )
+from app.modules.backup.adapters.storage.in_memory_progress_store import (
+    InMemoryProgressStore,
+)
 from app.shared_kernel.actor import Actor
 
 if TYPE_CHECKING:
@@ -60,10 +64,12 @@ def client() -> Iterator[TestClient]:
     app = create_app()
     store = InMemoryBackupStore()
     target = InMemoryDatabaseRestorer("revision")
+    progress = InMemoryProgressStore()
     app.dependency_overrides.update(
         {
             get_current_actor: lambda: Actor(id=uuid7(), roles=frozenset({"admin"})),
             get_backup_store: lambda: store,
+            get_restore_progress_store: lambda: progress,
             first_run_restore_slot: lambda: None,
             get_backup_workspace: InMemoryBackupWorkspace,
             get_database_snapshot: lambda: InMemoryDatabaseSnapshot(
@@ -150,6 +156,50 @@ def test_public_first_run_restore_then_closed_gate(client: TestClient) -> None:
         == 409
     )
     assert client.post(f"/api/v1/backups/{created['id']}/restore").status_code == 404
+
+
+def test_restore_progress_is_not_found_before_any_restore(client: TestClient) -> None:
+    """With nothing reported, the first-run page gets a plain 404."""
+    response = client.get("/api/v1/backups/restore/progress")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "No restore is in progress."
+
+
+def test_restore_progress_reports_the_finished_restore(client: TestClient) -> None:
+    """The setup page can still read the final state after the gate has closed."""
+    created = client.post("/api/v1/backups", json={}).json()
+    archive = client.get(f"/api/v1/backups/{created['id']}/download").content
+    assert (
+        client.post(
+            "/api/v1/backups/restore",
+            content=archive,
+            headers={"Content-Type": "application/gzip"},
+        ).status_code
+        == 204
+    )
+    body = client.get("/api/v1/backups/restore/progress").json()
+    assert body["outcome"] == "succeeded"
+    assert body["percent"] == 100
+    assert [phase["key"] for phase in body["phases"]] == [
+        "verify",
+        "database",
+        "media",
+    ]
+    assert {phase["state"] for phase in body["phases"]} == {"done"}
+
+
+def test_a_rejected_restore_is_reported_as_failed(client: TestClient) -> None:
+    """A bad upload ends as failed, with the curated message and no internals."""
+    response = client.post(
+        "/api/v1/backups/restore",
+        content=b"not an archive",
+        headers={"Content-Type": "application/gzip"},
+    )
+    assert response.status_code >= 400
+    body = client.get("/api/v1/backups/restore/progress").json()
+    assert body["outcome"] == "failed"
+    assert body["message"]
+    assert "/" not in body["message"]
 
 
 def test_cross_site_first_run_restore_is_refused(client: TestClient) -> None:

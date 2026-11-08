@@ -278,6 +278,10 @@ ALLOWED: dict[Route, str] = {
         "/api/v1/backups/restore",
     ): "public only before setup; shared-lock and rate-limit integration tests",
     (
+        "GET",
+        "/api/v1/backups/restore/progress",
+    ): "public and unowned: phase counts only, 404 unless a restore reported recently",
+    (
         "POST",
         "/api/v1/me/exports",
     ): "personal snapshots and dedicated two-user export API tests",

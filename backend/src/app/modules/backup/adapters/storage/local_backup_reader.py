@@ -135,10 +135,12 @@ class _HashingReader:
     def __init__(self, raw: BinaryIO) -> None:
         self.raw = raw
         self.digest = hashlib.sha256()
+        self.count = 0
 
     def read(self, size: int = -1) -> bytes:
         data = self.raw.read(size)
         self.digest.update(data)
+        self.count += len(data)
         return data
 
     def seek(self, offset: int, /) -> int:
@@ -151,6 +153,7 @@ class LocalBackupReader:
     def __init__(self, source: Path | bytes) -> None:
         self._source = source
         self._digest: str | None = None
+        self._hashed: _HashingReader | None = None
 
     async def members(self) -> AsyncGenerator[ArchiveMember]:
         """Yield regular files, validating gzip through its final trailer."""
@@ -159,7 +162,7 @@ class LocalBackupReader:
             if isinstance(self._source, bytes)
             else await asyncio.to_thread(self._source.open, "rb")
         )
-        hashed = _HashingReader(raw)
+        hashed = self._hashed = _HashingReader(raw)
         compressed = gzip.GzipFile(fileobj=hashed, mode="rb")
         archive: tarfile.TarFile | None = None
         try:
@@ -212,6 +215,10 @@ class LocalBackupReader:
             raise CorruptBackupError(
                 "The backup archive is damaged or truncated."
             ) from error
+
+    def compressed_read(self) -> int:
+        """Return the compressed bytes read from the source so far."""
+        return 0 if self._hashed is None else self._hashed.count
 
     async def archive_digest(self) -> str:
         """Return the compressed digest after the member stream is exhausted."""

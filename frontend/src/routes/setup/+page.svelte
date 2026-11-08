@@ -10,7 +10,10 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
-	import { restoreFirstRunArchive } from '$lib/backup-restore';
+	import { readRestoreProgress, restoreFirstRunArchive } from '$lib/backup-restore';
+	import ProgressPanel from '$lib/components/progress-panel.svelte';
+	import { liveSnapshot, pollProgress } from '$lib/progress';
+	import type { ProgressSnapshotResponse } from '$lib/api/client';
 	import { toast } from 'svelte-sonner';
 
 	let displayName = $state('');
@@ -24,6 +27,7 @@
 	let restoring = $state(false);
 	let backupFile = $state<File | null>(null);
 	let backupDrop = $state<HTMLDivElement | null>(null);
+	let progress = $state.raw<ProgressSnapshotResponse | null>(null);
 
 	const mismatch = $derived(confirm !== '' && confirm !== password);
 	const tooShort = $derived(password !== '' && password.length < PASSWORD_MIN_LENGTH);
@@ -33,6 +37,15 @@
 			password.length >= PASSWORD_MIN_LENGTH &&
 			confirm === password
 	);
+
+	// The restore request stays open until it finishes, so watch it from the side.
+	// A finished snapshot now would be an earlier restore's, so only live ones show.
+	$effect(() => {
+		if (!restoring || !busy) return;
+		return pollProgress(readRestoreProgress, (latest) => {
+			progress = liveSnapshot(latest) ?? progress;
+		});
+	});
 
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
@@ -68,6 +81,7 @@
 		event.preventDefault();
 		const file = backupFile;
 		if (busy || !file) return;
+		progress = null;
 		busy = true;
 		error = null;
 		const result = await restoreFirstRunArchive(file);
@@ -131,6 +145,13 @@
 				/>
 				{#if backupFile}<p class="text-sm text-muted-foreground">{backupFile.name}</p>{/if}
 			</div>
+			{#if busy}
+				<ProgressPanel
+					snapshot={progress}
+					label="Restore progress"
+					fallback="Receiving your backup"
+				/>
+			{/if}
 			<Button type="submit" class="w-full pointer-coarse:h-11" disabled={busy || !backupFile}>
 				{#if busy}<Spinner class="size-4" />Restoring backup…{:else}Restore backup{/if}
 			</Button>

@@ -1,8 +1,10 @@
 import asyncio
+import io
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock
+from unittest.mock import ANY, AsyncMock
 
 import pytest
+from rich.console import Console
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.settings_reader import get_settings_reader
@@ -18,10 +20,13 @@ from app.modules.backup.application.create_backup import (
     CreateBackup,
     CreateBackupCommand,
 )
+from app.modules.backup.domain.errors import CorruptBackupError
 from app.modules.settings.domain.setting import SettingScope, StoredSetting
+from app.platform import cli_progress
 from app.platform.config.backup import BackupSettings
 from app.shared_kernel.access_guard import DenyAllAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.progress import GENERIC_FAILURE, Phase
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -30,6 +35,7 @@ if TYPE_CHECKING:
     from app.modules.settings.adapters.persistence.in_memory_setting_value_repository import (  # noqa: E501
         InMemorySettingValueRepository,
     )
+    from app.shared_kernel.progress import ProgressReporter
 
 
 @pytest.fixture
@@ -104,11 +110,95 @@ def test_create_and_restore_use_composition(
     created = commands.create(label="scheduled")
     assert created["id"] == archive.id
     assert created["message"] == "Backup created and verified"
-    create.assert_awaited_once_with("scheduled")
+    create.assert_awaited_once_with("scheduled", ANY)
     restored = commands.restore(archive.id, replace=True)
     assert restored["replaced_existing_data"] is True
     assert restore.await_args is not None
     assert restore.await_args.args[1] is True
+
+
+@pytest.fixture
+def terminal(monkeypatch: pytest.MonkeyPatch) -> io.StringIO:
+    """Pretend a person is at a terminal, and capture what is drawn on stderr."""
+    drawn = io.StringIO()
+    monkeypatch.setattr(cli_progress, "interactive", lambda: True)
+    monkeypatch.setattr(
+        cli_progress,
+        "_console",
+        lambda: Console(file=drawn, force_terminal=True, width=100),
+    )
+    return drawn
+
+
+def test_restore_draws_its_progress_but_writes_no_file(
+    archive: BackupSummary,
+    backup_settings: BackupSettings,
+    monkeypatch: pytest.MonkeyPatch,
+    terminal: io.StringIO,
+) -> None:
+    """The public restore route serves only the first-run restore's file."""
+
+    async def restore(
+        backup_id: object, replace: bool, guard: object, progress: ProgressReporter
+    ) -> None:
+        await progress.begin((Phase(key="verify", label="Checking the backup"),))
+        await progress.start("verify", 1)
+
+    monkeypatch.setattr(commands, "_restore", restore)
+    commands.restore(archive.id)
+    assert "Checking the backup" in terminal.getvalue()
+    assert not (backup_settings.path / ".progress").exists()
+
+
+def test_a_failed_restore_ends_the_bar_on_the_curated_message(
+    archive: BackupSummary,
+    monkeypatch: pytest.MonkeyPatch,
+    terminal: io.StringIO,
+) -> None:
+    """The bar says why, then the command exits as it always has.
+
+    While the bar is live Rich carries the command's own stderr line above it,
+    so both appear in the same stream.
+    """
+
+    async def restore(
+        backup_id: object, replace: bool, guard: object, progress: ProgressReporter
+    ) -> None:
+        raise CorruptBackupError("The archive is damaged.")
+
+    monkeypatch.setattr(commands, "_restore", restore)
+    with pytest.raises(SystemExit, match="1"):
+        commands.restore(archive.id)
+    drawn = terminal.getvalue()
+    assert "Failed: The archive is damaged." in drawn
+    assert drawn.count("The archive is damaged.") >= 2
+
+
+def test_an_unexpected_failure_shows_a_generic_line_on_the_bar(
+    archive: BackupSummary,
+    monkeypatch: pytest.MonkeyPatch,
+    terminal: io.StringIO,
+) -> None:
+    """Only curated domain messages are put on the bar."""
+
+    async def restore(
+        backup_id: object, replace: bool, guard: object, progress: ProgressReporter
+    ) -> None:
+        raise OSError("/data/backups/secret: permission denied")
+
+    monkeypatch.setattr(commands, "_restore", restore)
+    with pytest.raises(OSError, match="permission denied"):
+        commands.restore(archive.id)
+    assert GENERIC_FAILURE in terminal.getvalue()
+    assert "secret" not in terminal.getvalue()
+
+
+def test_no_command_writes_a_progress_file(
+    archive: BackupSummary, backup_settings: BackupSettings
+) -> None:
+    """Without a terminal, verify reports to nobody and leaves no file behind."""
+    commands.verify(archive.id)
+    assert not (backup_settings.path / ".progress").exists()
 
 
 def test_unwired_authorisation_fails_closed(
@@ -136,11 +226,11 @@ def test_user_transfers_require_explicit_owner(
     monkeypatch.setattr(commands, "_export_user", export)
     monkeypatch.setattr(commands, "_import_user", import_operation)
     exported = commands.export_user(output, user=owner_id)
-    export.assert_awaited_once_with(owner_id, output)
+    export.assert_awaited_once_with(owner_id, output, ANY)
     assert exported["id"] == archive.id
     imported = commands.import_user(output, user=owner_id)
     assert imported["user"] == str(owner_id)
-    import_operation.assert_awaited_once_with(owner_id, output)
+    import_operation.assert_awaited_once_with(owner_id, output, ANY)
     monkeypatch.setattr(commands, "_guard", DenyAllAccessGuard())
     with pytest.raises(SystemExit, match="1"):
         commands.export_user(output, user=owner_id)

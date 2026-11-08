@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from app.entrypoints.api.shared.progress import make_reporter
+from app.modules.scheduling.adapters.cli.job_progress import JobRunProgressSink
 from app.modules.scheduling.application.check_job_execution import (
     CheckJobExecutionQuery,
 )
@@ -16,6 +18,7 @@ from app.modules.scheduling.application.heartbeat_job_run import HeartbeatJobRun
 from app.modules.scheduling.domain.errors import LostClaimError, UnknownRunError
 from app.modules.scheduling.domain.job_run import RunStatus
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.progress import NULL_PROGRESS, failure_reason
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -25,9 +28,13 @@ if TYPE_CHECKING:
     from app.modules.scheduling.application.finish_job_run import FinishJobRun
     from app.modules.scheduling.application.get_job_next_run import GetJobNextRun
     from app.modules.scheduling.application.heartbeat_job_run import HeartbeatJobRun
+    from app.modules.scheduling.application.record_job_run_progress import (
+        RecordJobRunProgress,
+    )
     from app.modules.scheduling.domain.job_run import JobRun
     from app.modules.scheduling.ports.restore_guard import RestoreGuard
     from app.shared_kernel.jobs import JobDefinition, JobHandler
+    from app.shared_kernel.progress import ProgressReporter
 
 
 logger = structlog.get_logger(__name__)
@@ -55,6 +62,7 @@ class JobExecutor:
         heartbeat_interval: float = 30,
         next_run: Callable[[], GetJobNextRun] | None = None,
         timezone: str = "UTC",
+        record_progress: Callable[[], RecordJobRunProgress] | None = None,
     ) -> None:
         self._heartbeat_factory = heartbeat
         self._finish_factory = finish
@@ -64,6 +72,7 @@ class JobExecutor:
         self._heartbeat_interval = heartbeat_interval
         self._next_run = next_run
         self._timezone = timezone
+        self._record_progress = record_progress
 
     async def execute(
         self, run: JobRun, job: JobDefinition, handler: JobHandler
@@ -157,13 +166,24 @@ class JobExecutor:
             SYSTEM_ACTOR,
         )
 
+    def _reporter(self, run_id: UUID, worker_id: str) -> ProgressReporter:
+        """Report to the run's row, or to nobody when no recorder is wired."""
+        if self._record_progress is None:
+            return NULL_PROGRESS
+        return make_reporter(
+            JobRunProgressSink(self._record_progress, run_id, worker_id)
+        )
+
     async def _invoke(
-        self, run_id: UUID, handler: JobHandler
+        self, run_id: UUID, worker_id: str, handler: JobHandler
     ) -> tuple[RunStatus, str | None]:
+        reporter = self._reporter(run_id, worker_id)
         try:
-            await handler(SYSTEM_ACTOR)
+            await handler(SYSTEM_ACTOR, reporter)
         except Exception as exc:
             logger.exception("scheduled job failed", run_id=run_id)
+            # The row keeps where the job stopped; the reporter owner records it.
+            await reporter.fail(failure_reason(exc))
             return RunStatus.FAILED, repr(exc)
         return RunStatus.SUCCEEDED, None
 
@@ -175,7 +195,7 @@ class JobExecutor:
     async def _run_with_heartbeats(
         self, run_id: UUID, worker_id: str, handler: JobHandler
     ) -> tuple[RunStatus, str | None]:
-        execution = asyncio.create_task(self._invoke(run_id, handler))
+        execution = asyncio.create_task(self._invoke(run_id, worker_id, handler))
         heartbeat = asyncio.create_task(self._heartbeat_loop(run_id, worker_id))
         try:
             done, _ = await asyncio.wait(

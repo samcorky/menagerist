@@ -56,8 +56,26 @@ def _expand_access_log_fields(
 _configured = False
 
 
+class CurrentStderr:
+    """A stream that writes to whatever `sys.stderr` is at the moment of each write.
+
+    A log handler keeps one stream for its lifetime, but a live Rich bar or
+    spinner swaps `sys.stderr` for a proxy that prints above it. A handler that
+    looked stderr up once, at start-up, would write over the bar's line instead
+    and leave a stale frame behind.
+    """
+
+    def write(self, text: str) -> int:
+        """Write to the current `sys.stderr`."""
+        return sys.stderr.write(text)
+
+    def flush(self) -> None:
+        """Flush the current `sys.stderr`."""
+        sys.stderr.flush()
+
+
 def configure_logging(
-    *, level: int | str | None = None, stream: TextIO | None = None
+    *, level: int | str | None = None, stream: TextIO | CurrentStderr | None = None
 ) -> None:
     """Sets up logging with structlog.
 
@@ -68,7 +86,7 @@ def configure_logging(
     call would silently reset the level back to `LOG_LEVEL`.
 
     Logs go to stdout, which is where a container collects them. A CLI that prints
-    data passes `stream=sys.stderr` to keep stdout clean.
+    data passes `stream=CurrentStderr()` (or `sys.stderr`) to keep stdout clean.
     """
     global _configured
     if _configured and level is None and stream is None:

@@ -9,9 +9,11 @@ from app.entrypoints.api.shared.purge_deleted import (
 )
 from app.platform.config.retention import get_retention_settings
 from app.shared_kernel.jobs import JobContribution, JobDefinition, job
+from app.shared_kernel.progress import NULL_PROGRESS
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.progress import ProgressReporter
 
 
 @job(
@@ -29,7 +31,9 @@ if TYPE_CHECKING:
         ),
     )
 )
-async def purge_deleted_content(actor: Actor) -> None:
+async def purge_deleted_content(
+    actor: Actor, progress: ProgressReporter = NULL_PROGRESS
+) -> None:
     """Hard-delete everything deleted before the retention cutoff."""
     cutoff = datetime.now(UTC) - timedelta(days=get_retention_settings().deleted_days)
     await build_purge_deleted_content().handle(

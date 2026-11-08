@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { JobResponse } from '$lib/api/client';
+import type { JobResponse, ProgressSnapshotResponse } from '$lib/api/client';
 import {
 	isActive,
 	lastRunLabel,
 	nextRunLabel,
 	runDuration,
+	runProgressText,
 	runStatusLabel,
 	runTone,
 	scheduleLabel,
@@ -122,5 +123,47 @@ describe('last run label', () => {
 		expect(lastRunLabel({ started_at: null, scheduled_for: '2026-10-28T03:00:00Z' }, format)).toBe(
 			'at 2026-10-28T03:00:00Z'
 		);
+	});
+});
+
+describe('run progress text', () => {
+	const progress = (over: Partial<ProgressSnapshotResponse> = {}): ProgressSnapshotResponse => ({
+		phases: [
+			{
+				key: 'media',
+				label: 'Saving photos and files',
+				state: 'running',
+				done: 3,
+				total: 10,
+				unit: 'count'
+			}
+		],
+		message: null,
+		percent: 55,
+		outcome: 'running',
+		...over
+	});
+
+	it('names the phase a running job is in, with counts', () => {
+		expect(runProgressText({ status: 'running', progress: progress() })).toBe(
+			'Saving photos and files (3 of 10)'
+		);
+	});
+
+	it('says where a job that did not finish stopped', () => {
+		const failed = progress({ outcome: 'failed' });
+		expect(runProgressText({ status: 'failed', progress: failed })).toBe(
+			'Stopped while saving photos and files'
+		);
+		expect(runProgressText({ status: 'abandoned', progress: failed })).toBe(
+			'Stopped while saving photos and files'
+		);
+	});
+
+	it('has nothing to add for a run that never reported or has finished', () => {
+		expect(runProgressText({ status: 'running', progress: null })).toBeNull();
+		expect(runProgressText({ status: 'running', progress: progress({ phases: [] }) })).toBeNull();
+		expect(runProgressText({ status: 'succeeded', progress: progress() })).toBeNull();
+		expect(runProgressText({ status: 'queued', progress: progress() })).toBeNull();
 	});
 });

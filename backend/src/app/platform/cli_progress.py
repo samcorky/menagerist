@@ -13,7 +13,10 @@ from rich.progress import (
     BarColumn,
     DownloadColumn,
     Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
     TextColumn,
+    TimeElapsedColumn,
     TimeRemainingColumn,
     TransferSpeedColumn,
 )
@@ -61,6 +64,32 @@ def byte_progress(description: str, total: int) -> Iterator[Callable[[int], None
     ) as progress:
         task = progress.add_task(description, total=total)
         yield lambda count: progress.advance(task, count)
+
+
+@contextmanager
+def overall_bar() -> Iterator[Callable[[int, str], None] | None]:
+    """Yield `update(percent, description)` for a bar out of 100, or None.
+
+    None means nobody is watching, so a caller skips drawing altogether.
+    """
+    if not interactive():
+        yield None
+        return
+    # The spinner turns on its own refresh, so a step that reports nothing for a
+    # while (a long database statement) still shows that the run is alive.
+    with Progress(
+        SpinnerColumn("dots"),
+        TextColumn("{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        TimeElapsedColumn(),
+        console=_console(),
+        transient=True,
+    ) as progress:
+        task = progress.add_task("Starting", total=100)
+        yield lambda percent, description: progress.update(
+            task, completed=percent, description=description
+        )
 
 
 def confirm(question: str, *, assume_yes: bool = False) -> None:

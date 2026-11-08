@@ -18,6 +18,10 @@ from app.entrypoints.api.shared.http.upload_limit_middleware import (
     PAYLOAD_TOO_LARGE_RESPONSE,
 )
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
+from app.entrypoints.api.shared.progress_schemas import (
+    SNAPSHOT_EXAMPLE,
+    ProgressSnapshotResponse,
+)
 from app.modules.backup.adapters.api.dependencies import (
     get_create_backup,
     get_delete_backup,
@@ -25,6 +29,7 @@ from app.modules.backup.adapters.api.dependencies import (
     get_open_backup,
     get_prune_backups,
     get_restore_on_first_run,
+    get_restore_progress,
     get_upload_backup,
     get_verify_backup,
 )
@@ -39,6 +44,10 @@ from app.modules.backup.application.create_backup import CreateBackup
 from app.modules.backup.application.delete_backup import (
     DeleteBackup,
     DeleteBackupCommand,
+)
+from app.modules.backup.application.get_restore_progress import (
+    GetRestoreProgress,
+    GetRestoreProgressQuery,
 )
 from app.modules.backup.application.list_backups import ListBackups, ListBackupsQuery
 from app.modules.backup.application.open_backup import OpenBackup, OpenBackupQuery
@@ -55,6 +64,7 @@ from app.modules.backup.application.verify_backup import VerifyBackup, VerifyBac
 from app.modules.backup.domain.errors import (
     BackupNotFoundError,
     CorruptBackupError,
+    RestoreProgressNotFoundError,
     RestoreTargetNotEmptyError,
 )
 from app.shared_kernel.actor import ANONYMOUS_ACTOR, Actor
@@ -192,6 +202,28 @@ async def restore_instance(
         RestoreOnFirstRunCommand(stream=request.stream()), ANONYMOUS_ACTOR
     )
     return Response(status_code=204)
+
+
+@public_router.get(
+    "/restore/progress",
+    response_model=ProgressSnapshotResponse,
+    operation_id="get_restore_progress",
+    responses={
+        200: {"content": {"application/json": {"example": SNAPSHOT_EXAMPLE}}},
+        **error_response(
+            RestoreProgressNotFoundError,
+            detail="No restore is in progress.",
+            description="No restore has reported progress in the last few minutes.",
+        ),
+    },
+)
+async def get_restore_progress_snapshot(
+    use_case: Annotated[GetRestoreProgress, Depends(get_restore_progress)],
+) -> ProgressSnapshotResponse:
+    """Report how the current or most recent restore is getting on."""
+    return ProgressSnapshotResponse.model_validate(
+        await use_case.handle(GetRestoreProgressQuery(), ANONYMOUS_ACTOR)
+    )
 
 
 @router.post(

@@ -139,3 +139,92 @@ test('a member cannot see or reach scheduled tasks', async ({
 	).toBeVisible();
 	await memberSession.context.close();
 });
+
+const PROGRESS = {
+	phases: [
+		{
+			key: 'database',
+			label: 'Saving your collection',
+			state: 'done',
+			done: 4,
+			total: 4,
+			unit: 'count'
+		},
+		{
+			key: 'media',
+			label: 'Saving photos and files',
+			state: 'running',
+			done: 3,
+			total: 10,
+			unit: 'count'
+		}
+	],
+	message: null,
+	percent: 55,
+	outcome: 'running'
+};
+
+/** Answer the task list with one task's runs replaced, leaving everything else real. */
+async function withRuns(
+	page: import('@playwright/test').Page,
+	patch: (job: Record<string, unknown>) => void
+) {
+	await page.route(/\/api\/v1\/scheduling\/jobs(\?.*)?$/, async (route) => {
+		const response = await route.fetch();
+		const jobs = (await response.json()) as Record<string, unknown>[];
+		const target = jobs.find((job) => job.title === TASK);
+		if (target) patch(target);
+		await route.fulfill({ response, json: jobs });
+	});
+}
+
+test('a running task shows a bar and the phase it is in', async ({ page }) => {
+	await withRuns(page, (job) => {
+		job.active_run = {
+			id: '0198f3a2-7c1e-7a4b-9d2e-5b6c8f1a2b3c',
+			job_key: job.job_key,
+			status: 'running',
+			scheduled_for: '2026-11-07T03:00:00Z',
+			created_at: '2026-11-07T03:00:00Z',
+			started_at: '2026-11-07T03:00:02Z',
+			finished_at: null,
+			error: null,
+			requested_by: null,
+			progress: PROGRESS
+		};
+	});
+	await page.goto('/admin/scheduled-tasks');
+	const row = page
+		.getByRole('table', { name: 'Scheduled tasks' })
+		.getByRole('row')
+		.filter({ has: page.getByRole('rowheader', { name: TASK }) });
+	const bar = row.getByRole('progressbar', { name: `Progress of ${TASK}` });
+	await expect(bar).toHaveAttribute('aria-valuenow', '55');
+	await expect(row.getByText('Saving photos and files (3 of 10)')).toBeVisible();
+});
+
+test('a task that did not finish says where it stopped', async ({ page }) => {
+	await withRuns(page, (job) => {
+		job.active_run = null;
+		job.last_run = {
+			id: '0198f3a2-7c1e-7a4b-9d2e-5b6c8f1a2b3d',
+			job_key: job.job_key,
+			status: 'failed',
+			scheduled_for: '2026-11-07T03:00:00Z',
+			created_at: '2026-11-07T03:00:00Z',
+			started_at: '2026-11-07T03:00:02Z',
+			finished_at: '2026-11-07T03:00:30Z',
+			error: 'boom',
+			requested_by: null,
+			progress: { ...PROGRESS, outcome: 'failed' }
+		};
+	});
+	await page.goto('/admin/scheduled-tasks');
+	const row = page
+		.getByRole('table', { name: 'Scheduled tasks' })
+		.getByRole('row')
+		.filter({ has: page.getByRole('rowheader', { name: TASK }) });
+	await expect(row.getByText("Didn't finish")).toBeVisible();
+	await expect(row.getByText('Stopped while saving photos and files')).toBeVisible();
+	await expect(row.getByRole('progressbar')).toHaveCount(0);
+});

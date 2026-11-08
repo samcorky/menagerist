@@ -23,9 +23,11 @@ from app.modules.media.application.remove_stray_media_files import (
 from app.platform.config.media import get_media_settings
 from app.platform.database import get_session_factory
 from app.shared_kernel.jobs import JobContribution, JobDefinition, Lane, job
+from app.shared_kernel.progress import NULL_PROGRESS
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.progress import ProgressReporter
 
 
 @job(
@@ -38,7 +40,9 @@ if TYPE_CHECKING:
         ),
     )
 )
-async def cleanup_expired_media(actor: Actor) -> None:
+async def cleanup_expired_media(
+    actor: Actor, progress: ProgressReporter = NULL_PROGRESS
+) -> None:
     """Delete uploads never attached and files no longer referenced, once expired."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
 
@@ -65,7 +69,9 @@ async def cleanup_expired_media(actor: Actor) -> None:
         description="Removes stored files that no upload refers to any more.",
     )
 )
-async def remove_stray_media_files(actor: Actor) -> None:
+async def remove_stray_media_files(
+    actor: Actor, progress: ProgressReporter = NULL_PROGRESS
+) -> None:
     """Delete stored files with no asset, once old enough not to be an upload."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
 
@@ -95,7 +101,9 @@ async def remove_stray_media_files(actor: Actor) -> None:
         confirm_required=True,
     )
 )
-async def regenerate_thumbnails(actor: Actor) -> None:
+async def regenerate_thumbnails(
+    actor: Actor, progress: ProgressReporter = NULL_PROGRESS
+) -> None:
     """Rebuild thumbnails for every attached image, as the media CLI does."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
 

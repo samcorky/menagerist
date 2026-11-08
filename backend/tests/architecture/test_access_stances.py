@@ -25,6 +25,7 @@ from app.shared_kernel.permission import PermissionEnum
 # Filled in as each module migrates.
 EXPECTED_PUBLIC: frozenset[str] = frozenset(
     {
+        "backup.GetRestoreProgress",
         "backup.RestoreOnFirstRun",
         "identity.AuthenticateApiToken",
         "identity.GetCurrentUser",
@@ -60,6 +61,7 @@ EXPECTED_SYSTEM: frozenset[str] = frozenset(
         "scheduling.TickSchedules",
         "scheduling.CheckJobExecution",
         "scheduling.HeartbeatJobRun",
+        "scheduling.RecordJobRunProgress",
         "scheduling.FinishJobRun",
         "scheduling.ClaimJobRun",
         "scheduling.MaintainWorker",

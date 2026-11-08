@@ -520,13 +520,17 @@ heading = "Build & Run"
 
 [tool.poe.groups.run.tasks.build-backend]
 cmd = "uv build --package menagerist"
-help = "Build sdist+wheel for the menagerist package"
+help = "Build sdist+wheel for the menagerist package, after syncing backend dependencies"
+deps = ["sync-backend"]
 
-[tool.poe.groups.run.tasks.build-frontend]
+[tool.poe.groups.run.tasks._run-frontend-build]
 shell = "npm run build"
 interpreter = ["powershell", "posix"]
 cwd = "frontend"
-help = "Build the frontend for production"
+
+[tool.poe.groups.run.tasks.build-frontend]
+sequence = ["sync-frontend", "generate-frontend-client", "_run-frontend-build"]
+help = "Build the frontend for production, after installing dependencies and regenerating openapi.json and the API client"
 
 [tool.poe.groups.run.tasks.build]
 sequence = ["build-backend", "build-frontend"]

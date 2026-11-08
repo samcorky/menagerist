@@ -8,16 +8,20 @@ import structlog
 
 from app.modules.backup.application.permissions import BackupPermission
 from app.modules.backup.application.restore_backup import (
+    MANIFEST_PASSES,
     archive_manifest,
     cleanup_media,
     rollback_media,
+    start_verify_phase,
     transactional_media_members,
 )
+from app.modules.backup.application.verify_backup import CompressedMeter
 from app.modules.backup.domain.backup import BackupScope
 from app.modules.backup.domain.errors import CorruptBackupError, IncompatibleBackupError
 from app.modules.backup.ports.user_database_restorer import UserDatabaseRestorer
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.progress import NULL_PROGRESS, Phase
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -29,8 +33,17 @@ if TYPE_CHECKING:
     from app.modules.backup.ports.media_files import MediaFiles
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.progress import ProgressReporter
 
 logger = structlog.get_logger()
+
+IMPORT_PLAN = (
+    Phase(key="verify", label="Checking the export", weight=2, unit="bytes"),
+    Phase(key="database", label="Importing your items", weight=3),
+    Phase(key="media", label="Importing photos and files", weight=5),
+)
+# archive_manifest's passes plus the media-record validation pass.
+IMPORT_VERIFY_PASSES = MANIFEST_PASSES + 1
 
 
 _MAX_ROW_BYTES = 16 * 1024 * 1024
@@ -68,12 +81,17 @@ async def _media_records(
 
 
 async def _validate_media_records(
-    store: BackupStore, backup_id: UUID, manifest: BackupManifest
+    store: BackupStore,
+    backup_id: UUID,
+    manifest: BackupManifest,
+    progress: ProgressReporter = NULL_PROGRESS,
 ) -> None:
     """Reject arbitrary media destinations before any database or file mutation."""
     assets: dict[UUID, tuple[object, object, object]] = {}
     data_finished = False
-    async with aclosing((await store.open(backup_id)).members()) as members:
+    reader = await store.open(backup_id)
+    meter = CompressedMeter(reader, progress)
+    async with aclosing(reader.members()) as members:
         async for member in members:
             if member.name.startswith("media/"):
                 data_finished = True
@@ -83,7 +101,9 @@ async def _validate_media_records(
                 assets = await _media_records(member.chunks)
             else:
                 async for _ in member.chunks:
-                    pass
+                    await meter.tick()
+            await meter.tick()
+    await meter.tick()
     expected = {
         ref.asset_id: (ref.status, ref.size, ref.sha256) for ref in manifest.media
     }
@@ -112,8 +132,10 @@ class ImportUserData(CommandHandler[UserDatabaseRestorer, ImportUserDataCommand,
         media: MediaFiles,
         workspace: BackupWorkspace,
         guard: AccessGuard,
+        progress: ProgressReporter | None = None,
     ) -> None:
         super().__init__(restorer, guard)
+        self._progress = progress or NULL_PROGRESS
         self._store, self._restorer, self._media, self._workspace = (
             store,
             restorer,
@@ -124,8 +146,17 @@ class ImportUserData(CommandHandler[UserDatabaseRestorer, ImportUserDataCommand,
     async def _handle(self, request: ImportUserDataCommand, actor: Actor) -> None:
         """Verify before writes and compensate media if the database load fails."""
         self._guard.assert_can_modify(actor, actor.id)
+        await self._progress.begin(IMPORT_PLAN)
+        await start_verify_phase(
+            self._store,
+            request.backup_id,
+            self._progress,
+            passes=IMPORT_VERIFY_PASSES,
+        )
         expected_digest = await self._store.archive_digest(request.backup_id)
-        manifest = await archive_manifest(self._store, request.backup_id)
+        manifest = await archive_manifest(
+            self._store, request.backup_id, self._progress
+        )
         if (
             manifest.scope != BackupScope.USER
             or manifest.owner_id is None
@@ -139,7 +170,9 @@ class ImportUserData(CommandHandler[UserDatabaseRestorer, ImportUserDataCommand,
             raise IncompatibleBackupError(
                 "The export migration revision differs from the target."
             )
-        await _validate_media_records(self._store, request.backup_id, manifest)
+        await _validate_media_records(
+            self._store, request.backup_id, manifest, self._progress
+        )
         undo: MediaUndo = []
         try:
             async with aclosing(
@@ -150,6 +183,7 @@ class ImportUserData(CommandHandler[UserDatabaseRestorer, ImportUserDataCommand,
                     self._workspace,
                     undo,
                     expected_digest=expected_digest,
+                    progress=self._progress,
                 )
             ) as members:
                 await self._restorer.import_user(members, new_owner_id=actor.id)
@@ -158,6 +192,7 @@ class ImportUserData(CommandHandler[UserDatabaseRestorer, ImportUserDataCommand,
             raise
         finally:
             await cleanup_media(self._workspace, undo)
+        await self._progress.done()
         logger.info(
             "user data imported", actor_id=actor.id, backup_id=request.backup_id
         )

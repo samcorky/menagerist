@@ -12,6 +12,7 @@ from app.modules.scheduling.domain.errors import (
 from app.shared_kernel.errors import ValidationError
 from app.shared_kernel.jobs import JobDefinition, Lane, Overlap
 from app.shared_kernel.mixins import Identifiable
+from app.shared_kernel.progress import ProgressSnapshot
 
 
 def utc_instant(moment: datetime) -> datetime:
@@ -49,6 +50,7 @@ class JobRun(Identifiable):
     heartbeat_at: datetime | None = None
     finished_at: datetime | None = None
     error: str | None = None
+    progress: ProgressSnapshot | None = None
 
     def __post_init__(self) -> None:
         """Store schedule instants in UTC so DST folds compare correctly."""
@@ -111,6 +113,11 @@ class JobRun(Identifiable):
         now = utc_instant(now)
         self.heartbeat_at = max(now, self.heartbeat_at or now)
 
+    def record_progress(self, worker_id: str, snapshot: ProgressSnapshot) -> None:
+        """Keep the claimant's latest progress; only the owner of a running job may."""
+        self._assert_owner(worker_id)
+        self.progress = snapshot
+
     def finish(
         self,
         worker_id: str,
@@ -119,7 +126,11 @@ class JobRun(Identifiable):
         *,
         error: str | None = None,
     ) -> None:
-        """Record the claimant's execution result."""
+        """Record the claimant's execution result.
+
+        A success drops the progress, which is ephemeral. A failure keeps it, so
+        the run shows where it stopped.
+        """
         self._assert_owner(worker_id)
         if status not in {RunStatus.SUCCEEDED, RunStatus.FAILED, RunStatus.SKIPPED}:
             raise InvalidRunTransitionError(
@@ -129,6 +140,8 @@ class JobRun(Identifiable):
         self.status = status
         self.finished_at = now
         self.error = error
+        if status is RunStatus.SUCCEEDED:
+            self.progress = None
 
     def abandon(self, now: datetime) -> None:
         """Fence a crashed worker; abandoned work is never implicitly retried."""

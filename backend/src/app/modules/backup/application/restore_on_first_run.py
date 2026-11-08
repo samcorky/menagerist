@@ -4,11 +4,15 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
-from app.modules.backup.application.restore_backup import restore_verified_backup
+from app.modules.backup.application.restore_backup import (
+    RESTORE_PLAN,
+    restore_verified_backup,
+)
 from app.modules.backup.application.upload_backup import upload_verified_backup
 from app.modules.backup.domain.errors import RestoreTargetNotEmptyError
 from app.shared_kernel.access import Access, Public
 from app.shared_kernel.cqrs import UseCase
+from app.shared_kernel.progress import NULL_PROGRESS, failure_reason
 
 if TYPE_CHECKING:
     from app.modules.backup.ports.backup_store import BackupStore
@@ -18,6 +22,7 @@ if TYPE_CHECKING:
     from app.modules.backup.ports.setup_gate import SetupGate
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.progress import ProgressReporter
 
 logger = structlog.get_logger()
 
@@ -44,29 +49,40 @@ class RestoreOnFirstRun(UseCase[RestoreOnFirstRunCommand, None]):
         guard: AccessGuard,
         *,
         max_upload_size: int = 8 * 1024**3,
+        progress: ProgressReporter | None = None,
     ) -> None:
         self._gate, self._store, self._restorer = gate, store, restorer
         self._media, self._workspace = media, workspace
         self._max_size = max_upload_size
         self._guard = guard
+        self._progress = progress or NULL_PROGRESS
 
     async def _handle(self, request: RestoreOnFirstRunCommand, actor: Actor) -> None:
         """Verify and restore only while first-run setup remains open."""
         if not await self._gate.is_open():
             raise RestoreTargetNotEmptyError("Setup has already been completed.")
         logger.warning("first-run instance restore started")
-        uploaded = await upload_verified_backup(
-            self._store, self._workspace, request.stream, self._max_size
-        )
+        # No caller owns this reporter, so this use case also records a failure
+        # for the setup page. Starting now replaces any earlier snapshot, so a
+        # rejected upload cannot leave the previous restore's state on show.
+        await self._progress.begin(RESTORE_PLAN)
         try:
-            await restore_verified_backup(
-                self._store,
-                self._restorer,
-                self._media,
-                self._workspace,
-                uploaded.id,
-                setup_only=True,
+            uploaded = await upload_verified_backup(
+                self._store, self._workspace, request.stream, self._max_size
             )
-        finally:
-            await self._store.delete(uploaded.id)
+            try:
+                await restore_verified_backup(
+                    self._store,
+                    self._restorer,
+                    self._media,
+                    self._workspace,
+                    uploaded.id,
+                    setup_only=True,
+                    progress=self._progress,
+                )
+            finally:
+                await self._store.delete(uploaded.id)
+        except Exception as error:
+            await self._progress.fail(failure_reason(error))
+            raise
         logger.warning("first-run instance restore completed")

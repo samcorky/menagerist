@@ -10,6 +10,10 @@ class BackupNotFoundError(NotFoundError):
     """The requested backup does not exist."""
 
 
+class RestoreProgressNotFoundError(NotFoundError):
+    """No restore has reported progress recently."""
+
+
 class CorruptBackupError(ValidationError):
     """The archive failed integrity or structural validation."""
 

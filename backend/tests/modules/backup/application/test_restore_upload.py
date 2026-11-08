@@ -188,7 +188,9 @@ async def test_restore_refuses_user_archive(monkeypatch: pytest.MonkeyPatch) -> 
     store, summary, _ = await archive()
     manifest = await archive_manifest(store, summary.id)
 
-    async def user_manifest(store: object, backup_id: object) -> BackupManifest:
+    async def user_manifest(
+        store: object, backup_id: object, progress: object = None
+    ) -> BackupManifest:
         return replace(manifest, scope=BackupScope.USER)
 
     monkeypatch.setattr(

@@ -13,6 +13,10 @@ class BackupReader(Protocol):
         """Yield members in archive order; consume each before advancing."""
         ...
 
+    def compressed_read(self) -> int:
+        """Return the compressed bytes consumed so far, for progress reporting."""
+        ...
+
     async def archive_digest(self) -> str:
         """Return the compressed digest computed while consuming the archive."""
         ...

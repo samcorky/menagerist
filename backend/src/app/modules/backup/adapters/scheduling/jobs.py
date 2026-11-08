@@ -8,9 +8,11 @@ from app.modules.backup.application.setting_keys import KEEP_LAST, USER_EXPORT_T
 from app.platform.config.backup import get_backup_settings
 from app.platform.config.media import get_media_settings
 from app.shared_kernel.jobs import JobContribution, JobDefinition, Lane, MissedRun, job
+from app.shared_kernel.progress import NULL_PROGRESS
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.progress import ProgressReporter
 
 
 def backup_schedules() -> dict[str, str]:
@@ -22,7 +24,9 @@ def backup_schedules() -> dict[str, str]:
     }
 
 
-async def create_scheduled_backup(actor: Actor) -> object:
+async def create_scheduled_backup(
+    actor: Actor, progress: ProgressReporter = NULL_PROGRESS
+) -> object:
     """Back up the shared volumes, refusing to archive a worker that lacks them."""
     from app.entrypoints.api.shared.backup_operations import create_backup
 
@@ -32,7 +36,7 @@ async def create_scheduled_backup(actor: Actor) -> object:
             f"The media directory {media_path} is missing; "
             + "mount the API's data volumes on the worker."
         )
-    return await create_backup(label="scheduled", actor=actor)
+    return await create_backup(label="scheduled", actor=actor, progress=progress)
 
 
 async def prune_scheduled_backups(actor: Actor) -> object:
@@ -65,7 +69,9 @@ async def prune_scheduled_backups(actor: Actor) -> object:
         description="Removes personal exports once they have expired.",
     )
 )
-async def prune_expired_exports(actor: Actor) -> None:
+async def prune_expired_exports(
+    actor: Actor, progress: ProgressReporter = NULL_PROGRESS
+) -> None:
     """Expire user exports without applying backup retention."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
     from app.modules.backup.adapters.storage.local_backup_store import (
@@ -95,9 +101,11 @@ async def prune_expired_exports(actor: Actor) -> None:
         description="Saves a full copy of your collection, keeping the newest.",
     )
 )
-async def create_then_prune_backups(actor: Actor) -> None:
+async def create_then_prune_backups(
+    actor: Actor, progress: ProgressReporter = NULL_PROGRESS
+) -> None:
     """Back up, then apply retention; a failed backup prunes nothing."""
-    await create_scheduled_backup(actor)
+    await create_scheduled_backup(actor, progress)
     await prune_scheduled_backups(actor)
 
 

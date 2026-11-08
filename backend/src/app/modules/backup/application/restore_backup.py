@@ -15,13 +15,14 @@ from app.modules.backup.domain.errors import (
     MediaFileMissingError,
     RestoreTargetNotEmptyError,
 )
+from app.modules.backup.ports.archive_member import ArchiveMember
 from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import UseCase
+from app.shared_kernel.progress import NULL_PROGRESS, Phase
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+    from collections.abc import AsyncGenerator, AsyncIterator
 
-    from app.modules.backup.ports.archive_member import ArchiveMember
     from app.modules.backup.ports.backup_reader import BackupReader
     from app.modules.backup.ports.backup_store import BackupStore
     from app.modules.backup.ports.backup_workspace import BackupWorkspace
@@ -29,10 +30,20 @@ if TYPE_CHECKING:
     from app.modules.backup.ports.media_files import MediaFiles
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.progress import ProgressReporter
 
 type MediaUndo = list[tuple[MediaFileRef, UUID | None]]
 
 logger = structlog.get_logger()
+
+RESTORE_PLAN = (
+    Phase(key="verify", label="Checking the backup", weight=2, unit="bytes"),
+    Phase(key="database", label="Restoring your collection", weight=3),
+    Phase(key="media", label="Restoring photos and files", weight=5),
+)
+
+# archive_manifest reads the archive twice (verify, then manifest metadata).
+MANIFEST_PASSES = 2
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -44,16 +55,57 @@ class RestoreBackupCommand:
     setup_only: bool = False
 
 
-async def archive_manifest(store: BackupStore, backup_id: UUID) -> BackupManifest:
-    """Verify all bytes before exposing the archive manifest."""
+async def start_verify_phase(
+    store: BackupStore,
+    backup_id: UUID,
+    progress: ProgressReporter,
+    *,
+    passes: int = MANIFEST_PASSES,
+) -> None:
+    """Start the `verify` phase, sized as `passes` reads of the compressed archive."""
+    await progress.start("verify", passes * await store.archive_size(backup_id))
+
+
+async def archive_manifest(
+    store: BackupStore, backup_id: UUID, progress: ProgressReporter = NULL_PROGRESS
+) -> BackupManifest:
+    """Verify all bytes before exposing the archive manifest.
+
+    Reads the archive `MANIFEST_PASSES` times, advancing the running phase.
+    """
     expected_digest = await store.archive_digest(backup_id)
-    if (await verify_archive(store, backup_id)).findings:
+    if (await verify_archive(store, backup_id, progress)).findings:
         raise CorruptBackupError("Backup failed integrity verification.")
     reader = await store.open(backup_id)
-    _, metadata, _ = await _scan(reader)
+    _, metadata, _ = await _scan(reader, progress)
     if await reader.archive_digest() != expected_digest:
         raise CorruptBackupError("The backup changed after integrity verification.")
     return parse_manifest(metadata["manifest.json"])
+
+
+async def _counting_rows(
+    chunks: AsyncIterator[bytes], progress: ProgressReporter
+) -> AsyncIterator[bytes]:
+    """Pass chunks through, advancing `progress` by the rows each one holds."""
+    async for chunk in chunks:
+        yield chunk
+        await progress.advance(chunk.count(b"\n"))
+
+
+async def _write_media(
+    ref: MediaFileRef,
+    member: ArchiveMember,
+    media: MediaFiles,
+    workspace: BackupWorkspace,
+    undo: MediaUndo,
+) -> None:
+    """Stage any file being replaced, then write the archived original."""
+    try:
+        original = await workspace.save(media.open(ref))
+    except MediaFileMissingError:
+        original = None
+    undo.append((ref, original))
+    await media.write(ref, member.chunks)
 
 
 async def transactional_media_members(
@@ -64,21 +116,34 @@ async def transactional_media_members(
     undo: MediaUndo,
     *,
     expected_digest: str | None = None,
+    progress: ProgressReporter = NULL_PROGRESS,
 ) -> AsyncGenerator[ArchiveMember]:
-    """Write media before the database consumer reaches its commit point."""
+    """Write media before the database consumer reaches its commit point.
+
+    Reports the `database` phase in rows consumed and the `media` phase in files
+    written; the caller owns the plan.
+    """
     refs = {f"media/{ref.asset_id}": ref for ref in manifest.media}
+    rows = sum(table.rows for table in manifest.tables)
+    files = sum(
+        1 for ref in manifest.media if ref.asset_id not in manifest.media_missing
+    )
+    phase = ""
     async with aclosing(reader.members()) as members:
         async for member in members:
             if member.name.startswith("data/"):
-                yield member
+                if phase != "database":
+                    phase = "database"
+                    await progress.start("database", rows)
+                yield ArchiveMember(
+                    name=member.name, chunks=_counting_rows(member.chunks, progress)
+                )
             elif member.name in refs:
-                ref = refs[member.name]
-                try:
-                    original = await workspace.save(media.open(ref))
-                except MediaFileMissingError:
-                    original = None
-                undo.append((ref, original))
-                await media.write(ref, member.chunks)
+                if phase != "media":
+                    phase = "media"
+                    await progress.start("media", files)
+                await _write_media(refs[member.name], member, media, workspace, undo)
+                await progress.advance()
             else:
                 async for _ in member.chunks:
                     pass
@@ -113,10 +178,17 @@ async def restore_verified_backup(
     *,
     replace: bool = False,
     setup_only: bool = False,
+    progress: ProgressReporter = NULL_PROGRESS,
 ) -> None:
-    """Verify and restore with reversible media writes inside the transaction."""
+    """Verify and restore with reversible media writes inside the transaction.
+
+    Reports against `RESTORE_PLAN` and ends the operation with `done()`. A failure
+    propagates; whoever owns the reporter records it with `fail()`.
+    """
+    await progress.begin(RESTORE_PLAN)
+    await start_verify_phase(store, backup_id, progress)
     expected_digest = await store.archive_digest(backup_id)
-    manifest = await archive_manifest(store, backup_id)
+    manifest = await archive_manifest(store, backup_id, progress)
     if (
         manifest.scope != BackupScope.INSTANCE
         or manifest.format != "ndjson"
@@ -141,6 +213,7 @@ async def restore_verified_backup(
                 workspace,
                 undo,
                 expected_digest=expected_digest,
+                progress=progress,
             )
         ) as members:
             await restorer.restore_instance(
@@ -151,6 +224,7 @@ async def restore_verified_backup(
         raise
     finally:
         await cleanup_media(workspace, undo)
+    await progress.done()
 
 
 class RestoreBackup(UseCase[RestoreBackupCommand, None]):
@@ -165,6 +239,7 @@ class RestoreBackup(UseCase[RestoreBackupCommand, None]):
         media: MediaFiles,
         workspace: BackupWorkspace,
         guard: AccessGuard,
+        progress: ProgressReporter | None = None,
     ) -> None:
         self._guard = guard
         self._store, self._restorer, self._media, self._workspace = (
@@ -173,6 +248,7 @@ class RestoreBackup(UseCase[RestoreBackupCommand, None]):
             media,
             workspace,
         )
+        self._progress = progress or NULL_PROGRESS
 
     async def _handle(self, request: RestoreBackupCommand, actor: Actor) -> None:
         await restore_verified_backup(
@@ -183,6 +259,7 @@ class RestoreBackup(UseCase[RestoreBackupCommand, None]):
             request.backup_id,
             replace=request.replace,
             setup_only=request.setup_only,
+            progress=self._progress,
         )
         logger.warning(
             "instance backup restored",

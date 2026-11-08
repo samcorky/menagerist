@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { restoreFirstRunArchive } from '../src/lib/backup-restore';
+import { readRestoreProgress, restoreFirstRunArchive } from '../src/lib/backup-restore';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -40,5 +40,44 @@ describe('first-run backup restore', () => {
 		const result = await restoreFirstRunArchive(new File([], 'backup.tar.gz'));
 		expect(result.ok).toBe(false);
 		if (!result.ok) expect(result.message).toContain('connection');
+	});
+});
+
+describe('restore progress', () => {
+	const snapshot = {
+		phases: [],
+		message: null,
+		percent: 40,
+		outcome: 'running'
+	};
+
+	it('reads the snapshot from the progress route', async () => {
+		let sent: Request | undefined;
+		vi.stubGlobal('fetch', async (request: Request) => {
+			sent = request;
+			return new Response(JSON.stringify(snapshot), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		});
+		expect(await readRestoreProgress()).toEqual(snapshot);
+		expect(sent?.url).toContain('/api/v1/backups/restore/progress');
+		expect(sent?.method).toBe('GET');
+	});
+
+	it('reads nothing when no restore has reported', async () => {
+		vi.stubGlobal(
+			'fetch',
+			async () =>
+				new Response('{}', { status: 404, headers: { 'Content-Type': 'application/json' } })
+		);
+		expect(await readRestoreProgress()).toBeNull();
+	});
+
+	it('reads nothing when the server cannot be reached', async () => {
+		vi.stubGlobal('fetch', async () => {
+			throw new Error('offline');
+		});
+		expect(await readRestoreProgress()).toBeNull();
 	});
 });

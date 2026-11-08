@@ -11,9 +11,11 @@ from app.modules.identity.application.purge_expired_credentials import (
 from app.platform.config.identity import get_identity_settings
 from app.platform.database import get_session_factory
 from app.shared_kernel.jobs import JobContribution, JobDefinition, job
+from app.shared_kernel.progress import NULL_PROGRESS
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.progress import ProgressReporter
 
 
 @job(
@@ -24,7 +26,9 @@ if TYPE_CHECKING:
         description="Removes sessions and access tokens that have expired.",
     )
 )
-async def purge_expired_credentials(actor: Actor) -> None:
+async def purge_expired_credentials(
+    actor: Actor, progress: ProgressReporter = NULL_PROGRESS
+) -> None:
     """Remove sessions and API tokens that have passed their expiry."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
 

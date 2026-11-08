@@ -13,9 +13,11 @@ from app.modules.scheduling.application.prune_job_runs import (
 from app.modules.scheduling.application.setting_keys import RUN_HISTORY_PER_JOB
 from app.platform.database import get_session_factory
 from app.shared_kernel.jobs import JobContribution, JobDefinition, job
+from app.shared_kernel.progress import NULL_PROGRESS
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.progress import ProgressReporter
 
 # Each worker start adds a heartbeat row under a new id; nothing else removes it.
 _WORKER_HEARTBEAT_RETENTION = timedelta(days=7)
@@ -33,7 +35,9 @@ _WORKER_HEARTBEAT_RETENTION = timedelta(days=7)
         ),
     )
 )
-async def prune_job_runs(actor: Actor) -> None:
+async def prune_job_runs(
+    actor: Actor, progress: ProgressReporter = NULL_PROGRESS
+) -> None:
     """Apply the current run quota and forget workers that have gone quiet."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
     from app.entrypoints.api.shared.settings_reader import get_settings_reader

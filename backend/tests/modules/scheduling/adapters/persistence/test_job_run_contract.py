@@ -28,6 +28,7 @@ from app.modules.scheduling.ports.job_run_queue import JobRunQueue
 from app.modules.scheduling.ports.job_run_reader import JobRunReader
 from app.modules.scheduling.ports.job_run_recorder import JobRunRecorder
 from app.shared_kernel.jobs import JobDefinition, Lane, Overlap
+from app.shared_kernel.progress import PhaseState, ProgressSnapshot
 
 
 def run_id(run: JobRun | None) -> UUID:
@@ -273,6 +274,42 @@ async def test_heartbeats_reaping_and_stale_completion(harness: QueueHarness) ->
     assert run_id(await harness.queue.claim([Lane.DEFAULT], "three", NOW)) == queued.id
     assert await harness.queue.claim([Lane.DEFAULT], "four", NOW) is None
     assert await harness.recorder.reap_abandoned(NOW, NOW) == 0
+
+
+async def test_progress_follows_the_claimant_and_is_dropped_only_on_success(
+    harness: QueueHarness,
+) -> None:
+    """The owner keeps the latest snapshot; success clears it and failure keeps it."""
+    snapshot = ProgressSnapshot(
+        phases=(
+            PhaseState(
+                key="media",
+                label="Saving photos and files",
+                state="running",
+                done=3,
+                total=10,
+            ),
+        ),
+        message=None,
+        percent=30,
+        outcome="running",
+    )
+    ok = await harness.queue.enqueue(JobRun.create(job_key="ok", scheduled_for=NOW))
+    bad = await harness.queue.enqueue(JobRun.create(job_key="bad", scheduled_for=NOW))
+    await harness.queue.claim([Lane.DEFAULT], "one", NOW)
+    await harness.queue.claim([Lane.DEFAULT], "two", NOW)
+    assert (await harness.reader.get(ok.id)).progress is None
+    with pytest.raises(LostClaimError):
+        await harness.recorder.record_progress(ok.id, "intruder", snapshot)
+    await harness.recorder.record_progress(ok.id, "one", snapshot)
+    await harness.recorder.record_progress(bad.id, "two", snapshot)
+    assert (await harness.reader.get(ok.id)).progress == snapshot
+    await harness.recorder.finish(ok.id, "one", RunStatus.SUCCEEDED, NOW)
+    await harness.recorder.finish(bad.id, "two", RunStatus.FAILED, NOW, error="boom")
+    assert (await harness.reader.get(ok.id)).progress is None
+    assert (await harness.reader.get(bad.id)).progress == snapshot
+    with pytest.raises(LostClaimError):
+        await harness.recorder.record_progress(ok.id, "one", snapshot)
 
 
 async def test_idle_worker_liveness_is_independent_of_job_runs(

@@ -1,9 +1,11 @@
 """Durable execution state, observation cursors and independent worker liveness."""
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import DateTime, Index, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.platform.database import Base
@@ -42,6 +44,7 @@ class JobRunModel(IdentifiableMixin, Base):
     heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error: Mapped[str | None]
+    progress: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
 
 class ScheduleCursorModel(Base):

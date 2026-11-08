@@ -1,4 +1,5 @@
 import type { JobResponse, JobRunResponse } from '$lib/api/client';
+import { currentPhase, phaseText, stoppedAt } from '$lib/progress';
 
 export type RunStatus = JobRunResponse['status'];
 
@@ -54,6 +55,21 @@ export function runDuration(
 	if (minutes < 60) return rest ? `${minutes} min ${rest} s` : `${minutes} min`;
 	const hours = Math.floor(minutes / 60);
 	return minutes % 60 ? `${hours} h ${minutes % 60} min` : `${hours} h`;
+}
+
+/**
+ * What a run's progress says, in words: the phase a running job is in (with
+ * counts), or where one that did not finish stopped. Null when it has nothing
+ * to add, such as a run that finished or never reported.
+ */
+export function runProgressText(run: Pick<JobRunResponse, 'status' | 'progress'>): string | null {
+	const progress = run.progress;
+	if (!progress) return null;
+	if (run.status === 'running') {
+		const phase = currentPhase(progress);
+		return phase ? phaseText(phase) : null;
+	}
+	return run.status === 'failed' || run.status === 'abandoned' ? stoppedAt(progress) : null;
 }
 
 /** Whether the run was started by a person rather than the schedule. */

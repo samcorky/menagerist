@@ -86,6 +86,73 @@ test('the setup page and its restore view fit a phone without zooming', async ({
 	}
 });
 
+// The restore request stays open until it finishes, so the page watches the progress route.
+// Both routes are answered here, which also keeps this test from changing the database.
+test('a restore shows its phases while the backup is restored', async ({ page }) => {
+	const phases = [
+		{
+			key: 'verify',
+			label: 'Checking the backup',
+			state: 'done',
+			done: 9,
+			total: 9,
+			unit: 'bytes'
+		},
+		{
+			key: 'database',
+			label: 'Restoring your collection',
+			state: 'done',
+			done: 4210,
+			total: 4210,
+			unit: 'count'
+		},
+		{
+			key: 'media',
+			label: 'Restoring photos and files',
+			state: 'running',
+			done: 1240,
+			total: 2000,
+			unit: 'count'
+		}
+	];
+	let finish!: () => void;
+	const held = new Promise<void>((resolve) => (finish = resolve));
+	await page.route('**/api/v1/backups/restore', async (route) => {
+		if (route.request().method() !== 'POST') return route.fallback();
+		await held;
+		await route.fulfill({ status: 400, json: { detail: 'unverified' } });
+	});
+	await page.route('**/api/v1/backups/restore/progress', (route) =>
+		route.fulfill({ json: { phases, message: null, percent: 81, outcome: 'running' } })
+	);
+
+	await page.goto('/setup');
+	await page.getByRole('button', { name: 'Restore from backup instead' }).click();
+	await page.getByLabel('Backup file').setInputFiles({
+		name: 'backup.tar.gz',
+		mimeType: 'application/gzip',
+		buffer: Buffer.from('backup')
+	});
+	await page.getByRole('button', { name: 'Restore backup', exact: true }).click();
+
+	const bar = page.getByRole('progressbar', { name: 'Restore progress' });
+	await expect(bar).toHaveAttribute('aria-valuenow', '81');
+	await expect(page.getByText('81%')).toBeVisible();
+	const steps = page.getByRole('list', { name: 'Steps' });
+	await expect(steps.getByRole('listitem')).toHaveCount(3);
+	await expect(steps.getByRole('listitem').nth(0)).toContainText('Checking the backup');
+	await expect(steps.getByRole('listitem').nth(0)).toContainText('Done');
+	await expect(steps.getByRole('listitem').nth(2)).toContainText('(1,240 of 2,000)');
+	await expect(steps.getByRole('listitem').nth(2)).toContainText('In progress');
+	await expect(page.getByText('Restoring photos and files').first()).toBeVisible();
+
+	finish();
+	await expect(
+		page.getByText('This backup could not be verified.', { exact: false })
+	).toBeVisible();
+	await expect(bar).toHaveCount(0);
+});
+
 /** No sideways scroll, and no text field under 16px (iOS Safari zooms in on those). */
 async function expectFitsAndReadable(page: Page, width: number, view: string) {
 	const m = await page.evaluate(() => ({

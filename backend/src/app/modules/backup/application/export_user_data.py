@@ -19,6 +19,7 @@ from app.modules.backup.ports.user_database_snapshot import UserDatabaseSnapshot
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.progress import NULL_PROGRESS, Phase
 
 if TYPE_CHECKING:
     from app.modules.backup.domain.backup import MediaFileRef
@@ -27,8 +28,15 @@ if TYPE_CHECKING:
     from app.modules.backup.ports.media_files import MediaFiles
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.progress import ProgressReporter
 
 logger = structlog.get_logger()
+
+EXPORT_PLAN = (
+    Phase(key="database", label="Saving your items", weight=3),
+    Phase(key="media", label="Saving photos and files", weight=5),
+    Phase(key="verify", label="Checking the export", weight=2, unit="bytes"),
+)
 
 
 async def prune_user_exports(store: BackupStore, *, older_than: datetime) -> list[UUID]:
@@ -62,11 +70,13 @@ class ExportUserData(
         *,
         app_version: str,
         ttl_hours: int = 24,
+        progress: ProgressReporter | None = None,
     ) -> None:
         super().__init__(snapshot, guard)
         self._store, self._snapshot, self._media = store, snapshot, media
         self._app_version = app_version
         self._ttl = timedelta(hours=ttl_hours)
+        self._progress = progress or NULL_PROGRESS
 
     async def _add_media(
         self, writer: BackupWriter, refs: list[MediaFileRef]
@@ -84,6 +94,7 @@ class ExportUserData(
                     raise CorruptBackupError(
                         "A media original has an incorrect hash or size."
                     )
+            await self._progress.advance()
         return missing
 
     async def _handle(
@@ -96,7 +107,9 @@ class ExportUserData(
             scope = ContentFilter.of(actor.id)
         await prune_user_exports(self._store, older_than=datetime.now(UTC) - self._ttl)
         writer = await self._store.begin(uuid7())
+        await self._progress.begin(EXPORT_PLAN)
         try:
+            await self._progress.start("database")
             tables = []
             async with aclosing(self._snapshot.export(scope=scope)) as members:
                 async for member in members:
@@ -111,6 +124,7 @@ class ExportUserData(
                         )
                     )
             refs = await self._media.list_files()
+            await self._progress.start("media", len(refs))
             missing = await self._add_media(writer, refs)
             stored = await writer.finish(
                 BackupManifest(
@@ -126,7 +140,11 @@ class ExportUserData(
                     media_missing=missing,
                 )
             )
-            if (await verify_archive(self._store, stored.summary.id)).findings:
+            await self._progress.start("verify", stored.summary.size)
+            report = await verify_archive(
+                self._store, stored.summary.id, self._progress
+            )
+            if report.findings:
                 await self._store.delete(stored.summary.id)
                 raise CorruptBackupError(
                     "The new export failed integrity verification."
@@ -134,6 +152,7 @@ class ExportUserData(
         except BaseException:
             await writer.abort()
             raise
+        await self._progress.done()
         logger.info(
             "user data exported", actor_id=actor.id, backup_id=stored.summary.id
         )

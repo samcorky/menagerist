@@ -17,6 +17,7 @@ from app.modules.backup.domain.backup import (
 from app.modules.backup.domain.errors import CorruptBackupError, MediaFileMissingError
 from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import UseCase
+from app.shared_kernel.progress import NULL_PROGRESS, Phase
 
 if TYPE_CHECKING:
     from app.modules.backup.ports.backup_store import BackupStore
@@ -25,8 +26,17 @@ if TYPE_CHECKING:
     from app.modules.backup.ports.media_files import MediaFiles
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.progress import ProgressReporter
 
 logger = structlog.get_logger()
+
+CREATE_PLAN = (
+    Phase(key="database", label="Saving your collection", weight=3),
+    Phase(key="media", label="Saving photos and files", weight=5),
+)
+VERIFY_PHASE = Phase(
+    key="verify", label="Checking the new backup", weight=2, unit="bytes"
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -52,12 +62,14 @@ class CreateBackup(UseCase[CreateBackupCommand, BackupSummary]):
         guard: AccessGuard,
         *,
         app_version: str,
+        progress: ProgressReporter | None = None,
     ) -> None:
         self._guard = guard
         self._store = store
         self._snapshot = snapshot
         self._media = media
         self._app_version = app_version
+        self._progress = progress or NULL_PROGRESS
 
     async def _add_media(
         self, writer: BackupWriter, refs: list[MediaFileRef]
@@ -76,6 +88,7 @@ class CreateBackup(UseCase[CreateBackupCommand, BackupSummary]):
                     raise CorruptBackupError(
                         f"Media {ref.asset_id} has an incorrect hash or size."
                     )
+            await self._progress.advance()
         return missing
 
     async def _handle(
@@ -84,7 +97,11 @@ class CreateBackup(UseCase[CreateBackupCommand, BackupSummary]):
         revision = await self._snapshot.schema_revision()
         backup_id = uuid7()
         writer = await self._store.begin(backup_id)
+        await self._progress.begin(
+            (*CREATE_PLAN, VERIFY_PHASE) if request.verify else CREATE_PLAN
+        )
         try:
+            await self._progress.start("database")
             tables = []
             async with aclosing(self._snapshot.export()) as members:
                 async for member in members:
@@ -99,6 +116,7 @@ class CreateBackup(UseCase[CreateBackupCommand, BackupSummary]):
                         )
                     )
             refs = await self._media.list_files()
+            await self._progress.start("media", len(refs))
             missing = await self._add_media(writer, refs)
             stored = await writer.finish(
                 BackupManifest(
@@ -115,7 +133,8 @@ class CreateBackup(UseCase[CreateBackupCommand, BackupSummary]):
                 )
             )
             if request.verify:
-                report = await verify_archive(self._store, backup_id)
+                await self._progress.start("verify", stored.summary.size)
+                report = await verify_archive(self._store, backup_id, self._progress)
                 if report.findings:
                     await self._store.delete(backup_id)
                     raise CorruptBackupError(
@@ -124,6 +143,7 @@ class CreateBackup(UseCase[CreateBackupCommand, BackupSummary]):
         except BaseException:
             await writer.abort()
             raise
+        await self._progress.done()
         logger.info(
             "instance backup created",
             backup_id=backup_id,

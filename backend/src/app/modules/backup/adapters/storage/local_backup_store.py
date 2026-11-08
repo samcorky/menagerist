@@ -66,6 +66,11 @@ class LocalDirectoryBackupStore:
         finally:
             await asyncio.to_thread(stream.close)
 
+    async def archive_size(self, backup_id: UUID) -> int:
+        """Return the compressed archive's size on disk."""
+        path = await asyncio.to_thread(self._require, backup_id)
+        return (await asyncio.to_thread(path.stat)).st_size
+
     async def archive_digest(self, backup_id: UUID) -> str | None:
         """Read the independent whole-archive SHA-256 sidecar."""
         await asyncio.to_thread(self._require, backup_id)

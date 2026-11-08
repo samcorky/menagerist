@@ -18,9 +18,11 @@ from app.platform.app_info import load_app_info
 from app.platform.config.release import get_release_settings
 from app.platform.database import get_session_factory
 from app.shared_kernel.jobs import JobContribution, JobDefinition, Overlap, job
+from app.shared_kernel.progress import NULL_PROGRESS
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.progress import ProgressReporter
 
 
 def release_provider() -> GitHubReleaseProvider:
@@ -37,7 +39,9 @@ def release_provider() -> GitHubReleaseProvider:
         description="Looks for a newer Menagerist release on GitHub.",
     )
 )
-async def check_for_updates(actor: Actor) -> None:
+async def check_for_updates(
+    actor: Actor, progress: ProgressReporter = NULL_PROGRESS
+) -> None:
     """Look for a newer release and keep the answer for the Status page."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
     from app.entrypoints.api.shared.settings_reader import get_settings_reader

@@ -23,11 +23,13 @@
 	import { coreForProp } from '$lib/field-types';
 	import { explainCron } from '$lib/field-types/cron/explain';
 	import { formatDateTime } from '$lib/format-date';
+	import { percentOf } from '$lib/progress';
 	import {
 		isActive,
 		lastRunLabel,
 		nextRunLabel,
 		runDuration,
+		runProgressText,
 		runStatusLabel,
 		runTone,
 		scheduleLabel,
@@ -45,6 +47,7 @@
 	} from '$lib/settings-form';
 	import BackButton from '$lib/components/back-button.svelte';
 	import DataTable from '$lib/components/data-table.svelte';
+	import ProgressBar from '$lib/components/progress-bar.svelte';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Badge, type BadgeVariant } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -426,13 +429,24 @@
 {/snippet}
 
 {#snippet lastRun(job: JobResponse)}
+	{@const live = activeRun(job)}
+	{#if live?.progress}
+		<div class="mb-2 space-y-1">
+			<ProgressBar compact percent={percentOf(live.progress)} label={`Progress of ${job.title}`} />
+			<p class="text-xs text-muted-foreground">{runProgressText(live)}</p>
+		</div>
+	{/if}
 	{#if job.last_run}
+		{@const stopped = runProgressText(job.last_run)}
 		<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
 			<Badge variant={badgeVariant(job.last_run.status)}>
 				{runStatusLabel(job.last_run.status)}
 			</Badge>
 			<span class="text-muted-foreground">{lastRunLabel(job.last_run, formatWhen)}</span>
 		</div>
+		{#if stopped}
+			<p class="mt-1 text-xs text-muted-foreground">{stopped}</p>
+		{/if}
 	{:else}
 		<span class="text-muted-foreground">Never run</span>
 	{/if}
@@ -529,6 +543,9 @@
 								{startedByHand(run) ? 'Started by an administrator' : 'On schedule'}
 							</span>
 						</div>
+						{#if runProgressText(run)}
+							<p class="text-xs text-muted-foreground">{runProgressText(run)}</p>
+						{/if}
 						{#if run.error && (run.status === 'failed' || run.status === 'abandoned')}
 							<details class="text-xs text-muted-foreground">
 								<summary class="cursor-pointer">Details</summary>
