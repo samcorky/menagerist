@@ -17,6 +17,7 @@ from app.modules.backup.adapters.storage.local_backup_store import (
 from app.modules.backup.adapters.storage.local_backup_workspace import (
     LocalBackupWorkspace,
 )
+from app.modules.backup.domain.errors import BackupStorageError
 from app.platform.config.backup import get_backup_settings
 
 if TYPE_CHECKING:
@@ -127,3 +128,36 @@ async def test_a_configured_staging_path_gets_a_folder_of_its_own(
     )
     assert removed == [str(staged)]
     assert (neighbour / "data").read_bytes() == b"keep me"
+
+
+async def test_a_symlinked_staging_folder_is_refused(tmp_path: Path) -> None:
+    """A planted symlink must not redirect staged bytes somewhere else."""
+    target = tmp_path / "elsewhere"
+    target.mkdir()
+    link = tmp_path / "scratch"
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlinks need privileges on this platform")
+    workspace = LocalBackupWorkspace(tmp_path / "backups", staging=link)
+
+    with pytest.raises(BackupStorageError):
+        await workspace.save(_chunks())
+    assert list(target.iterdir()) == []
+
+
+async def test_cleanup_does_not_follow_a_symlink_in_staging(tmp_path: Path) -> None:
+    """A link in the staging folder is left alone, and so is what it points at."""
+    scratch, target = tmp_path / "scratch", tmp_path / "precious"
+    scratch.mkdir()
+    target.mkdir()
+    (target / "data").write_bytes(b"keep")
+    try:
+        (scratch / "link").symlink_to(target, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlinks need privileges on this platform")
+    _age(target)
+    store = LocalDirectoryBackupStore(tmp_path / "backups", workspace_staging=scratch)
+
+    assert await store.cleanup_orphans(before=datetime.now(UTC), dry_run=False) == []
+    assert (target / "data").read_bytes() == b"keep"

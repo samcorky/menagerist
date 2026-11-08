@@ -208,7 +208,7 @@ class LocalDirectoryBackupStore:
             directories.append(self._workspace_staging)
         candidates = [entry for folder in directories for entry in folder.glob("*")]
         for path in candidates:
-            if not self._inactive(path):
+            if path.is_symlink() or not self._inactive(path):
                 continue
             try:
                 entries = [path, *path.rglob("*")] if path.is_dir() else [path]
