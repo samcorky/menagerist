@@ -1,6 +1,5 @@
 """Thin Cyclopts adapters for registered jobs."""
 
-import asyncio
 from typing import TYPE_CHECKING
 
 from cyclopts import App
@@ -82,8 +81,10 @@ def run(job_key: str) -> Report:
 
 
 def _run_operation[T](operation: Awaitable[T]) -> T:
+    from app.platform.database import run_async
+
     try:
-        return asyncio.run(operation)
+        return run_async(operation)
     except DomainError as error:
         job_app.error_console.print(Text(str(error)), style="red")
         raise SystemExit(1) from error
