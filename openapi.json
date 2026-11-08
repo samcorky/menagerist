@@ -22798,6 +22798,37 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProgressSnapshotResponse"
+                },
+                "example": {
+                  "phases": [
+                    {
+                      "key": "verify",
+                      "label": "Checking the backup",
+                      "state": "done",
+                      "done": 2097152,
+                      "total": 2097152,
+                      "unit": "bytes"
+                    },
+                    {
+                      "key": "database",
+                      "label": "Restoring your collection",
+                      "state": "done",
+                      "done": 4210,
+                      "total": 4210,
+                      "unit": "count"
+                    },
+                    {
+                      "key": "media",
+                      "label": "Restoring photos and files",
+                      "state": "running",
+                      "done": 1240,
+                      "total": 2000,
+                      "unit": "count"
+                    }
+                  ],
+                  "message": "Restoring photos and files",
+                  "percent": 81,
+                  "outcome": "running"
                 }
               }
             }
@@ -26316,14 +26347,6 @@
           }
         ]
       },
-      "Outcome": {
-        "type": "string",
-        "enum": [
-          "running",
-          "succeeded",
-          "failed"
-        ]
-      },
       "Overlap": {
         "type": "string",
         "enum": [
@@ -26561,18 +26584,28 @@
         "properties": {
           "key": {
             "type": "string",
-            "title": "Key"
+            "title": "Key",
+            "description": "Stable identifier of the phase within its plan."
           },
           "label": {
             "type": "string",
-            "title": "Label"
+            "title": "Label",
+            "description": "What the phase is doing, in plain words."
           },
           "state": {
-            "$ref": "#/components/schemas/PhaseStatus"
+            "type": "string",
+            "enum": [
+              "waiting",
+              "running",
+              "done"
+            ],
+            "title": "State",
+            "description": "Whether the phase is waiting, running or done."
           },
           "done": {
             "type": "integer",
-            "title": "Done"
+            "title": "Done",
+            "description": "Units finished so far in this phase."
           },
           "total": {
             "anyOf": [
@@ -26583,10 +26616,17 @@
                 "type": "null"
               }
             ],
-            "title": "Total"
+            "title": "Total",
+            "description": "Units in the phase, or null while the total is not known yet."
           },
           "unit": {
-            "$ref": "#/components/schemas/Unit"
+            "type": "string",
+            "enum": [
+              "count",
+              "bytes"
+            ],
+            "title": "Unit",
+            "description": "What `done` and `total` count: `count` for items such as files or rows, `bytes` for data read."
           }
         },
         "type": "object",
@@ -26609,14 +26649,6 @@
             "total": 2000,
             "unit": "count"
           }
-        ]
-      },
-      "PhaseStatus": {
-        "type": "string",
-        "enum": [
-          "waiting",
-          "running",
-          "done"
         ]
       },
       "PresetPermission": {
@@ -26724,7 +26756,8 @@
               "$ref": "#/components/schemas/PhaseProgressResponse"
             },
             "type": "array",
-            "title": "Phases"
+            "title": "Phases",
+            "description": "Every planned phase in order, each with its own progress."
           },
           "message": {
             "anyOf": [
@@ -26735,14 +26768,23 @@
                 "type": "null"
               }
             ],
-            "title": "Message"
+            "title": "Message",
+            "description": "What is happening now, or why the operation failed. Null when there is nothing to add."
           },
           "percent": {
             "type": "integer",
-            "title": "Percent"
+            "title": "Percent",
+            "description": "Overall completion from 0 to 100, weighting each phase."
           },
           "outcome": {
-            "$ref": "#/components/schemas/Outcome"
+            "type": "string",
+            "enum": [
+              "running",
+              "succeeded",
+              "failed"
+            ],
+            "title": "Outcome",
+            "description": "Whether the operation is running, has succeeded or has failed."
           }
         },
         "type": "object",
@@ -27702,13 +27744,6 @@
               "relationship_types": 2
             }
           }
-        ]
-      },
-      "Unit": {
-        "type": "string",
-        "enum": [
-          "count",
-          "bytes"
         ]
       },
       "UpdateCollectionRequest": {

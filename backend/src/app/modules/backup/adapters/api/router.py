@@ -18,7 +18,10 @@ from app.entrypoints.api.shared.http.upload_limit_middleware import (
     PAYLOAD_TOO_LARGE_RESPONSE,
 )
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
-from app.entrypoints.api.shared.progress_schemas import ProgressSnapshotResponse
+from app.entrypoints.api.shared.progress_schemas import (
+    SNAPSHOT_EXAMPLE,
+    ProgressSnapshotResponse,
+)
 from app.modules.backup.adapters.api.dependencies import (
     get_create_backup,
     get_delete_backup,
@@ -205,11 +208,14 @@ async def restore_instance(
     "/restore/progress",
     response_model=ProgressSnapshotResponse,
     operation_id="get_restore_progress",
-    responses=error_response(
-        RestoreProgressNotFoundError,
-        detail="No restore is in progress.",
-        description="No restore has reported progress in the last few minutes.",
-    ),
+    responses={
+        200: {"content": {"application/json": {"example": SNAPSHOT_EXAMPLE}}},
+        **error_response(
+            RestoreProgressNotFoundError,
+            detail="No restore is in progress.",
+            description="No restore has reported progress in the last few minutes.",
+        ),
+    },
 )
 async def get_restore_progress_snapshot(
     use_case: Annotated[GetRestoreProgress, Depends(get_restore_progress)],
