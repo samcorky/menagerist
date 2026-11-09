@@ -183,11 +183,11 @@ def check_hardening(client: docker.DockerClient) -> None:
         raise SmokeTestError(f"expected capabilities dropped (ALL), got {cap_drop!r}")
 
     # The Engine API reports capabilities back with the `CAP_` prefix
-    # normalized on, even though compose.yaml (and `docker compose`) accept
+    # normalised on, even though compose.yaml (and `docker compose`) accept
     # the bare name.
     cap_add = host_config.get("CapAdd") or []
-    if "CAP_NET_BIND_SERVICE" not in cap_add:
-        raise SmokeTestError(f"expected NET_BIND_SERVICE added back, got {cap_add!r}")
+    if len(cap_add) > 0:
+        raise SmokeTestError(f"expected no capabilities added back, got {cap_add!r}")
 
     security_opt = host_config.get("SecurityOpt") or []
     if "no-new-privileges:true" not in security_opt:
