@@ -7,8 +7,6 @@ x-app: &app
     - no-new-privileges:true
   cap_drop:
     - ALL
-  cap_add:
-    - NET_BIND_SERVICE
   tmpfs:
     - /tmp:mode=1700,size=512M,noexec,nosuid,nodev,uid=1000,gid=1000
     - /var/run:mode=1700,size=16M,noexec,nosuid,nodev,uid=1000,gid=1000
