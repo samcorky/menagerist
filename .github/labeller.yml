@@ -33,6 +33,21 @@
           - "frontend/src/lib/auth*"
           - "frontend/src/lib/api/auth-*"
 
+# Container images and how they are run; the compose files and Dockerfile sit at the
+# repository root, so neither backend/** nor frontend/** catches them.
+"area: deployment":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "Dockerfile*"
+          - "docker-bake.hcl"
+          - "compose*.yaml"
+          - "scripts/compose/**"
+          - "scripts/smoke_test.py"
+          - "scripts/proxy_test.py"
+          - "scripts/proxy_test/**"
+          - "scripts/image_*.py"
+          - "scripts/measure_image_size.py"
+
 documentation:
   - changed-files:
       - any-glob-to-any-file:

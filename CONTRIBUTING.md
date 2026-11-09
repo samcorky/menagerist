@@ -379,7 +379,7 @@ Generated release notes group pull requests by label (`.github/release.yml`), so
 | `security` | `security:` or a `(security)` scope | Security |
 | `dependencies` | Dependency updates | Dependencies |
 | `maintenance`, `tests`, `CI/CD`, `documentation` | `chore:`, `refactor:`, `build:`, `test:`, `ci:`, `docs:` and matching files | Housekeeping |
-| `area: backend`, `area: frontend` | Files under `backend/` or `frontend/` changed (area only; added automatically) | none |
+| `area: backend`, `area: frontend`, `area: deployment` | Files under `backend/` or `frontend/`, or the Dockerfile, compose files and image scripts, changed (area only; added automatically) | none |
 | `skip-release-notes` | Leave the pull request out; add by hand | none |
 
 A pull request appears under the first section it matches, in the order above; one with no label lands under "Other changes". Renovate follows the same titles: `chore(deps):` for dependencies, `ci(deps):` for GitHub Actions, `build(deps):` for Docker images and the build system, and `fix(security):` for vulnerability updates, so its pull requests are labelled like any other.
