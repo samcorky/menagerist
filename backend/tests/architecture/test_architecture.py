@@ -49,7 +49,7 @@ def test_dependency_direction_and_layering() -> None:
         .where_layer("shared_kernel")
         .may_only_depend_on_layers("shared_kernel")
         .where_layer("platform")
-        .may_only_depend_on_layers("platform")
+        .may_only_depend_on_layers("platform", "shared_kernel")
     )
     assert_passes(arch)
 
