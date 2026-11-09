@@ -1,4 +1,4 @@
-from app.shared_kernel.log_safe import loggable
+from app.shared_kernel.log_safe import escape_controls, loggable
 
 
 def test_plain_text_is_unchanged() -> None:
@@ -17,3 +17,9 @@ def test_long_text_is_cut_and_marked() -> None:
     """Text over the limit is truncated with an ellipsis."""
     assert loggable("x" * 10, limit=4) == "xxxx..."
     assert loggable("x" * 4, limit=4) == "xxxx"
+
+
+def test_layout_can_be_kept_while_other_controls_are_escaped() -> None:
+    """Newlines and tabs survive for multi-line text; escape sequences do not."""
+    assert escape_controls("a\n\tb\x1b", keep_layout=True) == "a\n\tb\\x1b"
+    assert escape_controls("a\n\tb\x1b") == "a\\x0a\\x09b\\x1b"

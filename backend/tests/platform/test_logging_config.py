@@ -1,4 +1,5 @@
 import io
+import json
 import logging
 import re
 import sys
@@ -204,3 +205,76 @@ def test_a_log_line_during_a_live_bar_prints_above_it(
     before = terminal.getvalue().split("instance backup restored")[0]
     # The bar's last text (its elapsed time), then an erase of that line, then the log.
     assert re.search(r"\d:\d{2}:\d{2}\r\x1b\[2K[^\r\n]*\[warning", before)
+
+
+def _no_colour(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the renderer's own colour codes out of the output under test."""
+    monkeypatch.setenv("NO_COLOR", "1")
+
+
+def test_console_output_shows_control_characters_as_visible_escapes(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A client-supplied escape sequence or newline cannot reach the terminal raw."""
+    _no_colour(monkeypatch)
+    configure_logging(level="INFO")
+
+    structlog.get_logger("test").info("saw \x1b[31mred\x1b[0m", path="/a\nforged line")
+
+    out = capsys.readouterr().out
+    assert "\x1b" not in out
+    assert r"saw \x1b[31mred\x1b[0m" in out
+    assert "x0aforged line" in out  # a keyword value is shown via repr, after escaping
+    assert out.count("\n") == 1
+
+
+def test_console_output_escapes_foreign_stdlib_records(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Records from other libraries get the same treatment as structlog ones."""
+    _no_colour(monkeypatch)
+    configure_logging(level="INFO")
+
+    logging.getLogger("granian.access").info("GET /\x1b]0;pwned\x07")
+
+    out = capsys.readouterr().out
+    assert "\x1b" not in out
+    assert "\x07" not in out
+    assert r"\x1b]0;pwned\x07" in out
+
+
+def test_console_output_keeps_traceback_lines_but_escapes_controls_in_them(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A traceback stays multi-line and readable; an escape in its message is shown."""
+    _no_colour(monkeypatch)
+    configure_logging(level="INFO")
+
+    try:
+        raise ValueError("bad \x1b[2J input")
+    except ValueError:
+        structlog.get_logger("test").exception("failed")
+
+    out = capsys.readouterr().out
+    assert "\x1b" not in out
+    assert r"ValueError: bad \x1b[2J input" in out
+    assert "Traceback" in out
+    assert out.count("\n") > 3
+
+
+def test_json_output_is_left_to_the_json_encoder(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """JSON already escapes controls, so the console escaper must not double-escape."""
+    monkeypatch.setattr(
+        logging_config,
+        "get_logging_settings",
+        lambda: LoggingSettings(json_output=True),
+    )
+    configure_logging(level="INFO")
+
+    structlog.get_logger("test").info("saw \x1b[0m")
+
+    out = capsys.readouterr().out
+    assert json.loads(out)["event"] == "saw \x1b[0m"
+    assert r"\u001b[0m" in out

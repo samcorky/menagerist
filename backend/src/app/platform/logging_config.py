@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from app.platform.config import get_logging_settings, get_terminal_settings
+from app.shared_kernel.log_safe import escape_controls
 
 if TYPE_CHECKING:
     from typing import TextIO
@@ -51,6 +52,28 @@ def _expand_access_log_fields(
         # Redundant with the `timestamp` key TimeStamper adds to every record.
         event_dict.pop("time", None)
     return event_dict
+
+
+# Keys whose text is multi-line by design (rendered tracebacks).
+_MULTILINE_KEYS = frozenset({"exception", "stack"})
+
+
+def _escape_control_characters(
+    logger: logging.Logger | None,
+    method_name: str,
+    event_dict: structlog.types.EventDict,
+) -> structlog.types.EventDict:
+    """Escape control characters in string values, so a line cannot drive a terminal.
+
+    Runs only before the console renderer: JSON output already escapes them. Call
+    sites that log client text still cap its length with `loggable()`.
+    """
+    return {
+        key: escape_controls(value, keep_layout=key in _MULTILINE_KEYS)
+        if isinstance(value, str)
+        else value
+        for key, value in event_dict.items()
+    }
 
 
 _configured = False
@@ -115,17 +138,25 @@ def configure_logging(
     )
 
     if settings.json_output:
-        renderer: structlog.types.Processor = structlog.processors.JSONRenderer()
+        renderers: list[structlog.types.Processor] = [
+            structlog.processors.JSONRenderer()
+        ]
     else:
         # https://no-color.org/
         colors_enabled = get_terminal_settings().colour
-        renderer = structlog.dev.ConsoleRenderer(
-            colors=colors_enabled,
-            force_colors=colors_enabled,
-            sort_keys=False,
-        )
+        renderers = [
+            _escape_control_characters,
+            structlog.dev.ConsoleRenderer(
+                colors=colors_enabled,
+                force_colors=colors_enabled,
+                sort_keys=False,
+            ),
+        ]
     formatter = structlog.stdlib.ProcessorFormatter(
-        processor=renderer,
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            *renderers,
+        ],
         foreign_pre_chain=shared_processors,
         pass_foreign_args=True,
     )
