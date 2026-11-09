@@ -20,7 +20,7 @@ dependencies = [
     "filetype>=1.2.0",
     "Pillow>=13.0.0",
     "jsonschema>=4.26.0",
-    "cronsim>=2.7",
+    "cronsim>=2.8",
     "httpx2>=2.16.0",
     "starlette-compress>=2.0.0",
 ]
