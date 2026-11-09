@@ -101,11 +101,13 @@ jobs:
             });
             // `area: ...` labels say where a change is, not what it is, so they do not count.
             const kinds = labels.filter((l) => !l.name.startsWith('area: '));
+            const found = labels.length ? labels.map((l) => l.name).join(', ') : 'none';
             if (kinds.length === 0) {
               core.setFailed(
-                'Add a label for the kind of change, or start the title with a ' +
-                  'conventional-commit prefix (feat:, fix:, docs:, ...). See "Labels and ' +
-                  'release notes" in CONTRIBUTING.md.',
+                `This pull request has no label for the kind of change (labels found: ${found}). ` +
+                  '"area: ..." labels only say where a change is, so they do not count. ' +
+                  'Start the title with a conventional-commit prefix (feat:, fix:, docs:, ...) ' +
+                  'or add a label by hand. See "Labels and release notes" in CONTRIBUTING.md.',
               );
             } else {
               core.info(`Labels: ${labels.map((l) => l.name).join(', ')}`);
