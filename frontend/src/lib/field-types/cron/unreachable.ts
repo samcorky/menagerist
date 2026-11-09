@@ -2,6 +2,9 @@
  * The two ways a well-formed schedule can still be refused by the server: a range that runs
  * backwards (5-1, FRI-MON) and a day of the month that no chosen month has (31 February). The
  * rest of the grammar is cronstrue's to check.
+ *
+ * Like cron (and cronsim 2.8), a day of the month and a day of the week that are both set mean
+ * "either", so `0 3 31 2 1` still runs on Mondays in February and is accepted.
  */
 
 const MONTH_NAMES = [
@@ -70,6 +73,8 @@ export function unreachableReason(parts: string[]): string | null {
 		}
 		found[part.label] = result.values;
 	}
+	// Either field starting with `*` makes cron require both to match; otherwise the weekday can run alone.
+	if (!parts[2].startsWith('*') && !parts[4].startsWith('*')) return null;
 	const days = found[DAY.label];
 	const fits = [...found[MONTH.label]].some((month) =>
 		[...days].some((day) => day <= MONTH_LENGTHS[month - 1])

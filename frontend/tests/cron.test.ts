@@ -311,7 +311,7 @@ describe('explainCron on schedules the server refuses', () => {
 		expect(!reading.ok && reading.reason).toMatch(reason);
 	});
 
-	it.each(['0 0 29 2 *', '0 0 31 2-3 *', '0 0 L * *', '0 0 * * 1#2', '0 0 * * 0-7'])(
+	it.each(['0 0 29 2 *', '0 0 31 2-3 *', '0 0 L * *', '0 0 * * 1#2', '0 0 * * 0-7', '0 3 31 2 1'])(
 		'still reads %s',
 		(expression) => {
 			expect(explainCron(expression).ok).toBe(true);
